@@ -963,7 +963,7 @@ where
             .or_insert_with(move || {
                 let root_env_dir = self.root_env_dir.as_ref();
                 let keystore = self.keystore.clone();
-                EnvWrite::open(root_env_dir, DbKind::P2p(space), keystore)
+                EnvWrite::open(root_env_dir, DbKind::P2pState(space), keystore)
                     .expect("failed to open p2p_store database")
             })
             .clone()
@@ -1015,11 +1015,11 @@ pub fn integration_dump(vault: &EnvRead) -> ConductorApiResult<IntegrationStateD
         )?;
         let validation_limbo = txn.query_row(
             "
-                SELECT count(hash) FROM DhtOp 
-                WHERE when_integrated IS NULL 
+                SELECT count(hash) FROM DhtOp
+                WHERE when_integrated IS NULL
                 AND (
                     (is_authored = 1 AND validation_stage IS NOT NULL AND validation_stage < 3)
-                    OR 
+                    OR
                     (is_authored = 0 AND (validation_stage IS NULL OR validation_stage < 3))
                 )
                 ",

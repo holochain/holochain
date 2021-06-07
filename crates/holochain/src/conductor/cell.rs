@@ -230,6 +230,10 @@ impl Cell {
                 // store lives.
                 unreachable!()
             }
+            PutMetricDatum { .. } | QueryMetrics { .. } => {
+                // Same goes for metrics
+                unreachable!()
+            }
             CallRemote {
                 span_context: _,
                 from_agent,

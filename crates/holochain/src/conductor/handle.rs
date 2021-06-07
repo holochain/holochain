@@ -51,12 +51,15 @@ use super::p2p_store::put_agent_info_signed;
 use super::p2p_store::query_agent_info_signed;
 use super::Cell;
 use super::Conductor;
+use crate::conductor::p2p_metrics::put_metric_datum;
+use crate::conductor::p2p_metrics::query_metrics;
 use crate::core::workflow::ZomeCallResult;
 use crate::core::{queue_consumer::InitialQueueTriggers, ribosome::real_ribosome::RealRibosome};
 use derive_more::From;
 use futures::future::FutureExt;
 use futures::StreamExt;
 use holochain_conductor_api::InstalledAppInfo;
+use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_p2p::DnaHashExt;
 use holochain_p2p::HolochainP2pCellT;
@@ -412,6 +415,24 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
+            PutMetricDatum {
+                respond,
+                agent,
+                metric,
+                timestamp,
+                ..
+            } => {
+                let env = { self.conductor.read().await.p2p_env(space) };
+                let res = put_metric_datum(env, agent, metric, timestamp)
+                    .map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
+            }
+            QueryMetrics { respond, query, .. } => {
+                let env = { self.conductor.read().await.p2p_env(space) };
+                let res =
+                    query_metrics(env, query).map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
+            }
             SignNetworkData { respond, data, .. } => {
                 let signature = cell_id
                     .agent_pubkey()
@@ -419,7 +440,17 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                     .await?;
                 respond.respond(Ok(async move { Ok(signature) }.boxed().into()));
             }
-            _ => {
+
+            HolochainP2pEvent::CallRemote { .. }
+            | Publish { .. }
+            | GetValidationPackage { .. }
+            | Get { .. }
+            | GetMeta { .. }
+            | GetLinks { .. }
+            | GetAgentActivity { .. }
+            | ValidationReceiptReceived { .. }
+            | FetchOpHashesForConstraints { .. }
+            | FetchOpHashData { .. } => {
                 let cell = self.cell_by_id(cell_id).await?;
                 cell.handle_holochain_p2p_event(event).await?;
             }
