@@ -25,6 +25,7 @@ fn simple_crud_zome() -> InlineZome {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "This doesn't work without proper publishes"]
 async fn test_validation_receipt() {
     let _g = observability::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;

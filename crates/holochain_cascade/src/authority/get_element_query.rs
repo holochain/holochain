@@ -113,11 +113,14 @@ impl Query for GetElementOpsQuery {
     where
         S: Store,
     {
-        let entry_hash = state
-            .header
-            .as_ref()
-            .and_then(|wire_op| wire_op.data.0.entry_hash());
-        if let Some(entry_hash) = entry_hash {
+        let entry_hash = state.header.as_ref().and_then(|wire_op| {
+            wire_op
+                .data
+                .0
+                .entry_data()
+                .map(|(hash, et)| (hash, et.visibility()))
+        });
+        if let Some((entry_hash, holochain_zome_types::EntryVisibility::Public)) = entry_hash {
             let entry = stores.get_entry(entry_hash)?;
             state.entry = entry;
         }
