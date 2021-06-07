@@ -278,10 +278,13 @@ impl SimpleBloomMod {
 
     /// Get metrics data via event channel in the form of NodeInfo
     // TODO: remove NodeInfo
-    async fn get_metric(
+    async fn get_metric_info(
         &self,
         agents: Vec<Arc<KitsuneAgent>>,
     ) -> KitsuneP2pResult<Option<NodeInfo>> {
+        // We pick an arbitrary agent for now, since in a full-sync situation,
+        // any agent should have the same data as any other agent.
+        // TODO: this will naturally change after sharding.
         let arbitrary_agent = agents
             .first()
             .expect("Gossip must have a least one from_agent")

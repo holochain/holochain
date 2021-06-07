@@ -98,6 +98,8 @@ pub struct MetricDatum {
     pub timestamp: SystemTime,
 }
 
+/// The ordering is defined as such to facilitate in-memory metric store
+/// implementations such that the earliest and latest metrics can be easily obtained.
 impl PartialOrd for MetricDatum {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         match self.timestamp.cmp(&other.timestamp) {

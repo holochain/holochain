@@ -62,23 +62,10 @@ pub(crate) async fn step_3_initiate_inner(bloom: &SimpleBloomMod) -> KitsuneP2pR
     let mut initiate = None;
 
     for (endpoint, url) in endpoints {
-        match bloom.get_metric(endpoint.agents().clone()).await? {
+        match bloom.get_metric_info(endpoint.agents().clone()).await? {
             Some(info) => {
                 // we've seen this node before, let's see if it's been too long
-
-                let saw_recently = if info.was_err {
-                    info.last_touch.elapsed()?.as_millis() as u32 + last_touch_fudge_ms
-                        <= bloom
-                            .tuning_params
-                            .gossip_peer_on_error_next_gossip_delay_ms
-                } else {
-                    info.last_touch.elapsed()?.as_millis() as u32 + last_touch_fudge_ms
-                        <= bloom
-                            .tuning_params
-                            .gossip_peer_on_success_next_gossip_delay_ms
-                };
-
-                if saw_recently {
+                if saw_recently(&info, &bloom.tuning_params, last_touch_fudge_ms)? {
                     tracing::trace!(?endpoint, "saw too recently");
                     // we've seen this node too recently, skip them
                     continue;
@@ -121,4 +108,18 @@ pub(crate) async fn step_3_initiate_inner(bloom: &SimpleBloomMod) -> KitsuneP2pR
     })?;
 
     Ok(())
+}
+
+fn saw_recently(
+    info: &NodeInfo,
+    tuning_params: &KitsuneP2pTuningParams,
+    last_touch_fudge_ms: u32,
+) -> KitsuneP2pResult<bool> {
+    Ok(if info.was_err {
+        info.last_touch.elapsed()?.as_millis() as u32 + last_touch_fudge_ms
+            <= tuning_params.gossip_peer_on_error_next_gossip_delay_ms
+    } else {
+        info.last_touch.elapsed()?.as_millis() as u32 + last_touch_fudge_ms
+            <= tuning_params.gossip_peer_on_success_next_gossip_delay_ms
+    })
 }
