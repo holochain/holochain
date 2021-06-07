@@ -375,6 +375,7 @@ dependencies = [
  "fixt",
  "holo_hash",
  "holochain_serialized_bytes",
+ "holochain_wasmer_common",
  "nanoid",
  "paste",
  "rand 0.7.3",

@@ -6,6 +6,8 @@ struct Post;
 #[hdk_entry(id = "comment", visibility = "private")]
 struct Comment;
 
+pub struct Foo;
+
 entry_defs![Post::entry_def(), Comment::entry_def()];
 
 #[hdk_extern]

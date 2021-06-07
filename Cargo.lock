@@ -2154,6 +2154,7 @@ dependencies = [
  "fixt",
  "holo_hash",
  "holochain_serialized_bytes",
+ "holochain_wasmer_common",
  "nanoid",
  "num_enum",
  "paste 1.0.5",

@@ -29,7 +29,7 @@ macro_rules! map_extern {
                 use super::*;
 
                 #[no_mangle]
-                pub extern "C" fn $name(guest_ptr: $crate::prelude::GuestPtr, len: $crate::prelude::Len) -> $crate::prelude::GuestPtrLen {
+                pub extern "C" fn $name<IO>(guest_ptr: $crate::prelude::GuestPtr, len: $crate::prelude::Len) -> $crate::prelude::GuestPtrLen {
                     // Setup tracing.
                     // @TODO feature flag this?
                     let _subscriber_guard = $crate::prelude::tracing::subscriber::set_default(
@@ -50,14 +50,24 @@ macro_rules! map_extern {
                         }
                     };
 
-                    // Call the function.
-                    let output: $output = match super::$f(inner) {
-                        Ok(v) => Ok(v),
-                        Err(wasm_error) => return $crate::prelude::return_err_ptr(wasm_error),
+                    // Call the function and handle the output.
+                    let maybe_extern_io: Result<ExternIO, SerializedBytesError> = match super::$f(inner) {
+                        Ok(v) => {
+                            $crate::prelude::ExternIO::encode(v)
+                        },
+                        Err(e) => {
+                            let output_type_id = std::any::TypeId::of::<$output>();
+                            if output_type_id == std::any::TypeId::of::<ExternResult<ValidateCallbackResult>>() {
+                                match ValidateCallbackResult::try_from(e) {
+                                    Ok(v) => $crate::prelude::ExternIO::encode(v),
+                                    Err(e) => return $crate::prelude::return_err_ptr(e),
+                                }
+                            } else {
+                                return $crate::prelude::return_err_ptr(e);
+                            }
+                        },
                     };
-
-                    // Serialize the output for the host.
-                    match $crate::prelude::ExternIO::encode(output.unwrap()) {
+                    match maybe_extern_io {
                         Ok(v) => $crate::prelude::return_ptr::<$crate::prelude::ExternIO>(v),
                         Err(serialized_bytes_error) => $crate::prelude::return_err_ptr($crate::prelude::WasmError::Serialize(serialized_bytes_error)),
                     }

@@ -82,7 +82,7 @@ fn validate_delete_link(
     validate_delete_link: ValidateDeleteLinkData,
 ) -> ExternResult<ValidateLinkCallbackResult> {
     let delete_link = validate_delete_link.delete_link;
-    let base: MaybeLinkable = must_get_entry(delete_link.base_address.clone())?.try_into()?;
+    let base: MaybeLinkable = must_get_entry(delete_link.base_address)?.try_into()?;
     Ok(match base {
         MaybeLinkable::AlwaysLinkable => ValidateLinkCallbackResult::Valid,
         _ => ValidateLinkCallbackResult::Invalid("base never validates".to_string()),

@@ -37,6 +37,12 @@ pub type CapClaimEntry = CapClaim;
 /// An Entry paired with its EntryHash
 pub type EntryHashed = holo_hash::HoloHashed<Entry>;
 
+impl From<EntryHashed> for Entry {
+    fn from(entry_hashed: EntryHashed) -> Self {
+        entry_hashed.into_content()
+    }
+}
+
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 /// Options for controlling how get works
 pub struct GetOptions {

@@ -1,41 +1,12 @@
 
 use hdk::prelude::*;
 
-#[derive(Debug, thiserror::Error)]
-enum Error {
-    #[error("Failed to parse from element")]
-    FromElement,
-}
-
-impl From<Error> for WasmError {
-    fn from(e: Error) -> Self {
-        Self::Guest(e.to_string())
-    }
-}
-
-fn element_to_entry<'a, O>(element: &'a Element) -> Result<O, Error> where O: TryFrom<&'a Entry> {
-    Ok(match element.entry() {
-        ElementEntry::Present(serialized) => match O::try_from(serialized) {
-            Ok(o) => o,
-            Err(_) => return Err(Error::FromElement),
-        },
-        _ => return Err(Error::FromElement),
-    })
-}
-
 #[hdk_entry(id = "something")]
 #[derive(Clone)]
 struct Something(#[serde(with = "serde_bytes")] Vec<u8>);
 
 #[hdk_entry(id = "entry_reference")]
 struct EntryReference(EntryHash);
-
-impl TryFrom<&Element> for EntryReference {
-    type Error = Error;
-    fn try_from(element: &Element) -> Result<Self, Self::Error> {
-        element_to_entry(element)
-    }
-}
 
 impl EntryReference {
     fn into_inner(self) -> EntryHash {
@@ -46,13 +17,6 @@ impl EntryReference {
 #[hdk_entry(id = "header_reference")]
 struct HeaderReference(HeaderHash);
 
-impl TryFrom<&Element> for HeaderReference {
-    type Error = Error;
-    fn try_from(element: &Element) -> Result<Self, Self::Error> {
-        element_to_entry(element)
-    }
-}
-
 impl HeaderReference {
     fn into_inner(self) -> HeaderHash {
         self.0
@@ -61,13 +25,6 @@ impl HeaderReference {
 
 #[hdk_entry(id = "element_reference")]
 struct ElementReference(HeaderHash);
-
-impl TryFrom<&Element> for ElementReference {
-    type Error = Error;
-    fn try_from(element: &Element) -> Result<Self, Self::Error> {
-        element_to_entry(element)
-    }
-}
 
 impl ElementReference {
     fn into_inner(self) -> HeaderHash {
@@ -87,7 +44,7 @@ fn validate_create_entry_entry_reference(data: ValidateData) -> ExternResult<Val
     let entry_reference = EntryReference::try_from(&data.element)?;
 
     let entry_hashed: EntryHashed = must_get_entry(entry_reference.into_inner())?;
-    let entry: Entry = entry_hashed.into();
+    let entry: Entry = entry_hashed.clone().into();
     let _something_hashed: Something = entry_hashed.try_into()?;
     let _something: Something = entry.try_into()?;
 
@@ -98,7 +55,7 @@ fn validate_create_entry_entry_reference(data: ValidateData) -> ExternResult<Val
 fn validate_create_entry_header_reference(data: ValidateData) -> ExternResult<ValidateCallbackResult> {
     let header_reference = HeaderReference::try_from(&data.element)?;
 
-    let signed_heder_hashed: SignedHeaderHashed = must_get_header(header_reference.into_inner())?;
+    let signed_header_hashed: SignedHeaderHashed = must_get_header(header_reference.into_inner())?;
     let _header: Header = signed_header_hashed.into();
 
     Ok(ValidateCallbackResult::Valid)
@@ -109,7 +66,7 @@ fn validate_create_entry_element_reference(data: ValidateData) -> ExternResult<V
     let element_reference = ElementReference::try_from(&data.element)?;
 
     let element: Element = must_get_valid_element(element_reference.into_inner())?;
-    let something: Something = element.try_into()?;
+    let _something: Something = element.try_into()?;
 
     Ok(ValidateCallbackResult::Valid)
 }

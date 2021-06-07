@@ -3,6 +3,7 @@ use crate::zome_io::ExternIO;
 use crate::CallbackResult;
 use holo_hash::AnyDhtHash;
 use holochain_serialized_bytes::prelude::*;
+use holochain_wasmer_common::WasmError;
 
 /// The validation status for an op or element
 /// much of this happens in the subconscious
@@ -53,6 +54,28 @@ pub enum ValidateCallbackResult {
     /// Subconscious needs to map this to either pending or abandoned based on context that the
     /// wasm can't possibly have.
     UnresolvedDependencies(Vec<AnyDhtHash>),
+}
+
+impl TryFrom<WasmError> for ValidateCallbackResult {
+    type Error = WasmError;
+    fn try_from(wasm_error: WasmError) -> Result<Self, Self::Error> {
+        match wasm_error {
+            WasmError::Guest(e) => Ok(ValidateCallbackResult::Invalid(e)),
+            WasmError::Serialize(e) => Ok(ValidateCallbackResult::Invalid(e.to_string())),
+            WasmError::Deserialize(e) => Ok(ValidateCallbackResult::Invalid(format!(
+                "Failed to deserialize: {:?}",
+                e
+            ))),
+            WasmError::PointerMap => Err(wasm_error),
+            WasmError::ErrorWhileError => Err(wasm_error),
+            WasmError::Memory => Err(wasm_error),
+            WasmError::GuestResultHandling(_) => Err(wasm_error),
+            WasmError::Host(_) => Err(wasm_error),
+            WasmError::HostShortCircuit(_) => Err(wasm_error),
+            WasmError::Compile(_) => Err(wasm_error),
+            WasmError::CallError(_) => Err(wasm_error),
+        }
+    }
 }
 
 impl CallbackResult for ValidateCallbackResult {

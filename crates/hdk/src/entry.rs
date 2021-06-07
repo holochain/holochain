@@ -334,6 +334,30 @@ macro_rules! app_entry {
             }
         }
 
+        impl TryFrom<$crate::prelude::EntryHashed> for $t {
+            type Error = $crate::prelude::WasmError;
+            fn try_from(entry_hashed: $crate::prelude::EntryHashed) -> Result<Self, Self::Error> {
+                Self::try_from(entry_hashed.as_content())
+            }
+        }
+
+        impl TryFrom<&$crate::prelude::Element> for $t {
+            type Error = $crate::prelude::WasmError;
+            fn try_from(element: &$crate::prelude::Element) -> Result<Self, Self::Error> {
+                Ok(match element.entry() {
+                    ElementEntry::Present(serialized) => Self::try_from(serialized)?,
+                    _ => return Err(Self::Error::Guest("Missing entry".into())),
+                })
+            }
+        }
+
+        impl TryFrom<$crate::prelude::Element> for $t {
+            type Error = $crate::prelude::WasmError;
+            fn try_from(element: $crate::prelude::Element) -> Result<Self, Self::Error> {
+                (&element).try_into()
+            }
+        }
+
         impl TryFrom<&$t> for $crate::prelude::Entry {
             type Error = $crate::prelude::WasmError;
             fn try_from(t: &$t) -> Result<Self, Self::Error> {
