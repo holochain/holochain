@@ -822,7 +822,7 @@ where
         }
     }
 
-    pub(super) fn add_agent_infos(
+    pub(super) async fn add_agent_infos(
         &self,
         agent_infos: Vec<AgentInfoSigned>,
     ) -> ConductorApiResult<()> {
@@ -840,7 +840,7 @@ where
         }
         for (space, agent_infos) in space_map {
             let env = self.p2p_env(space);
-            inject_agent_infos(env, agent_infos)?;
+            inject_agent_infos(env, agent_infos.iter()).await?;
         }
         Ok(())
     }

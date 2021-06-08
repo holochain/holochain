@@ -1959,6 +1959,7 @@ dependencies = [
  "lazy_static",
  "must_future",
  "nanoid",
+ "num_cpus",
  "observability",
  "once_cell",
  "page_size",

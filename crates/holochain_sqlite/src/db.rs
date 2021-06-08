@@ -9,11 +9,16 @@ use futures::Future;
 use holo_hash::DnaHash;
 use holochain_zome_types::cell::CellId;
 use kitsune_p2p::KitsuneSpace;
+use parking_lot::Mutex;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
-use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::{collections::HashMap, path::Path};
+use tokio::{
+    sync::{OwnedSemaphorePermit, Semaphore},
+    task,
+};
 
 mod p2p;
 pub use p2p::*;
@@ -25,6 +30,8 @@ pub struct DbRead {
     kind: DbKind,
     path: PathBuf,
     connection_pool: ConnectionPool,
+    write_semaphore: Arc<Semaphore>,
+    read_semaphore: Arc<Semaphore>,
 }
 
 impl DbRead {
@@ -95,10 +102,42 @@ impl DbWrite {
         crate::table::initialize_database(&mut conn, &kind)?;
 
         Ok(DbWrite(DbRead {
+            write_semaphore: Self::get_write_semaphore(&kind),
+            read_semaphore: Self::get_read_semaphore(&kind),
             kind,
             path,
             connection_pool: pool,
         }))
+    }
+
+    fn get_write_semaphore(kind: &DbKind) -> Arc<Semaphore> {
+        static MAP: once_cell::sync::Lazy<Mutex<HashMap<DbKind, Arc<Semaphore>>>> =
+            once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
+        let mut map = MAP.lock();
+        match map.get(kind) {
+            Some(s) => s.clone(),
+            None => {
+                let s = Arc::new(Semaphore::new(1));
+                map.insert(kind.clone(), s.clone());
+                s
+            }
+        }
+    }
+
+    fn get_read_semaphore(kind: &DbKind) -> Arc<Semaphore> {
+        static MAP: once_cell::sync::Lazy<Mutex<HashMap<DbKind, Arc<Semaphore>>>> =
+            once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
+        let mut map = MAP.lock();
+        match map.get(kind) {
+            Some(s) => s.clone(),
+            None => {
+                let num_cpus = num_cpus::get();
+                let num_read_threads = if num_cpus < 4 { 4 } else { num_cpus / 2 };
+                let s = Arc::new(Semaphore::new(num_read_threads));
+                map.insert(kind.clone(), s.clone());
+                s
+            }
+        }
     }
 
     /// Create a unique db in a temp dir with no static management of the
@@ -119,7 +158,7 @@ impl DbWrite {
 }
 
 /// The various types of database, used to specify the list of databases to initialize
-#[derive(Clone, Debug, derive_more::Display)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 pub enum DbKind {
     /// Specifies the environment used by each Cell
     Cell(CellId),
@@ -219,6 +258,31 @@ impl<'e> WriteManager<'e> for PConn {
         let result = f(&mut txn)?;
         txn.commit().map_err(DatabaseError::from)?;
         Ok(result)
+    }
+}
+
+impl DbWrite {
+    pub async fn async_commit<E, R, F>(&self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError> + Send + 'static,
+        F: FnOnce(&mut Transaction) -> Result<R, E> + Send + 'static,
+        R: Send + 'static,
+    {
+        let _g = self.aquire_writer_permit().await;
+        let mut conn = self.conn()?;
+        let r = task::spawn_blocking(move || conn.with_commit(f))
+            .await
+            .map_err(DatabaseError::from)?;
+        r
+    }
+
+    async fn aquire_writer_permit(&self) -> OwnedSemaphorePermit {
+        self.0
+            .write_semaphore
+            .clone()
+            .acquire_owned()
+            .await
+            .expect("We don't ever close these semaphores")
     }
 }
 

@@ -52,6 +52,9 @@ pub enum DatabaseError {
 
     #[error("Unable to construct a value key")]
     KeyConstruction,
+
+    #[error("transparent")]
+    FailedToJoinBlocking(#[from] tokio::task::JoinError),
 }
 
 impl PartialEq for DatabaseError {
