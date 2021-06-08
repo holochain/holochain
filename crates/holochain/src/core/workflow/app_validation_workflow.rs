@@ -72,7 +72,7 @@ async fn app_validation_workflow_inner(
     network: &HolochainP2pCell,
 ) -> WorkflowResult<WorkComplete> {
     let env = workspace.vault.clone().into();
-    let sorted_ops = validation_query::get_ops_to_app_validate(&env)?;
+    let sorted_ops = validation_query::get_ops_to_app_validate(&env).await?;
 
     // Validate all the ops
     for so in sorted_ops {
@@ -132,7 +132,7 @@ async fn validate_op(
     network: &HolochainP2pCell,
 ) -> AppValidationOutcome<Outcome> {
     // Get the workspace for the validation calls
-    let workspace_lock = workspace.validation_workspace(network.from_agent())?;
+    let workspace_lock = workspace.validation_workspace(network.from_agent()).await?;
 
     // Create the element
     let element = get_element(op)?;
@@ -493,16 +493,14 @@ async fn get_validation_package_local(
                 Some(EntryType::App(aet)) => aet,
                 _ => return Ok(None),
             };
-            Ok(Some(get_as_author_sub_chain(
-                header_seq,
-                app_entry_type,
-                workspace_lock.source_chain(),
-            )?))
+            Ok(Some(
+                get_as_author_sub_chain(header_seq, app_entry_type, workspace_lock.source_chain())
+                    .await?,
+            ))
         }
-        RequiredValidationType::Full => Ok(Some(get_as_author_full(
-            header_seq,
-            workspace_lock.source_chain(),
-        )?)),
+        RequiredValidationType::Full => Ok(Some(
+            get_as_author_full(header_seq, workspace_lock.source_chain()).await?,
+        )),
         RequiredValidationType::Custom => {
             {
                 let cascade = Cascade::from_workspace(workspace_lock);
@@ -851,15 +849,11 @@ impl AppValidationWorkspace {
         Ok(())
     }
 
-    pub fn validation_workspace(
+    pub async fn validation_workspace(
         &self,
         author: AgentPubKey,
     ) -> AppValidationResult<HostFnWorkspace> {
-        Ok(HostFnWorkspace::new(
-            self.vault.clone(),
-            self.cache.clone(),
-            author,
-        )?)
+        Ok(HostFnWorkspace::new(self.vault.clone(), self.cache.clone(), author).await?)
     }
 
     pub fn full_cascade<Network: HolochainP2pCellT + Clone + 'static + Send>(

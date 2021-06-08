@@ -76,7 +76,7 @@ async fn sys_validation_workflow_inner(
     sys_validation_trigger: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     let env = workspace.vault.clone().into();
-    let sorted_ops = validation_query::get_ops_to_sys_validate(&env)?;
+    let sorted_ops = validation_query::get_ops_to_sys_validate(&env).await?;
 
     // Process each op
     for so in sorted_ops {
@@ -698,6 +698,7 @@ impl SysValidationWorkspace {
                 DhtOp.when_integrated IS NOT NULL
                 AND
                 DhtOp.type = :activity
+                LIMIT 1
                 ",
             )?;
             DatabaseResult::Ok(stmt.exists(named_params! {

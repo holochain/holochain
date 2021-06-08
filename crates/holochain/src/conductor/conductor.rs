@@ -784,28 +784,30 @@ where
         let env = &self.wasm_env;
 
         // Load out all dna defs
-        let (wasm_tasks, defs) = env.conn()?.with_reader(|txn| {
-            let wasm_tasks = holochain_state::dna_def::get_all(&txn)?
-                .into_iter()
-                .map(|dna_def| {
-                    // Load all wasms for each dna_def from the wasm db into memory
-                    let wasms = dna_def.zomes.clone().into_iter().map(|(zome_name, zome)| {
-                        let wasm_hash = zome.wasm_hash(&zome_name)?;
-                        holochain_state::wasm::get(&txn, &wasm_hash)?
-                            .map(|hashed| hashed.into_content())
-                            .ok_or(ConductorError::WasmMissing)
-                    });
-                    let wasms = wasms.collect::<ConductorResult<Vec<_>>>();
-                    async move {
-                        let dna_file = DnaFile::new(dna_def.into_content(), wasms?).await?;
-                        ConductorResult::Ok((dna_file.dna_hash().clone(), dna_file))
-                    }
-                })
-                // This needs to happen due to the environment not being Send
-                .collect::<Vec<_>>();
-            let defs = holochain_state::entry_def::get_all(&txn)?;
-            ConductorResult::Ok((wasm_tasks, defs))
-        })?;
+        let (wasm_tasks, defs) = env
+            .async_reader(move |txn| {
+                let wasm_tasks = holochain_state::dna_def::get_all(&txn)?
+                    .into_iter()
+                    .map(|dna_def| {
+                        // Load all wasms for each dna_def from the wasm db into memory
+                        let wasms = dna_def.zomes.clone().into_iter().map(|(zome_name, zome)| {
+                            let wasm_hash = zome.wasm_hash(&zome_name)?;
+                            holochain_state::wasm::get(&txn, &wasm_hash)?
+                                .map(|hashed| hashed.into_content())
+                                .ok_or(ConductorError::WasmMissing)
+                        });
+                        let wasms = wasms.collect::<ConductorResult<Vec<_>>>();
+                        async move {
+                            let dna_file = DnaFile::new(dna_def.into_content(), wasms?).await?;
+                            ConductorResult::Ok((dna_file.dna_hash().clone(), dna_file))
+                        }
+                    })
+                    // This needs to happen due to the environment not being Send
+                    .collect::<Vec<_>>();
+                let defs = holochain_state::entry_def::get_all(&txn)?;
+                ConductorResult::Ok((wasm_tasks, defs))
+            })
+            .await?;
         // try to join all the tasks and return the list of dna files
         let dnas = futures::future::try_join_all(wasm_tasks).await?;
         Ok((dnas, defs))
@@ -947,12 +949,12 @@ where
 
         let peer_dump = p2p_store::dump_state(p2p_env.into(), Some(cell_id.clone()))?;
         let source_chain_dump =
-            source_chain::dump_state(arc.clone().into(), cell_id.agent_pubkey()).await?;
+            source_chain::dump_state(arc.clone().into(), cell_id.agent_pubkey().clone()).await?;
 
         let out = JsonDump {
             peer_dump,
             source_chain_dump,
-            integration_dump: integration_dump(&arc.clone().into())?,
+            integration_dump: integration_dump(&arc.clone().into()).await?,
         };
         // Add summary
         let summary = out.to_string();
@@ -1005,20 +1007,21 @@ where
 }
 
 /// Dump the integration json state.
-pub fn integration_dump(vault: &EnvRead) -> ConductorApiResult<IntegrationStateDump> {
-    fresh_reader!(vault, |txn| {
-        let integrated = txn.query_row(
-            "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NOT NULL",
-            [],
-            |row| row.get(0),
-        )?;
-        let integration_limbo = txn.query_row(
+pub async fn integration_dump(vault: &EnvRead) -> ConductorApiResult<IntegrationStateDump> {
+    vault
+        .async_reader(move |txn| {
+            let integrated = txn.query_row(
+                "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NOT NULL",
+                [],
+                |row| row.get(0),
+            )?;
+            let integration_limbo = txn.query_row(
             "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NULL AND validation_stage = 3",
             [],
             |row| row.get(0),
         )?;
-        let validation_limbo = txn.query_row(
-            "
+            let validation_limbo = txn.query_row(
+                "
                 SELECT count(hash) FROM DhtOp
                 WHERE when_integrated IS NULL
                 AND (
@@ -1027,15 +1030,16 @@ pub fn integration_dump(vault: &EnvRead) -> ConductorApiResult<IntegrationStateD
                     (is_authored = 0 AND (validation_stage IS NULL OR validation_stage < 3))
                 )
                 ",
-            [],
-            |row| row.get(0),
-        )?;
-        ConductorApiResult::Ok(IntegrationStateDump {
-            validation_limbo,
-            integration_limbo,
-            integrated,
+                [],
+                |row| row.get(0),
+            )?;
+            ConductorApiResult::Ok(IntegrationStateDump {
+                validation_limbo,
+                integration_limbo,
+                integrated,
+            })
         })
-    })
+        .await
 }
 
 //-----------------------------------------------------------------------------

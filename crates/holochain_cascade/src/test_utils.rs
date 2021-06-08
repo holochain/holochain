@@ -92,6 +92,7 @@ impl HolochainP2pCellT for PassThroughNetwork {
                         dht_hash.clone().into(),
                         (&options).into(),
                     )
+                    .await
                     .map_err(|e| HolochainP2pError::Other(e.into()))?;
                     out.push(WireOps::Entry(r));
                 }
@@ -103,6 +104,7 @@ impl HolochainP2pCellT for PassThroughNetwork {
                         dht_hash.clone().into(),
                         (&options).into(),
                     )
+                    .await
                     .map_err(|e| HolochainP2pError::Other(e.into()))?;
                     out.push(WireOps::Element(r));
                 }
@@ -125,6 +127,7 @@ impl HolochainP2pCellT for PassThroughNetwork {
         let mut out = Vec::new();
         for env in &self.envs {
             let r = authority::handle_get_links(env.clone(), link_key.clone(), (&options).into())
+                .await
                 .map_err(|e| HolochainP2pError::Other(e.into()))?;
             out.push(r);
         }
@@ -144,6 +147,7 @@ impl HolochainP2pCellT for PassThroughNetwork {
                 query.clone(),
                 (&options).into(),
             )
+            .await
             .map_err(|e| HolochainP2pError::Other(e.into()))?;
             out.push(r);
         }

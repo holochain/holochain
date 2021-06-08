@@ -73,7 +73,9 @@ pub async fn publish_dht_ops_workflow_inner(
     let mut to_publish = HashMap::new();
     let mut hashes = Vec::new();
 
-    for op_hashed in publish_query::get_ops_to_publish(&agent, &env, DEFAULT_RECEIPT_BUNDLE_SIZE)? {
+    for op_hashed in
+        publish_query::get_ops_to_publish(agent.clone(), &env, DEFAULT_RECEIPT_BUNDLE_SIZE).await?
+    {
         let (op, op_hash) = op_hashed.into_inner();
         hashes.push(op_hash.clone());
 
@@ -371,7 +373,9 @@ mod tests {
                 let author = fake_agent_pubkey_1();
 
                 // Put data in elements
-                let source_chain = SourceChain::new(env.clone().into(), author.clone()).unwrap();
+                let source_chain = SourceChain::new(env.clone().into(), author.clone())
+                    .await
+                    .unwrap();
                 // Produces 3 ops but minus 1 for store entry so 2 ops.
                 let original_header_address = source_chain
                     .put(

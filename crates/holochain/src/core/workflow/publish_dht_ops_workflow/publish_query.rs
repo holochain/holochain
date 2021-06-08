@@ -3,7 +3,6 @@
 
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
-use holochain_sqlite::db::ReadManager;
 use holochain_state::query::prelude::*;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
@@ -22,8 +21,8 @@ use crate::core::workflow::error::WorkflowResult;
 /// - Don't publish private entries.
 /// - Only get ops that haven't been published within the minimum publish interval
 /// - Only get ops that have less then the RECEIPT_BUNDLE_SIZE
-pub fn get_ops_to_publish(
-    agent: &AgentPubKey,
+pub async fn get_ops_to_publish(
+    agent: AgentPubKey,
     env: &EnvRead,
     _required_receipt_count: u32,
 ) -> WorkflowResult<Vec<DhtOpHashed>> {
@@ -33,9 +32,11 @@ pub fn get_ops_to_publish(
     //     .and_then(|epoch| epoch.checked_sub(MIN_PUBLISH_INTERVAL))
     //     .map(|t| t.as_secs())
     //     .unwrap_or(0);
-    let results = env.conn()?.with_reader(|txn| {
-        let mut stmt = txn.prepare(
-            "
+
+    let results = env
+        .async_reader(move |txn| {
+            let mut stmt = txn.prepare(
+                "
             SELECT 
             Header.blob as header_blob,
             Entry.blob as entry_blob,
@@ -55,39 +56,40 @@ pub fn get_ops_to_publish(
             AND
             DhtOp.last_publish_time IS NULL
             ",
-            // (DhtOp.last_publish_time IS NULL OR DhtOp.last_publish_time <= :earliest_allowed_time)
-            // AND
-            // (DhtOp.receipt_count IS NULL OR DhtOp.receipt_count < :required_receipt_count)
-        )?;
-        let r = stmt.query_and_then(
-            named_params! {
-                ":author": agent,
-                // ":earliest_allowed_time": earliest_allowed_time,
-                // ":required_receipt_count": required_receipt_count,
-                ":store_entry": DhtOpType::StoreEntry,
-            },
-            |row| {
-                let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
-                let op_type: DhtOpType = row.get("dht_type")?;
-                let hash: DhtOpHash = row.get("dht_hash")?;
-                let entry = match header.0.entry_type().map(|et| et.visibility()) {
-                    Some(EntryVisibility::Public) => {
-                        let entry: Option<Vec<u8>> = row.get("entry_blob")?;
-                        match entry {
-                            Some(entry) => Some(from_blob::<Entry>(entry)?),
-                            None => None,
+                // (DhtOp.last_publish_time IS NULL OR DhtOp.last_publish_time <= :earliest_allowed_time)
+                // AND
+                // (DhtOp.receipt_count IS NULL OR DhtOp.receipt_count < :required_receipt_count)
+            )?;
+            let r = stmt.query_and_then(
+                named_params! {
+                    ":author": agent,
+                    // ":earliest_allowed_time": earliest_allowed_time,
+                    // ":required_receipt_count": required_receipt_count,
+                    ":store_entry": DhtOpType::StoreEntry,
+                },
+                |row| {
+                    let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
+                    let op_type: DhtOpType = row.get("dht_type")?;
+                    let hash: DhtOpHash = row.get("dht_hash")?;
+                    let entry = match header.0.entry_type().map(|et| et.visibility()) {
+                        Some(EntryVisibility::Public) => {
+                            let entry: Option<Vec<u8>> = row.get("entry_blob")?;
+                            match entry {
+                                Some(entry) => Some(from_blob::<Entry>(entry)?),
+                                None => None,
+                            }
                         }
-                    }
-                    _ => None,
-                };
-                WorkflowResult::Ok(DhtOpHashed::with_pre_hashed(
-                    DhtOp::from_type(op_type, header, entry)?,
-                    hash,
-                ))
-            },
-        )?;
-        WorkflowResult::Ok(r.collect())
-    })?;
+                        _ => None,
+                    };
+                    WorkflowResult::Ok(DhtOpHashed::with_pre_hashed(
+                        DhtOp::from_type(op_type, header, entry)?,
+                        hash,
+                    ))
+                },
+            )?;
+            WorkflowResult::Ok(r.collect())
+        })
+        .await?;
     tracing::info!(?results);
     results
 }

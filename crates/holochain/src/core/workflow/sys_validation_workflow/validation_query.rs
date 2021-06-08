@@ -1,5 +1,4 @@
 use holo_hash::DhtOpHash;
-use holochain_sqlite::db::ReadManager;
 use holochain_state::query::prelude::*;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
@@ -13,18 +12,18 @@ use crate::core::workflow::error::WorkflowResult;
 /// Get all ops that need to sys or app validated in order.
 /// - Sys validated or awaiting app dependencies.
 /// - Ordered by type then timestamp (See [`DhtOpOrder`])
-pub fn get_ops_to_app_validate(env: &EnvRead) -> WorkflowResult<Vec<DhtOpHashed>> {
-    get_ops_to_validate(env, false)
+pub async fn get_ops_to_app_validate(env: &EnvRead) -> WorkflowResult<Vec<DhtOpHashed>> {
+    get_ops_to_validate(env, false).await
 }
 
 /// Get all ops that need to sys or app validated in order.
 /// - Pending or awaiting sys dependencies.
 /// - Ordered by type then timestamp (See [`DhtOpOrder`])
-pub fn get_ops_to_sys_validate(env: &EnvRead) -> WorkflowResult<Vec<DhtOpHashed>> {
-    get_ops_to_validate(env, true)
+pub async fn get_ops_to_sys_validate(env: &EnvRead) -> WorkflowResult<Vec<DhtOpHashed>> {
+    get_ops_to_validate(env, true).await
 }
 
-fn get_ops_to_validate(env: &EnvRead, system: bool) -> WorkflowResult<Vec<DhtOpHashed>> {
+async fn get_ops_to_validate(env: &EnvRead, system: bool) -> WorkflowResult<Vec<DhtOpHashed>> {
     let mut sql = "
         SELECT 
         Header.blob as header_blob,
@@ -59,7 +58,7 @@ fn get_ops_to_validate(env: &EnvRead, system: bool) -> WorkflowResult<Vec<DhtOpH
         DhtOp.op_order ASC
         ",
     );
-    env.conn()?.with_reader(|txn| {
+    env.async_reader(move |txn| {
         let mut stmt = txn.prepare(&sql)?;
         let r = stmt.query_and_then([], |row| {
             let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
@@ -77,7 +76,8 @@ fn get_ops_to_validate(env: &EnvRead, system: bool) -> WorkflowResult<Vec<DhtOpH
         })?;
         let r = r.collect();
         WorkflowResult::Ok(r)
-    })?
+    })
+    .await?
 }
 
 #[cfg(test)]
@@ -111,7 +111,7 @@ mod tests {
         observability::test_run().ok();
         let env = test_cell_env();
         let expected = test_data(&env.env().into());
-        let r = get_ops_to_validate(&env.env().into(), true).unwrap();
+        let r = get_ops_to_validate(&env.env().into(), true).await.unwrap();
         let mut r_sorted = r.clone();
         // Sorted by OpOrder
         r_sorted.sort_by_key(|d| {

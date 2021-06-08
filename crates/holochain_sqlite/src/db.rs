@@ -255,6 +255,30 @@ impl<'e> ReadManager<'e> for PConn {
     }
 }
 
+impl DbRead {
+    pub async fn async_reader<E, R, F>(&self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError> + Send + 'static,
+        F: FnOnce(Transaction) -> Result<R, E> + Send + 'static,
+        R: Send + 'static,
+    {
+        let _g = self.acquire_reader_permit().await;
+        let mut conn = self.conn()?;
+        let r = task::spawn_blocking(move || conn.with_reader(f))
+            .await
+            .map_err(DatabaseError::from)?;
+        r
+    }
+
+    async fn acquire_reader_permit(&self) -> OwnedSemaphorePermit {
+        self.read_semaphore
+            .clone()
+            .acquire_owned()
+            .await
+            .expect("We don't ever close these semaphores")
+    }
+}
+
 impl<'e> WriteManager<'e> for PConn {
     #[cfg(feature = "test_utils")]
     fn with_commit_sync<E, R, F>(&'e mut self, f: F) -> Result<R, E>
@@ -278,7 +302,7 @@ impl DbWrite {
         F: FnOnce(&mut Transaction) -> Result<R, E> + Send + 'static,
         R: Send + 'static,
     {
-        let _g = self.aquire_writer_permit().await;
+        let _g = self.acquire_writer_permit().await;
         let mut conn = self.conn()?;
         let r = task::spawn_blocking(move || conn.with_commit_sync(f))
             .await
@@ -293,12 +317,12 @@ impl DbWrite {
         F: FnOnce(&mut Transaction) -> Result<R, E>,
         R: Send,
     {
-        let _g = self.aquire_writer_permit().await;
+        let _g = self.acquire_writer_permit().await;
         let mut conn = self.conn()?;
         task::block_in_place(move || conn.with_commit_sync(f))
     }
 
-    async fn aquire_writer_permit(&self) -> OwnedSemaphorePermit {
+    async fn acquire_writer_permit(&self) -> OwnedSemaphorePermit {
         self.0
             .write_semaphore
             .clone()

@@ -22,8 +22,12 @@ pub type Vault = EnvRead;
 pub type Cache = EnvWrite;
 
 impl HostFnWorkspace {
-    pub fn new(vault: EnvWrite, cache: EnvWrite, author: AgentPubKey) -> SourceChainResult<Self> {
-        let source_chain = SourceChain::new(vault.clone(), author)?;
+    pub async fn new(
+        vault: EnvWrite,
+        cache: EnvWrite,
+        author: AgentPubKey,
+    ) -> SourceChainResult<Self> {
+        let source_chain = SourceChain::new(vault.clone(), author).await?;
         Ok(Self {
             source_chain,
             vault,

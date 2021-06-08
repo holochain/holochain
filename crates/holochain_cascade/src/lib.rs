@@ -667,12 +667,15 @@ where
             merged_response
         } else {
             match self.vault.clone() {
-                Some(vault) => authority::handle_get_agent_activity(
-                    vault,
-                    agent.clone(),
-                    query.clone(),
-                    (&options).into(),
-                )?,
+                Some(vault) => {
+                    authority::handle_get_agent_activity(
+                        vault,
+                        agent.clone(),
+                        query.clone(),
+                        (&options).into(),
+                    )
+                    .await?
+                }
                 None => agent_activity::merge_activities(
                     agent.clone(),
                     &options,
