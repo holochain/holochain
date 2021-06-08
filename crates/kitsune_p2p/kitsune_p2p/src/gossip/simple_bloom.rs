@@ -379,10 +379,10 @@ impl SimpleBloomMod {
         //   TODO: this may not be technically correct, since we may want to
         //       record metrics from previous steps even if those other steps
         //       short-circuited this iteration. Revisit.
-        #[allow(clippy::single_match)]
         match self.step_5_flush_metrics().await {
             Err(_) => return GossipIterationResult::Close,
-            Ok(_) => (),
+            Ok(false) => return GossipIterationResult::Good,
+            Ok(true) => (),
         }
 
         GossipIterationResult::Good
@@ -426,14 +426,14 @@ impl SimpleBloomMod {
         Ok(true)
     }
 
-    async fn step_5_flush_metrics(&self) -> KitsuneP2pResult<()> {
+    async fn step_5_flush_metrics(&self) -> KitsuneP2pResult<bool> {
         let metrics: Vec<_> = self
             .inner
             .share_mut(|i, _| Ok(i.pending_metrics.drain(..).collect()))?;
         for (agents, info) in metrics {
             self.record_metric(agents, info).await?;
         }
-        Ok(())
+        Ok(true)
     }
 }
 
@@ -472,9 +472,9 @@ impl AsGossipModule for SimpleBloomMod {
     }
 }
 
-struct SimpleBloomModFact;
+struct SimpleBloomModFactory;
 
-impl AsGossipModuleFactory for SimpleBloomModFact {
+impl AsGossipModuleFactory for SimpleBloomModFactory {
     fn spawn_gossip_task(
         &self,
         tuning_params: KitsuneP2pTuningParams,
@@ -492,5 +492,5 @@ impl AsGossipModuleFactory for SimpleBloomModFact {
 }
 
 pub fn factory() -> GossipModuleFactory {
-    GossipModuleFactory(Arc::new(SimpleBloomModFact))
+    GossipModuleFactory(Arc::new(SimpleBloomModFactory))
 }
