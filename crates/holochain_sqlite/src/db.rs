@@ -15,8 +15,8 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-mod p2p_state;
-pub use p2p_state::*;
+mod p2p_agents;
+pub use p2p_agents::*;
 
 mod p2p_metrics;
 pub use p2p_metrics::*;
@@ -146,7 +146,7 @@ impl DbKind {
             DbKind::Cache(dna) => ["cache", &format!("cache-{}", dna)].iter().collect(),
             DbKind::Conductor => ["conductor", "conductor"].iter().collect(),
             DbKind::Wasm => ["wasm", "wasm"].iter().collect(),
-            DbKind::P2pState(space) => ["p2p", &format!("p2p_state-{}", space)].iter().collect(),
+            DbKind::P2pState(space) => ["p2p", &format!("p2p_agents-{}", space)].iter().collect(),
             DbKind::P2pMetrics(space) => {
                 ["p2p", &format!("p2p_metrics-{}", space)].iter().collect()
             }
