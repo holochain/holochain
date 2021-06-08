@@ -41,8 +41,8 @@ pub struct SignNetworkDataEvt {
     pub data: Arc<Vec<u8>>,
 }
 
-#[derive(Debug)]
 /// Store the AgentInfo as signed by the agent themselves.
+#[derive(Debug)]
 pub struct PutAgentInfoSignedEvt {
     /// The "space" context.
     pub space: Arc<super::KitsuneSpace>,
@@ -52,8 +52,8 @@ pub struct PutAgentInfoSignedEvt {
     pub agent_info_signed: AgentInfoSigned,
 }
 
+/// Get agent info for a single agent, as previously signed and put.
 #[derive(Debug)]
-/// Get agent info as previously signed and put.
 pub struct GetAgentInfoSignedEvt {
     /// The "space" context.
     pub space: Arc<super::KitsuneSpace>,
@@ -61,8 +61,8 @@ pub struct GetAgentInfoSignedEvt {
     pub agent: Arc<super::KitsuneAgent>,
 }
 
+/// Get agent info which satisfies a query.
 #[derive(Debug)]
-/// Get agent info as previously signed and put.
 pub struct QueryAgentInfoSignedEvt {
     /// The "space" context.
     pub space: Arc<super::KitsuneSpace>,
@@ -87,8 +87,8 @@ pub enum MetricKind {
     ConnectError,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
 /// A single row in the metrics database
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MetricDatum {
     /// The agent this event is about
     pub agent: Arc<super::KitsuneAgent>,
