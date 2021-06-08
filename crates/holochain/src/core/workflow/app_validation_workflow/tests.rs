@@ -239,6 +239,7 @@ async fn run_test(
     let expected_count = 3 + 16 + 2;
     let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
     wait_for_integration(&alice_env, expected_count, num_attempts, delay_per_attempt).await;
+    holochain_state::prelude::dump_tmp(&alice_env);
 
     let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
 

@@ -1,4 +1,7 @@
 use crate::agent_store::AgentInfoSigned;
+use crate::event::MetricQuery;
+use crate::event::MetricQueryAnswer;
+use crate::types::event::*;
 use crate::types::gossip::*;
 use crate::types::*;
 use ghost_actor::dependencies::tracing;
@@ -60,7 +63,6 @@ impl MetaOpData {
 }
 
 type KeySet = HashSet<Arc<MetaOpKey>>;
-type HasMap = HashMap<Arc<KitsuneAgent>, KeySet>;
 type DataMap = HashMap<Arc<MetaOpKey>, Arc<MetaOpData>>;
 type BloomFilter = bloomfilter::Bloom<Arc<MetaOpKey>>;
 
@@ -105,6 +107,7 @@ pub(crate) fn decode_bloom_filter(bloom: &[u8]) -> BloomFilter {
     bloomfilter::Bloom::from_existing(&bloom[44..], bitmap_bits, k_num, sip_keys)
 }
 
+mod step_1_check_inner;
 mod step_2_local_sync_inner;
 use step_2_local_sync_inner::*;
 mod step_3_initiate_inner;
@@ -117,25 +120,28 @@ kitsune_p2p_types::write_codec_enum! {
     codec GossipWire {
         /// Initiate a round of gossip with a remote node
         Initiate(0x10) {
-            filter.0: PoolBuf,
+            agents.0: HashSet<Arc<KitsuneAgent>>,
+            filter.1: PoolBuf,
         },
 
         /// Accept an incoming round of gossip from a remote node
         Accept(0x20) {
-            filter.0: PoolBuf,
+            agents.0: HashSet<Arc<KitsuneAgent>>,
+            filter.1: PoolBuf,
         },
 
         /// Send a chunks of gossip meta op data,
         /// if "finished" this will be the final chunk.
         Chunk(0x30) {
-            finished.0: bool,
-            chunks.1: Vec<Arc<MetaOpData>>,
+            agents.0: HashSet<Arc<KitsuneAgent>>,
+            finished.1: bool,
+            chunks.2: Vec<Arc<MetaOpData>>,
         },
     }
 }
 
 struct NodeInfo {
-    last_touch: std::time::Instant,
+    last_touch: std::time::SystemTime,
     was_err: bool,
 }
 
@@ -145,62 +151,37 @@ pub(crate) enum HowToConnect {
 }
 
 pub(crate) struct SimpleBloomModInner {
-    tuning_params: KitsuneP2pTuningParams,
-    space: Arc<KitsuneSpace>,
-    ep_hnd: Tx2EpHnd<wire::Wire>,
-    evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
-
     local_agents: HashSet<Arc<KitsuneAgent>>,
     local_bloom: BloomFilter,
     local_data_map: DataMap,
     local_key_set: KeySet,
 
-    remote_metrics: HashMap<Tx2Cert, NodeInfo>,
+    /// Metrics to be recorded at the end of this round of gossip
+    pending_metrics: Vec<(Vec<Arc<KitsuneAgent>>, NodeInfo)>,
 
     last_initiate_check: std::time::Instant,
-    initiate_tgt: Option<Tx2Cert>,
+    initiate_tgt: Option<GossipTgt>,
 
     incoming: Vec<(Tx2ConHnd<wire::Wire>, GossipWire)>,
 
     last_outgoing: std::time::Instant,
-    send_interval_ms: u64,
-    outgoing: Vec<(Tx2Cert, HowToConnect, GossipWire)>,
+    outgoing: Vec<(GossipTgt, HowToConnect, GossipWire)>,
 }
 
 impl SimpleBloomModInner {
-    pub fn new(
-        tuning_params: KitsuneP2pTuningParams,
-        space: Arc<KitsuneSpace>,
-        ep_hnd: Tx2EpHnd<wire::Wire>,
-        evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
-    ) -> Self {
-        let send_interval_ms: u64 = (
-            // !*)&^$# cargo fmt...
-            16384.0    // max bytes in a gossip msg
-            * 8.0      // bits per byte
-            * 1000.0   // milliseconds
-            / 1024.0   // kbps
-            / 1024.0   // mbps
-            / tuning_params.gossip_output_target_mbps
-        ) as u64;
-
+    pub fn new() -> Self {
         // pick an old instant for initialization
         let old = std::time::Instant::now()
             .checked_sub(std::time::Duration::from_secs(60 * 60 * 24))
             .unwrap();
 
         Self {
-            tuning_params,
-            space,
-            ep_hnd,
-            evt_sender,
-
             local_agents: HashSet::new(),
             local_bloom: bloomfilter::Bloom::new(1, 1),
             local_data_map: HashMap::new(),
             local_key_set: HashSet::new(),
 
-            remote_metrics: HashMap::new(),
+            pending_metrics: Vec::new(),
 
             last_initiate_check: old,
             initiate_tgt: None,
@@ -208,9 +189,18 @@ impl SimpleBloomModInner {
             incoming: Vec::new(),
 
             last_outgoing: old,
-            send_interval_ms,
             outgoing: Vec::new(),
         }
+    }
+
+    /// Record a metric to be recorded at the end of this gossip round
+    // TODO: remove NodeInfo
+    fn record_pending_metric(&mut self, agents: Vec<Arc<KitsuneAgent>>, was_err: bool) {
+        let info = NodeInfo {
+            last_touch: std::time::SystemTime::now(),
+            was_err,
+        };
+        self.pending_metrics.push((agents, info))
     }
 }
 
@@ -226,7 +216,14 @@ enum CheckResult {
     SkipSyncAndInitiate,
 }
 
-struct SimpleBloomMod(Share<SimpleBloomModInner>);
+pub(crate) struct SimpleBloomMod {
+    tuning_params: KitsuneP2pTuningParams,
+    send_interval_ms: u64,
+    space: Arc<KitsuneSpace>,
+    ep_hnd: Tx2EpHnd<wire::Wire>,
+    evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
+    inner: Share<SimpleBloomModInner>,
+}
 
 impl SimpleBloomMod {
     pub fn new(
@@ -235,11 +232,26 @@ impl SimpleBloomMod {
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
     ) -> Arc<Self> {
-        let inner = SimpleBloomModInner::new(tuning_params, space, ep_hnd, evt_sender);
+        let inner = SimpleBloomModInner::new();
 
-        let send_interval_ms = inner.send_interval_ms;
+        let send_interval_ms: u64 = (
+            // !*)&^$# cargo fmt...
+            16384.0    // max bytes in a gossip msg
+            * 8.0      // bits per byte
+            * 1000.0   // milliseconds
+            / 1024.0   // kbps
+            / 1024.0   // mbps
+            / tuning_params.gossip_output_target_mbps
+        ) as u64;
 
-        let this = Arc::new(Self(Share::new(inner)));
+        let this = Arc::new(Self {
+            tuning_params,
+            space,
+            ep_hnd,
+            send_interval_ms,
+            evt_sender,
+            inner: Share::new(inner),
+        });
 
         // this value needs to be somewhat frequent to support send timing
         let loop_check_interval_ms = std::cmp::max(send_interval_ms / 3, 100);
@@ -264,11 +276,68 @@ impl SimpleBloomMod {
         this
     }
 
+    /// Get metrics data via event channel in the form of NodeInfo
+    // TODO: remove NodeInfo
+    async fn get_metric(
+        &self,
+        agents: Vec<Arc<KitsuneAgent>>,
+    ) -> KitsuneP2pResult<Option<NodeInfo>> {
+        let arbitrary_agent = agents
+            .first()
+            .expect("Gossip must have a least one from_agent")
+            .clone();
+        let last_touch = match self
+            .evt_sender
+            .query_metrics(MetricQuery::LastSync {
+                agent: arbitrary_agent,
+            })
+            .await?
+        {
+            MetricQueryAnswer::LastSync(time) => time,
+            _ => unreachable!(),
+        };
+        Ok(last_touch.map(|last_touch| NodeInfo {
+            last_touch,
+            was_err: false,
+        }))
+    }
+
+    /// Record a metric via event channel
+    // TODO: remove NodeInfo
+    async fn record_metric(
+        &self,
+        agents: Vec<Arc<KitsuneAgent>>,
+        info: NodeInfo,
+    ) -> KitsuneP2pResult<()> {
+        if info.was_err {
+            for agent in agents {
+                self.evt_sender
+                    .put_metric_datum(MetricDatum {
+                        agent,
+                        kind: MetricKind::ConnectError,
+                        timestamp: info.last_touch,
+                    })
+                    .await?;
+            }
+        } else {
+            for agent in agents {
+                self.evt_sender
+                    .put_metric_datum(MetricDatum {
+                        agent,
+                        kind: MetricKind::QuickGossip,
+                        timestamp: info.last_touch,
+                    })
+                    .await?;
+            }
+        }
+        Ok(())
+    }
+
     async fn run_one_iteration(&self) -> GossipIterationResult {
         // # Step 1 - check state
         //   - if closed, send GossipIterationResult::Close
         //   - if not ready, exit early
-        let sync_and_initiate = match self.step_1_check() {
+        let sync_and_initiate = match self.step_1_check().await {
             CheckResult::Close => return GossipIterationResult::Close,
             CheckResult::NotReady => return GossipIterationResult::Good,
             CheckResult::SyncAndInitiate => true,
@@ -306,67 +375,32 @@ impl SimpleBloomMod {
             Ok(true) => (),
         }
 
+        // # Step 5 - flush all pending metrics via KitsuneP2pEvent channel
+        //   TODO: this may not be technically correct, since we may want to
+        //       record metrics from previous steps even if those other steps
+        //       short-circuited this iteration. Revisit.
+        #[allow(clippy::single_match)]
+        match self.step_5_flush_metrics().await {
+            Err(_) => return GossipIterationResult::Close,
+            Ok(_) => (),
+        }
+
         GossipIterationResult::Good
     }
 
-    fn step_1_check(&self) -> CheckResult {
-        match self.0.share_mut(|i, _| {
-            // first, if we don't have any local agents, there's
-            // no point in doing any gossip logic
-            if i.local_agents.is_empty() {
-                return Ok(CheckResult::NotReady);
-            }
-
-            // next, check to see if we should time out any current initiate_tgt
-            if let Some(initiate_tgt) = i.initiate_tgt.clone() {
-                if let Some(metric) = i.remote_metrics.get(&initiate_tgt) {
-                    if metric.was_err
-                        || metric.last_touch.elapsed().as_millis() as u32
-                            > i.tuning_params.gossip_peer_on_success_next_gossip_delay_ms
-                            // give us a little leeway... we don't
-                            // need to be too agressive with timing out
-                            // this loop
-                            * 2
-                    {
-                        tracing::warn!("gossip timeout on initiate tgt {:?}", i.initiate_tgt);
-                        i.initiate_tgt = None;
-                    } else {
-                        // we're still processing the current initiate...
-                        // don't bother syncing locally
-                        return Ok(CheckResult::SkipSyncAndInitiate);
-                    }
-                } else {
-                    // erm... we have an initate tgt,
-                    // but we've never seen them??
-                    // this must be a logic error.
-                    unreachable!()
-                }
-            }
-
-            if i.initiate_tgt.is_none()
-                && i.last_initiate_check.elapsed().as_millis() as u32
-                    > i.tuning_params.gossip_loop_iteration_delay_ms
-            {
-                return Ok(CheckResult::SyncAndInitiate);
-            }
-            Ok(CheckResult::SkipSyncAndInitiate)
-        }) {
+    async fn step_1_check(&self) -> CheckResult {
+        match self.step_1_check_inner().await {
             Err(_) => CheckResult::Close,
             Ok(r) => r,
         }
     }
 
     async fn step_2_local_sync(&self) -> KitsuneResult<bool> {
-        let (space, evt_sender, local_agents) = self.0.share_mut(|i, _| {
-            Ok((
-                i.space.clone(),
-                i.evt_sender.clone(),
-                i.local_agents.clone(),
-            ))
-        })?;
+        let evt_sender = self.evt_sender.clone();
+        let local_agents = self.inner.share_mut(|i, _| Ok(i.local_agents.clone()))?;
 
         let (data_map, key_set, bloom) =
-            match step_2_local_sync_inner(space, evt_sender, local_agents).await {
+            match step_2_local_sync_inner(self.space.clone(), evt_sender, local_agents).await {
                 Err(e) => {
                     tracing::warn!("gossip error: {:?}", e);
                     return Ok(false);
@@ -374,7 +408,7 @@ impl SimpleBloomMod {
                 Ok(r) => r,
             };
 
-        self.0.share_mut(move |i, _| {
+        self.inner.share_mut(move |i, _| {
             i.local_data_map = data_map;
             i.local_key_set = key_set;
             i.local_bloom = bloom;
@@ -384,10 +418,8 @@ impl SimpleBloomMod {
         Ok(true)
     }
 
-    async fn step_3_initiate(&self) -> KitsuneResult<bool> {
-        self.0
-            .share_mut(|i, _| danger_mutex_locked_sync_step_3_initiate_inner(i))?;
-
+    async fn step_3_initiate(&self) -> KitsuneP2pResult<bool> {
+        step_3_initiate_inner(self).await?;
         Ok(true)
     }
 
@@ -395,10 +427,15 @@ impl SimpleBloomMod {
         let loop_start = std::time::Instant::now();
 
         loop {
-            let (tuning_params, space, ep_hnd, mut maybe_outgoing, mut maybe_incoming) =
-                self.0.share_mut(|i, _| {
+            let (tuning_params, space, ep_hnd) = (
+                self.tuning_params.clone(),
+                self.space.clone(),
+                self.ep_hnd.clone(),
+            );
+            let (mut maybe_outgoing, mut maybe_incoming) =
+                self.inner.share_mut(|i, _| {
                     let maybe_outgoing = if !i.outgoing.is_empty()
-                        && i.last_outgoing.elapsed().as_millis() as u64 > i.send_interval_ms
+                        && i.last_outgoing.elapsed().as_millis() as u64 > self.send_interval_ms
                     {
                         let (cert, how, gossip) = i.outgoing.remove(0);
 
@@ -408,7 +445,7 @@ impl SimpleBloomMod {
                         // when we get a success or failure below.
                         i.last_outgoing = std::time::Instant::now()
                             .checked_add(std::time::Duration::from_millis(
-                                i.tuning_params.tx2_implicit_timeout_ms as u64,
+                                self.tuning_params.tx2_implicit_timeout_ms as u64,
                             ))
                             .expect("Congratulations on running holochain near the heat death of the universe :)");
 
@@ -422,9 +459,6 @@ impl SimpleBloomMod {
                         None
                     };
                     Ok((
-                        i.tuning_params.clone(),
-                        i.space.clone(),
-                        i.ep_hnd.clone(),
                         maybe_outgoing,
                         maybe_incoming,
                     ))
@@ -435,40 +469,29 @@ impl SimpleBloomMod {
                     > tuning_params.gossip_loop_iteration_delay_ms;
 
             if let Some(outgoing) = maybe_outgoing.take() {
-                let (cert, how, gossip) = outgoing;
+                let (endpoint, how, gossip) = outgoing;
+                let agents = endpoint.agents().clone();
                 if let Err(e) = step_4_com_loop_inner_outgoing(
-                    &self.0,
+                    &self.inner,
                     tuning_params.clone(),
                     space.clone(),
                     ep_hnd,
-                    cert.clone(),
+                    endpoint.cert().clone(),
                     how,
                     gossip,
                 )
                 .await
                 {
-                    tracing::warn!("failed to send outgoing: {:?} {:?}", cert, e);
-                    self.0.share_mut(move |i, _| {
+                    tracing::warn!("failed to send outgoing: {:?} {:?}", endpoint, e);
+                    self.inner.share_mut(move |i, _| {
                         i.last_outgoing = std::time::Instant::now();
-                        i.remote_metrics.insert(
-                            cert,
-                            NodeInfo {
-                                last_touch: std::time::Instant::now(),
-                                was_err: true,
-                            },
-                        );
+                        i.record_pending_metric(agents, true);
                         Ok(())
                     })?;
                 } else {
-                    self.0.share_mut(move |i, _| {
+                    self.inner.share_mut(move |i, _| {
                         i.last_outgoing = std::time::Instant::now();
-                        i.remote_metrics.insert(
-                            cert,
-                            NodeInfo {
-                                last_touch: std::time::Instant::now(),
-                                was_err: false,
-                            },
-                        );
+                        i.record_pending_metric(agents, false);
                         Ok(())
                     })?;
                 }
@@ -476,7 +499,7 @@ impl SimpleBloomMod {
 
             if let Some(incoming) = maybe_incoming.take() {
                 let (con, gossip) = incoming;
-                if let Err(e) = step_4_com_loop_inner_incoming(&self.0, con, gossip).await {
+                if let Err(e) = step_4_com_loop_inner_incoming(&self, con, gossip).await {
                     tracing::warn!("failed to process incoming: {:?}", e);
                 }
             }
@@ -488,6 +511,16 @@ impl SimpleBloomMod {
 
         Ok(true)
     }
+
+    async fn step_5_flush_metrics(&self) -> KitsuneP2pResult<()> {
+        let metrics: Vec<_> = self
+            .inner
+            .share_mut(|i, _| Ok(i.pending_metrics.drain(..).collect()))?;
+        for (agents, info) in metrics {
+            self.record_metric(agents, info).await?;
+        }
+        Ok(())
+    }
 }
 
 impl AsGossipModule for SimpleBloomMod {
@@ -498,7 +531,7 @@ impl AsGossipModule for SimpleBloomMod {
     ) -> KitsuneResult<()> {
         use kitsune_p2p_types::codec::*;
         let (_, gossip) = GossipWire::decode_ref(&gossip_data).map_err(KitsuneError::other)?;
-        self.0.share_mut(move |i, _| {
+        self.inner.share_mut(move |i, _| {
             i.incoming.push((con, gossip));
             if i.incoming.len() > 20 {
                 tracing::warn!(
@@ -511,14 +544,14 @@ impl AsGossipModule for SimpleBloomMod {
     }
 
     fn local_agent_join(&self, a: Arc<KitsuneAgent>) {
-        let _ = self.0.share_mut(move |i, _| {
+        let _ = self.inner.share_mut(move |i, _| {
             i.local_agents.insert(a);
             Ok(())
         });
     }
 
     fn local_agent_leave(&self, a: Arc<KitsuneAgent>) {
-        let _ = self.0.share_mut(move |i, _| {
+        let _ = self.inner.share_mut(move |i, _| {
             i.local_agents.remove(&a);
             Ok(())
         });

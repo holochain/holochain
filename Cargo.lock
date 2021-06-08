@@ -2477,6 +2477,7 @@ version = "0.0.1"
 dependencies = [
  "arrayref",
  "base64",
+ "derive_more",
  "futures",
  "hyper",
  "kitsune_p2p",
@@ -5893,13 +5894,3 @@ dependencies = [
  "syn",
  "synstructure",
 ]
-
-[[patch.unused]]
-name = "holochain_wasmer_guest"
-version = "0.0.67"
-source = "git+https://github.com/holochain/holochain-wasmer.git?branch=wasmer-patch#b7fcc65c88f89f39f75f5d2946de893cb30eeec2"
-
-[[patch.unused]]
-name = "holochain_wasmer_host"
-version = "0.0.67"
-source = "git+https://github.com/holochain/holochain-wasmer.git?branch=wasmer-patch#b7fcc65c88f89f39f75f5d2946de893cb30eeec2"

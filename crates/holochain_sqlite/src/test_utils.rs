@@ -56,8 +56,10 @@ pub struct TestDbs {
     conductor: DbWrite,
     /// A test wasm environment
     wasm: DbWrite,
-    /// A test p2p environment
-    p2p: DbWrite,
+    /// A test p2p state environment
+    p2p_state: DbWrite,
+    /// A test p2p metrics environment
+    p2p_metrics: DbWrite,
     /// The shared root temp dir for these environments
     tempdir: Arc<TempDir>,
 }
@@ -69,12 +71,14 @@ impl TestDbs {
         use DbKind::*;
         let conductor = DbWrite::new(&tempdir.path(), Conductor).unwrap();
         let wasm = DbWrite::new(&tempdir.path(), Wasm).unwrap();
-        let space = kitsune_p2p::KitsuneSpace(vec![0; 36]);
-        let p2p = DbWrite::new(&tempdir.path(), P2p(Arc::new(space))).unwrap();
+        let space = Arc::new(kitsune_p2p::KitsuneSpace(vec![0; 36]));
+        let p2p_state = DbWrite::new(&tempdir.path(), P2pState(space.clone())).unwrap();
+        let p2p_metrics = DbWrite::new(&tempdir.path(), P2pMetrics(space)).unwrap();
         Self {
             conductor,
             wasm,
-            p2p,
+            p2p_state,
+            p2p_metrics,
             tempdir: Arc::new(tempdir),
         }
     }
@@ -87,8 +91,12 @@ impl TestDbs {
         self.wasm.clone()
     }
 
-    pub fn p2p(&self) -> DbWrite {
-        self.p2p.clone()
+    pub fn p2p_state(&self) -> DbWrite {
+        self.p2p_state.clone()
+    }
+
+    pub fn p2p_metrics(&self) -> DbWrite {
+        self.p2p_metrics.clone()
     }
 
     /// Get the root temp dir for these environments

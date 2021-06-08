@@ -39,9 +39,14 @@ pub fn test_wasm_env() -> TestEnv {
     test_env(DbKind::Wasm)
 }
 
-/// Create a [TestEnv] of [DbKind::P2p], backed by a temp directory.
-pub fn test_p2p_env() -> TestEnv {
-    test_env(DbKind::P2p(Arc::new(KitsuneSpace(vec![0; 36]))))
+/// Create a [TestEnv] of [DbKind::P2pState], backed by a temp directory.
+pub fn test_p2p_state_env() -> TestEnv {
+    test_env(DbKind::P2pState(Arc::new(KitsuneSpace(vec![0; 36]))))
+}
+
+/// Create a [TestEnv] of [DbKind::P2pState], backed by a temp directory.
+pub fn test_p2p_metrics_env() -> TestEnv {
+    test_env(DbKind::P2pMetrics(Arc::new(KitsuneSpace(vec![0; 36]))))
 }
 
 fn test_env(kind: DbKind) -> TestEnv {
