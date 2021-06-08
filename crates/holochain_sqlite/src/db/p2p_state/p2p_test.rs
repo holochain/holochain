@@ -1,4 +1,3 @@
-use crate::db::p2p::p2p_put;
 use crate::prelude::*;
 use kitsune_p2p::agent_store::{AgentInfo, AgentInfoSigned, AgentMetaInfo};
 use kitsune_p2p::dht_arc::DhtArc;
@@ -77,7 +76,7 @@ async fn test_p2p_store_sanity() {
 
     let space = rand_space();
 
-    let db = DbWrite::test(&tmp_dir, DbKind::P2p(Arc::new(space.clone()))).unwrap();
+    let db = DbWrite::test(&tmp_dir, DbKind::P2pState(Arc::new(space.clone()))).unwrap();
 
     let mut example_agent = rand_agent();
 

@@ -9,7 +9,7 @@ use rusqlite::*;
 
 /// Extension trait to treat connection instances
 /// as p2p store accessors.
-pub trait AsP2pConExt {
+pub trait AsP2pStateConExt {
     /// Get an AgentInfoSigned record from the p2p_store
     fn p2p_get(&mut self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>>;
 
@@ -27,7 +27,7 @@ pub trait AsP2pConExt {
 
 /// Extension trait to treat transaction instances
 /// as p2p store accessors.
-pub trait AsP2pTxExt {
+pub trait AsP2pStateTxExt {
     /// Get an AgentInfoSigned record from the p2p_store
     fn p2p_get(&self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>>;
 
@@ -43,7 +43,7 @@ pub trait AsP2pTxExt {
     ) -> DatabaseResult<Vec<KitsuneAgent>>;
 }
 
-impl AsP2pConExt for crate::db::PConn {
+impl AsP2pStateConExt for crate::db::PConn {
     fn p2p_get(&mut self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>> {
         self.with_reader(move |reader| reader.p2p_get(agent))
     }
@@ -88,7 +88,7 @@ pub async fn p2p_put_all(
 
 fn tx_p2p_put(txn: &mut Transaction, record: P2pRecord) -> DatabaseResult<()> {
     txn.execute(
-        sql_p2p::INSERT,
+        sql_p2p_state::INSERT,
         named_params! {
             ":agent": &record.agent.0,
 
@@ -115,19 +115,19 @@ pub async fn p2p_prune(db: &DbWrite) -> DatabaseResult<()> {
             .unwrap()
             .as_millis() as u64;
 
-        txn.execute(sql_p2p::PRUNE, named_params! { ":now": now })?;
+        txn.execute(sql_p2p_state::PRUNE, named_params! { ":now": now })?;
         DatabaseResult::Ok(())
     })
     .await?;
 
     Ok(())
 }
-impl AsP2pTxExt for Transaction<'_> {
+impl AsP2pStateTxExt for Transaction<'_> {
     fn p2p_get(&self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>> {
         use std::convert::TryFrom;
 
         let mut stmt = self
-            .prepare(sql_p2p::SELECT)
+            .prepare(sql_p2p_state::SELECT)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
 
         Ok(stmt
@@ -145,7 +145,7 @@ impl AsP2pTxExt for Transaction<'_> {
         use std::convert::TryFrom;
 
         let mut stmt = self
-            .prepare(sql_p2p::SELECT_ALL)
+            .prepare(sql_p2p_state::SELECT_ALL)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
         let mut out = Vec::new();
         for r in stmt.query_map([], |r| {
@@ -168,7 +168,7 @@ impl AsP2pTxExt for Transaction<'_> {
         within_arc: DhtArc,
     ) -> DatabaseResult<Vec<KitsuneAgent>> {
         let mut stmt = self
-            .prepare(sql_p2p::GOSSIP_QUERY)
+            .prepare(sql_p2p_state::GOSSIP_QUERY)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
 
         let (storage_1, storage_2) = split_arc(&within_arc);

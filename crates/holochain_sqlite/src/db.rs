@@ -20,8 +20,11 @@ use tokio::{
     task,
 };
 
-mod p2p;
-pub use p2p::*;
+mod p2p_state;
+pub use p2p_state::*;
+
+mod p2p_metrics;
+pub use p2p_metrics::*;
 
 /// A read-only version of [DbWrite].
 /// This environment can only generate read-only transactions, never read-write.
@@ -169,7 +172,9 @@ pub enum DbKind {
     /// Specifies the environment used to save wasm
     Wasm,
     /// State of the p2p network (one per space).
-    P2p(Arc<KitsuneSpace>),
+    P2pState(Arc<KitsuneSpace>),
+    /// Metrics for peers on p2p network (one per space).
+    P2pMetrics(Arc<KitsuneSpace>),
 }
 
 impl DbKind {
@@ -180,7 +185,10 @@ impl DbKind {
             DbKind::Cache(dna) => ["cache", &format!("cache-{}", dna)].iter().collect(),
             DbKind::Conductor => ["conductor", "conductor"].iter().collect(),
             DbKind::Wasm => ["wasm", "wasm"].iter().collect(),
-            DbKind::P2p(space) => ["p2p", &format!("p2p-{}", space)].iter().collect(),
+            DbKind::P2pState(space) => ["p2p", &format!("p2p_state-{}", space)].iter().collect(),
+            DbKind::P2pMetrics(space) => {
+                ["p2p", &format!("p2p_metrics-{}", space)].iter().collect()
+            }
         };
         path.set_extension("sqlite3");
         path

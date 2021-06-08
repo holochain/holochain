@@ -1,4 +1,4 @@
-//! A simple KvBuf for AgentInfoSigned.
+//! Queries for the P2pState store
 
 use fallible_iterator::FallibleIterator;
 use holo_hash::AgentPubKey;
@@ -207,14 +207,14 @@ pub fn dump_state(env: EnvRead, cell_id: Option<CellId>) -> StateQueryResult<P2p
 mod tests {
     use super::*;
     use ::fixt::prelude::*;
-    use holochain_state::test_utils::test_p2p_env;
+    use holochain_state::test_utils::test_p2p_state_env;
     use kitsune_p2p::fixt::AgentInfoSignedFixturator;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_store_agent_info_signed() {
         observability::test_run().ok();
 
-        let test_env = test_p2p_env();
+        let test_env = test_p2p_state_env();
         let env = test_env.env();
 
         let agent_info_signed = fixt!(AgentInfoSigned, Predictable);
@@ -230,7 +230,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn add_agent_info_to_peer_env() {
         observability::test_run().ok();
-        let t_env = test_p2p_env();
+        let t_env = test_p2p_state_env();
         let env = t_env.env();
 
         // - Check no data in the store to start

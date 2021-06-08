@@ -230,6 +230,10 @@ impl Cell {
                 // store lives.
                 unreachable!()
             }
+            PutMetricDatum { .. } | QueryMetrics { .. } => {
+                // Same goes for metrics
+                unreachable!()
+            }
             CallRemote {
                 span_context: _,
                 from_agent,
@@ -683,11 +687,20 @@ impl Cell {
                     let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
                     let op_type: DhtOpType = row.get("dht_type")?;
                     let hash: DhtOpHash = row.get("hash")?;
-                    let entry: Option<Vec<u8>> = row.get("entry_blob")?;
-                    let entry = match entry {
-                        Some(entry) => Some(from_blob::<Entry>(entry)?),
-                        None => None,
-                    };
+                    // Check the entry isn't private before gossiping it.
+                    let mut entry: Option<Entry> = None;
+                    if header
+                        .0
+                        .entry_type()
+                        .filter(|et| *et.visibility() == EntryVisibility::Public)
+                        .is_some()
+                    {
+                        let e: Option<Vec<u8>> = row.get("entry_blob")?;
+                        entry = match e {
+                            Some(entry) => Some(from_blob::<Entry>(entry)?),
+                            None => None,
+                        };
+                    }
                     let op = DhtOp::from_type(op_type, header, entry)?;
                     StateQueryResult::Ok((basis_hash, hash, op))
                 })?
