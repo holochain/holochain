@@ -1,9 +1,9 @@
 use crate::crdt::CrdtType;
 use crate::validate::RequiredValidationType;
-use crate::zome_io::ExternIO;
 use crate::CallbackResult;
 use crate::EntryDefIndex;
 use holochain_serialized_bytes::prelude::*;
+use holochain_wasmer_common::WasmError;
 
 const DEFAULT_REQUIRED_VALIDATIONS: u8 = 5;
 
@@ -145,7 +145,6 @@ impl From<Vec<EntryDef>> for EntryDefs {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub enum EntryDefsCallbackResult {
     Defs(EntryDefs),
-    Err(String),
 }
 
 impl From<Vec<EntryDef>> for EntryDefsCallbackResult {
@@ -154,21 +153,13 @@ impl From<Vec<EntryDef>> for EntryDefsCallbackResult {
     }
 }
 
-impl From<ExternIO> for EntryDefsCallbackResult {
-    fn from(callback_guest_output: ExternIO) -> Self {
-        match callback_guest_output.decode() {
-            Ok(v) => v,
-            Err(e) => Self::Err(format!("{:?}", e)),
-        }
-    }
-}
-
 impl CallbackResult for EntryDefsCallbackResult {
     fn is_definitive(&self) -> bool {
-        match self {
-            EntryDefsCallbackResult::Defs(_) => false,
-            EntryDefsCallbackResult::Err(_) => true,
-        }
+        false
+    }
+    fn try_from_wasm_error(wasm_error: WasmError) -> Result<Self, WasmError> {
+        // There is no concept of entry defs failing, other than normal error handling.
+        Err(wasm_error)
     }
 }
 

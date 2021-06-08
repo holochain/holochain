@@ -57,12 +57,48 @@ macro_rules! map_extern {
                         },
                         Err(e) => {
                             let output_type_id = std::any::TypeId::of::<$output>();
-                            if output_type_id == std::any::TypeId::of::<$crate::prelude::ExternResult<$crate::prelude::ValidateCallbackResult>>() {
-                                match $crate::prelude::ValidateCallbackResult::try_from(e) {
+                            // Callback results have a pass/fail nature that needs to map some wasm errors to an Ok(XCallbackResult::Fail).
+                            if output_type_id == std::any::TypeId::of::<$crate::prelude::ExternResult<$crate::prelude::EntryDefsCallbackResult>>() {
+                                match $crate::prelude::EntryDefsCallbackResult::try_from_wasm_error(e) {
                                     Ok(v) => $crate::prelude::ExternIO::encode(v),
                                     Err(e) => return $crate::prelude::return_err_ptr(e),
                                 }
-                            } else {
+                            }
+                            else if output_type_id == std::any::TypeId::of::<$crate::prelude::ExternResult<$crate::prelude::InitCallbackResult>>() {
+                                match $crate::prelude::InitCallbackResult::try_from_wasm_error(e) {
+                                    Ok(v) => $crate::prelude::ExternIO::encode(v),
+                                    Err(e) => return $crate::prelude::return_err_ptr(e),
+                                }
+                            } else if output_type_id == std::any::TypeId::of::<$crate::prelude::ExternResult<$crate::prelude::MigrateAgentCallbackResult>>() {
+                                match $crate::prelude::MigrateAgentCallbackResult::try_from_wasm_error(e) {
+                                    Ok(v) => $crate::prelude::ExternIO::encode(v),
+                                    Err(e) => return $crate::prelude::return_err_ptr(e),
+                                }
+                            }
+                            else if output_type_id == std::any::TypeId::of::<$crate::prelude::ExternResult<$crate::prelude::PostCommitCallbackResult>>() {
+                                match $crate::prelude::PostCommitCallbackResult::try_from_wasm_error(e) {
+                                    Ok(v) => $crate::prelude::ExternIO::encode(v),
+                                    Err(e) => return $crate::prelude::return_err_ptr(e),
+                                }
+                            }
+                            else if output_type_id == std::any::TypeId::of::<$crate::prelude::ExternResult<$crate::prelude::ValidateLinkCallbackResult>>() {
+                                match $crate::prelude::ValidateLinkCallbackResult::try_from_wasm_error(e) {
+                                    Ok(v) => $crate::prelude::ExternIO::encode(v),
+                                    Err(e) => return $crate::prelude::return_err_ptr(e),
+                                }
+                            }
+                            else if output_type_id == std::any::TypeId::of::<$crate::prelude::ExternResult<$crate::prelude::ValidateCallbackResult>>() {
+                                match $crate::prelude::ValidateCallbackResult::try_from_wasm_error(e) {
+                                    Ok(v) => $crate::prelude::ExternIO::encode(v),
+                                    Err(e) => return $crate::prelude::return_err_ptr(e),
+                                }
+                            } else if output_type_id == std::any::TypeId::of::<$crate::prelude::ExternResult<$crate::prelude::ValidationPackageCallbackResult>>() {
+                                match $crate::prelude::ValidationPackageCallbackResult::try_from_wasm_error(e) {
+                                    Ok(v) => $crate::prelude::ExternIO::encode(v),
+                                    Err(e) => return $crate::prelude::return_err_ptr(e),
+                                }
+                            }
+                            else {
                                 return $crate::prelude::return_err_ptr(e);
                             }
                         },

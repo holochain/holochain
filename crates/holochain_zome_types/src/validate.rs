@@ -1,5 +1,4 @@
 use crate::element::Element;
-use crate::zome_io::ExternIO;
 use crate::CallbackResult;
 use holo_hash::AnyDhtHash;
 use holochain_serialized_bytes::prelude::*;
@@ -56,39 +55,16 @@ pub enum ValidateCallbackResult {
     UnresolvedDependencies(Vec<AnyDhtHash>),
 }
 
-impl TryFrom<WasmError> for ValidateCallbackResult {
-    type Error = WasmError;
-    fn try_from(wasm_error: WasmError) -> Result<Self, Self::Error> {
-        match wasm_error {
-            WasmError::Guest(e) => Ok(ValidateCallbackResult::Invalid(e)),
-            WasmError::Serialize(e) => Ok(ValidateCallbackResult::Invalid(e.to_string())),
-            WasmError::Deserialize(e) => Ok(ValidateCallbackResult::Invalid(format!(
-                "Failed to deserialize: {:?}",
-                e
-            ))),
-            WasmError::PointerMap => Err(wasm_error),
-            WasmError::ErrorWhileError => Err(wasm_error),
-            WasmError::Memory => Err(wasm_error),
-            WasmError::GuestResultHandling(_) => Err(wasm_error),
-            WasmError::Host(_) => Err(wasm_error),
-            WasmError::HostShortCircuit(_) => Err(wasm_error),
-            WasmError::Compile(_) => Err(wasm_error),
-            WasmError::CallError(_) => Err(wasm_error),
-        }
-    }
-}
-
 impl CallbackResult for ValidateCallbackResult {
     fn is_definitive(&self) -> bool {
         matches!(self, ValidateCallbackResult::Invalid(_))
     }
-}
-
-impl From<ExternIO> for ValidateCallbackResult {
-    fn from(guest_output: ExternIO) -> Self {
-        match guest_output.decode() {
-            Ok(v) => v,
-            Err(e) => Self::Invalid(format!("{:?}", e)),
+    fn try_from_wasm_error(wasm_error: WasmError) -> Result<Self, WasmError> {
+        match wasm_error {
+            WasmError::Guest(_) | WasmError::Serialize(_) | WasmError::Deserialize(_) => {
+                Ok(ValidateCallbackResult::Invalid(wasm_error.to_string()))
+            }
+            _ => Err(wasm_error),
         }
     }
 }
@@ -117,18 +93,17 @@ pub enum ValidationPackageCallbackResult {
     UnresolvedDependencies(Vec<AnyDhtHash>),
 }
 
-impl From<ExternIO> for ValidationPackageCallbackResult {
-    fn from(guest_output: ExternIO) -> Self {
-        match guest_output.decode() {
-            Ok(v) => v,
-            Err(e) => ValidationPackageCallbackResult::Fail(format!("{:?}", e)),
-        }
-    }
-}
-
 impl CallbackResult for ValidationPackageCallbackResult {
     fn is_definitive(&self) -> bool {
         matches!(self, ValidationPackageCallbackResult::Fail(_))
+    }
+    fn try_from_wasm_error(wasm_error: WasmError) -> Result<Self, WasmError> {
+        match wasm_error {
+            WasmError::Guest(_) | WasmError::Serialize(_) | WasmError::Deserialize(_) => Ok(
+                ValidationPackageCallbackResult::Fail(wasm_error.to_string()),
+            ),
+            _ => Err(wasm_error),
+        }
     }
 }
 

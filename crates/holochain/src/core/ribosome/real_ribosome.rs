@@ -443,9 +443,9 @@ macro_rules! do_callback {
         // fallible iterator syntax instead of for loop
         let mut call_iterator = $self.call_iterator($access.into(), $invocation);
         while let Some(output) = call_iterator.next()? {
-            let (zome, callback_result) = output;
+            let (zome, extern_io): (Zome, ExternIO) = output;
             let zome_name: ZomeName = zome.into();
-            let callback_result: $callback_result = callback_result.into();
+            let callback_result: $callback_result = extern_io.decode()?;
             // return early if we have a definitive answer, no need to keep invoking callbacks
             // if we know we are done
             if callback_result.is_definitive() {
@@ -554,7 +554,7 @@ impl RibosomeT for RealRibosome {
         access: GenesisSelfCheckHostAccess,
         invocation: GenesisSelfCheckInvocation,
     ) -> RibosomeResult<GenesisSelfCheckResult> {
-        do_callback!(self, access, invocation, GenesisSelfCheckResult)
+        do_callback!(self, access, invocation, ValidateCallbackResult)
     }
 
     fn run_validate(

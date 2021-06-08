@@ -631,12 +631,6 @@ macro_rules! entry_def_index {
                     }
                 }
             }
-            Ok($crate::prelude::EntryDefsCallbackResult::Err(error)) => {
-                $crate::prelude::tracing::error!(?error, "Failed to lookup entry defs.");
-                Err::<$crate::prelude::EntryDefIndex, $crate::prelude::WasmError>(
-                    $crate::prelude::WasmError::Guest(error),
-                )
-            }
             Err(error) => {
                 $crate::prelude::tracing::error!(?error, "Failed to lookup entry defs.");
                 Err::<$crate::prelude::EntryDefIndex, $crate::prelude::WasmError>(error)

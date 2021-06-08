@@ -63,10 +63,6 @@ impl From<Vec<(ZomeName, EntryDefsCallbackResult)>> for EntryDefsResult {
         callback_results.into_iter().fold(
             EntryDefsResult::Defs(BTreeMap::new()),
             |acc, x| match x {
-                // err overrides everything
-                (zome_name, EntryDefsCallbackResult::Err(fail_string)) => {
-                    Self::Err(zome_name, fail_string)
-                }
                 // passing callback allows the acc to carry forward
                 (zome_name, EntryDefsCallbackResult::Defs(defs)) => match acc {
                     Self::Defs(mut btreemap) => {
@@ -89,7 +85,6 @@ mod test {
     use crate::fixt::EntryDefsFixturator;
     use crate::fixt::EntryDefsInvocationFixturator;
     use crate::fixt::ZomeNameFixturator;
-    use ::fixt::prelude::*;
     use holochain_types::prelude::*;
     use holochain_zome_types::entry_def::EntryDefsCallbackResult;
     use holochain_zome_types::ExternIO;
@@ -98,11 +93,8 @@ mod test {
     #[test]
     /// this is a non-standard fold test because the result is not so simple
     fn entry_defs_callback_result_fold() {
-        let mut rng = ::fixt::rng();
-
         let mut zome_name_fixturator = ZomeNameFixturator::new(::fixt::Unpredictable);
         let mut entry_defs_fixturator = EntryDefsFixturator::new(::fixt::Unpredictable);
-        let mut string_fixturator = StringFixturator::new(::fixt::Unpredictable);
 
         // zero defs
         assert_eq!(EntryDefsResult::Defs(BTreeMap::new()), vec![].into(),);
@@ -137,35 +129,6 @@ mod test {
             ]
             .into()
         );
-
-        // some err
-        let mut results = vec![];
-
-        let number_of_fails = rng.gen_range(1, 3);
-        let number_of_defs = rng.gen_range(0, 3);
-
-        for _ in 0..number_of_fails {
-            results.push((
-                zome_name_fixturator.next().unwrap(),
-                EntryDefsCallbackResult::Err(string_fixturator.next().unwrap()),
-            ));
-        }
-
-        for _ in 0..number_of_defs {
-            results.push((
-                zome_name_fixturator.next().unwrap(),
-                EntryDefsCallbackResult::Defs(entry_defs_fixturator.next().unwrap()),
-            ));
-        }
-
-        results.shuffle(&mut rng);
-
-        let result: EntryDefsResult = results.into();
-
-        match result {
-            EntryDefsResult::Err(_, _) => assert!(true),
-            _ => assert!(false),
-        }
     }
 
     #[test]
