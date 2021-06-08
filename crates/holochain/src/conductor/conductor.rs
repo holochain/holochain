@@ -739,16 +739,16 @@ where
         slot_id: &SlotId,
         properties: YamlProperties,
     ) -> ConductorResult<CellId> {
+        let dna_store = &self.dna_store;
         let (_, child_dna) = self
-            .update_state_prime(|mut state| {
+            .update_state_prime(move |mut state| {
                 if let Some(app) = state.active_apps.get_mut(installed_app_id) {
                     let slot = app
                         .slots()
                         .get(slot_id)
                         .ok_or_else(|| AppError::SlotIdMissing(slot_id.to_owned()))?;
                     let parent_dna_hash = slot.dna_hash();
-                    let dna = self
-                        .dna_store
+                    let dna = dna_store
                         .get(parent_dna_hash)
                         .ok_or_else(|| DnaError::DnaMissing(parent_dna_hash.to_owned()))?
                         .modify_phenotype(random_uid(), properties)?;
@@ -887,22 +887,26 @@ where
         )
         .await;
 
-        env.conn()?.with_commit(|txn| {
-            for dna_wasm in wasms {
-                if !holochain_state::wasm::contains(txn, dna_wasm.as_hash())? {
-                    holochain_state::wasm::put(txn, dna_wasm)?;
+        env.async_commit({
+            let zome_defs = zome_defs.clone();
+            move |txn| {
+                for dna_wasm in wasms {
+                    if !holochain_state::wasm::contains(txn, dna_wasm.as_hash())? {
+                        holochain_state::wasm::put(txn, dna_wasm)?;
+                    }
                 }
-            }
 
-            for (key, entry_def) in zome_defs.clone() {
-                holochain_state::entry_def::put(txn, key, entry_def)?;
-            }
+                for (key, entry_def) in zome_defs.clone() {
+                    holochain_state::entry_def::put(txn, key, entry_def)?;
+                }
 
-            if !holochain_state::dna_def::contains(txn, dna.dna_hash())? {
-                holochain_state::dna_def::put(txn, dna.dna_def().clone())?;
+                if !holochain_state::dna_def::contains(txn, dna.dna_hash())? {
+                    holochain_state::dna_def::put(txn, dna.dna_def().clone())?;
+                }
+                StateMutationResult::Ok(())
             }
-            StateMutationResult::Ok(())
-        })?;
+        })
+        .await?;
 
         Ok(zome_defs)
     }
@@ -1103,7 +1107,7 @@ where
     /// Update the internal state with a pure function mapping old state to new
     async fn update_state<F: Send>(&self, f: F) -> ConductorResult<ConductorState>
     where
-        F: FnOnce(ConductorState) -> ConductorResult<ConductorState>,
+        F: FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
     {
         let (state, _) = self.update_state_prime(|s| Ok((f(s)?, ()))).await?;
         Ok(state)
@@ -1112,26 +1116,29 @@ where
     /// Update the internal state with a pure function mapping old state to new,
     /// which may also produce an output value which will be the output of
     /// this function
-    async fn update_state_prime<F: Send, O>(&self, f: F) -> ConductorResult<(ConductorState, O)>
+    async fn update_state_prime<F, O>(&self, f: F) -> ConductorResult<(ConductorState, O)>
     where
         F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)>,
+        O: Send,
     {
         self.check_running()?;
-        let mut guard = self.env.conn()?;
-        let output = guard.with_commit(|txn| {
-            let state = txn
-                .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
-                    row.get("blob")
-                })
-                .optional()?;
-            let state = match state {
-                Some(state) => from_blob(state)?,
-                None => ConductorState::default(),
-            };
-            let (new_state, output) = f(state)?;
-            mutations::insert_conductor_state(txn, (&new_state).try_into()?)?;
-            Result::<_, ConductorError>::Ok((new_state, output))
-        })?;
+        let output = self
+            .env
+            .async_commit_in_place(move |txn| {
+                let state = txn
+                    .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
+                        row.get("blob")
+                    })
+                    .optional()?;
+                let state = match state {
+                    Some(state) => from_blob(state)?,
+                    None => ConductorState::default(),
+                };
+                let (new_state, output) = f(state)?;
+                mutations::insert_conductor_state(txn, (&new_state).try_into()?)?;
+                Result::<_, ConductorError>::Ok((new_state, output))
+            })
+            .await?;
         Ok(output)
     }
 

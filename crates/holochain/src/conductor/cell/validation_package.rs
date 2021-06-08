@@ -24,7 +24,7 @@ pub(super) async fn get_as_author(
     // Get the source chain with public data only
     // TODO: evaluate if we even need to use a source chain here
     // vs directly querying the database.
-    let mut source_chain = SourceChain::new(env.clone(), header.author().clone())?;
+    let mut source_chain = SourceChain::new(env.clone().into(), header.author().clone())?;
     source_chain.public_only();
 
     // Get the header data

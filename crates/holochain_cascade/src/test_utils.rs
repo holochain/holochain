@@ -206,7 +206,7 @@ impl HolochainP2pCellT for PassThroughNetwork {
 pub fn fill_db(env: &EnvWrite, op: DhtOpHashed) {
     env.conn()
         .unwrap()
-        .with_commit(|txn| {
+        .with_commit_sync(|txn| {
             let hash = op.as_hash().clone();
             insert_op(txn, op, false).unwrap();
             set_validation_status(txn, hash.clone(), ValidationStatus::Valid).unwrap();
@@ -219,7 +219,7 @@ pub fn fill_db(env: &EnvWrite, op: DhtOpHashed) {
 pub fn fill_db_rejected(env: &EnvWrite, op: DhtOpHashed) {
     env.conn()
         .unwrap()
-        .with_commit(|txn| {
+        .with_commit_sync(|txn| {
             let hash = op.as_hash().clone();
             insert_op(txn, op, false).unwrap();
             set_validation_status(txn, hash.clone(), ValidationStatus::Rejected).unwrap();
@@ -232,7 +232,7 @@ pub fn fill_db_rejected(env: &EnvWrite, op: DhtOpHashed) {
 pub fn fill_db_pending(env: &EnvWrite, op: DhtOpHashed) {
     env.conn()
         .unwrap()
-        .with_commit(|txn| {
+        .with_commit_sync(|txn| {
             let hash = op.as_hash().clone();
             insert_op(txn, op, false).unwrap();
             set_validation_status(txn, hash, ValidationStatus::Valid).unwrap();
@@ -244,7 +244,7 @@ pub fn fill_db_pending(env: &EnvWrite, op: DhtOpHashed) {
 pub fn fill_db_as_author(env: &EnvWrite, op: DhtOpHashed) {
     env.conn()
         .unwrap()
-        .with_commit(|txn| {
+        .with_commit_sync(|txn| {
             insert_op(txn, op, true).unwrap();
             DatabaseResult::Ok(())
         })

@@ -42,21 +42,6 @@ pub async fn publish_dht_ops_workflow(
     let (to_publish, hashes) =
         publish_dht_ops_workflow_inner(env.clone().into(), network.from_agent()).await?;
 
-    // commit the workspace
-    //
-    // FIXME: the local commit should happen only AFTER successfully publishing.
-    //        I moved this because when switching from LMDB to SQLite, in the
-    //        case of self-publishing, the transaction held here would block
-    //        the attempt to get a transaction for the integration workflow
-    //        (part of handling the self-publish)
-    //
-    //        so, TODO: make publishing come before this, after self-publishing
-    //        is abolished [ B-04053 ]
-    // @freesig I think the correct thing to do here is not wait for a response from the
-    // publish.
-    // tracing::warn!("Committing local state before publishing to network! TODO: circle back ");
-    // writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
-
     // Commit to the network
     tracing::info!("sending {} ops", to_publish.len());
     for (basis, ops) in to_publish {
@@ -66,12 +51,13 @@ pub async fn publish_dht_ops_workflow(
     }
     tracing::info!("sent {} ops", hashes.len());
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
-    env.conn()?.with_commit(|writer| {
+    env.async_commit(move |writer| {
         for hash in hashes {
             mutations::set_last_publish_time(writer, hash, now)?;
         }
         WorkflowResult::Ok(())
-    })?;
+    })
+    .await?;
     tracing::info!("commited sent ops");
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
@@ -147,7 +133,7 @@ mod tests {
 
         env.conn()
             .unwrap()
-            .with_commit(|txn| {
+            .with_commit_sync(|txn| {
                 for _ in 0..num_hash {
                     // Create data for op
                     let sig = sig_fixt.next().unwrap();
@@ -412,7 +398,7 @@ mod tests {
                     .await
                     .unwrap();
 
-                source_chain.flush().unwrap();
+                source_chain.flush().await.unwrap();
                 let (entry_create_header, entry_update_header) = env
                     .conn()
                     .unwrap()

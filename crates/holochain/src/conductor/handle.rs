@@ -426,13 +426,15 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             } => {
                 let env = { self.conductor.read().await.p2p_env(space) };
                 let res = put_metric_datum(env, agent, metric, timestamp)
+                    .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
             QueryMetrics { respond, query, .. } => {
                 let env = { self.conductor.read().await.p2p_env(space) };
-                let res =
-                    query_metrics(env, query).map_err(holochain_p2p::HolochainP2pError::other);
+                let res = query_metrics(env, query)
+                    .await
+                    .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
             SignNetworkData { respond, data, .. } => {

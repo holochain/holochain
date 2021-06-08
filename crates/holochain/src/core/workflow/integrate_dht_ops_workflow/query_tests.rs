@@ -102,7 +102,7 @@ fn create_and_insert_op(env: &EnvRead, facts: Facts, data: &mut SharedData) -> D
 
     env.conn()
         .unwrap()
-        .with_commit(|txn| {
+        .with_commit_sync(|txn| {
             let hash = state.as_hash().clone();
             insert_op(txn, state.clone(), false).unwrap();
             set_validation_status(txn, hash.clone(), ValidationStatus::Valid).unwrap();

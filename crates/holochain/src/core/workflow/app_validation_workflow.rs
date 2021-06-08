@@ -35,7 +35,6 @@ use holochain_cascade::Cascade;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::HolochainP2pCell;
 use holochain_p2p::HolochainP2pCellT;
-use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
@@ -72,7 +71,7 @@ async fn app_validation_workflow_inner(
     conductor_api: impl CellConductorApiT,
     network: &HolochainP2pCell,
 ) -> WorkflowResult<WorkComplete> {
-    let env = workspace.vault.clone();
+    let env = workspace.vault.clone().into();
     let sorted_ops = validation_query::get_ops_to_app_validate(&env)?;
 
     // Validate all the ops
@@ -95,11 +94,13 @@ async fn app_validation_workflow_inner(
 
         match outcome {
             Outcome::Accepted => {
-                workspace.put_integration_limbo(op_hash, ValidationStatus::Valid)?;
+                workspace
+                    .put_integration_limbo(op_hash, ValidationStatus::Valid)
+                    .await?;
             }
             Outcome::AwaitingDeps(deps) => {
                 let status = ValidationLimboStatus::AwaitingAppDeps(deps);
-                workspace.put_validation_limbo(op_hash, status)?;
+                workspace.put_validation_limbo(op_hash, status).await?;
             }
             Outcome::Rejected(_) => {
                 if *op.header().author() == network.from_agent() {
@@ -107,7 +108,9 @@ async fn app_validation_workflow_inner(
                 } else {
                     tracing::warn!("Received invalid op! Warrants aren't implemented yet, so we can't do anything about this right now, but be warned that somebody on the network has maliciously hacked their node.\nOp: {:?}", op.to_light());
                 }
-                workspace.put_integration_limbo(op_hash, ValidationStatus::Rejected)?;
+                workspace
+                    .put_integration_limbo(op_hash, ValidationStatus::Rejected)
+                    .await?;
             }
         }
     }
@@ -810,37 +813,41 @@ pub fn run_link_validation_callback<I: Invocation + 'static>(
 }
 
 pub struct AppValidationWorkspace {
-    vault: EnvRead,
+    vault: EnvWrite,
     cache: EnvWrite,
 }
 
 impl AppValidationWorkspace {
-    pub fn new(vault: EnvRead, cache: EnvWrite) -> Self {
+    pub fn new(vault: EnvWrite, cache: EnvWrite) -> Self {
         Self { vault, cache }
     }
 
-    pub fn put_validation_limbo(
+    pub async fn put_validation_limbo(
         &self,
         hash: DhtOpHash,
         status: ValidationLimboStatus,
     ) -> WorkflowResult<()> {
-        self.vault.conn()?.with_commit(|txn| {
-            set_validation_stage(txn, hash, status)?;
-            WorkflowResult::Ok(())
-        })?;
+        self.vault
+            .async_commit(|txn| {
+                set_validation_stage(txn, hash, status)?;
+                WorkflowResult::Ok(())
+            })
+            .await?;
         Ok(())
     }
 
-    pub fn put_integration_limbo(
+    pub async fn put_integration_limbo(
         &self,
         hash: DhtOpHash,
         status: ValidationStatus,
     ) -> WorkflowResult<()> {
-        self.vault.conn()?.with_commit(|txn| {
-            set_validation_status(txn, hash.clone(), status)?;
-            set_validation_stage(txn, hash, ValidationLimboStatus::AwaitingIntegration)?;
-            WorkflowResult::Ok(())
-        })?;
+        self.vault
+            .async_commit(move |txn| {
+                set_validation_status(txn, hash.clone(), status)?;
+                set_validation_stage(txn, hash, ValidationLimboStatus::AwaitingIntegration)?;
+                WorkflowResult::Ok(())
+            })
+            .await?;
         Ok(())
     }
 
@@ -849,7 +856,7 @@ impl AppValidationWorkspace {
         author: AgentPubKey,
     ) -> AppValidationResult<HostFnWorkspace> {
         Ok(HostFnWorkspace::new(
-            self.vault.clone().into(),
+            self.vault.clone(),
             self.cache.clone(),
             author,
         )?)
@@ -860,7 +867,7 @@ impl AppValidationWorkspace {
         network: Network,
     ) -> Cascade<Network> {
         Cascade::empty()
-            .with_vault(self.vault.clone())
+            .with_vault(self.vault.clone().into())
             .with_network(network, self.cache.clone())
     }
 }
@@ -868,6 +875,9 @@ impl AppValidationWorkspace {
 impl From<&HostFnWorkspace> for AppValidationWorkspace {
     fn from(h: &HostFnWorkspace) -> Self {
         let (vault, cache) = h.databases();
-        Self { vault, cache }
+        Self {
+            vault: vault.into(),
+            cache,
+        }
     }
 }

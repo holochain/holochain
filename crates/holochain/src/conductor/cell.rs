@@ -580,12 +580,14 @@ impl Cell {
     async fn handle_validation_receipt(&self, receipt: SerializedBytes) -> CellResult<()> {
         let receipt: SignedValidationReceipt = receipt.try_into()?;
 
-        self.env.conn()?.with_commit(|txn| {
-            // Update receipt count.
-            add_one_receipt_count(txn, &receipt.receipt.dht_op_hash)?;
-            // Add to receipts db
-            validation_receipts::add_if_unique(txn, receipt)
-        })?;
+        self.env
+            .async_commit(move |txn| {
+                // Update receipt count.
+                add_one_receipt_count(txn, &receipt.receipt.dht_op_hash)?;
+                // Add to receipts db
+                validation_receipts::add_if_unique(txn, receipt)
+            })
+            .await?;
 
         Ok(())
     }

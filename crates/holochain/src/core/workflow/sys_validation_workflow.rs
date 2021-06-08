@@ -75,7 +75,7 @@ async fn sys_validation_workflow_inner(
     conductor_api: impl CellConductorApiT,
     sys_validation_trigger: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
-    let env = workspace.vault.clone();
+    let env = workspace.vault.clone().into();
     let sorted_ops = validation_query::get_ops_to_sys_validate(&env)?;
 
     // Process each op
@@ -85,10 +85,8 @@ async fn sys_validation_workflow_inner(
         // Create an incoming ops sender for any dependencies we find
         // that we are meant to be holding but aren't.
         // If we are not holding them they will be added to our incoming ops.
-        let incoming_dht_ops_sender = IncomingDhtOpSender::new(
-            workspace.vault.clone().into(),
-            sys_validation_trigger.clone(),
-        );
+        let incoming_dht_ops_sender =
+            IncomingDhtOpSender::new(workspace.vault.clone(), sys_validation_trigger.clone());
 
         let outcome = validate_op(
             &op,
@@ -101,10 +99,14 @@ async fn sys_validation_workflow_inner(
 
         match outcome {
             Outcome::Accepted => {
-                workspace.put_validation_limbo(op_hash, ValidationLimboStatus::SysValidated)?;
+                workspace
+                    .put_validation_limbo(op_hash, ValidationLimboStatus::SysValidated)
+                    .await?;
             }
             Outcome::SkipAppValidation => {
-                workspace.put_integration_limbo(op_hash, ValidationStatus::Valid)?;
+                workspace
+                    .put_integration_limbo(op_hash, ValidationStatus::Valid)
+                    .await?;
             }
             Outcome::AwaitingOpDep(missing_dep) => {
                 // TODO: Try and get this dependency to add to limbo
@@ -117,14 +119,18 @@ async fn sys_validation_workflow_inner(
                 // we were meant to get a StoreElement or StoreEntry or
                 // RegisterAgentActivity or RegisterAddLink.
                 let status = ValidationLimboStatus::AwaitingSysDeps(missing_dep);
-                workspace.put_validation_limbo(op_hash, status)?;
+                workspace.put_validation_limbo(op_hash, status).await?;
             }
             Outcome::MissingDhtDep => {
                 // TODO: Not sure what missing dht dep is. Check if we need this.
-                workspace.put_validation_limbo(op_hash, ValidationLimboStatus::Pending)?;
+                workspace
+                    .put_validation_limbo(op_hash, ValidationLimboStatus::Pending)
+                    .await?;
             }
             Outcome::Rejected => {
-                workspace.put_integration_limbo(op_hash, ValidationStatus::Rejected)?;
+                workspace
+                    .put_integration_limbo(op_hash, ValidationStatus::Rejected)
+                    .await?;
             }
         }
     }
@@ -637,39 +643,43 @@ fn update_check(entry_update: &Update, original_header: &Header) -> SysValidatio
 
 pub struct SysValidationWorkspace {
     scratch: Option<SyncScratch>,
-    vault: EnvRead,
+    vault: EnvWrite,
     cache: EnvWrite,
 }
 
 impl SysValidationWorkspace {
-    pub fn new(vault: EnvRead, cache: EnvWrite) -> Self {
+    pub fn new(vault: EnvWrite, cache: EnvWrite) -> Self {
         Self {
             vault,
             cache,
             scratch: None,
         }
     }
-    pub fn put_validation_limbo(
+    pub async fn put_validation_limbo(
         &self,
         hash: DhtOpHash,
         status: ValidationLimboStatus,
     ) -> WorkflowResult<()> {
-        self.vault.conn()?.with_commit(|txn| {
-            set_validation_stage(txn, hash, status)?;
-            WorkflowResult::Ok(())
-        })?;
+        self.vault
+            .async_commit(|txn| {
+                set_validation_stage(txn, hash, status)?;
+                WorkflowResult::Ok(())
+            })
+            .await?;
         Ok(())
     }
-    pub fn put_integration_limbo(
+    pub async fn put_integration_limbo(
         &self,
         hash: DhtOpHash,
         status: ValidationStatus,
     ) -> WorkflowResult<()> {
-        self.vault.conn()?.with_commit(|txn| {
-            set_validation_status(txn, hash.clone(), status)?;
-            set_validation_stage(txn, hash, ValidationLimboStatus::AwaitingIntegration)?;
-            WorkflowResult::Ok(())
-        })?;
+        self.vault
+            .async_commit(move |txn| {
+                set_validation_status(txn, hash.clone(), status)?;
+                set_validation_stage(txn, hash, ValidationLimboStatus::AwaitingIntegration)?;
+                WorkflowResult::Ok(())
+            })
+            .await?;
         Ok(())
     }
     pub fn is_chain_empty(&self, author: &AgentPubKey) -> SourceChainResult<bool> {
@@ -743,7 +753,7 @@ impl SysValidationWorkspace {
     /// Create a cascade with local data only
     pub fn local_cascade(&mut self) -> Cascade {
         let cascade = Cascade::empty()
-            .with_vault(self.vault.clone())
+            .with_vault(self.vault.clone().into())
             // TODO: Does the cache count as local?
             .with_cache(self.cache.clone());
         match &self.scratch {
@@ -756,7 +766,7 @@ impl SysValidationWorkspace {
         network: Network,
     ) -> Cascade<Network> {
         let cascade = Cascade::empty()
-            .with_vault(self.vault.clone())
+            .with_vault(self.vault.clone().into())
             .with_network(network, self.cache.clone());
         match &self.scratch {
             Some(scratch) => cascade.with_scratch(scratch.clone()),
@@ -774,7 +784,7 @@ impl From<&HostFnWorkspace> for SysValidationWorkspace {
         } = h.stores();
         Self {
             scratch: Some(scratch),
-            vault,
+            vault: vault.into(),
             cache,
         }
     }

@@ -133,7 +133,7 @@ mod tests {
 
         env.conn()
             .unwrap()
-            .with_commit(|txn| {
+            .with_commit_sync(|txn| {
                 let hash = state.as_hash().clone();
                 insert_op(txn, state.clone(), false).unwrap();
                 if facts.has_validation_status {

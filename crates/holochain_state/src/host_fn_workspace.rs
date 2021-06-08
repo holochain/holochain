@@ -23,7 +23,7 @@ pub type Cache = EnvWrite;
 
 impl HostFnWorkspace {
     pub fn new(vault: EnvWrite, cache: EnvWrite, author: AgentPubKey) -> SourceChainResult<Self> {
-        let source_chain = SourceChain::new(vault.clone().into(), author)?;
+        let source_chain = SourceChain::new(vault.clone(), author)?;
         Ok(Self {
             source_chain,
             vault,
@@ -31,8 +31,8 @@ impl HostFnWorkspace {
         })
     }
 
-    pub fn flush(self) -> SourceChainResult<()> {
-        self.source_chain.flush()
+    pub async fn flush(self) -> SourceChainResult<()> {
+        self.source_chain.flush().await
     }
 
     pub fn source_chain(&self) -> &SourceChain {

@@ -192,7 +192,7 @@ impl HostFnCaller {
         let output = host_fn::create::create(ribosome, call_context, input).unwrap();
 
         // Write
-        workspace_lock.flush().unwrap();
+        workspace_lock.flush().await.unwrap();
 
         output
     }
@@ -209,7 +209,7 @@ impl HostFnCaller {
         };
 
         // Write
-        workspace_lock.flush().unwrap();
+        workspace_lock.flush().await.unwrap();
 
         output
     }
@@ -228,7 +228,7 @@ impl HostFnCaller {
         let output = { host_fn::update::update(ribosome, call_context, input).unwrap() };
 
         // Write
-        workspace_lock.flush().unwrap();
+        workspace_lock.flush().await.unwrap();
 
         output
     }
@@ -260,7 +260,7 @@ impl HostFnCaller {
         let output = { host_fn::create_link::create_link(ribosome, call_context, input).unwrap() };
 
         // Write
-        workspace_lock.flush().unwrap();
+        workspace_lock.flush().await.unwrap();
 
         output
     }
@@ -271,7 +271,7 @@ impl HostFnCaller {
             { host_fn::delete_link::delete_link(ribosome, call_context, link_add_hash).unwrap() };
 
         // Write
-        workspace_lock.flush().unwrap();
+        workspace_lock.flush().await.unwrap();
 
         output
     }
@@ -287,7 +287,7 @@ impl HostFnCaller {
         let output = { host_fn::get_links::get_links(ribosome, call_context, input).unwrap() };
 
         // Write
-        workspace_lock.flush().unwrap();
+        workspace_lock.flush().await.unwrap();
 
         output.into()
     }
@@ -304,7 +304,7 @@ impl HostFnCaller {
             { host_fn::get_link_details::get_link_details(ribosome, call_context, input).unwrap() };
 
         // Write
-        workspace_lock.flush().unwrap();
+        workspace_lock.flush().await.unwrap();
 
         output.into()
     }
@@ -330,7 +330,7 @@ impl HostFnCaller {
         };
 
         // Write
-        workspace_lock.flush().unwrap();
+        workspace_lock.flush().await.unwrap();
         unwrap_to!(output => ZomeCallResponse::Ok).to_owned()
     }
 }

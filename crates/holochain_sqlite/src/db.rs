@@ -216,7 +216,8 @@ pub trait WriteManager<'e> {
     /// transaction, and commit the transaction after the closure has run.
     /// If there is a SQLite error, recover from it and re-run the closure.
     // FIXME: B-01566: implement write failure detection
-    fn with_commit<E, R, F>(&'e mut self, f: F) -> Result<R, E>
+    #[cfg(feature = "test_utils")]
+    fn with_commit_sync<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
         F: 'e + FnOnce(&mut Transaction) -> Result<R, E>;
@@ -231,7 +232,7 @@ pub trait WriteManager<'e> {
     where
         F: 'e + FnOnce(&mut Transaction) -> R,
     {
-        self.with_commit(|w| DatabaseResult::Ok(f(w)))
+        self.with_commit_sync(|w| DatabaseResult::Ok(f(w)))
     }
 }
 
@@ -255,7 +256,8 @@ impl<'e> ReadManager<'e> for PConn {
 }
 
 impl<'e> WriteManager<'e> for PConn {
-    fn with_commit<E, R, F>(&'e mut self, f: F) -> Result<R, E>
+    #[cfg(feature = "test_utils")]
+    fn with_commit_sync<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
         F: 'e + FnOnce(&mut Transaction) -> Result<R, E>,
@@ -278,10 +280,22 @@ impl DbWrite {
     {
         let _g = self.aquire_writer_permit().await;
         let mut conn = self.conn()?;
-        let r = task::spawn_blocking(move || conn.with_commit(f))
+        let r = task::spawn_blocking(move || conn.with_commit_sync(f))
             .await
             .map_err(DatabaseError::from)?;
         r
+    }
+
+    /// If possible prefer async_commit as this is slower and can starve chained futures.
+    pub async fn async_commit_in_place<E, R, F>(&self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError>,
+        F: FnOnce(&mut Transaction) -> Result<R, E>,
+        R: Send,
+    {
+        let _g = self.aquire_writer_permit().await;
+        let mut conn = self.conn()?;
+        task::block_in_place(move || conn.with_commit_sync(f))
     }
 
     async fn aquire_writer_permit(&self) -> OwnedSemaphorePermit {

@@ -41,7 +41,7 @@ where
 
     // only commit if the result was successful
     if result == InitResult::Pass {
-        workspace.flush()?;
+        workspace.flush().await?;
     }
     Ok(result)
 }
