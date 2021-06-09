@@ -41,7 +41,7 @@ where
 
     // only commit if the result was successful
     if result == InitResult::Pass {
-        workspace.flush()?;
+        workspace.flush().await?;
     }
     Ok(result)
 }
@@ -106,8 +106,10 @@ pub mod tests {
     use holochain_zome_types::Header;
     use matches::assert_matches;
 
-    fn get_chain(cell: &SweetCell) -> SourceChain {
-        SourceChain::new(cell.env().clone().into(), cell.agent_pubkey().clone()).unwrap()
+    async fn get_chain(cell: &SweetCell) -> SourceChain {
+        SourceChain::new(cell.env().clone().into(), cell.agent_pubkey().clone())
+            .await
+            .unwrap()
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -120,8 +122,9 @@ pub mod tests {
         // Genesis
         fake_genesis(env.clone()).await.unwrap();
 
-        let workspace =
-            HostFnWorkspace::new(env.clone(), test_cache.env(), author.clone()).unwrap();
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author.clone())
+            .await
+            .unwrap();
         let mut ribosome = MockRibosomeT::new();
         let dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
         let dna_hash = DnaHash::with_data_sync(&dna_def);
@@ -166,19 +169,24 @@ pub mod tests {
         let (cell,) = app.into_tuple();
         let zome = cell.zome("create_entry");
 
-        assert_eq!(get_chain(&cell).len().unwrap(), 3);
+        assert_eq!(get_chain(&cell).await.len().unwrap(), 3);
         assert_eq!(
-            get_chain(&cell).query(&Default::default()).unwrap().len(),
+            get_chain(&cell)
+                .await
+                .query(Default::default())
+                .await
+                .unwrap()
+                .len(),
             3
         );
 
         let _: HeaderHash = conductor.call(&zome, "create_entry", ()).await;
 
-        let source_chain = get_chain(&cell);
+        let source_chain = get_chain(&cell).await;
         // - Ensure that the InitZomesComplete element got committed after the
         //   element committed during init()
         assert_matches!(
-            source_chain.query(&Default::default()).unwrap()[4].header(),
+            source_chain.query(Default::default()).await.unwrap()[4].header(),
             Header::InitZomesComplete(_)
         );
     }
@@ -194,19 +202,19 @@ pub mod tests {
         let (cell,) = app.into_tuple();
         let zome = cell.zome("create_entry");
 
-        assert_eq!(get_chain(&cell).len().unwrap(), 3);
+        assert_eq!(get_chain(&cell).await.len().unwrap(), 3);
 
         // - Ensure that the chain does not advance due to init failing
         let r: Result<HeaderHash, _> = conductor.call_fallible(&zome, "create_entry", ()).await;
         assert!(r.is_err());
         let source_chain = get_chain(&cell);
-        assert_eq!(source_chain.len().unwrap(), 3);
+        assert_eq!(source_chain.await.len().unwrap(), 3);
 
         // - Ensure idempotence of the above
         let r: Result<HeaderHash, _> = conductor.call_fallible(&zome, "create_entry", ()).await;
         assert!(r.is_err());
         let source_chain = get_chain(&cell);
-        assert_eq!(source_chain.len().unwrap(), 3);
+        assert_eq!(source_chain.await.len().unwrap(), 3);
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -236,18 +244,18 @@ pub mod tests {
         let (cell,) = app.into_tuple();
         let zome = cell.zome("no-init");
 
-        assert_eq!(get_chain(&cell).len().unwrap(), 3);
+        assert_eq!(get_chain(&cell).await.len().unwrap(), 3);
 
         // - Ensure that the chain does not advance due to init failing
         let r: Result<HeaderHash, _> = conductor.call_fallible(&zome, "create_entry", ()).await;
         assert!(r.is_err());
         let source_chain = get_chain(&cell);
-        assert_eq!(source_chain.len().unwrap(), 3);
+        assert_eq!(source_chain.await.len().unwrap(), 3);
 
         // - Ensure idempotence of the above
         let r: Result<HeaderHash, _> = conductor.call_fallible(&zome, "create_entry", ()).await;
         assert!(r.is_err());
         let source_chain = get_chain(&cell);
-        assert_eq!(source_chain.len().unwrap(), 3);
+        assert_eq!(source_chain.await.len().unwrap(), 3);
     }
 }

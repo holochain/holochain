@@ -269,8 +269,10 @@ fixturator!(
         //      wrapped in an UnsafeZomeCallWorkspace
         let vault = holochain_state::test_utils::test_cell_env();
         let cache = holochain_state::test_utils::test_cell_env();
-        tokio_helper::block_forever_on(fake_genesis(vault.env())).unwrap();
-        HostFnWorkspace::new(vault.env(), cache.env(), fake_agent_pubkey_1()).unwrap()
+        tokio_helper::block_forever_on(async {
+            fake_genesis(vault.env()).await.unwrap();
+            HostFnWorkspace::new(vault.env(), cache.env(), fake_agent_pubkey_1()).await.unwrap()
+        })
     };
     curve Unpredictable {
         HostFnWorkspaceFixturator::new(Empty)

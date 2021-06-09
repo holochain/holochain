@@ -334,6 +334,7 @@ impl Cell {
                 async {
                     let res = self
                         .handle_get_links(link_key, options)
+                        .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
@@ -351,6 +352,7 @@ impl Cell {
                 async {
                     let res = self
                         .handle_get_agent_activity(agent, query, options)
+                        .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
@@ -384,6 +386,7 @@ impl Cell {
                 async {
                     let res = self
                         .handle_fetch_op_hashes_for_constraints(dht_arc, since, until)
+                        .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
@@ -526,7 +529,9 @@ impl Cell {
         options: holochain_p2p::event::GetOptions,
     ) -> CellResult<WireEntryOps> {
         let env = self.env.clone();
-        authority::handle_get_entry(env.into(), hash, options).map_err(Into::into)
+        authority::handle_get_entry(env.into(), hash, options)
+            .await
+            .map_err(Into::into)
     }
 
     #[tracing::instrument(skip(self))]
@@ -536,7 +541,9 @@ impl Cell {
         options: holochain_p2p::event::GetOptions,
     ) -> CellResult<WireElementOps> {
         let env = self.env.clone();
-        authority::handle_get_element(env.into(), hash, options).map_err(Into::into)
+        authority::handle_get_element(env.into(), hash, options)
+            .await
+            .map_err(Into::into)
     }
 
     #[instrument(skip(self, _dht_hash, _options))]
@@ -554,25 +561,29 @@ impl Cell {
     // TODO: Right now we are returning all the full headers
     // We could probably send some smaller types instead of the full headers
     // if we are careful.
-    fn handle_get_links(
+    async fn handle_get_links(
         &self,
         link_key: WireLinkKey,
         options: holochain_p2p::event::GetLinksOptions,
     ) -> CellResult<WireLinkOps> {
         debug!(id = ?self.id());
         let env = self.env.clone();
-        authority::handle_get_links(env.into(), link_key, options).map_err(Into::into)
+        authority::handle_get_links(env.into(), link_key, options)
+            .await
+            .map_err(Into::into)
     }
 
     #[instrument(skip(self, options))]
-    fn handle_get_agent_activity(
+    async fn handle_get_agent_activity(
         &self,
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: holochain_p2p::event::GetActivityOptions,
     ) -> CellResult<AgentActivityResponse<HeaderHash>> {
         let env = self.env.clone();
-        authority::handle_get_agent_activity(env.into(), agent, query, options).map_err(Into::into)
+        authority::handle_get_agent_activity(env.into(), agent, query, options)
+            .await
+            .map_err(Into::into)
     }
 
     /// a remote agent is sending us a validation receipt.
@@ -580,19 +591,21 @@ impl Cell {
     async fn handle_validation_receipt(&self, receipt: SerializedBytes) -> CellResult<()> {
         let receipt: SignedValidationReceipt = receipt.try_into()?;
 
-        self.env.conn()?.with_commit(|txn| {
-            // Update receipt count.
-            add_one_receipt_count(txn, &receipt.receipt.dht_op_hash)?;
-            // Add to receipts db
-            validation_receipts::add_if_unique(txn, receipt)
-        })?;
+        self.env
+            .async_commit(move |txn| {
+                // Update receipt count.
+                add_one_receipt_count(txn, &receipt.receipt.dht_op_hash)?;
+                // Add to receipts db
+                validation_receipts::add_if_unique(txn, receipt)
+            })
+            .await?;
 
         Ok(())
     }
 
     #[instrument(skip(self, dht_arc, since, until))]
     /// the network module is requesting a list of dht op hashes
-    fn handle_fetch_op_hashes_for_constraints(
+    async fn handle_fetch_op_hashes_for_constraints(
         &self,
         dht_arc: holochain_p2p::dht_arc::DhtArc,
         since: Timestamp,
@@ -601,52 +614,60 @@ impl Cell {
         // FIXME: Test this query.
         let full = (dht_arc.coverage() - 1.0).abs() < f64::EPSILON;
         let (storage_1, storage_2) = split_arc(&dht_arc);
-        let mut conn = self.env().conn()?;
-        let result = conn.with_reader(|txn| {
-            let r = if full {
-                txn.prepare_cached(holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_FULL)?
-                    .query_map(
-                        named_params! {
-                        ":from": since.to_sql_ms_lossy(),
-                        ":to": until.to_sql_ms_lossy(),
-                        },
-                        |row| row.get("hash"),
-                    )?
-                    .collect::<rusqlite::Result<Vec<_>>>()?
-            } else {
-                match (storage_1, storage_2) {
-                    (None, None) => Vec::with_capacity(0),
-                    (None, Some(_)) => unreachable!("Cannot have only second arc"),
-                    (Some(storage_1), None) => txn
-                        .prepare_cached(holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_SINGLE)?
+        // TODO: SQL_PERF: Really on the fence about this query.
+        // It has the potential to be slow if data density is very high
+        // but this is ideally not the case for most apps so is it
+        // worth everyone paying the cost of asyncifying?
+        let result = self
+            .env()
+            .async_reader(move |txn| {
+                let r = if full {
+                    txn.prepare_cached(holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_FULL)?
                         .query_map(
                             named_params! {
                             ":from": since.to_sql_ms_lossy(),
                             ":to": until.to_sql_ms_lossy(),
-                            ":storage_start_1": storage_1.0,
-                            ":storage_end_1": storage_1.1,
                             },
                             |row| row.get("hash"),
                         )?
-                        .collect::<rusqlite::Result<Vec<_>>>()?,
-                    (Some(storage_1), Some(storage_2)) => txn
-                        .prepare_cached(holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_WRAP)?
-                        .query_map(
-                            named_params! {
-                            ":from": since.to_sql_ms_lossy(),
-                            ":to": until.to_sql_ms_lossy(),
-                            ":storage_start_1": storage_1.0,
-                            ":storage_end_1": storage_1.1,
-                            ":storage_start_2": storage_2.0,
-                            ":storage_end_2": storage_2.1,
-                            },
-                            |row| row.get("hash"),
-                        )?
-                        .collect::<rusqlite::Result<Vec<_>>>()?,
-                }
-            };
-            DatabaseResult::Ok(r)
-        })?;
+                        .collect::<rusqlite::Result<Vec<_>>>()?
+                } else {
+                    match (storage_1, storage_2) {
+                        (None, None) => Vec::with_capacity(0),
+                        (None, Some(_)) => unreachable!("Cannot have only second arc"),
+                        (Some(storage_1), None) => txn
+                            .prepare_cached(
+                                holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_SINGLE,
+                            )?
+                            .query_map(
+                                named_params! {
+                                ":from": since.to_sql_ms_lossy(),
+                                ":to": until.to_sql_ms_lossy(),
+                                ":storage_start_1": storage_1.0,
+                                ":storage_end_1": storage_1.1,
+                                },
+                                |row| row.get("hash"),
+                            )?
+                            .collect::<rusqlite::Result<Vec<_>>>()?,
+                        (Some(storage_1), Some(storage_2)) => txn
+                            .prepare_cached(holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_WRAP)?
+                            .query_map(
+                                named_params! {
+                                ":from": since.to_sql_ms_lossy(),
+                                ":to": until.to_sql_ms_lossy(),
+                                ":storage_start_1": storage_1.0,
+                                ":storage_end_1": storage_1.1,
+                                ":storage_start_2": storage_2.0,
+                                ":storage_end_2": storage_2.1,
+                                },
+                                |row| row.get("hash"),
+                            )?
+                            .collect::<rusqlite::Result<Vec<_>>>()?,
+                    }
+                };
+                DatabaseResult::Ok(r)
+            })
+            .await?;
         Ok(result)
     }
 
@@ -663,11 +684,17 @@ impl Cell {
         )>,
     > {
         // FIXME: Test this query.
-        let results = self.env().conn()?.with_reader(|txn| {
-            let mut positions = "?,".repeat(op_hashes.len());
-            positions.pop();
-            let sql = format!(
-                "
+        // TODO: SQL_PERF: Really on the fence about this query.
+        // It has the potential to be slow if data density is very high
+        // but this is ideally not the case for most apps so is it
+        // worth everyone paying the cost of asyncifying?
+        let results = self
+            .env()
+            .async_reader(move |txn| {
+                let mut positions = "?,".repeat(op_hashes.len());
+                positions.pop();
+                let sql = format!(
+                    "
                 SELECT DhtOp.hash, DhtOp.basis_hash, DhtOp.type AS dht_type,
                 Header.blob AS header_blob, Entry.blob AS entry_blob
                 FROM DHtOp
@@ -678,35 +705,36 @@ impl Cell {
                 AND
                 DhtOp.hash in ({})
                 ",
-                positions
-            );
-            let mut stmt = txn.prepare(&sql)?;
-            let r = stmt
-                .query_and_then(rusqlite::params_from_iter(op_hashes.into_iter()), |row| {
-                    let basis_hash: AnyDhtHash = row.get("basis_hash")?;
-                    let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
-                    let op_type: DhtOpType = row.get("dht_type")?;
-                    let hash: DhtOpHash = row.get("hash")?;
-                    // Check the entry isn't private before gossiping it.
-                    let mut entry: Option<Entry> = None;
-                    if header
-                        .0
-                        .entry_type()
-                        .filter(|et| *et.visibility() == EntryVisibility::Public)
-                        .is_some()
-                    {
-                        let e: Option<Vec<u8>> = row.get("entry_blob")?;
-                        entry = match e {
-                            Some(entry) => Some(from_blob::<Entry>(entry)?),
-                            None => None,
-                        };
-                    }
-                    let op = DhtOp::from_type(op_type, header, entry)?;
-                    StateQueryResult::Ok((basis_hash, hash, op))
-                })?
-                .collect::<StateQueryResult<Vec<_>>>()?;
-            StateQueryResult::Ok(r)
-        })?;
+                    positions
+                );
+                let mut stmt = txn.prepare(&sql)?;
+                let r = stmt
+                    .query_and_then(rusqlite::params_from_iter(op_hashes.into_iter()), |row| {
+                        let basis_hash: AnyDhtHash = row.get("basis_hash")?;
+                        let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
+                        let op_type: DhtOpType = row.get("dht_type")?;
+                        let hash: DhtOpHash = row.get("hash")?;
+                        // Check the entry isn't private before gossiping it.
+                        let mut entry: Option<Entry> = None;
+                        if header
+                            .0
+                            .entry_type()
+                            .filter(|et| *et.visibility() == EntryVisibility::Public)
+                            .is_some()
+                        {
+                            let e: Option<Vec<u8>> = row.get("entry_blob")?;
+                            entry = match e {
+                                Some(entry) => Some(from_blob::<Entry>(entry)?),
+                                None => None,
+                            };
+                        }
+                        let op = DhtOp::from_type(op_type, header, entry)?;
+                        StateQueryResult::Ok((basis_hash, hash, op))
+                    })?
+                    .collect::<StateQueryResult<Vec<_>>>()?;
+                StateQueryResult::Ok(r)
+            })
+            .await?;
         Ok(results)
     }
 
@@ -757,11 +785,14 @@ impl Cell {
         let is_root_zome_call = workspace_lock.is_none();
         let workspace_lock = match workspace_lock {
             Some(l) => l,
-            None => HostFnWorkspace::new(
-                self.env().clone(),
-                self.cache().clone(),
-                self.id.agent_pubkey().clone(),
-            )?,
+            None => {
+                HostFnWorkspace::new(
+                    self.env().clone(),
+                    self.cache().clone(),
+                    self.id.agent_pubkey().clone(),
+                )
+                .await?
+            }
         };
 
         let conductor_api = self.conductor_api.clone();
@@ -800,7 +831,8 @@ impl Cell {
             self.env().clone(),
             self.cache().clone(),
             id.agent_pubkey().clone(),
-        )?;
+        )
+        .await?;
 
         // Check if initialization has run
         if workspace.source_chain().has_initialized()? {

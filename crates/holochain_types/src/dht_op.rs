@@ -840,6 +840,16 @@ pub enum WireOps {
     Element(WireElementOps),
 }
 
+impl WireOps {
+    /// Render the wire ops to DhtOps.
+    pub fn render(self) -> DhtOpResult<RenderedOps> {
+        match self {
+            WireOps::Entry(o) => o.render(),
+            WireOps::Element(o) => o.render(),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 /// The data rendered from a wire op to place in the database.
 pub struct RenderedOp {

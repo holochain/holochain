@@ -1,4 +1,3 @@
-use crate::db::PConn;
 use crate::prelude::*;
 use kitsune_p2p::agent_store::{AgentInfo, AgentInfoSigned, AgentMetaInfo};
 use kitsune_p2p::dht_arc::DhtArc;
@@ -33,7 +32,7 @@ fn rand_signed_at_ms() -> u64 {
     now - rng.gen_range(1000, 2000)
 }
 
-fn rand_insert(con: &mut PConn, space: &KitsuneSpace, agent: &KitsuneAgent) {
+async fn rand_insert(db: &DbWrite, space: &KitsuneSpace, agent: &KitsuneAgent) {
     use std::convert::TryInto;
 
     let mut rng = rand::thread_rng();
@@ -68,7 +67,7 @@ fn rand_insert(con: &mut PConn, space: &KitsuneSpace, agent: &KitsuneAgent) {
     )
     .unwrap();
 
-    con.p2p_put(&signed).unwrap();
+    p2p_put(db, &signed).await.unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -78,7 +77,6 @@ async fn test_p2p_agent_store_sanity() {
     let space = rand_space();
 
     let db = DbWrite::test(&tmp_dir, DbKind::P2pAgentStore(Arc::new(space.clone()))).unwrap();
-    let mut con = db.connection_pooled().unwrap();
 
     let mut example_agent = rand_agent();
 
@@ -86,9 +84,11 @@ async fn test_p2p_agent_store_sanity() {
         example_agent = rand_agent();
 
         for _ in 0..3 {
-            rand_insert(&mut con, &space, &example_agent);
+            rand_insert(&db, &space, &example_agent).await;
         }
     }
+
+    let mut con = db.connection_pooled().unwrap();
 
     // check that we only get 20 results
     let all = con.p2p_list().unwrap();
@@ -124,7 +124,7 @@ async fn test_p2p_agent_store_sanity() {
     assert!(all.len() > 0 && all.len() < 20);
 
     // prune everything by expires time
-    con.p2p_prune().unwrap();
+    p2p_prune(&db).await.unwrap();
 
     // after prune, make sure all are pruned
     let all = con.p2p_list().unwrap();

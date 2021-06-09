@@ -92,7 +92,7 @@ async fn can_add_clone_cell_to_app() {
 
     conductor.register_phenotype(dna).await.unwrap();
     conductor
-        .update_state(|mut state| {
+        .update_state(move |mut state| {
             state.active_apps.insert(app1.clone().into());
             state.active_apps.insert(app2.clone().into());
             Ok(state)
