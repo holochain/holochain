@@ -229,8 +229,8 @@ where
 /// `must_get_entry` is available in contexts such as validation where both determinism and network access is desirable.
 ///
 /// An EntryHashed will NOT be returned if:
-/// - It is PURGED (community redacted entry)
-/// - ALL headers pointing to it are WITHDRAWN by the authors
+/// - @TODO It is PURGED (community redacted entry)
+/// - @TODO ALL headers pointing to it are WITHDRAWN by the authors
 /// - ALL headers pointing to it are ABANDONED by ALL authorities due to validation failure
 /// - Nobody knows about it on the currently visible network
 ///
@@ -257,8 +257,8 @@ pub fn must_get_entry(entry_hash: EntryHash) -> ExternResult<EntryHashed> {
 ///
 /// A `SignedHeaderHashed` will NOT be returned if:
 ///
-/// - The header is WITHDRAWN by the author
-/// - The header is ABANDONED by ALL authorities
+/// - @TODO The header is WITHDRAWN by the author
+/// - @TODO The header is ABANDONED by ALL authorities
 /// - Nobody knows about it on the currently visible network
 ///
 /// If a `SignedHeaderHashed` fails to be returned:
@@ -301,8 +301,8 @@ pub fn must_get_header(header_hash: HeaderHash) -> ExternResult<SignedHeaderHash
 ///
 /// An `Element` will not be returned if:
 ///
-/// - It is WITHDRAWN by the author
-/// - The Entry is PURGED by the community
+/// - @TODO It is WITHDRAWN by the author
+/// - @TODO The Entry is PURGED by the community
 /// - It is ABANDONED by ALL authorities due to failed validation
 /// - If ANY authority (1 of N trust) OR ourselves (0 of N trust) believes it INVALID
 /// - Nobody knows about it on the visible network
