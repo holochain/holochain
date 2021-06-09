@@ -26,9 +26,9 @@ use super::manager::spawn_task_manager;
 use super::manager::ManagedTaskAdd;
 use super::manager::ManagedTaskHandle;
 use super::manager::TaskManagerRunHandle;
-use super::p2p_store::all_agent_infos;
-use super::p2p_store::get_single_agent_info;
-use super::p2p_store::inject_agent_infos;
+use super::p2p_agent_store::all_agent_infos;
+use super::p2p_agent_store::get_single_agent_info;
+use super::p2p_agent_store::inject_agent_infos;
 use super::paths::EnvironmentRootPath;
 use super::state::AppInterfaceId;
 use super::state::ConductorState;
@@ -36,7 +36,7 @@ use super::CellError;
 use super::{api::CellConductorApi, state::AppInterfaceConfig};
 use super::{api::CellConductorApiT, interface::AppInterfaceRuntime};
 use super::{api::RealAdminInterfaceApi, manager::TaskManagerClient};
-use super::{api::RealAppInterfaceApi, p2p_store};
+use super::{api::RealAppInterfaceApi, p2p_agent_store};
 use crate::conductor::cell::Cell;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::error::ConductorResult;
@@ -941,7 +941,7 @@ where
             .cloned()
             .expect("invalid cell space");
 
-        let peer_dump = p2p_store::dump_state(p2p_env.into(), Some(cell_id.clone()))?;
+        let peer_dump = p2p_agent_store::dump_state(p2p_env.into(), Some(cell_id.clone()))?;
         let source_chain_dump =
             source_chain::dump_state(arc.clone().into(), cell_id.agent_pubkey()).await?;
 
@@ -963,8 +963,8 @@ where
             .or_insert_with(move || {
                 let root_env_dir = self.root_env_dir.as_ref();
                 let keystore = self.keystore.clone();
-                EnvWrite::open(root_env_dir, DbKind::P2pAgents(space), keystore)
-                    .expect("failed to open p2p_store database")
+                EnvWrite::open(root_env_dir, DbKind::P2pAgentStore(space), keystore)
+                    .expect("failed to open p2p_agent_store database")
             })
             .clone()
     }

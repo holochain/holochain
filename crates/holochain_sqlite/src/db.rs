@@ -15,8 +15,8 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-mod p2p_agents;
-pub use p2p_agents::*;
+mod p2p_agent_store;
+pub use p2p_agent_store::*;
 
 mod p2p_metrics;
 pub use p2p_metrics::*;
@@ -133,7 +133,7 @@ pub enum DbKind {
     /// Specifies the environment used to save wasm
     Wasm,
     /// State of the p2p network (one per space).
-    P2pAgents(Arc<KitsuneSpace>),
+    P2pAgentStore(Arc<KitsuneSpace>),
     /// Metrics for peers on p2p network (one per space).
     P2pMetrics(Arc<KitsuneSpace>),
 }
@@ -146,7 +146,9 @@ impl DbKind {
             DbKind::Cache(dna) => ["cache", &format!("cache-{}", dna)].iter().collect(),
             DbKind::Conductor => ["conductor", "conductor"].iter().collect(),
             DbKind::Wasm => ["wasm", "wasm"].iter().collect(),
-            DbKind::P2pAgents(space) => ["p2p", &format!("p2p_agents-{}", space)].iter().collect(),
+            DbKind::P2pAgentStore(space) => ["p2p", &format!("p2p_agent_store-{}", space)]
+                .iter()
+                .collect(),
             DbKind::P2pMetrics(space) => {
                 ["p2p", &format!("p2p_metrics-{}", space)].iter().collect()
             }

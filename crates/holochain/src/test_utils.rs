@@ -5,7 +5,7 @@ use crate::conductor::api::ZomeCall;
 use crate::conductor::config::AdminInterfaceConfig;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::config::InterfaceDriver;
-use crate::conductor::p2p_store;
+use crate::conductor::p2p_agent_store;
 use crate::conductor::ConductorBuilder;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::ZomeCallInvocation;
@@ -435,8 +435,8 @@ fn get_published_ops(env: &EnvWrite) -> Vec<DhtOpLight> {
     fresh_reader_test(env.clone(), |txn| {
         txn.prepare(
             "
-            SELECT 
-            DhtOp.blob 
+            SELECT
+            DhtOp.blob
             FROM DhtOp
             JOIN
             Header ON DhtOp.header_hash = Header.hash
@@ -659,7 +659,7 @@ pub async fn display_agent_infos(conductor: &ConductorHandle) {
     for cell_id in conductor.list_cell_ids().await.unwrap() {
         let space = cell_id.dna_hash().to_kitsune();
         let env = conductor.get_p2p_env(space).await;
-        let info = p2p_store::dump_state(env.into(), Some(cell_id)).unwrap();
+        let info = p2p_agent_store::dump_state(env.into(), Some(cell_id)).unwrap();
         tracing::debug!(%info);
     }
 }

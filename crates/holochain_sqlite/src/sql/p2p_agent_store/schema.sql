@@ -1,5 +1,5 @@
 -- p2p store
-CREATE TABLE IF NOT EXISTS p2p_store (
+CREATE TABLE IF NOT EXISTS p2p_agent_store (
   -- primary key
   agent                   BLOB      PRIMARY KEY ON CONFLICT REPLACE,
 
