@@ -64,7 +64,7 @@ async fn check_valid_if_dna_test() {
 
     // Empty store not dna
     let header = fixt!(CreateLink);
-    let workspace = SysValidationWorkspace::new(env.clone(), tmp_cache.env());
+    let workspace = SysValidationWorkspace::new(env.clone().into(), tmp_cache.env());
 
     assert_matches!(
         check_valid_if_dna(&header.clone().into(), &workspace).await,

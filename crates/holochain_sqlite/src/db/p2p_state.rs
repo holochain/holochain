@@ -10,9 +10,6 @@ use rusqlite::*;
 /// Extension trait to treat connection instances
 /// as p2p store accessors.
 pub trait AsP2pStateConExt {
-    /// Put an AgentInfoSigned record into the p2p_store
-    fn p2p_put(&mut self, signed: &AgentInfoSigned) -> DatabaseResult<()>;
-
     /// Get an AgentInfoSigned record from the p2p_store
     fn p2p_get(&mut self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>>;
 
@@ -26,17 +23,11 @@ pub trait AsP2pStateConExt {
         until_ms: u64,
         within_arc: DhtArc,
     ) -> DatabaseResult<Vec<KitsuneAgent>>;
-
-    /// Prune all expired AgentInfoSigned records from the p2p_store
-    fn p2p_prune(&mut self) -> DatabaseResult<()>;
 }
 
 /// Extension trait to treat transaction instances
 /// as p2p store accessors.
 pub trait AsP2pStateTxExt {
-    /// Put an AgentInfoSigned record into the p2p_store
-    fn p2p_put(&self, signed: &AgentInfoSigned) -> DatabaseResult<()>;
-
     /// Get an AgentInfoSigned record from the p2p_store
     fn p2p_get(&self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>>;
 
@@ -50,16 +41,9 @@ pub trait AsP2pStateTxExt {
         until_ms: u64,
         within_arc: DhtArc,
     ) -> DatabaseResult<Vec<KitsuneAgent>>;
-
-    /// Prune all expired AgentInfoSigned records from the p2p_store
-    fn p2p_prune(&self) -> DatabaseResult<()>;
 }
 
 impl AsP2pStateConExt for crate::db::PConn {
-    fn p2p_put(&mut self, signed: &AgentInfoSigned) -> DatabaseResult<()> {
-        self.with_commit(move |writer| writer.p2p_put(signed))
-    }
-
     fn p2p_get(&mut self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>> {
         self.with_reader(move |reader| reader.p2p_get(agent))
     }
@@ -76,35 +60,69 @@ impl AsP2pStateConExt for crate::db::PConn {
     ) -> DatabaseResult<Vec<KitsuneAgent>> {
         self.with_reader(move |reader| reader.p2p_gossip_query(since_ms, until_ms, within_arc))
     }
-
-    fn p2p_prune(&mut self) -> DatabaseResult<()> {
-        self.with_commit(move |writer| writer.p2p_prune())
-    }
 }
 
-impl AsP2pStateTxExt for Transaction<'_> {
-    fn p2p_put(&self, signed: &AgentInfoSigned) -> DatabaseResult<()> {
-        let record = P2pRecord::from_signed(signed)?;
-        self.execute(
-            sql_p2p_state::INSERT,
-            named_params! {
-                ":agent": &record.agent.0,
+/// Put an AgentInfoSigned record into the p2p_store
+pub async fn p2p_put(db: &DbWrite, signed: &AgentInfoSigned) -> DatabaseResult<()> {
+    let record = P2pRecord::from_signed(signed)?;
+    db.async_commit(move |txn| tx_p2p_put(txn, record)).await
+}
 
-                ":encoded": &record.encoded,
-
-                ":signed_at_ms": &record.signed_at_ms,
-                ":expires_at_ms": &record.expires_at_ms,
-                ":storage_center_loc": &record.storage_center_loc,
-
-                ":storage_start_1": &record.storage_start_1,
-                ":storage_end_1": &record.storage_end_1,
-                ":storage_start_2": &record.storage_start_2,
-                ":storage_end_2": &record.storage_end_2,
-            },
-        )?;
-        Ok(())
+/// Put an iterator of AgentInfoSigned records into the p2p_store
+pub async fn p2p_put_all(
+    db: &DbWrite,
+    signed: impl Iterator<Item = &AgentInfoSigned>,
+) -> DatabaseResult<()> {
+    let mut records = Vec::new();
+    for s in signed {
+        records.push(P2pRecord::from_signed(s)?);
     }
+    db.async_commit(move |txn| {
+        for record in records {
+            tx_p2p_put(txn, record)?;
+        }
+        Ok(())
+    })
+    .await
+}
 
+fn tx_p2p_put(txn: &mut Transaction, record: P2pRecord) -> DatabaseResult<()> {
+    txn.execute(
+        sql_p2p_state::INSERT,
+        named_params! {
+            ":agent": &record.agent.0,
+
+            ":encoded": &record.encoded,
+
+            ":signed_at_ms": &record.signed_at_ms,
+            ":expires_at_ms": &record.expires_at_ms,
+            ":storage_center_loc": &record.storage_center_loc,
+
+            ":storage_start_1": &record.storage_start_1,
+            ":storage_end_1": &record.storage_end_1,
+            ":storage_start_2": &record.storage_start_2,
+            ":storage_end_2": &record.storage_end_2,
+        },
+    )?;
+    Ok(())
+}
+
+/// Prune all expired AgentInfoSigned records from the p2p_store
+pub async fn p2p_prune(db: &DbWrite) -> DatabaseResult<()> {
+    db.async_commit(move |txn| {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
+        txn.execute(sql_p2p_state::PRUNE, named_params! { ":now": now })?;
+        DatabaseResult::Ok(())
+    })
+    .await?;
+
+    Ok(())
+}
+impl AsP2pStateTxExt for Transaction<'_> {
     fn p2p_get(&self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>> {
         use std::convert::TryFrom;
 
@@ -173,17 +191,6 @@ impl AsP2pStateTxExt for Transaction<'_> {
             out.push(r?);
         }
         Ok(out)
-    }
-
-    fn p2p_prune(&self) -> DatabaseResult<()> {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
-
-        self.execute(sql_p2p_state::PRUNE, named_params! { ":now": now })?;
-
-        Ok(())
     }
 }
 

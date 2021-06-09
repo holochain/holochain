@@ -12,30 +12,34 @@ use crate::core::SourceChainResult;
 use holochain_state::source_chain::SourceChain;
 use tracing::*;
 
-pub fn get_as_author_sub_chain(
+pub async fn get_as_author_sub_chain(
     header_seq: u32,
     app_entry_type: AppEntryType,
     source_chain: &SourceChain,
 ) -> SourceChainResult<ValidationPackage> {
     // Collect and return the sub chain
-    let elements = source_chain.query(
-        &ChainQueryFilter::default()
-            .include_entries(true)
-            .entry_type(EntryType::App(app_entry_type))
-            .sequence_range(0..header_seq),
-    )?;
+    let elements = source_chain
+        .query(
+            ChainQueryFilter::default()
+                .include_entries(true)
+                .entry_type(EntryType::App(app_entry_type))
+                .sequence_range(0..header_seq),
+        )
+        .await?;
     Ok(ValidationPackage::new(elements))
 }
 
-pub fn get_as_author_full(
+pub async fn get_as_author_full(
     header_seq: u32,
     source_chain: &SourceChain,
 ) -> SourceChainResult<ValidationPackage> {
-    let elements = source_chain.query(
-        &ChainQueryFilter::default()
-            .include_entries(true)
-            .sequence_range(0..header_seq),
-    )?;
+    let elements = source_chain
+        .query(
+            ChainQueryFilter::default()
+                .include_entries(true)
+                .sequence_range(0..header_seq),
+        )
+        .await?;
     Ok(ValidationPackage::new(elements))
 }
 

@@ -188,6 +188,7 @@ mod tests {
             filter_full,
             options.clone(),
         )
+        .await
         .unwrap();
 
         let results_partial = crate::authority::handle_get_agent_activity_deterministic(
@@ -196,6 +197,7 @@ mod tests {
             filter_partial,
             options,
         )
+        .await
         .unwrap();
 
         assert_eq!(results_full.chain.len(), 10);

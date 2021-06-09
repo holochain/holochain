@@ -377,7 +377,9 @@ mod slow_tests {
         let env = test_env.env();
         let author = fake_agent_pubkey_1();
         crate::test_utils::fake_genesis(env.clone()).await.unwrap();
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).unwrap();
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author)
+            .await
+            .unwrap();
         // test workspace boilerplate
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace.clone();
@@ -401,7 +403,9 @@ mod slow_tests {
         let env = test_env.env();
         let author = fake_agent_pubkey_1();
         crate::test_utils::fake_genesis(env.clone()).await.unwrap();
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).unwrap();
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author)
+            .await
+            .unwrap();
         // test workspace boilerplate
 
         let mut host_access = fixt!(ZomeCallHostAccess);
