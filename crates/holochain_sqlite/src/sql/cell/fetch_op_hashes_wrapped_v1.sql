@@ -11,6 +11,6 @@ WHERE
     DhtOp.authored_timestamp_ms >= :from
     AND DhtOp.authored_timestamp_ms < :to
     AND (
-        storage_center_loc < :storage_start_loc
-        OR storage_center_loc > :storage_end_loc
+        storage_center_loc < :storage_end_loc
+        OR storage_center_loc > :storage_start_loc
     )

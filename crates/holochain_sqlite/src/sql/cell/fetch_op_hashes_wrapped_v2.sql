@@ -11,7 +11,7 @@ FROM
 WHERE
     DhtOp.authored_timestamp_ms >= :from
     AND DhtOp.authored_timestamp_ms < :to
-    AND storage_center_loc < :storage_start_loc
+    AND storage_center_loc < :storage_end_loc
 
 UNION ALL
 
@@ -22,4 +22,4 @@ FROM
 WHERE
     DhtOp.authored_timestamp_ms >= :from
     AND DhtOp.authored_timestamp_ms < :to
-    AND storage_center_loc > :storage_end_loc
+    AND storage_center_loc > :storage_start_loc

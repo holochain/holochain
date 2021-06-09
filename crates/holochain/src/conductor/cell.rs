@@ -620,8 +620,8 @@ impl Cell {
                     txn.prepare_cached(holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_FULL)?
                         .query_map(
                             named_params! {
-                            ":from": since.to_sql_ms_lossy(),
-                            ":to": until.to_sql_ms_lossy(),
+                                ":from": since.to_sql_ms_lossy(),
+                                ":to": until.to_sql_ms_lossy(),
                             },
                             |row| row.get("hash"),
                         )?
@@ -635,10 +635,10 @@ impl Cell {
                     txn.prepare_cached(sql)?
                         .query_map(
                             named_params! {
-                            ":from": since.to_sql_ms_lossy(),
-                            ":to": until.to_sql_ms_lossy(),
-                            ":storage_start_loc": start_loc,
-                            ":storage_end_loc": end_loc,
+                                ":from": since.to_sql_ms_lossy(),
+                                ":to": until.to_sql_ms_lossy(),
+                                ":storage_start_loc": start_loc,
+                                ":storage_end_loc": end_loc,
                             },
                             |row| row.get("hash"),
                         )?

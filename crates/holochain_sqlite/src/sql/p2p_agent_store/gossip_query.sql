@@ -21,8 +21,8 @@ WHERE signed_at_ms >= :since_ms -- between given signed_at range
       -- wrapping case: everything *outside* the given range
       :storage_start_loc > :storage_end_loc
       AND (
-          storage_center_loc < :storage_start_loc
-          OR storage_center_loc > :storage_end_loc
+          storage_center_loc < :storage_end_loc
+          OR storage_center_loc > :storage_start_loc
       )
     )
   )
