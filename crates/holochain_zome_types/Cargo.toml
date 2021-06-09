@@ -21,7 +21,7 @@ serde_bytes = "0.11"
 subtle = "2"
 thiserror = "1.0.22"
 tracing = "0.1"
-holochain_wasmer_common = { path = "../../../holochain-wasmer/crates/common" }
+holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer", rev = "9b1f3f2e53f77d8c24c74fc2c75002dfbdc2e0a3" }
 
 # fixturator dependencies
 fixt = { version = "^0.0.2-alpha.1", path = "../fixt", optional = true }

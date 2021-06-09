@@ -22,8 +22,7 @@ test_utils = [ "holochain_zome_types/test_utils" ]
 [dependencies]
 hdk_derive = { version = "^0.0.2-alpha.1", path = "../hdk_derive" }
 holo_hash = { version = "0.0.2-alpha.1", path = "../holo_hash" }
-# holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "develop" }
-holochain_wasmer_guest = { path = "../../../holochain-wasmer/crates/guest" }
+holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", rev = "9b1f3f2e53f77d8c24c74fc2c75002dfbdc2e0a3" }
 holochain_zome_types = { version = "0.0.2-alpha.1", path = "../holochain_zome_types" }
 paste = "=1.0.5"
 serde = "1.0"
