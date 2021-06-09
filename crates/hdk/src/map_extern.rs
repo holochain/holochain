@@ -52,15 +52,11 @@ macro_rules! map_extern {
 
                     // Call the function and handle the output.
                     match super::$f(inner) {
-                        Ok(v) => {
-                            match $crate::prelude::ExternIO::encode(v) {
-                                Ok(v) => $crate::prelude::return_ptr::<$crate::prelude::ExternIO>(v),
-                                Err(serialized_bytes_error) => $crate::prelude::return_err_ptr($crate::prelude::WasmError::Serialize(serialized_bytes_error)),
-                            }
+                        Ok(v) => match $crate::prelude::ExternIO::encode(v) {
+                            Ok(v) => $crate::prelude::return_ptr::<$crate::prelude::ExternIO>(v),
+                            Err(serialized_bytes_error) => $crate::prelude::return_err_ptr($crate::prelude::WasmError::Serialize(serialized_bytes_error)),
                         },
-                        Err(e) => {
-                            return $crate::prelude::return_err_ptr(e);
-                        },
+                        Err(e) => $crate::prelude::return_err_ptr(e),
                     }
                 }
             }

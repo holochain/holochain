@@ -572,10 +572,8 @@ pub mod wasm_test {
                     ))
                     .next()
                     .unwrap();
-                let zome_invocation_response =
-                    ribosome.call_zome_function(host_access, invocation.clone());
 
-                let output = match zome_invocation_response {
+                match ribosome.call_zome_function(host_access, invocation.clone()) {
                     Ok(crate::core::ribosome::ZomeCallResponse::Ok(guest_output)) => {
                         Ok(guest_output.decode().unwrap())
                     }
@@ -584,8 +582,7 @@ pub mod wasm_test {
                     }
                     Ok(crate::core::ribosome::ZomeCallResponse::NetworkError(_)) => unreachable!(),
                     Err(e) => Err(e),
-                };
-                output
+                }
             })
             .await
             .unwrap()
