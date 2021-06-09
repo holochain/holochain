@@ -12,6 +12,9 @@ use holo_hash::HeaderHash;
 use holo_hash::HoloHashed;
 use holochain_serialized_bytes::prelude::*;
 
+#[cfg(feature = "rusqlite")]
+use crate::impl_to_sql_via_display;
+
 pub mod builder;
 pub mod conversions;
 
@@ -76,9 +79,21 @@ macro_rules! write_into_header {
 
         /// A unit enum which just maps onto the different Header variants,
         /// without containing any extra data
-        #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Clone, Debug)]
+        #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Eq, Clone, Debug)]
         pub enum HeaderType {
             $($n,)*
+        }
+
+        impl std::fmt::Display for HeaderType {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                writeln!(
+                    f,
+                    "{}",
+                    match self {
+                        $( HeaderType::$n => stringify!($n), )*
+                    }
+                )
+            }
         }
 
         impl From<&Header> for HeaderType {
@@ -117,6 +132,9 @@ write_into_header! {
     Update,
     Delete,
 }
+
+#[cfg(feature = "rusqlite")]
+impl_to_sql_via_display!(HeaderType);
 
 /// a utility macro just to not have to type in the match statement everywhere.
 macro_rules! match_header {
@@ -381,7 +399,7 @@ pub struct Update {
 /// Via the associated [DhtOp], this also has an effect on Entries: namely,
 /// that a previously published Entry will become inaccessible if all of its
 /// Headers are marked deleted.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 pub struct Delete {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -444,6 +462,26 @@ impl EntryType {
     }
 }
 
+impl std::fmt::Display for EntryType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EntryType::AgentPubKey => writeln!(f, "AgentPubKey"),
+            EntryType::App(aet) => writeln!(
+                f,
+                "App({:?}, {}, {:?})",
+                aet.id(),
+                aet.zome_id(),
+                aet.visibility()
+            ),
+            EntryType::CapClaim => writeln!(f, "CapClaim"),
+            EntryType::CapGrant => writeln!(f, "CapGrant"),
+        }
+    }
+}
+
+#[cfg(feature = "rusqlite")]
+impl_to_sql_via_display!(EntryType);
+
 /// Information about a class of Entries provided by the DNA
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 pub struct AppEntryType {
@@ -495,5 +533,12 @@ impl ZomeId {
     /// Use as an index into a slice
     pub fn index(&self) -> usize {
         self.0 as usize
+    }
+}
+
+#[cfg(feature = "full")]
+impl rusqlite::ToSql for ZomeId {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
+        Ok(self.0.into())
     }
 }

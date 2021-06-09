@@ -84,12 +84,12 @@ mod tests {
     fn location_flattening() {
         use serde_yaml::Value;
 
-        let r = TunaSalad {
+        let tuna = TunaSalad {
             celery: vec![Location::Bundled("b".into()), Location::Path("p".into())],
             mayo: Location::Url("http://r.co".into()),
         };
-        let val = serde_yaml::to_value(&r).unwrap();
-        println!("yaml produced:\n{}", serde_yaml::to_string(&r).unwrap());
+        let val = serde_yaml::to_value(&tuna).unwrap();
+        println!("yaml produced:\n{}", serde_yaml::to_string(&tuna).unwrap());
 
         assert_eq!(val["celery"][0]["bundled"], Value::from("b"));
         assert_eq!(val["celery"][1]["path"], Value::from("p"));

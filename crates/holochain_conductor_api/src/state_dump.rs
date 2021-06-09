@@ -58,18 +58,12 @@ pub struct AgentInfoDump {
 impl std::fmt::Display for JsonDump {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let num_other_peers = self.peer_dump.peers.len();
-        let int = &self.integration_dump;
         let s = &self.source_chain_dump;
         writeln!(f, "--- Cell State Dump Summary ---")?;
         writeln!(
             f,
             "Number of other peers in p2p store: {},",
             num_other_peers
-        )?;
-        writeln!(
-            f,
-            "Ops: Limbo (validation: {} integration: {}) Integrated: {}",
-            int.validation_limbo, int.integration_limbo, int.integrated
         )?;
         writeln!(
             f,

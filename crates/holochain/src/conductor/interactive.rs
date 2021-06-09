@@ -43,10 +43,10 @@ pub fn ask_yn(prompt: String, default_yes: Option<bool>) -> std::io::Result<bool
     }
 }
 
-/// Prompts user to enter an LMDB environment path
-pub fn prompt_for_environment_dir(path: &Path) -> std::io::Result<()> {
+/// Prompts user to enter a database path
+pub fn prompt_for_database_dir(path: &Path) -> std::io::Result<()> {
     let prompt = format!(
-        "There is no database environment set at the path specified ({})\nWould you like to create one now?",
+        "There is no database at the path specified ({})\nWould you like to create one now?",
         path.display()
     );
     if ask_yn(prompt, Some(true))? {
@@ -55,7 +55,7 @@ pub fn prompt_for_environment_dir(path: &Path) -> std::io::Result<()> {
     } else {
         Err(std::io::Error::new(
             std::io::ErrorKind::Other,
-            "Cannot continue without LMDB environment created.",
+            "Cannot continue without database.",
         ))
     }
 }

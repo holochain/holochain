@@ -14,7 +14,7 @@ const KEYS_DIRECTORY: &str = "keys";
 const DATABASES_DIRECTORY: &str = "databases";
 const CONFIG_FILENAME: &str = "conductor-config.yml";
 
-/// Newtype for the LMDB environment path. Has a Default.
+/// Newtype for the database path. Has a Default.
 #[derive(
     Clone,
     From,

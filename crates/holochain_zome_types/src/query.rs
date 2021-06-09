@@ -18,8 +18,12 @@ pub struct ChainQueryFilter {
     // TODO: can we generalize this over RangeBounds to allow unbounded ranges?
     pub sequence_range: Option<std::ops::Range<u32>>,
     /// Filter by EntryType
+    // NB: if this filter is set, you can't verify the results, so don't
+    //     use this in validation
     pub entry_type: Option<EntryType>,
     /// Filter by HeaderType
+    // NB: if this filter is set, you can't verify the results, so don't
+    //     use this in validation
     pub header_type: Option<HeaderType>,
     /// Include the entries in the elements
     pub include_entries: bool,
@@ -83,6 +87,12 @@ pub enum ChainStatus {
     Forked(ChainFork),
     /// Chain is invalid because of this header.
     Invalid(ChainHead),
+}
+
+impl Default for ChainStatus {
+    fn default() -> Self {
+        ChainStatus::Empty
+    }
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
