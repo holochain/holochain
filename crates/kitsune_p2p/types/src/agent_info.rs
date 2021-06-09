@@ -1,8 +1,8 @@
 //! Data structures to be stored in the agent/peer database.
 
-use crate::*;
 use crate::bin_types::*;
 use crate::dht_arc::DhtArc;
+use crate::*;
 
 use crate::tx2::tx2_utils::TxUrl;
 
@@ -89,8 +89,7 @@ pub struct AgentInfoInner {
 
 impl std::fmt::Debug for AgentInfoInner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f
-            .debug_struct("AgentInfoSigned")
+        f.debug_struct("AgentInfoSigned")
             .field("space", &self.space)
             .field("agent", &self.agent)
             .field("storage_arc", &self.storage_arc)
@@ -153,9 +152,11 @@ impl<'de> serde::Deserialize<'de> for AgentInfoSigned {
         } = AgentInfoSignedEncode::deserialize(deserializer)?;
 
         let mut bytes: &[u8] = &agent_info;
-        let info: AgentInfoEncode = crate::codec::rmp_decode(&mut bytes).map_err(serde::de::Error::custom)?;
+        let info: AgentInfoEncode =
+            crate::codec::rmp_decode(&mut bytes).map_err(serde::de::Error::custom)?;
         let mut bytes: &[u8] = &info.meta_info;
-        let meta: AgentMetaInfoEncode = crate::codec::rmp_decode(&mut bytes).map_err(serde::de::Error::custom)?;
+        let meta: AgentMetaInfoEncode =
+            crate::codec::rmp_decode(&mut bytes).map_err(serde::de::Error::custom)?;
 
         if agent != info.agent {
             return Err(serde::de::Error::custom("agent mismatch"));
@@ -217,7 +218,7 @@ impl AgentInfoSigned {
             space: space.clone(),
             agent: agent.clone(),
             urls: url_list.clone(),
-            signed_at_ms: signed_at_ms,
+            signed_at_ms,
             expires_after_ms: expires_at_ms - signed_at_ms,
             meta_info: meta,
         };
@@ -244,6 +245,19 @@ impl AgentInfoSigned {
 
         Ok(Self(Arc::new(inner)))
     }
+
+    /// decode from msgpack
+    pub fn decode(b: &[u8]) -> KitsuneResult<Self> {
+        let mut bytes: &[u8] = &b;
+        crate::codec::rmp_decode(&mut bytes).map_err(KitsuneError::other)
+    }
+
+    /// encode as msgpack
+    pub fn encode(&self) -> KitsuneResult<Box<[u8]>> {
+        let mut buf = Vec::new();
+        crate::codec::rmp_encode(&mut buf, self).map_err(KitsuneError::other)?;
+        Ok(buf.into_boxed_slice())
+    }
 }
 
 #[cfg(test)]
@@ -262,10 +276,10 @@ mod tests {
             vec![],
             42,
             69,
-            |_| async move {
-                Ok(Arc::new(vec![0x03; 64].into()))
-            },
-        ).await.unwrap();
+            |_| async move { Ok(Arc::new(vec![0x03; 64].into())) },
+        )
+        .await
+        .unwrap();
 
         assert_eq!(info.space, space);
         assert_eq!(info.agent, agent);

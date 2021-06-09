@@ -126,7 +126,7 @@ impl SpaceInternalHandler for Space {
                             evt_sender
                                 .sign_network_data(sign_req)
                                 .await
-                                .map(|s| Arc::new(s))
+                                .map(Arc::new)
                                 .map_err(KitsuneError::other)
                         }
                     },

@@ -43,8 +43,7 @@ use crate::conductor::error::ConductorResult;
 use crate::conductor::handle::ConductorHandle;
 use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::{
-    conductor::api::error::{ConductorApiError, ConductorApiResult},
-    core::ribosome::real_ribosome::RealRibosome,
+    conductor::api::error::ConductorApiResult, core::ribosome::real_ribosome::RealRibosome,
 };
 pub use builder::*;
 use futures::future;
@@ -830,11 +829,7 @@ where
     ) -> ConductorApiResult<()> {
         let mut space_map = HashMap::new();
         for agent_info_signed in agent_infos {
-            let space: Arc<KitsuneSpace> = Arc::new(
-                (&agent_info_signed)
-                    .try_into()
-                    .map_err(ConductorApiError::other)?,
-            );
+            let space = agent_info_signed.space.clone();
             space_map
                 .entry(space)
                 .or_insert_with(Vec::new)

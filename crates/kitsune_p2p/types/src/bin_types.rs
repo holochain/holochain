@@ -145,4 +145,3 @@ impl std::fmt::Debug for KitsuneSignature {
         Ok(())
     }
 }
-
