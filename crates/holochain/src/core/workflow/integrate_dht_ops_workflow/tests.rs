@@ -428,7 +428,7 @@ impl Db {
     async fn set<'env>(pre_state: Vec<Self>, env: EnvWrite) {
         env.conn()
             .unwrap()
-            .with_commit::<WorkspaceError, _, _>(|txn| {
+            .with_commit_sync::<WorkspaceError, _, _>(|txn| {
                 for state in pre_state {
                     match state {
                         Db::Integrated(op) => {
@@ -476,7 +476,7 @@ async fn call_workflow<'env>(env: EnvWrite) {
 fn clear_dbs(env: EnvWrite) {
     env.conn()
         .unwrap()
-        .with_commit(|txn| {
+        .with_commit_sync(|txn| {
             txn.execute("DELETE FROM DhtOP", []).unwrap();
             txn.execute("DELETE FROM Header", []).unwrap();
             txn.execute("DELETE FROM Entry", []).unwrap();

@@ -65,6 +65,10 @@ impl Scratch {
         SyncScratch(Arc::new(Mutex::new(self)))
     }
 
+    pub fn len(&self) -> usize {
+        self.headers.len()
+    }
+
     pub fn is_empty(&self) -> bool {
         self.headers.is_empty()
     }

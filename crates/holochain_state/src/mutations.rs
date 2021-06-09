@@ -89,6 +89,7 @@ pub fn insert_op(
     let (op, hash) = op.into_inner();
     let op_light = op.to_light();
     let header = op.header();
+    let timestamp = header.timestamp();
     let signature = op.signature().clone();
     if let Some(entry) = op.entry() {
         let entry_hashed = EntryHashed::with_pre_hashed(
@@ -104,7 +105,7 @@ pub fn insert_op(
     let header_hashed = SignedHeaderHashed::with_presigned(header_hashed, signature);
     let op_order = OpOrder::new(op_light.get_type(), header_hashed.header().timestamp());
     insert_header(txn, header_hashed)?;
-    insert_op_lite(txn, op_light, hash, is_authored, op_order)?;
+    insert_op_lite(txn, op_light, hash, is_authored, op_order, timestamp)?;
     Ok(())
 }
 
@@ -115,12 +116,15 @@ pub fn insert_op_lite(
     hash: DhtOpHash,
     is_authored: bool,
     order: OpOrder,
+    timestamp: Timestamp,
 ) -> StateMutationResult<()> {
     let header_hash = op_lite.header_hash().clone();
     let basis = op_lite.dht_basis().to_owned();
     sql_insert!(txn, DhtOp, {
         "hash": hash,
         "type": op_lite.get_type(),
+        "storage_center_loc": basis.get_loc(),
+        "authored_timestamp_ms": timestamp.to_sql_ms_lossy(),
         "basis_hash": basis,
         "header_hash": header_hash,
         "is_authored": is_authored,

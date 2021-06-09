@@ -1,4 +1,4 @@
-//! A simple KvBuf for AgentInfoSigned.
+//! Queries for the P2pState store
 
 use fallible_iterator::FallibleIterator;
 use holo_hash::AgentPubKey;
@@ -22,16 +22,11 @@ use std::sync::Arc;
 use super::error::ConductorResult;
 
 /// Inject multiple agent info entries into the peer store
-pub fn inject_agent_infos<I: IntoIterator<Item = AgentInfoSigned> + Send>(
+pub async fn inject_agent_infos<'iter, I: IntoIterator<Item = &'iter AgentInfoSigned> + Send>(
     env: EnvWrite,
     iter: I,
 ) -> StateMutationResult<()> {
-    env.conn()?.with_commit(|writer| {
-        for agent_info_signed in iter {
-            writer.p2p_put(&agent_info_signed)?;
-        }
-        StateMutationResult::Ok(())
-    })
+    Ok(p2p_put_all(&env, iter.into_iter()).await?)
 }
 
 /// Helper function to get all the peer data from this conductor
@@ -51,14 +46,18 @@ pub fn get_single_agent_info(
 
 /// Interconnect every provided pair of conductors via their peer store databases
 #[cfg(any(test, feature = "test_utils"))]
-pub fn exchange_peer_info(envs: Vec<EnvWrite>) {
+pub async fn exchange_peer_info(envs: Vec<EnvWrite>) {
     for (i, a) in envs.iter().enumerate() {
         for (j, b) in envs.iter().enumerate() {
             if i == j {
                 continue;
             }
-            inject_agent_infos(a.clone(), all_agent_infos(b.clone().into()).unwrap()).unwrap();
-            inject_agent_infos(b.clone(), all_agent_infos(a.clone().into()).unwrap()).unwrap();
+            inject_agent_infos(a.clone(), all_agent_infos(b.clone().into()).unwrap().iter())
+                .await
+                .unwrap();
+            inject_agent_infos(b.clone(), all_agent_infos(a.clone().into()).unwrap().iter())
+                .await
+                .unwrap();
         }
     }
 }
@@ -111,11 +110,11 @@ pub fn query_peer_density(
 }
 
 /// Put single agent info into store
-pub fn put_agent_info_signed(
+pub async fn put_agent_info_signed(
     environ: EnvWrite,
     agent_info_signed: kitsune_p2p::agent_store::AgentInfoSigned,
 ) -> ConductorResult<()> {
-    Ok(environ.conn()?.p2p_put(&agent_info_signed)?)
+    Ok(p2p_put(&environ, &agent_info_signed).await?)
 }
 
 fn now() -> u64 {
@@ -208,19 +207,19 @@ pub fn dump_state(env: EnvRead, cell_id: Option<CellId>) -> StateQueryResult<P2p
 mod tests {
     use super::*;
     use ::fixt::prelude::*;
-    use holochain_state::test_utils::test_p2p_env;
+    use holochain_state::test_utils::test_p2p_state_env;
     use kitsune_p2p::fixt::AgentInfoSignedFixturator;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_store_agent_info_signed() {
         observability::test_run().ok();
 
-        let test_env = test_p2p_env();
+        let test_env = test_p2p_state_env();
         let env = test_env.env();
 
         let agent_info_signed = fixt!(AgentInfoSigned, Predictable);
 
-        env.conn().unwrap().p2p_put(&agent_info_signed).unwrap();
+        p2p_put(&env, &agent_info_signed).await.unwrap();
 
         let agent = kitsune_p2p::KitsuneAgent::try_from(agent_info_signed.clone()).unwrap();
         let ret = env.conn().unwrap().p2p_get(&agent).unwrap();
@@ -231,7 +230,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn add_agent_info_to_peer_env() {
         observability::test_run().ok();
-        let t_env = test_p2p_env();
+        let t_env = test_p2p_state_env();
         let env = t_env.env();
 
         // - Check no data in the store to start
@@ -248,7 +247,9 @@ mod tests {
         expect.sort();
 
         // - Inject some data
-        inject_agent_infos(env.clone(), agent_infos).unwrap();
+        inject_agent_infos(env.clone(), agent_infos.iter())
+            .await
+            .unwrap();
 
         // - Check the same data is now in the store
         let mut agents = all_agent_infos(env.clone().into()).unwrap();

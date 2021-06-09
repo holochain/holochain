@@ -63,7 +63,7 @@ pub mod wasm_test {
         crate::test_utils::fake_genesis(env.clone())
             .await
             .unwrap();
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).unwrap();
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
 
         const LEN: u32 = 5;
         let mut host_access = fixt!(ZomeCallHostAccess);

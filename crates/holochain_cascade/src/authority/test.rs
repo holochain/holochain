@@ -26,7 +26,9 @@ async fn get_entry() {
     fill_db(&env.env(), td.store_entry_op.clone());
     let options = options();
 
-    let result = handle_get_entry(env.env().into(), td.hash.clone(), options.clone()).unwrap();
+    let result = handle_get_entry(env.env().into(), td.hash.clone(), options.clone())
+        .await
+        .unwrap();
     let expected = WireEntryOps {
         creates: vec![td.wire_create.clone()],
         deletes: vec![],
@@ -37,7 +39,9 @@ async fn get_entry() {
 
     fill_db(&env.env(), td.delete_entry_header_op.clone());
 
-    let result = handle_get_entry(env.env().into(), td.hash.clone(), options.clone()).unwrap();
+    let result = handle_get_entry(env.env().into(), td.hash.clone(), options.clone())
+        .await
+        .unwrap();
     let expected = WireEntryOps {
         creates: vec![td.wire_create.clone()],
         deletes: vec![td.wire_delete.clone()],
@@ -48,7 +52,9 @@ async fn get_entry() {
 
     fill_db(&env.env(), td.update_content_op.clone());
 
-    let result = handle_get_entry(env.env().into(), td.hash.clone(), options.clone()).unwrap();
+    let result = handle_get_entry(env.env().into(), td.hash.clone(), options.clone())
+        .await
+        .unwrap();
     let expected = WireEntryOps {
         creates: vec![td.wire_create.clone()],
         deletes: vec![td.wire_delete.clone()],
@@ -69,8 +75,9 @@ async fn get_element() {
 
     let options = options();
 
-    let result =
-        handle_get_element(env.env().into(), td.create_hash.clone(), options.clone()).unwrap();
+    let result = handle_get_element(env.env().into(), td.create_hash.clone(), options.clone())
+        .await
+        .unwrap();
     let expected = WireElementOps {
         header: Some(td.wire_create.clone()),
         deletes: vec![],
@@ -81,8 +88,9 @@ async fn get_element() {
 
     fill_db(&env.env(), td.deleted_by_op.clone());
 
-    let result =
-        handle_get_element(env.env().into(), td.create_hash.clone(), options.clone()).unwrap();
+    let result = handle_get_element(env.env().into(), td.create_hash.clone(), options.clone())
+        .await
+        .unwrap();
     let expected = WireElementOps {
         header: Some(td.wire_create.clone()),
         deletes: vec![td.wire_delete.clone()],
@@ -93,8 +101,9 @@ async fn get_element() {
 
     fill_db(&env.env(), td.update_element_op.clone());
 
-    let result =
-        handle_get_element(env.env().into(), td.create_hash.clone(), options.clone()).unwrap();
+    let result = handle_get_element(env.env().into(), td.create_hash.clone(), options.clone())
+        .await
+        .unwrap();
     let expected = WireElementOps {
         header: Some(td.wire_create.clone()),
         deletes: vec![td.wire_delete.clone()],
@@ -110,6 +119,7 @@ async fn get_element() {
         td.any_header_hash.clone(),
         options.clone(),
     )
+    .await
     .unwrap();
     let expected = WireElementOps {
         header: Some(td.any_header.clone()),
@@ -132,8 +142,9 @@ async fn retrieve_element() {
     let mut options = options();
     options.request_type = GetRequest::Pending;
 
-    let result =
-        handle_get_element(env.env().into(), td.create_hash.clone(), options.clone()).unwrap();
+    let result = handle_get_element(env.env().into(), td.create_hash.clone(), options.clone())
+        .await
+        .unwrap();
     let expected = WireElementOps {
         header: Some(td.wire_create.clone()),
         deletes: vec![],
@@ -154,8 +165,9 @@ async fn get_links() {
     fill_db(&env.env(), td.create_link_op.clone());
     let options = actor::GetLinksOptions::default();
 
-    let result =
-        handle_get_links(env.env().into(), td.link_key.clone(), (&options).into()).unwrap();
+    let result = handle_get_links(env.env().into(), td.link_key.clone(), (&options).into())
+        .await
+        .unwrap();
     let expected = WireLinkOps {
         creates: vec![td.wire_create_link.clone()],
         deletes: vec![],
@@ -164,8 +176,9 @@ async fn get_links() {
 
     fill_db(&env.env(), td.delete_link_op.clone());
 
-    let result =
-        handle_get_links(env.env().into(), td.link_key_tag.clone(), (&options).into()).unwrap();
+    let result = handle_get_links(env.env().into(), td.link_key_tag.clone(), (&options).into())
+        .await
+        .unwrap();
     let expected = WireLinkOps {
         creates: vec![td.wire_create_link_base.clone()],
         deletes: vec![td.wire_delete_link.clone()],
@@ -200,6 +213,7 @@ async fn get_agent_activity() {
         td.query_filter.clone(),
         (&options).into(),
     )
+    .await
     .unwrap();
     let mut expected = AgentActivityResponse {
         agent: td.agent.clone(),
@@ -222,6 +236,7 @@ async fn get_agent_activity() {
         filter,
         (&options).into(),
     )
+    .await
     .unwrap();
 
     assert_eq!(result, expected);

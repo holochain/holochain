@@ -640,7 +640,9 @@ async fn get_counts(envs: &[&EnvWrite]) -> IntegrationStateDumps {
 }
 
 async fn count_integration(env: &EnvWrite) -> IntegrationStateDump {
-    crate::conductor::integration_dump(&env.clone().into()).unwrap()
+    crate::conductor::integration_dump(&env.clone().into())
+        .await
+        .unwrap()
 }
 
 async fn display_integration(env: &EnvWrite) -> usize {

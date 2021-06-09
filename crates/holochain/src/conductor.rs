@@ -17,7 +17,7 @@ pub mod api;
 mod cell;
 #[allow(clippy::module_inception)]
 #[allow(missing_docs)]
-mod conductor;
+pub mod conductor;
 #[allow(missing_docs)]
 pub mod config;
 #[allow(missing_docs)]
@@ -29,6 +29,7 @@ pub mod handle;
 pub mod interactive;
 pub mod interface;
 pub mod manager;
+pub mod p2p_metrics;
 pub mod p2p_store;
 pub mod paths;
 pub mod state;

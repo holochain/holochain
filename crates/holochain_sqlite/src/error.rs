@@ -15,9 +15,6 @@ pub enum DatabaseError {
     #[error("database directory does not exist at configured path: {0}")]
     DatabaseMissing(PathBuf),
 
-    #[error("There is an unexpected value in a database (TODO: more info)")]
-    InvalidValue,
-
     #[error(
         "Attempted to access a private entry in a context where no private database is specified: {0}"
     )]
@@ -52,6 +49,9 @@ pub enum DatabaseError {
 
     #[error("Unable to construct a value key")]
     KeyConstruction,
+
+    #[error("transparent")]
+    FailedToJoinBlocking(#[from] tokio::task::JoinError),
 }
 
 impl PartialEq for DatabaseError {

@@ -14,7 +14,8 @@ pub fn query(
             .host_context
             .workspace()
             .source_chain()
-            .query(&input)
+            .query(input)
+            .await
             .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
         Ok(elements)
     })
@@ -41,7 +42,7 @@ pub mod slow_tests {
         crate::test_utils::fake_genesis(env.clone())
             .await
             .unwrap();
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).unwrap();
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace;
         (test_env, host_access)

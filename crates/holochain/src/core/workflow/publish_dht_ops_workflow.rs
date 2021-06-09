@@ -42,21 +42,6 @@ pub async fn publish_dht_ops_workflow(
     let (to_publish, hashes) =
         publish_dht_ops_workflow_inner(env.clone().into(), network.from_agent()).await?;
 
-    // commit the workspace
-    //
-    // FIXME: the local commit should happen only AFTER successfully publishing.
-    //        I moved this because when switching from LMDB to SQLite, in the
-    //        case of self-publishing, the transaction held here would block
-    //        the attempt to get a transaction for the integration workflow
-    //        (part of handling the self-publish)
-    //
-    //        so, TODO: make publishing come before this, after self-publishing
-    //        is abolished [ B-04053 ]
-    // @freesig I think the correct thing to do here is not wait for a response from the
-    // publish.
-    // tracing::warn!("Committing local state before publishing to network! TODO: circle back ");
-    // writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
-
     // Commit to the network
     tracing::info!("sending {} ops", to_publish.len());
     for (basis, ops) in to_publish {
@@ -66,12 +51,13 @@ pub async fn publish_dht_ops_workflow(
     }
     tracing::info!("sent {} ops", hashes.len());
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
-    env.conn()?.with_commit(|writer| {
+    env.async_commit(move |writer| {
         for hash in hashes {
             mutations::set_last_publish_time(writer, hash, now)?;
         }
         WorkflowResult::Ok(())
-    })?;
+    })
+    .await?;
     tracing::info!("commited sent ops");
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
@@ -87,7 +73,9 @@ pub async fn publish_dht_ops_workflow_inner(
     let mut to_publish = HashMap::new();
     let mut hashes = Vec::new();
 
-    for op_hashed in publish_query::get_ops_to_publish(&agent, &env, DEFAULT_RECEIPT_BUNDLE_SIZE)? {
+    for op_hashed in
+        publish_query::get_ops_to_publish(agent.clone(), &env, DEFAULT_RECEIPT_BUNDLE_SIZE).await?
+    {
         let (op, op_hash) = op_hashed.into_inner();
         hashes.push(op_hash.clone());
 
@@ -147,7 +135,7 @@ mod tests {
 
         env.conn()
             .unwrap()
-            .with_commit(|txn| {
+            .with_commit_sync(|txn| {
                 for _ in 0..num_hash {
                     // Create data for op
                     let sig = sig_fixt.next().unwrap();
@@ -385,7 +373,9 @@ mod tests {
                 let author = fake_agent_pubkey_1();
 
                 // Put data in elements
-                let source_chain = SourceChain::new(env.clone().into(), author.clone()).unwrap();
+                let source_chain = SourceChain::new(env.clone().into(), author.clone())
+                    .await
+                    .unwrap();
                 // Produces 3 ops but minus 1 for store entry so 2 ops.
                 let original_header_address = source_chain
                     .put(
@@ -412,7 +402,7 @@ mod tests {
                     .await
                     .unwrap();
 
-                source_chain.flush().unwrap();
+                source_chain.flush().await.unwrap();
                 let (entry_create_header, entry_update_header) = env
                     .conn()
                     .unwrap()
@@ -518,8 +508,8 @@ mod tests {
                 .await;
                 let cell_network = test_network.cell_network();
                 let (tx_complete, rx_complete) = tokio::sync::oneshot::channel();
-                // We are expecting six ops per agent plus one for self
-                let total_expected = (num_agents + 1) * 6;
+                // We are expecting six ops per agent plus one for self plus 7 for genesis.
+                let total_expected = (num_agents + 1) * (6 + 7);
                 let mut recv_count: u32 = 0;
 
                 // Receive events and increment count
@@ -546,10 +536,16 @@ mod tests {
                                                 assert_eq!(dht_hash, expected_op.dht_basis());
                                                 count.fetch_add(1, Ordering::SeqCst);
                                             }
-                                            None => panic!(
-                                                "This DhtOpHash was not expected: {:?}",
-                                                op_hash
-                                            ),
+                                            None => {
+                                                if let DhtOp::StoreEntry(_, h, _) = op {
+                                                    if *h.visibility() == EntryVisibility::Private {
+                                                        panic!(
+                                                            "A private op has been published: {:?}",
+                                                            h
+                                                        )
+                                                    }
+                                                }
+                                            }
                                         }
                                         recv_count += 1;
                                     }

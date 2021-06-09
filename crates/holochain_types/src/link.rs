@@ -62,12 +62,12 @@ impl WireLinkOps {
         Default::default()
     }
     /// Render these ops to their full types.
-    pub fn render(self, key: WireLinkKey) -> DhtOpResult<RenderedOps> {
+    pub fn render(self, key: &WireLinkKey) -> DhtOpResult<RenderedOps> {
         let Self { creates, deletes } = self;
         let mut ops = Vec::with_capacity(creates.len() + deletes.len());
         // We silently ignore ops that fail to render as they come from the network.
-        ops.extend(creates.into_iter().filter_map(|op| op.render(&key).ok()));
-        ops.extend(deletes.into_iter().filter_map(|op| op.render(&key).ok()));
+        ops.extend(creates.into_iter().filter_map(|op| op.render(key).ok()));
+        ops.extend(deletes.into_iter().filter_map(|op| op.render(key).ok()));
         Ok(RenderedOps {
             ops,
             ..Default::default()

@@ -6,6 +6,7 @@ use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::dht_op::produce_op_lights_from_elements;
 use holochain_types::dht_op::produce_op_lights_from_iter;
 use holochain_types::dht_op::DhtOpLight;
+use holochain_types::dht_op::DhtOpType;
 use holochain_types::dht_op::OpOrder;
 use holochain_types::dht_op::UniqueForm;
 use holochain_types::element::SignedHeaderHashedExt;
@@ -19,6 +20,7 @@ use holochain_zome_types::CapGrant;
 use holochain_zome_types::CapSecret;
 use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
+use holochain_zome_types::EntryVisibility;
 use holochain_zome_types::GrantedFunction;
 use holochain_zome_types::Header;
 use holochain_zome_types::HeaderBuilder;
@@ -42,7 +44,7 @@ mod error;
 #[derive(Clone)]
 pub struct SourceChain {
     scratch: SyncScratch,
-    vault: EnvRead,
+    vault: EnvWrite,
     author: Arc<AgentPubKey>,
     persisted_seq: u32,
     persisted_head: HeaderHash,
@@ -65,13 +67,18 @@ pub struct SourceChainJsonElement {
     pub entry: Option<Entry>,
 }
 
+// TODO: document that many functions here are only reading from the scratch,
+//       not the entire source chain!
 impl SourceChain {
-    pub fn new(vault: EnvRead, author: AgentPubKey) -> SourceChainResult<Self> {
+    pub async fn new(vault: EnvWrite, author: AgentPubKey) -> SourceChainResult<Self> {
         let scratch = Scratch::new().into_sync();
         let author = Arc::new(author);
         let (persisted_head, persisted_seq) = vault
-            .conn()?
-            .with_reader(|txn| chain_head_db(&txn, author.clone()))?;
+            .async_reader({
+                let author = author.clone();
+                move |txn| chain_head_db(&txn, author)
+            })
+            .await?;
         Ok(Self {
             scratch,
             vault,
@@ -101,6 +108,8 @@ impl SourceChain {
     /// This has to clone all the data because we can't return
     /// references to constructed data.
     // TODO: Maybe we should store data as elements in the scratch?
+    // TODO: document that this is only the elemnts in the SCRATCH, not the
+    //       entire source chain!
     pub fn elements(&self) -> SourceChainResult<Vec<Element>> {
         Ok(self.scratch.apply(|scratch| scratch.elements().collect())?)
     }
@@ -135,7 +144,7 @@ impl SourceChain {
         let hash = header.as_hash().clone();
 
         // Sign the header.
-        let header = SignedHeaderHashed::new(self.vault.keystore(), header).await?;
+        let header = SignedHeaderHashed::new(&self.vault.keystore(), header).await?;
         let element = Element::new(header, maybe_entry);
 
         // Put into scratch.
@@ -172,6 +181,7 @@ impl SourceChain {
         if author_grant.is_valid(check_function, check_agent, check_secret) {
             return Ok(Some(author_grant));
         }
+        // TODO: SQL_PERF: This query could have a fast upper bound if we add indexes.
         let valid_cap_grant = self.vault.conn()?.with_reader(|txn| {
             let not_referenced_header = "
             SELECT COUNT(H_REF.hash)
@@ -270,38 +280,43 @@ impl SourceChain {
     /// This returns a Vec rather than an iterator because it is intended to be
     /// used by the `query` host function, which crosses the wasm boundary
     // FIXME: This query needs to be tested.
-    pub fn query(&self, query: &QueryFilter) -> SourceChainResult<Vec<Element>> {
+    pub async fn query(&self, query: QueryFilter) -> SourceChainResult<Vec<Element>> {
         let (range_min, range_max) = match query.sequence_range.clone() {
             Some(range) => (Some(range.start), Some(range.end)),
             None => (None, None),
         };
-        let mut elements = self.vault.conn()?.with_reader(|txn| {
-            let mut sql = "
+        let author = self.author.clone();
+        let mut elements = self
+            .vault
+            .async_reader({
+                let query = query.clone();
+                move |txn| {
+                    let mut sql = "
                 SELECT DISTINCT
                 Header.hash AS header_hash, Header.blob AS header_blob
             "
-            .to_string();
-            if query.include_entries {
-                sql.push_str(
-                    "
+                    .to_string();
+                    if query.include_entries {
+                        sql.push_str(
+                            "
                     , Entry.blob AS entry_blob
                     ",
-                );
-            }
-            sql.push_str(
-                "
+                        );
+                    }
+                    sql.push_str(
+                        "
                 FROM Header
                 ",
-            );
-            if query.include_entries {
-                sql.push_str(
-                    "
+                    );
+                    if query.include_entries {
+                        sql.push_str(
+                            "
                     LEFT JOIN Entry On Header.entry_hash = Entry.hash
                     ",
-                );
-            }
-            sql.push_str(
-                "
+                        );
+                    }
+                    sql.push_str(
+                        "
                 JOIN DhtOp On DhtOp.header_hash = Header.hash
                 WHERE
                 Header.author = :author
@@ -316,38 +331,40 @@ impl SourceChain {
                 AND
                 (:header_type IS NULL OR Header.type = :header_type)
                 ",
-            );
-            let mut stmt = txn.prepare(&sql)?;
-            let elements = stmt
-                .query_and_then(
-                    named_params! {
-                        ":author": self.author.as_ref(),
-                        ":range_min": range_min,
-                        ":range_max": range_max,
-                        ":entry_type": query.entry_type,
-                        ":header_type": query.header_type,
-                    },
-                    |row| {
-                        let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
-                        let SignedHeader(header, signature) = header;
-                        let hash: HeaderHash = row.get("header_hash")?;
-                        let header = HeaderHashed::with_pre_hashed(header, hash);
-                        let shh = SignedHeaderHashed::with_presigned(header, signature);
-                        let entry = if query.include_entries {
-                            let entry: Option<Vec<u8>> = row.get("entry_blob")?;
-                            match entry {
-                                Some(entry) => Some(from_blob::<Entry>(entry)?),
-                                None => None,
-                            }
-                        } else {
-                            None
-                        };
-                        StateQueryResult::Ok(Element::new(shh, entry))
-                    },
-                )?
-                .collect::<StateQueryResult<Vec<_>>>();
-            elements
-        })?;
+                    );
+                    let mut stmt = txn.prepare(&sql)?;
+                    let elements = stmt
+                        .query_and_then(
+                            named_params! {
+                                ":author": author.as_ref(),
+                                ":range_min": range_min,
+                                ":range_max": range_max,
+                                ":entry_type": query.entry_type,
+                                ":header_type": query.header_type,
+                            },
+                            |row| {
+                                let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
+                                let SignedHeader(header, signature) = header;
+                                let hash: HeaderHash = row.get("header_hash")?;
+                                let header = HeaderHashed::with_pre_hashed(header, hash);
+                                let shh = SignedHeaderHashed::with_presigned(header, signature);
+                                let entry = if query.include_entries {
+                                    let entry: Option<Vec<u8>> = row.get("entry_blob")?;
+                                    match entry {
+                                        Some(entry) => Some(from_blob::<Entry>(entry)?),
+                                        None => None,
+                                    }
+                                } else {
+                                    None
+                                };
+                                StateQueryResult::Ok(Element::new(shh, entry))
+                            },
+                        )?
+                        .collect::<StateQueryResult<Vec<_>>>();
+                    elements
+                }
+            })
+            .await?;
         self.scratch.apply(|scratch| {
             let scratch_iter = scratch
                 .headers()
@@ -364,7 +381,7 @@ impl SourceChain {
         Ok(elements)
     }
 
-    pub fn flush(&self) -> SourceChainResult<()> {
+    pub async fn flush(&self) -> SourceChainResult<()> {
         // Nothing to write
         if self.scratch.apply(|s| s.is_empty())? {
             return Ok(());
@@ -399,10 +416,12 @@ impl SourceChain {
                     let (header, op_hash) =
                         UniqueForm::op_hash(op_type, h.expect("This can't be empty"))?;
                     let op_order = OpOrder::new(op_type, header.timestamp());
+                    let timestamp = header.timestamp();
+                    let visibility = header.entry_type().map(|et| *et.visibility());
                     // Put the header back by value.
                     h = Some(header);
                     // Collect the DhtOpLight, DhtOpHash and OpOrder.
-                    ops.push((op, op_hash, op_order));
+                    ops.push((op, op_hash, op_order, timestamp, visibility));
                 }
 
                 // Put the SignedHeaderHashed back together.
@@ -420,32 +439,54 @@ impl SourceChain {
         })?;
 
         // Write the entries, headers and ops to the database in one transaction.
-        self.vault.conn()?.with_commit(|txn| {
-            // As at check.
-            let (new_persisted_head, _) = chain_head_db(&txn, self.author.clone())?;
-            if headers.last().is_none() {
-                // Nothing to write
-                return Ok(());
-            }
-            if self.persisted_head != new_persisted_head {
-                return Err(SourceChainError::HeadMoved(
-                    Some(self.persisted_head.clone()),
-                    Some(new_persisted_head),
-                ));
-            }
+        let author = self.author.clone();
+        let persisted_head = self.persisted_head.clone();
+        self.vault
+            .async_commit(move |txn| {
+                // As at check.
+                let (new_persisted_head, _) = chain_head_db(&txn, author)?;
+                if headers.last().is_none() {
+                    // Nothing to write
+                    return Ok(());
+                }
+                if persisted_head != new_persisted_head {
+                    return Err(SourceChainError::HeadMoved(
+                        Some(persisted_head),
+                        Some(new_persisted_head),
+                    ));
+                }
 
-            for entry in entries {
-                insert_entry(txn, entry)?;
-            }
-            for header in headers {
-                insert_header(txn, header)?;
-            }
-            for (op, op_hash, op_order) in ops {
-                insert_op_lite(txn, op, op_hash.clone(), true, op_order)?;
-                set_validation_status(txn, op_hash, holochain_zome_types::ValidationStatus::Valid)?;
-            }
-            SourceChainResult::Ok(())
-        })?;
+                for entry in entries {
+                    insert_entry(txn, entry)?;
+                }
+                for header in headers {
+                    insert_header(txn, header)?;
+                }
+                for (op, op_hash, op_order, timestamp, visibility) in ops {
+                    let op_type = op.get_type();
+                    insert_op_lite(txn, op, op_hash.clone(), true, op_order, timestamp)?;
+                    set_validation_status(
+                        txn,
+                        op_hash.clone(),
+                        holochain_zome_types::ValidationStatus::Valid,
+                    )?;
+                    // TODO: SHARDING: Check if we are the authority here.
+                    // StoreEntry ops with private entries are never gossiped or published
+                    // so we don't need to integrate them.
+                    // TODO: Can anything every depend on a private store entry op? I don't think so.
+                    if !(op_type == DhtOpType::StoreEntry
+                        && visibility == Some(EntryVisibility::Private))
+                    {
+                        set_validation_stage(
+                            txn,
+                            op_hash,
+                            ValidationLimboStatus::AwaitingIntegration,
+                        )?;
+                    }
+                }
+                SourceChainResult::Ok(())
+            })
+            .await?;
         Ok(())
     }
 }
@@ -501,12 +542,14 @@ pub async fn genesis(
     let (agent_header, agent_entry) = element.into_inner();
     let agent_entry = agent_entry.into_option();
 
-    vault.conn()?.with_commit(|txn| {
-        source_chain::put_raw(txn, dna_header, dna_ops, None)?;
-        source_chain::put_raw(txn, agent_validation_header, avh_ops, None)?;
-        source_chain::put_raw(txn, agent_header, agent_ops, agent_entry)?;
-        SourceChainResult::Ok(())
-    })
+    vault
+        .async_commit(move |txn| {
+            source_chain::put_raw(txn, dna_header, dna_ops, None)?;
+            source_chain::put_raw(txn, agent_validation_header, avh_ops, None)?;
+            source_chain::put_raw(txn, agent_header, agent_ops, agent_entry)?;
+            SourceChainResult::Ok(())
+        })
+        .await
 }
 
 pub fn put_raw(
@@ -524,8 +567,9 @@ pub fn put_raw(
         let (h, op_hash) =
             UniqueForm::op_hash(op_type, header.take().expect("This can't be empty"))?;
         let op_order = OpOrder::new(op_type, h.timestamp());
+        let timestamp = h.timestamp();
         header = Some(h);
-        hashes.push((op_hash, op_order));
+        hashes.push((op_hash, op_order, timestamp));
     }
     let shh = SignedHeaderHashed::with_presigned(
         HeaderHashed::with_pre_hashed(header.expect("This can't be empty"), hash),
@@ -535,8 +579,8 @@ pub fn put_raw(
         insert_entry(txn, EntryHashed::from_content_sync(entry))?;
     }
     insert_header(txn, shh)?;
-    for (op, (op_hash, op_order)) in ops.into_iter().zip(hashes) {
-        insert_op_lite(txn, op, op_hash, true, op_order)?;
+    for (op, (op_hash, op_order, timestamp)) in ops.into_iter().zip(hashes) {
+        insert_op_lite(txn, op, op_hash, true, op_order, timestamp)?;
     }
     Ok(())
 }
@@ -590,7 +634,7 @@ async fn _put_db<H: HeaderInner, B: HeaderBuilder<H>>(
     let (header, entry) = element.into_inner();
     let entry = entry.into_option();
     let hash = header.as_hash().clone();
-    vault.conn()?.with_commit(|txn| {
+    vault.conn()?.with_commit_sync(|txn| {
         let (new_head, _) = chain_head_db(txn, author.clone())?;
         if new_head != prev_header {
             return Err(SourceChainError::HeadMoved(
@@ -606,12 +650,13 @@ async fn _put_db<H: HeaderInner, B: HeaderBuilder<H>>(
 /// dump the entire source chain as a pretty-printed json string
 pub async fn dump_state(
     vault: EnvRead,
-    author: &AgentPubKey,
+    author: AgentPubKey,
 ) -> Result<SourceChainJsonDump, SourceChainError> {
-    Ok(vault.conn()?.with_reader(|txn| {
-        let elements = txn
-            .prepare(
-                "
+    Ok(vault
+        .async_reader(move |txn| {
+            let elements = txn
+                .prepare(
+                    "
                 SELECT DISTINCT
                 Header.blob AS header_blob, Entry.blob AS entry_blob,
                 Header.hash AS header_hash
@@ -624,30 +669,30 @@ pub async fn dump_state(
                 Header.author = :author
                 ORDER BY Header.seq ASC
                 ",
-            )?
-            .query_and_then(
-                named_params! {
-                    ":author": author,
-                },
-                |row| {
-                    let SignedHeader(header, signature) = from_blob(row.get("header_blob")?)?;
-                    let header_address = row.get("header_hash")?;
-                    let entry: Option<Vec<u8>> = row.get("entry_blob")?;
-                    let entry: Option<Entry> = match entry {
-                        Some(entry) => Some(from_blob(entry)?),
-                        None => None,
-                    };
-                    StateQueryResult::Ok(SourceChainJsonElement {
-                        signature,
-                        header_address,
-                        header,
-                        entry,
-                    })
-                },
-            )?
-            .collect::<StateQueryResult<Vec<_>>>()?;
-        let published_ops_count = txn.query_row(
-            "
+                )?
+                .query_and_then(
+                    named_params! {
+                        ":author": author,
+                    },
+                    |row| {
+                        let SignedHeader(header, signature) = from_blob(row.get("header_blob")?)?;
+                        let header_address = row.get("header_hash")?;
+                        let entry: Option<Vec<u8>> = row.get("entry_blob")?;
+                        let entry: Option<Entry> = match entry {
+                            Some(entry) => Some(from_blob(entry)?),
+                            None => None,
+                        };
+                        StateQueryResult::Ok(SourceChainJsonElement {
+                            signature,
+                            header_address,
+                            header,
+                            entry,
+                        })
+                    },
+                )?
+                .collect::<StateQueryResult<Vec<_>>>()?;
+            let published_ops_count = txn.query_row(
+                "
                 SELECT COUNT(DhtOp.hash) FROM DhtOp
                 JOIN Header ON DhtOp.header_hash = Header.hash
                 WHERE
@@ -657,16 +702,17 @@ pub async fn dump_state(
                 AND
                 last_publish_time IS NOT NULL
                 ",
-            named_params! {
-            ":author": author,
-            },
-            |row| row.get(0),
-        )?;
-        StateQueryResult::Ok(SourceChainJsonDump {
-            elements,
-            published_ops_count,
+                named_params! {
+                ":author": author,
+                },
+                |row| row.get(0),
+            )?;
+            StateQueryResult::Ok(SourceChainJsonDump {
+                elements,
+                published_ops_count,
+            })
         })
-    })?)
+        .await?)
 }
 
 #[cfg(test)]
@@ -700,7 +746,7 @@ pub mod tests {
             .unwrap();
 
         {
-            let chain = SourceChain::new(env.clone().into(), alice.clone())?;
+            let chain = SourceChain::new(env.clone().into(), alice.clone()).await?;
             assert_eq!(
                 chain.valid_cap_grant(&function, &alice, secret.as_ref())?,
                 Some(CapGrant::ChainAuthor(alice.clone())),
@@ -714,7 +760,7 @@ pub mod tests {
         }
 
         let (original_header_address, original_entry_address) = {
-            let chain = SourceChain::new(env.clone().into(), alice.clone())?;
+            let chain = SourceChain::new(env.clone().into(), alice.clone()).await?;
             let (entry, entry_hash) =
                 EntryHashed::from_content_sync(Entry::CapGrant(grant.clone())).into_inner();
             let header_builder = builder::Create {
@@ -723,13 +769,13 @@ pub mod tests {
             };
             let header = chain.put(header_builder, Some(entry)).await?;
 
-            chain.flush().unwrap();
+            chain.flush().await.unwrap();
 
             (header, entry_hash)
         };
 
         {
-            let chain = SourceChain::new(env.clone().into(), alice.clone())?;
+            let chain = SourceChain::new(env.clone().into(), alice.clone()).await?;
             // alice should find her own authorship with higher priority than the committed grant
             // even if she passes in the secret
             assert_eq!(
@@ -753,7 +799,7 @@ pub mod tests {
         let updated_grant = ZomeCallCapGrant::new("tag".into(), updated_access.clone(), functions);
 
         let (updated_header_hash, updated_entry_hash) = {
-            let chain = SourceChain::new(env.clone().into(), alice.clone())?;
+            let chain = SourceChain::new(env.clone().into(), alice.clone()).await?;
             let (entry, entry_hash) =
                 EntryHashed::from_content_sync(Entry::CapGrant(updated_grant.clone())).into_inner();
             let header_builder = builder::Update {
@@ -764,13 +810,13 @@ pub mod tests {
             };
             let header = chain.put(header_builder, Some(entry)).await?;
 
-            chain.flush().unwrap();
+            chain.flush().await.unwrap();
 
             (header, entry_hash)
         };
 
         {
-            let chain = SourceChain::new(env.clone().into(), alice.clone())?;
+            let chain = SourceChain::new(env.clone().into(), alice.clone()).await?;
             // alice should find her own authorship with higher priority than the committed grant
             // even if she passes in the secret
             assert_eq!(
@@ -794,18 +840,18 @@ pub mod tests {
         }
 
         {
-            let chain = SourceChain::new(env.clone().into(), alice.clone())?;
+            let chain = SourceChain::new(env.clone().into(), alice.clone()).await?;
             let header_builder = builder::Delete {
                 deletes_address: updated_header_hash,
                 deletes_entry_address: updated_entry_hash,
             };
             chain.put(header_builder, None).await?;
 
-            chain.flush().unwrap();
+            chain.flush().await.unwrap();
         }
 
         {
-            let chain = SourceChain::new(env.clone().into(), alice.clone())?;
+            let chain = SourceChain::new(env.clone().into(), alice.clone()).await?;
             // alice should find her own authorship
             assert_eq!(
                 chain.valid_cap_grant(&function, &alice, secret.as_ref())?,
@@ -897,7 +943,9 @@ pub mod tests {
         .await
         .unwrap();
 
-        let source_chain = SourceChain::new(vault.clone().into(), (*author).clone()).unwrap();
+        let source_chain = SourceChain::new(vault.clone().into(), (*author).clone())
+            .await
+            .unwrap();
         let entry = Entry::App(fixt!(AppEntryBytes));
         let create = builder::Create {
             entry_type: EntryType::App(fixt!(AppEntryType)),
@@ -910,7 +958,7 @@ pub mod tests {
             entry_hash: EntryHash::with_data_sync(&entry),
         };
         let h2 = source_chain.put(create, Some(entry)).await.unwrap();
-        source_chain.flush().unwrap();
+        source_chain.flush().await.unwrap();
 
         fresh_reader_test!(vault, |txn| {
             assert_eq!(chain_head_db(&txn, author.clone()).unwrap().0, h2);
@@ -929,8 +977,10 @@ pub mod tests {
         });
 
         // check that you can iterate on the chain
-        let source_chain = SourceChain::new(vault.clone().into(), (*author).clone()).unwrap();
-        let res = source_chain.query(&QueryFilter::new()).unwrap();
+        let source_chain = SourceChain::new(vault.clone().into(), (*author).clone())
+            .await
+            .unwrap();
+        let res = source_chain.query(QueryFilter::new()).await.unwrap();
         assert_eq!(res.len(), 5);
         assert_eq!(*res[3].header_address(), h1);
         assert_eq!(*res[4].header_address(), h2);
@@ -947,7 +997,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        let json = dump_state(vault.clone().into(), &author).await?;
+        let json = dump_state(vault.clone().into(), author.clone()).await?;
         let json = serde_json::to_string_pretty(&json)?;
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
 

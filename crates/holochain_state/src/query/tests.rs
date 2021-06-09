@@ -201,6 +201,7 @@ async fn insert_op_equivalence() {
         op.as_hash().clone(),
         true,
         op_order,
+        create_header.timestamp,
     )
     .unwrap();
 

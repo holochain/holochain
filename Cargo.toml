@@ -24,11 +24,14 @@ members = [
   "crates/holochain_util",
   "crates/holochain_zome_types",
 
+  "crates/kitsune_p2p/direct",
+  "crates/kitsune_p2p/direct_api",
+  "crates/kitsune_p2p/direct_test",
   "crates/kitsune_p2p/kitsune_p2p",
+  "crates/kitsune_p2p/mdns",
+  "crates/kitsune_p2p/proxy",
   "crates/kitsune_p2p/transport_quic",
   "crates/kitsune_p2p/types",
-  "crates/kitsune_p2p/proxy",
-  "crates/kitsune_p2p/mdns",
 
   "crates/test_utils/wasm",
   "crates/test_utils/wasm_common",
@@ -50,8 +53,8 @@ incremental = false
 codegen-units = 16
 
 [patch.crates-io]
-# holochain_wasmer_guest = { path = "../holochain-wasmer/crates/guest" }
-# holochain_wasmer_host = { path = "../holochain-wasmer/crates/host" }
+# holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "wasmer-patch" }
+# holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "wasmer-patch" }
 # holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "bump-serde" }
 # holochain_serialized_bytes_derive = { git = "https://github.com/holochain/holochain-serialization.git", branch = "bump-serde" }
 # observability = { git = "https://github.com/freesig/observability.git", branch = "main" }

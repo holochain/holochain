@@ -9,14 +9,22 @@ use futures::Future;
 use holo_hash::DnaHash;
 use holochain_zome_types::cell::CellId;
 use kitsune_p2p::KitsuneSpace;
+use parking_lot::Mutex;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
-use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::{collections::HashMap, path::Path};
+use tokio::{
+    sync::{OwnedSemaphorePermit, Semaphore},
+    task,
+};
 
-mod p2p;
-pub use p2p::*;
+mod p2p_state;
+pub use p2p_state::*;
+
+mod p2p_metrics;
+pub use p2p_metrics::*;
 
 /// A read-only version of [DbWrite].
 /// This environment can only generate read-only transactions, never read-write.
@@ -25,6 +33,8 @@ pub struct DbRead {
     kind: DbKind,
     path: PathBuf,
     connection_pool: ConnectionPool,
+    write_semaphore: Arc<Semaphore>,
+    read_semaphore: Arc<Semaphore>,
 }
 
 impl DbRead {
@@ -95,10 +105,42 @@ impl DbWrite {
         crate::table::initialize_database(&mut conn, &kind)?;
 
         Ok(DbWrite(DbRead {
+            write_semaphore: Self::get_write_semaphore(&kind),
+            read_semaphore: Self::get_read_semaphore(&kind),
             kind,
             path,
             connection_pool: pool,
         }))
+    }
+
+    fn get_write_semaphore(kind: &DbKind) -> Arc<Semaphore> {
+        static MAP: once_cell::sync::Lazy<Mutex<HashMap<DbKind, Arc<Semaphore>>>> =
+            once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
+        let mut map = MAP.lock();
+        match map.get(kind) {
+            Some(s) => s.clone(),
+            None => {
+                let s = Arc::new(Semaphore::new(1));
+                map.insert(kind.clone(), s.clone());
+                s
+            }
+        }
+    }
+
+    fn get_read_semaphore(kind: &DbKind) -> Arc<Semaphore> {
+        static MAP: once_cell::sync::Lazy<Mutex<HashMap<DbKind, Arc<Semaphore>>>> =
+            once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
+        let mut map = MAP.lock();
+        match map.get(kind) {
+            Some(s) => s.clone(),
+            None => {
+                let num_cpus = num_cpus::get();
+                let num_read_threads = if num_cpus < 4 { 4 } else { num_cpus / 2 };
+                let s = Arc::new(Semaphore::new(num_read_threads));
+                map.insert(kind.clone(), s.clone());
+                s
+            }
+        }
     }
 
     /// Create a unique db in a temp dir with no static management of the
@@ -119,7 +161,7 @@ impl DbWrite {
 }
 
 /// The various types of database, used to specify the list of databases to initialize
-#[derive(Clone, Debug, derive_more::Display)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 pub enum DbKind {
     /// Specifies the environment used by each Cell
     Cell(CellId),
@@ -130,7 +172,9 @@ pub enum DbKind {
     /// Specifies the environment used to save wasm
     Wasm,
     /// State of the p2p network (one per space).
-    P2p(Arc<KitsuneSpace>),
+    P2pState(Arc<KitsuneSpace>),
+    /// Metrics for peers on p2p network (one per space).
+    P2pMetrics(Arc<KitsuneSpace>),
 }
 
 impl DbKind {
@@ -141,7 +185,10 @@ impl DbKind {
             DbKind::Cache(dna) => ["cache", &format!("cache-{}", dna)].iter().collect(),
             DbKind::Conductor => ["conductor", "conductor"].iter().collect(),
             DbKind::Wasm => ["wasm", "wasm"].iter().collect(),
-            DbKind::P2p(space) => ["p2p", &format!("p2p-{}", space)].iter().collect(),
+            DbKind::P2pState(space) => ["p2p", &format!("p2p_state-{}", space)].iter().collect(),
+            DbKind::P2pMetrics(space) => {
+                ["p2p", &format!("p2p_metrics-{}", space)].iter().collect()
+            }
         };
         path.set_extension("sqlite3");
         path
@@ -169,7 +216,8 @@ pub trait WriteManager<'e> {
     /// transaction, and commit the transaction after the closure has run.
     /// If there is a SQLite error, recover from it and re-run the closure.
     // FIXME: B-01566: implement write failure detection
-    fn with_commit<E, R, F>(&'e mut self, f: F) -> Result<R, E>
+    #[cfg(feature = "test_utils")]
+    fn with_commit_sync<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
         F: 'e + FnOnce(&mut Transaction) -> Result<R, E>;
@@ -184,7 +232,7 @@ pub trait WriteManager<'e> {
     where
         F: 'e + FnOnce(&mut Transaction) -> R,
     {
-        self.with_commit(|w| DatabaseResult::Ok(f(w)))
+        self.with_commit_sync(|w| DatabaseResult::Ok(f(w)))
     }
 }
 
@@ -207,8 +255,33 @@ impl<'e> ReadManager<'e> for PConn {
     }
 }
 
+impl DbRead {
+    pub async fn async_reader<E, R, F>(&self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError> + Send + 'static,
+        F: FnOnce(Transaction) -> Result<R, E> + Send + 'static,
+        R: Send + 'static,
+    {
+        let _g = self.acquire_reader_permit().await;
+        let mut conn = self.conn()?;
+        let r = task::spawn_blocking(move || conn.with_reader(f))
+            .await
+            .map_err(DatabaseError::from)?;
+        r
+    }
+
+    async fn acquire_reader_permit(&self) -> OwnedSemaphorePermit {
+        self.read_semaphore
+            .clone()
+            .acquire_owned()
+            .await
+            .expect("We don't ever close these semaphores")
+    }
+}
+
 impl<'e> WriteManager<'e> for PConn {
-    fn with_commit<E, R, F>(&'e mut self, f: F) -> Result<R, E>
+    #[cfg(feature = "test_utils")]
+    fn with_commit_sync<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
         F: 'e + FnOnce(&mut Transaction) -> Result<R, E>,
@@ -219,6 +292,43 @@ impl<'e> WriteManager<'e> for PConn {
         let result = f(&mut txn)?;
         txn.commit().map_err(DatabaseError::from)?;
         Ok(result)
+    }
+}
+
+impl DbWrite {
+    pub async fn async_commit<E, R, F>(&self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError> + Send + 'static,
+        F: FnOnce(&mut Transaction) -> Result<R, E> + Send + 'static,
+        R: Send + 'static,
+    {
+        let _g = self.acquire_writer_permit().await;
+        let mut conn = self.conn()?;
+        let r = task::spawn_blocking(move || conn.with_commit_sync(f))
+            .await
+            .map_err(DatabaseError::from)?;
+        r
+    }
+
+    /// If possible prefer async_commit as this is slower and can starve chained futures.
+    pub async fn async_commit_in_place<E, R, F>(&self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError>,
+        F: FnOnce(&mut Transaction) -> Result<R, E>,
+        R: Send,
+    {
+        let _g = self.acquire_writer_permit().await;
+        let mut conn = self.conn()?;
+        task::block_in_place(move || conn.with_commit_sync(f))
+    }
+
+    async fn acquire_writer_permit(&self) -> OwnedSemaphorePermit {
+        self.0
+            .write_semaphore
+            .clone()
+            .acquire_owned()
+            .await
+            .expect("We don't ever close these semaphores")
     }
 }
 

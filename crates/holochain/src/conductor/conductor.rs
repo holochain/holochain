@@ -94,8 +94,8 @@ where
     _state: CellState,
 }
 
-pub type StopBroadcaster = tokio::sync::broadcast::Sender<()>;
-pub type StopReceiver = tokio::sync::broadcast::Receiver<()>;
+pub(crate) type StopBroadcaster = tokio::sync::broadcast::Sender<()>;
+pub(crate) type StopReceiver = tokio::sync::broadcast::Receiver<()>;
 
 /// A Conductor is a group of [Cell]s
 pub struct Conductor<DS = RealDnaStore, CA = CellConductorApi>
@@ -739,16 +739,16 @@ where
         slot_id: &SlotId,
         properties: YamlProperties,
     ) -> ConductorResult<CellId> {
+        let dna_store = &self.dna_store;
         let (_, child_dna) = self
-            .update_state_prime(|mut state| {
+            .update_state_prime(move |mut state| {
                 if let Some(app) = state.active_apps.get_mut(installed_app_id) {
                     let slot = app
                         .slots()
                         .get(slot_id)
                         .ok_or_else(|| AppError::SlotIdMissing(slot_id.to_owned()))?;
                     let parent_dna_hash = slot.dna_hash();
-                    let dna = self
-                        .dna_store
+                    let dna = dna_store
                         .get(parent_dna_hash)
                         .ok_or_else(|| DnaError::DnaMissing(parent_dna_hash.to_owned()))?
                         .modify_phenotype(random_uid(), properties)?;
@@ -784,28 +784,30 @@ where
         let env = &self.wasm_env;
 
         // Load out all dna defs
-        let (wasm_tasks, defs) = env.conn()?.with_reader(|txn| {
-            let wasm_tasks = holochain_state::dna_def::get_all(&txn)?
-                .into_iter()
-                .map(|dna_def| {
-                    // Load all wasms for each dna_def from the wasm db into memory
-                    let wasms = dna_def.zomes.clone().into_iter().map(|(zome_name, zome)| {
-                        let wasm_hash = zome.wasm_hash(&zome_name)?;
-                        holochain_state::wasm::get(&txn, &wasm_hash)?
-                            .map(|hashed| hashed.into_content())
-                            .ok_or(ConductorError::WasmMissing)
-                    });
-                    let wasms = wasms.collect::<ConductorResult<Vec<_>>>();
-                    async move {
-                        let dna_file = DnaFile::new(dna_def.into_content(), wasms?).await?;
-                        ConductorResult::Ok((dna_file.dna_hash().clone(), dna_file))
-                    }
-                })
-                // This needs to happen due to the environment not being Send
-                .collect::<Vec<_>>();
-            let defs = holochain_state::entry_def::get_all(&txn)?;
-            ConductorResult::Ok((wasm_tasks, defs))
-        })?;
+        let (wasm_tasks, defs) = env
+            .async_reader(move |txn| {
+                let wasm_tasks = holochain_state::dna_def::get_all(&txn)?
+                    .into_iter()
+                    .map(|dna_def| {
+                        // Load all wasms for each dna_def from the wasm db into memory
+                        let wasms = dna_def.zomes.clone().into_iter().map(|(zome_name, zome)| {
+                            let wasm_hash = zome.wasm_hash(&zome_name)?;
+                            holochain_state::wasm::get(&txn, &wasm_hash)?
+                                .map(|hashed| hashed.into_content())
+                                .ok_or(ConductorError::WasmMissing)
+                        });
+                        let wasms = wasms.collect::<ConductorResult<Vec<_>>>();
+                        async move {
+                            let dna_file = DnaFile::new(dna_def.into_content(), wasms?).await?;
+                            ConductorResult::Ok((dna_file.dna_hash().clone(), dna_file))
+                        }
+                    })
+                    // This needs to happen due to the environment not being Send
+                    .collect::<Vec<_>>();
+                let defs = holochain_state::entry_def::get_all(&txn)?;
+                ConductorResult::Ok((wasm_tasks, defs))
+            })
+            .await?;
         // try to join all the tasks and return the list of dna files
         let dnas = futures::future::try_join_all(wasm_tasks).await?;
         Ok((dnas, defs))
@@ -822,7 +824,7 @@ where
         }
     }
 
-    pub(super) fn add_agent_infos(
+    pub(super) async fn add_agent_infos(
         &self,
         agent_infos: Vec<AgentInfoSigned>,
     ) -> ConductorApiResult<()> {
@@ -840,7 +842,7 @@ where
         }
         for (space, agent_infos) in space_map {
             let env = self.p2p_env(space);
-            inject_agent_infos(env, agent_infos)?;
+            inject_agent_infos(env, agent_infos.iter()).await?;
         }
         Ok(())
     }
@@ -887,22 +889,26 @@ where
         )
         .await;
 
-        env.conn()?.with_commit(|txn| {
-            for dna_wasm in wasms {
-                if !holochain_state::wasm::contains(txn, dna_wasm.as_hash())? {
-                    holochain_state::wasm::put(txn, dna_wasm)?;
+        env.async_commit({
+            let zome_defs = zome_defs.clone();
+            move |txn| {
+                for dna_wasm in wasms {
+                    if !holochain_state::wasm::contains(txn, dna_wasm.as_hash())? {
+                        holochain_state::wasm::put(txn, dna_wasm)?;
+                    }
                 }
-            }
 
-            for (key, entry_def) in zome_defs.clone() {
-                holochain_state::entry_def::put(txn, key, entry_def)?;
-            }
+                for (key, entry_def) in zome_defs.clone() {
+                    holochain_state::entry_def::put(txn, key, entry_def)?;
+                }
 
-            if !holochain_state::dna_def::contains(txn, dna.dna_hash())? {
-                holochain_state::dna_def::put(txn, dna.dna_def().clone())?;
+                if !holochain_state::dna_def::contains(txn, dna.dna_hash())? {
+                    holochain_state::dna_def::put(txn, dna.dna_def().clone())?;
+                }
+                StateMutationResult::Ok(())
             }
-            StateMutationResult::Ok(())
-        })?;
+        })
+        .await?;
 
         Ok(zome_defs)
     }
@@ -943,12 +949,12 @@ where
 
         let peer_dump = p2p_store::dump_state(p2p_env.into(), Some(cell_id.clone()))?;
         let source_chain_dump =
-            source_chain::dump_state(arc.clone().into(), cell_id.agent_pubkey()).await?;
+            source_chain::dump_state(arc.clone().into(), cell_id.agent_pubkey().clone()).await?;
 
         let out = JsonDump {
             peer_dump,
             source_chain_dump,
-            integration_dump: integration_dump(&arc.clone().into())?,
+            integration_dump: integration_dump(&arc.clone().into()).await?,
         };
         // Add summary
         let summary = out.to_string();
@@ -963,7 +969,7 @@ where
             .or_insert_with(move || {
                 let root_env_dir = self.root_env_dir.as_ref();
                 let keystore = self.keystore.clone();
-                EnvWrite::open(root_env_dir, DbKind::P2p(space), keystore)
+                EnvWrite::open(root_env_dir, DbKind::P2pState(space), keystore)
                     .expect("failed to open p2p_store database")
             })
             .clone()
@@ -1001,37 +1007,39 @@ where
 }
 
 /// Dump the integration json state.
-pub fn integration_dump(vault: &EnvRead) -> ConductorApiResult<IntegrationStateDump> {
-    fresh_reader!(vault, |txn| {
-        let integrated = txn.query_row(
-            "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NOT NULL",
-            [],
-            |row| row.get(0),
-        )?;
-        let integration_limbo = txn.query_row(
+pub async fn integration_dump(vault: &EnvRead) -> ConductorApiResult<IntegrationStateDump> {
+    vault
+        .async_reader(move |txn| {
+            let integrated = txn.query_row(
+                "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NOT NULL",
+                [],
+                |row| row.get(0),
+            )?;
+            let integration_limbo = txn.query_row(
             "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NULL AND validation_stage = 3",
             [],
             |row| row.get(0),
         )?;
-        let validation_limbo = txn.query_row(
-            "
-                SELECT count(hash) FROM DhtOp 
-                WHERE when_integrated IS NULL 
+            let validation_limbo = txn.query_row(
+                "
+                SELECT count(hash) FROM DhtOp
+                WHERE when_integrated IS NULL
                 AND (
                     (is_authored = 1 AND validation_stage IS NOT NULL AND validation_stage < 3)
-                    OR 
+                    OR
                     (is_authored = 0 AND (validation_stage IS NULL OR validation_stage < 3))
                 )
                 ",
-            [],
-            |row| row.get(0),
-        )?;
-        ConductorApiResult::Ok(IntegrationStateDump {
-            validation_limbo,
-            integration_limbo,
-            integrated,
+                [],
+                |row| row.get(0),
+            )?;
+            ConductorApiResult::Ok(IntegrationStateDump {
+                validation_limbo,
+                integration_limbo,
+                integrated,
+            })
         })
-    })
+        .await
 }
 
 //-----------------------------------------------------------------------------
@@ -1103,7 +1111,7 @@ where
     /// Update the internal state with a pure function mapping old state to new
     async fn update_state<F: Send>(&self, f: F) -> ConductorResult<ConductorState>
     where
-        F: FnOnce(ConductorState) -> ConductorResult<ConductorState>,
+        F: FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
     {
         let (state, _) = self.update_state_prime(|s| Ok((f(s)?, ()))).await?;
         Ok(state)
@@ -1112,26 +1120,29 @@ where
     /// Update the internal state with a pure function mapping old state to new,
     /// which may also produce an output value which will be the output of
     /// this function
-    async fn update_state_prime<F: Send, O>(&self, f: F) -> ConductorResult<(ConductorState, O)>
+    async fn update_state_prime<F, O>(&self, f: F) -> ConductorResult<(ConductorState, O)>
     where
         F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)>,
+        O: Send,
     {
         self.check_running()?;
-        let mut guard = self.env.conn()?;
-        let output = guard.with_commit(|txn| {
-            let state = txn
-                .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
-                    row.get("blob")
-                })
-                .optional()?;
-            let state = match state {
-                Some(state) => from_blob(state)?,
-                None => ConductorState::default(),
-            };
-            let (new_state, output) = f(state)?;
-            mutations::insert_conductor_state(txn, (&new_state).try_into()?)?;
-            Result::<_, ConductorError>::Ok((new_state, output))
-        })?;
+        let output = self
+            .env
+            .async_commit_in_place(move |txn| {
+                let state = txn
+                    .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
+                        row.get("blob")
+                    })
+                    .optional()?;
+                let state = match state {
+                    Some(state) => from_blob(state)?,
+                    None => ConductorState::default(),
+                };
+                let (new_state, output) = f(state)?;
+                mutations::insert_conductor_state(txn, (&new_state).try_into()?)?;
+                Result::<_, ConductorError>::Ok((new_state, output))
+            })
+            .await?;
         Ok(output)
     }
 
