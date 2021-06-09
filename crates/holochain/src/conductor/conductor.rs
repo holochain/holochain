@@ -1380,7 +1380,7 @@ mod builder {
                 envs.p2p(),
                 self.dna_store,
                 keystore,
-                envs.tempdir().path().to_path_buf().into(),
+                envs.path().to_path_buf().into(),
                 holochain_p2p,
             )
             .await?;

@@ -18,13 +18,13 @@ use holo_hash::HeaderHash;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::DnaHashExt;
 use holochain_serialized_bytes::SerializedBytes;
+use holochain_state::prelude::TestEnvs;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::ZomeCallResponse;
 use kitsune_p2p::KitsuneP2pConfig;
 use matches::assert_matches;
 use shrinkwraprs::Shrinkwrap;
-use tempdir::TempDir;
 use test_case::test_case;
 use tokio_helper;
 use tracing::debug_span;
@@ -491,7 +491,7 @@ struct TestHandle {
     #[shrinkwrap(main_field)]
     handle: ConductorHandle,
     cell_id: CellId,
-    __tmpdir: Arc<TempDir>,
+    _envs: Arc<TestEnvs>,
 }
 
 impl TestHandle {
@@ -529,7 +529,7 @@ async fn setup(
     let mut handles = Vec::with_capacity(num_conductors);
     for _ in 0..num_conductors {
         let dnas = vec![dna_file.clone()];
-        let (__tmpdir, _, handle) =
+        let (_envs, _, handle) =
             setup_app_with_network(vec![], vec![], network.clone().unwrap_or_default()).await;
 
         let agent_key = AgentPubKey::new_from_pure_entropy(handle.keystore())
@@ -539,7 +539,7 @@ async fn setup(
         let app = InstalledCell::new(cell_id.clone(), "cell_handle".into());
         install_app("test_app", vec![(app, None)], dnas.clone(), handle.clone()).await;
         handles.push(TestHandle {
-            __tmpdir,
+            _envs: Arc::new(_envs),
             cell_id,
             handle,
         });
