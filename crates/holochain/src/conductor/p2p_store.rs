@@ -1,10 +1,10 @@
-//! Queries for the P2pState store
+//! Queries for the P2pAgents store
 
 use fallible_iterator::FallibleIterator;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_conductor_api::AgentInfoDump;
-use holochain_conductor_api::P2pStateDump;
+use holochain_conductor_api::P2pAgentsDump;
 use holochain_p2p::dht_arc::DhtArc;
 use holochain_p2p::dht_arc::DhtArcBucket;
 use holochain_p2p::dht_arc::PeerDensity;
@@ -133,7 +133,7 @@ fn is_expired(now: u64, info: &kitsune_p2p::agent_store::AgentInfo) -> bool {
 }
 
 /// Dump the agents currently in the peer store
-pub fn dump_state(env: EnvRead, cell_id: Option<CellId>) -> StateQueryResult<P2pStateDump> {
+pub fn dump_state(env: EnvRead, cell_id: Option<CellId>) -> StateQueryResult<P2pAgentsDump> {
     use std::fmt::Write;
     let cell_id = cell_id.map(|c| c.into_dna_and_agent()).map(|c| {
         (
@@ -196,7 +196,7 @@ pub fn dump_state(env: EnvRead, cell_id: Option<CellId>) -> StateQueryResult<P2p
         }
     }
 
-    Ok(P2pStateDump {
+    Ok(P2pAgentsDump {
         this_agent_info,
         this_dna: cell_id.clone().map(|(s, _)| s),
         this_agent: cell_id.clone().map(|(_, a)| a),

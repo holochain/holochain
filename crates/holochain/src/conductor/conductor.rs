@@ -963,7 +963,7 @@ where
             .or_insert_with(move || {
                 let root_env_dir = self.root_env_dir.as_ref();
                 let keystore = self.keystore.clone();
-                EnvWrite::open(root_env_dir, DbKind::P2pState(space), keystore)
+                EnvWrite::open(root_env_dir, DbKind::P2pAgents(space), keystore)
                     .expect("failed to open p2p_store database")
             })
             .clone()

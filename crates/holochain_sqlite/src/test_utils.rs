@@ -72,7 +72,7 @@ impl TestDbs {
         let conductor = DbWrite::new(&tempdir.path(), Conductor).unwrap();
         let wasm = DbWrite::new(&tempdir.path(), Wasm).unwrap();
         let space = Arc::new(kitsune_p2p::KitsuneSpace(vec![0; 36]));
-        let p2p_agents = DbWrite::new(&tempdir.path(), P2pState(space.clone())).unwrap();
+        let p2p_agents = DbWrite::new(&tempdir.path(), P2pAgents(space.clone())).unwrap();
         let p2p_metrics = DbWrite::new(&tempdir.path(), P2pMetrics(space)).unwrap();
         Self {
             conductor,
