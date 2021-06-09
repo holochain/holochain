@@ -557,11 +557,14 @@ macro_rules! curve {
 /// c.f. fixt!(Foo) vs. FooFixturator::new(Unpredictable).next().unwrap();
 macro_rules! fixt {
     ( $name:tt ) => {
-        fixt!($name, $crate::prelude::Unpredictable)
+        $crate::fixt!($name, $crate::prelude::Unpredictable)
     };
     ( $name:tt, $curve:expr ) => {
-        $crate::prelude::paste! { [< $name:camel Fixturator>]::new($curve).next().unwrap() }
+        $crate::fixt!($name, $curve, 0)
     };
+    ( $name:tt, $curve:expr, $index:literal ) => {
+        $crate::prelude::paste! { [< $name:camel Fixturator>]::new_indexed($curve, $index).next().unwrap() }
+    }
 }
 
 /// represents an unpredictable curve

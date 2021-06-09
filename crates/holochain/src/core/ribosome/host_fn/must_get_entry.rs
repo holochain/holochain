@@ -81,6 +81,7 @@ pub mod test {
     use crate::core::ribosome::ZomesToInvoke;
     use crate::core::ribosome::RibosomeT;
     use crate::core::ribosome::guest_callback::validate::ValidateResult;
+    use ::fixt::prelude::*;
 
     /// Mimics inside the must_get wasm.
     #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug, PartialEq)]
@@ -248,6 +249,21 @@ pub mod test {
         assert_eq!(
             ValidateResult::UnresolvedDependencies(vec![fail_entry_hash.clone().into()]),
             entry_dangling_validate_result,
+        );
+
+        // A garbage entry should fail to deserialize and return Ok(ValidateCallbackResult::Invalid) not Err(WasmError).
+        let garbage_entry = fixt!(Entry, Predictable, 1);
+        let mut garbage_element: Element = validate_invocation.element.as_ref().clone();
+        *garbage_element.as_entry_mut() = ElementEntry::Present(garbage_entry);
+
+
+        validate_invocation.element = Arc::new(garbage_element);
+
+        let garbage_entry_validate_result = ribosome.run_validate(validate_host_access.clone(), validate_invocation.clone());
+
+        assert_eq!(
+            garbage_entry_validate_result.unwrap(),
+            ValidateResult::Invalid("Serialize(Deserialize(\"invalid type: boolean `false`, expected a HoloHash of primitive hash_type\"))".into())
         );
     }
 }
