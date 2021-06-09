@@ -23,11 +23,12 @@ pub async fn incoming_dht_ops_workflow(
     request_validation_receipt: bool,
 ) -> WorkflowResult<()> {
     // add incoming ops to the validation limbo
+    let mut to_pending = Vec::with_capacity(ops.len());
     for (hash, op) in ops {
         if !op_exists(&vault, &hash)? {
             if should_keep(&op).await? {
                 let op = DhtOpHashed::from_content_sync(op);
-                add_to_pending(&vault, op, from_agent.clone(), request_validation_receipt)?;
+                to_pending.push(op);
             } else {
                 tracing::warn!(
                     msg = "Dropping op because it failed counterfeit checks",
@@ -37,11 +38,18 @@ pub async fn incoming_dht_ops_workflow(
         } else {
             // Check if we should set receipt to send.
             if needs_receipt(&op, &from_agent) && request_validation_receipt {
-                set_send_receipt(vault, hash.clone())?;
+                set_send_receipt(vault, hash.clone()).await?;
             }
         }
     }
 
+    add_to_pending(
+        &vault,
+        to_pending,
+        from_agent.clone(),
+        request_validation_receipt,
+    )
+    .await?;
     // trigger validation of queued ops
     sys_validation_trigger.trigger();
 
@@ -63,21 +71,22 @@ async fn should_keep(op: &DhtOp) -> WorkflowResult<bool> {
     Ok(counterfeit_check(signature, &header).await?)
 }
 
-fn add_to_pending(
+async fn add_to_pending(
     env: &EnvWrite,
-    op: DhtOpHashed,
+    ops: Vec<DhtOpHashed>,
     from_agent: Option<AgentPubKey>,
     request_validation_receipt: bool,
 ) -> StateMutationResult<()> {
-    let send_receipt = needs_receipt(&op, &from_agent) && request_validation_receipt;
-    tracing::debug!(?op);
-
-    let op_hash = op.as_hash().clone();
-    env.conn()?.with_commit(|txn| {
-        insert_op(txn, op, false)?;
-        set_require_receipt(txn, op_hash, send_receipt)?;
+    env.async_commit(move |txn| {
+        for op in ops {
+            let send_receipt = needs_receipt(&op, &from_agent) && request_validation_receipt;
+            let op_hash = op.as_hash().clone();
+            insert_op(txn, op, false)?;
+            set_require_receipt(txn, op_hash, send_receipt)?;
+        }
         StateMutationResult::Ok(())
-    })?;
+    })
+    .await?;
     Ok(())
 }
 
@@ -102,10 +111,12 @@ pub fn op_exists(vault: &EnvWrite, hash: &DhtOpHash) -> DatabaseResult<bool> {
     Ok(exists)
 }
 
-fn set_send_receipt(vault: &EnvWrite, hash: DhtOpHash) -> StateMutationResult<()> {
-    vault.conn()?.with_commit(|txn| {
-        set_require_receipt(txn, hash, true)?;
-        StateMutationResult::Ok(())
-    })?;
+async fn set_send_receipt(vault: &EnvWrite, hash: DhtOpHash) -> StateMutationResult<()> {
+    vault
+        .async_commit(|txn| {
+            set_require_receipt(txn, hash, true)?;
+            StateMutationResult::Ok(())
+        })
+        .await?;
     Ok(())
 }

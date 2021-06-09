@@ -40,7 +40,7 @@ pub fn spawn_app_validation_consumer(
             }
 
             // Run the workflow
-            let workspace = AppValidationWorkspace::new(env.clone().into(), cache.clone());
+            let workspace = AppValidationWorkspace::new(env.clone(), cache.clone());
             let result = app_validation_workflow(
                 workspace,
                 trigger_integration.clone(),

@@ -65,7 +65,7 @@ mod tests {
 
         // Put wasm
         env.conn()?
-            .with_commit(|txn| put(txn, wasm.clone()))
+            .with_commit_sync(|txn| put(txn, wasm.clone()))
             .unwrap();
         fresh_reader_test!(env, |txn| {
             assert!(contains(&txn, &wasm.as_hash()).unwrap());

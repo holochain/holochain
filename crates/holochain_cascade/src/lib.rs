@@ -194,34 +194,35 @@ where
         Ok(())
     }
 
-    fn merge_entry_ops_into_cache(&mut self, response: WireEntryOps) -> CascadeResult<()> {
+    async fn merge_ops_into_cache(&mut self, responses: Vec<WireOps>) -> CascadeResult<()> {
         let cache = ok_or_return!(self.cache.as_mut());
-        let ops = response.render()?;
         cache
-            .conn()?
-            .with_commit(|txn| Self::insert_rendered_ops(txn, ops))?;
+            .async_commit(|txn| {
+                for response in responses {
+                    let ops = response.render()?;
+                    Self::insert_rendered_ops(txn, ops)?;
+                }
+                CascadeResult::Ok(())
+            })
+            .await?;
         Ok(())
     }
 
-    fn merge_element_ops_into_cache(&mut self, response: WireElementOps) -> CascadeResult<()> {
-        let cache = ok_or_return!(self.cache.as_mut());
-        let ops = response.render()?;
-        cache
-            .conn()?
-            .with_commit(|txn| Self::insert_rendered_ops(txn, ops))?;
-        Ok(())
-    }
-
-    fn merge_link_ops_into_cache(
+    async fn merge_link_ops_into_cache(
         &mut self,
-        response: WireLinkOps,
+        responses: Vec<WireLinkOps>,
         key: WireLinkKey,
     ) -> CascadeResult<()> {
         let cache = ok_or_return!(self.cache.as_mut());
-        let ops = response.render(key)?;
         cache
-            .conn()?
-            .with_commit(|txn| Self::insert_rendered_ops(txn, ops))?;
+            .async_commit(move |txn| {
+                for response in responses {
+                    let ops = response.render(&key)?;
+                    Self::insert_rendered_ops(txn, ops)?;
+                }
+                CascadeResult::Ok(())
+            })
+            .await?;
         Ok(())
     }
 
@@ -237,12 +238,7 @@ where
             .instrument(debug_span!("fetch_element::network_get"))
             .await?;
 
-        for response in results {
-            match response {
-                WireOps::Entry(response) => self.merge_entry_ops_into_cache(response)?,
-                WireOps::Element(response) => self.merge_element_ops_into_cache(response)?,
-            }
-        }
+        self.merge_ops_into_cache(results).await?;
         Ok(())
     }
 
@@ -255,9 +251,8 @@ where
         let network = ok_or_return!(self.network.as_mut());
         let results = network.get_links(link_key.clone(), options).await?;
 
-        for response in results {
-            self.merge_link_ops_into_cache(response, link_key.clone())?;
-        }
+        self.merge_link_ops_into_cache(results, link_key.clone())
+            .await?;
         Ok(())
     }
 
@@ -672,12 +667,15 @@ where
             merged_response
         } else {
             match self.vault.clone() {
-                Some(vault) => authority::handle_get_agent_activity(
-                    vault,
-                    agent.clone(),
-                    query.clone(),
-                    (&options).into(),
-                )?,
+                Some(vault) => {
+                    authority::handle_get_agent_activity(
+                        vault,
+                        agent.clone(),
+                        query.clone(),
+                        (&options).into(),
+                    )
+                    .await?
+                }
                 None => agent_activity::merge_activities(
                     agent.clone(),
                     &options,

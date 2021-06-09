@@ -360,7 +360,9 @@ mod slow_tests {
         // commits fail validation if we don't do genesis
         crate::test_utils::fake_genesis(env.clone()).await.unwrap();
 
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).unwrap();
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author)
+            .await
+            .unwrap();
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace.clone();
 
@@ -387,7 +389,9 @@ mod slow_tests {
         // commits fail validation if we don't do genesis
         crate::test_utils::fake_genesis(env.clone()).await.unwrap();
 
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).unwrap();
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author)
+            .await
+            .unwrap();
 
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace.clone();

@@ -164,14 +164,14 @@ mod tests {
         let test_op_hash = op.as_hash().clone();
         env.conn()
             .unwrap()
-            .with_commit(|txn| mutations::insert_op(txn, op, true))
+            .with_commit_sync(|txn| mutations::insert_op(txn, op, true))
             .unwrap();
 
         let vr1 = fake_vr(&test_op_hash, &keystore).await;
         let vr2 = fake_vr(&test_op_hash, &keystore).await;
 
         {
-            env.conn().unwrap().with_commit(|txn| {
+            env.conn().unwrap().with_commit_sync(|txn| {
                 add_if_unique(txn, vr1.clone())?;
                 add_if_unique(txn, vr1.clone())?;
                 add_if_unique(txn, vr2.clone())
@@ -179,7 +179,7 @@ mod tests {
 
             env.conn()
                 .unwrap()
-                .with_commit(|txn| add_if_unique(txn, vr1.clone()))?;
+                .with_commit_sync(|txn| add_if_unique(txn, vr1.clone()))?;
         }
 
         let mut g = env.conn().unwrap();

@@ -388,8 +388,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 respond,
                 ..
             } => {
+                // TODO: This read lock isn't needed to get the p2p_env.
                 let env = { self.conductor.read().await.p2p_env(space) };
                 let res = put_agent_info_signed(env, agent_info_signed)
+                    .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
@@ -435,13 +437,15 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             } => {
                 let env = { self.conductor.read().await.p2p_env(space) };
                 let res = put_metric_datum(env, agent, metric, timestamp)
+                    .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
             QueryMetrics { respond, query, .. } => {
                 let env = { self.conductor.read().await.p2p_env(space) };
-                let res =
-                    query_metrics(env, query).map_err(holochain_p2p::HolochainP2pError::other);
+                let res = query_metrics(env, query)
+                    .await
+                    .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
             SignNetworkData {
@@ -728,7 +732,11 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn add_agent_infos(&self, agent_infos: Vec<AgentInfoSigned>) -> ConductorApiResult<()> {
-        self.conductor.read().await.add_agent_infos(agent_infos)
+        self.conductor
+            .read()
+            .await
+            .add_agent_infos(agent_infos)
+            .await
     }
 
     async fn get_agent_infos(
