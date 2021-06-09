@@ -37,7 +37,7 @@ impl<R: RibosomeT, I: Invocation> CallIterator<R, I> {
 
 impl<R: RibosomeT, I: Invocation + 'static> FallibleIterator for CallIterator<R, I> {
     type Item = (Zome, ExternIO);
-    type Error = RibosomeError;
+    type Error = (Zome, RibosomeError);
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         Ok(match self.remaining_zomes.first() {
             Some(zome) => {
@@ -48,9 +48,10 @@ impl<R: RibosomeT, I: Invocation + 'static> FallibleIterator for CallIterator<R,
                             &self.invocation,
                             zome,
                             &to_call.into(),
-                        )? {
-                            Some(result) => Some((zome.clone(), result)),
-                            None => self.next()?,
+                        ) {
+                            Ok(Some(result)) => Some((zome.clone(), result)),
+                            Ok(None) => self.next()?,
+                            Err(e) => return Err((zome.clone(), e)),
                         }
                     }
                     // there are no more callbacks to call in this zome

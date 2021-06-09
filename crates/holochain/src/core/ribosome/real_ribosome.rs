@@ -442,10 +442,17 @@ macro_rules! do_callback {
         let mut results: Vec<(ZomeName, $callback_result)> = Vec::new();
         // fallible iterator syntax instead of for loop
         let mut call_iterator = $self.call_iterator($access.into(), $invocation);
-        while let Some(output) = call_iterator.next()? {
-            let (zome, extern_io): (Zome, ExternIO) = output;
-            let zome_name: ZomeName = zome.into();
-            let callback_result: $callback_result = extern_io.decode()?;
+        loop {
+            let (zome_name, callback_result): (ZomeName, $callback_result) =
+                match call_iterator.next() {
+                    Ok(Some((zome, extern_io))) => (zome.into(), extern_io.decode()?),
+                    Err((zome, RibosomeError::WasmError(wasm_error))) => (
+                        zome.into(),
+                        <$callback_result>::try_from_wasm_error(wasm_error)?,
+                    ),
+                    Err((_zome, other_error)) => return Err(other_error),
+                    Ok(None) => break,
+                };
             // return early if we have a definitive answer, no need to keep invoking callbacks
             // if we know we are done
             if callback_result.is_definitive() {
@@ -533,9 +540,10 @@ impl RibosomeT for RealRibosome {
             let fn_name = invocation.fn_name.clone();
 
             let guest_output: ExternIO =
-                match self.call_iterator(host_access.into(), invocation).next()? {
-                    Some(result) => result.1,
-                    None => return Err(RibosomeError::ZomeFnNotExists(zome_name, fn_name)),
+                match self.call_iterator(host_access.into(), invocation).next() {
+                    Ok(Some((_zome, extern_io))) => extern_io,
+                    Ok(None) => return Err(RibosomeError::ZomeFnNotExists(zome_name, fn_name)),
+                    Err((_zome, ribosome_error)) => return Err(ribosome_error),
                 };
 
             ZomeCallResponse::Ok(guest_output)

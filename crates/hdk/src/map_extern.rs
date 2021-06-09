@@ -51,61 +51,16 @@ macro_rules! map_extern {
                     };
 
                     // Call the function and handle the output.
-                    let maybe_extern_io: std::result::Result<$crate::prelude::ExternIO, $crate::prelude::SerializedBytesError> = match super::$f(inner) {
+                    match super::$f(inner) {
                         Ok(v) => {
-                            $crate::prelude::ExternIO::encode(v)
+                            match $crate::prelude::ExternIO::encode(v) {
+                                Ok(v) => $crate::prelude::return_ptr::<$crate::prelude::ExternIO>(v),
+                                Err(serialized_bytes_error) => $crate::prelude::return_err_ptr($crate::prelude::WasmError::Serialize(serialized_bytes_error)),
+                            }
                         },
                         Err(e) => {
-                            let output_type_id = std::any::TypeId::of::<$output>();
-                            // Callback results have a pass/fail nature that needs to map some wasm errors to an Ok(XCallbackResult::Fail).
-                            if output_type_id == std::any::TypeId::of::<$crate::prelude::ExternResult<$crate::prelude::EntryDefsCallbackResult>>() {
-                                match $crate::prelude::EntryDefsCallbackResult::try_from_wasm_error(e) {
-                                    Ok(v) => $crate::prelude::ExternIO::encode(v),
-                                    Err(e) => return $crate::prelude::return_err_ptr(e),
-                                }
-                            }
-                            else if output_type_id == std::any::TypeId::of::<$crate::prelude::ExternResult<$crate::prelude::InitCallbackResult>>() {
-                                match $crate::prelude::InitCallbackResult::try_from_wasm_error(e) {
-                                    Ok(v) => $crate::prelude::ExternIO::encode(v),
-                                    Err(e) => return $crate::prelude::return_err_ptr(e),
-                                }
-                            } else if output_type_id == std::any::TypeId::of::<$crate::prelude::ExternResult<$crate::prelude::MigrateAgentCallbackResult>>() {
-                                match $crate::prelude::MigrateAgentCallbackResult::try_from_wasm_error(e) {
-                                    Ok(v) => $crate::prelude::ExternIO::encode(v),
-                                    Err(e) => return $crate::prelude::return_err_ptr(e),
-                                }
-                            }
-                            else if output_type_id == std::any::TypeId::of::<$crate::prelude::ExternResult<$crate::prelude::PostCommitCallbackResult>>() {
-                                match $crate::prelude::PostCommitCallbackResult::try_from_wasm_error(e) {
-                                    Ok(v) => $crate::prelude::ExternIO::encode(v),
-                                    Err(e) => return $crate::prelude::return_err_ptr(e),
-                                }
-                            }
-                            else if output_type_id == std::any::TypeId::of::<$crate::prelude::ExternResult<$crate::prelude::ValidateLinkCallbackResult>>() {
-                                match $crate::prelude::ValidateLinkCallbackResult::try_from_wasm_error(e) {
-                                    Ok(v) => $crate::prelude::ExternIO::encode(v),
-                                    Err(e) => return $crate::prelude::return_err_ptr(e),
-                                }
-                            }
-                            else if output_type_id == std::any::TypeId::of::<$crate::prelude::ExternResult<$crate::prelude::ValidateCallbackResult>>() {
-                                match $crate::prelude::ValidateCallbackResult::try_from_wasm_error(e) {
-                                    Ok(v) => $crate::prelude::ExternIO::encode(v),
-                                    Err(e) => return $crate::prelude::return_err_ptr(e),
-                                }
-                            } else if output_type_id == std::any::TypeId::of::<$crate::prelude::ExternResult<$crate::prelude::ValidationPackageCallbackResult>>() {
-                                match $crate::prelude::ValidationPackageCallbackResult::try_from_wasm_error(e) {
-                                    Ok(v) => $crate::prelude::ExternIO::encode(v),
-                                    Err(e) => return $crate::prelude::return_err_ptr(e),
-                                }
-                            }
-                            else {
-                                return $crate::prelude::return_err_ptr(e);
-                            }
+                            return $crate::prelude::return_err_ptr(e);
                         },
-                    };
-                    match maybe_extern_io {
-                        Ok(v) => $crate::prelude::return_ptr::<$crate::prelude::ExternIO>(v),
-                        Err(serialized_bytes_error) => $crate::prelude::return_err_ptr($crate::prelude::WasmError::Serialize(serialized_bytes_error)),
                     }
                 }
             }
