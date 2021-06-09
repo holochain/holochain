@@ -24,7 +24,6 @@ use std::convert::TryInto;
 use std::time::Duration;
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "(david.b) - not working locally"]
 async fn app_validation_workflow_test() {
     observability::test_run_open().ok();
 
