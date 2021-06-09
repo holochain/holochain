@@ -185,6 +185,6 @@ mod tests {
             .into(),
         );
         let guest_output = ExternIO::encode(&defs_callback_result).unwrap();
-        assert_eq!(defs_callback_result, guest_output.into(),);
+        assert_eq!(defs_callback_result, guest_output.try_into().unwrap(),);
     }
 }
