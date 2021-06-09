@@ -231,7 +231,7 @@ impl From<TestWasm> for ZomeDef {
             let (_, wasm_hash) = holochain_types::dna::wasm::DnaWasmHashed::from_content(dna_wasm)
                 .await
                 .into_inner();
-            WasmZome { wasm_hash }.into()
+            ZomeDef::Wasm(WasmZome { wasm_hash })
         })
     }
 }

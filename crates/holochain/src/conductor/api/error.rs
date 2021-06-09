@@ -7,7 +7,7 @@ use crate::conductor::CellError;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::workflow::error::WorkflowError;
 use holo_hash::DnaHash;
-use holochain_lmdb::error::DatabaseError;
+use holochain_sqlite::error::DatabaseError;
 use holochain_state::source_chain::SourceChainError;
 use holochain_state::workspace::WorkspaceError;
 use holochain_types::prelude::*;
@@ -59,6 +59,10 @@ pub enum ConductorApiError {
     #[error(transparent)]
     WorkflowError(#[from] Box<WorkflowError>),
 
+    /// ZomeError
+    #[error("ZomeError: {0}")]
+    ZomeError(#[from] holochain_zome_types::zome::error::ZomeError),
+
     /// DnaError
     #[error("DnaError: {0}")]
     DnaError(#[from] holochain_types::dna::DnaError),
@@ -94,6 +98,26 @@ pub enum ConductorApiError {
 
     #[error(transparent)]
     JsonDumpError(#[from] serde_json::Error),
+
+    #[error(transparent)]
+    StateQueryError(#[from] holochain_state::query::StateQueryError),
+
+    #[error(transparent)]
+    StateMutationError(#[from] holochain_state::mutations::StateMutationError),
+
+    #[error(transparent)]
+    RusqliteError(#[from] rusqlite::Error),
+
+    /// Other
+    #[error("Other: {0}")]
+    Other(Box<dyn std::error::Error + Send + Sync>),
+}
+
+impl ConductorApiError {
+    /// promote a custom error type to a KitsuneP2pError
+    pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
+        Self::Other(e.into())
+    }
 }
 
 /// All the serialization errors that can occur

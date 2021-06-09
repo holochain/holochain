@@ -18,7 +18,9 @@ use error::*;
 
 pub mod error;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, derive_more::From,
+)]
 /// A header of one of the two types that create a new entry.
 pub enum NewEntryHeader {
     /// A header which simply creates a new entry
@@ -188,6 +190,14 @@ impl WireUpdateRelationship {
     /// Recreate the Update Element without an Entry.
     /// Useful for creating dht ops
     pub fn into_element(self, original_entry_address: EntryHash) -> Element {
+        Element::new(
+            SignedHeaderHashed::from_content_sync(self.into_signed_header(original_entry_address)),
+            None,
+        )
+    }
+
+    /// Render the [`SignedHeader`] from the wire type
+    pub fn into_signed_header(self, original_entry_address: EntryHash) -> SignedHeader {
         let eu = Update {
             author: self.author,
             timestamp: self.timestamp,
@@ -198,10 +208,7 @@ impl WireUpdateRelationship {
             entry_type: self.new_entry_type,
             entry_hash: self.new_entry_address,
         };
-        Element::new(
-            SignedHeaderHashed::from_content_sync(SignedHeader(Header::Update(eu), self.signature)),
-            None,
-        )
+        SignedHeader(Header::Update(eu), self.signature)
     }
 }
 
@@ -231,6 +238,17 @@ impl TryFrom<SignedHeaderHashed> for WireDelete {
     }
 }
 
+impl TryFrom<SignedHeader> for WireDelete {
+    type Error = WrongHeaderError;
+    fn try_from(sh: SignedHeader) -> Result<Self, Self::Error> {
+        let SignedHeader(h, signature) = sh;
+        Ok(Self {
+            delete: h.try_into()?,
+            signature,
+        })
+    }
+}
+
 impl TryFrom<SignedHeaderHashed> for WireUpdate {
     type Error = WrongHeaderError;
     fn try_from(shh: SignedHeaderHashed) -> Result<Self, Self::Error> {
@@ -251,8 +269,16 @@ impl TryFrom<SignedHeaderHashed> for WireUpdate {
 impl TryFrom<SignedHeaderHashed> for WireUpdateRelationship {
     type Error = WrongHeaderError;
     fn try_from(shh: SignedHeaderHashed) -> Result<Self, Self::Error> {
-        let (h, signature) = shh.into_header_and_signature();
-        let d: Update = h.into_content().try_into()?;
+        let (h, s) = shh.into_header_and_signature();
+        SignedHeader(h.into_content(), s).try_into()
+    }
+}
+
+impl TryFrom<SignedHeader> for WireUpdateRelationship {
+    type Error = WrongHeaderError;
+    fn try_from(sh: SignedHeader) -> Result<Self, Self::Error> {
+        let SignedHeader(h, signature) = sh;
+        let d: Update = h.try_into()?;
         Ok(Self {
             signature,
             timestamp: d.timestamp,
@@ -273,6 +299,10 @@ impl WireNewEntryHeader {
     }
 
     pub fn into_header(self, entry_type: EntryType, entry_hash: EntryHash) -> SignedHeaderHashed {
+        SignedHeaderHashed::from_content_sync(self.into_signed_header(entry_type, entry_hash))
+    }
+
+    pub fn into_signed_header(self, entry_type: EntryType, entry_hash: EntryHash) -> SignedHeader {
         match self {
             WireNewEntryHeader::Create(ec) => {
                 let signature = ec.signature;
@@ -284,7 +314,7 @@ impl WireNewEntryHeader {
                     entry_type,
                     entry_hash,
                 };
-                SignedHeaderHashed::from_content_sync(SignedHeader(ec.into(), signature))
+                SignedHeader(ec.into(), signature)
             }
             WireNewEntryHeader::Update(eu) => {
                 let signature = eu.signature;
@@ -298,7 +328,7 @@ impl WireNewEntryHeader {
                     entry_type,
                     entry_hash,
                 };
-                SignedHeaderHashed::from_content_sync(SignedHeader(eu.into(), signature))
+                SignedHeader(eu.into(), signature)
             }
         }
     }
@@ -341,6 +371,18 @@ impl TryFrom<SignedHeaderHashed> for WireNewEntryHeader {
     type Error = HeaderError;
     fn try_from(shh: SignedHeaderHashed) -> Result<Self, Self::Error> {
         let (sh, _) = shh.into_inner();
+        let (header, s) = sh.into();
+        match header {
+            Header::Create(ec) => Ok(Self::Create((ec, s).into())),
+            Header::Update(eu) => Ok(Self::Update((eu, s).into())),
+            _ => Err(HeaderError::NotNewEntry),
+        }
+    }
+}
+
+impl TryFrom<SignedHeader> for WireNewEntryHeader {
+    type Error = HeaderError;
+    fn try_from(sh: SignedHeader) -> Result<Self, Self::Error> {
         let (header, s) = sh.into();
         match header {
             Header::Create(ec) => Ok(Self::Create((ec, s).into())),

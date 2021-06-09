@@ -53,6 +53,8 @@ pub enum KitsuneP2pError {
     Other(Box<dyn std::error::Error + Send + Sync>),
 }
 
+pub use crate::actor::KitsuneP2pResult;
+
 impl KitsuneP2pError {
     /// promote a custom error type to a KitsuneP2pError
     pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
@@ -172,6 +174,18 @@ macro_rules! make_kitsune_bin_type {
                     Ok(())
                 }
             }
+
+            impl std::fmt::Display for $name {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    base64::encode_config(&self.0, base64::URL_SAFE_NO_PAD).fmt(f)
+                }
+            }
+
+            impl AsRef<[u8]> for $name {
+                fn as_ref(&self) -> &[u8] {
+                    self.0.as_slice()
+                }
+            }
         )*
     };
 }
@@ -222,7 +236,7 @@ impl std::fmt::Debug for KitsuneSignature {
 pub mod actor;
 pub mod agent_store;
 pub mod event;
-pub mod gossip;
+pub(crate) mod gossip;
 pub(crate) mod wire;
 
 pub use kitsune_p2p_types::dht_arc;

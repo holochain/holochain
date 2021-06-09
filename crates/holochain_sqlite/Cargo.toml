@@ -1,0 +1,72 @@
+[package]
+name = "holochain_sqlite"
+version = "0.0.1"
+description = "Abstractions for persistence of Holochain state via SQLite"
+license-file = "LICENSE_CAL-1.0"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://github.com/holochain/holochain"
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+edition = "2018"
+
+[dependencies]
+anyhow = "1.0.26"
+byteorder = "1.3.4"
+cfg-if = "0.1"
+chashmap = "2.2"
+chrono = "0.4.6"
+derive_more = "0.99.3"
+either = "1.5.0"
+fallible-iterator = "0.2.0"
+failure = "0.1.6"
+fixt = { version = "^0.0.2-alpha.1", path = "../fixt" }
+futures = "0.3.1"
+holo_hash = { path = "../holo_hash", features = ["rusqlite"] }
+holochain_serialized_bytes = "=0.0.50"
+holochain_zome_types = { version = "^0.0.2-alpha.1", path = "../holochain_zome_types" }
+kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p/kitsune_p2p" }
+lazy_static = "1.4.0"
+once_cell = "1.4.1"
+must_future = "0.1.1"
+nanoid = "0.3.0"
+num_cpus = "1.13.0"
+page_size = "0.4.2"
+parking_lot = "0.10"
+rand = "0.7"
+r2d2 = "0.8"
+r2d2_sqlite = "0.18"
+rmp-serde = "0.15"
+serde = "1.0"
+serde_derive = "1.0"
+shrinkwraprs = "0.3.0"
+tempdir = "0.3.7"
+thiserror = "1.0.22"
+tokio = { version = "1.3", features = [ "macros", "rt-multi-thread", "io-util", "sync" ] }
+holochain_util = { version = "0.0.1", path = "../holochain_util" }
+tracing = "0.1.18"
+tracing-futures = "0.2"
+
+rusqlite = { version = "0.25", features = [
+  "blob",        # better integration with blob types (Read, Write, etc)
+  "backup",
+  "trace",
+  #"chrono",      # integration with chrono crate
+  #"functions",   # rust scalar / agg / window functions
+  #"hooks",       # sqlite notification callbacks
+  #"serde_json",  # integration with serde_json crate
+  #"url",         # integration with url crate
+  #"uuid",        # integration with uuid crate
+] }
+
+[dev-dependencies]
+observability = { version = "0.1.3" }
+
+[features]
+default = [ "test_utils", "no-deps" ]
+
+test_utils = [ ]
+
+# Use at-rest encryption of databases
+db-encryption = ["rusqlite/sqlcipher"]
+
+# Compile SQLite from source rather than depending on a library
+no-deps = ['rusqlite/bundled']

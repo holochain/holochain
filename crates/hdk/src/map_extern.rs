@@ -29,7 +29,7 @@ macro_rules! map_extern {
                 use super::*;
 
                 #[no_mangle]
-                pub extern "C" fn $name(guest_ptr: $crate::prelude::GuestPtr) -> $crate::prelude::GuestPtr {
+                pub extern "C" fn $name(guest_ptr: $crate::prelude::GuestPtr, len: $crate::prelude::Len) -> $crate::prelude::GuestPtrLen {
                     // Setup tracing.
                     // @TODO feature flag this?
                     let _subscriber_guard = $crate::prelude::tracing::subscriber::set_default(
@@ -37,7 +37,7 @@ macro_rules! map_extern {
                     );
 
                     // Deserialize the input from the host.
-                    let extern_io: $crate::prelude::ExternIO = match $crate::prelude::host_args(guest_ptr) {
+                    let extern_io: $crate::prelude::ExternIO = match $crate::prelude::host_args(guest_ptr, len) {
                         Ok(v) => v,
                         Err(err_ptr) => return err_ptr,
                     };

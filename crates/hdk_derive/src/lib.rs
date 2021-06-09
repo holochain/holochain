@@ -94,9 +94,9 @@ impl Parse for EntryDef {
         }
         Ok(EntryDef(holochain_zome_types::entry_def::EntryDef {
             id,
-            required_validations,
             visibility,
             crdt_type,
+            required_validations,
             required_validation_type,
         }))
     }

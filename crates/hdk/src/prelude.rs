@@ -84,7 +84,6 @@ pub use mockall;
 #[macro_export]
 macro_rules! holochain_externs {
     () => {
-        holochain_wasmer_guest::memory_externs!();
         holochain_wasmer_guest::host_externs!(
             __trace,
             __hash_entry,

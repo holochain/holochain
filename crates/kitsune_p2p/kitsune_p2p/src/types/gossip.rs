@@ -1,97 +1,93 @@
-//! # Gossip Event Types
+use crate::types::*;
+use kitsune_p2p_types::config::*;
+use kitsune_p2p_types::tx2::tx2_api::*;
+use kitsune_p2p_types::*;
+use std::sync::Arc;
 
-use kitsune_p2p_types::dht_arc::DhtArc;
-
-use crate::agent_store::AgentInfoSigned;
-
-use super::*;
-
-#[derive(Debug, derive_more::Constructor)]
-/// Request dht op hashes and
-/// agent store information from an agent.
-/// This is the lightweight hashes only call.
-pub struct ReqOpHashesEvt {
-    /// Agent Requesting the ops.
-    pub from_agent: Arc<KitsuneAgent>,
-    /// The agent you are requesting ops from.
-    pub to_agent: Arc<KitsuneAgent>,
-    /// The arc on the dht that you want ops from.
-    pub dht_arc: DhtArc,
-    /// Get ops from this time.
-    pub since_utc_epoch_s: i64,
-    /// Get ops till this time.
-    pub until_utc_epoch_s: i64,
-    /// Count of the hashes from the requesting agent
-    pub op_count: OpCount,
+/// Represents an interchangeable gossip strategy module
+pub trait AsGossipModule: 'static + Send + Sync {
+    fn incoming_gossip(
+        &self,
+        con: Tx2ConHnd<wire::Wire>,
+        gossip_data: Box<[u8]>,
+    ) -> KitsuneResult<()>;
+    fn local_agent_join(&self, a: Arc<KitsuneAgent>);
+    fn local_agent_leave(&self, a: Arc<KitsuneAgent>);
 }
 
-#[derive(Debug, derive_more::Constructor)]
-/// Request dht ops from an agent.
-pub struct ReqOpDataEvt {
-    /// Agent Requesting the ops.
-    pub from_agent: Arc<KitsuneAgent>,
-    /// The agent you are requesting ops from.
-    pub to_agent: Arc<KitsuneAgent>,
-    /// The hashes of the ops you want.
-    pub op_hashes: Vec<Arc<KitsuneOpHash>>,
-    /// The hashes of the agent store information you want.
-    pub peer_hashes: Vec<Arc<KitsuneAgent>>,
+pub struct GossipModule(pub Arc<dyn AsGossipModule>);
+
+impl GossipModule {
+    pub fn incoming_gossip(
+        &self,
+        con: Tx2ConHnd<wire::Wire>,
+        gossip_data: Box<[u8]>,
+    ) -> KitsuneResult<()> {
+        self.0.incoming_gossip(con, gossip_data)
+    }
+
+    pub fn local_agent_join(&self, a: Arc<KitsuneAgent>) {
+        self.0.local_agent_join(a);
+    }
+
+    pub fn local_agent_leave(&self, a: Arc<KitsuneAgent>) {
+        self.0.local_agent_leave(a);
+    }
 }
 
-#[derive(Debug, derive_more::Constructor)]
-/// Request dht ops from an agent.
-pub struct GossipEvt {
-    /// Agent sending gossip.
-    pub from_agent: Arc<KitsuneAgent>,
-    /// The agent receiving gossip.
-    pub to_agent: Arc<KitsuneAgent>,
-    /// The ops being send in this gossip.
-    pub ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
-    /// The agent info in this gossip.
-    pub agents: Vec<AgentInfoSigned>,
+/// Represents an interchangeable gossip strategy module factory
+pub trait AsGossipModuleFactory: 'static + Send + Sync {
+    fn spawn_gossip_task(
+        &self,
+        tuning_params: KitsuneP2pTuningParams,
+        space: Arc<KitsuneSpace>,
+        ep_hnd: Tx2EpHnd<wire::Wire>,
+        evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
+    ) -> GossipModule;
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-/// Type for responding to a request for dht op hashes.
-/// If the count hasn't changed then the hashes are consistent
-/// otherwise there is a change in the data and new hashes are sent.
-pub enum OpConsistency {
-    /// There is new hashes since last gossip request.
-    Variance(OpHashes),
-    /// Gossip is consistent since the last call.
-    Consistent,
+pub struct GossipModuleFactory(pub Arc<dyn AsGossipModuleFactory>);
+
+impl GossipModuleFactory {
+    pub fn spawn_gossip_task(
+        &self,
+        tuning_params: KitsuneP2pTuningParams,
+        space: Arc<KitsuneSpace>,
+        ep_hnd: Tx2EpHnd<wire::Wire>,
+        evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
+    ) -> GossipModule {
+        self.0
+            .spawn_gossip_task(tuning_params, space, ep_hnd, evt_sender)
+    }
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-/// The count of ops last seen from the requester.
-/// If the requester has a variance then the
-/// responder needs to reply with hashes.
-pub enum OpCount {
-    /// Requestor has a variance since they last
-    /// gossiped to this agent.
-    Variance,
-    /// Requestor is consistent since last gossip
-    /// and this is the count they saw from
-    /// this agent.
-    Consistent(u64),
+/// The specific provenance/destination of gossip is to a particular Agent on
+/// a connection specified by a Tx2Cert
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, derive_more::Constructor)]
+pub struct GossipTgt {
+    /// The agents on the remote node for whom this gossip is intended.
+    /// In the current full-sync case, it makes sense to address gossip to all
+    /// known agents on a node, but after sharding, we may make this a single
+    /// agent target.
+    agents: Vec<Arc<KitsuneAgent>>,
+    /// The cert which represents the remote node to talk to.
+    cert: Tx2Cert,
 }
 
-/// Dht Op hashes that an agent holds
-pub type OpHashes = Vec<Arc<KitsuneOpHash>>;
+impl GossipTgt {
+    /// Accessor
+    pub fn agents(&self) -> &Vec<Arc<KitsuneAgent>> {
+        &self.agents
+    }
 
-/// Dht op and agent hashes that the agent has information on.
-pub type OpHashesAgentHashes = (OpConsistency, Vec<(Arc<KitsuneAgent>, u64)>);
+    /// Accessor
+    pub fn cert(&self) -> &Tx2Cert {
+        self.as_ref()
+    }
+}
 
-/// Dht op and agent hashes that the agent has information on.
-/// Same as [OpHashesAgentHashes] but without consistency information.
-pub type LocalOpHashesAgentHashes = (OpHashes, Vec<(Arc<KitsuneAgent>, u64)>);
-/// The Dht op data and agent store information
-pub type OpDataAgentInfo = (Vec<(Arc<KitsuneOpHash>, Vec<u8>)>, Vec<AgentInfoSigned>);
-/// Local and remote neighbors.
-pub type ListNeighborAgents = (Vec<Arc<KitsuneAgent>>, Vec<Arc<KitsuneAgent>>);
-
-impl Default for OpCount {
-    fn default() -> Self {
-        OpCount::Variance
+impl AsRef<Tx2Cert> for GossipTgt {
+    fn as_ref(&self) -> &Tx2Cert {
+        &self.cert
     }
 }
