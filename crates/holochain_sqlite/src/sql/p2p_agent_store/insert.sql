@@ -8,7 +8,7 @@ SELECT
   :expires_at_ms AS expires_at_ms,
   :storage_center_loc AS storage_center_loc,
   :storage_start_loc AS storage_start_loc,
-  :storage_end_loc AS storage_end_loc,
+  :storage_end_loc AS storage_end_loc
 WHERE (
   -- count the rows that should supercede the one we're trying to insert
   SELECT count(rowid)
