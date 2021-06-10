@@ -51,10 +51,19 @@ fixturator!(
     from SixtyFourBytesVec;
 );
 
+/// make fixturators sync for now
+fn block_on<F>(f: F) -> F::Output
+where
+    F: 'static + std::future::Future + Send,
+    F::Output: 'static + Send,
+{
+    tokio::task::block_in_place(move || tokio::runtime::Handle::current().block_on(f))
+}
+
 fixturator!(
     AgentInfoSigned;
     curve Empty {
-        tokio::runtime::Handle::current().block_on(async move {
+        block_on(async move {
             AgentInfoSigned::sign(
                 Arc::new(fixt!(KitsuneSpace, Empty)),
                 Arc::new(fixt!(KitsuneAgent, Empty)),
@@ -69,7 +78,7 @@ fixturator!(
         })
     };
     curve Unpredictable {
-        tokio::runtime::Handle::current().block_on(async move {
+        block_on(async move {
             AgentInfoSigned::sign(
                 Arc::new(fixt!(KitsuneSpace, Unpredictable)),
                 Arc::new(fixt!(KitsuneAgent, Unpredictable)),
@@ -84,7 +93,7 @@ fixturator!(
         })
     };
     curve Predictable {
-        tokio::runtime::Handle::current().block_on(async move {
+        block_on(async move {
             AgentInfoSigned::sign(
                 Arc::new(fixt!(KitsuneSpace, Predictable)),
                 Arc::new(fixt!(KitsuneAgent, Predictable)),
