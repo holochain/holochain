@@ -204,8 +204,11 @@ mod tests {
 
         p2p_put(&env, &agent_info_signed).await.unwrap();
 
-        let agent = kitsune_p2p::KitsuneAgent::try_from(agent_info_signed.clone()).unwrap();
-        let ret = env.conn().unwrap().p2p_get(&agent).unwrap();
+        let ret = env
+            .conn()
+            .unwrap()
+            .p2p_get(&agent_info_signed.agent)
+            .unwrap();
 
         assert_eq!(ret, Some(agent_info_signed));
     }
@@ -227,7 +230,7 @@ mod tests {
             .collect::<Vec<_>>();
 
         let mut expect = agent_infos.clone();
-        expect.sort();
+        expect.sort_by(|a, b| a.agent.partial_cmp(&b.agent).unwrap());
 
         // - Inject some data
         inject_agent_infos(env.clone(), agent_infos.iter())
@@ -237,7 +240,7 @@ mod tests {
         // - Check the same data is now in the store
         let mut agents = all_agent_infos(env.clone().into()).unwrap();
 
-        agents.sort();
+        agents.sort_by(|a, b| a.agent.partial_cmp(&b.agent).unwrap());
 
         assert_eq!(expect, agents);
     }
