@@ -3,23 +3,26 @@ use kitsune_p2p_types::dht_arc::*;
 
 type HasMap = HashMap<Arc<KitsuneAgent>, KeySet>;
 
-pub(crate) async fn step_2_local_sync_inner(
-    space: Arc<KitsuneSpace>,
-    evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
-    local_agents: HashSet<Arc<KitsuneAgent>>,
-) -> KitsuneResult<(DataMap, KeySet, BloomFilter)> {
-    let mut inner = Inner {
-        space,
-        evt_sender,
-        local_agents,
-        data_map: HashMap::new(),
-        has_map: HashMap::new(),
-    };
+impl SimpleBloomMod {
+    pub(crate) async fn step_2_local_sync_inner(
+        &self,
+        local_agents: HashSet<Arc<KitsuneAgent>>,
+    ) -> KitsuneResult<(DataMap, KeySet, BloomFilter)> {
+        let space = self.space.clone();
+        let evt_sender = self.evt_sender.clone();
+        let mut inner = Inner {
+            space,
+            evt_sender,
+            local_agents,
+            data_map: HashMap::new(),
+            has_map: HashMap::new(),
+        };
 
-    inner.collect_local_ops().await;
-    inner.collect_local_agents().await;
-    inner.local_sync().await?;
-    Ok(inner.finish())
+        inner.collect_local_ops().await;
+        inner.collect_local_agents().await;
+        inner.local_sync().await?;
+        Ok(inner.finish())
+    }
 }
 
 struct Inner {

@@ -109,11 +109,8 @@ pub(crate) fn decode_bloom_filter(bloom: &[u8]) -> BloomFilter {
 
 mod step_1_check_inner;
 mod step_2_local_sync_inner;
-use step_2_local_sync_inner::*;
 mod step_3_initiate_inner;
-use step_3_initiate_inner::*;
 mod step_4_com_loop_inner;
-use step_4_com_loop_inner::*;
 
 kitsune_p2p_types::write_codec_enum! {
     /// SimpleBloom Gossip Wire Protocol Codec
@@ -278,10 +275,13 @@ impl SimpleBloomMod {
 
     /// Get metrics data via event channel in the form of NodeInfo
     // TODO: remove NodeInfo
-    async fn get_metric(
+    async fn get_metric_info(
         &self,
         agents: Vec<Arc<KitsuneAgent>>,
     ) -> KitsuneP2pResult<Option<NodeInfo>> {
+        // We pick an arbitrary agent for now, since in a full-sync situation,
+        // any agent should have the same data as any other agent.
+        // TODO: this will naturally change after sharding.
         let arbitrary_agent = agents
             .first()
             .expect("Gossip must have a least one from_agent")
@@ -379,10 +379,10 @@ impl SimpleBloomMod {
         //   TODO: this may not be technically correct, since we may want to
         //       record metrics from previous steps even if those other steps
         //       short-circuited this iteration. Revisit.
-        #[allow(clippy::single_match)]
         match self.step_5_flush_metrics().await {
             Err(_) => return GossipIterationResult::Close,
-            Ok(_) => (),
+            Ok(false) => return GossipIterationResult::Good,
+            Ok(true) => (),
         }
 
         GossipIterationResult::Good
@@ -396,17 +396,15 @@ impl SimpleBloomMod {
     }
 
     async fn step_2_local_sync(&self) -> KitsuneResult<bool> {
-        let evt_sender = self.evt_sender.clone();
         let local_agents = self.inner.share_mut(|i, _| Ok(i.local_agents.clone()))?;
 
-        let (data_map, key_set, bloom) =
-            match step_2_local_sync_inner(self.space.clone(), evt_sender, local_agents).await {
-                Err(e) => {
-                    tracing::warn!("gossip error: {:?}", e);
-                    return Ok(false);
-                }
-                Ok(r) => r,
-            };
+        let (data_map, key_set, bloom) = match self.step_2_local_sync_inner(local_agents).await {
+            Err(e) => {
+                tracing::warn!("gossip error: {:?}", e);
+                return Ok(false);
+            }
+            Ok(r) => r,
+        };
 
         self.inner.share_mut(move |i, _| {
             i.local_data_map = data_map;
@@ -419,107 +417,23 @@ impl SimpleBloomMod {
     }
 
     async fn step_3_initiate(&self) -> KitsuneP2pResult<bool> {
-        step_3_initiate_inner(self).await?;
+        self.step_3_initiate_inner().await?;
         Ok(true)
     }
 
     async fn step_4_com_loop(&self) -> KitsuneResult<bool> {
-        let loop_start = std::time::Instant::now();
-
-        loop {
-            let (tuning_params, space, ep_hnd) = (
-                self.tuning_params.clone(),
-                self.space.clone(),
-                self.ep_hnd.clone(),
-            );
-            let (mut maybe_outgoing, mut maybe_incoming) =
-                self.inner.share_mut(|i, _| {
-                    let maybe_outgoing = if !i.outgoing.is_empty()
-                        && i.last_outgoing.elapsed().as_millis() as u64 > self.send_interval_ms
-                    {
-                        let (cert, how, gossip) = i.outgoing.remove(0);
-
-                        // set this to a time in the future
-                        // so we don't accidentally double up if sending
-                        // is slow... we'll set this more reasonably
-                        // when we get a success or failure below.
-                        i.last_outgoing = std::time::Instant::now()
-                            .checked_add(std::time::Duration::from_millis(
-                                self.tuning_params.tx2_implicit_timeout_ms as u64,
-                            ))
-                            .expect("Congratulations on running holochain near the heat death of the universe :)");
-
-                        Some((cert, how, gossip))
-                    } else {
-                        None
-                    };
-                    let maybe_incoming = if !i.incoming.is_empty() {
-                        Some(i.incoming.remove(0))
-                    } else {
-                        None
-                    };
-                    Ok((
-                        maybe_outgoing,
-                        maybe_incoming,
-                    ))
-                })?;
-
-            let will_break = (maybe_outgoing.is_none() && maybe_incoming.is_none())
-                || loop_start.elapsed().as_millis() as u32
-                    > tuning_params.gossip_loop_iteration_delay_ms;
-
-            if let Some(outgoing) = maybe_outgoing.take() {
-                let (endpoint, how, gossip) = outgoing;
-                let agents = endpoint.agents().clone();
-                if let Err(e) = step_4_com_loop_inner_outgoing(
-                    &self.inner,
-                    tuning_params.clone(),
-                    space.clone(),
-                    ep_hnd,
-                    endpoint.cert().clone(),
-                    how,
-                    gossip,
-                )
-                .await
-                {
-                    tracing::warn!("failed to send outgoing: {:?} {:?}", endpoint, e);
-                    self.inner.share_mut(move |i, _| {
-                        i.last_outgoing = std::time::Instant::now();
-                        i.record_pending_metric(agents, true);
-                        Ok(())
-                    })?;
-                } else {
-                    self.inner.share_mut(move |i, _| {
-                        i.last_outgoing = std::time::Instant::now();
-                        i.record_pending_metric(agents, false);
-                        Ok(())
-                    })?;
-                }
-            }
-
-            if let Some(incoming) = maybe_incoming.take() {
-                let (con, gossip) = incoming;
-                if let Err(e) = step_4_com_loop_inner_incoming(&self, con, gossip).await {
-                    tracing::warn!("failed to process incoming: {:?}", e);
-                }
-            }
-
-            if will_break {
-                break;
-            }
-        }
-
+        self.step_4_com_loop_inner().await?;
         Ok(true)
     }
 
-    async fn step_5_flush_metrics(&self) -> KitsuneP2pResult<()> {
+    async fn step_5_flush_metrics(&self) -> KitsuneP2pResult<bool> {
         let metrics: Vec<_> = self
             .inner
             .share_mut(|i, _| Ok(i.pending_metrics.drain(..).collect()))?;
         for (agents, info) in metrics {
             self.record_metric(agents, info).await?;
         }
-        Ok(())
+        Ok(true)
     }
 }
 
@@ -558,9 +472,9 @@ impl AsGossipModule for SimpleBloomMod {
     }
 }
 
-struct SimpleBloomModFact;
+struct SimpleBloomModFactory;
 
-impl AsGossipModuleFactory for SimpleBloomModFact {
+impl AsGossipModuleFactory for SimpleBloomModFactory {
     fn spawn_gossip_task(
         &self,
         tuning_params: KitsuneP2pTuningParams,
@@ -578,5 +492,5 @@ impl AsGossipModuleFactory for SimpleBloomModFact {
 }
 
 pub fn factory() -> GossipModuleFactory {
-    GossipModuleFactory(Arc::new(SimpleBloomModFact))
+    GossipModuleFactory(Arc::new(SimpleBloomModFactory))
 }

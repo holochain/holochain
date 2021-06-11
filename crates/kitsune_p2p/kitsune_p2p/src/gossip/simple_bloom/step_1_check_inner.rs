@@ -18,7 +18,7 @@ impl SimpleBloomMod {
 
         // next, check to see if we should time out any current initiate_tgt
         if let Some(initiate_tgt) = tgt {
-            if let Some(metric) = self.get_metric(initiate_tgt.agents().clone()).await? {
+            if let Some(metric) = self.get_metric_info(initiate_tgt.agents().clone()).await? {
                 if metric.was_err
                     || metric.last_touch.elapsed()?.as_millis() as u32
                         > self.tuning_params.gossip_peer_on_success_next_gossip_delay_ms

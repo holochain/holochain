@@ -1,5 +1,5 @@
 SELECT agent
-FROM p2p_store
+FROM p2p_agent_store
 WHERE signed_at_ms >= :since_ms -- between given signed_at range
   AND signed_at_ms <= :until_ms
   AND (

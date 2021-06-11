@@ -1,8 +1,8 @@
 use std::convert::TryFrom;
 use std::sync::Arc;
 
-use crate::conductor::p2p_store::all_agent_infos;
-use crate::conductor::p2p_store::exchange_peer_info;
+use crate::conductor::p2p_agent_store::all_agent_infos;
+use crate::conductor::p2p_agent_store::exchange_peer_info;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
