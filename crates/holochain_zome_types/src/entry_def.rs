@@ -162,29 +162,3 @@ impl CallbackResult for EntryDefsCallbackResult {
         Err(wasm_error)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::EntryDef;
-    use super::EntryDefsCallbackResult;
-    use super::EntryVisibility;
-    use crate::crdt::CrdtType;
-    use crate::validate::RequiredValidationType;
-    use crate::zome_io::ExternIO;
-
-    #[test]
-    fn from_guest_output_test() {
-        let defs_callback_result = EntryDefsCallbackResult::Defs(
-            vec![EntryDef {
-                id: "bar".into(),
-                visibility: EntryVisibility::Public,
-                crdt_type: CrdtType,
-                required_validations: 5.into(),
-                required_validation_type: RequiredValidationType::default(),
-            }]
-            .into(),
-        );
-        let guest_output = ExternIO::encode(&defs_callback_result).unwrap();
-        assert_eq!(defs_callback_result, guest_output.try_into().unwrap(),);
-    }
-}

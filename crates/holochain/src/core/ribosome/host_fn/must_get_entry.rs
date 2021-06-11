@@ -96,7 +96,7 @@ pub mod test {
         let env = test_env.env();
         let author = fake_agent_pubkey_1();
         crate::test_utils::fake_genesis(env.clone()).await.unwrap();
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author.clone()).unwrap();
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author.clone()).await.unwrap();
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace.clone();
 
