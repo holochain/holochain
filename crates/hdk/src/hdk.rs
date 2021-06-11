@@ -9,12 +9,21 @@ pub const HDK_NOT_REGISTERED: &str = "HDK not registered";
 /// Every test needs its own mock so each test needs to set it.
 use core::cell::RefCell;
 
+/// When mocking is enabled the default behaviour is to error every hdk call.
+/// Specific mock(s) need to be generated with mockall, set and called.
 #[cfg(feature = "mock")]
 thread_local!(pub static HDK: RefCell<Box<dyn HdkT>> = RefCell::new(Box::new(ErrHdk)));
 
+/// When mocking is disabled we use the real holochain host for all calls.
 #[cfg(not(feature = "mock"))]
 thread_local!(pub static HDK: RefCell<Box<dyn HdkT>> = RefCell::new(Box::new(HostHdk)));
 
+/// When mocking is enabled the mockall crate automatically builds a MockHdkT for us.
+/// ```ignore
+/// let mut mock = MockHdkT::new();
+/// mock_hdk.expect_foo().times(1).etc().etc();
+/// set_hdk(mock_hdk);
+/// ```
 #[cfg_attr(feature = "mock", automock)]
 pub trait HdkT: Send + Sync {
     // Chain
@@ -79,6 +88,7 @@ pub trait HdkT: Send + Sync {
 }
 
 /// Used as a placeholder before any other Hdk is registered.
+/// Generally only useful for testing but technically can be set any time.
 pub struct ErrHdk;
 
 impl ErrHdk {
@@ -87,6 +97,7 @@ impl ErrHdk {
     }
 }
 
+/// Every call is an error for the ErrHdk.
 impl HdkT for ErrHdk {
     fn get_agent_activity(&self, _: GetAgentActivityInput) -> ExternResult<AgentActivity> {
         Self::err()
@@ -213,6 +224,10 @@ impl HdkT for ErrHdk {
 /// The HDK implemented as externs provided by the host.
 pub struct HostHdk;
 
+/// The real hdk implements `host_call` for every hdk function.
+/// This is deferring to the standard `holochain_wasmer_guest` crate functionality.
+/// Every function works exactly the same way with the same basic signatures and patterns.
+/// Elsewhere in the hdk are more high level wrappers around this basic trait.
 #[cfg(not(feature = "mock"))]
 impl HdkT for HostHdk {
     fn get_agent_activity(
@@ -358,6 +373,9 @@ impl HdkT for HostHdk {
     }
 }
 
+/// At any time the global HDK can be set to a different hdk.
+/// Generally this is only useful during rust unit testing.
+/// When executing wasm without the `mock` feature, the host will be assumed.
 pub fn set_hdk<H: 'static>(hdk: H)
 where
     H: HdkT,
