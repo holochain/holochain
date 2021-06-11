@@ -91,6 +91,10 @@ fn initialize_connection(
         conn.pragma_update(None, "key", &FAKE_KEY)?;
     }
 
+    // this is recommended to always be off:
+    // https://sqlite.org/pragma.html#pragma_trusted_schema
+    conn.pragma_update(None, "trusted_schema", &false)?;
+
     // set to faster write-ahead-log mode
     conn.pragma_update(None, "journal_mode", &"WAL".to_string())?;
 
