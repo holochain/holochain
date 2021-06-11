@@ -1,5 +1,5 @@
 ---
-unreleasable: true
+unreleasable: false
 default_unreleasable: true
 ---
 
@@ -8,6 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Changed
+
+- Migrated to wasmer 1+ and latest `holochain_wasmer` crates to match
+- Added `HdkT` trait to support mocking the host and native rust unit tests
 
 ### Added
 - Added `sign_ephemeral` and `sign_ephemeral_raw`
