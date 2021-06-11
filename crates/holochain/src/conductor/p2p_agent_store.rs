@@ -1,10 +1,10 @@
-//! Queries for the P2pState store
+//! Queries for the P2pAgentStore db
 
 use fallible_iterator::FallibleIterator;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_conductor_api::AgentInfoDump;
-use holochain_conductor_api::P2pStateDump;
+use holochain_conductor_api::P2pAgentsDump;
 use holochain_p2p::dht_arc::DhtArc;
 use holochain_p2p::dht_arc::DhtArcBucket;
 use holochain_p2p::dht_arc::PeerDensity;
@@ -132,7 +132,7 @@ fn is_expired(now: u64, info: &kitsune_p2p::agent_store::AgentInfo) -> bool {
 }
 
 /// Dump the agents currently in the peer store
-pub fn dump_state(env: EnvRead, cell_id: Option<CellId>) -> StateQueryResult<P2pStateDump> {
+pub fn dump_state(env: EnvRead, cell_id: Option<CellId>) -> StateQueryResult<P2pAgentsDump> {
     use std::fmt::Write;
     let cell_id = cell_id.map(|c| c.into_dna_and_agent()).map(|c| {
         (
@@ -195,7 +195,7 @@ pub fn dump_state(env: EnvRead, cell_id: Option<CellId>) -> StateQueryResult<P2p
         }
     }
 
-    Ok(P2pStateDump {
+    Ok(P2pAgentsDump {
         this_agent_info,
         this_dna: cell_id.clone().map(|(s, _)| s),
         this_agent: cell_id.clone().map(|(_, a)| a),
@@ -207,14 +207,14 @@ pub fn dump_state(env: EnvRead, cell_id: Option<CellId>) -> StateQueryResult<P2p
 mod tests {
     use super::*;
     use ::fixt::prelude::*;
-    use holochain_state::test_utils::test_p2p_state_env;
+    use holochain_state::test_utils::test_p2p_agent_store_env;
     use kitsune_p2p::fixt::AgentInfoSignedFixturator;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_store_agent_info_signed() {
         observability::test_run().ok();
 
-        let test_env = test_p2p_state_env();
+        let test_env = test_p2p_agent_store_env();
         let env = test_env.env();
 
         let agent_info_signed = fixt!(AgentInfoSigned, Predictable);
@@ -230,7 +230,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn add_agent_info_to_peer_env() {
         observability::test_run().ok();
-        let t_env = test_p2p_state_env();
+        let t_env = test_p2p_agent_store_env();
         let env = t_env.env();
 
         // - Check no data in the store to start
