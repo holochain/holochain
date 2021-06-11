@@ -719,7 +719,7 @@ pub mod test {
             {
                 let mut count = 0;
                 for env in p2p.lock().values() {
-                    count += env.conn().unwrap().p2p_list().unwrap().len();
+                    count += env.conn().unwrap().p2p_list_agents().unwrap().len();
                 }
                 count
             },

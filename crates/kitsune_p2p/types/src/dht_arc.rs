@@ -12,6 +12,9 @@ use std::ops::RangeInclusive;
 #[cfg(test)]
 mod tests;
 
+mod dht_arc_set;
+pub use dht_arc_set::{ArcInterval, DhtArcSet};
+
 #[cfg(any(test, feature = "test_utils"))]
 pub mod gaps;
 
@@ -147,7 +150,7 @@ fn converge(current: f64, density: PeerDensity) -> f64 {
 /// ```text
 /// [4][3][2][1][0][1][2][3][4]
 // half length of 3 will give you
-/// [2][1][0][1][2]
+///       [2][1][0][1][2]
 /// ```
 pub struct DhtArc {
     /// The center location of this dht arc

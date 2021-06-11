@@ -1,4 +1,4 @@
-SELECT agent
+SELECT agent, storage_start_loc, storage_end_loc
 FROM p2p_agent_store
 WHERE signed_at_ms >= :since_ms -- between given signed_at range
   AND signed_at_ms <= :until_ms

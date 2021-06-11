@@ -60,8 +60,8 @@ async fn rand_insert(db: &DbWrite, space: &Arc<KitsuneSpace>, agent: &Arc<Kitsun
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_p2p_agent_store_sanity() {
-    let tmp_dir = tempdir::TempDir::new("p2p_agent_store_sanity").unwrap();
+async fn test_p2p_agent_store_gossip_query_sanity() {
+    let tmp_dir = tempdir::TempDir::new("p2p_agent_store_gossip_query_sanity").unwrap();
 
     let space = rand_space();
 
@@ -80,35 +80,35 @@ async fn test_p2p_agent_store_sanity() {
     let mut con = db.connection_pooled().unwrap();
 
     // check that we only get 20 results
-    let all = con.p2p_list().unwrap();
+    let all = con.p2p_list_agents().unwrap();
     assert_eq!(20, all.len());
 
     // make sure we can get our example result
     println!("after insert select all count: {}", all.len());
-    let signed = con.p2p_get(&example_agent).unwrap();
+    let signed = con.p2p_get_agent(&example_agent).unwrap();
     assert!(signed.is_some());
 
     // check that gossip query over full range returns 20 results
     let all = con
-        .p2p_gossip_query(u64::MIN, u64::MAX, DhtArc::new(0, u32::MAX))
+        .p2p_gossip_query_agents(u64::MIN, u64::MAX, DhtArc::new(0, u32::MAX).into())
         .unwrap();
     assert_eq!(20, all.len());
 
     // check that gossip query over zero time returns zero results
     let all = con
-        .p2p_gossip_query(u64::MIN, u64::MIN, DhtArc::new(0, u32::MAX))
+        .p2p_gossip_query_agents(u64::MIN, u64::MIN, DhtArc::new(0, u32::MAX).into())
         .unwrap();
     assert_eq!(0, all.len());
 
     // check that gossip query over zero arc returns zero results
     let all = con
-        .p2p_gossip_query(u64::MIN, u64::MAX, DhtArc::new(0, 0))
+        .p2p_gossip_query_agents(u64::MIN, u64::MAX, DhtArc::new(0, 0).into())
         .unwrap();
     assert_eq!(0, all.len());
 
     // check that gossip query over half arc returns some but not all results
     let all = con
-        .p2p_gossip_query(u64::MIN, u64::MAX, DhtArc::new(0, u32::MAX / 4))
+        .p2p_gossip_query_agents(u64::MIN, u64::MAX, DhtArc::new(0, u32::MAX / 4).into())
         .unwrap();
     assert!(all.len() > 0 && all.len() < 20);
 
@@ -116,12 +116,12 @@ async fn test_p2p_agent_store_sanity() {
     p2p_prune(&db).await.unwrap();
 
     // after prune, make sure all are pruned
-    let all = con.p2p_list().unwrap();
+    let all = con.p2p_list_agents().unwrap();
     assert_eq!(0, all.len());
 
     // make sure our specific get also returns None
     println!("after prune_all select all count: {}", all.len());
-    let signed = con.p2p_get(&example_agent).unwrap();
+    let signed = con.p2p_get_agent(&example_agent).unwrap();
     assert!(signed.is_none());
 
     // clean up temp dir
