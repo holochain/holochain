@@ -9,12 +9,9 @@ pub const HDK_NOT_REGISTERED: &str = "HDK not registered";
 /// Every test needs its own mock so each test needs to set it.
 use core::cell::RefCell;
 
-/// When mocking is enabled the default behaviour is to error every hdk call.
-/// Specific mock(s) need to be generated with mockall, set and called.
 #[cfg(feature = "mock")]
 thread_local!(pub static HDK: RefCell<Box<dyn HdkT>> = RefCell::new(Box::new(ErrHdk)));
 
-/// When mocking is disabled we use the real holochain host for all calls.
 #[cfg(not(feature = "mock"))]
 thread_local!(pub static HDK: RefCell<Box<dyn HdkT>> = RefCell::new(Box::new(HostHdk)));
 
