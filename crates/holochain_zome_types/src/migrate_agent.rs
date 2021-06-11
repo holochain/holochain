@@ -23,7 +23,14 @@ impl CallbackResult for MigrateAgentCallbackResult {
             WasmError::Guest(_) | WasmError::Serialize(_) | WasmError::Deserialize(_) => {
                 Ok(MigrateAgentCallbackResult::Fail(wasm_error.to_string()))
             }
-            _ => Err(wasm_error),
+            WasmError::Host(_)
+            | WasmError::HostShortCircuit(_)
+            | WasmError::GuestResultHandling(_)
+            | WasmError::Compile(_)
+            | WasmError::CallError(_)
+            | WasmError::PointerMap
+            | WasmError::ErrorWhileError
+            | WasmError::Memory => Err(wasm_error),
         }
     }
 }
