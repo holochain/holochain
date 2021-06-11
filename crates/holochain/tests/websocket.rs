@@ -176,7 +176,7 @@ how_many: 42
     // List Dnas
     let request = AdminRequest::ListDnas;
     let response = client.request(request);
-    let response = check_timeout(&mut holochain, response, 3000).await;
+    let response = check_timeout(&mut holochain, response, 6000).await;
 
     let tmp_wasm = dna.code().values().cloned().collect::<Vec<_>>();
     let mut tmp_dna = dna.dna_def().clone();
@@ -246,7 +246,7 @@ pub async fn call_zome_fn<S>(
     .into();
     let request = AppRequest::ZomeCallInvocation(Box::new(call));
     let response = app_tx.request(request);
-    let call_response = check_timeout(holochain, response, 3000).await;
+    let call_response = check_timeout(holochain, response, 6000).await;
     trace!(?call_response);
     assert_matches!(call_response, AppResponse::ZomeCallInvocation(_));
 }
@@ -258,7 +258,7 @@ pub async fn attach_app_interface(
 ) -> u16 {
     let request = AdminRequest::AttachAppInterface { port };
     let response = client.request(request);
-    let response = check_timeout(holochain, response, 1000).await;
+    let response = check_timeout(holochain, response, 3000).await;
     match response {
         AdminResponse::AppInterfaceAttached { port } => port,
         _ => panic!("Attach app interface failed: {:?}", response),
@@ -304,7 +304,7 @@ async fn register_and_install_dna(
     };
     let request = AdminRequest::RegisterDna(Box::new(register_payload));
     let response = client.request(request);
-    let response = check_timeout(&mut holochain, response, 3000).await;
+    let response = check_timeout(&mut holochain, response, 6000).await;
     assert_matches!(response, AdminResponse::DnaRegistered(_));
     let dna_hash = if let AdminResponse::DnaRegistered(h) = response {
         h.clone()
@@ -324,7 +324,7 @@ async fn register_and_install_dna(
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
     let response = client.request(request);
-    let response = check_timeout(&mut holochain, response, 3000).await;
+    let response = check_timeout(&mut holochain, response, 6000).await;
     assert_matches!(response, AdminResponse::AppInstalled(_));
     dna_hash
 }
@@ -374,7 +374,7 @@ async fn call_zome() {
     // List Dnas
     let request = AdminRequest::ListDnas;
     let response = client.request(request);
-    let response = check_timeout(&mut holochain, response, 1000).await;
+    let response = check_timeout(&mut holochain, response, 3000).await;
 
     let expects = vec![original_dna_hash.clone()];
     assert_matches!(response, AdminResponse::DnasListed(a) if a == expects);
@@ -384,7 +384,7 @@ async fn call_zome() {
         installed_app_id: "test".to_string(),
     };
     let response = client.request(request);
-    let response = check_timeout(&mut holochain, response, 1000).await;
+    let response = check_timeout(&mut holochain, response, 3000).await;
     assert_matches!(response, AdminResponse::AppActivated);
 
     // Attach App Interface
@@ -524,7 +524,7 @@ async fn emit_signals() {
         installed_app_id: "test".to_string(),
     };
     let response = admin_tx.request(request);
-    let response = check_timeout(&mut holochain, response, 1000).await;
+    let response = check_timeout(&mut holochain, response, 3000).await;
     assert_matches!(response, AdminResponse::AppActivated);
 
     // Attach App Interface
@@ -678,8 +678,7 @@ async fn too_many_open() {
     let conductor_handle = Conductor::builder().config(config).build().await.unwrap();
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");
-    for i in 0..1000 {
-        dbg!(i);
+    for _i in 0..1000 {
         holochain_websocket::connect(
             url2!("ws://127.0.0.1:{}", port),
             Arc::new(WebsocketConfig {

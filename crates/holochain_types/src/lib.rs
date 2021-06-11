@@ -22,6 +22,7 @@ pub mod dht_op;
 pub mod dna;
 pub mod element;
 pub mod entry;
+pub mod env;
 pub mod fixt;
 pub mod header;
 pub mod link;
@@ -33,7 +34,6 @@ pub mod signal;
 pub mod timestamp;
 pub mod validate;
 
-// #[cfg(test)]
 pub mod test_utils;
 
 pub use entry::EntryHashed;

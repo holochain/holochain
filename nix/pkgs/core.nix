@@ -18,7 +18,7 @@ rec {
 
     # alas, we cannot specify --features in the virtual workspace
     # run the specific slow tests in the holochain crate
-    cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,build_wasms -- --nocapture --test-threads 1
+    cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,test_utils,build_wasms,db-encryption -- --nocapture --test-threads 1
     # run all the remaining cargo tests
     cargo test --workspace --exclude holochain -- --nocapture --test-threads 1
     # run all the wasm tests (within wasm) with the conductor mocked

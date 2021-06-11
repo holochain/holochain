@@ -1,37 +1,27 @@
 use super::app_validation_workflow;
+use super::app_validation_workflow::Outcome;
 use super::error::WorkflowResult;
 use super::sys_validation_workflow::sys_validate_element;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::interface::SignalBroadcaster;
-use crate::core::queue_consumer::OneshotWriter;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
-pub use call_zome_workspace_lock::CallZomeWorkspaceLock;
+use crate::core::ribosome::ZomesToInvoke;
 use either::Either;
 use holochain_cascade::Cascade;
-use holochain_cascade::DbPair;
-use holochain_cascade::DbPairMut;
 use holochain_keystore::KeystoreSender;
-use holochain_lmdb::prelude::*;
 use holochain_p2p::HolochainP2pCell;
-use holochain_state::element_buf::ElementBuf;
-use holochain_state::metadata::MetadataBuf;
-use holochain_state::metadata::MetadataBufT;
-use holochain_state::source_chain::SourceChain;
+use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::source_chain::SourceChainError;
-use holochain_state::workspace::Workspace;
-use holochain_state::workspace::WorkspaceResult;
 use holochain_zome_types::element::Element;
 
 use holochain_types::prelude::*;
 use std::sync::Arc;
 use tracing::instrument;
-
-pub mod call_zome_workspace_lock;
 
 #[cfg(test)]
 mod validation_test;
@@ -40,7 +30,11 @@ mod validation_test;
 pub type ZomeCallResult = RibosomeResult<ZomeCallResponse>;
 
 #[derive(Debug)]
-pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT + Send, C: CellConductorApiT> {
+pub struct CallZomeWorkflowArgs<Ribosome, C>
+where
+    Ribosome: RibosomeT + Send,
+    C: CellConductorApiT,
+{
     pub ribosome: Ribosome,
     pub invocation: ZomeCallInvocation,
     pub signal_tx: SignalBroadcaster,
@@ -48,53 +42,43 @@ pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT + Send, C: CellConductorApiT
     pub is_root_zome_call: bool,
 }
 
-#[instrument(skip(
-    workspace_lock,
-    network,
-    keystore,
-    writer,
-    args,
-    trigger_produce_dht_ops
-))]
-pub async fn call_zome_workflow<
-    'env,
-    Ribosome: RibosomeT + Send + 'static,
-    C: CellConductorApiT,
->(
-    workspace_lock: CallZomeWorkspaceLock,
+#[instrument(skip(workspace, network, keystore, args, trigger_publish_dht_ops))]
+pub async fn call_zome_workflow<Ribosome, C>(
+    workspace: HostFnWorkspace,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
-    writer: OneshotWriter,
     args: CallZomeWorkflowArgs<Ribosome, C>,
-    mut trigger_produce_dht_ops: TriggerSender,
-) -> WorkflowResult<ZomeCallResult> {
+    mut trigger_publish_dht_ops: TriggerSender,
+) -> WorkflowResult<ZomeCallResult>
+where
+    Ribosome: RibosomeT + Send + 'static,
+    C: CellConductorApiT,
+{
     let should_write = args.is_root_zome_call;
-    let result = call_zome_workflow_inner(workspace_lock.clone(), network, keystore, args).await?;
+    let result = call_zome_workflow_inner(workspace.clone(), network, keystore, args).await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
     if should_write {
-        let mut guard = workspace_lock.write().await;
-        let workspace = &mut guard;
-        writer.with_writer(|writer| workspace.flush_to_txn_ref(writer))?;
+        workspace.flush().await?;
     }
 
-    trigger_produce_dht_ops.trigger();
+    trigger_publish_dht_ops.trigger();
 
     Ok(result)
 }
 
-async fn call_zome_workflow_inner<
-    'env,
-    Ribosome: RibosomeT + Send + 'static,
-    C: CellConductorApiT,
->(
-    workspace_lock: CallZomeWorkspaceLock,
+async fn call_zome_workflow_inner<Ribosome, C>(
+    workspace: HostFnWorkspace,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
     args: CallZomeWorkflowArgs<Ribosome, C>,
-) -> WorkflowResult<ZomeCallResult> {
+) -> WorkflowResult<ZomeCallResult>
+where
+    Ribosome: RibosomeT + Send + 'static,
+    C: CellConductorApiT,
+{
     let CallZomeWorkflowArgs {
         ribosome,
         invocation,
@@ -106,17 +90,14 @@ async fn call_zome_workflow_inner<
     let call_zome_handle = conductor_api.clone().into_call_zome_handle();
     let zome = invocation.zome.clone();
 
-    // Get the current head
-    let chain_head_start_len = workspace_lock.read().await.source_chain.len();
-
-    tracing::trace!(line = line!());
+    tracing::trace!("Before zome call");
     // Create the unsafe sourcechain for use with wasm closure
     let (ribosome, result) = tokio::task::spawn_blocking({
-        let workspace_lock = workspace_lock.clone();
+        let workspace = workspace.clone();
         let network = network.clone();
         move || {
             let host_access = ZomeCallHostAccess::new(
-                workspace_lock,
+                workspace,
                 keystore,
                 network,
                 signal_tx,
@@ -128,37 +109,57 @@ async fn call_zome_workflow_inner<
         }
     })
     .await?;
-    tracing::trace!(line = line!());
+    tracing::trace!("After zome call");
 
+    inline_validation(workspace, network, conductor_api, Some(zome), ribosome).await?;
+
+    Ok(result)
+}
+
+/// Run validation inline and wait for the result.
+pub async fn inline_validation<C, Ribosome>(
+    workspace: HostFnWorkspace,
+    network: HolochainP2pCell,
+    conductor_api: C,
+    zome: Option<Zome>,
+    ribosome: Ribosome,
+) -> WorkflowResult<()>
+where
+    C: CellConductorApiT,
+    Ribosome: RibosomeT + Send + 'static,
+{
     let to_app_validate = {
-        let mut workspace = workspace_lock.write().await;
-        // Get the new head
-        let chain_head_end_len = workspace.source_chain.len();
-        let new_elements_len = chain_head_end_len - chain_head_start_len;
-
         // collect all the elements we need to validate in wasm
-        let mut to_app_validate: Vec<Element> = Vec::with_capacity(new_elements_len);
-
-        // Has there been changes?
-        if new_elements_len > 0 {
-            // Loop forwards through all the new elements
-            let mut i = chain_head_start_len;
-            while let Some(element) = workspace.source_chain.get_at_index(i as u32)? {
-                sys_validate_element(&element, &mut workspace, network.clone(), &conductor_api)
-                    .await
-                    // If the was en error exit
-                    // If the validation failed, exit with an InvalidCommit
-                    // If it was ok continue
-                    .or_else(|outcome_or_err| outcome_or_err.invalid_call_zome_commit())?;
-                to_app_validate.push(element);
-                i += 1;
-            }
+        let mut to_app_validate: Vec<Element> =
+            Vec::with_capacity(workspace.source_chain().len()? as usize);
+        // Loop forwards through all the new elements
+        for element in workspace.source_chain().elements()? {
+            sys_validate_element(&element, &workspace, network.clone(), &conductor_api)
+                .await
+                // If the was en error exit
+                // If the validation failed, exit with an InvalidCommit
+                // If it was ok continue
+                .or_else(|outcome_or_err| outcome_or_err.invalid_call_zome_commit())?;
+            to_app_validate.push(element);
         }
+
         to_app_validate
     };
 
     {
         for chain_element in to_app_validate {
+            let zome = match zome.clone() {
+                Some(zome) => ZomesToInvoke::One(zome),
+                None => {
+                    get_zome(
+                        &chain_element,
+                        &workspace,
+                        network.clone(),
+                        ribosome.dna_def(),
+                    )
+                    .await?
+                }
+            };
             let outcome = match chain_element.header() {
                 Header::Dna(_)
                 | Header::AgentValidationPkg(_)
@@ -170,8 +171,10 @@ async fn call_zome_workflow_inner<
                 }
                 Header::CreateLink(link_add) => {
                     let (base, target) = {
-                        let mut workspace = workspace_lock.write().await;
-                        let mut cascade = workspace.cascade(network.clone());
+                        let mut cascade = holochain_cascade::Cascade::from_workspace_network(
+                            &workspace,
+                            network.clone(),
+                        );
                         let base_address = &link_add.base_address;
                         let base = cascade
                             .retrieve_entry(base_address.clone(), Default::default())
@@ -194,148 +197,99 @@ async fn call_zome_workflow_inner<
                         (base, target)
                     };
                     let link_add = Arc::new(link_add.clone());
+
                     Either::Left(
                         app_validation_workflow::run_create_link_validation_callback(
-                            zome.clone(),
+                            app_validation_workflow::to_single_zome(zome)?,
                             link_add,
                             base,
                             target,
                             &ribosome,
-                            workspace_lock.clone(),
+                            workspace.clone(),
                             network.clone(),
                         )?,
                     )
                 }
                 Header::DeleteLink(delete_link) => Either::Left(
                     app_validation_workflow::run_delete_link_validation_callback(
-                        zome.clone(),
+                        app_validation_workflow::to_single_zome(zome)?,
                         delete_link.clone(),
                         &ribosome,
-                        workspace_lock.clone(),
+                        workspace.clone(),
                         network.clone(),
                     )?,
                 ),
                 Header::Create(_) | Header::Update(_) | Header::Delete(_) => Either::Right(
                     app_validation_workflow::run_validation_callback_direct(
-                        zome.clone(),
+                        zome,
                         chain_element,
                         &ribosome,
-                        workspace_lock.clone(),
+                        workspace.clone(),
                         network.clone(),
                         &conductor_api,
                     )
                     .await?,
                 ),
             };
+            map_outcome(outcome)?;
+        }
+    }
+    Ok(())
+}
+
+fn map_outcome(outcome: Either<app_validation_workflow::Outcome, Outcome>) -> WorkflowResult<()> {
+    match outcome {
+        Either::Left(outcome) => match outcome {
+            app_validation_workflow::Outcome::Accepted => {}
+            app_validation_workflow::Outcome::Rejected(reason) => {
+                return Err(SourceChainError::InvalidLink(reason).into());
+            }
+            app_validation_workflow::Outcome::AwaitingDeps(hashes) => {
+                return Err(SourceChainError::InvalidCommit(format!("{:?}", hashes)).into());
+            }
+        },
+        Either::Right(outcome) => match outcome {
+            app_validation_workflow::Outcome::Accepted => {}
+            app_validation_workflow::Outcome::Rejected(reason) => {
+                return Err(SourceChainError::InvalidCommit(reason).into());
+            }
+            // when the wasm is being called directly in a zome invocation any
+            // state other than valid is not allowed for new entries
+            // e.g. we require that all dependencies are met when committing an
+            // entry to a local source chain
+            // this is different to the case where we are validating data coming in
+            // from the network where unmet dependencies would need to be
+            // rescheduled to attempt later due to partitions etc.
+            app_validation_workflow::Outcome::AwaitingDeps(hashes) => {
+                return Err(SourceChainError::InvalidCommit(format!("{:?}", hashes)).into());
+            }
+        },
+    }
+    Ok(())
+}
+async fn get_zome(
+    element: &Element,
+    workspace: &HostFnWorkspace,
+    network: HolochainP2pCell,
+    dna_def: &DnaDefHashed,
+) -> WorkflowResult<crate::core::ribosome::ZomesToInvoke> {
+    let mut cascade = Cascade::from_workspace_network(workspace, network);
+    let result = app_validation_workflow::get_zomes_to_invoke(element, dna_def, &mut cascade).await;
+    match result {
+        Ok(zomes) => Ok(zomes),
+        Err(outcome_or_err) => {
+            let outcome = outcome_or_err.try_into()?;
             match outcome {
-                Either::Left(outcome) => match outcome {
-                    app_validation_workflow::Outcome::Accepted => {}
-                    app_validation_workflow::Outcome::Rejected(reason) => {
-                        return Err(SourceChainError::InvalidLink(reason).into());
-                    }
-                    app_validation_workflow::Outcome::AwaitingDeps(hashes) => {
-                        return Err(SourceChainError::InvalidCommit(format!("{:?}", hashes)).into());
-                    }
-                },
-                Either::Right(outcome) => match outcome {
-                    app_validation_workflow::Outcome::Accepted => {}
-                    app_validation_workflow::Outcome::Rejected(reason) => {
-                        return Err(SourceChainError::InvalidCommit(reason).into());
-                    }
-                    // when the wasm is being called directly in a zome invocation any
-                    // state other than valid is not allowed for new entries
-                    // e.g. we require that all dependencies are met when committing an
-                    // entry to a local source chain
-                    // this is different to the case where we are validating data coming in
-                    // from the network where unmet dependencies would need to be
-                    // rescheduled to attempt later due to partitions etc.
-                    app_validation_workflow::Outcome::AwaitingDeps(hashes) => {
-                        return Err(SourceChainError::InvalidCommit(format!("{:?}", hashes)).into());
-                    }
-                },
+                app_validation_workflow::Outcome::AwaitingDeps(hashes) => {
+                    return Err(SourceChainError::InvalidCommit(format!("{:?}", hashes)).into());
+                }
+                _ => unreachable!("get_zomes_to_invoke only returns success, error or await"),
             }
         }
     }
-
-    Ok(result)
 }
 
-pub struct CallZomeWorkspace {
-    pub source_chain: SourceChain,
-    pub meta_authored: MetadataBuf<AuthoredPrefix>,
-    pub element_integrated: ElementBuf<IntegratedPrefix>,
-    pub meta_integrated: MetadataBuf<IntegratedPrefix>,
-    pub element_rejected: ElementBuf<RejectedPrefix>,
-    pub meta_rejected: MetadataBuf<RejectedPrefix>,
-    pub element_cache: ElementBuf,
-    pub meta_cache: MetadataBuf,
-}
-
-impl<'a> CallZomeWorkspace {
-    pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
-        let source_chain = SourceChain::new(env.clone())?;
-        let meta_authored = MetadataBuf::authored(env.clone())?;
-        let element_integrated = ElementBuf::vault(env.clone(), true)?;
-        let meta_integrated = MetadataBuf::vault(env.clone())?;
-        let element_rejected = ElementBuf::rejected(env.clone())?;
-        let meta_rejected = MetadataBuf::rejected(env.clone())?;
-        let element_cache = ElementBuf::cache(env.clone())?;
-        let meta_cache = MetadataBuf::cache(env)?;
-
-        Ok(CallZomeWorkspace {
-            source_chain,
-            meta_authored,
-            element_integrated,
-            meta_integrated,
-            element_rejected,
-            meta_rejected,
-            element_cache,
-            meta_cache,
-        })
-    }
-
-    pub fn cascade(&'a mut self, network: HolochainP2pCell) -> Cascade<'a> {
-        Cascade::new(
-            self.source_chain.env().clone(),
-            &self.source_chain.elements(),
-            &self.meta_authored,
-            &self.element_integrated,
-            &self.meta_integrated,
-            &self.element_rejected,
-            &self.meta_rejected,
-            &mut self.element_cache,
-            &mut self.meta_cache,
-            network,
-        )
-    }
-
-    /// Cascade without a network connection
-    pub fn cascade_local(&'a mut self) -> Cascade<'a> {
-        let authored_data = DbPair::new(&self.source_chain.elements(), &self.meta_authored);
-        let cache_data = DbPairMut::new(&mut self.element_cache, &mut self.meta_cache);
-        let integrated_data = DbPair::new(&self.element_integrated, &self.meta_integrated);
-        Cascade::empty()
-            .with_authored(authored_data)
-            .with_cache(cache_data)
-            .with_integrated(integrated_data)
-    }
-
-    pub fn env(&self) -> &EnvironmentRead {
-        self.meta_authored.env()
-    }
-}
-
-impl Workspace for CallZomeWorkspace {
-    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
-        self.source_chain.flush_to_txn_ref(writer)?;
-        self.meta_authored.flush_to_txn_ref(writer)?;
-        self.element_cache.flush_to_txn_ref(writer)?;
-        self.meta_cache.flush_to_txn_ref(writer)?;
-        Ok(())
-    }
-}
-
-#[cfg(test)]
+#[cfg(todo_redo_old_tests)]
 pub mod tests {
     use super::*;
     use crate::conductor::api::CellConductorApi;
@@ -346,9 +300,8 @@ pub mod tests {
     use crate::fixt::*;
     use ::fixt::prelude::*;
 
-    use holochain_lmdb::env::ReadManager;
-    use holochain_lmdb::test_utils::test_cell_env;
     use holochain_p2p::HolochainP2pCellFixturator;
+    use holochain_state::prelude::test_cell_env;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::cell::CellId;
@@ -391,8 +344,6 @@ pub mod tests {
     async fn private_zome_call() {
         let test_env = test_cell_env();
         let env = test_env.env();
-        let env_ref = env.guard();
-        let reader = env_ref.reader().unwrap();
         let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
         let ribosome = MockRibosomeT::new();
         // FIXME: CAP: Set this function to private

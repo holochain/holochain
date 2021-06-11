@@ -1,24 +1,28 @@
 use super::*;
-use crate::event::*;
 use kitsune_p2p_types::dht_arc::*;
 
-pub(crate) async fn step_2_local_sync_inner(
-    space: Arc<KitsuneSpace>,
-    evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
-    local_agents: HashSet<Arc<KitsuneAgent>>,
-) -> KitsuneResult<(DataMap, KeySet, BloomFilter)> {
-    let mut inner = Inner {
-        space,
-        evt_sender,
-        local_agents,
-        data_map: HashMap::new(),
-        has_hash: HashMap::new(),
-    };
+type HasMap = HashMap<Arc<KitsuneAgent>, KeySet>;
 
-    inner.collect_local_ops().await;
-    inner.collect_local_agents().await;
-    inner.local_sync().await?;
-    Ok(inner.finish())
+impl SimpleBloomMod {
+    pub(crate) async fn step_2_local_sync_inner(
+        &self,
+        local_agents: HashSet<Arc<KitsuneAgent>>,
+    ) -> KitsuneResult<(DataMap, KeySet, BloomFilter)> {
+        let space = self.space.clone();
+        let evt_sender = self.evt_sender.clone();
+        let mut inner = Inner {
+            space,
+            evt_sender,
+            local_agents,
+            data_map: HashMap::new(),
+            has_map: HashMap::new(),
+        };
+
+        inner.collect_local_ops().await;
+        inner.collect_local_agents().await;
+        inner.local_sync().await?;
+        Ok(inner.finish())
+    }
 }
 
 struct Inner {
@@ -26,7 +30,7 @@ struct Inner {
     evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
     local_agents: HashSet<Arc<KitsuneAgent>>,
     data_map: DataMap,
-    has_hash: HasMap,
+    has_map: HasMap,
 }
 
 impl Inner {
@@ -35,7 +39,7 @@ impl Inner {
             space,
             evt_sender,
             local_agents,
-            has_hash,
+            has_map,
             ..
         } = self;
 
@@ -53,7 +57,7 @@ impl Inner {
             {
                 for op in ops {
                     let key = Arc::new(MetaOpKey::Op(op));
-                    has_hash
+                    has_map
                         .entry(agent.clone())
                         .or_insert_with(HashSet::new)
                         .insert(key);
@@ -68,7 +72,7 @@ impl Inner {
             evt_sender,
             local_agents,
             data_map,
-            has_hash,
+            has_map,
             ..
         } = self;
 
@@ -86,7 +90,7 @@ impl Inner {
                     let data = Arc::new(MetaOpData::Agent(agent_info));
                     let key = data.key();
                     data_map.insert(key.clone(), data);
-                    for (_agent, has) in has_hash.iter_mut() {
+                    for (_agent, has) in has_map.iter_mut() {
                         has.insert(key.clone());
                     }
                 }
@@ -95,18 +99,18 @@ impl Inner {
     }
 
     pub async fn local_sync(&mut self) -> KitsuneResult<()> {
-        let mut new_has_map = self.has_hash.clone();
+        let mut new_has_map = self.has_map.clone();
 
         let Self {
             space,
             evt_sender,
             data_map,
-            has_hash,
+            has_map,
             ..
         } = self;
 
         let mut local_synced_ops = 0;
-        for (old_agent, old_set) in has_hash.iter() {
+        for (old_agent, old_set) in has_map.iter() {
             for (new_agent, new_set) in new_has_map.iter_mut() {
                 if old_agent == new_agent {
                     continue;
@@ -148,14 +152,14 @@ impl Inner {
             );
         }
 
-        *has_hash = new_has_map;
+        *has_map = new_has_map;
 
         Ok(())
     }
 
     pub fn finish(self) -> (DataMap, KeySet, BloomFilter) {
         let Self {
-            data_map, has_hash, ..
+            data_map, has_map, ..
         } = self;
 
         // 1 in 100 false positives...
@@ -163,9 +167,9 @@ impl Inner {
         // 1 in 100 pretty much guarantees full sync after two communications.
         const TGT_FP: f64 = 0.01;
 
-        // at this point, all the local has_hash maps should be identical,
+        // at this point, all the local has_map maps should be identical,
         // so we can just take the first one
-        let (key_set, bloom) = if let Some((_, map)) = has_hash.into_iter().next() {
+        let (key_set, bloom) = if let Some((_, map)) = has_map.into_iter().next() {
             let len = map.len();
             tracing::trace!(
                 local_op_count=%len,
