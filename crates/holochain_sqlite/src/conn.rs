@@ -41,7 +41,11 @@ pub type PConnInner = r2d2::PooledConnection<r2d2_sqlite::SqliteConnectionManage
 
 pub(crate) fn new_connection_pool(path: &Path, kind: DbKind) -> ConnectionPool {
     use r2d2_sqlite::SqliteConnectionManager;
-    let manager = SqliteConnectionManager::file(path);
+    let manager = SqliteConnectionManager::file(path).with_flags(
+        OpenFlags::SQLITE_OPEN_READ_WRITE
+            | OpenFlags::SQLITE_OPEN_CREATE
+            | OpenFlags::SQLITE_OPEN_SHARED_CACHE,
+    );
     let customizer = Box::new(ConnCustomizer { kind });
     r2d2::Pool::builder()
         .max_size(20)
