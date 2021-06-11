@@ -23,8 +23,9 @@ pub fn must_get_header<'a>(
         let workspace = call_context.host_context.workspace();
         let mut cascade = Cascade::from_workspace_network(workspace, network);
         match cascade
-            .retrieve_header(header_hash.clone(), // Set every GetOptions manually here.
-            // Using defaults is dangerous as it can undermine determinism.
+            .retrieve_header(header_hash.clone(),
+            // Set every GetOptions manually here.
+            // Using defaults is dangerous in a must_get as it can undermine determinism.
             // We want refactors to explicitly consider this.
             NetworkGetOptions {
                 remote_agent_count: None,

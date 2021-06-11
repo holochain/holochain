@@ -25,7 +25,7 @@ pub fn must_get_entry<'a>(
         match cascade
             .retrieve_entry(entry_hash.clone(),
             // Set every GetOptions manually here.
-            // Using defaults is dangerous as it can undermine determinism.
+            // Using defaults is dangerous in a must_get as it can undermine determinism.
             // We want refactors to explicitly consider this.
             NetworkGetOptions {
                 remote_agent_count: None,
