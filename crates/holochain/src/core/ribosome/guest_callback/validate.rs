@@ -225,39 +225,39 @@ mod test {
             assert_eq!(fn_component, expected.pop().unwrap(),);
         }
 
-        let agent_entry = Entry::App(
+        let app_entry = Entry::App(
             AppEntryBytesFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap()
                 .into(),
         );
-        let el = fixt!(Element, (agent_entry, HeaderType::Create));
+        let el = fixt!(Element, (app_entry, HeaderType::Create));
         validate_invocation.element = Arc::new(el);
         let mut expected = vec!["validate", "validate_create", "validate_create_entry"];
         for fn_component in validate_invocation.fn_components() {
             assert_eq!(fn_component, expected.pop().unwrap(),);
         }
 
-        let agent_entry = Entry::CapClaim(
+        let capclaim_entry = Entry::CapClaim(
             CapClaimFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap()
                 .into(),
         );
-        let el = fixt!(Element, (agent_entry, HeaderType::Update));
+        let el = fixt!(Element, (capclaim_entry, HeaderType::Update));
         validate_invocation.element = Arc::new(el);
         let mut expected = vec!["validate", "validate_update"];
         for fn_component in validate_invocation.fn_components() {
             assert_eq!(fn_component, expected.pop().unwrap(),);
         }
 
-        let agent_entry = Entry::CapGrant(
+        let capgrant_entry = Entry::CapGrant(
             ZomeCallCapGrantFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap()
                 .into(),
         );
-        let el = fixt!(Element, (agent_entry, HeaderType::Create));
+        let el = fixt!(Element, (capgrant_entry, HeaderType::Create));
         validate_invocation.element = Arc::new(el);
         let mut expected = vec!["validate", "validate_create"];
         for fn_component in validate_invocation.fn_components() {
