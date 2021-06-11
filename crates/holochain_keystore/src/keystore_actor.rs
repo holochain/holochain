@@ -74,8 +74,6 @@ impl KeystoreSenderExt for KeystoreSender {
     }
 
     fn sign(&self, input: Sign) -> KeystoreApiFuture<Signature> {
-        let span = tracing::debug_span!("signing request", input);
-        let span_enter = span.enter();
         let fut = self.sign_ed25519_sign_by_pub_key(
             input.key.as_ref()[HOLO_HASH_PREFIX_LEN..HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN]
                 .to_vec()
@@ -83,8 +81,9 @@ impl KeystoreSenderExt for KeystoreSender {
             <Vec<u8>>::from(UnsafeBytes::from(input.data.to_vec())).into(),
         );
         async move {
+            let span = tracing::debug_span!("signing request");
+            let _enter = span.enter();
             let res = fut.await?;
-            drop(span_enter);
             Ok(Signature::try_from(res.to_vec().as_ref())?)
         }
         .boxed()

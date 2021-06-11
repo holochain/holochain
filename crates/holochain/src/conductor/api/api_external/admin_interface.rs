@@ -40,7 +40,7 @@ pub trait AdminInterfaceApi: 'static + Send + Sync + Clone {
             Ok(response) => response,
             Err(e) => AdminResponse::Error(e.into()),
         };
-        debug!("admin response: {:?}", response);
+        debug!("admin response: {:?}", res);
         res
     }
 }
