@@ -985,7 +985,7 @@ where
                 let root_env_dir = self.root_env_dir.as_ref();
                 let keystore = self.keystore.clone();
                 EnvWrite::open(root_env_dir, DbKind::P2pMetrics(space), keystore)
-                    .expect("failed to open p2p_store database")
+                    .expect("failed to open p2p_metrics database")
             })
             .clone()
     }
