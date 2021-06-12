@@ -156,19 +156,19 @@ pub(crate) struct SimpleBloomModInner {
     /// Metrics to be recorded at the end of this round of gossip
     pending_metrics: Vec<(Vec<Arc<KitsuneAgent>>, NodeInfo)>,
 
-    last_initiate_check: std::time::Instant,
+    last_initiate_check: std::time::SystemTime,
     initiate_tgt: Option<GossipTgt>,
 
     incoming: Vec<(Tx2ConHnd<wire::Wire>, GossipWire)>,
 
-    last_outgoing: std::time::Instant,
+    last_outgoing: std::time::SystemTime,
     outgoing: Vec<(GossipTgt, HowToConnect, GossipWire)>,
 }
 
 impl SimpleBloomModInner {
     pub fn new() -> Self {
-        // pick an old instant for initialization
-        let old = std::time::Instant::now()
+        // pick an old time (one day ago) for initialization
+        let old = std::time::SystemTime::now()
             .checked_sub(std::time::Duration::from_secs(60 * 60 * 24))
             .unwrap();
 
