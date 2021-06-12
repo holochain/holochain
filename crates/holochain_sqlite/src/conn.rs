@@ -44,7 +44,12 @@ pub(crate) fn new_connection_pool(path: &Path, kind: DbKind) -> ConnectionPool {
     let manager = SqliteConnectionManager::file(path);
     let customizer = Box::new(ConnCustomizer { kind });
     r2d2::Pool::builder()
+        // Only up to 20 connections at a time
         .max_size(20)
+        // Never maintain idle connections
+        .min_idle(Some(0))
+        // Close connections after 30-60 seconds of idle time
+        .idle_timeout(Some(Duration::from_secs(30)))
         .connection_customizer(customizer)
         .build(manager)
         .unwrap()
