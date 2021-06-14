@@ -20,8 +20,8 @@ use tokio::{
     task,
 };
 
-mod p2p_state;
-pub use p2p_state::*;
+mod p2p_agent_store;
+pub use p2p_agent_store::*;
 
 mod p2p_metrics;
 pub use p2p_metrics::*;
@@ -172,7 +172,7 @@ pub enum DbKind {
     /// Specifies the environment used to save wasm
     Wasm,
     /// State of the p2p network (one per space).
-    P2pState(Arc<KitsuneSpace>),
+    P2pAgentStore(Arc<KitsuneSpace>),
     /// Metrics for peers on p2p network (one per space).
     P2pMetrics(Arc<KitsuneSpace>),
 }
@@ -185,7 +185,9 @@ impl DbKind {
             DbKind::Cache(dna) => ["cache", &format!("cache-{}", dna)].iter().collect(),
             DbKind::Conductor => ["conductor", "conductor"].iter().collect(),
             DbKind::Wasm => ["wasm", "wasm"].iter().collect(),
-            DbKind::P2pState(space) => ["p2p", &format!("p2p_state-{}", space)].iter().collect(),
+            DbKind::P2pAgentStore(space) => ["p2p", &format!("p2p_agent_store-{}", space)]
+                .iter()
+                .collect(),
             DbKind::P2pMetrics(space) => {
                 ["p2p", &format!("p2p_metrics-{}", space)].iter().collect()
             }
