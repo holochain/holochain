@@ -26,9 +26,9 @@ use super::manager::spawn_task_manager;
 use super::manager::ManagedTaskAdd;
 use super::manager::ManagedTaskHandle;
 use super::manager::TaskManagerRunHandle;
-use super::p2p_store::all_agent_infos;
-use super::p2p_store::get_single_agent_info;
-use super::p2p_store::inject_agent_infos;
+use super::p2p_agent_store::all_agent_infos;
+use super::p2p_agent_store::get_single_agent_info;
+use super::p2p_agent_store::inject_agent_infos;
 use super::paths::EnvironmentRootPath;
 use super::state::AppInterfaceId;
 use super::state::ConductorState;
@@ -36,7 +36,7 @@ use super::CellError;
 use super::{api::CellConductorApi, state::AppInterfaceConfig};
 use super::{api::CellConductorApiT, interface::AppInterfaceRuntime};
 use super::{api::RealAdminInterfaceApi, manager::TaskManagerClient};
-use super::{api::RealAppInterfaceApi, p2p_store};
+use super::{api::RealAppInterfaceApi, p2p_agent_store};
 use crate::conductor::cell::Cell;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::error::ConductorResult;
@@ -118,6 +118,8 @@ where
 
     /// The database for storing AgentInfoSigned
     p2p_env: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
+
+    p2p_metrics_env: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
 
     /// The database for persisting [ConductorState]
     // state_db: ConductorStateDb,
@@ -947,7 +949,7 @@ where
             .cloned()
             .expect("invalid cell space");
 
-        let peer_dump = p2p_store::dump_state(p2p_env.into(), Some(cell_id.clone()))?;
+        let peer_dump = p2p_agent_store::dump_state(p2p_env.into(), Some(cell_id.clone()))?;
         let source_chain_dump =
             source_chain::dump_state(arc.clone().into(), cell_id.agent_pubkey().clone()).await?;
 
@@ -969,8 +971,21 @@ where
             .or_insert_with(move || {
                 let root_env_dir = self.root_env_dir.as_ref();
                 let keystore = self.keystore.clone();
-                EnvWrite::open(root_env_dir, DbKind::P2pState(space), keystore)
-                    .expect("failed to open p2p_store database")
+                EnvWrite::open(root_env_dir, DbKind::P2pAgentStore(space), keystore)
+                    .expect("failed to open p2p_agent_store database")
+            })
+            .clone()
+    }
+
+    pub(super) fn p2p_metrics_env(&self, space: Arc<KitsuneSpace>) -> EnvWrite {
+        let mut p2p_metrics_env = self.p2p_metrics_env.lock();
+        p2p_metrics_env
+            .entry(space.clone())
+            .or_insert_with(move || {
+                let root_env_dir = self.root_env_dir.as_ref();
+                let keystore = self.keystore.clone();
+                EnvWrite::open(root_env_dir, DbKind::P2pMetrics(space), keystore)
+                    .expect("failed to open p2p_metrics database")
             })
             .clone()
     }
@@ -1050,10 +1065,12 @@ impl<DS> Conductor<DS>
 where
     DS: DnaStore + 'static,
 {
+    #[allow(clippy::too_many_arguments)]
     async fn new(
         env: EnvWrite,
         wasm_env: EnvWrite,
         p2p_env: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
+        p2p_metrics_env: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
         dna_store: DS,
         keystore: KeystoreSender,
         root_env_dir: EnvironmentRootPath,
@@ -1063,6 +1080,7 @@ where
             env,
             wasm_env,
             p2p_env,
+            p2p_metrics_env,
             caches: parking_lot::Mutex::new(HashMap::new()),
             cells: HashMap::new(),
             shutting_down: false,
@@ -1254,6 +1272,7 @@ mod builder {
                 EnvWrite::open(env_path.as_ref(), DbKind::Wasm, keystore.clone())?;
 
             let p2p_env = Arc::new(parking_lot::Mutex::new(HashMap::new()));
+            let p2p_metrics_env = Arc::new(parking_lot::Mutex::new(HashMap::new()));
 
             #[cfg(any(test, feature = "test_utils"))]
             let state = self.state;
@@ -1281,6 +1300,7 @@ mod builder {
                 environment,
                 wasm_environment,
                 p2p_env,
+                p2p_metrics_env,
                 dna_store,
                 keystore,
                 env_path,
@@ -1378,6 +1398,7 @@ mod builder {
                 envs.conductor(),
                 envs.wasm(),
                 envs.p2p(),
+                envs.p2p_metrics(),
                 self.dna_store,
                 keystore,
                 envs.tempdir().path().to_path_buf().into(),

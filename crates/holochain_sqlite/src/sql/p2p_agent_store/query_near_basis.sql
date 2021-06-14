@@ -33,7 +33,7 @@ SELECT encoded FROM (
     -- if we have no spans, set the distance to u32::MAX
     ELSE 4294967295
     END AS distance
-    FROM p2p_store
+    FROM p2p_agent_store
     ORDER BY distance
     LIMIT :limit
 )
