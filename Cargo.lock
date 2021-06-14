@@ -2597,6 +2597,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_json",
+ "shrinkwraprs",
  "sysinfo",
  "thiserror",
  "tokio",

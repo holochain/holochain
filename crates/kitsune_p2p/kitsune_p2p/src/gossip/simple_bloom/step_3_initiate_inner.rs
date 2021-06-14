@@ -16,29 +16,19 @@ impl SimpleBloomMod {
                 .filter_map(|v| {
                     if let MetaOpData::Agent(agent_info_signed) = &**v {
                         // this is for remote gossip, we've already sync local agents
-                        if inner
-                            .local_agents
-                            .contains(agent_info_signed.as_agent_ref())
-                        {
+                        if inner.local_agents.contains(&agent_info_signed.agent) {
                             return None;
                         }
 
-                        use std::convert::TryFrom;
-                        if let Ok(agent_info) =
-                            crate::agent_store::AgentInfo::try_from(agent_info_signed)
-                        {
-                            if let Some(url) = agent_info.as_urls_ref().get(0) {
-                                if let Ok(purl) =
-                                    kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str())
-                                {
-                                    return Some((
-                                        GossipTgt::new(
-                                            vec![Arc::new(agent_info.as_agent_ref().clone())],
-                                            Tx2Cert::from(purl.digest()),
-                                        ),
-                                        TxUrl::from(url.as_str()),
-                                    ));
-                                }
+                        if let Some(url) = agent_info_signed.url_list.get(0) {
+                            if let Ok(purl) = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()) {
+                                return Some((
+                                    GossipTgt::new(
+                                        vec![agent_info_signed.agent.clone()],
+                                        Tx2Cert::from(purl.digest()),
+                                    ),
+                                    TxUrl::from(url.as_str()),
+                                ));
                             }
                         }
                     }

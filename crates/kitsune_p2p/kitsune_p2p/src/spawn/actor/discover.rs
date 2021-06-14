@@ -1,9 +1,8 @@
 #![allow(dead_code)]
 use super::*;
-use crate::agent_store::{AgentInfo, AgentInfoSigned};
 use ghost_actor::dependencies::must_future::MustBoxFuture;
+use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use std::collections::HashSet;
-use std::convert::TryFrom;
 use std::future::Future;
 
 /// This enum represents the outcomes from peer discovery
@@ -69,7 +68,7 @@ pub(crate) fn search_and_discover_peer_connect(
                             Ok(wire::Wire::PeerGetResp(wire::PeerGetResp {
                                 agent_info_signed,
                             })) => {
-                                let agent = Arc::new(agent_info_signed.as_agent_ref().clone());
+                                let agent = agent_info_signed.agent.clone();
                                 let _ = inner
                                     .evt_sender
                                     .put_agent_info_signed(PutAgentInfoSignedEvt {
@@ -102,28 +101,26 @@ pub(crate) fn peer_connect(
     agent_info_signed: &AgentInfoSigned,
     timeout: KitsuneTimeout,
 ) -> impl Future<Output = PeerDiscoverResult> + 'static + Send {
-    let agent = Arc::new(agent_info_signed.as_agent_ref().clone());
-    let info = AgentInfo::try_from(agent_info_signed);
+    let agent = agent_info_signed.agent.clone();
+    let url = agent_info_signed
+        .url_list
+        .get(0)
+        .map(|u| u.clone())
+        .ok_or_else(|| KitsuneP2pError::from("no url"));
 
     async move {
-        let info = info?;
+        let url = url?;
 
         // if they are local, return the shortcut result
         if inner.i_s.is_agent_local(agent).await? {
             return Ok(PeerDiscoverResult::OkShortcut);
         }
 
-        let url = info
-            .as_urls_ref()
-            .get(0)
-            .ok_or_else(|| KitsuneP2pError::from("no url"))?
-            .clone();
-
         // attempt an outgoing connection
         let con_hnd = inner.ep_hnd.get_connection(url.clone(), timeout).await?;
 
         // return the result
-        Ok(PeerDiscoverResult::OkRemote { url, con_hnd })
+        Ok(PeerDiscoverResult::OkRemote { url: url.into(), con_hnd })
     }
     .map(|r| match r {
         Ok(r) => r,
@@ -154,13 +151,9 @@ pub(crate) fn search_remotes_covering_basis(
                 .await
                 .unwrap_or_else(|_| Vec::new())
             {
-                if let Ok(info) = AgentInfo::try_from(&node) {
-                    if let Ok(arc) = info.dht_arc() {
-                        if arc.contains(basis_loc) {
-                            cover_nodes.push(node);
-                            continue;
-                        }
-                    }
+                if node.storage_arc.contains(basis_loc) {
+                    cover_nodes.push(node);
+                    continue;
                 }
                 near_nodes.push(node);
                 if cover_nodes.len() + near_nodes.len() >= CHECK_NODE_COUNT {
@@ -203,7 +196,7 @@ pub(crate) fn search_remotes_covering_basis(
                             }
                             // if we got results, add them to our peer store
                             for agent_info_signed in peer_list {
-                                let agent = Arc::new(agent_info_signed.as_agent_ref().clone());
+                                let agent = agent_info_signed.agent.clone();
                                 let _ = inner
                                     .evt_sender
                                     .put_agent_info_signed(PutAgentInfoSignedEvt {
@@ -252,7 +245,7 @@ pub(crate) fn get_cached_remotes_near_basis(
         {
             if !inner
                 .i_s
-                .is_agent_local(Arc::new(node.as_agent_ref().clone()))
+                .is_agent_local(node.agent.clone())
                 .await
                 .unwrap_or(true)
             {
@@ -335,10 +328,10 @@ where
             .await
             {
                 for node in nodes {
-                    let to_agent = Arc::new(node.as_agent_ref().clone());
+                    let to_agent = node.agent.clone();
                     if !sent_to.contains(&to_agent) {
                         sent_to.insert(to_agent.clone());
-                        let url = match node.as_urls_ref().get(0) {
+                        let url = match node.url_list.get(0) {
                             None => continue,
                             Some(url) => url.clone(),
                         };
@@ -397,7 +390,7 @@ pub(crate) fn get_5_or_less_non_local_agents_near_basis(
     _basis: Arc<KitsuneBasis>,
     i_s: ghost_actor::GhostSender<SpaceInternal>,
     evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
-) -> MustBoxFuture<'static, KitsuneP2pResult<HashSet<AgentInfo>>> {
+) -> MustBoxFuture<'static, KitsuneP2pResult<HashSet<AgentInfoSigned>>> {
     async move {
         let mut out = HashSet::new();
 
@@ -411,14 +404,9 @@ pub(crate) fn get_5_or_less_non_local_agents_near_basis(
             // randomize the results
             rand::seq::SliceRandom::shuffle(&mut list[..], &mut rand::thread_rng());
             for item in list {
-                if let Ok(info) = AgentInfo::try_from(&item) {
-                    if let Ok(is_local) = i_s
-                        .is_agent_local(Arc::new(info.as_agent_ref().clone()))
-                        .await
-                    {
-                        if !is_local {
-                            out.insert(info);
-                        }
+                if let Ok(is_local) = i_s.is_agent_local(item.agent.clone()).await {
+                    if !is_local {
+                        out.insert(item);
                     }
                 }
                 if out.len() >= 5 {

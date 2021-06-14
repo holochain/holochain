@@ -346,29 +346,26 @@ fn pick_url_for_cert(inner: &Share<SimpleBloomModInner>, cert: &Tx2Cert) -> Kits
         let mut out_url = None;
         for data in i.local_data_map.values() {
             if let MetaOpData::Agent(agent_info_signed) = &**data {
-                use std::convert::TryFrom;
-                if let Ok(agent_info) = crate::agent_store::AgentInfo::try_from(agent_info_signed) {
-                    if let Some(url) = agent_info.as_urls_ref().get(0) {
-                        if let Ok(purl) = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()) {
-                            if &Tx2Cert::from(purl.digest()) != cert {
-                                continue;
-                            }
-
-                            if agent_info.signed_at_ms() < most_recent {
-                                continue;
-                            }
-                            most_recent = agent_info.signed_at_ms();
-
-                            let url = TxUrl::from(url.as_str());
-
-                            if let Some(out_url) = out_url {
-                                if out_url != url {
-                                    tracing::warn!(?cert, %out_url, %url, "url mismatch for tgt cert");
-                                }
-                            }
-
-                            out_url = Some(url);
+                if let Some(url) = agent_info_signed.url_list.get(0) {
+                    if let Ok(purl) = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()) {
+                        if &Tx2Cert::from(purl.digest()) != cert {
+                            continue;
                         }
+
+                        if agent_info_signed.signed_at_ms < most_recent {
+                            continue;
+                        }
+                        most_recent = agent_info_signed.signed_at_ms;
+
+                        let url = TxUrl::from(url.as_str());
+
+                        if let Some(out_url) = out_url {
+                            if out_url != url {
+                                tracing::warn!(?cert, %out_url, %url, "url mismatch for tgt cert");
+                            }
+                        }
+
+                        out_url = Some(url);
                     }
                 }
             }
