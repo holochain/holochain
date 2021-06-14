@@ -105,7 +105,7 @@ pub(crate) fn peer_connect(
     let url = agent_info_signed
         .url_list
         .get(0)
-        .map(|u| u.clone())
+        .cloned()
         .ok_or_else(|| KitsuneP2pError::from("no url"));
 
     async move {
@@ -120,7 +120,10 @@ pub(crate) fn peer_connect(
         let con_hnd = inner.ep_hnd.get_connection(url.clone(), timeout).await?;
 
         // return the result
-        Ok(PeerDiscoverResult::OkRemote { url: url.into(), con_hnd })
+        Ok(PeerDiscoverResult::OkRemote {
+            url: url.into(),
+            con_hnd,
+        })
     }
     .map(|r| match r {
         Ok(r) => r,

@@ -210,8 +210,6 @@ impl AsP2pStateTxExt for Transaction<'_> {
     }
 
     fn p2p_query_near_basis(&self, basis: u32, limit: u32) -> DatabaseResult<Vec<AgentInfoSigned>> {
-        use std::convert::TryFrom;
-
         let mut stmt = self
             .prepare(sql_p2p_agent_store::QUERY_NEAR_BASIS)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
@@ -220,7 +218,7 @@ impl AsP2pStateTxExt for Transaction<'_> {
         for r in stmt.query_map(named_params! { ":basis": basis, ":limit": limit }, |r| {
             let r = r.get_ref(0)?;
             let r = r.as_blob()?;
-            let signed = AgentInfoSigned::try_from(r)
+            let signed = AgentInfoSigned::decode(r)
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
 
             Ok(signed)

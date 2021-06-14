@@ -223,7 +223,6 @@ impl KitsuneP2pHandler for Space {
         self.local_joined_agents.insert(agent.clone());
         self.gossip_mod.local_agent_join(agent);
         let fut = self.i_s.update_agent_info();
-        //let i_s = self.i_s.clone();
         let evt_sender = self.evt_sender.clone();
         match self.config.network_type {
             NetworkType::QuicMdns => {
@@ -517,8 +516,7 @@ impl Space {
                             for item in list {
                                 // TODO - someday some validation here
                                 let agent = item.agent.clone();
-                                if let Ok(is_local) = i_s_c.is_agent_local(agent.clone()).await
-                                {
+                                if let Ok(is_local) = i_s_c.is_agent_local(agent.clone()).await {
                                     if !is_local {
                                         // we got a result - let's add it to our store for the future
                                         let _ = evt_s_c

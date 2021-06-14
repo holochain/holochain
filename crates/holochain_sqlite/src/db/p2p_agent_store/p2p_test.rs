@@ -118,7 +118,7 @@ async fn test_p2p_agent_store_sanity() {
     let mut prev = 0;
     for agent_info_signed in near {
         use kitsune_p2p::KitsuneBinType;
-        let loc = agent_info_signed.as_agent_ref().get_loc();
+        let loc = agent_info_signed.agent.get_loc();
         let record = super::P2pRecord::from_signed(&agent_info_signed).unwrap();
         let mut dist = u32::MAX;
         let mut deb = "not reset";
