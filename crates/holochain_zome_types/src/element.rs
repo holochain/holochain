@@ -16,7 +16,7 @@ use holo_hash::HeaderHash;
 use holo_hash::HoloHashed;
 use holochain_serialized_bytes::prelude::*;
 
-/// a chain element which is a triple containing the signature of the header along with the
+/// a chain element which is a tuple containing the signature of the header along with the
 /// entry if the header type has one.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub struct Element {
@@ -77,7 +77,7 @@ impl Element {
         &self.signed_header
     }
 
-    /// Access the signature portion of this triple.
+    /// Access the signature portion of this tuple.
     pub fn signature(&self) -> &Signature {
         self.signed_header.signature()
     }
@@ -87,7 +87,7 @@ impl Element {
         self.signed_header.header_address()
     }
 
-    /// Access the Header portion of this triple.
+    /// Access the Header portion of this tuple.
     pub fn header(&self) -> &Header {
         self.signed_header.header()
     }
@@ -97,7 +97,7 @@ impl Element {
         self.signed_header.header_hashed()
     }
 
-    /// Access the Entry portion of this triple as a ElementEntry,
+    /// Access the Entry portion of this tuple as a ElementEntry,
     /// which includes the context around the presence or absence of the entry.
     pub fn entry(&self) -> &ElementEntry {
         &self.entry
