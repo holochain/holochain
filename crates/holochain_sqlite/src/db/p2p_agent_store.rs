@@ -1,4 +1,4 @@
-//! p2p_store sql logic
+//! p2p_agent_store sql logic
 
 use crate::prelude::*;
 use crate::sql::*;
@@ -14,7 +14,7 @@ pub trait AsP2pStateConExt {
     /// Get an AgentInfoSigned record from the p2p_store
     fn p2p_get(&mut self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>>;
 
-    /// List all AgentInfoSigned records within a space in the p2p_store
+    /// List all AgentInfoSigned records within a space in the p2p_agent_store
     fn p2p_list(&mut self) -> DatabaseResult<Vec<AgentInfoSigned>>;
 
     /// Query agent list for gossip
@@ -32,7 +32,7 @@ pub trait AsP2pStateTxExt {
     /// Get an AgentInfoSigned record from the p2p_store
     fn p2p_get(&self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>>;
 
-    /// List all AgentInfoSigned records within a space in the p2p_store
+    /// List all AgentInfoSigned records within a space in the p2p_agent_store
     fn p2p_list(&self) -> DatabaseResult<Vec<AgentInfoSigned>>;
 
     /// Query agent list for gossip
@@ -89,7 +89,7 @@ pub async fn p2p_put_all(
 
 fn tx_p2p_put(txn: &mut Transaction, record: P2pRecord) -> DatabaseResult<()> {
     txn.execute(
-        sql_p2p_state::INSERT,
+        sql_p2p_agent_store::INSERT,
         named_params! {
             ":agent": &record.agent.0,
 
@@ -116,7 +116,7 @@ pub async fn p2p_prune(db: &DbWrite) -> DatabaseResult<()> {
             .unwrap()
             .as_millis() as u64;
 
-        txn.execute(sql_p2p_state::PRUNE, named_params! { ":now": now })?;
+        txn.execute(sql_p2p_agent_store::PRUNE, named_params! { ":now": now })?;
         DatabaseResult::Ok(())
     })
     .await?;
@@ -126,7 +126,7 @@ pub async fn p2p_prune(db: &DbWrite) -> DatabaseResult<()> {
 impl AsP2pStateTxExt for Transaction<'_> {
     fn p2p_get(&self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>> {
         let mut stmt = self
-            .prepare(sql_p2p_state::SELECT)
+            .prepare(sql_p2p_agent_store::SELECT)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
 
         Ok(stmt
@@ -142,7 +142,7 @@ impl AsP2pStateTxExt for Transaction<'_> {
 
     fn p2p_list(&self) -> DatabaseResult<Vec<AgentInfoSigned>> {
         let mut stmt = self
-            .prepare(sql_p2p_state::SELECT_ALL)
+            .prepare(sql_p2p_agent_store::SELECT_ALL)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
         let mut out = Vec::new();
         for r in stmt.query_map([], |r| {
@@ -165,7 +165,7 @@ impl AsP2pStateTxExt for Transaction<'_> {
         within_arc: DhtArc,
     ) -> DatabaseResult<Vec<KitsuneAgent>> {
         let mut stmt = self
-            .prepare(sql_p2p_state::GOSSIP_QUERY)
+            .prepare(sql_p2p_agent_store::GOSSIP_QUERY)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
 
         let (storage_1, storage_2) = split_arc(&within_arc);
@@ -191,7 +191,7 @@ impl AsP2pStateTxExt for Transaction<'_> {
     }
 }
 
-/// Owned data dealing with a full p2p_store record.
+/// Owned data dealing with a full p2p_agent_store record.
 #[derive(Debug)]
 struct P2pRecord {
     agent: Arc<KitsuneAgent>,

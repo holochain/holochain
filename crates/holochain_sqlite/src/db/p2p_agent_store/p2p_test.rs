@@ -60,12 +60,12 @@ async fn rand_insert(db: &DbWrite, space: &Arc<KitsuneSpace>, agent: &Arc<Kitsun
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_p2p_store_sanity() {
-    let tmp_dir = tempdir::TempDir::new("p2p_store_sanity").unwrap();
+async fn test_p2p_agent_store_sanity() {
+    let tmp_dir = tempdir::TempDir::new("p2p_agent_store_sanity").unwrap();
 
     let space = rand_space();
 
-    let db = DbWrite::test(&tmp_dir, DbKind::P2pState(space.clone())).unwrap();
+    let db = DbWrite::test(&tmp_dir, DbKind::P2pAgentStore(space.clone())).unwrap();
 
     let mut example_agent = rand_agent();
 

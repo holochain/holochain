@@ -63,6 +63,7 @@
 //!
 //! HDK implements several key features:
 //!
+//! - Base HDKT trait for standardisation, mocking, unit testing support: hdk module
 //! - Capabilities and function level access control: capability module
 //! - Application data and entry definitions for the source chain and DHT: entry module and `entry_defs` callback
 //! - Referencing/linking entries on the DHT together into a graph structure: link module
@@ -479,4 +480,10 @@ pub mod time;
 /// The host provides the random bytes because any/all wasm implementations of randomness is flawed and insecure.
 pub mod random;
 
+/// The interface between the host and guest is implemented as an `HdkT` trait.
+///
+/// The `set_hdk` function globally sets a `RefCell` to track the current HDK implementation.
+/// When the `mock` feature is set then this will default to an HDK that always errors, else a wasm host is assumed to exist.
+/// The `mockall` crate (in prelude with `mock` feature) can be used to generate compatible mocks for unit testing.
+/// See mocking examples in the test wasms crate, such as `agent_info`.
 pub mod hdk;
