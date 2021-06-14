@@ -4,6 +4,9 @@ use hdk::prelude::*;
 pub struct AnchorInput(pub String, pub String);
 
 #[derive(Clone, serde::Serialize, serde::Deserialize, SerializedBytes, Debug)]
+pub struct ManyAnchorInput(pub Vec<AnchorInput>);
+
+#[derive(Clone, serde::Serialize, serde::Deserialize, SerializedBytes, Debug)]
 pub struct AgentActivitySearch {
     pub agent: AgentPubKey,
     pub query: QueryFilter,

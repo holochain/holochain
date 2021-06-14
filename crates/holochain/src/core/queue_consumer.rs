@@ -26,13 +26,9 @@
 //! Implicitly, every workflow also writes to its own source queue, i.e. to
 //! remove the item it has just processed.
 
-use derive_more::Constructor;
 use derive_more::Display;
-use derive_more::From;
 use futures::future::Either;
-use holochain_lmdb::env::EnvironmentWrite;
-use holochain_lmdb::env::WriteManager;
-use holochain_lmdb::prelude::Writer;
+use holochain_types::prelude::*;
 use holochain_zome_types::CellId;
 use tokio::sync;
 use tokio::sync::mpsc;
@@ -44,15 +40,13 @@ mod sys_validation_consumer;
 use sys_validation_consumer::*;
 mod app_validation_consumer;
 use app_validation_consumer::*;
-mod produce_dht_ops_consumer;
-use produce_dht_ops_consumer::*;
 mod publish_dht_ops_consumer;
 use validation_receipt_consumer::*;
 mod validation_receipt_consumer;
 use crate::conductor::{api::CellConductorApiT, error::ConductorError, manager::ManagedTaskResult};
 use crate::conductor::{manager::ManagedTaskAdd, ConductorHandle};
+use holochain_p2p::HolochainP2pCell;
 use holochain_p2p::*;
-use holochain_state::workspace::WorkspaceError;
 use publish_dht_ops_consumer::*;
 
 use super::workflow::error::WorkflowError;
@@ -63,7 +57,8 @@ use super::workflow::error::WorkflowError;
 /// Waits for the initial loop to complete before returning, to prevent causing
 /// a race condition by trying to run a workflow too soon after cell creation.
 pub async fn spawn_queue_consumer_tasks(
-    env: &EnvironmentWrite,
+    env: EnvWrite,
+    cache: EnvWrite,
     cell_network: HolochainP2pCell,
     conductor_handle: ConductorHandle,
     conductor_api: impl CellConductorApiT + 'static,
@@ -126,6 +121,7 @@ pub async fn spawn_queue_consumer_tasks(
     // App validation
     let (tx_app, handle) = spawn_app_validation_consumer(
         env.clone(),
+        cache.clone(),
         conductor_handle.clone(),
         stop.subscribe(),
         tx_integration.clone(),
@@ -144,6 +140,7 @@ pub async fn spawn_queue_consumer_tasks(
     // Sys validation
     let (tx_sys, handle) = spawn_sys_validation_consumer(
         env.clone(),
+        cache.clone(),
         conductor_handle.clone(),
         stop.subscribe(),
         tx_app.clone(),
@@ -162,33 +159,9 @@ pub async fn spawn_queue_consumer_tasks(
         panic!("Failed to send tx_sys");
     }
 
-    // Produce
-    let (tx_produce, handle) = spawn_produce_dht_ops_consumer(
-        env.clone(),
-        conductor_handle.clone(),
-        cell_network.cell_id(),
-        stop.subscribe(),
-        tx_publish.clone(),
-    );
-    task_sender
-        .send(ManagedTaskAdd::cell_critical(
-            handle,
-            cell_id,
-            "produce_dht_ops_consumer",
-        ))
-        .await
-        .expect("Failed to manage workflow handle");
-
     (
-        QueueTriggers::new(tx_sys.clone(), tx_produce.clone()),
-        InitialQueueTriggers::new(
-            tx_sys,
-            tx_produce,
-            tx_publish,
-            tx_app,
-            tx_integration,
-            tx_receipt,
-        ),
+        QueueTriggers::new(tx_sys.clone(), tx_publish.clone()),
+        InitialQueueTriggers::new(tx_sys, tx_publish, tx_app, tx_integration, tx_receipt),
     )
 }
 
@@ -198,7 +171,7 @@ pub struct QueueTriggers {
     /// Notify the SysValidation workflow to run, i.e. after handling gossip
     pub sys_validation: TriggerSender,
     /// Notify the ProduceDhtOps workflow to run, i.e. after InvokeCallZome
-    pub produce_dht_ops: TriggerSender,
+    pub publish_dht_ops: TriggerSender,
 }
 
 /// The triggers to run once at the start of a cell
@@ -206,7 +179,6 @@ pub struct InitialQueueTriggers {
     /// These triggers can only be run once
     /// so they are private
     sys_validation: TriggerSender,
-    produce_dht_ops: TriggerSender,
     publish_dht_ops: TriggerSender,
     app_validation: TriggerSender,
     integrate_dht_ops: TriggerSender,
@@ -215,10 +187,10 @@ pub struct InitialQueueTriggers {
 
 impl QueueTriggers {
     /// Create a new queue trigger
-    pub fn new(sys_validation: TriggerSender, produce_dht_ops: TriggerSender) -> Self {
+    pub fn new(sys_validation: TriggerSender, publish_dht_ops: TriggerSender) -> Self {
         Self {
             sys_validation,
-            produce_dht_ops,
+            publish_dht_ops,
         }
     }
 }
@@ -226,7 +198,6 @@ impl QueueTriggers {
 impl InitialQueueTriggers {
     fn new(
         sys_validation: TriggerSender,
-        produce_dht_ops: TriggerSender,
         publish_dht_ops: TriggerSender,
         app_validation: TriggerSender,
         integrate_dht_ops: TriggerSender,
@@ -234,7 +205,6 @@ impl InitialQueueTriggers {
     ) -> Self {
         Self {
             sys_validation,
-            produce_dht_ops,
             publish_dht_ops,
             app_validation,
             integrate_dht_ops,
@@ -246,9 +216,8 @@ impl InitialQueueTriggers {
     pub fn initialize_workflows(mut self) {
         self.sys_validation.trigger();
         self.app_validation.trigger();
-        self.publish_dht_ops.trigger();
         self.integrate_dht_ops.trigger();
-        self.produce_dht_ops.trigger();
+        self.publish_dht_ops.trigger();
         self.validation_receipt.trigger();
     }
 }
@@ -308,28 +277,6 @@ impl TriggerReceiver {
         } else {
             Err(QueueTriggerClosedError)
         }
-    }
-}
-
-/// A lazy Writer factory which can only be used once.
-///
-/// This is a way of encapsulating an EnvironmentWrite so that it can only be
-/// used to create a single Writer before being consumed.
-#[derive(Constructor, From)]
-pub struct OneshotWriter(EnvironmentWrite);
-
-impl OneshotWriter {
-    /// Create the writer and pass it into a closure.
-    pub fn with_writer<F>(self, f: F) -> Result<(), WorkspaceError>
-    where
-        F: FnOnce(&mut Writer) -> Result<(), WorkspaceError> + Send,
-    {
-        let env_ref = self.0.guard();
-        env_ref.with_commit::<WorkspaceError, (), _>(|w| {
-            f(w)?;
-            Ok(())
-        })?;
-        Ok(())
     }
 }
 

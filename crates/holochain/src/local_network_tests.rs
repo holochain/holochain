@@ -1,8 +1,8 @@
 use std::convert::TryFrom;
 use std::sync::Arc;
 
-use crate::conductor::p2p_store::all_agent_infos;
-use crate::conductor::p2p_store::exchange_peer_info;
+use crate::conductor::p2p_agent_store::all_agent_infos;
+use crate::conductor::p2p_agent_store::exchange_peer_info;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
@@ -16,7 +16,7 @@ use hdk::prelude::WasmError;
 use holo_hash::AgentPubKey;
 use holo_hash::HeaderHash;
 use holochain_keystore::AgentPubKeyExt;
-use holochain_lmdb::env::EnvironmentWrite;
+use holochain_p2p::DnaHashExt;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
@@ -72,10 +72,11 @@ fn conductors_call_remote(num_conductors: usize) {
 
         let mut envs = Vec::with_capacity(handles.len());
         for h in &handles {
-            envs.push(h.get_p2p_env().await);
+            let space = h.cell_id.dna_hash().to_kitsune();
+            envs.push(h.get_p2p_env(space).await);
         }
 
-        exchange_peer_info(envs);
+        exchange_peer_info(envs).await;
 
         // Give a little longer timeout here because they must find each other to pass the test
         // This can require multiple round trips if the head of the source chain keeps moving.
@@ -293,11 +294,12 @@ async fn conductors_gossip_inner(
 
     let mut envs = Vec::with_capacity(handles.len() + second_handles.len());
     for h in handles.iter().chain(second_handles.iter()) {
-        envs.push(h.get_p2p_env().await);
+        let space = h.cell_id.dna_hash().to_kitsune();
+        envs.push(h.get_p2p_env(space).await);
     }
 
     if share_peers {
-        exchange_peer_info(envs.clone());
+        exchange_peer_info(envs.clone()).await;
     }
 
     // for _ in 0..600 {
@@ -324,11 +326,12 @@ async fn conductors_gossip_inner(
 
     let mut envs = Vec::with_capacity(third_handles.len() + second_handles.len());
     for h in third_handles.iter().chain(second_handles.iter()) {
-        envs.push(h.get_p2p_env().await);
+        let space = h.cell_id.dna_hash().to_kitsune();
+        envs.push(h.get_p2p_env(space).await);
     }
 
     if share_peers {
-        exchange_peer_info(envs.clone());
+        exchange_peer_info(envs.clone()).await;
     }
 
     let all_handles = third_handles
@@ -471,7 +474,7 @@ async fn check_gossip(
 }
 
 #[tracing::instrument(skip(envs))]
-fn check_peers(envs: Vec<EnvironmentWrite>) {
+fn check_peers(envs: Vec<EnvWrite>) {
     for (i, a) in envs.iter().enumerate() {
         let peers = all_agent_infos(a.clone().into()).unwrap();
         let num_peers = peers.len();

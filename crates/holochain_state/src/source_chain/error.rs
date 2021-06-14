@@ -1,10 +1,14 @@
 // use crate::holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
-use holochain_lmdb::error::DatabaseError;
 use holochain_serialized_bytes::prelude::*;
+use holochain_sqlite::error::DatabaseError;
 use holochain_types::prelude::*;
 use thiserror::Error;
+
+use crate::prelude::StateMutationError;
+use crate::query::StateQueryError;
+use crate::scratch::SyncScratchError;
 
 #[derive(Error, Debug)]
 pub enum SourceChainError {
@@ -65,6 +69,15 @@ pub enum SourceChainError {
 
     #[error(transparent)]
     ElementGroupError(#[from] ElementGroupError),
+
+    #[error(transparent)]
+    StateMutationError(#[from] StateMutationError),
+
+    #[error(transparent)]
+    StateQueryError(#[from] StateQueryError),
+
+    #[error(transparent)]
+    SyncScratchError(#[from] SyncScratchError),
 }
 
 // serde_json::Error does not implement PartialEq - why is that a requirement??

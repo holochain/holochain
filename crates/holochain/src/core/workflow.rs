@@ -29,7 +29,6 @@ pub mod genesis_workflow;
 pub mod incoming_dht_ops_workflow;
 pub mod initialize_zomes_workflow;
 pub mod integrate_dht_ops_workflow;
-pub mod produce_dht_ops_workflow;
 pub mod publish_dht_ops_workflow;
 pub mod sys_validation_workflow;
 pub mod validation_receipt_workflow;
@@ -38,6 +37,3 @@ pub mod validation_receipt_workflow;
 pub use call_zome_workflow::*;
 pub use genesis_workflow::*;
 pub use initialize_zomes_workflow::*;
-
-#[cfg(test)]
-pub use genesis_workflow::tests::fake_genesis;

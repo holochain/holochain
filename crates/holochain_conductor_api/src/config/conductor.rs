@@ -28,7 +28,7 @@ use std::path::PathBuf;
 /// All the config information for the conductor
 #[derive(Clone, Deserialize, Serialize, Default, Debug, PartialEq)]
 pub struct ConductorConfig {
-    /// The path to the LMDB environment for this conductor.
+    /// The path to the database for this conductor.
     /// If omitted, chooses a default path.
     pub environment_path: EnvironmentRootPath,
 

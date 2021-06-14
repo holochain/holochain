@@ -3,10 +3,9 @@ use hdk::prelude::Element;
 use hdk::prelude::EntryType;
 use hdk::prelude::ValidationPackage;
 use holo_hash::HeaderHash;
-use holochain_lmdb::env::EnvironmentRead;
-use holochain_lmdb::fresh_reader_test;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::HolochainP2pCellT;
+use holochain_sqlite::fresh_reader_test;
 use holochain_test_wasm_common::AgentActivitySearch;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
@@ -551,7 +550,7 @@ async fn get_custom_package_test() {
         .unwrap();
 
     {
-        let env: EnvironmentRead = bob_call_data.env.clone().into();
+        let env: EnvRead = bob_call_data.env.clone().into();
         let element_integrated = ElementBuf::vault(env.clone(), false).unwrap();
         let meta_integrated = MetadataBuf::vault(env.clone()).unwrap();
         let mut element_cache = ElementBuf::cache(env.clone()).unwrap();
@@ -703,8 +702,8 @@ async fn check_cascade(
 ///
 /// This may not turn out to be a real issue, but this illustrates a way to reproduce this behavior,
 /// and may be something we want to investigate more in the future.
-async fn slow_lmdb_reads_test() {
-    let num_commits = std::env::var_os("SLOW_LMDB_COMMITS")
+async fn slow_db_reads_test() {
+    let num_commits = std::env::var_os("SLOW_DB_COMMITS")
         .and_then(|s| s.into_string().ok()?.parse::<usize>().ok())
         .unwrap_or(10);
     observability::test_run().ok();
@@ -799,11 +798,11 @@ async fn slow_lmdb_reads_test() {
     for _ in 0..runs {
         let element_integrated = ElementBuf::vault(alice_env.clone().into(), false).unwrap();
         let meta_integrated = MetadataBuf::vault(alice_env.clone().into()).unwrap();
-        fresh_reader_test!(alice_env, |r| {
+        fresh_reader_test!(alice_env, |mut r| {
             let now = std::time::Instant::now();
             let hashes = meta_integrated
                 .get_activity_sequence(
-                    &r,
+                    &mut r,
                     ChainItemKey::AgentStatus(
                         alice_call_data.cell_id.agent_pubkey().clone(),
                         ValidationStatus::Valid,
