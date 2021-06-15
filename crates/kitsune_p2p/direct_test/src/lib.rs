@@ -259,20 +259,25 @@ impl KdTestHarness {
         }
 
         // -- begin bootstrap node info sync -- //
-        let mut all_agent_info = Vec::new();
-        for node in nodes.iter() {
-            for info in node
+        let mut one_agent_info = None;
+
+        // pick one single agent info so that we exercise gossip
+        if let Some(node) = nodes.get(0) {
+            if let Some(info) = node
                 .kdirect
                 .get_persist()
                 .query_agent_info(root.clone())
                 .await?
+                .get(0)
             {
                 tracing::debug!(?info);
-                all_agent_info.push(info);
+                one_agent_info = Some(info.clone());
             }
         }
-        for node in nodes.iter() {
-            for info in all_agent_info.iter() {
+
+        // push that one agent info to all nodes
+        if let Some(info) = one_agent_info {
+            for node in nodes.iter() {
                 node.kdirect
                     .get_persist()
                     .store_agent_info(info.clone())
@@ -324,6 +329,7 @@ mod tests {
     use super::*;
 
     #[tokio::test(flavor = "multi_thread")]
+    #[allow(irrefutable_let_patterns)]
     async fn sanity_run_for_five_seconds() {
         init_tracing();
 
@@ -370,7 +376,45 @@ mod tests {
 
         let test = KdTestHarness::start_test(config).await.unwrap();
 
+        let from_agent = test
+            .nodes
+            .get(0)
+            .unwrap()
+            .local_agents
+            .get(1)
+            .unwrap()
+            .clone();
+        let to_agent = test
+            .nodes
+            .get(1)
+            .unwrap()
+            .local_agents
+            .get(0)
+            .unwrap()
+            .clone();
+        test.nodes
+            .get(0)
+            .unwrap()
+            .kdhnd
+            .message_send(
+                test.root.clone(),
+                to_agent,
+                from_agent,
+                serde_json::json!({"hello": "world"}),
+                vec![].into_boxed_slice().into(),
+            )
+            .await
+            .unwrap();
+
         tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+
+        let mut msgs = test.nodes.get(1).unwrap().collect_events();
+        assert_eq!(1, msgs.len());
+        if let KdHndEvt::Message { content, .. } = msgs.remove(0) {
+            assert_eq!(content, serde_json::json!({"hello": "world"}));
+        } else {
+            panic!("unexpected");
+        }
 
         assert_eq!(2, test.nodes.len());
         for node in test.nodes.iter() {
