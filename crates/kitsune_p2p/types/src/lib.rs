@@ -264,6 +264,7 @@ pub mod agent_info;
 pub mod async_lazy;
 mod auto_stream_select;
 pub use auto_stream_select::*;
+pub mod bootstrap;
 pub mod bin_types;
 pub mod codec;
 pub mod config;
