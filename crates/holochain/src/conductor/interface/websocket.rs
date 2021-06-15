@@ -816,12 +816,7 @@ pub mod test {
     fn to_key(r: Vec<AgentInfoSigned>) -> Vec<(Arc<KitsuneSpace>, Arc<KitsuneAgent>)> {
         let mut results = r
             .into_iter()
-            .map(|a| {
-                (
-                    Arc::new(KitsuneSpace::try_from(&a).unwrap()),
-                    Arc::new(KitsuneAgent::try_from(a).unwrap()),
-                )
-            })
+            .map(|a| (a.space.clone(), a.agent.clone()))
             .collect::<Vec<_>>();
         results.sort();
         results

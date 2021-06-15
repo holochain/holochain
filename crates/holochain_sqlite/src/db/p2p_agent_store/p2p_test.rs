@@ -1,24 +1,24 @@
 use crate::prelude::*;
-use kitsune_p2p::agent_store::{AgentInfo, AgentInfoSigned, AgentMetaInfo};
+use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::dht_arc::DhtArc;
 use kitsune_p2p::{KitsuneAgent, KitsuneSignature, KitsuneSpace};
 use rand::Rng;
 use std::sync::Arc;
 
-fn rand_space() -> KitsuneSpace {
+fn rand_space() -> Arc<KitsuneSpace> {
     let mut rng = rand::thread_rng();
 
     let mut data = vec![0_u8; 36];
     rng.fill(&mut data[..]);
-    KitsuneSpace(data)
+    Arc::new(KitsuneSpace(data))
 }
 
-fn rand_agent() -> KitsuneAgent {
+fn rand_agent() -> Arc<KitsuneAgent> {
     let mut rng = rand::thread_rng();
 
     let mut data = vec![0_u8; 36];
     rng.fill(&mut data[..]);
-    KitsuneAgent(data)
+    Arc::new(KitsuneAgent(data))
 }
 
 fn rand_signed_at_ms() -> u64 {
@@ -32,21 +32,11 @@ fn rand_signed_at_ms() -> u64 {
     now - rng.gen_range(1000, 2000)
 }
 
-async fn rand_insert(db: &DbWrite, space: &KitsuneSpace, agent: &KitsuneAgent) {
-    use std::convert::TryInto;
-
+async fn rand_insert(db: &DbWrite, space: &Arc<KitsuneSpace>, agent: &Arc<KitsuneAgent>) {
     let mut rng = rand::thread_rng();
 
     let signed_at_ms = rand_signed_at_ms();
-    let expires_after_ms = rng.gen_range(100, 200);
-
-    let info = AgentInfo::new(
-        space.clone(),
-        agent.clone(),
-        vec![],
-        signed_at_ms,
-        expires_after_ms,
-    );
+    let expires_at_ms = signed_at_ms + rng.gen_range(100, 200);
 
     let half_len = match rng.gen_range(0_u8, 5_u8) {
         0 => 0,
@@ -54,17 +44,16 @@ async fn rand_insert(db: &DbWrite, space: &KitsuneSpace, agent: &KitsuneAgent) {
         _ => rng.gen_range(0, u32::MAX / 2),
     };
 
-    let info = info
-        .with_meta_info(AgentMetaInfo {
-            dht_storage_arc_half_length: half_len,
-        })
-        .unwrap();
-
-    let signed = AgentInfoSigned::try_new(
+    let signed = AgentInfoSigned::sign(
+        space.clone(),
         agent.clone(),
-        KitsuneSignature(vec![0; 64]),
-        (&info).try_into().unwrap(),
+        half_len,
+        vec![],
+        signed_at_ms,
+        expires_at_ms,
+        |_| async { Ok(Arc::new(KitsuneSignature(vec![0; 64]))) },
     )
+    .await
     .unwrap();
 
     p2p_put(db, &signed).await.unwrap();
@@ -76,7 +65,7 @@ async fn test_p2p_agent_store_sanity() {
 
     let space = rand_space();
 
-    let db = DbWrite::test(&tmp_dir, DbKind::P2pAgentStore(Arc::new(space.clone()))).unwrap();
+    let db = DbWrite::test(&tmp_dir, DbKind::P2pAgentStore(space.clone())).unwrap();
 
     let mut example_agent = rand_agent();
 

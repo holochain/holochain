@@ -2,10 +2,11 @@
 
 use crate::prelude::*;
 use crate::sql::*;
-use kitsune_p2p::agent_store::{AgentInfo, AgentInfoSigned};
+use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::dht_arc::DhtArc;
 use kitsune_p2p::KitsuneAgent;
 use rusqlite::*;
+use std::sync::Arc;
 
 /// Extension trait to treat connection instances
 /// as p2p store accessors.
@@ -122,8 +123,6 @@ pub async fn p2p_prune(db: &DbWrite) -> DatabaseResult<()> {
 }
 impl AsP2pStateTxExt for Transaction<'_> {
     fn p2p_get(&self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>> {
-        use std::convert::TryFrom;
-
         let mut stmt = self
             .prepare(sql_p2p_agent_store::SELECT)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
@@ -132,7 +131,7 @@ impl AsP2pStateTxExt for Transaction<'_> {
             .query_row(named_params! { ":agent": &agent.0 }, |r| {
                 let r = r.get_ref(0)?;
                 let r = r.as_blob()?;
-                let signed = AgentInfoSigned::try_from(r)
+                let signed = AgentInfoSigned::decode(r)
                     .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
                 Ok(signed)
             })
@@ -140,8 +139,6 @@ impl AsP2pStateTxExt for Transaction<'_> {
     }
 
     fn p2p_list(&self) -> DatabaseResult<Vec<AgentInfoSigned>> {
-        use std::convert::TryFrom;
-
         let mut stmt = self
             .prepare(sql_p2p_agent_store::SELECT_ALL)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
@@ -149,7 +146,7 @@ impl AsP2pStateTxExt for Transaction<'_> {
         for r in stmt.query_map([], |r| {
             let r = r.get_ref(0)?;
             let r = r.as_blob()?;
-            let signed = AgentInfoSigned::try_from(r)
+            let signed = AgentInfoSigned::decode(r)
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
 
             Ok(signed)
@@ -193,10 +190,10 @@ impl AsP2pStateTxExt for Transaction<'_> {
 /// Owned data dealing with a full p2p_agent_store record.
 #[derive(Debug)]
 struct P2pRecord {
-    agent: KitsuneAgent,
+    agent: Arc<KitsuneAgent>,
 
     // encoded binary
-    encoded: Vec<u8>,
+    encoded: Box<[u8]>,
 
     // additional queryable fields
     signed_at_ms: i64,
@@ -218,16 +215,13 @@ fn clamp64(u: u64) -> i64 {
 
 impl P2pRecord {
     pub fn from_signed(signed: &AgentInfoSigned) -> DatabaseResult<Self> {
-        use std::convert::TryFrom;
+        let agent = signed.agent.clone();
 
-        let info = AgentInfo::try_from(signed).map_err(|e| anyhow::anyhow!(e))?;
-        let agent = info.as_agent_ref().clone();
+        let encoded = signed.encode().map_err(|e| anyhow::anyhow!(e))?;
 
-        let encoded = <Vec<u8>>::try_from(signed).map_err(|e| anyhow::anyhow!(e))?;
-
-        let signed_at_ms = info.signed_at_ms();
-        let expires_at_ms = signed_at_ms + info.expires_after_ms();
-        let arc = info.dht_arc().map_err(|e| anyhow::anyhow!(e))?;
+        let signed_at_ms = signed.signed_at_ms;
+        let expires_at_ms = signed.expires_at_ms;
+        let arc = signed.storage_arc;
 
         let storage_center_loc = arc.center_loc.into();
 

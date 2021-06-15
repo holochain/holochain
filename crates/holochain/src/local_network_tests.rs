@@ -480,7 +480,7 @@ fn check_peers(envs: Vec<EnvWrite>) {
         let num_peers = peers.len();
         let peers = peers
             .into_iter()
-            .map(|a| a.into_agent())
+            .map(|a| a.agent.clone())
             .collect::<Vec<_>>();
         tracing::debug!(?i, ?num_peers, ?peers);
     }
