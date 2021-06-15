@@ -55,6 +55,11 @@ impl EnvWrite {
         })
     }
 
+    /// Kind Accessor
+    pub fn kind(&self) -> &DbKind {
+        self.db.kind()
+    }
+
     /// Accessor
     pub fn keystore(&self) -> KeystoreSender {
         self.keystore.clone()
