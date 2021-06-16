@@ -330,7 +330,7 @@ pub enum AdminResponse {
     /// It means the `App` was activated successfully
     ///
     /// [`AdminRequest::ActivateApp`]: enum.AdminRequest.html#variant.ActivateApp
-    AppActivated,
+    AppActivated(InstalledAppInfo),
 
     /// The succesful response to an [`AdminRequest::DeactivateApp`].
     ///
