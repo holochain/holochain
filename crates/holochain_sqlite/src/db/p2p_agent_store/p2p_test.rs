@@ -90,25 +90,37 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
 
     // check that gossip query over full range returns 20 results
     let all = con
-        .p2p_gossip_query_agents(u64::MIN, u64::MAX, DhtArc::new(0, u32::MAX).into())
+        .p2p_gossip_query_agents(
+            u64::MIN,
+            u64::MAX,
+            DhtArc::new(0, u32::MAX).interval().into(),
+        )
         .unwrap();
     assert_eq!(20, all.len());
 
     // check that gossip query over zero time returns zero results
     let all = con
-        .p2p_gossip_query_agents(u64::MIN, u64::MIN, DhtArc::new(0, u32::MAX).into())
+        .p2p_gossip_query_agents(
+            u64::MIN,
+            u64::MIN,
+            DhtArc::new(0, u32::MAX).interval().into(),
+        )
         .unwrap();
     assert_eq!(0, all.len());
 
     // check that gossip query over zero arc returns zero results
     let all = con
-        .p2p_gossip_query_agents(u64::MIN, u64::MAX, DhtArc::new(0, 0).into())
+        .p2p_gossip_query_agents(u64::MIN, u64::MAX, DhtArc::new(0, 0).interval().into())
         .unwrap();
     assert_eq!(0, all.len());
 
     // check that gossip query over half arc returns some but not all results
     let all = con
-        .p2p_gossip_query_agents(u64::MIN, u64::MAX, DhtArc::new(0, u32::MAX / 4).into())
+        .p2p_gossip_query_agents(
+            u64::MIN,
+            u64::MAX,
+            DhtArc::new(0, u32::MAX / 4).interval().into(),
+        )
         .unwrap();
     assert!(all.len() > 0 && all.len() < 20);
 
