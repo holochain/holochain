@@ -4,19 +4,16 @@ use super::*;
 
 use crate::conductor::manager::ManagedTaskResult;
 use crate::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
-use crate::core::workflow::publish_dht_ops_workflow::PublishDhtOpsWorkspace;
-use holochain_lmdb::env::EnvironmentWrite;
-
 use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for Publish workflow
 #[instrument(skip(env, conductor_handle, stop, cell_network))]
 pub fn spawn_publish_dht_ops_consumer(
-    env: EnvironmentWrite,
+    env: EnvWrite,
     conductor_handle: ConductorHandle,
     mut stop: sync::broadcast::Receiver<()>,
-    mut cell_network: HolochainP2pCell,
+    cell_network: HolochainP2pCell,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
     let (tx, mut rx) = TriggerSender::new();
     let mut trigger_self = tx.clone();
@@ -31,9 +28,7 @@ pub fn spawn_publish_dht_ops_consumer(
             }
 
             // Run the workflow
-            let workspace = PublishDhtOpsWorkspace::new(env.clone().into())
-                .expect("Could not create Workspace");
-            match publish_dht_ops_workflow(workspace, env.clone().into(), &mut cell_network).await {
+            match publish_dht_ops_workflow(env.clone(), cell_network.clone()).await {
                 Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
                 Err(err) => {
                     handle_workflow_error(

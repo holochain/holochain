@@ -297,7 +297,7 @@ impl HarnessControlApiHandler for HarnessActor {
             let infos = futures::future::try_join_all(infos).await?;
             let infos = infos.into_iter().fold(HashMap::new(), |acc, x| {
                 x.into_iter().fold(acc, |mut acc, x| {
-                    acc.insert(Arc::new(x.as_agent_ref().clone()), x);
+                    acc.insert(x.agent.clone(), x);
                     acc
                 })
             });

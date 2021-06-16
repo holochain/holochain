@@ -29,13 +29,14 @@ pub mod handle;
 pub mod interactive;
 pub mod interface;
 pub mod manager;
-pub mod p2p_store;
+pub mod p2p_agent_store;
+pub mod p2p_metrics;
 pub mod paths;
 pub mod state;
 
 pub use cell::error::CellError;
 pub use cell::Cell;
+pub use conductor::integration_dump;
 pub use conductor::Conductor;
 pub use conductor::ConductorBuilder;
-pub use conductor::ConductorStateDb;
 pub use handle::ConductorHandle;

@@ -329,7 +329,7 @@ mod test {
     use super::*;
     use crate::conductor::Conductor;
     use anyhow::Result;
-    use holochain_lmdb::test_utils::test_environments;
+    use holochain_state::prelude::*;
     use holochain_types::app::InstallAppDnaPayload;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_zomes;
@@ -343,7 +343,7 @@ mod test {
     async fn register_list_dna_app() -> Result<()> {
         observability::test_run().ok();
         let envs = test_environments();
-        let handle = Conductor::builder().test(&envs).await?;
+        let handle = Conductor::builder().test(&envs.into()).await?;
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
         let uid = Uuid::new_v4();
@@ -472,10 +472,10 @@ mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn install_list_dna_app() -> Result<()> {
+    async fn install_list_dna_app() {
         observability::test_run().ok();
         let envs = test_environments();
-        let handle = Conductor::builder().test(&envs).await?;
+        let handle = Conductor::builder().test(&envs.into()).await.unwrap();
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
         let uid = Uuid::new_v4();
@@ -580,6 +580,5 @@ mod test {
         tokio::time::timeout(std::time::Duration::from_secs(1), shutdown)
             .await
             .ok();
-        Ok(())
     }
 }

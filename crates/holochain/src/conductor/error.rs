@@ -3,7 +3,7 @@ use super::{entry_def_store::error::EntryDefStoreError, state::AppInterfaceId};
 use crate::conductor::cell::error::CellError;
 use crate::core::workflow::error::WorkflowError;
 use holochain_conductor_api::conductor::ConductorConfigError;
-use holochain_lmdb::error::DatabaseError;
+use holochain_sqlite::error::DatabaseError;
 use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
 use thiserror::Error;
@@ -108,6 +108,15 @@ pub enum ConductorError {
 
     #[error(transparent)]
     MrBundleError(#[from] mr_bundle::error::MrBundleError),
+
+    #[error(transparent)]
+    StateQueryError(#[from] holochain_state::query::StateQueryError),
+
+    #[error(transparent)]
+    StateMutationError(#[from] holochain_state::mutations::StateMutationError),
+
+    #[error(transparent)]
+    RusqliteError(#[from] rusqlite::Error),
 }
 
 #[derive(Error, Debug)]

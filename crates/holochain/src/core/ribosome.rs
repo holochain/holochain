@@ -31,7 +31,6 @@ use crate::core::ribosome::guest_callback::validate_link::ValidateLinkResult;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
-use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use error::RibosomeResult;
 use guest_callback::entry_defs::EntryDefsHostAccess;
@@ -44,6 +43,7 @@ use holo_hash::AgentPubKey;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
+use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
 use mockall::automock;
 use std::iter::Iterator;
@@ -107,7 +107,7 @@ impl From<&HostAccess> for HostFnAccess {
 
 impl HostAccess {
     /// Get the workspace, panics if none was provided
-    pub fn workspace(&self) -> &CallZomeWorkspaceLock {
+    pub fn workspace(&self) -> &HostFnWorkspace {
         match self {
             Self::ZomeCall(ZomeCallHostAccess { workspace, .. })
             | Self::Init(InitHostAccess { workspace, .. })
@@ -263,16 +263,13 @@ impl ZomeCallInvocation {
         let check_agent = self.provenance.clone();
         let check_secret = self.cap;
 
-        tokio_helper::block_forever_on(async move {
-            let maybe_grant: Option<CapGrant> = host_access
-                .workspace
-                .read()
-                .await
-                .source_chain
-                .valid_cap_grant(&check_function, &check_agent, check_secret.as_ref())?;
+        let maybe_grant: Option<CapGrant> = host_access.workspace.source_chain().valid_cap_grant(
+            &check_function,
+            &check_agent,
+            check_secret.as_ref(),
+        )?;
 
-            Ok(maybe_grant.is_some())
-        })
+        Ok(maybe_grant.is_some())
     }
 }
 
@@ -371,7 +368,7 @@ impl From<ZomeCallInvocation> for ZomeCall {
 
 #[derive(Clone, Constructor)]
 pub struct ZomeCallHostAccess {
-    pub workspace: CallZomeWorkspaceLock,
+    pub workspace: HostFnWorkspace,
     pub keystore: KeystoreSender,
     pub network: HolochainP2pCell,
     pub signal_tx: SignalBroadcaster,

@@ -11,7 +11,7 @@ use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::SerializedBytes;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct HeaderBuilderCommon {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,

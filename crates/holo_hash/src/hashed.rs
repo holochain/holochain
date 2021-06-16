@@ -7,7 +7,7 @@ use holochain_serialized_bytes::prelude::*;
 /// hashes need not be calculated multiple times.
 /// Provides an easy constructor which consumes the content.
 // TODO: consider making lazy with OnceCell
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct HoloHashed<C: HashableContent> {
     /// Whatever type C is as data.
     pub(crate) content: C,
@@ -69,16 +69,6 @@ where
             content: self.content.clone(),
             hash: self.hash.clone(),
         }
-    }
-}
-
-impl<C> std::fmt::Debug for HoloHashed<C>
-where
-    C: HashableContent + std::fmt::Debug,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("HoloHashed({:?})", self.content))?;
-        Ok(())
     }
 }
 

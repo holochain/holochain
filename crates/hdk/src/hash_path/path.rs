@@ -280,6 +280,7 @@ impl Path {
         Ok(())
     }
 
+    /// The parent of the current path is simply the path truncated one level.
     pub fn parent(&self) -> Option<Path> {
         if self.as_ref().len() > 1 {
             let parent_vec: Vec<Component> = self.as_ref()[0..self.as_ref().len() - 1].to_vec();

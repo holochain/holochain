@@ -17,7 +17,7 @@ use crate::prelude::*;
 /// - can reference any entry regardless of type (e.g. posts can link to comments)
 /// - cannot reference other links or crud headers (@todo maybe we can do this in the future)
 ///
-/// Note: There is a hard limit of 400 bytes of data for the tag as it is used as an lmdb key.
+/// Note: There is a hard limit of 1kb of data for the tag.
 ///
 /// Crud:
 ///

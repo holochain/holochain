@@ -9,19 +9,16 @@
 
 use super::error::WorkflowError;
 use super::error::WorkflowResult;
-use crate::core::{
-    queue_consumer::OneshotWriter,
-    ribosome::guest_callback::genesis_self_check::{
-        GenesisSelfCheckHostAccess, GenesisSelfCheckInvocation, GenesisSelfCheckResult,
-    },
+use crate::core::ribosome::guest_callback::genesis_self_check::{
+    GenesisSelfCheckHostAccess, GenesisSelfCheckInvocation, GenesisSelfCheckResult,
 };
 use crate::{conductor::api::CellConductorApiT, core::ribosome::RibosomeT};
 use derive_more::Constructor;
-use holochain_lmdb::prelude::*;
-use holochain_state::source_chain::SourceChainBuf;
-use holochain_state::workspace::Workspace;
+use holochain_sqlite::prelude::*;
+use holochain_state::source_chain;
 use holochain_state::workspace::WorkspaceResult;
 use holochain_types::prelude::*;
+use rusqlite::named_params;
 use tracing::*;
 
 /// The struct which implements the genesis Workflow
@@ -36,10 +33,9 @@ where
     ribosome: Ribosome,
 }
 
-#[instrument(skip(workspace, writer, api))]
+#[instrument(skip(workspace, api))]
 pub async fn genesis_workflow<'env, Api: CellConductorApiT, Ribosome>(
     mut workspace: GenesisWorkspace,
-    writer: OneshotWriter,
     api: Api,
     args: GenesisWorkflowArgs<Ribosome>,
 ) -> WorkflowResult<()>
@@ -47,12 +43,6 @@ where
     Ribosome: RibosomeT + Send + 'static,
 {
     genesis_workflow_inner(&mut workspace, args, api).await?;
-
-    // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
-
-    // commit the workspace
-    writer.with_writer(|writer| workspace.flush_to_txn(writer))?;
-
     Ok(())
 }
 
@@ -71,7 +61,7 @@ where
         ribosome,
     } = args;
 
-    if workspace.source_chain.has_genesis() {
+    if workspace.has_genesis(&agent_pubkey)? {
         return Ok(());
     }
 
@@ -101,37 +91,50 @@ where
         return Err(WorkflowError::AgentInvalid(agent_pubkey.clone()));
     }
 
-    workspace
-        .source_chain
-        .genesis(
-            dna_file.dna_hash().clone(),
-            agent_pubkey.clone(),
-            membrane_proof,
-        )
-        .await
-        .map_err(WorkflowError::from)?;
+    source_chain::genesis(
+        workspace.vault.clone(),
+        dna_file.dna_hash().clone(),
+        agent_pubkey,
+        membrane_proof,
+    )
+    .await?;
 
     Ok(())
 }
 
 /// The workspace for Genesis
 pub struct GenesisWorkspace {
-    source_chain: SourceChainBuf,
+    vault: EnvWrite,
 }
 
 impl GenesisWorkspace {
     /// Constructor
-    pub async fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
-        Ok(Self {
-            source_chain: SourceChainBuf::new(env)?,
-        })
+    pub fn new(env: EnvWrite) -> WorkspaceResult<Self> {
+        Ok(Self { vault: env })
     }
-}
 
-impl Workspace for GenesisWorkspace {
-    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
-        self.source_chain.flush_to_txn_ref(writer)?;
-        Ok(())
+    pub fn has_genesis(&self, author: &AgentPubKey) -> DatabaseResult<bool> {
+        let count = self.vault.conn()?.with_reader(|txn| {
+            let count: u32 = txn.query_row(
+                "
+                SELECT
+                COUNT(Header.hash)
+                FROM Header
+                JOIN DhtOp ON DhtOp.header_hash = Header.hash
+                WHERE
+                DhtOp.is_authored = 1
+                AND
+                Header.author = :author
+                LIMIT 3
+                ",
+                named_params! {
+                    ":author": author,
+                },
+                |row| row.get(0),
+            )?;
+            DatabaseResult::Ok(count)
+        })?;
+        Ok(count >= 3)
     }
 }
 
@@ -141,34 +144,23 @@ pub mod tests {
 
     use crate::conductor::api::MockCellConductorApi;
     use crate::core::ribosome::MockRibosomeT;
-    use crate::core::SourceChainResult;
-    use fallible_iterator::FallibleIterator;
-    use holochain_lmdb::test_utils::test_cell_env;
-    use holochain_state::source_chain::SourceChain;
+    use holochain_state::{prelude::test_cell_env, source_chain::SourceChain};
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
     use holochain_zome_types::Header;
     use matches::assert_matches;
     use observability;
 
-    pub async fn fake_genesis(source_chain: &mut SourceChain) -> SourceChainResult<()> {
-        let dna = fake_dna_file("cool dna");
-        let dna_hash = dna.dna_hash().clone();
-        let agent_pubkey = fake_agent_pubkey_1();
-
-        source_chain.genesis(dna_hash, agent_pubkey, None).await
-    }
-
     #[tokio::test(flavor = "multi_thread")]
-    async fn genesis_initializes_source_chain() -> Result<(), anyhow::Error> {
-        observability::test_run()?;
+    async fn genesis_initializes_source_chain() {
+        observability::test_run().unwrap();
         let test_env = test_cell_env();
-        let arc = test_env.env();
+        let vault = test_env.env();
         let dna = fake_dna_file("a");
-        let agent_pubkey = fake_agent_pubkey_1();
+        let author = fake_agent_pubkey_1();
 
         {
-            let workspace = GenesisWorkspace::new(arc.clone().into()).await?;
+            let workspace = GenesisWorkspace::new(vault.clone().into()).unwrap();
             let mut api = MockCellConductorApi::new();
             api.expect_sync_dpki_request()
                 .returning(|_, _| Ok("mocked dpki request response".to_string()));
@@ -178,38 +170,34 @@ pub mod tests {
                 .returning(|_, _| Ok(GenesisSelfCheckResult::Valid));
             let args = GenesisWorkflowArgs {
                 dna_file: dna.clone(),
-                agent_pubkey: agent_pubkey.clone(),
+                agent_pubkey: author.clone(),
                 membrane_proof: None,
                 ribosome,
             };
-            let _: () = genesis_workflow(workspace, arc.clone().into(), api, args).await?;
+            let _: () = genesis_workflow(workspace, api, args).await.unwrap();
         }
 
         {
-            let source_chain = SourceChain::new(arc.clone().into())?;
-            assert_eq!(source_chain.agent_pubkey()?, agent_pubkey);
-            source_chain.chain_head().expect("chain head should be set");
-
-            let mut iter = source_chain.iter_back();
-            let mut headers = Vec::new();
-
-            while let Some(h) = iter.next().unwrap() {
-                let (h, _) = h.into_header_and_signature();
-                let (h, _) = h.into_inner();
-                headers.push(h);
-            }
+            let source_chain = SourceChain::new(vault.clone().into(), author.clone())
+                .await
+                .unwrap();
+            let headers = source_chain
+                .query(Default::default())
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|e| e.header().clone())
+                .collect::<Vec<_>>();
 
             assert_matches!(
                 headers.as_slice(),
                 [
-                    Header::Create(_),
+                    Header::Dna(_),
                     Header::AgentValidationPkg(_),
-                    Header::Dna(_)
+                    Header::Create(_)
                 ]
             );
         }
-
-        Ok(())
     }
 }
 
@@ -247,7 +235,7 @@ Functions / Workflows:
 
 - retrieve DNA from file path [in the future from HCHC]
 
-- initialize lmdb environment and dbs, save to conductor runtime config.
+- initialize databases, save to conductor runtime config.
 
 - commit DNA entry (w/ special enum header with NULL  prev_header)
 

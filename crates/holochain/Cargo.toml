@@ -15,7 +15,6 @@ base64 = "0.13"
 byteorder = "1.3.4"
 cfg-if = "0.1"
 chrono = "0.4.6"
-derivative = "2.1.1"
 derive_more = "0.99.3"
 directories = "2.0.2"
 either = "1.5.0"
@@ -28,14 +27,15 @@ holochain_cascade = { version = "0.0.1", path = "../holochain_cascade" }
 holochain_conductor_api = { version = "0.0.1", path = "../holochain_conductor_api" }
 holochain_keystore = { version = "0.0.1", path = "../holochain_keystore" }
 holochain_p2p = { version = "0.0.1", path = "../holochain_p2p" }
-holochain_lmdb = { version = "0.0.1", path = "../holochain_lmdb" }
+holochain_sqlite = { version = "0.0.1", path = "../holochain_sqlite" }
 holochain_serialized_bytes = "=0.0.50"
 holochain_state = { version = "0.0.1", path = "../holochain_state" }
 holochain_types = { version = "0.0.1", path = "../holochain_types" }
-holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", tag = "v0.0.68" }
+holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", tag = "v0.0.69" }
 holochain_websocket = { version = "0.0.1", path = "../holochain_websocket" }
 holochain_zome_types = { version = "^0.0.2-alpha.1", path = "../holochain_zome_types" }
 human-panic = "1.0.3"
+kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p/kitsune_p2p" }
 kitsune_p2p_types = { version = "0.0.1", path = "../kitsune_p2p/types" }
 lazy_static = "1.4.0"
 mockall = "0.8"
@@ -44,10 +44,12 @@ must_future = "0.1.1"
 nanoid = "0.3"
 num_cpus = "1.8"
 observability = "0.1.3"
+once_cell = "1.4.1"
 parking_lot = "0.10"
 predicates = "1.0.4"
 rand = "0.7"
 ring = "0.16"
+rusqlite = { version = "0.25" }
 serde = { version = "1.0", features = [ "derive" ] }
 serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 serde_yaml = "0.8"
@@ -67,13 +69,11 @@ url = "1.7.2"
 url2 = "0.0.6"
 url_serde = "0.2.0"
 uuid = { version = "0.7", features = [ "serde", "v4" ] }
-kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p/kitsune_p2p" }
 xsalsa20poly1305 = "0.6.0"
-once_cell = "1.4.1"
 
 # Dependencies for test_utils: keep in sync with below
 holochain_wasm_test_utils = { version = "0.0.1", path = "../test_utils/wasm", optional = true }
-hdk = { path = "../hdk", optional = true }
+hdk = { version = "0.0.101-alpha.0", path = "../hdk", optional = true }
 matches = {version = "0.1.8", optional = true }
 holochain_test_wasm_common = { version = "0.0.1", path = "../test_utils/wasm_common", optional = true  }
 unwrap_to = { version = "0.1.0", optional = true }
@@ -94,7 +94,7 @@ test-case = "1.0.0"
 
 # Dependencies for test_utils: keep in sync with above
 holochain_wasm_test_utils = { version = "0.0.1", path = "../test_utils/wasm", optional = false }
-hdk = { path = "../hdk", optional = false }
+hdk = { version = "0.0.101-alpha.0", path = "../hdk", optional = false }
 matches = {version = "0.1.8", optional = false }
 holochain_test_wasm_common = { version = "0.0.1", path = "../test_utils/wasm_common", optional = false  }
 unwrap_to = { version = "0.1.0", optional = false }
@@ -102,6 +102,10 @@ unwrap_to = { version = "0.1.0", optional = false }
 
 [[bench]]
 name = "bench"
+harness = false
+
+[[bench]]
+name = "consistency"
 harness = false
 
 [lib]
@@ -113,13 +117,13 @@ name = "holochain"
 path = "src/bin/holochain/main.rs"
 
 [features]
-default = ["slow_tests", "test_utils", "only_check_wasms"]
+default = ["slow_tests", "test_utils", "only_check_wasms", "no-deps"]
 
 # Exposes additional functionality only needed for integration tests.
 # This feature should be turned off for production builds.
 test_utils = [
   "hdk",
-  "holochain_lmdb/test_utils",
+  "holochain_sqlite/test_utils",
   "holochain_state/test_utils",
   "holochain_types/test_utils",
   "holochain_zome_types/test_utils",
@@ -136,3 +140,11 @@ slow_tests = []
 # Includes the wasm build script, which we don't need when not building wasms
 build_wasms = ['holochain_wasm_test_utils/build']
 only_check_wasms = ['holochain_wasm_test_utils/only_check']
+
+# Enables at-rest encryption of the SQLite database.
+# Incompatible with "no-deps".
+db-encryption = ['holochain_sqlite/db-encryption']
+
+# Compile SQLite from source rather than depending on a library.
+# Incompatible with "db-encryption"
+no-deps = ['holochain_sqlite/no-deps']

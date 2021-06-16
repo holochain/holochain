@@ -4,7 +4,6 @@
 //! then calling the [`CmdRunner`] directly.
 //! For simple calls like [`AdminRequest::ListDnas`] this is probably easier
 //! but if you want more control use [`CmdRunner::command`].
-use std::convert::TryInto;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -15,7 +14,6 @@ use holochain_conductor_api::AdminRequest;
 use holochain_conductor_api::AdminResponse;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::{AdminInterfaceConfig, InstalledAppInfo};
-use holochain_p2p::kitsune_p2p;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use holochain_types::prelude::DnaHash;
 use holochain_types::prelude::InstallAppDnaPayload;
@@ -326,20 +324,22 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
                     .map(|d| (d.clone(), holochain_p2p::space_holo_to_kit(d)))
                     .collect::<Vec<_>>();
 
-                let info: kitsune_p2p::agent_store::AgentInfo = (&info).try_into().unwrap();
-                let this_agent = agents.iter().find(|a| *info.as_agent_ref() == a.1);
-                let this_dna = dnas.iter().find(|d| *info.as_space_ref() == d.1).unwrap();
+                let this_agent = agents.iter().find(|a| *info.agent == a.1);
+                let this_dna = dnas.iter().find(|d| *info.space == d.1).unwrap();
                 if let Some(this_agent) = this_agent {
                     writeln!(out, "This Agent {:?} is {:?}", this_agent.0, this_agent.1)?;
                 }
                 writeln!(out, "This DNA {:?} is {:?}", this_dna.0, this_dna.1)?;
 
                 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
-                let duration = Duration::milliseconds(info.signed_at_ms() as i64);
+                let duration = Duration::milliseconds(info.signed_at_ms as i64);
                 let s = duration.num_seconds() as i64;
                 let n = duration.clone().to_std().unwrap().subsec_nanos();
                 let dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(s, n), Utc);
-                let exp = dt + Duration::milliseconds(info.expires_after_ms() as i64);
+                let duration = Duration::milliseconds(info.expires_at_ms as i64);
+                let s = duration.num_seconds() as i64;
+                let n = duration.clone().to_std().unwrap().subsec_nanos();
+                let exp = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(s, n), Utc);
                 let now = Utc::now();
 
                 writeln!(out, "signed at {}", dt)?;
@@ -349,9 +349,9 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
                     exp,
                     (exp - now).num_minutes()
                 )?;
-                writeln!(out, "space: {:?}", info.as_space_ref())?;
-                writeln!(out, "agent: {:?}", info.as_agent_ref())?;
-                writeln!(out, "urls: {:?}", info.as_urls_ref())?;
+                writeln!(out, "space: {:?}", info.space)?;
+                writeln!(out, "agent: {:?}", info.agent)?;
+                writeln!(out, "urls: {:?}", info.url_list)?;
                 msg!("{}\n", out);
             }
         }

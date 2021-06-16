@@ -1,9 +1,8 @@
 #![allow(dead_code)]
 use super::*;
-use crate::agent_store::AgentInfo;
 use ghost_actor::dependencies::must_future::MustBoxFuture;
+use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use std::collections::HashSet;
-use std::convert::TryFrom;
 
 /// This enum represents the outcomes from peer discovery
 /// - OkShortcut - the agent is locally joined, just mirror the request back out
@@ -58,13 +57,12 @@ pub(crate) fn peer_discover(
                 })
                 .await?
             {
-                let info = types::agent_store::AgentInfo::try_from(&info)?;
                 let url = info
-                    .as_urls_ref()
+                    .url_list
                     .get(0)
                     .ok_or_else(|| KitsuneP2pError::from("no url"))?
                     .clone();
-                return try_connect(url).await;
+                return try_connect(url.into()).await;
             }
 
             KitsuneP2pResult::Err("failed to connect".into())
@@ -168,10 +166,10 @@ where
             .await
             {
                 for node in nodes {
-                    let to_agent = Arc::new(node.as_agent_ref().clone());
+                    let to_agent = node.agent.clone();
                     if !sent_to.contains(&to_agent) {
                         sent_to.insert(to_agent.clone());
-                        let url = match node.as_urls_ref().get(0) {
+                        let url = match node.url_list.get(0) {
                             None => continue,
                             Some(url) => url.clone(),
                         };
@@ -231,7 +229,7 @@ pub(crate) fn get_5_or_less_non_local_agents_near_basis(
     i_s: ghost_actor::GhostSender<SpaceInternal>,
     evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     bootstrap_service: Option<url2::Url2>,
-) -> MustBoxFuture<'static, KitsuneP2pResult<HashSet<AgentInfo>>> {
+) -> MustBoxFuture<'static, KitsuneP2pResult<HashSet<AgentInfoSigned>>> {
     async move {
         let mut out = HashSet::new();
 
@@ -245,14 +243,9 @@ pub(crate) fn get_5_or_less_non_local_agents_near_basis(
             // randomize the results
             rand::seq::SliceRandom::shuffle(&mut list[..], &mut rand::thread_rng());
             for item in list {
-                if let Ok(info) = AgentInfo::try_from(&item) {
-                    if let Ok(is_local) = i_s
-                        .is_agent_local(Arc::new(info.as_agent_ref().clone()))
-                        .await
-                    {
-                        if !is_local {
-                            out.insert(info);
-                        }
+                if let Ok(is_local) = i_s.is_agent_local(item.agent.clone()).await {
+                    if !is_local {
+                        out.insert(item);
                     }
                 }
                 if out.len() >= 5 {
@@ -273,22 +266,17 @@ pub(crate) fn get_5_or_less_non_local_agents_near_basis(
         {
             for item in list {
                 // TODO - someday some validation here
-                if let Ok(info) = AgentInfo::try_from(&item) {
-                    if let Ok(is_local) = i_s
-                        .is_agent_local(Arc::new(info.as_agent_ref().clone()))
-                        .await
-                    {
-                        if !is_local {
-                            // we got a result - let's add it to our store for the future
-                            let _ = evt_sender
-                                .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                    space: space.clone(),
-                                    agent: from_agent.clone(),
-                                    agent_info_signed: item.clone(),
-                                })
-                                .await;
-                            out.insert(info);
-                        }
+                if let Ok(is_local) = i_s.is_agent_local(item.agent.clone()).await {
+                    if !is_local {
+                        // we got a result - let's add it to our store for the future
+                        let _ = evt_sender
+                            .put_agent_info_signed(PutAgentInfoSignedEvt {
+                                space: space.clone(),
+                                agent: from_agent.clone(),
+                                agent_info_signed: item.clone(),
+                            })
+                            .await;
+                        out.insert(item);
                     }
                 }
                 if out.len() >= 5 {
@@ -326,21 +314,16 @@ pub(crate) fn add_5_or_less_non_local_agents(
         {
             for item in list {
                 // TODO - someday some validation here
-                if let Ok(info) = AgentInfo::try_from(&item) {
-                    if let Ok(is_local) = i_s
-                        .is_agent_local(Arc::new(info.as_agent_ref().clone()))
-                        .await
-                    {
-                        if !is_local {
-                            // we got a result - let's add it to our store for the future
-                            let _ = evt_sender
-                                .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                    space: space.clone(),
-                                    agent: from_agent.clone(),
-                                    agent_info_signed: item.clone(),
-                                })
-                                .await;
-                        }
+                if let Ok(is_local) = i_s.is_agent_local(item.agent.clone()).await {
+                    if !is_local {
+                        // we got a result - let's add it to our store for the future
+                        let _ = evt_sender
+                            .put_agent_info_signed(PutAgentInfoSignedEvt {
+                                space: space.clone(),
+                                agent: from_agent.clone(),
+                                agent_info_signed: item.clone(),
+                            })
+                            .await;
                     }
                 }
             }
