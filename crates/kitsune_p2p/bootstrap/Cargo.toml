@@ -27,3 +27,17 @@ kitsune_p2p_types = { version = "0.0.1", path = "../types" }
 [dev-dependencies]
 kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p" }
 fixt = { path = "../../fixt" }
+criterion = "0.3"
+reqwest = "0.11.2"
+
+[[bench]]
+name = "bench"
+harness = false
+
+[lib]
+name = "kitsune_bootstrap"
+path = "src/lib.rs"
+
+[[bin]]
+name = "kitsune-bootstrap"
+path = "src/main.rs"

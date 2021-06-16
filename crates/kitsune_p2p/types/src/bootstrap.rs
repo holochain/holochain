@@ -8,7 +8,7 @@ use std::sync::Arc;
 const RANDOM_LIMIT_DEFAULT: u32 = 16;
 
 /// Struct to be encoded for the `random` op.
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(serde::Deserialize, serde::Serialize, Clone)]
 pub struct RandomQuery {
     /// The space to get random agents from.
     pub space: Arc<KitsuneSpace>,
@@ -27,7 +27,7 @@ impl Default for RandomQuery {
     }
 }
 
-#[derive(serde::Deserialize, serde::Serialize, derive_more::From, derive_more::Into)]
+#[derive(serde::Deserialize, serde::Serialize, derive_more::From, derive_more::Into, Clone)]
 /// Limit of random peers to return.
 pub struct RandomLimit(pub u32);
 

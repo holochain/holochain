@@ -24,7 +24,9 @@ async fn put_info(peer: Bytes, store: Store) -> Result<impl warp::Reply, warp::R
         store.put(peer);
     }
     PUT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    Ok(warp::reply())
+    let mut buf = Vec::with_capacity(1);
+    rmp_encode(&mut buf, ()).map_err(|_| warp::reject())?;
+    Ok(buf)
 }
 
 fn valid(peer: &AgentInfoSigned) -> bool {
