@@ -66,8 +66,7 @@ pub fn query_metrics(
                         ":kind": MetricKind::QuickGossip.to_string(),
                     },
                     |row| row.get(0),
-                )
-                .optional()?;
+                )?;
             let time = match timestamp {
                 Some(t) => Some(time_from_micros(t)?),
                 None => None,

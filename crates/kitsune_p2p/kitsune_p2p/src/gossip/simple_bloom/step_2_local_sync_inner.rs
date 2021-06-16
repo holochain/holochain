@@ -56,8 +56,8 @@ impl Inner {
                     let key = Arc::new(MetaOpKey::Op(op));
                     has_map
                         .entry(agent.clone())
-                        .or_insert_with(HashSet::new)
-                        .insert(key);
+                        .or_insert_with(HashMap::new)
+                        .insert(key, agent.clone());
                 }
             }
         }
@@ -87,8 +87,8 @@ impl Inner {
                     let data = Arc::new(MetaOpData::Agent(agent_info));
                     let key = data.key();
                     data_map.insert(key.clone(), data);
-                    for (_agent, has) in has_map.iter_mut() {
-                        has.insert(key.clone());
+                    for (agent, has) in has_map.iter_mut() {
+                        has.insert(key.clone(), agent.clone());
                     }
                 }
             }
@@ -112,11 +112,11 @@ impl Inner {
                 if old_agent == new_agent {
                     continue;
                 }
-                for old_key in old_set.iter() {
-                    if !new_set.contains(old_key) {
+                for (old_key, origin) in old_set.iter() {
+                    if !new_set.contains_key(old_key) {
                         local_synced_ops += 1;
                         let op_data =
-                            data_map_get(evt_sender, space, old_agent, data_map, &old_key).await?;
+                            data_map_get(evt_sender, space, origin, data_map, &old_key).await?;
 
                         match &*op_data {
                             MetaOpData::Op(key, data) => {
@@ -136,7 +136,7 @@ impl Inner {
                             MetaOpData::Agent(_) => unreachable!(),
                         }
 
-                        new_set.insert(old_key.clone());
+                        new_set.insert(old_key.clone(), origin.clone());
                     }
                 }
             }
@@ -173,12 +173,12 @@ impl Inner {
                 "generating local bloom",
             );
             let mut bloom = bloomfilter::Bloom::new_for_fp_rate(len, TGT_FP);
-            for h in map.iter() {
+            for (h, _) in map.iter() {
                 bloom.set(h);
             }
             (map, bloom)
         } else {
-            (HashSet::new(), bloomfilter::Bloom::new(1, 1))
+            (HashMap::new(), bloomfilter::Bloom::new(1, 1))
         };
 
         (data_map, key_set, bloom)

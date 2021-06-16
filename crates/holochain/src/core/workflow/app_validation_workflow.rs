@@ -748,6 +748,11 @@ fn run_validation_callback_inner(
     workspace_lock: HostFnWorkspace,
     network: HolochainP2pCell,
 ) -> AppValidationResult<Outcome> {
+    
+    static COUNT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let start = std::time::Instant::now();
+    COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
     let validate: ValidateResult = ribosome.run_validate(
         ValidateHostAccess::new(workspace_lock, network),
         ValidateInvocation {
@@ -757,6 +762,9 @@ fn run_validation_callback_inner(
             entry_def_id,
         },
     )?;
+    dbg!(start.elapsed());
+    dbg!(&COUNT);
+    COUNT.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
     match validate {
         ValidateResult::Valid => Ok(Outcome::Accepted),
         ValidateResult::Invalid(reason) => Ok(Outcome::Rejected(reason)),

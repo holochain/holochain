@@ -167,10 +167,15 @@ impl RealRibosome {
     }
 
     pub fn module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
-        Ok(holochain_wasmer_host::module::MODULE_CACHE.write().get(
+        // Ok(holochain_wasmer_host::module::MODULE_CACHE.write().get(
+        //     self.wasm_cache_key(zome_name)?,
+        //     &*self.dna_file.get_wasm_for_zome(zome_name)?.code(),
+        // )?)
+        let r = holochain_wasmer_host::module::MODULE_CACHE.write().get(
             self.wasm_cache_key(zome_name)?,
             &*self.dna_file.get_wasm_for_zome(zome_name)?.code(),
-        )?)
+        )?;
+        Ok(r)
     }
 
     pub fn wasm_cache_key(&self, zome_name: &ZomeName) -> Result<[u8; 32], DnaError> {

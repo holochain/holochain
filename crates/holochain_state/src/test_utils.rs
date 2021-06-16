@@ -184,6 +184,8 @@ pub struct TestEnvs {
     wasm: EnvWrite,
     /// A test p2p environment
     p2p: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
+    /// A test p2p environment
+    p2p_metrics: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
     /// The shared root temp dir for these environments
     tempdir: Arc<TempDir>,
 }
@@ -196,10 +198,12 @@ impl TestEnvs {
         let conductor = EnvWrite::test(&tempdir, Conductor, keystore.clone()).unwrap();
         let wasm = EnvWrite::test(&tempdir, Wasm, keystore).unwrap();
         let p2p = Arc::new(parking_lot::Mutex::new(HashMap::new()));
+        let p2p_metrics = Arc::new(parking_lot::Mutex::new(HashMap::new()));
         Self {
             conductor,
             wasm,
             p2p,
+            p2p_metrics,
             tempdir: Arc::new(tempdir),
         }
     }
@@ -219,6 +223,10 @@ impl TestEnvs {
 
     pub fn p2p(&self) -> Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>> {
         self.p2p.clone()
+    }
+    
+    pub fn p2p_metrics(&self) -> Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>> {
+        self.p2p_metrics.clone()
     }
 
     /// Get the root temp dir for these environments

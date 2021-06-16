@@ -62,7 +62,7 @@ impl MetaOpData {
     }
 }
 
-type KeySet = HashSet<Arc<MetaOpKey>>;
+type KeySet = HashMap<Arc<MetaOpKey>, Arc<KitsuneAgent>>;
 type DataMap = HashMap<Arc<MetaOpKey>, Arc<MetaOpData>>;
 type BloomFilter = bloomfilter::Bloom<Arc<MetaOpKey>>;
 
@@ -179,7 +179,7 @@ impl SimpleBloomModInner {
             local_agents: HashSet::new(),
             local_bloom: bloomfilter::Bloom::new(1, 1),
             local_data_map: HashMap::new(),
-            local_key_set: HashSet::new(),
+            local_key_set: HashMap::new(),
 
             pending_metrics: Vec::new(),
 

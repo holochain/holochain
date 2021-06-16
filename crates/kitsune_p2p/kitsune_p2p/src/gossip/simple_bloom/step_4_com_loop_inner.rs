@@ -146,7 +146,7 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
         let mut out_keys = Vec::new();
 
         // find the keys for data the remote doesn't have
-        for key in i.local_key_set.iter() {
+        for (key, _) in i.local_key_set.iter() {
             if !remote_filter.check(key) {
                 out_keys.push(key.clone());
             }

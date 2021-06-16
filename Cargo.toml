@@ -55,6 +55,9 @@ codegen-units = 16
 [patch.crates-io]
 # holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "wasmer-patch" }
 # holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "wasmer-patch" }
+holochain_wasmer_host = { path = "../holochain-wasmer/crates/host" }
+holochain_wasmer_guest = { path = "../holochain-wasmer/crates/guest" }
+holochain_wasmer_common = { path = "../holochain-wasmer/crates/common" }
 # holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "bump-serde" }
 # holochain_serialized_bytes_derive = { git = "https://github.com/holochain/holochain-serialization.git", branch = "bump-serde" }
 # observability = { git = "https://github.com/freesig/observability.git", branch = "main" }

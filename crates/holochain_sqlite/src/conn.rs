@@ -2,16 +2,13 @@ use crate::prelude::*;
 use chashmap::CHashMap;
 use once_cell::sync::Lazy;
 use rusqlite::*;
-use std::{
-    path::{Path, PathBuf},
-    time::Duration,
-};
+use std::{collections::HashMap, path::{Path, PathBuf}, time::Duration};
 
 mod singleton_conn;
 
 const SQLITE_BUSY_TIMEOUT: Duration = Duration::from_secs(30);
 
-pub(crate) static DATABASE_HANDLES: Lazy<CHashMap<PathBuf, DbWrite>> = Lazy::new(|| {
+pub(crate) static DATABASE_HANDLES: Lazy<parking_lot::Mutex<HashMap<PathBuf, DbWrite>>> = Lazy::new(|| {
     // This is just a convenient place that we know gets initialized
     // both in the final binary holochain && in all relevant tests
     //
@@ -33,7 +30,7 @@ pub(crate) static DATABASE_HANDLES: Lazy<CHashMap<PathBuf, DbWrite>> = Lazy::new
         // std::process::abort();
     }));
 
-    CHashMap::new()
+    parking_lot::Mutex::new(HashMap::new())
 });
 
 pub type ConnectionPool = r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>;
@@ -44,7 +41,9 @@ pub(crate) fn new_connection_pool(path: &Path, kind: DbKind) -> ConnectionPool {
     let manager = SqliteConnectionManager::file(path);
     let customizer = Box::new(ConnCustomizer { kind });
     r2d2::Pool::builder()
-        .max_size(20)
+        .max_size(4)
+        .min_idle(Some(0))
+        .idle_timeout(Some(std::time::Duration::from_secs(60)))
         .connection_customizer(customizer)
         .build(manager)
         .unwrap()
