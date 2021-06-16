@@ -583,6 +583,8 @@ async fn test_reactivate_app() {
     let zome = simple_create_entry_zome();
     let (conductor, app) = common_genesis_test_app(zome).await.unwrap();
 
+    assert_eq_retry_10s!(conductor.list_inactive_apps().await.unwrap().len(), 0);
+
     conductor
         .deactivate_app("app".to_string(), DeactivationReason::Normal)
         .await
@@ -592,8 +594,6 @@ async fn test_reactivate_app() {
 
     conductor.activate_app("app".to_string()).await.unwrap();
     conductor.inner_handle().setup_cells().await.unwrap();
-
-    assert_eq_retry_10s!(conductor.list_inactive_apps().await.unwrap().len(), 0);
 
     let (_, cell) = app.into_tuple();
 
@@ -605,6 +605,7 @@ async fn test_reactivate_app() {
 
     // - Ensure that the app is active
     assert_eq_retry_10s!(conductor.list_active_apps().await.unwrap().len(), 1);
+    assert_eq_retry_10s!(conductor.list_inactive_apps().await.unwrap().len(), 0);
 }
 
 #[tokio::test(flavor = "multi_thread")]
