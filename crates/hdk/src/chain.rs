@@ -22,7 +22,6 @@ pub fn get_agent_activity(
 /// Given a header and entry type, returns an [ `Vec<Element>` ]
 ///
 /// @todo document this better with examples
-/// @todo do we want to return elements rather than hashes?
 /// @todo implement cap grant/claim usage in terms of query
 pub fn query(filter: ChainQueryFilter) -> ExternResult<Vec<Element>> {
     HDK.with(|h| h.borrow().query(filter))

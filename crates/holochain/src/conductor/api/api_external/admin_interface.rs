@@ -179,16 +179,23 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let installed_cells = cell_ids_with_proofs
                     .into_iter()
                     .map(|(cell_data, _)| cell_data);
-                let app = InstalledApp::new_legacy(installed_app_id, installed_cells)?;
-                Ok(AdminResponse::AppInstalled(app))
+                let app = InstalledApp::new_inactive(InstalledAppCommon::new_legacy(
+                    installed_app_id,
+                    installed_cells,
+                )?);
+                let info = InstalledAppInfo::from_installed_app(&app);
+                Ok(AdminResponse::AppInstalled(info))
             }
             InstallAppBundle(payload) => {
-                let app = self
+                let app: InstalledApp = self
                     .conductor_handle
                     .clone()
                     .install_app_bundle(*payload)
-                    .await?;
-                Ok(AdminResponse::AppBundleInstalled(app))
+                    .await?
+                    .into();
+                Ok(AdminResponse::AppBundleInstalled(
+                    InstalledAppInfo::from_installed_app(&app),
+                ))
             }
             ListDnas => {
                 let dna_list = self.conductor_handle.list_dnas().await?;
@@ -238,7 +245,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             DeactivateApp { installed_app_id } => {
                 // Activate app
                 self.conductor_handle
-                    .deactivate_app(installed_app_id.clone())
+                    .deactivate_app(installed_app_id.clone(), DeactivationReason::Normal)
                     .await?;
                 Ok(AdminResponse::AppDeactivated)
             }
@@ -322,7 +329,7 @@ mod test {
     use super::*;
     use crate::conductor::Conductor;
     use anyhow::Result;
-    use holochain_lmdb::test_utils::test_environments;
+    use holochain_state::prelude::*;
     use holochain_types::app::InstallAppDnaPayload;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_zomes;
@@ -336,7 +343,7 @@ mod test {
     async fn register_list_dna_app() -> Result<()> {
         observability::test_run().ok();
         let envs = test_environments();
-        let handle = Conductor::builder().test(&envs).await?;
+        let handle = Conductor::builder().test(&envs.into()).await?;
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
         let uid = Uuid::new_v4();
@@ -465,10 +472,10 @@ mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn install_list_dna_app() -> Result<()> {
+    async fn install_list_dna_app() {
         observability::test_run().ok();
         let envs = test_environments();
-        let handle = Conductor::builder().test(&envs).await?;
+        let handle = Conductor::builder().test(&envs.into()).await.unwrap();
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
         let uid = Uuid::new_v4();
@@ -514,11 +521,14 @@ mod test {
         let agent_key2 = fake_agent_pubkey_2();
         let path_payload = InstallAppDnaPayload::hash_only(dna_hash.clone(), "".to_string());
         let cell_id2 = CellId::new(dna_hash.clone(), agent_key2.clone());
-        let expected_cell_ids = InstalledApp::new_legacy(
-            "test-by-path".to_string(),
-            vec![InstalledCell::new(cell_id2.clone(), "".to_string())],
-        )
-        .unwrap();
+        let expected_installed_app = InstalledApp::new_inactive(
+            InstalledAppCommon::new_legacy(
+                "test-by-path".to_string(),
+                vec![InstalledCell::new(cell_id2.clone(), "".to_string())],
+            )
+            .unwrap(),
+        );
+        let expected_installed_app_info: InstalledAppInfo = (&expected_installed_app).into();
         let path_install_payload = InstallAppPayload {
             dnas: vec![path_payload],
             installed_app_id: "test-by-path".to_string(),
@@ -530,7 +540,7 @@ mod test {
             .await;
         assert_matches!(
             install_response,
-            AdminResponse::AppInstalled(cell_ids) if cell_ids == expected_cell_ids
+            AdminResponse::AppInstalled(info) if info == expected_installed_app_info
         );
         let dna_list = admin_api.handle_admin_request(AdminRequest::ListDnas).await;
         let expects = vec![dna_hash.clone()];
@@ -570,6 +580,5 @@ mod test {
         tokio::time::timeout(std::time::Duration::from_secs(1), shutdown)
             .await
             .ok();
-        Ok(())
     }
 }

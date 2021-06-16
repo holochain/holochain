@@ -3,10 +3,13 @@ use std::cell::RefCell;
 // TODO - expirement with these values for efficiency.
 
 /// The max capacity of in-pool stored PoolBufs per thread.
+/// See how this affects max mem usage in doc of POOL_BUF_SHRINK_TO_CAPACITY.
 pub(crate) const POOL_MAX_CAPACITY: usize = 1024;
 
 /// Returned PoolBufs will be shrunk to this capacity when returned.
-pub(crate) const POOL_BUF_SHRINK_TO_CAPACITY: usize = 4096;
+/// for an 8 core system (using 8 tokio threads),
+/// this results in a max of 1024 * 16_384 * 8 = 128MiB of memory overhead.
+pub(crate) const POOL_BUF_SHRINK_TO_CAPACITY: usize = 16_384;
 
 /// PoolBufs will be allocated/reset with this byte count BEFORE
 /// the readable buffer to make prepending frame info more efficient.
@@ -103,6 +106,7 @@ impl Drop for PoolBuf {
 
 /// reset used both for requeuing into thread local, and for clear()
 fn reset(v: &mut Vec<u8>, do_truncate: bool) {
+    crate::metrics::metric_push_pool_buf_release_size(v.capacity() as u64);
     if do_truncate && v.capacity() > POOL_BUF_SHRINK_TO_CAPACITY {
         v.truncate(POOL_BUF_SHRINK_TO_CAPACITY);
         v.shrink_to_fit();

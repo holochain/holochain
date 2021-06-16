@@ -55,12 +55,10 @@ mod tests {
     use std::sync::atomic::Ordering;
 
     use super::*;
-    use crate::test_utils::sweetest::SweetDnaFile;
-    use crate::test_utils::sweetest::{SweetAgents, SweetConductorBatch};
+    use crate::sweettest::SweetDnaFile;
+    use crate::sweettest::{SweetAgents, SweetConductorBatch};
     use futures::future;
     use hdk::prelude::*;
-    use holochain_types::dna::zome::inline_zome::InlineZome;
-    use holochain_zome_types::signal::AppSignal;
     use matches::assert_matches;
 
     fn zome(agents: Vec<AgentPubKey>, num_signals: Arc<AtomicUsize>) -> InlineZome {
@@ -125,7 +123,8 @@ mod tests {
 
         let apps = conductors
             .setup_app_for_zipped_agents("app", &agents, &[dna_file.clone().into()])
-            .await;
+            .await
+            .unwrap();
 
         conductors.exchange_peer_info().await;
 

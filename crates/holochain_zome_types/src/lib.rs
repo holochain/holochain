@@ -20,16 +20,19 @@ pub mod capability;
 pub mod cell;
 #[allow(missing_docs)]
 pub mod crdt;
+pub mod dna_def;
 pub mod element;
 pub mod entry;
 #[allow(missing_docs)]
 pub mod entry_def;
+pub mod genesis;
 #[allow(missing_docs)]
 pub mod header;
 #[allow(missing_docs)]
 pub mod info;
 #[allow(missing_docs)]
 pub mod init;
+pub mod judged;
 #[allow(missing_docs)]
 pub mod link;
 pub mod metadata;
@@ -70,6 +73,10 @@ pub mod test_utils;
 pub use entry::Entry;
 pub use header::Header;
 pub use prelude::*;
+/// Re-exported dependencies
+pub mod dependencies {
+    pub use ::subtle;
+}
 
 #[allow(missing_docs)]
 pub trait CallbackResult {
@@ -168,7 +175,7 @@ macro_rules! secure_primitive {
         /// This type of attack has been successfully demonstrated over a network despite varied latencies.
         impl PartialEq for $t {
             fn eq(&self, other: &Self) -> bool {
-                use subtle::ConstantTimeEq;
+                use $crate::dependencies::subtle::ConstantTimeEq;
                 self.0.ct_eq(&other.0).into()
             }
         }
@@ -201,7 +208,7 @@ macro_rules! secure_primitive {
 
         impl TryFrom<&[u8]> for $t {
             type Error = $crate::SecurePrimitiveError;
-            fn try_from(slice: &[u8]) -> Result<$t, Self::Error> {
+            fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
                 if slice.len() == $len {
                     let mut inner = [0; $len];
                     inner.copy_from_slice(slice);
@@ -212,9 +219,44 @@ macro_rules! secure_primitive {
             }
         }
 
+        impl TryFrom<Vec<u8>> for $t {
+            type Error = $crate::SecurePrimitiveError;
+            fn try_from(v: Vec<u8>) -> Result<Self, Self::Error> {
+                Self::try_from(v.as_ref())
+            }
+        }
+
         impl AsRef<[u8]> for $t {
             fn as_ref(&self) -> &[u8] {
                 &self.0
+            }
+        }
+    };
+}
+
+/// Helper macro for implementing ToSql, when using rusqlite as a dependency
+#[macro_export]
+macro_rules! impl_to_sql_via_as_ref {
+    ($s: ty) => {
+        impl ::rusqlite::ToSql for $s {
+            fn to_sql(&self) -> ::rusqlite::Result<::rusqlite::types::ToSqlOutput<'_>> {
+                Ok(::rusqlite::types::ToSqlOutput::Borrowed(
+                    self.as_ref().into(),
+                ))
+            }
+        }
+    };
+}
+
+/// Helper macro for implementing ToSql, when using rusqlite as a dependency
+#[macro_export]
+macro_rules! impl_to_sql_via_display {
+    ($s: ty) => {
+        impl ::rusqlite::ToSql for $s {
+            fn to_sql(&self) -> ::rusqlite::Result<::rusqlite::types::ToSqlOutput<'_>> {
+                Ok(::rusqlite::types::ToSqlOutput::Owned(
+                    self.to_string().into(),
+                ))
             }
         }
     };

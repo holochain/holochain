@@ -33,14 +33,14 @@ pub fn call(
     };
 
     // Make the call using this workspace
-    Ok(tokio_helper::block_forever_on(async move {
+    tokio_helper::block_forever_on(async move {
         conductor_handle
             .call_zome(invocation, workspace)
             .await
             .map_err(Box::new)
     })
     .map_err(|conductor_api_error| WasmError::Host(conductor_api_error.to_string()))?
-    .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?)
+    .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))
 }
 
 #[cfg(test)]
@@ -51,20 +51,19 @@ pub mod wasm_test {
     use hdk::prelude::CellId;
     use holo_hash::HeaderHash;
     use holochain_serialized_bytes::SerializedBytes;
-    use holochain_types::app::InstalledCell;
-    use holochain_types::dna::DnaDef;
-    use holochain_types::dna::DnaFile;
+    use holochain_state::prelude::fresh_reader_test;
+    use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::test_utils::fake_agent_pubkey_2;
     use holochain_zome_types::ExternIO;
     use holochain_zome_types::ZomeCallResponse;
     use matches::assert_matches;
+    use rusqlite::named_params;
 
     use crate::conductor::{api::ZomeCall, ConductorHandle};
     use crate::test_utils::conductor_setup::ConductorTestData;
     use crate::test_utils::install_app;
     use crate::test_utils::new_zome_call;
-    use holochain_state::element_buf::ElementBuf;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn call_test() {
@@ -149,10 +148,17 @@ pub mod wasm_test {
                 .unwrap();
 
         // Check alice's source chain contains the new value
-        let alice_source_chain =
-            ElementBuf::authored(alice_call_data.env.clone().into(), true).unwrap();
-        let el = alice_source_chain.get_element(&header_hash).unwrap();
-        assert_matches!(el, Some(_));
+        let has_hash: bool = fresh_reader_test(alice_call_data.env.clone(), |txn| {
+            txn.query_row(
+                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE header_hash = :hash AND is_authored = 1)",
+                named_params! {
+                    ":hash": header_hash
+                },
+                |row| row.get(0),
+            )
+            .unwrap()
+        });
+        assert!(has_hash);
 
         conductor_test.shutdown_conductor().await;
     }
@@ -191,10 +197,17 @@ pub mod wasm_test {
                 .unwrap();
 
         // Check alice's source chain contains the new value
-        let alice_source_chain =
-            ElementBuf::authored(alice_call_data.env.clone().into(), true).unwrap();
-        let el = alice_source_chain.get_element(&header_hash).unwrap();
-        assert_matches!(el, Some(_));
+        let has_hash: bool = fresh_reader_test(alice_call_data.env.clone(), |txn| {
+            txn.query_row(
+                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE header_hash = :hash AND is_authored = 1)",
+                named_params! {
+                    ":hash": header_hash
+                },
+                |row| row.get(0),
+            )
+            .unwrap()
+        });
+        assert!(has_hash);
 
         conductor_test.shutdown_conductor().await;
     }

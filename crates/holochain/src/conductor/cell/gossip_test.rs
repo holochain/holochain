@@ -1,15 +1,12 @@
-use crate::conductor::p2p_store::AgentKv;
-use crate::conductor::p2p_store::AgentKvKey;
 use crate::test_utils::conductor_setup::ConductorTestData;
 use crate::test_utils::new_zome_call;
 use crate::test_utils::wait_for_integration;
-use fallible_iterator::FallibleIterator;
 use hdk::prelude::*;
-use holochain_lmdb::buffer::KvStoreT;
-use holochain_lmdb::fresh_reader_test;
+use holochain_p2p::{AgentPubKeyExt, DnaHashExt};
+use holochain_sqlite::prelude::*;
+use holochain_state::prelude::fresh_reader_test;
 use holochain_test_wasm_common::AnchorInput;
 use holochain_wasm_test_utils::TestWasm;
-use kitsune_p2p::KitsuneBinType;
 use kitsune_p2p::KitsuneP2pConfig;
 use matches::assert_matches;
 
@@ -107,25 +104,15 @@ async fn agent_info_test() {
     let alice_agent_id = alice_cell_id.agent_pubkey();
 
     // Kitsune types
-    let dna_kit = kitsune_p2p::KitsuneSpace::new(
-        alice_call_data
-            .ribosome
-            .dna_file
-            .dna_hash()
-            .get_raw_36()
-            .to_vec(),
-    );
+    let dna_kit = alice_call_data.ribosome.dna_file.dna_hash().to_kitsune();
 
-    let alice_kit = kitsune_p2p::KitsuneAgent::new(alice_agent_id.get_raw_36().to_vec());
+    let alice_kit = alice_agent_id.to_kitsune();
 
-    let p2p_env = handle.get_p2p_env().await;
-    let p2p_kv = AgentKv::new(p2p_env.clone().into()).unwrap();
+    let p2p_env = handle.get_p2p_env(dna_kit.clone()).await;
 
-    let alice_key: AgentKvKey = (&dna_kit, &alice_kit).into();
-
-    let (agent_info, len) = fresh_reader_test!(p2p_env, |r| {
-        let agent_info = p2p_kv.as_store_ref().get(&r, &alice_key).unwrap();
-        let len = p2p_kv.as_store_ref().iter(&r).unwrap().count().unwrap();
+    let (agent_info, len) = fresh_reader_test(p2p_env.clone(), |txn| {
+        let agent_info = txn.p2p_get(&alice_kit).unwrap();
+        let len = txn.p2p_list().unwrap().len();
         (agent_info, len)
     });
     tracing::debug!(?agent_info);
@@ -141,17 +128,15 @@ async fn agent_info_test() {
         .unwrap()
         .cell_id
         .agent_pubkey();
-    let bob_kit = kitsune_p2p::KitsuneAgent::new(bob_agent_id.get_raw_36().to_vec());
-    let bob_key: AgentKvKey = (&dna_kit, &bob_kit).into();
+    let bob_kit = bob_agent_id.to_kitsune();
 
     // Give publish time to finish
     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
-    let p2p_kv = AgentKv::new(p2p_env.clone().into()).unwrap();
-    let (alice_agent_info, bob_agent_info, len) = fresh_reader_test!(p2p_env, |r| {
-        let alice_agent_info = p2p_kv.as_store_ref().get(&r, &alice_key).unwrap();
-        let bob_agent_info = p2p_kv.as_store_ref().get(&r, &bob_key).unwrap();
-        let len = p2p_kv.as_store_ref().iter(&r).unwrap().count().unwrap();
+    let (alice_agent_info, bob_agent_info, len) = fresh_reader_test(p2p_env.clone(), |txn| {
+        let alice_agent_info = txn.p2p_get(&alice_kit).unwrap();
+        let bob_agent_info = txn.p2p_get(&bob_kit).unwrap();
+        let len = txn.p2p_list().unwrap().len();
         (alice_agent_info, bob_agent_info, len)
     });
     tracing::debug!(?alice_agent_info);

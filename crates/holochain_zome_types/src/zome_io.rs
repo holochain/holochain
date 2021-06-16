@@ -46,7 +46,7 @@ impl ExternIO {
     where
         O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
-        Ok(holochain_serialized_bytes::decode(&self.0)?)
+        holochain_serialized_bytes::decode(&self.0)
     }
 
     pub fn into_vec(self) -> Vec<u8> {
@@ -107,13 +107,13 @@ wasm_io_types! {
     // @todo Get the capability for the current zome call.
     fn capability_info (()) -> ();
 
+    // Returns HeaderHash of the newly created element.
+    fn create (zt::entry::EntryWithDefId) -> holo_hash::HeaderHash;
+
     // Create a link between two entries.
     fn create_link (zt::link::CreateLinkInput) -> holo_hash::HeaderHash;
 
     fn create_x25519_keypair(()) -> zt::x_salsa20_poly1305::x25519::X25519PubKey;
-
-    // Returns HeaderHash of the newly created element.
-    fn create (zt::entry::EntryWithDefId) -> holo_hash::HeaderHash;
 
     // The debug host import takes a TraceMsg to output wherever the host wants to display it.
     // TraceMsg includes line numbers. so the wasm tells the host about it's own code structure.

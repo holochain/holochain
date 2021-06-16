@@ -28,6 +28,24 @@ pub struct Element {
 }
 
 impl Element {
+    /// Mutable reference to the Header content.
+    /// This is useless and dangerous in production usage.
+    /// Guaranteed to make hashes and signatures mismatch whatever the Header is mutated to (at least).
+    /// This may be useful for tests that rely heavily on mocked and fixturated data.
+    #[cfg(feature = "test_utils")]
+    pub fn as_header_mut(&mut self) -> &mut Header {
+        self.signed_header.header.as_content_mut()
+    }
+
+    /// Mutable reference to the ElementEntry.
+    /// This is useless and dangerous in production usage.
+    /// Guaranteed to make hashes and signatures mismatch whatever the ElementEntry is mutated to (at least).
+    /// This may be useful for tests that rely heavily on mocked and fixturated data.
+    #[cfg(feature = "test_utils")]
+    pub fn as_entry_mut(&mut self) -> &mut ElementEntry {
+        &mut self.entry
+    }
+
     /// Raw element constructor.  Used only when we know that the values are valid.
     pub fn new(signed_header: SignedHeaderHashed, maybe_entry: Option<Entry>) -> Self {
         let maybe_visibilty = signed_header
@@ -157,7 +175,7 @@ impl ElementEntry {
 /// A combination of a Header and its signature.
 ///
 /// Has implementations From and Into its tuple form.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 pub struct SignedHeader(pub Header, pub Signature);
 
 impl SignedHeader {
@@ -189,10 +207,25 @@ impl HashableContent for SignedHeader {
 }
 
 /// The header and the signature that signed it
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, Serialize, Deserialize)]
 pub struct SignedHeaderHashed {
+    /// The hashed but unsigned header.
     header: HeaderHashed,
+    /// The signature of the header.
     signature: Signature,
+}
+
+impl std::hash::Hash for SignedHeaderHashed {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.signature.hash(state);
+        self.as_hash().hash(state);
+    }
+}
+
+impl PartialEq for SignedHeaderHashed {
+    fn eq(&self, other: &Self) -> bool {
+        self.signature.eq(&other.signature) && self.as_hash() == other.as_hash()
+    }
 }
 
 #[allow(missing_docs)]
@@ -265,6 +298,13 @@ impl From<SignedHeaderHashed> for HoloHashed<SignedHeader> {
     fn from(shh: SignedHeaderHashed) -> HoloHashed<SignedHeader> {
         let (signed_header, hash) = shh.into_inner();
         HoloHashed::with_pre_hashed(signed_header, hash)
+    }
+}
+
+impl From<SignedHeaderHashed> for SignedHeader {
+    fn from(shh: SignedHeaderHashed) -> SignedHeader {
+        let (signed_header, _) = shh.into_inner();
+        signed_header
     }
 }
 

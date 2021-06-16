@@ -1,5 +1,6 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
+use holochain_cascade::Cascade;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
@@ -33,12 +34,9 @@ pub fn get_agent_activity(
 
     // timeouts must be handled by the network
     tokio_helper::block_forever_on(async move {
-        let activity = call_context
-            .host_access
-            .workspace()
-            .write()
-            .await
-            .cascade(network)
+        let workspace = call_context.host_access.workspace();
+        let mut cascade = Cascade::from_workspace_network(workspace, network);
+        let activity = cascade
             .get_agent_activity(agent_pubkey, chain_query_filter, options)
             .await
             .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;

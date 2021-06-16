@@ -6,25 +6,22 @@
 //! but if you want more control use [`CmdRunner::command`].
 use std::path::Path;
 use std::path::PathBuf;
-use std::{collections::HashSet, convert::TryInto};
 
 use anyhow::anyhow;
 use anyhow::bail;
 use anyhow::ensure;
-use holochain_conductor_api::AdminInterfaceConfig;
 use holochain_conductor_api::AdminRequest;
 use holochain_conductor_api::AdminResponse;
 use holochain_conductor_api::InterfaceDriver;
-use holochain_p2p::kitsune_p2p;
+use holochain_conductor_api::{AdminInterfaceConfig, InstalledAppInfo};
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
+use holochain_types::prelude::DnaHash;
 use holochain_types::prelude::InstallAppDnaPayload;
 use holochain_types::prelude::InstallAppPayload;
-use holochain_types::prelude::InstalledCell;
 use holochain_types::prelude::RegisterDnaPayload;
 use holochain_types::prelude::YamlProperties;
 use holochain_types::prelude::{AgentPubKey, AppBundleSource};
 use holochain_types::prelude::{CellId, InstallAppBundlePayload};
-use holochain_types::prelude::{DnaHash, InstalledApp};
 use holochain_types::prelude::{DnaSource, Uid};
 use std::convert::TryFrom;
 
@@ -273,17 +270,12 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
         }
         AdminRequestCli::InstallApp(args) => {
             let app_id = args.app_id.clone();
-            let cells = install_app(cmd, args).await?;
-            msg!("Installed App: {} with cells {:?}", app_id, cells);
+            let _ = install_app(cmd, args).await?;
+            msg!("Installed App: {}", app_id);
         }
         AdminRequestCli::InstallAppBundle(args) => {
             let app = install_app_bundle(cmd, args).await?;
-            let cells: Vec<_> = app.all_cells().collect();
-            msg!(
-                "Installed App: {} with cells {:?}",
-                app.installed_app_id(),
-                cells
-            );
+            msg!("Installed App: {}", app.installed_app_id,);
         }
         AdminRequestCli::ListDnas => {
             let dnas = list_dnas(cmd).await?;
@@ -334,20 +326,22 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
                     .map(|d| (d.clone(), holochain_p2p::space_holo_to_kit(d)))
                     .collect::<Vec<_>>();
 
-                let info: kitsune_p2p::agent_store::AgentInfo = (&info).try_into().unwrap();
-                let this_agent = agents.iter().find(|a| *info.as_agent_ref() == a.1);
-                let this_dna = dnas.iter().find(|d| *info.as_space_ref() == d.1).unwrap();
+                let this_agent = agents.iter().find(|a| *info.agent == a.1);
+                let this_dna = dnas.iter().find(|d| *info.space == d.1).unwrap();
                 if let Some(this_agent) = this_agent {
                     writeln!(out, "This Agent {:?} is {:?}", this_agent.0, this_agent.1)?;
                 }
                 writeln!(out, "This DNA {:?} is {:?}", this_dna.0, this_dna.1)?;
 
                 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
-                let duration = Duration::milliseconds(info.signed_at_ms() as i64);
+                let duration = Duration::milliseconds(info.signed_at_ms as i64);
                 let s = duration.num_seconds() as i64;
                 let n = duration.clone().to_std().unwrap().subsec_nanos();
                 let dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(s, n), Utc);
-                let exp = dt + Duration::milliseconds(info.expires_after_ms() as i64);
+                let duration = Duration::milliseconds(info.expires_at_ms as i64);
+                let s = duration.num_seconds() as i64;
+                let n = duration.clone().to_std().unwrap().subsec_nanos();
+                let exp = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(s, n), Utc);
                 let now = Utc::now();
 
                 writeln!(out, "signed at {}", dt)?;
@@ -357,9 +351,9 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
                     exp,
                     (exp - now).num_minutes()
                 )?;
-                writeln!(out, "space: {:?}", info.as_space_ref())?;
-                writeln!(out, "agent: {:?}", info.as_agent_ref())?;
-                writeln!(out, "urls: {:?}", info.as_urls_ref())?;
+                writeln!(out, "space: {:?}", info.space)?;
+                writeln!(out, "agent: {:?}", info.agent)?;
+                writeln!(out, "urls: {:?}", info.url_list)?;
                 msg!("{}\n", out);
             }
         }
@@ -424,7 +418,7 @@ pub async fn register_dna(cmd: &mut CmdRunner, args: RegisterDna) -> anyhow::Res
 pub async fn install_app(
     cmd: &mut CmdRunner,
     args: InstallApp,
-) -> anyhow::Result<HashSet<InstalledCell>> {
+) -> anyhow::Result<InstalledAppInfo> {
     let InstallApp {
         app_id,
         agent_key,
@@ -454,21 +448,18 @@ pub async fn install_app(
     activate_app(
         cmd,
         ActivateApp {
-            app_id: installed_app.installed_app_id().clone(),
+            app_id: installed_app.installed_app_id.clone(),
         },
     )
     .await?;
-    Ok(installed_app
-        .provisioned_cells()
-        .map(|(n, c)| InstalledCell::new(c.clone(), n.clone()))
-        .collect())
+    Ok(installed_app)
 }
 
 /// Calls [`AdminRequest::InstallApp`] and installs a new app.
 pub async fn install_app_bundle(
     cmd: &mut CmdRunner,
     args: InstallAppBundle,
-) -> anyhow::Result<InstalledApp> {
+) -> anyhow::Result<InstalledAppInfo> {
     let InstallAppBundle {
         app_id,
         agent_key,
@@ -498,7 +489,7 @@ pub async fn install_app_bundle(
     activate_app(
         cmd,
         ActivateApp {
-            app_id: installed_app.installed_app_id().clone(),
+            app_id: installed_app.installed_app_id.clone(),
         },
     )
     .await?;
@@ -632,7 +623,7 @@ fn parse_dna_hash(arg: &str) -> anyhow::Result<DnaHash> {
 impl From<CellId> for DumpState {
     fn from(cell_id: CellId) -> Self {
         let (dna, agent_key) = cell_id.into_dna_and_agent();
-        Self { agent_key, dna }
+        Self { dna, agent_key }
     }
 }
 

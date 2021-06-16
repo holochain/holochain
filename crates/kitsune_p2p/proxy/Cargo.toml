@@ -32,6 +32,7 @@ webpki = "0.21.2"
 
 [dev-dependencies]
 criterion = "*"
+crossterm = "0.19"
 
 [[bench]]
 name = "old_proxy_thru"

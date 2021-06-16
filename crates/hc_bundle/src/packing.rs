@@ -3,6 +3,7 @@
 //! Defines the CLI commands for packing/unpacking both DNA and hApp bundles
 
 use crate::error::{HcBundleError, HcBundleResult};
+use holochain_util::ffs;
 use mr_bundle::{Bundle, Manifest};
 use std::path::Path;
 use std::path::PathBuf;
@@ -132,11 +133,9 @@ zomes:
                 false
             )
             .await,
-            Err(
-                HcBundleError::MrBundleError(
-                    MrBundleError::UnpackingError(UnpackingError::DirectoryExists(_)),
-                ),
-            )
+            Err(HcBundleError::MrBundleError(MrBundleError::UnpackingError(
+                UnpackingError::DirectoryExists(_)
+            ),),)
         );
         // Now unpack with forcing to overwrite original directory
         unpack::<DnaManifest>(
@@ -150,12 +149,11 @@ zomes:
 
         let (bundle_path, bundle) = pack::<DnaManifest>(
             &dir,
-            Some(dbg!(dir.parent().unwrap().to_path_buf())),
+            Some(dir.parent().unwrap().to_path_buf()),
             "test_dna".to_string(),
         )
         .await
         .unwrap();
-        dbg!(&bundle_path);
 
         // Now remove the directory altogether, unpack again, and check that
         // all of the same files are present

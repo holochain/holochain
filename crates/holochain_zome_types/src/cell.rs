@@ -16,7 +16,7 @@ pub struct CellId(DnaHash, AgentPubKey);
 
 impl fmt::Display for CellId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "cell-{}-{}", self.dna_hash(), self.agent_pubkey())
+        write!(f, "Cell({}, {})", self.dna_hash(), self.agent_pubkey())
     }
 }
 

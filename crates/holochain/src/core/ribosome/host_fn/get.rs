@@ -1,5 +1,6 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
+use holochain_cascade::Cascade;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
@@ -20,12 +21,9 @@ pub fn get<'a>(
 
     // timeouts must be handled by the network
     tokio_helper::block_forever_on(async move {
-        let maybe_element = call_context
-            .host_access
-            .workspace()
-            .write()
-            .await
-            .cascade(network)
+        let workspace = call_context.host_access.workspace();
+        let mut cascade = Cascade::from_workspace_network(workspace, network);
+        let maybe_element = cascade
             .dht_get(any_dht_hash, get_options)
             .await
             .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;

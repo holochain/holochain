@@ -12,6 +12,9 @@ use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
+use crate::core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckHostAccess;
+use crate::core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckInvocation;
+use crate::core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation;
@@ -74,9 +77,6 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
-/// Path to the wasm cache path
-const WASM_CACHE_PATH_ENV: &str = "HC_WASM_CACHE_PATH";
-
 /// The only RealRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
 #[derive(Clone, Debug)]
@@ -86,6 +86,74 @@ pub struct RealRibosome {
     //      - is already in the wasm cache, and only include the DnaDef portion
     //      - here in the ribosome.
     pub dna_file: DnaFile,
+}
+
+struct HostFnBuilder {
+    store: Store,
+    env: Env,
+    ribosome_arc: Arc<RealRibosome>,
+    context_arc: Arc<CallContext>,
+}
+
+impl HostFnBuilder {
+    const SIGNATURE: ([Type; 2], [Type; 0]) = ([Type::I32, Type::I32], []);
+
+    fn with_host_function<I: 'static, O: 'static>(
+        &self,
+        ns: &mut Exports,
+        host_function_name: &str,
+        host_function: fn(Arc<RealRibosome>, Arc<CallContext>, I) -> Result<O, WasmError>,
+    ) -> &Self
+    where
+        I: serde::de::DeserializeOwned + std::fmt::Debug,
+        O: serde::Serialize + std::fmt::Debug,
+    {
+        let ribosome_arc = Arc::clone(&self.ribosome_arc);
+        let context_arc = Arc::clone(&self.context_arc);
+        ns.insert(
+            host_function_name,
+            Function::new_with_env(
+                &self.store,
+                Self::SIGNATURE,
+                self.env.clone(),
+                move |env: &Env, args: &[Value]| -> Result<Vec<Value>, RuntimeError> {
+                    let guest_ptr: GuestPtr = match args[0] {
+                        Value::I32(i) => i
+                            .try_into()
+                            .map_err(|_| RuntimeError::new(WasmError::PointerMap))?,
+                        _ => {
+                            return Err::<_, RuntimeError>(RuntimeError::new(WasmError::PointerMap))
+                        }
+                    };
+                    let len: Len = match args[1] {
+                        Value::I32(i) => i
+                            .try_into()
+                            .map_err(|_| RuntimeError::new(WasmError::PointerMap))?,
+                        _ => {
+                            return Err::<_, RuntimeError>(RuntimeError::new(WasmError::PointerMap))
+                        }
+                    };
+                    let result = match env.consume_bytes_from_guest(guest_ptr, len) {
+                        Ok(input) => {
+                            match host_function(
+                                Arc::clone(&ribosome_arc),
+                                Arc::clone(&context_arc),
+                                input,
+                            ) {
+                                Ok(output) => Ok::<_, WasmError>(output),
+                                Err(wasm_error) => Err::<_, WasmError>(wasm_error),
+                            }
+                        }
+                        Err(wasm_error) => Err::<_, WasmError>(wasm_error),
+                    };
+                    env.set_data(result)
+                        .map_err(|e| RuntimeError::new(e.to_string()))?;
+                    Ok(vec![])
+                },
+            ),
+        );
+        &self
+    }
 }
 
 impl RealRibosome {
@@ -98,150 +166,112 @@ impl RealRibosome {
         &self.dna_file
     }
 
-    pub fn module(&self, zome_name: &ZomeName) -> RibosomeResult<Module> {
-        let wasm: Arc<Box<[u8]>> = self.dna_file.get_wasm_for_zome(zome_name)?.code();
-        Ok(holochain_wasmer_host::instantiate::module(
-            &self.wasm_cache_key(zome_name)?,
-            &wasm,
-            std::env::var_os(WASM_CACHE_PATH_ENV),
+    pub fn module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
+        Ok(holochain_wasmer_host::module::MODULE_CACHE.write().get(
+            self.wasm_cache_key(zome_name)?,
+            &*self.dna_file.get_wasm_for_zome(zome_name)?.code(),
         )?)
     }
 
-    pub fn wasm_cache_key(&self, zome_name: &ZomeName) -> Result<&[u8], DnaError> {
+    pub fn wasm_cache_key(&self, zome_name: &ZomeName) -> Result<[u8; 32], DnaError> {
         // TODO: make this actually the hash of the wasm once we can do that
         // watch out for cache misses in the tests that make things slooow if you change this!
         // format!("{}{}", &self.dna.dna_hash(), zome_name).into_bytes()
-        Ok(self
+        let mut key = [0; 32];
+        let bytes = self
             .dna_file
             .dna()
             .get_wasm_zome(zome_name)?
             .wasm_hash
-            .get_raw_39())
+            .get_raw_32();
+        key.copy_from_slice(&bytes);
+        Ok(key)
     }
 
-    pub fn instance(&self, call_context: CallContext) -> RibosomeResult<Instance> {
+    pub fn instance(&self, call_context: CallContext) -> RibosomeResult<Arc<Mutex<Instance>>> {
         let zome_name = call_context.zome.zome_name().clone();
-        let wasm: Arc<Box<[u8]>> = self.dna_file.get_wasm_for_zome(&zome_name)?.code();
-        let imports: ImportObject = Self::imports(self, call_context);
-        Ok(holochain_wasmer_host::instantiate::instantiate(
-            self.wasm_cache_key(&zome_name)?,
-            &wasm,
-            &imports,
-            std::env::var_os(WASM_CACHE_PATH_ENV),
-        )?)
+        let module = self.module(&zome_name)?;
+        let imports: ImportObject = Self::imports(self, call_context, module.store());
+        let instance = Arc::new(Mutex::new(
+            Instance::new(&module, &imports).map_err(|e| WasmError::Compile(e.to_string()))?,
+        ));
+        Ok(instance)
     }
 
-    fn imports(&self, call_context: CallContext) -> ImportObject {
+    fn imports(&self, call_context: CallContext, store: &Store) -> ImportObject {
         let host_fn_access = (&call_context.host_access()).into();
 
-        // it is important that RealRibosome and ZomeCallInvocation are cheap to clone here
-        let self_arc = std::sync::Arc::new((*self).clone());
-        let call_context_arc = std::sync::Arc::new(call_context);
-
-        macro_rules! invoke_host_function {
-            ( $host_function:ident ) => {{
-                let closure_self_arc = std::sync::Arc::clone(&self_arc);
-                let closure_call_context_arc = std::sync::Arc::clone(&call_context_arc);
-                move |ctx: &mut Ctx, guest_allocation_ptr: GuestPtr| -> Result<Len, WasmError> {
-                    let result = match $crate::holochain_wasmer_host::guest::from_guest_ptr(
-                        ctx,
-                        guest_allocation_ptr,
-                    ) {
-                        Ok(input) => {
-                            match $host_function(
-                                std::sync::Arc::clone(&closure_self_arc),
-                                std::sync::Arc::clone(&closure_call_context_arc),
-                                input,
-                            ) {
-                                Ok(output) => Ok::<_, WasmError>(output),
-                                Err(wasm_error) => Err::<_, WasmError>(wasm_error),
-                            }
-                        }
-                        Err(wasm_error) => Err::<_, WasmError>(wasm_error),
-                    };
-                    $crate::holochain_wasmer_host::import::set_context_data(ctx, result)
-                }
-            }};
-        }
+        let env = Env::default();
         let mut imports = imports! {};
-        let mut ns = Namespace::new();
+        let mut ns = Exports::new();
+
+        // it is important that RealRibosome and ZomeCallInvocation are cheap to clone here
+        let ribosome_arc = std::sync::Arc::new((*self).clone());
+        let context_arc = std::sync::Arc::new(call_context);
 
         // standard memory handling used by the holochain_wasmer guest and host macros
         ns.insert(
             "__import_data",
-            func!(holochain_wasmer_host::import::__import_data),
+            Function::new_native_with_env(
+                store,
+                env.clone(),
+                holochain_wasmer_host::import::__import_data,
+            ),
         );
 
-        // imported host functions for core
-        ns.insert("__trace", func!(invoke_host_function!(trace)));
-        ns.insert("__hash_entry", func!(invoke_host_function!(hash_entry)));
-        ns.insert("__version", func!(invoke_host_function!(version)));
-        ns.insert("__unreachable", func!(invoke_host_function!(unreachable)));
+        let host_fn_builder = HostFnBuilder {
+            store: store.clone(),
+            env,
+            ribosome_arc,
+            context_arc,
+        };
+
+        host_fn_builder
+            .with_host_function(&mut ns, "__trace", trace)
+            .with_host_function(&mut ns, "__hash_entry", hash_entry)
+            .with_host_function(&mut ns, "__version", version)
+            .with_host_function(&mut ns, "__unreachable", unreachable);
 
         if let HostFnAccess {
             keystore: Permission::Allow,
             ..
         } = host_fn_access
         {
-            ns.insert(
-                "__verify_signature",
-                func!(invoke_host_function!(verify_signature)),
-            );
-            ns.insert("__sign", func!(invoke_host_function!(sign)));
-            ns.insert(
-                "__sign_ephemeral",
-                func!(invoke_host_function!(sign_ephemeral)),
-            );
-            ns.insert(
-                "__create_x25519_keypair",
-                func!(invoke_host_function!(create_x25519_keypair)),
-            );
-            ns.insert(
-                "__x_salsa20_poly1305_encrypt",
-                func!(invoke_host_function!(x_salsa20_poly1305_encrypt)),
-            );
-            ns.insert(
-                "__x_salsa20_poly1305_decrypt",
-                func!(invoke_host_function!(x_salsa20_poly1305_decrypt)),
-            );
-            ns.insert(
-                "__x_25519_x_salsa20_poly1305_encrypt",
-                func!(invoke_host_function!(x_25519_x_salsa20_poly1305_encrypt)),
-            );
-            ns.insert(
-                "__x_25519_x_salsa20_poly1305_decrypt",
-                func!(invoke_host_function!(x_25519_x_salsa20_poly1305_decrypt)),
-            );
+            host_fn_builder
+                .with_host_function(&mut ns, "__verify_signature", verify_signature)
+                .with_host_function(&mut ns, "__sign", sign)
+                .with_host_function(&mut ns, "__sign_ephemeral", sign_ephemeral)
+                .with_host_function(&mut ns, "__create_x25519_keypair", create_x25519_keypair)
+                .with_host_function(
+                    &mut ns,
+                    "__x_salsa20_poly1305_encrypt",
+                    x_salsa20_poly1305_encrypt,
+                )
+                .with_host_function(
+                    &mut ns,
+                    "__x_salsa20_poly1305_decrypt",
+                    x_salsa20_poly1305_decrypt,
+                )
+                .with_host_function(
+                    &mut ns,
+                    "__x_25519_x_salsa20_poly1305_encrypt",
+                    x_25519_x_salsa20_poly1305_encrypt,
+                )
+                .with_host_function(
+                    &mut ns,
+                    "__x_25519_x_salsa20_poly1305_decrypt",
+                    x_25519_x_salsa20_poly1305_decrypt,
+                );
         } else {
-            ns.insert(
-                "__verify_signature",
-                func!(invoke_host_function!(unreachable)),
-            );
-            ns.insert("__sign", func!(invoke_host_function!(unreachable)));
-            ns.insert(
-                "__sign_ephemeral",
-                func!(invoke_host_function!(unreachable)),
-            );
-            ns.insert(
-                "__create_x25519_keypair",
-                func!(invoke_host_function!(unreachable)),
-            );
-            ns.insert(
-                "__x_salsa20_poly1305_encrypt",
-                func!(invoke_host_function!(unreachable)),
-            );
-            ns.insert(
-                "__x_salsa20_poly1305_decrypt",
-                func!(invoke_host_function!(unreachable)),
-            );
-            ns.insert(
-                "__x_25519_x_salsa20_poly1305_encrypt",
-                func!(invoke_host_function!(unreachable)),
-            );
-            ns.insert(
-                "__x_25519_x_salsa20_poly1305_decrypt",
-                func!(invoke_host_function!(unreachable)),
-            );
+            host_fn_builder
+                .with_host_function(&mut ns, "__verify_signature", unreachable)
+                .with_host_function(&mut ns, "__sign", unreachable)
+                .with_host_function(&mut ns, "__sign_ephemeral", unreachable)
+                .with_host_function(&mut ns, "__create_x25519_keypair", unreachable)
+                .with_host_function(&mut ns, "__x_salsa20_poly1305_encrypt", unreachable)
+                .with_host_function(&mut ns, "__x_salsa20_poly1305_decrypt", unreachable)
+                .with_host_function(&mut ns, "__x_25519_x_salsa20_poly1305_encrypt", unreachable)
+                .with_host_function(&mut ns, "__x_25519_x_salsa20_poly1305_decrypt", unreachable);
         }
 
         if let HostFnAccess {
@@ -249,15 +279,17 @@ impl RealRibosome {
             ..
         } = host_fn_access
         {
-            ns.insert("__zome_info", func!(invoke_host_function!(zome_info)));
-            ns.insert("__app_info", func!(invoke_host_function!(app_info)));
-            ns.insert("__dna_info", func!(invoke_host_function!(dna_info)));
-            ns.insert("__call_info", func!(invoke_host_function!(call_info)));
+            host_fn_builder
+                .with_host_function(&mut ns, "__zome_info", zome_info)
+                .with_host_function(&mut ns, "__app_info", app_info)
+                .with_host_function(&mut ns, "__dna_info", dna_info)
+                .with_host_function(&mut ns, "__call_info", call_info);
         } else {
-            ns.insert("__zome_info", func!(invoke_host_function!(unreachable)));
-            ns.insert("__app_info", func!(invoke_host_function!(unreachable)));
-            ns.insert("__dna_info", func!(invoke_host_function!(unreachable)));
-            ns.insert("__call_info", func!(invoke_host_function!(unreachable)));
+            host_fn_builder
+                .with_host_function(&mut ns, "__zome_info", unreachable)
+                .with_host_function(&mut ns, "__app_info", unreachable)
+                .with_host_function(&mut ns, "__dna_info", unreachable)
+                .with_host_function(&mut ns, "__call_info", unreachable);
         }
 
         if let HostFnAccess {
@@ -265,13 +297,15 @@ impl RealRibosome {
             ..
         } = host_fn_access
         {
-            ns.insert("__random_bytes", func!(invoke_host_function!(random_bytes)));
-            ns.insert("__sys_time", func!(invoke_host_function!(sys_time)));
-            ns.insert("__sleep", func!(invoke_host_function!(sleep)));
+            host_fn_builder
+                .with_host_function(&mut ns, "__random_bytes", random_bytes)
+                .with_host_function(&mut ns, "__sys_time", sys_time)
+                .with_host_function(&mut ns, "__sleep", sleep);
         } else {
-            ns.insert("__random_bytes", func!(invoke_host_function!(unreachable)));
-            ns.insert("__sys_time", func!(invoke_host_function!(unreachable)));
-            ns.insert("__sleep", func!(invoke_host_function!(unreachable)));
+            host_fn_builder
+                .with_host_function(&mut ns, "__random_bytes", unreachable)
+                .with_host_function(&mut ns, "__sys_time", unreachable)
+                .with_host_function(&mut ns, "__sleep", unreachable);
         }
 
         if let HostFnAccess {
@@ -279,33 +313,17 @@ impl RealRibosome {
             ..
         } = host_fn_access
         {
-            ns.insert("__agent_info", func!(invoke_host_function!(agent_info)));
-            ns.insert(
-                "__capability_claims",
-                func!(invoke_host_function!(capability_claims)),
-            );
-            ns.insert(
-                "__capability_grants",
-                func!(invoke_host_function!(capability_grants)),
-            );
-            ns.insert(
-                "__capability_info",
-                func!(invoke_host_function!(capability_info)),
-            );
+            host_fn_builder
+                .with_host_function(&mut ns, "__agent_info", agent_info)
+                .with_host_function(&mut ns, "__capability_claims", capability_claims)
+                .with_host_function(&mut ns, "__capability_grants", capability_grants)
+                .with_host_function(&mut ns, "__capability_info", capability_info);
         } else {
-            ns.insert("__agent_info", func!(invoke_host_function!(unreachable)));
-            ns.insert(
-                "__capability_claims",
-                func!(invoke_host_function!(unreachable)),
-            );
-            ns.insert(
-                "__capability_grants",
-                func!(invoke_host_function!(unreachable)),
-            );
-            ns.insert(
-                "__capability_info",
-                func!(invoke_host_function!(unreachable)),
-            );
+            host_fn_builder
+                .with_host_function(&mut ns, "__agent_info", unreachable)
+                .with_host_function(&mut ns, "__capability_claims", unreachable)
+                .with_host_function(&mut ns, "__capability_grants", unreachable)
+                .with_host_function(&mut ns, "__capability_info", unreachable);
         }
 
         if let HostFnAccess {
@@ -313,31 +331,21 @@ impl RealRibosome {
             ..
         } = host_fn_access
         {
-            ns.insert("__get", func!(invoke_host_function!(get)));
-            ns.insert("__get_details", func!(invoke_host_function!(get_details)));
-            ns.insert("__get_links", func!(invoke_host_function!(get_links)));
-            ns.insert(
-                "__get_link_details",
-                func!(invoke_host_function!(get_link_details)),
-            );
-            ns.insert(
-                "__get_agent_activity",
-                func!(invoke_host_function!(get_agent_activity)),
-            );
-            ns.insert("__query", func!(invoke_host_function!(query)));
+            host_fn_builder
+                .with_host_function(&mut ns, "__get", get)
+                .with_host_function(&mut ns, "__get_details", get_details)
+                .with_host_function(&mut ns, "__get_links", get_links)
+                .with_host_function(&mut ns, "__get_link_details", get_link_details)
+                .with_host_function(&mut ns, "__get_agent_activity", get_agent_activity)
+                .with_host_function(&mut ns, "__query", query);
         } else {
-            ns.insert("__get", func!(invoke_host_function!(unreachable)));
-            ns.insert("__get_details", func!(invoke_host_function!(unreachable)));
-            ns.insert("__get_links", func!(invoke_host_function!(unreachable)));
-            ns.insert(
-                "__get_link_details",
-                func!(invoke_host_function!(unreachable)),
-            );
-            ns.insert(
-                "__get_agent_activity",
-                func!(invoke_host_function!(unreachable)),
-            );
-            ns.insert("__query", func!(invoke_host_function!(unreachable)));
+            host_fn_builder
+                .with_host_function(&mut ns, "__get", unreachable)
+                .with_host_function(&mut ns, "__get_details", unreachable)
+                .with_host_function(&mut ns, "__get_links", unreachable)
+                .with_host_function(&mut ns, "__get_link_details", unreachable)
+                .with_host_function(&mut ns, "__get_agent_activity", unreachable)
+                .with_host_function(&mut ns, "__query", unreachable);
         }
 
         if let HostFnAccess {
@@ -345,14 +353,13 @@ impl RealRibosome {
             ..
         } = host_fn_access
         {
-            ns.insert("__call_remote", func!(invoke_host_function!(call_remote)));
-            ns.insert(
-                "__remote_signal",
-                func!(invoke_host_function!(remote_signal)),
-            );
+            host_fn_builder
+                .with_host_function(&mut ns, "__call_remote", call_remote)
+                .with_host_function(&mut ns, "__remote_signal", remote_signal);
         } else {
-            ns.insert("__call_remote", func!(invoke_host_function!(unreachable)));
-            ns.insert("__remote_signal", func!(invoke_host_function!(unreachable)));
+            host_fn_builder
+                .with_host_function(&mut ns, "__call_remote", unreachable)
+                .with_host_function(&mut ns, "__remote_signal", unreachable);
         }
 
         if let HostFnAccess {
@@ -360,24 +367,27 @@ impl RealRibosome {
             ..
         } = host_fn_access
         {
-            ns.insert("__call", func!(invoke_host_function!(call)));
-            ns.insert("__create", func!(invoke_host_function!(create)));
-            ns.insert("__emit_signal", func!(invoke_host_function!(emit_signal)));
-            ns.insert("__create_link", func!(invoke_host_function!(create_link)));
-            ns.insert("__delete_link", func!(invoke_host_function!(delete_link)));
-            ns.insert("__update", func!(invoke_host_function!(update)));
-            ns.insert("__delete", func!(invoke_host_function!(delete)));
-            ns.insert("__schedule", func!(invoke_host_function!(schedule)));
+            host_fn_builder
+                .with_host_function(&mut ns, "__call", call)
+                .with_host_function(&mut ns, "__create", create)
+                .with_host_function(&mut ns, "__emit_signal", emit_signal)
+                .with_host_function(&mut ns, "__create_link", create_link)
+                .with_host_function(&mut ns, "__delete_link", delete_link)
+                .with_host_function(&mut ns, "__update", update)
+                .with_host_function(&mut ns, "__delete", delete)
+                .with_host_function(&mut ns, "__schedule", schedule);
         } else {
-            ns.insert("__call", func!(invoke_host_function!(unreachable)));
-            ns.insert("__create", func!(invoke_host_function!(unreachable)));
-            ns.insert("__emit_signal", func!(invoke_host_function!(unreachable)));
-            ns.insert("__create_link", func!(invoke_host_function!(unreachable)));
-            ns.insert("__delete_link", func!(invoke_host_function!(unreachable)));
-            ns.insert("__update", func!(invoke_host_function!(unreachable)));
-            ns.insert("__delete", func!(invoke_host_function!(unreachable)));
-            ns.insert("__schedule", func!(invoke_host_function!(unreachable)));
+            host_fn_builder
+                .with_host_function(&mut ns, "__call", unreachable)
+                .with_host_function(&mut ns, "__create", unreachable)
+                .with_host_function(&mut ns, "__emit_signal", unreachable)
+                .with_host_function(&mut ns, "__create_link", unreachable)
+                .with_host_function(&mut ns, "__delete_link", unreachable)
+                .with_host_function(&mut ns, "__update", unreachable)
+                .with_host_function(&mut ns, "__delete", unreachable)
+                .with_host_function(&mut ns, "__schedule", unreachable);
         }
+
         imports.register("env", ns);
 
         imports
@@ -434,10 +444,10 @@ impl RibosomeT for RealRibosome {
                     // there is a callback to_call and it is implemented in the wasm
                     // it is important to fully instantiate this (e.g. don't try to use the module above)
                     // because it builds guards against memory leaks and handles imports correctly
-                    let mut instance = self.instance(call_context)?;
+                    let instance = self.instance(call_context)?;
 
                     let result: Result<ExternIO, WasmError> = holochain_wasmer_host::guest::call(
-                        &mut instance,
+                        instance,
                         to_call.as_ref(),
                         // be aware of this clone!
                         // the whole invocation is cloned!
@@ -496,6 +506,14 @@ impl RibosomeT for RealRibosome {
                 invocation.provenance.clone(),
             )
         })
+    }
+
+    fn run_genesis_self_check(
+        &self,
+        access: GenesisSelfCheckHostAccess,
+        invocation: GenesisSelfCheckInvocation,
+    ) -> RibosomeResult<GenesisSelfCheckResult> {
+        do_callback!(self, access, invocation, GenesisSelfCheckResult)
     }
 
     fn run_validate(
@@ -561,23 +579,24 @@ pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use hdk::prelude::*;
+    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(flavor = "multi_thread")]
     /// Basic checks that we can call externs internally and externally the way we want using the
     /// hdk macros rather than low level rust extern syntax.
     async fn ribosome_extern_test() {
-        let test_env = holochain_lmdb::test_utils::test_cell_env();
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
-        let mut workspace =
-            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+        let author = fake_agent_pubkey_1();
+        crate::test_utils::fake_genesis(env.clone()).await.unwrap();
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author)
             .await
             .unwrap();
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let mut host_access = fixt!(ZomeCallHostAccess, Predictable);
-        host_access.workspace = workspace_lock;
+        host_access.workspace = workspace;
 
         let foo_result: String =
             crate::call_test_ribosome!(host_access, TestWasm::HdkExtern, "foo", ());

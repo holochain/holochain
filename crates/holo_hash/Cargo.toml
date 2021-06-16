@@ -6,7 +6,7 @@ keywords = [ "holochain", "holo", "hash", "blake", "blake2b" ]
 categories = [ "cryptography" ]
 edition = "2018"
 description = "hashing helpers supporting dht sharding"
-license-file = "LICENSE_CAL-1.0"
+license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://github.com/holochain/holochain"
 
@@ -21,6 +21,7 @@ derive_more = { version = "0.99", optional = true }
 fixt = { version = "^0.0.2-alpha.1", path = "../fixt", optional = true }
 holochain_serialized_bytes = {version = "=0.0.50", optional = true }
 rand = {version = "0.7", optional = true}
+rusqlite = { version = "0.25", optional = true }
 tracing = { version = "0.1", optional = true}
 thiserror = "1.0.22"
 
@@ -30,12 +31,13 @@ serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 [features]
 
 default = ["serialized-bytes", "fixturators"]
-full = ["fixturators", "hashing", "string-encoding"]
+full = ["fixturators", "hashing", "string-encoding", "rusqlite"]
 
 fixturators = ["fixt", "rand", "serialized-bytes", "string-encoding"]
 serialized-bytes = ["holochain_serialized_bytes"]
 string-encoding = ["base64", "blake2b_simd", "derive_more"]
 hashing = ["blake2b_simd", "serialized-bytes"]
+test_utils = []
 
 [package.metadata.cargo-udeps.ignore]
 normal = ["tracing"]

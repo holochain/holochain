@@ -12,12 +12,10 @@ use crate::core::ribosome::real_ribosome::RealRibosome;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
-use holochain_lmdb::env::EnvironmentWrite;
-use holochain_lmdb::test_utils::test_environments;
-use holochain_lmdb::test_utils::TestEnvironments;
 use holochain_p2p::actor::HolochainP2pRefToCell;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::SerializedBytes;
+use holochain_state::{prelude::test_environments, test_utils::TestEnvs};
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
@@ -29,7 +27,8 @@ use tempdir::TempDir;
 /// A "factory" for HostFnCaller, which will produce them when given a ZomeName
 pub struct CellHostFnCaller {
     pub cell_id: CellId,
-    pub env: EnvironmentWrite,
+    pub env: EnvWrite,
+    pub cache: EnvWrite,
     pub ribosome: RealRibosome,
     pub network: HolochainP2pCell,
     pub keystore: KeystoreSender,
@@ -41,6 +40,7 @@ pub struct CellHostFnCaller {
 impl CellHostFnCaller {
     pub async fn new(cell_id: &CellId, handle: &ConductorHandle, dna_file: &DnaFile) -> Self {
         let env = handle.get_cell_env(cell_id).await.unwrap();
+        let cache = handle.get_cache_env(cell_id).await.unwrap();
         let keystore = env.keystore().clone();
         let network = handle
             .holochain_p2p()
@@ -53,6 +53,7 @@ impl CellHostFnCaller {
         CellHostFnCaller {
             cell_id: cell_id.clone(),
             env,
+            cache,
             ribosome,
             network,
             keystore,
@@ -69,6 +70,7 @@ impl CellHostFnCaller {
         let call_zome_handle = self.cell_conductor_api.clone().into_call_zome_handle();
         HostFnCaller {
             env: self.env.clone(),
+            cache: self.cache.clone(),
             ribosome: self.ribosome.clone(),
             zome_path,
             network: self.network.clone(),
@@ -89,7 +91,7 @@ pub struct ConductorTestData {
 
 impl ConductorTestData {
     pub async fn new(
-        envs: TestEnvironments,
+        envs: TestEnvs,
         dna_files: Vec<DnaFile>,
         agents: Vec<AgentPubKey>,
         network_config: KitsuneP2pConfig,

@@ -1,14 +1,12 @@
 use hdk::prelude::*;
 use holochain::conductor::config::ConductorConfig;
+use holochain::sweettest::SweetNetwork;
+use holochain::sweettest::{SweetConductorBatch, SweetDnaFile};
 use holochain::test_utils::host_fn_caller::Post;
 use holochain::test_utils::show_authored;
-use holochain::test_utils::sweetest::SweetNetwork;
-use holochain::test_utils::sweetest::{SweetConductorBatch, SweetDnaFile};
 use holochain::test_utils::wait_for_integration_1m;
 use holochain::test_utils::wait_for_integration_with_others_10s;
 use holochain::test_utils::WaitOps;
-use holochain_types::dna::zome::inline_zome::InlineZome;
-use holochain_zome_types::element::ElementEntry;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]
 #[serde(transparent)]
@@ -47,7 +45,6 @@ fn invalid_cell_zome() -> InlineZome {
         })
 }
 
-// TODO [ B-03669 ]: make much less verbose
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
 async fn multi_conductor() -> anyhow::Result<()> {
@@ -60,7 +57,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
         .await
         .unwrap();
 
-    let apps = conductors.setup_app("app", &[dna_file]).await;
+    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     conductors.exchange_peer_info().await;
 
     let ((alice,), (bobbo,), (_carol,)) = apps.into_tuples();
@@ -109,7 +106,7 @@ async fn invalid_cell() -> anyhow::Result<()> {
         .await
         .unwrap();
 
-    let apps = conductors.setup_app("app", &[dna_file]).await;
+    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     conductors.exchange_peer_info().await;
 
     let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
