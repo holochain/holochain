@@ -587,8 +587,13 @@ async fn test_reactivate_app() {
         .deactivate_app("app".to_string(), DeactivationReason::Normal)
         .await
         .unwrap();
+
+    assert_eq_retry_10s!(conductor.list_inactive_apps().await.unwrap().len(), 1);
+
     conductor.activate_app("app".to_string()).await.unwrap();
     conductor.inner_handle().setup_cells().await.unwrap();
+
+    assert_eq_retry_10s!(conductor.list_inactive_apps().await.unwrap().len(), 0);
 
     let (_, cell) = app.into_tuple();
 

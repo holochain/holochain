@@ -921,6 +921,11 @@ where
         Ok(active_apps.keys().cloned().collect())
     }
 
+    pub(super) async fn list_inactive_apps(&self) -> ConductorResult<Vec<InstalledAppId>> {
+        let inactive_apps = self.get_state().await?.inactive_apps;
+        Ok(inactive_apps.keys().cloned().collect())
+    }
+
     pub(super) async fn list_active_apps_for_cell_id(
         &self,
         cell_id: &CellId,

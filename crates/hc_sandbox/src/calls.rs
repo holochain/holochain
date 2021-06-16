@@ -67,6 +67,8 @@ pub enum AdminRequestCli {
     ListCells,
     /// Calls AdminRequest::ListActiveApps.
     ListActiveApps,
+    /// Calls AdminRequest::ListInactiveApps.
+    ListInactiveApps,
     ActivateApp(ActivateApp),
     DeactivateApp(DeactivateApp),
     DumpState(DumpState),
@@ -290,6 +292,10 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
         AdminRequestCli::ListActiveApps => {
             let apps = list_active_apps(cmd).await?;
             msg!("Active Apps: {:?}", apps);
+        }
+        AdminRequestCli::ListInactiveApps => {
+            let apps = list_inactive_apps(cmd).await?;
+            msg!("Inactive Apps: {:?}", apps);
         }
         AdminRequestCli::ActivateApp(args) => {
             let app_id = args.app_id.clone();
@@ -524,6 +530,12 @@ pub async fn list_cell_ids(cmd: &mut CmdRunner) -> anyhow::Result<Vec<CellId>> {
 pub async fn list_active_apps(cmd: &mut CmdRunner) -> anyhow::Result<Vec<String>> {
     let resp = cmd.command(AdminRequest::ListActiveApps).await?;
     Ok(expect_match!(resp => AdminResponse::ActiveAppsListed, "Failed to list active apps"))
+}
+
+/// Calls [`AdminRequest::ListInactiveApps`].
+pub async fn list_inactive_apps(cmd: &mut CmdRunner) -> anyhow::Result<Vec<String>> {
+    let resp = cmd.command(AdminRequest::ListInactiveApps).await?;
+    Ok(expect_match!(resp => AdminResponse::InactiveAppsListed, "Failed to list inactive apps"))
 }
 
 /// Calls [`AdminRequest::ActivateApp`] and activates the installed app.

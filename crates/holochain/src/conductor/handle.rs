@@ -216,6 +216,9 @@ pub trait ConductorHandleT: Send + Sync {
     /// List Active AppIds
     async fn list_active_apps(&self) -> ConductorResult<Vec<InstalledAppId>>;
 
+    /// List Inactive AppIds
+    async fn list_inactive_apps(&self) -> ConductorResult<Vec<InstalledAppId>>;
+
     /// Get the IDs of all active installed Apps which use this Cell
     async fn list_active_apps_for_cell_id(
         &self,
@@ -683,6 +686,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn list_active_apps(&self) -> ConductorResult<Vec<InstalledAppId>> {
         self.conductor.read().await.list_active_apps().await
+    }
+
+    async fn list_inactive_apps(&self) -> ConductorResult<Vec<InstalledAppId>> {
+        self.conductor.read().await.list_inactive_apps().await
     }
 
     async fn list_active_apps_for_cell_id(

@@ -130,6 +130,15 @@ pub enum AdminRequest {
     /// [`AdminResponse::ActiveAppsListed`]: enum.AdminResponse.html#variant.ActiveAppsListed
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
     ListActiveApps,
+    /// List the ids of all the inactive Apps in the conductor.
+    /// Takes no arguments.
+    ///
+    /// Will be responded to with an [`AdminResponse::InactiveAppsListed`]
+    /// or an [`AdminResponse::Error`]
+    ///
+    /// [`AdminResponse::InactiveAppsListed`]: enum.AdminResponse.html#variant.InactiveAppsListed
+    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
+    ListInactiveApps,
     /// Changes the `App` specified by argument `installed_app_id` from an inactive state to an active state in the conductor,
     /// meaning that Zome calls can now be made and the `App` will be loaded on a reboot of the conductor.
     /// It is likely to want to call this after calling [`AdminRequest::InstallApp`], since a freshly
@@ -309,6 +318,13 @@ pub enum AdminResponse {
     ///
     /// [`AdminRequest::ListActiveApps`]: enum.AdminRequest.html#variant.ListActiveApps
     ActiveAppsListed(Vec<InstalledAppId>),
+
+    /// The succesful response to an [`AdminRequest::ListInactiveApps`].
+    ///
+    /// Contains a list of all the active `App` ids in the conductor
+    ///
+    /// [`AdminRequest::ListInactiveApps`]: enum.AdminRequest.html#variant.ListInactiveApps
+    InactiveAppsListed(Vec<InstalledAppId>),
 
     /// The succesful response to an [`AdminRequest::AttachAppInterface`].
     ///
