@@ -1,6 +1,5 @@
 use tokio::sync::oneshot;
 
-
 #[tokio::main]
 async fn main() {
     let (tx, rx) = oneshot::channel();
