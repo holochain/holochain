@@ -46,7 +46,7 @@ impl DhtArcSet {
             ArcInterval::Full => Self::new_full(),
             ArcInterval::Empty => Self::new_empty(),
             ArcInterval::Bounded(start, end) => {
-                if (start <= MIN && end >= MAX) || end == start.wrapping_sub(1) {
+                if (start == MIN && end >= MAX) || end == start.wrapping_sub(1) {
                     Self::new_full()
                 } else {
                     Self::Partial(
@@ -73,7 +73,7 @@ impl DhtArcSet {
                         // if there is an interval at the very beginning and one
                         // at the very end, let's interpret it as a single
                         // wrapping interval
-                        if first.0 <= MIN && last.1 >= MAX {
+                        if first.0 == MIN && last.1 >= MAX {
                             Some((last.0, first.1))
                         } else {
                             None
