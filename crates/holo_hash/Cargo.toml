@@ -33,7 +33,7 @@ serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 [features]
 
 default = ["serialized-bytes", "fixturators"]
-full = ["fixturators", "hashing", "string-encoding", "rusqlite", "test_utils"]
+full = ["fixturators", "hashing", "string-encoding", "rusqlite"]
 
 test_utils = ["full"]
 fixturators = ["fixt", "rand", "serialized-bytes", "string-encoding"]
