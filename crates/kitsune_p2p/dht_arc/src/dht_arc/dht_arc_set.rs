@@ -154,23 +154,11 @@ impl From<Vec<(T, T)>> for DhtArcSet {
 
 #[test]
 fn fullness() {
-    assert_eq!(
-        DhtArcSet::from(vec![(0, u32::MAX),]),
-        DhtArcSet::Full,
-    );
-    assert_eq!(
-        DhtArcSet::from(vec![(0, u32::MAX - 1),]),
-        DhtArcSet::Full,
-    );
-    assert_ne!(
-        DhtArcSet::from(vec![(0, u32::MAX - 2),]),
-        DhtArcSet::Full,
-    );
+    assert_eq!(DhtArcSet::from(vec![(0, u32::MAX),]), DhtArcSet::Full,);
+    assert_eq!(DhtArcSet::from(vec![(0, u32::MAX - 1),]), DhtArcSet::Full,);
+    assert_ne!(DhtArcSet::from(vec![(0, u32::MAX - 2),]), DhtArcSet::Full,);
 
-    assert_eq!(
-        DhtArcSet::from(vec![(11, 10),]),
-        DhtArcSet::Full,
-    );
+    assert_eq!(DhtArcSet::from(vec![(11, 10),]), DhtArcSet::Full,);
 
     assert_eq!(
         DhtArcSet::from(vec![(u32::MAX - 1, u32::MAX - 2),]),
@@ -181,7 +169,6 @@ fn fullness() {
         DhtArcSet::from(vec![(u32::MAX, u32::MAX - 1),]),
         DhtArcSet::Full,
     );
-
 }
 
 /// An alternate implementation of `ArcRange`
