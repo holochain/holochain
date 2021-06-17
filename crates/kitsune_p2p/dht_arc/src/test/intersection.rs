@@ -19,7 +19,7 @@ macro_rules! assert_intersection {
 }
 
 #[test]
-fn test_intersection_regression() {
+fn test_intersection_at_limits() {
     assert_intersection!(
         DhtArcSet::from(vec![(0, MAX - 1)]),
         DhtArcSet::from(vec![(0, MAX / 4), (MAX / 2, MAX),]),
