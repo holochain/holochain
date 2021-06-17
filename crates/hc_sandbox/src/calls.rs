@@ -13,6 +13,7 @@ use anyhow::ensure;
 use holochain_conductor_api::AdminRequest;
 use holochain_conductor_api::AdminResponse;
 use holochain_conductor_api::InterfaceDriver;
+use holochain_conductor_api::ListAppsResponse;
 use holochain_conductor_api::{AdminInterfaceConfig, InstalledAppInfo};
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use holochain_types::prelude::DnaHash;
@@ -67,8 +68,8 @@ pub enum AdminRequestCli {
     ListCells,
     /// Calls AdminRequest::ListActiveApps.
     ListActiveApps,
-    /// Calls AdminRequest::ListInactiveApps.
-    ListInactiveApps,
+    /// Calls AdminRequest::ListApps.
+    ListApps,
     ActivateApp(ActivateApp),
     DeactivateApp(DeactivateApp),
     DumpState(DumpState),
@@ -293,9 +294,9 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
             let apps = list_active_apps(cmd).await?;
             msg!("Active Apps: {:?}", apps);
         }
-        AdminRequestCli::ListInactiveApps => {
-            let apps = list_inactive_apps(cmd).await?;
-            msg!("Inactive Apps: {:?}", apps);
+        AdminRequestCli::ListApps => {
+            let apps = list_apps(cmd).await?;
+            msg!("List Apps: {:?}", apps);
         }
         AdminRequestCli::ActivateApp(args) => {
             let app_id = args.app_id.clone();
@@ -532,10 +533,10 @@ pub async fn list_active_apps(cmd: &mut CmdRunner) -> anyhow::Result<Vec<String>
     Ok(expect_match!(resp => AdminResponse::ActiveAppsListed, "Failed to list active apps"))
 }
 
-/// Calls [`AdminRequest::ListInactiveApps`].
-pub async fn list_inactive_apps(cmd: &mut CmdRunner) -> anyhow::Result<Vec<String>> {
-    let resp = cmd.command(AdminRequest::ListInactiveApps).await?;
-    Ok(expect_match!(resp => AdminResponse::InactiveAppsListed, "Failed to list inactive apps"))
+/// Calls [`AdminRequest::ListApps`].
+pub async fn list_apps(cmd: &mut CmdRunner) -> anyhow::Result<ListAppsResponse> {
+    let resp = cmd.command(AdminRequest::ListApps).await?;
+    Ok(expect_match!(resp => AdminResponse::AppsListed, "Failed to list apps"))
 }
 
 /// Calls [`AdminRequest::ActivateApp`] and activates the installed app.

@@ -130,15 +130,15 @@ pub enum AdminRequest {
     /// [`AdminResponse::ActiveAppsListed`]: enum.AdminResponse.html#variant.ActiveAppsListed
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
     ListActiveApps,
-    /// List the ids of all the inactive Apps in the conductor.
+    /// List the ids of all the Apps that are installed in the conductor, returning their information.
     /// Takes no arguments.
     ///
-    /// Will be responded to with an [`AdminResponse::InactiveAppsListed`]
+    /// Will be responded to with an [`AdminResponse::AppsListed`]
     /// or an [`AdminResponse::Error`]
     ///
-    /// [`AdminResponse::InactiveAppsListed`]: enum.AdminResponse.html#variant.InactiveAppsListed
+    /// [`AdminResponse::AppsListed`]: enum.AdminResponse.html#variant.AppsListed
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
-    ListInactiveApps,
+    ListApps,
     /// Changes the `App` specified by argument `installed_app_id` from an inactive state to an active state in the conductor,
     /// meaning that Zome calls can now be made and the `App` will be loaded on a reboot of the conductor.
     /// It is likely to want to call this after calling [`AdminRequest::InstallApp`], since a freshly
@@ -319,12 +319,12 @@ pub enum AdminResponse {
     /// [`AdminRequest::ListActiveApps`]: enum.AdminRequest.html#variant.ListActiveApps
     ActiveAppsListed(Vec<InstalledAppId>),
 
-    /// The succesful response to an [`AdminRequest::ListInactiveApps`].
+    /// The succesful response to an [`AdminRequest::ListApps`].
     ///
-    /// Contains a list of all the active `App` ids in the conductor
+    /// Contains a list of the `InstalledAppInfo` of all the installed `App` in the conductor
     ///
-    /// [`AdminRequest::ListInactiveApps`]: enum.AdminRequest.html#variant.ListInactiveApps
-    InactiveAppsListed(Vec<InstalledAppId>),
+    /// [`AdminRequest::ListApps`]: enum.AdminRequest.html#variant.ListApps
+    AppsListed(ListAppsResponse),
 
     /// The succesful response to an [`AdminRequest::AttachAppInterface`].
     ///
@@ -408,4 +408,13 @@ impl ExternalApiWireError {
         // this version intended for users.
         ExternalApiWireError::InternalError(e.to_string())
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+/// Info about all the apps installed in the conductor, returned by [`AdminResponse::ListApps`]
+pub struct ListAppsResponse {
+    // List of active apps running in the conductor
+    pub active_apps: Vec<InstalledAppInfo>,
+    // List of inactive apps
+    pub inactive_apps: Vec<InstalledAppInfo>,
 }

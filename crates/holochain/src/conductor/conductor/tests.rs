@@ -583,14 +583,27 @@ async fn test_reactivate_app() {
     let zome = simple_create_entry_zome();
     let (conductor, app) = common_genesis_test_app(zome).await.unwrap();
 
-    assert_eq_retry_10s!(conductor.list_inactive_apps().await.unwrap().len(), 0);
+    let apps = conductor.list_apps().await.unwrap();
+    assert_eq!(apps.inactive_apps.len(), 0);
+    assert_eq!(apps.active_apps.len(), 1);
+    assert_eq!(apps.active_apps[0].cell_data.len(), 2);
+    assert_matches!(apps.active_apps[0].status, InstalledAppStatus::Active);
 
     conductor
         .deactivate_app("app".to_string(), DeactivationReason::Normal)
         .await
         .unwrap();
 
-    assert_eq_retry_10s!(conductor.list_inactive_apps().await.unwrap().len(), 1);
+    let apps = conductor.list_apps().await.unwrap();
+    assert_eq!(apps.active_apps.len(), 0);
+    assert_eq!(apps.inactive_apps.len(), 1);
+    assert_eq!(apps.inactive_apps[0].cell_data.len(), 2);
+    assert_matches!(
+        apps.inactive_apps[0].status,
+        InstalledAppStatus::Inactive {
+            reason: DeactivationReason::Normal
+        }
+    );
 
     conductor.activate_app("app".to_string()).await.unwrap();
     conductor.inner_handle().setup_cells().await.unwrap();
@@ -605,7 +618,9 @@ async fn test_reactivate_app() {
 
     // - Ensure that the app is active
     assert_eq_retry_10s!(conductor.list_active_apps().await.unwrap().len(), 1);
-    assert_eq_retry_10s!(conductor.list_inactive_apps().await.unwrap().len(), 0);
+    let apps = conductor.list_apps().await.unwrap();
+    assert_eq!(apps.active_apps.len(), 1);
+    assert_eq!(apps.inactive_apps.len(), 0);
 }
 
 #[tokio::test(flavor = "multi_thread")]

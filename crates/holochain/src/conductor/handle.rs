@@ -58,7 +58,7 @@ use crate::core::{queue_consumer::InitialQueueTriggers, ribosome::real_ribosome:
 use derive_more::From;
 use futures::future::FutureExt;
 use futures::StreamExt;
-use holochain_conductor_api::InstalledAppInfo;
+use holochain_conductor_api::{InstalledAppInfo, ListAppsResponse};
 use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_p2p::DnaHashExt;
@@ -216,8 +216,8 @@ pub trait ConductorHandleT: Send + Sync {
     /// List Active AppIds
     async fn list_active_apps(&self) -> ConductorResult<Vec<InstalledAppId>>;
 
-    /// List Inactive AppIds
-    async fn list_inactive_apps(&self) -> ConductorResult<Vec<InstalledAppId>>;
+    /// List Apps with their information
+    async fn list_apps(&self) -> ConductorResult<ListAppsResponse>;
 
     /// Get the IDs of all active installed Apps which use this Cell
     async fn list_active_apps_for_cell_id(
@@ -688,8 +688,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self.conductor.read().await.list_active_apps().await
     }
 
-    async fn list_inactive_apps(&self) -> ConductorResult<Vec<InstalledAppId>> {
-        self.conductor.read().await.list_inactive_apps().await
+    async fn list_apps(&self) -> ConductorResult<ListAppsResponse> {
+        self.conductor.read().await.list_apps().await
     }
 
     async fn list_active_apps_for_cell_id(

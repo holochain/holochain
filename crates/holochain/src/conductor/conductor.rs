@@ -52,6 +52,7 @@ use futures::stream::StreamExt;
 use holo_hash::DnaHash;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::JsonDump;
+use holochain_conductor_api::{InstalledAppInfo, ListAppsResponse};
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_keystore::KeystoreSender;
@@ -921,9 +922,25 @@ where
         Ok(active_apps.keys().cloned().collect())
     }
 
-    pub(super) async fn list_inactive_apps(&self) -> ConductorResult<Vec<InstalledAppId>> {
-        let inactive_apps = self.get_state().await?.inactive_apps;
-        Ok(inactive_apps.keys().cloned().collect())
+    pub(super) async fn list_apps(&self) -> ConductorResult<ListAppsResponse> {
+        let conductor_state = self.get_state().await?;
+
+        let active_apps: Vec<InstalledAppInfo> = conductor_state
+            .active_apps
+            .keys()
+            .filter_map(|app_id| conductor_state.get_app_info(&app_id))
+            .collect();
+
+        let inactive_apps: Vec<InstalledAppInfo> = conductor_state
+            .inactive_apps
+            .keys()
+            .filter_map(|app_id| conductor_state.get_app_info(&app_id))
+            .collect();
+
+        Ok(ListAppsResponse {
+            active_apps,
+            inactive_apps,
+        })
     }
 
     pub(super) async fn list_active_apps_for_cell_id(
