@@ -2,11 +2,11 @@ use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holo_hash::AnyDhtHash;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
+use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
 use std::sync::Arc;
 
@@ -28,7 +28,7 @@ pub struct ValidateInvocation {
 
 #[derive(Clone, Constructor)]
 pub struct ValidateHostAccess {
-    pub workspace: CallZomeWorkspaceLock,
+    pub workspace: HostFnWorkspace,
     pub network: HolochainP2pCell,
 }
 
@@ -225,39 +225,39 @@ mod test {
             assert_eq!(fn_component, expected.pop().unwrap(),);
         }
 
-        let agent_entry = Entry::App(
+        let app_entry = Entry::App(
             AppEntryBytesFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap()
                 .into(),
         );
-        let el = fixt!(Element, (agent_entry, HeaderType::Create));
+        let el = fixt!(Element, (app_entry, HeaderType::Create));
         validate_invocation.element = Arc::new(el);
         let mut expected = vec!["validate", "validate_create", "validate_create_entry"];
         for fn_component in validate_invocation.fn_components() {
             assert_eq!(fn_component, expected.pop().unwrap(),);
         }
 
-        let agent_entry = Entry::CapClaim(
+        let capclaim_entry = Entry::CapClaim(
             CapClaimFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap()
                 .into(),
         );
-        let el = fixt!(Element, (agent_entry, HeaderType::Update));
+        let el = fixt!(Element, (capclaim_entry, HeaderType::Update));
         validate_invocation.element = Arc::new(el);
         let mut expected = vec!["validate", "validate_update"];
         for fn_component in validate_invocation.fn_components() {
             assert_eq!(fn_component, expected.pop().unwrap(),);
         }
 
-        let agent_entry = Entry::CapGrant(
+        let capgrant_entry = Entry::CapGrant(
             ZomeCallCapGrantFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap()
                 .into(),
         );
-        let el = fixt!(Element, (agent_entry, HeaderType::Create));
+        let el = fixt!(Element, (capgrant_entry, HeaderType::Create));
         validate_invocation.element = Arc::new(el);
         let mut expected = vec!["validate", "validate_create"];
         for fn_component in validate_invocation.fn_components() {
@@ -286,11 +286,11 @@ mod slow_tests {
     use super::ValidateResult;
     use crate::core::ribosome::RibosomeT;
     use crate::core::ribosome::ZomesToInvoke;
-    use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
     use crate::fixt::curve::Zomes;
     use crate::fixt::*;
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
+    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_state::source_chain::SourceChainResult;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
@@ -372,33 +372,24 @@ mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn pass_validate_test<'a>() {
-        // test workspace boilerplate
-        let test_env = holochain_lmdb::test_utils::test_cell_env();
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
-
-        // commits fail validation if we don't do genesis
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+        let author = fake_agent_pubkey_1();
+        crate::test_utils::fake_genesis(env.clone()).await.unwrap();
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author)
             .await
             .unwrap();
-
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        // test workspace boilerplate
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock.clone();
+        host_access.workspace = workspace.clone();
 
         let output: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::Validate, "always_validates", ());
 
         // the chain head should be the committed entry header
         let chain_head = tokio_helper::block_forever_on(async move {
-            SourceChainResult::Ok(
-                workspace_lock
-                    .read()
-                    .await
-                    .source_chain
-                    .chain_head()?
-                    .to_owned(),
-            )
+            SourceChainResult::Ok(workspace.source_chain().chain_head()?.0)
         })
         .unwrap();
 
@@ -407,34 +398,25 @@ mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn fail_validate_test<'a>() {
-        // test workspace boilerplate
-        let test_env = holochain_lmdb::test_utils::test_cell_env();
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
-
-        // commits fail validation if we don't do genesis
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+        let author = fake_agent_pubkey_1();
+        crate::test_utils::fake_genesis(env.clone()).await.unwrap();
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author)
             .await
             .unwrap();
-
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        // test workspace boilerplate
 
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock.clone();
+        host_access.workspace = workspace.clone();
 
         let output: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::Validate, "never_validates", ());
 
         // the chain head should be the committed entry header
         let chain_head = tokio_helper::block_forever_on(async move {
-            SourceChainResult::Ok(
-                workspace_lock
-                    .read()
-                    .await
-                    .source_chain
-                    .chain_head()?
-                    .to_owned(),
-            )
+            SourceChainResult::Ok(workspace.source_chain().chain_head()?.0)
         })
         .unwrap();
 

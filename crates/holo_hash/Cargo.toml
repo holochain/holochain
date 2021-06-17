@@ -23,6 +23,7 @@ holochain_serialized_bytes = {version = "=0.0.50", optional = true }
 futures = {version = "0.3", optional = true}
 must_future = {version = "0.1", optional = true}
 rand = {version = "0.7", optional = true}
+rusqlite = { version = "0.25", optional = true }
 tracing = { version = "0.1", optional = true}
 thiserror = "1.0.22"
 
@@ -32,7 +33,7 @@ serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 [features]
 
 default = ["serialized-bytes", "fixturators"]
-full = ["fixturators", "hashing", "string-encoding", "test_utils"]
+full = ["fixturators", "hashing", "string-encoding", "rusqlite", "test_utils"]
 
 test_utils = ["full"]
 fixturators = ["fixt", "rand", "serialized-bytes", "string-encoding"]

@@ -1,14 +1,13 @@
 use super::SweetZome;
 use hdk::prelude::*;
 use holo_hash::DnaHash;
-use holochain_lmdb::env::EnvironmentWrite;
-
+use holochain_types::env::EnvWrite;
 /// A reference to a Cell created by a SweetConductor installation function.
 /// It has very concise methods for calling a zome on this cell
 #[derive(Clone, derive_more::Constructor)]
 pub struct SweetCell {
     pub(super) cell_id: CellId,
-    pub(super) cell_env: EnvironmentWrite,
+    pub(super) cell_env: EnvWrite,
 }
 
 impl SweetCell {
@@ -18,7 +17,7 @@ impl SweetCell {
     }
 
     /// Get the environment for this cell
-    pub fn env(&self) -> &EnvironmentWrite {
+    pub fn env(&self) -> &EnvWrite {
         &self.cell_env
     }
 

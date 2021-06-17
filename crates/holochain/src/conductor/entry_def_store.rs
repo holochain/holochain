@@ -9,100 +9,12 @@ use crate::core::ribosome::RibosomeT;
 use super::api::CellConductorApiT;
 use error::EntryDefStoreError;
 use error::EntryDefStoreResult;
-use fallible_iterator::FallibleIterator;
 use holo_hash::*;
-use holochain_lmdb::buffer::KvBufFresh;
-use holochain_lmdb::error::DatabaseError;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::prelude::*;
 use holochain_serialized_bytes::prelude::*;
-use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::prelude::*;
 use std::collections::HashMap;
-use std::convert::TryInto;
 
 pub mod error;
-
-/// This is where entry defs live
-pub struct EntryDefBuf(KvBufFresh<EntryDefStoreKey, EntryDef>);
-
-#[derive(Debug, Clone, Hash, Eq, PartialEq, PartialOrd, Ord)]
-struct EntryDefStoreKey(SerializedBytes);
-
-impl AsRef<[u8]> for EntryDefStoreKey {
-    fn as_ref(&self) -> &[u8] {
-        self.0.bytes()
-    }
-}
-
-impl BufKey for EntryDefStoreKey {
-    fn from_key_bytes_or_friendly_panic(bytes: &[u8]) -> Self {
-        Self(UnsafeBytes::from(bytes.to_vec()).into())
-    }
-}
-
-impl From<EntryDefBufferKey> for EntryDefStoreKey {
-    fn from(a: EntryDefBufferKey) -> Self {
-        Self(
-            a.try_into()
-                .expect("EntryDefStoreKey serialization cannot fail"),
-        )
-    }
-}
-
-impl From<&[u8]> for EntryDefStoreKey {
-    fn from(bytes: &[u8]) -> Self {
-        Self(UnsafeBytes::from(bytes.to_vec()).into())
-    }
-}
-
-impl From<EntryDefStoreKey> for EntryDefBufferKey {
-    fn from(a: EntryDefStoreKey) -> Self {
-        a.0.try_into()
-            .expect("Database corruption when retrieving EntryDefBufferKeys")
-    }
-}
-
-impl EntryDefBuf {
-    /// Create a new buffer
-    pub fn new(env: EnvironmentRead, entry_def_store: SingleStore) -> DatabaseResult<Self> {
-        Ok(Self(KvBufFresh::new(env, entry_def_store)))
-    }
-
-    /// Get an entry def
-    pub fn get(&self, k: EntryDefBufferKey) -> DatabaseResult<Option<EntryDef>> {
-        self.0.get(&k.into())
-    }
-
-    /// Store an entry def
-    pub fn put(&mut self, k: EntryDefBufferKey, entry_def: EntryDef) -> DatabaseResult<()> {
-        self.0.put(k.into(), entry_def)
-    }
-
-    /// Get all the entry defs in the database
-    pub fn get_all<'r, R: Readable>(
-        &self,
-        r: &'r R,
-    ) -> DatabaseResult<
-        Box<dyn FallibleIterator<Item = (EntryDefBufferKey, EntryDef), Error = DatabaseError> + 'r>,
-    > {
-        Ok(Box::new(
-            self.0
-                .store()
-                .iter(r)?
-                .map(|(k, v)| Ok((EntryDefStoreKey::from(k).into(), v))),
-        ))
-    }
-}
-
-impl BufferedStore for EntryDefBuf {
-    type Error = DatabaseError;
-
-    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
-        self.0.flush_to_txn_ref(writer)?;
-        Ok(())
-    }
-}
 
 /// Get an [EntryDef] from the entry def store
 /// or fallback to running the zome
@@ -203,7 +115,7 @@ mod tests {
     use super::EntryDefBufferKey;
     use crate::conductor::Conductor;
     use holo_hash::HasHash;
-    use holochain_lmdb::test_utils::test_environments;
+    use holochain_state::prelude::test_environments;
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_dna_zomes;
     use holochain_wasm_test_utils::TestWasm;
@@ -263,7 +175,7 @@ mod tests {
         std::mem::drop(handle);
 
         // Restart conductor and check defs are still here
-        let handle = Conductor::builder().test(&envs).await.unwrap();
+        let handle = Conductor::builder().test(&envs.into()).await.unwrap();
 
         assert_eq!(handle.get_entry_def(&post_def_key).await, Some(post_def));
         assert_eq!(

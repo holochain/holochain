@@ -10,7 +10,7 @@ use crate::{
 use ::fixt::prelude::*;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppRequest, AppResponse, ZomeCall};
 use holochain_keystore::crude_mock_keystore::spawn_crude_mock_keystore;
-use holochain_lmdb::test_utils::test_environments;
+use holochain_state::prelude::*;
 use holochain_types::test_utils::fake_cell_id;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::WebsocketSender;
@@ -28,6 +28,7 @@ async fn can_update_state() {
         envs.conductor(),
         envs.wasm(),
         envs.p2p(),
+        envs.p2p_metrics(),
         dna_store,
         keystore,
         envs.tempdir().path().to_path_buf().into(),
@@ -77,6 +78,7 @@ async fn can_add_clone_cell_to_app() {
         envs.conductor(),
         envs.wasm(),
         envs.p2p(),
+        envs.p2p_metrics(),
         dna_store,
         keystore,
         envs.tempdir().path().to_path_buf().into(),
@@ -92,7 +94,7 @@ async fn can_add_clone_cell_to_app() {
 
     conductor.register_phenotype(dna).await.unwrap();
     conductor
-        .update_state(|mut state| {
+        .update_state(move |mut state| {
             state.active_apps.insert(app1.clone().into());
             state.active_apps.insert(app2.clone().into());
             Ok(state)
@@ -136,6 +138,7 @@ async fn app_ids_are_unique() {
         environments.conductor(),
         environments.wasm(),
         environments.p2p(),
+        environments.p2p_metrics(),
         dna_store,
         environments.keystore().clone(),
         environments.tempdir().path().to_path_buf().into(),
@@ -430,7 +433,7 @@ async fn test_signing_error_during_genesis() {
         .await
         .unwrap();
 
-    let envs = test_environments_with_keystore(bad_keystore);
+    let envs = test_envs_with_keystore(bad_keystore);
     let config = ConductorConfig::default();
     let mut conductor = SweetConductor::new(
         SweetConductor::handle_from_existing(&envs, &config).await,
@@ -494,7 +497,7 @@ async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
         .await
         .unwrap();
 
-    let envs = test_environments_with_keystore(good_keystore.clone());
+    let envs = test_envs_with_keystore(good_keystore.clone());
     let config = standard_config();
     let mut conductor = SweetConductor::new(
         SweetConductor::handle_from_existing(&envs, &config).await,

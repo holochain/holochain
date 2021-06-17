@@ -63,14 +63,14 @@ There is no conductor config YAML file at the path specified (/home/eric/.config
 Would you like to create a default config file at this location? [Y/n]
 Y
 Conductor config written.
-There is no database environment set at the path specified (/home/eric/.local/share/holochain/databases)
+There is no database set at the path specified (/home/eric/.local/share/holochain/databases)
 Would you like to create one now? [Y/n]
 Y
-LMDB environment created.
+Database created.
 Conductor ready.
 ```
 
-As well as creating the config file this process also instantiates the initial LMDB database environment.   If you provide a config file on first run with just the `-c` flag `holochain` will also initialize the environment even if not in interactive mode.
+As well as creating the config file this process also instantiates the database.   If you provide a config file on first run with just the `-c` flag `holochain` will also initialize the environment even if not in interactive mode.
 
 ## Development Environment
 

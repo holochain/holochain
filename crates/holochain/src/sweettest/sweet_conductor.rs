@@ -10,7 +10,7 @@ use hdk::prelude::*;
 use holo_hash::DnaHash;
 use holochain_conductor_api::{AdminInterfaceConfig, InterfaceDriver};
 use holochain_keystore::KeystoreSender;
-use holochain_lmdb::test_utils::{test_environments, TestEnvironments};
+use holochain_state::test_utils::{test_environments, TestEnvs};
 use holochain_types::prelude::*;
 use holochain_websocket::*;
 use kitsune_p2p::KitsuneP2pConfig;
@@ -28,7 +28,7 @@ pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Syn
 #[derive(derive_more::From)]
 pub struct SweetConductor {
     handle: Option<SweetConductorHandle>,
-    envs: TestEnvironments,
+    envs: TestEnvs,
     config: ConductorConfig,
     dnas: Vec<DnaFile>,
     signal_stream: Option<SignalStream>,
@@ -59,7 +59,7 @@ impl SweetConductor {
     /// "sweet-interface" so that signals may be emitted
     pub async fn new(
         handle: ConductorHandle,
-        envs: TestEnvironments,
+        envs: TestEnvs,
         config: ConductorConfig,
     ) -> SweetConductor {
         // Automatically add a test app interface
@@ -80,7 +80,7 @@ impl SweetConductor {
         }
     }
 
-    /// Create a SweetConductor with a new set of TestEnvironments from the given config
+    /// Create a SweetConductor with a new set of TestEnvs from the given config
     pub async fn from_config(config: ConductorConfig) -> SweetConductor {
         let envs = test_environments();
         let handle = Self::handle_from_existing(&envs, &config).await;
@@ -99,7 +99,7 @@ impl SweetConductor {
 
     /// Create a handle from an existing environment and config
     pub async fn handle_from_existing(
-        envs: &TestEnvironments,
+        envs: &TestEnvs,
         config: &ConductorConfig,
     ) -> ConductorHandle {
         Conductor::builder()
@@ -109,13 +109,13 @@ impl SweetConductor {
             .unwrap()
     }
 
-    /// Create a SweetConductor with a new set of TestEnvironments from the given config
+    /// Create a SweetConductor with a new set of TestEnvs from the given config
     pub async fn from_standard_config() -> SweetConductor {
         Self::from_config(standard_config()).await
     }
 
-    /// Access the TestEnvironments for this conductor
-    pub fn envs(&self) -> &TestEnvironments {
+    /// Access the TestEnvs for this conductor
+    pub fn envs(&self) -> &TestEnvs {
         &self.envs
     }
 

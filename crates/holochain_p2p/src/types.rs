@@ -109,12 +109,20 @@ pub(crate) mod wire;
 macro_rules! to_and_from_kitsune {
     ($($i:ident<$h:ty> -> $k:ty,)*) => {
         $(
-            pub(crate) trait $i: ::std::clone::Clone + Sized {
+            /// Extension trait for holo/kitsune conversion
+            pub trait $i: ::std::clone::Clone + Sized {
+                /// convert into Arc<Kitsune> type
                 fn into_kitsune(self) -> ::std::sync::Arc<$k>;
+
+                /// convert into Kitsune type
                 fn into_kitsune_raw(self) -> $k;
+
+                /// to Arc<Kitsune> type
                 fn to_kitsune(&self) -> ::std::sync::Arc<$k> {
                     self.clone().into_kitsune()
                 }
+
+                /// from Kitsune type
                 fn from_kitsune(k: &::std::sync::Arc<$k>) -> Self;
             }
 
@@ -137,18 +145,22 @@ macro_rules! to_and_from_kitsune {
 
 to_and_from_kitsune! {
     DnaHashExt<holo_hash::DnaHash> -> kitsune_p2p::KitsuneSpace,
-    AgentPubKeyExt<
-        holo_hash::AgentPubKey
-    > -> kitsune_p2p::KitsuneAgent,
+    AgentPubKeyExt<holo_hash::AgentPubKey> -> kitsune_p2p::KitsuneAgent,
     DhtOpHashExt<holo_hash::DhtOpHash> -> kitsune_p2p::KitsuneOpHash,
 }
 
 macro_rules! to_kitsune {
     ($($i:ident<$h:ty> -> $k:ty,)*) => {
         $(
-            pub(crate) trait $i: ::std::clone::Clone + Sized {
+            /// Extension trait for holo/kitsune conversion
+            pub trait $i: ::std::clone::Clone + Sized {
+                /// convert into Arc<Kitsune> type
                 fn into_kitsune(self) -> ::std::sync::Arc<$k>;
+
+                /// convert into Kitsune type
                 fn into_kitsune_raw(self) -> $k;
+
+                /// to Arc<Kitsune> type
                 fn to_kitsune(&self) -> ::std::sync::Arc<$k> {
                     self.clone().into_kitsune()
                 }
@@ -168,7 +180,5 @@ macro_rules! to_kitsune {
 }
 
 to_kitsune! {
-    AnyDhtHashExt<
-        holo_hash::AnyDhtHash
-    > -> kitsune_p2p::KitsuneBasis,
+    AnyDhtHashExt<holo_hash::AnyDhtHash> -> kitsune_p2p::KitsuneBasis,
 }

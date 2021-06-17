@@ -112,6 +112,7 @@ pub struct KnownCreateLink {
 
 pub struct KnownDeleteLink {
     pub link_add_address: holo_hash::HeaderHash,
+    pub base_address: holo_hash::EntryHash,
 }
 
 impl Iterator for CreateLinkFixturator<KnownCreateLink> {
@@ -131,6 +132,7 @@ impl Iterator for DeleteLinkFixturator<KnownDeleteLink> {
     fn next(&mut self) -> Option<Self::Item> {
         let mut f = fixt!(DeleteLink);
         f.link_add_address = self.0.curve.link_add_address.clone();
+        f.base_address = self.0.curve.base_address.clone();
         Some(f)
     }
 }
@@ -631,6 +633,16 @@ fixturator!(
             other_type => other_type,
         }
     };
+);
+
+fixturator!(
+    HeaderHashed;
+    constructor fn from_content_sync(Header);
+);
+
+fixturator!(
+    SignedHeaderHashed;
+    constructor fn with_presigned(HeaderHashed, Signature);
 );
 
 fixturator!(

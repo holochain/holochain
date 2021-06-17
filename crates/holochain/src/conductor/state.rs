@@ -13,7 +13,7 @@ use std::collections::HashMap;
 /// References between structs (cell configs pointing to
 /// the agent and DNA to be instantiated) are implemented
 /// via string IDs.
-#[derive(Clone, Deserialize, Serialize, Default, Debug)]
+#[derive(Clone, Deserialize, Serialize, Default, Debug, SerializedBytes)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct ConductorState {
     /// Apps that are ready to be activated
