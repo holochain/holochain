@@ -533,11 +533,7 @@ pub async fn activate_app(cmd: &mut CmdRunner, args: ActivateApp) -> anyhow::Res
             installed_app_id: args.app_id,
         })
         .await?;
-    ensure!(
-        matches!(resp, AdminResponse::AppActivated),
-        "Failed to activate app, got: {:?}",
-        resp
-    );
+    expect_match!(resp => AdminResponse::AppActivated, format!("Failed to activate app, got: {:?}", resp));
     Ok(())
 }
 
