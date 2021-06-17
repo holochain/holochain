@@ -10,9 +10,9 @@ pub fn encode<T: serde::ser::Serialize>(data: &T) -> MrBundleResult<Vec<u8>> {
     Ok(enc.finish()?)
 }
 
-/// Decompress and deserialize some bytes (inverse of [`encode`])
+/// Decompress and deserialize some bytes (inverse of `encode`)
 pub fn decode<T: serde::de::DeserializeOwned>(compressed: &[u8]) -> MrBundleResult<T> {
-    let mut gz = flate2::read::GzDecoder::new(&compressed[..]);
+    let mut gz = flate2::read::GzDecoder::new(compressed);
     let mut bytes = Vec::new();
     gz.read_to_end(&mut bytes)?;
     Ok(rmp_serde::from_read_ref(&bytes)?)

@@ -180,7 +180,9 @@ impl DnaFile {
     /// leaving the "genotype" of actual DNA code intact
     pub fn modify_phenotype(&self, uid: Uid, properties: YamlProperties) -> DnaResult<Self> {
         let mut clone = self.clone();
-        clone.dna = DnaDefHashed::from_content_sync(clone.dna.modify_phenotype(uid, properties)?);
+        clone.dna = DnaDefHashed::from_content_sync(
+            clone.dna.modify_phenotype(uid, properties.try_into()?),
+        );
         Ok(clone)
     }
 }

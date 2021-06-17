@@ -70,13 +70,13 @@ fn needs_cap_claim(_: ()) -> ExternResult<()> {
 
 #[hdk_extern]
 fn try_cap_claim(cap_for: crate::CapFor) -> ExternResult<ZomeCallResponse> {
-    Ok(call_remote(
+    call_remote(
         cap_for.1,
         zome_info()?.zome_name,
         "needs_cap_claim".to_string().into(),
         Some(cap_for.0),
         &(),
-    )?)
+    )
 }
 
 #[hdk_extern]

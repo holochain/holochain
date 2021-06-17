@@ -6,6 +6,6 @@
   "dependencies": {
     "isomorphic-ws": "^4.0.1",
     "msgpack-lite": "^0.1.26",
-    "ws": "^7.2.3"
+    "ws": "^7.4.6"
   }
 }

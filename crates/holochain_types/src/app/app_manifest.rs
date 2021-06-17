@@ -2,6 +2,7 @@
 
 //! Defines the hApp Manifest YAML format, including validation.
 
+use holochain_zome_types::Uid;
 use mr_bundle::{Location, Manifest};
 use std::path::PathBuf;
 

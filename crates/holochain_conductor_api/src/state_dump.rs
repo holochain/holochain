@@ -3,10 +3,11 @@ use holo_hash::DnaHash;
 use holochain_state::source_chain::SourceChainJsonDump;
 use serde::Deserialize;
 use serde::Serialize;
+use std::sync::Arc;
 
 #[derive(Serialize, Deserialize)]
 pub struct JsonDump {
-    pub peer_dump: P2pStateDump,
+    pub peer_dump: P2pAgentsDump,
     pub source_chain_dump: SourceChainJsonDump,
     pub integration_dump: IntegrationStateDump,
 }
@@ -34,7 +35,7 @@ pub struct IntegrationStateDump {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 /// State dump of all the peer info
-pub struct P2pStateDump {
+pub struct P2pAgentsDump {
     /// The info of this agents cell.
     pub this_agent_info: Option<AgentInfoDump>,
     /// The dna as a [`DnaHash`] and [`kitsune_p2p::KitsuneSpace`].
@@ -50,26 +51,20 @@ pub struct P2pStateDump {
 /// space, signed time, expires in and
 /// urls printed in a pretty way.
 pub struct AgentInfoDump {
-    pub kitsune_agent: kitsune_p2p::KitsuneAgent,
-    pub kitsune_space: kitsune_p2p::KitsuneSpace,
+    pub kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>,
+    pub kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     pub dump: String,
 }
 
 impl std::fmt::Display for JsonDump {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let num_other_peers = self.peer_dump.peers.len();
-        let int = &self.integration_dump;
         let s = &self.source_chain_dump;
         writeln!(f, "--- Cell State Dump Summary ---")?;
         writeln!(
             f,
             "Number of other peers in p2p store: {},",
             num_other_peers
-        )?;
-        writeln!(
-            f,
-            "Ops: Limbo (validation: {} integration: {}) Integrated: {}",
-            int.validation_limbo, int.integration_limbo, int.integrated
         )?;
         writeln!(
             f,
@@ -107,7 +102,7 @@ impl std::fmt::Display for AgentInfoDump {
         writeln!(f, "{}", self.dump)
     }
 }
-impl std::fmt::Display for P2pStateDump {
+impl std::fmt::Display for P2pAgentsDump {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(this_agent) = &self.this_agent {
             writeln!(f, "This Agent {:?} is {:?}", this_agent.0, this_agent.1)?;

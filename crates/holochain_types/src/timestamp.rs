@@ -30,11 +30,11 @@ const NSEC: usize = std::mem::size_of::<u32>();
 pub const TS_SIZE: usize = SEC + NSEC;
 
 /// A representation of a Timestamp which can go into and out of a byte slice
-/// in-place without allocation. Useful for LMDB keys.
+/// in-place without allocation. Useful for ordered database keys.
 ///
 /// The mapping to byte slice involves some bit shifting, and so the bytes
 /// should not be directly used. However, ordering is preserved when mapping
-/// to a TimestampKey, which is what allows us to use it for an LMDB key.
+/// to a TimestampKey, which is what allows us to use it as a key.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct TimestampKey([u8; TS_SIZE]);
