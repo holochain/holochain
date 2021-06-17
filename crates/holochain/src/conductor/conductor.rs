@@ -654,17 +654,19 @@ where
     pub(super) async fn activate_app_in_db(
         &mut self,
         installed_app_id: InstalledAppId,
-    ) -> ConductorResult<()> {
-        self.update_state(move |mut state| {
-            let app = state
-                .inactive_apps
-                .remove(&installed_app_id)
-                .ok_or_else(|| ConductorError::AppNotInstalled(installed_app_id.clone()))?;
-            state.active_apps.insert(app.into_active());
-            Ok(state)
-        })
-        .await?;
-        Ok(())
+    ) -> ConductorResult<ActiveApp> {
+        let (_, active_app) = self
+            .update_state_prime(move |mut state| {
+                let app = state
+                    .inactive_apps
+                    .remove(&installed_app_id)
+                    .ok_or_else(|| ConductorError::AppNotInstalled(installed_app_id.clone()))?;
+                let active_app = app.into_active();
+                state.active_apps.insert(active_app.clone());
+                Ok((state, active_app))
+            })
+            .await?;
+        Ok(active_app)
     }
 
     /// Deactivate an app in the database
