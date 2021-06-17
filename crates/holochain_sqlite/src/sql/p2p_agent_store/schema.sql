@@ -16,6 +16,6 @@ CREATE TABLE IF NOT EXISTS p2p_agent_store (
   -- Otherwise, both will be set, i.e. XOR of these two fields is always false.
   -- If the start loc is greater than the end loc, then this represents a
   -- "wrapping" range
-  storage_start_loc         INTEGER   NULL,
-  storage_end_loc           INTEGER   NULL
+  storage_start_loc       INTEGER   NULL,
+  storage_end_loc         INTEGER   NULL
 );
