@@ -34,7 +34,6 @@ const TIMEOUT_ERROR: &'static str = "inner function \'call_create_entry_remotely
 #[test_case(2)]
 #[test_case(5)]
 // #[test_case(10)]
-#[ignore = "(david.b) - not working locally"]
 fn conductors_call_remote(num_conductors: usize) {
     let f = async move {
         observability::test_run().ok();
