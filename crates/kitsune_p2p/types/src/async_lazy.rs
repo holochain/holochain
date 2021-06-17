@@ -1,8 +1,12 @@
 //! utility for lazy init-ing things
 
+use futures::future::{BoxFuture, FutureExt, Shared};
+
 /// utility for lazy init-ing things
 /// note how new is not async so we can do it in an actor handler
-pub struct AsyncLazy<O: 'static + Clone + Send + Sync>(tokio::sync::watch::Receiver<Option<O>>);
+pub struct AsyncLazy<O: 'static + Clone + Send + Sync> {
+    fut: Shared<BoxFuture<'static, O>>,
+}
 
 impl<O: 'static + Clone + Send + Sync> AsyncLazy<O> {
     /// sync create a new lazy-init value
@@ -12,27 +16,15 @@ impl<O: 'static + Clone + Send + Sync> AsyncLazy<O> {
     where
         F: 'static + std::future::Future<Output = O> + Send,
     {
-        let (s, r) = tokio::sync::watch::channel(None);
-        tokio::task::spawn(async move {
-            let val: O = f.await;
-            let _ = s.broadcast(Some(val));
-        });
-        Self(r)
+        Self {
+            fut: f.boxed().shared(),
+        }
     }
 
     /// async get the value of this lazy type
     /// will return once the initialization future completes
     pub fn get(&self) -> impl std::future::Future<Output = O> + 'static {
-        let mut r = self.0.clone();
-        async move {
-            loop {
-                match r.recv().await {
-                    Some(Some(v)) => return v,
-                    None => panic!("sender task dropped"),
-                    _ => (),
-                }
-            }
-        }
+        self.fut.clone()
     }
 }
 
@@ -41,15 +33,15 @@ mod tests {
     use super::*;
     use std::sync::Arc;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn async_lazy() {
         let s = AsyncLazy::new(async move {
-            tokio::time::delay_for(std::time::Duration::from_millis(20)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
             Arc::new(42)
         });
         assert_eq!(
             vec![Arc::new(42), Arc::new(42)],
-            futures::future::join_all(vec![s.get(), s.get(),]).await
+            futures::future::join_all(vec![s.get(), s.get()]).await
         );
         assert_eq!(42, *s.get().await);
         assert_eq!(42, *s.get().await);

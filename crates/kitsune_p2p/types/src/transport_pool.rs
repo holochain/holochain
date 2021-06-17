@@ -1,11 +1,12 @@
 //! Unify multiple sub-transports into one pool.
 
 use crate::transport::*;
-use futures::{future::FutureExt, sink::SinkExt, stream::StreamExt};
-use ghost_actor::{
-    dependencies::{must_future::MustBoxFuture, tracing},
-    GhostControlSender,
-};
+use futures::future::FutureExt;
+use futures::sink::SinkExt;
+use futures::stream::StreamExt;
+use ghost_actor::dependencies::must_future::MustBoxFuture;
+use ghost_actor::dependencies::tracing;
+use ghost_actor::GhostControlSender;
 use std::collections::HashMap;
 
 ghost_actor::ghost_chan! {
@@ -37,7 +38,7 @@ pub async fn spawn_transport_pool() -> TransportResult<(
 
     let (evt_send, evt_recv) = futures::channel::mpsc::channel(10);
 
-    tokio::task::spawn(builder.spawn(Inner {
+    crate::metrics::metric_task(builder.spawn(Inner {
         i_s,
         sub_listeners: HashMap::new(),
         evt_send,
@@ -112,12 +113,14 @@ impl TransportPoolHandler for Inner {
 
             i_s.inject_listener(scheme, sub_listener).await?;
 
-            tokio::task::spawn(async move {
+            crate::metrics::metric_task(async move {
                 while let Some(evt) = sub_event.next().await {
                     if evt_send.send(evt).await.is_err() {
                         break;
                     }
                 }
+
+                <Result<(), ()>>::Ok(())
             });
 
             Ok(())
@@ -199,7 +202,7 @@ mod tests {
     use futures::stream::StreamExt;
 
     fn test_receiver(mut recv: TransportEventReceiver) {
-        tokio::task::spawn(async move {
+        crate::metrics::metric_task(async move {
             while let Some(evt) = recv.next().await {
                 match evt {
                     TransportEvent::IncomingChannel(url, mut write, read) => {
@@ -213,7 +216,7 @@ mod tests {
         });
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn it_can_pool_transport() -> TransportResult<()> {
         let _ = ghost_actor::dependencies::tracing::subscriber::set_global_default(
             tracing_subscriber::FmtSubscriber::builder()

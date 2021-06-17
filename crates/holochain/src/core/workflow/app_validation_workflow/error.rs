@@ -1,22 +1,19 @@
 use holochain_p2p::HolochainP2pError;
-use holochain_types::cell::CellId;
-use holochain_zome_types::header::ZomeId;
+use holochain_types::prelude::*;
 use thiserror::Error;
 
-use crate::{
-    conductor::entry_def_store::error::EntryDefStoreError,
-    core::ribosome::error::RibosomeError,
-    core::state::cascade::error::CascadeError,
-    core::{validation::OutcomeOrError, SourceChainError},
-    from_sub_error,
-};
+use crate::conductor::entry_def_store::error::EntryDefStoreError;
+use crate::core::ribosome::error::RibosomeError;
+use crate::core::validation::OutcomeOrError;
+use crate::core::SourceChainError;
+use crate::from_sub_error;
 
 use super::types::Outcome;
 
 #[derive(Error, Debug)]
 pub enum AppValidationError {
     #[error(transparent)]
-    CascadeError(#[from] CascadeError),
+    CascadeError(#[from] holochain_cascade::error::CascadeError),
     #[error("Dna is missing for this cell {0:?}. Cannot validate without dna.")]
     DnaMissing(CellId),
     #[error(transparent)]
@@ -43,7 +40,7 @@ impl<T> From<AppValidationError> for OutcomeOrError<T, AppValidationError> {
         OutcomeOrError::Err(e)
     }
 }
-
+use holochain_cascade::error::CascadeError;
 // These need to match the #[from] in AppValidationError
 from_sub_error!(AppValidationError, RibosomeError);
 from_sub_error!(AppValidationError, CascadeError);

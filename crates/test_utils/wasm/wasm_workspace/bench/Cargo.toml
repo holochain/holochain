@@ -9,5 +9,9 @@ name = "test_wasm_bench"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
-hdk3 = { path = "../../../../hdk" }
-serde = "=1.0.104"
+hdk = { path = "../../../../hdk" }
+serde = "1.0"
+
+[features]
+default = []
+mock = ["hdk/mock"]

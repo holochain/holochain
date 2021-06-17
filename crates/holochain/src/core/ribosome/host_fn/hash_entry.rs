@@ -1,25 +1,18 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holo_hash::HasHash;
-use holochain_zome_types::Entry;
-use holochain_zome_types::HashEntryInput;
-use holochain_zome_types::HashEntryOutput;
+use holochain_types::prelude::*;
+use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 
 pub fn hash_entry(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
-    input: HashEntryInput,
-) -> RibosomeResult<HashEntryOutput> {
-    let entry: Entry = input.into_inner();
+    input: Entry,
+) -> Result<EntryHash, WasmError> {
+    let entry_hash = holochain_types::entry::EntryHashed::from_content_sync(input).into_hash();
 
-    let entry_hash = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        holochain_types::entry::EntryHashed::from_content_sync(entry)
-    })
-    .into_hash();
-
-    Ok(HashEntryOutput::new(entry_hash))
+    Ok(entry_hash)
 }
 
 #[cfg(test)]
@@ -30,77 +23,86 @@ pub mod wasm_test {
 
     use crate::fixt::CallContextFixturator;
     use crate::fixt::EntryFixturator;
-    use crate::fixt::WasmRibosomeFixturator;
+    use crate::fixt::RealRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use holo_hash::EntryHash;
+    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::HashEntryInput;
-    use holochain_zome_types::HashEntryOutput;
     use std::convert::TryInto;
     use std::sync::Arc;
-    use test_wasm_common::TestString;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     /// we can get an entry hash out of the fn directly
     async fn hash_entry_test() {
-        let ribosome = WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
+        let ribosome = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
             .next()
             .unwrap();
-        let call_context = CallContextFixturator::new(fixt::Unpredictable)
+        let call_context = CallContextFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        let entry = EntryFixturator::new(fixt::Predictable).next().unwrap();
-        let input = HashEntryInput::new(entry);
+        let input = EntryFixturator::new(::fixt::Predictable).next().unwrap();
 
-        let output: HashEntryOutput =
+        let output: EntryHash =
             hash_entry(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
-        assert_eq!(output.into_inner().get_full_bytes().to_vec().len(), 36,);
+        assert_eq!(*output.hash_type(), holo_hash::hash_type::Entry);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     /// we can get an entry hash out of the fn via. a wasm call
     async fn ribosome_hash_entry_test() {
         let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
-        let mut workspace =
-            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+        let author = fake_agent_pubkey_1();
+        crate::test_utils::fake_genesis(env.clone())
             .await
             .unwrap();
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
 
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
-
-        let entry = EntryFixturator::new(fixt::Predictable).next().unwrap();
-        let input = HashEntryInput::new(entry);
+        let input = EntryFixturator::new(::fixt::Predictable).next().unwrap();
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock;
-        let output: HashEntryOutput =
+        host_access.workspace = workspace;
+        let output: EntryHash =
             crate::call_test_ribosome!(host_access, TestWasm::HashEntry, "hash_entry", input);
-        assert_eq!(output.into_inner().get_full_bytes().to_vec().len(), 36,);
+        assert_eq!(*output.hash_type(), holo_hash::hash_type::Entry);
+
+        let entry_hash_output: EntryHash = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::HashEntry,
+            "twenty_three_degrees_entry_hash",
+            ()
+        );
+
+        let hash_output: EntryHash = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::HashEntry,
+            "twenty_three_degrees_hash",
+            ()
+        );
+
+        assert_eq!(entry_hash_output, hash_output);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     /// the hash path underlying anchors wraps entry_hash
     async fn ribosome_hash_path_pwd_test() {
         let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
-        let mut workspace =
-            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+        let author = fake_agent_pubkey_1();
+        crate::test_utils::fake_genesis(env.clone())
             .await
             .unwrap();
-
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
-
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock;
-        let input = TestString::from("foo.bar".to_string());
+        host_access.workspace = workspace;
+        let input = "foo.bar".to_string();
         let output: EntryHash =
             crate::call_test_ribosome!(host_access, TestWasm::HashPath, "hash", input);
 
-        let expected_path = hdk3::hash_path::path::Path::from("foo.bar");
+        let expected_path = hdk::hash_path::path::Path::from("foo.bar");
 
         let expected_hash = holochain_types::entry::EntryHashed::from_content_sync(
             Entry::app((&expected_path).try_into().unwrap()).unwrap(),

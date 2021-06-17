@@ -3,11 +3,12 @@
 
 use derive_more::*;
 use futures::future::FutureExt;
-use ghost_actor::{dependencies::must_future::MustBoxFuture, GhostControlSender};
-use kitsune_p2p_types::{
-    dependencies::{ghost_actor, url2},
-    transport::*,
-};
+use ghost_actor::dependencies::must_future::MustBoxFuture;
+use ghost_actor::GhostControlSender;
+use kitsune_p2p_types::dependencies::ghost_actor;
+use kitsune_p2p_types::dependencies::url2;
+use kitsune_p2p_types::metrics::metric_task;
+use kitsune_p2p_types::transport::*;
 use lair_keystore_api::actor::*;
 use std::sync::Arc;
 
@@ -21,20 +22,18 @@ pub(crate) fn blake2b_32(data: &[u8]) -> Vec<u8> {
         .to_vec()
 }
 
+pub mod tx2;
+
 mod proxy_url;
 pub use proxy_url::*;
 
 pub mod wire;
 pub(crate) use wire::*;
 
-#[allow(dead_code)]
 mod wire_read;
-#[allow(dead_code)]
 mod wire_write;
 
-#[allow(dead_code)]
 mod tls_cli;
-#[allow(dead_code)]
 mod tls_srv;
 
 #[cfg(test)]

@@ -1,19 +1,13 @@
+use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::core::{ribosome::FnComponents, workflow::CallZomeWorkspaceLock};
 use derive_more::Constructor;
 use holo_hash::AnyDhtHash;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::zome::{HostFnAccess, Permission};
-use holochain_zome_types::entry::Entry;
-use holochain_zome_types::entry_def::EntryDefId;
-use holochain_zome_types::validate::ValidateCallbackResult;
-use holochain_zome_types::validate::ValidateData;
-use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::ExternInput;
-use holochain_zome_types::{element::Element, validate::ValidationPackage, Header};
+use holochain_state::host_fn_workspace::HostFnWorkspace;
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -34,7 +28,7 @@ pub struct ValidateInvocation {
 
 #[derive(Clone, Constructor)]
 pub struct ValidateHostAccess {
-    pub workspace: CallZomeWorkspaceLock,
+    pub workspace: HostFnWorkspace,
     pub network: HolochainP2pCell,
 }
 
@@ -49,16 +43,18 @@ impl From<&ValidateHostAccess> for HostFnAccess {
         let mut access = Self::none();
         access.read_workspace = Permission::Allow;
         access.keystore = Permission::Allow;
+        access.dna_bindings = Permission::Allow;
         access
     }
 }
 
 impl Invocation for ValidateInvocation {
     fn zomes(&self) -> ZomesToInvoke {
-        // Entries are specific to zomes so only validate in the zome the entry is defined in
-        // note that here it is possible there is a zome/entry mismatch
+        // Entries are specific to zomes, so they only validate in the zome the entry is defined in.
+        // However, agent entries need to be validated on all zomes.
+        //
+        // Note that here it is possible there is a zome/entry mismatch:
         // we rely on the invocation to be built correctly.
-        // However agent entries need to run on all zomes.
         self.zomes_to_invoke.clone()
     }
     fn fn_components(&self) -> FnComponents {
@@ -67,7 +63,7 @@ impl Invocation for ValidateInvocation {
             Header::Create(_) => fns.push("create".into()),
             Header::Update(_) => fns.push("update".into()),
             Header::Delete(_) => fns.push("delete".into()),
-            _ => (),
+            _ => {}
         }
         match self.element.entry().as_option() {
             Some(Entry::Agent(_)) => fns.push("agent".into()),
@@ -77,12 +73,12 @@ impl Invocation for ValidateInvocation {
                     fns.push(entry_def_id);
                 }
             }
-            _ => (),
+            _ => {}
         }
         fns.into()
     }
-    fn host_input(self) -> Result<ExternInput, SerializedBytesError> {
-        Ok(ExternInput::new(ValidateData::from(self).try_into()?))
+    fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
+        ExternIO::encode(ValidateData::from(self))
     }
 }
 
@@ -96,26 +92,32 @@ pub enum ValidateResult {
 }
 
 impl From<Vec<(ZomeName, ValidateCallbackResult)>> for ValidateResult {
+    /// This function is called after multiple app validation callbacks
+    /// have been run by a Ribosome and it is necessary to return one
+    /// decisive result to the host, even if that "decisive" result
+    /// is the UnresolvedDependencies variant.
+    /// It drops the irrelevant zome names and falls back to the conversion from
+    /// a Vec<ValidateCallbackResults> -> ValidateResult
     fn from(a: Vec<(ZomeName, ValidateCallbackResult)>) -> Self {
         a.into_iter().map(|(_, v)| v).collect::<Vec<_>>().into()
     }
 }
 
+/// if any ValidateCallbackResult is Invalid, then ValidateResult::Invalid
+/// If none are Invalid and there is an UnresolvedDependencies, then ValidateResult::UnresolvedDependencies
+/// If all ValidateCallbackResult are Valid, then ValidateResult::Valid
 impl From<Vec<ValidateCallbackResult>> for ValidateResult {
     fn from(callback_results: Vec<ValidateCallbackResult>) -> Self {
-        callback_results.into_iter().fold(Self::Valid, |acc, x| {
-            match x {
-                // validation is invalid if any x is invalid
+        callback_results
+            .into_iter()
+            .fold(Self::Valid, |acc, x| match x {
                 ValidateCallbackResult::Invalid(i) => Self::Invalid(i),
-                // return unresolved dependencies if it's otherwise valid
                 ValidateCallbackResult::UnresolvedDependencies(ud) => match acc {
                     Self::Invalid(_) => acc,
                     _ => Self::UnresolvedDependencies(ud),
                 },
-                // valid x allows validation to continue
                 ValidateCallbackResult::Valid => acc,
-            }
-        })
+            })
     }
 }
 
@@ -132,7 +134,6 @@ impl From<ValidateInvocation> for ValidateData {
 
 #[cfg(test)]
 mod test {
-
     use super::ValidateData;
     use super::ValidateResult;
     use crate::core::ribosome::Invocation;
@@ -141,17 +142,13 @@ mod test {
     use crate::fixt::ZomeCallCapGrantFixturator;
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
-    use holochain_serialized_bytes::prelude::*;
-    use holochain_types::{dna::zome::HostFnAccess, dna::zome::Permission, fixt::*};
-    use holochain_zome_types::validate::ValidateCallbackResult;
-    use holochain_zome_types::ExternInput;
-    use holochain_zome_types::{entry::Entry, header::HeaderType};
+    use holochain_types::prelude::*;
     use rand::seq::SliceRandom;
     use std::sync::Arc;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validate_callback_result_fold() {
-        let mut rng = fixt::rng();
+        let mut rng = ::fixt::rng();
 
         let result_valid = || ValidateResult::Valid;
         let result_ud = || ValidateResult::UnresolvedDependencies(vec![]);
@@ -188,34 +185,35 @@ mod test {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validate_invocation_allow_side_effects() {
-        let validate_host_access = ValidateHostAccessFixturator::new(fixt::Unpredictable)
+        let validate_host_access = ValidateHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
         let mut access = HostFnAccess::none();
         access.read_workspace = Permission::Allow;
         access.keystore = Permission::Allow;
+        access.dna_bindings = Permission::Allow;
         assert_eq!(HostFnAccess::from(&validate_host_access), access);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validate_invocation_zomes() {
-        let validate_invocation = ValidateInvocationFixturator::new(fixt::Unpredictable)
+        let validate_invocation = ValidateInvocationFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
         let zomes_to_invoke = validate_invocation.zomes_to_invoke.clone();
         assert_eq!(zomes_to_invoke, validate_invocation.zomes(),);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validate_invocation_fn_components() {
-        let mut validate_invocation = ValidateInvocationFixturator::new(fixt::Unpredictable)
+        let mut validate_invocation = ValidateInvocationFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
 
         let agent_entry = Entry::Agent(
-            AgentPubKeyFixturator::new(fixt::Unpredictable)
+            AgentPubKeyFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap()
                 .into(),
@@ -227,39 +225,39 @@ mod test {
             assert_eq!(fn_component, expected.pop().unwrap(),);
         }
 
-        let agent_entry = Entry::App(
-            AppEntryBytesFixturator::new(fixt::Unpredictable)
+        let app_entry = Entry::App(
+            AppEntryBytesFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap()
                 .into(),
         );
-        let el = fixt!(Element, (agent_entry, HeaderType::Create));
+        let el = fixt!(Element, (app_entry, HeaderType::Create));
         validate_invocation.element = Arc::new(el);
         let mut expected = vec!["validate", "validate_create", "validate_create_entry"];
         for fn_component in validate_invocation.fn_components() {
             assert_eq!(fn_component, expected.pop().unwrap(),);
         }
 
-        let agent_entry = Entry::CapClaim(
-            CapClaimFixturator::new(fixt::Unpredictable)
+        let capclaim_entry = Entry::CapClaim(
+            CapClaimFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap()
                 .into(),
         );
-        let el = fixt!(Element, (agent_entry, HeaderType::Update));
+        let el = fixt!(Element, (capclaim_entry, HeaderType::Update));
         validate_invocation.element = Arc::new(el);
         let mut expected = vec!["validate", "validate_update"];
         for fn_component in validate_invocation.fn_components() {
             assert_eq!(fn_component, expected.pop().unwrap(),);
         }
 
-        let agent_entry = Entry::CapGrant(
-            ZomeCallCapGrantFixturator::new(fixt::Unpredictable)
+        let capgrant_entry = Entry::CapGrant(
+            ZomeCallCapGrantFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap()
                 .into(),
         );
-        let el = fixt!(Element, (agent_entry, HeaderType::Create));
+        let el = fixt!(Element, (capgrant_entry, HeaderType::Create));
         validate_invocation.element = Arc::new(el);
         let mut expected = vec!["validate", "validate_create"];
         for fn_component in validate_invocation.fn_components() {
@@ -267,9 +265,9 @@ mod test {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validate_invocation_host_input() {
-        let validate_invocation = ValidateInvocationFixturator::new(fixt::Unpredictable)
+        let validate_invocation = ValidateInvocationFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
 
@@ -277,9 +275,7 @@ mod test {
 
         assert_eq!(
             host_input,
-            ExternInput::new(
-                SerializedBytes::try_from(&ValidateData::from(validate_invocation)).unwrap()
-            ),
+            ExternIO::encode(&ValidateData::from(validate_invocation)).unwrap(),
         );
     }
 }
@@ -287,27 +283,25 @@ mod test {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
-
     use super::ValidateResult;
-    use crate::core::ribosome::{RibosomeT, ZomesToInvoke};
-    use crate::core::state::source_chain::SourceChainResult;
-    use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
+    use crate::core::ribosome::RibosomeT;
+    use crate::core::ribosome::ZomesToInvoke;
     use crate::fixt::curve::Zomes;
     use crate::fixt::*;
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
-    use holochain_types::fixt::*;
+    use holochain_state::host_fn_workspace::HostFnWorkspace;
+    use holochain_state::source_chain::SourceChainResult;
+    use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::CreateOutput;
-    use holochain_zome_types::Entry;
     use std::sync::Arc;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_unimplemented() {
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
-        let mut validate_invocation = ValidateInvocationFixturator::new(fixt::Empty)
+        let mut validate_invocation = ValidateInvocationFixturator::new(::fixt::Empty)
             .next()
             .unwrap();
         validate_invocation.zomes_to_invoke = ZomesToInvoke::One(TestWasm::Foo.into());
@@ -318,12 +312,12 @@ mod slow_tests {
         assert_eq!(result, ValidateResult::Valid,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_implemented_valid() {
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateValid]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateValid]))
             .next()
             .unwrap();
-        let mut validate_invocation = ValidateInvocationFixturator::new(fixt::Empty)
+        let mut validate_invocation = ValidateInvocationFixturator::new(::fixt::Empty)
             .next()
             .unwrap();
         validate_invocation.zomes_to_invoke = ZomesToInvoke::One(TestWasm::ValidateValid.into());
@@ -334,12 +328,12 @@ mod slow_tests {
         assert_eq!(result, ValidateResult::Valid,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_implemented_invalid() {
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalid]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalid]))
             .next()
             .unwrap();
-        let mut validate_invocation = ValidateInvocationFixturator::new(fixt::Empty)
+        let mut validate_invocation = ValidateInvocationFixturator::new(::fixt::Empty)
             .next()
             .unwrap();
         validate_invocation.zomes_to_invoke = ZomesToInvoke::One(TestWasm::ValidateInvalid.into());
@@ -350,16 +344,16 @@ mod slow_tests {
         assert_eq!(result, ValidateResult::Invalid("esoteric edge case".into()),);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_implemented_multi() {
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalid]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalid]))
             .next()
             .unwrap();
-        let mut validate_invocation = ValidateInvocationFixturator::new(fixt::Empty)
+        let mut validate_invocation = ValidateInvocationFixturator::new(::fixt::Empty)
             .next()
             .unwrap();
         let entry = Entry::Agent(
-            AgentPubKeyFixturator::new(fixt::Unpredictable)
+            AgentPubKeyFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap()
                 .into(),
@@ -367,7 +361,7 @@ mod slow_tests {
 
         validate_invocation.zomes_to_invoke = ZomesToInvoke::One(TestWasm::ValidateInvalid.into());
 
-        let el = fixt!(Element, entry);
+        let el = ElementFixturator::new(entry).next().unwrap();
         validate_invocation.element = Arc::new(el);
 
         let result = ribosome
@@ -376,74 +370,56 @@ mod slow_tests {
         assert_eq!(result, ValidateResult::Invalid("esoteric edge case".into()));
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn pass_validate_test<'a>() {
-        // test workspace boilerplate
         let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
-
-        // commits fail validation if we don't do genesis
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+        let author = fake_agent_pubkey_1();
+        crate::test_utils::fake_genesis(env.clone()).await.unwrap();
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author)
             .await
             .unwrap();
-
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        // test workspace boilerplate
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock.clone();
+        host_access.workspace = workspace.clone();
 
-        let output: CreateOutput =
+        let output: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::Validate, "always_validates", ());
 
         // the chain head should be the committed entry header
-        let chain_head = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            SourceChainResult::Ok(
-                workspace_lock
-                    .read()
-                    .await
-                    .source_chain
-                    .chain_head()?
-                    .to_owned(),
-            )
+        let chain_head = tokio_helper::block_forever_on(async move {
+            SourceChainResult::Ok(workspace.source_chain().chain_head()?.0)
         })
         .unwrap();
 
-        assert_eq!(chain_head, output.into_inner(),);
+        assert_eq!(chain_head, output);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn fail_validate_test<'a>() {
-        // test workspace boilerplate
         let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
-
-        // commits fail validation if we don't do genesis
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+        let author = fake_agent_pubkey_1();
+        crate::test_utils::fake_genesis(env.clone()).await.unwrap();
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author)
             .await
             .unwrap();
-
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        // test workspace boilerplate
 
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock.clone();
+        host_access.workspace = workspace.clone();
 
-        let output: CreateOutput =
+        let output: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::Validate, "never_validates", ());
 
         // the chain head should be the committed entry header
-        let chain_head = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            SourceChainResult::Ok(
-                workspace_lock
-                    .read()
-                    .await
-                    .source_chain
-                    .chain_head()?
-                    .to_owned(),
-            )
+        let chain_head = tokio_helper::block_forever_on(async move {
+            SourceChainResult::Ok(workspace.source_chain().chain_head()?.0)
         })
         .unwrap();
 
-        assert_eq!(chain_head, output.into_inner(),);
+        assert_eq!(chain_head, output);
     }
 }

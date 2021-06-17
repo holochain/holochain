@@ -1,4 +1,4 @@
-use hdk3::prelude::*;
+use hdk::prelude::*;
 mod countree;
 
 entry_defs![countree::CounTree::entry_def()];
@@ -9,18 +9,18 @@ fn new(_: ()) -> ExternResult<HeaderHash> {
 }
 
 #[hdk_extern]
-fn header_details(header_hash: HeaderHash) -> ExternResult<GetDetailsOutput> {
+fn header_details(header_hash: HeaderHash) -> ExternResult<Option<Details>> {
     countree::CounTree::header_details(header_hash)
 }
 
 #[hdk_extern]
-fn entry_details(entry_hash: EntryHash) -> ExternResult<GetDetailsOutput> {
+fn entry_details(entry_hash: EntryHash) -> ExternResult<Option<Details>> {
     countree::CounTree::entry_details(entry_hash)
 }
 
 #[hdk_extern]
-fn entry_hash(countree: countree::CounTree) -> ExternResult<EntryHash> {
-    Ok(hash_entry!(countree)?)
+fn entry_hash(countree: crate::countree::CounTree) -> ExternResult<EntryHash> {
+    hash_entry(&countree)
 }
 
 #[hdk_extern]

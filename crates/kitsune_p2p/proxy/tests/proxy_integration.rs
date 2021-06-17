@@ -1,7 +1,9 @@
 use futures::stream::StreamExt;
 use ghost_actor::dependencies::tracing;
 use kitsune_p2p_proxy::*;
-use kitsune_p2p_types::{dependencies::ghost_actor, transport::*};
+use kitsune_p2p_types::config::KitsuneP2pTuningParams;
+use kitsune_p2p_types::dependencies::ghost_actor;
+use kitsune_p2p_types::transport::*;
 use std::sync::Arc;
 
 fn init_tracing() {
@@ -12,7 +14,7 @@ fn init_tracing() {
     );
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_proxy_integration() {
     if let Err(e) = test_inner().await {
         panic!("{:?}", e);
@@ -26,7 +28,9 @@ async fn connect(
     let addr = bind.bound_url().await?;
     tracing::warn!("got bind: {}", addr);
 
-    let (bind, mut evt) = spawn_kitsune_proxy_listener(proxy_config, bind, evt).await?;
+    let (bind, mut evt) =
+        spawn_kitsune_proxy_listener(proxy_config, KitsuneP2pTuningParams::default(), bind, evt)
+            .await?;
     let addr = bind.bound_url().await?;
     tracing::warn!("got proxy: {}", addr);
 
@@ -70,6 +74,13 @@ async fn test_inner() -> TransportResult<()> {
     let bind3 = connect(proxy_config3).await?;
     let addr3 = bind3.bound_url().await?;
 
+    let (_url, mut write, read) = bind2.create_channel(addr3.clone()).await?;
+    write.write_and_close(b"test".to_vec()).await?;
+    let data = read.read_to_end().await;
+    let data = String::from_utf8_lossy(&data);
+    assert_eq!("echo: test", data);
+
+    // run a second time to prove out session resumption
     let (_url, mut write, read) = bind2.create_channel(addr3).await?;
     write.write_and_close(b"test".to_vec()).await?;
     let data = read.read_to_end().await;

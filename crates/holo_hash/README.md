@@ -7,8 +7,6 @@
 [![Twitter Follow](https://img.shields.io/twitter/follow/holochain.svg?style=social&label=Follow)](https://twitter.com/holochain)
 License: [![License: CAL 1.0](https://img.shields.io/badge/License-CAL%201.0-blue.svg)](https://github.com/holochain/cryptographic-autonomy-license)
 
-Current version: 0.0.1
-
 holo_hash::HoloHash is a hashing framework for Holochain.
 
 Note that not all HoloHashes are simple hashes of the full content as you might expect in a "content-addressable" application. The main exception is `AgentPubKey`, which is simply the key itself to enable self-proving signatures. As an exception it is also named exceptionally, i.e. it doesn't end in "Hash".
@@ -102,7 +100,7 @@ use holo_hash::*;
 // pretend our pub key is all 0xdb bytes
 let agent_pub_key = vec![0xdb; 32];
 
-let agent_id: HoloHash = AgentPubKey::with_pre_hashed(agent_pub_key).into();
+let agent_id: HoloHash = AgentPubKey::from_raw_32(agent_pub_key).into();
 
 assert_eq!(
     "AgentPubKey(uhCAk29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29uTp5Iv)",
@@ -116,9 +114,9 @@ Holochain is an open source project.  We welcome all sorts of participation and 
 * Connect with us on our [forum](https://forum.holochain.org)
 
 ## License
- [![License: CAL 1.0](https://img.shields.io/badge/License-CAL-1.0-blue.svg)](https://github.com/holochain/cryptographic-autonomy-license)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
-Copyright (C) 2019 - 2020, Holochain Foundation
+Copyright (C) 2019 - 2021, Holochain Foundation
 
 This program is free software: you can redistribute it and/or modify it under the terms of the license
 provided in the LICENSE file (CAL-1.0).  This program is distributed in the hope that it will be useful,

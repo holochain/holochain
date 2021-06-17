@@ -1,16 +1,15 @@
 use crate::*;
-use futures::{sink::SinkExt, stream::StreamExt};
+use futures::sink::SinkExt;
+use futures::stream::StreamExt;
 use ghost_actor::dependencies::tracing;
+use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::dependencies::serde_json;
 use std::collections::HashMap;
-
-/// How often should NAT nodes refresh their proxy contract?
-/// Note - ProxyTo entries will be expired at double this time.
-const PROXY_KEEPALIVE_MS: u64 = 10000;
 
 /// Wrap a transport listener sender/receiver in kitsune proxy logic.
 pub async fn spawn_kitsune_proxy_listener(
     proxy_config: Arc<ProxyConfig>,
+    tuning_params: KitsuneP2pTuningParams,
     sub_sender: ghost_actor::GhostSender<TransportListener>,
     mut sub_receiver: TransportEventReceiver,
 ) -> TransportResult<(
@@ -49,10 +48,11 @@ pub async fn spawn_kitsune_proxy_listener(
     let (evt_send, evt_recv) = futures::channel::mpsc::channel(10);
 
     // spawn the actor
-    tokio::task::spawn(
+    metric_task(
         builder.spawn(
             InnerListen::new(
                 i_s.clone(),
+                tuning_params.clone(),
                 this_url,
                 tls,
                 accept_proxy_cb,
@@ -66,31 +66,49 @@ pub async fn spawn_kitsune_proxy_listener(
     // if we want to be proxied, we need to connect to our proxy
     // and manage that connection contract
     if let Some(proxy_url) = proxy_url {
-        i_s.req_proxy(proxy_url.clone()).await?;
+        if let Err(e) = i_s.req_proxy(proxy_url.clone()).await {
+            tracing::error!(
+                msg = "Request proxy failed. Check proxy_url / network status.",
+                ?proxy_url,
+                ?e
+            );
+        }
 
         // Set up a timer to refresh our proxy contract at keepalive interval
         let i_s_c = i_s.clone();
-        tokio::task::spawn(async move {
-            tokio::time::delay_for(std::time::Duration::from_millis(PROXY_KEEPALIVE_MS)).await;
+        let proxy_keepalive_ms = tuning_params.proxy_keepalive_ms as u64;
+        metric_task(async move {
+            loop {
+                tokio::time::sleep(std::time::Duration::from_millis(proxy_keepalive_ms)).await;
 
-            if i_s_c.req_proxy(proxy_url.clone()).await.is_err() {
-                // either we failed because the actor is already shutdown
-                // or the remote end rejected us.
-                // if it's the latter - shut down our ghost actor : )
-                let _ = i_s_c.ghost_actor_shutdown().await;
+                if let Err(e) = i_s_c.req_proxy(proxy_url.clone()).await {
+                    tracing::error!(msg = "renewing proxy failed", ?proxy_url, ?e);
+                    // either we failed because the actor is already shutdown
+                    // or the remote end rejected us.
+                    // if it's the latter - shut down our ghost actor : )
+                    if !i_s_c.ghost_actor_is_active() {
+                        tracing::debug!("Ghost actor has closed so exiting keep alive");
+                        break;
+                    }
+                } else {
+                    tracing::info!("Proxy renewed for {:?}", proxy_url);
+                }
             }
+            tracing::error!("Keep alive closed");
+            <Result<(), ()>>::Ok(())
         });
     }
 
     // handle incoming channels from our sub transport
-    tokio::task::spawn(async move {
+    metric_task(async move {
         while let Some(evt) = sub_receiver.next().await {
             match evt {
                 TransportEvent::IncomingChannel(url, write, read) => {
                     // spawn so we can process incoming requests in parallel
                     let i_s = i_s.clone();
-                    tokio::task::spawn(async move {
+                    metric_task(async move {
                         let _ = i_s.incoming_channel(url, write, read).await;
+                        <Result<(), ()>>::Ok(())
                     });
                 }
             }
@@ -107,6 +125,7 @@ pub async fn spawn_kitsune_proxy_listener(
     Ok((sender, evt_recv))
 }
 
+#[derive(Debug)]
 /// An item in our proxy_list - a client we have agreed to proxy for
 struct ProxyTo {
     /// the low-level connection url
@@ -118,6 +137,8 @@ struct ProxyTo {
 
 struct InnerListen {
     i_s: ghost_actor::GhostSender<Internal>,
+    #[allow(dead_code)]
+    tuning_params: KitsuneP2pTuningParams,
     this_url: ProxyUrl,
     accept_proxy_cb: AcceptProxyCallback,
     sub_sender: ghost_actor::GhostSender<TransportListener>,
@@ -131,6 +152,7 @@ struct InnerListen {
 impl InnerListen {
     pub async fn new(
         i_s: ghost_actor::GhostSender<Internal>,
+        tuning_params: KitsuneP2pTuningParams,
         this_url: ProxyUrl,
         tls: TlsConfig,
         accept_proxy_cb: AcceptProxyCallback,
@@ -143,10 +165,11 @@ impl InnerListen {
             this_url
         );
 
-        let (tls_server_config, tls_client_config) = gen_tls_configs(&tls)?;
+        let (tls_server_config, tls_client_config) = gen_tls_configs(&tls, tuning_params.clone())?;
 
         Ok(Self {
             i_s,
+            tuning_params,
             this_url,
             accept_proxy_cb,
             sub_sender,
@@ -200,6 +223,8 @@ ghost_actor::ghost_chan! {
             futures::channel::mpsc::Receiver<ProxyWire>,
         );
 
+        fn prune_bad_proxy_to(proxy_url: ProxyUrl) -> ();
+
         fn register_proxy_to(proxy_url: ProxyUrl, base_url: url2::Url2) -> ();
 
         fn req_proxy(proxy_url: ProxyUrl) -> ();
@@ -215,7 +240,7 @@ fn cross_join_channel_forward(
     mut write: futures::channel::mpsc::Sender<ProxyWire>,
     mut read: futures::channel::mpsc::Receiver<ProxyWire>,
 ) {
-    tokio::task::spawn(async move {
+    metric_task(async move {
         while let Some(msg) = read.next().await {
             // do we need to inspect these??
             // for now just forwarding everything
@@ -314,27 +339,42 @@ impl InternalHandler for InnerListen {
 
         // first check to see if we should proxy this
         // to a client we are servicing.
-        let proxy_to = if let Some(proxy_to) = self.proxy_list.get(&dest_proxy_url) {
-            Some(proxy_to.base_connection_url.clone())
-        } else {
-            None
-        };
+        let proxy_to = self
+            .proxy_list
+            .get(&dest_proxy_url)
+            .map(|proxy_to| proxy_to.base_connection_url.clone());
 
         // if we're not proxying for a client,
         // check to see if our owner is the destination.
         if proxy_to.is_none() && dest_proxy_url.as_base() == self.this_url.as_base() {
-            tracing::debug!("{}: chan new to self, hooking connection", short);
+            if dest_proxy_url.as_full() == self.this_url.as_full() {
+                tracing::debug!("{}: chan new to self, hooking connection", short);
 
-            // Hey! They're trying to talk to us!
-            // Let's connect them to our owner.
-            tls_srv::spawn_tls_server(
-                short,
-                base_url,
-                self.tls_server_config.clone(),
-                self.evt_send.clone(),
-                write,
-                read,
-            );
+                // Hey! They're trying to talk to us!
+                // Let's connect them to our owner.
+                tls_srv::spawn_tls_server(
+                    short,
+                    base_url,
+                    self.tls_server_config.clone(),
+                    self.evt_send.clone(),
+                    write,
+                    read,
+                );
+            } else {
+                tracing::warn!("Dropping message for {}", dest_proxy_url.as_full_str());
+                return Ok(async move {
+                    write
+                        .send(ProxyWire::failure(format!(
+                            "Dropped message to {}",
+                            dest_proxy_url.as_full_str()
+                        )))
+                        .await
+                        .map_err(TransportError::other)?;
+                    Ok(())
+                }
+                .boxed()
+                .into());
+            }
 
             return Ok(async move { Ok(()) }.boxed().into());
         }
@@ -345,14 +385,38 @@ impl InternalHandler for InnerListen {
         // and the channel create will re-use that.
         // If it is not, it will try to create a new connection that may fail.
         let fut = match proxy_to {
-            None => self
-                .i_s
-                .create_low_level_channel(dest_proxy_url.as_base().clone()),
+            None => {
+                tracing::warn!("Dropping message for {}", dest_proxy_url.as_full_str());
+                return Ok(async move {
+                    write
+                        .send(ProxyWire::failure(format!(
+                            "Dropped message to {}",
+                            dest_proxy_url.as_full_str()
+                        )))
+                        .await
+                        .map_err(TransportError::other)?;
+                    Ok(())
+                }
+                .boxed()
+                .into());
+            }
             Some(proxy_to) => self.i_s.create_low_level_channel(proxy_to),
         };
+        let i_s = self.i_s.clone();
         Ok(async move {
-            let (mut fwd_write, fwd_read) = match fut.await {
+            let url = dest_proxy_url.clone();
+            let res = async move {
+                let (mut fwd_write, fwd_read) = fut.await?;
+                fwd_write
+                    .send(ProxyWire::chan_new(url.into()))
+                    .await
+                    .map_err(TransportError::other)?;
+                TransportResult::Ok((fwd_write, fwd_read))
+            }
+            .await;
+            let (fwd_write, fwd_read) = match res {
                 Err(e) => {
+                    let _ = i_s.prune_bad_proxy_to(dest_proxy_url).await;
                     write
                         .send(ProxyWire::failure(format!("{:?}", e)))
                         .await
@@ -361,10 +425,6 @@ impl InternalHandler for InnerListen {
                 }
                 Ok(t) => t,
             };
-            fwd_write
-                .send(ProxyWire::chan_new(dest_proxy_url.clone().into()))
-                .await
-                .map_err(TransportError::other)?;
             cross_join_channel_forward(fwd_write, read);
             cross_join_channel_forward(write, fwd_read);
             Ok(())
@@ -391,14 +451,21 @@ impl InternalHandler for InnerListen {
         .into())
     }
 
+    fn handle_prune_bad_proxy_to(&mut self, proxy_url: ProxyUrl) -> InternalHandlerResult<()> {
+        self.proxy_list.remove(&proxy_url);
+        Ok(async move { Ok(()) }.boxed().into())
+    }
+
+    #[tracing::instrument(skip(self))]
     fn handle_register_proxy_to(
         &mut self,
         proxy_url: ProxyUrl,
         base_url: url2::Url2,
     ) -> InternalHandlerResult<()> {
-        // expire ProxyTo entries at double the proxy keepalive timeframe.
         let expires_at = std::time::Instant::now()
-            .checked_add(std::time::Duration::from_millis(PROXY_KEEPALIVE_MS * 2))
+            .checked_add(std::time::Duration::from_millis(
+                self.tuning_params.proxy_to_expire_ms as u64,
+            ))
             .unwrap();
         self.proxy_list.insert(
             proxy_url,
@@ -457,22 +524,14 @@ impl TransportListenerHandler for InnerListen {
     fn handle_debug(&mut self) -> TransportListenerHandlerResult<serde_json::Value> {
         let url = self.this_url.to_string();
         let sub = self.sub_sender.debug();
-        let proxy = self
-            .proxy_list
-            .iter()
-            .map(|(k, v)| {
-                serde_json::json! {{
-                    "proxy_url": k.to_string(),
-                    "base_url": v.base_connection_url.to_string(),
-                }}
-            })
-            .collect::<Vec<_>>();
+        let proxy_count = self.proxy_list.len();
         Ok(async move {
             let sub = sub.await?;
             Ok(serde_json::json! {{
                 "sub_transport": sub,
                 "url": url,
-                "proxy": proxy,
+                "proxy_count": proxy_count,
+                "sys_info": kitsune_p2p_types::metrics::get_sys_info(),
             }})
         }
         .boxed()

@@ -10,15 +10,15 @@
 //! outside world
 
 #![deny(missing_docs)]
+
 // TODO: clean up allows once parent is fully documented
 
 pub mod api;
 mod cell;
-#[allow(missing_docs)]
-pub mod compat;
 #[allow(clippy::module_inception)]
 #[allow(missing_docs)]
-mod conductor;
+pub mod conductor;
+#[allow(missing_docs)]
 pub mod config;
 #[allow(missing_docs)]
 pub mod dna_store;
@@ -29,28 +29,14 @@ pub mod handle;
 pub mod interactive;
 pub mod interface;
 pub mod manager;
-pub mod p2p_store;
+pub mod p2p_agent_store;
+pub mod p2p_metrics;
 pub mod paths;
 pub mod state;
 
-pub use cell::{error::CellError, Cell};
-pub use conductor::{Conductor, ConductorBuilder, ConductorStateDb};
+pub use cell::error::CellError;
+pub use cell::Cell;
+pub use conductor::integration_dump;
+pub use conductor::Conductor;
+pub use conductor::ConductorBuilder;
 pub use handle::ConductorHandle;
-
-/// setup a tokio runtime that meets the conductor's needs
-pub fn tokio_runtime() -> tokio::runtime::Runtime {
-    tokio::runtime::Builder::new()
-        // we use both IO and Time tokio utilities
-        .enable_all()
-        // we want to use multiple threads
-        .threaded_scheduler()
-        // we want to use thread count matching cpu count
-        // (sometimes tokio by default only uses half cpu core threads)
-        .core_threads(num_cpus::get())
-        // give our threads a descriptive name (they'll be numbered too)
-        .thread_name("holochain-tokio-thread")
-        // build the runtime
-        .build()
-        // panic if we cannot (we cannot run without it)
-        .expect("can build tokio runtime")
-}

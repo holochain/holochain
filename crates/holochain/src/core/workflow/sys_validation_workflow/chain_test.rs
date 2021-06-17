@@ -1,29 +1,22 @@
-use std::{convert::TryFrom, time::Duration};
-
+use super::*;
+use crate::conductor::ConductorHandle;
+use crate::test_utils::setup_app;
+use crate::test_utils::wait_for_integration;
+use ::fixt::prelude::*;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_types::{
-    app::InstalledCell,
-    cell::CellId,
-    dna::{DnaDef, DnaFile},
-};
-use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::test_utils::fake_agent_pubkey_1;
+use holochain_state::source_chain::SourceChain;
 
-use super::*;
-use crate::{
-    conductor::dna_store::MockDnaStore, conductor::ConductorHandle,
-    core::state::source_chain::SourceChain, test_utils::setup_app,
-    test_utils::wait_for_integration,
-};
-use ::fixt::prelude::*;
-use holochain_zome_types::fixt::*;
+use holochain_wasm_test_utils::TestWasm;
+
+use std::convert::TryFrom;
+use std::time::Duration;
 
 /// Unfortunately this test doesn't do anything yet because
 /// failing a chain validation is just a log error so the only way to
 /// verify this works is to run this with logging and check it outputs
 /// use `RUST_LOG=[agent_activity]=warn`
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "TODO: complete when chain validation returns actual error"]
 async fn sys_validation_agent_activity_test() {
     observability::test_run().ok();
@@ -31,7 +24,7 @@ async fn sys_validation_agent_activity_test() {
     let dna_file = DnaFile::new(
         DnaDef {
             name: "chain_test".to_string(),
-            uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+            uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
             zomes: vec![TestWasm::Create.into()].into(),
         },
@@ -44,16 +37,9 @@ async fn sys_validation_agent_activity_test() {
     let alice_cell_id = CellId::new(dna_file.dna_hash().to_owned(), alice_agent_id.clone());
     let alice_installed_cell = InstalledCell::new(alice_cell_id.clone(), "alice_handle".into());
 
-    let mut dna_store = MockDnaStore::new();
-
-    dna_store.expect_get().return_const(Some(dna_file.clone()));
-    dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-    dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
-    dna_store.expect_get_entry_def().return_const(None);
-
     let (_tmpdir, _app_api, handle) = setup_app(
         vec![("test_app", vec![(alice_installed_cell, None)])],
-        dna_store,
+        vec![dna_file.clone()],
     )
     .await;
 
@@ -61,7 +47,7 @@ async fn sys_validation_agent_activity_test() {
 
     let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
-    shutdown.await.unwrap();
+    shutdown.await.unwrap().unwrap();
 }
 
 async fn run_test(alice_cell_id: CellId, handle: ConductorHandle) {
@@ -74,7 +60,7 @@ async fn run_test(alice_cell_id: CellId, handle: ConductorHandle) {
     wait_for_integration(&alice_env, 7, 100, Duration::from_millis(100)).await;
 
     let source_chain = SourceChain::new(alice_env.clone().into()).unwrap();
-    let mut timestamp = Timestamp::now();
+    let mut timestamp = timestamp::now();
 
     // Create the headers
     let mut h1 = fixt!(Create);
@@ -134,6 +120,7 @@ async fn run_test(alice_cell_id: CellId, handle: ConductorHandle) {
         sys_validation_trigger.clone(),
         ops,
         None,
+        false,
     )
     .await
     .unwrap();
@@ -190,6 +177,7 @@ async fn run_test(alice_cell_id: CellId, handle: ConductorHandle) {
         sys_validation_trigger,
         ops,
         None,
+        false,
     )
     .await
     .unwrap();

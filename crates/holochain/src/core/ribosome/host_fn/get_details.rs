@@ -1,64 +1,67 @@
-use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::{CallContext, RibosomeT};
-use holochain_zome_types::{GetDetailsInput, GetDetailsOutput};
+use crate::core::ribosome::CallContext;
+use crate::core::ribosome::RibosomeT;
+use holochain_cascade::Cascade;
+use holochain_types::prelude::*;
+use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_details<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: GetDetailsInput,
-) -> RibosomeResult<GetDetailsOutput> {
-    let (hash, options) = input.into_inner();
+    input: GetInput,
+) -> Result<Option<Details>, WasmError> {
+    let GetInput {
+        any_dht_hash,
+        get_options,
+    } = input;
 
     // Get the network from the context
     let network = call_context.host_access.network().clone();
 
     // timeouts must be handled by the network
-    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        let maybe_details = call_context
-            .host_access
-            .workspace()
-            .write()
+    tokio_helper::block_forever_on(async move {
+        let workspace = call_context.host_access.workspace();
+        let mut cascade = Cascade::from_workspace_network(workspace, network);
+        let maybe_details = cascade
+            .get_details(any_dht_hash, get_options)
             .await
-            .cascade(network)
-            .get_details(hash, options.into())
-            .await?;
-        Ok(GetDetailsOutput::new(maybe_details))
+            .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
+        Ok(maybe_details)
     })
 }
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::{core::workflow::CallZomeWorkspace, fixt::ZomeCallHostAccessFixturator};
+    use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
-    use hdk3::prelude::*;
+    use hdk::prelude::*;
+    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_wasm_test_utils::TestWasm;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_get_details_test<'a>() {
-        holochain_types::observability::test_run().ok();
-
+        observability::test_run().ok();
         let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
-
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+        let author = fake_agent_pubkey_1();
+        crate::test_utils::fake_genesis(env.clone())
             .await
             .unwrap();
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
 
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock.clone();
+        host_access.workspace = workspace.clone();
 
         // simple replica of the internal type for the TestWasm::Crud entry
         #[derive(Clone, Copy, Serialize, Deserialize, SerializedBytes, Debug, PartialEq)]
         struct CounTree(u32);
 
-        let check = |details: GetDetailsOutput, count, delete| match details.clone().into_inner() {
-            Some(Details::Element(element_details)) => {
+        let check = |details: Option<Details>, count, delete| match details {
+            Some(Details::Element(ref element_details)) => {
                 match element_details.element.entry().to_app_option::<CounTree>() {
                     Ok(Some(CounTree(u))) => assert_eq!(u, count),
                     _ => panic!("failed to deserialize {:?}, {}, {}", details, count, delete),
@@ -68,14 +71,11 @@ pub mod wasm_test {
             _ => panic!("no element"),
         };
 
-        let check_entry = |details: GetDetailsOutput, count, update, delete, line| match details
-            .clone()
-            .into_inner()
-        {
-            Some(Details::Entry(entry_details)) => {
+        let check_entry = |details: Option<Details>, count, update, delete, line| match details {
+            Some(Details::Entry(ref entry_details)) => {
                 match entry_details.entry {
-                    Entry::App(eb) => {
-                        let countree = CounTree::try_from(eb.into_sb()).unwrap();
+                    Entry::App(ref eb) => {
+                        let countree = CounTree::try_from(eb.clone().into_sb()).unwrap();
                         assert_eq!(countree, CounTree(count));
                     }
                     _ => panic!(
@@ -231,9 +231,9 @@ pub mod wasm_test {
             line!(),
         );
 
-        let zero_b_details: GetDetailsOutput =
+        let zero_b_details: Option<Details> =
             crate::call_test_ribosome!(host_access, TestWasm::Crud, "header_details", zero_b);
-        match zero_b_details.into_inner() {
+        match zero_b_details {
             Some(Details::Element(element_details)) => {
                 match element_details.element.entry().as_option() {
                     None => {

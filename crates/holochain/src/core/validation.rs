@@ -1,13 +1,13 @@
 //! Types needed for all validation
 use std::convert::TryFrom;
 
-use derivative::Derivative;
 use holo_hash::DhtOpHash;
 use holochain_types::dht_op::DhtOp;
 
-use super::{
-    workflow::error::WorkflowResult, SourceChainError, SysValidationError, ValidationOutcome,
-};
+use super::workflow::error::WorkflowResult;
+use super::SourceChainError;
+use super::SysValidationError;
+use super::ValidationOutcome;
 
 /// Exit early with either an outcome or an error
 pub enum OutcomeOrError<T, E> {
@@ -31,6 +31,7 @@ macro_rules! from_sub_error {
 /// Type for deriving ordering of DhtOps
 /// Don't change the order of this enum unless
 /// you mean to change the order we process ops
+// TODO: We can probably remove this now?
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum DhtOpOrder {
@@ -46,16 +47,32 @@ pub enum DhtOpOrder {
 }
 
 /// Op data that will be ordered by [DhtOpOrder]
-#[derive(Derivative, Debug, Clone)]
-#[derivative(Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Clone)]
 pub struct OrderedOp<V> {
     pub order: DhtOpOrder,
-    #[derivative(PartialEq = "ignore", PartialOrd = "ignore", Ord = "ignore")]
     pub hash: DhtOpHash,
-    #[derivative(PartialEq = "ignore", PartialOrd = "ignore", Ord = "ignore")]
     pub op: DhtOp,
-    #[derivative(PartialEq = "ignore", PartialOrd = "ignore", Ord = "ignore")]
     pub value: V,
+}
+
+// Derivative is no longer working because we have a module called `core`
+// so I have to impl these traits manually.
+
+impl<V> PartialEq for OrderedOp<V> {
+    fn eq(&self, other: &Self) -> bool {
+        self.order.eq(&other.order)
+    }
+}
+impl<V> PartialOrd for OrderedOp<V> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.order.partial_cmp(&other.order)
+    }
+}
+impl<V> Eq for OrderedOp<V> {}
+impl<V> Ord for OrderedOp<V> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.order.cmp(&other.order)
+    }
 }
 
 impl From<&DhtOp> for DhtOpOrder {

@@ -1,11 +1,15 @@
-use holochain::conductor::{
-    compat::load_conductor_from_legacy_config, config::ConductorConfig, error::ConductorError,
-    interactive, paths::ConfigFilePath, Conductor, ConductorHandle,
-};
-use holochain_types::observability::{self, Output};
-use std::error::Error;
-use std::fs;
-use std::path::{Path, PathBuf};
+use holochain::conductor::config::ConductorConfig;
+use holochain::conductor::interactive;
+use holochain::conductor::manager::handle_shutdown;
+use holochain::conductor::paths::ConfigFilePath;
+use holochain::conductor::Conductor;
+use holochain::conductor::ConductorHandle;
+use holochain_conductor_api::conductor::ConductorConfigError;
+use holochain_util::tokio_helper;
+use observability::Output;
+#[cfg(unix)]
+use sd_notify::{notify, NotifyState};
+use std::path::PathBuf;
 use structopt::StructOpt;
 use tracing::*;
 
@@ -30,15 +34,9 @@ struct Opt {
     #[structopt(
         short = "c",
         long,
-        help = "Path to a TOML file containing conductor configuration"
+        help = "Path to a YAML file containing conductor configuration"
     )]
     config_path: Option<PathBuf>,
-
-    #[structopt(
-        long,
-        help = "For backwards compatibility with Tryorama only: Path to a TOML file containing legacy conductor configuration"
-    )]
-    legacy_tryorama_config_path: Option<PathBuf>,
 
     #[structopt(
         short = "i",
@@ -50,9 +48,8 @@ struct Opt {
 }
 
 fn main() {
-    holochain::conductor::tokio_runtime()
-        // the async_main function should only end if our program is done
-        .block_on(async_main())
+    // the async_main function should only end if our program is done
+    tokio_helper::block_forever_on(async_main())
 }
 
 async fn async_main() {
@@ -65,11 +62,10 @@ async fn async_main() {
     observability::init_fmt(opt.structured).expect("Failed to start contextual logging");
     debug!("observability initialized");
 
-    let conductor = if let Some(legacy_config_path) = opt.legacy_tryorama_config_path {
-        conductor_handle_from_legacy_config_path(&legacy_config_path).await
-    } else {
-        conductor_handle_from_config_path(opt.config_path.clone(), opt.interactive).await
-    };
+    kitsune_p2p_types::metrics::init_sys_info_poll();
+
+    let conductor =
+        conductor_handle_from_config_path(opt.config_path.clone(), opt.interactive).await;
 
     info!("Conductor successfully initialized.");
 
@@ -78,30 +74,24 @@ async fn async_main() {
     // interfaces are running, and can be connected to.
     println!("{}", MAGIC_CONDUCTOR_READY_STRING);
 
+    // Lets systemd units know that holochain is ready via sd_notify socket
+    // Requires NotifyAccess=all and Type=notify attributes on holochain systemd unit
+    // and NotifyAccess=all on dependant systemd unit
+    #[cfg(unix)]
+    let _ = notify(true, &[NotifyState::Ready]);
+
     // Await on the main JoinHandle, keeping the process alive until all
     // Conductor activity has ceased
-    conductor
+    let result = conductor
         .take_shutdown_handle()
         .await
         .expect("The shutdown handle has already been taken.")
-        .await
-        .map_err(|e| {
-            error!(error = &e as &dyn Error, "Failed to join the main task");
-            e
-        })
-        .expect("Error while joining threads during shutdown");
+        .await;
+
+    handle_shutdown(result);
 
     // TODO: on SIGINT/SIGKILL, kill the conductor:
     // conductor.kill().await
-}
-
-async fn conductor_handle_from_legacy_config_path(legacy_config_path: &Path) -> ConductorHandle {
-    let toml =
-        fs::read_to_string(legacy_config_path).expect("Couldn't read legacy config from file");
-    let legacy_config = toml::from_str(&toml).expect("Couldn't deserialize legacy config");
-    load_conductor_from_legacy_config(legacy_config, Conductor::builder())
-        .await
-        .expect("Couldn't initialize conductor from legacy config")
 }
 
 async fn conductor_handle_from_config_path(
@@ -124,19 +114,19 @@ async fn conductor_handle_from_config_path(
         load_config(&config_path, config_path_default)
     };
 
-    // Check if LMDB env dir is present
+    // Check if database is present
     // In interactive mode give the user a chance to create it, otherwise create it automatically
     let env_path = PathBuf::from(config.environment_path.clone());
     if !env_path.is_dir() {
         let result = if interactive {
-            interactive::prompt_for_environment_dir(&env_path)
+            interactive::prompt_for_database_dir(&env_path)
         } else {
             std::fs::create_dir_all(&env_path)
         };
         match result {
-            Ok(()) => println!("Created LMDB environment at {}.", env_path.display()),
+            Ok(()) => println!("Created database at {}.", env_path.display()),
             Err(e) => {
-                println!("Couldn't create LMDB environment: {}", e);
+                println!("Couldn't create database: {}", e);
                 std::process::exit(ERROR_CODE);
             }
         }
@@ -152,12 +142,12 @@ async fn conductor_handle_from_config_path(
 
 /// Load config, throw friendly error on failure
 fn load_config(config_path: &ConfigFilePath, config_path_default: bool) -> ConductorConfig {
-    match ConductorConfig::load_toml(config_path.as_ref()) {
-        Err(ConductorError::ConfigMissing(_)) => {
+    match ConductorConfig::load_yaml(config_path.as_ref()) {
+        Err(ConductorConfigError::ConfigMissing(_)) => {
             display_friendly_missing_config_message(config_path, config_path_default);
             std::process::exit(ERROR_CODE);
         }
-        Err(ConductorError::DeserializationError(err)) => {
+        Err(ConductorConfigError::SerializationError(err)) => {
             display_friendly_malformed_config_message(config_path, err);
             std::process::exit(ERROR_CODE);
         }
@@ -177,7 +167,7 @@ Error: The conductor is set up to load its configuration from the default path:
     {path}
 
 but this file doesn't exist. If you meant to specify a path, run this command
-again with the -c option. Otherwise, please either create a TOML config file at
+again with the -c option. Otherwise, please either create a YAML config file at
 this path yourself, or rerun the command with the '-i' flag, which will help you
 automatically create a default config file.
         ",
@@ -190,7 +180,7 @@ Error: You asked to load configuration from the path:
 
     {path}
 
-but this file doesn't exist. Please either create a TOML config file at this
+but this file doesn't exist. Please either create a YAML config file at this
 path yourself, or rerun the command with the '-i' flag, which will help you
 automatically create a default config file.
         ",
@@ -199,11 +189,14 @@ automatically create a default config file.
     }
 }
 
-fn display_friendly_malformed_config_message(config_path: &ConfigFilePath, error: toml::de::Error) {
+fn display_friendly_malformed_config_message(
+    config_path: &ConfigFilePath,
+    error: serde_yaml::Error,
+) {
     println!(
         "
 The specified config file ({})
-could not be parsed, because it is not valid TOML. Please check and fix the
+could not be parsed, because it is not valid YAML. Please check and fix the
 file, or delete the file and run the conductor again with the -i flag to create
 a valid default configuration. Details:
 

@@ -1,8 +1,7 @@
-use element::ElementEntry;
-use hdk3::prelude::*;
+use hdk::prelude::*;
 
 /// an example inner value that can be serialized into the contents of Entry::App()
-#[derive(Deserialize, Serialize, SerializedBytes)]
+#[derive(Deserialize, Serialize, SerializedBytes, Debug)]
 enum ThisWasmEntry {
     AlwaysValidates,
     NeverValidates,
@@ -53,11 +52,40 @@ impl TryFrom<&Entry> for ThisWasmEntry {
     fn try_from(entry: &Entry) -> Result<Self, Self::Error> {
         match entry {
             Entry::App(eb) => Ok(Self::try_from(SerializedBytes::from(eb.to_owned()))?),
-            _ => Err(
-                SerializedBytesError::FromBytes("failed to deserialize ThisWasmEntry".into())
-                    .into(),
-            ),
+            _ => Err(SerializedBytesError::Deserialize(
+                "failed to deserialize ThisWasmEntry".into(),
+            )
+            .into()),
         }
+    }
+}
+
+impl TryFrom<&ThisWasmEntry> for Entry {
+    type Error = WasmError;
+    fn try_from(this_wasm_entry: &ThisWasmEntry) -> Result<Self, Self::Error> {
+        Ok(Entry::App(
+            match AppEntryBytes::try_from(SerializedBytes::try_from(this_wasm_entry)?) {
+                Ok(app_entry_bytes) => app_entry_bytes,
+                Err(entry_error) => match entry_error {
+                    EntryError::SerializedBytes(serialized_bytes_error) => {
+                        return Err(WasmError::Serialize(serialized_bytes_error))
+                    }
+                    EntryError::EntryTooLarge(_) => {
+                        return Err(WasmError::Guest(entry_error.to_string()))
+                    }
+                },
+            },
+        ))
+    }
+}
+
+impl TryFrom<&ThisWasmEntry> for EntryWithDefId {
+    type Error = WasmError;
+    fn try_from(this_wasm_entry: &ThisWasmEntry) -> Result<Self, Self::Error> {
+        Ok(Self::new(
+            EntryDefId::from(this_wasm_entry),
+            Entry::try_from(this_wasm_entry)?,
+        ))
     }
 }
 
@@ -69,25 +97,31 @@ entry_defs![
 #[hdk_extern]
 fn validate(data: ValidateData) -> ExternResult<ValidateCallbackResult> {
     let element = data.element;
+    let entry_type = element.header().entry_type().cloned();
     let entry = element.into_inner().1;
     let entry = match entry {
         ElementEntry::Present(e) => e,
         _ => return Ok(ValidateCallbackResult::Valid),
     };
-    if let Entry::Agent(_) = entry {
-        return Ok(ValidateCallbackResult::Valid);
+
+    if let Entry::App(_) = &entry {
+        Ok(match ThisWasmEntry::try_from(&entry) {
+            Ok(ThisWasmEntry::AlwaysValidates) => ValidateCallbackResult::Valid,
+            Ok(ThisWasmEntry::NeverValidates) => {
+                ValidateCallbackResult::Invalid("NeverValidates never validates".to_string())
+            }
+            _ => ValidateCallbackResult::Invalid(format!(
+                "Not a ThisWasmEntry but a {:?}",
+                entry_type
+            )),
+        })
+    } else {
+        Ok(ValidateCallbackResult::Valid)
     }
-    Ok(match ThisWasmEntry::try_from(&entry) {
-        Ok(ThisWasmEntry::AlwaysValidates) => ValidateCallbackResult::Valid,
-        Ok(ThisWasmEntry::NeverValidates) => {
-            ValidateCallbackResult::Invalid("NeverValidates never validates".to_string())
-        }
-        _ => ValidateCallbackResult::Invalid("Not a ThisWasmEntry".to_string()),
-    })
 }
 
 fn _commit_validate(to_commit: ThisWasmEntry) -> ExternResult<HeaderHash> {
-    Ok(create_entry!(&to_commit)?)
+    create_entry(&to_commit)
 }
 
 #[hdk_extern]

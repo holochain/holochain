@@ -1,18 +1,11 @@
-use super::{create::extract_entry_def, delete::get_original_address};
-use crate::core::ribosome::error::RibosomeResult;
+use super::create::extract_entry_def;
+use super::delete::get_original_address;
 use crate::core::ribosome::CallContext;
-use crate::core::{
-    ribosome::RibosomeT,
-    workflow::{integrate_dht_ops_workflow::integrate_to_authored, CallZomeWorkspace},
-    SourceChainError,
-};
+use crate::core::ribosome::RibosomeT;
+use holochain_wasmer_host::prelude::WasmError;
+
 use holo_hash::HasHash;
-use holochain_zome_types::entry_def::EntryDefId;
-use holochain_zome_types::UpdateInput;
-use holochain_zome_types::{
-    header::{builder, AppEntryType, EntryType},
-    UpdateOutput,
-};
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -20,23 +13,31 @@ pub fn update<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: UpdateInput,
-) -> RibosomeResult<UpdateOutput> {
+) -> Result<HeaderHash, WasmError> {
     // destructure the args out into an app type def id and entry
-    let (entry_def_id, entry, original_header_address) = input.into_inner();
+    let UpdateInput {
+        original_header_address,
+        entry_with_def_id,
+    } = input;
 
     // build the entry hash
-    let async_entry = entry.clone();
+    let async_entry = AsRef::<Entry>::as_ref(&entry_with_def_id).to_owned();
     let entry_hash =
         holochain_types::entry::EntryHashed::from_content_sync(async_entry).into_hash();
 
     // extract the zome position
-    let header_zome_id = ribosome.zome_name_to_id(&call_context.zome_name)?;
+    let header_zome_id = ribosome
+        .zome_to_id(&call_context.zome)
+        .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
 
     // extract the entry defs for a zome
-    let entry_type = match entry_def_id {
+    let entry_type = match AsRef::<EntryDefId>::as_ref(&entry_with_def_id) {
         EntryDefId::App(entry_def_id) => {
-            let (header_entry_def_id, entry_visibility) =
-                extract_entry_def(ribosome, call_context.clone(), entry_def_id.into())?;
+            let (header_entry_def_id, entry_visibility) = extract_entry_def(
+                ribosome,
+                call_context.clone(),
+                entry_def_id.to_owned().into(),
+            )?;
             let app_entry_type =
                 AppEntryType::new(header_entry_def_id, header_zome_id, entry_visibility);
             EntryType::App(app_entry_type)
@@ -50,36 +51,27 @@ pub fn update<'a>(
 
     // build a header for the entry being updated
     let header_builder = builder::Update {
+        original_entry_address,
+        original_header_address,
         entry_type,
         entry_hash,
-        original_header_address,
-        original_entry_address,
     };
 
-    let workspace_lock = call_context.host_access.workspace();
+    let workspace = call_context.host_access.workspace();
 
     // return the hash of the updated entry
     // note that validation is handled by the workflow
-    // if the validation fails this update will be rolled back by virtue of the lmdb transaction
+    // if the validation fails this update will be rolled back by virtue of the DB transaction
     // being atomic
-    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        let mut guard = workspace_lock.write().await;
-        let workspace: &mut CallZomeWorkspace = &mut guard;
-        let source_chain = &mut workspace.source_chain;
+    let entry = AsRef::<Entry>::as_ref(&entry_with_def_id).to_owned();
+    tokio_helper::block_forever_on(async move {
+        let source_chain = workspace.source_chain();
         // push the header and the entry into the source chain
-        let header_hash = source_chain.put(header_builder, Some(entry)).await?;
-        // fetch the element we just added so we can integrate its DhtOps
-        let element = source_chain
-            .get_element(&header_hash)?
-            .expect("Element we just put in SourceChain must be gettable");
-        integrate_to_authored(
-            &element,
-            workspace.source_chain.elements(),
-            &mut workspace.meta_authored,
-        )
-        .map_err(Box::new)
-        .map_err(SourceChainError::from)?;
-        Ok(UpdateOutput::new(header_hash))
+        let header_hash = source_chain
+            .put(header_builder, Some(entry))
+            .await
+            .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
+        Ok(header_hash)
     })
 }
 

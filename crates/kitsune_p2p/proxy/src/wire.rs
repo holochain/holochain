@@ -3,7 +3,9 @@
 use crate::*;
 
 /// Type used for content data of wire proxy messages.
-#[derive(Debug, PartialEq, Deref, AsRef, From, Into, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Deref, AsRef, From, Into, serde::Serialize, serde::Deserialize,
+)]
 pub struct ChannelData(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 /// Wire type for transfering urls.

@@ -1,57 +1,52 @@
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_p2p::HolochainP2pCellT;
-use holochain_zome_types::CallRemoteInput;
-use holochain_zome_types::CallRemoteOutput;
-use holochain_zome_types::ZomeCallResponse;
-use std::convert::TryInto;
+use holochain_types::prelude::*;
+use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 
 pub fn call_remote(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: CallRemoteInput,
-) -> RibosomeResult<CallRemoteOutput> {
+    input: CallRemote,
+) -> Result<ZomeCallResponse, WasmError> {
     // it is the network's responsibility to handle timeouts and return an Err result in that case
-    let result: ZomeCallResponse = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+    let result: Result<SerializedBytes, _> = tokio_helper::block_forever_on(async move {
         let mut network = call_context.host_access().network().clone();
-        let call_remote = input.into_inner();
         network
             .call_remote(
-                call_remote.to_agent(),
-                call_remote.zome_name(),
-                call_remote.fn_name(),
-                call_remote.cap(),
-                call_remote.request(),
+                input.target_agent_as_ref().to_owned(),
+                input.zome_name_as_ref().to_owned(),
+                input.fn_name_as_ref().to_owned(),
+                input.cap_as_ref().to_owned(),
+                input.payload_as_ref().to_owned(),
             )
             .await
-    })?
-    .try_into()?;
+    });
+    let result = match result {
+        Ok(r) => ZomeCallResponse::try_from(r)?,
+        Err(e) => ZomeCallResponse::NetworkError(e.to_string()),
+    };
 
-    Ok(CallRemoteOutput::new(result))
+    Ok(result)
 }
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-
-    use crate::conductor::dna_store::MockDnaStore;
-    use crate::conductor::interface::websocket::test::setup_app;
-    use crate::core::ribosome::ZomeCallInvocation;
+    use crate::conductor::api::ZomeCall;
+    use crate::conductor::interface::websocket::test_utils::setup_app;
     use crate::core::ribosome::ZomeCallResponse;
-    use hdk3::prelude::*;
-    use holochain_types::app::InstalledCell;
-    use holochain_types::cell::CellId;
-    use holochain_types::dna::DnaDef;
-    use holochain_types::dna::DnaFile;
+    use hdk::prelude::*;
+    use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_agent_pubkey_2;
     use holochain_wasm_test_utils::TestWasm;
     pub use holochain_zome_types::capability::CapSecret;
-    use holochain_zome_types::ExternInput;
+    use holochain_zome_types::cell::CellId;
+    use holochain_zome_types::ExternIO;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     /// we can call a fn on a remote
     async fn call_remote_test() {
         // ////////////
@@ -60,7 +55,7 @@ pub mod wasm_test {
 
         let dna_def = DnaDef {
             name: "call_remote_test".to_string(),
-            uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+            uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
             zomes: vec![TestWasm::WhoAmI.into()].into(),
         };
@@ -125,12 +120,12 @@ pub mod wasm_test {
         // BOB INIT (to do cap grant)
 
         let _ = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: bob_cell_id,
                 zome_name: TestWasm::WhoAmI.into(),
                 cap: None,
                 fn_name: "set_access".into(),
-                payload: ExternInput::new(().try_into().unwrap()),
+                payload: ExternIO::encode(()).unwrap(),
                 provenance: bob_agent_id.clone(),
             })
             .await
@@ -139,12 +134,12 @@ pub mod wasm_test {
         // ALICE DOING A CALL
 
         let output = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: alice_cell_id,
                 zome_name: TestWasm::WhoAmI.into(),
                 cap: None,
                 fn_name: "whoarethey".into(),
-                payload: ExternInput::new(bob_agent_id.clone().try_into().unwrap()),
+                payload: ExternIO::encode(&bob_agent_id).unwrap(),
                 provenance: alice_agent_id,
             })
             .await
@@ -153,8 +148,7 @@ pub mod wasm_test {
 
         match output {
             ZomeCallResponse::Ok(guest_output) => {
-                let response: SerializedBytes = guest_output.into_inner();
-                let agent_info: AgentInfo = response.try_into().unwrap();
+                let agent_info: AgentInfo = guest_output.decode().unwrap();
                 assert_eq!(
                     agent_info,
                     AgentInfo {
@@ -168,6 +162,6 @@ pub mod wasm_test {
 
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         handle.shutdown().await;
-        shutdown.await.unwrap();
+        shutdown.await.unwrap().unwrap();
     }
 }

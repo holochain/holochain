@@ -1,20 +1,17 @@
 use std::convert::TryFrom;
 
 use super::SourceChainError;
-use crate::{
-    conductor::entry_def_store::error::EntryDefStoreError,
-    core::state::cascade::error::CascadeError, core::state::workspace::WorkspaceError,
-    core::validation::OutcomeOrError, core::workflow::error::WorkflowError, from_sub_error,
-};
-use holo_hash::{AnyDhtHash, HeaderHash};
+use crate::conductor::api::error::ConductorApiError;
+use crate::conductor::entry_def_store::error::EntryDefStoreError;
+use crate::core::validation::OutcomeOrError;
+use crate::core::workflow::error::WorkflowError;
+use crate::from_sub_error;
+use holo_hash::AnyDhtHash;
+use holo_hash::HeaderHash;
 use holochain_keystore::KeystoreError;
-use holochain_state::error::DatabaseError;
-use holochain_types::cell::CellId;
-use holochain_zome_types::signature::Signature;
-use holochain_zome_types::{
-    header::{AppEntryType, EntryType},
-    Header,
-};
+use holochain_sqlite::error::DatabaseError;
+use holochain_state::workspace::WorkspaceError;
+use holochain_types::prelude::*;
 use thiserror::Error;
 
 /// Validation can result in either
@@ -28,7 +25,7 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum SysValidationError {
     #[error(transparent)]
-    CascadeError(#[from] CascadeError),
+    CascadeError(#[from] holochain_cascade::error::CascadeError),
     #[error(transparent)]
     DatabaseError(#[from] DatabaseError),
     #[error(transparent)]
@@ -46,6 +43,8 @@ pub enum SysValidationError {
     WorkflowError(#[from] Box<WorkflowError>),
     #[error(transparent)]
     WorkspaceError(#[from] WorkspaceError),
+    #[error(transparent)]
+    ConductorApiError(#[from] Box<ConductorApiError>),
 }
 
 #[deprecated = "This will be replaced with SysValidationOutcome as we shouldn't treat outcomes as errors"]
@@ -139,7 +138,7 @@ impl ValidationOutcome {
 pub enum PrevHeaderError {
     #[error("Root of source chain must be Dna")]
     InvalidRoot,
-    #[error("Previous header sequence number {1} is not {0} - 1")]
+    #[error("Previous header sequence number {1} != ({0} - 1)")]
     InvalidSeq(u32, u32),
     #[error("Previous header was missing from the metadata store")]
     MissingMeta(HeaderHash),

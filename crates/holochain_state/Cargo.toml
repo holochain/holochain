@@ -1,0 +1,60 @@
+[package]
+name = "holochain_state"
+version = "0.0.1"
+description = "TODO minimize deps"
+license-file = "LICENSE_CAL-1.0"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://github.com/holochain/holochain"
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+edition = "2018"
+
+[dependencies]
+byteorder = "1.3.4"
+chrono = "0.4.6"
+derive_more = "0.99.3"
+either = "1.5"
+holochain_sqlite = { version = "0.0.1", path = "../holochain_sqlite" }
+holo_hash = { version = "^0.0.2-alpha.1", path = "../holo_hash", features = ["full"] }
+fallible-iterator = "0.2.0"
+holochain_keystore = { version = "0.0.1", path = "../holochain_keystore" }
+holochain_serialized_bytes = "=0.0.50"
+holochain_p2p = { version = "0.0.1", path = "../holochain_p2p" }
+holochain_types = { version = "0.0.1", path = "../holochain_types" }
+holochain_util = { version = "0.0.1", path = "../holochain_util" }
+holochain_wasm_test_utils = { path = "../test_utils/wasm", optional = true }
+holochain_zome_types = { version = "^0.0.2-alpha.1", path = "../holochain_zome_types", features = [ "full" ] }
+kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p/kitsune_p2p" }
+mockall = "0.8"
+parking_lot = "0.10"
+shrinkwraprs = "0.3.0"
+serde = { version = "1.0", features = [ "derive" ] }
+serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
+thiserror = "1.0.22"
+tokio = { version = "1.3", features = [ "full" ] }
+tracing = "=0.1.21"
+tracing-futures = "0.2.4"
+
+tempdir = { version = "0.3", optional = true }
+base64 = {version = "0.13", optional = true}
+
+[dev-dependencies]
+anyhow = "1.0.26"
+fixt = { version = "^0.0.2-alpha.1", path = "../fixt" }
+hdk = { version = "^0.0.101-alpha.0", path = "../hdk" }
+holochain_wasm_test_utils = { path = "../test_utils/wasm" }
+matches = "0.1.8"
+observability = "0.1.3"
+pretty_assertions = "0.6.1"
+
+tempdir = "0.3"
+
+[features]
+default = ["test_utils"]
+
+test_utils = [
+    "holochain_types/test_utils",
+    "holochain_zome_types/test_utils",
+    "holochain_wasm_test_utils",
+    "tempdir",
+    "base64",
+]

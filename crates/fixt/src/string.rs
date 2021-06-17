@@ -5,11 +5,13 @@ pub const EMPTY_CHAR: char = '\u{0000}';
 pub const PREDICTABLE_CHARS: &str = "💯❤💩.!foobarbaz!.💩❤💯";
 
 fixturator!(char, EMPTY_CHAR, crate::rng().gen(), {
+    let mut index = get_fixt_index!();
     let ret = PREDICTABLE_CHARS
         .chars()
-        .nth(self.0.index % PREDICTABLE_CHARS.chars().count())
+        .nth(index % PREDICTABLE_CHARS.chars().count())
         .unwrap();
-    self.0.index += 1;
+    index += 1;
+    set_fixt_index!(index);
     ret
 });
 
@@ -41,13 +43,15 @@ fixturator!(
         string
     },
     {
+        let mut index = get_fixt_index!();
         let ret = PREDICTABLE_STRS
             .iter()
             .cycle()
-            .nth(self.0.index)
+            .nth(index)
             .unwrap()
             .to_string();
-        self.0.index += 1;
+        index += 1;
+        set_fixt_index!(index);
         ret
     }
 );

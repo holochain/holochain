@@ -27,7 +27,10 @@ where
 }
 
 /// Apply to a data item to indicate it can be encoded / decoded.
-pub trait Codec: Sized {
+pub trait Codec: Clone + Sized {
+    /// Variant identifier (for debugging or as a cheap discriminant).
+    fn variant_type(&self) -> &'static str;
+
     /// Encode this item to given writer.
     /// You may wish to first wrap your writer in a BufWriter.
     fn encode<W>(&self, w: &mut W) -> Result<(), std::io::Error>
@@ -56,29 +59,6 @@ pub trait Codec: Sized {
         let item = Self::decode(&mut r)?;
         Ok((r.position(), item))
     }
-}
-
-/// Most items that implement serde Serialize and Deserialize
-/// can just use this macro to implement Codec.
-#[macro_export]
-macro_rules! default_impl_codec {
-    ($item:ident) => {
-        impl $crate::codec::Codec for $item {
-            fn encode<W>(&self, w: &mut W) -> ::std::io::Result<()>
-            where
-                W: ::std::io::Write,
-            {
-                $crate::codec::rmp_encode(w, self)
-            }
-
-            fn decode<R>(r: &mut R) -> ::std::io::Result<Self>
-            where
-                R: ::std::io::Read,
-            {
-                $crate::codec::rmp_decode(r)
-            }
-        }
-    };
 }
 
 /// DSL-style macro for generating a serialization protocol message enum.
@@ -125,7 +105,7 @@ macro_rules! write_codec_enum {
         $crate::dependencies::paste::item! {
             $(
                 $(#[doc = $var_doc])*
-                #[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+                #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
                 pub struct [< $var_name:camel >] {
                     $(
                         $(#[doc = $type_doc])* pub [< $type_name:snake >]: $type_ty,
@@ -133,6 +113,14 @@ macro_rules! write_codec_enum {
                 }
 
                 impl $crate::codec::Codec for [< $var_name:camel >] {
+                    fn variant_type(&self) -> &'static str {
+                        concat!(
+                            stringify!([< $codec_name:camel >]),
+                            "::",
+                            stringify!([< $var_name:camel >]),
+                        )
+                    }
+
                     fn encode<W>(&self, w: &mut W) -> ::std::io::Result<()>
                     where
                         W: ::std::io::Write
@@ -174,7 +162,7 @@ macro_rules! write_codec_enum {
             )*
 
             $(#[doc = $codec_doc])*
-            #[derive(Debug, PartialEq)]
+            #[derive(Clone, Debug, PartialEq)]
             pub enum [< $codec_name:camel >] {
                 $(
                     $(#[doc = $var_doc])*
@@ -198,6 +186,15 @@ macro_rules! write_codec_enum {
             }
 
             impl $crate::codec::Codec for [< $codec_name:camel >] {
+                fn variant_type(&self) -> &'static str {
+                    match self {
+                        $(
+                            Self::[< $var_name:camel >](data) =>
+                                $crate::codec::Codec::variant_type(data),
+                        )*
+                    }
+                }
+
                 fn encode<W>(&self, w: &mut W) -> ::std::io::Result<()>
                 where
                     W: ::std::io::Write
@@ -237,6 +234,10 @@ mod tests {
     #![allow(dead_code)]
 
     use super::*;
+    use std::sync::Arc;
+
+    #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+    pub struct Sub(pub Vec<u8>);
 
     write_codec_enum! {
         /// Codec
@@ -248,6 +249,9 @@ mod tests {
 
                 /// type 2
                 age.1: u32,
+
+                /// type 3
+                sub.2: Arc<Sub>,
             },
             /// nother variant
             BobTwo(0x43) {
@@ -257,7 +261,7 @@ mod tests {
 
     #[test]
     fn test_encode_decode() {
-        let bob = Bob::bob_one(true, 42);
+        let bob = Bob::bob_one(true, 42, Arc::new(Sub(b"test".to_vec())));
         let data = bob.encode_vec().unwrap();
         let res = Bob::decode_ref(&data).unwrap().1;
         assert_eq!(bob, res);

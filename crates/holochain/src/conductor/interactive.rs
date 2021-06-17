@@ -1,11 +1,12 @@
 //! Helper functions for interacting with the user when running a Conductor
 //! with the --interactive flag
 
-use crate::conductor::{
-    config::ConductorConfig,
-    error::{ConductorError, ConductorResult},
-    paths::ConfigFilePath,
-};
+use holochain_conductor_api::conductor::ConductorConfigError;
+
+use crate::conductor::config::ConductorConfig;
+use crate::conductor::error::ConductorError;
+use crate::conductor::error::ConductorResult;
+use crate::conductor::paths::ConfigFilePath;
 use std::path::Path;
 
 /// Prompt the user to answer Y or N.
@@ -35,17 +36,18 @@ pub fn ask_yn(prompt: String, default_yes: Option<bool>) -> std::io::Result<bool
             return Ok(false);
         } else {
             match default_yes {
-                Some(answer) if input == "" => return Ok(answer),
+                Some(answer) if input.is_empty() => return Ok(answer),
                 _ => println!("Invalid answer."),
             }
         }
     }
 }
 
-/// Prompts user to enter an LMDB environment path
-pub fn prompt_for_environment_dir(path: &Path) -> std::io::Result<()> {
+/// Prompts user to enter a database path
+pub fn prompt_for_database_dir(path: &Path) -> std::io::Result<()> {
     let prompt = format!(
-        "There is no database environment set at the path specified ({})\nWould you like to create one now?", path.display()
+        "There is no database at the path specified ({})\nWould you like to create one now?",
+        path.display()
     );
     if ask_yn(prompt, Some(true))? {
         std::fs::create_dir_all(path)?;
@@ -53,7 +55,7 @@ pub fn prompt_for_environment_dir(path: &Path) -> std::io::Result<()> {
     } else {
         Err(std::io::Error::new(
             std::io::ErrorKind::Other,
-            "Cannot continue without LMDB environment created.",
+            "Cannot continue without database.",
         ))
     }
 }
@@ -63,50 +65,49 @@ pub fn prompt_for_environment_dir(path: &Path) -> std::io::Result<()> {
 pub fn load_config_or_prompt_for_default(
     config_path: ConfigFilePath,
 ) -> ConductorResult<Option<ConductorConfig>> {
-    ConductorConfig::load_toml(config_path.as_ref()).map(Some).or_else(|err| {
-        if let ConductorError::ConfigMissing(_) = err {
+    ConductorConfig::load_yaml(config_path.as_ref()).map(Some).or_else(|err| {
+        if let ConductorConfigError::ConfigMissing(_) = err {
             let prompt = format!(
-                "There is no conductor config TOML file at the path specified ({})\nWould you like to create a default config file at this location?",
+                "There is no conductor config YAML file at the path specified ({})\nWould you like to create a default config file at this location?",
                 config_path
             );
             if ask_yn(prompt, Some(true))? {
-                let config = save_default_config_toml(config_path.as_ref())?;
+                let config = save_default_config_yaml(config_path.as_ref())?;
                 println!("Conductor config written.");
                 Ok(Some(config))
             } else {
                 Ok(None)
             }
         } else {
-            Err(err)
+            Err(err.into())
         }
     })
 }
 
 /// Save the default [ConductorConfig] to `path`
-fn save_default_config_toml(path: &Path) -> ConductorResult<ConductorConfig> {
+fn save_default_config_yaml(path: &Path) -> ConductorResult<ConductorConfig> {
     let dir = path.parent().ok_or_else(|| {
         ConductorError::ConfigError(format!("Bad path for conductor config: {}", path.display()))
     })?;
     std::fs::create_dir_all(dir)?;
     let default = ConductorConfig::default();
-    let content_toml = toml::to_string(&default)?;
-    std::fs::write(path, content_toml)?;
+    let content_yaml = serde_yaml::to_string(&default)?;
+    std::fs::write(path, content_yaml)?;
     Ok(default)
 }
 
 #[cfg(test)]
 mod tests {
-
-    use super::save_default_config_toml;
+    use super::save_default_config_yaml;
     use crate::conductor::config::ConductorConfig;
     use tempdir::TempDir;
 
     #[test]
     fn test_save_default_config() {
         let tmp = TempDir::new("test").unwrap();
-        let config_path = tmp.path().join("config.toml");
-        save_default_config_toml(&config_path).unwrap();
-        let config = ConductorConfig::load_toml(config_path.as_ref()).unwrap();
+        let config_path = tmp.path().join("config.yaml");
+        save_default_config_yaml(&config_path).unwrap();
+        let config = ConductorConfig::load_yaml(config_path.as_ref()).unwrap();
         assert_eq!(config, ConductorConfig::default());
     }
 }

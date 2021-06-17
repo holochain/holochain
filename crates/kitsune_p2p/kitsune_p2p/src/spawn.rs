@@ -7,6 +7,7 @@ use actor::*;
 /// Spawn a new KitsuneP2p actor.
 pub async fn spawn_kitsune_p2p(
     config: crate::KitsuneP2pConfig,
+    tls_config: kitsune_p2p_types::tls::TlsConfig,
 ) -> KitsuneP2pResult<(
     ghost_actor::GhostSender<KitsuneP2p>,
     KitsuneP2pEventReceiver,
@@ -21,8 +22,16 @@ pub async fn spawn_kitsune_p2p(
     let sender = channel_factory.create_channel::<KitsuneP2p>().await?;
 
     tokio::task::spawn(
-        builder
-            .spawn(KitsuneP2pActor::new(config, channel_factory, internal_sender, evt_send).await?),
+        builder.spawn(
+            KitsuneP2pActor::new(
+                config,
+                tls_config,
+                channel_factory,
+                internal_sender,
+                evt_send,
+            )
+            .await?,
+        ),
     );
 
     Ok((sender, evt_recv))

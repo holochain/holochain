@@ -1,5 +1,6 @@
 use crate::*;
-use futures::{sink::SinkExt, stream::StreamExt};
+use futures::sink::SinkExt;
+use futures::stream::StreamExt;
 use ghost_actor::dependencies::tracing;
 use kitsune_p2p_types::codec::Codec;
 
@@ -9,7 +10,7 @@ pub(crate) fn wrap_wire_read(
 ) -> futures::channel::mpsc::Receiver<ProxyWire> {
     let (mut send, recv) = futures::channel::mpsc::channel(10);
 
-    tokio::task::spawn(async move {
+    metric_task(async move {
         let mut buf = Vec::new();
         while let Some(data) = read.next().await {
             buf.extend_from_slice(&data);

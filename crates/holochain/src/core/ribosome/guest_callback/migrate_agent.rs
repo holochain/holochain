@@ -2,17 +2,10 @@ use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::{
-    zome::{HostFnAccess, Permission},
-    DnaDef,
-};
-use holochain_zome_types::migrate_agent::MigrateAgent;
-use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
-use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::ExternInput;
+use holochain_state::host_fn_workspace::HostFnWorkspace;
+use holochain_types::prelude::*;
 
 #[derive(Clone)]
 pub struct MigrateAgentInvocation {
@@ -31,7 +24,7 @@ impl MigrateAgentInvocation {
 
 #[derive(Clone, Constructor)]
 pub struct MigrateAgentHostAccess {
-    pub workspace: CallZomeWorkspaceLock,
+    pub workspace: HostFnWorkspace,
 }
 
 impl From<MigrateAgentHostAccess> for HostAccess {
@@ -66,17 +59,15 @@ impl Invocation for MigrateAgentInvocation {
         ]
         .into()
     }
-    fn host_input(self) -> Result<ExternInput, SerializedBytesError> {
-        Ok(ExternInput::new((&self.migrate_agent).try_into()?))
+    fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
+        ExternIO::encode(self.migrate_agent)
     }
 }
 
-impl TryFrom<MigrateAgentInvocation> for ExternInput {
+impl TryFrom<MigrateAgentInvocation> for ExternIO {
     type Error = SerializedBytesError;
     fn try_from(migrate_agent_invocation: MigrateAgentInvocation) -> Result<Self, Self::Error> {
-        Ok(Self::new(
-            (&migrate_agent_invocation.migrate_agent).try_into()?,
-        ))
+        ExternIO::encode(&migrate_agent_invocation.migrate_agent)
     }
 }
 
@@ -110,7 +101,6 @@ impl From<Vec<(ZomeName, MigrateAgentCallbackResult)>> for MigrateAgentResult {
 
 #[cfg(test)]
 mod test {
-
     use super::MigrateAgentResult;
     use crate::core::ribosome::Invocation;
     use crate::core::ribosome::ZomesToInvoke;
@@ -118,34 +108,30 @@ mod test {
     use crate::fixt::MigrateAgentHostAccessFixturator;
     use crate::fixt::MigrateAgentInvocationFixturator;
     use crate::fixt::ZomeNameFixturator;
-    use holochain_serialized_bytes::prelude::*;
-    use holochain_types::dna::zome::HostFnAccess;
-    use holochain_zome_types::migrate_agent::MigrateAgent;
-    use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
-    use holochain_zome_types::ExternInput;
+    use holochain_types::prelude::*;
     use rand::prelude::*;
 
     #[test]
     fn migrate_agent_callback_result_fold() {
-        let mut rng = fixt::rng();
+        let mut rng = ::fixt::rng();
 
         let result_pass = || MigrateAgentResult::Pass;
         let result_fail = || {
             MigrateAgentResult::Fail(
-                ZomeNameFixturator::new(fixt::Empty).next().unwrap(),
+                ZomeNameFixturator::new(::fixt::Empty).next().unwrap(),
                 "".into(),
             )
         };
 
         let cb_pass = || {
             (
-                ZomeNameFixturator::new(fixt::Empty).next().unwrap(),
+                ZomeNameFixturator::new(::fixt::Empty).next().unwrap(),
                 MigrateAgentCallbackResult::Pass,
             )
         };
         let cb_fail = || {
             (
-                ZomeNameFixturator::new(fixt::Empty).next().unwrap(),
+                ZomeNameFixturator::new(::fixt::Empty).next().unwrap(),
                 MigrateAgentCallbackResult::Fail("".into()),
             )
         };
@@ -173,12 +159,13 @@ mod test {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn migrate_agent_invocation_allow_side_effects() {
-        use holochain_types::dna::zome::Permission::*;
-        let migrate_agent_host_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
-            .next()
-            .unwrap();
+        use holochain_types::access::Permission::*;
+        let migrate_agent_host_access =
+            MigrateAgentHostAccessFixturator::new(::fixt::Unpredictable)
+                .next()
+                .unwrap();
         assert_eq!(
             HostFnAccess::from(&migrate_agent_host_access),
             HostFnAccess {
@@ -195,7 +182,7 @@ mod test {
 
     #[test]
     fn migrate_agent_invocation_zomes() {
-        let migrate_agent_invocation = MigrateAgentInvocationFixturator::new(fixt::Unpredictable)
+        let migrate_agent_invocation = MigrateAgentInvocationFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
         assert_eq!(ZomesToInvoke::All, migrate_agent_invocation.zomes(),);
@@ -204,7 +191,7 @@ mod test {
     #[test]
     fn migrate_agent_invocation_fn_components() {
         let mut migrate_agent_invocation =
-            MigrateAgentInvocationFixturator::new(fixt::Unpredictable)
+            MigrateAgentInvocationFixturator::new(::fixt::Unpredictable)
                 .next()
                 .unwrap();
 
@@ -218,7 +205,7 @@ mod test {
 
     #[test]
     fn migrate_agent_invocation_host_input() {
-        let migrate_agent_invocation = MigrateAgentInvocationFixturator::new(fixt::Empty)
+        let migrate_agent_invocation = MigrateAgentInvocationFixturator::new(::fixt::Empty)
             .next()
             .unwrap();
 
@@ -226,10 +213,7 @@ mod test {
 
         assert_eq!(
             host_input,
-            ExternInput::new(
-                SerializedBytes::try_from(MigrateAgentFixturator::new(fixt::Empty).next().unwrap())
-                    .unwrap()
-            ),
+            ExternIO::encode(MigrateAgentFixturator::new(::fixt::Empty).next().unwrap()).unwrap(),
         );
     }
 }
@@ -237,27 +221,26 @@ mod test {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
-
     use super::MigrateAgentResult;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
     use crate::fixt::MigrateAgentHostAccessFixturator;
     use crate::fixt::MigrateAgentInvocationFixturator;
-    use crate::fixt::WasmRibosomeFixturator;
+    use crate::fixt::RealRibosomeFixturator;
     use holochain_wasm_test_utils::TestWasm;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_migrate_agent_unimplemented() {
-        let host_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
+        let host_access = MigrateAgentHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
-        let mut migrate_agent_invocation = MigrateAgentInvocationFixturator::new(fixt::Empty)
+        let mut migrate_agent_invocation = MigrateAgentInvocationFixturator::new(::fixt::Empty)
             .next()
             .unwrap();
-        migrate_agent_invocation.dna_def = ribosome.dna_file.dna.clone();
+        migrate_agent_invocation.dna_def = ribosome.dna_file.dna_def().clone();
 
         let result = ribosome
             .run_migrate_agent(host_access, migrate_agent_invocation)
@@ -265,18 +248,18 @@ mod slow_tests {
         assert_eq!(result, MigrateAgentResult::Pass,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_migrate_agent_implemented_pass() {
-        let host_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
+        let host_access = MigrateAgentHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::MigrateAgentPass]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::MigrateAgentPass]))
             .next()
             .unwrap();
-        let mut migrate_agent_invocation = MigrateAgentInvocationFixturator::new(fixt::Empty)
+        let mut migrate_agent_invocation = MigrateAgentInvocationFixturator::new(::fixt::Empty)
             .next()
             .unwrap();
-        migrate_agent_invocation.dna_def = ribosome.dna_file.dna.clone();
+        migrate_agent_invocation.dna_def = ribosome.dna_file.dna_def().clone();
 
         let result = ribosome
             .run_migrate_agent(host_access, migrate_agent_invocation)
@@ -284,18 +267,18 @@ mod slow_tests {
         assert_eq!(result, MigrateAgentResult::Pass,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_migrate_agent_implemented_fail() {
-        let host_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
+        let host_access = MigrateAgentHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::MigrateAgentFail]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::MigrateAgentFail]))
             .next()
             .unwrap();
-        let mut migrate_agent_invocation = MigrateAgentInvocationFixturator::new(fixt::Empty)
+        let mut migrate_agent_invocation = MigrateAgentInvocationFixturator::new(::fixt::Empty)
             .next()
             .unwrap();
-        migrate_agent_invocation.dna_def = ribosome.dna_file.dna.clone();
+        migrate_agent_invocation.dna_def = ribosome.dna_file.dna_def().clone();
 
         let result = ribosome
             .run_migrate_agent(host_access, migrate_agent_invocation)
@@ -306,21 +289,21 @@ mod slow_tests {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_migrate_agent_multi_implemented_fail() {
-        let host_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
+        let host_access = MigrateAgentHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![
             TestWasm::MigrateAgentPass,
             TestWasm::MigrateAgentFail,
         ]))
         .next()
         .unwrap();
-        let mut migrate_agent_invocation = MigrateAgentInvocationFixturator::new(fixt::Empty)
+        let mut migrate_agent_invocation = MigrateAgentInvocationFixturator::new(::fixt::Empty)
             .next()
             .unwrap();
-        migrate_agent_invocation.dna_def = ribosome.dna_file.dna.clone();
+        migrate_agent_invocation.dna_def = ribosome.dna_file.dna_def().clone();
 
         let result = ribosome
             .run_migrate_agent(host_access, migrate_agent_invocation)

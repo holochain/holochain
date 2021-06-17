@@ -15,97 +15,91 @@
 //! hard to automate piping from tests stderr.
 //!
 
+#![allow(deprecated)]
+
 use ::fixt::prelude::*;
-use hdk3::prelude::*;
-use holochain::conductor::{
-    api::{AdminRequest, AdminResponse, AppRequest, AppResponse, RealAppInterfaceApi},
-    config::{AdminInterfaceConfig, ConductorConfig, InterfaceDriver},
-    dna_store::MockDnaStore,
-    ConductorBuilder, ConductorHandle,
-};
-use holochain::fixt::*;
-use holochain::{core::ribosome::ZomeCallInvocation, test_utils::warm_wasm_tests};
-use holochain_state::test_utils::test_p2p_env;
-use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
-use holochain_types::app::InstalledCell;
-use holochain_types::cell::CellId;
-use holochain_types::dna::DnaDef;
-use holochain_types::dna::DnaFile;
-use holochain_types::test_utils::fake_agent_pubkey_1;
-use holochain_types::{observability, test_utils::fake_agent_pubkey_2};
+use hdk::prelude::*;
+use holochain::conductor::api::AdminRequest;
+use holochain::conductor::api::AdminResponse;
+use holochain::conductor::api::AppRequest;
+use holochain::conductor::api::AppResponse;
+use holochain::conductor::api::RealAppInterfaceApi;
+use holochain::conductor::api::ZomeCall;
+use holochain::conductor::config::AdminInterfaceConfig;
+use holochain::conductor::config::ConductorConfig;
+use holochain::conductor::config::InterfaceDriver;
+use holochain::conductor::ConductorBuilder;
+use holochain::conductor::ConductorHandle;
+
+use holochain_state::{prelude::test_environments, test_utils::TestEnvs};
+use holochain_test_wasm_common::AnchorInput;
+use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_websocket::WebsocketResult;
 use holochain_websocket::WebsocketSender;
-use holochain_zome_types::ExternInput;
 use matches::assert_matches;
+use observability;
 use test_case::test_case;
 use test_utils::*;
-use test_wasm_common::{AnchorInput, TestString};
 use tracing::instrument;
 
 mod test_utils;
 
 const DEFAULT_NUM: usize = 2000;
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
+#[cfg(feature = "test_utils")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_prep() {
-    warm_wasm_tests();
+    holochain::test_utils::warm_wasm_tests();
 }
 
-#[tokio::test(threaded_scheduler)]
-#[ignore = "speed tests are ignored by default; unignore to run"]
-async fn speed_test_flame() {
-    let _g = observability::flame_run().unwrap();
-    let _g = _g.unwrap();
-    speed_test(None).await;
-}
-
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_timed() {
     let _g = observability::test_run_timed().unwrap();
     speed_test(None).await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_timed_json() {
     let _g = observability::test_run_timed_json().unwrap();
     speed_test(None).await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_timed_flame() {
     let _g = observability::test_run_timed_flame(None).unwrap();
     speed_test(None).await;
-    tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_timed_ice() {
     let _g = observability::test_run_timed_ice(None).unwrap();
     speed_test(None).await;
-    tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_normal() {
     observability::test_run().unwrap();
     speed_test(None).await;
 }
 
-/// Run this test to execute the speed test, but then keep the LMDB env files
-/// around in temp dirs for inspection by e.g. `mdb_stat`
-#[tokio::test(threaded_scheduler)]
+/// Run this test to execute the speed test, but then keep the database files
+/// around in temp dirs for inspection
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_persisted() {
     observability::test_run().unwrap();
-    let env = speed_test(None).await;
-    let tmpdir = env.tmpdir();
-    drop(env);
+    let envs = speed_test(None).await;
+    let tmpdir = envs.tempdir();
+    drop(envs);
     let tmpdir = std::sync::Arc::try_unwrap(tmpdir).unwrap();
     let path = tmpdir.into_path();
     println!("Run the following to see info about the test that just ran,");
@@ -123,11 +117,11 @@ async fn speed_test_persisted() {
 #[ignore = "speed tests are ignored by default; unignore to run"]
 fn speed_test_all(n: usize) {
     observability::test_run().unwrap();
-    holochain::conductor::tokio_runtime().block_on(speed_test(Some(n)));
+    tokio_helper::block_forever_on(speed_test(Some(n)));
 }
 
 #[instrument]
-async fn speed_test(n: Option<usize>) -> TestEnvironment {
+async fn speed_test(n: Option<usize>) -> TestEnvs {
     let num = n.unwrap_or(DEFAULT_NUM);
 
     // ////////////
@@ -137,7 +131,7 @@ async fn speed_test(n: Option<usize>) -> TestEnvironment {
     let dna_file = DnaFile::new(
         DnaDef {
             name: "need_for_speed_test".to_string(),
-            uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+            uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
             zomes: vec![TestWasm::Anchor.into()].into(),
         },
@@ -214,34 +208,34 @@ async fn speed_test(n: Option<usize>) -> TestEnvironment {
 
     // ALICE DOING A CALL
 
-    fn new_invocation<P>(
+    fn new_zome_call<P>(
         cell_id: CellId,
         func: &str,
         payload: P,
-    ) -> Result<ZomeCallInvocation, SerializedBytesError>
+    ) -> Result<ZomeCall, SerializedBytesError>
     where
-        P: TryInto<SerializedBytes, Error = SerializedBytesError>,
+        P: serde::Serialize + std::fmt::Debug,
     {
-        Ok(ZomeCallInvocation {
+        Ok(ZomeCall {
             cell_id: cell_id.clone(),
             zome_name: TestWasm::Anchor.into(),
             cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
             fn_name: func.into(),
-            payload: ExternInput::new(payload.try_into()?),
+            payload: ExternIO::encode(payload)?,
             provenance: cell_id.agent_pubkey().clone(),
         })
     }
 
     let anchor_invocation = |anchor: &str, cell_id, i: usize| {
         let anchor = AnchorInput(anchor.into(), i.to_string());
-        new_invocation(cell_id, "anchor", anchor)
+        new_zome_call(cell_id, "anchor", anchor)
     };
 
     async fn call(
         app_interface: &mut WebsocketSender,
-        invocation: ZomeCallInvocation,
-    ) -> std::io::Result<AppResponse> {
-        let request = AppRequest::ZomeCallInvocation(Box::new(invocation));
+        invocation: ZomeCall,
+    ) -> WebsocketResult<AppResponse> {
+        let request = AppRequest::ZomeCall(Box::new(invocation));
         app_interface.request(request).await
     }
 
@@ -250,53 +244,47 @@ async fn speed_test(n: Option<usize>) -> TestEnvironment {
     for i in 0..num {
         let invocation = anchor_invocation("alice", alice_cell_id.clone(), i).unwrap();
         let response = call(&mut app_interface, invocation).await.unwrap();
-        assert_matches!(response, AppResponse::ZomeCallInvocation(_));
+        assert_matches!(response, AppResponse::ZomeCall(_));
         let invocation = anchor_invocation("bobbo", bob_cell_id.clone(), i).unwrap();
         let response = call(&mut app_interface, invocation).await.unwrap();
-        assert_matches!(response, AppResponse::ZomeCallInvocation(_));
+        assert_matches!(response, AppResponse::ZomeCall(_));
     }
 
     let mut alice_done = false;
     let mut bobbo_done = false;
-    let mut alice_attempts = 0;
-    let mut bobbo_attempts = 0;
+    let mut alice_attempts = 0_usize;
+    let mut bobbo_attempts = 0_usize;
     loop {
         if !bobbo_done {
             bobbo_attempts += 1;
-            let invocation = new_invocation(
+            let invocation = new_zome_call(
                 alice_cell_id.clone(),
                 "list_anchor_addresses",
-                TestString("bobbo".into()),
+                "bobbo".to_string(),
             )
             .unwrap();
             let response = call(&mut app_interface, invocation).await.unwrap();
-            match response {
-                AppResponse::ZomeCallInvocation(r) => {
-                    let response: SerializedBytes = r.into_inner();
-                    let hashes: EntryHashes = response.try_into().unwrap();
-                    bobbo_done = hashes.0.len() == num;
-                }
+            let hashes: EntryHashes = match response {
+                AppResponse::ZomeCall(r) => r.decode().unwrap(),
                 _ => unreachable!(),
-            }
+            };
+            bobbo_done = hashes.0.len() == num;
         }
 
         if !alice_done {
             alice_attempts += 1;
-            let invocation = new_invocation(
+            let invocation = new_zome_call(
                 bob_cell_id.clone(),
                 "list_anchor_addresses",
-                TestString("alice".into()),
+                "alice".to_string(),
             )
             .unwrap();
             let response = call(&mut app_interface, invocation).await.unwrap();
-            match response {
-                AppResponse::ZomeCallInvocation(r) => {
-                    let response: SerializedBytes = r.into_inner();
-                    let hashes: EntryHashes = response.try_into().unwrap();
-                    alice_done = hashes.0.len() == num;
-                }
+            let hashes: EntryHashes = match response {
+                AppResponse::ZomeCall(r) => r.decode().unwrap(),
                 _ => unreachable!(),
-            }
+            };
+            alice_done = hashes.0.len() == num;
         }
         if alice_done && bobbo_done {
             let el = timer.elapsed();
@@ -313,30 +301,17 @@ async fn speed_test(n: Option<usize>) -> TestEnvironment {
             break;
         }
     }
-    app_interface
-        .close(1000, "Shutting down".into())
-        .await
-        .unwrap();
     let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
-    shutdown.await.unwrap();
+    shutdown.await.unwrap().unwrap();
     test_env
 }
 
 pub async fn setup_app(
     cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
     dna_store: MockDnaStore,
-) -> (TestEnvironment, RealAppInterfaceApi, ConductorHandle) {
-    let test_env = test_conductor_env();
-    let TestEnvironment {
-        env: wasm_env,
-        tmpdir: _tmpdir,
-    } = test_wasm_env();
-
-    let TestEnvironment {
-        env: p2p_env,
-        tmpdir: _p2p_tmpdir,
-    } = test_p2p_env();
+) -> (TestEnvs, RealAppInterfaceApi, ConductorHandle) {
+    let envs = test_environments();
 
     let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
         .config(ConductorConfig {
@@ -345,7 +320,7 @@ pub async fn setup_app(
             }]),
             ..Default::default()
         })
-        .test(test_env.clone(), wasm_env, p2p_env)
+        .test(&envs)
         .await
         .unwrap();
 
@@ -367,8 +342,8 @@ pub async fn setup_app(
     let handle = conductor_handle.clone();
 
     (
-        test_env,
-        RealAppInterfaceApi::new(conductor_handle, "test-interface".into()),
+        envs,
+        RealAppInterfaceApi::new(conductor_handle, Default::default()),
         handle,
     )
 }

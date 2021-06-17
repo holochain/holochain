@@ -1,26 +1,24 @@
-use crate::{
-    conductor::{
-        api::error::ConductorApiError, dna_store::MockDnaStore, CellError, ConductorHandle,
-    },
-    core::workflow::error::WorkflowError,
-    core::SourceChainError,
-    test_utils::{new_invocation, setup_app},
-};
+use crate::conductor::api::error::ConductorApiError;
+use crate::conductor::CellError;
+use crate::conductor::ConductorHandle;
+use crate::core::workflow::error::WorkflowError;
+use crate::core::SourceChainError;
+use crate::test_utils::new_zome_call;
+use crate::test_utils::setup_app;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_types::{
-    app::InstalledCell, cell::CellId, dna::DnaDef, dna::DnaFile, test_utils::fake_agent_pubkey_1,
-};
+use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::cell::CellId;
 use std::convert::TryFrom;
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn direct_validation_test() {
     observability::test_run().ok();
 
     let dna_file = DnaFile::new(
         DnaDef {
             name: "direct_validation_test".to_string(),
-            uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+            uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
             zomes: vec![TestWasm::Update.into()].into(),
         },
@@ -33,16 +31,9 @@ async fn direct_validation_test() {
     let alice_cell_id = CellId::new(dna_file.dna_hash().to_owned(), alice_agent_id.clone());
     let alice_installed_cell = InstalledCell::new(alice_cell_id.clone(), "alice_handle".into());
 
-    let mut dna_store = MockDnaStore::new();
-
-    dna_store.expect_get().return_const(Some(dna_file.clone()));
-    dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-    dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
-    dna_store.expect_get_entry_def().return_const(None);
-
     let (_tmpdir, _app_api, handle) = setup_app(
         vec![("test_app", vec![(alice_installed_cell, None)])],
-        dna_store,
+        vec![dna_file.clone()],
     )
     .await;
 
@@ -50,23 +41,23 @@ async fn direct_validation_test() {
 
     let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
-    shutdown.await.unwrap();
+    shutdown.await.unwrap().unwrap();
 }
 
 /// - Commit a valid update should pass
 /// - Commit an invalid update should fail the zome call
 async fn run_test(alice_cell_id: CellId, handle: ConductorHandle) {
     // Valid update should work
-    let invocation = new_invocation(&alice_cell_id, "update_entry", (), TestWasm::Update).unwrap();
+    let invocation = new_zome_call(&alice_cell_id, "update_entry", (), TestWasm::Update).unwrap();
     handle.call_zome(invocation).await.unwrap().unwrap();
 
     // Invalid update should fail work
     let invocation =
-        new_invocation(&alice_cell_id, "invalid_update_entry", (), TestWasm::Update).unwrap();
+        new_zome_call(&alice_cell_id, "invalid_update_entry", (), TestWasm::Update).unwrap();
     let result = handle.call_zome(invocation).await;
     match &result {
         Err(ConductorApiError::CellError(CellError::WorkflowError(wfe))) => match **wfe {
-            WorkflowError::SourceChainError(SourceChainError::InvalidCommit(_)) => (),
+            WorkflowError::SourceChainError(SourceChainError::InvalidCommit(_)) => {}
             _ => panic!("Expected InvalidCommit got {:?}", result),
         },
         _ => panic!("Expected InvalidCommit got {:?}", result),

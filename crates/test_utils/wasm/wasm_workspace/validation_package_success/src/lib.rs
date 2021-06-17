@@ -1,4 +1,4 @@
-use hdk3::prelude::*;
+use hdk::prelude::*;
 
 const NUM_SONGS: usize = 30;
 
@@ -25,7 +25,7 @@ fn validation_package(
                     EntryVisibility::Public,
                 )))
                 .include_entries(true);
-            let songs = query!(query)?.0;
+            let songs = hdk::prelude::query(query)?;
             // Need to post at least 30 songs to be an artist on this dht
             if songs.len() >= NUM_SONGS {
                 Ok(ValidationPackageCallbackResult::Success(
@@ -45,13 +45,13 @@ fn validation_package(
 
 #[hdk_extern]
 fn commit_artist(_: ()) -> ExternResult<HeaderHash> {
-    Ok(create_entry!(Artist)?)
+    create_entry(&Artist)
 }
 
 #[hdk_extern]
 fn commit_songs(_: ()) -> ExternResult<()> {
     for _ in 0..NUM_SONGS {
-        create_entry!(Song)?;
+        create_entry(&Song)?;
     }
     Ok(())
 }

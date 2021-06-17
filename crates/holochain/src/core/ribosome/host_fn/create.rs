@@ -1,22 +1,12 @@
 use crate::core::ribosome::error::RibosomeError;
-use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use crate::core::{
-    workflow::{
-        call_zome_workflow::CallZomeWorkspace, integrate_dht_ops_workflow::integrate_to_authored,
-    },
-    SourceChainError,
-};
+use holochain_wasmer_host::prelude::WasmError;
+
 use holo_hash::HasHash;
-use holochain_zome_types::entry_def::{EntryDefId, EntryVisibility};
-use holochain_zome_types::header::builder;
-use holochain_zome_types::header::AppEntryType;
-use holochain_zome_types::header::EntryType;
-use holochain_zome_types::CreateInput;
-use holochain_zome_types::CreateOutput;
+use holochain_types::prelude::*;
 use std::sync::Arc;
 
 /// create element
@@ -24,24 +14,26 @@ use std::sync::Arc;
 pub fn create<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: CreateInput,
-) -> RibosomeResult<CreateOutput> {
-    // destructure the args out into an app type def id and entry
-    let (entry_def_id, entry) = input.into_inner();
-
+    input: EntryWithDefId,
+) -> Result<HeaderHash, WasmError> {
     // build the entry hash
-    let async_entry = entry.clone();
+    let async_entry = AsRef::<Entry>::as_ref(&input).to_owned();
     let entry_hash =
         holochain_types::entry::EntryHashed::from_content_sync(async_entry).into_hash();
 
     // extract the zome position
-    let header_zome_id = ribosome.zome_name_to_id(&call_context.zome_name)?;
+    let header_zome_id = ribosome
+        .zome_to_id(&call_context.zome)
+        .expect("Failed to get ID for current zome");
 
     // extract the entry defs for a zome
-    let entry_type = match entry_def_id {
+    let entry_type = match AsRef::<EntryDefId>::as_ref(&input) {
         EntryDefId::App(entry_def_id) => {
-            let (header_entry_def_id, entry_visibility) =
-                extract_entry_def(ribosome, call_context.clone(), entry_def_id.into())?;
+            let (header_entry_def_id, entry_visibility) = extract_entry_def(
+                ribosome,
+                call_context.clone(),
+                entry_def_id.to_owned().into(),
+            )?;
             let app_entry_type =
                 AppEntryType::new(header_entry_def_id, header_zome_id, entry_visibility);
             EntryType::App(app_entry_type)
@@ -58,26 +50,19 @@ pub fn create<'a>(
 
     // return the hash of the committed entry
     // note that validation is handled by the workflow
-    // if the validation fails this commit will be rolled back by virtue of the lmdb transaction
+    // if the validation fails this commit will be rolled back by virtue of the DB transaction
     // being atomic
-    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        let mut guard = call_context.host_access.workspace().write().await;
-        let workspace: &mut CallZomeWorkspace = &mut guard;
-        let source_chain = &mut workspace.source_chain;
+    let entry = AsRef::<Entry>::as_ref(&input).to_owned();
+    tokio_helper::block_forever_on(async move {
         // push the header and the entry into the source chain
-        let header_hash = source_chain.put(header_builder, Some(entry)).await?;
-        // fetch the element we just added so we can integrate its DhtOps
-        let element = source_chain
-            .get_element(&header_hash)?
-            .expect("Element we just put in SourceChain must be gettable");
-        integrate_to_authored(
-            &element,
-            workspace.source_chain.elements(),
-            &mut workspace.meta_authored,
-        )
-        .map_err(Box::new)
-        .map_err(SourceChainError::from)?;
-        Ok(CreateOutput::new(header_hash))
+        let header_hash = call_context
+            .host_access
+            .workspace()
+            .source_chain()
+            .put(header_builder, Some(entry))
+            .await
+            .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
+        Ok(header_hash)
     })
 }
 
@@ -85,23 +70,22 @@ pub fn extract_entry_def(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     entry_def_id: EntryDefId,
-) -> RibosomeResult<(holochain_zome_types::header::EntryDefIndex, EntryVisibility)> {
+) -> Result<(holochain_zome_types::header::EntryDefIndex, EntryVisibility), WasmError> {
     let app_entry_type = match ribosome
-        .run_entry_defs((&call_context.host_access).into(), EntryDefsInvocation)?
+        .run_entry_defs((&call_context.host_access).into(), EntryDefsInvocation)
+        .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?
     {
         // the ribosome returned some defs
         EntryDefsResult::Defs(defs) => {
-            let maybe_entry_defs = defs.get(&call_context.zome_name);
+            let maybe_entry_defs = defs.get(call_context.zome.zome_name());
             match maybe_entry_defs {
                 // convert the entry def id string into a numeric position in the defs
-                Some(entry_defs) => match entry_defs.entry_def_id_position(entry_def_id.clone()) {
-                    // build an app entry type from the entry def at the found position
-                    Some(index) => Some((
-                        holochain_zome_types::header::EntryDefIndex::from(index as u8),
-                        entry_defs[index].visibility,
-                    )),
-                    None => None,
-                },
+                Some(entry_defs) => {
+                    entry_defs.entry_def_index_from_id(entry_def_id.clone()).map(|index| {
+                        // build an app entry type from the entry def at the found position
+                        (index, entry_defs[index.0 as usize].visibility)
+                                                      })
+                }
                 None => None,
             }
         }
@@ -109,9 +93,12 @@ pub fn extract_entry_def(
     };
     match app_entry_type {
         Some(app_entry_type) => Ok(app_entry_type),
-        None => Err(RibosomeError::EntryDefs(
-            call_context.zome_name.clone(),
-            format!("entry def not found for {:?}", entry_def_id),
+        None => Err(WasmError::Host(
+            RibosomeError::EntryDefs(
+                call_context.zome.zome_name().clone(),
+                format!("entry def not found for {:?}", entry_def_id),
+            )
+            .to_string(),
         )),
     }
 }
@@ -120,165 +107,96 @@ pub fn extract_entry_def(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use super::create;
-    use crate::conductor::dna_store::MockDnaStore;
-    use crate::core::ribosome::error::RibosomeError;
-    use crate::core::ribosome::ZomeCallInvocation;
-    use crate::core::state::source_chain::ChainInvalidReason;
-    use crate::core::state::source_chain::SourceChainError;
-    use crate::core::state::source_chain::SourceChainResult;
-    use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
-    use crate::fixt::CallContextFixturator;
-    use crate::fixt::EntryFixturator;
-    use crate::fixt::WasmRibosomeFixturator;
-    use crate::fixt::ZomeCallHostAccessFixturator;
+    use crate::conductor::api::ZomeCall;
+    use crate::fixt::*;
     use crate::test_utils::setup_app;
     use ::fixt::prelude::*;
-    use hdk3::prelude::*;
-    use holo_hash::{AnyDhtHash, EntryHash};
-    use holochain_types::{
-        app::InstalledCell, cell::CellId, dna::DnaDef, dna::DnaFile, fixt::AppEntry, observability,
-        test_utils::fake_agent_pubkey_1, test_utils::fake_agent_pubkey_2,
-    };
+    use hdk::prelude::*;
+    use holo_hash::AnyDhtHash;
+    use holo_hash::EntryHash;
+    use holochain_state::host_fn_workspace::HostFnWorkspace;
+    use holochain_state::source_chain::SourceChainResult;
+    use holochain_types::prelude::*;
+    use holochain_types::test_utils::fake_agent_pubkey_1;
+    use holochain_types::test_utils::fake_agent_pubkey_2;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::entry_def::EntryDefId;
-    use holochain_zome_types::CreateInput;
-    use holochain_zome_types::CreateOutput;
-    use holochain_zome_types::Entry;
-    use holochain_zome_types::GetOutput;
-    use holochain_zome_types::{entry::EntryError, ExternInput};
+    use observability;
     use std::sync::Arc;
-    use test_wasm_common::TestBytes;
-    use test_wasm_common::TestInt;
 
-    #[tokio::test(threaded_scheduler)]
-    /// we cannot commit before genesis
-    async fn create_pre_genesis_test() {
-        // test workspace boilerplate
-        let test_env = holochain_state::test_utils::test_cell_env();
-        let env = test_env.env();
-        let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
-
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
-
-        let ribosome =
-            WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Create]))
-                .next()
-                .unwrap();
-        let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
-        call_context.zome_name = TestWasm::Create.into();
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock;
-        call_context.host_access = host_access.into();
-        let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
-        let entry_def_id = EntryDefId::App("post".into());
-        let input = CreateInput::new((entry_def_id, app_entry.clone()));
-
-        let output = create(Arc::new(ribosome), Arc::new(call_context), input);
-
-        assert_eq!(
-            format!("{:?}", output.unwrap_err()),
-            format!(
-                "{:?}",
-                RibosomeError::SourceChainError(SourceChainError::InvalidStructure(
-                    ChainInvalidReason::GenesisDataMissing
-                ))
-            ),
-        );
-    }
-
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     /// we can get an entry hash out of the fn directly
     async fn create_entry_test<'a>() {
         // test workspace boilerplate
         let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
-
-        // commits fail validation if we don't do genesis
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
-            .await
-            .unwrap();
-
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let author = fake_agent_pubkey_1();
+        crate::test_utils::fake_genesis(env.clone()).await.unwrap();
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
 
         let ribosome =
-            WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Create]))
+            RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Create]))
                 .next()
                 .unwrap();
         let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
-        call_context.zome_name = TestWasm::Create.into();
+        call_context.zome = TestWasm::Create.into();
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock.clone();
+        host_access.workspace = workspace.clone();
         call_context.host_access = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::App("post".into());
-        let input = CreateInput::new((entry_def_id, app_entry.clone()));
+        let input = EntryWithDefId::new(entry_def_id, app_entry.clone());
 
         let output = create(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
         // the chain head should be the committed entry header
-        let chain_head = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            SourceChainResult::Ok(
-                workspace_lock
-                    .read()
-                    .await
-                    .source_chain
-                    .chain_head()?
-                    .to_owned(),
-            )
+        let chain_head = tokio_helper::block_forever_on(async move {
+            SourceChainResult::Ok(workspace.source_chain().chain_head()?.0)
         })
         .unwrap();
 
-        assert_eq!(chain_head, output.into_inner(),);
+        assert_eq!(chain_head, output);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_create_entry_test<'a>() {
-        holochain_types::observability::test_run().ok();
+        observability::test_run().ok();
         // test workspace boilerplate
         let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
-
-        // commits fail validation if we don't do genesis
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
-            .await
-            .unwrap();
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let author = fake_agent_pubkey_1();
+        crate::test_utils::fake_genesis(env.clone()).await.unwrap();
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock.clone();
+        host_access.workspace = workspace.clone();
 
         // get the result of a commit entry
-        let output: CreateOutput =
+        let output: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::Create, "create_entry", ());
 
         // the chain head should be the committed entry header
-        let chain_head = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            SourceChainResult::Ok(
-                workspace_lock
-                    .read()
-                    .await
-                    .source_chain
-                    .chain_head()?
-                    .to_owned(),
-            )
+        let chain_head = tokio_helper::block_forever_on(async move {
+            SourceChainResult::Ok(workspace.source_chain().chain_head()?.0)
         })
         .unwrap();
 
-        assert_eq!(&chain_head, output.inner_ref());
+        assert_eq!(&chain_head, &output);
 
-        let round: GetOutput =
+        let round: Option<Element> =
             crate::call_test_ribosome!(host_access, TestWasm::Create, "get_entry", ());
 
-        let sb: SerializedBytes = match round.into_inner().and_then(|el| el.into()) {
-            Some(holochain_zome_types::entry::Entry::App(entry_bytes)) => entry_bytes.into(),
-            other => panic!(format!("unexpected output: {:?}", other)),
+        let bytes: Vec<u8> = match round.and_then(|el| el.into()) {
+            Some(holochain_zome_types::entry::Entry::App(entry_bytes)) => {
+                entry_bytes.bytes().to_vec()
+            }
+            other => panic!("unexpected output: {:?}", other),
         };
         // this should be the content "foo" of the committed post
-        assert_eq!(&vec![163, 102, 111, 111], sb.bytes(),)
+        assert_eq!(vec![163, 102, 111, 111], bytes);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore = "david.b (this test is flaky)"]
     // maackle: this consistently passes for me with n = 37
     //          but starts to randomly lock up at n = 38,
@@ -288,7 +206,7 @@ pub mod wasm_test {
         let dna_file = DnaFile::new(
             DnaDef {
                 name: "create_multi_test".to_string(),
-                uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+                uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
                 zomes: vec![TestWasm::MultipleCalls.into()].into(),
             },
@@ -329,19 +247,12 @@ pub mod wasm_test {
         // START CONDUCTOR
         // ///////////////
 
-        let mut dna_store = MockDnaStore::new();
-
-        dna_store.expect_get().return_const(Some(dna_file.clone()));
-        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
-        dna_store.expect_get_entry_def().return_const(None);
-
         let (_tmpdir, _app_api, handle) = setup_app(
             vec![(
                 "APPropriated",
                 vec![(alice_installed_cell, None), (bob_installed_cell, None)],
             )],
-            dna_store,
+            vec![dna_file.clone()],
         )
         .await;
 
@@ -351,38 +262,31 @@ pub mod wasm_test {
 
         // ALICE DOING A CALL
 
-        let n = 50;
+        let n = 50_u32;
 
         // alice create a bunch of entries
         let output = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: alice_cell_id.clone(),
                 zome_name: TestWasm::MultipleCalls.into(),
                 cap: None,
                 fn_name: "create_entry_multiple".into(),
-                payload: ExternInput::new(TestInt(n).try_into().unwrap()),
+                payload: ExternIO::encode(n).unwrap(),
                 provenance: alice_agent_id.clone(),
             })
             .await
             .unwrap()
             .unwrap();
-        assert_eq!(
-            output,
-            ZomeCallResponse::Ok(
-                ExternOutput::new(().try_into().unwrap())
-                    .try_into()
-                    .unwrap()
-            )
-        );
+        assert_eq!(output, ZomeCallResponse::Ok(ExternIO::encode(()).unwrap()));
 
         // bob get the entries
         let output = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: alice_cell_id,
                 zome_name: TestWasm::MultipleCalls.into(),
                 cap: None,
                 fn_name: "get_entry_multiple".into(),
-                payload: ExternInput::new(TestInt(n).try_into().unwrap()),
+                payload: ExternIO::encode(n).unwrap(),
                 provenance: alice_agent_id,
             })
             .await
@@ -396,22 +300,18 @@ pub mod wasm_test {
         }
         assert_eq!(
             output,
-            ZomeCallResponse::Ok(
-                ExternOutput::new(TestBytes(expected).try_into().unwrap())
-                    .try_into()
-                    .unwrap()
-            )
+            ZomeCallResponse::Ok(ExternIO::encode(expected).unwrap())
         );
 
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         handle.shutdown().await;
-        shutdown.await.unwrap();
+        shutdown.await.unwrap().unwrap();
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_serialize_bytes_hash() {
-        holochain_types::observability::test_run().ok();
-        #[derive(Default, SerializedBytes, Serialize, Deserialize)]
+        observability::test_run().ok();
+        #[derive(Default, SerializedBytes, Serialize, Deserialize, Debug)]
         #[repr(transparent)]
         #[serde(transparent)]
         struct Post(String);

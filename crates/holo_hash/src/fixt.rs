@@ -1,9 +1,23 @@
 #![allow(missing_docs)]
 
-use crate::{
-    encode::holo_dht_location_bytes, hash_type, AgentPubKey, AnyDhtHash, DhtOpHash, DnaHash,
-    EntryHash, HeaderHash, NetIdHash, WasmHash,
-};
+use crate::encode::holo_dht_location_bytes;
+use crate::hash_type;
+use crate::AgentPubKey;
+use crate::AgentPubKeyB64;
+use crate::AnyDhtHash;
+use crate::AnyDhtHashB64;
+use crate::DhtOpHash;
+use crate::DhtOpHashB64;
+use crate::DnaHash;
+use crate::DnaHashB64;
+use crate::EntryHash;
+use crate::EntryHashB64;
+use crate::HeaderHash;
+use crate::HeaderHashB64;
+use crate::NetIdHash;
+use crate::NetIdHashB64;
+use crate::WasmHash;
+use crate::WasmHashB64;
 use ::fixt::prelude::*;
 use std::convert::TryFrom;
 
@@ -33,7 +47,6 @@ fixturator!(
     ThirtySixHashBytes,
     append_location([0; 32].to_vec()),
     {
-        let mut rng = rand::thread_rng();
         let mut u8_fixturator = U8Fixturator::new(Unpredictable);
         let mut bytes = vec![];
         for _ in 0..32 {
@@ -42,12 +55,14 @@ fixturator!(
         append_location(bytes)
     },
     {
-        let mut u8_fixturator = U8Fixturator::new_indexed(Predictable, self.0.index);
+        let mut index = get_fixt_index!();
+        let mut u8_fixturator = U8Fixturator::new_indexed(Predictable, index);
         let mut bytes = vec![];
         for _ in 0..32 {
             bytes.push(u8_fixturator.next().unwrap());
         }
-        self.0.index += 1;
+        index += 1;
+        set_fixt_index!(index);
         append_location(bytes)
     }
 );
@@ -59,9 +74,10 @@ fn append_location(mut base: Vec<u8>) -> Vec<u8> {
 }
 
 fixturator!(
+    // with_vec 0 5;
     AgentPubKey;
-    curve Empty AgentPubKey::from_raw_bytes(ThirtySixHashBytesFixturator::new_indexed(Empty, self.0.index).next().unwrap());
-    curve Unpredictable AgentPubKey::from_raw_bytes(ThirtySixHashBytesFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap());
+    curve Empty AgentPubKey::from_raw_36(ThirtySixHashBytesFixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap());
+    curve Unpredictable AgentPubKey::from_raw_36(ThirtySixHashBytesFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap());
     curve Predictable {
         // these agent keys match what the mock keystore spits out for the first two agents
         // don't mess with this unless you also update the keystore!!!
@@ -71,41 +87,74 @@ fixturator!(
             AgentPubKey::try_from("uhCAke1j8Z2a-_min0h0pGuEMcYlo_V1l1mt9OtBuywKmHlg4L_R-")
                 .unwrap(),
         ];
-        agents[self.0.index % agents.len()].clone()
+        agents[get_fixt_index!() % agents.len()].clone()
     };
 );
 
 fixturator!(
+    AgentPubKeyB64;
+    constructor fn new(AgentPubKey);
+);
+
+fixturator!(
     EntryHash;
-    constructor fn from_raw_bytes(ThirtySixHashBytes);
+    constructor fn from_raw_36(ThirtySixHashBytes);
+);
+fixturator!(
+    EntryHashB64;
+    constructor fn new(EntryHash);
 );
 
 fixturator!(
     DnaHash;
-    constructor fn from_raw_bytes(ThirtySixHashBytes);
+    constructor fn from_raw_36(ThirtySixHashBytes);
+);
+fixturator!(
+    DnaHashB64;
+    constructor fn new(DnaHash);
 );
 
 fixturator!(
     DhtOpHash;
-    constructor fn from_raw_bytes(ThirtySixHashBytes);
+    constructor fn from_raw_36(ThirtySixHashBytes);
+);
+fixturator!(
+    DhtOpHashB64;
+    constructor fn new(DhtOpHash);
 );
 
 fixturator!(
     HeaderHash;
-    constructor fn from_raw_bytes(ThirtySixHashBytes);
+    constructor fn from_raw_36(ThirtySixHashBytes);
+);
+fixturator!(
+    HeaderHashB64;
+    constructor fn new(HeaderHash);
 );
 
 fixturator!(
     NetIdHash;
-    constructor fn from_raw_bytes(ThirtySixHashBytes);
+    constructor fn from_raw_36(ThirtySixHashBytes);
+);
+fixturator!(
+    NetIdHashB64;
+    constructor fn new(NetIdHash);
 );
 
 fixturator!(
     WasmHash;
-    constructor fn from_raw_bytes(ThirtySixHashBytes);
+    constructor fn from_raw_36(ThirtySixHashBytes);
+);
+fixturator!(
+    WasmHashB64;
+    constructor fn new(WasmHash);
 );
 
 fixturator!(
     AnyDhtHash;
-    constructor fn from_raw_bytes_and_type(ThirtySixHashBytes, HashTypeAnyDht);
+    constructor fn from_raw_36_and_type(ThirtySixHashBytes, HashTypeAnyDht);
+);
+fixturator!(
+    AnyDhtHashB64;
+    constructor fn new(AnyDhtHash);
 );

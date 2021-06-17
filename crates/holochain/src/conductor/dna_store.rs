@@ -1,19 +1,5 @@
-use super::entry_def_store::EntryDefBufferKey;
-use fallible_iterator::FallibleIterator;
-use holochain_state::{
-    buffer::CasBufFreshAsync,
-    env::EnvironmentRead,
-    error::{DatabaseError, DatabaseResult},
-    exports::SingleStore,
-    fresh_reader,
-    prelude::*,
-};
-use holochain_types::{
-    dna::{DnaDef, DnaDefHashed, DnaFile},
-    prelude::*,
-};
+use holochain_types::prelude::*;
 use holochain_zome_types::entry_def::EntryDef;
-use mockall::automock;
 use std::collections::HashMap;
 use tracing::*;
 
@@ -24,28 +10,9 @@ pub struct RealDnaStore {
     entry_defs: HashMap<EntryDefBufferKey, EntryDef>,
 }
 
-pub struct DnaDefBuf {
-    dna_defs: CasBufFreshAsync<DnaDef>,
-}
-
-#[automock]
-pub trait DnaStore: Default + Send + Sync {
-    fn add(&mut self, dna: DnaFile);
-    fn add_dnas<T: IntoIterator<Item = (DnaHash, DnaFile)> + 'static>(&mut self, dnas: T);
-    fn add_entry_def(&mut self, k: EntryDefBufferKey, entry_def: EntryDef);
-    fn add_entry_defs<T: IntoIterator<Item = (EntryDefBufferKey, EntryDef)> + 'static>(
-        &mut self,
-        entry_defs: T,
-    );
-    // TODO: FAST: Make this return an iterator to avoid allocating
-    fn list(&self) -> Vec<DnaHash>;
-    fn get(&self, hash: &DnaHash) -> Option<DnaFile>;
-    fn get_entry_def(&self, k: &EntryDefBufferKey) -> Option<EntryDef>;
-}
-
 impl DnaStore for RealDnaStore {
     #[instrument]
-    fn add(&mut self, dna: DnaFile) {
+    fn add_dna(&mut self, dna: DnaFile) {
         self.dnas.insert(dna.dna_hash().clone(), dna);
     }
     fn add_dnas<T: IntoIterator<Item = (DnaHash, DnaFile)> + 'static>(&mut self, dnas: T) {
@@ -79,38 +46,5 @@ impl RealDnaStore {
             dnas: HashMap::new(),
             entry_defs: HashMap::new(),
         }
-    }
-}
-
-impl DnaDefBuf {
-    pub fn new(env: EnvironmentRead, dna_def_store: SingleStore) -> DatabaseResult<Self> {
-        Ok(Self {
-            dna_defs: CasBufFreshAsync::new(env, dna_def_store),
-        })
-    }
-
-    pub async fn get(&self, dna_hash: &DnaHash) -> DatabaseResult<Option<DnaDefHashed>> {
-        self.dna_defs.get(dna_hash).await
-    }
-
-    pub async fn put(&mut self, dna_def: DnaDef) -> DatabaseResult<()> {
-        self.dna_defs.put(DnaDefHashed::from_content(dna_def).await);
-        Ok(())
-    }
-
-    pub fn get_all(&self) -> DatabaseResult<Vec<DnaDefHashed>> {
-        fresh_reader!(self.dna_defs.env(), |r| self
-            .dna_defs
-            .iter_fail(&r)?
-            .collect())
-    }
-}
-
-impl BufferedStore for DnaDefBuf {
-    type Error = DatabaseError;
-
-    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
-        self.dna_defs.flush_to_txn_ref(writer)?;
-        Ok(())
     }
 }

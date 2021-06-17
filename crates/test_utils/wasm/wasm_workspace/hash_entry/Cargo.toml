@@ -9,5 +9,12 @@ name = "test_wasm_hash_entry"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
-hdk3 = { path = "../../../../hdk" }
-serde = "=1.0.104"
+hdk = { path = "../../../../hdk" }
+serde = "1.0"
+
+[dev-dependencies]
+fixt = { path = "../../../../fixt" }
+
+[features]
+default = []
+mock = ["hdk/mock"]

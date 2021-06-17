@@ -1,91 +1,88 @@
-use crate::core::ribosome::error::RibosomeResult;
-use crate::core::{
-    ribosome::{CallContext, RibosomeT},
-    state::metadata::LinkMetaKey,
-};
+use crate::core::ribosome::CallContext;
+use crate::core::ribosome::RibosomeT;
+use holochain_cascade::Cascade;
 use holochain_p2p::actor::GetLinksOptions;
-use holochain_zome_types::link::LinkDetails;
-use holochain_zome_types::GetLinkDetailsInput;
-use holochain_zome_types::GetLinkDetailsOutput;
+use holochain_types::prelude::*;
+use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_link_details<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: GetLinkDetailsInput,
-) -> RibosomeResult<GetLinkDetailsOutput> {
-    let (base_address, tag) = input.into_inner();
+    input: GetLinksInput,
+) -> Result<LinkDetails, WasmError> {
+    let GetLinksInput {
+        base_address,
+        tag_prefix,
+    } = input;
 
     // Get zome id
-    let zome_id = ribosome.zome_name_to_id(&call_context.zome_name)?;
+    let zome_id = ribosome
+        .zome_to_id(&call_context.zome)
+        .expect("Failed to get ID for current zome.");
 
     // Get the network from the context
     let network = call_context.host_access.network().clone();
 
-    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+    tokio_helper::block_forever_on(async move {
         // Create the key
-        let key = match tag.as_ref() {
-            Some(tag) => LinkMetaKey::BaseZomeTag(&base_address, zome_id, tag),
-            None => LinkMetaKey::BaseZome(&base_address, zome_id),
+        let key = WireLinkKey {
+            base: base_address,
+            zome_id,
+            tag: tag_prefix,
         };
 
+        let workspace = call_context.host_access.workspace();
+        let mut cascade = Cascade::from_workspace_network(workspace, network);
         // Get the links from the dht
         let link_details = LinkDetails::from(
-            call_context
-                .host_access
-                .workspace()
-                .write()
+            cascade
+                .get_link_details(key, GetLinksOptions::default())
                 .await
-                .cascade(network)
-                .get_link_details(&key, GetLinksOptions::default())
-                .await?,
+                .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?,
         );
 
-        Ok(GetLinkDetailsOutput::new(link_details))
+        Ok(link_details)
     })
 }
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
-
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
+    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::element::SignedHeaderHashed;
     use holochain_zome_types::Header;
-    use test_wasm_common::*;
+    use holochain_zome_types::fake_agent_pubkey_1;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_entry_hash_path_children_details() {
         let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
-
-        let mut workspace =
-            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
-
-        // commits fail validation if we don't do genesis
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+        let author = fake_agent_pubkey_1();
+        crate::test_utils::fake_genesis(env.clone())
             .await
             .unwrap();
-
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock;
+        host_access.workspace = workspace;
 
         // ensure foo.bar twice to ensure idempotency
         let _: () = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "ensure",
-            TestString::from("foo.bar".to_string())
+            "foo.bar".to_string()
         );
         let _: () = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "ensure",
-            TestString::from("foo.bar".to_string())
+            "foo.bar".to_string()
         );
 
         // ensure foo.baz
@@ -93,37 +90,37 @@ pub mod slow_tests {
             host_access,
             TestWasm::HashPath,
             "ensure",
-            TestString::from("foo.baz".to_string())
+            "foo.baz".to_string()
         );
 
-        let exists_output: TestBool = crate::call_test_ribosome!(
+        let exists_output: bool = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "exists",
-            TestString::from("foo".to_string())
+            "foo".to_string()
         );
 
-        assert_eq!(TestBool(true), exists_output,);
+        assert_eq!(true, exists_output,);
 
         let _foo_bar: holo_hash::EntryHash = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "hash",
-            TestString::from("foo.bar".to_string())
+            "foo.bar".to_string()
         );
 
         let _foo_baz: holo_hash::EntryHash = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "hash",
-            TestString::from("foo.baz".to_string())
+            "foo.baz".to_string()
         );
 
         let children_details_output: holochain_zome_types::link::LinkDetails = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "children_details",
-            TestString::from("foo".to_string())
+            "foo".to_string()
         );
 
         let link_details = children_details_output.into_inner();
@@ -143,7 +140,7 @@ pub mod slow_tests {
             host_access,
             TestWasm::HashPath,
             "children_details",
-            TestString::from("foo".to_string())
+            "foo".to_string()
         );
 
         let children_details_output_2_vec = children_details_output_2.into_inner();

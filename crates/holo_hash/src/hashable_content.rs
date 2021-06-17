@@ -3,7 +3,7 @@ use holochain_serialized_bytes::prelude::*;
 
 /// Any implementor of HashableContent may be used in a HoloHashed to pair
 /// data with its HoloHash representation. It also has an associated HashType.
-pub trait HashableContent: Sized + Send + Sync {
+pub trait HashableContent: Sized {
     /// The HashType which this content will be hashed to
     type HashType: HashType;
 
@@ -22,7 +22,7 @@ pub enum HashableContentBytes {
     /// Denotes that the hash should be computed for the given data
     Content(SerializedBytes),
     /// Denotes that the given bytes already constitute a valid HoloHash
-    Prehashed36(Vec<u8>),
+    Prehashed39(Vec<u8>),
 }
 
 /// A default HashableContent implementation, suitable for content which
