@@ -198,9 +198,8 @@ impl AsP2pStateTxExt for Transaction<'_> {
         dbg!(&arcset);
         query.fold(Ok(vec![]), |out, maybe_pair| {
             if let Some((agent, interval)) = maybe_pair? {
-                dbg!(&interval);
-                if arcset.overlap(&interval.clone().into()) {
-                    return out.map(|mut out| {
+                if dbg!(arcset.overlap(dbg!(&interval.clone().into()))) {
+                    return dbg!(out).map(|mut out| {
                         out.push((agent, interval));
                         out
                     });

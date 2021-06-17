@@ -1,6 +1,8 @@
 use super::ascii;
 use crate::DhtArcSet;
 
+const MAX: u32 = u32::MAX;
+
 macro_rules! assert_intersection {
     ($a: expr, $b: expr, $e: expr $(,)?) => {
         let empty = $e.is_empty();
@@ -14,6 +16,20 @@ macro_rules! assert_intersection {
             assert!(DhtArcSet::overlap(&$b, &$a));
         }
     };
+}
+
+#[test]
+fn test_intersection_regression() {
+    assert_intersection!(
+        DhtArcSet::from(vec![(0, MAX - 1)]),
+        DhtArcSet::from(vec![(0, MAX / 4), (MAX / 2, MAX),]),
+        DhtArcSet::from(vec![(0, MAX / 4), (MAX / 2, MAX - 1),]),
+    );
+    assert_intersection!(
+        DhtArcSet::from(vec![(0, MAX)]),
+        DhtArcSet::from(vec![(0, MAX / 4), (MAX / 2, MAX),]),
+        DhtArcSet::from(vec![(0, MAX / 4), (MAX / 2, MAX),]),
+    );
 }
 
 #[test]

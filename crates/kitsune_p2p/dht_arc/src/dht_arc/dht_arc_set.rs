@@ -70,6 +70,7 @@ impl DhtArcSet {
 
     /// Cheap check if the two sets have a non-null intersection
     pub fn overlap(&self, other: &Self) -> bool {
+        dbg!(dbg!(self).intersection(dbg!(other)));
         self.0.overlap(&other.0)
     }
 
@@ -93,6 +94,15 @@ impl From<Vec<ArcInterval>> for DhtArcSet {
         wints
             .into_iter()
             .map(Self::from)
+            .fold(Self::new_empty(), |a, b| a.union(&b))
+    }
+}
+
+impl From<Vec<(T, T)>> for DhtArcSet {
+    fn from(pairs: Vec<(T, T)>) -> Self {
+        pairs
+            .into_iter()
+            .map(|(a, b)| Self::from(ArcInterval::new(a, b)))
             .fold(Self::new_empty(), |a, b| a.union(&b))
     }
 }
