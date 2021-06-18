@@ -12,8 +12,8 @@ use anyhow::bail;
 use anyhow::ensure;
 use holochain_conductor_api::AdminRequest;
 use holochain_conductor_api::AdminResponse;
+use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InterfaceDriver;
-use holochain_conductor_api::ListAppsResponse;
 use holochain_conductor_api::{AdminInterfaceConfig, InstalledAppInfo};
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use holochain_types::prelude::DnaHash;
@@ -69,7 +69,7 @@ pub enum AdminRequestCli {
     /// Calls AdminRequest::ListActiveApps.
     ListActiveApps,
     /// Calls AdminRequest::ListApps.
-    ListApps,
+    ListApps(ListApps),
     ActivateApp(ActivateApp),
     DeactivateApp(DeactivateApp),
     DumpState(DumpState),
@@ -204,6 +204,16 @@ pub struct ListAgents {
     pub dna: Option<DnaHash>,
 }
 
+#[derive(Debug, StructOpt, Clone)]
+/// Calls AdminRequest::ListApps
+/// and pretty prints the list of apps
+/// installed in this conductor.
+pub struct ListApps {
+    #[structopt(short, long, parse(try_from_str = parse_status_filter))]
+    /// Optionally request agent info for a particular cell id.
+    pub status: Option<AppStatusFilter>,
+}
+
 #[doc(hidden)]
 pub async fn call(holochain_path: &Path, req: Call) -> anyhow::Result<()> {
     let Call {
@@ -294,8 +304,8 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
             let apps = list_active_apps(cmd).await?;
             msg!("Active Apps: {:?}", apps);
         }
-        AdminRequestCli::ListApps => {
-            let apps = list_apps(cmd).await?;
+        AdminRequestCli::ListApps(args) => {
+            let apps = list_apps(cmd, args).await?;
             msg!("List Apps: {:?}", apps);
         }
         AdminRequestCli::ActivateApp(args) => {
@@ -534,8 +544,15 @@ pub async fn list_active_apps(cmd: &mut CmdRunner) -> anyhow::Result<Vec<String>
 }
 
 /// Calls [`AdminRequest::ListApps`].
-pub async fn list_apps(cmd: &mut CmdRunner) -> anyhow::Result<ListAppsResponse> {
-    let resp = cmd.command(AdminRequest::ListApps).await?;
+pub async fn list_apps(
+    cmd: &mut CmdRunner,
+    args: ListApps,
+) -> anyhow::Result<Vec<InstalledAppInfo>> {
+    let resp = cmd
+        .command(AdminRequest::ListApps {
+            status_filter: args.status,
+        })
+        .await?;
     Ok(expect_match!(resp => AdminResponse::AppsListed, "Failed to list apps"))
 }
 
@@ -625,6 +642,17 @@ fn parse_agent_key(arg: &str) -> anyhow::Result<AgentPubKey> {
 
 fn parse_dna_hash(arg: &str) -> anyhow::Result<DnaHash> {
     DnaHash::try_from(arg).map_err(|e| anyhow::anyhow!("{:?}", e))
+}
+
+fn parse_status_filter(arg: &str) -> anyhow::Result<AppStatusFilter> {
+    match arg {
+        "active" => Ok(AppStatusFilter::Active),
+        "inactive" => Ok(AppStatusFilter::Inactive),
+        _ => Err(anyhow::anyhow!(
+            "Bad app status filter value: {}, only 'active' and 'inactive' are possible",
+            arg
+        )),
+    }
 }
 
 impl From<CellId> for DumpState {

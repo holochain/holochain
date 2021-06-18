@@ -583,23 +583,40 @@ async fn test_reactivate_app() {
     let zome = simple_create_entry_zome();
     let (conductor, app) = common_genesis_test_app(zome).await.unwrap();
 
-    let apps = conductor.list_apps().await.unwrap();
-    assert_eq!(apps.inactive_apps.len(), 0);
-    assert_eq!(apps.active_apps.len(), 1);
-    assert_eq!(apps.active_apps[0].cell_data.len(), 2);
-    assert_matches!(apps.active_apps[0].status, InstalledAppStatus::Active);
+    let all_apps = conductor.list_apps(None).await.unwrap();
+    assert_eq!(all_apps.len(), 1);
+
+    let inactive_apps = conductor
+        .list_apps(Some(AppStatusFilter::Inactive))
+        .await
+        .unwrap();
+    let active_apps = conductor
+        .list_apps(Some(AppStatusFilter::Active))
+        .await
+        .unwrap();
+    assert_eq!(inactive_apps.len(), 0);
+    assert_eq!(active_apps.len(), 1);
+    assert_eq!(active_apps[0].cell_data.len(), 2);
+    assert_matches!(active_apps[0].status, InstalledAppStatus::Active);
 
     conductor
         .deactivate_app("app".to_string(), DeactivationReason::Normal)
         .await
         .unwrap();
 
-    let apps = conductor.list_apps().await.unwrap();
-    assert_eq!(apps.active_apps.len(), 0);
-    assert_eq!(apps.inactive_apps.len(), 1);
-    assert_eq!(apps.inactive_apps[0].cell_data.len(), 2);
+    let inactive_apps = conductor
+        .list_apps(Some(AppStatusFilter::Inactive))
+        .await
+        .unwrap();
+    let active_apps = conductor
+        .list_apps(Some(AppStatusFilter::Active))
+        .await
+        .unwrap();
+    assert_eq!(active_apps.len(), 0);
+    assert_eq!(inactive_apps.len(), 1);
+    assert_eq!(inactive_apps[0].cell_data.len(), 2);
     assert_matches!(
-        apps.inactive_apps[0].status,
+        inactive_apps[0].status,
         InstalledAppStatus::Inactive {
             reason: DeactivationReason::Normal
         }
@@ -617,10 +634,18 @@ async fn test_reactivate_app() {
         .unwrap();
 
     // - Ensure that the app is active
+
     assert_eq_retry_10s!(conductor.list_active_apps().await.unwrap().len(), 1);
-    let apps = conductor.list_apps().await.unwrap();
-    assert_eq!(apps.active_apps.len(), 1);
-    assert_eq!(apps.inactive_apps.len(), 0);
+    let inactive_apps = conductor
+        .list_apps(Some(AppStatusFilter::Inactive))
+        .await
+        .unwrap();
+    let active_apps = conductor
+        .list_apps(Some(AppStatusFilter::Active))
+        .await
+        .unwrap();
+    assert_eq!(active_apps.len(), 1);
+    assert_eq!(inactive_apps.len(), 0);
 }
 
 #[tokio::test(flavor = "multi_thread")]

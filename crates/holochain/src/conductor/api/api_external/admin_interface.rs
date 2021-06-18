@@ -222,8 +222,8 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let app_ids = self.conductor_handle.list_active_apps().await?;
                 Ok(AdminResponse::ActiveAppsListed(app_ids))
             }
-            ListApps => {
-                let apps = self.conductor_handle.list_apps().await?;
+            ListApps { status_filter } => {
+                let apps = self.conductor_handle.list_apps(status_filter).await?;
                 Ok(AdminResponse::AppsListed(apps))
             }
             ActivateApp { installed_app_id } => {

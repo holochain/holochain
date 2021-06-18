@@ -130,15 +130,17 @@ pub enum AdminRequest {
     /// [`AdminResponse::ActiveAppsListed`]: enum.AdminResponse.html#variant.ActiveAppsListed
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
     ListActiveApps,
-    /// List the ids of all the Apps that are installed in the conductor, returning their information.
-    /// Takes no arguments.
+    /// List the ids of the Apps that are installed in the conductor, returning their information.
+    /// If `status_filter` is `Some(_)`, it will return only the `Apps` with the specified status
     ///
     /// Will be responded to with an [`AdminResponse::AppsListed`]
     /// or an [`AdminResponse::Error`]
     ///
     /// [`AdminResponse::AppsListed`]: enum.AdminResponse.html#variant.AppsListed
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
-    ListApps,
+    ListApps {
+        status_filter: Option<AppStatusFilter>,
+    },
     /// Changes the `App` specified by argument `installed_app_id` from an inactive state to an active state in the conductor,
     /// meaning that Zome calls can now be made and the `App` will be loaded on a reboot of the conductor.
     /// It is likely to want to call this after calling [`AdminRequest::InstallApp`], since a freshly
@@ -321,10 +323,10 @@ pub enum AdminResponse {
 
     /// The succesful response to an [`AdminRequest::ListApps`].
     ///
-    /// Contains a list of the `InstalledAppInfo` of all the installed `App` in the conductor
+    /// Contains a list of the `InstalledAppInfo` of the installed `Apps` in the conductor
     ///
     /// [`AdminRequest::ListApps`]: enum.AdminRequest.html#variant.ListApps
-    AppsListed(ListAppsResponse),
+    AppsListed(Vec<InstalledAppInfo>),
 
     /// The succesful response to an [`AdminRequest::AttachAppInterface`].
     ///
@@ -410,11 +412,9 @@ impl ExternalApiWireError {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-/// Info about all the apps installed in the conductor, returned by [`AdminResponse::ListApps`]
-pub struct ListAppsResponse {
-    // List of active apps running in the conductor
-    pub active_apps: Vec<InstalledAppInfo>,
-    // List of inactive apps
-    pub inactive_apps: Vec<InstalledAppInfo>,
+#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, Clone)]
+// Filter to get either only active or only inactive apps with `ListApps`
+pub enum AppStatusFilter {
+    Active,
+    Inactive,
 }
