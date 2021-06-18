@@ -1,6 +1,7 @@
 SELECT agent
 FROM p2p_agent_store
-WHERE signed_at_ms >= :since_ms -- between given signed_at range
+WHERE is_active = TRUE
+  AND signed_at_ms >= :since_ms -- between given signed_at range
   AND signed_at_ms <= :until_ms
   AND (
     -- if the input has two ranges, check them both

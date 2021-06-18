@@ -99,6 +99,8 @@ fn tx_p2p_put(txn: &mut Transaction, record: P2pRecord) -> DatabaseResult<()> {
             ":expires_at_ms": &record.expires_at_ms,
             ":storage_center_loc": &record.storage_center_loc,
 
+            ":is_active": &record.is_active,
+
             ":storage_start_1": &record.storage_start_1,
             ":storage_end_1": &record.storage_end_1,
             ":storage_start_2": &record.storage_start_2,
@@ -123,6 +125,7 @@ pub async fn p2p_prune(db: &DbWrite) -> DatabaseResult<()> {
 
     Ok(())
 }
+
 impl AsP2pStateTxExt for Transaction<'_> {
     fn p2p_get(&self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>> {
         let mut stmt = self
@@ -204,6 +207,9 @@ struct P2pRecord {
     expires_at_ms: i64,
     storage_center_loc: u32,
 
+    // is this record active?
+    is_active: bool,
+
     // generated fields
     storage_start_1: Option<u32>,
     storage_end_1: Option<u32>,
@@ -259,6 +265,8 @@ impl P2pRecord {
 
         let storage_center_loc = arc.center_loc.into();
 
+        let is_active = !signed.url_list.is_empty();
+
         let (storage_1, storage_2) = split_arc(&arc);
 
         Ok(Self {
@@ -269,6 +277,8 @@ impl P2pRecord {
             signed_at_ms: clamp64(signed_at_ms),
             expires_at_ms: clamp64(expires_at_ms),
             storage_center_loc,
+
+            is_active,
 
             storage_start_1: storage_1.map(|s| s.0),
             storage_end_1: storage_1.map(|s| s.1),

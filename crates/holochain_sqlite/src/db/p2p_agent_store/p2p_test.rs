@@ -48,7 +48,7 @@ async fn rand_insert(db: &DbWrite, space: &Arc<KitsuneSpace>, agent: &Arc<Kitsun
         space.clone(),
         agent.clone(),
         half_len,
-        vec![],
+        vec!["fake:".into()],
         signed_at_ms,
         expires_at_ms,
         |_| async { Ok(Arc::new(KitsuneSignature(vec![0; 64]))) },

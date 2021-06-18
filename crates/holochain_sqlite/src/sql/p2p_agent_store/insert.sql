@@ -7,6 +7,7 @@ SELECT
   :signed_at_ms AS signed_at_ms,
   :expires_at_ms AS expires_at_ms,
   :storage_center_loc AS storage_center_loc,
+  :is_active AS is_active,
   :storage_start_1 AS storage_start_1,
   :storage_end_1 AS storage_end_1,
   :storage_start_2 AS storage_start_2,
