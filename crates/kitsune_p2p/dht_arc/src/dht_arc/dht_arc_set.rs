@@ -41,12 +41,12 @@ impl DhtArcSet {
         Self::Full
     }
 
-    pub fn from_interval(wint: ArcInterval) -> Self {
-        match wint {
+    pub fn from_interval(arc: ArcInterval) -> Self {
+        match arc {
             ArcInterval::Full => Self::new_full(),
             ArcInterval::Empty => Self::new_empty(),
             ArcInterval::Bounded(start, end) => {
-                if (start <= MIN && end >= MAX) || end == start.wrapping_sub(1) {
+                if is_full(start, end) {
                     Self::new_full()
                 } else {
                     Self::Partial(
@@ -73,7 +73,7 @@ impl DhtArcSet {
                         // if there is an interval at the very beginning and one
                         // at the very end, let's interpret it as a single
                         // wrapping interval
-                        if first.0 <= MIN && last.1 >= MAX {
+                        if first.0 == MIN && last.1 >= MAX {
                             Some((last.0, first.1))
                         } else {
                             None
@@ -129,15 +129,14 @@ impl DhtArcSet {
 }
 
 impl From<ArcInterval> for DhtArcSet {
-    fn from(wint: ArcInterval) -> Self {
-        Self::from_interval(wint)
+    fn from(arc: ArcInterval) -> Self {
+        Self::from_interval(arc)
     }
 }
 
 impl From<Vec<ArcInterval>> for DhtArcSet {
-    fn from(wints: Vec<ArcInterval>) -> Self {
-        wints
-            .into_iter()
+    fn from(arcs: Vec<ArcInterval>) -> Self {
+        arcs.into_iter()
             .map(Self::from)
             .fold(Self::new_empty(), |a, b| a.union(&b))
     }
@@ -154,23 +153,11 @@ impl From<Vec<(T, T)>> for DhtArcSet {
 
 #[test]
 fn fullness() {
-    assert_eq!(
-        DhtArcSet::from(vec![(0, u32::MAX),]),
-        DhtArcSet::Full,
-    );
-    assert_eq!(
-        DhtArcSet::from(vec![(0, u32::MAX - 1),]),
-        DhtArcSet::Full,
-    );
-    assert_ne!(
-        DhtArcSet::from(vec![(0, u32::MAX - 2),]),
-        DhtArcSet::Full,
-    );
+    assert_eq!(DhtArcSet::from(vec![(0, u32::MAX),]), DhtArcSet::Full,);
+    assert_eq!(DhtArcSet::from(vec![(0, u32::MAX - 1),]), DhtArcSet::Full,);
+    assert_ne!(DhtArcSet::from(vec![(0, u32::MAX - 2),]), DhtArcSet::Full,);
 
-    assert_eq!(
-        DhtArcSet::from(vec![(11, 10),]),
-        DhtArcSet::Full,
-    );
+    assert_eq!(DhtArcSet::from(vec![(11, 10),]), DhtArcSet::Full,);
 
     assert_eq!(
         DhtArcSet::from(vec![(u32::MAX - 1, u32::MAX - 2),]),
@@ -181,7 +168,6 @@ fn fullness() {
         DhtArcSet::from(vec![(u32::MAX, u32::MAX - 1),]),
         DhtArcSet::Full,
     );
-
 }
 
 /// An alternate implementation of `ArcRange`
@@ -194,7 +180,11 @@ pub enum ArcInterval {
 
 impl ArcInterval {
     pub fn new(start: T, end: T) -> Self {
-        Self::Bounded(start, end)
+        if is_full(start, end) {
+            Self::Full
+        } else {
+            Self::Bounded(start, end)
+        }
     }
 
     /// Constructor
@@ -205,4 +195,9 @@ impl ArcInterval {
     pub fn from_bounds(bounds: (T, T)) -> Self {
         Self::Bounded(bounds.0, bounds.1)
     }
+}
+
+/// Check whether a bounded interval is equivalent to the Full interval
+fn is_full(start: u32, end: u32) -> bool {
+    (start == MIN && end >= MAX) || end == start.wrapping_sub(1)
 }

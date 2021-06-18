@@ -72,6 +72,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
     for _ in 0..20 {
         example_agent = rand_agent();
 
+        // insert multiple times to test idempotence of "upsert"
         for _ in 0..3 {
             rand_insert(&db, &space, &example_agent).await;
         }
@@ -82,6 +83,10 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
     // check that we only get 20 results
     let all = con.p2p_list_agents().unwrap();
     assert_eq!(20, all.len());
+
+    // agents with zero arc lengths will never be returned, so count only the
+    // nonzero ones
+    let num_nonzero = all.iter().filter(|a| a.storage_arc.half_length > 0).count();
 
     // make sure we can get our example result
     println!("after insert select all count: {}", all.len());
@@ -96,7 +101,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
             DhtArc::new(0, u32::MAX).interval().into(),
         )
         .unwrap();
-    assert_eq!(20, all.len());
+    assert_eq!(all.len(), num_nonzero);
 
     // check that gossip query over zero time returns zero results
     let all = con
@@ -106,13 +111,13 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
             DhtArc::new(0, u32::MAX).interval().into(),
         )
         .unwrap();
-    assert_eq!(0, all.len());
+    assert_eq!(all.len(), 0);
 
     // check that gossip query over zero arc returns zero results
     let all = con
         .p2p_gossip_query_agents(u64::MIN, u64::MAX, DhtArc::new(0, 0).interval().into())
         .unwrap();
-    assert_eq!(0, all.len());
+    assert_eq!(all.len(), 0);
 
     // check that gossip query over half arc returns some but not all results
     let all = con
@@ -122,7 +127,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
             DhtArc::new(0, u32::MAX / 4).interval().into(),
         )
         .unwrap();
-    assert!(all.len() > 0 && all.len() < 20);
+    assert!(all.len() > 0 && all.len() < num_nonzero);
 
     // prune everything by expires time
     p2p_prune(&db).await.unwrap();

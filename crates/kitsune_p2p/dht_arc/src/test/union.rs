@@ -12,7 +12,6 @@ macro_rules! assert_union {
 
 #[test]
 fn test_union_at_limits() {
-
     assert_union!(
         DhtArcSet::from(vec![(0, MAX / 2)]),
         DhtArcSet::from(vec![(MAX / 2, MAX)]),
