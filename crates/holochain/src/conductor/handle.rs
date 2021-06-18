@@ -218,7 +218,10 @@ pub trait ConductorHandleT: Send + Sync {
     async fn list_active_apps(&self) -> ConductorResult<Vec<InstalledAppId>>;
 
     /// List Apps with their information
-    async fn list_apps(&self, status_filter: Option<AppStatusFilter>) -> ConductorResult<Vec<InstalledAppInfo>>;
+    async fn list_apps(
+        &self,
+        status_filter: Option<AppStatusFilter>,
+    ) -> ConductorResult<Vec<InstalledAppInfo>>;
 
     /// Get the IDs of all active installed Apps which use this Cell
     async fn list_active_apps_for_cell_id(
