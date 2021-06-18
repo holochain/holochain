@@ -124,7 +124,7 @@ impl ShardedGossip {
                 };
                 // Send local agents
                 // TODO: Wait for bandwidth
-                let gossip = ShardedGossipWire::initiate(local_agents.clone(), arc_set);
+                let gossip = ShardedGossipWire::initiate(local_agents.clone(), arc_set.intervals());
                 let gossip = gossip.encode_vec().map_err(KitsuneError::other)?;
                 let gossip = wire::Wire::gossip(self.space.clone(), gossip.into());
                 conn.notify(&gossip, timeout).await?;
@@ -145,7 +145,7 @@ kitsune_p2p_types::write_codec_enum! {
         /// Initiate a round of gossip with a remote node
         Initiate(0x10) {
             agents.0: HashSet<Arc<KitsuneAgent>>,
-            arc_set.1: DhtArcSet,
+            arc_set.1: Vec<ArcInterval>,
         },
 
         /// Accept an incoming round of gossip from a remote node
