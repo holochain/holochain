@@ -470,13 +470,13 @@ impl Space {
         ep_hnd: Tx2EpHnd<wire::Wire>,
         config: Arc<KitsuneP2pConfig>,
     ) -> Self {
-        let gossip_mod_fact = if &config.tuning_params.gossip_strategy == "simple-bloom" {
-            crate::gossip::simple_bloom::factory()
-        } else {
-            panic!(
+        let gossip_mod_fact = match config.tuning_params.gossip_strategy.as_str() {
+            "simple-bloom" => crate::gossip::simple_bloom::factory(),
+            "sharded-gossip" => crate::gossip::sharded_gossip::factory(),
+            _ => panic!(
                 "unknown gossip strategy: {}",
                 config.tuning_params.gossip_strategy
-            );
+            ),
         };
         let gossip_mod = gossip_mod_fact.spawn_gossip_task(
             config.tuning_params.clone(),

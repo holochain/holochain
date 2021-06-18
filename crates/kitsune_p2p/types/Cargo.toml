@@ -46,4 +46,4 @@ name = "api_thru"
 harness = false
 
 [features]
-test_utils = []
+test_utils = ["kitsune_dht_arc/test_utils"]

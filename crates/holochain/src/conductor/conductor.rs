@@ -1323,6 +1323,9 @@ mod builder {
                 conductor: RwLock::new(conductor),
                 keystore,
                 holochain_p2p,
+
+                #[cfg(any(test, feature = "test_utils"))]
+                skip_publish: std::sync::atomic::AtomicBool::new(false),
             });
 
             let configs = conductor_config.admin_interfaces.unwrap_or_default();

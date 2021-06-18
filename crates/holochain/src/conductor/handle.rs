@@ -274,6 +274,14 @@ pub trait ConductorHandleT: Send + Sync {
     #[cfg(any(test, feature = "test_utils"))]
     async fn add_test_app_interface(&self, id: super::state::AppInterfaceId)
         -> ConductorResult<()>;
+
+    #[cfg(any(test, feature = "test_utils"))]
+    /// Check whether this conductor should skip gossip.
+    fn should_skip_publish(&self) -> bool;
+
+    #[cfg(any(test, feature = "test_utils"))]
+    /// For testing we can choose to skip publish.
+    fn set_skip_publish(&self, skip_publish: bool);
 }
 
 /// The current "production" implementation of a ConductorHandle.
@@ -288,6 +296,12 @@ pub struct ConductorHandleImpl<DS: DnaStore + 'static> {
     pub(crate) conductor: RwLock<Conductor<DS>>,
     pub(crate) keystore: KeystoreSender,
     pub(crate) holochain_p2p: holochain_p2p::HolochainP2pRef,
+
+    // Testing:
+    #[cfg(any(test, feature = "test_utils"))]
+    /// All conductors should skip publishing.
+    /// This is useful for testing gossip.
+    pub skip_publish: std::sync::atomic::AtomicBool,
 }
 
 #[async_trait::async_trait]
@@ -776,6 +790,17 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     ) -> ConductorResult<()> {
         let mut lock = self.conductor.write().await;
         lock.add_test_app_interface(id).await
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    fn should_skip_publish(&self) -> bool {
+        self.skip_publish.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    fn set_skip_publish(&self, skip_publish: bool) {
+        self.skip_publish
+            .store(skip_publish, std::sync::atomic::Ordering::Relaxed);
     }
 }
 
