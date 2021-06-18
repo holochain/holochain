@@ -324,6 +324,18 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
         Ok(self.evt_sender.query_agent_info_signed(input))
     }
 
+    fn handle_query_gossip_agents(
+        &mut self,
+        input: crate::event::QueryGossipAgentsEvt,
+    ) -> KitsuneP2pEventHandlerResult<
+        Vec<(
+            Arc<crate::KitsuneAgent>,
+            kitsune_p2p_types::dht_arc::ArcInterval,
+        )>,
+    > {
+        Ok(self.evt_sender.query_gossip_agents(input))
+    }
+
     fn handle_put_metric_datum(&mut self, datum: MetricDatum) -> KitsuneP2pEventHandlerResult<()> {
         Ok(self.evt_sender.put_metric_datum(datum))
     }

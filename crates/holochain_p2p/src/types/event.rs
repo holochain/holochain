@@ -118,6 +118,16 @@ ghost_actor::ghost_chan! {
         /// We need to get previously stored agent info.
         fn query_agent_info_signed(dna_hash: DnaHash, to_agent: AgentPubKey, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>) -> Vec<AgentInfoSigned>;
 
+        /// We need to get agents that fit into an arc set for gossip.
+        fn query_gossip_agents(
+            dna_hash: DnaHash,
+            to_agent: AgentPubKey,
+            kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
+            since_ms: u64,
+            until_ms: u64,
+            arc_set: Arc<kitsune_p2p_types::dht_arc::DhtArcSet>,
+        ) -> Vec<(Arc<kitsune_p2p::KitsuneAgent>, kitsune_p2p_types::dht_arc::ArcInterval)>;
+
         /// We need to store some metric data on behalf of kitsune.
         fn put_metric_datum(dna_hash: DnaHash, to_agent: AgentPubKey, agent: AgentPubKey, metric: MetricKind, timestamp: SystemTime) -> ();
 
@@ -240,6 +250,7 @@ macro_rules! match_p2p_evt {
             HolochainP2pEvent::PutAgentInfoSigned { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetAgentInfoSigned { $i, .. } => { $($t)* }
             HolochainP2pEvent::QueryAgentInfoSigned { $i, .. } => { $($t)* }
+            HolochainP2pEvent::QueryGossipAgents { $i, .. } => { $($t)* }
 
             HolochainP2pEvent::PutMetricDatum { $i, .. } => { $($t)* }
             HolochainP2pEvent::QueryMetrics { $i, .. } => { $($t)* }
