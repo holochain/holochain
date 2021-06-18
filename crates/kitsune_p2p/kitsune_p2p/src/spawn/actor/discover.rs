@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use super::*;
 use ghost_actor::dependencies::must_future::MustBoxFuture;
-use kitsune_p2p_types::agent_info::AgentInfoSigned;
+use kitsune_p2p_types::{agent_info::AgentInfoSigned, bootstrap::RandomQuery};
 use std::collections::HashSet;
 
 /// This enum represents the outcomes from peer discovery
@@ -256,7 +256,7 @@ pub(crate) fn get_5_or_less_non_local_agents_near_basis(
 
         if let Ok(list) = super::bootstrap::random(
             bootstrap_service,
-            super::bootstrap::RandomQuery {
+            RandomQuery {
                 space: space.clone(),
                 // grap a couple extra incase they happen to be local
                 limit: 8.into(),
@@ -305,7 +305,7 @@ pub(crate) fn add_5_or_less_non_local_agents(
     async move {
         if let Ok(list) = super::bootstrap::random(
             Some(bootstrap_service),
-            super::bootstrap::RandomQuery {
+            RandomQuery {
                 space: space.clone(),
                 limit: 8.into(),
             },
