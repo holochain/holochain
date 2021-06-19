@@ -1,10 +1,10 @@
-//! Queries for the P2pState store
+//! Queries for the P2pAgentStore db
 
 use fallible_iterator::FallibleIterator;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_conductor_api::AgentInfoDump;
-use holochain_conductor_api::P2pStateDump;
+use holochain_conductor_api::P2pAgentsDump;
 use holochain_p2p::dht_arc::DhtArc;
 use holochain_p2p::dht_arc::DhtArcBucket;
 use holochain_p2p::dht_arc::PeerDensity;
@@ -16,7 +16,6 @@ use holochain_state::prelude::StateQueryResult;
 use holochain_types::prelude::*;
 use holochain_zome_types::CellId;
 use kitsune_p2p::KitsuneBinType;
-use std::convert::TryFrom;
 use std::sync::Arc;
 
 use super::error::ConductorResult;
@@ -90,10 +89,9 @@ pub fn query_peer_density(
     let arcs = env.conn()?.p2p_list()?;
     let arcs = fallible_iterator::convert(arcs.into_iter().map(ConductorResult::Ok))
         .filter_map(|v| {
-            if dht_arc.contains(v.as_agent_ref().get_loc()) {
-                let info = kitsune_p2p::agent_store::AgentInfo::try_from(&v)?;
-                if info.as_space_ref() == kitsune_space.as_ref() && !is_expired(now, &info) {
-                    Ok(Some(info.dht_arc()?))
+            if dht_arc.contains(v.agent.get_loc()) {
+                if v.space == kitsune_space && !is_expired(now, &v) {
+                    Ok(Some(v.storage_arc))
                 } else {
                     Ok(None)
                 }
@@ -124,15 +122,12 @@ fn now() -> u64 {
         .as_millis() as u64
 }
 
-fn is_expired(now: u64, info: &kitsune_p2p::agent_store::AgentInfo) -> bool {
-    info.signed_at_ms()
-        .checked_add(info.expires_after_ms())
-        .map(|expires| expires <= now)
-        .unwrap_or(true)
+fn is_expired(now: u64, info: &AgentInfoSigned) -> bool {
+    now >= info.expires_at_ms
 }
 
 /// Dump the agents currently in the peer store
-pub fn dump_state(env: EnvRead, cell_id: Option<CellId>) -> StateQueryResult<P2pStateDump> {
+pub fn dump_state(env: EnvRead, cell_id: Option<CellId>) -> StateQueryResult<P2pAgentsDump> {
     use std::fmt::Write;
     let cell_id = cell_id.map(|c| c.into_dna_and_agent()).map(|c| {
         (
@@ -141,36 +136,24 @@ pub fn dump_state(env: EnvRead, cell_id: Option<CellId>) -> StateQueryResult<P2p
         )
     });
     let agent_infos = all_agent_infos(env)?;
-    let agent_infos =
-        agent_infos.into_iter().filter_map(
-            |a| match kitsune_p2p::agent_store::AgentInfo::try_from(&a) {
-                Ok(a) => match &cell_id {
-                    Some((s, _)) => {
-                        if s.1 == *a.as_space_ref() {
-                            Some(a)
-                        } else {
-                            None
-                        }
-                    }
-                    None => Some(a),
-                },
-                Err(e) => {
-                    tracing::error!(failed_to_deserialize_agent_info = ?e);
-                    None
-                }
-            },
-        );
+    let agent_infos = agent_infos.into_iter().filter(|a| match &cell_id {
+        Some((s, _)) => s.1 == *a.space,
+        None => true,
+    });
     let mut this_agent_info = None;
     let mut peers = Vec::new();
     for info in agent_infos {
         let mut dump = String::new();
 
         use chrono::{DateTime, Duration, NaiveDateTime, Utc};
-        let duration = Duration::milliseconds(info.signed_at_ms() as i64);
+        let duration = Duration::milliseconds(info.signed_at_ms as i64);
         let s = duration.num_seconds() as i64;
         let n = duration.clone().to_std().unwrap().subsec_nanos();
         let dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(s, n), Utc);
-        let exp = dt + Duration::milliseconds(info.expires_after_ms() as i64);
+        let duration = Duration::milliseconds(info.expires_at_ms as i64);
+        let s = duration.num_seconds() as i64;
+        let n = duration.clone().to_std().unwrap().subsec_nanos();
+        let exp = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(s, n), Utc);
         let now = Utc::now();
 
         writeln!(dump, "signed at {}", dt).ok();
@@ -181,21 +164,21 @@ pub fn dump_state(env: EnvRead, cell_id: Option<CellId>) -> StateQueryResult<P2p
             (exp - now).num_minutes()
         )
         .ok();
-        writeln!(dump, "urls: {:?}", info.as_urls_ref()).ok();
+        writeln!(dump, "urls: {:?}", info.url_list).ok();
         let info = AgentInfoDump {
-            kitsune_agent: info.as_agent_ref().clone(),
-            kitsune_space: info.as_space_ref().clone(),
+            kitsune_agent: info.agent.clone(),
+            kitsune_space: info.space.clone(),
             dump,
         };
         match &cell_id {
-            Some((s, a)) if info.kitsune_agent == a.1 && info.kitsune_space == s.1 => {
+            Some((s, a)) if *info.kitsune_agent == a.1 && *info.kitsune_space == s.1 => {
                 this_agent_info = Some(info);
             }
             None | Some(_) => peers.push(info),
         }
     }
 
-    Ok(P2pStateDump {
+    Ok(P2pAgentsDump {
         this_agent_info,
         this_dna: cell_id.clone().map(|(s, _)| s),
         this_agent: cell_id.clone().map(|(_, a)| a),
@@ -207,22 +190,25 @@ pub fn dump_state(env: EnvRead, cell_id: Option<CellId>) -> StateQueryResult<P2p
 mod tests {
     use super::*;
     use ::fixt::prelude::*;
-    use holochain_state::test_utils::test_p2p_state_env;
+    use holochain_state::test_utils::test_p2p_agent_store_env;
     use kitsune_p2p::fixt::AgentInfoSignedFixturator;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_store_agent_info_signed() {
         observability::test_run().ok();
 
-        let test_env = test_p2p_state_env();
+        let test_env = test_p2p_agent_store_env();
         let env = test_env.env();
 
         let agent_info_signed = fixt!(AgentInfoSigned, Predictable);
 
         p2p_put(&env, &agent_info_signed).await.unwrap();
 
-        let agent = kitsune_p2p::KitsuneAgent::try_from(agent_info_signed.clone()).unwrap();
-        let ret = env.conn().unwrap().p2p_get(&agent).unwrap();
+        let ret = env
+            .conn()
+            .unwrap()
+            .p2p_get(&agent_info_signed.agent)
+            .unwrap();
 
         assert_eq!(ret, Some(agent_info_signed));
     }
@@ -230,7 +216,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn add_agent_info_to_peer_env() {
         observability::test_run().ok();
-        let t_env = test_p2p_state_env();
+        let t_env = test_p2p_agent_store_env();
         let env = t_env.env();
 
         // - Check no data in the store to start
@@ -244,7 +230,7 @@ mod tests {
             .collect::<Vec<_>>();
 
         let mut expect = agent_infos.clone();
-        expect.sort();
+        expect.sort_by(|a, b| a.agent.partial_cmp(&b.agent).unwrap());
 
         // - Inject some data
         inject_agent_infos(env.clone(), agent_infos.iter())
@@ -254,7 +240,7 @@ mod tests {
         // - Check the same data is now in the store
         let mut agents = all_agent_infos(env.clone().into()).unwrap();
 
-        agents.sort();
+        agents.sort_by(|a, b| a.agent.partial_cmp(&b.agent).unwrap());
 
         assert_eq!(expect, agents);
     }

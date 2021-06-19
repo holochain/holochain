@@ -47,6 +47,3 @@ See [#546](https://github.com/holochain/holochain/pull/546) or the docs for the 
 
 ### Fixed
 - If installing the same app_id twice, previously the second installation would overwrite the first. Now it is an error to do so.
-
-[Unreleased]: https://github.com/holochain/holochain/compare/20210226.155101...HEAD
-[20210304.120604]: https://github.com/holochain/holochain/compare/20210226.155101..20210304.120604
