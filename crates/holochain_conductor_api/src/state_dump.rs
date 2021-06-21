@@ -3,6 +3,7 @@ use holo_hash::DnaHash;
 use holochain_state::source_chain::SourceChainJsonDump;
 use serde::Deserialize;
 use serde::Serialize;
+use std::sync::Arc;
 
 #[derive(Serialize, Deserialize)]
 pub struct JsonDump {
@@ -50,8 +51,8 @@ pub struct P2pAgentsDump {
 /// space, signed time, expires in and
 /// urls printed in a pretty way.
 pub struct AgentInfoDump {
-    pub kitsune_agent: kitsune_p2p::KitsuneAgent,
-    pub kitsune_space: kitsune_p2p::KitsuneSpace,
+    pub kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>,
+    pub kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     pub dump: String,
 }
 

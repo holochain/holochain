@@ -260,9 +260,12 @@ pub type KitsuneResult<T> = Result<T, KitsuneError>;
 mod timeout;
 pub use timeout::*;
 
+pub mod agent_info;
 pub mod async_lazy;
 mod auto_stream_select;
 pub use auto_stream_select::*;
+pub mod bin_types;
+pub mod bootstrap;
 pub mod codec;
 pub mod config;
 pub mod dht_arc;

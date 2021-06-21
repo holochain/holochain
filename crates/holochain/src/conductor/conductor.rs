@@ -43,8 +43,7 @@ use crate::conductor::error::ConductorResult;
 use crate::conductor::handle::ConductorHandle;
 use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::{
-    conductor::api::error::{ConductorApiError, ConductorApiResult},
-    core::ribosome::real_ribosome::RealRibosome,
+    conductor::api::error::ConductorApiResult, core::ribosome::real_ribosome::RealRibosome,
 };
 pub use builder::*;
 use futures::future;
@@ -655,17 +654,19 @@ where
     pub(super) async fn activate_app_in_db(
         &mut self,
         installed_app_id: InstalledAppId,
-    ) -> ConductorResult<()> {
-        self.update_state(move |mut state| {
-            let app = state
-                .inactive_apps
-                .remove(&installed_app_id)
-                .ok_or_else(|| ConductorError::AppNotInstalled(installed_app_id.clone()))?;
-            state.active_apps.insert(app.into_active());
-            Ok(state)
-        })
-        .await?;
-        Ok(())
+    ) -> ConductorResult<ActiveApp> {
+        let (_, active_app) = self
+            .update_state_prime(move |mut state| {
+                let app = state
+                    .inactive_apps
+                    .remove(&installed_app_id)
+                    .ok_or_else(|| ConductorError::AppNotInstalled(installed_app_id.clone()))?;
+                let active_app = app.into_active();
+                state.active_apps.insert(active_app.clone());
+                Ok((state, active_app))
+            })
+            .await?;
+        Ok(active_app)
     }
 
     /// Deactivate an app in the database
@@ -832,11 +833,7 @@ where
     ) -> ConductorApiResult<()> {
         let mut space_map = HashMap::new();
         for agent_info_signed in agent_infos {
-            let space: Arc<KitsuneSpace> = Arc::new(
-                (&agent_info_signed)
-                    .try_into()
-                    .map_err(ConductorApiError::other)?,
-            );
+            let space = agent_info_signed.space.clone();
             space_map
                 .entry(space)
                 .or_insert_with(Vec::new)

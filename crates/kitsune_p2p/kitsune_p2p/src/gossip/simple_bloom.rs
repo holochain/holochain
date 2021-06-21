@@ -41,9 +41,9 @@ impl MetaOpData {
         match self {
             MetaOpData::Op(h, d) => (**h).len() + d.len(),
             MetaOpData::Agent(a) => {
-                let h = (**a.as_agent_ref()).len();
-                let s = (**a.as_signature_ref()).len();
-                let d = a.as_agent_info_ref().len();
+                let h = (**a.agent).len();
+                let s = (**a.signature).len();
+                let d = a.encoded_bytes.len();
                 h + s + d
             }
         }
@@ -52,11 +52,7 @@ impl MetaOpData {
     fn key(&self) -> Arc<MetaOpKey> {
         let key = match self {
             MetaOpData::Op(key, _) => MetaOpKey::Op(key.clone()),
-            MetaOpData::Agent(s) => {
-                use std::convert::TryInto;
-                let info: crate::agent_store::AgentInfo = s.try_into().unwrap();
-                MetaOpKey::Agent(Arc::new(s.as_agent_ref().clone()), info.signed_at_ms())
-            }
+            MetaOpData::Agent(s) => MetaOpKey::Agent(s.agent.clone(), s.signed_at_ms),
         };
         Arc::new(key)
     }

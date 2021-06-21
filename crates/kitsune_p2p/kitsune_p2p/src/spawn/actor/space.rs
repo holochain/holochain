@@ -84,7 +84,7 @@ impl SpaceInternalHandler for Space {
             });
         Ok(async move {
             for peer in all_peers_fut.await? {
-                res.insert(Arc::new(peer.as_agent_ref().clone()));
+                res.insert(peer.agent.clone());
             }
             Ok(res)
         }
@@ -102,32 +102,39 @@ impl SpaceInternalHandler for Space {
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
         Ok(async move {
-            let urls = vec![bound_url];
+            let urls = vec![bound_url.into()];
             for agent in agent_list {
-                let agent_info = crate::types::agent_store::AgentInfo::new(
-                    (*space).clone(),
-                    (*agent).clone(),
+                use kitsune_p2p_types::agent_info::AgentInfoSigned;
+                let signed_at_ms = crate::spawn::actor::bootstrap::now_once(None).await?;
+                let expires_at_ms = signed_at_ms + expires_after;
+
+                let agent_info_signed = AgentInfoSigned::sign(
+                    space.clone(),
+                    agent.clone(),
+                    u32::MAX,
                     urls.clone(),
-                    crate::spawn::actor::bootstrap::now_once(None).await?,
-                    expires_after,
+                    signed_at_ms,
+                    expires_at_ms,
+                    |d| {
+                        let data = Arc::new(d.to_vec());
+                        async {
+                            let sign_req = SignNetworkDataEvt {
+                                space: space.clone(),
+                                agent: agent.clone(),
+                                data,
+                            };
+                            evt_sender
+                                .sign_network_data(sign_req)
+                                .await
+                                .map(Arc::new)
+                                .map_err(KitsuneError::other)
+                        }
+                    },
                 )
-                .with_meta_info(crate::types::agent_store::AgentMetaInfo {
-                    dht_storage_arc_half_length: 0,
-                })?;
-                let mut data = Vec::new();
-                rmp_encode(&mut data, &agent_info)?;
-                let sign_req = SignNetworkDataEvt {
-                    space: space.clone(),
-                    agent: agent.clone(),
-                    data: Arc::new(data.clone()),
-                };
-                let sig = evt_sender.sign_network_data(sign_req).await?;
-                let agent_info_signed = crate::types::agent_store::AgentInfoSigned::try_new(
-                    (*agent).clone(),
-                    sig.clone(),
-                    data,
-                )?;
-                tracing::debug!(?agent_info, ?sig);
+                .await?;
+
+                tracing::debug!(?agent_info_signed);
+
                 evt_sender
                     .put_agent_info_signed(PutAgentInfoSignedEvt {
                         space: space.clone(),
@@ -135,6 +142,7 @@ impl SpaceInternalHandler for Space {
                         agent_info_signed: agent_info_signed.clone(),
                     })
                     .await?;
+
                 // Push to the network as well
                 match network_type {
                     NetworkType::QuicMdns => {
