@@ -201,7 +201,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn setup_cells(self: Arc<Self>) -> ConductorResult<Vec<CreateAppError>>;
 
     /// Activate an app
-    async fn activate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<()>;
+    async fn activate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<ActiveApp>;
 
     /// Deactivate an app
     async fn deactivate_app(
@@ -642,12 +642,14 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(r)
     }
 
-    async fn activate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<()> {
-        self.conductor
+    async fn activate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<ActiveApp> {
+        let app = self
+            .conductor
             .write()
             .await
             .activate_app_in_db(installed_app_id)
-            .await
+            .await?;
+        Ok(app)
         // MD: Should we be doing `Conductor::add_cells()` here? (see below comment)
     }
 

@@ -487,7 +487,7 @@ impl Space {
 
                     match super::bootstrap::random(
                         bootstrap_service.clone(),
-                        super::bootstrap::RandomQuery {
+                        kitsune_p2p_types::bootstrap::RandomQuery {
                             space: space_c.clone(),
                             limit: 8.into(),
                         },
