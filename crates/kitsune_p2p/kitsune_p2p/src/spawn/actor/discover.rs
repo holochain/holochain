@@ -200,14 +200,17 @@ pub(crate) fn search_remotes_covering_basis(
                             // if we got results, add them to our peer store
                             for agent_info_signed in peer_list {
                                 let agent = agent_info_signed.agent.clone();
-                                let _ = inner
+                                if let Err(err) = inner
                                     .evt_sender
                                     .put_agent_info_signed(PutAgentInfoSignedEvt {
                                         space: inner.space.clone(),
                                         agent,
                                         agent_info_signed,
                                     })
-                                    .await;
+                                    .await
+                                {
+                                    tracing::error!(?err, "error storing peer_queried agent_info");
+                                }
                             }
                             // then break, to pull up the local query
                             // that should now include these new results
