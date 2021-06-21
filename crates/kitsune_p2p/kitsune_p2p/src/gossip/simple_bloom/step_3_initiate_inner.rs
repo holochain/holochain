@@ -6,7 +6,7 @@ impl SimpleBloomMod {
 
         // get the remote certs we might want to speak to
         let endpoints: HashMap<GossipTgt, TxUrl> = self.inner.share_mut(|inner, _| {
-            inner.last_initiate_check = std::time::SystemTime::now();
+            inner.last_initiate_check = proc_count_now_us();
             // TODO: In the future we'll pull the endpoints from a p2p store query that
             //       finds nodes which overlap our arc.
             //       For now we use `local_data_map`.

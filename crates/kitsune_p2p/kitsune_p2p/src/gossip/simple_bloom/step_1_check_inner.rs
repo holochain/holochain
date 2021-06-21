@@ -1,4 +1,5 @@
 use crate::*;
+use kitsune_p2p_types::*;
 use observability::tracing;
 
 use super::{CheckResult, SimpleBloomMod};
@@ -48,7 +49,7 @@ impl SimpleBloomMod {
         // TODO: clean up ugly locking here
         let needs_sync = self.inner.share_mut(|i, _| {
             Ok(i.initiate_tgt.is_none()
-                && i.last_initiate_check.elapsed().unwrap().as_millis() as u32
+                && proc_count_elapsed(i.last_initiate_check).as_millis() as u32
                     > self.tuning_params.gossip_loop_iteration_delay_ms)
         })?;
         if needs_sync {

@@ -152,21 +152,20 @@ pub(crate) struct SimpleBloomModInner {
     /// Metrics to be recorded at the end of this round of gossip
     pending_metrics: Vec<(Vec<Arc<KitsuneAgent>>, NodeInfo)>,
 
-    last_initiate_check: std::time::SystemTime,
+    last_initiate_check: ProcCountMicros,
     initiate_tgt: Option<GossipTgt>,
 
     incoming: Vec<(Tx2ConHnd<wire::Wire>, GossipWire)>,
 
-    last_outgoing: std::time::SystemTime,
+    last_outgoing: ProcCountMicros,
     outgoing: Vec<(GossipTgt, HowToConnect, GossipWire)>,
 }
 
 impl SimpleBloomModInner {
     pub fn new() -> Self {
-        // pick an old time (one day ago) for initialization
-        let old = std::time::SystemTime::now()
-            .checked_sub(std::time::Duration::from_secs(60 * 60 * 24))
-            .unwrap();
+        // pick an old instant for initialization
+        const ONE_DAY_MICROS: i64 = 1000 * 1000 * 60 * 60 * 24;
+        let old_us = proc_count_now_us() - ONE_DAY_MICROS;
 
         Self {
             local_agents: HashSet::new(),
@@ -176,12 +175,12 @@ impl SimpleBloomModInner {
 
             pending_metrics: Vec::new(),
 
-            last_initiate_check: old,
+            last_initiate_check: old_us,
             initiate_tgt: None,
 
             incoming: Vec::new(),
 
-            last_outgoing: old,
+            last_outgoing: old_us,
             outgoing: Vec::new(),
         }
     }
