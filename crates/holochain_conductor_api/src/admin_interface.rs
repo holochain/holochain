@@ -129,8 +129,11 @@ pub enum AdminRequest {
     ///
     /// [`AdminResponse::ActiveAppsListed`]: enum.AdminResponse.html#variant.ActiveAppsListed
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
+    ListEnabledApps,
+    /// DEPRECATED. Alias for ListEnabledApps.
+    #[deprecated = "alias for ListEnabledApps"]
     ListActiveApps,
-    /// Changes the `App` specified by argument `installed_app_id` from an inactive state to an active state in the conductor,
+    /// Changes the `App` specified by argument `installed_app_id` from a disabled state to an enabled state in the conductor,
     /// meaning that Zome calls can now be made and the `App` will be loaded on a reboot of the conductor.
     /// It is likely to want to call this after calling [`AdminRequest::InstallApp`], since a freshly
     /// installed `App` is not activated automatically.
@@ -141,11 +144,17 @@ pub enum AdminRequest {
     /// [`AdminRequest::InstallApp`]: enum.AdminRequest.html#variant.InstallApp
     /// [`AdminResponse::AppActivated`]: enum.AdminResponse.html#variant.AppActivated
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
-    ActivateApp {
-        /// The InstalledAppId to activate
+    EnableApp {
+        /// The InstalledAppId to enable
         installed_app_id: InstalledAppId,
     },
-    /// Changes the `App` specified by argument `installed_app_id` from an active state to an inactive state in the conductor,
+    /// DEPRECATED. Alias for EnableApp.
+    #[deprecated = "alias for EnableApp"]
+    ActivateApp {
+        /// The InstalledAppId to enable
+        installed_app_id: InstalledAppId,
+    },
+    /// Changes the `App` specified by argument `installed_app_id` from an enabled state to a disabled state in the conductor,
     /// meaning that Zome calls can no longer be made, and the `App` will not be loaded on a
     /// reboot of the conductor.
     ///
@@ -154,8 +163,22 @@ pub enum AdminRequest {
     ///
     /// [`AdminResponse::AppDeactivated`]: enum.AdminResponse.html#variant.AppDeactivated
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
+    DisableApp {
+        /// The InstalledAppId to disable
+        installed_app_id: InstalledAppId,
+    },
+    /// DEPRECATED. Alias for DisableApp.
+    #[deprecated = "alias for DisableApp"]
     DeactivateApp {
-        /// The InstalledAppId to deactivate
+        /// The InstalledAppId to disable
+        installed_app_id: InstalledAppId,
+    },
+    StartApp {
+        /// The InstalledAppId to (re)start
+        installed_app_id: InstalledAppId,
+    },
+    PauseApp {
+        /// The InstalledAppId to pause
         installed_app_id: InstalledAppId,
     },
     /// Open up a new websocket interface at the networking port
@@ -325,18 +348,24 @@ pub enum AdminResponse {
     /// The list of attached app interfaces.
     AppInterfacesListed(Vec<u16>),
 
-    /// The succesful response to an [`AdminRequest::ActivateApp`].
+    /// The succesful response to an [`AdminRequest::EnableApp`].
     ///
-    /// It means the `App` was activated successfully
+    /// It means the `App` was enabled successfully
     ///
-    /// [`AdminRequest::ActivateApp`]: enum.AdminRequest.html#variant.ActivateApp
+    /// [`AdminRequest::EnableApp`]: enum.AdminRequest.html#variant.EnableApp
+    AppEnabled(InstalledAppInfo),
+
+    #[deprecated = "alias for AppEnabled"]
     AppActivated(InstalledAppInfo),
 
-    /// The succesful response to an [`AdminRequest::DeactivateApp`].
+    /// The succesful response to an [`AdminRequest::DisableApp`].
     ///
-    /// It means the `App` was deactivated successfully.
+    /// It means the `App` was disabled successfully.
     ///
-    /// [`AdminRequest::DeactivateApp`]: enum.AdminRequest.html#variant.DeactivateApp
+    /// [`AdminRequest::DisableApp`]: enum.AdminRequest.html#variant.DisableApp
+    AppDisabled,
+
+    #[deprecated = "alias for AppDisabled"]
     AppDeactivated,
 
     /// The succesful response to an [`AdminRequest::DumpState`].

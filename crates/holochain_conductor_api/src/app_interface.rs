@@ -125,14 +125,14 @@ pub struct InstalledAppInfo {
     pub installed_app_id: InstalledAppId,
     /// Info about the Cells installed in this app
     pub cell_data: Vec<InstalledCell>,
-    /// Is this app currently active?
-    pub status: InstalledAppStatus,
+    /// The app's current status, in an API-friendly format
+    pub status: InstalledAppInfoStatus,
 }
 
 impl InstalledAppInfo {
     pub fn from_installed_app(app: &InstalledApp) -> Self {
         let installed_app_id = app.installed_app_id().clone();
-        let status = app.status();
+        let status = app.status().clone().into();
         let cell_data = app
             .provisioned_cells()
             .map(|(nick, id)| InstalledCell::new(id.clone(), nick.clone()))
@@ -148,5 +148,20 @@ impl InstalledAppInfo {
 impl From<&InstalledApp> for InstalledAppInfo {
     fn from(app: &InstalledApp) -> Self {
         Self::from_installed_app(app)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+/// A flatter, more API-friendly representation of [`InstalledAppStatus`]
+pub enum InstalledAppInfoStatus {
+    NeverStarted,
+    Paused { reason: PausedAppReason },
+    Disabled { reason: DisabledAppReason },
+    Running,
+}
+
+impl From<InstalledAppStatus> for InstalledAppInfoStatus {
+    fn from(_: InstalledAppStatus) -> Self {
+        todo!()
     }
 }

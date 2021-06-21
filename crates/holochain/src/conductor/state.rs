@@ -8,7 +8,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
 
-/// Mutable conductor state, stored in a DB and writeable only via Admin interface.
+/// Mutable conductor state, stored in a DB and writable only via Admin interface.
 ///
 /// References between structs (cell configs pointing to
 /// the agent and DNA to be instantiated) are implemented
@@ -18,10 +18,10 @@ use std::collections::HashMap;
 pub struct ConductorState {
     /// Apps that are ready to be activated
     #[serde(default)]
-    pub inactive_apps: DeactivatedAppMap,
+    pub stopped_apps: StoppedAppMap,
     /// Apps that are active and will be loaded
     #[serde(default)]
-    pub active_apps: InstalledAppMap,
+    pub running_apps: RunningAppMap,
     /// List of interfaces any UI can use to access zome functions.
     #[serde(default)]
     pub app_interfaces: HashMap<AppInterfaceId, AppInterfaceConfig>,
@@ -63,11 +63,11 @@ impl ConductorState {
     /// Retrieve info about an installed App by its InstalledAppId
     #[allow(clippy::ptr_arg)]
     pub fn get_app_info(&self, installed_app_id: &InstalledAppId) -> Option<InstalledAppInfo> {
-        self.active_apps
+        self.running_apps
             .get(installed_app_id)
             .map(|app| InstalledAppInfo::from_installed_app(&app.clone().into()))
             .or_else(|| {
-                self.inactive_apps
+                self.stopped_apps
                     .get(installed_app_id)
                     .map(|app| InstalledAppInfo::from_installed_app(&app.clone().into()))
             })

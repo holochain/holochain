@@ -214,15 +214,15 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let cell_ids = self.conductor_handle.list_cell_ids().await?;
                 Ok(AdminResponse::CellIdsListed(cell_ids))
             }
-            ListActiveApps => {
+            ListEnabledApps => {
                 let app_ids = self.conductor_handle.list_active_apps().await?;
                 Ok(AdminResponse::ActiveAppsListed(app_ids))
             }
-            ActivateApp { installed_app_id } => {
-                // Activate app
+            EnableApp { installed_app_id } => {
+                // Enable app
                 let app = self
                     .conductor_handle
-                    .activate_app(installed_app_id.clone())
+                    .enable_app(installed_app_id.clone())
                     .await?;
 
                 // Create cells
@@ -242,18 +242,20 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .map(|this_app_error| Ok(AdminResponse::Error(this_app_error.into())))
                     // No error, return success
                     .unwrap_or_else(|| {
-                        Ok(AdminResponse::AppActivated(
-                            InstalledAppInfo::from_installed_app(&InstalledApp::Active(app)),
+                        Ok(AdminResponse::AppEnabled(
+                            InstalledAppInfo::from_installed_app(&app.into()),
                         ))
                     })
             }
-            DeactivateApp { installed_app_id } => {
-                // Activate app
+            DisableApp { installed_app_id } => {
+                // Disable app
                 self.conductor_handle
-                    .deactivate_app(installed_app_id.clone(), DeactivationReason::Normal)
+                    .disable_app(installed_app_id.clone(), DisabledAppReason::User)
                     .await?;
-                Ok(AdminResponse::AppDeactivated)
+                Ok(AdminResponse::AppDisabled)
             }
+            StartApp { installed_app_id } => todo!(),
+            PauseApp { installed_app_id } => todo!(),
             AttachAppInterface { port } => {
                 let port = port.unwrap_or(0);
                 let port = self
@@ -278,6 +280,17 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             RequestAgentInfo { cell_id } => {
                 let r = self.conductor_handle.get_agent_infos(cell_id).await?;
                 Ok(AdminResponse::AgentInfoRequested(r))
+            }
+
+            // deprecated aliases
+            ListActiveApps => self.handle_admin_request_inner(ListEnabledApps).await,
+            ActivateApp { installed_app_id } => {
+                self.handle_admin_request_inner(EnableApp { installed_app_id })
+                    .await
+            }
+            DeactivateApp { installed_app_id } => {
+                self.handle_admin_request_inner(DisableApp { installed_app_id })
+                    .await
             }
         }
     }
@@ -551,7 +564,7 @@ mod test {
         let expects = vec![dna_hash.clone()];
         assert_matches!(dna_list, AdminResponse::DnasListed(a) if a == expects);
 
-        let expected_activated_app = InstalledApp::new_active(
+        let expected_activated_app = InstalledApp::new_running(
             InstalledAppCommon::new_legacy(
                 "test-by-path".to_string(),
                 vec![InstalledCell::new(cell_id2.clone(), "".to_string())],

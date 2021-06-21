@@ -196,6 +196,7 @@ async fn run(
                     return Err(TaskManagerError::Unrecoverable(error));
                 },
                 Some(TaskOutcome::UninstallApp(cell_id, error, context)) => {
+                    // TODO: do we need this anymore, since apps aren't installed if they don't pass genesis?
                     tracing::error!("About to uninstall apps");
                     let app_ids = conductor.list_active_apps_for_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
                     tracing::error!(
@@ -210,18 +211,31 @@ async fn run(
                     tracing::error!("Apps uninstalled.");
                 },
                 Some(TaskOutcome::DeactivateApps(cell_id, error, context)) => {
-                    tracing::error!("About to deactivate apps");
+                    tracing::error!("About to automatically stop apps");
                     let app_ids = conductor.list_active_apps_for_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
-                    tracing::error!(
-                        "DEACTIVATING the following apps due to an unrecoverable error: {:?}\nError: {:?}\nContext: {}",
-                        app_ids,
-                        error,
-                        context
-                    );
-                    for app_id in app_ids.iter() {
-                        conductor.deactivate_app(app_id.to_string(), DeactivationReason::Quarantined { error: error.to_string() } ).await.map_err(TaskManagerError::internal)?;
+                    if todo!("Distinguish between recoverable and unrecoverable errors") {
+                        tracing::error!(
+                            "PAUSING the following apps due to a recoverable error: {:?}\nError: {:?}\nContext: {}",
+                            app_ids,
+                            error,
+                            context
+                        );
+                        for app_id in app_ids.iter() {
+                            conductor.pause_app(app_id.to_string(), PausedAppReason::Error(error.to_string())).await.map_err(TaskManagerError::internal)?;
+                        }
+                        tracing::error!("Apps paused.");
+                    } else {
+                        tracing::error!(
+                            "DISABLING the following apps due to an unrecoverable error: {:?}\nError: {:?}\nContext: {}",
+                            app_ids,
+                            error,
+                            context
+                        );
+                        for app_id in app_ids.iter() {
+                            conductor.disable_app(app_id.to_string(), DisabledAppReason::Error(error.to_string())).await.map_err(TaskManagerError::internal)?;
+                        }
+                        tracing::error!("Apps disabled.");
                     }
-                    tracing::error!("Apps quarantined via deactivation.");
                 },
                 None => return Ok(()),
             }}

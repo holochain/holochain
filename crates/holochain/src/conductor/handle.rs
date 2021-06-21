@@ -191,7 +191,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn install_app_bundle(
         self: Arc<Self>,
         payload: InstallAppBundlePayload,
-    ) -> ConductorResult<InactiveApp>;
+    ) -> ConductorResult<StoppedApp>;
 
     /// Uninstall an app from the state DB and remove all running Cells
     async fn uninstall_app(&self, app: &InstalledAppId) -> ConductorResult<()>;
@@ -201,13 +201,23 @@ pub trait ConductorHandleT: Send + Sync {
     async fn setup_cells(self: Arc<Self>) -> ConductorResult<Vec<CreateAppError>>;
 
     /// Activate an app
-    async fn activate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<ActiveApp>;
+    async fn enable_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<RunningApp>;
 
     /// Deactivate an app
-    async fn deactivate_app(
+    async fn disable_app(
         &self,
         installed_app_id: InstalledAppId,
-        reason: DeactivationReason,
+        reason: DisabledAppReason,
+    ) -> ConductorResult<()>;
+
+    /// Start an enabled but stopped (paused) app
+    async fn start_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<RunningApp>;
+
+    /// Stop a running app while leaving it enabled
+    async fn pause_app(
+        &self,
+        installed_app_id: InstalledAppId,
+        reason: PausedAppReason,
     ) -> ConductorResult<()>;
 
     /// List Cell Ids
@@ -557,7 +567,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .conductor
             .write()
             .await
-            .add_inactive_app_to_db(app)
+            .add_stopped_app_to_db(app)
             .await?;
 
         Ok(())
@@ -566,7 +576,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn install_app_bundle(
         self: Arc<Self>,
         payload: InstallAppBundlePayload,
-    ) -> ConductorResult<InactiveApp> {
+    ) -> ConductorResult<StoppedApp> {
         let InstallAppBundlePayload {
             source,
             agent_key,
@@ -612,7 +622,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .conductor
             .write()
             .await
-            .add_inactive_app_to_db(app.clone())
+            .add_stopped_app_to_db(app.clone())
             .await?;
 
         Ok(app)
@@ -642,7 +652,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(r)
     }
 
-    async fn activate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<ActiveApp> {
+    async fn enable_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<RunningApp> {
         let app = self
             .conductor
             .write()
@@ -653,20 +663,32 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         // MD: Should we be doing `Conductor::add_cells()` here? (see below comment)
     }
 
-    async fn deactivate_app(
+    async fn disable_app(
         &self,
         installed_app_id: InstalledAppId,
-        reason: DeactivationReason,
+        reason: DisabledAppReason,
     ) -> ConductorResult<()> {
         let mut conductor = self.conductor.write().await;
         let cell_ids_to_remove = conductor
-            .deactivate_app_in_db(installed_app_id, reason)
+            .disable_app_in_db(installed_app_id, reason)
             .await?;
         // MD: I'm not sure about this. We never add the cells back in after re-activating an app,
         //     so it seems either we shouldn't remove them here, or we should be sure to add them
         //     back in when re-activating.
         conductor.remove_cells(cell_ids_to_remove).await;
         Ok(())
+    }
+
+    async fn start_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<RunningApp> {
+        todo!()
+    }
+
+    async fn pause_app(
+        &self,
+        installed_app_id: InstalledAppId,
+        reason: PausedAppReason,
+    ) -> ConductorResult<()> {
+        todo!()
     }
 
     async fn uninstall_app(&self, installed_app_id: &InstalledAppId) -> ConductorResult<()> {

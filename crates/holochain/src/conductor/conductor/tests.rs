@@ -41,20 +41,20 @@ async fn can_update_state() {
 
     let cell_id = fake_cell_id(1);
     let installed_cell = InstalledCell::new(cell_id.clone(), "nick".to_string());
-    let app = InactiveApp::new_fresh(
+    let app = StoppedApp::new_fresh(
         InstalledAppCommon::new_legacy("fake app", vec![installed_cell]).unwrap(),
     );
 
     conductor
         .update_state(|mut state| {
-            state.inactive_apps.insert(app);
+            state.stopped_apps.insert(app);
             Ok(state)
         })
         .await
         .unwrap();
     let state = conductor.get_state().await.unwrap();
     assert_eq!(
-        state.inactive_apps.values().collect::<Vec<_>>()[0]
+        state.stopped_apps.values().collect::<Vec<_>>()[0]
             .all_cells()
             .collect::<Vec<_>>()
             .as_slice(),
@@ -95,8 +95,8 @@ async fn can_add_clone_cell_to_app() {
     conductor.register_phenotype(dna).await.unwrap();
     conductor
         .update_state(move |mut state| {
-            state.active_apps.insert(app1.clone().into());
-            state.active_apps.insert(app2.clone().into());
+            state.running_apps.insert(app1.clone().into());
+            state.running_apps.insert(app2.clone().into());
             Ok(state)
         })
         .await
@@ -117,7 +117,7 @@ async fn can_add_clone_cell_to_app() {
     let state = conductor.get_state().await.unwrap();
     assert_eq!(
         state
-            .active_apps
+            .running_apps
             .get("yes clone")
             .unwrap()
             .cloned_cells()
@@ -152,12 +152,12 @@ async fn app_ids_are_unique() {
     let app = InstalledAppCommon::new_legacy("id".to_string(), vec![installed_cell]).unwrap();
 
     conductor
-        .add_inactive_app_to_db(app.clone().into())
+        .add_stopped_app_to_db(app.clone().into())
         .await
         .unwrap();
 
     assert_matches!(
-        conductor.add_inactive_app_to_db(app.clone().into()).await,
+        conductor.add_stopped_app_to_db(app.clone().into()).await,
         Err(ConductorError::AppAlreadyInstalled(id))
         if id == "id".to_string()
     );
@@ -169,7 +169,7 @@ async fn app_ids_are_unique() {
         .unwrap();
 
     assert_matches!(
-        conductor.add_inactive_app_to_db(app.clone().into()).await,
+        conductor.add_stopped_app_to_db(app.clone().into()).await,
         Err(ConductorError::AppAlreadyInstalled(id))
         if id == "id".to_string()
     );
@@ -396,7 +396,7 @@ async fn test_uninstall_app() {
     assert_eq_retry_10s!(
         {
             let state = conductor.get_state_from_handle().await.unwrap();
-            (state.active_apps.len(), state.inactive_apps.len())
+            (state.running_apps.len(), state.stopped_apps.len())
         },
         (1, 0)
     );
@@ -407,7 +407,7 @@ async fn test_uninstall_app() {
     assert_eq_retry_10s!(
         {
             let state = conductor.get_state_from_handle().await.unwrap();
-            (state.active_apps.len(), state.inactive_apps.len())
+            (state.running_apps.len(), state.stopped_apps.len())
         },
         (0, 0)
     );
@@ -584,10 +584,10 @@ async fn test_reactivate_app() {
     let (conductor, app) = common_genesis_test_app(zome).await.unwrap();
 
     conductor
-        .deactivate_app("app".to_string(), DeactivationReason::Normal)
+        .disable_app("app".to_string(), DisabledAppReason::User)
         .await
         .unwrap();
-    conductor.activate_app("app".to_string()).await.unwrap();
+    conductor.enable_app("app".to_string()).await.unwrap();
     conductor.inner_handle().setup_cells().await.unwrap();
 
     let (_, cell) = app.into_tuple();
@@ -618,7 +618,7 @@ async fn test_cells_self_deactivate_on_validation_panic() {
     assert_eq_retry_10s!(
         {
             let state = conductor.get_state_from_handle().await.unwrap();
-            (state.active_apps.len(), state.inactive_apps.len())
+            (state.running_apps.len(), state.stopped_apps.len())
         },
         (0, 1)
     );
@@ -640,7 +640,7 @@ async fn test_cells_proceed_on_validation_error() {
     assert_eq_retry_10s!(
         {
             let state = conductor.get_state_from_handle().await.unwrap();
-            (state.active_apps.len(), state.inactive_apps.len())
+            (state.running_apps.len(), state.stopped_apps.len())
         },
         (1, 0)
     );
@@ -699,7 +699,7 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
     assert_eq_retry_10s!(
         {
             let state = conductor.get_state_from_handle().await.unwrap();
-            (state.active_apps.len(), state.inactive_apps.len())
+            (state.running_apps.len(), state.stopped_apps.len())
         },
         (1, 0)
     );
@@ -744,7 +744,7 @@ async fn test_apps_deactivate_on_panic_after_genesis() {
     assert_eq_retry_10s!(
         {
             let state = conductor.get_state_from_handle().await.unwrap();
-            (state.active_apps.len(), state.inactive_apps.len())
+            (state.running_apps.len(), state.stopped_apps.len())
         },
         (0, 1)
     );

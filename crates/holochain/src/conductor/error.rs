@@ -91,8 +91,8 @@ pub enum ConductorError {
     #[error("Tried to install an app using an already-used InstalledAppId: {0}")]
     AppAlreadyInstalled(InstalledAppId),
 
-    #[error("Tried to perform an operation on an app that was not active: {0}")]
-    AppNotActive(InstalledAppId),
+    #[error("Tried to perform an operation on an app that was not running: {0}")]
+    AppNotRunning(InstalledAppId),
 
     #[error(transparent)]
     HolochainP2pError(#[from] holochain_p2p::HolochainP2pError),

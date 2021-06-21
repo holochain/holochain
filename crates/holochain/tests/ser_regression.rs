@@ -195,7 +195,7 @@ pub async fn setup_app(
         .unwrap();
 
     conductor_handle
-        .activate_app("test app".to_string())
+        .enable_app("test app".to_string())
         .await
         .unwrap();
 

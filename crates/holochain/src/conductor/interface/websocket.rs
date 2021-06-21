@@ -248,7 +248,7 @@ pub mod test_utils {
             .unwrap();
 
         conductor_handle
-            .activate_app("test app".to_string())
+            .enable_app("test app".to_string())
             .await
             .unwrap();
 
@@ -346,7 +346,7 @@ pub mod test {
 
     async fn activate(conductor_handle: ConductorHandle) -> ConductorHandle {
         conductor_handle
-            .activate_app("test app".to_string())
+            .enable_app("test app".to_string())
             .await
             .unwrap();
 
@@ -476,7 +476,7 @@ pub mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn activate_app() {
+    async fn enable_disable_app() {
         observability::test_run().ok();
         let agent_key = fake_agent_pubkey_1();
         let mut dnas = Vec::new();
@@ -532,13 +532,13 @@ pub mod test {
         // Get the state
         let state: ConductorState = conductor_handle.get_state_from_handle().await.unwrap();
 
-        // Check it is not in inactive apps
-        let r = state.inactive_apps.get("test app");
+        // Check it is not in stopped apps
+        let r = state.stopped_apps.get("test app");
         assert_eq!(r, None);
 
-        // Check it is in active apps
+        // Check it is in running apps
         let cell_ids: HashSet<CellId> = state
-            .active_apps
+            .running_apps
             .get("test app")
             .unwrap()
             .all_cells()
@@ -553,11 +553,11 @@ pub mod test {
 
         assert_eq!(expected, cell_ids);
 
-        // Check that it is returned in get_app_info as active
+        // Check that it is returned in get_app_info as running
         let maybe_info = state.get_app_info(&"test app".to_string());
         if let Some(info) = maybe_info {
             assert_eq!(info.installed_app_id, "test app");
-            assert_matches!(info.status, InstalledAppStatus::Active);
+            assert_matches!(info.status, InstalledAppInfoStatus::Running);
         } else {
             assert!(false);
         }
@@ -582,13 +582,13 @@ pub mod test {
         // Get the state
         let state = conductor_handle.get_state_from_handle().await.unwrap();
 
-        // Check it's removed from active
-        let r = state.active_apps.get("test app");
+        // Check it's removed from running apps
+        let r = state.running_apps.get("test app");
         assert_eq!(r, None);
 
-        // Check it's added to inactive
+        // Check it's added to stopped apps
         let cell_ids: HashSet<CellId> = state
-            .inactive_apps
+            .stopped_apps
             .get("test app")
             .unwrap()
             .all_cells()
@@ -597,11 +597,11 @@ pub mod test {
 
         assert_eq!(expected, cell_ids);
 
-        // Check that it is returned in get_app_info as not active
+        // Check that it is returned in get_app_info as disabled
         let maybe_info = state.get_app_info(&"test app".to_string());
         if let Some(info) = maybe_info {
             assert_eq!(info.installed_app_id, "test app");
-            assert_matches!(info.status, InstalledAppStatus::Inactive { .. });
+            assert_matches!(info.status, InstalledAppInfoStatus::Disabled { .. });
         } else {
             assert!(false);
         }

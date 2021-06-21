@@ -519,7 +519,7 @@ where
         conductor_handle: ConductorHandle,
     ) -> ConductorResult<Vec<Result<Vec<(Cell, InitialQueueTriggers)>, CreateAppError>>> {
         // Only create the active apps
-        let active_apps = self.get_state().await?.active_apps;
+        let active_apps = self.get_state().await?.running_apps;
 
         // Data required to create apps
         let root_env_dir = self.root_env_dir.clone();
@@ -531,7 +531,7 @@ where
 
         // Closure for creating all cells in an app
         let tasks = active_apps.into_iter().map(
-            move |(installed_app_id, app): (InstalledAppId, ActiveApp)| {
+            move |(installed_app_id, app): (InstalledAppId, RunningApp)| {
                 // Clone data for async block
                 let root_env_dir = std::path::PathBuf::from(root_env_dir.clone());
                 let conductor_handle = conductor_handle.clone();
@@ -629,15 +629,15 @@ where
     }
 
     /// Register an app as inactive in the database
-    pub(super) async fn add_inactive_app_to_db(
+    pub(super) async fn add_stopped_app_to_db(
         &mut self,
         app: InstalledAppCommon,
-    ) -> ConductorResult<InactiveApp> {
-        let app = InactiveApp::new(app, DeactivationReason::NeverActivated);
+    ) -> ConductorResult<StoppedApp> {
+        let app = StoppedApp::new(app, StoppedAppReason::NeverStarted);
         let ret = app.clone();
         self.update_state(move |mut state| {
-            let is_active = state.active_apps.contains_key(app.installed_app_id());
-            let is_inactive = state.inactive_apps.insert(app.clone()).is_some();
+            let is_active = state.running_apps.contains_key(app.installed_app_id());
+            let is_inactive = state.stopped_apps.insert(app.clone()).is_some();
             if is_active || is_inactive {
                 Err(ConductorError::AppAlreadyInstalled(
                     app.installed_app_id().clone(),
@@ -654,15 +654,15 @@ where
     pub(super) async fn activate_app_in_db(
         &mut self,
         installed_app_id: InstalledAppId,
-    ) -> ConductorResult<ActiveApp> {
+    ) -> ConductorResult<RunningApp> {
         let (_, active_app) = self
             .update_state_prime(move |mut state| {
                 let app = state
-                    .inactive_apps
+                    .stopped_apps
                     .remove(&installed_app_id)
                     .ok_or_else(|| ConductorError::AppNotInstalled(installed_app_id.clone()))?;
                 let active_app = app.into_active();
-                state.active_apps.insert(active_app.clone());
+                state.running_apps.insert(active_app.clone());
                 Ok((state, active_app))
             })
             .await?;
@@ -670,26 +670,26 @@ where
     }
 
     /// Deactivate an app in the database
-    pub(super) async fn deactivate_app_in_db(
+    pub(super) async fn disable_app_in_db(
         &mut self,
         installed_app_id: InstalledAppId,
-        reason: DeactivationReason,
+        reason: DisabledAppReason,
     ) -> ConductorResult<Vec<CellId>> {
         let state = self
             .update_state({
                 let installed_app_id = installed_app_id.clone();
                 move |mut state| {
                     let app = state
-                        .active_apps
+                        .running_apps
                         .remove(&installed_app_id)
-                        .ok_or_else(|| ConductorError::AppNotActive(installed_app_id.clone()))?;
-                    state.inactive_apps.insert(app.into_inactive(reason));
+                        .ok_or_else(|| ConductorError::AppNotRunning(installed_app_id.clone()))?;
+                    state.stopped_apps.insert(app.into_stopped(reason.into()));
                     Ok(state)
                 }
             })
             .await?;
         Ok(state
-            .inactive_apps
+            .stopped_apps
             .get(&installed_app_id)
             .expect("This app was just put here")
             .clone()
@@ -707,8 +707,8 @@ where
             .update_state_prime({
                 let installed_app_id = installed_app_id.clone();
                 move |mut state| {
-                    let active = state.active_apps.remove(&installed_app_id);
-                    let inactive = state.inactive_apps.remove(&installed_app_id);
+                    let active = state.running_apps.remove(&installed_app_id);
+                    let inactive = state.stopped_apps.remove(&installed_app_id);
                     let cells = active
                         .map(|a| a.into_common())
                         .or_else(|| inactive.map(|a| a.into_common()))
@@ -745,7 +745,7 @@ where
         let dna_store = &self.dna_store;
         let (_, child_dna) = self
             .update_state_prime(move |mut state| {
-                if let Some(app) = state.active_apps.get_mut(installed_app_id) {
+                if let Some(app) = state.running_apps.get_mut(installed_app_id) {
                     let slot = app
                         .slots()
                         .get(slot_id)
@@ -757,7 +757,7 @@ where
                         .modify_phenotype(random_uid(), properties)?;
                     Ok((state, dna))
                 } else {
-                    Err(ConductorError::AppNotActive(installed_app_id.clone()))
+                    Err(ConductorError::AppNotRunning(installed_app_id.clone()))
                 }
             })
             .await?;
@@ -765,13 +765,13 @@ where
         self.register_phenotype(child_dna).await?;
         let (_, cell_id) = self
             .update_state_prime(|mut state| {
-                if let Some(app) = state.active_apps.get_mut(installed_app_id) {
+                if let Some(app) = state.running_apps.get_mut(installed_app_id) {
                     let agent_key = app.slot(slot_id)?.agent_key().to_owned();
                     let cell_id = CellId::new(child_dna_hash, agent_key);
                     app.add_clone(slot_id, cell_id.clone())?;
                     Ok((state, cell_id))
                 } else {
-                    Err(ConductorError::AppNotActive(installed_app_id.clone()))
+                    Err(ConductorError::AppNotRunning(installed_app_id.clone()))
                 }
             })
             .await?;
@@ -917,7 +917,7 @@ where
     }
 
     pub(super) async fn list_active_apps(&self) -> ConductorResult<Vec<InstalledAppId>> {
-        let active_apps = self.get_state().await?.active_apps;
+        let active_apps = self.get_state().await?.running_apps;
         Ok(active_apps.keys().cloned().collect())
     }
 
@@ -925,7 +925,7 @@ where
         &self,
         cell_id: &CellId,
     ) -> ConductorResult<HashSet<InstalledAppId>> {
-        let active_apps = self.get_state().await?.active_apps;
+        let active_apps = self.get_state().await?.running_apps;
         Ok(active_apps
             .iter()
             .filter(|(_, v)| v.all_cells().any(|i| i == cell_id))

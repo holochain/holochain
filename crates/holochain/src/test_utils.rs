@@ -248,10 +248,7 @@ pub async fn install_app(
         .await
         .unwrap();
 
-    conductor_handle
-        .activate_app(name.to_string())
-        .await
-        .unwrap();
+    conductor_handle.enable_app(name.to_string()).await.unwrap();
 
     let errors = conductor_handle.setup_cells().await.unwrap();
 
