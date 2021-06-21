@@ -377,12 +377,8 @@ mod tests {
         let test = KdTestHarness::start_test(config).await.unwrap();
 
         let from_agent = test
-            .nodes
-            .get(0)
-            .unwrap()
-            .local_agents
-            .get(1)
-            .unwrap()
+            .nodes[0]
+            .local_agents[1]
             .clone();
         let to_agent = test
             .nodes
