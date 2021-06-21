@@ -13,7 +13,7 @@ impl SimpleBloomMod {
             );
             let (mut maybe_outgoing, mut maybe_incoming) = self.inner.share_mut(|i, _| {
                 let maybe_outgoing = if !i.outgoing.is_empty()
-                    && proc_count_elapsed(i.last_outgoing).as_millis() as u64
+                    && proc_count_us_elapsed(i.last_outgoing_us).as_millis() as u64
                         > self.send_interval_ms
                 {
                     let (cert, how, gossip) = i.outgoing.remove(0);
@@ -22,7 +22,7 @@ impl SimpleBloomMod {
                     // so we don't accidentally double up if sending
                     // is slow... we'll set this more reasonably
                     // when we get a success or failure below.
-                    i.last_outgoing = proc_count_now_us()
+                    i.last_outgoing_us = proc_count_now_us()
                         + (self.tuning_params.tx2_implicit_timeout_ms as i64 * 1000);
 
                     Some((cert, how, gossip))
@@ -38,7 +38,7 @@ impl SimpleBloomMod {
             })?;
 
             let will_break = (maybe_outgoing.is_none() && maybe_incoming.is_none())
-                || proc_count_elapsed(loop_start).as_millis() as u32
+                || proc_count_us_elapsed(loop_start).as_millis() as u32
                     > tuning_params.gossip_loop_iteration_delay_ms;
 
             if let Some(outgoing) = maybe_outgoing.take() {

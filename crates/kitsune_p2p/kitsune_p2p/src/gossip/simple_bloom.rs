@@ -152,12 +152,12 @@ pub(crate) struct SimpleBloomModInner {
     /// Metrics to be recorded at the end of this round of gossip
     pending_metrics: Vec<(Vec<Arc<KitsuneAgent>>, NodeInfo)>,
 
-    last_initiate_check: ProcCountMicros,
+    last_initiate_check_us: ProcCountMicros,
     initiate_tgt: Option<GossipTgt>,
 
     incoming: Vec<(Tx2ConHnd<wire::Wire>, GossipWire)>,
 
-    last_outgoing: ProcCountMicros,
+    last_outgoing_us: ProcCountMicros,
     outgoing: Vec<(GossipTgt, HowToConnect, GossipWire)>,
 }
 
@@ -175,12 +175,12 @@ impl SimpleBloomModInner {
 
             pending_metrics: Vec::new(),
 
-            last_initiate_check: old_us,
+            last_initiate_check_us: old_us,
             initiate_tgt: None,
 
             incoming: Vec::new(),
 
-            last_outgoing: old_us,
+            last_outgoing_us: old_us,
             outgoing: Vec::new(),
         }
     }

@@ -34,7 +34,7 @@ pub fn proc_count_now_us() -> ProcCountMicros {
 
 /// Get the elapsed process count duration from a captured `ProcCount` to now.
 /// If the duration would be negative, this fn returns a zero Duration.
-pub fn proc_count_elapsed(pc: ProcCountMicros) -> std::time::Duration {
+pub fn proc_count_us_elapsed(pc: ProcCountMicros) -> std::time::Duration {
     let dur = proc_count_now_us() - pc;
     let dur = if dur < 0 { 0 } else { dur as u64 };
     std::time::Duration::from_micros(dur)

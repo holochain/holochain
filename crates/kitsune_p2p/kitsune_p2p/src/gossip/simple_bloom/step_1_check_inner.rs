@@ -49,7 +49,7 @@ impl SimpleBloomMod {
         // TODO: clean up ugly locking here
         let needs_sync = self.inner.share_mut(|i, _| {
             Ok(i.initiate_tgt.is_none()
-                && proc_count_elapsed(i.last_initiate_check).as_millis() as u32
+                && proc_count_us_elapsed(i.last_initiate_check_us).as_millis() as u32
                     > self.tuning_params.gossip_loop_iteration_delay_ms)
         })?;
         if needs_sync {
