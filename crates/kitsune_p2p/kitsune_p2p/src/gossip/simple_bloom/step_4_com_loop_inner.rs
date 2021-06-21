@@ -57,13 +57,13 @@ impl SimpleBloomMod {
                 {
                     tracing::warn!("failed to send outgoing: {:?} {:?}", endpoint, e);
                     self.inner.share_mut(move |i, _| {
-                        i.last_outgoing = proc_count_now_us();
+                        i.last_outgoing_us = proc_count_now_us();
                         i.record_pending_metric(agents, true);
                         Ok(())
                     })?;
                 } else {
                     self.inner.share_mut(move |i, _| {
-                        i.last_outgoing = proc_count_now_us();
+                        i.last_outgoing_us = proc_count_now_us();
                         i.record_pending_metric(agents, false);
                         Ok(())
                     })?;
