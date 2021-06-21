@@ -502,7 +502,7 @@ impl Space {
 
                     match super::bootstrap::random(
                         bootstrap_service.clone(),
-                        super::bootstrap::RandomQuery {
+                        kitsune_p2p_types::bootstrap::RandomQuery {
                             space: space_c.clone(),
                             limit: 8.into(),
                         },
@@ -519,13 +519,19 @@ impl Space {
                                 if let Ok(is_local) = i_s_c.is_agent_local(agent.clone()).await {
                                     if !is_local {
                                         // we got a result - let's add it to our store for the future
-                                        let _ = evt_s_c
+                                        if let Err(err) = evt_s_c
                                             .put_agent_info_signed(PutAgentInfoSignedEvt {
                                                 space: space_c.clone(),
                                                 agent,
                                                 agent_info_signed: item.clone(),
                                             })
-                                            .await;
+                                            .await
+                                        {
+                                            tracing::error!(
+                                                ?err,
+                                                "error storing bootstrap agent_info"
+                                            );
+                                        }
                                     }
                                 }
                             }
