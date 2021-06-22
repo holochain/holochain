@@ -519,7 +519,7 @@ pub mod test {
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AdminResponse::AppActivated);
+            assert_matches!(response, AdminResponse::AppActivated(_));
             async { Ok(()) }.boxed().into()
         };
         let respond = Respond::Request(Box::new(respond));
@@ -816,12 +816,7 @@ pub mod test {
     fn to_key(r: Vec<AgentInfoSigned>) -> Vec<(Arc<KitsuneSpace>, Arc<KitsuneAgent>)> {
         let mut results = r
             .into_iter()
-            .map(|a| {
-                (
-                    Arc::new(KitsuneSpace::try_from(&a).unwrap()),
-                    Arc::new(KitsuneAgent::try_from(a).unwrap()),
-                )
-            })
+            .map(|a| (a.space.clone(), a.agent.clone()))
             .collect::<Vec<_>>();
         results.sort();
         results

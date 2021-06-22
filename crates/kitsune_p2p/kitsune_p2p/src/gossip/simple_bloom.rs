@@ -41,9 +41,9 @@ impl MetaOpData {
         match self {
             MetaOpData::Op(h, d) => (**h).len() + d.len(),
             MetaOpData::Agent(a) => {
-                let h = (**a.as_agent_ref()).len();
-                let s = (**a.as_signature_ref()).len();
-                let d = a.as_agent_info_ref().len();
+                let h = (**a.agent).len();
+                let s = (**a.signature).len();
+                let d = a.encoded_bytes.len();
                 h + s + d
             }
         }
@@ -52,11 +52,7 @@ impl MetaOpData {
     fn key(&self) -> Arc<MetaOpKey> {
         let key = match self {
             MetaOpData::Op(key, _) => MetaOpKey::Op(key.clone()),
-            MetaOpData::Agent(s) => {
-                use std::convert::TryInto;
-                let info: crate::agent_store::AgentInfo = s.try_into().unwrap();
-                MetaOpKey::Agent(Arc::new(s.as_agent_ref().clone()), info.signed_at_ms())
-            }
+            MetaOpData::Agent(s) => MetaOpKey::Agent(s.agent.clone(), s.signed_at_ms),
         };
         Arc::new(key)
     }
@@ -156,21 +152,20 @@ pub(crate) struct SimpleBloomModInner {
     /// Metrics to be recorded at the end of this round of gossip
     pending_metrics: Vec<(Vec<Arc<KitsuneAgent>>, NodeInfo)>,
 
-    last_initiate_check: std::time::Instant,
+    last_initiate_check_us: ProcCountMicros,
     initiate_tgt: Option<GossipTgt>,
 
     incoming: Vec<(Tx2ConHnd<wire::Wire>, GossipWire)>,
 
-    last_outgoing: std::time::Instant,
+    last_outgoing_us: ProcCountMicros,
     outgoing: Vec<(GossipTgt, HowToConnect, GossipWire)>,
 }
 
 impl SimpleBloomModInner {
     pub fn new() -> Self {
         // pick an old instant for initialization
-        let old = std::time::Instant::now()
-            .checked_sub(std::time::Duration::from_secs(60 * 60 * 24))
-            .unwrap();
+        const ONE_DAY_MICROS: i64 = 1000 * 1000 * 60 * 60 * 24;
+        let old_us = proc_count_now_us() - ONE_DAY_MICROS;
 
         Self {
             local_agents: HashSet::new(),
@@ -180,12 +175,12 @@ impl SimpleBloomModInner {
 
             pending_metrics: Vec::new(),
 
-            last_initiate_check: old,
+            last_initiate_check_us: old_us,
             initiate_tgt: None,
 
             incoming: Vec::new(),
 
-            last_outgoing: old,
+            last_outgoing_us: old_us,
             outgoing: Vec::new(),
         }
     }
