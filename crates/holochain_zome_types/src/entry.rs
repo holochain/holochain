@@ -100,6 +100,7 @@ pub enum Entry {
     Agent(AgentPubKey),
     /// The application entry data for entries that aren't system created entries
     App(AppEntryBytes),
+    CounterSign(Vec<AgentPubKey>, AppEntryBytes),
     /// The capability claim system entry which allows committing a granted permission
     /// for later use
     CapClaim(CapClaimEntry),
