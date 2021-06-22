@@ -38,7 +38,7 @@ pub(crate) static DATABASE_HANDLES: Lazy<CHashMap<PathBuf, DbWrite>> = Lazy::new
     CHashMap::new()
 });
 
-static R2D2_POOL: Lazy<Arc<ScheduledThreadPool>> = Lazy::new(|| {
+static R2D2_THREADPOOL: Lazy<Arc<ScheduledThreadPool>> = Lazy::new(|| {
     let t = ScheduledThreadPool::new(1);
     Arc::new(t)
 });
@@ -57,7 +57,7 @@ pub(crate) fn new_connection_pool(path: &Path, kind: DbKind) -> ConnectionPool {
         .min_idle(Some(0))
         // Close connections after 30-60 seconds of idle time
         .idle_timeout(Some(Duration::from_secs(30)))
-        .thread_pool(R2D2_POOL.clone())
+        .thread_pool(R2D2_THREADPOOL.clone())
         .connection_customizer(customizer)
         .build(manager)
         .unwrap()
