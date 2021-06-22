@@ -2004,6 +2004,7 @@ dependencies = [
  "rand 0.7.3",
  "rmp-serde",
  "rusqlite",
+ "scheduled-thread-pool",
  "serde",
  "serde_derive",
  "shrinkwraprs",
