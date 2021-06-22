@@ -3,7 +3,7 @@ use kitsune_p2p_types::codec::*;
 
 impl SimpleBloomMod {
     pub(crate) async fn step_4_com_loop_inner(&self) -> KitsuneResult<()> {
-        let loop_start = std::time::Instant::now();
+        let loop_start = proc_count_now_us();
 
         loop {
             let (tuning_params, space, ep_hnd) = (
@@ -11,40 +11,34 @@ impl SimpleBloomMod {
                 self.space.clone(),
                 self.ep_hnd.clone(),
             );
-            let (mut maybe_outgoing, mut maybe_incoming) =
-                self.inner.share_mut(|i, _| {
-                    let maybe_outgoing = if !i.outgoing.is_empty()
-                        && i.last_outgoing.elapsed().as_millis() as u64 > self.send_interval_ms
-                    {
-                        let (cert, how, gossip) = i.outgoing.remove(0);
+            let (mut maybe_outgoing, mut maybe_incoming) = self.inner.share_mut(|i, _| {
+                let maybe_outgoing = if !i.outgoing.is_empty()
+                    && proc_count_us_elapsed(i.last_outgoing_us).as_millis() as u64
+                        > self.send_interval_ms
+                {
+                    let (cert, how, gossip) = i.outgoing.remove(0);
 
-                        // set this to a time in the future
-                        // so we don't accidentally double up if sending
-                        // is slow... we'll set this more reasonably
-                        // when we get a success or failure below.
-                        i.last_outgoing = std::time::Instant::now()
-                            .checked_add(std::time::Duration::from_millis(
-                                self.tuning_params.tx2_implicit_timeout_ms as u64,
-                            ))
-                            .expect("Congratulations on running holochain near the heat death of the universe :)");
+                    // set this to a time in the future
+                    // so we don't accidentally double up if sending
+                    // is slow... we'll set this more reasonably
+                    // when we get a success or failure below.
+                    i.last_outgoing_us = proc_count_now_us()
+                        + (self.tuning_params.tx2_implicit_timeout_ms as i64 * 1000);
 
-                        Some((cert, how, gossip))
-                    } else {
-                        None
-                    };
-                    let maybe_incoming = if !i.incoming.is_empty() {
-                        Some(i.incoming.remove(0))
-                    } else {
-                        None
-                    };
-                    Ok((
-                        maybe_outgoing,
-                        maybe_incoming,
-                    ))
-                })?;
+                    Some((cert, how, gossip))
+                } else {
+                    None
+                };
+                let maybe_incoming = if !i.incoming.is_empty() {
+                    Some(i.incoming.remove(0))
+                } else {
+                    None
+                };
+                Ok((maybe_outgoing, maybe_incoming))
+            })?;
 
             let will_break = (maybe_outgoing.is_none() && maybe_incoming.is_none())
-                || loop_start.elapsed().as_millis() as u32
+                || proc_count_us_elapsed(loop_start).as_millis() as u32
                     > tuning_params.gossip_loop_iteration_delay_ms;
 
             if let Some(outgoing) = maybe_outgoing.take() {
@@ -63,13 +57,13 @@ impl SimpleBloomMod {
                 {
                     tracing::warn!("failed to send outgoing: {:?} {:?}", endpoint, e);
                     self.inner.share_mut(move |i, _| {
-                        i.last_outgoing = std::time::Instant::now();
+                        i.last_outgoing_us = proc_count_now_us();
                         i.record_pending_metric(agents, true);
                         Ok(())
                     })?;
                 } else {
                     self.inner.share_mut(move |i, _| {
-                        i.last_outgoing = std::time::Instant::now();
+                        i.last_outgoing_us = proc_count_now_us();
                         i.record_pending_metric(agents, false);
                         Ok(())
                     })?;
@@ -346,29 +340,26 @@ fn pick_url_for_cert(inner: &Share<SimpleBloomModInner>, cert: &Tx2Cert) -> Kits
         let mut out_url = None;
         for data in i.local_data_map.values() {
             if let MetaOpData::Agent(agent_info_signed) = &**data {
-                use std::convert::TryFrom;
-                if let Ok(agent_info) = crate::agent_store::AgentInfo::try_from(agent_info_signed) {
-                    if let Some(url) = agent_info.as_urls_ref().get(0) {
-                        if let Ok(purl) = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()) {
-                            if &Tx2Cert::from(purl.digest()) != cert {
-                                continue;
-                            }
-
-                            if agent_info.signed_at_ms() < most_recent {
-                                continue;
-                            }
-                            most_recent = agent_info.signed_at_ms();
-
-                            let url = TxUrl::from(url.as_str());
-
-                            if let Some(out_url) = out_url {
-                                if out_url != url {
-                                    tracing::warn!(?cert, %out_url, %url, "url mismatch for tgt cert");
-                                }
-                            }
-
-                            out_url = Some(url);
+                if let Some(url) = agent_info_signed.url_list.get(0) {
+                    if let Ok(purl) = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()) {
+                        if &Tx2Cert::from(purl.digest()) != cert {
+                            continue;
                         }
+
+                        if agent_info_signed.signed_at_ms < most_recent {
+                            continue;
+                        }
+                        most_recent = agent_info_signed.signed_at_ms;
+
+                        let url = TxUrl::from(url.as_str());
+
+                        if let Some(out_url) = out_url {
+                            if out_url != url {
+                                tracing::warn!(?cert, %out_url, %url, "url mismatch for tgt cert");
+                            }
+                        }
+
+                        out_url = Some(url);
                     }
                 }
             }
