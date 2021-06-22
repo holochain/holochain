@@ -301,7 +301,7 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
             msg!("Cell Ids: {:?}", cells);
         }
         AdminRequestCli::ListActiveApps => {
-            let apps = list_active_apps(cmd).await?;
+            let apps = list_running_apps(cmd).await?;
             msg!("Active Apps: {:?}", apps);
         }
         AdminRequestCli::ListApps(args) => {
@@ -538,7 +538,7 @@ pub async fn list_cell_ids(cmd: &mut CmdRunner) -> anyhow::Result<Vec<CellId>> {
 }
 
 /// Calls [`AdminRequest::ListActiveApps`].
-pub async fn list_active_apps(cmd: &mut CmdRunner) -> anyhow::Result<Vec<String>> {
+pub async fn list_running_apps(cmd: &mut CmdRunner) -> anyhow::Result<Vec<String>> {
     let resp = cmd.command(AdminRequest::ListActiveApps).await?;
     Ok(expect_match!(resp => AdminResponse::ActiveAppsListed, "Failed to list active apps"))
 }

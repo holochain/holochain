@@ -225,7 +225,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn list_cell_ids(&self) -> ConductorResult<Vec<CellId>>;
 
     /// List Active AppIds
-    async fn list_active_apps(&self) -> ConductorResult<Vec<InstalledAppId>>;
+    async fn list_running_apps(&self) -> ConductorResult<Vec<InstalledAppId>>;
 
     /// List Apps with their information
     async fn list_apps(
@@ -234,7 +234,7 @@ pub trait ConductorHandleT: Send + Sync {
     ) -> ConductorResult<Vec<InstalledAppInfo>>;
 
     /// Get the IDs of all active installed Apps which use this Cell
-    async fn list_active_apps_for_cell_id(
+    async fn list_running_apps_for_cell_id(
         &self,
         cell_id: &CellId,
     ) -> ConductorResult<HashSet<InstalledAppId>>;
@@ -710,8 +710,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self.conductor.read().await.list_cell_ids().await
     }
 
-    async fn list_active_apps(&self) -> ConductorResult<Vec<InstalledAppId>> {
-        self.conductor.read().await.list_active_apps().await
+    async fn list_running_apps(&self) -> ConductorResult<Vec<InstalledAppId>> {
+        self.conductor.read().await.list_running_apps().await
     }
 
     async fn list_apps(
@@ -721,14 +721,14 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self.conductor.read().await.list_apps(status_filter).await
     }
 
-    async fn list_active_apps_for_cell_id(
+    async fn list_running_apps_for_cell_id(
         &self,
         cell_id: &CellId,
     ) -> ConductorResult<HashSet<InstalledAppId>> {
         self.conductor
             .read()
             .await
-            .list_active_apps_for_cell_id(cell_id)
+            .list_running_apps_for_cell_id(cell_id)
             .await
     }
 

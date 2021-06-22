@@ -219,7 +219,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     "AdminRequest::ListEnabledApps is deprecated, use AdminRequest::ListApps (TODO: update conductor-api)"
                 );
 
-                let app_ids = self.conductor_handle.list_active_apps().await?;
+                let app_ids = self.conductor_handle.list_running_apps().await?;
                 Ok(AdminResponse::ActiveAppsListed(app_ids))
             }
             ListApps { status_filter } => {

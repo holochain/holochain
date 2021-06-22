@@ -221,7 +221,7 @@ async fn invalid_cell() -> anyhow::Result<()> {
 
     tracing::debug!(dnas = ?conductor.list_dnas().await.unwrap());
     tracing::debug!(cell_ids = ?conductor.list_cell_ids().await.unwrap());
-    tracing::debug!(apps = ?conductor.list_active_apps().await.unwrap());
+    tracing::debug!(apps = ?conductor.list_running_apps().await.unwrap());
 
     display_agent_infos(&conductor).await;
 

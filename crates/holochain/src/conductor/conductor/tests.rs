@@ -297,7 +297,7 @@ async fn proxy_tls_inner(
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_list_active_apps_for_cell_id() {
+async fn test_list_running_apps_for_cell_id() {
     observability::test_run().ok();
 
     let mk_dna = |name| async move {
@@ -330,7 +330,7 @@ async fn test_list_active_apps_for_cell_id() {
 
     let list_apps = |conductor: ConductorHandle, cell: SweetCell| async move {
         conductor
-            .list_active_apps_for_cell_id(cell.cell_id())
+            .list_running_apps_for_cell_id(cell.cell_id())
             .await
             .unwrap()
     };
@@ -424,7 +424,7 @@ async fn test_setup_cells_idempotency() {
     conductor.inner_handle().setup_cells().await.unwrap();
 
     // - Ensure that the app is active
-    assert_eq_retry_10s!(conductor.list_active_apps().await.unwrap().len(), 1);
+    assert_eq_retry_10s!(conductor.list_running_apps().await.unwrap().len(), 1);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -636,7 +636,7 @@ async fn test_reactivate_app() {
 
     // - Ensure that the app is active
 
-    assert_eq_retry_10s!(conductor.list_active_apps().await.unwrap().len(), 1);
+    assert_eq_retry_10s!(conductor.list_running_apps().await.unwrap().len(), 1);
     let inactive_apps = conductor
         .list_apps(Some(AppStatusFilter::Inactive))
         .await

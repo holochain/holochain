@@ -198,7 +198,7 @@ async fn run(
                 Some(TaskOutcome::UninstallApp(cell_id, error, context)) => {
                     // TODO: do we need this anymore, since apps aren't installed if they don't pass genesis?
                     tracing::error!("About to uninstall apps");
-                    let app_ids = conductor.list_active_apps_for_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
+                    let app_ids = conductor.list_running_apps_for_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
                     tracing::error!(
                         "UNINSTALLING the following apps due to an unrecoverable error during genesis: {:?}\nError: {:?}\nContext: {}",
                         app_ids,
@@ -212,7 +212,7 @@ async fn run(
                 },
                 Some(TaskOutcome::DeactivateApps(cell_id, error, context)) => {
                     tracing::error!("About to automatically stop apps");
-                    let app_ids = conductor.list_active_apps_for_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
+                    let app_ids = conductor.list_running_apps_for_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
                     if todo!("Distinguish between recoverable and unrecoverable errors") {
                         tracing::error!(
                             "PAUSING the following apps due to a recoverable error: {:?}\nError: {:?}\nContext: {}",

@@ -151,8 +151,9 @@ impl From<&InstalledApp> for InstalledAppInfo {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// A flatter, more API-friendly representation of [`InstalledAppStatus`]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[serde(rename_all = "snake_case")]
 pub enum InstalledAppInfoStatus {
     NeverStarted,
     Paused { reason: PausedAppReason },
@@ -161,7 +162,40 @@ pub enum InstalledAppInfoStatus {
 }
 
 impl From<InstalledAppStatus> for InstalledAppInfoStatus {
-    fn from(_: InstalledAppStatus) -> Self {
-        todo!()
+    fn from(i: InstalledAppStatus) -> Self {
+        match i {
+            InstalledAppStatus::Running => InstalledAppInfoStatus::Running,
+            InstalledAppStatus::Stopped(s) => match s {
+                StoppedAppReason::Disabled(reason) => InstalledAppInfoStatus::Disabled { reason },
+                StoppedAppReason::Paused(reason) => InstalledAppInfoStatus::Paused { reason },
+                StoppedAppReason::NeverStarted => InstalledAppInfoStatus::NeverStarted,
+            },
+        }
     }
+}
+
+#[test]
+fn status_serialization() {
+    use kitsune_p2p::dependencies::kitsune_p2p_types::dependencies::serde_json;
+
+    let status: InstalledAppInfoStatus = InstalledAppStatus::Stopped(StoppedAppReason::Disabled(
+        DisabledAppReason::Error("because".into()),
+    ))
+    .into();
+
+    assert_eq!(serde_json::to_string(&status).unwrap(), "{\"disabled\":{\"reason\":{\"error\":\"because\"}}}");
+
+    let status: InstalledAppInfoStatus = InstalledAppStatus::Stopped(StoppedAppReason::Paused(
+        PausedAppReason::Error("because".into()),
+    ))
+    .into();
+
+    assert_eq!(serde_json::to_string(&status).unwrap(), "{\"paused\":{\"reason\":{\"error\":\"because\"}}}");
+
+    let status: InstalledAppInfoStatus = InstalledAppStatus::Stopped(StoppedAppReason::Paused(
+        PausedAppReason::User,
+    ))
+    .into();
+
+    assert_eq!(serde_json::to_string(&status).unwrap(), "{\"paused\":{\"reason\":\"user\"}}");
 }

@@ -578,8 +578,9 @@ pub enum StoppedAppReason {
     Disabled(DisabledAppReason),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// The reason for an app being in a Paused state.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[serde(rename_all = "snake_case")]
 pub enum PausedAppReason {
     /// The pause was user-initiated
     User,
@@ -587,8 +588,9 @@ pub enum PausedAppReason {
     Error(String),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// The reason for an app being in a Disabled state.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[serde(rename_all = "snake_case")]
 pub enum DisabledAppReason {
     /// The disabling was user-initiated
     User,
@@ -716,17 +718,6 @@ mod tests {
         assert_eq!(
             app.cloned_cells().collect::<HashSet<_>>(),
             app.all_cells().collect::<HashSet<_>>()
-        );
-    }
-
-    #[test]
-    fn status_serialization() {
-        let status = todo!();
-
-        let json = serde_json::to_string(&status).unwrap();
-        assert_eq!(
-            json,
-            "{\"inactive\":{\"reason\":{\"quarantined\":{\"error\":\"because\"}}}}"
         );
     }
 }
