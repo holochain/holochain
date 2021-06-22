@@ -34,8 +34,7 @@ pub fn must_get_entry<'a>(
                 race_timeout_ms: None,
                 // Never redirect as the returned entry must always match the hash.
                 follow_redirects: false,
-                // Ignore deletes.
-                all_live_headers_with_metadata: true,
+                all_live_headers_with_metadata: false,
                 // Redundant with retrieve_entry internals.
                 request_type: GetRequest::Pending,
             })
