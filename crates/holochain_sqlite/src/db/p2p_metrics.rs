@@ -58,16 +58,14 @@ pub fn query_metrics(
     Ok(match query {
         MetricQuery::LastSync { agent } => {
             let agent_bytes: &[u8] = agent.as_ref();
-            let timestamp: Option<i64> = txn
-                .query_row(
-                    sql_p2p_metrics::QUERY_LAST_SYNC,
-                    named_params! {
-                        ":agent": agent_bytes,
-                        ":kind": MetricKind::QuickGossip.to_string(),
-                    },
-                    |row| row.get(0),
-                )
-                .optional()?;
+            let timestamp: Option<i64> = txn.query_row(
+                sql_p2p_metrics::QUERY_LAST_SYNC,
+                named_params! {
+                    ":agent": agent_bytes,
+                    ":kind": MetricKind::QuickGossip.to_string(),
+                },
+                |row| row.get(0),
+            )?;
             let time = match timestamp {
                 Some(t) => Some(time_from_micros(t)?),
                 None => None,
