@@ -130,6 +130,17 @@ pub enum AdminRequest {
     /// [`AdminResponse::ActiveAppsListed`]: enum.AdminResponse.html#variant.ActiveAppsListed
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
     ListActiveApps,
+    /// List the ids of the Apps that are installed in the conductor, returning their information.
+    /// If `status_filter` is `Some(_)`, it will return only the `Apps` with the specified status
+    ///
+    /// Will be responded to with an [`AdminResponse::AppsListed`]
+    /// or an [`AdminResponse::Error`]
+    ///
+    /// [`AdminResponse::AppsListed`]: enum.AdminResponse.html#variant.AppsListed
+    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
+    ListApps {
+        status_filter: Option<AppStatusFilter>,
+    },
     /// Changes the `App` specified by argument `installed_app_id` from an inactive state to an active state in the conductor,
     /// meaning that Zome calls can now be made and the `App` will be loaded on a reboot of the conductor.
     /// It is likely to want to call this after calling [`AdminRequest::InstallApp`], since a freshly
@@ -310,6 +321,13 @@ pub enum AdminResponse {
     /// [`AdminRequest::ListActiveApps`]: enum.AdminRequest.html#variant.ListActiveApps
     ActiveAppsListed(Vec<InstalledAppId>),
 
+    /// The succesful response to an [`AdminRequest::ListApps`].
+    ///
+    /// Contains a list of the `InstalledAppInfo` of the installed `Apps` in the conductor
+    ///
+    /// [`AdminRequest::ListApps`]: enum.AdminRequest.html#variant.ListApps
+    AppsListed(Vec<InstalledAppInfo>),
+
     /// The succesful response to an [`AdminRequest::AttachAppInterface`].
     ///
     /// `AppInterfaceApi` successfully attached.
@@ -330,7 +348,7 @@ pub enum AdminResponse {
     /// It means the `App` was activated successfully
     ///
     /// [`AdminRequest::ActivateApp`]: enum.AdminRequest.html#variant.ActivateApp
-    AppActivated,
+    AppActivated(InstalledAppInfo),
 
     /// The succesful response to an [`AdminRequest::DeactivateApp`].
     ///
@@ -392,4 +410,11 @@ impl ExternalApiWireError {
         // this version intended for users.
         ExternalApiWireError::InternalError(e.to_string())
     }
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, Clone)]
+// Filter to get either only active or only inactive apps with `ListApps`
+pub enum AppStatusFilter {
+    Active,
+    Inactive,
 }
