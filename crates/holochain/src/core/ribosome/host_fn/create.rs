@@ -5,7 +5,6 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_wasmer_host::prelude::WasmError;
 
-use holo_hash::HasHash;
 use holochain_types::prelude::*;
 use std::sync::Arc;
 
@@ -17,9 +16,8 @@ pub fn create<'a>(
     input: EntryWithDefId,
 ) -> Result<HeaderHash, WasmError> {
     // build the entry hash
-    let async_entry = AsRef::<Entry>::as_ref(&input).to_owned();
     let entry_hash =
-        holochain_zome_types::entry::EntryHashed::from_content_sync(async_entry).into_hash();
+    EntryHash::with_data_sync(AsRef::<Entry>::as_ref(&input));
 
     // extract the zome position
     let header_zome_id = ribosome
