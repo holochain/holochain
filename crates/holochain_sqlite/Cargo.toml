@@ -2,7 +2,7 @@
 name = "holochain_sqlite"
 version = "0.0.1"
 description = "Abstractions for persistence of Holochain state via SQLite"
-license-file = "LICENSE_CAL-1.0"
+license-file = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://github.com/holochain/holochain"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
@@ -20,7 +20,7 @@ fallible-iterator = "0.2.0"
 failure = "0.1.6"
 fixt = { version = "^0.0.2-alpha.1", path = "../fixt" }
 futures = "0.3.1"
-holo_hash = { path = "../holo_hash", features = ["rusqlite"] }
+holo_hash = { path = "../holo_hash", features = ["rusqlite"], version = "0.0.2-alpha.1" }
 holochain_serialized_bytes = "=0.0.50"
 holochain_zome_types = { version = "^0.0.2-alpha.1", path = "../holochain_zome_types" }
 kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p/kitsune_p2p" }
