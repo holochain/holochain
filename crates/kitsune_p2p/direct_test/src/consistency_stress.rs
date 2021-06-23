@@ -59,7 +59,7 @@ pub enum Progress {
     /// An op consistency marker has been reached
     OpConsistent {
         /// the number of ops that were synced in this round
-        target_op_count: usize,
+        new_ops_added_count: usize,
 
         /// the total number of ops that all agents know about
         total_op_count: usize,
@@ -88,6 +88,8 @@ pub fn run(
     (p_recv, shutdown)
 }
 
+// -- private -- //
+
 async fn test(
     node_count: usize,
     agents_per_node: usize,
@@ -114,6 +116,8 @@ async fn test(
             .unwrap();
         (root, app_entry)
     };
+
+    let app_entry_hash = app_entry.hash().clone();
 
     #[allow(dead_code)]
     struct TestNode {
@@ -179,14 +183,15 @@ async fn test(
         .await
         .unwrap();
 
+    // this loop waits for agent info to be synced
     loop {
-        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
         let target_agent_count = node_count * agents_per_node;
         let mut avg_agent_count = 0;
 
         for node in nodes.iter() {
-            avg_agent_count *= node
+            avg_agent_count += node
                 .kdirect
                 .get_persist()
                 .query_agent_info(root.clone())
@@ -195,6 +200,16 @@ async fn test(
                 .len();
         }
         avg_agent_count /= nodes.len();
+
+        if avg_agent_count >= target_agent_count {
+            p_send
+                .send(Progress::AgentConsistent {
+                    agent_count: avg_agent_count,
+                })
+                .await
+                .unwrap();
+            break;
+        }
 
         let target_total_op_count = 0;
         let avg_total_op_count = 0;
@@ -209,6 +224,98 @@ async fn test(
             .await
             .unwrap();
     }
+
+    let mut target_total_op_count = 0;
+
+    // this loop publishes ops, and waits for them to be synced
+    loop {
+        for node in nodes.iter() {
+            for agent in node.agents.iter() {
+                node.kdhnd
+                    .entry_author(
+                        root.clone(),
+                        agent.clone(),
+                        KdEntryContent {
+                            kind: "u.foo".to_string(),
+                            parent: app_entry_hash.clone(),
+                            author: agent.clone(),
+                            verify: "".to_string(),
+                            data: serde_json::json!({
+                                "nonce": std::time::SystemTime::now()
+                                    .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                                    .unwrap()
+                                    .as_secs_f64(),
+                            }),
+                        },
+                        vec![].into_boxed_slice().into(),
+                    )
+                    .await
+                    .unwrap();
+                target_total_op_count += 1;
+            }
+        }
+
+        // this loop waits for the target op count to reach consistency
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+
+            let target_agent_count = node_count * agents_per_node;
+            let mut avg_agent_count = 0;
+
+            for node in nodes.iter() {
+                avg_agent_count += node
+                    .kdirect
+                    .get_persist()
+                    .query_agent_info(root.clone())
+                    .await
+                    .unwrap()
+                    .len();
+            }
+            avg_agent_count /= nodes.len();
+
+            let mut avg_total_op_count = 0;
+
+            for node in nodes.iter() {
+                for agent in node.agents.iter() {
+                    avg_total_op_count += node
+                        .kdirect
+                        .get_persist()
+                        .query_entries(
+                            root.clone(),
+                            agent.clone(),
+                            f32::MIN,
+                            f32::MAX,
+                            DhtArc::new(0, u32::MAX),
+                        )
+                        .await
+                        .unwrap()
+                        .len();
+                }
+            }
+            avg_total_op_count /= target_agent_count;
+
+            if avg_total_op_count >= target_total_op_count {
+                p_send
+                    .send(Progress::OpConsistent {
+                        new_ops_added_count: target_agent_count,
+                        total_op_count: avg_total_op_count,
+                    })
+                    .await
+                    .unwrap();
+                break;
+            }
+
+            p_send
+                .send(Progress::InterimState {
+                    target_agent_count,
+                    avg_agent_count,
+                    target_total_op_count,
+                    avg_total_op_count,
+                })
+                .await
+                .unwrap();
+        }
+    }
 }
 
 #[cfg(test)]
@@ -221,12 +328,32 @@ mod tests {
             node_count: 2,
             agents_per_node: 2,
         });
-        tokio::task::spawn(async move {
-            while let Some(progress) = progress.next().await {
-                println!("{:?}", progress);
+
+        let deadline = tokio::time::Instant::now()
+            .checked_add(std::time::Duration::from_secs(5))
+            .unwrap();
+
+        let mut test_started = false;
+        let mut agent_consistent = false;
+        let mut op_consistent = false;
+
+        while let Ok(Some(progress)) = tokio::time::timeout_at(deadline, progress.next()).await {
+            println!("{:?}", progress);
+            match progress {
+                Progress::TestStarted { .. } => test_started = true,
+                Progress::AgentConsistent { .. } => agent_consistent = true,
+                Progress::OpConsistent { .. } => {
+                    op_consistent = true;
+                    break;
+                }
+                _ => (),
             }
-        });
-        tokio::time::sleep(std::time::Duration::from_secs(7)).await;
+        }
+
         shutdown().await;
+
+        assert!(test_started);
+        assert!(agent_consistent);
+        assert!(op_consistent);
     }
 }
