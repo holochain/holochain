@@ -501,21 +501,24 @@ impl Space {
                             for item in list {
                                 // TODO - someday some validation here
                                 let agent = item.agent.clone();
-                                if let Ok(is_local) = i_s_c.is_agent_local(agent.clone()).await {
-                                    if !is_local {
-                                        // we got a result - let's add it to our store for the future
-                                        if let Err(err) = evt_s_c
-                                            .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                                space: space_c.clone(),
-                                                agent,
-                                                agent_info_signed: item.clone(),
-                                            })
-                                            .await
-                                        {
-                                            tracing::error!(
-                                                ?err,
-                                                "error storing bootstrap agent_info"
-                                            );
+                                match i_s_c.is_agent_local(agent.clone()).await {
+                                    Err(err) => tracing::error!(?err),
+                                    Ok(is_local) => {
+                                        if !is_local {
+                                            // we got a result - let's add it to our store for the future
+                                            if let Err(err) = evt_s_c
+                                                .put_agent_info_signed(PutAgentInfoSignedEvt {
+                                                    space: space_c.clone(),
+                                                    agent,
+                                                    agent_info_signed: item.clone(),
+                                                })
+                                                .await
+                                            {
+                                                tracing::error!(
+                                                    ?err,
+                                                    "error storing bootstrap agent_info"
+                                                );
+                                            }
                                         }
                                     }
                                 }
