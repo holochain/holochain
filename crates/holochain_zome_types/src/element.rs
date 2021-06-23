@@ -16,10 +16,16 @@ use holo_hash::HeaderHash;
 use holo_hash::HoloHashed;
 use holochain_serialized_bytes::prelude::*;
 
-/// a chain element which is a tuple containing the signed-header along with the
+/// a chain element containing the signed header along with the
 /// entry if the header type has one.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub struct Element (SignedHeaderHashed, ElementEntry);
+pub struct Element {
+    /// The signed header for this element
+    signed_header: SignedHeaderHashed,
+    /// If there is an entry associated with this header it will be here.
+    /// If not, there will be an enum variant explaining the reason.
+    entry: ElementEntry,
+}
 
 impl Element {
     /// Mutable reference to the Header content.
@@ -28,7 +34,7 @@ impl Element {
     /// This may be useful for tests that rely heavily on mocked and fixturated data.
     #[cfg(feature = "test_utils")]
     pub fn as_header_mut(&mut self) -> &mut Header {
-        self.0.header.as_content_mut()
+        self.signed_header.header.as_content_mut()
     }
 
     /// Mutable reference to the ElementEntry.
@@ -37,7 +43,7 @@ impl Element {
     /// This may be useful for tests that rely heavily on mocked and fixturated data.
     #[cfg(feature = "test_utils")]
     pub fn as_entry_mut(&mut self) -> &mut ElementEntry {
-        &mut self.1
+        &mut self.entry
     }
 
     /// Raw element constructor.  Used only when we know that the values are valid.
@@ -55,46 +61,46 @@ impl Element {
             }
             (None, Some(EntryVisibility::Public)) => ElementEntry::NotStored,
         };
-        Self (
+        Self {
             signed_header,
             entry,
-        )
+        }
     }
 
     /// Break this element into its components
     pub fn into_inner(self) -> (SignedHeaderHashed, ElementEntry) {
-        (self.0, self.1)
+        (self.signed_header, self.entry)
     }
 
     /// The inner signed-header
     pub fn signed_header(&self) -> &SignedHeaderHashed {
-        &self.0
+        &self.signed_header
     }
 
-    /// Access the signature from the signed-header portion of this tuple.
+    /// Access the signature from this element's signed header
     pub fn signature(&self) -> &Signature {
-        self.0.signature()
+        self.signed_header.signature()
     }
 
-    /// Access the header address
+    /// Access the header address from this element's signed header
     pub fn header_address(&self) -> &HeaderHash {
-        self.0.header_address()
+        self.signed_header.header_address()
     }
 
-    /// Access the Header from the signed-header portion of this tuple.
+    /// Access the Header from this element's signed header
     pub fn header(&self) -> &Header {
-        self.0.header()
+        self.signed_header.header()
     }
 
-    /// Access the HeaderHashed from the signed-header portion.
+    /// Access the HeaderHashed from this element's signed header portion
     pub fn header_hashed(&self) -> &HeaderHashed {
-        self.0.header_hashed()
+        self.signed_header.header_hashed()
     }
 
-    /// Access the Entry portion of this tuple as an ElementEntry,
+    /// Access the Entry portion of this element as an ElementEntry,
     /// which includes the context around the presence or absence of the entry.
     pub fn entry(&self) -> &ElementEntry {
-        &self.1
+        &self.entry
     }
 }
 
