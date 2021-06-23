@@ -2,7 +2,7 @@
 name = "holochain_sqlite"
 version = "0.0.1"
 description = "Abstractions for persistence of Holochain state via SQLite"
-license-file = "Apache-2.0"
+license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://github.com/holochain/holochain"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
