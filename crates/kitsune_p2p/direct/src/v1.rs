@@ -32,6 +32,39 @@ pub struct KitsuneDirectV1Config {
 /// Close callback for quick_proxy
 pub type CloseCb = Box<dyn FnOnce(u32, &str) -> BoxFuture<'static, ()> + 'static + Send>;
 
+/// run a v1 quick bootstrap instance, returning the url
+pub async fn new_quick_bootstrap_v1() -> KdResult<(TxUrl, KitsuneDirectDriver, CloseCb)> {
+    let (driver, addr) = kitsune_p2p_bootstrap::run(([0, 0, 0, 0], 0))
+        .await
+        .map_err(KdError::other)?;
+
+    let close_cb: CloseCb = Box::new(|_code, _reason| {
+        async move {
+            // TODO - figure out how to shut down bootstrap server
+        }
+        .boxed()
+    });
+
+    let mut url = url2::url2!("http://{}", addr);
+
+    if let Some(host) = url.host_str() {
+        if host == "0.0.0.0" {
+            for iface in if_addrs::get_if_addrs().map_err(KdError::other)? {
+                // super naive - just picking the first v4 that is not 127.0.0.1
+                let addr = iface.addr.ip();
+                if let std::net::IpAddr::V4(addr) = addr {
+                    if addr != std::net::Ipv4Addr::from([127, 0, 0, 1]) {
+                        url.set_host(Some(&iface.addr.ip().to_string())).unwrap();
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    Ok((url.into(), driver, close_cb))
+}
+
 /// run a v1 quick proxy instance, returning the url
 pub async fn new_quick_proxy_v1() -> KdResult<(TxUrl, KitsuneDirectDriver, CloseCb)> {
     use crate::dependencies::*;
