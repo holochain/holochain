@@ -14,7 +14,7 @@ edition = "2018"
 ghost_actor = "0.3.0-alpha.1"
 holo_hash = { version = "^0.0.2-alpha.1", path = "../holo_hash", features = ["full"] }
 holochain_serialized_bytes = "=0.0.50"
-holochain_zome_types = { path = "../holochain_zome_types" }
+holochain_zome_types = { path = "../holochain_zome_types", version = "0.0.2-alpha.1" }
 lair_keystore_api = "=0.0.1-alpha.12"
 lair_keystore_client = "=0.0.1-alpha.12"
 serde = { version = "1.0", features = [ "derive" ] }

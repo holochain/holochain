@@ -410,10 +410,13 @@ pub(crate) fn get_5_or_less_non_local_agents_near_basis(
             // randomize the results
             rand::seq::SliceRandom::shuffle(&mut list[..], &mut rand::thread_rng());
             for item in list {
-                if let Ok(is_local) = i_s.is_agent_local(item.agent.clone()).await {
-                    if !is_local {
-                        out.insert(item);
+                match i_s.is_agent_local(item.agent.clone()).await {
+                    Ok(is_local) => {
+                        if !is_local {
+                            out.insert(item);
+                        }
                     }
+                    Err(err) => tracing::error!(?err),
                 }
                 if out.len() >= 5 {
                     return Ok(out);
