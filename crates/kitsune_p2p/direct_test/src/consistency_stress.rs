@@ -20,8 +20,23 @@ pub struct Config {
 /// progress emitted by this test
 #[derive(Debug)]
 pub enum Progress {
+    /// System Metrics
+    SysMetrics {
+        /// Used Memory GiB
+        used_mem_gb: f64,
+
+        /// CPU usage %
+        cpu_usage_pct: f64,
+
+        /// network KiB per sec
+        net_kb_per_s: f64,
+    },
+
     /// The test has started
     TestStarted {
+        /// how long the test has been running
+        run_time_s: f64,
+
         /// how many nodes were created
         node_count: usize,
 
@@ -37,6 +52,12 @@ pub enum Progress {
 
     /// A periodic interim report to show progress
     InterimState {
+        /// how long the test has been running
+        run_time_s: f64,
+
+        /// the elapsed time since this round started
+        round_elapsed_s: f64,
+
         /// the current target agent count nodes should know about
         target_agent_count: usize,
 
@@ -52,18 +73,99 @@ pub enum Progress {
 
     /// Initial agent consistency has been reached
     AgentConsistent {
+        /// how long the test has been running
+        run_time_s: f64,
+
         /// the number of agents that all nodes know about
         agent_count: usize,
     },
 
     /// An op consistency marker has been reached
     OpConsistent {
+        /// how long the test has been running
+        run_time_s: f64,
+
+        /// the elapsed time since this round started
+        round_elapsed_s: f64,
+
         /// the number of ops that were synced in this round
         new_ops_added_count: usize,
 
         /// the total number of ops that all agents know about
         total_op_count: usize,
     },
+}
+
+impl std::fmt::Display for Progress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Progress::SysMetrics {
+                used_mem_gb,
+                cpu_usage_pct,
+                net_kb_per_s,
+            } => {
+                write!(
+                    f,
+                    "-- CPU {:.0} % -- MEM {:.3} GiB -- NET {:.3} KiB/s --",
+                    cpu_usage_pct, used_mem_gb, net_kb_per_s,
+                )
+            }
+            Progress::TestStarted {
+                run_time_s,
+                node_count,
+                agents_per_node,
+                bootstrap_url,
+                proxy_url,
+            } => {
+                write!(
+                    f,
+                    "{:.4}s: TestStarted {} agents per {} nodes bootstrap:{} proxy:{}",
+                    run_time_s, agents_per_node, node_count, bootstrap_url, proxy_url,
+                )
+            }
+            Progress::InterimState {
+                run_time_s,
+                round_elapsed_s,
+                target_agent_count,
+                avg_agent_count,
+                target_total_op_count,
+                avg_total_op_count,
+            } => {
+                write!(
+                    f,
+                    "{:.4}s: InterimState {:.4}s {}/{} agents {}/{} ops",
+                    run_time_s,
+                    round_elapsed_s,
+                    avg_agent_count,
+                    target_agent_count,
+                    avg_total_op_count,
+                    target_total_op_count,
+                )
+            }
+            Progress::AgentConsistent {
+                run_time_s,
+                agent_count,
+            } => {
+                write!(
+                    f,
+                    "--!!--\n{:.4}s: ! AgentConsistent ! {} agents\n--!!--",
+                    run_time_s, agent_count,
+                )
+            }
+            Progress::OpConsistent {
+                run_time_s,
+                round_elapsed_s,
+                new_ops_added_count,
+                total_op_count,
+            } => {
+                write!(
+                    f,
+                    "--!!--\n{:.4}s: ! OpConsistent ! {:.4}s {} new {} total\n--!!--",
+                    run_time_s, round_elapsed_s, new_ops_added_count, total_op_count,
+                )
+            }
+        }
+    }
 }
 
 /// run the consistency_stress test
@@ -95,6 +197,33 @@ async fn test(
     agents_per_node: usize,
     mut p_send: futures::channel::mpsc::Sender<Progress>,
 ) {
+    kitsune_p2p_types::metrics::init_sys_info_poll();
+
+    let mut p_send_clone = p_send.clone();
+    tokio::task::spawn(async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+
+            let sys_info = kitsune_p2p_types::metrics::get_sys_info();
+
+            let used_mem_gb = sys_info.used_mem_kb as f64 / 1024.0 / 1024.0;
+            let cpu_usage_pct = sys_info.proc_cpu_usage_pct_1000 as f64 / 1000.0;
+            let net_kb_per_s =
+                (sys_info.tx_bytes_per_sec as f64 + sys_info.rx_bytes_per_sec as f64) / 1024.0;
+
+            p_send_clone
+                .send(Progress::SysMetrics {
+                    used_mem_gb,
+                    cpu_usage_pct,
+                    net_kb_per_s,
+                })
+                .await
+                .unwrap();
+        }
+    });
+
+    let test_start = std::time::Instant::now();
+
     let (bootstrap_url, driver, _bootstrap_close) = new_quick_bootstrap_v1().await.unwrap();
     tokio::task::spawn(driver);
 
@@ -175,6 +304,7 @@ async fn test(
 
     p_send
         .send(Progress::TestStarted {
+            run_time_s: test_start.elapsed().as_secs_f64(),
             node_count,
             agents_per_node,
             bootstrap_url,
@@ -204,6 +334,7 @@ async fn test(
         if avg_agent_count >= target_agent_count {
             p_send
                 .send(Progress::AgentConsistent {
+                    run_time_s: test_start.elapsed().as_secs_f64(),
                     agent_count: avg_agent_count,
                 })
                 .await
@@ -216,6 +347,8 @@ async fn test(
 
         p_send
             .send(Progress::InterimState {
+                run_time_s: test_start.elapsed().as_secs_f64(),
+                round_elapsed_s: test_start.elapsed().as_secs_f64(),
                 target_agent_count,
                 avg_agent_count,
                 target_total_op_count,
@@ -225,10 +358,12 @@ async fn test(
             .unwrap();
     }
 
-    let mut target_total_op_count = 0;
+    let mut target_total_op_count = 1; // 1 to account for the app_entry
 
     // this loop publishes ops, and waits for them to be synced
     loop {
+        let round_start_time = std::time::Instant::now();
+
         for node in nodes.iter() {
             for agent in node.agents.iter() {
                 node.kdhnd
@@ -297,6 +432,8 @@ async fn test(
             if avg_total_op_count >= target_total_op_count {
                 p_send
                     .send(Progress::OpConsistent {
+                        run_time_s: test_start.elapsed().as_secs_f64(),
+                        round_elapsed_s: round_start_time.elapsed().as_secs_f64(),
                         new_ops_added_count: target_agent_count,
                         total_op_count: avg_total_op_count,
                     })
@@ -307,6 +444,8 @@ async fn test(
 
             p_send
                 .send(Progress::InterimState {
+                    run_time_s: test_start.elapsed().as_secs_f64(),
+                    round_elapsed_s: round_start_time.elapsed().as_secs_f64(),
                     target_agent_count,
                     avg_agent_count,
                     target_total_op_count,
@@ -338,7 +477,7 @@ mod tests {
         let mut op_consistent = false;
 
         while let Ok(Some(progress)) = tokio::time::timeout_at(deadline, progress.next()).await {
-            println!("{:?}", progress);
+            println!("{}", progress);
             match progress {
                 Progress::TestStarted { .. } => test_started = true,
                 Progress::AgentConsistent { .. } => agent_consistent = true,
