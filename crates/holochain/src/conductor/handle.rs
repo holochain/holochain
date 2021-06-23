@@ -46,9 +46,9 @@ use super::error::ConductorResult;
 use super::error::CreateAppError;
 use super::interface::SignalBroadcaster;
 use super::manager::TaskManagerRunHandle;
-use super::p2p_store::get_agent_info_signed;
-use super::p2p_store::put_agent_info_signed;
-use super::p2p_store::query_agent_info_signed;
+use super::p2p_agent_store::get_agent_info_signed;
+use super::p2p_agent_store::put_agent_info_signed;
+use super::p2p_agent_store::query_agent_info_signed;
 use super::Cell;
 use super::Conductor;
 use crate::conductor::p2p_metrics::put_metric_datum;
@@ -58,6 +58,7 @@ use crate::core::{queue_consumer::InitialQueueTriggers, ribosome::real_ribosome:
 use derive_more::From;
 use futures::future::FutureExt;
 use futures::StreamExt;
+use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InstalledAppInfo;
 use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::event::HolochainP2pEvent::*;
@@ -201,7 +202,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn setup_cells(self: Arc<Self>) -> ConductorResult<Vec<CreateAppError>>;
 
     /// Activate an app
-    async fn activate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<()>;
+    async fn activate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<ActiveApp>;
 
     /// Deactivate an app
     async fn deactivate_app(
@@ -215,6 +216,12 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// List Active AppIds
     async fn list_active_apps(&self) -> ConductorResult<Vec<InstalledAppId>>;
+
+    /// List Apps with their information
+    async fn list_apps(
+        &self,
+        status_filter: Option<AppStatusFilter>,
+    ) -> ConductorResult<Vec<InstalledAppInfo>>;
 
     /// Get the IDs of all active installed Apps which use this Cell
     async fn list_active_apps_for_cell_id(
@@ -642,12 +649,14 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(r)
     }
 
-    async fn activate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<()> {
-        self.conductor
+    async fn activate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<ActiveApp> {
+        let app = self
+            .conductor
             .write()
             .await
             .activate_app_in_db(installed_app_id)
-            .await
+            .await?;
+        Ok(app)
         // MD: Should we be doing `Conductor::add_cells()` here? (see below comment)
     }
 
@@ -681,6 +690,13 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn list_active_apps(&self) -> ConductorResult<Vec<InstalledAppId>> {
         self.conductor.read().await.list_active_apps().await
+    }
+
+    async fn list_apps(
+        &self,
+        status_filter: Option<AppStatusFilter>,
+    ) -> ConductorResult<Vec<InstalledAppInfo>> {
+        self.conductor.read().await.list_apps(status_filter).await
     }
 
     async fn list_active_apps_for_cell_id(

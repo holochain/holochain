@@ -1,4 +1,5 @@
 use crate::*;
+use kitsune_p2p_types::*;
 use observability::tracing;
 
 use super::{CheckResult, SimpleBloomMod};
@@ -18,7 +19,7 @@ impl SimpleBloomMod {
 
         // next, check to see if we should time out any current initiate_tgt
         if let Some(initiate_tgt) = tgt {
-            if let Some(metric) = self.get_metric(initiate_tgt.agents().clone()).await? {
+            if let Some(metric) = self.get_metric_info(initiate_tgt.agents().clone()).await? {
                 if metric.was_err
                     || metric.last_touch.elapsed()?.as_millis() as u32
                         > self.tuning_params.gossip_peer_on_success_next_gossip_delay_ms
@@ -48,7 +49,7 @@ impl SimpleBloomMod {
         // TODO: clean up ugly locking here
         let needs_sync = self.inner.share_mut(|i, _| {
             Ok(i.initiate_tgt.is_none()
-                && i.last_initiate_check.elapsed().as_millis() as u32
+                && proc_count_us_elapsed(i.last_initiate_check_us).as_millis() as u32
                     > self.tuning_params.gossip_loop_iteration_delay_ms)
         })?;
         if needs_sync {

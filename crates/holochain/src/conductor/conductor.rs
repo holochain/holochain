@@ -26,9 +26,9 @@ use super::manager::spawn_task_manager;
 use super::manager::ManagedTaskAdd;
 use super::manager::ManagedTaskHandle;
 use super::manager::TaskManagerRunHandle;
-use super::p2p_store::all_agent_infos;
-use super::p2p_store::get_single_agent_info;
-use super::p2p_store::inject_agent_infos;
+use super::p2p_agent_store::all_agent_infos;
+use super::p2p_agent_store::get_single_agent_info;
+use super::p2p_agent_store::inject_agent_infos;
 use super::paths::EnvironmentRootPath;
 use super::state::AppInterfaceId;
 use super::state::ConductorState;
@@ -36,21 +36,22 @@ use super::CellError;
 use super::{api::CellConductorApi, state::AppInterfaceConfig};
 use super::{api::CellConductorApiT, interface::AppInterfaceRuntime};
 use super::{api::RealAdminInterfaceApi, manager::TaskManagerClient};
-use super::{api::RealAppInterfaceApi, p2p_store};
+use super::{api::RealAppInterfaceApi, p2p_agent_store};
 use crate::conductor::cell::Cell;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::error::ConductorResult;
 use crate::conductor::handle::ConductorHandle;
 use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::{
-    conductor::api::error::{ConductorApiError, ConductorApiResult},
-    core::ribosome::real_ribosome::RealRibosome,
+    conductor::api::error::ConductorApiResult, core::ribosome::real_ribosome::RealRibosome,
 };
 pub use builder::*;
 use futures::future;
 use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
 use holo_hash::DnaHash;
+use holochain_conductor_api::AppStatusFilter;
+use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::JsonDump;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
@@ -119,6 +120,8 @@ where
     /// The database for storing AgentInfoSigned
     p2p_env: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
     
+    p2p_metrics_env: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
+
     p2p_metrics_env: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
 
     /// The database for persisting [ConductorState]
@@ -655,17 +658,19 @@ where
     pub(super) async fn activate_app_in_db(
         &mut self,
         installed_app_id: InstalledAppId,
-    ) -> ConductorResult<()> {
-        self.update_state(move |mut state| {
-            let app = state
-                .inactive_apps
-                .remove(&installed_app_id)
-                .ok_or_else(|| ConductorError::AppNotInstalled(installed_app_id.clone()))?;
-            state.active_apps.insert(app.into_active());
-            Ok(state)
-        })
-        .await?;
-        Ok(())
+    ) -> ConductorResult<ActiveApp> {
+        let (_, active_app) = self
+            .update_state_prime(move |mut state| {
+                let app = state
+                    .inactive_apps
+                    .remove(&installed_app_id)
+                    .ok_or_else(|| ConductorError::AppNotInstalled(installed_app_id.clone()))?;
+                let active_app = app.into_active();
+                state.active_apps.insert(active_app.clone());
+                Ok((state, active_app))
+            })
+            .await?;
+        Ok(active_app)
     }
 
     /// Deactivate an app in the database
@@ -832,11 +837,7 @@ where
     ) -> ConductorApiResult<()> {
         let mut space_map = HashMap::new();
         for agent_info_signed in agent_infos {
-            let space: Arc<KitsuneSpace> = Arc::new(
-                (&agent_info_signed)
-                    .try_into()
-                    .map_err(ConductorApiError::other)?,
-            );
+            let space = agent_info_signed.space.clone();
             space_map
                 .entry(space)
                 .or_insert_with(Vec::new)
@@ -924,6 +925,30 @@ where
         Ok(active_apps.keys().cloned().collect())
     }
 
+    pub(super) async fn list_apps(
+        &self,
+        status_filter: Option<AppStatusFilter>,
+    ) -> ConductorResult<Vec<InstalledAppInfo>> {
+        let conductor_state = self.get_state().await?;
+
+        let apps_ids: Vec<&String> = match status_filter {
+            Some(AppStatusFilter::Active) => conductor_state.active_apps.keys().collect(),
+            Some(AppStatusFilter::Inactive) => conductor_state.inactive_apps.keys().collect(),
+            None => conductor_state
+                .active_apps
+                .keys()
+                .chain(conductor_state.inactive_apps.keys())
+                .collect(),
+        };
+
+        let apps_info: Vec<InstalledAppInfo> = apps_ids
+            .into_iter()
+            .filter_map(|app_id| conductor_state.get_app_info(app_id))
+            .collect();
+
+        Ok(apps_info)
+    }
+
     pub(super) async fn list_active_apps_for_cell_id(
         &self,
         cell_id: &CellId,
@@ -949,7 +974,7 @@ where
             .cloned()
             .expect("invalid cell space");
 
-        let peer_dump = p2p_store::dump_state(p2p_env.into(), Some(cell_id.clone()))?;
+        let peer_dump = p2p_agent_store::dump_state(p2p_env.into(), Some(cell_id.clone()))?;
         let source_chain_dump =
             source_chain::dump_state(arc.clone().into(), cell_id.agent_pubkey().clone()).await?;
 
@@ -971,8 +996,21 @@ where
             .or_insert_with(move || {
                 let root_env_dir = self.root_env_dir.as_ref();
                 let keystore = self.keystore.clone();
-                EnvWrite::open(root_env_dir, DbKind::P2pState(space), keystore)
-                    .expect("failed to open p2p_store database")
+                EnvWrite::open(root_env_dir, DbKind::P2pAgentStore(space), keystore)
+                    .expect("failed to open p2p_agent_store database")
+            })
+            .clone()
+    }
+
+    pub(super) fn p2p_metrics_env(&self, space: Arc<KitsuneSpace>) -> EnvWrite {
+        let mut p2p_metrics_env = self.p2p_metrics_env.lock();
+        p2p_metrics_env
+            .entry(space.clone())
+            .or_insert_with(move || {
+                let root_env_dir = self.root_env_dir.as_ref();
+                let keystore = self.keystore.clone();
+                EnvWrite::open(root_env_dir, DbKind::P2pMetrics(space), keystore)
+                    .expect("failed to open p2p_metrics database")
             })
             .clone()
     }
@@ -1065,6 +1103,7 @@ impl<DS> Conductor<DS>
 where
     DS: DnaStore + 'static,
 {
+    #[allow(clippy::too_many_arguments)]
     async fn new(
         env: EnvWrite,
         wasm_env: EnvWrite,

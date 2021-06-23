@@ -113,7 +113,7 @@ impl SweetConductorBatch {
                 all.push(env.clone());
             }
         }
-        crate::conductor::p2p_store::exchange_peer_info(all).await;
+        crate::conductor::p2p_agent_store::exchange_peer_info(all).await;
     }
 }
 

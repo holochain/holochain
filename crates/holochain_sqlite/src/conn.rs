@@ -3,6 +3,12 @@ use chashmap::CHashMap;
 use once_cell::sync::Lazy;
 use rusqlite::*;
 use std::{collections::HashMap, path::{Path, PathBuf}, time::Duration};
+use scheduled_thread_pool::ScheduledThreadPool;
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
 
 mod singleton_conn;
 
@@ -33,6 +39,11 @@ pub(crate) static DATABASE_HANDLES: Lazy<parking_lot::Mutex<HashMap<PathBuf, DbW
     parking_lot::Mutex::new(HashMap::new())
 });
 
+static R2D2_THREADPOOL: Lazy<Arc<ScheduledThreadPool>> = Lazy::new(|| {
+    let t = ScheduledThreadPool::new(1);
+    Arc::new(t)
+});
+
 pub type ConnectionPool = r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>;
 pub type PConnInner = r2d2::PooledConnection<r2d2_sqlite::SqliteConnectionManager>;
 
@@ -41,9 +52,13 @@ pub(crate) fn new_connection_pool(path: &Path, kind: DbKind) -> ConnectionPool {
     let manager = SqliteConnectionManager::file(path);
     let customizer = Box::new(ConnCustomizer { kind });
     r2d2::Pool::builder()
-        .max_size(4)
+        // Only up to 20 connections at a time
+        .max_size(20)
+        // Never maintain idle connections
         .min_idle(Some(0))
-        .idle_timeout(Some(std::time::Duration::from_secs(60)))
+        // Close connections after 30-60 seconds of idle time
+        .idle_timeout(Some(Duration::from_secs(30)))
+        .thread_pool(R2D2_THREADPOOL.clone())
         .connection_customizer(customizer)
         .build(manager)
         .unwrap()
@@ -85,6 +100,10 @@ fn initialize_connection(
         // conn.pragma_update(None, "key", &keyval)?;
         conn.pragma_update(None, "key", &FAKE_KEY)?;
     }
+
+    // this is recommended to always be off:
+    // https://sqlite.org/pragma.html#pragma_trusted_schema
+    conn.pragma_update(None, "trusted_schema", &false)?;
 
     // set to faster write-ahead-log mode
     conn.pragma_update(None, "journal_mode", &"WAL".to_string())?;
