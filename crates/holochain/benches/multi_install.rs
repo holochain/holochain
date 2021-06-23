@@ -20,12 +20,6 @@ use reqwest::Client;
 use tokio::runtime::Builder;
 use tokio::runtime::Runtime;
 
-// TODO: Produce a high data version of this bench.
-// TODO: Add profile function to queries that need optimizing.
-// TODO: Research indexing.
-
-const NUM_MACHINES: u64 = 2;
-const URL: &str = "http://127.0.0.1:3030";
 criterion_group!(benches, multi_install);
 
 criterion_main!(benches);
@@ -33,6 +27,15 @@ criterion_main!(benches);
 fn multi_install(bench: &mut Criterion) {
     observability::test_run().ok();
     let client = reqwest::Client::new();
+    let num_machines = std::env::var_os("BENCH_NUM_MACHINES")
+        .and_then(|s| s.to_string_lossy().parse::<u64>().ok())
+        .unwrap_or(1);
+    let num_conductors = std::env::var_os("BENCH_NUM_CONDUCTORS")
+        .and_then(|s| s.to_string_lossy().parse::<usize>().ok())
+        .unwrap_or(1);
+    let url = std::env::var_os("BENCH_BOOTSTRAP")
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or("http://127.0.0.1:3030".to_string());
 
     let mut group = bench.benchmark_group("multi_install");
     group.sample_size(
@@ -44,17 +47,17 @@ fn multi_install(bench: &mut Criterion) {
     let runtime = rt();
 
     runtime.block_on(async {
-        clear(&client).await;
-        sync(&client, NUM_MACHINES).await;
+        clear(&client, &url).await;
+        sync(&client, num_machines, &url).await;
     });
 
-    let mut producers = runtime.block_on(setup());
+    let mut producers = runtime.block_on(setup(num_conductors));
     group.bench_function(BenchmarkId::new("test", format!("install")), |b| {
         b.iter(|| {
             runtime.block_on(async { producers.run().await });
         });
     });
-    runtime.block_on(async { producers.consistency(&client).await });
+    runtime.block_on(async { producers.consistency(&client, num_machines, &url).await });
     group.sample_size(10);
     runtime.block_on(async move {
         for c in producers.conductors {
@@ -76,6 +79,7 @@ impl Producers {
         use holochain_keystore::KeystoreSenderExt;
         let start = std::time::Instant::now();
         for _ in 0..1 {
+            let s = std::time::Instant::now();
             let conductor = &self.conductors[self.i];
             let agent_key = conductor
                 .keystore()
@@ -83,6 +87,10 @@ impl Producers {
                 .generate_sign_keypair_from_pure_entropy()
                 .await
                 .expect("Failed to generate agent key");
+            if s.elapsed().as_millis() > 500 {
+                dbg!(s.elapsed());
+            }
+            let s = std::time::Instant::now();
             self.i += 1;
             if self.i >= self.conductors.len() {
                 self.i = 0;
@@ -91,6 +99,11 @@ impl Producers {
             let source = AppBundleSource::Path(PathBuf::from(
                 "/home/freesig/holochain/elemental-chat/elemental-chat.happ",
             ));
+
+            if s.elapsed().as_millis() > 500 {
+                dbg!(s.elapsed());
+            }
+            let s = std::time::Instant::now();
             let mut membrane_proofs = HashMap::new();
             membrane_proofs.insert(
                 "elemental-chat".to_string(),
@@ -109,25 +122,36 @@ impl Producers {
             )
             .await
             .expect("Failed to install");
+            if s.elapsed().as_millis() > 500 {
+                dbg!(s.elapsed());
+            }
+            let s = std::time::Instant::now();
             let id = id.installed_app_id().clone();
             conductor
                 .activate_app(id)
                 .await
                 .expect("Failed to activate app");
 
+            if s.elapsed().as_millis() > 500 {
+                dbg!(s.elapsed());
+            }
+            let s = std::time::Instant::now();
             let errors = conductor
                 .inner_handle()
                 .setup_cells()
                 .await
                 .expect("Failed to setup cells");
             assert_eq!(0, errors.len(), "{:?}", errors);
+            if s.elapsed().as_millis() > 500 {
+                dbg!(s.elapsed());
+            }
         }
         println!("{}:{:?}", self.total, start.elapsed());
     }
 
-    async fn consistency(&mut self, client: &Client) {
-        sync(&client, NUM_MACHINES).await;
-        let num_peers = num(client).await;
+    async fn consistency(&mut self, client: &Client, num_machines: u64, url: &str) {
+        sync(&client, num_machines, url).await;
+        let num_peers = num(client, url).await;
         let mut peers = Vec::new();
         for c in &self.conductors {
             let info = c
@@ -163,10 +187,11 @@ impl Producers {
             std::time::Duration::from_millis(500),
         )
         .await;
+        sync(&client, num_machines, url).await;
     }
 }
 
-async fn setup() -> Producers {
+async fn setup(num_conductors: usize) -> Producers {
     let config = || {
         let tuning: KitsuneP2pTuningParams = KitsuneP2pTuningParams::default();
         // tuning.gossip_peer_on_success_next_gossip_delay_ms = 1000 * 10;
@@ -190,7 +215,7 @@ async fn setup() -> Producers {
         }
     };
     let mut configs = Vec::new();
-    for _ in 0..2 {
+    for _ in 0..num_conductors {
         configs.push(config());
     }
     let conductors = SweetConductorBatch::from_configs(configs.clone()).await;
@@ -208,9 +233,9 @@ pub fn rt() -> Runtime {
     Builder::new_multi_thread().enable_all().build().unwrap()
 }
 
-async fn clear(client: &Client) {
+async fn clear(client: &Client, url: &str) {
     let res = client
-        .post(URL)
+        .post(url)
         .header("X-Op", "clear")
         .header(reqwest::header::CONTENT_TYPE, "application/octet")
         .send()
@@ -218,9 +243,9 @@ async fn clear(client: &Client) {
         .unwrap();
     assert!(res.status().is_success());
 }
-async fn num(client: &Client) -> u64 {
+async fn num(client: &Client, url: &str) -> u64 {
     let res = client
-        .post(URL)
+        .post(url)
         .header("X-Op", "num")
         .header(reqwest::header::CONTENT_TYPE, "application/octet")
         .send()
@@ -232,11 +257,11 @@ async fn num(client: &Client) -> u64 {
     println!("num_peers {}", num_peers);
     num_peers
 }
-async fn sync(client: &Client, num_wait_for: u64) {
+async fn sync(client: &Client, num_wait_for: u64, url: &str) {
     let mut body_data = Vec::new();
     kitsune_p2p_types::codec::rmp_encode(&mut body_data, num_wait_for).unwrap();
     let res = client
-        .post(URL)
+        .post(url)
         .header("X-Op", "sync")
         .header(reqwest::header::CONTENT_TYPE, "application/octet")
         .body(body_data)

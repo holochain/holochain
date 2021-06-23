@@ -814,6 +814,7 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
         self.conductor.write().await.add_cells(cells);
         // Join the network but ignore errors because the
         // space retries joining all cells every 5 minutes.
+        let s = std::time::Instant::now();
         futures::stream::iter(networks)
             .for_each_concurrent(100, |mut network| async move {
                 match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join()).await {
@@ -827,6 +828,9 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
                 }
             })
             .await;
+        if s.elapsed().as_millis() > 500 {
+            dbg!(s.elapsed());
+        }
 
         // Now we can trigger the workflows.
         for trigger in triggers {

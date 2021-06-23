@@ -635,7 +635,7 @@ pub async fn wait_for_peers_with_others(
         };
         let change = total.checked_sub(last_total).expect("LOST A VALUE");
         last_total = total;
-        if count == expected_count {
+        if count >= expected_count {
             return;
         } else {
             let time_waited = this_start.elapsed().as_secs();

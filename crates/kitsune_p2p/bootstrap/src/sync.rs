@@ -43,7 +43,7 @@ async fn waiting(query: Bytes, sync: NodeSync) -> Result<impl warp::Reply, warp:
             }
         }
     };
-    tokio::time::timeout(std::time::Duration::from_secs(30), wait.wait())
+    tokio::time::timeout(std::time::Duration::from_secs(60 * 5), wait.wait())
         .await
         .ok();
     {
