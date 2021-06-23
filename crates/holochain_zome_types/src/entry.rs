@@ -13,6 +13,7 @@ use holo_hash::AgentPubKey;
 use holo_hash::HashableContent;
 use holo_hash::HashableContentBytes;
 use holochain_serialized_bytes::prelude::*;
+use holo_hash::CounterSigningHash;
 
 mod app_entry_bytes;
 mod error;
@@ -91,6 +92,18 @@ pub enum GetStrategy {
     Content,
 }
 
+/// A vector of agents to countersign a shared entry.
+/// The vector must be sorted to generate a CounterSigningTag.
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
+pub struct CounterSigningAgents(Vec<AgentPubKey>);
+
+impl CounterSigningAgents {
+    /// Constructor.
+    pub fn new(agents: Vec<AgentPubKey>) -> Self {
+        Self(agents)
+    }
+}
+
 /// Structure holding the entry portion of a chain element.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 #[serde(tag = "entry_type", content = "entry")]
@@ -100,7 +113,8 @@ pub enum Entry {
     Agent(AgentPubKey),
     /// The application entry data for entries that aren't system created entries
     App(AppEntryBytes),
-    CounterSign(Vec<AgentPubKey>, AppEntryBytes),
+    /// Application entry data for entries that need countersigning to move forward multiple chains together.
+    CounterSign(CounterSigningHash, CounterSigningAgents, AppEntryBytes),
     /// The capability claim system entry which allows committing a granted permission
     /// for later use
     CapClaim(CapClaimEntry),
