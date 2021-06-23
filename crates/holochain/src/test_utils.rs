@@ -6,6 +6,7 @@ use crate::conductor::config::AdminInterfaceConfig;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::config::InterfaceDriver;
 use crate::conductor::p2p_agent_store;
+use crate::conductor::p2p_agent_store::all_agent_infos;
 use crate::conductor::ConductorBuilder;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::ZomeCallInvocation;
@@ -401,7 +402,8 @@ pub async fn consistency_others(all_cells: &[&SweetCell], num_attempts: usize, d
     consistency_envs_others(&all_cell_envs[..], num_attempts, delay).await
 }
 
-async fn consistency_envs_others(
+/// Wait for all cells to reach consistency
+pub async fn consistency_envs_others(
     all_cell_envs: &[&EnvWrite],
     num_attempts: usize,
     delay: Duration,
@@ -417,6 +419,37 @@ async fn consistency_envs_others(
         others.remove(i);
         wait_for_integration_with_others(env, &others, expected_count, num_attempts, delay, start)
             .await
+    }
+}
+
+/// Wait for all cells to reach consistency
+pub async fn fixed_consistency_envs_others(
+    all_cell_envs: &[&EnvWrite],
+    expected_count: usize,
+    num_attempts: usize,
+    delay: Duration,
+) {
+    let start = Some(std::time::Instant::now());
+    for (i, &env) in all_cell_envs.iter().enumerate() {
+        let mut others = all_cell_envs.to_vec();
+        others.remove(i);
+        wait_for_integration_with_others(env, &others, expected_count, num_attempts, delay, start)
+            .await
+    }
+}
+
+/// Wait for all cells to reach consistency
+pub async fn fixed_peer_consistency_envs_others(
+    all_peer_envs: &[&EnvWrite],
+    expected_count: usize,
+    num_attempts: usize,
+    delay: Duration,
+) {
+    let start = Some(std::time::Instant::now());
+    for (i, &env) in all_peer_envs.iter().enumerate() {
+        let mut others = all_peer_envs.to_vec();
+        others.remove(i);
+        wait_for_peers_with_others(env, &others, expected_count, num_attempts, delay, start).await
     }
 }
 
@@ -555,7 +588,7 @@ pub async fn wait_for_integration_with_others(
                 total as f64 / total_time_waited as f64
             };
             tracing::debug!(
-                "Count: {}, val: {}, int: {}\nTime waited: {}s (total {}s),\nCounts: {:?}\nTotal: {} out of {} {:.4}% change:{} {:.4}ops/s\n",
+                "Count: {}, val: {}, int: {}\nTime waited: {}s (total {}s),\nCounts: {}\nTotal: {} out of {} {:.4}% change:{} {:.4}ops/s\n",
                 count.integrated,
                 count.validation_limbo,
                 count.integration_limbo,
@@ -567,6 +600,62 @@ pub async fn wait_for_integration_with_others(
                 progress,
                 change,
                 ops_per_s,
+            );
+        }
+        tokio::time::sleep(delay).await;
+    }
+}
+
+#[tracing::instrument(skip(env, others, start))]
+/// Same as wait for integration but can print other states at the same time
+pub async fn wait_for_peers_with_others(
+    env: &EnvWrite,
+    others: &[&EnvWrite],
+    expected_count: usize,
+    num_attempts: usize,
+    delay: Duration,
+    start: Option<std::time::Instant>,
+) {
+    let mut last_total = 0;
+    let this_start = std::time::Instant::now();
+    for _ in 0..num_attempts {
+        let count = all_agent_infos(env.clone().into()).unwrap().len();
+        let mut counts = Vec::with_capacity(others.len());
+        for o in others {
+            let c = all_agent_infos(EnvRead::from((*o).clone())).unwrap().len();
+            counts.push(c);
+        }
+        let total: usize = counts.iter().sum();
+        let num_conductors = counts.len() + 1;
+        let total_expected = num_conductors * expected_count;
+        let progress = if total_expected == 0 {
+            0.0
+        } else {
+            total as f64 / total_expected as f64 * 100.0
+        };
+        let change = total.checked_sub(last_total).expect("LOST A VALUE");
+        last_total = total;
+        if count == expected_count {
+            return;
+        } else {
+            let time_waited = this_start.elapsed().as_secs();
+            let total_time_waited = start.map(|s| s.elapsed().as_secs()).unwrap_or(0);
+            let peers_per_s = if total_time_waited == 0 {
+                0.0
+            } else {
+                total as f64 / total_time_waited as f64
+            };
+            tracing::debug!(
+                "Count: {}, \nTime waited: {}s (total {}s),\nCounts: {:?}\nTotal: {} out of {} {:.4}% change:{} {:.4}peers/s\n",
+                count,
+                time_waited,
+                total_time_waited,
+                counts,
+                total,
+                total_expected,
+                progress,
+                change,
+                peers_per_s,
             );
         }
         tokio::time::sleep(delay).await;
