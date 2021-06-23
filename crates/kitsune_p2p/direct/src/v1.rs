@@ -15,11 +15,16 @@ use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::dependencies::ghost_actor;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use std::collections::HashSet;
+use std::future::Future;
 
 /// Config for v1 impl of KitsuneDirect
 pub struct KitsuneDirectV1Config {
     /// persistence module to use for this kdirect instance
     pub persist: KdPersist,
+
+    /// v1 requires a bootstrap server
+    /// specify the addr here
+    pub bootstrap: TxUrl,
 
     /// v1 is only set up to run through a proxy
     /// specify the proxy addr here
@@ -108,52 +113,57 @@ pub async fn new_quick_proxy_v1() -> KdResult<(TxUrl, KitsuneDirectDriver, Close
 }
 
 /// create a new v1 instance of the kitsune direct api
-pub async fn new_kitsune_direct_v1(
+#[allow(clippy::manual_async_fn)] // david.b - we have some problems with this
+                                  //           future not ending up Send
+                                  //           specifying it directly makes
+                                  //           for better compile errors
+                                  //           when this happens
+pub fn new_kitsune_direct_v1(
     conf: KitsuneDirectV1Config,
-) -> KdResult<(KitsuneDirect, KitsuneDirectDriver)> {
-    let KitsuneDirectV1Config {
-        persist,
-        proxy,
-        ui_port,
-    } = conf;
+) -> impl Future<Output = KdResult<(KitsuneDirect, KitsuneDirectDriver)>> + 'static + Send {
+    async move {
+        let KitsuneDirectV1Config {
+            persist,
+            bootstrap,
+            proxy,
+            ui_port,
+        } = conf;
 
-    let mut sub_config = KitsuneP2pConfig::default();
+        let mut sub_config = KitsuneP2pConfig::default();
 
-    let tuning_params = sub_config.tuning_params.clone();
+        sub_config.bootstrap_service = Some(bootstrap.into());
 
-    sub_config.transport_pool.push(TransportConfig::Proxy {
-        sub_transport: Box::new(TransportConfig::Quic {
-            bind_to: None,
-            override_host: None,
-            override_port: None,
-        }),
-        proxy_config: ProxyConfig::RemoteProxyClient {
-            proxy_url: proxy.into(),
-        },
-    });
+        let tuning_params = sub_config.tuning_params.clone();
 
-    let tls = persist.singleton_tls_config().await?;
+        sub_config.transport_pool.push(TransportConfig::Proxy {
+            sub_transport: Box::new(TransportConfig::Quic {
+                bind_to: None,
+                override_host: None,
+                override_port: None,
+            }),
+            proxy_config: ProxyConfig::RemoteProxyClient {
+                proxy_url: proxy.into(),
+            },
+        });
 
-    let (p2p, evt) = spawn_kitsune_p2p(sub_config, tls)
-        .await
-        .map_err(KdError::other)?;
+        let tls = persist.singleton_tls_config().await?;
 
-    let mut logic_chan = <LogicChan<()>>::new(tuning_params.concurrent_limit_per_thread);
+        let (p2p, evt) = spawn_kitsune_p2p(sub_config, tls)
+            .await
+            .map_err(KdError::other)?;
 
-    let (srv, srv_evt) = new_srv(Default::default(), ui_port).await?;
-    let kdirect = Kd1::new(srv.clone(), persist, p2p);
+        let mut logic_chan = <LogicChan<()>>::new(tuning_params.concurrent_limit_per_thread);
 
-    logic_chan
-        .handle()
-        .clone()
-        .capture_logic(handle_events(tuning_params.clone(), kdirect.clone(), evt))
-        .await
-        .map_err(KdError::other)?;
+        let (srv, srv_evt) = new_srv(Default::default(), ui_port).await?;
+        let kdirect = Kd1::new(srv.clone(), persist, p2p);
 
-    logic_chan
-        .handle()
-        .clone()
-        .capture_logic(handle_srv_events(
+        let cc = logic_chan.handle().clone();
+
+        cc.capture_logic(handle_events(tuning_params.clone(), kdirect.clone(), evt))
+            .await
+            .map_err(KdError::other)?;
+
+        cc.capture_logic(handle_srv_events(
             tuning_params,
             kdirect.clone(),
             srv,
@@ -162,10 +172,11 @@ pub async fn new_kitsune_direct_v1(
         .await
         .map_err(KdError::other)?;
 
-    let kdirect = KitsuneDirect(kdirect);
-    let driver = async move { while logic_chan.next().await.is_some() {} }.boxed();
+        let kdirect = KitsuneDirect(kdirect);
+        let driver = async move { while logic_chan.next().await.is_some() {} }.boxed();
 
-    Ok((kdirect, driver))
+        Ok((kdirect, driver))
+    }
 }
 
 // -- private -- //

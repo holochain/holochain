@@ -6,6 +6,7 @@ pub(crate) async fn run(opt: KdOptNode) -> KdResult<()> {
 
     let conf = KitsuneDirectV1Config {
         persist,
+        bootstrap: opt.bootstrap_url.into(),
         proxy: opt.proxy_url.into(),
         ui_port: 0,
     };

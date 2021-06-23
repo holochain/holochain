@@ -4,11 +4,15 @@ use kitsune_p2p_direct_api::kd_sys_kind::{self, *};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_direct_sanity() {
+    let (bootstrap, driver, bootstrap_close) = new_quick_bootstrap_v1().await.unwrap();
+    tokio::task::spawn(driver);
+
     let (proxy, driver, proxy_close) = new_quick_proxy_v1().await.unwrap();
     tokio::task::spawn(driver);
 
     let conf = KitsuneDirectV1Config {
         persist: new_persist_mem(),
+        bootstrap,
         proxy,
         ui_port: 0,
     };
@@ -113,6 +117,7 @@ async fn test_direct_sanity() {
 
     assert_eq!(app_entry, e);
 
+    bootstrap_close(0, "").await;
     proxy_close(0, "").await;
     hnd.close(0, "").await;
     kd.close(0, "").await;

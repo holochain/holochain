@@ -9,6 +9,9 @@ struct KdOptProxy {}
 
 #[derive(Debug, StructOpt)]
 struct KdOptNode {
+    /// You must specify a bootstrap address to connect to
+    bootstrap_url: String,
+
     /// You must specify a proxy address to connect to
     proxy_url: String,
 }
