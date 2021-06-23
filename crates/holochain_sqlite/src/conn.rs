@@ -2,8 +2,10 @@ use crate::prelude::*;
 use chashmap::CHashMap;
 use once_cell::sync::Lazy;
 use rusqlite::*;
+use scheduled_thread_pool::ScheduledThreadPool;
 use std::{
     path::{Path, PathBuf},
+    sync::Arc,
     time::Duration,
 };
 
@@ -36,6 +38,11 @@ pub(crate) static DATABASE_HANDLES: Lazy<CHashMap<PathBuf, DbWrite>> = Lazy::new
     CHashMap::new()
 });
 
+static R2D2_THREADPOOL: Lazy<Arc<ScheduledThreadPool>> = Lazy::new(|| {
+    let t = ScheduledThreadPool::new(1);
+    Arc::new(t)
+});
+
 pub type ConnectionPool = r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>;
 pub type PConnInner = r2d2::PooledConnection<r2d2_sqlite::SqliteConnectionManager>;
 
@@ -50,6 +57,7 @@ pub(crate) fn new_connection_pool(path: &Path, kind: DbKind) -> ConnectionPool {
         .min_idle(Some(0))
         // Close connections after 30-60 seconds of idle time
         .idle_timeout(Some(Duration::from_secs(30)))
+        .thread_pool(R2D2_THREADPOOL.clone())
         .connection_customizer(customizer)
         .build(manager)
         .unwrap()
