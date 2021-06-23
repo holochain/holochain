@@ -119,7 +119,7 @@ where
 
     /// The database for storing AgentInfoSigned
     p2p_env: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
-    
+
     p2p_metrics_env: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
 
     /// The database for persisting [ConductorState]
@@ -1012,7 +1012,7 @@ where
             })
             .clone()
     }
-    
+
     pub(super) fn print_setup(&self) {
         use std::fmt::Write;
         let mut out = String::new();

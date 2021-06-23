@@ -100,64 +100,63 @@ impl Producers {
         if self.total >= 100 {
             tokio::time::sleep(std::time::Duration::from_secs(5)).await;
         } else {
-
-        for _ in 0..10 {
-            let conductor = &self.conductors[self.i];
-            let agent_key = conductor
-                .keystore()
-                .clone()
-                .generate_sign_keypair_from_pure_entropy()
+            for _ in 0..10 {
+                let conductor = &self.conductors[self.i];
+                let agent_key = conductor
+                    .keystore()
+                    .clone()
+                    .generate_sign_keypair_from_pure_entropy()
+                    .await
+                    .expect("Failed to generate agent key");
+                self.i += 1;
+                if self.i >= self.conductors.len() {
+                    self.i = 0;
+                }
+                self.total += 1;
+                let source = AppBundleSource::Path(PathBuf::from(
+                    "/home/freesig/holochain/elemental-chat/elemental-chat.happ",
+                ));
+                let mut membrane_proofs = HashMap::new();
+                membrane_proofs.insert(
+                    "elemental-chat".to_string(),
+                    SerializedBytes::from(UnsafeBytes::from(vec![0])),
+                );
+                let payload = InstallAppBundlePayload {
+                    source,
+                    agent_key,
+                    installed_app_id: Some(format!("ec {}", self.total)),
+                    membrane_proofs,
+                    uid: None,
+                };
+                let id = holochain::conductor::handle::ConductorHandleT::install_app_bundle(
+                    conductor.inner_handle(),
+                    payload,
+                )
                 .await
-                .expect("Failed to generate agent key");
-            self.i += 1;
-            if self.i >= self.conductors.len() {
-                self.i = 0;
+                .expect("Failed to install");
+                let id = id.installed_app_id().clone();
+                conductor
+                    .activate_app(id)
+                    .await
+                    .expect("Failed to activate app");
+
+                let errors = conductor
+                    .inner_handle()
+                    .setup_cells()
+                    .await
+                    .expect("Failed to setup cells");
+                assert_eq!(0, errors.len(), "{:?}", errors);
             }
-            self.total += 1;
-            let source = AppBundleSource::Path(PathBuf::from(
-                "/home/freesig/holochain/elemental-chat/elemental-chat.happ",
-            ));
-            let mut membrane_proofs = HashMap::new();
-            membrane_proofs.insert(
-                "elemental-chat".to_string(),
-                SerializedBytes::from(UnsafeBytes::from(vec![0])),
-            );
-            let payload = InstallAppBundlePayload {
-                source,
-                agent_key,
-                installed_app_id: Some(format!("ec {}", self.total)),
-                membrane_proofs,
-                uid: None,
-            };
-            let id = holochain::conductor::handle::ConductorHandleT::install_app_bundle(
-                conductor.inner_handle(),
-                payload,
-            )
-            .await
-            .expect("Failed to install");
-            let id = id.installed_app_id().clone();
-            conductor
-                .activate_app(id)
-                .await
-                .expect("Failed to activate app");
-
-            let errors = conductor
-                .inner_handle()
-                .setup_cells()
-                .await
-                .expect("Failed to setup cells");
-            assert_eq!(0, errors.len(), "{:?}", errors);
-        }
-        let mut cells = Vec::new();
-        for c in &self.conductors {
-            let ids = c.list_cell_ids().await.expect("Failed to list cell ids");
-            for id in ids {
-                cells.push(c.get_cell_env(&id).await.unwrap());
+            let mut cells = Vec::new();
+            for c in &self.conductors {
+                let ids = c.list_cell_ids().await.expect("Failed to list cell ids");
+                for id in ids {
+                    cells.push(c.get_cell_env(&id).await.unwrap());
+                }
             }
-        }
-        let cell_refs = cells.iter().collect::<Vec<_>>();
+            let cell_refs = cells.iter().collect::<Vec<_>>();
 
-        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
         }
         // consistency_envs(&cell_refs, 2000, std::time::Duration::from_millis(500)).await;
     }

@@ -3,10 +3,9 @@ use chashmap::CHashMap;
 use once_cell::sync::Lazy;
 use rusqlite::*;
 use scheduled_thread_pool::ScheduledThreadPool;
-use std::sync::Arc;
 use std::{
-    collections::HashMap,
     path::{Path, PathBuf},
+    sync::Arc,
     time::Duration,
 };
 
@@ -14,31 +13,30 @@ mod singleton_conn;
 
 const SQLITE_BUSY_TIMEOUT: Duration = Duration::from_secs(30);
 
-pub(crate) static DATABASE_HANDLES: Lazy<parking_lot::Mutex<HashMap<PathBuf, DbWrite>>> =
-    Lazy::new(|| {
-        // This is just a convenient place that we know gets initialized
-        // both in the final binary holochain && in all relevant tests
-        //
-        // Holochain (and most binaries) are left in invalid states
-        // if a thread panic!s - switch to failing fast in that case.
-        //
-        // We tried putting `panic = "abort"` in the Cargo.toml,
-        // but somehow that breaks the wasmer / test_utils integration.
+pub(crate) static DATABASE_HANDLES: Lazy<CHashMap<PathBuf, DbWrite>> = Lazy::new(|| {
+    // This is just a convenient place that we know gets initialized
+    // both in the final binary holochain && in all relevant tests
+    //
+    // Holochain (and most binaries) are left in invalid states
+    // if a thread panic!s - switch to failing fast in that case.
+    //
+    // We tried putting `panic = "abort"` in the Cargo.toml,
+    // but somehow that breaks the wasmer / test_utils integration.
 
-        let orig_handler = std::panic::take_hook();
-        std::panic::set_hook(Box::new(move |panic_info| {
-            // print the panic message
-            eprintln!("FATAL PANIC {:#?}", panic_info);
-            // invoke the original handler
-            orig_handler(panic_info);
-            // // Abort the process
-            // // TODO - we need a better solution than this, but if there is
-            // // no better solution, we can uncomment the following line:
-            // std::process::abort();
-        }));
+    let orig_handler = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic_info| {
+        // print the panic message
+        eprintln!("FATAL PANIC {:#?}", panic_info);
+        // invoke the original handler
+        orig_handler(panic_info);
+        // // Abort the process
+        // // TODO - we need a better solution than this, but if there is
+        // // no better solution, we can uncomment the following line:
+        // std::process::abort();
+    }));
 
-        parking_lot::Mutex::new(HashMap::new())
-    });
+    CHashMap::new()
+});
 
 static R2D2_THREADPOOL: Lazy<Arc<ScheduledThreadPool>> = Lazy::new(|| {
     let t = ScheduledThreadPool::new(1);

@@ -82,12 +82,11 @@ impl DbWrite {
     /// Create or open an existing database reference,
     pub fn open(path_prefix: &Path, kind: DbKind) -> DatabaseResult<DbWrite> {
         let path = path_prefix.join(kind.filename());
-        let db = { DATABASE_HANDLES.lock().get(&path).cloned() };
-        if let Some(v) = db {
-            Ok(v)
+        if let Some(v) = DATABASE_HANDLES.get(&path) {
+            Ok(v.clone())
         } else {
             let db = Self::new(path_prefix, kind)?;
-            DATABASE_HANDLES.lock().insert(path, db.clone());
+            DATABASE_HANDLES.insert_new(path, db.clone());
             Ok(db)
         }
     }
@@ -135,9 +134,8 @@ impl DbWrite {
         match map.get(kind) {
             Some(s) => s.clone(),
             None => {
-                // let num_cpus = num_cpus::get();
-                // let num_read_threads = if num_cpus < 4 { 4 } else { num_cpus / 2 };
-                let num_read_threads = 4;
+                let num_cpus = num_cpus::get();
+                let num_read_threads = if num_cpus < 4 { 4 } else { num_cpus / 2 };
                 let s = Arc::new(Semaphore::new(num_read_threads));
                 map.insert(kind.clone(), s.clone());
                 s

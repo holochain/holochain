@@ -224,7 +224,7 @@ impl TestEnvs {
     pub fn p2p(&self) -> Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>> {
         self.p2p.clone()
     }
-    
+
     pub fn p2p_metrics(&self) -> Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>> {
         self.p2p_metrics.clone()
     }
