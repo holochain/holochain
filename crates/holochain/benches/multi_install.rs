@@ -51,7 +51,7 @@ fn multi_install(bench: &mut Criterion) {
         sync(&client, num_machines, &url).await;
     });
 
-    let mut producers = runtime.block_on(setup(num_conductors));
+    let mut producers = runtime.block_on(setup(num_conductors, &url));
     group.bench_function(BenchmarkId::new("test", format!("install")), |b| {
         b.iter(|| {
             runtime.block_on(async { producers.run().await });
@@ -191,7 +191,7 @@ impl Producers {
     }
 }
 
-async fn setup(num_conductors: usize) -> Producers {
+async fn setup(num_conductors: usize, url: &str) -> Producers {
     let config = || {
         let tuning: KitsuneP2pTuningParams = KitsuneP2pTuningParams::default();
         // tuning.gossip_peer_on_success_next_gossip_delay_ms = 1000 * 10;
@@ -199,7 +199,7 @@ async fn setup(num_conductors: usize) -> Producers {
 
         let mut network = KitsuneP2pConfig::default();
         network.tuning_params = Arc::new(tuning);
-        network.bootstrap_service = Some(url2::url2!("http://127.0.0.1:3030"));
+        network.bootstrap_service = Some(url2::Url2::parse(url));
         // network.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host"));
         network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
             bind_to: None,
