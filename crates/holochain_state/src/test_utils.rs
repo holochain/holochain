@@ -229,10 +229,6 @@ impl TestEnvs {
         self.p2p_metrics.clone()
     }
 
-    pub fn p2p_metrics(&self) -> Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>> {
-        self.p2p_metrics.clone()
-    }
-
     /// Get the root temp dir for these environments
     pub fn tempdir(&self) -> Arc<TempDir> {
         self.tempdir.clone()

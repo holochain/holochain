@@ -122,8 +122,6 @@ where
     
     p2p_metrics_env: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
 
-    p2p_metrics_env: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
-
     /// The database for persisting [ConductorState]
     // state_db: ConductorStateDb,
 
@@ -1015,19 +1013,6 @@ where
             .clone()
     }
     
-    pub(super) fn p2p_metrics_env(&self, space: Arc<KitsuneSpace>) -> EnvWrite {
-        let mut p2p_metrics_env = self.p2p_metrics_env.lock();
-        p2p_metrics_env
-            .entry(space.clone())
-            .or_insert_with(move || {
-                let root_env_dir = self.root_env_dir.as_ref();
-                let keystore = self.keystore.clone();
-                EnvWrite::open(root_env_dir, DbKind::P2pMetrics(space), keystore)
-                    .expect("failed to open p2p_store database")
-            })
-            .clone()
-    }
-
     pub(super) fn print_setup(&self) {
         use std::fmt::Write;
         let mut out = String::new();
