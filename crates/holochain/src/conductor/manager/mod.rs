@@ -119,10 +119,9 @@ pub enum TaskOutcome {
     MinorError(ManagedTaskError, String),
     /// Close the conductor down because this is an unrecoverable error.
     ShutdownConductor(Box<ManagedTaskError>, String),
-    /// Remove the App which caused the panic, but let all other apps remain.
-    UninstallApp(CellId, Box<ManagedTaskError>, String),
-    /// Deactivate all apps which contain the problematic Cell.
-    DeactivateApps(CellId, Box<ManagedTaskError>, String),
+    /// Either pause or deactivate all apps which contain the problematic Cell,
+    /// depending upon the specific error.
+    StopApps(CellId, Box<ManagedTaskError>, String),
 }
 
 struct TaskManager {
@@ -195,25 +194,10 @@ async fn run(
                     error!("Shutting down conductor due to unrecoverable error: {:?}\nContext: {}", error, context);
                     return Err(TaskManagerError::Unrecoverable(error));
                 },
-                Some(TaskOutcome::UninstallApp(cell_id, error, context)) => {
-                    // TODO: do we need this anymore, since apps aren't installed if they don't pass genesis?
-                    tracing::error!("About to uninstall apps");
-                    let app_ids = conductor.list_running_apps_for_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
-                    tracing::error!(
-                        "UNINSTALLING the following apps due to an unrecoverable error during genesis: {:?}\nError: {:?}\nContext: {}",
-                        app_ids,
-                        error,
-                        context
-                    );
-                    for app_id in app_ids.iter() {
-                        conductor.uninstall_app(app_id).await.map_err(TaskManagerError::internal)?;
-                    }
-                    tracing::error!("Apps uninstalled.");
-                },
-                Some(TaskOutcome::DeactivateApps(cell_id, error, context)) => {
+                Some(TaskOutcome::StopApps(cell_id, error, context)) => {
                     tracing::error!("About to automatically stop apps");
                     let app_ids = conductor.list_running_apps_for_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
-                    if todo!("Distinguish between recoverable and unrecoverable errors") {
+                    if error.is_recoverable() {
                         tracing::error!(
                             "PAUSING the following apps due to a recoverable error: {:?}\nError: {:?}\nContext: {}",
                             app_ids,
@@ -257,34 +241,7 @@ fn handle_completed_task(kind: &TaskKind, result: ManagedTaskResult, name: Strin
         },
         TaskKind::CellCritical(cell_id) => match result {
             Ok(_) => LogInfo(name),
-            Err(err) => match &err {
-                ManagedTaskError::Conductor(conductor_err) => match conductor_err {
-                    // If the error was due to validation failure during genesis,
-                    // just uninstall the app.
-                    ConductorError::WorkflowError(WorkflowError::GenesisFailure(_))
-                    | ConductorError::GenesisFailed { .. } => {
-                        UninstallApp(cell_id.to_owned(), Box::new(err), name)
-                    }
-
-                    // For all other errors, deactivate the offending app
-                    // TODO: revisit this and handle in a more fine-grained way.
-                    _ => DeactivateApps(cell_id.to_owned(), Box::new(err), name),
-                },
-                // If the task panicked, deactivate the app.
-                // TODO: ideally, we could differentiate between the case of
-                //   pre- and post-genesis failure, using UninstallApp for
-                //   the former and DeactivateApps for the latter. However,
-                //   there is no easy way to do this, so we simply deactivate
-                //   in both cases, so we don't lose data.
-                //   I think B-04188 would make this distinction possible.
-                ManagedTaskError::Join(_) => {
-                    DeactivateApps(cell_id.to_owned(), Box::new(err), name)
-                }
-
-                // For all others, deactivate the offending app
-                // TODO: revisit this and handle in a more fine-grained way.
-                _ => DeactivateApps(cell_id.to_owned(), Box::new(err), name),
-            },
+            Err(err) => StopApps(cell_id.to_owned(), Box::new(err), name),
         },
         TaskKind::Generic(f) => f(result),
     }

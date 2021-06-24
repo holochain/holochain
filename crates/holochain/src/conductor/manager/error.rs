@@ -45,3 +45,17 @@ pub enum ManagedTaskError {
 }
 
 pub type ManagedTaskResult = Result<(), ManagedTaskError>;
+
+impl ManagedTaskError {
+    pub fn is_recoverable(&self) -> bool {
+        use ConductorError as C;
+        use ManagedTaskError::*;
+        match self {
+            Io(_) | Join(_) | Recv(_) => false,
+            Conductor(err) => match err {
+                C::ShuttingDown => true,
+                _ => todo!("identify all recoverable cases"),
+            },
+        }
+    }
+}

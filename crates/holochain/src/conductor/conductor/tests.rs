@@ -46,7 +46,7 @@ async fn can_update_state() {
 
     conductor
         .update_state(|mut state| {
-            state.add_app(app);
+            state.add_app(app)?;
             Ok(state)
         })
         .await
