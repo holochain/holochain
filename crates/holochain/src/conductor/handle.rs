@@ -574,7 +574,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .conductor
             .write()
             .await
-            .add_stopped_app_to_db(app)
+            .add_deactivated_app_to_db(app)
             .await?;
 
         Ok(())
@@ -625,14 +625,14 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let app = InstalledAppCommon::new(installed_app_id, agent_key, slots);
 
         // Update the db
-        let app = self
+        let stopped_app = self
             .conductor
             .write()
             .await
-            .add_stopped_app_to_db(app.clone())
+            .add_deactivated_app_to_db(app)
             .await?;
 
-        Ok(app)
+        Ok(stopped_app)
     }
 
     async fn setup_cells(self: Arc<Self>) -> ConductorResult<Vec<CreateAppError>> {
@@ -664,7 +664,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .conductor
             .write()
             .await
-            .activate_app_in_db(installed_app_id)
+            .enable_app_in_db(installed_app_id)
             .await?;
         Ok(app)
         // MD: Should we be doing `Conductor::add_cells()` here? (see below comment)
@@ -678,7 +678,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let mut conductor = self.conductor.write().await;
         let cell_ids_to_remove = conductor
             .disable_app_in_db(installed_app_id, reason)
-            .await?;
+            .await?
+            .all_cells()
+            .cloned()
+            .collect();
         // MD: I'm not sure about this. We never add the cells back in after re-activating an app,
         //     so it seems either we shouldn't remove them here, or we should be sure to add them
         //     back in when re-activating.
@@ -700,9 +703,9 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn uninstall_app(&self, installed_app_id: &InstalledAppId) -> ConductorResult<()> {
         let mut conductor = self.conductor.write().await;
-        if let Some(cell_ids_to_remove) = conductor.remove_app_from_db(installed_app_id).await? {
-            conductor.remove_cells(cell_ids_to_remove).await;
-        }
+        let app = conductor.remove_app_from_db(installed_app_id).await?;
+        let cell_ids_to_remove = app.all_cells().cloned().collect();
+        conductor.remove_cells(cell_ids_to_remove).await;
         Ok(())
     }
 

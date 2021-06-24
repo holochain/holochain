@@ -511,10 +511,11 @@ pub mod test {
         let (_tmpdir, conductor_handle) =
             setup_admin_fake_cells(cell_ids_with_proofs, dna_store).await;
         let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
+        let app_id = "test app".to_string();
 
         // Activate the app
-        let msg = AdminRequest::ActivateApp {
-            installed_app_id: "test app".to_string(),
+        let msg = AdminRequest::EnableApp {
+            installed_app_id: app_id.clone(),
         };
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
@@ -532,14 +533,13 @@ pub mod test {
         // Get the state
         let state: ConductorState = conductor_handle.get_state_from_handle().await.unwrap();
 
-        // Check it is not in stopped apps
-        let r = state.stopped_apps.get("test app");
-        assert_eq!(r, None);
-
-        // Check it is in running apps
+        // Check it is running, and get all cells
         let cell_ids: HashSet<CellId> = state
-            .running_apps
-            .get("test app")
+            .get_app(&app_id)
+            .map(|app| {
+                assert_eq!(*app.status(), InstalledAppStatus::Running);
+                app
+            })
             .unwrap()
             .all_cells()
             .cloned()
@@ -554,9 +554,9 @@ pub mod test {
         assert_eq!(expected, cell_ids);
 
         // Check that it is returned in get_app_info as running
-        let maybe_info = state.get_app_info(&"test app".to_string());
+        let maybe_info = state.get_app_info(&app_id);
         if let Some(info) = maybe_info {
-            assert_eq!(info.installed_app_id, "test app");
+            assert_eq!(info.installed_app_id, app_id);
             assert_matches!(info.status, InstalledAppInfoStatus::Running);
         } else {
             assert!(false);
@@ -564,7 +564,7 @@ pub mod test {
 
         // Now deactivate app
         let msg = AdminRequest::DeactivateApp {
-            installed_app_id: "test app".to_string(),
+            installed_app_id: app_id.clone(),
         };
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
@@ -582,14 +582,13 @@ pub mod test {
         // Get the state
         let state = conductor_handle.get_state_from_handle().await.unwrap();
 
-        // Check it's removed from running apps
-        let r = state.running_apps.get("test app");
-        assert_eq!(r, None);
-
-        // Check it's added to stopped apps
+        // Check it's stopped, and get all cells
         let cell_ids: HashSet<CellId> = state
-            .stopped_apps
-            .get("test app")
+            .get_app(&app_id)
+            .map(|app| {
+                assert_matches!(*app.status(), InstalledAppStatus::Stopped(_));
+                app
+            })
             .unwrap()
             .all_cells()
             .cloned()
@@ -598,9 +597,9 @@ pub mod test {
         assert_eq!(expected, cell_ids);
 
         // Check that it is returned in get_app_info as disabled
-        let maybe_info = state.get_app_info(&"test app".to_string());
+        let maybe_info = state.get_app_info(&app_id);
         if let Some(info) = maybe_info {
-            assert_eq!(info.installed_app_id, "test app");
+            assert_eq!(info.installed_app_id, app_id);
             assert_matches!(info.status, InstalledAppInfoStatus::Disabled { .. });
         } else {
             assert!(false);

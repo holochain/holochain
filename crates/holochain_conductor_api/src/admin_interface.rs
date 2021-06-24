@@ -445,6 +445,8 @@ impl ExternalApiWireError {
 // Filter to get either only active or only inactive apps with `ListApps`
 // TODO: rename to Enabled | Disabled
 pub enum AppStatusFilter {
+    #[deprecated = "rename, refactor"]
     Active,
+    #[deprecated = "rename, refactor"]
     Inactive,
 }

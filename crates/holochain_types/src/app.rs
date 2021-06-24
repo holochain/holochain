@@ -215,10 +215,22 @@ impl InstalledCell {
 
 /// An app which has been installed.
 /// An installed app is merely its collection of "slots", associated with an ID.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::From)]
+#[derive(
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    derive_more::Constructor,
+    shrinkwraprs::Shrinkwrap,
+)]
+#[shrinkwrap(mutable, unsafe_ignore_visibility)]
 pub struct InstalledApp {
+    #[shrinkwrap(main_field)]
     app: InstalledAppCommon,
-    status: InstalledAppStatus,
+    /// The status of the installed app
+    pub status: InstalledAppStatus,
 }
 
 impl InstalledApp {
@@ -245,25 +257,27 @@ impl InstalledApp {
         (self.app, self.status)
     }
 
-    /// Return the status
+    /// Accessor
     pub fn status(&self) -> &InstalledAppStatus {
         &self.status
     }
-}
 
-impl AsRef<InstalledAppCommon> for InstalledApp {
-    fn as_ref(&self) -> &InstalledAppCommon {
-        &self.app
+    /// Accessor
+    pub fn id(&self) -> &InstalledAppId {
+        &self.app.installed_app_id
     }
 }
 
-impl std::ops::Deref for InstalledApp {
-    type Target = InstalledAppCommon;
+impl automap::AutoMapped for InstalledApp {
+    type Key = InstalledAppId;
 
-    fn deref(&self) -> &Self::Target {
-        self.as_ref()
+    fn key(&self) -> &Self::Key {
+        &self.app.installed_app_id
     }
 }
+
+/// A map from InstalledAppId -> InstalledApp
+pub type InstalledAppMap = automap::AutoHashMap<InstalledApp>;
 
 /// An active app
 #[derive(
@@ -276,46 +290,21 @@ impl std::ops::Deref for InstalledApp {
     derive_more::From,
     shrinkwraprs::Shrinkwrap,
 )]
+#[shrinkwrap(mutable, unsafe_ignore_visibility)]
 pub struct RunningApp(InstalledAppCommon);
 
 impl RunningApp {
     /// Convert to a StoppedApp with the given reason
     pub fn into_stopped(self, reason: StoppedAppReason) -> StoppedApp {
-        StoppedApp::new(self.0, reason)
-    }
-
-    /// Add a cloned cell
-    pub fn add_clone(&mut self, slot_id: &SlotId, cell_id: CellId) -> AppResult<()> {
-        let slot = self.0.slot_mut(slot_id)?;
-        assert_eq!(
-            cell_id.agent_pubkey(),
-            slot.agent_key(),
-            "A clone cell must use the same agent key as the slot it is added to"
-        );
-        if slot.clones.len() as u32 >= slot.clone_limit {
-            return Err(AppError::CloneLimitExceeded(slot.clone_limit, slot.clone()));
+        StoppedApp {
+            app: self.0,
+            reason,
         }
-        let _ = slot.clones.insert(cell_id);
-        Ok(())
-    }
-
-    /// Remove a cloned cell
-    pub fn remove_clone(&mut self, slot_id: &SlotId, cell_id: &CellId) -> AppResult<bool> {
-        let slot = self.0.slot_mut(slot_id)?;
-        Ok(slot.clones.remove(cell_id))
     }
 
     /// Move inner type out
     pub fn into_common(self) -> InstalledAppCommon {
         self.0
-    }
-}
-
-impl automap::AutoMapped for RunningApp {
-    type Key = InstalledAppId;
-
-    fn key(&self) -> &Self::Key {
-        &self.0.installed_app_id
     }
 }
 
@@ -332,6 +321,7 @@ impl From<RunningApp> for InstalledApp {
 #[derive(
     Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, shrinkwraprs::Shrinkwrap,
 )]
+#[shrinkwrap(mutable, unsafe_ignore_visibility)]
 pub struct StoppedApp {
     #[shrinkwrap(main_field)]
     app: InstalledAppCommon,
@@ -340,6 +330,7 @@ pub struct StoppedApp {
 
 impl StoppedApp {
     /// Constructor
+    #[deprecated = "should only be constructable through conversions from other types"]
     pub fn new(app: InstalledAppCommon, reason: StoppedAppReason) -> Self {
         Self { app, reason }
     }
@@ -360,14 +351,6 @@ impl StoppedApp {
     /// Move inner type out
     pub fn into_common(self) -> InstalledAppCommon {
         self.app
-    }
-}
-
-impl automap::AutoMapped for StoppedApp {
-    type Key = InstalledAppId;
-
-    fn key(&self) -> &Self::Key {
-        &self.app.installed_app_id
     }
 }
 
@@ -414,7 +397,7 @@ impl InstalledAppCommon {
     }
 
     /// Accessor
-    pub fn installed_app_id(&self) -> &InstalledAppId {
+    pub fn id(&self) -> &InstalledAppId {
         &self.installed_app_id
     }
 
@@ -460,6 +443,27 @@ impl InstalledAppCommon {
     /// Accessor
     pub fn slots(&self) -> &HashMap<SlotId, AppSlot> {
         &self.slots
+    }
+
+    /// Add a cloned cell
+    pub fn add_clone(&mut self, slot_id: &SlotId, cell_id: CellId) -> AppResult<()> {
+        let slot = self.slot_mut(slot_id)?;
+        assert_eq!(
+            cell_id.agent_pubkey(),
+            slot.agent_key(),
+            "A clone cell must use the same agent key as the slot it is added to"
+        );
+        if slot.clones.len() as u32 >= slot.clone_limit {
+            return Err(AppError::CloneLimitExceeded(slot.clone_limit, slot.clone()));
+        }
+        let _ = slot.clones.insert(cell_id);
+        Ok(())
+    }
+
+    /// Remove a cloned cell
+    pub fn remove_clone(&mut self, slot_id: &SlotId, cell_id: &CellId) -> AppResult<bool> {
+        let slot = self.slot_mut(slot_id)?;
+        Ok(slot.clones.remove(cell_id))
     }
 
     /// Accessor
@@ -548,6 +552,14 @@ impl InstalledAppStatus {
     pub fn never_started() -> Self {
         Self::Stopped(StoppedAppReason::NeverStarted)
     }
+
+    /// Does this status correspond to an Enabled state?
+    pub fn is_enabled(&self) -> bool {
+        match self {
+            Self::Running | Self::Stopped(StoppedAppReason::Paused(_)) => true,
+            _ => false,
+        }
+    }
 }
 
 /// The various reasons for why an App is not in the Running state.
@@ -597,10 +609,6 @@ pub enum DisabledAppReason {
     /// The disabling was due to an UNRECOVERABLE error
     Error(String),
 }
-/// A map from InstalledAppId -> RunningApp
-pub type RunningAppMap = automap::AutoHashMap<RunningApp>;
-/// A map from InstalledAppId -> StoppedApp
-pub type StoppedAppMap = automap::AutoHashMap<StoppedApp>;
 
 /// Cell "slots" correspond to cell entries in the AppManifest.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

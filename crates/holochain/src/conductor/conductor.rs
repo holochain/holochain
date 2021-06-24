@@ -520,9 +520,6 @@ where
         &self,
         conductor_handle: ConductorHandle,
     ) -> ConductorResult<Vec<Result<Vec<(Cell, InitialQueueTriggers)>, CreateAppError>>> {
-        // Only create the active apps
-        let active_apps = self.get_state().await?.running_apps;
-
         // Data required to create apps
         let root_env_dir = self.root_env_dir.clone();
         let keystore = self.keystore.clone();
@@ -532,97 +529,99 @@ where
             .expect("Task manager not initialized");
 
         // Closure for creating all cells in an app
-        let tasks = active_apps.into_iter().map(
-            move |(installed_app_id, app): (InstalledAppId, RunningApp)| {
-                // Clone data for async block
-                let root_env_dir = std::path::PathBuf::from(root_env_dir.clone());
-                let conductor_handle = conductor_handle.clone();
-                let keystore = keystore.clone();
+        let state = self.get_state().await?;
+        let tasks =
+            state
+                .enabled_apps()
+                .map(move |(app_id, app): (&InstalledAppId, &InstalledApp)| {
+                    // Clone data for async block
+                    let root_env_dir = std::path::PathBuf::from(root_env_dir.clone());
+                    let conductor_handle = conductor_handle.clone();
+                    let keystore = keystore.clone();
 
-                // Task that creates the cells
-                async move {
-                    // Only create cells not already created
-                    let cells_to_create = app
-                        .all_cells()
-                        .filter(|cell_id| !self.cells.contains_key(cell_id))
-                        .map(|cell_id| {
-                            (
-                                cell_id,
-                                root_env_dir.clone(),
-                                keystore.clone(),
-                                conductor_handle.clone(),
-                            )
-                        });
+                    // Task that creates the cells
+                    async move {
+                        // Only create cells not already created
+                        let cells_to_create = app
+                            .all_cells()
+                            .filter(|cell_id| !self.cells.contains_key(cell_id))
+                            .map(|cell_id| {
+                                (
+                                    cell_id,
+                                    root_env_dir.clone(),
+                                    keystore.clone(),
+                                    conductor_handle.clone(),
+                                )
+                            });
 
-                    use holochain_p2p::actor::HolochainP2pRefToCell;
+                        use holochain_p2p::actor::HolochainP2pRefToCell;
 
-                    // Create each cell
-                    let cells_tasks = cells_to_create.map(
-                        |(cell_id, dir, keystore, conductor_handle)| async move {
-                            let holochain_p2p_cell = self.holochain_p2p.to_cell(
-                                cell_id.dna_hash().clone(),
-                                cell_id.agent_pubkey().clone(),
-                            );
+                        // Create each cell
+                        let cells_tasks = cells_to_create.map(
+                            |(cell_id, dir, keystore, conductor_handle)| async move {
+                                let holochain_p2p_cell = self.holochain_p2p.to_cell(
+                                    cell_id.dna_hash().clone(),
+                                    cell_id.agent_pubkey().clone(),
+                                );
 
-                            let env = EnvWrite::open(
-                                &dir,
-                                DbKind::Cell(cell_id.clone()),
-                                keystore.clone(),
-                            )?;
-                            let cache = self
-                                .get_or_create_cache(cell_id.dna_hash())
-                                .map_err(|e| CellError::FailedToCreateCache(e.into()))?;
-                            Cell::create(
-                                cell_id.clone(),
-                                conductor_handle.clone(),
-                                env,
-                                cache,
-                                holochain_p2p_cell,
-                                task_manager.task_add_sender().clone(),
-                                task_manager.task_stop_broadcaster().clone(),
-                            )
-                            .await
-                        },
-                    );
+                                let env = EnvWrite::open(
+                                    &dir,
+                                    DbKind::Cell(cell_id.clone()),
+                                    keystore.clone(),
+                                )?;
+                                let cache = self
+                                    .get_or_create_cache(cell_id.dna_hash())
+                                    .map_err(|e| CellError::FailedToCreateCache(e.into()))?;
+                                Cell::create(
+                                    cell_id.clone(),
+                                    conductor_handle.clone(),
+                                    env,
+                                    cache,
+                                    holochain_p2p_cell,
+                                    task_manager.task_add_sender().clone(),
+                                    task_manager.task_stop_broadcaster().clone(),
+                                )
+                                .await
+                            },
+                        );
 
-                    // Join all the cell create tasks for this app
-                    // and separate any errors
-                    let (success, errors): (Vec<_>, Vec<_>) =
-                        futures::future::join_all(cells_tasks)
-                            .await
-                            .into_iter()
-                            .partition(Result::is_ok);
-                    // unwrap safe because of the partition
-                    let success = success.into_iter().map(Result::unwrap);
+                        // Join all the cell create tasks for this app
+                        // and separate any errors
+                        let (success, errors): (Vec<_>, Vec<_>) =
+                            futures::future::join_all(cells_tasks)
+                                .await
+                                .into_iter()
+                                .partition(Result::is_ok);
+                        // unwrap safe because of the partition
+                        let success = success.into_iter().map(Result::unwrap);
 
-                    // If there were errors, cleanup and return the errors
-                    if !errors.is_empty() {
-                        for cell in success {
-                            // Error needs to capture which app failed
-                            cell.0.destroy().await.map_err(|e| CreateAppError::Failed {
-                                installed_app_id: installed_app_id.clone(),
-                                errors: vec![e],
-                            })?;
-                        }
-                        // match needed to avoid Debug requirement on unwrap_err
-                        let errors = errors
-                            .into_iter()
-                            .map(|e| match e {
-                                Err(e) => e,
-                                Ok(_) => unreachable!("Safe because of the partition"),
+                        // If there were errors, cleanup and return the errors
+                        if !errors.is_empty() {
+                            for cell in success {
+                                // Error needs to capture which app failed
+                                cell.0.destroy().await.map_err(|e| CreateAppError::Failed {
+                                    installed_app_id: app_id.clone(),
+                                    errors: vec![e],
+                                })?;
+                            }
+                            // match needed to avoid Debug requirement on unwrap_err
+                            let errors = errors
+                                .into_iter()
+                                .map(|e| match e {
+                                    Err(e) => e,
+                                    Ok(_) => unreachable!("Safe because of the partition"),
+                                })
+                                .collect();
+                            Err(CreateAppError::Failed {
+                                installed_app_id: app_id.clone(),
+                                errors,
                             })
-                            .collect();
-                        Err(CreateAppError::Failed {
-                            installed_app_id,
-                            errors,
-                        })
-                    } else {
-                        // No errors so return the cells
-                        Ok(success.collect())
+                        } else {
+                            // No errors so return the cells
+                            Ok(success.collect())
+                        }
                     }
-                }
-            },
-        );
+                });
 
         // Join on all apps and return a list of
         // apps that had succelly created cells
@@ -630,96 +629,77 @@ where
         Ok(futures::future::join_all(tasks).await)
     }
 
-    /// Register an app as inactive in the database
-    pub(super) async fn add_stopped_app_to_db(
+    /// Register an app as deactivated in the database
+    pub(super) async fn add_deactivated_app_to_db(
         &mut self,
         app: InstalledAppCommon,
     ) -> ConductorResult<StoppedApp> {
-        let app = StoppedApp::new(app, StoppedAppReason::NeverStarted);
-        let ret = app.clone();
-        self.update_state(move |mut state| {
-            let is_active = state.running_apps.contains_key(app.installed_app_id());
-            let is_inactive = state.stopped_apps.insert(app.clone()).is_some();
-            if is_active || is_inactive {
-                Err(ConductorError::AppAlreadyInstalled(
-                    app.installed_app_id().clone(),
-                ))
-            } else {
-                Ok(state)
-            }
-        })
-        .await?;
-        Ok(ret)
-    }
-
-    /// Activate an app in the database
-    pub(super) async fn activate_app_in_db(
-        &mut self,
-        installed_app_id: InstalledAppId,
-    ) -> ConductorResult<RunningApp> {
-        let (_, active_app) = self
+        let (_, stopped_app) = self
             .update_state_prime(move |mut state| {
-                let app = state
-                    .stopped_apps
-                    .remove(&installed_app_id)
-                    .ok_or_else(|| ConductorError::AppNotInstalled(installed_app_id.clone()))?;
-                let active_app = app.into_active();
-                state.running_apps.insert(active_app.clone());
-                Ok((state, active_app))
+                let stopped_app = state.add_app(app)?;
+                Ok((state, stopped_app))
             })
             .await?;
-        Ok(active_app)
+        Ok(stopped_app)
     }
 
-    /// Deactivate an app in the database
+    /// Enable an app in the database.
+    /// This also causes the app to enter the Running state, regardless of whether
+    /// or not it was already enabled or disabled.
+    pub(super) async fn enable_app_in_db(
+        &mut self,
+        app_id: InstalledAppId,
+    ) -> ConductorResult<RunningApp> {
+        use InstalledAppStatus::*;
+        let (_, app) = self
+            .update_state_prime(move |mut state| {
+                let app = state
+                    .update_app_status(&app_id, Running)?
+                    .clone()
+                    .into_app_and_status()
+                    .0;
+                Ok((state, app))
+            })
+            .await?;
+        Ok(app.into())
+    }
+
+    /// Disable an app in the database, returning the installed app
     pub(super) async fn disable_app_in_db(
         &mut self,
-        installed_app_id: InstalledAppId,
+        app_id: InstalledAppId,
         reason: DisabledAppReason,
-    ) -> ConductorResult<Vec<CellId>> {
+    ) -> ConductorResult<InstalledApp> {
         let state = self
             .update_state({
-                let installed_app_id = installed_app_id.clone();
+                let app_id = app_id.clone();
                 move |mut state| {
-                    let app = state
-                        .running_apps
-                        .remove(&installed_app_id)
-                        .ok_or_else(|| ConductorError::AppNotRunning(installed_app_id.clone()))?;
-                    state.stopped_apps.insert(app.into_stopped(reason.into()));
+                    state.update_app_status(
+                        &app_id,
+                        InstalledAppStatus::Stopped(StoppedAppReason::Disabled(reason)),
+                    )?;
                     Ok(state)
                 }
             })
             .await?;
-        Ok(state
-            .stopped_apps
-            .get(&installed_app_id)
-            .expect("This app was just put here")
-            .clone()
-            .all_cells()
-            .cloned()
-            .collect())
+        Ok(state.get_app(&app_id)?.clone())
     }
 
-    /// Entirely remove an app from the database
+    /// Entirely remove an app from the database, returning the removed app.
     pub(super) async fn remove_app_from_db(
         &mut self,
-        installed_app_id: &InstalledAppId,
-    ) -> ConductorResult<Option<Vec<CellId>>> {
-        let (_state, cells_to_remove) = self
+        app_id: &InstalledAppId,
+    ) -> ConductorResult<InstalledApp> {
+        let (_state, app) = self
             .update_state_prime({
-                let installed_app_id = installed_app_id.clone();
+                let app_id = app_id.clone();
                 move |mut state| {
-                    let active = state.running_apps.remove(&installed_app_id);
-                    let inactive = state.stopped_apps.remove(&installed_app_id);
-                    let cells = active
-                        .map(|a| a.into_common())
-                        .or_else(|| inactive.map(|a| a.into_common()))
-                        .map(|app| app.all_cells().cloned().collect());
-                    Ok((state, cells))
+                    let app = state.remove_app(&app_id)?;
+                    Ok((state, app))
                 }
             })
             .await?;
-        Ok(cells_to_remove)
+        Ok(app)
     }
 
     /// Add fully constructed cells to the cell map in the Conductor
@@ -740,14 +720,14 @@ where
     /// Associate a Cell with an existing App
     pub(super) async fn add_clone_cell_to_app(
         &mut self,
-        installed_app_id: &InstalledAppId,
+        app_id: &InstalledAppId,
         slot_id: &SlotId,
         properties: YamlProperties,
     ) -> ConductorResult<CellId> {
         let dna_store = &self.dna_store;
         let (_, child_dna) = self
             .update_state_prime(move |mut state| {
-                if let Some(app) = state.running_apps.get_mut(installed_app_id) {
+                if let Some(app) = state.installed_apps_mut().get_mut(app_id) {
                     let slot = app
                         .slots()
                         .get(slot_id)
@@ -759,7 +739,7 @@ where
                         .modify_phenotype(random_uid(), properties)?;
                     Ok((state, dna))
                 } else {
-                    Err(ConductorError::AppNotRunning(installed_app_id.clone()))
+                    Err(ConductorError::AppNotRunning(app_id.clone()))
                 }
             })
             .await?;
@@ -767,13 +747,13 @@ where
         self.register_phenotype(child_dna).await?;
         let (_, cell_id) = self
             .update_state_prime(|mut state| {
-                if let Some(app) = state.running_apps.get_mut(installed_app_id) {
+                if let Some(app) = state.installed_apps_mut().get_mut(app_id) {
                     let agent_key = app.slot(slot_id)?.agent_key().to_owned();
                     let cell_id = CellId::new(child_dna_hash, agent_key);
                     app.add_clone(slot_id, cell_id.clone())?;
                     Ok((state, cell_id))
                 } else {
-                    Err(ConductorError::AppNotRunning(installed_app_id.clone()))
+                    Err(ConductorError::AppNotRunning(app_id.clone()))
                 }
             })
             .await?;
@@ -919,8 +899,8 @@ where
     }
 
     pub(super) async fn list_running_apps(&self) -> ConductorResult<Vec<InstalledAppId>> {
-        let active_apps = self.get_state().await?.running_apps;
-        Ok(active_apps.keys().cloned().collect())
+        let state = self.get_state().await?;
+        Ok(state.running_apps().map(|(id, _)| id).cloned().collect())
     }
 
     pub(super) async fn list_apps(
@@ -930,13 +910,13 @@ where
         let conductor_state = self.get_state().await?;
 
         let apps_ids: Vec<&String> = match status_filter {
-            Some(AppStatusFilter::Active) => conductor_state.running_apps.keys().collect(),
-            Some(AppStatusFilter::Inactive) => conductor_state.stopped_apps.keys().collect(),
-            None => conductor_state
-                .running_apps
-                .keys()
-                .chain(conductor_state.stopped_apps.keys())
-                .collect(),
+            Some(AppStatusFilter::Active) => {
+                conductor_state.running_apps().map(|(id, _)| id).collect()
+            }
+            Some(AppStatusFilter::Inactive) => {
+                conductor_state.stopped_apps().map(|(id, _)| id).collect()
+            }
+            None => conductor_state.installed_apps().keys().collect(),
         };
 
         let apps_info: Vec<InstalledAppInfo> = apps_ids
@@ -951,9 +931,10 @@ where
         &self,
         cell_id: &CellId,
     ) -> ConductorResult<HashSet<InstalledAppId>> {
-        let active_apps = self.get_state().await?.running_apps;
-        Ok(active_apps
-            .iter()
+        Ok(self
+            .get_state()
+            .await?
+            .running_apps()
             .filter(|(_, v)| v.all_cells().any(|i| i == cell_id))
             .map(|(k, _)| k)
             .cloned()

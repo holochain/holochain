@@ -131,7 +131,7 @@ pub struct InstalledAppInfo {
 
 impl InstalledAppInfo {
     pub fn from_installed_app(app: &InstalledApp) -> Self {
-        let installed_app_id = app.installed_app_id().clone();
+        let installed_app_id = app.id().clone();
         let status = app.status().clone().into();
         let cell_data = app
             .provisioned_cells()
@@ -183,19 +183,26 @@ fn status_serialization() {
     ))
     .into();
 
-    assert_eq!(serde_json::to_string(&status).unwrap(), "{\"disabled\":{\"reason\":{\"error\":\"because\"}}}");
+    assert_eq!(
+        serde_json::to_string(&status).unwrap(),
+        "{\"disabled\":{\"reason\":{\"error\":\"because\"}}}"
+    );
 
     let status: InstalledAppInfoStatus = InstalledAppStatus::Stopped(StoppedAppReason::Paused(
         PausedAppReason::Error("because".into()),
     ))
     .into();
 
-    assert_eq!(serde_json::to_string(&status).unwrap(), "{\"paused\":{\"reason\":{\"error\":\"because\"}}}");
+    assert_eq!(
+        serde_json::to_string(&status).unwrap(),
+        "{\"paused\":{\"reason\":{\"error\":\"because\"}}}"
+    );
 
-    let status: InstalledAppInfoStatus = InstalledAppStatus::Stopped(StoppedAppReason::Paused(
-        PausedAppReason::User,
-    ))
-    .into();
+    let status: InstalledAppInfoStatus =
+        InstalledAppStatus::Stopped(StoppedAppReason::Paused(PausedAppReason::User)).into();
 
-    assert_eq!(serde_json::to_string(&status).unwrap(), "{\"paused\":{\"reason\":\"user\"}}");
+    assert_eq!(
+        serde_json::to_string(&status).unwrap(),
+        "{\"paused\":{\"reason\":\"user\"}}"
+    );
 }

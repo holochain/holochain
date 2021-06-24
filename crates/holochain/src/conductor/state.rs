@@ -8,6 +8,8 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
 
+use super::error::{ConductorError, ConductorResult};
+
 /// Mutable conductor state, stored in a DB and writable only via Admin interface.
 ///
 /// References between structs (cell configs pointing to
@@ -16,15 +18,12 @@ use std::collections::HashMap;
 #[derive(Clone, Deserialize, Serialize, Default, Debug, SerializedBytes)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct ConductorState {
-    /// Apps that are ready to be activated
+    /// Apps that have been installed, regardless of status
     #[serde(default)]
-    pub stopped_apps: StoppedAppMap,
-    /// Apps that are active and will be loaded
-    #[serde(default)]
-    pub running_apps: RunningAppMap,
+    installed_apps: InstalledAppMap,
     /// List of interfaces any UI can use to access zome functions.
     #[serde(default)]
-    pub app_interfaces: HashMap<AppInterfaceId, AppInterfaceConfig>,
+    pub(crate) app_interfaces: HashMap<AppInterfaceId, AppInterfaceConfig>,
 }
 
 /// A unique identifier used to refer to an App Interface internally.
@@ -60,17 +59,94 @@ impl AppInterfaceId {
 }
 
 impl ConductorState {
+    /// Immutable access to the inner collection of all apps
+    pub fn installed_apps(&self) -> &InstalledAppMap {
+        &self.installed_apps
+    }
+
+    /// Mutable access to the inner collection of all apps
+    // #[cfg(test)]
+    #[deprecated = "Bare mutable access isn't the best idea"]
+    pub fn installed_apps_mut(&mut self) -> &mut InstalledAppMap {
+        &mut self.installed_apps
+    }
+
+    /// Iterate over only the "enabled" apps
+    pub fn enabled_apps(&self) -> impl Iterator<Item = (&InstalledAppId, &InstalledApp)> + '_ {
+        self.installed_apps
+            .iter()
+            .filter(|(_, app)| app.status().is_enabled())
+    }
+
+    /// Iterate over only the "running" apps
+    pub fn running_apps(&self) -> impl Iterator<Item = (&InstalledAppId, RunningApp)> + '_ {
+        self.installed_apps.iter().filter_map(|(id, app)| {
+            if *app.status() == InstalledAppStatus::Running {
+                let running = RunningApp::from(app.as_ref().clone());
+                Some((id, running))
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Iterate over only the "stopped" apps
+    pub fn stopped_apps(&self) -> impl Iterator<Item = (&InstalledAppId, StoppedApp)> + '_ {
+        self.installed_apps.iter().filter_map(|(id, app)| {
+            if let InstalledAppStatus::Stopped(reason) = app.status() {
+                let stopped = StoppedApp::new(app.as_ref().clone(), reason.clone());
+                Some((id, stopped))
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Getter for a single app. Returns error if app missing.
+    pub fn get_app(&self, id: &InstalledAppId) -> ConductorResult<&InstalledApp> {
+        self.installed_apps
+            .get(id)
+            .ok_or_else(|| ConductorError::AppNotInstalled(id.clone()))
+    }
+
+    /// Getter for a single app. Returns error if app missing.
+    pub fn remove_app(&mut self, id: &InstalledAppId) -> ConductorResult<InstalledApp> {
+        self.installed_apps
+            .remove(id)
+            .ok_or_else(|| ConductorError::AppNotInstalled(id.clone()))
+    }
+
+    /// Add an app in the Deactivated state. Returns an error if an app is already
+    /// present at the given ID.
+    pub fn add_app(&mut self, app: InstalledAppCommon) -> ConductorResult<StoppedApp> {
+        if self.installed_apps.contains_key(app.id()) {
+            return Err(ConductorError::AppAlreadyInstalled(app.id().clone()));
+        }
+        let stopped_app = StoppedApp::new_fresh(app);
+        self.installed_apps.insert(stopped_app.clone().into());
+        Ok(stopped_app)
+    }
+
+    /// Update the status of an installed app in-place.
+    pub fn update_app_status(
+        &mut self,
+        id: &InstalledAppId,
+        status: InstalledAppStatus,
+    ) -> ConductorResult<&InstalledApp> {
+        let mut app = self
+            .installed_apps
+            .get_mut(id)
+            .ok_or_else(|| ConductorError::AppNotInstalled(id.clone()))?;
+        app.status = status;
+        Ok(app)
+    }
+
     /// Retrieve info about an installed App by its InstalledAppId
     #[allow(clippy::ptr_arg)]
     pub fn get_app_info(&self, installed_app_id: &InstalledAppId) -> Option<InstalledAppInfo> {
-        self.running_apps
+        self.installed_apps
             .get(installed_app_id)
-            .map(|app| InstalledAppInfo::from_installed_app(&app.clone().into()))
-            .or_else(|| {
-                self.stopped_apps
-                    .get(installed_app_id)
-                    .map(|app| InstalledAppInfo::from_installed_app(&app.clone().into()))
-            })
+            .map(InstalledAppInfo::from_installed_app)
     }
 
     /// Returns the interface configuration with the given ID if present
