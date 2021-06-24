@@ -4,6 +4,7 @@ use futures::future::{BoxFuture, FutureExt};
 use futures::stream::StreamExt;
 use kitsune_p2p_direct::dependencies::*;
 use kitsune_p2p_direct::prelude::*;
+use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::metrics::metric_task;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 
@@ -44,6 +45,9 @@ pub type AgentHook = Box<dyn FnMut(AgentHookInput) -> AgentHookResp + 'static + 
 
 /// configuration for spawning KdTestHarness
 pub struct KdTestConfig {
+    /// tuning_params
+    pub tuning_params: KitsuneP2pTuningParams,
+
     /// which kdirect ver to run
     pub ver: KdVerSpec,
 
@@ -66,6 +70,7 @@ pub struct KdTestConfig {
 impl Default for KdTestConfig {
     fn default() -> Self {
         Self {
+            tuning_params: Default::default(),
             ver: KdVerSpec::V1,
             node_count: 2,
             agents_per_node: 2,
@@ -141,7 +146,8 @@ impl KdTestHarness {
 impl KdTestHarness {
     /// spawn a new kdirect test harness
     pub async fn start_test(mut config: KdTestConfig) -> KdResult<Self> {
-        let (bootstrap_url, driver, bootstrap_close) = new_quick_bootstrap_v1().await?;
+        let (bootstrap_url, driver, bootstrap_close) =
+            new_quick_bootstrap_v1(config.tuning_params.clone()).await?;
         metric_task(async move {
             driver.await;
             KdResult::Ok(())
@@ -149,7 +155,8 @@ impl KdTestHarness {
 
         tracing::info!(%bootstrap_url);
 
-        let (proxy_url, driver, proxy_close) = new_quick_proxy_v1().await?;
+        let (proxy_url, driver, proxy_close) =
+            new_quick_proxy_v1(config.tuning_params.clone()).await?;
         metric_task(async move {
             driver.await;
             KdResult::Ok(())
@@ -183,6 +190,7 @@ impl KdTestHarness {
             let (kdirect, kdhnd) = match config.ver {
                 KdVerSpec::V1 => {
                     let conf = KitsuneDirectV1Config {
+                        tuning_params: config.tuning_params.clone(),
                         persist,
                         bootstrap: bootstrap_url.clone(),
                         proxy: proxy_url.clone(),
@@ -337,7 +345,13 @@ mod tests {
     async fn sanity_run_for_five_seconds() {
         init_tracing();
 
+        let mut tuning_params =
+            kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+        tuning_params.gossip_peer_on_success_next_gossip_delay_ms = 1000;
+        let tuning_params = std::sync::Arc::new(tuning_params);
+
         let mut config = KdTestConfig::default();
+        config.tuning_params = tuning_params;
         config.node_count = 2;
         config.agents_per_node = 2;
         config.agent_init_hook = Box::new(|input| {

@@ -2,6 +2,7 @@
 
 use kitsune_p2p_direct::dependencies::*;
 use kitsune_p2p_direct::prelude::*;
+use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 
 use futures::future::{BoxFuture, FutureExt};
@@ -10,11 +11,17 @@ use futures::stream::StreamExt;
 
 /// configuration for consistency_stress test
 pub struct Config {
+    /// tuning_params
+    pub tuning_params: KitsuneP2pTuningParams,
+
     /// how many nodes to create
     pub node_count: usize,
 
     /// how many agents to join on each node
     pub agents_per_node: usize,
+
+    /// introduce bad agent infos
+    pub bad_agent_infos: bool,
 }
 
 /// progress emitted by this test
@@ -42,6 +49,9 @@ pub enum Progress {
 
         /// how many agents were joined on each oned
         agents_per_node: usize,
+
+        /// test will introduce bad agent infos
+        bad_agent_infos: bool,
 
         /// bootstrap_url used
         bootstrap_url: TxUrl,
@@ -114,13 +124,19 @@ impl std::fmt::Display for Progress {
                 run_time_s,
                 node_count,
                 agents_per_node,
+                bad_agent_infos,
                 bootstrap_url,
                 proxy_url,
             } => {
+                let bad = if *bad_agent_infos {
+                    "WITH bad agent infos"
+                } else {
+                    "WITHOUT bad agent infos"
+                };
                 write!(
                     f,
-                    "{:.4}s: TestStarted {} agents per {} nodes bootstrap:{} proxy:{}",
-                    run_time_s, agents_per_node, node_count, bootstrap_url, proxy_url,
+                    "{:.4}s: TestStarted {} {} agents / {} nodes bootstrap:{} proxy:{}",
+                    run_time_s, bad, agents_per_node, node_count, bootstrap_url, proxy_url,
                 )
             }
             Progress::InterimState {
@@ -185,7 +201,13 @@ pub fn run(
         .boxed()
     };
 
-    tokio::task::spawn(test(config.node_count, config.agents_per_node, p_send));
+    tokio::task::spawn(test(
+        config.tuning_params,
+        config.node_count,
+        config.agents_per_node,
+        config.bad_agent_infos,
+        p_send,
+    ));
 
     (p_recv, shutdown)
 }
@@ -193,8 +215,10 @@ pub fn run(
 // -- private -- //
 
 async fn test(
+    tuning_params: KitsuneP2pTuningParams,
     node_count: usize,
     agents_per_node: usize,
+    bad_agent_infos: bool,
     mut p_send: futures::channel::mpsc::Sender<Progress>,
 ) {
     kitsune_p2p_types::metrics::init_sys_info_poll();
@@ -224,10 +248,12 @@ async fn test(
 
     let test_start = std::time::Instant::now();
 
-    let (bootstrap_url, driver, _bootstrap_close) = new_quick_bootstrap_v1().await.unwrap();
+    let (bootstrap_url, driver, _bootstrap_close) =
+        new_quick_bootstrap_v1(tuning_params.clone()).await.unwrap();
     tokio::task::spawn(driver);
 
-    let (proxy_url, driver, _proxy_close) = new_quick_proxy_v1().await.unwrap();
+    let (proxy_url, driver, _proxy_close) =
+        new_quick_proxy_v1(tuning_params.clone()).await.unwrap();
     tokio::task::spawn(driver);
 
     let (root, app_entry) = {
@@ -259,6 +285,7 @@ async fn test(
     for _ in 0..node_count {
         let persist = new_persist_mem();
         let conf = KitsuneDirectV1Config {
+            tuning_params: tuning_params.clone(),
             persist,
             bootstrap: bootstrap_url.clone(),
             proxy: proxy_url.clone(),
@@ -307,17 +334,42 @@ async fn test(
             run_time_s: test_start.elapsed().as_secs_f64(),
             node_count,
             agents_per_node,
-            bootstrap_url,
-            proxy_url,
+            bad_agent_infos,
+            bootstrap_url: bootstrap_url.clone(),
+            proxy_url: proxy_url.clone(),
         })
         .await
         .unwrap();
+
+    let inject_bad_agent_info = || async {
+        let info = gen_bad_agent_info(
+            tuning_params.clone(),
+            root.clone(),
+            bootstrap_url.clone(),
+            proxy_url.clone(),
+        )
+        .await;
+
+        for node in nodes.iter() {
+            node.kdirect
+                .get_persist()
+                .store_agent_info(info.clone())
+                .await
+                .unwrap();
+        }
+    };
+
+    let mut target_agent_count = node_count * agents_per_node;
+
+    if bad_agent_infos {
+        inject_bad_agent_info().await;
+        target_agent_count += 1;
+    }
 
     // this loop waits for agent info to be synced
     loop {
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
-        let target_agent_count = node_count * agents_per_node;
         let mut avg_agent_count = 0;
 
         for node in nodes.iter() {
@@ -364,6 +416,11 @@ async fn test(
     loop {
         let round_start_time = std::time::Instant::now();
 
+        if bad_agent_infos {
+            inject_bad_agent_info().await;
+            target_agent_count += 1;
+        }
+
         for node in nodes.iter() {
             for agent in node.agents.iter() {
                 node.kdhnd
@@ -394,7 +451,6 @@ async fn test(
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
-            let target_agent_count = node_count * agents_per_node;
             let mut avg_agent_count = 0;
 
             for node in nodes.iter() {
@@ -427,14 +483,14 @@ async fn test(
                         .len();
                 }
             }
-            avg_total_op_count /= target_agent_count;
+            avg_total_op_count /= node_count * agents_per_node;
 
             if avg_total_op_count >= target_total_op_count {
                 p_send
                     .send(Progress::OpConsistent {
                         run_time_s: test_start.elapsed().as_secs_f64(),
                         round_elapsed_s: round_start_time.elapsed().as_secs_f64(),
-                        new_ops_added_count: target_agent_count,
+                        new_ops_added_count: node_count * agents_per_node,
                         total_op_count: avg_total_op_count,
                     })
                     .await
@@ -457,19 +513,71 @@ async fn test(
     }
 }
 
+async fn gen_bad_agent_info(
+    tuning_params: KitsuneP2pTuningParams,
+    root: KdHash,
+    bootstrap: TxUrl,
+    proxy: TxUrl,
+) -> KdAgentInfo {
+    let persist = new_persist_mem();
+    let conf = KitsuneDirectV1Config {
+        tuning_params,
+        persist,
+        bootstrap,
+        proxy,
+        ui_port: 0,
+    };
+
+    let (kdirect, driver) = new_kitsune_direct_v1(conf).await.unwrap();
+    tokio::task::spawn(driver);
+
+    let (kdhnd, mut evt) = kdirect.bind_control_handle().await.unwrap();
+    tokio::task::spawn(async move {
+        while let Some(evt) = evt.next().await {
+            tracing::trace!(?evt);
+        }
+    });
+
+    let agent = kdirect
+        .get_persist()
+        .generate_signing_keypair()
+        .await
+        .unwrap();
+
+    kdhnd.app_join(root.clone(), agent.clone()).await.unwrap();
+
+    let agent_info = kdirect
+        .get_persist()
+        .get_agent_info(root.clone(), agent)
+        .await
+        .unwrap();
+
+    kdhnd.close(0, "").await;
+    kdirect.close(0, "").await;
+
+    println!("BAD_AGENT_INFO: {:?}", agent_info);
+    agent_info
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn consistency_test() {
+        let mut tuning_params =
+            kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+        tuning_params.gossip_peer_on_success_next_gossip_delay_ms = 1000;
+        let tuning_params = std::sync::Arc::new(tuning_params);
         let (mut progress, shutdown) = run(Config {
+            tuning_params,
             node_count: 2,
             agents_per_node: 2,
+            bad_agent_infos: false,
         });
 
         let deadline = tokio::time::Instant::now()
-            .checked_add(std::time::Duration::from_secs(5))
+            .checked_add(std::time::Duration::from_secs(10))
             .unwrap();
 
         let mut test_started = false;

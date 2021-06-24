@@ -19,6 +19,9 @@ use std::future::Future;
 
 /// Config for v1 impl of KitsuneDirect
 pub struct KitsuneDirectV1Config {
+    /// tuning params
+    pub tuning_params: KitsuneP2pTuningParams,
+
     /// persistence module to use for this kdirect instance
     pub persist: KdPersist,
 
@@ -38,7 +41,9 @@ pub struct KitsuneDirectV1Config {
 pub type CloseCb = Box<dyn FnOnce(u32, &str) -> BoxFuture<'static, ()> + 'static + Send>;
 
 /// run a v1 quick bootstrap instance, returning the url
-pub async fn new_quick_bootstrap_v1() -> KdResult<(TxUrl, KitsuneDirectDriver, CloseCb)> {
+pub async fn new_quick_bootstrap_v1(
+    _tuning_params: KitsuneP2pTuningParams,
+) -> KdResult<(TxUrl, KitsuneDirectDriver, CloseCb)> {
     let (driver, addr) = kitsune_p2p_bootstrap::run(([0, 0, 0, 0], 0))
         .await
         .map_err(KdError::other)?;
@@ -71,15 +76,14 @@ pub async fn new_quick_bootstrap_v1() -> KdResult<(TxUrl, KitsuneDirectDriver, C
 }
 
 /// run a v1 quick proxy instance, returning the url
-pub async fn new_quick_proxy_v1() -> KdResult<(TxUrl, KitsuneDirectDriver, CloseCb)> {
+pub async fn new_quick_proxy_v1(
+    tuning_params: KitsuneP2pTuningParams,
+) -> KdResult<(TxUrl, KitsuneDirectDriver, CloseCb)> {
     use crate::dependencies::*;
     use kitsune_p2p_proxy::tx2::*;
     use kitsune_p2p_transport_quic::tx2::*;
-    use kitsune_p2p_types::config::*;
     use kitsune_p2p_types::tls::*;
     use kitsune_p2p_types::tx2::tx2_pool_promote::*;
-
-    let tuning_params = KitsuneP2pTuningParams::default();
 
     let p_tls = TlsConfig::new_ephemeral().await.map_err(KdError::other)?;
     let mut conf = QuicConfig::default();
@@ -123,6 +127,7 @@ pub fn new_kitsune_direct_v1(
 ) -> impl Future<Output = KdResult<(KitsuneDirect, KitsuneDirectDriver)>> + 'static + Send {
     async move {
         let KitsuneDirectV1Config {
+            tuning_params,
             persist,
             bootstrap,
             proxy,
@@ -130,10 +135,9 @@ pub fn new_kitsune_direct_v1(
         } = conf;
 
         let mut sub_config = KitsuneP2pConfig::default();
+        sub_config.tuning_params = tuning_params.clone();
 
         sub_config.bootstrap_service = Some(bootstrap.into());
-
-        let tuning_params = sub_config.tuning_params.clone();
 
         sub_config.transport_pool.push(TransportConfig::Proxy {
             sub_transport: Box::new(TransportConfig::Quic {
