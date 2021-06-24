@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+***:exclamation: Performance impact***
+
+Please navigate to the holochain crate release notes further down for details on the performance impact in this release.
+
 ## [fixt](crates/fixt/CHANGELOG.md#unreleased)
 
 ### Changed
@@ -26,7 +30,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
-- Migrated to wasmer 1+ and latest `holochain_wasmer` crates to match
 - Added `HdkT` trait to support mocking the host and native rust unit tests
 
 ### Added
@@ -47,6 +50,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [holochain](crates/holochain/CHANGELOG.md#unreleased)
 
+This version contains breaking changes to the conductor API as well as a major upgrade to the underlying Wasm runtime.
+
+***:exclamation: Performance impact***
+
+The version of wasmer that is used in this holochain release contains bugs in the scoping of wasmer modules vs. instances, such that it blocks the proper release of memory and slows down execution of concurrent Wasm instances. This has negative a impact on performance and memory usage. We were able to mitigate at least the memory impact to a certain extent and are coordinating with wasmer to create a proper solution as soon as possible.
+
+The severity of these issues increases with cell concurrency, i.e. using multiple cells with the same DNA. Application development with a single conductor and a few cells are expected to work well unless your machine has serious resource restrictions.
+
 ### Added
 
 - `InstallAppBundle` command added to admin conductor API. [\#665](https://github.com/holochain/holochain/pull/665)
@@ -56,6 +67,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - BREAKING:  `InstallAppDnaPayload` in admin conductor API `InstallApp` command now only accepts a hash.  Both properties and path have been removed as per deprecation warning.  Use either `RegisterDna` or `InstallAppBundle` instead. [\#665](https://github.com/holochain/holochain/pull/665)
 - BREAKING: `DnaSource(Path)` in conductor\_api `RegisterDna` call now must point to `DnaBundle` as created by `hc dna pack` not a `DnaFile` created by `dna_util` [\#665](https://github.com/holochain/holochain/pull/665)
+
+### CHANGED
+
+- Updated to a version of `holochain_wasmer` that includes a migration to wasmer v2+. [\#773](https://github.com/holochain/holochain/pull/773/files), [\#801](https://github.com/holochain/holochain/pull/80), [\#836](https://github.com/holochain/holochain/pull/836)
 
 # \[20210304.120604\]
 

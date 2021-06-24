@@ -11,7 +11,6 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
-- Migrated to wasmer 1+ and latest `holochain_wasmer` crates to match
 - Added `HdkT` trait to support mocking the host and native rust unit tests
 
 ### Added
