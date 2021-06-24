@@ -166,7 +166,7 @@ impl AsP2pStateTxExt for Transaction<'_> {
             .prepare(sql_p2p_agent_store::GOSSIP_QUERY)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
 
-        let (start, end) = within_arc.primitive_range_transposed();
+        let (start, end) = within_arc.primitive_range_detached();
 
         let mut out = Vec::new();
         for r in stmt.query_map(
@@ -225,7 +225,7 @@ impl P2pRecord {
 
         let storage_center_loc = arc.center_loc.into();
 
-        let (storage_start_loc, storage_end_loc) = arc.primitive_range_transposed();
+        let (storage_start_loc, storage_end_loc) = arc.primitive_range_detached();
 
         Ok(Self {
             agent,
