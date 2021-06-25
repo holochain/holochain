@@ -904,17 +904,15 @@ where
         &self,
         status_filter: Option<InstalledAppStatusFilter>,
     ) -> ConductorResult<Vec<InstalledAppInfo>> {
+        use InstalledAppStatusFilter::*;
         let conductor_state = self.get_state().await?;
 
         let apps_ids: Vec<&String> = match status_filter {
-            Some(InstalledAppStatusFilter::Enabled) => {
-                conductor_state.running_apps().map(|(id, _)| id).collect()
-            }
-            Some(InstalledAppStatusFilter::Disabled) => {
-                conductor_state.stopped_apps().map(|(id, _)| id).collect()
-            }
+            Some(Enabled) => conductor_state.enabled_apps().map(|(id, _)| id).collect(),
+            Some(Disabled) => conductor_state.disabled_apps().map(|(id, _)| id).collect(),
+            Some(Running) => conductor_state.running_apps().map(|(id, _)| id).collect(),
+            Some(Stopped) => conductor_state.stopped_apps().map(|(id, _)| id).collect(),
             None => conductor_state.installed_apps().keys().collect(),
-            _ => todo!("other filters"),
         };
 
         let apps_info: Vec<InstalledAppInfo> = apps_ids

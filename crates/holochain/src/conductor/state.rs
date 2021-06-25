@@ -78,6 +78,13 @@ impl ConductorState {
             .filter(|(_, app)| app.status().is_enabled())
     }
 
+    /// Iterate over only the "disabled" apps
+    pub fn disabled_apps(&self) -> impl Iterator<Item = (&InstalledAppId, &InstalledApp)> + '_ {
+        self.installed_apps
+            .iter()
+            .filter(|(_, app)| !app.status().is_enabled())
+    }
+
     /// Iterate over only the "running" apps
     pub fn running_apps(&self) -> impl Iterator<Item = (&InstalledAppId, RunningApp)> + '_ {
         self.installed_apps.iter().filter_map(|(id, app)| {

@@ -442,11 +442,10 @@ impl ExternalApiWireError {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, Clone)]
-// Filter to get either only active or only inactive apps with `ListApps`
+/// Filter for `ListApps`.
 pub enum InstalledAppStatusFilter {
     Enabled,
     Disabled,
     Running,
     Stopped,
-    Paused,
 }

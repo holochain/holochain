@@ -806,5 +806,49 @@ async fn test_app_status_states() {
     let all_apps = conductor.list_apps(None).await.unwrap();
     assert_eq!(all_apps.len(), 1);
 
-    todo!("write test")
+    let get_status = || async { conductor.list_apps(None).await.unwrap()[0].status.clone() };
+
+    // RUNNING -pause-> PAUSED
+
+    conductor
+        .pause_app("app".to_string(), PausedAppReason::User)
+        .await
+        .unwrap();
+    assert_matches!(get_status().await, InstalledAppInfoStatus::Paused { .. });
+
+    // PAUSED  --start->  RUNNING
+
+    conductor.start_app("app".to_string()).await.unwrap();
+    assert_matches!(get_status().await, InstalledAppInfoStatus::Running);
+
+    // RUNNING  --disable->  DISABLED
+
+    conductor
+        .disable_app("app".to_string(), DisabledAppReason::User)
+        .await
+        .unwrap();
+    assert_matches!(get_status().await, InstalledAppInfoStatus::Disabled { .. });
+
+    // DISABLED  --start->  DISABLED
+
+    conductor.start_app("app".to_string()).await.unwrap();
+    assert_matches!(get_status().await, InstalledAppInfoStatus::Disabled { .. });
+
+    // DISABLED  --enable->  ENABLED
+
+    conductor.enable_app("app".to_string()).await.unwrap();
+    assert_matches!(get_status().await, InstalledAppInfoStatus::Running);
+
+    // RUNNING  --pause->  PAUSED
+
+    conductor
+        .pause_app("app".to_string(), PausedAppReason::User)
+        .await
+        .unwrap();
+    assert_matches!(get_status().await, InstalledAppInfoStatus::Paused { .. });
+
+    // PAUSED  --enable->  RUNNING
+
+    conductor.enable_app("app".to_string()).await.unwrap();
+    assert_matches!(get_status().await, InstalledAppInfoStatus::Running);
 }
