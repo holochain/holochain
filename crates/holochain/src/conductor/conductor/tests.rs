@@ -588,11 +588,11 @@ async fn test_reactivate_app() {
     assert_eq!(all_apps.len(), 1);
 
     let inactive_apps = conductor
-        .list_apps(Some(AppStatusFilter::Inactive))
+        .list_apps(Some(InstalledAppStatusFilter::Disabled))
         .await
         .unwrap();
     let active_apps = conductor
-        .list_apps(Some(AppStatusFilter::Active))
+        .list_apps(Some(InstalledAppStatusFilter::Enabled))
         .await
         .unwrap();
     assert_eq!(inactive_apps.len(), 0);
@@ -606,11 +606,11 @@ async fn test_reactivate_app() {
         .unwrap();
 
     let inactive_apps = conductor
-        .list_apps(Some(AppStatusFilter::Inactive))
+        .list_apps(Some(InstalledAppStatusFilter::Disabled))
         .await
         .unwrap();
     let active_apps = conductor
-        .list_apps(Some(AppStatusFilter::Active))
+        .list_apps(Some(InstalledAppStatusFilter::Enabled))
         .await
         .unwrap();
     assert_eq!(active_apps.len(), 0);
@@ -638,11 +638,11 @@ async fn test_reactivate_app() {
 
     assert_eq_retry_10s!(conductor.list_running_apps().await.unwrap().len(), 1);
     let inactive_apps = conductor
-        .list_apps(Some(AppStatusFilter::Inactive))
+        .list_apps(Some(InstalledAppStatusFilter::Disabled))
         .await
         .unwrap();
     let active_apps = conductor
-        .list_apps(Some(AppStatusFilter::Active))
+        .list_apps(Some(InstalledAppStatusFilter::Enabled))
         .await
         .unwrap();
     assert_eq!(active_apps.len(), 1);
@@ -795,4 +795,16 @@ async fn test_apps_deactivate_on_panic_after_genesis() {
         },
         (0, 1)
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_app_status_states() {
+    observability::test_run().ok();
+    let zome = simple_create_entry_zome();
+    let (conductor, app) = common_genesis_test_app(zome).await.unwrap();
+
+    let all_apps = conductor.list_apps(None).await.unwrap();
+    assert_eq!(all_apps.len(), 1);
+
+    todo!("write test")
 }

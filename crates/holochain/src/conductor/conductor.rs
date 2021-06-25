@@ -50,8 +50,8 @@ use futures::future;
 use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
 use holo_hash::DnaHash;
-use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InstalledAppInfo;
+use holochain_conductor_api::InstalledAppStatusFilter;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::JsonDump;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
@@ -902,18 +902,19 @@ where
 
     pub(super) async fn list_apps(
         &self,
-        status_filter: Option<AppStatusFilter>,
+        status_filter: Option<InstalledAppStatusFilter>,
     ) -> ConductorResult<Vec<InstalledAppInfo>> {
         let conductor_state = self.get_state().await?;
 
         let apps_ids: Vec<&String> = match status_filter {
-            Some(AppStatusFilter::Active) => {
+            Some(InstalledAppStatusFilter::Enabled) => {
                 conductor_state.running_apps().map(|(id, _)| id).collect()
             }
-            Some(AppStatusFilter::Inactive) => {
+            Some(InstalledAppStatusFilter::Disabled) => {
                 conductor_state.stopped_apps().map(|(id, _)| id).collect()
             }
             None => conductor_state.installed_apps().keys().collect(),
+            _ => todo!("other filters"),
         };
 
         let apps_info: Vec<InstalledAppInfo> = apps_ids

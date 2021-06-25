@@ -179,7 +179,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let installed_cells = cell_ids_with_proofs
                     .into_iter()
                     .map(|(cell_data, _)| cell_data);
-                let app = InstalledApp::new_inactive(InstalledAppCommon::new_legacy(
+                let app = InstalledApp::new_fresh(InstalledAppCommon::new_legacy(
                     installed_app_id,
                     installed_cells,
                 )?);
@@ -547,7 +547,7 @@ mod test {
         let agent_key2 = fake_agent_pubkey_2();
         let path_payload = InstallAppDnaPayload::hash_only(dna_hash.clone(), "".to_string());
         let cell_id2 = CellId::new(dna_hash.clone(), agent_key2.clone());
-        let expected_installed_app = InstalledApp::new_inactive(
+        let expected_installed_app = InstalledApp::new_fresh(
             InstalledAppCommon::new_legacy(
                 "test-by-path".to_string(),
                 vec![InstalledCell::new(cell_id2.clone(), "".to_string())],

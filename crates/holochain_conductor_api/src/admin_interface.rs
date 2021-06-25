@@ -142,7 +142,7 @@ pub enum AdminRequest {
     /// [`AdminResponse::AppsListed`]: enum.AdminResponse.html#variant.AppsListed
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
     ListApps {
-        status_filter: Option<AppStatusFilter>,
+        status_filter: Option<InstalledAppStatusFilter>,
     },
     /// Changes the `App` specified by argument `installed_app_id` from a disabled state to an enabled state in the conductor,
     /// meaning that Zome calls can now be made and the `App` will be loaded on a reboot of the conductor.
@@ -443,10 +443,10 @@ impl ExternalApiWireError {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, Clone)]
 // Filter to get either only active or only inactive apps with `ListApps`
-// TODO: rename to Enabled | Disabled
-pub enum AppStatusFilter {
-    #[deprecated = "rename, refactor"]
-    Active,
-    #[deprecated = "rename, refactor"]
-    Inactive,
+pub enum InstalledAppStatusFilter {
+    Enabled,
+    Disabled,
+    Running,
+    Stopped,
+    Paused,
 }

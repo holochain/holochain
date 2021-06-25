@@ -235,10 +235,10 @@ pub struct InstalledApp {
 
 impl InstalledApp {
     /// Constructor for freshly installed app
-    pub fn new_inactive(app: InstalledAppCommon) -> Self {
+    pub fn new_fresh(app: InstalledAppCommon) -> Self {
         Self {
             app,
-            status: InstalledAppStatus::NeverStarted,
+            status: InstalledAppStatus::Disabled(DisabledAppReason::NeverStarted),
         }
     }
 
@@ -339,7 +339,7 @@ impl StoppedApp {
     pub fn new_fresh(app: InstalledAppCommon) -> Self {
         Self {
             app,
-            reason: StoppedAppReason::NeverStarted,
+            reason: StoppedAppReason::Disabled(DisabledAppReason::NeverStarted),
         }
     }
 
@@ -545,9 +545,8 @@ impl InstalledAppCommon {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename_all = "snake_case")]
 pub enum InstalledAppStatus {
-    /// The app was freshly installed and has never been started.
-    /// Equivalent in every way to `Disabled(None)`
-    NeverStarted,
+    /// The app is enabled and running normally.
+    Running,
 
     /// Enabled, but stopped. App can be Started, and will restart on conductor reboot.
     /// If optional string is None, this was a manual pause.
@@ -558,9 +557,6 @@ pub enum InstalledAppStatus {
     /// If optional string is None, this was a manual stop.
     /// Otherwise, the reason for automatically stopping is given.
     Disabled(DisabledAppReason),
-
-    /// The app is enabled and running normally.
-    Running,
 }
 
 impl InstalledAppStatus {
@@ -596,11 +592,6 @@ impl InstalledAppStatus {
 )]
 #[serde(rename_all = "snake_case")]
 pub enum StoppedAppReason {
-    /// The app was freshly installed and has never been started.
-    /// Equivalent in every way to `Disabled(None)`.
-    /// Same as [`InstalledAppStatus::NeverStarted`].
-    NeverStarted,
-
     /// Enabled, but stopped. App can be Started, and will restart on conductor reboot.
     /// If optional string is None, this was a manual pause.
     /// Otherwise, the reason for automatically pausing is given.
@@ -619,7 +610,6 @@ impl StoppedAppReason {
     /// If the status is Running, returns None.
     pub fn from_status(status: &InstalledAppStatus) -> Option<Self> {
         match status {
-            InstalledAppStatus::NeverStarted => Some(Self::NeverStarted),
             InstalledAppStatus::Paused(reason) => Some(Self::Paused(reason.clone())),
             InstalledAppStatus::Disabled(reason) => Some(Self::Disabled(reason.clone())),
             InstalledAppStatus::Running => None,
@@ -630,7 +620,6 @@ impl StoppedAppReason {
 impl From<StoppedAppReason> for InstalledAppStatus {
     fn from(reason: StoppedAppReason) -> Self {
         match reason {
-            StoppedAppReason::NeverStarted => Self::NeverStarted,
             StoppedAppReason::Paused(reason) => Self::Paused(reason),
             StoppedAppReason::Disabled(reason) => Self::Disabled(reason),
         }
@@ -651,6 +640,8 @@ pub enum PausedAppReason {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename_all = "snake_case")]
 pub enum DisabledAppReason {
+    /// The app is freshly installed, and never started
+    NeverStarted,
     /// The disabling was user-initiated
     User,
     /// The disabling was due to an UNRECOVERABLE error

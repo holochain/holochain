@@ -155,7 +155,6 @@ impl From<&InstalledApp> for InstalledAppInfo {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename_all = "snake_case")]
 pub enum InstalledAppInfoStatus {
-    NeverStarted,
     Paused { reason: PausedAppReason },
     Disabled { reason: DisabledAppReason },
     Running,
@@ -167,7 +166,6 @@ impl From<InstalledAppStatus> for InstalledAppInfoStatus {
             InstalledAppStatus::Running => InstalledAppInfoStatus::Running,
             InstalledAppStatus::Disabled(reason) => InstalledAppInfoStatus::Disabled { reason },
             InstalledAppStatus::Paused(reason) => InstalledAppInfoStatus::Paused { reason },
-            InstalledAppStatus::NeverStarted => InstalledAppInfoStatus::NeverStarted,
         }
     }
 }
