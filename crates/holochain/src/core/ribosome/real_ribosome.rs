@@ -169,12 +169,12 @@ impl HostFnBuilder {
     }
 }
 
-static CONTEXT_MAP: Lazy<Arc<Mutex<HashMap<u64, Arc<CallContext>>>>> =
-    Lazy::new(|| Arc::new(Mutex::new(HashMap::new())));
+type ContextMap = Lazy<Arc<Mutex<HashMap<u64, Arc<CallContext>>>>>;
+static CONTEXT_MAP: ContextMap = Lazy::new(Default::default);
 
-static INSTANCE_CACHE: Lazy<
-    Arc<Mutex<HashMap<[u8; 32], (HashMap<u64, Arc<Mutex<Instance>>>, AtomicU64)>>>,
-> = Lazy::new(|| Arc::new(Mutex::new(HashMap::new())));
+type InstanceCache =
+    Lazy<Arc<Mutex<HashMap<[u8; 32], (HashMap<u64, Arc<Mutex<Instance>>>, AtomicU64)>>>>;
+static INSTANCE_CACHE: InstanceCache = Lazy::new(Default::default);
 
 const INSTANCE_CACHE_SIZE: usize = 20;
 
