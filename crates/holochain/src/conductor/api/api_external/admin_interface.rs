@@ -586,7 +586,7 @@ mod test {
             })
             .await;
         assert_matches!(res,
-            AdminResponse::AppActivated(info) if info == expected_activated_app_info
+            AdminResponse::AppEnabled(info) if info == expected_activated_app_info
         );
 
         let res = admin_api

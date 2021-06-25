@@ -520,7 +520,7 @@ pub mod test {
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AdminResponse::AppActivated(_));
+            assert_matches!(response, AdminResponse::AppEnabled(_));
             async { Ok(()) }.boxed().into()
         };
         let respond = Respond::Request(Box::new(respond));
@@ -569,7 +569,7 @@ pub mod test {
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AdminResponse::AppDeactivated);
+            assert_matches!(response, AdminResponse::AppDisabled);
             async { Ok(()) }.boxed().into()
         };
         let respond = Respond::Request(Box::new(respond));

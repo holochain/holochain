@@ -70,8 +70,8 @@ pub enum AdminRequestCli {
     ListActiveApps,
     /// Calls AdminRequest::ListApps.
     ListApps(ListApps),
-    ActivateApp(ActivateApp),
-    DeactivateApp(DeactivateApp),
+    EnableApp(EnableApp),
+    DisableApp(DisableApp),
     DumpState(DumpState),
     /// Calls AdminRequest::AddAgentInfo.
     /// [Unimplemented].
@@ -162,17 +162,17 @@ pub struct InstallAppBundle {
 }
 
 #[derive(Debug, StructOpt, Clone)]
-/// Calls AdminRequest::ActivateApp
+/// Calls AdminRequest::EnableApp
 /// and activates the installed app.
-pub struct ActivateApp {
+pub struct EnableApp {
     /// The InstalledAppId to activate.
     pub app_id: String,
 }
 
 #[derive(Debug, StructOpt, Clone)]
-/// Calls AdminRequest::DeactivateApp
+/// Calls AdminRequest::DisableApp
 /// and deactivates the installed app.
-pub struct DeactivateApp {
+pub struct DisableApp {
     /// The InstalledAppId to deactivate.
     pub app_id: String,
 }
@@ -308,14 +308,14 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
             let apps = list_apps(cmd, args).await?;
             msg!("List Apps: {:?}", apps);
         }
-        AdminRequestCli::ActivateApp(args) => {
+        AdminRequestCli::EnableApp(args) => {
             let app_id = args.app_id.clone();
-            activate_app(cmd, args).await?;
+            enable_app(cmd, args).await?;
             msg!("Activated app: {:?}", app_id);
         }
-        AdminRequestCli::DeactivateApp(args) => {
+        AdminRequestCli::DisableApp(args) => {
             let app_id = args.app_id.clone();
-            deactivate_app(cmd, args).await?;
+            disable_app(cmd, args).await?;
             msg!("Deactivated app: {:?}", app_id);
         }
         AdminRequestCli::DumpState(args) => {
@@ -460,9 +460,9 @@ pub async fn install_app(
     let installed_app = cmd.command(r).await?;
     let installed_app =
         expect_match!(installed_app => AdminResponse::AppInstalled, "Failed to install app");
-    activate_app(
+    enable_app(
         cmd,
-        ActivateApp {
+        EnableApp {
             app_id: installed_app.installed_app_id.clone(),
         },
     )
@@ -501,9 +501,9 @@ pub async fn install_app_bundle(
     let installed_app = cmd.command(r).await?;
     let installed_app =
         expect_match!(installed_app => AdminResponse::AppBundleInstalled, "Failed to install app");
-    activate_app(
+    enable_app(
         cmd,
-        ActivateApp {
+        EnableApp {
             app_id: installed_app.installed_app_id.clone(),
         },
     )
@@ -556,26 +556,26 @@ pub async fn list_apps(
     Ok(expect_match!(resp => AdminResponse::AppsListed, "Failed to list apps"))
 }
 
-/// Calls [`AdminRequest::ActivateApp`] and activates the installed app.
-pub async fn activate_app(cmd: &mut CmdRunner, args: ActivateApp) -> anyhow::Result<()> {
+/// Calls [`AdminRequest::EnableApp`] and activates the installed app.
+pub async fn enable_app(cmd: &mut CmdRunner, args: EnableApp) -> anyhow::Result<()> {
     let resp = cmd
-        .command(AdminRequest::ActivateApp {
+        .command(AdminRequest::EnableApp {
             installed_app_id: args.app_id,
         })
         .await?;
-    expect_match!(resp => AdminResponse::AppActivated, format!("Failed to activate app, got: {:?}", resp));
+    expect_match!(resp => AdminResponse::AppEnabled, format!("Failed to enable app, got: {:?}", resp));
     Ok(())
 }
 
-/// Calls [`AdminRequest::DeactivateApp`] and deactivates the installed app.
-pub async fn deactivate_app(cmd: &mut CmdRunner, args: DeactivateApp) -> anyhow::Result<()> {
+/// Calls [`AdminRequest::DisableApp`] and deactivates the installed app.
+pub async fn disable_app(cmd: &mut CmdRunner, args: DisableApp) -> anyhow::Result<()> {
     let resp = cmd
-        .command(AdminRequest::DeactivateApp {
+        .command(AdminRequest::DisableApp {
             installed_app_id: args.app_id,
         })
         .await?;
     ensure!(
-        matches!(resp, AdminResponse::AppDeactivated),
+        matches!(resp, AdminResponse::AppDisabled),
         "Failed to deactivate app, got: {:?}",
         resp
     );

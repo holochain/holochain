@@ -149,11 +149,11 @@ pub enum AdminRequest {
     /// It is likely to want to call this after calling [`AdminRequest::InstallApp`], since a freshly
     /// installed `App` is not activated automatically.
     ///
-    /// Will be responded to with an [`AdminResponse::AppActivated`]
+    /// Will be responded to with an [`AdminResponse::AppEnabled`]
     /// or an [`AdminResponse::Error`]
     ///
     /// [`AdminRequest::InstallApp`]: enum.AdminRequest.html#variant.InstallApp
-    /// [`AdminResponse::AppActivated`]: enum.AdminResponse.html#variant.AppActivated
+    /// [`AdminResponse::AppEnabled`]: enum.AdminResponse.html#variant.AppEnabled
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
     EnableApp {
         /// The InstalledAppId to enable
@@ -169,10 +169,10 @@ pub enum AdminRequest {
     /// meaning that Zome calls can no longer be made, and the `App` will not be loaded on a
     /// reboot of the conductor.
     ///
-    /// Will be responded to with an [`AdminResponse::AppDeactivated`]
+    /// Will be responded to with an [`AdminResponse::AppDisabled`]
     /// or an [`AdminResponse::Error`]
     ///
-    /// [`AdminResponse::AppDeactivated`]: enum.AdminResponse.html#variant.AppDeactivated
+    /// [`AdminResponse::AppDisabled`]: enum.AdminResponse.html#variant.AppDisabled
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
     DisableApp {
         /// The InstalledAppId to disable
