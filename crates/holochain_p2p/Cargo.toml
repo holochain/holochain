@@ -12,7 +12,7 @@ edition = "2018"
 
 [dependencies]
 async-trait = "0.1"
-fixt = { path = "../fixt" }
+fixt = { path = "../fixt", version = "0.0.2-alpha.1" }
 futures = "0.3"
 ghost_actor = "0.3.0-alpha.1"
 holo_hash = { version = "^0.0.2-alpha.1", path = "../holo_hash" }

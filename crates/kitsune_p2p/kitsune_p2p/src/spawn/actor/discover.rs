@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use super::*;
 use ghost_actor::dependencies::must_future::MustBoxFuture;
-use kitsune_p2p_types::{agent_info::AgentInfoSigned, bootstrap::RandomQuery};
+use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use std::collections::HashSet;
 
 /// This enum represents the outcomes from peer discovery
@@ -121,7 +121,6 @@ where
     let i_s = space.i_s.clone();
     let evt_sender = space.evt_sender.clone();
     let ep_hnd = space.ep_hnd.clone();
-    let bootstrap_service = space.config.bootstrap_service.clone();
     let space = space.space.clone();
     let accept_result_cb = Arc::new(accept_result_cb);
     async move {
@@ -161,7 +160,6 @@ where
                 _basis.clone(),
                 i_s.clone(),
                 evt_sender.clone(),
-                bootstrap_service.clone(),
             )
             .await
             {
@@ -228,7 +226,6 @@ pub(crate) fn get_5_or_less_non_local_agents_near_basis(
     _basis: Arc<KitsuneBasis>,
     i_s: ghost_actor::GhostSender<SpaceInternal>,
     evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
-    bootstrap_service: Option<url2::Url2>,
 ) -> MustBoxFuture<'static, KitsuneP2pResult<HashSet<AgentInfoSigned>>> {
     async move {
         let mut out = HashSet::new();
@@ -243,41 +240,13 @@ pub(crate) fn get_5_or_less_non_local_agents_near_basis(
             // randomize the results
             rand::seq::SliceRandom::shuffle(&mut list[..], &mut rand::thread_rng());
             for item in list {
-                if let Ok(is_local) = i_s.is_agent_local(item.agent.clone()).await {
-                    if !is_local {
-                        out.insert(item);
+                match i_s.is_agent_local(item.agent.clone()).await {
+                    Ok(is_local) => {
+                        if !is_local {
+                            out.insert(item);
+                        }
                     }
-                }
-                if out.len() >= 5 {
-                    return Ok(out);
-                }
-            }
-        }
-
-        if let Ok(list) = super::bootstrap::random(
-            bootstrap_service,
-            RandomQuery {
-                space: space.clone(),
-                // grap a couple extra incase they happen to be local
-                limit: 8.into(),
-            },
-        )
-        .await
-        {
-            for item in list {
-                // TODO - someday some validation here
-                if let Ok(is_local) = i_s.is_agent_local(item.agent.clone()).await {
-                    if !is_local {
-                        // we got a result - let's add it to our store for the future
-                        let _ = evt_sender
-                            .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                space: space.clone(),
-                                agent: from_agent.clone(),
-                                agent_info_signed: item.clone(),
-                            })
-                            .await;
-                        out.insert(item);
-                    }
+                    Err(err) => tracing::error!(?err),
                 }
                 if out.len() >= 5 {
                     return Ok(out);
@@ -290,45 +259,6 @@ pub(crate) fn get_5_or_less_non_local_agents_near_basis(
         }
 
         Ok(out)
-    }
-    .boxed()
-    .into()
-}
-
-pub(crate) fn add_5_or_less_non_local_agents(
-    space: Arc<KitsuneSpace>,
-    from_agent: Arc<KitsuneAgent>,
-    i_s: ghost_actor::GhostSender<SpaceInternal>,
-    evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
-    bootstrap_service: url2::Url2,
-) -> MustBoxFuture<'static, KitsuneP2pResult<()>> {
-    async move {
-        if let Ok(list) = super::bootstrap::random(
-            Some(bootstrap_service),
-            RandomQuery {
-                space: space.clone(),
-                limit: 8.into(),
-            },
-        )
-        .await
-        {
-            for item in list {
-                // TODO - someday some validation here
-                if let Ok(is_local) = i_s.is_agent_local(item.agent.clone()).await {
-                    if !is_local {
-                        // we got a result - let's add it to our store for the future
-                        let _ = evt_sender
-                            .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                space: space.clone(),
-                                agent: from_agent.clone(),
-                                agent_info_signed: item.clone(),
-                            })
-                            .await;
-                    }
-                }
-            }
-        }
-        Ok(())
     }
     .boxed()
     .into()

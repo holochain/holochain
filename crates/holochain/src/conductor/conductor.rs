@@ -50,6 +50,8 @@ use futures::future;
 use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
 use holo_hash::DnaHash;
+use holochain_conductor_api::AppStatusFilter;
+use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::JsonDump;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
@@ -921,6 +923,30 @@ where
         Ok(active_apps.keys().cloned().collect())
     }
 
+    pub(super) async fn list_apps(
+        &self,
+        status_filter: Option<AppStatusFilter>,
+    ) -> ConductorResult<Vec<InstalledAppInfo>> {
+        let conductor_state = self.get_state().await?;
+
+        let apps_ids: Vec<&String> = match status_filter {
+            Some(AppStatusFilter::Active) => conductor_state.active_apps.keys().collect(),
+            Some(AppStatusFilter::Inactive) => conductor_state.inactive_apps.keys().collect(),
+            None => conductor_state
+                .active_apps
+                .keys()
+                .chain(conductor_state.inactive_apps.keys())
+                .collect(),
+        };
+
+        let apps_info: Vec<InstalledAppInfo> = apps_ids
+            .into_iter()
+            .filter_map(|app_id| conductor_state.get_app_info(app_id))
+            .collect();
+
+        Ok(apps_info)
+    }
+
     pub(super) async fn list_active_apps_for_cell_id(
         &self,
         cell_id: &CellId,
@@ -1398,7 +1424,7 @@ mod builder {
                 envs.p2p_metrics(),
                 self.dna_store,
                 keystore,
-                envs.tempdir().path().to_path_buf().into(),
+                envs.path().to_path_buf().into(),
                 holochain_p2p,
             )
             .await?;

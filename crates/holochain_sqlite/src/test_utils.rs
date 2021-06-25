@@ -14,7 +14,7 @@ pub fn test_cell_db() -> TestDb {
 }
 
 fn test_db(kind: DbKind) -> TestDb {
-    let tmpdir = Arc::new(TempDir::new("holochain-test-environments").unwrap());
+    let tmpdir = TempDir::new("holochain-test-environments").unwrap();
     TestDb {
         db: DbWrite::new(tmpdir.path(), kind).expect("Couldn't create test database"),
         tmpdir,
@@ -28,13 +28,13 @@ pub fn test_dbs() -> TestDbs {
 }
 
 /// A test database in a temp directory
-#[derive(Clone, Shrinkwrap)]
+#[derive(Shrinkwrap)]
 pub struct TestDb {
     #[shrinkwrap(main_field)]
     /// sqlite database
     db: DbWrite,
     /// temp directory for this environment
-    tmpdir: Arc<TempDir>,
+    tmpdir: TempDir,
 }
 
 impl TestDb {
@@ -44,12 +44,11 @@ impl TestDb {
     }
 
     /// Accessor
-    pub fn tmpdir(&self) -> Arc<TempDir> {
-        self.tmpdir.clone()
+    pub fn into_tempdir(self) -> TempDir {
+        self.tmpdir
     }
 }
 
-#[derive(Clone)]
 /// A container for all three non-cell environments
 pub struct TestDbs {
     /// A test conductor environment
@@ -61,7 +60,7 @@ pub struct TestDbs {
     /// A test p2p metrics environment
     p2p_metrics: DbWrite,
     /// The shared root temp dir for these environments
-    tempdir: Arc<TempDir>,
+    tempdir: TempDir,
 }
 
 #[allow(missing_docs)]
@@ -79,7 +78,7 @@ impl TestDbs {
             wasm,
             p2p_agent_store,
             p2p_metrics,
-            tempdir: Arc::new(tempdir),
+            tempdir,
         }
     }
 
@@ -100,8 +99,8 @@ impl TestDbs {
     }
 
     /// Get the root temp dir for these environments
-    pub fn tempdir(&self) -> Arc<TempDir> {
-        self.tempdir.clone()
+    pub fn into_tempdir(self) -> TempDir {
+        self.tempdir
     }
 }
 
