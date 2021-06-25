@@ -613,11 +613,6 @@ impl Cell {
     ) -> CellResult<Vec<DhtOpHash>> {
         // FIXME: Test this query.
         let full = (dht_arc.coverage() - 1.0).abs() < f64::EPSILON;
-        let (storage_1, storage_2) = split_arc(&dht_arc);
-        // TODO: SQL_PERF: Really on the fence about this query.
-        // It has the potential to be slow if data density is very high
-        // but this is ideally not the case for most apps so is it
-        // worth everyone paying the cost of asyncifying?
         let result = self
             .env()
             .async_reader(move |txn| {
@@ -625,45 +620,31 @@ impl Cell {
                     txn.prepare_cached(holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_FULL)?
                         .query_map(
                             named_params! {
-                            ":from": since.to_sql_ms_lossy(),
-                            ":to": until.to_sql_ms_lossy(),
+                                ":from": since.to_sql_ms_lossy(),
+                                ":to": until.to_sql_ms_lossy(),
+                            },
+                            |row| row.get("hash"),
+                        )?
+                        .collect::<rusqlite::Result<Vec<_>>>()?
+                } else if let Some((start_loc, end_loc)) = dht_arc.primitive_range_grouped() {
+                    let sql = if start_loc <= end_loc {
+                        holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_CONTINUOUS
+                    } else {
+                        holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_WRAPPED
+                    };
+                    txn.prepare_cached(sql)?
+                        .query_map(
+                            named_params! {
+                                ":from": since.to_sql_ms_lossy(),
+                                ":to": until.to_sql_ms_lossy(),
+                                ":storage_start_loc": start_loc,
+                                ":storage_end_loc": end_loc,
                             },
                             |row| row.get("hash"),
                         )?
                         .collect::<rusqlite::Result<Vec<_>>>()?
                 } else {
-                    match (storage_1, storage_2) {
-                        (None, None) => Vec::with_capacity(0),
-                        (None, Some(_)) => unreachable!("Cannot have only second arc"),
-                        (Some(storage_1), None) => txn
-                            .prepare_cached(
-                                holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_SINGLE,
-                            )?
-                            .query_map(
-                                named_params! {
-                                ":from": since.to_sql_ms_lossy(),
-                                ":to": until.to_sql_ms_lossy(),
-                                ":storage_start_1": storage_1.0,
-                                ":storage_end_1": storage_1.1,
-                                },
-                                |row| row.get("hash"),
-                            )?
-                            .collect::<rusqlite::Result<Vec<_>>>()?,
-                        (Some(storage_1), Some(storage_2)) => txn
-                            .prepare_cached(holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_WRAP)?
-                            .query_map(
-                                named_params! {
-                                ":from": since.to_sql_ms_lossy(),
-                                ":to": until.to_sql_ms_lossy(),
-                                ":storage_start_1": storage_1.0,
-                                ":storage_end_1": storage_1.1,
-                                ":storage_start_2": storage_2.0,
-                                ":storage_end_2": storage_2.1,
-                                },
-                                |row| row.get("hash"),
-                            )?
-                            .collect::<rusqlite::Result<Vec<_>>>()?,
-                    }
+                    Vec::new()
                 };
                 DatabaseResult::Ok(r)
             })

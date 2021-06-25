@@ -24,6 +24,7 @@ members = [
   "crates/holochain_util",
   "crates/holochain_zome_types",
 
+  "crates/kitsune_p2p/dht_arc",
   "crates/kitsune_p2p/bootstrap",
   "crates/kitsune_p2p/direct",
   "crates/kitsune_p2p/direct_api",
