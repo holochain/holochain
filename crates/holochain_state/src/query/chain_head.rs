@@ -22,15 +22,10 @@ impl Query for ChainHeadQuery {
 
     fn query(&self) -> String {
         "
-            SELECT H.blob, H.hash FROM Header AS H
-            JOIN DhtOp as D
-            ON D.header_hash = H.hash
-            JOIN (
-                SELECT author, MAX(seq) FROM Header
-                GROUP BY author
-            ) AS H2
-            ON H.author = H2.author
-            WHERE H.author = :author AND D.is_authored = 1
+            SELECT Header.blob, Header.hash, MAX(header.seq) 
+            FROM Header
+            JOIN DhtOp ON DhtOp.header_hash = Header.hash
+            WHERE Header.author = :author AND DhtOp.is_authored = 
         "
         .into()
     }
