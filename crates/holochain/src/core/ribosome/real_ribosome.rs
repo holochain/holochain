@@ -75,6 +75,9 @@ use fallible_iterator::FallibleIterator;
 use holochain_types::prelude::*;
 
 use holochain_wasmer_host::prelude::*;
+use once_cell::sync::Lazy;
+use std::collections::HashMap;
+use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
 /// The only RealRibosome is a Wasm ribosome.
@@ -92,7 +95,8 @@ struct HostFnBuilder {
     store: Store,
     env: Env,
     ribosome_arc: Arc<RealRibosome>,
-    context_arc: Arc<CallContext>,
+    // context_arc: Arc<CallContext>,
+    context_key: u64,
 }
 
 impl HostFnBuilder {
@@ -109,7 +113,8 @@ impl HostFnBuilder {
         O: serde::Serialize + std::fmt::Debug,
     {
         let ribosome_arc = Arc::clone(&self.ribosome_arc);
-        let context_arc = Arc::clone(&self.context_arc);
+        // let context_arc = Arc::clone(&self.context_arc);
+        let context_key = self.context_key;
         ns.insert(
             host_function_name,
             Function::new_with_env(
@@ -133,11 +138,19 @@ impl HostFnBuilder {
                             return Err::<_, RuntimeError>(RuntimeError::new(WasmError::PointerMap))
                         }
                     };
+                    let context_arc = {
+                        CONTEXT_MAP
+                            .lock()
+                            .get(&context_key)
+                            .expect("Context must be set before call, this is a bug.")
+                            .clone()
+                    };
                     let result = match env.consume_bytes_from_guest(guest_ptr, len) {
                         Ok(input) => {
                             match host_function(
                                 Arc::clone(&ribosome_arc),
-                                Arc::clone(&context_arc),
+                                // Arc::clone(&context_arc),
+                                context_arc,
                                 input,
                             ) {
                                 Ok(output) => Ok::<_, WasmError>(output),
@@ -155,6 +168,15 @@ impl HostFnBuilder {
         &self
     }
 }
+
+static CONTEXT_MAP: Lazy<Arc<Mutex<HashMap<u64, Arc<CallContext>>>>> =
+    Lazy::new(|| Arc::new(Mutex::new(HashMap::new())));
+
+static INSTANCE_CACHE: Lazy<
+    Arc<Mutex<HashMap<[u8; 32], (HashMap<u64, Arc<Mutex<Instance>>>, AtomicU64)>>>,
+> = Lazy::new(|| Arc::new(Mutex::new(HashMap::new())));
+
+const INSTANCE_CACHE_SIZE: usize = 20;
 
 impl RealRibosome {
     /// Create a new instance
@@ -188,18 +210,115 @@ impl RealRibosome {
         Ok(key)
     }
 
-    pub fn instance(&self, call_context: CallContext) -> RibosomeResult<Arc<Mutex<Instance>>> {
-        let zome_name = call_context.zome.zome_name().clone();
-        let module = self.module(&zome_name)?;
-        let imports: ImportObject = Self::imports(self, call_context, module.store());
-        let instance = Arc::new(Mutex::new(
-            Instance::new(&module, &imports).map_err(|e| WasmError::Compile(e.to_string()))?,
-        ));
-        Ok(instance)
+    pub fn cache_instance(
+        &self,
+        context_key: u64,
+        instance: Arc<Mutex<Instance>>,
+        zome_name: &ZomeName,
+    ) -> RibosomeResult<()> {
+        // Clear the context as the call is done.
+        {
+            CONTEXT_MAP.lock().remove(&context_key);
+        }
+        let cache_key = self.wasm_cache_key(&zome_name)?;
+        // Lock the cache.
+        let mut lock = INSTANCE_CACHE.lock();
+        match lock.get_mut(&cache_key) {
+            Some((cache, _)) => {
+                // If we have space in the cache then add this instance.
+                if cache.len() <= INSTANCE_CACHE_SIZE {
+                    cache.insert(context_key, instance);
+                }
+            }
+            None => {
+                // We have no cache so add a new one.
+                // Note this path shouldn't really be hit but it's ok if it is.
+                let mut cache = HashMap::new();
+                let new_key = AtomicU64::new(0);
+                cache.insert(context_key, instance);
+                lock.insert(cache_key, (cache, new_key));
+            }
+        }
+        Ok(())
     }
 
-    fn imports(&self, call_context: CallContext, store: &Store) -> ImportObject {
-        let host_fn_access = (&call_context.host_access()).into();
+    pub fn instance(
+        &self,
+        call_context: CallContext,
+    ) -> RibosomeResult<(Arc<Mutex<Instance>>, u64)> {
+        let zome_name = call_context.zome.zome_name().clone();
+
+        // Fallback to creating an instance if we don't have a cache hit.
+        let fallback = |context_key| {
+            let module = self.module(&zome_name)?;
+            let imports: ImportObject = Self::imports(self, context_key, module.store());
+            let instance = Arc::new(Mutex::new(
+                Instance::new(&module, &imports).map_err(|e| WasmError::Compile(e.to_string()))?,
+            ));
+            RibosomeResult::Ok(instance)
+        };
+        {
+            let zome_key = self.wasm_cache_key(&zome_name)?;
+            // Lock the cache.
+            let mut lock = INSTANCE_CACHE.lock();
+            // Check if we have a hit for this zome.
+            match lock.get_mut(&zome_key) {
+                Some((cache, new_key)) => {
+                    // We have a hit for the zome.
+                    let key = cache.keys().next().cloned();
+                    // Check if we have a hit for the instance.
+                    if let Some(context_key) = key {
+                        // We have a key, check if we have an instance hit.
+                        if let Some(instance) = cache.remove(&context_key) {
+                            // We have an instance hit.
+                            // Update the context.
+                            {
+                                CONTEXT_MAP
+                                    .lock()
+                                    .insert(context_key, Arc::new(call_context));
+                            }
+                            // This is the fastest path.
+                            return Ok((instance, context_key));
+                        }
+                    }
+
+                    // We didn't get an instance hit so create a new key.
+                    let context_key = new_key.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    // Update the context.
+                    {
+                        CONTEXT_MAP
+                            .lock()
+                            .insert(context_key, Arc::new(call_context));
+                    }
+                    // Fallback to creating the instance.
+                    let instance = fallback(context_key)?;
+                    Ok((instance, context_key))
+                }
+                None => {
+                    // We didn't get a hit for the zome so create a cache for this zome.
+                    let cache = HashMap::new();
+                    // Create a new set of keys.
+                    let new_key = AtomicU64::new(0);
+                    // Get the key for this context.
+                    let context_key = new_key.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    // Update the context.
+                    {
+                        CONTEXT_MAP
+                            .lock()
+                            .insert(context_key, Arc::new(call_context));
+                    }
+                    // Fallback to creating the instance.
+                    let instance = fallback(context_key)?;
+                    // Insert the cache for next time.
+                    lock.insert(zome_key, (cache, new_key));
+                    Ok((instance, context_key))
+                }
+            }
+        }
+    }
+
+    fn imports(&self, context_key: u64, store: &Store) -> ImportObject {
+        // let host_fn_access = (&call_context.host_access()).into();
 
         let env = Env::default();
         let mut imports = imports! {};
@@ -207,7 +326,15 @@ impl RealRibosome {
 
         // it is important that RealRibosome and ZomeCallInvocation are cheap to clone here
         let ribosome_arc = std::sync::Arc::new((*self).clone());
-        let context_arc = std::sync::Arc::new(call_context);
+        let host_fn_access = {
+            (&CONTEXT_MAP
+                .lock()
+                .get(&context_key)
+                .expect("Context must be set before call, this is a bug.")
+                .host_access())
+                .into()
+        };
+        // let context_arc = std::sync::Arc::new(call_context);
 
         // standard memory handling used by the holochain_wasmer guest and host macros
         ns.insert(
@@ -223,7 +350,8 @@ impl RealRibosome {
             store: store.clone(),
             env,
             ribosome_arc,
-            context_arc,
+            // context_arc,
+            context_key,
         };
 
         host_fn_builder
@@ -444,16 +572,19 @@ impl RibosomeT for RealRibosome {
                     // there is a callback to_call and it is implemented in the wasm
                     // it is important to fully instantiate this (e.g. don't try to use the module above)
                     // because it builds guards against memory leaks and handles imports correctly
-                    let instance = self.instance(call_context)?;
+                    let (instance, context_key) = self.instance(call_context)?;
 
                     let result: Result<ExternIO, WasmError> = holochain_wasmer_host::guest::call(
-                        instance,
+                        instance.clone(),
                         to_call.as_ref(),
                         // be aware of this clone!
                         // the whole invocation is cloned!
                         // @todo - is this a problem for large payloads like entries?
                         invocation.to_owned().host_input()?,
                     );
+
+                    // Cache this instance.
+                    self.cache_instance(context_key, instance, zome.zome_name())?;
 
                     Ok(Some(result?))
                 } else {
