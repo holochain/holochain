@@ -99,10 +99,8 @@ fn tx_p2p_put(txn: &mut Transaction, record: P2pRecord) -> DatabaseResult<()> {
             ":expires_at_ms": &record.expires_at_ms,
             ":storage_center_loc": &record.storage_center_loc,
 
-            ":storage_start_1": &record.storage_start_1,
-            ":storage_end_1": &record.storage_end_1,
-            ":storage_start_2": &record.storage_start_2,
-            ":storage_end_2": &record.storage_end_2,
+            ":storage_start_loc": &record.storage_start_loc,
+            ":storage_end_loc": &record.storage_end_loc,
         },
     )?;
     Ok(())
@@ -168,17 +166,15 @@ impl AsP2pStateTxExt for Transaction<'_> {
             .prepare(sql_p2p_agent_store::GOSSIP_QUERY)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
 
-        let (storage_1, storage_2) = split_arc(&within_arc);
+        let (start, end) = within_arc.primitive_range_detached();
 
         let mut out = Vec::new();
         for r in stmt.query_map(
             named_params! {
                 ":since_ms": clamp64(since_ms),
                 ":until_ms": clamp64(until_ms),
-                ":storage_start_1": storage_1.map(|s| s.0),
-                ":storage_end_1": storage_1.map(|s| s.1),
-                ":storage_start_2": storage_2.map(|s| s.0),
-                ":storage_end_2": storage_2.map(|s| s.1),
+                ":storage_start_loc": start,
+                ":storage_end_loc": end,
             },
             |r| {
                 let agent: Vec<u8> = r.get(0)?;
@@ -205,38 +201,8 @@ struct P2pRecord {
     storage_center_loc: u32,
 
     // generated fields
-    storage_start_1: Option<u32>,
-    storage_end_1: Option<u32>,
-    storage_start_2: Option<u32>,
-    storage_end_2: Option<u32>,
-}
-
-pub type SplitRange = (u32, u32);
-pub fn split_arc(arc: &DhtArc) -> (Option<SplitRange>, Option<SplitRange>) {
-    let mut storage_1 = None;
-    let mut storage_2 = None;
-
-    use std::ops::{Bound, RangeBounds};
-    let r = arc.range();
-    let s = r.start_bound();
-    let e = r.end_bound();
-    match (s, e) {
-        // in the zero length case, DhtArc returns two excluded bounds
-        (Bound::Excluded(_), Bound::Excluded(_)) => (),
-        // the only other case for DhtArc is two included bounds
-        (Bound::Included(s), Bound::Included(e)) => {
-            if s > e {
-                storage_1 = Some((u32::MIN, *e));
-                storage_2 = Some((*s, u32::MAX));
-            } else {
-                storage_1 = Some((*s, *e));
-            }
-        }
-        // no other cases currently exist
-        _ => unreachable!(),
-    }
-
-    (storage_1, storage_2)
+    storage_start_loc: Option<u32>,
+    storage_end_loc: Option<u32>,
 }
 
 fn clamp64(u: u64) -> i64 {
@@ -259,7 +225,7 @@ impl P2pRecord {
 
         let storage_center_loc = arc.center_loc.into();
 
-        let (storage_1, storage_2) = split_arc(&arc);
+        let (storage_start_loc, storage_end_loc) = arc.primitive_range_detached();
 
         Ok(Self {
             agent,
@@ -270,10 +236,8 @@ impl P2pRecord {
             expires_at_ms: clamp64(expires_at_ms),
             storage_center_loc,
 
-            storage_start_1: storage_1.map(|s| s.0),
-            storage_end_1: storage_1.map(|s| s.1),
-            storage_start_2: storage_2.map(|s| s.0),
-            storage_end_2: storage_2.map(|s| s.1),
+            storage_start_loc,
+            storage_end_loc,
         })
     }
 }
