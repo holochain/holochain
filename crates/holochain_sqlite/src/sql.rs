@@ -2,8 +2,10 @@ pub mod sql_cell {
     pub(crate) const SCHEMA: &str = include_str!("sql/cell/schema.sql");
     pub const UPDATE_INTEGRATE_OPS: &str = include_str!("sql/cell/update_integrate_ops.sql");
     pub const FETCH_OP_HASHES_FULL: &str = include_str!("sql/cell/fetch_op_hashes_full.sql");
-    pub const FETCH_OP_HASHES_SINGLE: &str = include_str!("sql/cell/fetch_op_hashes_single.sql");
-    pub const FETCH_OP_HASHES_WRAP: &str = include_str!("sql/cell/fetch_op_hashes_wrap.sql");
+    pub const FETCH_OP_HASHES_CONTINUOUS: &str =
+        include_str!("sql/cell/fetch_op_hashes_continuous.sql");
+    pub const FETCH_OP_HASHES_WRAPPED: &str =
+        include_str!("sql/cell/fetch_op_hashes_wrapped_v1.sql");
 }
 
 pub(crate) mod sql_conductor {

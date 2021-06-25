@@ -30,7 +30,7 @@ pub async fn inject_agent_infos<'iter, I: IntoIterator<Item = &'iter AgentInfoSi
 
 /// Helper function to get all the peer data from this conductor
 pub fn all_agent_infos(env: EnvRead) -> StateQueryResult<Vec<AgentInfoSigned>> {
-    fresh_reader!(env, |r| Ok(r.p2p_list()?))
+    fresh_reader!(env, |r| Ok(r.p2p_list_agents()?))
 }
 
 /// Helper function to get a single agent info
@@ -40,7 +40,7 @@ pub fn get_single_agent_info(
     agent: AgentPubKey,
 ) -> StateQueryResult<Option<AgentInfoSigned>> {
     let agent = agent.to_kitsune();
-    fresh_reader!(env, |r| Ok(r.p2p_get(&agent)?))
+    fresh_reader!(env, |r| Ok(r.p2p_get_agent(&agent)?))
 }
 
 /// Interconnect every provided pair of conductors via their peer store databases
@@ -67,7 +67,7 @@ pub fn get_agent_info_signed(
     _kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>,
 ) -> ConductorResult<Option<AgentInfoSigned>> {
-    Ok(environ.conn()?.p2p_get(&kitsune_agent)?)
+    Ok(environ.conn()?.p2p_get_agent(&kitsune_agent)?)
 }
 
 /// Get agent info for a single space
@@ -75,7 +75,7 @@ pub fn query_agent_info_signed(
     environ: EnvWrite,
     _kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
 ) -> ConductorResult<Vec<AgentInfoSigned>> {
-    Ok(environ.conn()?.p2p_list()?)
+    Ok(environ.conn()?.p2p_list_agents()?)
 }
 
 /// Get agent info for a single space near a basis loc
@@ -96,7 +96,7 @@ pub fn query_peer_density(
     dht_arc: DhtArc,
 ) -> ConductorResult<PeerDensity> {
     let now = now();
-    let arcs = env.conn()?.p2p_list()?;
+    let arcs = env.conn()?.p2p_list_agents()?;
     let arcs = fallible_iterator::convert(arcs.into_iter().map(ConductorResult::Ok))
         .filter_map(|v| {
             if dht_arc.contains(v.agent.get_loc()) {
@@ -217,7 +217,7 @@ mod tests {
         let ret = env
             .conn()
             .unwrap()
-            .p2p_get(&agent_info_signed.agent)
+            .p2p_get_agent(&agent_info_signed.agent)
             .unwrap();
 
         assert_eq!(ret, Some(agent_info_signed));
@@ -230,7 +230,7 @@ mod tests {
         let env = t_env.env();
 
         // - Check no data in the store to start
-        let count = env.conn().unwrap().p2p_list().unwrap().len();
+        let count = env.conn().unwrap().p2p_list_agents().unwrap().len();
 
         assert_eq!(count, 0);
 
