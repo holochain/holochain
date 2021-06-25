@@ -58,7 +58,6 @@ use crate::core::ribosome::host_fn::sign_ephemeral::sign_ephemeral;
 use crate::core::ribosome::host_fn::sleep::sleep;
 use crate::core::ribosome::host_fn::sys_time::sys_time;
 use crate::core::ribosome::host_fn::trace::trace;
-use crate::core::ribosome::host_fn::unreachable::unreachable;
 use crate::core::ribosome::host_fn::update::update;
 use crate::core::ribosome::host_fn::verify_signature::verify_signature;
 use crate::core::ribosome::host_fn::version::version;
@@ -318,23 +317,12 @@ impl RealRibosome {
     }
 
     fn imports(&self, context_key: u64, store: &Store) -> ImportObject {
-        // let host_fn_access = (&call_context.host_access()).into();
-
         let env = Env::default();
         let mut imports = imports! {};
         let mut ns = Exports::new();
 
         // it is important that RealRibosome and ZomeCallInvocation are cheap to clone here
         let ribosome_arc = std::sync::Arc::new((*self).clone());
-        let host_fn_access = {
-            (&CONTEXT_MAP
-                .lock()
-                .get(&context_key)
-                .expect("Context must be set before call, this is a bug.")
-                .host_access())
-                .into()
-        };
-        // let context_arc = std::sync::Arc::new(call_context);
 
         // standard memory handling used by the holochain_wasmer guest and host macros
         ns.insert(
@@ -350,7 +338,6 @@ impl RealRibosome {
             store: store.clone(),
             env,
             ribosome_arc,
-            // context_arc,
             context_key,
         };
 
@@ -358,163 +345,57 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__trace", trace)
             .with_host_function(&mut ns, "__hash_entry", hash_entry)
             .with_host_function(&mut ns, "__version", version)
-            .with_host_function(&mut ns, "__unreachable", unreachable);
-
-        if let HostFnAccess {
-            keystore: Permission::Allow,
-            ..
-        } = host_fn_access
-        {
-            host_fn_builder
-                .with_host_function(&mut ns, "__verify_signature", verify_signature)
-                .with_host_function(&mut ns, "__sign", sign)
-                .with_host_function(&mut ns, "__sign_ephemeral", sign_ephemeral)
-                .with_host_function(&mut ns, "__create_x25519_keypair", create_x25519_keypair)
-                .with_host_function(
-                    &mut ns,
-                    "__x_salsa20_poly1305_encrypt",
-                    x_salsa20_poly1305_encrypt,
-                )
-                .with_host_function(
-                    &mut ns,
-                    "__x_salsa20_poly1305_decrypt",
-                    x_salsa20_poly1305_decrypt,
-                )
-                .with_host_function(
-                    &mut ns,
-                    "__x_25519_x_salsa20_poly1305_encrypt",
-                    x_25519_x_salsa20_poly1305_encrypt,
-                )
-                .with_host_function(
-                    &mut ns,
-                    "__x_25519_x_salsa20_poly1305_decrypt",
-                    x_25519_x_salsa20_poly1305_decrypt,
-                );
-        } else {
-            host_fn_builder
-                .with_host_function(&mut ns, "__verify_signature", unreachable)
-                .with_host_function(&mut ns, "__sign", unreachable)
-                .with_host_function(&mut ns, "__sign_ephemeral", unreachable)
-                .with_host_function(&mut ns, "__create_x25519_keypair", unreachable)
-                .with_host_function(&mut ns, "__x_salsa20_poly1305_encrypt", unreachable)
-                .with_host_function(&mut ns, "__x_salsa20_poly1305_decrypt", unreachable)
-                .with_host_function(&mut ns, "__x_25519_x_salsa20_poly1305_encrypt", unreachable)
-                .with_host_function(&mut ns, "__x_25519_x_salsa20_poly1305_decrypt", unreachable);
-        }
-
-        if let HostFnAccess {
-            dna_bindings: Permission::Allow,
-            ..
-        } = host_fn_access
-        {
-            host_fn_builder
-                .with_host_function(&mut ns, "__zome_info", zome_info)
-                .with_host_function(&mut ns, "__app_info", app_info)
-                .with_host_function(&mut ns, "__dna_info", dna_info)
-                .with_host_function(&mut ns, "__call_info", call_info);
-        } else {
-            host_fn_builder
-                .with_host_function(&mut ns, "__zome_info", unreachable)
-                .with_host_function(&mut ns, "__app_info", unreachable)
-                .with_host_function(&mut ns, "__dna_info", unreachable)
-                .with_host_function(&mut ns, "__call_info", unreachable);
-        }
-
-        if let HostFnAccess {
-            non_determinism: Permission::Allow,
-            ..
-        } = host_fn_access
-        {
-            host_fn_builder
-                .with_host_function(&mut ns, "__random_bytes", random_bytes)
-                .with_host_function(&mut ns, "__sys_time", sys_time)
-                .with_host_function(&mut ns, "__sleep", sleep);
-        } else {
-            host_fn_builder
-                .with_host_function(&mut ns, "__random_bytes", unreachable)
-                .with_host_function(&mut ns, "__sys_time", unreachable)
-                .with_host_function(&mut ns, "__sleep", unreachable);
-        }
-
-        if let HostFnAccess {
-            agent_info: Permission::Allow,
-            ..
-        } = host_fn_access
-        {
-            host_fn_builder
-                .with_host_function(&mut ns, "__agent_info", agent_info)
-                .with_host_function(&mut ns, "__capability_claims", capability_claims)
-                .with_host_function(&mut ns, "__capability_grants", capability_grants)
-                .with_host_function(&mut ns, "__capability_info", capability_info);
-        } else {
-            host_fn_builder
-                .with_host_function(&mut ns, "__agent_info", unreachable)
-                .with_host_function(&mut ns, "__capability_claims", unreachable)
-                .with_host_function(&mut ns, "__capability_grants", unreachable)
-                .with_host_function(&mut ns, "__capability_info", unreachable);
-        }
-
-        if let HostFnAccess {
-            read_workspace: Permission::Allow,
-            ..
-        } = host_fn_access
-        {
-            host_fn_builder
-                .with_host_function(&mut ns, "__get", get)
-                .with_host_function(&mut ns, "__get_details", get_details)
-                .with_host_function(&mut ns, "__get_links", get_links)
-                .with_host_function(&mut ns, "__get_link_details", get_link_details)
-                .with_host_function(&mut ns, "__get_agent_activity", get_agent_activity)
-                .with_host_function(&mut ns, "__query", query);
-        } else {
-            host_fn_builder
-                .with_host_function(&mut ns, "__get", unreachable)
-                .with_host_function(&mut ns, "__get_details", unreachable)
-                .with_host_function(&mut ns, "__get_links", unreachable)
-                .with_host_function(&mut ns, "__get_link_details", unreachable)
-                .with_host_function(&mut ns, "__get_agent_activity", unreachable)
-                .with_host_function(&mut ns, "__query", unreachable);
-        }
-
-        if let HostFnAccess {
-            write_network: Permission::Allow,
-            ..
-        } = host_fn_access
-        {
-            host_fn_builder
-                .with_host_function(&mut ns, "__call_remote", call_remote)
-                .with_host_function(&mut ns, "__remote_signal", remote_signal);
-        } else {
-            host_fn_builder
-                .with_host_function(&mut ns, "__call_remote", unreachable)
-                .with_host_function(&mut ns, "__remote_signal", unreachable);
-        }
-
-        if let HostFnAccess {
-            write_workspace: Permission::Allow,
-            ..
-        } = host_fn_access
-        {
-            host_fn_builder
-                .with_host_function(&mut ns, "__call", call)
-                .with_host_function(&mut ns, "__create", create)
-                .with_host_function(&mut ns, "__emit_signal", emit_signal)
-                .with_host_function(&mut ns, "__create_link", create_link)
-                .with_host_function(&mut ns, "__delete_link", delete_link)
-                .with_host_function(&mut ns, "__update", update)
-                .with_host_function(&mut ns, "__delete", delete)
-                .with_host_function(&mut ns, "__schedule", schedule);
-        } else {
-            host_fn_builder
-                .with_host_function(&mut ns, "__call", unreachable)
-                .with_host_function(&mut ns, "__create", unreachable)
-                .with_host_function(&mut ns, "__emit_signal", unreachable)
-                .with_host_function(&mut ns, "__create_link", unreachable)
-                .with_host_function(&mut ns, "__delete_link", unreachable)
-                .with_host_function(&mut ns, "__update", unreachable)
-                .with_host_function(&mut ns, "__delete", unreachable)
-                .with_host_function(&mut ns, "__schedule", unreachable);
-        }
+            .with_host_function(&mut ns, "__verify_signature", verify_signature)
+            .with_host_function(&mut ns, "__sign", sign)
+            .with_host_function(&mut ns, "__sign_ephemeral", sign_ephemeral)
+            .with_host_function(&mut ns, "__create_x25519_keypair", create_x25519_keypair)
+            .with_host_function(
+                &mut ns,
+                "__x_salsa20_poly1305_encrypt",
+                x_salsa20_poly1305_encrypt,
+            )
+            .with_host_function(
+                &mut ns,
+                "__x_salsa20_poly1305_decrypt",
+                x_salsa20_poly1305_decrypt,
+            )
+            .with_host_function(
+                &mut ns,
+                "__x_25519_x_salsa20_poly1305_encrypt",
+                x_25519_x_salsa20_poly1305_encrypt,
+            )
+            .with_host_function(
+                &mut ns,
+                "__x_25519_x_salsa20_poly1305_decrypt",
+                x_25519_x_salsa20_poly1305_decrypt,
+            )
+            .with_host_function(&mut ns, "__zome_info", zome_info)
+            .with_host_function(&mut ns, "__app_info", app_info)
+            .with_host_function(&mut ns, "__dna_info", dna_info)
+            .with_host_function(&mut ns, "__call_info", call_info)
+            .with_host_function(&mut ns, "__random_bytes", random_bytes)
+            .with_host_function(&mut ns, "__sys_time", sys_time)
+            .with_host_function(&mut ns, "__sleep", sleep)
+            .with_host_function(&mut ns, "__agent_info", agent_info)
+            .with_host_function(&mut ns, "__capability_claims", capability_claims)
+            .with_host_function(&mut ns, "__capability_grants", capability_grants)
+            .with_host_function(&mut ns, "__capability_info", capability_info)
+            .with_host_function(&mut ns, "__get", get)
+            .with_host_function(&mut ns, "__get_details", get_details)
+            .with_host_function(&mut ns, "__get_links", get_links)
+            .with_host_function(&mut ns, "__get_link_details", get_link_details)
+            .with_host_function(&mut ns, "__get_agent_activity", get_agent_activity)
+            .with_host_function(&mut ns, "__query", query)
+            .with_host_function(&mut ns, "__call_remote", call_remote)
+            .with_host_function(&mut ns, "__remote_signal", remote_signal)
+            .with_host_function(&mut ns, "__call", call)
+            .with_host_function(&mut ns, "__create", create)
+            .with_host_function(&mut ns, "__emit_signal", emit_signal)
+            .with_host_function(&mut ns, "__create_link", create_link)
+            .with_host_function(&mut ns, "__delete_link", delete_link)
+            .with_host_function(&mut ns, "__update", update)
+            .with_host_function(&mut ns, "__delete", delete)
+            .with_host_function(&mut ns, "__schedule", schedule);
 
         imports.register("env", ns);
 
