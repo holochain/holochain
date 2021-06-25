@@ -156,9 +156,9 @@ pub(crate) fn search_remotes_covering_basis(
             {
                 if node.storage_arc.contains(basis_loc) {
                     cover_nodes.push(node);
-                    continue;
+                } else {
+                    near_nodes.push(node);
                 }
-                near_nodes.push(node);
                 if cover_nodes.len() + near_nodes.len() >= CHECK_NODE_COUNT {
                     break;
                 }
