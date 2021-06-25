@@ -92,14 +92,9 @@ impl ConductorState {
 
     /// Iterate over only the "stopped" apps
     pub fn stopped_apps(&self) -> impl Iterator<Item = (&InstalledAppId, StoppedApp)> + '_ {
-        self.installed_apps.iter().filter_map(|(id, app)| {
-            if let InstalledAppStatus::Stopped(reason) = app.status() {
-                let stopped = StoppedApp::new(app.as_ref().clone(), reason.clone());
-                Some((id, stopped))
-            } else {
-                None
-            }
-        })
+        self.installed_apps
+            .iter()
+            .filter_map(|(id, app)| StoppedApp::from_app(app).map(|stopped| (id, stopped)))
     }
 
     /// Getter for a single app. Returns error if app missing.

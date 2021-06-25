@@ -151,7 +151,7 @@ impl From<&InstalledApp> for InstalledAppInfo {
     }
 }
 
-/// A flatter, more API-friendly representation of [`InstalledAppStatus`]
+/// A flat, slightly more API-friendly representation of [`InstalledAppStatus`]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename_all = "snake_case")]
 pub enum InstalledAppInfoStatus {
@@ -165,11 +165,9 @@ impl From<InstalledAppStatus> for InstalledAppInfoStatus {
     fn from(i: InstalledAppStatus) -> Self {
         match i {
             InstalledAppStatus::Running => InstalledAppInfoStatus::Running,
-            InstalledAppStatus::Stopped(s) => match s {
-                StoppedAppReason::Disabled(reason) => InstalledAppInfoStatus::Disabled { reason },
-                StoppedAppReason::Paused(reason) => InstalledAppInfoStatus::Paused { reason },
-                StoppedAppReason::NeverStarted => InstalledAppInfoStatus::NeverStarted,
-            },
+            InstalledAppStatus::Disabled(reason) => InstalledAppInfoStatus::Disabled { reason },
+            InstalledAppStatus::Paused(reason) => InstalledAppInfoStatus::Paused { reason },
+            InstalledAppStatus::NeverStarted => InstalledAppInfoStatus::NeverStarted,
         }
     }
 }
@@ -178,28 +176,23 @@ impl From<InstalledAppStatus> for InstalledAppInfoStatus {
 fn status_serialization() {
     use kitsune_p2p::dependencies::kitsune_p2p_types::dependencies::serde_json;
 
-    let status: InstalledAppInfoStatus = InstalledAppStatus::Stopped(StoppedAppReason::Disabled(
-        DisabledAppReason::Error("because".into()),
-    ))
-    .into();
+    let status: InstalledAppInfoStatus =
+        InstalledAppStatus::Disabled(DisabledAppReason::Error("because".into())).into();
 
     assert_eq!(
         serde_json::to_string(&status).unwrap(),
         "{\"disabled\":{\"reason\":{\"error\":\"because\"}}}"
     );
 
-    let status: InstalledAppInfoStatus = InstalledAppStatus::Stopped(StoppedAppReason::Paused(
-        PausedAppReason::Error("because".into()),
-    ))
-    .into();
+    let status: InstalledAppInfoStatus =
+        InstalledAppStatus::Paused(PausedAppReason::Error("because".into())).into();
 
     assert_eq!(
         serde_json::to_string(&status).unwrap(),
         "{\"paused\":{\"reason\":{\"error\":\"because\"}}}"
     );
 
-    let status: InstalledAppInfoStatus =
-        InstalledAppStatus::Stopped(StoppedAppReason::Paused(PausedAppReason::User)).into();
+    let status: InstalledAppInfoStatus = InstalledAppStatus::Paused(PausedAppReason::User).into();
 
     assert_eq!(
         serde_json::to_string(&status).unwrap(),

@@ -238,7 +238,7 @@ impl InstalledApp {
     pub fn new_inactive(app: InstalledAppCommon) -> Self {
         Self {
             app,
-            status: InstalledAppStatus::never_started(),
+            status: InstalledAppStatus::NeverStarted,
         }
     }
 
@@ -343,6 +343,15 @@ impl StoppedApp {
         }
     }
 
+    /// If the app is Stopped, convert into a StoppedApp.
+    /// Returns None if app is Running.
+    pub fn from_app(app: &InstalledApp) -> Option<Self> {
+        StoppedAppReason::from_status(app.status()).map(|reason| Self {
+            app: app.as_ref().clone(),
+            reason,
+        })
+    }
+
     /// Convert to a RunningApp
     pub fn into_active(self) -> RunningApp {
         RunningApp(self.app)
@@ -364,7 +373,7 @@ impl From<StoppedApp> for InstalledApp {
     fn from(d: StoppedApp) -> Self {
         Self {
             app: d.app,
-            status: InstalledAppStatus::Stopped(d.reason),
+            status: d.reason.into(),
         }
     }
 }
@@ -533,30 +542,42 @@ impl InstalledAppCommon {
 }
 
 /// The status of an installed app.
-/// An app is fundamenally either Running or Stopped.
-/// If Stopped, there are various reasons which correspond to distinct states
-/// each of which has its own state transitions (i.e. as a finite state machine)
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename_all = "snake_case")]
 pub enum InstalledAppStatus {
-    /// Indicates the app is fully operational and running.
-    /// This is the only state in which the app is actually doing anything.
-    Running,
+    /// The app was freshly installed and has never been started.
+    /// Equivalent in every way to `Disabled(None)`
+    NeverStarted,
 
-    /// The app is stopped for one reason or another
-    Stopped(StoppedAppReason),
+    /// Enabled, but stopped. App can be Started, and will restart on conductor reboot.
+    /// If optional string is None, this was a manual pause.
+    /// Otherwise, the reason for automatically pausing is given.
+    Paused(PausedAppReason),
+
+    /// Disabled and stopped. App must be Enabled before running, and will not restart on conductor reboot.
+    /// If optional string is None, this was a manual stop.
+    /// Otherwise, the reason for automatically stopping is given.
+    Disabled(DisabledAppReason),
+
+    /// The app is enabled and running normally.
+    Running,
 }
 
 impl InstalledAppStatus {
-    /// Construct a Stopped(NeverStarted) status
-    pub fn never_started() -> Self {
-        Self::Stopped(StoppedAppReason::NeverStarted)
-    }
-
     /// Does this status correspond to an Enabled state?
+    /// If false, this indicates a Disabled state.
     pub fn is_enabled(&self) -> bool {
         match self {
-            Self::Running | Self::Stopped(StoppedAppReason::Paused(_)) => true,
+            Self::Running | Self::Paused(_) => true,
+            _ => false,
+        }
+    }
+
+    /// Does this status correspond to a Running state?
+    /// If false, this indicates a Stopped state.
+    pub fn is_running(&self) -> bool {
+        match self {
+            Self::Running => true,
             _ => false,
         }
     }
@@ -576,18 +597,44 @@ impl InstalledAppStatus {
 #[serde(rename_all = "snake_case")]
 pub enum StoppedAppReason {
     /// The app was freshly installed and has never been started.
-    /// Equivalent in every way to `Stopped(None)`
+    /// Equivalent in every way to `Disabled(None)`.
+    /// Same as [`InstalledAppStatus::NeverStarted`].
     NeverStarted,
 
     /// Enabled, but stopped. App can be Started, and will restart on conductor reboot.
     /// If optional string is None, this was a manual pause.
     /// Otherwise, the reason for automatically pausing is given.
+    /// Same as [`InstalledAppStatus::Paused`].
     Paused(PausedAppReason),
 
     /// Disabled and stopped. App must be Enabled before running, and will not restart on conductor reboot.
     /// If optional string is None, this was a manual stop.
     /// Otherwise, the reason for automatically stopping is given.
+    /// Same as [`InstalledAppStatus::Disabled`].
     Disabled(DisabledAppReason),
+}
+
+impl StoppedAppReason {
+    /// Convert a status into a StoppedAppReason.
+    /// If the status is Running, returns None.
+    pub fn from_status(status: &InstalledAppStatus) -> Option<Self> {
+        match status {
+            InstalledAppStatus::NeverStarted => Some(Self::NeverStarted),
+            InstalledAppStatus::Paused(reason) => Some(Self::Paused(reason.clone())),
+            InstalledAppStatus::Disabled(reason) => Some(Self::Disabled(reason.clone())),
+            InstalledAppStatus::Running => None,
+        }
+    }
+}
+
+impl From<StoppedAppReason> for InstalledAppStatus {
+    fn from(reason: StoppedAppReason) -> Self {
+        match reason {
+            StoppedAppReason::NeverStarted => Self::NeverStarted,
+            StoppedAppReason::Paused(reason) => Self::Paused(reason),
+            StoppedAppReason::Disabled(reason) => Self::Disabled(reason),
+        }
+    }
 }
 
 /// The reason for an app being in a Paused state.

@@ -674,10 +674,7 @@ where
             .update_state({
                 let app_id = app_id.clone();
                 move |mut state| {
-                    state.update_app_status(
-                        &app_id,
-                        InstalledAppStatus::Stopped(StoppedAppReason::Disabled(reason)),
-                    )?;
+                    state.update_app_status(&app_id, InstalledAppStatus::Disabled(reason))?;
                     Ok(state)
                 }
             })

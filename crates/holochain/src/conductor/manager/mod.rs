@@ -8,8 +8,6 @@
 mod error;
 pub use error::*;
 
-use crate::conductor::error::ConductorError;
-use crate::core::workflow::error::WorkflowError;
 use futures::stream::FuturesUnordered;
 use holochain_types::prelude::*;
 use std::future::Future;

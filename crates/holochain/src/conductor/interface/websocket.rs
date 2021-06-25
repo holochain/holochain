@@ -582,11 +582,11 @@ pub mod test {
         // Get the state
         let state = conductor_handle.get_state_from_handle().await.unwrap();
 
-        // Check it's stopped, and get all cells
+        // Check it's disabled, and get all cells
         let cell_ids: HashSet<CellId> = state
             .get_app(&app_id)
             .map(|app| {
-                assert_matches!(*app.status(), InstalledAppStatus::Stopped(_));
+                assert_matches!(*app.status(), InstalledAppStatus::Disabled(_));
                 app
             })
             .unwrap()
