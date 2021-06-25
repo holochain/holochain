@@ -141,7 +141,10 @@ impl HostFnBuilder {
                         CONTEXT_MAP
                             .lock()
                             .get(&context_key)
-                            .expect("Context must be set before call, this is a bug.")
+                            .expect(&format!(
+                                "Context must be set before call, this is a bug. context_key: {}",
+                                &context_key,
+                            ))
                             .clone()
                     };
                     let result = match env.consume_bytes_from_guest(guest_ptr, len) {
@@ -217,6 +220,7 @@ impl RealRibosome {
     ) -> RibosomeResult<()> {
         // Clear the context as the call is done.
         {
+            eprintln!("removing context_key: {}", context_key);
             CONTEXT_MAP.lock().remove(&context_key);
         }
         let cache_key = self.wasm_cache_key(&zome_name)?;
@@ -226,7 +230,10 @@ impl RealRibosome {
             Some((cache, _)) => {
                 // If we have space in the cache then add this instance.
                 if cache.len() <= INSTANCE_CACHE_SIZE {
+                    eprintln!("inserting context_key: {}", context_key);
                     cache.insert(context_key, instance);
+                } else {
+                    panic!("cache is full, cannot reinsert context key {}", context_key);
                 }
             }
             None => {
@@ -234,6 +241,7 @@ impl RealRibosome {
                 // Note this path shouldn't really be hit but it's ok if it is.
                 let mut cache = HashMap::new();
                 let new_key = AtomicU64::new(0);
+                eprintln!("inserting context_key: {}", context_key);
                 cache.insert(context_key, instance);
                 lock.insert(cache_key, (cache, new_key));
             }
@@ -272,6 +280,7 @@ impl RealRibosome {
                             // We have an instance hit.
                             // Update the context.
                             {
+                                eprintln!("inserting context_key: {}", context_key);
                                 CONTEXT_MAP
                                     .lock()
                                     .insert(context_key, Arc::new(call_context));
@@ -285,6 +294,7 @@ impl RealRibosome {
                     let context_key = new_key.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     // Update the context.
                     {
+                        eprintln!("inserting context_key: {}", context_key);
                         CONTEXT_MAP
                             .lock()
                             .insert(context_key, Arc::new(call_context));
@@ -302,6 +312,7 @@ impl RealRibosome {
                     let context_key = new_key.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     // Update the context.
                     {
+                        eprintln!("inserting context_key: {}", context_key);
                         CONTEXT_MAP
                             .lock()
                             .insert(context_key, Arc::new(call_context));
