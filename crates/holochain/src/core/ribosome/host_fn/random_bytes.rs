@@ -39,6 +39,7 @@ pub mod wasm_test {
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::fake_agent_pubkey_1;
     use std::sync::Arc;
+    use crate::core::ribosome::HostAccess;
 
     #[tokio::test(flavor = "multi_thread")]
     /// we can get some random data out of the fn directly
@@ -46,9 +47,10 @@ pub mod wasm_test {
         let ribosome = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
             .next()
             .unwrap();
-        let call_context = CallContextFixturator::new(::fixt::Unpredictable)
+        let mut call_context = CallContextFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
+        call_context.host_access = HostAccess::ZomeCall(fixt!(ZomeCallHostAccess));
         const LEN: u32 = 10;
 
         let output: holochain_zome_types::prelude::Bytes =
