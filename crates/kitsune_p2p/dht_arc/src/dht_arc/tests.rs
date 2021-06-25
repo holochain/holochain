@@ -45,6 +45,7 @@ fn test_dht_arc() {
 
     assert!(DhtArc::new(0, 3).contains(2));
     assert!(DhtArc::new(0, 3).contains(u32::MAX - 1));
+
     assert!(DhtArc::new(0, MAX_HALF_LENGTH).contains(u32::MAX / 2));
     assert!(DhtArc::new(0, MAX_HALF_LENGTH).contains(u32::MAX));
     assert!(DhtArc::new(0, MAX_HALF_LENGTH).contains(0));
