@@ -140,7 +140,10 @@ impl HostFnBuilder {
                         CONTEXT_MAP
                             .lock()
                             .get(&context_key)
-                            .expect("Context must be set before call, this is a bug.")
+                            .expect(&format!(
+                                "Context must be set before call, this is a bug. context_key: {}",
+                                &context_key,
+                            ))
                             .clone()
                     };
                     let result = match env.consume_bytes_from_guest(guest_ptr, len) {
@@ -170,9 +173,12 @@ impl HostFnBuilder {
 type ContextMap = Lazy<Arc<Mutex<HashMap<u64, Arc<CallContext>>>>>;
 static CONTEXT_MAP: ContextMap = Lazy::new(Default::default);
 
-type InstanceCache =
-    Lazy<Arc<Mutex<HashMap<[u8; 32], (HashMap<u64, Arc<Mutex<Instance>>>, AtomicU64)>>>>;
-static INSTANCE_CACHE: InstanceCache = Lazy::new(Default::default);
+type InstanceCache = HashMap<u64, Arc<Mutex<Instance>>>;
+type ZomeKey = [u8; 32];
+type DnaZomeKey = (DnaHash, ZomeKey);
+type DnaZomeCache = Lazy<Arc<Mutex<HashMap<DnaZomeKey, InstanceCache>>>>;
+static INSTANCE_CACHE: DnaZomeCache = Lazy::new(Default::default);
+static CONTEXT_KEY: AtomicU64 = AtomicU64::new(0);
 
 const INSTANCE_CACHE_SIZE: usize = 20;
 
@@ -218,23 +224,24 @@ impl RealRibosome {
         {
             CONTEXT_MAP.lock().remove(&context_key);
         }
-        let cache_key = self.wasm_cache_key(&zome_name)?;
+        let cache_key = (
+            self.dna_file.dna_hash().clone(),
+            self.wasm_cache_key(&zome_name)?,
+        );
         // Lock the cache.
         let mut lock = INSTANCE_CACHE.lock();
         match lock.get_mut(&cache_key) {
-            Some((cache, _)) => {
+            Some(cache) => {
                 // If we have space in the cache then add this instance.
                 if cache.len() <= INSTANCE_CACHE_SIZE {
                     cache.insert(context_key, instance);
+                } else {
+                    panic!("cache is full, cannot reinsert context key {}", context_key);
                 }
             }
             None => {
-                // We have no cache so add a new one.
-                // Note this path shouldn't really be hit but it's ok if it is.
-                let mut cache = HashMap::new();
-                let new_key = AtomicU64::new(0);
-                cache.insert(context_key, instance);
-                lock.insert(cache_key, (cache, new_key));
+                // There's no good reason to cache an instance where we don't
+                // even have the DnaZome cache for it.
             }
         }
         Ok(())
@@ -256,12 +263,15 @@ impl RealRibosome {
             RibosomeResult::Ok(instance)
         };
         {
-            let zome_key = self.wasm_cache_key(&zome_name)?;
+            let zome_key = (
+                self.dna_file.dna_hash().clone(),
+                self.wasm_cache_key(&zome_name)?,
+            );
             // Lock the cache.
             let mut lock = INSTANCE_CACHE.lock();
             // Check if we have a hit for this zome.
             match lock.get_mut(&zome_key) {
-                Some((cache, new_key)) => {
+                Some(cache) => {
                     // We have a hit for the zome.
                     let key = cache.keys().next().cloned();
                     // Check if we have a hit for the instance.
@@ -281,7 +291,7 @@ impl RealRibosome {
                     }
 
                     // We didn't get an instance hit so create a new key.
-                    let context_key = new_key.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    let context_key = CONTEXT_KEY.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     // Update the context.
                     {
                         CONTEXT_MAP
@@ -295,10 +305,8 @@ impl RealRibosome {
                 None => {
                     // We didn't get a hit for the zome so create a cache for this zome.
                     let cache = HashMap::new();
-                    // Create a new set of keys.
-                    let new_key = AtomicU64::new(0);
                     // Get the key for this context.
-                    let context_key = new_key.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    let context_key = CONTEXT_KEY.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     // Update the context.
                     {
                         CONTEXT_MAP
@@ -308,7 +316,7 @@ impl RealRibosome {
                     // Fallback to creating the instance.
                     let instance = fallback(context_key)?;
                     // Insert the cache for next time.
-                    lock.insert(zome_key, (cache, new_key));
+                    lock.insert(zome_key, cache);
                     Ok((instance, context_key))
                 }
             }
