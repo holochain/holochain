@@ -140,10 +140,12 @@ impl HostFnBuilder {
                         CONTEXT_MAP
                             .lock()
                             .get(&context_key)
-                            .expect(&format!(
+                            .unwrap_or_else(|| {
+                                panic!(
                                 "Context must be set before call, this is a bug. context_key: {}",
                                 &context_key,
-                            ))
+                            )
+                            })
                             .clone()
                     };
                     let result = match env.consume_bytes_from_guest(guest_ptr, len) {
@@ -230,18 +232,12 @@ impl RealRibosome {
         );
         // Lock the cache.
         let mut lock = INSTANCE_CACHE.lock();
-        match lock.get_mut(&cache_key) {
-            Some(cache) => {
-                // If we have space in the cache then add this instance.
-                if cache.len() <= INSTANCE_CACHE_SIZE {
-                    cache.insert(context_key, instance);
-                } else {
-                    panic!("cache is full, cannot reinsert context key {}", context_key);
-                }
-            }
-            None => {
-                // There's no good reason to cache an instance where we don't
-                // even have the DnaZome cache for it.
+        if let Some(cache) = lock.get_mut(&cache_key) {
+            // If we have space in the cache then add this instance.
+            if cache.len() <= INSTANCE_CACHE_SIZE {
+                cache.insert(context_key, instance);
+            } else {
+                panic!("cache is full, cannot reinsert context key {}", context_key);
             }
         }
         Ok(())
