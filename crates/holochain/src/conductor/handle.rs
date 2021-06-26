@@ -212,14 +212,14 @@ pub trait ConductorHandleT: Send + Sync {
     ) -> ConductorResult<()>;
 
     /// Start an enabled but stopped (paused) app
-    async fn start_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<RunningApp>;
+    async fn start_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<InstalledApp>;
 
     /// Stop a running app while leaving it enabled
     async fn pause_app(
         &self,
         installed_app_id: InstalledAppId,
         reason: PausedAppReason,
-    ) -> ConductorResult<()>;
+    ) -> ConductorResult<InstalledApp>;
 
     /// List Cell Ids
     async fn list_cell_ids(&self) -> ConductorResult<Vec<CellId>>;
@@ -689,16 +689,18 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(())
     }
 
-    async fn start_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<RunningApp> {
-        todo!()
+    async fn start_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<InstalledApp> {
+        let mut conductor = self.conductor.write().await;
+        conductor.start_app_in_db(installed_app_id).await
     }
 
     async fn pause_app(
         &self,
         installed_app_id: InstalledAppId,
         reason: PausedAppReason,
-    ) -> ConductorResult<()> {
-        todo!()
+    ) -> ConductorResult<InstalledApp> {
+        let mut conductor = self.conductor.write().await;
+        conductor.pause_app_in_db(installed_app_id, reason).await
     }
 
     async fn uninstall_app(&self, installed_app_id: &InstalledAppId) -> ConductorResult<()> {

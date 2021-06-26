@@ -262,8 +262,20 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::AppDisabled)
             }
-            StartApp { installed_app_id } => todo!(),
-            PauseApp { installed_app_id } => todo!(),
+            StartApp { installed_app_id } => {
+                let app = self
+                    .conductor_handle
+                    .start_app(installed_app_id.clone())
+                    .await?;
+                Ok(AdminResponse::AppStarted(app.status().is_running()))
+            }
+            PauseApp { installed_app_id } => {
+                let app = self
+                    .conductor_handle
+                    .pause_app(installed_app_id.clone(), PausedAppReason::User)
+                    .await?;
+                Ok(AdminResponse::AppPaused(app.status().is_paused()))
+            }
             AttachAppInterface { port } => {
                 let port = port.unwrap_or(0);
                 let port = self

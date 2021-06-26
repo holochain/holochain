@@ -577,6 +577,14 @@ impl InstalledAppStatus {
             _ => false,
         }
     }
+
+    /// Does this status correspond to a Paused state?
+    pub fn is_paused(&self) -> bool {
+        match self {
+            Self::Paused(_) => true,
+            _ => false,
+        }
+    }
 }
 
 /// The various reasons for why an App is not in the Running state.

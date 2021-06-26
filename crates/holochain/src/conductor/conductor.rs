@@ -664,6 +664,53 @@ where
         Ok(app.into())
     }
 
+    /// Start an paused app in the database.
+    /// This causes the app to enter the Running state if it's enabled,
+    /// otherwise it's a noop.
+    pub(super) async fn start_app_in_db(
+        &mut self,
+        app_id: InstalledAppId,
+    ) -> ConductorResult<InstalledApp> {
+        use InstalledAppStatus::*;
+        let (_, app) = self
+            .update_state_prime(move |mut state| {
+                let app = state.get_app(&app_id)?;
+                let app = if app.status().is_enabled() {
+                    // Only update if enabled, i.e. Paused or already Running
+                    state.update_app_status(&app_id, Running)?.clone()
+                } else {
+                    app.clone()
+                };
+                Ok((state, app))
+            })
+            .await?;
+        Ok(app)
+    }
+
+    /// Pause an app in the database, returning the installed app.
+    /// This causes the app to enter the Paused state if it's enabled,
+    /// otherwise it's a noop.
+    pub(super) async fn pause_app_in_db(
+        &mut self,
+        app_id: InstalledAppId,
+        reason: PausedAppReason,
+    ) -> ConductorResult<InstalledApp> {
+        use InstalledAppStatus::*;
+        let (_, app) = self
+            .update_state_prime(move |mut state| {
+                let app = state.get_app(&app_id)?;
+                let app = if app.status().is_enabled() {
+                    // Only update if enabled, i.e. Running or already Paused
+                    state.update_app_status(&app_id, Paused(reason))?.clone()
+                } else {
+                    app.clone()
+                };
+                Ok((state, app))
+            })
+            .await?;
+        Ok(app)
+    }
+
     /// Disable an app in the database, returning the installed app
     pub(super) async fn disable_app_in_db(
         &mut self,

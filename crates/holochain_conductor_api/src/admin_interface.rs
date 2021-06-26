@@ -383,6 +383,22 @@ pub enum AdminResponse {
     /// [`AdminRequest::DisableApp`]: enum.AdminRequest.html#variant.DisableApp
     AppDisabled,
 
+    /// The succesful response to an [`AdminRequest::StartApp`].
+    ///
+    /// The boolean determines whether or not the was actually started.
+    /// If false, it was because the app was in a disabled state.
+    ///
+    /// [`AdminRequest::StartApp`]: enum.AdminRequest.html#variant.StartApp
+    AppStarted(bool),
+
+    /// The succesful response to an [`AdminRequest::PauseApp`].
+    ///
+    /// The boolean determines whether or not the was actually paused.
+    /// If false, it was because the app was in a disabled state.
+    ///
+    /// [`AdminRequest::PauseApp`]: enum.AdminRequest.html#variant.PauseApp
+    AppPaused(bool),
+
     #[deprecated = "alias for AppDisabled"]
     AppDeactivated,
 

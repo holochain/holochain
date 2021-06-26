@@ -801,7 +801,7 @@ async fn test_apps_deactivate_on_panic_after_genesis() {
 async fn test_app_status_states() {
     observability::test_run().ok();
     let zome = simple_create_entry_zome();
-    let (conductor, app) = common_genesis_test_app(zome).await.unwrap();
+    let (conductor, _) = common_genesis_test_app(zome).await.unwrap();
 
     let all_apps = conductor.list_apps(None).await.unwrap();
     assert_eq!(all_apps.len(), 1);
@@ -834,6 +834,14 @@ async fn test_app_status_states() {
     conductor.start_app("app".to_string()).await.unwrap();
     assert_matches!(get_status().await, InstalledAppInfoStatus::Disabled { .. });
 
+    // DISABLED  --pause->  DISABLED
+
+    conductor
+        .pause_app("app".to_string(), PausedAppReason::User)
+        .await
+        .unwrap();
+    assert_matches!(get_status().await, InstalledAppInfoStatus::Disabled { .. });
+
     // DISABLED  --enable->  ENABLED
 
     conductor.enable_app("app".to_string()).await.unwrap();
@@ -851,4 +859,65 @@ async fn test_app_status_states() {
 
     conductor.enable_app("app".to_string()).await.unwrap();
     assert_matches!(get_status().await, InstalledAppInfoStatus::Running);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_app_status_filters() {
+    observability::test_run().ok();
+    let zome = InlineZome::new_unique(Vec::new());
+    let dnas = [mk_dna("dna", zome).await.unwrap().0];
+
+    let mut conductor = SweetConductor::from_standard_config().await;
+
+    conductor.setup_app("running", &dnas).await.unwrap();
+    conductor.setup_app("paused", &dnas).await.unwrap();
+    conductor.setup_app("disabled", &dnas).await.unwrap();
+
+    // put apps in the proper states for testing
+
+    conductor
+        .pause_app("paused".to_string(), PausedAppReason::User)
+        .await
+        .unwrap();
+
+    conductor
+        .disable_app("disabled".to_string(), DisabledAppReason::User)
+        .await
+        .unwrap();
+
+    // Check the counts returned by each filter
+
+    assert_eq!(conductor.list_apps(None).await.unwrap().len(), 3);
+    assert_eq!(
+        conductor
+            .list_apps(Some(InstalledAppStatusFilter::Running))
+            .await
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        conductor
+            .list_apps(Some(InstalledAppStatusFilter::Stopped))
+            .await
+            .unwrap()
+            .len(),
+        2
+    );
+    assert_eq!(
+        conductor
+            .list_apps(Some(InstalledAppStatusFilter::Enabled))
+            .await
+            .unwrap()
+            .len(),
+        2
+    );
+    assert_eq!(
+        conductor
+            .list_apps(Some(InstalledAppStatusFilter::Disabled))
+            .await
+            .unwrap()
+            .len(),
+        1
+    );
 }
