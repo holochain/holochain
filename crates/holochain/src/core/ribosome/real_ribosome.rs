@@ -112,7 +112,6 @@ impl HostFnBuilder {
         O: serde::Serialize + std::fmt::Debug,
     {
         let ribosome_arc = Arc::clone(&self.ribosome_arc);
-        // let context_arc = Arc::clone(&self.context_arc);
         let context_key = self.context_key;
         ns.insert(
             host_function_name,
