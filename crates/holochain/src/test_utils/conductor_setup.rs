@@ -21,8 +21,6 @@ use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::sync::Arc;
-use tempdir::TempDir;
 
 /// A "factory" for HostFnCaller, which will produce them when given a ZomeName
 pub struct CellHostFnCaller {
@@ -84,7 +82,7 @@ impl CellHostFnCaller {
 /// Everything you need to run a test that uses the conductor
 // TODO: refactor this to be the "Test Conductor" wrapper
 pub struct ConductorTestData {
-    __tmpdir: Arc<TempDir>,
+    _envs: TestEnvs,
     handle: ConductorHandle,
     cell_apis: HashMap<CellId, CellHostFnCaller>,
 }
@@ -113,7 +111,7 @@ impl ConductorTestData {
             cell_id_by_dna_file.push((dna_file, cell_ids));
         }
 
-        let (__tmpdir, _app_api, handle) = setup_app_inner(
+        let (_envs, _app_api, handle) = setup_app_inner(
             envs,
             vec![("test_app", cells)],
             dna_files.clone(),
@@ -133,7 +131,7 @@ impl ConductorTestData {
         }
 
         let this = Self {
-            __tmpdir,
+            _envs,
             // app_api,
             handle,
             cell_apis,
