@@ -284,9 +284,8 @@ impl KitsuneP2pHandler for Space {
         agent: Arc<KitsuneAgent>,
     ) -> KitsuneP2pHandlerResult<()> {
         self.local_joined_agents.insert(agent.clone());
-        self.gossip_mod.local_agent_join(agent.clone());
+        self.gossip_mod.local_agent_join(agent);
         let fut = self.i_s.update_single_agent_info(agent.clone());
-        let i_s = self.i_s.clone();
         let evt_sender = self.evt_sender.clone();
         match self.config.network_type {
             NetworkType::QuicMdns => {
@@ -336,35 +335,8 @@ impl KitsuneP2pHandler for Space {
                 }
             }
             NetworkType::QuicBootstrap => {
-                let bootstrap_service = self.config.bootstrap_service.clone();
-                if let Some(bootstrap_service) = bootstrap_service {
-                    tokio::task::spawn(async move {
-                        const START_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
-                        const MAX_DELAY: std::time::Duration =
-                            std::time::Duration::from_secs(60 * 60);
-                        let mut delay_len = START_DELAY;
-
-                        loop {
-                            tokio::time::sleep(delay_len).await;
-                            if delay_len <= MAX_DELAY {
-                                delay_len *= 2;
-                            }
-
-                            // TODO - this will make redundant requests to bootstrap server if multiple local agents have joined the same space.
-                            if let Err(e) = super::discover::add_5_or_less_non_local_agents(
-                                space.clone(),
-                                agent.clone(),
-                                i_s.clone(),
-                                evt_sender.clone(),
-                                bootstrap_service.clone(),
-                            )
-                            .await
-                            {
-                                tracing::error!(msg = "Failed to get peers from bootstrap", ?e);
-                            }
-                        }
-                    });
-                }
+                // quic bootstrap is managed for the whole space
+                // see the Space::new() constructor
             }
         }
 
@@ -557,6 +529,68 @@ impl Space {
                 }
             }
         });
+
+        if let NetworkType::QuicBootstrap = &config.network_type {
+            // spawn the periodic bootstrap pull
+            let i_s_c = i_s.clone();
+            let evt_s_c = evt_sender.clone();
+            let bootstrap_service = config.bootstrap_service.clone();
+            let space_c = space.clone();
+            tokio::task::spawn(async move {
+                const START_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
+                const MAX_DELAY: std::time::Duration = std::time::Duration::from_secs(60 * 60);
+
+                let mut delay_len = START_DELAY;
+
+                loop {
+                    tokio::time::sleep(delay_len).await;
+                    if delay_len <= MAX_DELAY {
+                        delay_len *= 2;
+                    }
+
+                    match super::bootstrap::random(
+                        bootstrap_service.clone(),
+                        kitsune_p2p_types::bootstrap::RandomQuery {
+                            space: space_c.clone(),
+                            limit: 8.into(),
+                        },
+                    )
+                    .await
+                    {
+                        Err(e) => {
+                            tracing::error!(msg = "Failed to get peers from bootstrap", ?e);
+                        }
+                        Ok(list) => {
+                            for item in list {
+                                // TODO - someday some validation here
+                                let agent = item.agent.clone();
+                                match i_s_c.is_agent_local(agent.clone()).await {
+                                    Err(err) => tracing::error!(?err),
+                                    Ok(is_local) => {
+                                        if !is_local {
+                                            // we got a result - let's add it to our store for the future
+                                            if let Err(err) = evt_s_c
+                                                .put_agent_info_signed(PutAgentInfoSignedEvt {
+                                                    space: space_c.clone(),
+                                                    agent,
+                                                    agent_info_signed: item.clone(),
+                                                })
+                                                .await
+                                            {
+                                                tracing::error!(
+                                                    ?err,
+                                                    "error storing bootstrap agent_info"
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
 
         Self {
             space,
