@@ -602,8 +602,8 @@ impl AppStatus {
     /// If None, the transition is not valid, and the status did not change.
     pub fn transition(&mut self, transition: AppStatusTransition) -> AppStatusRunningDelta {
         use AppStatus::*;
-        use AppStatusTransition::*;
         use AppStatusRunningDelta::*;
+        use AppStatusTransition::*;
         match (&self, transition) {
             (Running, Pause(reason)) => Some((Paused(reason), Stop)),
             (Running, Disable(reason)) => Some((Disabled(reason), Stop)),
