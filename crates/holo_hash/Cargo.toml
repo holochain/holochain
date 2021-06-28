@@ -30,7 +30,7 @@ serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 
 [features]
 
-default = ["serialized-bytes", "fixturators"]
+default = ["serialized-bytes", "fixturators", "no-deps"]
 full = ["fixturators", "hashing", "string-encoding", "rusqlite"]
 
 fixturators = ["fixt", "rand", "serialized-bytes", "string-encoding"]
@@ -38,6 +38,12 @@ serialized-bytes = ["holochain_serialized_bytes"]
 string-encoding = ["base64", "blake2b_simd", "derive_more"]
 hashing = ["blake2b_simd", "serialized-bytes"]
 test_utils = []
+
+# Use at-rest encryption of databases
+db-encryption = ["rusqlite/sqlcipher"]
+
+# Compile SQLite from source rather than depending on a library
+no-deps = ["rusqlite/bundled"]
 
 [package.metadata.cargo-udeps.ignore]
 normal = ["tracing"]
