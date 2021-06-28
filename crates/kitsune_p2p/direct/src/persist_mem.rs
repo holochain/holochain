@@ -360,7 +360,7 @@ impl AsKdPersist for PersistMem {
     fn query_agent_info_near_basis(
         &self,
         root: KdHash,
-        _basis_loc: u32,
+        basis_loc: u32,
         limit: u32,
     ) -> BoxFuture<'static, KdResult<Vec<KdAgentInfo>>> {
         let store = self.0.share_mut(move |i, _| match i.agent_info.get(&root) {
@@ -372,10 +372,17 @@ impl AsKdPersist for PersistMem {
                 Err(_) => return Ok(vec![]),
                 Ok(store) => store,
             };
-            // TODO - FIXME - sort by nearness to basis
-            store
-                .get_all()
-                .map(|list| list.into_iter().take(limit as usize).collect())
+            let mut with_dist = store
+                .get_all()?
+                .into_iter()
+                .map(|info| (info.basis_distance_to_storage(basis_loc), info))
+                .collect::<Vec<_>>();
+            with_dist.sort_by(|a, b| a.0.cmp(&b.0));
+            Ok(with_dist
+                .into_iter()
+                .map(|(_, info)| info)
+                .take(limit as usize)
+                .collect())
         }
         .boxed()
     }

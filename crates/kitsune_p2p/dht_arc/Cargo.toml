@@ -1,7 +1,13 @@
 [package]
-name = "kitsune_dht_arc"
+name = "kitsune_p2p_dht_arc"
 version = "0.0.1"
-authors = ["Michael Dougherty <maackle.d@gmail.com>"]
+description = "Kitsune P2p Dht Arc Utils"
+license = "Apache-2.0"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://github.com/holochain/holochain"
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+keywords = [ "holochain", "holo", "p2p", "dht", "networking" ]
+categories = [ "network-programming" ]
 edition = "2018"
 
 [dependencies]
