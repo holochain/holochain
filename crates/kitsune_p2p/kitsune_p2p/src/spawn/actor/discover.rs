@@ -69,14 +69,20 @@ pub(crate) fn search_and_discover_peer_connect(
                                 agent_info_signed,
                             })) => {
                                 let agent = agent_info_signed.agent.clone();
-                                let _ = inner
+                                if let Err(err) = inner
                                     .evt_sender
                                     .put_agent_info_signed(PutAgentInfoSignedEvt {
                                         space: inner.space.clone(),
                                         agent,
                                         agent_info_signed: agent_info_signed.clone(),
                                     })
-                                    .await;
+                                    .await
+                                {
+                                    tracing::error!(
+                                        ?err,
+                                        "search_and_discover error putting agent info"
+                                    );
+                                }
 
                                 // hey, we got our target node info
                                 // return the try-to-connect future
