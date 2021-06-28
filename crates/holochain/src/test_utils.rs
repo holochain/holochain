@@ -607,7 +607,7 @@ pub async fn show_authored_ops(envs: &[&EnvWrite]) {
     for (i, env) in envs.iter().enumerate() {
         let int = int_ops(env);
         for op in &all_auth {
-            if int.iter().find(|&a| a == op).is_none() {
+            if !int.iter().any(|a| a == op) {
                 tracing::warn!(is_missing = ?op, for_env = %i);
                 show_data(env, op).await;
             }
