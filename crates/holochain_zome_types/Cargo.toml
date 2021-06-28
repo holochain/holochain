@@ -37,7 +37,7 @@ nanoid = { version = "0.3", optional = true }
 shrinkwraprs = { version = "0.3", optional = true }
 
 [features]
-default = ["full-dna-def", "fixturators", "test_utils"]
+default = ["full-dna-def", "fixturators", "test_utils", "no-deps"]
 
 # Extra impls for DnaDef, including InlineZome, which are not used in Wasm
 # but used in Holochain
@@ -48,3 +48,9 @@ full = ["default", "rusqlite", "num_enum"]
 fixturators = ["fixt", "rand", "strum", "holo_hash/fixturators", ]
 
 test_utils = ["holo_hash/hashing", "holo_hash/test_utils", "full-dna-def"]
+
+# Use at-rest encryption of databases
+db-encryption = ["rusqlite/sqlcipher"]
+
+# Compile SQLite from source rather than depending on a library
+no-deps = ["rusqlite/bundled"]

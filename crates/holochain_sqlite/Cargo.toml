@@ -67,7 +67,7 @@ default = [ "test_utils", "no-deps" ]
 test_utils = [ ]
 
 # Use at-rest encryption of databases
-db-encryption = ["rusqlite/sqlcipher", "holo_hash/db-encryption"]
+db-encryption = ["rusqlite/sqlcipher", "holo_hash/db-encryption", "holochain_zome_types/db-encryption"]
 
 # Compile SQLite from source rather than depending on a library
-no-deps = ["rusqlite/bundled", "holo_hash/no-deps"]
+no-deps = ["rusqlite/bundled", "holo_hash/no-deps", "holochain_zome_types/no-deps"]
