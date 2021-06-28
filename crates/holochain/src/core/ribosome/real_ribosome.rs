@@ -184,6 +184,24 @@ static CONTEXT_KEY: AtomicU64 = AtomicU64::new(0);
 
 const INSTANCE_CACHE_SIZE: usize = 20;
 
+fn instance_cache_key(wasm_hash: &WasmHash, dna_hash: &DnaHash, counter: u64) -> [u8; 32] {
+    let mut bits = [0u8; 32];
+    for (i, byte) in wasm_hash
+        .get_raw_32()
+        .iter()
+        .zip(dna_hash.get_raw_32().iter())
+        .map(|(a, b)| a ^ b)
+        .take(24)
+        .enumerate()
+    {
+        bits[i] = byte;
+    }
+    for (i, byte) in (24..32).zip(counter.to_be_bytes()) {
+        bits[i] = byte;
+    }
+    bits
+}
+
 impl RealRibosome {
     /// Create a new instance
     pub fn new(dna_file: DnaFile) -> Self {
@@ -226,21 +244,25 @@ impl RealRibosome {
         {
             CONTEXT_MAP.lock().remove(&context_key);
         }
-        let cache_key = (
-            self.dna_file.dna_hash().clone(),
-            self.wasm_cache_key(&zome_name)?,
+        let key = instance_cache_key(
+            &self.dna_file.dna().get_wasm_zome(zome_name)?.wasm_hash,
+            self.dna_file.dna_hash(),
+            context_key,
         );
+        holochain_wasmer_host::module::INSTANCE_CACHE
+            .write()
+            .put_item(key, instance.clone())?;
         // Lock the cache.
-        let mut lock = INSTANCE_CACHE.lock();
-        if let Some(cache) = lock.get_mut(&cache_key) {
-            // If we have space in the cache then add this instance.
-            if cache.len() <= INSTANCE_CACHE_SIZE {
-                cache.insert(context_key, instance);
-            } else {
-                panic!("cache is full, cannot reinsert context key {}", context_key);
-            }
-        }
-        Ok(())
+        // let mut lock = INSTANCE_CACHE.lock();
+        // if let Some(cache) = lock.get_mut(&cache_key) {
+        //     // If we have space in the cache then add this instance.
+        //     if cache.len() <= INSTANCE_CACHE_SIZE {
+        //         cache.insert(context_key, instance);
+        //     } else {
+        //         panic!("cache is full, cannot reinsert context key {}", context_key);
+        //     }
+        // }
+        // Ok(())
     }
 
     pub fn instance(
