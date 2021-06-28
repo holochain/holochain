@@ -38,10 +38,11 @@ async fn rand_insert(db: &DbWrite, space: &Arc<KitsuneSpace>, agent: &Arc<Kitsun
     let signed_at_ms = rand_signed_at_ms();
     let expires_at_ms = signed_at_ms + rng.gen_range(100, 200);
 
-    let half_len = match rng.gen_range(0_u8, 5_u8) {
+    let half_len = match rng.gen_range(0_u8, 9_u8) {
         0 => 0,
         1 => u32::MAX,
-        _ => rng.gen_range(0, u32::MAX / 2),
+        2 => rng.gen_range(0, u32::MAX / 2),
+        _ => rng.gen_range(0, u32::MAX / 1000),
     };
 
     let signed = AgentInfoSigned::sign(
@@ -120,6 +121,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
     assert_eq!(all.len(), 0);
 
     // check that gossip query over half arc returns some but not all results
+    // NB: there is a very small probability of this failing
     let all = con
         .p2p_gossip_query_agents(
             u64::MIN,

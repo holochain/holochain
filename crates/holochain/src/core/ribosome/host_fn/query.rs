@@ -3,22 +3,28 @@ use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
+use crate::core::ribosome::HostFnAccess;
 
 pub fn query(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: ChainQueryFilter,
 ) -> Result<Vec<Element>, WasmError> {
-    tokio_helper::block_forever_on(async move {
-        let elements: Vec<Element> = call_context
-            .host_access
-            .workspace()
-            .source_chain()
-            .query(input)
-            .await
-            .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
-        Ok(elements)
-    })
+    match HostFnAccess::from(&call_context.host_access()) {
+        HostFnAccess{ read_workspace: Permission::Allow, .. } => {
+            tokio_helper::block_forever_on(async move {
+                let elements: Vec<Element> = call_context
+                    .host_access
+                    .workspace()
+                    .source_chain()
+                    .query(input)
+                    .await
+                    .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
+                Ok(elements)
+            })
+        },
+        _ => unreachable!(),
+    }
 }
 
 #[cfg(test)]
