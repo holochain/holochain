@@ -29,7 +29,6 @@ impl<M: Manifest> Bundle<M> {
             let path_clone = path.clone();
             let parent = path_clone
                 .parent()
-                .clone()
                 .ok_or_else(|| UnpackingError::ParentlessPath(path.clone()))?;
             ffs::create_dir_all(&parent).await?;
             ffs::write(&path, resource).await?;
