@@ -284,7 +284,7 @@ impl KitsuneP2pHandler for Space {
         agent: Arc<KitsuneAgent>,
     ) -> KitsuneP2pHandlerResult<()> {
         self.local_joined_agents.insert(agent.clone());
-        self.gossip_mod.local_agent_join(agent);
+        self.gossip_mod.local_agent_join(agent.clone());
         let fut = self.i_s.update_single_agent_info(agent.clone());
         let evt_sender = self.evt_sender.clone();
         match self.config.network_type {
