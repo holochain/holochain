@@ -1,7 +1,6 @@
 use crate::test_utils::conductor_setup::ConductorTestData;
 use crate::test_utils::consistency_envs;
 use crate::test_utils::new_zome_call;
-use crate::test_utils::wait_for_integration;
 use hdk::prelude::*;
 use holochain_p2p::{AgentPubKeyExt, DnaHashExt};
 use holochain_sqlite::prelude::*;
