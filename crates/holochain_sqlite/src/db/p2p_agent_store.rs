@@ -3,63 +3,64 @@
 use crate::prelude::*;
 use crate::sql::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use kitsune_p2p::dht_arc::DhtArc;
+use kitsune_p2p::dht_arc::ArcInterval;
+use kitsune_p2p::dht_arc::DhtArcSet;
 use kitsune_p2p::KitsuneAgent;
 use rusqlite::*;
 use std::sync::Arc;
 
 /// Extension trait to treat connection instances
 /// as p2p store accessors.
-pub trait AsP2pStateConExt {
+pub trait AsP2pAgentStoreConExt {
     /// Get an AgentInfoSigned record from the p2p_store
-    fn p2p_get(&mut self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>>;
+    fn p2p_get_agent(&mut self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>>;
 
     /// List all AgentInfoSigned records within a space in the p2p_agent_store
-    fn p2p_list(&mut self) -> DatabaseResult<Vec<AgentInfoSigned>>;
+    fn p2p_list_agents(&mut self) -> DatabaseResult<Vec<AgentInfoSigned>>;
 
     /// Query agent list for gossip
-    fn p2p_gossip_query(
+    fn p2p_gossip_query_agents(
         &mut self,
         since_ms: u64,
         until_ms: u64,
-        within_arc: DhtArc,
-    ) -> DatabaseResult<Vec<KitsuneAgent>>;
+        arcset: DhtArcSet,
+    ) -> DatabaseResult<Vec<(KitsuneAgent, ArcInterval)>>;
 }
 
 /// Extension trait to treat transaction instances
 /// as p2p store accessors.
 pub trait AsP2pStateTxExt {
     /// Get an AgentInfoSigned record from the p2p_store
-    fn p2p_get(&self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>>;
+    fn p2p_get_agent(&self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>>;
 
     /// List all AgentInfoSigned records within a space in the p2p_agent_store
-    fn p2p_list(&self) -> DatabaseResult<Vec<AgentInfoSigned>>;
+    fn p2p_list_agents(&self) -> DatabaseResult<Vec<AgentInfoSigned>>;
 
     /// Query agent list for gossip
-    fn p2p_gossip_query(
+    fn p2p_gossip_query_agents(
         &self,
         since_ms: u64,
         until_ms: u64,
-        within_arc: DhtArc,
-    ) -> DatabaseResult<Vec<KitsuneAgent>>;
+        arcset: DhtArcSet,
+    ) -> DatabaseResult<Vec<(KitsuneAgent, ArcInterval)>>;
 }
 
-impl AsP2pStateConExt for crate::db::PConn {
-    fn p2p_get(&mut self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>> {
-        self.with_reader(move |reader| reader.p2p_get(agent))
+impl AsP2pAgentStoreConExt for crate::db::PConn {
+    fn p2p_get_agent(&mut self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>> {
+        self.with_reader(move |reader| reader.p2p_get_agent(agent))
     }
 
-    fn p2p_list(&mut self) -> DatabaseResult<Vec<AgentInfoSigned>> {
-        self.with_reader(move |reader| reader.p2p_list())
+    fn p2p_list_agents(&mut self) -> DatabaseResult<Vec<AgentInfoSigned>> {
+        self.with_reader(move |reader| reader.p2p_list_agents())
     }
 
-    fn p2p_gossip_query(
+    fn p2p_gossip_query_agents(
         &mut self,
         since_ms: u64,
         until_ms: u64,
-        within_arc: DhtArc,
-    ) -> DatabaseResult<Vec<KitsuneAgent>> {
-        self.with_reader(move |reader| reader.p2p_gossip_query(since_ms, until_ms, within_arc))
+        arcset: DhtArcSet,
+    ) -> DatabaseResult<Vec<(KitsuneAgent, ArcInterval)>> {
+        self.with_reader(move |reader| reader.p2p_gossip_query_agents(since_ms, until_ms, arcset))
     }
 }
 
@@ -99,10 +100,8 @@ fn tx_p2p_put(txn: &mut Transaction, record: P2pRecord) -> DatabaseResult<()> {
             ":expires_at_ms": &record.expires_at_ms,
             ":storage_center_loc": &record.storage_center_loc,
 
-            ":storage_start_1": &record.storage_start_1,
-            ":storage_end_1": &record.storage_end_1,
-            ":storage_start_2": &record.storage_start_2,
-            ":storage_end_2": &record.storage_end_2,
+            ":storage_start_loc": &record.storage_start_loc,
+            ":storage_end_loc": &record.storage_end_loc,
         },
     )?;
     Ok(())
@@ -124,7 +123,7 @@ pub async fn p2p_prune(db: &DbWrite) -> DatabaseResult<()> {
     Ok(())
 }
 impl AsP2pStateTxExt for Transaction<'_> {
-    fn p2p_get(&self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>> {
+    fn p2p_get_agent(&self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>> {
         let mut stmt = self
             .prepare(sql_p2p_agent_store::SELECT)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
@@ -140,7 +139,7 @@ impl AsP2pStateTxExt for Transaction<'_> {
             .optional()?)
     }
 
-    fn p2p_list(&self) -> DatabaseResult<Vec<AgentInfoSigned>> {
+    fn p2p_list_agents(&self) -> DatabaseResult<Vec<AgentInfoSigned>> {
         let mut stmt = self
             .prepare(sql_p2p_agent_store::SELECT_ALL)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
@@ -158,36 +157,55 @@ impl AsP2pStateTxExt for Transaction<'_> {
         Ok(out)
     }
 
-    fn p2p_gossip_query(
+    fn p2p_gossip_query_agents(
         &self,
         since_ms: u64,
         until_ms: u64,
-        within_arc: DhtArc,
-    ) -> DatabaseResult<Vec<KitsuneAgent>> {
+        arcset: DhtArcSet,
+    ) -> DatabaseResult<Vec<(KitsuneAgent, ArcInterval)>> {
         let mut stmt = self
             .prepare(sql_p2p_agent_store::GOSSIP_QUERY)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
 
-        let (storage_1, storage_2) = split_arc(&within_arc);
-
-        let mut out = Vec::new();
-        for r in stmt.query_map(
-            named_params! {
-                ":since_ms": clamp64(since_ms),
-                ":until_ms": clamp64(until_ms),
-                ":storage_start_1": storage_1.map(|s| s.0),
-                ":storage_end_1": storage_1.map(|s| s.1),
-                ":storage_start_2": storage_2.map(|s| s.0),
-                ":storage_end_2": storage_2.map(|s| s.1),
-            },
-            |r| {
-                let agent: Vec<u8> = r.get(0)?;
-                Ok(KitsuneAgent(agent))
-            },
-        )? {
-            out.push(r?);
-        }
-        Ok(out)
+        let query = stmt
+            .query_map(
+                named_params! {
+                    ":since_ms": clamp64(since_ms),
+                    ":until_ms": clamp64(until_ms),
+                    // we filter by arc in memory, not in the db query
+                    ":storage_start_loc": Some(u32::MIN),
+                    ":storage_end_loc": Some(u32::MAX),
+                },
+                |r| {
+                    let agent: Vec<u8> = r.get(0)?;
+                    let start: Option<u32> = r.get(1)?;
+                    let end: Option<u32> = r.get(2)?;
+                    let interval = match (start, end) {
+                        (Some(start), Some(end)) => Some(ArcInterval::new(start, end)),
+                        (None, None) => None,
+                        _ => {
+                            tracing::warn!(
+                            "Mismatch in arc bounds for an agent, treating as zero arc ({:?}, {:?})",
+                            start,
+                            end
+                        );
+                            None
+                        }
+                    };
+                    Ok(interval.map(|interval| (KitsuneAgent(agent), interval)))
+                },
+            )?;
+        query.fold(Ok(vec![]), |out, maybe_pair| {
+            if let Some((agent, interval)) = maybe_pair? {
+                if arcset.overlap(&interval.clone().into()) {
+                    return out.map(|mut out| {
+                        out.push((agent, interval));
+                        out
+                    });
+                }
+            }
+            out
+        })
     }
 }
 
@@ -205,38 +223,8 @@ struct P2pRecord {
     storage_center_loc: u32,
 
     // generated fields
-    storage_start_1: Option<u32>,
-    storage_end_1: Option<u32>,
-    storage_start_2: Option<u32>,
-    storage_end_2: Option<u32>,
-}
-
-pub type SplitRange = (u32, u32);
-pub fn split_arc(arc: &DhtArc) -> (Option<SplitRange>, Option<SplitRange>) {
-    let mut storage_1 = None;
-    let mut storage_2 = None;
-
-    use std::ops::{Bound, RangeBounds};
-    let r = arc.range();
-    let s = r.start_bound();
-    let e = r.end_bound();
-    match (s, e) {
-        // in the zero length case, DhtArc returns two excluded bounds
-        (Bound::Excluded(_), Bound::Excluded(_)) => (),
-        // the only other case for DhtArc is two included bounds
-        (Bound::Included(s), Bound::Included(e)) => {
-            if s > e {
-                storage_1 = Some((u32::MIN, *e));
-                storage_2 = Some((*s, u32::MAX));
-            } else {
-                storage_1 = Some((*s, *e));
-            }
-        }
-        // no other cases currently exist
-        _ => unreachable!(),
-    }
-
-    (storage_1, storage_2)
+    storage_start_loc: Option<u32>,
+    storage_end_loc: Option<u32>,
 }
 
 fn clamp64(u: u64) -> i64 {
@@ -259,7 +247,7 @@ impl P2pRecord {
 
         let storage_center_loc = arc.center_loc.into();
 
-        let (storage_1, storage_2) = split_arc(&arc);
+        let (storage_start_loc, storage_end_loc) = arc.primitive_range_detached();
 
         Ok(Self {
             agent,
@@ -270,10 +258,8 @@ impl P2pRecord {
             expires_at_ms: clamp64(expires_at_ms),
             storage_center_loc,
 
-            storage_start_1: storage_1.map(|s| s.0),
-            storage_end_1: storage_1.map(|s| s.1),
-            storage_start_2: storage_2.map(|s| s.0),
-            storage_end_2: storage_2.map(|s| s.1),
+            storage_start_loc,
+            storage_end_loc,
         })
     }
 }

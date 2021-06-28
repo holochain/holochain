@@ -260,7 +260,7 @@ pub mod test_utils {
         let handle = conductor_handle.clone();
 
         (
-            envs.tempdir(),
+            Arc::new(envs.into_tempdir()),
             RealAppInterfaceApi::new(conductor_handle, Default::default()),
             handle,
         )
@@ -318,7 +318,7 @@ pub mod test {
     async fn setup_admin() -> (Arc<TempDir>, ConductorHandle) {
         let envs = test_environments();
         let conductor_handle = Conductor::builder().test(&envs).await.unwrap();
-        (envs.tempdir(), conductor_handle)
+        (Arc::new(envs.into_tempdir()), conductor_handle)
     }
 
     async fn setup_admin_fake_cells(
@@ -342,7 +342,7 @@ pub mod test {
             .await
             .unwrap();
 
-        (envs.tempdir(), conductor_handle)
+        (Arc::new(envs.into_tempdir()), conductor_handle)
     }
 
     async fn activate(conductor_handle: ConductorHandle) -> ConductorHandle {
@@ -693,9 +693,9 @@ pub mod test {
         .unwrap()
     }
 
-    #[tokio::test(flavor = "multi_thread")]
     /// Check that we can add and get agent info for a conductor
     /// across the admin websocket.
+    #[tokio::test(flavor = "multi_thread")]
     async fn add_agent_info_via_admin() {
         observability::test_run().ok();
         let test_envs = test_environments();
@@ -720,7 +720,7 @@ pub mod test {
             {
                 let mut count = 0;
                 for env in p2p.lock().values() {
-                    count += env.conn().unwrap().p2p_list().unwrap().len();
+                    count += env.conn().unwrap().p2p_list_agents().unwrap().len();
                 }
                 count
             },

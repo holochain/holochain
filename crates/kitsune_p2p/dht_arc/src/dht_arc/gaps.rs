@@ -2,6 +2,9 @@
 
 use super::*;
 
+/// Margin of error for floating point comparisons
+const ERROR_MARGIN: f64 = 0.0000000001;
+
 /// Check a set of peers for a gap in coverage.
 /// Note this function is only used for verification in tests at this time.
 pub fn check_for_gaps(peers: Vec<DhtArc>) -> bool {

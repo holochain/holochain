@@ -98,10 +98,7 @@ async fn speed_test_normal() {
 async fn speed_test_persisted() {
     observability::test_run().unwrap();
     let envs = speed_test(None).await;
-    let tmpdir = envs.tempdir();
-    drop(envs);
-    let tmpdir = std::sync::Arc::try_unwrap(tmpdir).unwrap();
-    let path = tmpdir.into_path();
+    let path = envs.into_tempdir().into_path();
     println!("Run the following to see info about the test that just ran,");
     println!("with the correct cell env dir appended to the path:");
     println!();

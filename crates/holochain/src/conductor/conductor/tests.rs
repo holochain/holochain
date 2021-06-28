@@ -32,7 +32,7 @@ async fn can_update_state() {
         envs.p2p_metrics(),
         dna_store,
         keystore,
-        envs.tempdir().path().to_path_buf().into(),
+        envs.path().to_path_buf().into(),
         holochain_p2p,
     )
     .await
@@ -80,7 +80,7 @@ async fn can_add_clone_cell_to_app() {
         envs.p2p_metrics(),
         dna_store,
         keystore,
-        envs.tempdir().path().to_path_buf().into(),
+        envs.path().to_path_buf().into(),
         holochain_p2p,
     )
     .await
@@ -145,7 +145,7 @@ async fn app_ids_are_unique() {
         environments.p2p_metrics(),
         dna_store,
         environments.keystore().clone(),
-        environments.tempdir().path().to_path_buf().into(),
+        environments.path().to_path_buf().into(),
         holochain_p2p,
     )
     .await

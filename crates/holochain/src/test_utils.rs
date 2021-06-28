@@ -37,9 +37,7 @@ use holochain_p2p::DnaHashExt;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
 use rusqlite::named_params;
-use std::sync::Arc;
 use std::time::Duration;
-use tempdir::TempDir;
 use tokio::sync::mpsc;
 
 pub use itertools;
@@ -267,7 +265,7 @@ pub type InstalledCellsWithProofs = Vec<(InstalledCell, Option<SerializedBytes>)
 pub async fn setup_app(
     apps_data: Vec<(&str, InstalledCellsWithProofs)>,
     dnas: Vec<DnaFile>,
-) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
+) -> (TestEnvs, RealAppInterfaceApi, ConductorHandle) {
     setup_app_inner(test_environments(), apps_data, dnas, None).await
 }
 
@@ -277,7 +275,7 @@ pub async fn setup_app_with_network(
     apps_data: Vec<(&str, InstalledCellsWithProofs)>,
     dnas: Vec<DnaFile>,
     network: KitsuneP2pConfig,
-) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
+) -> (TestEnvs, RealAppInterfaceApi, ConductorHandle) {
     setup_app_inner(test_environments(), apps_data, dnas, Some(network)).await
 }
 
@@ -287,7 +285,7 @@ pub async fn setup_app_inner(
     apps_data: Vec<(&str, InstalledCellsWithProofs)>,
     dnas: Vec<DnaFile>,
     network: Option<KitsuneP2pConfig>,
-) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
+) -> (TestEnvs, RealAppInterfaceApi, ConductorHandle) {
     let conductor_handle = ConductorBuilder::new()
         .config(ConductorConfig {
             admin_interfaces: Some(vec![AdminInterfaceConfig {
@@ -307,7 +305,7 @@ pub async fn setup_app_inner(
     let handle = conductor_handle.clone();
 
     (
-        envs.tempdir(),
+        envs,
         RealAppInterfaceApi::new(conductor_handle, Default::default()),
         handle,
     )
@@ -610,7 +608,7 @@ pub async fn show_authored_ops(envs: &[&EnvWrite]) {
     for (i, env) in envs.iter().enumerate() {
         let int = int_ops(env);
         for op in &all_auth {
-            if int.iter().find(|&a| a == op).is_none() {
+            if !int.iter().any(|a| a == op) {
                 tracing::warn!(is_missing = ?op, for_env = %i);
                 show_data(env, op).await;
             }
