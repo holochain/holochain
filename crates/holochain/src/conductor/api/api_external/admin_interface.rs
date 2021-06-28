@@ -230,7 +230,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 // Enable app
                 let app = self
                     .conductor_handle
-                    .enable_app(installed_app_id.clone())
+                    .enable_app(&installed_app_id)
                     .await?;
 
                 // Create cells
@@ -258,21 +258,21 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             DisableApp { installed_app_id } => {
                 // Disable app
                 self.conductor_handle
-                    .disable_app(installed_app_id.clone(), DisabledAppReason::User)
+                    .disable_app(&installed_app_id, DisabledAppReason::User)
                     .await?;
                 Ok(AdminResponse::AppDisabled)
             }
             StartApp { installed_app_id } => {
                 let app = self
                     .conductor_handle
-                    .start_app(installed_app_id.clone())
+                    .start_app(&installed_app_id)
                     .await?;
                 Ok(AdminResponse::AppStarted(app.status().is_running()))
             }
             PauseApp { installed_app_id } => {
                 let app = self
                     .conductor_handle
-                    .pause_app(installed_app_id.clone(), PausedAppReason::User)
+                    .pause_app(&installed_app_id, PausedAppReason::User)
                     .await?;
                 Ok(AdminResponse::AppPaused(app.status().is_paused()))
             }

@@ -230,7 +230,7 @@ pub struct InstalledApp {
     #[shrinkwrap(main_field)]
     app: InstalledAppCommon,
     /// The status of the installed app
-    pub status: InstalledAppStatus,
+    pub status: AppStatus,
 }
 
 impl InstalledApp {
@@ -238,7 +238,7 @@ impl InstalledApp {
     pub fn new_fresh(app: InstalledAppCommon) -> Self {
         Self {
             app,
-            status: InstalledAppStatus::Disabled(DisabledAppReason::NeverStarted),
+            status: AppStatus::Disabled(DisabledAppReason::NeverStarted),
         }
     }
 
@@ -247,18 +247,18 @@ impl InstalledApp {
     pub fn new_running(app: InstalledAppCommon) -> Self {
         Self {
             app,
-            status: InstalledAppStatus::Running,
+            status: AppStatus::Running,
         }
     }
 
     /// Return the common app info, as well as a status which encodes the remaining
     /// information
-    pub fn into_app_and_status(self) -> (InstalledAppCommon, InstalledAppStatus) {
+    pub fn into_app_and_status(self) -> (InstalledAppCommon, AppStatus) {
         (self.app, self.status)
     }
 
     /// Accessor
-    pub fn status(&self) -> &InstalledAppStatus {
+    pub fn status(&self) -> &AppStatus {
         &self.status
     }
 
@@ -312,7 +312,7 @@ impl From<RunningApp> for InstalledApp {
     fn from(app: RunningApp) -> Self {
         Self {
             app: app.into_common(),
-            status: InstalledAppStatus::Running,
+            status: AppStatus::Running,
         }
     }
 }
@@ -544,7 +544,7 @@ impl InstalledAppCommon {
 /// The status of an installed app.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename_all = "snake_case")]
-pub enum InstalledAppStatus {
+pub enum AppStatus {
     /// The app is enabled and running normally.
     Running,
 
@@ -559,7 +559,19 @@ pub enum InstalledAppStatus {
     Disabled(DisabledAppReason),
 }
 
-impl InstalledAppStatus {
+/// Represents a state transition operation from one state to another
+pub enum AppStatusTransition {
+    /// Attempt to unpause a Paused app
+    Start,
+    /// Attempt to pause a Running app
+    Pause(PausedAppReason),
+    /// Gets an app running no matter what
+    Enable,
+    /// Disables an app, no matter what
+    Disable(DisabledAppReason),
+}
+
+impl AppStatus {
     /// Does this status correspond to an Enabled state?
     /// If false, this indicates a Disabled state.
     pub fn is_enabled(&self) -> bool {
@@ -585,6 +597,43 @@ impl InstalledAppStatus {
             _ => false,
         }
     }
+
+    /// Transition a status from one state to another.
+    /// If None, the transition is not valid, and the status did not change.
+    pub fn transition(&mut self, transition: AppStatusTransition) -> AppStatusRunningDelta {
+        use AppStatus::*;
+        use AppStatusTransition::*;
+        use AppStatusRunningDelta::*;
+        match (&self, transition) {
+            (Running, Pause(reason)) => Some((Paused(reason), Stop)),
+            (Running, Disable(reason)) => Some((Disabled(reason), Stop)),
+            (Running, Start) | (Running, Enable) => None,
+
+            (Paused(_), Start) => Some((Running, Run)),
+            (Paused(_), Enable) => Some((Running, Run)),
+            (Paused(_), Disable(reason)) => Some((Disabled(reason), NoChange)),
+            (Paused(_), Pause(_)) => None,
+
+            (Disabled(_), Enable) => Some((Running, Run)),
+            (Disabled(_), Pause(_)) | (Disabled(_), Disable(_)) | (Disabled(_), Start) => None,
+        }
+        .map(|(new_status, delta)| {
+            *self = new_status;
+            delta
+        })
+        .unwrap_or(NoChange)
+    }
+}
+
+/// Marks a change in the "running" status of an app
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum AppStatusRunningDelta {
+    /// The app was running, and now it has transitioned to stopped.
+    Stop,
+    /// No change: the previous running/stopped state persists.
+    NoChange,
+    /// The app was stopped, and now it has transitioned to running.
+    Run,
 }
 
 /// The various reasons for why an App is not in the Running state.
@@ -616,16 +665,16 @@ pub enum StoppedAppReason {
 impl StoppedAppReason {
     /// Convert a status into a StoppedAppReason.
     /// If the status is Running, returns None.
-    pub fn from_status(status: &InstalledAppStatus) -> Option<Self> {
+    pub fn from_status(status: &AppStatus) -> Option<Self> {
         match status {
-            InstalledAppStatus::Paused(reason) => Some(Self::Paused(reason.clone())),
-            InstalledAppStatus::Disabled(reason) => Some(Self::Disabled(reason.clone())),
-            InstalledAppStatus::Running => None,
+            AppStatus::Paused(reason) => Some(Self::Paused(reason.clone())),
+            AppStatus::Disabled(reason) => Some(Self::Disabled(reason.clone())),
+            AppStatus::Running => None,
         }
     }
 }
 
-impl From<StoppedAppReason> for InstalledAppStatus {
+impl From<StoppedAppReason> for AppStatus {
     fn from(reason: StoppedAppReason) -> Self {
         match reason {
             StoppedAppReason::Paused(reason) => Self::Paused(reason),

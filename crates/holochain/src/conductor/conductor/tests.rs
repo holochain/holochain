@@ -167,7 +167,10 @@ async fn app_ids_are_unique() {
     );
 
     //- it doesn't matter whether the app is active or inactive
-    conductor.enable_app_in_db("id".to_string()).await.unwrap();
+    conductor
+        .transition_app_status(&"id".to_string(), AppStatusTransition::Enable)
+        .await
+        .unwrap();
 
     assert_matches!(
         conductor.add_deactivated_app_to_db(app.clone().into()).await,
@@ -381,7 +384,7 @@ async fn common_genesis_test_app(
     // Install both DNAs under the same app:
     let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor
-        .setup_app("app", &[dna_hardcoded, dna_custom])
+        .setup_app(&"app", &[dna_hardcoded, dna_custom])
         .await?;
     Ok((conductor, app))
 }
@@ -448,7 +451,7 @@ async fn test_signing_error_during_genesis() {
         .unwrap();
 
     let result = conductor
-        .setup_app_for_agents("app", &[fixt!(AgentPubKey)], &[dna])
+        .setup_app_for_agents(&"app", &[fixt!(AgentPubKey)], &[dna])
         .await;
 
     // - Assert that we got an error during Genesis. However, this test is
@@ -601,7 +604,7 @@ async fn test_reactivate_app() {
     assert_matches!(active_apps[0].status, InstalledAppInfoStatus::Running);
 
     conductor
-        .disable_app("app".to_string(), DisabledAppReason::User)
+        .disable_app(&"app".to_string(), DisabledAppReason::User)
         .await
         .unwrap();
 
@@ -623,7 +626,7 @@ async fn test_reactivate_app() {
         }
     );
 
-    conductor.enable_app("app".to_string()).await.unwrap();
+    conductor.enable_app(&"app".to_string()).await.unwrap();
     conductor.inner_handle().setup_cells().await.unwrap();
 
     let (_, cell) = app.into_tuple();
@@ -811,53 +814,53 @@ async fn test_app_status_states() {
     // RUNNING -pause-> PAUSED
 
     conductor
-        .pause_app("app".to_string(), PausedAppReason::User)
+        .pause_app(&"app".to_string(), PausedAppReason::User)
         .await
         .unwrap();
     assert_matches!(get_status().await, InstalledAppInfoStatus::Paused { .. });
 
     // PAUSED  --start->  RUNNING
 
-    conductor.start_app("app".to_string()).await.unwrap();
+    conductor.start_app(&"app".to_string()).await.unwrap();
     assert_matches!(get_status().await, InstalledAppInfoStatus::Running);
 
     // RUNNING  --disable->  DISABLED
 
     conductor
-        .disable_app("app".to_string(), DisabledAppReason::User)
+        .disable_app(&"app".to_string(), DisabledAppReason::User)
         .await
         .unwrap();
     assert_matches!(get_status().await, InstalledAppInfoStatus::Disabled { .. });
 
     // DISABLED  --start->  DISABLED
 
-    conductor.start_app("app".to_string()).await.unwrap();
+    conductor.start_app(&"app".to_string()).await.unwrap();
     assert_matches!(get_status().await, InstalledAppInfoStatus::Disabled { .. });
 
     // DISABLED  --pause->  DISABLED
 
     conductor
-        .pause_app("app".to_string(), PausedAppReason::User)
+        .pause_app(&"app".to_string(), PausedAppReason::User)
         .await
         .unwrap();
     assert_matches!(get_status().await, InstalledAppInfoStatus::Disabled { .. });
 
     // DISABLED  --enable->  ENABLED
 
-    conductor.enable_app("app".to_string()).await.unwrap();
+    conductor.enable_app(&"app".to_string()).await.unwrap();
     assert_matches!(get_status().await, InstalledAppInfoStatus::Running);
 
     // RUNNING  --pause->  PAUSED
 
     conductor
-        .pause_app("app".to_string(), PausedAppReason::User)
+        .pause_app(&"app".to_string(), PausedAppReason::User)
         .await
         .unwrap();
     assert_matches!(get_status().await, InstalledAppInfoStatus::Paused { .. });
 
     // PAUSED  --enable->  RUNNING
 
-    conductor.enable_app("app".to_string()).await.unwrap();
+    conductor.enable_app(&"app".to_string()).await.unwrap();
     assert_matches!(get_status().await, InstalledAppInfoStatus::Running);
 }
 
@@ -876,12 +879,12 @@ async fn test_app_status_filters() {
     // put apps in the proper states for testing
 
     conductor
-        .pause_app("paused".to_string(), PausedAppReason::User)
+        .pause_app(&"paused".to_string(), PausedAppReason::User)
         .await
         .unwrap();
 
     conductor
-        .disable_app("disabled".to_string(), DisabledAppReason::User)
+        .disable_app(&"disabled".to_string(), DisabledAppReason::User)
         .await
         .unwrap();
 

@@ -202,22 +202,22 @@ pub trait ConductorHandleT: Send + Sync {
     async fn setup_cells(self: Arc<Self>) -> ConductorResult<Vec<CreateAppError>>;
 
     /// Activate an app
-    async fn enable_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<RunningApp>;
+    async fn enable_app(&self, installed_app_id: &InstalledAppId) -> ConductorResult<InstalledApp>;
 
     /// Deactivate an app
     async fn disable_app(
         &self,
-        installed_app_id: InstalledAppId,
+        installed_app_id: &InstalledAppId,
         reason: DisabledAppReason,
     ) -> ConductorResult<()>;
 
     /// Start an enabled but stopped (paused) app
-    async fn start_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<InstalledApp>;
+    async fn start_app(&self, installed_app_id: &InstalledAppId) -> ConductorResult<InstalledApp>;
 
     /// Stop a running app while leaving it enabled
     async fn pause_app(
         &self,
-        installed_app_id: InstalledAppId,
+        installed_app_id: &InstalledAppId,
         reason: PausedAppReason,
     ) -> ConductorResult<InstalledApp>;
 
@@ -659,48 +659,40 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(r)
     }
 
-    async fn enable_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<RunningApp> {
-        let app = self
+    async fn enable_app(&self, installed_app_id: &InstalledAppId) -> ConductorResult<InstalledApp> {
+        self
             .conductor
             .write()
             .await
-            .enable_app_in_db(installed_app_id)
-            .await?;
-        Ok(app)
-        // MD: Should we be doing `Conductor::add_cells()` here? (see below comment)
+            .enable_app(installed_app_id).await
     }
 
     async fn disable_app(
         &self,
-        installed_app_id: InstalledAppId,
+        installed_app_id: &InstalledAppId,
         reason: DisabledAppReason,
     ) -> ConductorResult<()> {
         let mut conductor = self.conductor.write().await;
-        let cell_ids_to_remove = conductor
-            .disable_app_in_db(installed_app_id, reason)
-            .await?
-            .all_cells()
-            .cloned()
-            .collect();
-        // MD: I'm not sure about this. We never add the cells back in after re-activating an app,
-        //     so it seems either we shouldn't remove them here, or we should be sure to add them
-        //     back in when re-activating.
-        conductor.remove_cells(cell_ids_to_remove).await;
+        conductor
+            .disable_app(installed_app_id, reason)
+            .await?;
         Ok(())
     }
 
-    async fn start_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<InstalledApp> {
+    async fn start_app(&self, installed_app_id: &InstalledAppId) -> ConductorResult<InstalledApp> {
         let mut conductor = self.conductor.write().await;
-        conductor.start_app_in_db(installed_app_id).await
+        conductor
+            .start_app(&installed_app_id)
+            .await
     }
 
     async fn pause_app(
         &self,
-        installed_app_id: InstalledAppId,
+        installed_app_id: &InstalledAppId,
         reason: PausedAppReason,
     ) -> ConductorResult<InstalledApp> {
         let mut conductor = self.conductor.write().await;
-        conductor.pause_app_in_db(installed_app_id, reason).await
+        conductor.pause_app(installed_app_id, reason).await
     }
 
     async fn uninstall_app(&self, installed_app_id: &InstalledAppId) -> ConductorResult<()> {

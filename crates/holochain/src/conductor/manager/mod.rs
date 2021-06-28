@@ -203,7 +203,7 @@ async fn run(
                             context
                         );
                         for app_id in app_ids.iter() {
-                            conductor.pause_app(app_id.to_string(), PausedAppReason::Error(error.to_string())).await.map_err(TaskManagerError::internal)?;
+                            conductor.pause_app(&app_id.to_string(), PausedAppReason::Error(error.to_string())).await.map_err(TaskManagerError::internal)?;
                         }
                         tracing::error!("Apps paused.");
                     } else {
@@ -214,7 +214,7 @@ async fn run(
                             context
                         );
                         for app_id in app_ids.iter() {
-                            conductor.disable_app(app_id.to_string(), DisabledAppReason::Error(error.to_string())).await.map_err(TaskManagerError::internal)?;
+                            conductor.disable_app(&app_id.to_string(), DisabledAppReason::Error(error.to_string())).await.map_err(TaskManagerError::internal)?;
                         }
                         tracing::error!("Apps disabled.");
                     }

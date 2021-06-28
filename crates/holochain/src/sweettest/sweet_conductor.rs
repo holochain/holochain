@@ -160,7 +160,7 @@ impl SweetConductor {
             .install_app(installed_app_id.clone(), installed_cells)
             .await?;
 
-        self.enable_app(installed_app_id).await?;
+        self.enable_app(&installed_app_id).await?;
         Ok(())
     }
 

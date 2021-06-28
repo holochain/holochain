@@ -643,90 +643,53 @@ where
         Ok(stopped_app)
     }
 
-    /// Enable an app in the database.
-    /// This also causes the app to enter the Running state, regardless of whether
-    /// or not it was already enabled or disabled.
-    pub(super) async fn enable_app_in_db(
-        &mut self,
-        app_id: InstalledAppId,
-    ) -> ConductorResult<RunningApp> {
-        use InstalledAppStatus::*;
-        let (_, app) = self
-            .update_state_prime(move |mut state| {
-                let app = state
-                    .update_app_status(&app_id, Running)?
-                    .clone()
-                    .into_app_and_status()
-                    .0;
-                Ok((state, app))
-            })
-            .await?;
-        Ok(app.into())
+    async fn process_app_status_delta(&mut self, delta: AppStatusRunningDelta) -> ConductorResult<()> {
+        match delta {
+            AppStatusRunningDelta::NoChange => (),   
+            AppStatusRunningDelta::Run => todo!("add cells"),   
+            AppStatusRunningDelta::Stop => todo!("remove cells"),   
+        }
+        Ok(())
     }
 
-    /// Start an paused app in the database.
-    /// This causes the app to enter the Running state if it's enabled,
-    /// otherwise it's a noop.
-    pub(super) async fn start_app_in_db(
+    /// Transition an app's status to a new state.
+    pub(super) async fn transition_app_status(
         &mut self,
-        app_id: InstalledAppId,
-    ) -> ConductorResult<InstalledApp> {
-        use InstalledAppStatus::*;
-        let (_, app) = self
+        app_id: &InstalledAppId,
+        transition: AppStatusTransition,
+    ) -> ConductorResult<(InstalledApp, AppStatusRunningDelta)> {
+        Ok(self
             .update_state_prime(move |mut state| {
-                let app = state.get_app(&app_id)?;
-                let app = if app.status().is_enabled() {
-                    // Only update if enabled, i.e. Paused or already Running
-                    state.update_app_status(&app_id, Running)?.clone()
-                } else {
-                    app.clone()
-                };
-                Ok((state, app))
+                let (app, delta) = state.transition_app_status(&app_id, transition)?.clone();
+                let app = app.clone();
+                Ok((state, (app, delta)))
             })
-            .await?;
+            .await?
+            .1)
+    }
+
+    pub(super) async fn enable_app(&mut self, app_id: &InstalledAppId) -> ConductorResult<InstalledApp> {
+        let (app, delta) = self.transition_app_status(app_id, AppStatusTransition::Enable).await?;
+        self.process_app_status_delta(delta).await?;
         Ok(app)
     }
-
-    /// Pause an app in the database, returning the installed app.
-    /// This causes the app to enter the Paused state if it's enabled,
-    /// otherwise it's a noop.
-    pub(super) async fn pause_app_in_db(
-        &mut self,
-        app_id: InstalledAppId,
-        reason: PausedAppReason,
-    ) -> ConductorResult<InstalledApp> {
-        use InstalledAppStatus::*;
-        let (_, app) = self
-            .update_state_prime(move |mut state| {
-                let app = state.get_app(&app_id)?;
-                let app = if app.status().is_enabled() {
-                    // Only update if enabled, i.e. Running or already Paused
-                    state.update_app_status(&app_id, Paused(reason))?.clone()
-                } else {
-                    app.clone()
-                };
-                Ok((state, app))
-            })
-            .await?;
+    
+    pub(super) async fn start_app(&mut self, app_id: &InstalledAppId) -> ConductorResult<InstalledApp> {
+        let (app, delta) = self.transition_app_status(app_id, AppStatusTransition::Start).await?;
+        self.process_app_status_delta(delta).await?;
         Ok(app)
     }
-
-    /// Disable an app in the database, returning the installed app
-    pub(super) async fn disable_app_in_db(
-        &mut self,
-        app_id: InstalledAppId,
-        reason: DisabledAppReason,
-    ) -> ConductorResult<InstalledApp> {
-        let state = self
-            .update_state({
-                let app_id = app_id.clone();
-                move |mut state| {
-                    state.update_app_status(&app_id, InstalledAppStatus::Disabled(reason))?;
-                    Ok(state)
-                }
-            })
-            .await?;
-        Ok(state.get_app(&app_id)?.clone())
+    
+    pub(super) async fn disable_app(&mut self, app_id: &InstalledAppId, reason: DisabledAppReason) -> ConductorResult<InstalledApp> {
+        let (app, delta) = self.transition_app_status(app_id, AppStatusTransition::Disable(reason)).await?;
+        self.process_app_status_delta(delta).await?;
+        Ok(app)
+    }
+    
+    pub(super) async fn pause_app(&mut self, app_id: &InstalledAppId, reason: PausedAppReason) -> ConductorResult<InstalledApp> {
+        let (app, delta) = self.transition_app_status(app_id, AppStatusTransition::Pause(reason)).await?;
+        self.process_app_status_delta(delta).await?;
+        Ok(app)
     }
 
     /// Entirely remove an app from the database, returning the removed app.

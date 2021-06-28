@@ -88,7 +88,7 @@ impl ConductorState {
     /// Iterate over only the "running" apps
     pub fn running_apps(&self) -> impl Iterator<Item = (&InstalledAppId, RunningApp)> + '_ {
         self.installed_apps.iter().filter_map(|(id, app)| {
-            if *app.status() == InstalledAppStatus::Running {
+            if *app.status() == AppStatus::Running {
                 let running = RunningApp::from(app.as_ref().clone());
                 Some((id, running))
             } else {
@@ -130,17 +130,19 @@ impl ConductorState {
     }
 
     /// Update the status of an installed app in-place.
-    pub fn update_app_status(
+    /// Return a reference to the (possibly updated) app.
+    /// Additionally, if an update occurred, return the previous state. If no update occurred, return None.
+    pub fn transition_app_status(
         &mut self,
         id: &InstalledAppId,
-        status: InstalledAppStatus,
-    ) -> ConductorResult<&InstalledApp> {
-        let mut app = self
+        transition: AppStatusTransition,
+    ) -> ConductorResult<(&InstalledApp, AppStatusRunningDelta)> {
+        let app = self
             .installed_apps
             .get_mut(id)
             .ok_or_else(|| ConductorError::AppNotInstalled(id.clone()))?;
-        app.status = status;
-        Ok(app)
+        let delta = app.status.transition(transition);
+        Ok((app, delta))
     }
 
     /// Retrieve info about an installed App by its InstalledAppId

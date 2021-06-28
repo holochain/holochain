@@ -248,7 +248,7 @@ pub mod test_utils {
             .unwrap();
 
         conductor_handle
-            .enable_app("test app".to_string())
+            .enable_app(&"test app".to_string())
             .await
             .unwrap();
 
@@ -346,7 +346,7 @@ pub mod test {
 
     async fn activate(conductor_handle: ConductorHandle) -> ConductorHandle {
         conductor_handle
-            .enable_app("test app".to_string())
+            .enable_app(&"test app".to_string())
             .await
             .unwrap();
 
@@ -537,7 +537,7 @@ pub mod test {
         let cell_ids: HashSet<CellId> = state
             .get_app(&app_id)
             .map(|app| {
-                assert_eq!(*app.status(), InstalledAppStatus::Running);
+                assert_eq!(*app.status(), AppStatus::Running);
                 app
             })
             .unwrap()
@@ -586,7 +586,7 @@ pub mod test {
         let cell_ids: HashSet<CellId> = state
             .get_app(&app_id)
             .map(|app| {
-                assert_matches!(*app.status(), InstalledAppStatus::Disabled(_));
+                assert_matches!(*app.status(), AppStatus::Disabled(_));
                 app
             })
             .unwrap()

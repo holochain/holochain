@@ -160,12 +160,12 @@ pub enum InstalledAppInfoStatus {
     Running,
 }
 
-impl From<InstalledAppStatus> for InstalledAppInfoStatus {
-    fn from(i: InstalledAppStatus) -> Self {
+impl From<AppStatus> for InstalledAppInfoStatus {
+    fn from(i: AppStatus) -> Self {
         match i {
-            InstalledAppStatus::Running => InstalledAppInfoStatus::Running,
-            InstalledAppStatus::Disabled(reason) => InstalledAppInfoStatus::Disabled { reason },
-            InstalledAppStatus::Paused(reason) => InstalledAppInfoStatus::Paused { reason },
+            AppStatus::Running => InstalledAppInfoStatus::Running,
+            AppStatus::Disabled(reason) => InstalledAppInfoStatus::Disabled { reason },
+            AppStatus::Paused(reason) => InstalledAppInfoStatus::Paused { reason },
         }
     }
 }
@@ -175,7 +175,7 @@ fn status_serialization() {
     use kitsune_p2p::dependencies::kitsune_p2p_types::dependencies::serde_json;
 
     let status: InstalledAppInfoStatus =
-        InstalledAppStatus::Disabled(DisabledAppReason::Error("because".into())).into();
+        AppStatus::Disabled(DisabledAppReason::Error("because".into())).into();
 
     assert_eq!(
         serde_json::to_string(&status).unwrap(),
@@ -183,14 +183,14 @@ fn status_serialization() {
     );
 
     let status: InstalledAppInfoStatus =
-        InstalledAppStatus::Paused(PausedAppReason::Error("because".into())).into();
+        AppStatus::Paused(PausedAppReason::Error("because".into())).into();
 
     assert_eq!(
         serde_json::to_string(&status).unwrap(),
         "{\"paused\":{\"reason\":{\"error\":\"because\"}}}"
     );
 
-    let status: InstalledAppInfoStatus = InstalledAppStatus::Paused(PausedAppReason::User).into();
+    let status: InstalledAppInfoStatus = AppStatus::Paused(PausedAppReason::User).into();
 
     assert_eq!(
         serde_json::to_string(&status).unwrap(),
