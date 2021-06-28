@@ -230,6 +230,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 // Enable app
                 let app = self
                     .conductor_handle
+                    .clone()
                     .enable_app(&installed_app_id)
                     .await?;
 
@@ -258,6 +259,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             DisableApp { installed_app_id } => {
                 // Disable app
                 self.conductor_handle
+                    .clone()
                     .disable_app(&installed_app_id, DisabledAppReason::User)
                     .await?;
                 Ok(AdminResponse::AppDisabled)
@@ -265,6 +267,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             StartApp { installed_app_id } => {
                 let app = self
                     .conductor_handle
+                    .clone()
                     .start_app(&installed_app_id)
                     .await?;
                 Ok(AdminResponse::AppStarted(app.status().is_running()))
@@ -272,6 +275,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             PauseApp { installed_app_id } => {
                 let app = self
                     .conductor_handle
+                    .clone()
                     .pause_app(&installed_app_id, PausedAppReason::User)
                     .await?;
                 Ok(AdminResponse::AppPaused(app.status().is_paused()))

@@ -124,6 +124,34 @@ impl SweetConductor {
         self.envs.keystore()
     }
 
+    /// Convenience function that uses the internal handle to enable an app
+    pub async fn enable_app(&self, id: &InstalledAppId) -> ConductorResult<InstalledApp> {
+        self.handle().0.enable_app(id).await
+    }
+
+    /// Convenience function that uses the internal handle to disable an app
+    pub async fn disable_app(
+        &self,
+        id: &InstalledAppId,
+        reason: DisabledAppReason,
+    ) -> ConductorResult<InstalledApp> {
+        self.handle().0.disable_app(id, reason).await
+    }
+
+    /// Convenience function that uses the internal handle to start an app
+    pub async fn start_app(&self, id: &InstalledAppId) -> ConductorResult<InstalledApp> {
+        self.handle().0.start_app(id).await
+    }
+
+    /// Convenience function that uses the internal handle to pause an app
+    pub async fn pause_app(
+        &self,
+        id: &InstalledAppId,
+        reason: PausedAppReason,
+    ) -> ConductorResult<InstalledApp> {
+        self.handle().0.pause_app(id, reason).await
+    }
+
     /// Install the dna first.
     /// This allows a big speed up when
     /// installing many apps with the same dna
@@ -160,7 +188,11 @@ impl SweetConductor {
             .install_app(installed_app_id.clone(), installed_cells)
             .await?;
 
-        self.enable_app(&installed_app_id).await?;
+        self.handle()
+            .0
+            .clone()
+            .enable_app(&installed_app_id)
+            .await?;
         Ok(())
     }
 

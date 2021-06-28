@@ -202,24 +202,30 @@ pub trait ConductorHandleT: Send + Sync {
     async fn setup_cells(self: Arc<Self>) -> ConductorResult<Vec<CreateAppError>>;
 
     /// Activate an app
-    async fn enable_app(&self, installed_app_id: &InstalledAppId) -> ConductorResult<InstalledApp>;
+    async fn enable_app(self: Arc<Self>, app_id: &InstalledAppId) -> ConductorResult<InstalledApp>;
 
     /// Deactivate an app
     async fn disable_app(
-        &self,
-        installed_app_id: &InstalledAppId,
+        self: Arc<Self>,
+        app_id: &InstalledAppId,
         reason: DisabledAppReason,
-    ) -> ConductorResult<()>;
+    ) -> ConductorResult<InstalledApp>;
 
     /// Start an enabled but stopped (paused) app
-    async fn start_app(&self, installed_app_id: &InstalledAppId) -> ConductorResult<InstalledApp>;
+    async fn start_app(self: Arc<Self>, app_id: &InstalledAppId) -> ConductorResult<InstalledApp>;
 
     /// Stop a running app while leaving it enabled
     async fn pause_app(
-        &self,
-        installed_app_id: &InstalledAppId,
+        self: Arc<Self>,
+        app_id: &InstalledAppId,
         reason: PausedAppReason,
     ) -> ConductorResult<InstalledApp>;
+
+    /// Deal with the side effects of an app status state transition
+    async fn process_app_status_delta(
+        self: Arc<Self>,
+        delta: AppStatusRunningDelta,
+    ) -> ConductorResult<()>;
 
     /// List Cell Ids
     async fn list_cell_ids(&self) -> ConductorResult<Vec<CellId>>;
@@ -335,6 +341,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         conductor
             .startup_app_interfaces_via_handle(self.clone())
             .await?;
+        conductor.start_paused_apps().await?;
         Ok(())
     }
 
@@ -638,7 +645,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn setup_cells(self: Arc<Self>) -> ConductorResult<Vec<CreateAppError>> {
         let cells = {
             let lock = self.conductor.read().await;
-            lock.create_active_app_cells(self.clone())
+            lock.create_cells_for_running_apps(self.clone())
                 .await?
                 .into_iter()
         };
@@ -659,40 +666,84 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(r)
     }
 
-    async fn enable_app(&self, installed_app_id: &InstalledAppId) -> ConductorResult<InstalledApp> {
-        self
+    async fn enable_app(self: Arc<Self>, app_id: &InstalledAppId) -> ConductorResult<InstalledApp> {
+        let (app, delta) = self
             .conductor
             .write()
             .await
-            .enable_app(installed_app_id).await
+            .transition_app_status(&app_id, AppStatusTransition::Enable)
+            .await?;
+        self.process_app_status_delta(delta).await?;
+        Ok(app)
     }
 
     async fn disable_app(
-        &self,
-        installed_app_id: &InstalledAppId,
+        self: Arc<Self>,
+        app_id: &InstalledAppId,
         reason: DisabledAppReason,
-    ) -> ConductorResult<()> {
-        let mut conductor = self.conductor.write().await;
-        conductor
-            .disable_app(installed_app_id, reason)
+    ) -> ConductorResult<InstalledApp> {
+        let (app, delta) = self
+            .conductor
+            .write()
+            .await
+            .transition_app_status(&app_id, AppStatusTransition::Disable(reason))
             .await?;
-        Ok(())
+        self.process_app_status_delta(delta).await?;
+        Ok(app)
     }
 
-    async fn start_app(&self, installed_app_id: &InstalledAppId) -> ConductorResult<InstalledApp> {
-        let mut conductor = self.conductor.write().await;
-        conductor
-            .start_app(&installed_app_id)
+    async fn start_app(self: Arc<Self>, app_id: &InstalledAppId) -> ConductorResult<InstalledApp> {
+        let (app, delta) = self
+            .conductor
+            .write()
             .await
+            .transition_app_status(&app_id, AppStatusTransition::Start)
+            .await?;
+        self.process_app_status_delta(delta).await?;
+        Ok(app)
     }
 
     async fn pause_app(
-        &self,
-        installed_app_id: &InstalledAppId,
+        self: Arc<Self>,
+        app_id: &InstalledAppId,
         reason: PausedAppReason,
     ) -> ConductorResult<InstalledApp> {
-        let mut conductor = self.conductor.write().await;
-        conductor.pause_app(installed_app_id, reason).await
+        let (app, delta) = self
+            .conductor
+            .write()
+            .await
+            .transition_app_status(&app_id, AppStatusTransition::Pause(reason))
+            .await?;
+        self.process_app_status_delta(delta).await?;
+        Ok(app)
+    }
+
+    async fn process_app_status_delta(
+        self: Arc<Self>,
+        delta: AppStatusRunningDelta,
+    ) -> ConductorResult<()> {
+        match delta {
+            AppStatusRunningDelta::NoChange => (),
+            AppStatusRunningDelta::Run => {
+                let cell_startup_errors = self.clone().setup_cells().await?;
+
+                // TODO: This should probably be emitted over the admin interface
+                if !cell_startup_errors.is_empty() {
+                    error!(
+                        msg = "Failed to create the following active apps",
+                        ?cell_startup_errors
+                    );
+                }
+            }
+            AppStatusRunningDelta::Stop => {
+                self.conductor
+                    .write()
+                    .await
+                    .remove_cells_for_stopped_apps()
+                    .await?
+            }
+        }
+        Ok(())
     }
 
     async fn uninstall_app(&self, installed_app_id: &InstalledAppId) -> ConductorResult<()> {

@@ -515,8 +515,27 @@ where
         }
     }
 
-    /// Create Cells for each CellId marked active in the ConductorState db
-    pub(super) async fn create_active_app_cells(
+    /// Remove Cells from the conductor for each CellId marked stopped. Idempotent.
+    pub(super) async fn remove_cells_for_stopped_apps(&mut self) -> ConductorResult<()> {
+        let state = self.get_state().await?;
+        let stopped_cells: HashSet<CellId> = state
+            .stopped_apps()
+            .flat_map(|(_, app)| app.all_cells().cloned().collect::<HashSet<_>>())
+            .collect();
+        for (_, cell) in self
+            .cells
+            .iter()
+            .filter(|(id, _)| stopped_cells.contains(id))
+        {
+            cell.cell.cleanup().await?;
+        }
+        self.cells.retain(|id, _| !stopped_cells.contains(id));
+        Ok(())
+    }
+
+    /// Create Cells to be added to the Conductor for each CellId marked running in the ConductorState db.
+    /// This only creates Cells that haven't already been created, so this is idempotent.
+    pub(super) async fn create_cells_for_running_apps(
         &self,
         conductor_handle: ConductorHandle,
     ) -> ConductorResult<Vec<Result<Vec<(Cell, InitialQueueTriggers)>, CreateAppError>>> {
@@ -532,8 +551,8 @@ where
         let state = self.get_state().await?;
         let tasks =
             state
-                .enabled_apps()
-                .map(move |(app_id, app): (&InstalledAppId, &InstalledApp)| {
+                .running_apps()
+                .map(move |(app_id, app): (&InstalledAppId, RunningApp)| {
                     // Clone data for async block
                     let root_env_dir = std::path::PathBuf::from(root_env_dir.clone());
                     let conductor_handle = conductor_handle.clone();
@@ -643,15 +662,6 @@ where
         Ok(stopped_app)
     }
 
-    async fn process_app_status_delta(&mut self, delta: AppStatusRunningDelta) -> ConductorResult<()> {
-        match delta {
-            AppStatusRunningDelta::NoChange => (),   
-            AppStatusRunningDelta::Run => todo!("add cells"),   
-            AppStatusRunningDelta::Stop => todo!("remove cells"),   
-        }
-        Ok(())
-    }
-
     /// Transition an app's status to a new state.
     pub(super) async fn transition_app_status(
         &mut self,
@@ -666,30 +676,6 @@ where
             })
             .await?
             .1)
-    }
-
-    pub(super) async fn enable_app(&mut self, app_id: &InstalledAppId) -> ConductorResult<InstalledApp> {
-        let (app, delta) = self.transition_app_status(app_id, AppStatusTransition::Enable).await?;
-        self.process_app_status_delta(delta).await?;
-        Ok(app)
-    }
-    
-    pub(super) async fn start_app(&mut self, app_id: &InstalledAppId) -> ConductorResult<InstalledApp> {
-        let (app, delta) = self.transition_app_status(app_id, AppStatusTransition::Start).await?;
-        self.process_app_status_delta(delta).await?;
-        Ok(app)
-    }
-    
-    pub(super) async fn disable_app(&mut self, app_id: &InstalledAppId, reason: DisabledAppReason) -> ConductorResult<InstalledApp> {
-        let (app, delta) = self.transition_app_status(app_id, AppStatusTransition::Disable(reason)).await?;
-        self.process_app_status_delta(delta).await?;
-        Ok(app)
-    }
-    
-    pub(super) async fn pause_app(&mut self, app_id: &InstalledAppId, reason: PausedAppReason) -> ConductorResult<InstalledApp> {
-        let (app, delta) = self.transition_app_status(app_id, AppStatusTransition::Pause(reason)).await?;
-        self.process_app_status_delta(delta).await?;
-        Ok(app)
     }
 
     /// Entirely remove an app from the database, returning the removed app.
@@ -814,6 +800,22 @@ where
                 }
             }
         }
+    }
+
+    /// Restart every paused app
+    pub(super) async fn start_paused_apps(&mut self) -> ConductorResult<()> {
+        self.update_state(|mut state| {
+            let ids = state.paused_apps().map(first).cloned().collect::<Vec<_>>();
+            if !ids.is_empty() {
+                tracing::info!("Restarting {} paused apps: {:#?}", ids.len(), ids);
+            }
+            for id in ids {
+                state.transition_app_status(&id, AppStatusTransition::Start)?;
+            }
+            Ok(state)
+        })
+        .await?;
+        Ok(())
     }
 
     pub(super) async fn add_agent_infos(
