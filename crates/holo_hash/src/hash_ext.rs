@@ -8,8 +8,10 @@ use crate::HoloHash;
 use crate::HoloHashOf;
 use crate::HoloHashed;
 use crate::HOLO_HASH_CORE_LEN;
+use futures::FutureExt;
 use hash_type::HashTypeAsync;
 use hash_type::HashTypeSync;
+use must_future::MustBoxFuture;
 
 /// The maximum size to hash synchronously. Anything larger than this will
 /// take too long to hash within a single tokio context
@@ -77,6 +79,13 @@ where
     }
 }
 
+impl<T, C> HoloHashed<C>
+where
+    T: HashTypeAsync,
+    C: HashableContent<HashType = T>,
+{
+}
+
 fn hash_from_content<T: HashType, C: HashableContent<HashType = T>>(content: &C) -> HoloHash<T> {
     match content.hashable_content() {
         HashableContentBytes::Content(sb) => {
@@ -86,5 +95,61 @@ fn hash_from_content<T: HashType, C: HashableContent<HashType = T>>(content: &C)
             HoloHash::<T>::from_raw_32_and_type(hash, content.hash_type())
         }
         HashableContentBytes::Prehashed39(bytes) => HoloHash::from_raw_39_panicky(bytes),
+    }
+}
+
+/// Adds convenience methods for constructing HoloHash and HoloHashed
+/// from some HashableContent
+pub trait HashableContentExtSync<T>: HashableContent
+where
+    T: HashTypeSync,
+{
+    /// Construct a HoloHash from a reference
+    fn to_hash(&self) -> HoloHash<T>;
+    /// Move into a HoloHashed
+    fn into_hashed(self) -> HoloHashed<Self>;
+}
+
+/// Adds convenience methods for constructing HoloHash and HoloHashed
+/// from some HashableContent
+pub trait HashableContentExtAsync<'a, T>: HashableContent
+where
+    T: HashTypeAsync,
+{
+    /// Construct a HoloHash from a reference
+    fn to_hash(&self) -> MustBoxFuture<HoloHash<T>>;
+    /// Move into a HoloHashed
+    fn into_hashed(self) -> MustBoxFuture<'a, HoloHashed<Self>>;
+}
+
+impl<T, C> HashableContentExtSync<T> for C
+where
+    T: HashTypeSync,
+    C: HashableContent<HashType = T>,
+{
+    fn to_hash(&self) -> HoloHash<T> {
+        HoloHash::with_data_sync(self)
+    }
+
+    fn into_hashed(self) -> HoloHashed<Self> {
+        HoloHashed::from_content_sync(self)
+    }
+}
+
+impl<'a, T, C> HashableContentExtAsync<'a, T> for C
+where
+    T: HashTypeAsync,
+    C: 'a + HashableContent<HashType = T> + Send + Sync,
+{
+    fn to_hash(&self) -> MustBoxFuture<HoloHash<T>> {
+        async move { HoloHash::with_data(self).await }
+            .boxed()
+            .into()
+    }
+
+    fn into_hashed(self) -> MustBoxFuture<'a, HoloHashed<Self>> {
+        async move { HoloHashed::from_content(self).await }
+            .boxed()
+            .into()
     }
 }

@@ -239,8 +239,8 @@ async fn bob_links_in_a_legit_way(
 ) -> HeaderHash {
     let base = Post("Bananas are good for you".into());
     let target = Post("Potassium is radioactive".into());
-    let base_entry_hash = EntryHash::with_data_sync(&Entry::try_from(base.clone()).unwrap());
-    let target_entry_hash = EntryHash::with_data_sync(&Entry::try_from(target.clone()).unwrap());
+    let base_entry_hash = Entry::try_from(base.clone()).unwrap().to_hash();
+    let target_entry_hash = Entry::try_from(target.clone()).unwrap().to_hash();
     let link_tag = fixt!(LinkTag);
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
     // 3
@@ -277,10 +277,9 @@ async fn bob_makes_a_large_link(
     let base = Post("Small time base".into());
     let target = Post("Spam it big time".into());
     let bad_update = Msg("This is not the msg you were looking for".into());
-    let base_entry_hash = EntryHash::with_data_sync(&Entry::try_from(base.clone()).unwrap());
-    let target_entry_hash = EntryHash::with_data_sync(&Entry::try_from(target.clone()).unwrap());
-    let bad_update_entry_hash =
-        EntryHash::with_data_sync(&Entry::try_from(bad_update.clone()).unwrap());
+    let base_entry_hash = Entry::try_from(base.clone()).unwrap().to_hash();
+    let target_entry_hash = Entry::try_from(target.clone()).unwrap().to_hash();
+    let bad_update_entry_hash = Entry::try_from(bad_update.clone()).unwrap().to_hash();
 
     let bytes = (0..MAX_TAG_SIZE + 1)
         .map(|_| 0u8)
@@ -329,8 +328,8 @@ async fn bob_makes_a_large_link(
 async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &DnaFile) {
     let base = Post("Bob is the best and I'll link to proof so you can check".into());
     let target = Post("Dodgy proof Bob is the best".into());
-    let base_entry_hash = EntryHash::with_data_sync(&Entry::try_from(base.clone()).unwrap());
-    let target_entry_hash = EntryHash::with_data_sync(&Entry::try_from(target.clone()).unwrap());
+    let base_entry_hash = Entry::try_from(base.clone()).unwrap().to_hash();
+    let target_entry_hash = Entry::try_from(target.clone()).unwrap().to_hash();
     let link_tag = fixt!(LinkTag);
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
 
