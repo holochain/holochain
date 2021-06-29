@@ -59,7 +59,7 @@ impl Settings {
             .unwrap_or("http://127.0.0.1:3030".to_string());
         let happ_path = std::env::var_os("BENCH_HAPP")
             .map(|s| s.to_string_lossy().to_string())
-            .unwrap_or("/../../../elemental-chat/elemental-chat.happ".to_string());
+            .unwrap_or("../../../elemental-chat/elemental-chat.happ".to_string());
         Self {
             num_machines,
             num_installs,
@@ -283,14 +283,9 @@ impl Producers {
         let num_peers = num(client, url).await;
         let mut peers = Vec::new();
         for c in &self.conductors {
-            let info = c
-                .get_agent_infos(None)
-                .await
-                .unwrap()
-                .into_iter()
-                .next()
-                .unwrap();
-            peers.push(c.get_p2p_env(info.space.clone()).await);
+            if let Some(info) = c.get_agent_infos(None).await.unwrap().into_iter().next() {
+                peers.push(c.get_p2p_env(info.space.clone()).await);
+            }
         }
         let peer_refs = peers.iter().collect::<Vec<_>>();
         let mut cells = Vec::new();
