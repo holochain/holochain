@@ -27,6 +27,7 @@ SELECT encoded FROM (
       END
     END AS distance
     FROM p2p_agent_store
+    WHERE is_active = TRUE
     ORDER BY distance
     LIMIT :limit
 )
