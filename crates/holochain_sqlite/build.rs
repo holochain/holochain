@@ -41,6 +41,10 @@ fn check_fmt(path: &std::path::Path) {
     let src_sql = std::fs::read_to_string(path).unwrap();
     let src_sql = src_sql.trim();
 
+    if src_sql.contains("no-sql-format") {
+        return;
+    }
+
     let opt = sqlformat::FormatOptions {
         indent: sqlformat::Indent::Spaces(2),
         uppercase: true,
@@ -48,6 +52,7 @@ fn check_fmt(path: &std::path::Path) {
     };
 
     let fmt_sql = sqlformat::format(&src_sql, &sqlformat::QueryParams::None, opt);
+
     let fmt_sql = fmt_sql.trim();
 
     if fix_sql_fmt() {
