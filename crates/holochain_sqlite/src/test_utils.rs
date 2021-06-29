@@ -14,7 +14,7 @@ pub fn test_cell_db() -> TestDb {
 }
 
 fn test_db(kind: DbKind) -> TestDb {
-    let tmpdir = Arc::new(TempDir::new("holochain-test-environments").unwrap());
+    let tmpdir = TempDir::new("holochain-test-environments").unwrap();
     TestDb {
         db: DbWrite::new(tmpdir.path(), kind).expect("Couldn't create test database"),
         tmpdir,
@@ -28,13 +28,13 @@ pub fn test_dbs() -> TestDbs {
 }
 
 /// A test database in a temp directory
-#[derive(Clone, Shrinkwrap)]
+#[derive(Shrinkwrap)]
 pub struct TestDb {
     #[shrinkwrap(main_field)]
     /// sqlite database
     db: DbWrite,
     /// temp directory for this environment
-    tmpdir: Arc<TempDir>,
+    tmpdir: TempDir,
 }
 
 impl TestDb {
@@ -44,22 +44,23 @@ impl TestDb {
     }
 
     /// Accessor
-    pub fn tmpdir(&self) -> Arc<TempDir> {
-        self.tmpdir.clone()
+    pub fn into_tempdir(self) -> TempDir {
+        self.tmpdir
     }
 }
 
-#[derive(Clone)]
 /// A container for all three non-cell environments
 pub struct TestDbs {
     /// A test conductor environment
     conductor: DbWrite,
     /// A test wasm environment
     wasm: DbWrite,
-    /// A test p2p environment
-    p2p: DbWrite,
+    /// A test p2p state environment
+    p2p_agent_store: DbWrite,
+    /// A test p2p metrics environment
+    p2p_metrics: DbWrite,
     /// The shared root temp dir for these environments
-    tempdir: Arc<TempDir>,
+    tempdir: TempDir,
 }
 
 #[allow(missing_docs)]
@@ -69,13 +70,15 @@ impl TestDbs {
         use DbKind::*;
         let conductor = DbWrite::new(&tempdir.path(), Conductor).unwrap();
         let wasm = DbWrite::new(&tempdir.path(), Wasm).unwrap();
-        let space = kitsune_p2p::KitsuneSpace(vec![0; 36]);
-        let p2p = DbWrite::new(&tempdir.path(), P2p(Arc::new(space))).unwrap();
+        let space = Arc::new(kitsune_p2p::KitsuneSpace(vec![0; 36]));
+        let p2p_agent_store = DbWrite::new(&tempdir.path(), P2pAgentStore(space.clone())).unwrap();
+        let p2p_metrics = DbWrite::new(&tempdir.path(), P2pMetrics(space)).unwrap();
         Self {
             conductor,
             wasm,
-            p2p,
-            tempdir: Arc::new(tempdir),
+            p2p_agent_store,
+            p2p_metrics,
+            tempdir,
         }
     }
 
@@ -87,13 +90,17 @@ impl TestDbs {
         self.wasm.clone()
     }
 
-    pub fn p2p(&self) -> DbWrite {
-        self.p2p.clone()
+    pub fn p2p_agent_store(&self) -> DbWrite {
+        self.p2p_agent_store.clone()
+    }
+
+    pub fn p2p_metrics(&self) -> DbWrite {
+        self.p2p_metrics.clone()
     }
 
     /// Get the root temp dir for these environments
-    pub fn tempdir(&self) -> Arc<TempDir> {
-        self.tempdir.clone()
+    pub fn into_tempdir(self) -> TempDir {
+        self.tempdir
     }
 }
 

@@ -61,7 +61,7 @@ where
 
     // commit the workspace
     if should_write {
-        workspace.flush()?;
+        workspace.flush().await?;
     }
 
     trigger_publish_dht_ops.trigger();

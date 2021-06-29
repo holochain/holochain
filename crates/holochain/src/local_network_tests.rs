@@ -1,8 +1,8 @@
 use std::convert::TryFrom;
 use std::sync::Arc;
 
-use crate::conductor::p2p_store::all_agent_infos;
-use crate::conductor::p2p_store::exchange_peer_info;
+use crate::conductor::p2p_agent_store::all_agent_infos;
+use crate::conductor::p2p_agent_store::exchange_peer_info;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
@@ -18,13 +18,13 @@ use holo_hash::HeaderHash;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::DnaHashExt;
 use holochain_serialized_bytes::SerializedBytes;
+use holochain_state::prelude::TestEnvs;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::ZomeCallResponse;
 use kitsune_p2p::KitsuneP2pConfig;
 use matches::assert_matches;
 use shrinkwraprs::Shrinkwrap;
-use tempdir::TempDir;
 use test_case::test_case;
 use tokio_helper;
 use tracing::debug_span;
@@ -76,7 +76,7 @@ fn conductors_call_remote(num_conductors: usize) {
             envs.push(h.get_p2p_env(space).await);
         }
 
-        exchange_peer_info(envs);
+        exchange_peer_info(envs).await;
 
         // Give a little longer timeout here because they must find each other to pass the test
         // This can require multiple round trips if the head of the source chain keeps moving.
@@ -299,7 +299,7 @@ async fn conductors_gossip_inner(
     }
 
     if share_peers {
-        exchange_peer_info(envs.clone());
+        exchange_peer_info(envs.clone()).await;
     }
 
     // for _ in 0..600 {
@@ -331,7 +331,7 @@ async fn conductors_gossip_inner(
     }
 
     if share_peers {
-        exchange_peer_info(envs.clone());
+        exchange_peer_info(envs.clone()).await;
     }
 
     let all_handles = third_handles
@@ -480,7 +480,7 @@ fn check_peers(envs: Vec<EnvWrite>) {
         let num_peers = peers.len();
         let peers = peers
             .into_iter()
-            .map(|a| a.into_agent())
+            .map(|a| a.agent.clone())
             .collect::<Vec<_>>();
         tracing::debug!(?i, ?num_peers, ?peers);
     }
@@ -491,7 +491,7 @@ struct TestHandle {
     #[shrinkwrap(main_field)]
     handle: ConductorHandle,
     cell_id: CellId,
-    __tmpdir: Arc<TempDir>,
+    _envs: Arc<TestEnvs>,
 }
 
 impl TestHandle {
@@ -529,7 +529,7 @@ async fn setup(
     let mut handles = Vec::with_capacity(num_conductors);
     for _ in 0..num_conductors {
         let dnas = vec![dna_file.clone()];
-        let (__tmpdir, _, handle) =
+        let (_envs, _, handle) =
             setup_app_with_network(vec![], vec![], network.clone().unwrap_or_default()).await;
 
         let agent_key = AgentPubKey::new_from_pure_entropy(handle.keystore())
@@ -539,7 +539,7 @@ async fn setup(
         let app = InstalledCell::new(cell_id.clone(), "cell_handle".into());
         install_app("test_app", vec![(app, None)], dnas.clone(), handle.clone()).await;
         handles.push(TestHandle {
-            __tmpdir,
+            _envs: Arc::new(_envs),
             cell_id,
             handle,
         });

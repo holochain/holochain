@@ -3,8 +3,6 @@
 use crate::*;
 use kitsune_p2p::agent_store::*;
 use kitsune_p2p::KitsuneSignature;
-use std::convert::TryFrom;
-
 pub use kitsune_p2p_direct_api::{kd_agent_info::KdAgentInfoInner, KdAgentInfo};
 
 /// Extension trait to augment the direct_api version of KdAgentInfo
@@ -26,33 +24,40 @@ fn clamp(u: u64) -> i64 {
 
 impl KdAgentInfoExt for KdAgentInfo {
     fn to_kitsune(&self) -> AgentInfoSigned {
-        let agent = (*self.agent().to_kitsune_agent()).clone();
-        let signature = KitsuneSignature(self.as_signature_ref().to_vec());
-        let agent_info = self.as_encoded_info_ref().to_vec();
-        AgentInfoSigned::new_unchecked(agent, signature, agent_info)
+        let space = self.root().to_kitsune_space();
+        let agent = self.agent().to_kitsune_agent();
+        let storage_arc = *self.storage_arc();
+        let url_list = self.url_list().iter().map(|u| u.into()).collect();
+        let signed_at_ms = self.signed_at_ms() as u64;
+        let expires_at_ms = self.expires_at_ms() as u64;
+        let signature = Arc::new(KitsuneSignature(self.as_signature_ref().to_vec()));
+        let encoded_bytes = self.as_encoded_info_ref().to_vec().into_boxed_slice();
+
+        AgentInfoSigned(Arc::new(AgentInfoInner {
+            space,
+            agent,
+            storage_arc,
+            url_list,
+            signed_at_ms,
+            expires_at_ms,
+            signature,
+            encoded_bytes,
+        }))
     }
 
     fn from_kitsune(kitsune: &AgentInfoSigned) -> KdResult<Self> {
-        let i = AgentInfo::try_from(kitsune).map_err(KdError::other)?;
-        let root = KdHash::from_kitsune_space(i.as_space_ref());
-        let agent = KdHash::from_kitsune_agent(i.as_agent_ref());
-        let url_list = i.as_urls_ref().iter().map(|u| u.clone().into()).collect();
-        let signed_at_ms = clamp(i.signed_at_ms());
-        let expires_at_ms = signed_at_ms + clamp(i.expires_after_ms());
-        let signature = kitsune
-            .as_signature_ref()
-            .0
-            .to_vec()
-            .into_boxed_slice()
-            .into();
-        let encoded_info = kitsune
-            .as_agent_info_ref()
-            .to_vec()
-            .into_boxed_slice()
-            .into();
+        let root = KdHash::from_kitsune_space(&kitsune.space);
+        let agent = KdHash::from_kitsune_agent(&kitsune.agent);
+        let storage_arc = kitsune.storage_arc;
+        let url_list = kitsune.url_list.iter().map(|u| u.as_str().into()).collect();
+        let signed_at_ms = clamp(kitsune.signed_at_ms);
+        let expires_at_ms = clamp(kitsune.expires_at_ms);
+        let signature = kitsune.signature.0.to_vec().into_boxed_slice().into();
+        let encoded_info = kitsune.encoded_bytes.clone().into();
         Ok(Self(Arc::new(KdAgentInfoInner {
             root,
             agent,
+            storage_arc,
             url_list,
             signed_at_ms,
             expires_at_ms,

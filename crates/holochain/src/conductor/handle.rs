@@ -46,17 +46,22 @@ use super::error::ConductorResult;
 use super::error::CreateAppError;
 use super::interface::SignalBroadcaster;
 use super::manager::TaskManagerRunHandle;
-use super::p2p_store::get_agent_info_signed;
-use super::p2p_store::put_agent_info_signed;
-use super::p2p_store::query_agent_info_signed;
+use super::p2p_agent_store::get_agent_info_signed;
+use super::p2p_agent_store::put_agent_info_signed;
+use super::p2p_agent_store::query_agent_info_signed;
+use super::p2p_agent_store::query_agent_info_signed_near_basis;
 use super::Cell;
 use super::Conductor;
+use crate::conductor::p2p_metrics::put_metric_datum;
+use crate::conductor::p2p_metrics::query_metrics;
 use crate::core::workflow::ZomeCallResult;
 use crate::core::{queue_consumer::InitialQueueTriggers, ribosome::real_ribosome::RealRibosome};
 use derive_more::From;
 use futures::future::FutureExt;
 use futures::StreamExt;
+use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InstalledAppInfo;
+use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_p2p::DnaHashExt;
 use holochain_p2p::HolochainP2pCellT;
@@ -134,7 +139,6 @@ pub trait ConductorHandleT: Send + Sync {
     /// Warning: returning an error from this function kills the network for the conductor.
     async fn dispatch_holochain_p2p_event(
         &self,
-        cell_id: &CellId,
         event: holochain_p2p::event::HolochainP2pEvent,
     ) -> ConductorApiResult<()>;
 
@@ -198,7 +202,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn setup_cells(self: Arc<Self>) -> ConductorResult<Vec<CreateAppError>>;
 
     /// Activate an app
-    async fn activate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<()>;
+    async fn activate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<ActiveApp>;
 
     /// Deactivate an app
     async fn deactivate_app(
@@ -212,6 +216,12 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// List Active AppIds
     async fn list_active_apps(&self) -> ConductorResult<Vec<InstalledAppId>>;
+
+    /// List Apps with their information
+    async fn list_apps(
+        &self,
+        status_filter: Option<AppStatusFilter>,
+    ) -> ConductorResult<Vec<InstalledAppInfo>>;
 
     /// Get the IDs of all active installed Apps which use this Cell
     async fn list_active_apps_for_cell_id(
@@ -375,19 +385,20 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     #[instrument(skip(self))]
     async fn dispatch_holochain_p2p_event(
         &self,
-        cell_id: &CellId,
         event: holochain_p2p::event::HolochainP2pEvent,
     ) -> ConductorApiResult<()> {
-        let space = cell_id.dna_hash().to_kitsune();
-        trace!(agent = ?cell_id.agent_pubkey(), dispatch_event = ?event);
+        let space = event.dna_hash().to_kitsune();
+        trace!(dispatch_event = ?event);
         match event {
             PutAgentInfoSigned {
                 agent_info_signed,
                 respond,
                 ..
             } => {
+                // TODO: This read lock isn't needed to get the p2p_env.
                 let env = { self.conductor.read().await.p2p_env(space) };
                 let res = put_agent_info_signed(env, agent_info_signed)
+                    .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
@@ -412,15 +423,62 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
-            SignNetworkData { respond, data, .. } => {
-                let signature = cell_id
-                    .agent_pubkey()
-                    .sign_raw(self.keystore(), &data)
-                    .await?;
+            QueryAgentInfoSignedNearBasis {
+                kitsune_space,
+                basis_loc,
+                limit,
+                respond,
+                ..
+            } => {
+                let env = { self.conductor.read().await.p2p_env(space) };
+                let res = query_agent_info_signed_near_basis(env, kitsune_space, basis_loc, limit)
+                    .map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
+            }
+            PutMetricDatum {
+                respond,
+                agent,
+                metric,
+                timestamp,
+                ..
+            } => {
+                let env = { self.conductor.read().await.p2p_metrics_env(space) };
+                let res = put_metric_datum(env, agent, metric, timestamp)
+                    .await
+                    .map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
+            }
+            QueryMetrics { respond, query, .. } => {
+                let env = { self.conductor.read().await.p2p_metrics_env(space) };
+                let res = query_metrics(env, query)
+                    .await
+                    .map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
+            }
+            SignNetworkData {
+                respond,
+                to_agent,
+                data,
+                ..
+            } => {
+                let signature = to_agent.sign_raw(self.keystore(), &data).await?;
                 respond.respond(Ok(async move { Ok(signature) }.boxed().into()));
             }
-            _ => {
-                let cell = self.cell_by_id(cell_id).await?;
+            HolochainP2pEvent::CallRemote { .. }
+            | Publish { .. }
+            | GetValidationPackage { .. }
+            | Get { .. }
+            | GetMeta { .. }
+            | GetLinks { .. }
+            | GetAgentActivity { .. }
+            | ValidationReceiptReceived { .. }
+            | FetchOpHashesForConstraints { .. }
+            | FetchOpHashData { .. } => {
+                let cell_id = CellId::new(
+                    event.dna_hash().clone(),
+                    event.target_agent_as_ref().clone(),
+                );
+                let cell = self.cell_by_id(&cell_id).await?;
                 cell.handle_holochain_p2p_event(event).await?;
             }
         }
@@ -607,12 +665,14 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(r)
     }
 
-    async fn activate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<()> {
-        self.conductor
+    async fn activate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<ActiveApp> {
+        let app = self
+            .conductor
             .write()
             .await
             .activate_app_in_db(installed_app_id)
-            .await
+            .await?;
+        Ok(app)
         // MD: Should we be doing `Conductor::add_cells()` here? (see below comment)
     }
 
@@ -648,6 +708,13 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self.conductor.read().await.list_active_apps().await
     }
 
+    async fn list_apps(
+        &self,
+        status_filter: Option<AppStatusFilter>,
+    ) -> ConductorResult<Vec<InstalledAppInfo>> {
+        self.conductor.read().await.list_apps(status_filter).await
+    }
+
     async fn list_active_apps_for_cell_id(
         &self,
         cell_id: &CellId,
@@ -681,7 +748,11 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn add_agent_infos(&self, agent_infos: Vec<AgentInfoSigned>) -> ConductorApiResult<()> {
-        self.conductor.read().await.add_agent_infos(agent_infos)
+        self.conductor
+            .read()
+            .await
+            .add_agent_infos(agent_infos)
+            .await
     }
 
     async fn get_agent_infos(

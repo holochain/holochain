@@ -4,20 +4,26 @@ use holochain_keystore::keystore_actor::KeystoreSenderExt;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
+use crate::core::ribosome::HostFnAccess;
 
 pub fn x_25519_x_salsa20_poly1305_encrypt(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: X25519XSalsa20Poly1305Encrypt,
 ) -> Result<XSalsa20Poly1305EncryptedData, WasmError> {
-    tokio_helper::block_forever_on(async move {
-        call_context
-            .host_access
-            .keystore()
-            .x_25519_x_salsa20_poly1305_encrypt(input)
-            .await
-    })
-    .map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))
+    match HostFnAccess::from(&call_context.host_access()) {
+        HostFnAccess{ keystore: Permission::Allow, .. } => {
+            tokio_helper::block_forever_on(async move {
+                call_context
+                    .host_access
+                    .keystore()
+                    .x_25519_x_salsa20_poly1305_encrypt(input)
+                    .await
+            })
+            .map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))
+        },
+        _ => unreachable!(),
+    }
 }
 
 #[cfg(test)]
@@ -39,7 +45,7 @@ pub mod wasm_test {
         crate::test_utils::fake_genesis(env.clone())
             .await
             .unwrap();
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).unwrap();
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
 
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace;

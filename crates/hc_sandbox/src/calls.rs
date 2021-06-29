@@ -4,7 +4,6 @@
 //! then calling the [`CmdRunner`] directly.
 //! For simple calls like [`AdminRequest::ListDnas`] this is probably easier
 //! but if you want more control use [`CmdRunner::command`].
-use std::convert::TryInto;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -13,9 +12,9 @@ use anyhow::bail;
 use anyhow::ensure;
 use holochain_conductor_api::AdminRequest;
 use holochain_conductor_api::AdminResponse;
+use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::{AdminInterfaceConfig, InstalledAppInfo};
-use holochain_p2p::kitsune_p2p;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use holochain_types::prelude::DnaHash;
 use holochain_types::prelude::InstallAppDnaPayload;
@@ -69,6 +68,8 @@ pub enum AdminRequestCli {
     ListCells,
     /// Calls AdminRequest::ListActiveApps.
     ListActiveApps,
+    /// Calls AdminRequest::ListApps.
+    ListApps(ListApps),
     ActivateApp(ActivateApp),
     DeactivateApp(DeactivateApp),
     DumpState(DumpState),
@@ -203,6 +204,16 @@ pub struct ListAgents {
     pub dna: Option<DnaHash>,
 }
 
+#[derive(Debug, StructOpt, Clone)]
+/// Calls AdminRequest::ListApps
+/// and pretty prints the list of apps
+/// installed in this conductor.
+pub struct ListApps {
+    #[structopt(short, long, parse(try_from_str = parse_status_filter))]
+    /// Optionally request agent info for a particular cell id.
+    pub status: Option<AppStatusFilter>,
+}
+
 #[doc(hidden)]
 pub async fn call(holochain_path: &Path, req: Call) -> anyhow::Result<()> {
     let Call {
@@ -293,6 +304,10 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
             let apps = list_active_apps(cmd).await?;
             msg!("Active Apps: {:?}", apps);
         }
+        AdminRequestCli::ListApps(args) => {
+            let apps = list_apps(cmd, args).await?;
+            msg!("List Apps: {:?}", apps);
+        }
         AdminRequestCli::ActivateApp(args) => {
             let app_id = args.app_id.clone();
             activate_app(cmd, args).await?;
@@ -326,20 +341,22 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
                     .map(|d| (d.clone(), holochain_p2p::space_holo_to_kit(d)))
                     .collect::<Vec<_>>();
 
-                let info: kitsune_p2p::agent_store::AgentInfo = (&info).try_into().unwrap();
-                let this_agent = agents.iter().find(|a| *info.as_agent_ref() == a.1);
-                let this_dna = dnas.iter().find(|d| *info.as_space_ref() == d.1).unwrap();
+                let this_agent = agents.iter().find(|a| *info.agent == a.1);
+                let this_dna = dnas.iter().find(|d| *info.space == d.1).unwrap();
                 if let Some(this_agent) = this_agent {
                     writeln!(out, "This Agent {:?} is {:?}", this_agent.0, this_agent.1)?;
                 }
                 writeln!(out, "This DNA {:?} is {:?}", this_dna.0, this_dna.1)?;
 
                 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
-                let duration = Duration::milliseconds(info.signed_at_ms() as i64);
+                let duration = Duration::milliseconds(info.signed_at_ms as i64);
                 let s = duration.num_seconds() as i64;
                 let n = duration.clone().to_std().unwrap().subsec_nanos();
                 let dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(s, n), Utc);
-                let exp = dt + Duration::milliseconds(info.expires_after_ms() as i64);
+                let duration = Duration::milliseconds(info.expires_at_ms as i64);
+                let s = duration.num_seconds() as i64;
+                let n = duration.clone().to_std().unwrap().subsec_nanos();
+                let exp = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(s, n), Utc);
                 let now = Utc::now();
 
                 writeln!(out, "signed at {}", dt)?;
@@ -349,9 +366,9 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
                     exp,
                     (exp - now).num_minutes()
                 )?;
-                writeln!(out, "space: {:?}", info.as_space_ref())?;
-                writeln!(out, "agent: {:?}", info.as_agent_ref())?;
-                writeln!(out, "urls: {:?}", info.as_urls_ref())?;
+                writeln!(out, "space: {:?}", info.space)?;
+                writeln!(out, "agent: {:?}", info.agent)?;
+                writeln!(out, "urls: {:?}", info.url_list)?;
                 msg!("{}\n", out);
             }
         }
@@ -526,6 +543,19 @@ pub async fn list_active_apps(cmd: &mut CmdRunner) -> anyhow::Result<Vec<String>
     Ok(expect_match!(resp => AdminResponse::ActiveAppsListed, "Failed to list active apps"))
 }
 
+/// Calls [`AdminRequest::ListApps`].
+pub async fn list_apps(
+    cmd: &mut CmdRunner,
+    args: ListApps,
+) -> anyhow::Result<Vec<InstalledAppInfo>> {
+    let resp = cmd
+        .command(AdminRequest::ListApps {
+            status_filter: args.status,
+        })
+        .await?;
+    Ok(expect_match!(resp => AdminResponse::AppsListed, "Failed to list apps"))
+}
+
 /// Calls [`AdminRequest::ActivateApp`] and activates the installed app.
 pub async fn activate_app(cmd: &mut CmdRunner, args: ActivateApp) -> anyhow::Result<()> {
     let resp = cmd
@@ -533,11 +563,7 @@ pub async fn activate_app(cmd: &mut CmdRunner, args: ActivateApp) -> anyhow::Res
             installed_app_id: args.app_id,
         })
         .await?;
-    ensure!(
-        matches!(resp, AdminResponse::AppActivated),
-        "Failed to activate app, got: {:?}",
-        resp
-    );
+    expect_match!(resp => AdminResponse::AppActivated, format!("Failed to activate app, got: {:?}", resp));
     Ok(())
 }
 
@@ -616,6 +642,17 @@ fn parse_agent_key(arg: &str) -> anyhow::Result<AgentPubKey> {
 
 fn parse_dna_hash(arg: &str) -> anyhow::Result<DnaHash> {
     DnaHash::try_from(arg).map_err(|e| anyhow::anyhow!("{:?}", e))
+}
+
+fn parse_status_filter(arg: &str) -> anyhow::Result<AppStatusFilter> {
+    match arg {
+        "active" => Ok(AppStatusFilter::Active),
+        "inactive" => Ok(AppStatusFilter::Inactive),
+        _ => Err(anyhow::anyhow!(
+            "Bad app status filter value: {}, only 'active' and 'inactive' are possible",
+            arg
+        )),
+    }
 }
 
 impl From<CellId> for DumpState {

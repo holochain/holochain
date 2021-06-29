@@ -31,7 +31,7 @@ holochain_sqlite = { version = "0.0.1", path = "../holochain_sqlite" }
 holochain_serialized_bytes = "=0.0.50"
 holochain_state = { version = "0.0.1", path = "../holochain_state" }
 holochain_types = { version = "0.0.1", path = "../holochain_types" }
-holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", tag = "v0.0.68" }
+holochain_wasmer_host = "0.0.71"
 holochain_websocket = { version = "0.0.1", path = "../holochain_websocket" }
 holochain_zome_types = { version = "^0.0.2-alpha.1", path = "../holochain_zome_types" }
 human-panic = "1.0.3"
@@ -73,7 +73,7 @@ xsalsa20poly1305 = "0.6.0"
 
 # Dependencies for test_utils: keep in sync with below
 holochain_wasm_test_utils = { version = "0.0.1", path = "../test_utils/wasm", optional = true }
-hdk = { path = "../hdk", optional = true }
+hdk = { version = "0.0.101-alpha.0", path = "../hdk", optional = true }
 matches = {version = "0.1.8", optional = true }
 holochain_test_wasm_common = { version = "0.0.1", path = "../test_utils/wasm_common", optional = true  }
 unwrap_to = { version = "0.1.0", optional = true }
@@ -94,7 +94,7 @@ test-case = "1.0.0"
 
 # Dependencies for test_utils: keep in sync with above
 holochain_wasm_test_utils = { version = "0.0.1", path = "../test_utils/wasm", optional = false }
-hdk = { path = "../hdk", optional = false }
+hdk = { version = "0.0.101-alpha.0", path = "../hdk", optional = false }
 matches = {version = "0.1.8", optional = false }
 holochain_test_wasm_common = { version = "0.0.1", path = "../test_utils/wasm_common", optional = false  }
 unwrap_to = { version = "0.1.0", optional = false }
@@ -102,6 +102,10 @@ unwrap_to = { version = "0.1.0", optional = false }
 
 [[bench]]
 name = "bench"
+harness = false
+
+[[bench]]
+name = "consistency"
 harness = false
 
 [lib]

@@ -26,9 +26,9 @@ use super::manager::spawn_task_manager;
 use super::manager::ManagedTaskAdd;
 use super::manager::ManagedTaskHandle;
 use super::manager::TaskManagerRunHandle;
-use super::p2p_store::all_agent_infos;
-use super::p2p_store::get_single_agent_info;
-use super::p2p_store::inject_agent_infos;
+use super::p2p_agent_store::all_agent_infos;
+use super::p2p_agent_store::get_single_agent_info;
+use super::p2p_agent_store::inject_agent_infos;
 use super::paths::EnvironmentRootPath;
 use super::state::AppInterfaceId;
 use super::state::ConductorState;
@@ -36,21 +36,22 @@ use super::CellError;
 use super::{api::CellConductorApi, state::AppInterfaceConfig};
 use super::{api::CellConductorApiT, interface::AppInterfaceRuntime};
 use super::{api::RealAdminInterfaceApi, manager::TaskManagerClient};
-use super::{api::RealAppInterfaceApi, p2p_store};
+use super::{api::RealAppInterfaceApi, p2p_agent_store};
 use crate::conductor::cell::Cell;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::error::ConductorResult;
 use crate::conductor::handle::ConductorHandle;
 use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::{
-    conductor::api::error::{ConductorApiError, ConductorApiResult},
-    core::ribosome::real_ribosome::RealRibosome,
+    conductor::api::error::ConductorApiResult, core::ribosome::real_ribosome::RealRibosome,
 };
 pub use builder::*;
 use futures::future;
 use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
 use holo_hash::DnaHash;
+use holochain_conductor_api::AppStatusFilter;
+use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::JsonDump;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
@@ -118,6 +119,8 @@ where
 
     /// The database for storing AgentInfoSigned
     p2p_env: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
+
+    p2p_metrics_env: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
 
     /// The database for persisting [ConductorState]
     // state_db: ConductorStateDb,
@@ -653,17 +656,19 @@ where
     pub(super) async fn activate_app_in_db(
         &mut self,
         installed_app_id: InstalledAppId,
-    ) -> ConductorResult<()> {
-        self.update_state(move |mut state| {
-            let app = state
-                .inactive_apps
-                .remove(&installed_app_id)
-                .ok_or_else(|| ConductorError::AppNotInstalled(installed_app_id.clone()))?;
-            state.active_apps.insert(app.into_active());
-            Ok(state)
-        })
-        .await?;
-        Ok(())
+    ) -> ConductorResult<ActiveApp> {
+        let (_, active_app) = self
+            .update_state_prime(move |mut state| {
+                let app = state
+                    .inactive_apps
+                    .remove(&installed_app_id)
+                    .ok_or_else(|| ConductorError::AppNotInstalled(installed_app_id.clone()))?;
+                let active_app = app.into_active();
+                state.active_apps.insert(active_app.clone());
+                Ok((state, active_app))
+            })
+            .await?;
+        Ok(active_app)
     }
 
     /// Deactivate an app in the database
@@ -739,16 +744,16 @@ where
         slot_id: &SlotId,
         properties: YamlProperties,
     ) -> ConductorResult<CellId> {
+        let dna_store = &self.dna_store;
         let (_, child_dna) = self
-            .update_state_prime(|mut state| {
+            .update_state_prime(move |mut state| {
                 if let Some(app) = state.active_apps.get_mut(installed_app_id) {
                     let slot = app
                         .slots()
                         .get(slot_id)
                         .ok_or_else(|| AppError::SlotIdMissing(slot_id.to_owned()))?;
                     let parent_dna_hash = slot.dna_hash();
-                    let dna = self
-                        .dna_store
+                    let dna = dna_store
                         .get(parent_dna_hash)
                         .ok_or_else(|| DnaError::DnaMissing(parent_dna_hash.to_owned()))?
                         .modify_phenotype(random_uid(), properties)?;
@@ -784,28 +789,30 @@ where
         let env = &self.wasm_env;
 
         // Load out all dna defs
-        let (wasm_tasks, defs) = env.conn()?.with_reader(|txn| {
-            let wasm_tasks = holochain_state::dna_def::get_all(&txn)?
-                .into_iter()
-                .map(|dna_def| {
-                    // Load all wasms for each dna_def from the wasm db into memory
-                    let wasms = dna_def.zomes.clone().into_iter().map(|(zome_name, zome)| {
-                        let wasm_hash = zome.wasm_hash(&zome_name)?;
-                        holochain_state::wasm::get(&txn, &wasm_hash)?
-                            .map(|hashed| hashed.into_content())
-                            .ok_or(ConductorError::WasmMissing)
-                    });
-                    let wasms = wasms.collect::<ConductorResult<Vec<_>>>();
-                    async move {
-                        let dna_file = DnaFile::new(dna_def.into_content(), wasms?).await?;
-                        ConductorResult::Ok((dna_file.dna_hash().clone(), dna_file))
-                    }
-                })
-                // This needs to happen due to the environment not being Send
-                .collect::<Vec<_>>();
-            let defs = holochain_state::entry_def::get_all(&txn)?;
-            ConductorResult::Ok((wasm_tasks, defs))
-        })?;
+        let (wasm_tasks, defs) = env
+            .async_reader(move |txn| {
+                let wasm_tasks = holochain_state::dna_def::get_all(&txn)?
+                    .into_iter()
+                    .map(|dna_def| {
+                        // Load all wasms for each dna_def from the wasm db into memory
+                        let wasms = dna_def.zomes.clone().into_iter().map(|(zome_name, zome)| {
+                            let wasm_hash = zome.wasm_hash(&zome_name)?;
+                            holochain_state::wasm::get(&txn, &wasm_hash)?
+                                .map(|hashed| hashed.into_content())
+                                .ok_or(ConductorError::WasmMissing)
+                        });
+                        let wasms = wasms.collect::<ConductorResult<Vec<_>>>();
+                        async move {
+                            let dna_file = DnaFile::new(dna_def.into_content(), wasms?).await?;
+                            ConductorResult::Ok((dna_file.dna_hash().clone(), dna_file))
+                        }
+                    })
+                    // This needs to happen due to the environment not being Send
+                    .collect::<Vec<_>>();
+                let defs = holochain_state::entry_def::get_all(&txn)?;
+                ConductorResult::Ok((wasm_tasks, defs))
+            })
+            .await?;
         // try to join all the tasks and return the list of dna files
         let dnas = futures::future::try_join_all(wasm_tasks).await?;
         Ok((dnas, defs))
@@ -822,17 +829,13 @@ where
         }
     }
 
-    pub(super) fn add_agent_infos(
+    pub(super) async fn add_agent_infos(
         &self,
         agent_infos: Vec<AgentInfoSigned>,
     ) -> ConductorApiResult<()> {
         let mut space_map = HashMap::new();
         for agent_info_signed in agent_infos {
-            let space: Arc<KitsuneSpace> = Arc::new(
-                (&agent_info_signed)
-                    .try_into()
-                    .map_err(ConductorApiError::other)?,
-            );
+            let space = agent_info_signed.space.clone();
             space_map
                 .entry(space)
                 .or_insert_with(Vec::new)
@@ -840,7 +843,7 @@ where
         }
         for (space, agent_infos) in space_map {
             let env = self.p2p_env(space);
-            inject_agent_infos(env, agent_infos)?;
+            inject_agent_infos(env, agent_infos.iter()).await?;
         }
         Ok(())
     }
@@ -887,22 +890,26 @@ where
         )
         .await;
 
-        env.conn()?.with_commit(|txn| {
-            for dna_wasm in wasms {
-                if !holochain_state::wasm::contains(txn, dna_wasm.as_hash())? {
-                    holochain_state::wasm::put(txn, dna_wasm)?;
+        env.async_commit({
+            let zome_defs = zome_defs.clone();
+            move |txn| {
+                for dna_wasm in wasms {
+                    if !holochain_state::wasm::contains(txn, dna_wasm.as_hash())? {
+                        holochain_state::wasm::put(txn, dna_wasm)?;
+                    }
                 }
-            }
 
-            for (key, entry_def) in zome_defs.clone() {
-                holochain_state::entry_def::put(txn, key, entry_def)?;
-            }
+                for (key, entry_def) in zome_defs.clone() {
+                    holochain_state::entry_def::put(txn, key, entry_def)?;
+                }
 
-            if !holochain_state::dna_def::contains(txn, dna.dna_hash())? {
-                holochain_state::dna_def::put(txn, dna.dna_def().clone())?;
+                if !holochain_state::dna_def::contains(txn, dna.dna_hash())? {
+                    holochain_state::dna_def::put(txn, dna.dna_def().clone())?;
+                }
+                StateMutationResult::Ok(())
             }
-            StateMutationResult::Ok(())
-        })?;
+        })
+        .await?;
 
         Ok(zome_defs)
     }
@@ -914,6 +921,30 @@ where
     pub(super) async fn list_active_apps(&self) -> ConductorResult<Vec<InstalledAppId>> {
         let active_apps = self.get_state().await?.active_apps;
         Ok(active_apps.keys().cloned().collect())
+    }
+
+    pub(super) async fn list_apps(
+        &self,
+        status_filter: Option<AppStatusFilter>,
+    ) -> ConductorResult<Vec<InstalledAppInfo>> {
+        let conductor_state = self.get_state().await?;
+
+        let apps_ids: Vec<&String> = match status_filter {
+            Some(AppStatusFilter::Active) => conductor_state.active_apps.keys().collect(),
+            Some(AppStatusFilter::Inactive) => conductor_state.inactive_apps.keys().collect(),
+            None => conductor_state
+                .active_apps
+                .keys()
+                .chain(conductor_state.inactive_apps.keys())
+                .collect(),
+        };
+
+        let apps_info: Vec<InstalledAppInfo> = apps_ids
+            .into_iter()
+            .filter_map(|app_id| conductor_state.get_app_info(app_id))
+            .collect();
+
+        Ok(apps_info)
     }
 
     pub(super) async fn list_active_apps_for_cell_id(
@@ -941,14 +972,14 @@ where
             .cloned()
             .expect("invalid cell space");
 
-        let peer_dump = p2p_store::dump_state(p2p_env.into(), Some(cell_id.clone()))?;
+        let peer_dump = p2p_agent_store::dump_state(p2p_env.into(), Some(cell_id.clone()))?;
         let source_chain_dump =
-            source_chain::dump_state(arc.clone().into(), cell_id.agent_pubkey()).await?;
+            source_chain::dump_state(arc.clone().into(), cell_id.agent_pubkey().clone()).await?;
 
         let out = JsonDump {
             peer_dump,
             source_chain_dump,
-            integration_dump: integration_dump(&arc.clone().into())?,
+            integration_dump: integration_dump(&arc.clone().into()).await?,
         };
         // Add summary
         let summary = out.to_string();
@@ -963,8 +994,21 @@ where
             .or_insert_with(move || {
                 let root_env_dir = self.root_env_dir.as_ref();
                 let keystore = self.keystore.clone();
-                EnvWrite::open(root_env_dir, DbKind::P2p(space), keystore)
-                    .expect("failed to open p2p_store database")
+                EnvWrite::open(root_env_dir, DbKind::P2pAgentStore(space), keystore)
+                    .expect("failed to open p2p_agent_store database")
+            })
+            .clone()
+    }
+
+    pub(super) fn p2p_metrics_env(&self, space: Arc<KitsuneSpace>) -> EnvWrite {
+        let mut p2p_metrics_env = self.p2p_metrics_env.lock();
+        p2p_metrics_env
+            .entry(space.clone())
+            .or_insert_with(move || {
+                let root_env_dir = self.root_env_dir.as_ref();
+                let keystore = self.keystore.clone();
+                EnvWrite::open(root_env_dir, DbKind::P2pMetrics(space), keystore)
+                    .expect("failed to open p2p_metrics database")
             })
             .clone()
     }
@@ -1001,37 +1045,39 @@ where
 }
 
 /// Dump the integration json state.
-pub fn integration_dump(vault: &EnvRead) -> ConductorApiResult<IntegrationStateDump> {
-    fresh_reader!(vault, |txn| {
-        let integrated = txn.query_row(
-            "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NOT NULL",
-            [],
-            |row| row.get(0),
-        )?;
-        let integration_limbo = txn.query_row(
+pub async fn integration_dump(vault: &EnvRead) -> ConductorApiResult<IntegrationStateDump> {
+    vault
+        .async_reader(move |txn| {
+            let integrated = txn.query_row(
+                "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NOT NULL",
+                [],
+                |row| row.get(0),
+            )?;
+            let integration_limbo = txn.query_row(
             "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NULL AND validation_stage = 3",
             [],
             |row| row.get(0),
         )?;
-        let validation_limbo = txn.query_row(
-            "
-                SELECT count(hash) FROM DhtOp 
-                WHERE when_integrated IS NULL 
+            let validation_limbo = txn.query_row(
+                "
+                SELECT count(hash) FROM DhtOp
+                WHERE when_integrated IS NULL
                 AND (
                     (is_authored = 1 AND validation_stage IS NOT NULL AND validation_stage < 3)
-                    OR 
+                    OR
                     (is_authored = 0 AND (validation_stage IS NULL OR validation_stage < 3))
                 )
                 ",
-            [],
-            |row| row.get(0),
-        )?;
-        ConductorApiResult::Ok(IntegrationStateDump {
-            validation_limbo,
-            integration_limbo,
-            integrated,
+                [],
+                |row| row.get(0),
+            )?;
+            ConductorApiResult::Ok(IntegrationStateDump {
+                validation_limbo,
+                integration_limbo,
+                integrated,
+            })
         })
-    })
+        .await
 }
 
 //-----------------------------------------------------------------------------
@@ -1042,10 +1088,12 @@ impl<DS> Conductor<DS>
 where
     DS: DnaStore + 'static,
 {
+    #[allow(clippy::too_many_arguments)]
     async fn new(
         env: EnvWrite,
         wasm_env: EnvWrite,
         p2p_env: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
+        p2p_metrics_env: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
         dna_store: DS,
         keystore: KeystoreSender,
         root_env_dir: EnvironmentRootPath,
@@ -1055,6 +1103,7 @@ where
             env,
             wasm_env,
             p2p_env,
+            p2p_metrics_env,
             caches: parking_lot::Mutex::new(HashMap::new()),
             cells: HashMap::new(),
             shutting_down: false,
@@ -1103,7 +1152,7 @@ where
     /// Update the internal state with a pure function mapping old state to new
     async fn update_state<F: Send>(&self, f: F) -> ConductorResult<ConductorState>
     where
-        F: FnOnce(ConductorState) -> ConductorResult<ConductorState>,
+        F: FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
     {
         let (state, _) = self.update_state_prime(|s| Ok((f(s)?, ()))).await?;
         Ok(state)
@@ -1112,26 +1161,29 @@ where
     /// Update the internal state with a pure function mapping old state to new,
     /// which may also produce an output value which will be the output of
     /// this function
-    async fn update_state_prime<F: Send, O>(&self, f: F) -> ConductorResult<(ConductorState, O)>
+    async fn update_state_prime<F, O>(&self, f: F) -> ConductorResult<(ConductorState, O)>
     where
         F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)>,
+        O: Send,
     {
         self.check_running()?;
-        let mut guard = self.env.conn()?;
-        let output = guard.with_commit(|txn| {
-            let state = txn
-                .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
-                    row.get("blob")
-                })
-                .optional()?;
-            let state = match state {
-                Some(state) => from_blob(state)?,
-                None => ConductorState::default(),
-            };
-            let (new_state, output) = f(state)?;
-            mutations::insert_conductor_state(txn, (&new_state).try_into()?)?;
-            Result::<_, ConductorError>::Ok((new_state, output))
-        })?;
+        let output = self
+            .env
+            .async_commit_in_place(move |txn| {
+                let state = txn
+                    .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
+                        row.get("blob")
+                    })
+                    .optional()?;
+                let state = match state {
+                    Some(state) => from_blob(state)?,
+                    None => ConductorState::default(),
+                };
+                let (new_state, output) = f(state)?;
+                mutations::insert_conductor_state(txn, (&new_state).try_into()?)?;
+                Result::<_, ConductorError>::Ok((new_state, output))
+            })
+            .await?;
         Ok(output)
     }
 
@@ -1243,6 +1295,7 @@ mod builder {
                 EnvWrite::open(env_path.as_ref(), DbKind::Wasm, keystore.clone())?;
 
             let p2p_env = Arc::new(parking_lot::Mutex::new(HashMap::new()));
+            let p2p_metrics_env = Arc::new(parking_lot::Mutex::new(HashMap::new()));
 
             #[cfg(any(test, feature = "test_utils"))]
             let state = self.state;
@@ -1270,6 +1323,7 @@ mod builder {
                 environment,
                 wasm_environment,
                 p2p_env,
+                p2p_metrics_env,
                 dna_store,
                 keystore,
                 env_path,
@@ -1367,9 +1421,10 @@ mod builder {
                 envs.conductor(),
                 envs.wasm(),
                 envs.p2p(),
+                envs.p2p_metrics(),
                 self.dna_store,
                 keystore,
-                envs.tempdir().path().to_path_buf().into(),
+                envs.path().to_path_buf().into(),
                 holochain_p2p,
             )
             .await?;
@@ -1393,9 +1448,7 @@ async fn p2p_event_task(
         .for_each_concurrent(NUM_PARALLEL_EVTS, |evt| {
             let handle = handle.clone();
             async move {
-                let cell_id =
-                    CellId::new(evt.dna_hash().clone(), evt.target_agent_as_ref().clone());
-                if let Err(e) = handle.dispatch_holochain_p2p_event(&cell_id, evt).await {
+                if let Err(e) = handle.dispatch_holochain_p2p_event(evt).await {
                     tracing::error!(
                         message = "error dispatching network event",
                         error = ?e,

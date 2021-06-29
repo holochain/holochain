@@ -2,6 +2,9 @@
 
 use crate::*;
 use futures::future::BoxFuture;
+use kitsune_p2p::event::MetricDatum;
+use kitsune_p2p::event::MetricQuery;
+use kitsune_p2p::event::MetricQueryAnswer;
 use kitsune_p2p_types::dht_arc::DhtArc;
 use kitsune_p2p_types::tls::TlsConfig;
 use std::future::Future;
@@ -38,6 +41,20 @@ pub trait AsKdPersist: 'static + Send + Sync {
 
     /// Query agent info
     fn query_agent_info(&self, root: KdHash) -> BoxFuture<'static, KdResult<Vec<KdAgentInfo>>>;
+
+    /// Query agent info near basis
+    fn query_agent_info_near_basis(
+        &self,
+        root: KdHash,
+        basis_loc: u32,
+        limit: u32,
+    ) -> BoxFuture<'static, KdResult<Vec<KdAgentInfo>>>;
+
+    /// Store agent info
+    fn put_metric_datum(&self, datum: MetricDatum) -> BoxFuture<'static, KdResult<()>>;
+
+    /// Store agent info
+    fn query_metrics(&self, query: MetricQuery) -> BoxFuture<'static, KdResult<MetricQueryAnswer>>;
 
     /// Store entry
     fn store_entry(
@@ -144,6 +161,32 @@ impl KdPersist {
         root: KdHash,
     ) -> impl Future<Output = KdResult<Vec<KdAgentInfo>>> + 'static + Send {
         AsKdPersist::query_agent_info(&*self.0, root)
+    }
+
+    /// Query agent info near basis
+    pub fn query_agent_info_near_basis(
+        &self,
+        root: KdHash,
+        basis_loc: u32,
+        limit: u32,
+    ) -> impl Future<Output = KdResult<Vec<KdAgentInfo>>> + 'static + Send {
+        AsKdPersist::query_agent_info_near_basis(&*self.0, root, basis_loc, limit)
+    }
+
+    /// Store agent info
+    pub fn store_metric_datum(
+        &self,
+        datum: MetricDatum,
+    ) -> impl Future<Output = KdResult<()>> + 'static + Send {
+        AsKdPersist::put_metric_datum(&*self.0, datum)
+    }
+
+    /// "Query" metric info
+    pub async fn fetch_metrics(
+        &self,
+        query: MetricQuery,
+    ) -> impl Future<Output = KdResult<MetricQueryAnswer>> + 'static + Send {
+        AsKdPersist::query_metrics(&*self.0, query)
     }
 
     /// Store entry

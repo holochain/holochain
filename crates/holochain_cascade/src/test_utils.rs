@@ -92,6 +92,7 @@ impl HolochainP2pCellT for PassThroughNetwork {
                         dht_hash.clone().into(),
                         (&options).into(),
                     )
+                    .await
                     .map_err(|e| HolochainP2pError::Other(e.into()))?;
                     out.push(WireOps::Entry(r));
                 }
@@ -103,6 +104,7 @@ impl HolochainP2pCellT for PassThroughNetwork {
                         dht_hash.clone().into(),
                         (&options).into(),
                     )
+                    .await
                     .map_err(|e| HolochainP2pError::Other(e.into()))?;
                     out.push(WireOps::Element(r));
                 }
@@ -125,6 +127,7 @@ impl HolochainP2pCellT for PassThroughNetwork {
         let mut out = Vec::new();
         for env in &self.envs {
             let r = authority::handle_get_links(env.clone(), link_key.clone(), (&options).into())
+                .await
                 .map_err(|e| HolochainP2pError::Other(e.into()))?;
             out.push(r);
         }
@@ -144,6 +147,7 @@ impl HolochainP2pCellT for PassThroughNetwork {
                 query.clone(),
                 (&options).into(),
             )
+            .await
             .map_err(|e| HolochainP2pError::Other(e.into()))?;
             out.push(r);
         }
@@ -206,7 +210,7 @@ impl HolochainP2pCellT for PassThroughNetwork {
 pub fn fill_db(env: &EnvWrite, op: DhtOpHashed) {
     env.conn()
         .unwrap()
-        .with_commit(|txn| {
+        .with_commit_sync(|txn| {
             let hash = op.as_hash().clone();
             insert_op(txn, op, false).unwrap();
             set_validation_status(txn, hash.clone(), ValidationStatus::Valid).unwrap();
@@ -219,7 +223,7 @@ pub fn fill_db(env: &EnvWrite, op: DhtOpHashed) {
 pub fn fill_db_rejected(env: &EnvWrite, op: DhtOpHashed) {
     env.conn()
         .unwrap()
-        .with_commit(|txn| {
+        .with_commit_sync(|txn| {
             let hash = op.as_hash().clone();
             insert_op(txn, op, false).unwrap();
             set_validation_status(txn, hash.clone(), ValidationStatus::Rejected).unwrap();
@@ -232,7 +236,7 @@ pub fn fill_db_rejected(env: &EnvWrite, op: DhtOpHashed) {
 pub fn fill_db_pending(env: &EnvWrite, op: DhtOpHashed) {
     env.conn()
         .unwrap()
-        .with_commit(|txn| {
+        .with_commit_sync(|txn| {
             let hash = op.as_hash().clone();
             insert_op(txn, op, false).unwrap();
             set_validation_status(txn, hash, ValidationStatus::Valid).unwrap();
@@ -244,7 +248,7 @@ pub fn fill_db_pending(env: &EnvWrite, op: DhtOpHashed) {
 pub fn fill_db_as_author(env: &EnvWrite, op: DhtOpHashed) {
     env.conn()
         .unwrap()
-        .with_commit(|txn| {
+        .with_commit_sync(|txn| {
             insert_op(txn, op, true).unwrap();
             DatabaseResult::Ok(())
         })

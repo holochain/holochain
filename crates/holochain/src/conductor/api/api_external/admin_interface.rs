@@ -215,12 +215,21 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 Ok(AdminResponse::CellIdsListed(cell_ids))
             }
             ListActiveApps => {
+                tracing::warn!(
+                    "AdminRequest::ListActiveApps is deprecated, use AdminRequest::ListApps (TODO: update conductor-api)"
+                );
+
                 let app_ids = self.conductor_handle.list_active_apps().await?;
                 Ok(AdminResponse::ActiveAppsListed(app_ids))
             }
+            ListApps { status_filter } => {
+                let apps = self.conductor_handle.list_apps(status_filter).await?;
+                Ok(AdminResponse::AppsListed(apps))
+            }
             ActivateApp { installed_app_id } => {
                 // Activate app
-                self.conductor_handle
+                let app = self
+                    .conductor_handle
                     .activate_app(installed_app_id.clone())
                     .await?;
 
@@ -240,7 +249,11 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     // There was an error in this app so return it
                     .map(|this_app_error| Ok(AdminResponse::Error(this_app_error.into())))
                     // No error, return success
-                    .unwrap_or(Ok(AdminResponse::AppActivated))
+                    .unwrap_or_else(|| {
+                        Ok(AdminResponse::AppActivated(
+                            InstalledAppInfo::from_installed_app(&InstalledApp::Active(app)),
+                        ))
+                    })
             }
             DeactivateApp { installed_app_id } => {
                 // Activate app
@@ -546,12 +559,22 @@ mod test {
         let expects = vec![dna_hash.clone()];
         assert_matches!(dna_list, AdminResponse::DnasListed(a) if a == expects);
 
+        let expected_activated_app = InstalledApp::new_active(
+            InstalledAppCommon::new_legacy(
+                "test-by-path".to_string(),
+                vec![InstalledCell::new(cell_id2.clone(), "".to_string())],
+            )
+            .unwrap(),
+        );
+        let expected_activated_app_info: InstalledAppInfo = (&expected_activated_app).into();
         let res = admin_api
             .handle_admin_request(AdminRequest::ActivateApp {
                 installed_app_id: "test-by-path".to_string(),
             })
             .await;
-        assert_matches!(res, AdminResponse::AppActivated);
+        assert_matches!(res,
+            AdminResponse::AppActivated(info) if info == expected_activated_app_info
+        );
 
         let res = admin_api
             .handle_admin_request(AdminRequest::ListCellIds)

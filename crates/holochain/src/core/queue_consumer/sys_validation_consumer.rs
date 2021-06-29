@@ -39,7 +39,7 @@ pub fn spawn_sys_validation_consumer(
             }
 
             // Run the workflow
-            let workspace = SysValidationWorkspace::new(env.clone().into(), cache.clone());
+            let workspace = SysValidationWorkspace::new(env.clone(), cache.clone());
             match sys_validation_workflow(
                 workspace,
                 trigger_app_validation.clone(),

@@ -1,8 +1,12 @@
 //! in-memory persistence module for kitsune direct
 
+use crate::types::metric_store::KdMetricStore;
 use crate::types::persist::*;
 use crate::*;
 use futures::future::{BoxFuture, FutureExt};
+use kitsune_p2p::event::MetricDatum;
+use kitsune_p2p::event::MetricQuery;
+use kitsune_p2p::event::MetricQueryAnswer;
 use kitsune_p2p_types::dht_arc::DhtArc;
 use kitsune_p2p_types::tls::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
@@ -202,6 +206,7 @@ struct PersistMemInner {
     agent_info: HashMap<KdHash, Arc<AgentStore>>,
     entries: HashMap<KdHash, Arc<AgentEntryStore>>,
     ui_cache: Arc<UiStore>,
+    metric_store: KdMetricStore,
 }
 
 struct PersistMem(Share<PersistMemInner>, Uniq);
@@ -215,6 +220,7 @@ impl PersistMem {
                 agent_info: HashMap::new(),
                 entries: HashMap::new(),
                 ui_cache: UiStore::new(),
+                metric_store: KdMetricStore::default(),
             }),
             Uniq::default(),
         ))
@@ -347,6 +353,60 @@ impl AsKdPersist for PersistMem {
                 Ok(store) => store,
             };
             store.get_all()
+        }
+        .boxed()
+    }
+
+    fn query_agent_info_near_basis(
+        &self,
+        root: KdHash,
+        basis_loc: u32,
+        limit: u32,
+    ) -> BoxFuture<'static, KdResult<Vec<KdAgentInfo>>> {
+        let store = self.0.share_mut(move |i, _| match i.agent_info.get(&root) {
+            Some(store) => Ok(store.clone()),
+            None => Err("root not found".into()),
+        });
+        async move {
+            let store = match store {
+                Err(_) => return Ok(vec![]),
+                Ok(store) => store,
+            };
+            let mut with_dist = store
+                .get_all()?
+                .into_iter()
+                .map(|info| (info.basis_distance_to_storage(basis_loc), info))
+                .collect::<Vec<_>>();
+            with_dist.sort_by(|a, b| a.0.cmp(&b.0));
+            Ok(with_dist
+                .into_iter()
+                .map(|(_, info)| info)
+                .take(limit as usize)
+                .collect())
+        }
+        .boxed()
+    }
+
+    fn put_metric_datum(&self, datum: MetricDatum) -> BoxFuture<'static, KdResult<()>> {
+        let inner = self.0.clone();
+        async move {
+            inner
+                .share_mut(|inner, _| {
+                    inner.metric_store.put_metric_datum(datum);
+                    Ok(())
+                })
+                .map_err(KdError::other)?;
+            Ok(())
+        }
+        .boxed()
+    }
+
+    fn query_metrics(&self, query: MetricQuery) -> BoxFuture<'static, KdResult<MetricQueryAnswer>> {
+        let inner = self.0.clone();
+        async move {
+            inner
+                .share_mut(|inner, _| Ok(inner.metric_store.query_metrics(query)))
+                .map_err(KdError::other)
         }
         .boxed()
     }

@@ -269,8 +269,10 @@ fixturator!(
         //      wrapped in an UnsafeZomeCallWorkspace
         let vault = holochain_state::test_utils::test_cell_env();
         let cache = holochain_state::test_utils::test_cell_env();
-        tokio_helper::block_forever_on(fake_genesis(vault.env())).unwrap();
-        HostFnWorkspace::new(vault.env(), cache.env(), fake_agent_pubkey_1()).unwrap()
+        tokio_helper::block_forever_on(async {
+            fake_genesis(vault.env()).await.unwrap();
+            HostFnWorkspace::new(vault.env(), cache.env(), fake_agent_pubkey_1()).await.unwrap()
+        })
     };
     curve Unpredictable {
         HostFnWorkspaceFixturator::new(Empty)
@@ -484,7 +486,7 @@ impl Iterator for ZomeCallInvocationFixturator<NamedInvocation> {
             .next()
             .unwrap();
         ret.cell_id = self.0.curve.0.clone();
-        ret.zome = self.0.curve.1.clone().into();
+        ret.zome = self.0.curve.1.into();
         ret.fn_name = self.0.curve.2.clone().into();
         ret.payload = self.0.curve.3.clone();
 

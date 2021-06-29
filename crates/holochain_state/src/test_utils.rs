@@ -1,5 +1,6 @@
 //! Helpers for unit tests
 
+use either::Either;
 use holochain_sqlite::prelude::*;
 use holochain_sqlite::rusqlite::Statement;
 use holochain_sqlite::rusqlite::Transaction;
@@ -9,6 +10,7 @@ use kitsune_p2p::KitsuneSpace;
 use shrinkwraprs::Shrinkwrap;
 use std::collections::HashMap;
 use std::path::Path;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tempdir::TempDir;
 
@@ -39,13 +41,18 @@ pub fn test_wasm_env() -> TestEnv {
     test_env(DbKind::Wasm)
 }
 
-/// Create a [TestEnv] of [DbKind::P2p], backed by a temp directory.
-pub fn test_p2p_env() -> TestEnv {
-    test_env(DbKind::P2p(Arc::new(KitsuneSpace(vec![0; 36]))))
+/// Create a [TestEnv] of [DbKind::P2pAgentStore], backed by a temp directory.
+pub fn test_p2p_agent_store_env() -> TestEnv {
+    test_env(DbKind::P2pAgentStore(Arc::new(KitsuneSpace(vec![0; 36]))))
+}
+
+/// Create a [TestEnv] of [DbKind::P2pAgentStore], backed by a temp directory.
+pub fn test_p2p_metrics_env() -> TestEnv {
+    test_env(DbKind::P2pMetrics(Arc::new(KitsuneSpace(vec![0; 36]))))
 }
 
 fn test_env(kind: DbKind) -> TestEnv {
-    let tmpdir = Arc::new(TempDir::new("holochain-test-environments").unwrap());
+    let tmpdir = TempDir::new("holochain-test-environments").unwrap();
     TestEnv {
         env: EnvWrite::test(&tmpdir, kind, test_keystore()).expect("Couldn't create test database"),
         tmpdir,
@@ -92,13 +99,13 @@ pub fn test_keystore() -> holochain_keystore::KeystoreSender {
 }
 
 /// A test database in a temp directory
-#[derive(Clone, Shrinkwrap)]
+#[derive(Shrinkwrap)]
 pub struct TestEnv {
     #[shrinkwrap(main_field)]
     /// sqlite database
     env: EnvWrite,
     /// temp directory for this environment
-    tmpdir: Arc<TempDir>,
+    tmpdir: TempDir,
 }
 
 impl TestEnv {
@@ -108,8 +115,8 @@ impl TestEnv {
     }
 
     /// Accessor
-    pub fn tmpdir(&self) -> Arc<TempDir> {
-        self.tmpdir.clone()
+    pub fn into_tempdir(self) -> TempDir {
+        self.tmpdir
     }
 
     /// Dump db to a location.
@@ -170,7 +177,6 @@ pub fn dump_tmp(env: &EnvWrite) {
         .unwrap();
 }
 
-#[derive(Clone)]
 /// A container for all three non-cell environments
 pub struct TestEnvs {
     /// A test conductor environment
@@ -179,8 +185,10 @@ pub struct TestEnvs {
     wasm: EnvWrite,
     /// A test p2p environment
     p2p: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
+    /// A test p2p environment
+    p2p_metrics: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
     /// The shared root temp dir for these environments
-    tempdir: Arc<TempDir>,
+    dir: Either<TempDir, PathBuf>,
 }
 
 #[allow(missing_docs)]
@@ -191,11 +199,13 @@ impl TestEnvs {
         let conductor = EnvWrite::test(&tempdir, Conductor, keystore.clone()).unwrap();
         let wasm = EnvWrite::test(&tempdir, Wasm, keystore).unwrap();
         let p2p = Arc::new(parking_lot::Mutex::new(HashMap::new()));
+        let p2p_metrics = Arc::new(parking_lot::Mutex::new(HashMap::new()));
         Self {
             conductor,
             wasm,
             p2p,
-            tempdir: Arc::new(tempdir),
+            p2p_metrics,
+            dir: Either::Left(tempdir),
         }
     }
 
@@ -216,9 +226,45 @@ impl TestEnvs {
         self.p2p.clone()
     }
 
-    /// Get the root temp dir for these environments
-    pub fn tempdir(&self) -> Arc<TempDir> {
-        self.tempdir.clone()
+    pub fn p2p_metrics(&self) -> Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>> {
+        self.p2p_metrics.clone()
+    }
+
+    /// Consume the TempDir so that it will not be cleaned up after the test is over.
+    #[deprecated = "solidified() should only be used during debugging"]
+    pub fn solidified(self) -> Self {
+        let Self {
+            conductor,
+            wasm,
+            p2p,
+            p2p_metrics,
+            dir,
+        } = self;
+        let dir = dir.left_and_then(|tempdir| {
+            let pathbuf = tempdir.into_path();
+            println!("Solidified TestEnvs at {:?}", pathbuf);
+            Either::Right(pathbuf)
+        });
+        Self {
+            conductor,
+            wasm,
+            p2p,
+            p2p_metrics,
+            dir,
+        }
+    }
+
+    pub fn into_tempdir(self) -> TempDir {
+        self.dir
+            .expect_left("can only use into_tempdir if not already solidified")
+    }
+
+    /// Get the root path for these environments
+    pub fn path(&self) -> &Path {
+        match &self.dir {
+            Either::Left(tempdir) => tempdir.path(),
+            Either::Right(path) => &path,
+        }
     }
 
     pub fn keystore(&self) -> KeystoreSender {

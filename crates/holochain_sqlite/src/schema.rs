@@ -31,8 +31,17 @@ pub static SCHEMA_WASM: Lazy<Schema> = Lazy::new(|| {
     }
 });
 
-pub static SCHEMA_P2P: Lazy<Schema> = Lazy::new(|| {
-    let migration_0 = Migration::initial(sql_p2p::SCHEMA);
+pub static SCHEMA_P2P_STATE: Lazy<Schema> = Lazy::new(|| {
+    let migration_0 = Migration::initial(sql_p2p_agent_store::SCHEMA);
+
+    Schema {
+        current_index: 0,
+        migrations: vec![migration_0],
+    }
+});
+
+pub static SCHEMA_P2P_METRICS: Lazy<Schema> = Lazy::new(|| {
+    let migration_0 = Migration::initial(sql_p2p_metrics::SCHEMA);
 
     Schema {
         current_index: 0,
