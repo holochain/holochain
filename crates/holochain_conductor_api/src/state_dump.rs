@@ -87,7 +87,7 @@ impl std::fmt::Display for IntegrationStateDumps {
 
 impl std::fmt::Display for IntegrationStateDump {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
+        write!(
             f,
             "({},{},{})",
             self.validation_limbo, self.integration_limbo, self.integrated

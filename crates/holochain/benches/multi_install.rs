@@ -24,18 +24,57 @@ criterion_group!(benches, multi_install);
 
 criterion_main!(benches);
 
+struct Settings {
+    /// Number of separate machines you want to run the test on.
+    /// Set via environment variable `BENCH_NUM_MACHINES`.
+    num_machines: u64,
+    /// Number of installs to try and reach. You may need
+    /// to tweak `BENCH_SAMPLE_SIZE` to actually reach this.
+    /// Set via environment variable `BENCH_NUM_INSTALLS`.
+    num_installs: usize,
+    /// NUmber of conductors to spread installs across.
+    /// Set via environment variable `BENCH_NUM_CONDUCTORS`.
+    num_conductors: usize,
+    /// The url of the local bootstrap to use.
+    /// Set via environment variable `BENCH_BOOTSTRAP`.
+    url: String,
+    /// Happ bundle path for the test that tries to install a happ bundle.
+    /// Set via environment variable `BENCH_HAPP`.
+    happ_path: PathBuf,
+}
+
+impl Settings {
+    fn new() -> Self {
+        let num_machines = std::env::var_os("BENCH_NUM_MACHINES")
+            .and_then(|s| s.to_string_lossy().parse::<u64>().ok())
+            .unwrap_or(1);
+        let num_installs = std::env::var_os("BENCH_NUM_INSTALLS")
+            .and_then(|s| s.to_string_lossy().parse::<usize>().ok())
+            .unwrap_or(20);
+        let num_conductors = std::env::var_os("BENCH_NUM_CONDUCTORS")
+            .and_then(|s| s.to_string_lossy().parse::<usize>().ok())
+            .unwrap_or(1);
+        let url = std::env::var_os("BENCH_BOOTSTRAP")
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or("http://127.0.0.1:3030".to_string());
+        let happ_path = std::env::var_os("BENCH_HAPP")
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or("/../../../elemental-chat/elemental-chat.happ".to_string());
+        Self {
+            num_machines,
+            num_installs,
+            num_conductors,
+            url,
+            happ_path: happ_path.into(),
+        }
+    }
+}
+
 fn multi_install(bench: &mut Criterion) {
     observability::test_run().ok();
     let client = reqwest::Client::new();
-    let num_machines = std::env::var_os("BENCH_NUM_MACHINES")
-        .and_then(|s| s.to_string_lossy().parse::<u64>().ok())
-        .unwrap_or(1);
-    let num_conductors = std::env::var_os("BENCH_NUM_CONDUCTORS")
-        .and_then(|s| s.to_string_lossy().parse::<usize>().ok())
-        .unwrap_or(1);
-    let url = std::env::var_os("BENCH_BOOTSTRAP")
-        .map(|s| s.to_string_lossy().to_string())
-        .unwrap_or("http://127.0.0.1:3030".to_string());
+
+    let settings = Settings::new();
 
     let mut group = bench.benchmark_group("multi_install");
     group.sample_size(
@@ -43,23 +82,49 @@ fn multi_install(bench: &mut Criterion) {
             .and_then(|s| s.to_string_lossy().parse::<usize>().ok())
             .unwrap_or(100),
     );
-    // group.sampling_mode(criterion::SamplingMode::Flat);
-    // group.warm_up_time(std::time::Duration::from_millis(1));
     let runtime = rt();
 
     runtime.block_on(async {
-        clear(&client, &url).await;
-        sync(&client, num_machines, &url).await;
+        clear(&client, &settings.url).await;
+        sync(&client, settings.num_machines, &settings.url).await;
     });
 
-    let mut producers = runtime.block_on(setup(num_conductors, &url));
-    group.bench_function(BenchmarkId::new("test", format!("install")), |b| {
+    let mut producers = runtime.block_on(setup(
+        settings.num_conductors,
+        settings.num_installs,
+        &settings.url,
+        settings.happ_path.clone(),
+    ));
+    group.bench_function(BenchmarkId::new("test", format!("happ")), |b| {
         b.iter(|| {
             runtime.block_on(async { producers.run().await });
         });
     });
-    runtime.block_on(async { producers.consistency(&client, num_machines, &url).await });
-    group.sample_size(10);
+    runtime.block_on(async {
+        producers
+            .consistency(&client, settings.num_machines, &settings.url)
+            .await
+    });
+    group.bench_function(BenchmarkId::new("test", format!("test_wasm")), |b| {
+        b.iter(|| {
+            runtime.block_on(async { producers.run_test_wasm().await });
+        });
+    });
+    runtime.block_on(async {
+        producers
+            .consistency(&client, settings.num_machines, &settings.url)
+            .await
+    });
+    group.bench_function(BenchmarkId::new("test", format!("inline_zome")), |b| {
+        b.iter(|| {
+            runtime.block_on(async { producers.run_inline_zome().await });
+        });
+    });
+    runtime.block_on(async {
+        producers
+            .consistency(&client, settings.num_machines, &settings.url)
+            .await
+    });
     runtime.block_on(async move {
         for c in producers.conductors {
             c.shutdown_and_wait().await;
@@ -75,12 +140,14 @@ struct Producers {
     total: usize,
     test_dna: DnaFile,
     inline_dna: DnaFile,
+    happ_path: PathBuf,
+    num_installs: usize,
 }
 
 impl Producers {
     async fn run(&mut self) {
         use holochain_keystore::KeystoreSenderExt;
-        if self.total > 300 {
+        if self.total > self.num_installs {
             return;
         }
         let start = std::time::Instant::now();
@@ -102,9 +169,7 @@ impl Producers {
                 self.i = 0;
             }
             self.total += 1;
-            let source = AppBundleSource::Path(PathBuf::from(
-                "/home/freesig/holochain/elemental-chat/elemental-chat.happ",
-            ));
+            let source = AppBundleSource::Path(self.happ_path.clone());
 
             if s.elapsed().as_millis() > 500 {
                 dbg!(s.elapsed());
@@ -157,7 +222,7 @@ impl Producers {
 
     async fn run_test_wasm(&mut self) {
         use holochain_keystore::KeystoreSenderExt;
-        if self.total > 300 {
+        if self.total > self.num_installs {
             return;
         }
         let start = std::time::Instant::now();
@@ -186,7 +251,7 @@ impl Producers {
 
     async fn run_inline_zome(&mut self) {
         use holochain_keystore::KeystoreSenderExt;
-        if self.total > 300 {
+        if self.total > self.num_installs {
             return;
         }
         let start = std::time::Instant::now();
@@ -255,7 +320,12 @@ impl Producers {
     }
 }
 
-async fn setup(num_conductors: usize, url: &str) -> Producers {
+async fn setup(
+    num_conductors: usize,
+    num_installs: usize,
+    url: &str,
+    happ_path: PathBuf,
+) -> Producers {
     let config = || {
         let tuning: KitsuneP2pTuningParams = KitsuneP2pTuningParams::default();
         // tuning.gossip_peer_on_success_next_gossip_delay_ms = 1000 * 10;
@@ -309,6 +379,8 @@ async fn setup(num_conductors: usize, url: &str) -> Producers {
         total: 0,
         test_dna: dna,
         inline_dna,
+        num_installs,
+        happ_path,
     }
 }
 
