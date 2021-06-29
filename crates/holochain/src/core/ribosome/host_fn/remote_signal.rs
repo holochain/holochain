@@ -7,6 +7,8 @@ use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::zome::ZomeName;
 use std::sync::Arc;
 use tracing::Instrument;
+use crate::core::ribosome::HostFnAccess;
+use holochain_types::access::Permission;
 
 #[tracing::instrument(skip(_ribosome, call_context, input))]
 pub fn remote_signal(
@@ -14,39 +16,44 @@ pub fn remote_signal(
     call_context: Arc<CallContext>,
     input: RemoteSignal,
 ) -> Result<(), WasmError> {
-    const FN_NAME: &str = "recv_remote_signal";
-    // Timeouts and errors are ignored,
-    // this is a send and forget operation.
-    let network = call_context.host_access().network().clone();
-    let RemoteSignal { agents, signal } = input;
-    let zome_name: ZomeName = call_context.zome().into();
-    let fn_name: FunctionName = FN_NAME.into();
-    for agent in agents {
-        tokio::task::spawn(
-            {
-                let mut network = network.clone();
-                let zome_name = zome_name.clone();
-                let fn_name = fn_name.clone();
-                let payload = signal.clone();
-                async move {
-                    tracing::debug!("sending to {:?}", agent);
-                    let result = network
-                        .call_remote(agent.clone(), zome_name, fn_name, None, payload)
-                        .await;
-                    tracing::debug!("sent to {:?}", agent);
-                    if let Err(e) = result {
-                        tracing::info!(
-                            "Failed to send remote signal to {:?} because of {:?}",
-                            agent,
-                            e
-                        );
+    match HostFnAccess::from(&call_context.host_access()) {
+        HostFnAccess{ write_network: Permission::Allow, .. } => {
+            const FN_NAME: &str = "recv_remote_signal";
+            // Timeouts and errors are ignored,
+            // this is a send and forget operation.
+            let network = call_context.host_access().network().clone();
+            let RemoteSignal { agents, signal } = input;
+            let zome_name: ZomeName = call_context.zome().into();
+            let fn_name: FunctionName = FN_NAME.into();
+            for agent in agents {
+                tokio::task::spawn(
+                    {
+                        let mut network = network.clone();
+                        let zome_name = zome_name.clone();
+                        let fn_name = fn_name.clone();
+                        let payload = signal.clone();
+                        async move {
+                            tracing::debug!("sending to {:?}", agent);
+                            let result = network
+                                .call_remote(agent.clone(), zome_name, fn_name, None, payload)
+                                .await;
+                            tracing::debug!("sent to {:?}", agent);
+                            if let Err(e) = result {
+                                tracing::info!(
+                                    "Failed to send remote signal to {:?} because of {:?}",
+                                    agent,
+                                    e
+                                );
+                            }
+                        }
                     }
-                }
+                    .in_current_span(),
+                );
             }
-            .in_current_span(),
-        );
+            Ok(())
+        },
+        _ => unreachable!(),
     }
-    Ok(())
 }
 
 #[cfg(test)]

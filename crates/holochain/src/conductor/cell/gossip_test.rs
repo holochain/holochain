@@ -111,8 +111,8 @@ async fn agent_info_test() {
     let p2p_env = handle.get_p2p_env(dna_kit.clone()).await;
 
     let (agent_info, len) = fresh_reader_test(p2p_env.clone(), |txn| {
-        let agent_info = txn.p2p_get(&alice_kit).unwrap();
-        let len = txn.p2p_list().unwrap().len();
+        let agent_info = txn.p2p_get_agent(&alice_kit).unwrap();
+        let len = txn.p2p_list_agents().unwrap().len();
         (agent_info, len)
     });
     tracing::debug!(?agent_info);
@@ -134,9 +134,9 @@ async fn agent_info_test() {
     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
     let (alice_agent_info, bob_agent_info, len) = fresh_reader_test(p2p_env.clone(), |txn| {
-        let alice_agent_info = txn.p2p_get(&alice_kit).unwrap();
-        let bob_agent_info = txn.p2p_get(&bob_kit).unwrap();
-        let len = txn.p2p_list().unwrap().len();
+        let alice_agent_info = txn.p2p_get_agent(&alice_kit).unwrap();
+        let bob_agent_info = txn.p2p_get_agent(&bob_kit).unwrap();
+        let len = txn.p2p_list_agents().unwrap().len();
         (alice_agent_info, bob_agent_info, len)
     });
     tracing::debug!(?alice_agent_info);
