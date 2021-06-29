@@ -45,7 +45,7 @@ async fn gossip_test() {
     const NUM_ATTEMPTS: usize = 200;
     const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
 
-    let all_cell_envs = vec![&bob_call_data.env, &alice_call_data.env];
+    let all_cell_envs = vec![&bob_call_data.env, &conductor_test.alice_call_data().env];
     consistency_envs(&all_cell_envs, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await;
 
     // Bob list anchors
