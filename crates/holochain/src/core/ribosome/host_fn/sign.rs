@@ -4,16 +4,20 @@ use holochain_keystore::keystore_actor::KeystoreSenderExt;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
+use crate::core::ribosome::HostFnAccess;
 
 pub fn sign(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: Sign,
 ) -> Result<Signature, WasmError> {
-    tokio_helper::block_forever_on(async move {
-        call_context.host_access.keystore().sign(input).await
-    })
-    .map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))
+    match HostFnAccess::from(&call_context.host_access()) {
+        HostFnAccess { keystore: Permission::Allow, .. } => tokio_helper::block_forever_on(async move {
+            call_context.host_access.keystore().sign(input).await
+        })
+        .map_err(|keystore_error| WasmError::Host(keystore_error.to_string())),
+        _ => unreachable!(),
+    }
 }
 
 #[cfg(test)]
