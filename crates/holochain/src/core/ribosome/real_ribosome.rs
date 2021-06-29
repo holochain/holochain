@@ -192,7 +192,7 @@ fn instance_cache_key(wasm_hash: &WasmHash, dna_hash: &DnaHash, context_key: u64
     {
         bits[i] = byte;
     }
-    for (i, byte) in (24..32).zip(context_key.to_be_bytes()) {
+    for (i, byte) in (24..32).zip(context_key.to_le_bytes()) {
         bits[i] = byte;
     }
     bits
@@ -205,7 +205,7 @@ fn context_key_from_key(key: &[u8; 32]) -> u64 {
         *b = *a;
     }
 
-    u64::from_be_bytes(bits)
+    u64::from_le_bytes(bits)
 }
 
 impl RealRibosome {
