@@ -575,27 +575,18 @@ impl AppStatus {
     /// Does this status correspond to an Enabled state?
     /// If false, this indicates a Disabled state.
     pub fn is_enabled(&self) -> bool {
-        match self {
-            Self::Running | Self::Paused(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Running | Self::Paused(_))
     }
 
     /// Does this status correspond to a Running state?
     /// If false, this indicates a Stopped state.
     pub fn is_running(&self) -> bool {
-        match self {
-            Self::Running => true,
-            _ => false,
-        }
+        matches!(self, Self::Running)
     }
 
     /// Does this status correspond to a Paused state?
     pub fn is_paused(&self) -> bool {
-        match self {
-            Self::Paused(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Paused(_))
     }
 
     /// Transition a status from one state to another.
