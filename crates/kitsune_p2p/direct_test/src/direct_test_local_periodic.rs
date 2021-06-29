@@ -276,20 +276,25 @@ impl KdTestHarness {
         }
 
         // -- begin bootstrap node info sync -- //
-        let mut all_agent_info = Vec::new();
-        for node in nodes.iter() {
-            for info in node
+        let mut one_agent_info = None;
+
+        // pick one single agent info so that we exercise gossip
+        if let Some(node) = nodes.get(0) {
+            if let Some(info) = node
                 .kdirect
                 .get_persist()
                 .query_agent_info(root.clone())
                 .await?
+                .get(0)
             {
                 tracing::debug!(?info);
-                all_agent_info.push(info);
+                one_agent_info = Some(info.clone());
             }
         }
-        for node in nodes.iter() {
-            for info in all_agent_info.iter() {
+
+        // push that one agent info to all nodes
+        if let Some(info) = one_agent_info {
+            for node in nodes.iter() {
                 node.kdirect
                     .get_persist()
                     .store_agent_info(info.clone())
