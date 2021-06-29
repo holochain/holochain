@@ -357,6 +357,36 @@ impl AsKdPersist for PersistMem {
         .boxed()
     }
 
+    fn query_agent_info_near_basis(
+        &self,
+        root: KdHash,
+        basis_loc: u32,
+        limit: u32,
+    ) -> BoxFuture<'static, KdResult<Vec<KdAgentInfo>>> {
+        let store = self.0.share_mut(move |i, _| match i.agent_info.get(&root) {
+            Some(store) => Ok(store.clone()),
+            None => Err("root not found".into()),
+        });
+        async move {
+            let store = match store {
+                Err(_) => return Ok(vec![]),
+                Ok(store) => store,
+            };
+            let mut with_dist = store
+                .get_all()?
+                .into_iter()
+                .map(|info| (info.basis_distance_to_storage(basis_loc), info))
+                .collect::<Vec<_>>();
+            with_dist.sort_by(|a, b| a.0.cmp(&b.0));
+            Ok(with_dist
+                .into_iter()
+                .map(|(_, info)| info)
+                .take(limit as usize)
+                .collect())
+        }
+        .boxed()
+    }
+
     fn put_metric_datum(&self, datum: MetricDatum) -> BoxFuture<'static, KdResult<()>> {
         let inner = self.0.clone();
         async move {

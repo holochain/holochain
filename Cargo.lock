@@ -2518,36 +2518,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "kitsune_bootstrap"
-version = "0.0.1"
-dependencies = [
- "criterion",
- "fixt",
- "kitsune_p2p",
- "kitsune_p2p_types",
- "once_cell",
- "parking_lot 0.11.1",
- "rand 0.7.3",
- "reqwest",
- "rmp-serde",
- "serde",
- "serde_bytes",
- "serde_json",
- "tokio",
- "warp",
-]
-
-[[package]]
-name = "kitsune_dht_arc"
-version = "0.0.1"
-dependencies = [
- "derive_more",
- "gcollections",
- "intervallum",
- "serde",
-]
-
-[[package]]
 name = "kitsune_p2p"
 version = "0.0.1"
 dependencies = [
@@ -2579,6 +2549,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "kitsune_p2p_bootstrap"
+version = "0.0.1"
+dependencies = [
+ "criterion",
+ "fixt",
+ "futures",
+ "kitsune_p2p",
+ "kitsune_p2p_types",
+ "once_cell",
+ "parking_lot 0.11.1",
+ "rand 0.7.3",
+ "reqwest",
+ "rmp-serde",
+ "serde",
+ "serde_bytes",
+ "serde_json",
+ "tokio",
+ "warp",
+]
+
+[[package]]
+name = "kitsune_p2p_dht_arc"
+version = "0.0.1"
+dependencies = [
+ "derive_more",
+ "gcollections",
+ "intervallum",
+ "serde",
+]
+
+[[package]]
 name = "kitsune_p2p_direct"
 version = "0.0.1"
 dependencies = [
@@ -2587,7 +2588,9 @@ dependencies = [
  "derive_more",
  "futures",
  "hyper",
+ "if-addrs",
  "kitsune_p2p",
+ "kitsune_p2p_bootstrap",
  "kitsune_p2p_direct_api",
  "kitsune_p2p_proxy",
  "kitsune_p2p_transport_quic",
@@ -2600,6 +2603,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite 0.14.0",
  "tungstenite 0.13.0",
+ "url2",
 ]
 
 [[package]]
@@ -2608,6 +2612,7 @@ version = "0.0.1"
 dependencies = [
  "arrayref",
  "base64",
+ "kitsune_p2p_dht_arc",
  "serde",
  "serde_json",
 ]
@@ -2619,6 +2624,7 @@ dependencies = [
  "kitsune_p2p_direct",
  "kitsune_p2p_proxy",
  "kitsune_p2p_transport_quic",
+ "structopt",
  "tokio",
 ]
 
@@ -2691,7 +2697,7 @@ dependencies = [
  "derive_more",
  "futures",
  "ghost_actor 0.3.0-alpha.1",
- "kitsune_dht_arc",
+ "kitsune_p2p_dht_arc",
  "lair_keystore_api",
  "lru",
  "nanoid",
