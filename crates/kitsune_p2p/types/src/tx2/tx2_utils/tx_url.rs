@@ -2,9 +2,7 @@ use std::sync::Arc;
 
 /// New-type for sync ref-counted Urls
 /// to make passing around tx2 more efficient.
-#[derive(
-    Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash,
-)]
+#[derive(Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TxUrl(Arc<url2::Url2>);
 
 impl TxUrl {
@@ -19,6 +17,12 @@ impl std::ops::Deref for TxUrl {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl std::fmt::Debug for TxUrl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
