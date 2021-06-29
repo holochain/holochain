@@ -4,6 +4,7 @@ use crate::test_utils::new_zome_call;
 use hdk::prelude::*;
 use holochain_p2p::{AgentPubKeyExt, DnaHashExt};
 use holochain_sqlite::prelude::*;
+use holochain_state::prelude::dump_tmp;
 use holochain_state::prelude::fresh_reader_test;
 use holochain_test_wasm_common::AnchorInput;
 use holochain_wasm_test_utils::TestWasm;
@@ -47,6 +48,8 @@ async fn gossip_test() {
 
     let all_cell_envs = vec![&bob_call_data.env, &conductor_test.alice_call_data().env];
     consistency_envs(&all_cell_envs, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await;
+
+    dump_tmp(&bob_call_data.env);
 
     // Bob list anchors
     let invocation = new_zome_call(

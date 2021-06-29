@@ -20,13 +20,14 @@ pub use error::*;
 
 mod error;
 
-enum Dependency {
+#[derive(Debug)]
+pub enum Dependency {
     Header(HeaderHash),
     Entry(AnyDhtHash),
     Null,
 }
 
-fn get_dependency(op_type: DhtOpType, header: &Header) -> Dependency {
+pub fn get_dependency(op_type: DhtOpType, header: &Header) -> Dependency {
     match op_type {
         DhtOpType::StoreElement | DhtOpType::StoreEntry => Dependency::Null,
         DhtOpType::RegisterAgentActivity => header
@@ -255,7 +256,7 @@ pub fn set_validation_status(
     Ok(())
 }
 /// Set the integration dependency of a [`DhtOp`] in the database.
-fn set_dependency(
+pub fn set_dependency(
     txn: &mut Transaction,
     hash: DhtOpHash,
     dependency: Dependency,
