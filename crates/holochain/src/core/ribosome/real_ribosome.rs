@@ -236,8 +236,6 @@ impl RealRibosome {
             // If we have space in the cache then add this instance.
             if cache.len() <= INSTANCE_CACHE_SIZE {
                 cache.insert(context_key, instance);
-            } else {
-                panic!("cache is full, cannot reinsert context key {}", context_key);
             }
         }
         Ok(())
