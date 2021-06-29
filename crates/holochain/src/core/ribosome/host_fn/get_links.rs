@@ -5,6 +5,7 @@ use holochain_p2p::actor::GetLinksOptions;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
+use crate::core::ribosome::HostFnAccess;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_links<'a>(
@@ -12,37 +13,42 @@ pub fn get_links<'a>(
     call_context: Arc<CallContext>,
     input: GetLinksInput,
 ) -> Result<Links, WasmError> {
-    let GetLinksInput {
-        base_address,
-        tag_prefix,
-    } = input;
+    match HostFnAccess::from(&call_context.host_access()) {
+        HostFnAccess{ read_workspace: Permission::Allow, .. } => {
+            let GetLinksInput {
+                base_address,
+                tag_prefix,
+            } = input;
 
-    // Get zome id
-    let zome_id = ribosome
-        .zome_to_id(&call_context.zome)
-        .expect("Failed to get ID for current zome.");
+            // Get zome id
+            let zome_id = ribosome
+                .zome_to_id(&call_context.zome)
+                .expect("Failed to get ID for current zome.");
 
-    // Get the network from the context
-    let network = call_context.host_access.network().clone();
+            // Get the network from the context
+            let network = call_context.host_access.network().clone();
 
-    tokio_helper::block_forever_on(async move {
-        // Create the key
-        let key = WireLinkKey {
-            base: base_address,
-            zome_id,
-            tag: tag_prefix,
-        };
-        let workspace = call_context.host_access.workspace();
-        let mut cascade = Cascade::from_workspace_network(workspace, network);
+            tokio_helper::block_forever_on(async move {
+                // Create the key
+                let key = WireLinkKey {
+                    base: base_address,
+                    zome_id,
+                    tag: tag_prefix,
+                };
+                let workspace = call_context.host_access.workspace();
+                let mut cascade = Cascade::from_workspace_network(workspace, network);
 
-        // Get the links from the dht
-        let links = cascade
-            .dht_get_links(key, GetLinksOptions::default())
-            .await
-            .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
+                // Get the links from the dht
+                let links = cascade
+                    .dht_get_links(key, GetLinksOptions::default())
+                    .await
+                    .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
 
-        Ok(links.into())
-    })
+                Ok(links.into())
+            })
+        },
+        _ => unreachable!(),
+    }
 }
 
 #[cfg(test)]
