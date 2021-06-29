@@ -1936,6 +1936,7 @@ dependencies = [
  "ghost_actor 0.3.0-alpha.1",
  "holo_hash",
  "holochain_serialized_bytes",
+ "holochain_sqlite",
  "holochain_zome_types",
  "lair_keystore_api",
  "lair_keystore_client",
