@@ -629,7 +629,7 @@ impl Cell {
                             |row| row.get("hash"),
                         )?
                         .collect::<rusqlite::Result<Vec<_>>>()?
-                } else if let Some((start_loc, end_loc)) = dht_arc.primitive_range() {
+                } else if let Some((start_loc, end_loc)) = dht_arc.primitive_range_grouped() {
                     let sql = if start_loc <= end_loc {
                         holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_CONTINUOUS
                     } else {

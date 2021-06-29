@@ -41,24 +41,40 @@ impl DhtArcSet {
         Self::Full
     }
 
+    pub fn normalized(self) -> Self {
+        let make_full = if let Self::Partial(intervals) = &self {
+            intervals.iter().any(|i| is_full(i.lower(), i.upper()))
+        } else {
+            false
+        };
+
+        if make_full {
+            Self::Full
+        } else {
+            self
+        }
+    }
+
+    pub fn from_bounds(start: u32, end: u32) -> Self {
+        if is_full(start, end) {
+            Self::new_full()
+        } else {
+            Self::Partial(
+                if start <= end {
+                    vec![(start, end)]
+                } else {
+                    vec![(MIN, end), (start, MAX)]
+                }
+                .to_interval_set(),
+            )
+        }
+    }
+
     pub fn from_interval(arc: ArcInterval) -> Self {
         match arc {
             ArcInterval::Full => Self::new_full(),
             ArcInterval::Empty => Self::new_empty(),
-            ArcInterval::Bounded(start, end) => {
-                if is_full(start, end) {
-                    Self::new_full()
-                } else {
-                    Self::Partial(
-                        if start <= end {
-                            vec![(start, end)]
-                        } else {
-                            vec![(MIN, end), (start, MAX)]
-                        }
-                        .to_interval_set(),
-                    )
-                }
-            }
+            ArcInterval::Bounded(start, end) => Self::from_bounds(start, end),
         }
     }
 
@@ -72,7 +88,11 @@ impl DhtArcSet {
                     (Some(first), Some(last)) => {
                         // if there is an interval at the very beginning and one
                         // at the very end, let's interpret it as a single
-                        // wrapping interval
+                        // wrapping interval.
+                        //
+                        // NB: this checks for values greater than the MAX,
+                        // because MAX is not u32::MAX. We don't expect values
+                        // greater than MAX, but it's no harm if we do see one.
                         if first.0 == MIN && last.1 >= MAX {
                             Some((last.0, first.1))
                         } else {
@@ -115,7 +135,9 @@ impl DhtArcSet {
         match (self, other) {
             (_, Self::Full) => Self::Full,
             (Self::Full, _) => Self::Full,
-            (Self::Partial(this), Self::Partial(that)) => Self::Partial(this.union(that)),
+            (Self::Partial(this), Self::Partial(that)) => {
+                Self::Partial(this.union(that)).normalized()
+            }
         }
     }
 
@@ -123,7 +145,9 @@ impl DhtArcSet {
         match (self, other) {
             (this, Self::Full) => this.clone(),
             (Self::Full, that) => that.clone(),
-            (Self::Partial(this), Self::Partial(that)) => Self::Partial(this.intersection(that)),
+            (Self::Partial(this), Self::Partial(that)) => {
+                Self::Partial(this.intersection(that)).normalized()
+            }
         }
     }
 }

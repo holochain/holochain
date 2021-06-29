@@ -237,7 +237,7 @@ impl DhtArc {
 
     /// Represent an arc as an optional range of inclusive endpoints.
     /// If none, the arc length is 0
-    pub fn primitive_range(&self) -> Option<(u32, u32)> {
+    pub fn primitive_range_grouped(&self) -> Option<(u32, u32)> {
         let ArcRange { start, end } = self.range();
         match (start, end) {
             (Bound::Included(a), Bound::Included(b)) => Some((a, b)),
@@ -246,9 +246,9 @@ impl DhtArc {
         }
     }
 
-    /// Same as primitive_range, but "inside-out"
-    pub fn primitive_range_transposed(&self) -> (Option<u32>, Option<u32>) {
-        self.primitive_range()
+    /// Same as primitive_range, but with the return type "inside-out"
+    pub fn primitive_range_detached(&self) -> (Option<u32>, Option<u32>) {
+        self.primitive_range_grouped()
             .map(|(a, b)| (Some(a), Some(b)))
             .unwrap_or_default()
     }

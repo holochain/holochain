@@ -247,7 +247,7 @@ impl P2pRecord {
 
         let storage_center_loc = arc.center_loc.into();
 
-        let (storage_start_loc, storage_end_loc) = arc.primitive_range_transposed();
+        let (storage_start_loc, storage_end_loc) = arc.primitive_range_detached();
 
         Ok(Self {
             agent,
