@@ -195,7 +195,7 @@ fn fullness() {
 }
 
 /// An alternate implementation of `ArcRange`
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ArcInterval {
     Empty,
     Full,

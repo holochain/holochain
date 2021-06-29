@@ -281,6 +281,14 @@ pub trait ConductorHandleT: Send + Sync {
     #[cfg(any(test, feature = "test_utils"))]
     async fn add_test_app_interface(&self, id: super::state::AppInterfaceId)
         -> ConductorResult<()>;
+
+    #[cfg(any(test, feature = "test_utils"))]
+    /// Check whether this conductor should skip gossip.
+    fn should_skip_publish(&self) -> bool;
+
+    #[cfg(any(test, feature = "test_utils"))]
+    /// For testing we can choose to skip publish.
+    fn set_skip_publish(&self, skip_publish: bool);
 }
 
 /// The current "production" implementation of a ConductorHandle.
@@ -295,6 +303,12 @@ pub struct ConductorHandleImpl<DS: DnaStore + 'static> {
     pub(crate) conductor: RwLock<Conductor<DS>>,
     pub(crate) keystore: KeystoreSender,
     pub(crate) holochain_p2p: holochain_p2p::HolochainP2pRef,
+
+    // Testing:
+    #[cfg(any(test, feature = "test_utils"))]
+    /// All conductors should skip publishing.
+    /// This is useful for testing gossip.
+    pub skip_publish: std::sync::atomic::AtomicBool,
 }
 
 #[async_trait::async_trait]
@@ -421,6 +435,28 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             } => {
                 let env = { self.conductor.read().await.p2p_env(space) };
                 let res = query_agent_info_signed(env, kitsune_space)
+                    .map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
+            }
+            QueryGossipAgents {
+                since_ms,
+                until_ms,
+                arc_set,
+                respond,
+                ..
+            } => {
+                use holochain_sqlite::db::AsP2pAgentStoreConExt;
+                let env = { self.conductor.read().await.p2p_env(space) };
+                let res = env
+                    .conn()?
+                    .p2p_gossip_query_agents(since_ms, until_ms, (*arc_set).clone())
+                    // FIXME: This sucks we have to iterate through the whole vec just to add Arcs.
+                    // Are arcs really saving us that much?
+                    .map(|r| {
+                        r.into_iter()
+                            .map(|(agent, arc)| (Arc::new(agent), arc))
+                            .collect()
+                    })
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
@@ -792,6 +828,17 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     ) -> ConductorResult<()> {
         let mut lock = self.conductor.write().await;
         lock.add_test_app_interface(id).await
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    fn should_skip_publish(&self) -> bool {
+        self.skip_publish.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    fn set_skip_publish(&self, skip_publish: bool) {
+        self.skip_publish
+            .store(skip_publish, std::sync::atomic::Ordering::Relaxed);
     }
 }
 

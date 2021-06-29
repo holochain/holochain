@@ -27,6 +27,13 @@ pub fn spawn_publish_dht_ops_consumer(
                 break;
             }
 
+            #[cfg(any(test, feature = "test_utils"))]
+            {
+                if conductor_handle.should_skip_publish() {
+                    continue;
+                }
+            }
+
             // Run the workflow
             match publish_dht_ops_workflow(env.clone(), cell_network.clone()).await {
                 Ok(WorkComplete::Incomplete) => trigger_self.trigger(),

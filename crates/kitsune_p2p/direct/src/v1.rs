@@ -508,6 +508,12 @@ async fn handle_events(
                         .boxed()
                         .into()));
                 }
+                event::KitsuneP2pEvent::QueryGossipAgents { respond, input, .. } => {
+                    respond.r(Ok(handle_query_gossip_agents(kdirect.clone(), input)
+                        .map_err(KitsuneP2pError::other)
+                        .boxed()
+                        .into()));
+                }
                 event::KitsuneP2pEvent::PutMetricDatum { respond, datum, .. } => {
                     respond.r(Ok(handle_put_metric_datum(kdirect.clone(), datum)
                         .map_err(KitsuneP2pError::other)
@@ -618,6 +624,18 @@ async fn handle_get_agent_info_signed(
         Ok(i) => Some(i.to_kitsune()),
         Err(_) => None,
     })
+}
+
+async fn handle_query_gossip_agents(
+    _kdirect: Arc<Kd1>,
+    _input: kitsune_p2p::event::QueryGossipAgentsEvt,
+) -> KdResult<
+    Vec<(
+        Arc<kitsune_p2p::KitsuneAgent>,
+        kitsune_p2p_types::dht_arc::ArcInterval,
+    )>,
+> {
+    todo!()
 }
 
 async fn handle_query_agent_info_signed(

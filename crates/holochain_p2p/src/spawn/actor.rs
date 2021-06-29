@@ -72,6 +72,39 @@ impl WrapEvtSender {
         )
     }
 
+    fn query_gossip_agents(
+        &self,
+        dna_hash: DnaHash,
+        to_agent: AgentPubKey,
+        kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
+        since_ms: u64,
+        until_ms: u64,
+        arc_set: Arc<kitsune_p2p_types::dht_arc::DhtArcSet>,
+    ) -> impl Future<
+        Output = HolochainP2pResult<
+            Vec<(
+                Arc<kitsune_p2p::KitsuneAgent>,
+                kitsune_p2p_types::dht_arc::ArcInterval,
+            )>,
+        >,
+    >
+           + 'static
+           + Send {
+        timing_trace!(
+            {
+                self.0.query_gossip_agents(
+                    dna_hash,
+                    to_agent,
+                    kitsune_space,
+                    since_ms,
+                    until_ms,
+                    arc_set,
+                )
+            },
+            "(hp2p:handle) query_gossip_agents",
+        )
+    }
+
     fn query_agent_info_signed(
         &self,
         dna_hash: DnaHash,
@@ -568,6 +601,36 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         Ok(async move {
             Ok(evt_sender
                 .query_agent_info_signed(h_space, h_agent, space, agent)
+                .await?)
+        }
+        .boxed()
+        .into())
+    }
+
+    /// We need to get previously stored agent info.
+    #[tracing::instrument(skip(self), level = "trace")]
+    fn handle_query_gossip_agents(
+        &mut self,
+        input: kitsune_p2p::event::QueryGossipAgentsEvt,
+    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<
+        Vec<(
+            Arc<kitsune_p2p::KitsuneAgent>,
+            kitsune_p2p_types::dht_arc::ArcInterval,
+        )>,
+    > {
+        let kitsune_p2p::event::QueryGossipAgentsEvt {
+            space,
+            agent,
+            since_ms,
+            until_ms,
+            arc_set,
+        } = input;
+        let h_space = DnaHash::from_kitsune(&space);
+        let h_agent = AgentPubKey::from_kitsune(&agent);
+        let evt_sender = self.evt_sender.clone();
+        Ok(async move {
+            Ok(evt_sender
+                .query_gossip_agents(h_space, h_agent, space, since_ms, until_ms, arc_set)
                 .await?)
         }
         .boxed()

@@ -70,6 +70,21 @@ pub struct QueryAgentInfoSignedEvt {
     pub agent: Arc<super::KitsuneAgent>,
 }
 
+/// Get agent info which satisfies a query.
+#[derive(Debug)]
+pub struct QueryGossipAgentsEvt {
+    /// The "space" context.
+    pub space: Arc<super::KitsuneSpace>,
+    /// The "agent" context.
+    pub agent: Arc<super::KitsuneAgent>,
+    /// Start of the time window.
+    pub since_ms: u64,
+    /// End of the time window.
+    pub until_ms: u64,
+    /// The set that we need agents to fit into.
+    pub arc_set: Arc<kitsune_p2p_types::dht_arc::DhtArcSet>,
+}
+
 /// A single datum of metric info about an Agent, to be recorded by the client.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, derive_more::Display)]
 pub enum MetricKind {
@@ -151,6 +166,9 @@ ghost_actor::ghost_chan! {
 
         /// We need to get previously stored agent info.
         fn query_agent_info_signed(input: QueryAgentInfoSignedEvt) -> Vec<crate::types::agent_store::AgentInfoSigned>;
+
+        /// We need to get agents that fit into an arc set for gossip.
+        fn query_gossip_agents(input: QueryGossipAgentsEvt) -> Vec<(Arc<crate::KitsuneAgent>, kitsune_p2p_types::dht_arc::ArcInterval)>;
 
         /// Record a metric datum about an agent.
         fn put_metric_datum(datum: MetricDatum) -> ();
