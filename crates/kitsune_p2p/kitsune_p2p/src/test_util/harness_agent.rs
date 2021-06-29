@@ -160,6 +160,22 @@ impl KitsuneP2pEventHandler for AgentHarness {
         Ok(async move { Ok(out) }.boxed().into())
     }
 
+    fn handle_query_agent_info_signed_near_basis(
+        &mut self,
+        _space: Arc<KitsuneSpace>,
+        _basis_loc: u32,
+        limit: u32,
+    ) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
+        // TODO - sort these?
+        let out = self
+            .agent_store
+            .values()
+            .map(|a| (**a).clone())
+            .take(limit as usize)
+            .collect();
+        Ok(async move { Ok(out) }.boxed().into())
+    }
+
     fn handle_put_metric_datum(&mut self, datum: MetricDatum) -> KitsuneP2pEventHandlerResult<()> {
         self.metric_store.put_metric_datum(datum);
         Ok(async move { Ok(()) }.boxed().into())

@@ -22,6 +22,8 @@ pub(crate) mod sql_p2p_agent_store {
     pub(crate) const SELECT_ALL: &str = include_str!("sql/p2p_agent_store/select_all.sql");
     pub(crate) const SELECT: &str = include_str!("sql/p2p_agent_store/select.sql");
     pub(crate) const GOSSIP_QUERY: &str = include_str!("sql/p2p_agent_store/gossip_query.sql");
+    pub(crate) const QUERY_NEAR_BASIS: &str =
+        include_str!("sql/p2p_agent_store/query_near_basis.sql");
     pub(crate) const PRUNE: &str = include_str!("sql/p2p_agent_store/prune.sql");
 }
 

@@ -1,6 +1,7 @@
 //! kdirect kdagent type
 
 use crate::*;
+use kitsune_p2p_dht_arc::DhtArc;
 
 /// Additional types associated with the KdAgentInfo struct
 pub mod kd_agent_info {
@@ -16,6 +17,9 @@ pub mod kd_agent_info {
         /// the agent pubkey
         #[serde(rename = "agent")]
         pub agent: KdHash,
+
+        /// The storage arc currently being published by this agent.
+        pub storage_arc: DhtArc,
 
         /// transport addressses this agent is reachable at
         #[serde(rename = "urlList")]
@@ -95,6 +99,34 @@ impl KdAgentInfo {
     /// get the agent hash
     pub fn agent(&self) -> &KdHash {
         &self.0.agent
+    }
+
+    /// get the storage arc
+    pub fn storage_arc(&self) -> &DhtArc {
+        &self.0.storage_arc
+    }
+
+    /// Get the distance from a basis to this agent's storage arc.
+    /// Will be zero if this agent covers this basis loc.
+    pub fn basis_distance_to_storage(&self, basis: u32) -> u32 {
+        match self.storage_arc().primitive_range_grouped() {
+            None => u32::MAX,
+            Some((s, e)) => {
+                if s <= e {
+                    if basis >= s && basis <= e {
+                        0
+                    } else if basis < s {
+                        std::cmp::min(s - basis, (u32::MAX - e) + basis)
+                    } else {
+                        std::cmp::min(basis - e, (u32::MAX - basis) + s)
+                    }
+                } else if basis <= e || basis >= s {
+                    0
+                } else {
+                    std::cmp::min(basis - e, s - basis)
+                }
+            }
+        }
     }
 
     /// get the url_list
