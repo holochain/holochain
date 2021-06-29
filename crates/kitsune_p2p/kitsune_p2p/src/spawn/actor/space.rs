@@ -369,8 +369,11 @@ impl KitsuneP2pHandler for Space {
         };
         let timeout = KitsuneTimeout::from_millis(timeout_ms);
 
-        let discover_fut =
-            discover::peer_discover(self, to_agent.clone(), from_agent.clone(), timeout_ms);
+        let discover_fut = discover::search_and_discover_peer_connect(
+            self.ro_inner.clone(),
+            to_agent.clone(),
+            timeout,
+        );
 
         Ok(async move {
             match discover_fut.await {
@@ -480,9 +483,21 @@ impl KitsuneP2pHandler for Space {
     }
 }
 
+pub(crate) struct SpaceReadOnlyInner {
+    pub(crate) space: Arc<KitsuneSpace>,
+    #[allow(dead_code)]
+    pub(crate) this_addr: url2::Url2,
+    pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
+    pub(crate) evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    pub(crate) ep_hnd: Tx2EpHnd<wire::Wire>,
+    #[allow(dead_code)]
+    pub(crate) config: Arc<KitsuneP2pConfig>,
+}
+
 /// A Kitsune P2p Node can track multiple "spaces" -- Non-interacting namespaced
 /// areas that share common transport infrastructure for communication.
 pub(crate) struct Space {
+    pub(crate) ro_inner: Arc<SpaceReadOnlyInner>,
     pub(crate) space: Arc<KitsuneSpace>,
     pub(crate) this_addr: url2::Url2,
     pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
@@ -592,7 +607,17 @@ impl Space {
             });
         }
 
+        let ro_inner = Arc::new(SpaceReadOnlyInner {
+            space: space.clone(),
+            this_addr: this_addr.clone(),
+            i_s: i_s.clone(),
+            evt_sender: evt_sender.clone(),
+            ep_hnd: ep_hnd.clone(),
+            config: config.clone(),
+        });
+
         Self {
+            ro_inner,
             space,
             this_addr,
             i_s,

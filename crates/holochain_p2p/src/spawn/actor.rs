@@ -88,6 +88,22 @@ impl WrapEvtSender {
         )
     }
 
+    fn query_agent_info_signed_near_basis(
+        &self,
+        dna_hash: DnaHash,
+        kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
+        basis_loc: u32,
+        limit: u32,
+    ) -> impl Future<Output = HolochainP2pResult<Vec<AgentInfoSigned>>> + 'static + Send {
+        timing_trace!(
+            {
+                self.0
+                    .query_agent_info_signed_near_basis(dna_hash, kitsune_space, basis_loc, limit)
+            },
+            "(hp2p:handle) query_agent_info_signed_near_basis",
+        )
+    }
+
     fn put_metric_datum(
         &self,
         dna_hash: DnaHash,
@@ -568,6 +584,24 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         Ok(async move {
             Ok(evt_sender
                 .query_agent_info_signed(h_space, h_agent, space, agent)
+                .await?)
+        }
+        .boxed()
+        .into())
+    }
+
+    #[tracing::instrument(skip(self), level = "trace")]
+    fn handle_query_agent_info_signed_near_basis(
+        &mut self,
+        space: Arc<kitsune_p2p::KitsuneSpace>,
+        basis_loc: u32,
+        limit: u32,
+    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<Vec<AgentInfoSigned>> {
+        let h_space = DnaHash::from_kitsune(&space);
+        let evt_sender = self.evt_sender.clone();
+        Ok(async move {
+            Ok(evt_sender
+                .query_agent_info_signed_near_basis(h_space, space, basis_loc, limit)
                 .await?)
         }
         .boxed()

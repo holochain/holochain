@@ -152,6 +152,9 @@ ghost_actor::ghost_chan! {
         /// We need to get previously stored agent info.
         fn query_agent_info_signed(input: QueryAgentInfoSignedEvt) -> Vec<crate::types::agent_store::AgentInfoSigned>;
 
+        /// query agent info in order of closeness to a basis location.
+        fn query_agent_info_signed_near_basis(space: Arc<super::KitsuneSpace>, basis_loc: u32, limit: u32) -> Vec<crate::types::agent_store::AgentInfoSigned>;
+
         /// Record a metric datum about an agent.
         fn put_metric_datum(datum: MetricDatum) -> ();
 

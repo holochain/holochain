@@ -508,6 +508,23 @@ async fn handle_events(
                         .boxed()
                         .into()));
                 }
+                event::KitsuneP2pEvent::QueryAgentInfoSignedNearBasis {
+                    respond,
+                    space,
+                    basis_loc,
+                    limit,
+                    ..
+                } => {
+                    respond.r(Ok(handle_query_agent_info_signed_near_basis(
+                        kdirect.clone(),
+                        space,
+                        basis_loc,
+                        limit,
+                    )
+                    .map_err(KitsuneP2pError::other)
+                    .boxed()
+                    .into()));
+                }
                 event::KitsuneP2pEvent::PutMetricDatum { respond, datum, .. } => {
                     respond.r(Ok(handle_put_metric_datum(kdirect.clone(), datum)
                         .map_err(KitsuneP2pError::other)
@@ -629,6 +646,20 @@ async fn handle_query_agent_info_signed(
     let root = KdHash::from_kitsune_space(&space);
 
     let map = kdirect.persist.query_agent_info(root).await?;
+    Ok(map.into_iter().map(|a| a.to_kitsune()).collect())
+}
+
+async fn handle_query_agent_info_signed_near_basis(
+    kdirect: Arc<Kd1>,
+    space: Arc<KitsuneSpace>,
+    basis_loc: u32,
+    limit: u32,
+) -> KdResult<Vec<AgentInfoSigned>> {
+    let root = KdHash::from_kitsune_space(&space);
+    let map = kdirect
+        .persist
+        .query_agent_info_near_basis(root, basis_loc, limit)
+        .await?;
     Ok(map.into_iter().map(|a| a.to_kitsune()).collect())
 }
 
