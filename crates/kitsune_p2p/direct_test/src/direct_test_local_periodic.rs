@@ -342,6 +342,7 @@ mod tests {
     use super::*;
 
     #[tokio::test(flavor = "multi_thread")]
+    #[allow(irrefutable_let_patterns)]
     async fn sanity_run_for_five_seconds() {
         init_tracing();
 
@@ -394,7 +395,29 @@ mod tests {
 
         let test = KdTestHarness::start_test(config).await.unwrap();
 
+        let from_agent = test.nodes[0].local_agents[1].clone();
+        let to_agent = test.nodes[1].local_agents[0].clone();
+        test.nodes[0]
+            .kdhnd
+            .message_send(
+                test.root.clone(),
+                to_agent,
+                from_agent,
+                serde_json::json!({"hello": "world"}),
+                vec![].into_boxed_slice().into(),
+            )
+            .await
+            .unwrap();
+
         tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+
+        let mut msgs = test.nodes.get(1).unwrap().collect_events();
+        assert_eq!(1, msgs.len());
+        if let KdHndEvt::Message { content, .. } = msgs.remove(0) {
+            assert_eq!(content, serde_json::json!({"hello": "world"}));
+        } else {
+            panic!("unexpected");
+        }
 
         assert_eq!(2, test.nodes.len());
         for node in test.nodes.iter() {

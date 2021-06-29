@@ -25,6 +25,13 @@ pub trait AsP2pAgentStoreConExt {
         until_ms: u64,
         arcset: DhtArcSet,
     ) -> DatabaseResult<Vec<(KitsuneAgent, ArcInterval)>>;
+
+    /// Query agents sorted by nearness to basis loc
+    fn p2p_query_near_basis(
+        &mut self,
+        basis: u32,
+        limit: u32,
+    ) -> DatabaseResult<Vec<AgentInfoSigned>>;
 }
 
 /// Extension trait to treat transaction instances
@@ -43,6 +50,9 @@ pub trait AsP2pStateTxExt {
         until_ms: u64,
         arcset: DhtArcSet,
     ) -> DatabaseResult<Vec<(KitsuneAgent, ArcInterval)>>;
+
+    /// Query agents sorted by nearness to basis loc
+    fn p2p_query_near_basis(&self, basis: u32, limit: u32) -> DatabaseResult<Vec<AgentInfoSigned>>;
 }
 
 impl AsP2pAgentStoreConExt for crate::db::PConn {
@@ -61,6 +71,14 @@ impl AsP2pAgentStoreConExt for crate::db::PConn {
         arcset: DhtArcSet,
     ) -> DatabaseResult<Vec<(KitsuneAgent, ArcInterval)>> {
         self.with_reader(move |reader| reader.p2p_gossip_query_agents(since_ms, until_ms, arcset))
+    }
+
+    fn p2p_query_near_basis(
+        &mut self,
+        basis: u32,
+        limit: u32,
+    ) -> DatabaseResult<Vec<AgentInfoSigned>> {
+        self.with_reader(move |reader| reader.p2p_query_near_basis(basis, limit))
     }
 }
 
@@ -122,6 +140,7 @@ pub async fn p2p_prune(db: &DbWrite) -> DatabaseResult<()> {
 
     Ok(())
 }
+
 impl AsP2pStateTxExt for Transaction<'_> {
     fn p2p_get_agent(&self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>> {
         let mut stmt = self
@@ -206,6 +225,25 @@ impl AsP2pStateTxExt for Transaction<'_> {
             }
             out
         })
+    }
+
+    fn p2p_query_near_basis(&self, basis: u32, limit: u32) -> DatabaseResult<Vec<AgentInfoSigned>> {
+        let mut stmt = self
+            .prepare(sql_p2p_agent_store::QUERY_NEAR_BASIS)
+            .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
+
+        let mut out = Vec::new();
+        for r in stmt.query_map(named_params! { ":basis": basis, ":limit": limit }, |r| {
+            let r = r.get_ref(0)?;
+            let r = r.as_blob()?;
+            let signed = AgentInfoSigned::decode(r)
+                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
+
+            Ok(signed)
+        })? {
+            out.push(r?);
+        }
+        Ok(out)
     }
 }
 

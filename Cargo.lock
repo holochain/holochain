@@ -2513,16 +2513,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "kitsune_dht_arc"
-version = "0.0.1"
-dependencies = [
- "derive_more",
- "gcollections",
- "intervallum",
- "serde",
-]
-
-[[package]]
 name = "kitsune_p2p"
 version = "0.0.1"
 dependencies = [
@@ -2575,6 +2565,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "kitsune_p2p_dht_arc"
+version = "0.0.1"
+dependencies = [
+ "derive_more",
+ "gcollections",
+ "intervallum",
+ "serde",
+]
+
+[[package]]
 name = "kitsune_p2p_direct"
 version = "0.0.1"
 dependencies = [
@@ -2607,6 +2607,7 @@ version = "0.0.1"
 dependencies = [
  "arrayref",
  "base64",
+ "kitsune_p2p_dht_arc",
  "serde",
  "serde_json",
 ]
@@ -2691,7 +2692,7 @@ dependencies = [
  "derive_more",
  "futures",
  "ghost_actor 0.3.0-alpha.1",
- "kitsune_dht_arc",
+ "kitsune_p2p_dht_arc",
  "lair_keystore_api",
  "lru",
  "nanoid",
