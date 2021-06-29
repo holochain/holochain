@@ -38,7 +38,7 @@ jobs:
       - run:
          name: Run the merge tests
          no_output_timeout: 30m
-         command: nix-shell --pure --argstr flavor "coreDev" --run hc-merge-test
+         command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-merge-test
 
   merge-test-mac:
    macos:
@@ -58,7 +58,7 @@ jobs:
         sh <(curl -L https://nixos.org/nix/install) --darwin-use-unencrypted-nix-store-volume
         . /Users/distiller/.nix-profile/etc/profile.d/nix.sh
         # do tests
-        nix-shell --argstr flavor ci --run hc-merge-test
+        nix-shell --fallback --argstr flavor ci --run hc-merge-test
 
   docker-build-latest:
    resource_class: large

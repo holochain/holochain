@@ -8,10 +8,8 @@ SELECT
   :expires_at_ms AS expires_at_ms,
   :storage_center_loc AS storage_center_loc,
   :is_active AS is_active,
-  :storage_start_1 AS storage_start_1,
-  :storage_end_1 AS storage_end_1,
-  :storage_start_2 AS storage_start_2,
-  :storage_end_2 AS storage_end_2
+  :storage_start_loc AS storage_start_loc,
+  :storage_end_loc AS storage_end_loc
 WHERE (
   -- count the rows that should supercede the one we're trying to insert
   SELECT count(rowid)

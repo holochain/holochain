@@ -31,7 +31,7 @@ async fn can_update_state() {
         envs.p2p_metrics(),
         dna_store,
         keystore,
-        envs.tempdir().path().to_path_buf().into(),
+        envs.path().to_path_buf().into(),
         holochain_p2p,
     )
     .await
@@ -81,7 +81,7 @@ async fn can_add_clone_cell_to_app() {
         envs.p2p_metrics(),
         dna_store,
         keystore,
-        envs.tempdir().path().to_path_buf().into(),
+        envs.path().to_path_buf().into(),
         holochain_p2p,
     )
     .await
@@ -141,7 +141,7 @@ async fn app_ids_are_unique() {
         environments.p2p_metrics(),
         dna_store,
         environments.keystore().clone(),
-        environments.tempdir().path().to_path_buf().into(),
+        environments.path().to_path_buf().into(),
         holochain_p2p,
     )
     .await
@@ -583,10 +583,45 @@ async fn test_reactivate_app() {
     let zome = simple_create_entry_zome();
     let (conductor, app) = common_genesis_test_app(zome).await.unwrap();
 
+    let all_apps = conductor.list_apps(None).await.unwrap();
+    assert_eq!(all_apps.len(), 1);
+
+    let inactive_apps = conductor
+        .list_apps(Some(AppStatusFilter::Inactive))
+        .await
+        .unwrap();
+    let active_apps = conductor
+        .list_apps(Some(AppStatusFilter::Active))
+        .await
+        .unwrap();
+    assert_eq!(inactive_apps.len(), 0);
+    assert_eq!(active_apps.len(), 1);
+    assert_eq!(active_apps[0].cell_data.len(), 2);
+    assert_matches!(active_apps[0].status, InstalledAppStatus::Active);
+
     conductor
         .deactivate_app("app".to_string(), DeactivationReason::Normal)
         .await
         .unwrap();
+
+    let inactive_apps = conductor
+        .list_apps(Some(AppStatusFilter::Inactive))
+        .await
+        .unwrap();
+    let active_apps = conductor
+        .list_apps(Some(AppStatusFilter::Active))
+        .await
+        .unwrap();
+    assert_eq!(active_apps.len(), 0);
+    assert_eq!(inactive_apps.len(), 1);
+    assert_eq!(inactive_apps[0].cell_data.len(), 2);
+    assert_matches!(
+        inactive_apps[0].status,
+        InstalledAppStatus::Inactive {
+            reason: DeactivationReason::Normal
+        }
+    );
+
     conductor.activate_app("app".to_string()).await.unwrap();
     conductor.inner_handle().setup_cells().await.unwrap();
 
@@ -599,7 +634,18 @@ async fn test_reactivate_app() {
         .unwrap();
 
     // - Ensure that the app is active
+
     assert_eq_retry_10s!(conductor.list_active_apps().await.unwrap().len(), 1);
+    let inactive_apps = conductor
+        .list_apps(Some(AppStatusFilter::Inactive))
+        .await
+        .unwrap();
+    let active_apps = conductor
+        .list_apps(Some(AppStatusFilter::Active))
+        .await
+        .unwrap();
+    assert_eq!(active_apps.len(), 1);
+    assert_eq!(inactive_apps.len(), 0);
 }
 
 #[tokio::test(flavor = "multi_thread")]
