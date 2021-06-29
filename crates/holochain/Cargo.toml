@@ -108,6 +108,10 @@ harness = false
 name = "consistency"
 harness = false
 
+[[bench]]
+name = "multi_install"
+harness = false
+
 [lib]
 name = "holochain"
 path = "src/lib.rs"
