@@ -926,30 +926,33 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
 
     /// Add cells to the map then join the network then initialize workflows.
     async fn initialize_cells(&self, cells: Vec<(Cell, InitialQueueTriggers)>) {
-        let (cells, triggers): (Vec<_>, Vec<_>) = cells.into_iter().unzip();
-        let networks: Vec<_> = cells
-            .iter()
-            .map(|cell| cell.holochain_p2p_cell().clone())
-            .collect();
+        // Join the network but ignore errors because the
+        // space retries joining all cells every 5 minutes.
+        let maybes: Vec<_> =
+            futures::stream::iter(cells.into_iter().map(|(cell, triggers)| async move {
+                let network = cell.holochain_p2p_cell();
+                match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join()).await {
+                    Ok(Err(e)) => {
+                        tracing::info!(error = ?e, cell_id = ?cell.id(), "Error while trying to join the network");
+                        None
+                    }
+                    Err(_) => {
+                        tracing::info!(cell_id = ?cell.id(), "Timed out trying to join the network");
+                        None
+                    }
+                    Ok(Ok(_)) => Some((cell, triggers)),
+                }
+            }))
+            .buffer_unordered(100)
+            .collect()
+            .await;
+
+        let (cells, triggers): (Vec<_>, Vec<_>) = maybes.into_iter().filter_map(|x| x).unzip();
+
         // Add the cells to the conductor map.
         // This write lock can't be held while join is awaited as join calls the conductor.
         // Cells need to be in the map before join is called so it can route the call.
         self.conductor.write().await.add_cells(cells);
-        // Join the network but ignore errors because the
-        // space retries joining all cells every 5 minutes.
-        futures::stream::iter(networks)
-            .for_each_concurrent(100, |mut network| async move {
-                match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join()).await {
-                    Ok(Err(e)) => {
-                        tracing::info!(failed_to_join_network = ?e);
-                    }
-                    Err(_) => {
-                        tracing::info!("Timed out trying to join the network");
-                    }
-                    Ok(Ok(_)) => (),
-                }
-            })
-            .await;
 
         // Now we can trigger the workflows.
         for trigger in triggers {
