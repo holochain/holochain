@@ -253,7 +253,11 @@ pub mod test_utils {
             .await
             .unwrap();
 
-        let errors = conductor_handle.clone().setup_cells().await.unwrap();
+        let errors = conductor_handle
+            .clone()
+            .reconcile_cells_with_app_state()
+            .await
+            .unwrap();
 
         assert!(errors.is_empty());
 
@@ -352,7 +356,11 @@ pub mod test {
             .await
             .unwrap();
 
-        let errors = conductor_handle.clone().setup_cells().await.unwrap();
+        let errors = conductor_handle
+            .clone()
+            .reconcile_cells_with_app_state()
+            .await
+            .unwrap();
 
         assert!(errors.is_empty());
 

@@ -417,8 +417,16 @@ async fn test_setup_cells_idempotency() {
     let zome = InlineZome::new_unique(Vec::new());
     let (conductor, _) = common_genesis_test_app(zome).await.unwrap();
 
-    conductor.inner_handle().setup_cells().await.unwrap();
-    conductor.inner_handle().setup_cells().await.unwrap();
+    conductor
+        .inner_handle()
+        .reconcile_cells_with_app_state()
+        .await
+        .unwrap();
+    conductor
+        .inner_handle()
+        .reconcile_cells_with_app_state()
+        .await
+        .unwrap();
 
     // - Ensure that the app is active
     assert_eq_retry_10s!(conductor.list_running_apps().await.unwrap().len(), 1);
@@ -621,7 +629,11 @@ async fn test_reactivate_app() {
     );
 
     conductor.enable_app(&"app".to_string()).await.unwrap();
-    conductor.inner_handle().setup_cells().await.unwrap();
+    conductor
+        .inner_handle()
+        .reconcile_cells_with_app_state()
+        .await
+        .unwrap();
 
     let (_, cell) = app.into_tuple();
 

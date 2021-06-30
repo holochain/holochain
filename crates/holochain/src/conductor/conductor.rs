@@ -1192,7 +1192,7 @@ mod builder {
 
             tokio::task::spawn(p2p_event_task(p2p_evt, handle.clone()));
 
-            let cell_startup_errors = handle.clone().setup_cells().await?;
+            let cell_startup_errors = handle.clone().reconcile_cells_with_app_state().await?;
 
             // TODO: This should probably be emitted over the admin interface
             if !cell_startup_errors.is_empty() {

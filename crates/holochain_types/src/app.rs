@@ -548,14 +548,16 @@ pub enum AppStatus {
     /// The app is enabled and running normally.
     Running,
 
-    /// Enabled, but stopped. App can be Started, and will restart on conductor reboot.
-    /// If optional string is None, this was a manual pause.
-    /// Otherwise, the reason for automatically pausing is given.
+    /// Enabled, but stopped due to some recoverable problem.
+    /// The app "hopes" to be Running again as soon as possible.
+    /// Holochain may restart the app automatically if it can. It may also be
+    /// restarted manually via the `StartApp` admin method.
+    /// Paused apps will be automatically set to Running when the conductor restarts.
     Paused(PausedAppReason),
 
-    /// Disabled and stopped. App must be Enabled before running, and will not restart on conductor reboot.
-    /// If optional string is None, this was a manual stop.
-    /// Otherwise, the reason for automatically stopping is given.
+    /// Disabled and stopped, either manually by the user, or automatically due
+    /// to an unrecoverable error. App must be Enabled before running again,
+    /// and will not restart automaticaly on conductor reboot.
     Disabled(DisabledAppReason),
 }
 
@@ -590,7 +592,7 @@ impl AppStatus {
     }
 
     /// Transition a status from one state to another.
-    /// If None, the transition is not valid, and the status did not change.
+    /// If None, the transition was not valid, and the status did not change.
     pub fn transition(&mut self, transition: AppStatusTransition) -> AppStatusRunningDelta {
         use AppStatus::*;
         use AppStatusRunningDelta::*;
@@ -640,16 +642,10 @@ pub enum AppStatusRunningDelta {
 )]
 #[serde(rename_all = "snake_case")]
 pub enum StoppedAppReason {
-    /// Enabled, but stopped. App can be Started, and will restart on conductor reboot.
-    /// If optional string is None, this was a manual pause.
-    /// Otherwise, the reason for automatically pausing is given.
-    /// Same as [`InstalledAppStatus::Paused`].
+    /// Same meaning as [`InstalledAppStatus::Paused`].
     Paused(PausedAppReason),
 
-    /// Disabled and stopped. App must be Enabled before running, and will not restart on conductor reboot.
-    /// If optional string is None, this was a manual stop.
-    /// Otherwise, the reason for automatically stopping is given.
-    /// Same as [`InstalledAppStatus::Disabled`].
+    /// Same meaning as [`InstalledAppStatus::Disabled`].
     Disabled(DisabledAppReason),
 }
 

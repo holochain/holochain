@@ -252,7 +252,10 @@ pub async fn install_app(
         .await
         .unwrap();
 
-    let errors = conductor_handle.setup_cells().await.unwrap();
+    let errors = conductor_handle
+        .reconcile_cells_with_app_state()
+        .await
+        .unwrap();
 
     assert!(errors.is_empty(), "{:?}", errors);
 }

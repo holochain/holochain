@@ -235,7 +235,11 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
 
                 // Create cells
-                let errors = self.conductor_handle.clone().setup_cells().await?;
+                let errors = self
+                    .conductor_handle
+                    .clone()
+                    .reconcile_cells_with_app_state()
+                    .await?;
 
                 // Check if this app was created successfully
                 errors

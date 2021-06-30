@@ -206,9 +206,22 @@ pub trait ConductorHandleT: Send + Sync {
     /// Uninstall an app from the state DB and remove all running Cells
     async fn uninstall_app(&self, app: &InstalledAppId) -> ConductorResult<()>;
 
-    /// Setup the cells from the database
-    /// Only creates any cells that are not already created
-    async fn setup_cells(self: Arc<Self>) -> ConductorResult<Vec<CreateAppError>>;
+    /// Adjust app statuses (via state transitions) to match the current
+    /// reality of which Cells are present in the conductor.
+    /// - Do not change state for Disabled apps. For all others:
+    /// - If an app is Paused but all of its (required) Cells are on, then
+    ///     set it to Running
+    /// - If an app is Running but at least one of its Cells are off, then
+    //      set it to Paused
+    async fn reconcile_app_state_with_cells(self: Arc<Self>) -> ();
+
+    /// Adjust which cells are present in the Conductor (adding and removing as
+    /// needed) to match the current reality of all app statuses.
+    /// - If a Cell is used by at least one Running app, then ensure it is added
+    /// - If a Cell is used by no running apps, then ensure it is removed.
+    async fn reconcile_cells_with_app_state(
+        self: Arc<Self>,
+    ) -> ConductorResult<Vec<CreateAppError>>;
 
     /// Activate an app
     async fn enable_app(self: Arc<Self>, app_id: &InstalledAppId) -> ConductorResult<InstalledApp>;
@@ -673,7 +686,13 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(stopped_app)
     }
 
-    async fn setup_cells(self: Arc<Self>) -> ConductorResult<Vec<CreateAppError>> {
+    async fn reconcile_app_state_with_cells(self: Arc<Self>) -> () {
+        todo!()
+    }
+
+    async fn reconcile_cells_with_app_state(
+        self: Arc<Self>,
+    ) -> ConductorResult<Vec<CreateAppError>> {
         let cells = {
             let lock = self.conductor.read().await;
             lock.create_cells_for_running_apps(self.clone())
@@ -949,7 +968,8 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
 
         let (cells, triggers): (Vec<_>, Vec<_>) = maybes.into_iter().filter_map(|x| x).unzip();
 
-        // Add the cells to the conductor map.
+        // Add the created cells to the conductor map.
+        // NB: if any cells had errors, they will NOT be added.
         // This write lock can't be held while join is awaited as join calls the conductor.
         // Cells need to be in the map before join is called so it can route the call.
         self.conductor.write().await.add_cells(cells);
@@ -979,7 +999,7 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
         match delta {
             AppStatusRunningDelta::NoChange => (),
             AppStatusRunningDelta::Run => {
-                let cell_startup_errors = self.clone().setup_cells().await?;
+                let cell_startup_errors = self.clone().reconcile_cells_with_app_state().await?;
 
                 // TODO: This should probably be emitted over the admin interface
                 if !cell_startup_errors.is_empty() {

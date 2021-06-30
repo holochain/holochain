@@ -230,7 +230,11 @@ impl SweetConductor {
         self.setup_app_2_install_and_activate(installed_app_id, agent.clone(), dna_files)
             .await?;
 
-        self.handle().0.clone().setup_cells().await?;
+        self.handle()
+            .0
+            .clone()
+            .reconcile_cells_with_app_state()
+            .await?;
 
         let dna_files = dna_files.iter().map(|d| d.dna_hash().clone());
         self.setup_app_3_create_sweet_app(installed_app_id, agent, dna_files)
@@ -272,7 +276,11 @@ impl SweetConductor {
                 .await?;
         }
 
-        self.handle().0.clone().setup_cells().await?;
+        self.handle()
+            .0
+            .clone()
+            .reconcile_cells_with_app_state()
+            .await?;
 
         let mut apps = Vec::new();
         for agent in agents {
