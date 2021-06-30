@@ -252,7 +252,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     // No error, return success
                     .unwrap_or_else(|| {
                         Ok(AdminResponse::AppEnabled(
-                            InstalledAppInfo::from_installed_app(&app.into()),
+                            InstalledAppInfo::from_installed_app(&app),
                         ))
                     })
             }
