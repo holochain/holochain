@@ -26,6 +26,15 @@ pub async fn run(
     addr: impl Into<SocketAddr> + 'static,
 ) -> Result<(BootstrapDriver, SocketAddr), String> {
     let store = Store::new();
+    {
+        let store = store.clone();
+        tokio::task::spawn(async move {
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                store.prune();
+            }
+        });
+    }
     let boot = now::now()
         .or(put::put(store.clone()))
         .or(random::random(store.clone()))
