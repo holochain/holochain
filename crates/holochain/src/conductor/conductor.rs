@@ -924,6 +924,7 @@ where
             Some(Disabled) => conductor_state.disabled_apps().map(|(id, _)| id).collect(),
             Some(Running) => conductor_state.running_apps().map(|(id, _)| id).collect(),
             Some(Stopped) => conductor_state.stopped_apps().map(|(id, _)| id).collect(),
+            Some(Paused) => conductor_state.paused_apps().map(|(id, _)| id).collect(),
             None => conductor_state.installed_apps().keys().collect(),
         };
 

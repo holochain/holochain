@@ -888,39 +888,25 @@ async fn test_app_status_filters() {
         .await
         .unwrap();
 
-    // Check the counts returned by each filter
+    let list_apps = |filter| async { conductor.list_apps(filter).await.unwrap() };
 
-    assert_eq!(conductor.list_apps(None).await.unwrap().len(), 3);
-    assert_eq!(
-        conductor
-            .list_apps(Some(InstalledAppStatusFilter::Running))
-            .await
-            .unwrap()
-            .len(),
-        1
-    );
-    assert_eq!(
-        conductor
-            .list_apps(Some(InstalledAppStatusFilter::Stopped))
-            .await
-            .unwrap()
-            .len(),
-        2
-    );
-    assert_eq!(
-        conductor
-            .list_apps(Some(InstalledAppStatusFilter::Enabled))
-            .await
-            .unwrap()
-            .len(),
-        2
-    );
-    assert_eq!(
-        conductor
-            .list_apps(Some(InstalledAppStatusFilter::Disabled))
-            .await
-            .unwrap()
-            .len(),
-        1
-    );
+    // Check the counts returned by each filter
+    use InstalledAppStatusFilter::*;
+
+    assert_eq!(list_apps(None).len(), 3);
+    assert_eq!(list_apps(Some(Running)).len(), 1);
+    assert_eq!(list_apps(Some(Stopped)).len(), 2);
+    assert_eq!(list_apps(Some(Enabled)).len(), 2);
+    assert_eq!(list_apps(Some(Disabled)).len(), 1);
+    assert_eq!(list_apps(Some(Paused)).len(), 1);
+
+    // check that paused apps move to Running state on conductor restart
+
+    conductor.shutdown().await;
+    conductor.startup().await;
+    assert_eq!(list_apps(Some(Running)).len(), 2);
+    assert_eq!(list_apps(Some(Stopped)).len(), 1);
+    assert_eq!(list_apps(Some(Enabled)).len(), 2);
+    assert_eq!(list_apps(Some(Disabled)).len(), 1);
+    assert_eq!(list_apps(Some(Paused)).len(), 0);
 }

@@ -464,4 +464,5 @@ pub enum InstalledAppStatusFilter {
     Disabled,
     Running,
     Stopped,
+    Paused,
 }
