@@ -1,9 +1,10 @@
 use crate::test_utils::conductor_setup::ConductorTestData;
+use crate::test_utils::consistency_envs;
 use crate::test_utils::new_zome_call;
-use crate::test_utils::wait_for_integration;
 use hdk::prelude::*;
 use holochain_p2p::{AgentPubKeyExt, DnaHashExt};
 use holochain_sqlite::prelude::*;
+use holochain_state::prelude::dump_tmp;
 use holochain_state::prelude::fresh_reader_test;
 use holochain_test_wasm_common::AnchorInput;
 use holochain_wasm_test_utils::TestWasm;
@@ -42,18 +43,13 @@ async fn gossip_test() {
     let bob_cell_id = &bob_call_data.cell_id;
 
     // Give gossip some time to finish
-    const NUM_ATTEMPTS: usize = 100;
+    const NUM_ATTEMPTS: usize = 200;
     const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
 
-    // 13 ops per anchor plus 7 for genesis + 2 for init + 2 for cap
-    let expected_count = NUM * 13 + 7 * 2 + 2 + 2;
-    wait_for_integration(
-        &bob_call_data.env,
-        expected_count,
-        NUM_ATTEMPTS,
-        DELAY_PER_ATTEMPT.clone(),
-    )
-    .await;
+    let all_cell_envs = vec![&bob_call_data.env, &conductor_test.alice_call_data().env];
+    consistency_envs(&all_cell_envs, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await;
+
+    dump_tmp(&bob_call_data.env);
 
     // Bob list anchors
     let invocation = new_zome_call(

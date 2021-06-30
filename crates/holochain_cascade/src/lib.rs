@@ -267,16 +267,6 @@ where
         Ok(network.get_agent_activity(agent, query, options).await?)
     }
 
-    /// Check if we have a valid reason to return an element from the cascade
-    /// See valid_header for details
-    pub fn valid_element(
-        &self,
-        _header_hash: &HeaderHash,
-        _entry_hash: Option<&EntryHash>,
-    ) -> CascadeResult<bool> {
-        todo!("I'm guessing we can remove this function")
-    }
-
     fn cascading<Q>(&mut self, query: Q) -> CascadeResult<Q::Output>
     where
         Q: Query<Item = Judged<SignedHeaderHashed>>,
@@ -417,7 +407,8 @@ where
         }
 
         // If we are not in the process of authoring this hash and we are not the
-        // authority we can skip the network call.
+        // authority, we should attempt a network fetch, otherwise we can skip it.
+        // TODO: do we want to put this behind an option, to allow cache-only queries?
         if !authoring && !authority {
             self.fetch_element(entry_hash.into(), options.into())
                 .await?;
@@ -457,7 +448,8 @@ where
         }
 
         // If we are not in the process of authoring this hash and we are not the
-        // authority we can skip the network call.
+        // authority, we should attempt a network fetch, otherwise we can skip it.
+        // TODO: do we want to put this behind an option, to allow cache-only queries?
         if !authoring && !authority {
             self.fetch_element(header_hash.into(), options.into())
                 .await?;
@@ -501,7 +493,8 @@ where
         }
 
         // If we are not in the process of authoring this hash and we are not the
-        // authority we can skip the network call.
+        // authority, we should attempt a network fetch, otherwise we can skip it.
+        // TODO: do we want to put this behind an option, to allow cache-only queries?
         if !authoring && !authority {
             self.fetch_element(header_hash.into(), options.into())
                 .await?;
@@ -539,7 +532,8 @@ where
         }
 
         // If we are not in the process of authoring this hash and we are not the
-        // authority we can skip the network call.
+        // authority, we should attempt a network fetch, otherwise we can skip it.
+        // TODO: do we want to put this behind an option, to allow cache-only queries?
         if !authoring && !authority {
             self.fetch_element(entry_hash.into(), options.into())
                 .await?;
