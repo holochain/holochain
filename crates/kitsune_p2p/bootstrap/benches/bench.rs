@@ -15,7 +15,6 @@ use kitsune_p2p_types::bootstrap::RandomLimit;
 use kitsune_p2p_types::bootstrap::RandomQuery;
 use tokio::runtime::Builder;
 use tokio::runtime::Runtime;
-use tokio::sync::oneshot;
 
 criterion_group!(benches, bootstrap);
 
@@ -32,12 +31,15 @@ fn bootstrap(bench: &mut Criterion) {
     let client = reqwest::Client::new();
 
     let mut url = url2!("http://127.0.0.1:0");
-    let (tx, rx) = oneshot::channel();
+    let (driver, addr) = runtime.block_on(async {
+        kitsune_p2p_bootstrap::run(([127, 0, 0, 1], 0))
+            .await
+            .unwrap()
+    });
     runtime.spawn(async move {
-        kitsune_bootstrap::run(([127, 0, 0, 1], 0), tx).await;
+        driver.await;
         println!("BOOTSTRAP CLOSED");
     });
-    let addr = runtime.block_on(async { rx.await.unwrap() });
     url.set_port(Some(addr.port())).unwrap();
     group.bench_function(BenchmarkId::new("test", format!("now")), |b| {
         b.iter(|| {
