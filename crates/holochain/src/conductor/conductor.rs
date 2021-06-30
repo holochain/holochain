@@ -22,7 +22,6 @@ use super::interface::websocket::spawn_websocket_listener;
 use super::interface::websocket::SIGNAL_BUFFER_SIZE;
 use super::interface::SignalBroadcaster;
 use super::manager::keep_alive_task;
-use super::manager::spawn_task_manager;
 use super::manager::ManagedTaskAdd;
 use super::manager::ManagedTaskHandle;
 use super::manager::TaskManagerRunHandle;
@@ -139,7 +138,7 @@ where
 
     /// The channels and handles needed to interact with the task_manager task.
     /// If this is None, then the task manager has not yet been initialized.
-    task_manager: Option<TaskManagerClient>,
+    pub(super) task_manager: Option<TaskManagerClient>,
 
     /// Placeholder for what will be the real DNA/Wasm cache
     dna_store: DS,
@@ -1105,23 +1104,6 @@ where
             root_env_dir,
             holochain_p2p,
         })
-    }
-
-    pub(super) async fn start_task_manager(
-        &mut self,
-        handle: ConductorHandle,
-    ) -> ConductorResult<()> {
-        if self.task_manager.is_some() {
-            panic!("Cannot start task manager twice");
-        }
-        let (task_add_sender, run_handle) = spawn_task_manager(handle);
-        let (task_stop_broadcaster, _) = tokio::sync::broadcast::channel::<()>(1);
-        self.task_manager = Some(TaskManagerClient::new(
-            task_add_sender,
-            task_stop_broadcaster,
-            run_handle,
-        ));
-        Ok(())
     }
 
     pub(super) async fn get_state(&self) -> ConductorResult<ConductorState> {

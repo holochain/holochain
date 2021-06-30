@@ -45,6 +45,8 @@ use super::config::AdminInterfaceConfig;
 use super::error::ConductorResult;
 use super::error::CreateAppError;
 use super::interface::SignalBroadcaster;
+use super::manager::spawn_task_manager;
+use super::manager::TaskManagerClient;
 use super::manager::TaskManagerRunHandle;
 use super::p2p_agent_store::get_agent_info_signed;
 use super::p2p_agent_store::put_agent_info_signed;
@@ -116,9 +118,6 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Install a [Dna] in this Conductor
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()>;
-
-    /// Install just the "code parts" (the wasm and entry defs) of a dna
-    async fn register_genotype(&self, dna: DnaFile) -> ConductorResult<()>;
 
     /// Get the list of hashes of installed Dnas in this Conductor
     async fn list_dnas(&self) -> ConductorResult<Vec<DnaHash>>;
@@ -220,12 +219,6 @@ pub trait ConductorHandleT: Send + Sync {
         app_id: &InstalledAppId,
         reason: PausedAppReason,
     ) -> ConductorResult<InstalledApp>;
-
-    /// Deal with the side effects of an app status state transition
-    async fn process_app_status_delta(
-        self: Arc<Self>,
-        delta: AppStatusRunningDelta,
-    ) -> ConductorResult<()>;
 
     /// List Cell Ids
     async fn list_cell_ids(&self) -> ConductorResult<Vec<CellId>>;
@@ -334,13 +327,27 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         admin_configs: Vec<AdminInterfaceConfig>,
     ) -> ConductorResult<()> {
         let mut conductor = self.conductor.write().await;
-        conductor.start_task_manager(self.clone()).await?;
+
+        // Start the task manager
+        if conductor.task_manager.is_some() {
+            panic!("Cannot start task manager twice");
+        }
+        let (task_add_sender, run_handle) = spawn_task_manager(self.clone());
+        let (task_stop_broadcaster, _) = tokio::sync::broadcast::channel::<()>(1);
+        conductor.task_manager = Some(TaskManagerClient::new(
+            task_add_sender,
+            task_stop_broadcaster,
+            run_handle,
+        ));
+
         conductor
             .add_admin_interfaces_via_handle(admin_configs, self.clone())
             .await?;
+
         conductor
             .startup_app_interfaces_via_handle(self.clone())
             .await?;
+
         conductor.start_paused_apps().await?;
         Ok(())
     }
@@ -358,16 +365,6 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()> {
         self.register_genotype(dna.clone()).await?;
         self.conductor.write().await.register_phenotype(dna).await
-    }
-
-    async fn register_genotype(&self, dna: DnaFile) -> ConductorResult<()> {
-        let entry_defs = self.conductor.read().await.register_dna_wasm(dna).await?;
-        self.conductor
-            .write()
-            .await
-            .register_dna_entry_defs(entry_defs)
-            .await?;
-        Ok(())
     }
 
     async fn load_dnas(&self) -> ConductorResult<()> {
@@ -734,34 +731,6 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(app)
     }
 
-    async fn process_app_status_delta(
-        self: Arc<Self>,
-        delta: AppStatusRunningDelta,
-    ) -> ConductorResult<()> {
-        match delta {
-            AppStatusRunningDelta::NoChange => (),
-            AppStatusRunningDelta::Run => {
-                let cell_startup_errors = self.clone().setup_cells().await?;
-
-                // TODO: This should probably be emitted over the admin interface
-                if !cell_startup_errors.is_empty() {
-                    error!(
-                        msg = "Failed to create the following active apps",
-                        ?cell_startup_errors
-                    );
-                }
-            }
-            AppStatusRunningDelta::Stop => {
-                self.conductor
-                    .write()
-                    .await
-                    .remove_cells_for_stopped_apps()
-                    .await?
-            }
-        }
-        Ok(())
-    }
-
     async fn uninstall_app(&self, installed_app_id: &InstalledAppId) -> ConductorResult<()> {
         let mut conductor = self.conductor.write().await;
         let app = conductor.remove_app_from_db(installed_app_id).await?;
@@ -918,5 +887,45 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
         for trigger in triggers {
             trigger.initialize_workflows();
         }
+    }
+
+    /// Install just the "code parts" (the wasm and entry defs) of a dna
+    async fn register_genotype(&self, dna: DnaFile) -> ConductorResult<()> {
+        let entry_defs = self.conductor.read().await.register_dna_wasm(dna).await?;
+        self.conductor
+            .write()
+            .await
+            .register_dna_entry_defs(entry_defs)
+            .await?;
+        Ok(())
+    }
+
+    /// Deal with the side effects of an app status state transition
+    async fn process_app_status_delta(
+        self: Arc<Self>,
+        delta: AppStatusRunningDelta,
+    ) -> ConductorResult<()> {
+        match delta {
+            AppStatusRunningDelta::NoChange => (),
+            AppStatusRunningDelta::Run => {
+                let cell_startup_errors = self.clone().setup_cells().await?;
+
+                // TODO: This should probably be emitted over the admin interface
+                if !cell_startup_errors.is_empty() {
+                    error!(
+                        msg = "Failed to create the following active apps",
+                        ?cell_startup_errors
+                    );
+                }
+            }
+            AppStatusRunningDelta::Stop => {
+                self.conductor
+                    .write()
+                    .await
+                    .remove_cells_for_stopped_apps()
+                    .await?
+            }
+        }
+        Ok(())
     }
 }
