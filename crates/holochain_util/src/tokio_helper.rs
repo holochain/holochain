@@ -33,7 +33,7 @@ pub fn block_on<F>(
 where
     F: futures::future::Future,
 {
-    block_on_given(tokio::time::timeout(timeout, f), &TOKIO)
+    block_on_given(async { tokio::time::timeout(timeout, f).await }, &TOKIO)
 }
 
 /// Run a blocking thread on `TOKIO`.
@@ -49,7 +49,7 @@ mod test {
     use super::*;
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn block_on_works() {
+    async fn block_forever_on_works() {
         block_forever_on(async { println!("stdio can block") });
         assert_eq!(1, super::block_forever_on(async { 1 }));
 
@@ -73,5 +73,14 @@ mod test {
         let r = "works";
         let test = block_forever_on(tokio::task::spawn(async move { r.to_string() })).unwrap();
         assert_eq!("works", &test);
+    }
+
+    // test calling without an existing reactor
+    #[test]
+    fn block_on_works() {
+        assert_eq!(
+            Ok(1),
+            block_on(async { 1 }, std::time::Duration::from_millis(0))
+        );
     }
 }
