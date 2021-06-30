@@ -12,7 +12,7 @@ use anyhow::bail;
 use anyhow::ensure;
 use holochain_conductor_api::AdminRequest;
 use holochain_conductor_api::AdminResponse;
-use holochain_conductor_api::InstalledAppStatusFilter;
+use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::{AdminInterfaceConfig, InstalledAppInfo};
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
@@ -211,7 +211,7 @@ pub struct ListAgents {
 pub struct ListApps {
     #[structopt(short, long, parse(try_from_str = parse_status_filter))]
     /// Optionally request agent info for a particular cell id.
-    pub status: Option<InstalledAppStatusFilter>,
+    pub status: Option<AppStatusFilter>,
 }
 
 #[doc(hidden)]
@@ -644,10 +644,10 @@ fn parse_dna_hash(arg: &str) -> anyhow::Result<DnaHash> {
     DnaHash::try_from(arg).map_err(|e| anyhow::anyhow!("{:?}", e))
 }
 
-fn parse_status_filter(arg: &str) -> anyhow::Result<InstalledAppStatusFilter> {
+fn parse_status_filter(arg: &str) -> anyhow::Result<AppStatusFilter> {
     match arg {
-        "active" => Ok(InstalledAppStatusFilter::Enabled),
-        "inactive" => Ok(InstalledAppStatusFilter::Disabled),
+        "active" => Ok(AppStatusFilter::Enabled),
+        "inactive" => Ok(AppStatusFilter::Disabled),
         _ => Err(anyhow::anyhow!(
             "Bad app status filter value: {}, only 'active' and 'inactive' are possible",
             arg

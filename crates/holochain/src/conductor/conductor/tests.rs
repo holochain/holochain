@@ -591,11 +591,11 @@ async fn test_reactivate_app() {
     assert_eq!(all_apps.len(), 1);
 
     let inactive_apps = conductor
-        .list_apps(Some(InstalledAppStatusFilter::Disabled))
+        .list_apps(Some(AppStatusFilter::Disabled))
         .await
         .unwrap();
     let active_apps = conductor
-        .list_apps(Some(InstalledAppStatusFilter::Enabled))
+        .list_apps(Some(AppStatusFilter::Enabled))
         .await
         .unwrap();
     assert_eq!(inactive_apps.len(), 0);
@@ -609,11 +609,11 @@ async fn test_reactivate_app() {
         .unwrap();
 
     let inactive_apps = conductor
-        .list_apps(Some(InstalledAppStatusFilter::Disabled))
+        .list_apps(Some(AppStatusFilter::Disabled))
         .await
         .unwrap();
     let active_apps = conductor
-        .list_apps(Some(InstalledAppStatusFilter::Enabled))
+        .list_apps(Some(AppStatusFilter::Enabled))
         .await
         .unwrap();
     assert_eq!(active_apps.len(), 0);
@@ -641,11 +641,11 @@ async fn test_reactivate_app() {
 
     assert_eq_retry_10s!(conductor.list_running_apps().await.unwrap().len(), 1);
     let inactive_apps = conductor
-        .list_apps(Some(InstalledAppStatusFilter::Disabled))
+        .list_apps(Some(AppStatusFilter::Disabled))
         .await
         .unwrap();
     let active_apps = conductor
-        .list_apps(Some(InstalledAppStatusFilter::Enabled))
+        .list_apps(Some(AppStatusFilter::Enabled))
         .await
         .unwrap();
     assert_eq!(active_apps.len(), 1);
@@ -898,7 +898,7 @@ async fn test_app_status_filters() {
     }
 
     // Check the counts returned by each filter
-    use InstalledAppStatusFilter::*;
+    use AppStatusFilter::*;
 
     assert_eq!(list_apps!(None).len(), 3);
     assert_eq!(list_apps!(Some(Running)).len(), 1);
