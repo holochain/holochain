@@ -675,11 +675,10 @@ impl From<StoppedAppReason> for AppStatus {
 }
 
 /// The reason for an app being in a Paused state.
+/// NB: there is no way to manually pause an app.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename_all = "snake_case")]
 pub enum PausedAppReason {
-    /// The pause was user-initiated
-    User,
     /// The pause was due to a RECOVERABLE error
     Error(String),
 }
@@ -690,7 +689,7 @@ pub enum PausedAppReason {
 pub enum DisabledAppReason {
     /// The app is freshly installed, and never started
     NeverStarted,
-    /// The disabling was user-initiated
+    /// The disabling was done manually by the user (via admin interface)
     User,
     /// The disabling was due to an UNRECOVERABLE error
     Error(String),

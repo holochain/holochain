@@ -190,10 +190,10 @@ fn status_serialization() {
         "{\"paused\":{\"reason\":{\"error\":\"because\"}}}"
     );
 
-    let status: InstalledAppInfoStatus = AppStatus::Paused(PausedAppReason::User).into();
+    let status: InstalledAppInfoStatus = AppStatus::Disabled(DisabledAppReason::User).into();
 
     assert_eq!(
         serde_json::to_string(&status).unwrap(),
-        "{\"paused\":{\"reason\":\"user\"}}"
+        "{\"disabled\":{\"reason\":\"user\"}}"
     );
 }

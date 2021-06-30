@@ -121,6 +121,7 @@ pub enum AdminRequest {
     /// [`AdminResponse::CellIdsListed`]: enum.AdminResponse.html#variant.CellIdsListed
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
     ListCellIds,
+
     /// List the ids of all the active (activated) Apps in the conductor.
     /// Takes no arguments.
     ///
@@ -130,9 +131,11 @@ pub enum AdminRequest {
     /// [`AdminResponse::ActiveAppsListed`]: enum.AdminResponse.html#variant.ActiveAppsListed
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
     ListEnabledApps,
+
     /// DEPRECATED. Alias for ListEnabledApps.
     #[deprecated = "alias for ListEnabledApps"]
     ListActiveApps,
+
     /// List the ids of the Apps that are installed in the conductor, returning their information.
     /// If `status_filter` is `Some(_)`, it will return only the `Apps` with the specified status
     ///
@@ -144,6 +147,7 @@ pub enum AdminRequest {
     ListApps {
         status_filter: Option<InstalledAppStatusFilter>,
     },
+
     /// Changes the `App` specified by argument `installed_app_id` from a disabled state to an enabled state in the conductor,
     /// meaning that Zome calls can now be made and the `App` will be loaded on a reboot of the conductor.
     /// It is likely to want to call this after calling [`AdminRequest::InstallApp`], since a freshly
@@ -159,12 +163,14 @@ pub enum AdminRequest {
         /// The InstalledAppId to enable
         installed_app_id: InstalledAppId,
     },
+
     /// DEPRECATED. Alias for EnableApp.
     #[deprecated = "alias for EnableApp"]
     ActivateApp {
         /// The InstalledAppId to enable
         installed_app_id: InstalledAppId,
     },
+
     /// Changes the `App` specified by argument `installed_app_id` from an enabled state to a disabled state in the conductor,
     /// meaning that Zome calls can no longer be made, and the `App` will not be loaded on a
     /// reboot of the conductor.
@@ -178,20 +184,19 @@ pub enum AdminRequest {
         /// The InstalledAppId to disable
         installed_app_id: InstalledAppId,
     },
+
     /// DEPRECATED. Alias for DisableApp.
     #[deprecated = "alias for DisableApp"]
     DeactivateApp {
         /// The InstalledAppId to disable
         installed_app_id: InstalledAppId,
     },
+
     StartApp {
         /// The InstalledAppId to (re)start
         installed_app_id: InstalledAppId,
     },
-    PauseApp {
-        /// The InstalledAppId to pause
-        installed_app_id: InstalledAppId,
-    },
+
     /// Open up a new websocket interface at the networking port
     /// (optionally) specified by argument `port` (or using any free port if argument `port` is `None`)
     /// over which you can then use the [`AppRequest`] API.
@@ -209,8 +214,10 @@ pub enum AdminRequest {
         /// OS choose a free port
         port: Option<u16>,
     },
+
     /// List all the app interfaces currently attached with [`AttachAppInterface`].
     ListAppInterfaces,
+
     /// Dump the full state of the `Cell` specified by argument `cell_id`,
     /// including its chain, as a string containing JSON.
     ///
@@ -223,6 +230,7 @@ pub enum AdminRequest {
         /// The `CellId` for which to dump state
         cell_id: Box<CellId>,
     },
+
     /// Add a list [AgentInfoSigned] to this conductor's peer store.
     /// This is another way of finding peers on a dht.
     ///
@@ -235,6 +243,7 @@ pub enum AdminRequest {
         /// Vec of signed agent info to add to peer store
         agent_infos: Vec<AgentInfoSigned>,
     },
+
     /// Request the [AgentInfoSigned] stored in this conductor's
     /// peer store.
     ///
@@ -390,14 +399,6 @@ pub enum AdminResponse {
     ///
     /// [`AdminRequest::StartApp`]: enum.AdminRequest.html#variant.StartApp
     AppStarted(bool),
-
-    /// The succesful response to an [`AdminRequest::PauseApp`].
-    ///
-    /// The boolean determines whether or not the was actually paused.
-    /// If false, it was because the app was in a disabled state.
-    ///
-    /// [`AdminRequest::PauseApp`]: enum.AdminRequest.html#variant.PauseApp
-    AppPaused(bool),
 
     #[deprecated = "alias for AppDisabled"]
     AppDeactivated,

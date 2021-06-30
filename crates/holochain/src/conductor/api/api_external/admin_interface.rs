@@ -272,14 +272,6 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::AppStarted(app.status().is_running()))
             }
-            PauseApp { installed_app_id } => {
-                let app = self
-                    .conductor_handle
-                    .clone()
-                    .pause_app(&installed_app_id, PausedAppReason::User)
-                    .await?;
-                Ok(AdminResponse::AppPaused(app.status().is_paused()))
-            }
             AttachAppInterface { port } => {
                 let port = port.unwrap_or(0);
                 let port = self
@@ -307,12 +299,17 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             }
 
             // deprecated aliases
-            ListActiveApps => self.handle_admin_request_inner(ListEnabledApps).await,
+            ListActiveApps => {
+                tracing::warn!("Admin method ListActiveApps is deprecated: use ListApps instead.");
+                self.handle_admin_request_inner(ListEnabledApps).await
+            }
             ActivateApp { installed_app_id } => {
+                tracing::warn!("Admin method ActivateApp is deprecated: use EnableApp instead (functionality is identical).");
                 self.handle_admin_request_inner(EnableApp { installed_app_id })
                     .await
             }
             DeactivateApp { installed_app_id } => {
+                tracing::warn!("Admin method DeactivateApp is deprecated: use DisableApp instead (functionality is identical).");
                 self.handle_admin_request_inner(DisableApp { installed_app_id })
                     .await
             }

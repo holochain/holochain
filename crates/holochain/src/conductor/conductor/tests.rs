@@ -814,7 +814,7 @@ async fn test_app_status_states() {
     // RUNNING -pause-> PAUSED
 
     conductor
-        .pause_app(&"app".to_string(), PausedAppReason::User)
+        .pause_app(&"app".to_string(), PausedAppReason::Error("because".into()))
         .await
         .unwrap();
     assert_matches!(get_status().await, InstalledAppInfoStatus::Paused { .. });
@@ -840,7 +840,7 @@ async fn test_app_status_states() {
     // DISABLED  --pause->  DISABLED
 
     conductor
-        .pause_app(&"app".to_string(), PausedAppReason::User)
+        .pause_app(&"app".to_string(), PausedAppReason::Error("because".into()))
         .await
         .unwrap();
     assert_matches!(get_status().await, InstalledAppInfoStatus::Disabled { .. });
@@ -853,7 +853,7 @@ async fn test_app_status_states() {
     // RUNNING  --pause->  PAUSED
 
     conductor
-        .pause_app(&"app".to_string(), PausedAppReason::User)
+        .pause_app(&"app".to_string(), PausedAppReason::Error("because".into()))
         .await
         .unwrap();
     assert_matches!(get_status().await, InstalledAppInfoStatus::Paused { .. });
@@ -879,7 +879,10 @@ async fn test_app_status_filters() {
     // put apps in the proper states for testing
 
     conductor
-        .pause_app(&"paused".to_string(), PausedAppReason::User)
+        .pause_app(
+            &"paused".to_string(),
+            PausedAppReason::Error("because".into()),
+        )
         .await
         .unwrap();
 
@@ -888,25 +891,29 @@ async fn test_app_status_filters() {
         .await
         .unwrap();
 
-    let list_apps = |filter| async { conductor.list_apps(filter).await.unwrap() };
+    macro_rules! list_apps {
+        ($filter: expr) => {
+            conductor.list_apps($filter).await.unwrap()
+        };
+    }
 
     // Check the counts returned by each filter
     use InstalledAppStatusFilter::*;
 
-    assert_eq!(list_apps(None).len(), 3);
-    assert_eq!(list_apps(Some(Running)).len(), 1);
-    assert_eq!(list_apps(Some(Stopped)).len(), 2);
-    assert_eq!(list_apps(Some(Enabled)).len(), 2);
-    assert_eq!(list_apps(Some(Disabled)).len(), 1);
-    assert_eq!(list_apps(Some(Paused)).len(), 1);
+    assert_eq!(list_apps!(None).len(), 3);
+    assert_eq!(list_apps!(Some(Running)).len(), 1);
+    assert_eq!(list_apps!(Some(Stopped)).len(), 2);
+    assert_eq!(list_apps!(Some(Enabled)).len(), 2);
+    assert_eq!(list_apps!(Some(Disabled)).len(), 1);
+    assert_eq!(list_apps!(Some(Paused)).len(), 1);
 
     // check that paused apps move to Running state on conductor restart
 
     conductor.shutdown().await;
     conductor.startup().await;
-    assert_eq!(list_apps(Some(Running)).len(), 2);
-    assert_eq!(list_apps(Some(Stopped)).len(), 1);
-    assert_eq!(list_apps(Some(Enabled)).len(), 2);
-    assert_eq!(list_apps(Some(Disabled)).len(), 1);
-    assert_eq!(list_apps(Some(Paused)).len(), 0);
+    assert_eq!(list_apps!(Some(Running)).len(), 2);
+    assert_eq!(list_apps!(Some(Stopped)).len(), 1);
+    assert_eq!(list_apps!(Some(Enabled)).len(), 2);
+    assert_eq!(list_apps!(Some(Disabled)).len(), 1);
+    assert_eq!(list_apps!(Some(Paused)).len(), 0);
 }
