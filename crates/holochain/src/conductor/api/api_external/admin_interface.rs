@@ -1,10 +1,7 @@
 use super::InterfaceApi;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::error::ConductorApiResult;
-
 use crate::conductor::api::error::SerializationError;
-
-use crate::conductor::error::CreateAppError;
 use crate::conductor::interface::error::InterfaceError;
 use crate::conductor::interface::error::InterfaceResult;
 use crate::conductor::ConductorHandle;
@@ -242,23 +239,24 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
 
                 // Check if this app was created successfully
-                errors
-                    .into_iter()
-                    // We only care about this app for the activate command
-                    .find(|cell_error| match cell_error {
-                        CreateAppError::Failed {
-                            installed_app_id: error_app_id,
-                            ..
-                        } => error_app_id == &installed_app_id,
-                    })
-                    // There was an error in this app so return it
-                    .map(|this_app_error| Ok(AdminResponse::Error(this_app_error.into())))
-                    // No error, return success
-                    .unwrap_or_else(|| {
-                        Ok(AdminResponse::AppEnabled(
-                            InstalledAppInfo::from_installed_app(&app),
-                        ))
-                    })
+                todo!("find out if there was a problem installing this app")
+                // errors
+                //     .into_iter()
+                //     // We only care about this app for the activate command
+                //     .find(|cell_error| match cell_error {
+                //         CreateAppError::Failed {
+                //             installed_app_id: error_app_id,
+                //             ..
+                //         } => error_app_id == &installed_app_id,
+                //     })
+                //     // There was an error in this app so return it
+                //     .map(|this_app_error| Ok(AdminResponse::Error(this_app_error.into())))
+                //     // No error, return success
+                //     .unwrap_or_else(|| {
+                //         Ok(AdminResponse::AppEnabled(
+                //             InstalledAppInfo::from_installed_app(&app),
+                //         ))
+                //     })
             }
             DisableApp { installed_app_id } => {
                 // Disable app

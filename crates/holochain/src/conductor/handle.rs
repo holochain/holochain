@@ -43,7 +43,6 @@ use super::api::error::ConductorApiResult;
 use super::api::ZomeCall;
 use super::config::AdminInterfaceConfig;
 use super::error::ConductorResult;
-use super::error::CreateAppError;
 use super::integration_dump;
 use super::interface::SignalBroadcaster;
 use super::manager::spawn_task_manager;
@@ -57,6 +56,7 @@ use super::p2p_agent_store::put_agent_info_signed;
 use super::p2p_agent_store::query_agent_info_signed;
 use super::p2p_agent_store::query_agent_info_signed_near_basis;
 use super::Cell;
+use super::CellError;
 use super::Conductor;
 use crate::conductor::p2p_agent_store::get_single_agent_info;
 use crate::conductor::p2p_metrics::put_metric_datum;
@@ -221,7 +221,7 @@ pub trait ConductorHandleT: Send + Sync {
     /// - If a Cell is used by no running apps, then ensure it is removed.
     async fn reconcile_cells_with_app_state(
         self: Arc<Self>,
-    ) -> ConductorResult<Vec<CreateAppError>>;
+    ) -> ConductorResult<Vec<(CellId, CellError)>>;
 
     /// Activate an app
     async fn enable_app(self: Arc<Self>, app_id: &InstalledAppId) -> ConductorResult<InstalledApp>;
@@ -692,7 +692,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn reconcile_cells_with_app_state(
         self: Arc<Self>,
-    ) -> ConductorResult<Vec<CreateAppError>> {
+    ) -> ConductorResult<Vec<(CellId, CellError)>> {
         let cells = {
             let lock = self.conductor.read().await;
             lock.create_cells_for_running_apps(self.clone())
@@ -702,7 +702,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let add_cells_tasks = cells.map(|result| async {
             match result {
                 Ok(cells) => {
-                    self.initialize_cells(cells).await;
+                    todo!();
+                    // self.initialize_and_add_cells(cells).await;
                     None
                 }
                 Err(e) => Some(e),
@@ -941,43 +942,6 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
     async fn cell_by_id(&self, cell_id: &CellId) -> ConductorApiResult<Arc<Cell>> {
         let lock = self.conductor.read().await;
         Ok(lock.cell_by_id(cell_id)?)
-    }
-
-    /// Add cells to the map then join the network then initialize workflows.
-    async fn initialize_cells(&self, cells: Vec<(Cell, InitialQueueTriggers)>) {
-        // Join the network but ignore errors because the
-        // space retries joining all cells every 5 minutes.
-        let maybes: Vec<_> =
-            futures::stream::iter(cells.into_iter().map(|(cell, triggers)| async move {
-                let network = cell.holochain_p2p_cell();
-                match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join()).await {
-                    Ok(Err(e)) => {
-                        tracing::info!(error = ?e, cell_id = ?cell.id(), "Error while trying to join the network");
-                        None
-                    }
-                    Err(_) => {
-                        tracing::info!(cell_id = ?cell.id(), "Timed out trying to join the network");
-                        None
-                    }
-                    Ok(Ok(_)) => Some((cell, triggers)),
-                }
-            }))
-            .buffer_unordered(100)
-            .collect()
-            .await;
-
-        let (cells, triggers): (Vec<_>, Vec<_>) = maybes.into_iter().filter_map(|x| x).unzip();
-
-        // Add the created cells to the conductor map.
-        // NB: if any cells had errors, they will NOT be added.
-        // This write lock can't be held while join is awaited as join calls the conductor.
-        // Cells need to be in the map before join is called so it can route the call.
-        self.conductor.write().await.add_cells(cells);
-
-        // Now we can trigger the workflows.
-        for trigger in triggers {
-            trigger.initialize_workflows();
-        }
     }
 
     /// Install just the "code parts" (the wasm and entry defs) of a dna

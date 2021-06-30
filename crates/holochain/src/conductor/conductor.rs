@@ -14,7 +14,6 @@ use super::config::InterfaceDriver;
 use super::dna_store::RealDnaStore;
 use super::entry_def_store::get_entry_defs;
 use super::error::ConductorError;
-use super::error::CreateAppError;
 use super::handle::ConductorHandleImpl;
 use super::interface::error::InterfaceResult;
 use super::interface::websocket::spawn_admin_interface_task;
@@ -53,14 +52,17 @@ use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_keystore::KeystoreSender;
 use holochain_keystore::KeystoreSenderExt;
+use holochain_p2p::*;
 use holochain_sqlite::db::DbKind;
 use holochain_sqlite::prelude::*;
 use holochain_state::mutations;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateMutationResult;
 use holochain_types::prelude::*;
+use kitsune_p2p_types::config::JOIN_NETWORK_TIMEOUT;
 use rusqlite::OptionalExtension;
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::*;
@@ -501,14 +503,69 @@ where
         Ok(())
     }
 
-    /// Create Cells to be added to the Conductor for each CellId marked running in the ConductorState db.
-    /// This only creates Cells that haven't already been created, so this is idempotent.
+    pub(super) async fn create_and_add_initialized_cells_for_running_apps(
+        &mut self,
+        conductor_handle: ConductorHandle,
+    ) -> ConductorResult<Vec<(CellId, CellError)>> {
+        let results = self.create_cells_for_running_apps(conductor_handle).await?;
+        let (successes, errors): (Vec<_>, Vec<_>) = results.into_iter().partition(Result::is_ok);
+        self.initialize_and_add_cells(successes.into_iter().map(Result::unwrap).collect())
+            .await;
+        Ok(errors
+            .into_iter()
+            .map(|r| r.map(|_| ())) // throw away the non-Debug types which will be unwrapped away anyway
+            .map(Result::unwrap_err)
+            .collect())
+    }
+
+    async fn initialize_and_add_cells(&mut self, cells: Vec<(Cell, InitialQueueTriggers)>) {
+        // Join the network but ignore errors because the
+        // space retries joining all cells every 5 minutes.
+        let maybes: Vec<_> =
+            futures::stream::iter(cells.into_iter().map(|(cell, triggers)| async move {
+                let network = cell.holochain_p2p_cell();
+                match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join()).await {
+                    Ok(Err(e)) => {
+                        tracing::info!(error = ?e, cell_id = ?cell.id(), "Error while trying to join the network");
+                        None
+                    }
+                    Err(_) => {
+                        tracing::info!(cell_id = ?cell.id(), "Timed out trying to join the network");
+                        None
+                    }
+                    Ok(Ok(_)) => Some((cell, triggers)),
+                }
+            }))
+            .buffer_unordered(100)
+            .collect()
+            .await;
+
+        let (cells, triggers): (Vec<_>, Vec<_>) = maybes.into_iter().filter_map(|x| x).unzip();
+
+        // Add the created cells to the conductor map.
+        // NB: if any cells had errors, they will NOT be added.
+        // This write lock can't be held while join is awaited as join calls the conductor.
+        // Cells need to be in the map before join is called so it can route the call.
+        self.add_cells(cells);
+
+        // Now we can trigger the workflows.
+        for trigger in triggers {
+            trigger.initialize_workflows();
+        }
+    }
+
+    /// Attempt to create all necessary Cells which have not already been created
+    /// and added to the conductor, namely the cells which are referenced by
+    /// Running apps. If there are no cells to create, this function does nothing.
+    ///
+    /// Returns a Result for each attempt so that successful creations can be
+    /// handled alongside the failures.
     pub(super) async fn create_cells_for_running_apps(
         &self,
         conductor_handle: ConductorHandle,
-    ) -> ConductorResult<Vec<Result<Vec<(Cell, InitialQueueTriggers)>, CreateAppError>>> {
+    ) -> ConductorResult<Vec<Result<(Cell, InitialQueueTriggers), (CellId, CellError)>>> {
         // Data required to create apps
-        let root_env_dir = self.root_env_dir.clone();
+        let root_env_dir = PathBuf::from(self.root_env_dir.clone());
         let keystore = self.keystore.clone();
         let task_manager = self
             .task_manager
@@ -517,98 +574,50 @@ where
 
         // Closure for creating all cells in an app
         let state = self.get_state().await?;
-        let tasks =
-            state
-                .running_apps()
-                .map(move |(app_id, app): (&InstalledAppId, RunningApp)| {
-                    // Clone data for async block
-                    let root_env_dir = std::path::PathBuf::from(root_env_dir.clone());
-                    let conductor_handle = conductor_handle.clone();
-                    let keystore = keystore.clone();
 
-                    // Task that creates the cells
-                    async move {
-                        // Only create cells not already created
-                        let cells_to_create = app
-                            .all_cells()
-                            .filter(|cell_id| !self.cells.contains_key(cell_id))
-                            .map(|cell_id| {
-                                (
-                                    cell_id,
-                                    root_env_dir.clone(),
-                                    keystore.clone(),
-                                    conductor_handle.clone(),
-                                )
-                            });
+        let app_cells: HashSet<&CellId> = state
+            .installed_apps()
+            .iter()
+            .filter(|(_, app)| app.status().is_running())
+            .flat_map(|(_id, app)| app.all_cells().collect::<Vec<&CellId>>())
+            .collect();
+        let on_cells: HashSet<&CellId> = self.cells.iter().map(first).collect();
 
-                        use holochain_p2p::actor::HolochainP2pRefToCell;
+        let tasks = app_cells.difference(&on_cells).map(|&cell_id| {
+            let root_env_dir = root_env_dir.clone();
+            let keystore = keystore.clone();
+            let conductor_handle = conductor_handle.clone();
+            async move {
+                use holochain_p2p::actor::HolochainP2pRefToCell;
+                let holochain_p2p_cell = self
+                    .holochain_p2p
+                    .to_cell(cell_id.dna_hash().clone(), cell_id.agent_pubkey().clone());
 
-                        // Create each cell
-                        let cells_tasks = cells_to_create.map(
-                            |(cell_id, dir, keystore, conductor_handle)| async move {
-                                let holochain_p2p_cell = self.holochain_p2p.to_cell(
-                                    cell_id.dna_hash().clone(),
-                                    cell_id.agent_pubkey().clone(),
-                                );
+                let env = EnvWrite::open(
+                    &root_env_dir,
+                    DbKind::Cell(cell_id.clone()),
+                    keystore.clone(),
+                )
+                .map_err(|err| (cell_id.clone(), err.into()))?;
 
-                                let env = EnvWrite::open(
-                                    &dir,
-                                    DbKind::Cell(cell_id.clone()),
-                                    keystore.clone(),
-                                )?;
-                                let cache = self
-                                    .get_or_create_cache(cell_id.dna_hash())
-                                    .map_err(|e| CellError::FailedToCreateCache(e.into()))?;
-                                Cell::create(
-                                    cell_id.clone(),
-                                    conductor_handle.clone(),
-                                    env,
-                                    cache,
-                                    holochain_p2p_cell,
-                                    task_manager.task_add_sender().clone(),
-                                    task_manager.task_stop_broadcaster().clone(),
-                                )
-                                .await
-                            },
-                        );
+                let cache = self
+                    .get_or_create_cache(cell_id.dna_hash())
+                    .map_err(|e| CellError::FailedToCreateCache(e.into()))
+                    .map_err(|err| (cell_id.clone(), err))?;
 
-                        // Join all the cell create tasks for this app
-                        // and separate any errors
-                        let (success, errors): (Vec<_>, Vec<_>) =
-                            futures::future::join_all(cells_tasks)
-                                .await
-                                .into_iter()
-                                .partition(Result::is_ok);
-                        // unwrap safe because of the partition
-                        let success = success.into_iter().map(Result::unwrap);
-
-                        // If there were errors, cleanup and return the errors
-                        if !errors.is_empty() {
-                            for cell in success {
-                                // Error needs to capture which app failed
-                                cell.0.destroy().await.map_err(|e| CreateAppError::Failed {
-                                    installed_app_id: app_id.clone(),
-                                    errors: vec![e],
-                                })?;
-                            }
-                            // match needed to avoid Debug requirement on unwrap_err
-                            let errors = errors
-                                .into_iter()
-                                .map(|e| match e {
-                                    Err(e) => e,
-                                    Ok(_) => unreachable!("Safe because of the partition"),
-                                })
-                                .collect();
-                            Err(CreateAppError::Failed {
-                                installed_app_id: app_id.clone(),
-                                errors,
-                            })
-                        } else {
-                            // No errors so return the cells
-                            Ok(success.collect())
-                        }
-                    }
-                });
+                Cell::create(
+                    cell_id.clone(),
+                    conductor_handle.clone(),
+                    env,
+                    cache,
+                    holochain_p2p_cell,
+                    task_manager.task_add_sender().clone(),
+                    task_manager.task_stop_broadcaster().clone(),
+                )
+                .await
+                .map_err(|err| (cell_id.clone(), err))
+            }
+        });
 
         // Join on all apps and return a list of
         // apps that had succelly created cells
@@ -664,7 +673,7 @@ where
     }
 
     /// Add fully constructed cells to the cell map in the Conductor
-    pub(super) fn add_cells(&mut self, cells: Vec<Cell>) {
+    fn add_cells(&mut self, cells: Vec<Cell>) {
         for cell in cells {
             let cell_id = cell.id().clone();
             tracing::info!(?cell_id, "ADD CELL");
