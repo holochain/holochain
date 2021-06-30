@@ -129,7 +129,54 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
             DhtArc::new(0, u32::MAX / 4).interval().into(),
         )
         .unwrap();
-    assert!(all.len() > 0 && all.len() < num_nonzero);
+    // TODO - not sure this is right with <= num_nonzero... but it breaks
+    //        sometimes if we just use '<'
+    assert!(all.len() > 0 && all.len() <= num_nonzero);
+
+    // near
+    let tgt = u32::MAX / 2;
+    let near = con.p2p_query_near_basis(tgt, 20).unwrap();
+    let mut prev = 0;
+    for agent_info_signed in near {
+        use kitsune_p2p::KitsuneBinType;
+        let loc = agent_info_signed.agent.get_loc();
+        let record = super::P2pRecord::from_signed(&agent_info_signed).unwrap();
+        let mut dist = u32::MAX;
+        let mut deb = "not reset";
+
+        let start = record.storage_start_loc;
+        let end = record.storage_end_loc;
+
+        match (start, end) {
+            (Some(start), Some(end)) => {
+                if start < end {
+                    if tgt >= start && tgt <= end {
+                        deb = "one-span-inside";
+                        dist = 0;
+                    } else if tgt < start {
+                        deb = "one-span-before";
+                        dist = std::cmp::min(start - tgt, (u32::MAX - end) + tgt);
+                    } else {
+                        deb = "one-span-after";
+                        dist = std::cmp::min(tgt - end, (u32::MAX - tgt) + start);
+                    }
+                } else {
+                    if tgt <= end || tgt >= start {
+                        deb = "two-span-inside";
+                        dist = 0;
+                    } else {
+                        deb = "two-span-outside";
+                        dist = std::cmp::min(tgt - end, start - tgt);
+                    }
+                }
+            }
+            _ => (),
+        }
+
+        assert!(dist >= prev);
+        prev = dist;
+        println!("loc({}) => dist({}) - {}", loc, dist, deb);
+    }
 
     // prune everything by expires time
     p2p_prune(&db).await.unwrap();

@@ -1,7 +1,6 @@
 use std::net::IpAddr;
 
 use structopt::StructOpt;
-use tokio::sync::oneshot;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -21,18 +20,13 @@ struct Opt {
 async fn main() {
     let Opt { port, bind } = Opt::from_args();
 
-    let (tx, rx) = oneshot::channel();
-    let jh = tokio::task::spawn(kitsune_bootstrap::run(
-        (
-            bind.parse::<IpAddr>().expect("Failed to parse address"),
-            port,
-        ),
-        tx,
-    ));
+    let (jh, addr) = kitsune_p2p_bootstrap::run((
+        bind.parse::<IpAddr>().expect("Failed to parse address"),
+        port,
+    ))
+    .await
+    .unwrap();
 
-    let addr = rx.await;
-    if let Ok(addr) = addr {
-        println!("Connected to {:?}", addr);
-        jh.await.unwrap();
-    }
+    println!("Connected to {:?}", addr);
+    jh.await;
 }

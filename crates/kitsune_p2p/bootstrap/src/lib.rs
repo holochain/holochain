@@ -4,7 +4,6 @@ use std::sync::atomic::AtomicUsize;
 use kitsune_p2p_types::codec::rmp_decode;
 use kitsune_p2p_types::codec::rmp_encode;
 use store::Store;
-use tokio::sync::oneshot;
 use warp::{hyper::body::Bytes, Filter};
 
 use crate::sync::NodeSync;
@@ -25,7 +24,11 @@ mod sync;
 // TODO: Maybe even that's too high?
 const SIZE_LIMIT: u64 = 1024;
 
-pub async fn run(addr: impl Into<SocketAddr> + 'static, tx: oneshot::Sender<SocketAddr>) {
+pub type BootstrapDriver = futures::future::BoxFuture<'static, ()>;
+
+pub async fn run(
+    addr: impl Into<SocketAddr> + 'static,
+) -> Result<(BootstrapDriver, SocketAddr), String> {
     let store = Store::new();
     let waiter = NodeSync::new();
     let boot = now::now()
@@ -36,10 +39,10 @@ pub async fn run(addr: impl Into<SocketAddr> + 'static, tx: oneshot::Sender<Sock
         .or(sync::sync(waiter.clone()));
     match warp::serve(boot).try_bind_ephemeral(addr) {
         Ok((addr, server)) => {
-            tx.send(addr).ok();
-            server.await;
+            let driver = futures::future::FutureExt::boxed(server);
+            Ok((driver, addr))
         }
-        Err(e) => eprintln!("Failed to bind socket: {:?}", e),
+        Err(e) => Err(format!("Failed to bind socket: {:?}", e)),
     }
 }
 

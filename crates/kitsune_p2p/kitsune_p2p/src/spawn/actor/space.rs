@@ -4,8 +4,10 @@ use ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::tracing_futures::Instrument;
 use kitsune_p2p_mdns::*;
 use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
+use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
+use url2::Url2;
 
 /// if the user specifies None or zero (0) for race_timeout_ms
 /// (david.b) this is not currently used
@@ -18,6 +20,9 @@ ghost_actor::ghost_chan! {
 
         /// Update / publish our agent info
         fn update_agent_info() -> ();
+
+        /// Update / publish a single agent info
+        fn update_single_agent_info(agent: Arc<KitsuneAgent>) -> ();
 
         /// see if an agent is locally joined
         fn is_agent_local(agent: Arc<KitsuneAgent>) -> bool;
@@ -104,81 +109,47 @@ impl SpaceInternalHandler for Space {
         Ok(async move {
             let urls = vec![bound_url.into()];
             for agent in agent_list {
-                use kitsune_p2p_types::agent_info::AgentInfoSigned;
-                let signed_at_ms = crate::spawn::actor::bootstrap::now_once(None).await?;
-                let expires_at_ms = signed_at_ms + expires_after;
-
-                let agent_info_signed = AgentInfoSigned::sign(
-                    space.clone(),
-                    agent.clone(),
-                    u32::MAX,
-                    urls.clone(),
-                    signed_at_ms,
-                    expires_at_ms,
-                    |d| {
-                        let data = Arc::new(d.to_vec());
-                        async {
-                            let sign_req = SignNetworkDataEvt {
-                                space: space.clone(),
-                                agent: agent.clone(),
-                                data,
-                            };
-                            evt_sender
-                                .sign_network_data(sign_req)
-                                .await
-                                .map(Arc::new)
-                                .map_err(KitsuneError::other)
-                        }
-                    },
-                )
-                .await?;
-
-                tracing::debug!(?agent_info_signed);
-
-                evt_sender
-                    .put_agent_info_signed(PutAgentInfoSignedEvt {
-                        space: space.clone(),
-                        agent: agent.clone(),
-                        agent_info_signed: agent_info_signed.clone(),
-                    })
-                    .await?;
-
-                // Push to the network as well
-                match network_type {
-                    NetworkType::QuicMdns => {
-                        // Broadcast only valid AgentInfo
-                        if !urls.is_empty() {
-                            // Kill previous broadcast for this space + agent
-                            let key = [space.get_bytes(), agent.get_bytes()].concat();
-                            if let Some(current_handle) = mdns_handles.get(&key) {
-                                mdns_kill_thread(current_handle.to_owned());
-                            }
-                            // Broadcast by using Space as service type and Agent as service name
-                            let space_b64 =
-                                base64::encode_config(&space[..], base64::URL_SAFE_NO_PAD);
-                            let agent_b64 =
-                                base64::encode_config(&agent[..], base64::URL_SAFE_NO_PAD);
-                            //println!("(MDNS) - Broadcasting of Agent {:?} ({}) in space {:?} ({} ; {})",
-                            // agent, agent.get_bytes().len(), space, space.get_bytes().len(), space_b64.len());
-                            // Broadcast rmp encoded agent_info_signed
-                            let mut buffer = Vec::new();
-                            rmp_encode(&mut buffer, &agent_info_signed)?;
-                            tracing::trace!(?space_b64, ?agent_b64);
-                            let handle =
-                                mdns_create_broadcast_thread(space_b64, agent_b64, &buffer);
-                            // store handle in self
-                            mdns_handles.insert(key, handle);
-                        }
-                    }
-                    NetworkType::QuicBootstrap => {
-                        crate::spawn::actor::bootstrap::put(
-                            bootstrap_service.clone(),
-                            agent_info_signed,
-                        )
-                        .await?;
-                    }
-                }
+                let input = UpdateAgentInfoInput {
+                    expires_after,
+                    space: space.clone(),
+                    agent,
+                    urls: &urls,
+                    evt_sender: &evt_sender,
+                    network_type: network_type.clone(),
+                    mdns_handles: &mut mdns_handles,
+                    bootstrap_service: &bootstrap_service,
+                };
+                update_single_agent_info(input).await?;
             }
+            Ok(())
+        }
+        .boxed()
+        .into())
+    }
+    fn handle_update_single_agent_info(
+        &mut self,
+        agent: Arc<KitsuneAgent>,
+    ) -> SpaceInternalHandlerResult<()> {
+        let space = self.space.clone();
+        let mut mdns_handles = self.mdns_handles.clone();
+        let network_type = self.config.network_type.clone();
+        let bound_url = self.this_addr.clone();
+        let evt_sender = self.evt_sender.clone();
+        let bootstrap_service = self.config.bootstrap_service.clone();
+        let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
+        Ok(async move {
+            let urls = vec![bound_url.into()];
+            let input = UpdateAgentInfoInput {
+                expires_after,
+                space: space.clone(),
+                agent,
+                urls: &urls,
+                evt_sender: &evt_sender,
+                network_type: network_type.clone(),
+                mdns_handles: &mut mdns_handles,
+                bootstrap_service: &bootstrap_service,
+            };
+            update_single_agent_info(input).await?;
             Ok(())
         }
         .boxed()
@@ -204,6 +175,98 @@ impl SpaceInternalHandler for Space {
     }
 }
 
+struct UpdateAgentInfoInput<'borrow> {
+    expires_after: u64,
+    space: Arc<KitsuneSpace>,
+    agent: Arc<KitsuneAgent>,
+    urls: &'borrow Vec<TxUrl>,
+    evt_sender: &'borrow futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    network_type: NetworkType,
+    mdns_handles: &'borrow mut HashMap<Vec<u8>, Arc<AtomicBool>>,
+    bootstrap_service: &'borrow Option<Url2>,
+}
+async fn update_single_agent_info(input: UpdateAgentInfoInput<'_>) -> KitsuneP2pResult<()> {
+    let UpdateAgentInfoInput {
+        expires_after,
+        space,
+        agent,
+        urls,
+        evt_sender,
+        network_type,
+        mdns_handles,
+        bootstrap_service,
+    } = input;
+    use kitsune_p2p_types::agent_info::AgentInfoSigned;
+    let signed_at_ms = crate::spawn::actor::bootstrap::now_once(None).await?;
+    let expires_at_ms = signed_at_ms + expires_after;
+
+    let agent_info_signed = AgentInfoSigned::sign(
+        space.clone(),
+        agent.clone(),
+        u32::MAX,
+        urls.clone(),
+        signed_at_ms,
+        expires_at_ms,
+        |d| {
+            let data = Arc::new(d.to_vec());
+            async {
+                let sign_req = SignNetworkDataEvt {
+                    space: space.clone(),
+                    agent: agent.clone(),
+                    data,
+                };
+                evt_sender
+                    .sign_network_data(sign_req)
+                    .await
+                    .map(Arc::new)
+                    .map_err(KitsuneError::other)
+            }
+        },
+    )
+    .await?;
+
+    tracing::debug!(?agent_info_signed);
+
+    evt_sender
+        .put_agent_info_signed(PutAgentInfoSignedEvt {
+            space: space.clone(),
+            agent: agent.clone(),
+            agent_info_signed: agent_info_signed.clone(),
+        })
+        .await?;
+
+    // Push to the network as well
+    match network_type {
+        NetworkType::QuicMdns => {
+            // Broadcast only valid AgentInfo
+            if !urls.is_empty() {
+                // Kill previous broadcast for this space + agent
+                let key = [space.get_bytes(), agent.get_bytes()].concat();
+                if let Some(current_handle) = mdns_handles.get(&key) {
+                    mdns_kill_thread(current_handle.to_owned());
+                }
+                // Broadcast by using Space as service type and Agent as service name
+                let space_b64 = base64::encode_config(&space[..], base64::URL_SAFE_NO_PAD);
+                let agent_b64 = base64::encode_config(&agent[..], base64::URL_SAFE_NO_PAD);
+                //println!("(MDNS) - Broadcasting of Agent {:?} ({}) in space {:?} ({} ; {})",
+                // agent, agent.get_bytes().len(), space, space.get_bytes().len(), space_b64.len());
+                // Broadcast rmp encoded agent_info_signed
+                let mut buffer = Vec::new();
+                rmp_encode(&mut buffer, &agent_info_signed)?;
+                tracing::trace!(?space_b64, ?agent_b64);
+                let handle = mdns_create_broadcast_thread(space_b64, agent_b64, &buffer);
+                // store handle in self
+                mdns_handles.insert(key, handle);
+            }
+        }
+        NetworkType::QuicBootstrap => {
+            crate::spawn::actor::bootstrap::put(bootstrap_service.clone(), agent_info_signed)
+                .await?;
+        }
+    }
+    Ok(())
+}
+
 impl ghost_actor::GhostControlHandler for Space {}
 
 impl ghost_actor::GhostHandler<KitsuneP2p> for Space {}
@@ -221,8 +284,8 @@ impl KitsuneP2pHandler for Space {
         agent: Arc<KitsuneAgent>,
     ) -> KitsuneP2pHandlerResult<()> {
         self.local_joined_agents.insert(agent.clone());
-        self.gossip_mod.local_agent_join(agent);
-        let fut = self.i_s.update_agent_info();
+        self.gossip_mod.local_agent_join(agent.clone());
+        let fut = self.i_s.update_single_agent_info(agent);
         let evt_sender = self.evt_sender.clone();
         match self.config.network_type {
             NetworkType::QuicMdns => {
@@ -306,8 +369,11 @@ impl KitsuneP2pHandler for Space {
         };
         let timeout = KitsuneTimeout::from_millis(timeout_ms);
 
-        let discover_fut =
-            discover::peer_discover(self, to_agent.clone(), from_agent.clone(), timeout_ms);
+        let discover_fut = discover::search_and_discover_peer_connect(
+            self.ro_inner.clone(),
+            to_agent.clone(),
+            timeout,
+        );
 
         Ok(async move {
             match discover_fut.await {
@@ -417,9 +483,21 @@ impl KitsuneP2pHandler for Space {
     }
 }
 
+pub(crate) struct SpaceReadOnlyInner {
+    pub(crate) space: Arc<KitsuneSpace>,
+    #[allow(dead_code)]
+    pub(crate) this_addr: url2::Url2,
+    pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
+    pub(crate) evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    pub(crate) ep_hnd: Tx2EpHnd<wire::Wire>,
+    #[allow(dead_code)]
+    pub(crate) config: Arc<KitsuneP2pConfig>,
+}
+
 /// A Kitsune P2p Node can track multiple "spaces" -- Non-interacting namespaced
 /// areas that share common transport infrastructure for communication.
 pub(crate) struct Space {
+    pub(crate) ro_inner: Arc<SpaceReadOnlyInner>,
     pub(crate) space: Arc<KitsuneSpace>,
     pub(crate) this_addr: url2::Url2,
     pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
@@ -529,7 +607,17 @@ impl Space {
             });
         }
 
+        let ro_inner = Arc::new(SpaceReadOnlyInner {
+            space: space.clone(),
+            this_addr: this_addr.clone(),
+            i_s: i_s.clone(),
+            evt_sender: evt_sender.clone(),
+            ep_hnd: ep_hnd.clone(),
+            config: config.clone(),
+        });
+
         Self {
+            ro_inner,
             space,
             this_addr,
             i_s,
