@@ -108,6 +108,10 @@ impl KitsuneP2pActor {
                 "Wire::Notify" => KitsuneMetrics::Notify,
                 "Wire::NotifyResp" => KitsuneMetrics::NotifyResp,
                 "Wire::Gossip" => KitsuneMetrics::Gossip,
+                "Wire::PeerGet" => KitsuneMetrics::PeerGet,
+                "Wire::PeerGetResp" => KitsuneMetrics::PeerGetResp,
+                "Wire::PeerQuery" => KitsuneMetrics::PeerQuery,
+                "Wire::PeerQueryResp" => KitsuneMetrics::PeerQueryResp,
                 _ => return,
             };
             KitsuneMetrics::count(t, l);
@@ -176,6 +180,14 @@ impl KitsuneP2pActor {
                 let tuning_params = tuning_params.clone();
                 let i_s = i_s.clone();
                 async move {
+                    macro_rules! resp {
+                        ($r:expr, $e:expr) => {
+                            // this can only error as channel closed
+                            // it would be noise to output tracing errors
+                            let _ = $r.respond($e, tuning_params.implicit_timeout()).await;
+                        };
+                    }
+
                     let evt_sender = &evt_sender;
                     use tx2_api::Tx2EpEvent::*;
                     #[allow(clippy::single_match)]
@@ -195,17 +207,13 @@ impl KitsuneP2pActor {
                                     Err(err) => {
                                         let reason = format!("{:?}", err);
                                         let fail = wire::Wire::failure(reason);
-                                        let _ = respond
-                                            .respond(fail, tuning_params.implicit_timeout())
-                                            .await;
+                                        resp!(respond, fail);
                                         return;
                                     }
                                     Ok(r) => r,
                                 };
                                 let resp = wire::Wire::call_resp(res.into());
-                                let _ = respond
-                                    .respond(resp, tuning_params.implicit_timeout())
-                                    .await;
+                                resp!(respond, resp);
                             }
                             wire::Wire::Notify(wire::Notify {
                                 space,
@@ -220,15 +228,44 @@ impl KitsuneP2pActor {
                                 {
                                     let reason = format!("{:?}", err);
                                     let fail = wire::Wire::failure(reason);
-                                    let _ = respond
-                                        .respond(fail, tuning_params.implicit_timeout())
-                                        .await;
+                                    resp!(respond, fail);
                                     return;
                                 }
                                 let resp = wire::Wire::notify_resp();
-                                let _ = respond
-                                    .respond(resp, tuning_params.implicit_timeout())
-                                    .await;
+                                resp!(respond, resp);
+                            }
+                            wire::Wire::PeerGet(wire::PeerGet { space, agent }) => {
+                                if let Ok(Some(agent_info_signed)) = evt_sender
+                                    .get_agent_info_signed(GetAgentInfoSignedEvt { space, agent })
+                                    .await
+                                {
+                                    let resp = wire::Wire::peer_get_resp(agent_info_signed);
+                                    resp!(respond, resp);
+                                } else {
+                                    let resp = wire::Wire::failure("no such agent".into());
+                                    resp!(respond, resp);
+                                }
+                            }
+                            wire::Wire::PeerQuery(wire::PeerQuery { space, basis_loc }) => {
+                                // this *does* go over the network...
+                                // so we don't want it to be too many
+                                const LIMIT: u32 = 8;
+                                match evt_sender
+                                    .query_agent_info_signed_near_basis(space, basis_loc, LIMIT)
+                                    .await
+                                {
+                                    Ok(list) if !list.is_empty() => {
+                                        let resp = wire::Wire::peer_query_resp(list);
+                                        resp!(respond, resp);
+                                    }
+                                    res => {
+                                        let resp = wire::Wire::failure(format!(
+                                            "error getting agents: {:?}",
+                                            res
+                                        ));
+                                        resp!(respond, resp);
+                                    }
+                                }
                             }
                             data => unimplemented!("{:?}", data),
                         },
@@ -334,6 +371,17 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
         )>,
     > {
         Ok(self.evt_sender.query_gossip_agents(input))
+    }
+
+    fn handle_query_agent_info_signed_near_basis(
+        &mut self,
+        space: Arc<KitsuneSpace>,
+        basis_loc: u32,
+        limit: u32,
+    ) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
+        Ok(self
+            .evt_sender
+            .query_agent_info_signed_near_basis(space, basis_loc, limit))
     }
 
     fn handle_put_metric_datum(&mut self, datum: MetricDatum) -> KitsuneP2pEventHandlerResult<()> {

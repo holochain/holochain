@@ -228,7 +228,8 @@ impl Cell {
             PutAgentInfoSigned { .. }
             | GetAgentInfoSigned { .. }
             | QueryAgentInfoSigned { .. }
-            | QueryGossipAgents { .. } => {
+            | QueryGossipAgents { .. }
+            | QueryAgentInfoSignedNearBasis { .. } => {
                 // PutAgentInfoSigned needs to be handled at the conductor level where the p2p
                 // store lives.
                 unreachable!()

@@ -5,7 +5,9 @@ pub(crate) async fn run(opt: KdOptNode) -> KdResult<()> {
     let persist = new_persist_mem();
 
     let conf = KitsuneDirectV1Config {
+        tuning_params: Default::default(),
         persist,
+        bootstrap: opt.bootstrap_url.into(),
         proxy: opt.proxy_url.into(),
         ui_port: 0,
     };

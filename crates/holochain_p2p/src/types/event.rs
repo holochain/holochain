@@ -127,6 +127,9 @@ ghost_actor::ghost_chan! {
             until_ms: u64,
             arc_set: Arc<kitsune_p2p_types::dht_arc::DhtArcSet>,
         ) -> Vec<(Arc<kitsune_p2p::KitsuneAgent>, kitsune_p2p_types::dht_arc::ArcInterval)>;
+        
+        /// query agent info in order of closeness to a basis location.
+        fn query_agent_info_signed_near_basis(dna_hash: DnaHash, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, basis_loc: u32, limit: u32) -> Vec<AgentInfoSigned>;
 
         /// We need to store some metric data on behalf of kitsune.
         fn put_metric_datum(dna_hash: DnaHash, to_agent: AgentPubKey, agent: AgentPubKey, metric: MetricKind, timestamp: SystemTime) -> ();
@@ -234,7 +237,7 @@ ghost_actor::ghost_chan! {
 
 /// utility macro to make it more ergonomic to access the enum variants
 macro_rules! match_p2p_evt {
-    ($h:ident => |$i:ident| { $($t:tt)* }) => {
+    ($h:ident => |$i:ident| { $($t:tt)* }, { $($t2:tt)* }) => {
         match $h {
             HolochainP2pEvent::CallRemote { $i, .. } => { $($t)* }
             HolochainP2pEvent::Publish { $i, .. } => { $($t)* }
@@ -251,9 +254,9 @@ macro_rules! match_p2p_evt {
             HolochainP2pEvent::GetAgentInfoSigned { $i, .. } => { $($t)* }
             HolochainP2pEvent::QueryAgentInfoSigned { $i, .. } => { $($t)* }
             HolochainP2pEvent::QueryGossipAgents { $i, .. } => { $($t)* }
-
             HolochainP2pEvent::PutMetricDatum { $i, .. } => { $($t)* }
             HolochainP2pEvent::QueryMetrics { $i, .. } => { $($t)* }
+            $($t2)*
         }
     };
 }
@@ -261,12 +264,16 @@ macro_rules! match_p2p_evt {
 impl HolochainP2pEvent {
     /// The dna_hash associated with this network p2p event.
     pub fn dna_hash(&self) -> &DnaHash {
-        match_p2p_evt!(self => |dna_hash| { dna_hash })
+        match_p2p_evt!(self => |dna_hash| { dna_hash }, {
+            HolochainP2pEvent::QueryAgentInfoSignedNearBasis { dna_hash, .. } => { dna_hash }
+        })
     }
 
     /// The agent_pub_key associated with this network p2p event.
     pub fn target_agent_as_ref(&self) -> &AgentPubKey {
-        match_p2p_evt!(self => |to_agent| { to_agent })
+        match_p2p_evt!(self => |to_agent| { to_agent }, {
+            HolochainP2pEvent::QueryAgentInfoSignedNearBasis { .. } => { unimplemented!() }
+        })
     }
 }
 

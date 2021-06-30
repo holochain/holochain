@@ -1,11 +1,10 @@
-use tokio::sync::oneshot;
-
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() {
-    let (tx, rx) = oneshot::channel();
-    kitsune_bootstrap::run(([127, 0, 0, 1], 0), tx).await;
-    let addr = rx.await;
-    if let Ok(addr) = addr {
-        println!("Connected to {:?}", addr);
+    match kitsune_p2p_bootstrap::run(([127, 0, 0, 1], 0)).await {
+        Ok((driver, addr)) => {
+            println!("http://{}", addr);
+            driver.await;
+        }
+        Err(err) => eprintln!("{}", err),
     }
 }
