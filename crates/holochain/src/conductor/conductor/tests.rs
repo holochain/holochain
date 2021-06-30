@@ -28,8 +28,6 @@ async fn can_update_state() {
     let conductor = Conductor::new(
         envs.conductor(),
         envs.wasm(),
-        envs.p2p(),
-        envs.p2p_metrics(),
         dna_store,
         keystore,
         envs.path().to_path_buf().into(),
@@ -76,8 +74,6 @@ async fn can_add_clone_cell_to_app() {
     let mut conductor = Conductor::new(
         envs.conductor(),
         envs.wasm(),
-        envs.p2p(),
-        envs.p2p_metrics(),
         dna_store,
         keystore,
         envs.path().to_path_buf().into(),
@@ -141,8 +137,6 @@ async fn app_ids_are_unique() {
     let mut conductor = Conductor::new(
         environments.conductor(),
         environments.wasm(),
-        environments.p2p(),
-        environments.p2p_metrics(),
         dna_store,
         environments.keystore().clone(),
         environments.path().to_path_buf().into(),

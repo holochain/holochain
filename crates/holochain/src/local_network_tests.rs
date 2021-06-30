@@ -58,7 +58,7 @@ fn conductors_call_remote(num_conductors: usize) {
                     Err(RibosomeError::WasmError(WasmError::Guest(e))) => {
                         assert_eq!(e, TIMEOUT_ERROR)
                     }
-                    _ => unreachable!(),
+                    _ => panic!("Unexpected result: {:?}", r),
                 },
                 // None also means a timeout which is what we want before the
                 // agent info is shared
