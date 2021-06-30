@@ -56,6 +56,10 @@ impl Store {
         self.0.write().clear()
     }
 
+    pub fn num(&self) -> usize {
+        self.0.read().values().map(|m| m.len()).sum()
+    }
+
     #[cfg(test)]
     pub fn all(&self) -> HashMap<KitsuneSpace, HashMap<KitsuneAgent, AgentInfoSigned>> {
         self.0.read().clone()

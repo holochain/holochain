@@ -6,15 +6,19 @@ use kitsune_p2p_types::codec::rmp_encode;
 use store::Store;
 use warp::{hyper::body::Bytes, Filter};
 
+use crate::sync::NodeSync;
+
 static NOW: AtomicUsize = AtomicUsize::new(0);
 static RANDOM: AtomicUsize = AtomicUsize::new(0);
 static PUT: AtomicUsize = AtomicUsize::new(0);
 
 mod clear;
 mod now;
+mod num;
 mod put;
 mod random;
 mod store;
+mod sync;
 
 /// No reason to accept a peer data bigger then 1KB.
 // TODO: Maybe even that's too high?
@@ -26,10 +30,13 @@ pub async fn run(
     addr: impl Into<SocketAddr> + 'static,
 ) -> Result<(BootstrapDriver, SocketAddr), String> {
     let store = Store::new();
+    let waiter = NodeSync::new();
     let boot = now::now()
         .or(put::put(store.clone()))
         .or(random::random(store.clone()))
-        .or(clear::clear(store));
+        .or(clear::clear(store.clone()))
+        .or(num::num(store.clone()))
+        .or(sync::sync(waiter.clone()));
     match warp::serve(boot).try_bind_ephemeral(addr) {
         Ok((addr, server)) => {
             let driver = futures::future::FutureExt::boxed(server);
