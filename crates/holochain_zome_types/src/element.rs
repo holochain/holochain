@@ -16,7 +16,7 @@ use holo_hash::HeaderHash;
 use holo_hash::HoloHashed;
 use holochain_serialized_bytes::prelude::*;
 
-/// a chain element which is a triple containing the signature of the header along with the
+/// a chain element containing the signed header along with the
 /// entry if the header type has one.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub struct Element {
@@ -48,11 +48,11 @@ impl Element {
 
     /// Raw element constructor.  Used only when we know that the values are valid.
     pub fn new(signed_header: SignedHeaderHashed, maybe_entry: Option<Entry>) -> Self {
-        let maybe_visibilty = signed_header
+        let maybe_visibility = signed_header
             .header()
             .entry_data()
             .map(|(_, entry_type)| entry_type.visibility());
-        let entry = match (maybe_entry, maybe_visibilty) {
+        let entry = match (maybe_entry, maybe_visibility) {
             (Some(entry), Some(_)) => ElementEntry::Present(entry),
             (None, Some(EntryVisibility::Private)) => ElementEntry::Hidden,
             (None, None) => ElementEntry::NotApplicable,
@@ -72,32 +72,32 @@ impl Element {
         (self.signed_header, self.entry)
     }
 
-    /// The inner signed header
+    /// The inner signed-header
     pub fn signed_header(&self) -> &SignedHeaderHashed {
         &self.signed_header
     }
 
-    /// Access the signature portion of this triple.
+    /// Access the signature from this element's signed header
     pub fn signature(&self) -> &Signature {
         self.signed_header.signature()
     }
 
-    /// Access the header address
+    /// Access the header address from this element's signed header
     pub fn header_address(&self) -> &HeaderHash {
         self.signed_header.header_address()
     }
 
-    /// Access the Header portion of this triple.
+    /// Access the Header from this element's signed header
     pub fn header(&self) -> &Header {
         self.signed_header.header()
     }
 
-    /// Access the HeaderHashed portion.
+    /// Access the HeaderHashed from this element's signed header portion
     pub fn header_hashed(&self) -> &HeaderHashed {
         self.signed_header.header_hashed()
     }
 
-    /// Access the Entry portion of this triple as a ElementEntry,
+    /// Access the Entry portion of this element as an ElementEntry,
     /// which includes the context around the presence or absence of the entry.
     pub fn entry(&self) -> &ElementEntry {
         &self.entry
