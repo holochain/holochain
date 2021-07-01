@@ -84,17 +84,14 @@ where
     cells: HashMap<CellId, RunningCell<CA>>,
 
     /// The database for persisting state related to this Conductor
-    env: EnvWrite,
-
-    /// The caches databases. These are shared across cells.
-    /// There is one per unique Dna.
-    caches: parking_lot::Mutex<HashMap<DnaHash, EnvWrite>>,
+    conductor_env: EnvWrite,
 
     /// A database for storing wasm
     wasm_env: EnvWrite,
 
-    /// The database for persisting [ConductorState]
-    // state_db: ConductorStateDb,
+    /// The caches databases. These are shared across cells.
+    /// There is one per unique Dna.
+    caches: parking_lot::Mutex<HashMap<DnaHash, EnvWrite>>,
 
     /// Set to true when `conductor.shutdown()` has been called, so that other
     /// tasks can check on the shutdown status
@@ -956,7 +953,7 @@ where
         holochain_p2p: holochain_p2p::HolochainP2pRef,
     ) -> ConductorResult<Self> {
         Ok(Self {
-            env,
+            conductor_env: env,
             wasm_env,
             caches: parking_lot::Mutex::new(HashMap::new()),
             cells: HashMap::new(),
@@ -972,7 +969,7 @@ where
     }
 
     pub(super) async fn get_state(&self) -> ConductorResult<ConductorState> {
-        self.env.conn()?.with_reader(|txn| {
+        self.conductor_env.conn()?.with_reader(|txn| {
             let state = txn
                 .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
                     row.get("blob")
@@ -1005,7 +1002,7 @@ where
     {
         self.check_running()?;
         let output = self
-            .env
+            .conductor_env
             .async_commit_in_place(move |txn| {
                 let state = txn
                     .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
