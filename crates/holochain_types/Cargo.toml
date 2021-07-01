@@ -21,14 +21,14 @@ cfg-if = "0.1"
 chrono = "0.4.6"
 derive_more = "0.99.3"
 either = "1.5"
-fixt = { path = "../fixt", version = "0.0.2-alpha.1" }
+fixt = { path = "../fixt", version = "0.0.3"}
 flate2 = "1.0.14"
 futures = "0.3"
-holo_hash = { version = "^0.0.2-alpha.1", path = "../holo_hash", features = ["string-encoding"] }
+holo_hash = { version = "0.0.3", path = "../holo_hash", features = ["string-encoding"] }
 holochain_keystore = { version = "0.0.1", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.50"
 holochain_sqlite = { path = "../holochain_sqlite", version = "0.0.1" }
-holochain_zome_types = { path = "../holochain_zome_types", version = "0.0.2-alpha.1" }
+holochain_zome_types = { path = "../holochain_zome_types", version = "0.0.3"}
 itertools = { version = "0.10" }
 lazy_static = "1.4.0"
 mockall = "0.8"

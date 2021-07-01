@@ -18,10 +18,10 @@ only_check = []
 
 
 [dependencies]
-fixt = { path = "../../fixt", version = "0.0.2-alpha.1" }
-holo_hash = { path = "../../holo_hash", version = "0.0.2-alpha.1" }
+fixt = { path = "../../fixt", version = "0.0.3"}
+holo_hash = { path = "../../holo_hash", version = "0.0.3"}
 holochain_types = { path = "../../holochain_types", version = "0.0.1" }
-holochain_zome_types = { path = "../../holochain_zome_types", version = "0.0.2-alpha.1" }
+holochain_zome_types = { path = "../../holochain_zome_types", version = "0.0.3"}
 rand = "0.7"
 strum = "0.18.0"
 strum_macros = "0.18.0"

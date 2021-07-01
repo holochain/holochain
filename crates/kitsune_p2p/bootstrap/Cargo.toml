@@ -27,7 +27,7 @@ warp = "0.3"
 
 [dev-dependencies]
 kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p" }
-fixt = { path = "../../fixt" }
+fixt = { path = "../../fixt" ,version = "0.0.3"}
 criterion = "0.3"
 reqwest = "0.11.2"
 
