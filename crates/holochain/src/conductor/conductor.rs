@@ -485,6 +485,64 @@ where
         }
     }
 
+    pub(super) async fn reconcile_app_state_with_cells<S>(
+        &mut self,
+        app_ids: Option<S>,
+    ) -> ConductorResult<()>
+    where
+        S: Into<HashSet<InstalledAppId>>,
+    {
+        use AppStatus::*;
+        use AppStatusTransition::*;
+
+        let app_ids: Option<HashSet<InstalledAppId>> = app_ids.map(S::into);
+        let running_cells: HashSet<CellId> = self.cells.keys().cloned().collect();
+        self.update_state(move |mut state| {
+            let apps = state.installed_apps_mut().iter_mut().filter(|(id, _)| {
+                app_ids
+                    .as_ref()
+                    .map(|ids| ids.contains(&**id))
+                    .unwrap_or(true)
+            });
+            for (_app_id, app) in apps {
+                match app.status().clone() {
+                    Running => {
+                        // If not all cells are running, pause the app
+                        let missing: Vec<_> = app
+                            .all_cells()
+                            .filter(|id| !running_cells.contains(id))
+                            .collect();
+                        if !missing.is_empty() {
+                            let reason = PausedAppReason::Error(format!(
+                                "Some cells are not able to run: {:#?}",
+                                missing
+                            ));
+                            app.status.transition(Pause(reason));
+                        }
+                    }
+                    Paused(_) => {
+                        // If all cells are now running, restart the app
+                        if app.all_cells().all(|id| running_cells.contains(id)) {
+                            app.status.transition(Start);
+                        }
+                    }
+                    Disabled(_) => {
+                        // Disabled status should never automatically change.
+                    }
+                }
+            }
+            Ok(state)
+        })
+        .await?;
+        Ok(())
+
+        //- Do not change state for Disabled apps. For all others:
+        //- If an app is Paused but all of its (required) Cells are on,
+        //    then set it to Running
+        //- If an app is Running but at least one of its (required) Cells are off,
+        //    then set it to Paused
+    }
+
     /// Remove Cells from the conductor for each CellId marked stopped. Idempotent.
     pub(super) async fn remove_cells_for_stopped_apps(&mut self) -> ConductorResult<()> {
         let state = self.get_state().await?;

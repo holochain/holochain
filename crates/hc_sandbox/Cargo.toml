@@ -23,6 +23,7 @@ holochain_conductor_api = { path = "../holochain_conductor_api", version = "0.0.
 holochain_types = { path = "../holochain_types", version = "0.0.1" }
 holochain_websocket = { path = "../holochain_websocket", version = "0.0.1" }
 holochain_p2p = { path = "../holochain_p2p", version = "0.0.1" }
+matches = "0.1"
 nanoid = "0.3"
 observability = "0.1.3"
 serde_yaml = "0.8"

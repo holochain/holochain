@@ -209,11 +209,14 @@ pub trait ConductorHandleT: Send + Sync {
     /// Adjust app statuses (via state transitions) to match the current
     /// reality of which Cells are present in the conductor.
     /// - Do not change state for Disabled apps. For all others:
-    /// - If an app is Paused but all of its (required) Cells are on, then
-    ///     set it to Running
-    /// - If an app is Running but at least one of its Cells are off, then
-    //      set it to Paused
-    async fn reconcile_app_state_with_cells(self: Arc<Self>) -> ();
+    /// - If an app is Paused but all of its (required) Cells are on,
+    ///     then set it to Running
+    /// - If an app is Running but at least one of its (required) Cells are off,
+    ///     then set it to Paused
+    async fn reconcile_app_state_with_cells(
+        &self,
+        app_ids: Option<HashSet<InstalledAppId>>,
+    ) -> ConductorResult<()>;
 
     /// Adjust which cells are present in the Conductor (adding and removing as
     /// needed) to match the current reality of all app statuses.
@@ -686,35 +689,26 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(stopped_app)
     }
 
-    async fn reconcile_app_state_with_cells(self: Arc<Self>) -> () {
-        todo!()
+    async fn reconcile_app_state_with_cells(
+        &self,
+        app_ids: Option<HashSet<InstalledAppId>>,
+    ) -> ConductorResult<()> {
+        self.conductor
+            .write()
+            .await
+            .reconcile_app_state_with_cells(app_ids)
+            .await
     }
 
     async fn reconcile_cells_with_app_state(
         self: Arc<Self>,
     ) -> ConductorResult<Vec<(CellId, CellError)>> {
-        let cells = {
-            let lock = self.conductor.read().await;
-            lock.create_cells_for_running_apps(self.clone())
-                .await?
-                .into_iter()
-        };
-        let add_cells_tasks = cells.map(|result| async {
-            match result {
-                Ok(cells) => {
-                    todo!();
-                    // self.initialize_and_add_cells(cells).await;
-                    None
-                }
-                Err(e) => Some(e),
-            }
-        });
-        let r = futures::future::join_all(add_cells_tasks)
-            .await
-            .into_iter()
-            .flatten()
-            .collect();
-        Ok(r)
+        let mut conductor = self.conductor.write().await;
+        conductor.remove_cells_for_stopped_apps().await?;
+        let results = conductor
+            .create_and_add_initialized_cells_for_running_apps(self.clone())
+            .await?;
+        Ok(results)
     }
 
     async fn enable_app(self: Arc<Self>, app_id: &InstalledAppId) -> ConductorResult<InstalledApp> {

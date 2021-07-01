@@ -436,6 +436,13 @@ impl InstalledAppCommon {
             .chain(self.cloned_cells())
     }
 
+    /// Iterator of all "required" cells, meaning Cells which must be running
+    /// for this App to be able to run. The notion of "required cells" is not
+    /// yet solidified, so for now this placeholder equates to "all cells".
+    pub fn required_cells(&self) -> impl Iterator<Item = &CellId> {
+        self.all_cells()
+    }
+
     /// Accessor for particular slot
     pub fn slot(&self, slot_id: &SlotId) -> AppResult<&AppSlot> {
         self.slots

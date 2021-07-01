@@ -385,7 +385,7 @@ async fn call_zome() {
     };
     let response = client.request(request);
     let response = check_timeout(&mut holochain, response, 3000).await;
-    assert_matches!(response, AdminResponse::AppEnabled(_));
+    assert_matches!(response, AdminResponse::AppEnabled { .. });
 
     // Attach App Interface
     let app_port_rcvd = attach_app_interface(&mut client, &mut holochain, Some(app_port)).await;
@@ -525,7 +525,7 @@ async fn emit_signals() {
     };
     let response = admin_tx.request(request);
     let response = check_timeout(&mut holochain, response, 3000).await;
-    assert_matches!(response, AdminResponse::AppEnabled(_));
+    assert_matches!(response, AdminResponse::AppEnabled { .. });
 
     // Attach App Interface
     let app_port = attach_app_interface(&mut admin_tx, &mut holochain, None).await;

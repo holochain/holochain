@@ -563,7 +563,7 @@ pub async fn enable_app(cmd: &mut CmdRunner, args: EnableApp) -> anyhow::Result<
             installed_app_id: args.app_id,
         })
         .await?;
-    expect_match!(resp => AdminResponse::AppEnabled, format!("Failed to enable app, got: {:?}", resp));
+    matches::assert_matches!(resp, AdminResponse::AppEnabled { .. });
     Ok(())
 }
 

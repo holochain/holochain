@@ -377,13 +377,21 @@ pub enum AdminResponse {
 
     /// The succesful response to an [`AdminRequest::EnableApp`].
     ///
-    /// It means the `App` was enabled successfully
+    /// It means the `App` was enabled successfully. If it was possible to
+    /// put the app in a Running state, it will be Running, otherwise it will
+    /// be Paused.
     ///
     /// [`AdminRequest::EnableApp`]: enum.AdminRequest.html#variant.EnableApp
-    AppEnabled(InstalledAppInfo),
+    AppEnabled {
+        app: InstalledAppInfo,
+        errors: Vec<(CellId, String)>,
+    },
 
     #[deprecated = "alias for AppEnabled"]
-    AppActivated(InstalledAppInfo),
+    AppActivated {
+        app: InstalledAppInfo,
+        errors: Vec<(CellId, String)>,
+    },
 
     /// The succesful response to an [`AdminRequest::DisableApp`].
     ///
@@ -395,7 +403,9 @@ pub enum AdminResponse {
     /// The succesful response to an [`AdminRequest::StartApp`].
     ///
     /// The boolean determines whether or not the was actually started.
-    /// If false, it was because the app was in a disabled state.
+    /// If false, it was because the app was in a disabled state, or the app
+    /// failed to start.
+    /// TODO: add reason why app couldn't start
     ///
     /// [`AdminRequest::StartApp`]: enum.AdminRequest.html#variant.StartApp
     AppStarted(bool),
