@@ -68,23 +68,8 @@ use tracing::*;
 #[cfg(any(test, feature = "test_utils"))]
 use super::handle::MockConductorHandleT;
 
-/// Conductor-specific Cell state, this can probably be stored in a database.
-/// Hypothesis: If nothing remains in this struct, then the Conductor state is
-/// essentially immutable, and perhaps we just throw it out and make a new one
-/// when we need to load new config, etc.
-pub struct CellState {
-    /// Whether or not we should call any methods on the cell
-    _active: bool,
-}
-
 /// An [Cell] tracked by a Conductor, along with some [CellState]
-struct CellItem<CA>
-where
-    CA: CellConductorApiT,
-{
-    cell: Arc<Cell<CA>>,
-    _state: CellState,
-}
+struct RunningCell<CA: CellConductorApiT>(Arc<Cell<CA>>);
 
 pub(crate) type StopBroadcaster = tokio::sync::broadcast::Sender<()>;
 pub(crate) type StopReceiver = tokio::sync::broadcast::Receiver<()>;
@@ -96,7 +81,7 @@ where
     CA: CellConductorApiT,
 {
     /// The collection of cells associated with this Conductor
-    cells: HashMap<CellId, CellItem<CA>>,
+    cells: HashMap<CellId, RunningCell<CA>>,
 
     /// The database for persisting state related to this Conductor
     env: EnvWrite,
@@ -169,11 +154,11 @@ where
     DS: DnaStore + 'static,
 {
     pub(super) fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<Arc<Cell>> {
-        let item = self
+        let cell = self
             .cells
             .get(cell_id)
             .ok_or_else(|| ConductorError::CellMissing(cell_id.clone()))?;
-        Ok(item.cell.clone())
+        Ok(cell.0.clone())
     }
 
     /// A gate to put at the top of public functions to ensure that work is not
@@ -513,7 +498,7 @@ where
             .iter()
             .filter(|(id, _)| stopped_cells.contains(id))
         {
-            cell.cell.cleanup().await?;
+            cell.0.cleanup().await?;
         }
         self.cells.retain(|id, _| !stopped_cells.contains(id));
         Ok(())
@@ -686,13 +671,7 @@ where
         for cell in cells {
             let cell_id = cell.id().clone();
             tracing::info!(?cell_id, "ADD CELL");
-            self.cells.insert(
-                cell_id,
-                CellItem {
-                    cell: Arc::new(cell),
-                    _state: CellState { _active: false },
-                },
-            );
+            self.cells.insert(cell_id, RunningCell(Arc::new(cell)));
         }
     }
 
@@ -780,8 +759,8 @@ where
     /// Remove cells from the cell map in the Conductor
     pub(super) async fn remove_cells(&mut self, cell_ids: Vec<CellId>) {
         for cell_id in cell_ids {
-            if let Some(item) = self.cells.remove(&cell_id) {
-                if let Err(err) = item.cell.cleanup().await {
+            if let Some(cell) = self.cells.remove(&cell_id) {
+                if let Err(err) = cell.0.cleanup().await {
                     tracing::error!("Error cleaning up Cell: {:?}\nCellId: {}", err, cell_id);
                 }
             }
