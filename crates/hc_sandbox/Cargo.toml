@@ -7,6 +7,8 @@ authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo" ]
 categories = [ "command-line-utilities", "development-tools::build-utils", "filesystem" ]
 edition = "2018"
+license = "Apache-2.0"
+description = "A library and CLI to help create, run and interact with sandboxed Holochain conductor environments, for testing and development purposes."
 
 [[bin]]
 name = "hc-sandbox"
