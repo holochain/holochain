@@ -1,6 +1,6 @@
 [package]
 name = "holochain_test_wasm_common"
-version = "0.0.1"
+version = "0.0.2-dev.0"
 authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
 edition = "2018"
 description = "Common code for Wasm testing for Holochain"
@@ -12,5 +12,5 @@ crate-type = [ "cdylib", "rlib" ]
 path = "src/lib.rs"
 
 [dependencies]
-hdk = { path = "../../hdk", version = "0.0.101"}
+hdk = { path = "../../hdk", version = "0.0.102-dev.0"}
 serde = "1.0"
