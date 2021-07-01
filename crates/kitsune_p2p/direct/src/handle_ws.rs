@@ -168,6 +168,23 @@ impl AsKdHnd for Hnd {
         .boxed()
     }
 
+    fn app_leave(&self, root: KdHash, agent: KdHash) -> BoxFuture<'static, KdResult<()>> {
+        let msg_id = new_msg_id();
+        let api = KdApi::AppLeaveReq {
+            msg_id,
+            root,
+            agent,
+        };
+        let api = self.request(api);
+        async move {
+            match api.await {
+                Ok(KdApi::AppLeaveRes { .. }) => Ok(()),
+                oth => Err(format!("unexpected: {:?}", oth).into()),
+            }
+        }
+        .boxed()
+    }
+
     fn agent_info_store(&self, agent_info: KdAgentInfo) -> BoxFuture<'static, KdResult<()>> {
         let msg_id = new_msg_id();
         let api = KdApi::AgentInfoStoreReq { msg_id, agent_info };

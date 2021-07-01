@@ -20,8 +20,12 @@ pub struct Config {
     /// how many agents to join on each node
     pub agents_per_node: usize,
 
-    /// introduce bad agent infos
-    pub bad_agent_infos: bool,
+    /// introduce this number of bad agent infos every round
+    pub bad_agent_count: usize,
+
+    /// have this many agents drop after each op consistency
+    /// the same number of new agents will also be added
+    pub agent_turnover_count: usize,
 }
 
 /// progress emitted by this test
@@ -51,7 +55,10 @@ pub enum Progress {
         agents_per_node: usize,
 
         /// test will introduce bad agent infos
-        bad_agent_infos: bool,
+        bad_agent_count: usize,
+
+        /// test will drop / add new agents of this number every round
+        agent_turnover_count: usize,
 
         /// bootstrap_url used
         bootstrap_url: TxUrl,
@@ -124,19 +131,26 @@ impl std::fmt::Display for Progress {
                 run_time_s,
                 node_count,
                 agents_per_node,
-                bad_agent_infos,
+                bad_agent_count,
+                agent_turnover_count,
                 bootstrap_url,
                 proxy_url,
             } => {
-                let bad = if *bad_agent_infos {
-                    "WITH bad agent infos"
-                } else {
-                    "WITHOUT bad agent infos"
-                };
                 write!(
                     f,
-                    "{:.4}s: TestStarted {} {} agents / {} nodes bootstrap:{} proxy:{}",
-                    run_time_s, bad, agents_per_node, node_count, bootstrap_url, proxy_url,
+                    r#"{:.4}s: TestStarted
+ -- {} agents / {} nodes
+ -- bad_agent_count: {}
+ -- agent_turnover_count: {}
+ -- bootstrap: {}
+ -- proxy: {}"#,
+                    run_time_s,
+                    agents_per_node,
+                    node_count,
+                    bad_agent_count,
+                    agent_turnover_count,
+                    bootstrap_url,
+                    proxy_url,
                 )
             }
             Progress::InterimState {
@@ -205,7 +219,8 @@ pub fn run(
         config.tuning_params,
         config.node_count,
         config.agents_per_node,
-        config.bad_agent_infos,
+        config.bad_agent_count,
+        config.agent_turnover_count,
         p_send,
     ));
 
@@ -214,81 +229,125 @@ pub fn run(
 
 // -- private -- //
 
-async fn test(
-    tuning_params: KitsuneP2pTuningParams,
+struct TestNode {
+    kdirect: KitsuneDirect,
+    kdhnd: KdHnd,
+    agents: Vec<KdHash>,
+}
+
+struct Test {
     node_count: usize,
     agents_per_node: usize,
-    bad_agent_infos: bool,
-    mut p_send: futures::channel::mpsc::Sender<Progress>,
-) {
-    kitsune_p2p_types::metrics::init_sys_info_poll();
+    bad_agent_count: usize,
+    agent_turnover_count: usize,
+    tuning_params: KitsuneP2pTuningParams,
+    p_send: futures::channel::mpsc::Sender<Progress>,
+    bootstrap_url: TxUrl,
+    proxy_url: TxUrl,
+    root: KdHash,
+    app_entry: KdEntrySigned,
+    app_entry_hash: KdHash,
+    nodes: Vec<TestNode>,
 
-    let mut p_send_clone = p_send.clone();
-    tokio::task::spawn(async move {
-        loop {
-            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    time_test_start: std::time::Instant,
+    #[allow(dead_code)]
+    time_round_start: std::time::Instant,
 
-            let sys_info = kitsune_p2p_types::metrics::get_sys_info();
+    target_agent_count: usize,
+    target_total_op_count: usize,
+}
 
-            let used_mem_gb = sys_info.used_mem_kb as f64 / 1024.0 / 1024.0;
-            let cpu_usage_pct = sys_info.proc_cpu_usage_pct_1000 as f64 / 1000.0;
-            let net_kb_per_s =
-                (sys_info.tx_bytes_per_sec as f64 + sys_info.rx_bytes_per_sec as f64) / 1024.0;
+impl Test {
+    async fn new(
+        node_count: usize,
+        agents_per_node: usize,
+        bad_agent_count: usize,
+        agent_turnover_count: usize,
+        tuning_params: KitsuneP2pTuningParams,
+        p_send: futures::channel::mpsc::Sender<Progress>,
+    ) -> Self {
+        let time_test_start = std::time::Instant::now();
 
-            p_send_clone
-                .send(Progress::SysMetrics {
-                    used_mem_gb,
-                    cpu_usage_pct,
-                    net_kb_per_s,
-                })
+        let (bootstrap_url, driver, _bootstrap_close) =
+            new_quick_bootstrap_v1(tuning_params.clone()).await.unwrap();
+        tokio::task::spawn(driver);
+
+        let (proxy_url, driver, _proxy_close) =
+            new_quick_proxy_v1(tuning_params.clone()).await.unwrap();
+        tokio::task::spawn(driver);
+
+        let (root, app_entry) = {
+            let root_persist = new_persist_mem();
+            let root = root_persist.generate_signing_keypair().await.unwrap();
+            let app_entry = KdEntryContent {
+                kind: "s.app".to_string(),
+                parent: root.clone(),
+                author: root.clone(),
+                verify: "".to_string(),
+                data: serde_json::json!({}),
+            };
+            let app_entry = KdEntrySigned::from_content(&root_persist, app_entry)
                 .await
                 .unwrap();
-        }
-    });
-
-    let test_start = std::time::Instant::now();
-
-    let (bootstrap_url, driver, _bootstrap_close) =
-        new_quick_bootstrap_v1(tuning_params.clone()).await.unwrap();
-    tokio::task::spawn(driver);
-
-    let (proxy_url, driver, _proxy_close) =
-        new_quick_proxy_v1(tuning_params.clone()).await.unwrap();
-    tokio::task::spawn(driver);
-
-    let (root, app_entry) = {
-        let root_persist = new_persist_mem();
-        let root = root_persist.generate_signing_keypair().await.unwrap();
-        let app_entry = KdEntryContent {
-            kind: "s.app".to_string(),
-            parent: root.clone(),
-            author: root.clone(),
-            verify: "".to_string(),
-            data: serde_json::json!({}),
+            (root, app_entry)
         };
-        let app_entry = KdEntrySigned::from_content(&root_persist, app_entry)
+
+        let app_entry_hash = app_entry.hash().clone();
+
+        Self {
+            node_count,
+            agents_per_node,
+            bad_agent_count,
+            agent_turnover_count,
+            tuning_params,
+            p_send,
+            bootstrap_url,
+            proxy_url,
+            root,
+            app_entry,
+            app_entry_hash,
+            nodes: Vec::new(),
+
+            time_test_start,
+            time_round_start: std::time::Instant::now(),
+
+            target_agent_count: node_count * agents_per_node,
+            target_total_op_count: 1, // 1 for app_entry
+        }
+    }
+
+    async fn add_agent_to_node(&mut self, node_idx: usize) {
+        let kdirect = self.nodes[node_idx].kdirect.clone();
+        let kdhnd = self.nodes[node_idx].kdhnd.clone();
+
+        let agent = kdirect
+            .get_persist()
+            .generate_signing_keypair()
             .await
             .unwrap();
-        (root, app_entry)
-    };
 
-    let app_entry_hash = app_entry.hash().clone();
+        kdhnd
+            .app_join(self.root.clone(), agent.clone())
+            .await
+            .unwrap();
 
-    #[allow(dead_code)]
-    struct TestNode {
-        kdirect: KitsuneDirect,
-        kdhnd: KdHnd,
-        agents: Vec<KdHash>,
+        // sneak this directly into the db : )
+        kdirect
+            .get_persist()
+            .store_entry(self.root.clone(), agent.clone(), self.app_entry.clone())
+            .await
+            .unwrap();
+
+        self.nodes[node_idx].agents.push(agent);
     }
-    let mut nodes = Vec::new();
 
-    for _ in 0..node_count {
+    async fn add_node(&mut self) {
         let persist = new_persist_mem();
         let conf = KitsuneDirectV1Config {
-            tuning_params: tuning_params.clone(),
+            tuning_params: self.tuning_params.clone(),
             persist,
-            bootstrap: bootstrap_url.clone(),
-            proxy: proxy_url.clone(),
+            bootstrap: self.bootstrap_url.clone(),
+            proxy: self.proxy_url.clone(),
             ui_port: 0,
         };
 
@@ -302,134 +361,235 @@ async fn test(
             }
         });
 
-        let mut agents = Vec::new();
-
-        for _ in 0..agents_per_node {
-            let agent = kdirect
-                .get_persist()
-                .generate_signing_keypair()
-                .await
-                .unwrap();
-            kdhnd.app_join(root.clone(), agent.clone()).await.unwrap();
-
-            // sneak this directly into the db : )
-            kdirect
-                .get_persist()
-                .store_entry(root.clone(), agent.clone(), app_entry.clone())
-                .await
-                .unwrap();
-
-            agents.push(agent);
-        }
-
-        nodes.push(TestNode {
+        self.nodes.push(TestNode {
             kdirect,
             kdhnd,
-            agents,
+            agents: Vec::new(),
         });
+
+        let node_idx = self.nodes.len() - 1;
+
+        for _ in 0..self.agents_per_node {
+            self.add_agent_to_node(node_idx).await;
+        }
     }
 
-    p_send
-        .send(Progress::TestStarted {
-            run_time_s: test_start.elapsed().as_secs_f64(),
-            node_count,
-            agents_per_node,
-            bad_agent_infos,
-            bootstrap_url: bootstrap_url.clone(),
-            proxy_url: proxy_url.clone(),
-        })
-        .await
-        .unwrap();
+    async fn inject_bad_agent_info(&mut self) {
+        for _ in 0..self.bad_agent_count {
+            self.target_agent_count += 1;
 
-    let inject_bad_agent_info = || async {
-        let info = gen_bad_agent_info(
-            tuning_params.clone(),
-            root.clone(),
-            bootstrap_url.clone(),
-            proxy_url.clone(),
-        )
-        .await;
+            let info = gen_bad_agent_info(
+                self.tuning_params.clone(),
+                self.root.clone(),
+                self.bootstrap_url.clone(),
+                self.proxy_url.clone(),
+            )
+            .await;
 
-        for node in nodes.iter() {
-            node.kdirect
-                .get_persist()
-                .store_agent_info(info.clone())
+            for node in self.nodes.iter() {
+                node.kdirect
+                    .get_persist()
+                    .store_agent_info(info.clone())
+                    .await
+                    .unwrap();
+            }
+        }
+    }
+
+    async fn turnover_agents(&mut self) {
+        use rand::Rng;
+
+        for _ in 0..self.agent_turnover_count {
+            let node_idx = rand::thread_rng().gen_range(0..self.nodes.len());
+            let agent_idx = rand::thread_rng().gen_range(0..self.nodes[node_idx].agents.len());
+            let agent = self.nodes[node_idx].agents.remove(agent_idx);
+            self.nodes[node_idx]
+                .kdhnd
+                .app_leave(self.root.clone(), agent)
                 .await
                 .unwrap();
+            self.add_agent_to_node(node_idx).await;
+            // we don't remove the old one, because the agent info is
+            // still going to be in the db / gossiped
+            self.target_agent_count += 1;
+            println!("Turned Over Agent in NODE {}", node_idx);
         }
-    };
-
-    let mut target_agent_count = node_count * agents_per_node;
-
-    if bad_agent_infos {
-        inject_bad_agent_info().await;
-        target_agent_count += 1;
     }
 
-    // this loop waits for agent info to be synced
-    loop {
-        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-
+    async fn calc_avgs(&mut self) -> (usize, usize) {
         let mut avg_agent_count = 0;
 
-        for node in nodes.iter() {
+        for node in self.nodes.iter() {
             avg_agent_count += node
                 .kdirect
                 .get_persist()
-                .query_agent_info(root.clone())
+                .query_agent_info(self.root.clone())
                 .await
                 .unwrap()
                 .len();
         }
-        avg_agent_count /= nodes.len();
+        avg_agent_count /= self.nodes.len();
 
-        if avg_agent_count >= target_agent_count {
-            p_send
-                .send(Progress::AgentConsistent {
-                    run_time_s: test_start.elapsed().as_secs_f64(),
-                    agent_count: avg_agent_count,
-                })
-                .await
-                .unwrap();
-            break;
+        let mut avg_total_op_count = 0;
+
+        for node in self.nodes.iter() {
+            for agent in node.agents.iter() {
+                avg_total_op_count += node
+                    .kdirect
+                    .get_persist()
+                    .query_entries(
+                        self.root.clone(),
+                        agent.clone(),
+                        f32::MIN,
+                        f32::MAX,
+                        DhtArc::new(0, u32::MAX),
+                    )
+                    .await
+                    .unwrap()
+                    .len();
+            }
         }
+        avg_total_op_count /= self.node_count * self.agents_per_node;
 
-        let target_total_op_count = 0;
-        let avg_total_op_count = 0;
+        (avg_agent_count, avg_total_op_count)
+    }
 
-        p_send
+    fn new_round(&mut self) {
+        self.time_round_start = std::time::Instant::now();
+    }
+
+    async fn emit_test_started(&mut self) {
+        self.p_send
+            .send(Progress::TestStarted {
+                run_time_s: self.time_test_start.elapsed().as_secs_f64(),
+                node_count: self.node_count,
+                agents_per_node: self.agents_per_node,
+                bad_agent_count: self.bad_agent_count,
+                agent_turnover_count: self.agent_turnover_count,
+                bootstrap_url: self.bootstrap_url.clone(),
+                proxy_url: self.proxy_url.clone(),
+            })
+            .await
+            .unwrap();
+    }
+
+    async fn emit_interim(&mut self, avg_agent_count: usize, avg_total_op_count: usize) {
+        self.p_send
             .send(Progress::InterimState {
-                run_time_s: test_start.elapsed().as_secs_f64(),
-                round_elapsed_s: test_start.elapsed().as_secs_f64(),
-                target_agent_count,
+                run_time_s: self.time_test_start.elapsed().as_secs_f64(),
+                round_elapsed_s: self.time_round_start.elapsed().as_secs_f64(),
+                target_agent_count: self.target_agent_count,
                 avg_agent_count,
-                target_total_op_count,
+                target_total_op_count: self.target_total_op_count,
                 avg_total_op_count,
             })
             .await
             .unwrap();
     }
 
-    let mut target_total_op_count = 1; // 1 to account for the app_entry
+    async fn emit_agent_consistent(&mut self, agent_count: usize) {
+        self.p_send
+            .send(Progress::AgentConsistent {
+                run_time_s: self.time_test_start.elapsed().as_secs_f64(),
+                agent_count,
+            })
+            .await
+            .unwrap();
+    }
+
+    async fn emit_op_consistent(&mut self, total_op_count: usize) {
+        self.p_send
+            .send(Progress::OpConsistent {
+                run_time_s: self.time_test_start.elapsed().as_secs_f64(),
+                round_elapsed_s: self.time_round_start.elapsed().as_secs_f64(),
+                new_ops_added_count: self.node_count * self.agents_per_node,
+                total_op_count,
+            })
+            .await
+            .unwrap();
+    }
+}
+
+async fn test(
+    tuning_params: KitsuneP2pTuningParams,
+    node_count: usize,
+    agents_per_node: usize,
+    bad_agent_count: usize,
+    agent_turnover_count: usize,
+    mut p_send: futures::channel::mpsc::Sender<Progress>,
+) {
+    kitsune_p2p_types::metrics::init_sys_info_poll();
+
+    let mut test = Test::new(
+        node_count,
+        agents_per_node,
+        bad_agent_count,
+        agent_turnover_count,
+        tuning_params.clone(),
+        p_send.clone(),
+    )
+    .await;
+
+    tokio::task::spawn(async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+
+            let sys_info = kitsune_p2p_types::metrics::get_sys_info();
+
+            let used_mem_gb = sys_info.used_mem_kb as f64 / 1024.0 / 1024.0;
+            let cpu_usage_pct = sys_info.proc_cpu_usage_pct_1000 as f64 / 1000.0;
+            let net_kb_per_s =
+                (sys_info.tx_bytes_per_sec as f64 + sys_info.rx_bytes_per_sec as f64) / 1024.0;
+
+            p_send
+                .send(Progress::SysMetrics {
+                    used_mem_gb,
+                    cpu_usage_pct,
+                    net_kb_per_s,
+                })
+                .await
+                .unwrap();
+        }
+    });
+
+    for _ in 0..node_count {
+        test.add_node().await;
+    }
+
+    test.emit_test_started().await;
+
+    test.inject_bad_agent_info().await;
+
+    // this loop waits for agent info to be synced
+    loop {
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+
+        let (avg_agent_count, avg_total_op_count) = test.calc_avgs().await;
+
+        if avg_agent_count >= test.target_agent_count {
+            test.emit_agent_consistent(avg_agent_count).await;
+            break;
+        }
+
+        test.emit_interim(avg_agent_count, avg_total_op_count).await;
+    }
 
     // this loop publishes ops, and waits for them to be synced
     loop {
-        let round_start_time = std::time::Instant::now();
+        test.new_round();
 
-        if bad_agent_infos {
-            inject_bad_agent_info().await;
-            target_agent_count += 1;
-        }
+        test.inject_bad_agent_info().await;
+        test.turnover_agents().await;
 
-        for node in nodes.iter() {
+        for node in test.nodes.iter() {
             for agent in node.agents.iter() {
                 node.kdhnd
                     .entry_author(
-                        root.clone(),
+                        test.root.clone(),
                         agent.clone(),
                         KdEntryContent {
                             kind: "u.foo".to_string(),
-                            parent: app_entry_hash.clone(),
+                            parent: test.app_entry_hash.clone(),
                             author: agent.clone(),
                             verify: "".to_string(),
                             data: serde_json::json!({
@@ -443,7 +603,7 @@ async fn test(
                     )
                     .await
                     .unwrap();
-                target_total_op_count += 1;
+                test.target_total_op_count += 1;
             }
         }
 
@@ -451,64 +611,14 @@ async fn test(
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
-            let mut avg_agent_count = 0;
+            let (avg_agent_count, avg_total_op_count) = test.calc_avgs().await;
 
-            for node in nodes.iter() {
-                avg_agent_count += node
-                    .kdirect
-                    .get_persist()
-                    .query_agent_info(root.clone())
-                    .await
-                    .unwrap()
-                    .len();
-            }
-            avg_agent_count /= nodes.len();
-
-            let mut avg_total_op_count = 0;
-
-            for node in nodes.iter() {
-                for agent in node.agents.iter() {
-                    avg_total_op_count += node
-                        .kdirect
-                        .get_persist()
-                        .query_entries(
-                            root.clone(),
-                            agent.clone(),
-                            f32::MIN,
-                            f32::MAX,
-                            DhtArc::new(0, u32::MAX),
-                        )
-                        .await
-                        .unwrap()
-                        .len();
-                }
-            }
-            avg_total_op_count /= node_count * agents_per_node;
-
-            if avg_total_op_count >= target_total_op_count {
-                p_send
-                    .send(Progress::OpConsistent {
-                        run_time_s: test_start.elapsed().as_secs_f64(),
-                        round_elapsed_s: round_start_time.elapsed().as_secs_f64(),
-                        new_ops_added_count: node_count * agents_per_node,
-                        total_op_count: avg_total_op_count,
-                    })
-                    .await
-                    .unwrap();
+            if avg_total_op_count >= test.target_total_op_count {
+                test.emit_op_consistent(avg_total_op_count).await;
                 break;
             }
 
-            p_send
-                .send(Progress::InterimState {
-                    run_time_s: test_start.elapsed().as_secs_f64(),
-                    round_elapsed_s: round_start_time.elapsed().as_secs_f64(),
-                    target_agent_count,
-                    avg_agent_count,
-                    target_total_op_count,
-                    avg_total_op_count,
-                })
-                .await
-                .unwrap();
+            test.emit_interim(avg_agent_count, avg_total_op_count).await;
         }
     }
 }
@@ -573,7 +683,8 @@ mod tests {
             tuning_params,
             node_count: 2,
             agents_per_node: 2,
-            bad_agent_infos: false,
+            bad_agent_count: 0,
+            agent_turnover_count: 1,
         });
 
         let deadline = tokio::time::Instant::now()

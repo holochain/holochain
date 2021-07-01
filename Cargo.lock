@@ -2619,6 +2619,7 @@ dependencies = [
  "kitsune_p2p_direct",
  "kitsune_p2p_proxy",
  "kitsune_p2p_transport_quic",
+ "rand 0.8.4",
  "structopt",
  "tokio",
 ]
