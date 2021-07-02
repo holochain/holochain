@@ -16,7 +16,7 @@ pub fn create<'a>(
     call_context: Arc<CallContext>,
     input: EntryWithDefId,
 ) -> Result<HeaderHash, WasmError> {
-    match HostFnAccess::from(&call_context.host_access()) {
+    match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ write_workspace: Permission::Allow, .. } => {
     // build the entry hash
     let entry_hash =

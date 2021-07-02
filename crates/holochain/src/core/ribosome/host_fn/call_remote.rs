@@ -11,7 +11,7 @@ pub fn call_remote(
     call_context: Arc<CallContext>,
     input: CallRemote,
 ) -> Result<ZomeCallResponse, WasmError> {
-    match HostFnAccess::from(&call_context.host_access()) {
+    match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ write_network: Permission::Allow, .. } => {
     // it is the network's responsibility to handle timeouts and return an Err result in that case
     let result: Result<SerializedBytes, _> = tokio_helper::block_forever_on(async move {

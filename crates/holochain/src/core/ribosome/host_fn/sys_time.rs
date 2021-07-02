@@ -10,7 +10,7 @@ pub fn sys_time(
     call_context: Arc<CallContext>,
     _input: (),
 ) -> Result<core::time::Duration, WasmError> {
-    match HostFnAccess::from(&call_context.host_access()) {
+    match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ non_determinism: Permission::Allow, .. } => {
             let start = std::time::SystemTime::now();
             let since_the_epoch = start

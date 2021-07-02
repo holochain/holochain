@@ -17,7 +17,7 @@ pub fn delete<'a>(
     call_context: Arc<CallContext>,
     input: HeaderHash,
 ) -> Result<HeaderHash, WasmError> {
-    match HostFnAccess::from(&call_context.host_access()) {
+    match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ write_workspace: Permission::Allow, .. } => {
             let deletes_entry_address = get_original_address(call_context.clone(), input.clone())?;
 

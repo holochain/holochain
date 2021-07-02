@@ -15,7 +15,7 @@ pub fn emit_signal(
         HostFnAccess{ write_workspace: Permission::Allow, .. } => {
             let cell_id = call_context.host_context().cell_id().clone();
             let signal = Signal::App(cell_id, input);
-            call_context.host_access().signal_tx().send(signal).map_err(|interface_error| WasmError::Host(interface_error.to_string()))?;
+            call_context.host_context().signal_tx().send(signal).map_err(|interface_error| WasmError::Host(interface_error.to_string()))?;
             Ok(())
         },
         _ => unreachable!(),

@@ -14,7 +14,7 @@ pub fn sign_ephemeral(
     call_context: Arc<CallContext>,
     input: SignEphemeral,
 ) -> Result<EphemeralSignatures, WasmError> {
-    match HostFnAccess::from(&call_context.host_access()) {
+    match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ keystore: Permission::Allow, .. } => {
             let rng = SystemRandom::new();
             let mut seed = [0; 32];

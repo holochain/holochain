@@ -11,10 +11,10 @@ pub fn agent_info<'a>(
     call_context: Arc<CallContext>,
     _input: (),
 ) -> Result<AgentInfo, WasmError> {
-    match HostFnAccess::from(&call_context.host_access()) {
+    match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ agent_info: Permission::Allow, .. } => {
             let agent_pubkey = call_context
-                .host_access
+                .host_context
                 .workspace()
                 .source_chain()
                 .agent_pubkey()

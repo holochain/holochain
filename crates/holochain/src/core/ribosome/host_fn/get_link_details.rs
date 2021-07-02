@@ -13,7 +13,7 @@ pub fn get_link_details<'a>(
     call_context: Arc<CallContext>,
     input: GetLinksInput,
 ) -> Result<LinkDetails, WasmError> {
-    match HostFnAccess::from(&call_context.host_access()) {
+    match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ read_workspace: Permission::Allow, .. } => {
             let GetLinksInput {
                 base_address,

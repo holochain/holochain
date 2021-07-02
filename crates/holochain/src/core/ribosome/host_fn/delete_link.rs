@@ -14,7 +14,7 @@ pub fn delete_link<'a>(
     call_context: Arc<CallContext>,
     input: HeaderHash,
 ) -> Result<HeaderHash, WasmError> {
-    match HostFnAccess::from(&call_context.host_access()) {
+    match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ write_workspace: Permission::Allow, .. } => {
             // get the base address from the add link header
             // don't allow the wasm developer to get this wrong

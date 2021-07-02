@@ -11,11 +11,11 @@ pub fn call(
     call_context: Arc<CallContext>,
     call: Call,
 ) -> Result<ZomeCallResponse, WasmError> {
-    match HostFnAccess::from(&call_context.host_access()) {
+    match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ write_workspace: Permission::Allow, .. } => {
-    let host_access = call_context.host_context();
-    let conductor_handle = host_access.call_zome_handle();
-    let workspace = host_access.workspace();
+    let host_context = call_context.host_context();
+    let conductor_handle = host_context.call_zome_handle();
+    let workspace = host_context.workspace();
     // Get the conductor handle
 
             // Get the cell id if it's not passed in

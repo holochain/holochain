@@ -12,7 +12,7 @@ pub fn get<'a>(
     call_context: Arc<CallContext>,
     input: GetInput,
 ) -> Result<Option<Element>, WasmError> {
-    match HostFnAccess::from(&call_context.host_access()) {
+    match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ read_workspace: Permission::Allow, .. } => {
             let GetInput {
                 any_dht_hash,

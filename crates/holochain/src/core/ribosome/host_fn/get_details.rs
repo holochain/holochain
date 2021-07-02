@@ -12,7 +12,7 @@ pub fn get_details<'a>(
     call_context: Arc<CallContext>,
     input: GetInput,
 ) -> Result<Option<Details>, WasmError> {
-    match HostFnAccess::from(&call_context.host_access()) {
+    match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ read_workspace: Permission::Allow, .. } => {
             let GetInput {
                 any_dht_hash,
@@ -32,6 +32,9 @@ pub fn get_details<'a>(
             .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
         Ok(maybe_details)
     })
+    },
+    _ => unreachable!(),
+}
 }
 
 #[cfg(test)]
