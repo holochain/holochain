@@ -173,16 +173,40 @@ impl HostFnBuilder {
 }
 
 type ContextMap = Lazy<Arc<Mutex<HashMap<u64, Arc<CallContext>>>>>;
+/// Map from an instance to it's context for a call.
 static CONTEXT_MAP: ContextMap = Lazy::new(Default::default);
 
-type InstanceCache = HashMap<u64, Arc<Mutex<Instance>>>;
-type ZomeKey = [u8; 32];
-type DnaZomeKey = (DnaHash, ZomeKey);
-type DnaZomeCache = Lazy<Arc<Mutex<HashMap<DnaZomeKey, InstanceCache>>>>;
-static INSTANCE_CACHE: DnaZomeCache = Lazy::new(Default::default);
 static CONTEXT_KEY: AtomicU64 = AtomicU64::new(0);
 
-const INSTANCE_CACHE_SIZE: usize = 20;
+/// Create a key for the instance cache.
+/// It will be [WasmHash..DnaHash..context_key] all as bytes.
+fn instance_cache_key(wasm_hash: &WasmHash, dna_hash: &DnaHash, context_key: u64) -> [u8; 32] {
+    let mut bits = [0u8; 32];
+    for (i, byte) in wasm_hash
+        .get_raw_32()
+        .iter()
+        .zip(dna_hash.get_raw_32().iter())
+        .map(|(a, b)| a ^ b)
+        .take(24)
+        .enumerate()
+    {
+        bits[i] = byte;
+    }
+    for (i, byte) in (24..32).zip(context_key.to_le_bytes()) {
+        bits[i] = byte;
+    }
+    bits
+}
+
+/// Get the context key back from the end of the instance cache key.
+fn context_key_from_key(key: &[u8; 32]) -> u64 {
+    let mut bits = [0u8; 8];
+    for (a, b) in key[24..].iter().zip(bits.iter_mut()) {
+        *b = *a;
+    }
+
+    u64::from_le_bytes(bits)
+}
 
 impl RealRibosome {
     /// Create a new instance
@@ -222,22 +246,25 @@ impl RealRibosome {
         instance: Arc<Mutex<Instance>>,
         zome_name: &ZomeName,
     ) -> RibosomeResult<()> {
+        use holochain_wasmer_host::module::PlruCache;
         // Clear the context as the call is done.
         {
             CONTEXT_MAP.lock().remove(&context_key);
         }
-        let cache_key = (
-            self.dna_file.dna_hash().clone(),
-            self.wasm_cache_key(&zome_name)?,
+        let key = instance_cache_key(
+            &self
+                .dna_file
+                .dna()
+                .get_wasm_zome(zome_name)
+                .map_err(DnaError::from)?
+                .wasm_hash,
+            self.dna_file.dna_hash(),
+            context_key,
         );
-        // Lock the cache.
-        let mut lock = INSTANCE_CACHE.lock();
-        if let Some(cache) = lock.get_mut(&cache_key) {
-            // If we have space in the cache then add this instance.
-            if cache.len() <= INSTANCE_CACHE_SIZE {
-                cache.insert(context_key, instance);
-            }
-        }
+        holochain_wasmer_host::module::INSTANCE_CACHE
+            .write()
+            .put_item(key, instance);
+
         Ok(())
     }
 
@@ -245,6 +272,7 @@ impl RealRibosome {
         &self,
         call_context: CallContext,
     ) -> RibosomeResult<(Arc<Mutex<Instance>>, u64)> {
+        use holochain_wasmer_host::module::PlruCache;
         let zome_name = call_context.zome.zome_name().clone();
 
         // Fallback to creating an instance if we don't have a cache hit.
@@ -256,65 +284,64 @@ impl RealRibosome {
             ));
             RibosomeResult::Ok(instance)
         };
-        {
-            let zome_key = (
-                self.dna_file.dna_hash().clone(),
-                self.wasm_cache_key(&zome_name)?,
-            );
-            // Lock the cache.
-            let mut lock = INSTANCE_CACHE.lock();
-            // Check if we have a hit for this zome.
-            match lock.get_mut(&zome_key) {
-                Some(cache) => {
-                    // We have a hit for the zome.
-                    let key = cache.keys().next().cloned();
-                    // Check if we have a hit for the instance.
-                    if let Some(context_key) = key {
-                        // We have a key, check if we have an instance hit.
-                        if let Some(instance) = cache.remove(&context_key) {
-                            // We have an instance hit.
-                            // Update the context.
-                            {
-                                CONTEXT_MAP
-                                    .lock()
-                                    .insert(context_key, Arc::new(call_context));
-                            }
-                            // This is the fastest path.
-                            return Ok((instance, context_key));
-                        }
-                    }
 
-                    // We didn't get an instance hit so create a new key.
-                    let context_key = CONTEXT_KEY.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    // Update the context.
-                    {
-                        CONTEXT_MAP
-                            .lock()
-                            .insert(context_key, Arc::new(call_context));
-                    }
-                    // Fallback to creating the instance.
-                    let instance = fallback(context_key)?;
-                    Ok((instance, context_key))
+        // Get the start of the possible keys.
+        let key_start = instance_cache_key(
+            &self
+                .dna_file
+                .dna()
+                .get_wasm_zome(&zome_name)
+                .map_err(DnaError::from)?
+                .wasm_hash,
+            self.dna_file.dna_hash(),
+            0,
+        );
+        // Get the end of the possible keys.
+        let key_end = instance_cache_key(
+            &self
+                .dna_file
+                .dna()
+                .get_wasm_zome(&zome_name)
+                .map_err(DnaError::from)?
+                .wasm_hash,
+            self.dna_file.dna_hash(),
+            CONTEXT_KEY.load(std::sync::atomic::Ordering::Relaxed),
+        );
+        let mut lock = holochain_wasmer_host::module::INSTANCE_CACHE.write();
+        // Get the first available key.
+        let key = lock
+            .cache()
+            .range(key_start..key_end)
+            .next()
+            .map(|(k, _)| k)
+            .cloned();
+        // Check if we got a key hit.
+        if let Some(key) = key {
+            // If we did then remove that instance.
+            if let Some(instance) = lock.remove_item(&key) {
+                let context_key = context_key_from_key(&key);
+                // We have an instance hit.
+                // Update the context.
+                {
+                    CONTEXT_MAP
+                        .lock()
+                        .insert(context_key, Arc::new(call_context));
                 }
-                None => {
-                    // We didn't get a hit for the zome so create a cache for this zome.
-                    let cache = HashMap::new();
-                    // Get the key for this context.
-                    let context_key = CONTEXT_KEY.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    // Update the context.
-                    {
-                        CONTEXT_MAP
-                            .lock()
-                            .insert(context_key, Arc::new(call_context));
-                    }
-                    // Fallback to creating the instance.
-                    let instance = fallback(context_key)?;
-                    // Insert the cache for next time.
-                    lock.insert(zome_key, cache);
-                    Ok((instance, context_key))
-                }
+                // This is the fastest path.
+                return Ok((instance, context_key));
             }
         }
+        // We didn't get an instance hit so create a new key.
+        let context_key = CONTEXT_KEY.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        // Update the context.
+        {
+            CONTEXT_MAP
+                .lock()
+                .insert(context_key, Arc::new(call_context));
+        }
+        // Fallback to creating the instance.
+        let instance = fallback(context_key)?;
+        Ok((instance, context_key))
     }
 
     fn imports(&self, context_key: u64, store: &Store) -> ImportObject {
