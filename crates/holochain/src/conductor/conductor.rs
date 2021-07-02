@@ -93,6 +93,19 @@ where
     status: CellNetworkStatus,
 }
 
+impl<CA> CellItem<CA>
+where
+    CA: CellConductorApiT,
+{
+    pub fn is_running(&self) -> bool {
+        self.status == CellNetworkStatus::Joined
+    }
+
+    pub fn is_pending(&self) -> bool {
+        self.status == CellNetworkStatus::PendingJoin
+    }
+}
+
 pub(crate) type StopBroadcaster = tokio::sync::broadcast::Sender<()>;
 pub(crate) type StopReceiver = tokio::sync::broadcast::Receiver<()>;
 
@@ -178,6 +191,36 @@ where
             .get(cell_id)
             .ok_or_else(|| ConductorError::CellMissing(cell_id.clone()))?;
         Ok(item.cell.clone())
+    }
+
+    /// Iterator over all cells, regardless of status. Generally used when
+    /// responding to kitsune requests.
+    pub(super) fn all_cells(&self) -> impl Iterator<Item = (&CellId, &Cell)> {
+        self.cells.iter().map(|(id, item)| (id, item.cell.as_ref()))
+    }
+
+    /// Iterator over only the cells which are fully running. Generally used
+    /// to handle conductor interface requests
+    pub(super) fn running_cells(&self) -> impl Iterator<Item = (&CellId, &Cell)> {
+        self.cells.iter().filter_map(|(id, item)| {
+            if item.is_running() {
+                Some((id, item.cell.as_ref()))
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Iterator over only the cells which are pending validation. Used to
+    /// discover which cells need to be joined to the network.
+    pub(super) fn pending_cells(&self) -> impl Iterator<Item = (&CellId, &Cell)> {
+        self.cells.iter().filter_map(|(id, item)| {
+            if item.is_pending() {
+                Some((id, item.cell.as_ref()))
+            } else {
+                None
+            }
+        })
     }
 
     /// A gate to put at the top of public functions to ensure that work is not
@@ -505,7 +548,7 @@ where
         }
     }
 
-    pub(super) async fn reconcile_app_state_with_cells<S>(
+    pub(super) async fn reconcile_app_status_with_cell_status<S>(
         &mut self,
         app_ids: Option<S>,
     ) -> ConductorResult<()>
@@ -516,7 +559,7 @@ where
         use AppStatusTransition::*;
 
         let app_ids: Option<HashSet<InstalledAppId>> = app_ids.map(S::into);
-        let running_cells: HashSet<CellId> = self.cells.keys().cloned().collect();
+        let running_cells: HashSet<CellId> = self.running_cells().map(first).cloned().collect();
         self.update_state(move |mut state| {
             let apps = state.installed_apps_mut().iter_mut().filter(|(id, _)| {
                 app_ids
@@ -700,8 +743,8 @@ where
     }
 
     /// Add fully constructed cells to the cell map in the Conductor
-    pub(super) fn add_cells(&mut self, cells: Vec<Cell>) {
-        for cell in cells {
+    pub(super) fn add_and_initialize_cells(&mut self, cells: Vec<(Cell, InitialQueueTriggers)>) {
+        for (cell, triggers) in cells {
             let cell_id = cell.id().clone();
             tracing::info!(?cell_id, "ADD CELL");
             self.cells.insert(
@@ -711,14 +754,15 @@ where
                     status: CellNetworkStatus::PendingJoin,
                 },
             );
+            triggers.initialize_workflows();
         }
     }
 
     /// Add fully constructed cells to the cell map in the Conductor
-    pub(super) fn update_cell_status(&mut self, cell_ids: Vec<CellId>, status: CellNetworkStatus) {
+    pub(super) fn update_cell_status(&mut self, cell_ids: &[CellId], status: CellNetworkStatus) {
         for cell_id in cell_ids {
             self.cells
-                .get_mut(&cell_id)
+                .get_mut(cell_id)
                 .map(|mut cell| cell.status = status.clone());
         }
     }
@@ -1243,7 +1287,10 @@ mod builder {
 
             tokio::task::spawn(p2p_event_task(p2p_evt, handle.clone()));
 
-            let cell_startup_errors = handle.clone().reconcile_cells_with_app_state().await?;
+            let cell_startup_errors = handle
+                .clone()
+                .reconcile_cell_status_with_app_status()
+                .await?;
 
             // TODO: This should probably be emitted over the admin interface
             if !cell_startup_errors.is_empty() {

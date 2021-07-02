@@ -240,12 +240,12 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let errors = self
                     .conductor_handle
                     .clone()
-                    .reconcile_cells_with_app_state()
+                    .reconcile_cell_status_with_app_status()
                     .await?;
 
                 self.conductor_handle
                     .clone()
-                    .reconcile_app_state_with_cells(Some(
+                    .reconcile_app_status_with_cell_status(Some(
                         vec![installed_app_id.clone()].into_iter().collect(),
                     ))
                     .await?;

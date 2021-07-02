@@ -253,7 +253,7 @@ pub async fn install_app(
         .unwrap();
 
     let errors = conductor_handle
-        .reconcile_cells_with_app_state()
+        .reconcile_cell_status_with_app_status()
         .await
         .unwrap();
 

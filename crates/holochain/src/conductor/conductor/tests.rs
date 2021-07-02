@@ -419,12 +419,12 @@ async fn test_setup_cells_idempotency() {
 
     conductor
         .inner_handle()
-        .reconcile_cells_with_app_state()
+        .reconcile_cell_status_with_app_status()
         .await
         .unwrap();
     conductor
         .inner_handle()
-        .reconcile_cells_with_app_state()
+        .reconcile_cell_status_with_app_status()
         .await
         .unwrap();
 
@@ -631,7 +631,7 @@ async fn test_reactivate_app() {
     conductor.enable_app(&"app".to_string()).await.unwrap();
     conductor
         .inner_handle()
-        .reconcile_cells_with_app_state()
+        .reconcile_cell_status_with_app_status()
         .await
         .unwrap();
 

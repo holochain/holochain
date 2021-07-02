@@ -255,7 +255,7 @@ pub mod test_utils {
 
         let errors = conductor_handle
             .clone()
-            .reconcile_cells_with_app_state()
+            .reconcile_cell_status_with_app_status()
             .await
             .unwrap();
 
@@ -358,7 +358,7 @@ pub mod test {
 
         let errors = conductor_handle
             .clone()
-            .reconcile_cells_with_app_state()
+            .reconcile_cell_status_with_app_status()
             .await
             .unwrap();
 

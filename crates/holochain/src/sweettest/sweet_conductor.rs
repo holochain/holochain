@@ -233,7 +233,7 @@ impl SweetConductor {
         self.handle()
             .0
             .clone()
-            .reconcile_cells_with_app_state()
+            .reconcile_cell_status_with_app_status()
             .await?;
 
         let dna_files = dna_files.iter().map(|d| d.dna_hash().clone());
@@ -279,7 +279,7 @@ impl SweetConductor {
         self.handle()
             .0
             .clone()
-            .reconcile_cells_with_app_state()
+            .reconcile_cell_status_with_app_status()
             .await?;
 
         let mut apps = Vec::new();
