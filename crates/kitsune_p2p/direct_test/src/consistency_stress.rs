@@ -205,7 +205,17 @@ pub fn run(
     impl futures::stream::Stream<Item = Progress>,
     impl FnOnce() -> BoxFuture<'static, ()>,
 ) {
-    observability::test_run().ok();
+    use tracing_subscriber::{filter::EnvFilter, fmt::time::ChronoUtc, FmtSubscriber};
+    tracing::subscriber::set_global_default(
+        FmtSubscriber::builder()
+            .with_writer(std::io::stderr)
+            // like rfc3339 but slightly more terse
+            .with_timer(ChronoUtc::with_format("%Y-%m-%dT%H:%M:%S.%3fZ".to_string()))
+            .with_env_filter(EnvFilter::from_default_env())
+            .pretty()
+            .finish(),
+    )
+    .unwrap();
 
     let (p_send, p_recv) = futures::channel::mpsc::channel(1024);
     let shutdown = || {

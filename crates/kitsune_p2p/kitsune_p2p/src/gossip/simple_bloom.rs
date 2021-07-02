@@ -11,6 +11,7 @@ use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::*;
 use std::collections::{HashMap, HashSet};
+use std::sync::atomic;
 use std::sync::Arc;
 
 /// max send buffer size (keep it under 16384 with a little room for overhead)
@@ -209,6 +210,7 @@ enum CheckResult {
 }
 
 pub(crate) struct SimpleBloomMod {
+    cont: Arc<atomic::AtomicBool>,
     tuning_params: KitsuneP2pTuningParams,
     send_interval_ms: u64,
     space: Arc<KitsuneSpace>,
@@ -236,7 +238,10 @@ impl SimpleBloomMod {
             / tuning_params.gossip_output_target_mbps
         ) as u64;
 
+        let cont = Arc::new(atomic::AtomicBool::new(true));
+
         let this = Arc::new(Self {
+            cont: cont.clone(),
             tuning_params,
             space,
             ep_hnd,
@@ -251,16 +256,20 @@ impl SimpleBloomMod {
         let gossip = this.clone();
         metric_task(async move {
             loop {
+                if !cont.load(atomic::Ordering::Relaxed) {
+                    break;
+                }
+
                 tokio::time::sleep(std::time::Duration::from_millis(
                     loop_check_interval_ms as u64,
                 ))
                 .await;
 
                 if let GossipIterationResult::Close = gossip.run_one_iteration().await {
-                    tracing::warn!("gossip loop ending");
                     break;
                 }
             }
+            tracing::warn!("gossip loop ending");
 
             KitsuneResult::Ok(())
         });
@@ -433,6 +442,10 @@ impl SimpleBloomMod {
 }
 
 impl AsGossipModule for SimpleBloomMod {
+    fn close(&self) {
+        self.cont.store(false, atomic::Ordering::Relaxed);
+    }
+
     fn incoming_gossip(
         &self,
         con: Tx2ConHnd<wire::Wire>,

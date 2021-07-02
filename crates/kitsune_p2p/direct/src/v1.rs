@@ -229,10 +229,11 @@ impl AsKitsuneDirect for Kd1 {
         // TODO - pass along code/reason to transport shutdowns
         let r = self.inner.share_mut(|i, c| {
             *c = true;
-            Ok(i.p2p.clone())
+            Ok((i.srv.clone(), i.p2p.clone()))
         });
         async move {
-            if let Ok(p2p) = r {
+            if let Ok((srv, p2p)) = r {
+                srv.close().await;
                 let _ = p2p.ghost_actor_shutdown_immediate().await;
             }
         }

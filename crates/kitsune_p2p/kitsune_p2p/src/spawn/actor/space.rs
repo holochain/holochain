@@ -267,7 +267,19 @@ async fn update_single_agent_info(input: UpdateAgentInfoInput<'_>) -> KitsuneP2p
     Ok(())
 }
 
-impl ghost_actor::GhostControlHandler for Space {}
+use ghost_actor::dependencies::must_future::MustBoxFuture;
+impl ghost_actor::GhostControlHandler for Space {
+    fn handle_ghost_actor_shutdown(mut self) -> MustBoxFuture<'static, ()> {
+        async move {
+            use futures::sink::SinkExt;
+            // this is a curtesy, ok if fails
+            let _ = self.evt_sender.close().await;
+            self.gossip_mod.close();
+        }
+        .boxed()
+        .into()
+    }
+}
 
 impl ghost_actor::GhostHandler<KitsuneP2p> for Space {}
 
@@ -558,6 +570,11 @@ impl Space {
                 let mut delay_len = START_DELAY;
 
                 loop {
+                    use ghost_actor::GhostControlSender;
+                    if !i_s_c.ghost_actor_is_active() {
+                        break;
+                    }
+
                     tokio::time::sleep(delay_len).await;
                     if delay_len <= MAX_DELAY {
                         delay_len *= 2;
@@ -576,6 +593,9 @@ impl Space {
                             tracing::error!(msg = "Failed to get peers from bootstrap", ?e);
                         }
                         Ok(list) => {
+                            if !i_s_c.ghost_actor_is_active() {
+                                break;
+                            }
                             for item in list {
                                 // TODO - someday some validation here
                                 let agent = item.agent.clone();
@@ -604,6 +624,7 @@ impl Space {
                         }
                     }
                 }
+                tracing::warn!("bootstrap fetch loop ending");
             });
         }
 

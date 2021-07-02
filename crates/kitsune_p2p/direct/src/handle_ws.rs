@@ -352,6 +352,10 @@ async fn handle_ws_recv(
                 let api: KdApi = match match evt {
                     Ok(tungstenite::Message::Text(json)) => serde_json::from_str(&json),
                     Ok(tungstenite::Message::Binary(json)) => serde_json::from_slice(&json),
+                    Ok(tungstenite::Message::Close(_)) => {
+                        tracing::debug!("kdhnd recv ws close");
+                        return;
+                    }
                     evt => {
                         tracing::warn!(?evt, "invalid websocket message");
                         return;
@@ -398,4 +402,5 @@ async fn handle_ws_recv(
             },
         )
         .await;
+    tracing::debug!("kdhnd recv shutdown");
 }
