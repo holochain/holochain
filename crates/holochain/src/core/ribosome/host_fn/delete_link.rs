@@ -6,6 +6,7 @@ use holochain_cascade::Cascade;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
+use crate::core::ribosome::HostFnAccess;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn delete_link<'a>(
@@ -13,61 +14,66 @@ pub fn delete_link<'a>(
     call_context: Arc<CallContext>,
     input: HeaderHash,
 ) -> Result<HeaderHash, WasmError> {
-    // get the base address from the add link header
-    // don't allow the wasm developer to get this wrong
-    // it is never valid to have divergent base address for add/remove links
-    // the subconscious will validate the base address match but we need to fetch it here to
-    // include it in the remove link header
-    let network = call_context.host_context.network().clone();
-    let address = input.clone();
-    let call_context_2 = call_context.clone();
+    match HostFnAccess::from(&call_context.host_access()) {
+        HostFnAccess{ write_workspace: Permission::Allow, .. } => {
+            // get the base address from the add link header
+            // don't allow the wasm developer to get this wrong
+            // it is never valid to have divergent base address for add/remove links
+            // the subconscious will validate the base address match but we need to fetch it here to
+            // include it in the remove link header
+            let network = call_context.host_context.network().clone();
+            let address = input.clone();
+            let call_context_2 = call_context.clone();
 
-    // handle timeouts at the network layer
-    let maybe_add_link: Option<SignedHeaderHashed> = tokio_helper::block_forever_on(async move {
-        let workspace = call_context_2.host_context.workspace();
-        CascadeResult::Ok(
-            Cascade::from_workspace_network(workspace, network)
-                .dht_get(address.into(), GetOptions::content())
-                .await?
-                .map(|el| el.into_inner().0),
-        )
-    })
-    .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
+            // handle timeouts at the network layer
+            let maybe_add_link: Option<SignedHeaderHashed> = tokio_helper::block_forever_on(async move {
+                let workspace = call_context_2.host_context.workspace();
+                CascadeResult::Ok(
+                    Cascade::from_workspace_network(workspace, network)
+                        .dht_get(address.into(), GetOptions::content())
+                        .await?
+                        .map(|el| el.into_inner().0),
+                )
+            })
+            .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
 
-    let base_address = match maybe_add_link {
-        Some(add_link_signed_header_hash) => {
-            match add_link_signed_header_hash.header() {
-                Header::CreateLink(link_add_header) => Ok(link_add_header.base_address.clone()),
-                // the add link header hash provided was found but didn't point to an AddLink
-                // header (it is something else) so we cannot proceed
-                _ => Err(RibosomeError::ElementDeps(input.clone().into())),
+            let base_address = match maybe_add_link {
+                Some(add_link_signed_header_hash) => {
+                    match add_link_signed_header_hash.header() {
+                        Header::CreateLink(link_add_header) => Ok(link_add_header.base_address.clone()),
+                        // the add link header hash provided was found but didn't point to an AddLink
+                        // header (it is something else) so we cannot proceed
+                        _ => Err(RibosomeError::ElementDeps(input.clone().into())),
+                    }
+                }
+                // the add link header hash could not be found
+                // it's unlikely that a wasm call would have a valid add link header hash from "somewhere"
+                // that isn't also discoverable in either the cache or DHT, but it _is_ possible so we have
+                // to fail in that case (e.g. the local cache could have GC'd at the same moment the
+                // network connection dropped out)
+                None => Err(RibosomeError::ElementDeps(input.clone().into())),
             }
-        }
-        // the add link header hash could not be found
-        // it's unlikely that a wasm call would have a valid add link header hash from "somewhere"
-        // that isn't also discoverable in either the cache or DHT, but it _is_ possible so we have
-        // to fail in that case (e.g. the local cache could have GC'd at the same moment the
-        // network connection dropped out)
-        None => Err(RibosomeError::ElementDeps(input.clone().into())),
-    }
-    .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?;
+            .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?;
 
     let source_chain = call_context.host_context.workspace().source_chain();
 
-    // handle timeouts at the source chain layer
+            // handle timeouts at the source chain layer
 
-    // add a DeleteLink to the source chain
-    tokio_helper::block_forever_on(async move {
-        let header_builder = builder::DeleteLink {
-            link_add_address: input,
-            base_address,
-        };
-        let header_hash = source_chain
-            .put(header_builder, None)
-            .await
-            .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
-        Ok(header_hash)
-    })
+            // add a DeleteLink to the source chain
+            tokio_helper::block_forever_on(async move {
+                let header_builder = builder::DeleteLink {
+                    link_add_address: input,
+                    base_address,
+                };
+                let header_hash = source_chain
+                    .put(header_builder, None)
+                    .await
+                    .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
+                Ok(header_hash)
+            })
+        },
+        _ => unreachable!(),
+    }
 }
 
 #[cfg(test)]

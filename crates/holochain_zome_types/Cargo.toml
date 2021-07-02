@@ -1,6 +1,6 @@
 [package]
 name = "holochain_zome_types"
-version = "0.0.2-alpha.1"
+version = "0.0.4-dev.0"
 description = "Holochain zome types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -13,7 +13,7 @@ edition = "2018"
 
 [dependencies]
 chrono = "0.4.6"
-holo_hash = { version = "0.0.2-alpha.1", path = "../holo_hash" }
+holo_hash = { version = "0.0.4-dev.0", path = "../holo_hash" }
 holochain_serialized_bytes = "=0.0.50"
 paste = "=1.0.5"
 serde = { version = "1.0", features = [ "derive" ] }
@@ -24,7 +24,7 @@ tracing = "0.1"
 holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer", rev = "9b1f3f2e53f77d8c24c74fc2c75002dfbdc2e0a3" }
 
 # fixturator dependencies
-fixt = { version = "^0.0.2-alpha.1", path = "../fixt", optional = true }
+fixt = { version = "0.0.4-dev.0", path = "../fixt", optional = true }
 strum = { version = "0.18.0", optional = true }
 rand = {version = "0.7", optional = true}
 

@@ -5,29 +5,32 @@ use holochain_p2p::actor::GetActivityOptions;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
+use crate::core::ribosome::HostFnAccess;
 
 pub fn get_agent_activity(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: GetAgentActivityInput,
 ) -> Result<AgentActivity, WasmError> {
-    let GetAgentActivityInput {
-        agent_pubkey,
-        chain_query_filter,
-        activity_request,
-    } = input;
-    let options = match activity_request {
-        ActivityRequest::Status => GetActivityOptions {
-            include_valid_activity: false,
-            include_rejected_activity: false,
-            ..Default::default()
-        },
-        ActivityRequest::Full => GetActivityOptions {
-            include_valid_activity: true,
-            include_rejected_activity: true,
-            ..Default::default()
-        },
-    };
+    match HostFnAccess::from(&call_context.host_access()) {
+        HostFnAccess{ read_workspace: Permission::Allow, .. } => {
+            let GetAgentActivityInput {
+                agent_pubkey,
+                chain_query_filter,
+                activity_request,
+            } = input;
+            let options = match activity_request {
+                ActivityRequest::Status => GetActivityOptions {
+                    include_valid_activity: false,
+                    include_rejected_activity: false,
+                    ..Default::default()
+                },
+                ActivityRequest::Full => GetActivityOptions {
+                    include_valid_activity: true,
+                    include_rejected_activity: true,
+                    ..Default::default()
+                },
+            };
 
     // Get the network from the context
     let network = call_context.host_context.network().clone();
@@ -41,8 +44,11 @@ pub fn get_agent_activity(
             .await
             .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
 
-        Ok(activity.into())
-    })
+                Ok(activity.into())
+            })
+        },
+        _ => unreachable!(),
+    }
 }
 
 // we are relying on the create tests to show the commit/get round trip

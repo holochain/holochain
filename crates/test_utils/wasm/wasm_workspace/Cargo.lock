@@ -209,7 +209,7 @@ checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 
 [[package]]
 name = "fixt"
-version = "0.0.2-alpha.1"
+version = "0.0.4-dev.0"
 dependencies = [
  "holochain_serialized_bytes",
  "lazy_static",
@@ -268,7 +268,7 @@ checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
 
 [[package]]
 name = "hdk"
-version = "0.0.101-alpha.0"
+version = "0.0.102-dev.0"
 dependencies = [
  "hdk_derive",
  "holo_hash",
@@ -286,7 +286,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.0.2-alpha.1"
+version = "0.0.4-dev.0"
 dependencies = [
  "holochain_zome_types",
  "paste",
@@ -306,7 +306,7 @@ dependencies = [
 
 [[package]]
 name = "holo_hash"
-version = "0.0.2-alpha.1"
+version = "0.0.4-dev.0"
 dependencies = [
  "base64",
  "blake2b_simd",
@@ -346,7 +346,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.0.1"
+version = "0.0.2-dev.0"
 dependencies = [
  "hdk",
  "serde",
@@ -354,8 +354,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.67"
-source = "git+https://github.com/holochain/holochain-wasmer.git?rev=9b1f3f2e53f77d8c24c74fc2c75002dfbdc2e0a3#9b1f3f2e53f77d8c24c74fc2c75002dfbdc2e0a3"
+version = "0.0.71"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0fddd727739c9e7335fb90d9e4f0604c3acb267e5123ef855b631084c38c7330"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -365,8 +366,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_guest"
-version = "0.0.67"
-source = "git+https://github.com/holochain/holochain-wasmer.git?rev=9b1f3f2e53f77d8c24c74fc2c75002dfbdc2e0a3#9b1f3f2e53f77d8c24c74fc2c75002dfbdc2e0a3"
+version = "0.0.71"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "61e6b7192ef8be6cf696bc11f7080ab30097ad64cb7a90bf98bdc12e313a7540"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
@@ -377,7 +379,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.0.2-alpha.1"
+version = "0.0.4-dev.0"
 dependencies = [
  "chrono",
  "derive_builder",

@@ -9,6 +9,7 @@ use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use crate::core::ribosome::HostFnAccess;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn delete<'a>(
@@ -16,23 +17,28 @@ pub fn delete<'a>(
     call_context: Arc<CallContext>,
     input: HeaderHash,
 ) -> Result<HeaderHash, WasmError> {
-    let deletes_entry_address = get_original_address(call_context.clone(), input.clone())?;
+    match HostFnAccess::from(&call_context.host_access()) {
+        HostFnAccess{ write_workspace: Permission::Allow, .. } => {
+            let deletes_entry_address = get_original_address(call_context.clone(), input.clone())?;
 
     let host_access = call_context.host_context();
 
-    // handle timeouts at the source chain layer
-    tokio_helper::block_forever_on(async move {
-        let source_chain = host_access.workspace().source_chain();
-        let header_builder = builder::Delete {
-            deletes_address: input,
-            deletes_entry_address,
-        };
-        let header_hash = source_chain
-            .put(header_builder, None)
-            .await
-            .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
-        Ok(header_hash)
-    })
+            // handle timeouts at the source chain layer
+            tokio_helper::block_forever_on(async move {
+                let source_chain = host_access.workspace().source_chain();
+                let header_builder = builder::Delete {
+                    deletes_address: input,
+                    deletes_entry_address,
+                };
+                let header_hash = source_chain
+                    .put(header_builder, None)
+                    .await
+                    .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
+                Ok(header_hash)
+            })
+        },
+        _ => unreachable!(),
+    }
 }
 
 #[allow(clippy::extra_unused_lifetimes)]

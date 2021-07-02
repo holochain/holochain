@@ -4,23 +4,29 @@ use holo_hash::HasHash;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
+use crate::core::ribosome::HostFnAccess;
 
 pub fn zome_info(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     _input: (),
 ) -> Result<ZomeInfo, WasmError> {
-    Ok(ZomeInfo {
-        dna_name: ribosome.dna_def().name.clone(),
-        zome_name: call_context.zome.zome_name().clone(),
-        dna_hash: ribosome.dna_def().as_hash().clone(),
-        zome_id: ribosome
-            .zome_to_id(&call_context.zome)
-            .expect("Failed to get ID for current zome"),
-        properties: ribosome.dna_def().properties.clone(),
-        // @TODO
-        // public_token: "".into(),
-    })
+    match HostFnAccess::from(&call_context.host_access()) {
+        HostFnAccess{ dna_bindings: Permission::Allow, .. } => {
+            Ok(ZomeInfo {
+                dna_name: ribosome.dna_def().name.clone(),
+                zome_name: call_context.zome.zome_name().clone(),
+                dna_hash: ribosome.dna_def().as_hash().clone(),
+                zome_id: ribosome
+                    .zome_to_id(&call_context.zome)
+                    .expect("Failed to get ID for current zome"),
+                properties: ribosome.dna_def().properties.clone(),
+                // @TODO
+                // public_token: "".into(),
+            })
+        },
+        _ => unreachable!(),
+    }
 }
 
 #[cfg(test)]

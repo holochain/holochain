@@ -172,10 +172,6 @@ host_fn_api_impls! {
 
     fn verify_signature (zt::signature::VerifySignature) -> bool;
 
-    // There's nothing to go in or out of a noop.
-    // Used to "defuse" host functions when side effects are not allowed.
-    fn unreachable (()) -> ();
-
     // The zome and agent info are constants specific to the current zome and chain.
     // All the information is provided by core so there is no input value.
     // These are constant for the lifetime of a zome call.

@@ -5,6 +5,7 @@ use holochain_p2p::actor::GetLinksOptions;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
+use crate::core::ribosome::HostFnAccess;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_link_details<'a>(
@@ -12,26 +13,28 @@ pub fn get_link_details<'a>(
     call_context: Arc<CallContext>,
     input: GetLinksInput,
 ) -> Result<LinkDetails, WasmError> {
-    let GetLinksInput {
-        base_address,
-        tag_prefix,
-    } = input;
+    match HostFnAccess::from(&call_context.host_access()) {
+        HostFnAccess{ read_workspace: Permission::Allow, .. } => {
+            let GetLinksInput {
+                base_address,
+                tag_prefix,
+            } = input;
 
-    // Get zome id
-    let zome_id = ribosome
-        .zome_to_id(&call_context.zome)
-        .expect("Failed to get ID for current zome.");
+            // Get zome id
+            let zome_id = ribosome
+                .zome_to_id(&call_context.zome)
+                .expect("Failed to get ID for current zome.");
 
     // Get the network from the context
     let network = call_context.host_context.network().clone();
 
-    tokio_helper::block_forever_on(async move {
-        // Create the key
-        let key = WireLinkKey {
-            base: base_address,
-            zome_id,
-            tag: tag_prefix,
-        };
+            tokio_helper::block_forever_on(async move {
+                // Create the key
+                let key = WireLinkKey {
+                    base: base_address,
+                    zome_id,
+                    tag: tag_prefix,
+                };
 
         let workspace = call_context.host_context.workspace();
         let mut cascade = Cascade::from_workspace_network(workspace, network);
@@ -43,8 +46,11 @@ pub fn get_link_details<'a>(
                 .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?,
         );
 
-        Ok(link_details)
-    })
+                Ok(link_details)
+            })
+        },
+        _ => unreachable!(),
+    }
 }
 
 #[cfg(test)]

@@ -4,6 +4,7 @@ use holochain_cascade::Cascade;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
+use crate::core::ribosome::HostFnAccess;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_details<'a>(
@@ -11,10 +12,12 @@ pub fn get_details<'a>(
     call_context: Arc<CallContext>,
     input: GetInput,
 ) -> Result<Option<Details>, WasmError> {
-    let GetInput {
-        any_dht_hash,
-        get_options,
-    } = input;
+    match HostFnAccess::from(&call_context.host_access()) {
+        HostFnAccess{ read_workspace: Permission::Allow, .. } => {
+            let GetInput {
+                any_dht_hash,
+                get_options,
+            } = input;
 
     // Get the network from the context
     let network = call_context.host_context.network().clone();

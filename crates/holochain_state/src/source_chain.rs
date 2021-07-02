@@ -419,9 +419,10 @@ impl SourceChain {
                     let timestamp = header.timestamp();
                     let visibility = header.entry_type().map(|et| *et.visibility());
                     // Put the header back by value.
+                    let dependency = get_dependency(op_type, &header);
                     h = Some(header);
                     // Collect the DhtOpLight, DhtOpHash and OpOrder.
-                    ops.push((op, op_hash, op_order, timestamp, visibility));
+                    ops.push((op, op_hash, op_order, timestamp, visibility, dependency));
                 }
 
                 // Put the SignedHeaderHashed back together.
@@ -462,7 +463,7 @@ impl SourceChain {
                 for header in headers {
                     insert_header(txn, header)?;
                 }
-                for (op, op_hash, op_order, timestamp, visibility) in ops {
+                for (op, op_hash, op_order, timestamp, visibility, dependency) in ops {
                     let op_type = op.get_type();
                     insert_op_lite(txn, op, op_hash.clone(), true, op_order, timestamp)?;
                     set_validation_status(
@@ -470,6 +471,7 @@ impl SourceChain {
                         op_hash.clone(),
                         holochain_zome_types::ValidationStatus::Valid,
                     )?;
+                    set_dependency(txn, op_hash.clone(), dependency)?;
                     // TODO: SHARDING: Check if we are the authority here.
                     // StoreEntry ops with private entries are never gossiped or published
                     // so we don't need to integrate them.
@@ -568,8 +570,12 @@ pub fn put_raw(
             UniqueForm::op_hash(op_type, header.take().expect("This can't be empty"))?;
         let op_order = OpOrder::new(op_type, h.timestamp());
         let timestamp = h.timestamp();
+        let visibility = h.entry_type().map(|et| *et.visibility());
+        let dependency = get_dependency(op_type, &h);
         header = Some(h);
-        hashes.push((op_hash, op_order, timestamp));
+        hashes.push((
+            op_hash, op_type, op_order, timestamp, visibility, dependency,
+        ));
     }
     let shh = SignedHeaderHashed::with_presigned(
         HeaderHashed::with_pre_hashed(header.expect("This can't be empty"), hash),
@@ -579,8 +585,18 @@ pub fn put_raw(
         insert_entry(txn, EntryHashed::from_content_sync(entry))?;
     }
     insert_header(txn, shh)?;
-    for (op, (op_hash, op_order, timestamp)) in ops.into_iter().zip(hashes) {
-        insert_op_lite(txn, op, op_hash, true, op_order, timestamp)?;
+    for (op, (op_hash, op_type, op_order, timestamp, visibility, dependency)) in
+        ops.into_iter().zip(hashes)
+    {
+        insert_op_lite(txn, op, op_hash.clone(), true, op_order, timestamp)?;
+        set_dependency(txn, op_hash.clone(), dependency)?;
+        // TODO: SHARDING: Check if we are the authority here.
+        // StoreEntry ops with private entries are never gossiped or published
+        // so we don't need to integrate them.
+        // TODO: Can anything every depend on a private store entry op? I don't think so.
+        if !(op_type == DhtOpType::StoreEntry && visibility == Some(EntryVisibility::Private)) {
+            set_validation_stage(txn, op_hash, ValidationLimboStatus::Pending)?;
+        }
     }
     Ok(())
 }
