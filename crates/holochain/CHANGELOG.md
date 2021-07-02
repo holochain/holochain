@@ -4,6 +4,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+### Added
+
+- Using the 3 level PLRU instance cache from latest holochain wasmer `v0.0.72`
+
 ## 0.0.101
 
 This version contains breaking changes to the conductor API as well as a major upgrade to the underlying Wasm runtime.
