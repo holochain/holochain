@@ -10,7 +10,7 @@ crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
 hdk = { path = "../../../../hdk" }
-holochain_test_wasm_common = { version = "=0.0.1", path = "../../../wasm_common" }
+holochain_test_wasm_common = { path = "../../../wasm_common" }
 serde = "1.0"
 
 [features]

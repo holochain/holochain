@@ -702,7 +702,9 @@ pub async fn run_validation_callback_direct(
     conductor_api: &impl CellConductorApiT,
 ) -> AppValidationResult<Outcome> {
     let outcome = {
-        let mut cascade = Cascade::from_workspace_network(&workspace, network.clone());
+        // TODO: Put this back to full cascade when we work out the cache contention.
+        // let mut cascade = Cascade::from_workspace_network(&workspace, network.clone());
+        let mut cascade = Cascade::from_workspace(&workspace);
         get_associated_entry_def(&element, ribosome.dna_def(), conductor_api, &mut cascade).await
     };
 
@@ -858,11 +860,13 @@ impl AppValidationWorkspace {
 
     pub fn full_cascade<Network: HolochainP2pCellT + Clone + 'static + Send>(
         &mut self,
-        network: Network,
-    ) -> Cascade<Network> {
+        _network: Network,
+    ) -> Cascade {
+        // TODO: Put this back to full cascade when we work out the cache contention.
         Cascade::empty()
             .with_vault(self.vault.clone().into())
-            .with_network(network, self.cache.clone())
+            // .with_network(network, self.cache.clone())
+            .with_cache(self.cache.clone())
     }
 }
 
