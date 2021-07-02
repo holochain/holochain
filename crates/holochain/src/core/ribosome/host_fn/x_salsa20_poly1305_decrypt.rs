@@ -13,7 +13,7 @@ pub fn x_salsa20_poly1305_decrypt(
     input: XSalsa20Poly1305Decrypt,
 ) -> Result<Option<XSalsa20Poly1305Data>, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
-        HostFnAccess{ keystore: Permission::Allow, .. } => {
+        HostFnAccess{ keystore_deterministic: Permission::Allow, .. } => {
             // @todo use a libsodium wrapper instead of an ad-hoc rust implementation.
             // Note that the we're mapping any decrypting error to None here.
             // @todo this decrypt should be in lair and key refs should be refs to keys in lair

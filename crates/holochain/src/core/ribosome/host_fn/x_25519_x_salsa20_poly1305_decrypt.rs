@@ -12,7 +12,7 @@ pub fn x_25519_x_salsa20_poly1305_decrypt(
     input: X25519XSalsa20Poly1305Decrypt,
 ) -> Result<Option<XSalsa20Poly1305Data>, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
-        HostFnAccess{ keystore: Permission::Allow, .. } => {
+        HostFnAccess{ keystore_deterministic: Permission::Allow, .. } => {
             tokio_helper::block_forever_on(async move {
                 call_context
                     .host_context

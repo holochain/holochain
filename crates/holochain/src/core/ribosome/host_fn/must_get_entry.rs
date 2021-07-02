@@ -15,53 +15,58 @@ pub fn must_get_entry<'a>(
     call_context: Arc<CallContext>,
     input: MustGetEntryInput,
 ) -> Result<EntryHashed, WasmError> {
-    let entry_hash = input.into_inner();
-    let network = call_context.host_context.network().clone();
-
-    // timeouts must be handled by the network
-    tokio_helper::block_forever_on(async move {
-        let workspace = call_context.host_context.workspace();
-        let mut cascade = Cascade::from_workspace_network(workspace, network);
-        match cascade
-            .retrieve_entry(entry_hash.clone(),
-            // Set every GetOptions manually here.
-            // Using defaults is dangerous in a must_get as it can undermine determinism.
-            // We want refactors to explicitly consider this.
-            NetworkGetOptions {
-                remote_agent_count: None,
-                timeout_ms: None,
-                as_race: true,
-                race_timeout_ms: None,
-                // Never redirect as the returned entry must always match the hash.
-                follow_redirects: false,
-                all_live_headers_with_metadata: false,
-                // Redundant with retrieve_entry internals.
-                request_type: GetRequest::Pending,
+    match HostFnAccess::from(&call_context.host_context()) {
+        HostFnAccess{ read_workspace_deterministic: Permission::Allow, .. } => {
+            let entry_hash = input.into_inner();
+            let network = call_context.host_context.network().clone();
+            // timeouts must be handled by the network
+            tokio_helper::block_forever_on(async move {
+                let workspace = call_context.host_context.workspace();
+                let mut cascade = Cascade::from_workspace_network(workspace, network);
+                match cascade
+                    .retrieve_entry(entry_hash.clone(),
+                    // Set every GetOptions manually here.
+                    // Using defaults is dangerous in a must_get as it can undermine determinism.
+                    // We want refactors to explicitly consider this.
+                    NetworkGetOptions {
+                        remote_agent_count: None,
+                        timeout_ms: None,
+                        as_race: true,
+                        race_timeout_ms: None,
+                        // Never redirect as the returned entry must always match the hash.
+                        follow_redirects: false,
+                        all_live_headers_with_metadata: false,
+                        // Redundant with retrieve_entry internals.
+                        request_type: GetRequest::Pending,
+                    })
+                    .await
+                    .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))? {
+                        Some(entry) => Ok(entry),
+                        None => match call_context.host_context {
+                            HostContext::EntryDefs(_) | HostContext::GenesisSelfCheck(_) | HostContext::MigrateAgent(_) | HostContext::PostCommit(_) | HostContext::ZomeCall(_) => Err(WasmError::Host(format!("Failed to get EntryHashed {}", entry_hash))),
+                            HostContext::Init(_) => RuntimeError::raise(Box::new(WasmError::HostShortCircuit(
+                                holochain_serialized_bytes::encode(
+                                    &ExternIO::encode(InitCallbackResult::UnresolvedDependencies(vec![entry_hash.into()]))?
+                                )?
+                            ))),
+                            HostContext::ValidateCreateLink(_) => RuntimeError::raise(Box::new(WasmError::HostShortCircuit(
+                                holochain_serialized_bytes::encode(
+                                    &ExternIO::encode(ValidateLinkCallbackResult::UnresolvedDependencies(vec![entry_hash.into()]))?
+                                )?
+                            ))),
+                            HostContext::Validate(_) => RuntimeError::raise(Box::new(WasmError::HostShortCircuit(
+                                holochain_serialized_bytes::encode(&ExternIO::encode(&ValidateCallbackResult::UnresolvedDependencies(vec![entry_hash.into()]))?)?
+                            ))),
+                            HostContext::ValidationPackage(_) => RuntimeError::raise(Box::new(WasmError::HostShortCircuit(holochain_serialized_bytes::encode(&
+                                ExternIO::encode(ValidationPackageCallbackResult::UnresolvedDependencies(vec![entry_hash.into()]))?
+                            )?))),
+                        },
+                    }
             })
-            .await
-            .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))? {
-                Some(entry) => Ok(entry),
-                None => match call_context.host_context {
-                    HostContext::EntryDefs(_) | HostContext::GenesisSelfCheck(_) | HostContext::MigrateAgent(_) | HostContext::PostCommit(_) | HostContext::ZomeCall(_) => Err(WasmError::Host(format!("Failed to get EntryHashed {}", entry_hash))),
-                    HostContext::Init(_) => RuntimeError::raise(Box::new(WasmError::HostShortCircuit(
-                        holochain_serialized_bytes::encode(
-                            &ExternIO::encode(InitCallbackResult::UnresolvedDependencies(vec![entry_hash.into()]))?
-                        )?
-                    ))),
-                    HostContext::ValidateCreateLink(_) => RuntimeError::raise(Box::new(WasmError::HostShortCircuit(
-                        holochain_serialized_bytes::encode(
-                            &ExternIO::encode(ValidateLinkCallbackResult::UnresolvedDependencies(vec![entry_hash.into()]))?
-                        )?
-                    ))),
-                    HostContext::Validate(_) => RuntimeError::raise(Box::new(WasmError::HostShortCircuit(
-                        holochain_serialized_bytes::encode(&ExternIO::encode(&ValidateCallbackResult::UnresolvedDependencies(vec![entry_hash.into()]))?)?
-                    ))),
-                    HostContext::ValidationPackage(_) => RuntimeError::raise(Box::new(WasmError::HostShortCircuit(holochain_serialized_bytes::encode(&
-                        ExternIO::encode(ValidationPackageCallbackResult::UnresolvedDependencies(vec![entry_hash.into()]))?
-                    )?))),
-                },
-            }
-    })
+        },
+        _ => unreachable!(),
+    }
+
 }
 
 #[cfg(test)]

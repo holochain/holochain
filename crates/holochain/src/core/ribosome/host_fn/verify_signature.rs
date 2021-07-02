@@ -12,7 +12,7 @@ pub fn verify_signature(
     input: VerifySignature,
 ) -> Result<bool, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
-        HostFnAccess { keystore: Permission::Allow, .. } => tokio_helper::block_forever_on(async move {
+        HostFnAccess { keystore_deterministic: Permission::Allow, .. } => tokio_helper::block_forever_on(async move {
             input
                 .key
                 .verify_signature_raw(input.as_ref(), input.as_data_ref())
