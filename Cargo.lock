@@ -2169,8 +2169,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.71"
-source = "git+https://github.com/holochain/holochain-wasmer.git?branch=btreemap_cache#f16e377e98f31e681013f61b12bc2caf8969e1a5"
+version = "0.0.72"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aff3c48ca9201c8d94dc056cad2e68a5a3f7c52e5b082ec4cd16356d263e2e48"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -2180,8 +2181,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_guest"
-version = "0.0.71"
-source = "git+https://github.com/holochain/holochain-wasmer.git?branch=btreemap_cache#f16e377e98f31e681013f61b12bc2caf8969e1a5"
+version = "0.0.72"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e8af2ef8b6fdb7921c65ef24aecff917340e34562f25cab6c5dd50f2cb484c4"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
@@ -2192,15 +2194,15 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_host"
-version = "0.0.71"
-source = "git+https://github.com/holochain/holochain-wasmer.git?branch=btreemap_cache#f16e377e98f31e681013f61b12bc2caf8969e1a5"
+version = "0.0.72"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "30f16b431b0345110134ada31f5e4573db378ce77720c63adba9799160bc8a85"
 dependencies = [
  "bimap",
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
  "once_cell",
  "parking_lot 0.11.1",
- "plru",
  "rand 0.8.4",
  "serde",
  "tracing",
@@ -3784,11 +3786,6 @@ checksum = "b38a02e23bd9604b842a812063aec4ef702b57989c37b655254bb61c471ad211"
 dependencies = [
  "plotters-backend",
 ]
-
-[[package]]
-name = "plru"
-version = "0.1.2"
-source = "git+https://github.com/crdumoul/plru#da1884ee2baa351bfa38bd9785b56d5b81daff00"
 
 [[package]]
 name = "polling"
