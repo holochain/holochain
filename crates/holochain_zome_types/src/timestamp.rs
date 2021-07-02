@@ -331,7 +331,7 @@ impl Timestamp {
 
     /// Convert this timestamp to fit into a sqlite integer which is
     /// an i64. The value will be clamped between 0 and i64::MAX.
-    pub fn to_sql_ms_lossy(&self) -> i64 {
+    pub fn to_sql_ms_lossy(self) -> i64 {
         use std::time::Duration;
         let s = Duration::from_secs(self.0.max(0) as u64);
         let ms = Duration::from_millis(self.1 as u64);
