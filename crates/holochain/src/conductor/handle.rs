@@ -41,6 +41,7 @@
 
 use super::api::error::ConductorApiResult;
 use super::api::ZomeCall;
+use super::conductor::CellNetworkStatus;
 use super::config::AdminInterfaceConfig;
 use super::error::ConductorResult;
 use super::integration_dump;
@@ -703,9 +704,12 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn reconcile_cells_with_app_state(
         self: Arc<Self>,
     ) -> ConductorResult<Vec<(CellId, CellError)>> {
-        let mut conductor = self.conductor.write().await;
-        conductor.remove_cells_for_stopped_apps().await?;
-        let results = conductor
+        self.conductor
+            .write()
+            .await
+            .remove_cells_for_stopped_apps()
+            .await?;
+        let results = self
             .create_and_add_initialized_cells_for_running_apps(self.clone())
             .await?;
         Ok(results)
@@ -976,6 +980,74 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
             }
         }
         Ok(())
+    }
+
+    pub(super) async fn create_and_add_initialized_cells_for_running_apps(
+        &self,
+        conductor_handle: ConductorHandle,
+    ) -> ConductorResult<Vec<(CellId, CellError)>> {
+        let results = self
+            .conductor
+            .read()
+            .await
+            .create_cells_for_running_apps(conductor_handle)
+            .await?;
+        let (successes, errors): (Vec<_>, Vec<_>) = results.into_iter().partition(Result::is_ok);
+        self.initialize_and_add_cells(successes.into_iter().map(Result::unwrap).collect())
+            .await;
+        Ok(errors
+            .into_iter()
+            .map(|r| r.map(|_| ())) // throw away the non-Debug types which will be unwrapped away anyway
+            .map(Result::unwrap_err)
+            .collect())
+    }
+
+    async fn initialize_and_add_cells(&self, cells: Vec<(Cell, InitialQueueTriggers)>) {
+        // Add all cells to the conductor with the PendingJoin status
+        let (cells, networks): (Vec<_>, Vec<_>) = cells
+            .into_iter()
+            .map(|(cell, triggers)| {
+                let network = cell.holochain_p2p_cell().clone();
+                let cell_id = cell.id().clone();
+                (cell, (cell_id, network, triggers))
+            })
+            .unzip();
+
+        self.conductor.write().await.add_cells(cells);
+
+        // Join the network but ignore errors because the
+        // space retries joining all cells every 5 minutes.
+        let maybes: Vec<_> =
+            futures::stream::iter(networks.into_iter().map(|(cell_id, network, triggers)| async move {
+                match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join()).await {
+                    Ok(Err(e)) => {
+                        tracing::info!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");
+                        None
+                    }
+                    Err(_) => {
+                        tracing::info!(cell_id = ?cell_id, "Timed out trying to join the network");
+                        None
+                    }
+                    Ok(Ok(_)) => Some((cell_id, triggers)),
+                }
+            }))
+            .buffer_unordered(100)
+            .collect()
+            .await;
+
+        let (cells, triggers): (Vec<_>, Vec<_>) = maybes.into_iter().filter_map(|x| x).unzip();
+
+        // Update the status of the cells which were able to join the network
+        // (may or may not be all cells which were added)
+        self.conductor
+            .write()
+            .await
+            .update_cell_status(cells, CellNetworkStatus::Joined);
+
+        // Now we can trigger the workflows.
+        for trigger in triggers {
+            trigger.initialize_workflows();
+        }
     }
 
     pub(super) fn p2p_env(&self, space: Arc<KitsuneSpace>) -> EnvWrite {

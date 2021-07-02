@@ -52,14 +52,12 @@ use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_keystore::KeystoreSender;
 use holochain_keystore::KeystoreSenderExt;
-use holochain_p2p::*;
 use holochain_sqlite::db::DbKind;
 use holochain_sqlite::prelude::*;
 use holochain_state::mutations;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateMutationResult;
 use holochain_types::prelude::*;
-use kitsune_p2p_types::config::JOIN_NETWORK_TIMEOUT;
 use rusqlite::OptionalExtension;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -74,9 +72,16 @@ use super::handle::MockConductorHandleT;
 /// Hypothesis: If nothing remains in this struct, then the Conductor state is
 /// essentially immutable, and perhaps we just throw it out and make a new one
 /// when we need to load new config, etc.
-pub struct CellState {
-    /// Whether or not we should call any methods on the cell
-    _active: bool,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CellNetworkStatus {
+    /// Kitsune knows about this Cell and it is considered fully "online"
+    Joined,
+    /// The Cell is on its way to being fully joined. It is a valid Cell from
+    /// the perspective of the conductor, and can handle HolochainP2pEvents,
+    /// but it is considered not to be fully running from the perspective of
+    /// app status, i.e. if any app has a required Cell with this status,
+    /// the app is considered to be in the Paused state.
+    PendingJoin,
 }
 
 /// An [Cell] tracked by a Conductor, along with some [CellState]
@@ -85,7 +90,7 @@ where
     CA: CellConductorApiT,
 {
     cell: Arc<Cell<CA>>,
-    _state: CellState,
+    status: CellNetworkStatus,
 }
 
 pub(crate) type StopBroadcaster = tokio::sync::broadcast::Sender<()>;
@@ -576,57 +581,6 @@ where
         Ok(())
     }
 
-    pub(super) async fn create_and_add_initialized_cells_for_running_apps(
-        &mut self,
-        conductor_handle: ConductorHandle,
-    ) -> ConductorResult<Vec<(CellId, CellError)>> {
-        let results = self.create_cells_for_running_apps(conductor_handle).await?;
-        let (successes, errors): (Vec<_>, Vec<_>) = results.into_iter().partition(Result::is_ok);
-        self.initialize_and_add_cells(successes.into_iter().map(Result::unwrap).collect())
-            .await;
-        Ok(errors
-            .into_iter()
-            .map(|r| r.map(|_| ())) // throw away the non-Debug types which will be unwrapped away anyway
-            .map(Result::unwrap_err)
-            .collect())
-    }
-
-    async fn initialize_and_add_cells(&mut self, cells: Vec<(Cell, InitialQueueTriggers)>) {
-        // Join the network but ignore errors because the
-        // space retries joining all cells every 5 minutes.
-        let maybes: Vec<_> =
-            futures::stream::iter(cells.into_iter().map(|(cell, triggers)| async move {
-                let network = cell.holochain_p2p_cell();
-                match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join()).await {
-                    Ok(Err(e)) => {
-                        tracing::info!(error = ?e, cell_id = ?cell.id(), "Error while trying to join the network");
-                        None
-                    }
-                    Err(_) => {
-                        tracing::info!(cell_id = ?cell.id(), "Timed out trying to join the network");
-                        None
-                    }
-                    Ok(Ok(_)) => Some((cell, triggers)),
-                }
-            }))
-            .buffer_unordered(100)
-            .collect()
-            .await;
-
-        let (cells, triggers): (Vec<_>, Vec<_>) = maybes.into_iter().filter_map(|x| x).unzip();
-
-        // Add the created cells to the conductor map.
-        // NB: if any cells had errors, they will NOT be added.
-        // This write lock can't be held while join is awaited as join calls the conductor.
-        // Cells need to be in the map before join is called so it can route the call.
-        self.add_cells(cells);
-
-        // Now we can trigger the workflows.
-        for trigger in triggers {
-            trigger.initialize_workflows();
-        }
-    }
-
     /// Attempt to create all necessary Cells which have not already been created
     /// and added to the conductor, namely the cells which are referenced by
     /// Running apps. If there are no cells to create, this function does nothing.
@@ -746,7 +700,7 @@ where
     }
 
     /// Add fully constructed cells to the cell map in the Conductor
-    fn add_cells(&mut self, cells: Vec<Cell>) {
+    pub(super) fn add_cells(&mut self, cells: Vec<Cell>) {
         for cell in cells {
             let cell_id = cell.id().clone();
             tracing::info!(?cell_id, "ADD CELL");
@@ -754,9 +708,18 @@ where
                 cell_id,
                 CellItem {
                     cell: Arc::new(cell),
-                    _state: CellState { _active: false },
+                    status: CellNetworkStatus::PendingJoin,
                 },
             );
+        }
+    }
+
+    /// Add fully constructed cells to the cell map in the Conductor
+    pub(super) fn update_cell_status(&mut self, cell_ids: Vec<CellId>, status: CellNetworkStatus) {
+        for cell_id in cell_ids {
+            self.cells
+                .get_mut(&cell_id)
+                .map(|mut cell| cell.status = status.clone());
         }
     }
 

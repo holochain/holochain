@@ -82,7 +82,7 @@ pub enum ConductorError {
     #[error("Wasm code was not found in the wasm store")]
     WasmMissing,
 
-    #[error("Tried to activate an app that was not installed: {0}")]
+    #[error("Tried to access an app that was not installed: {0}")]
     AppNotInstalled(InstalledAppId),
 
     #[error("Tried to install an app using an already-used InstalledAppId: {0}")]
