@@ -707,11 +707,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     ) -> ConductorResult<Vec<(CellId, CellError)>> {
         // TODO: first leave the network for any cells that should be removed.
 
-        self.conductor
-            .write()
-            .await
-            .remove_cells_for_stopped_apps()
-            .await?;
+        self.conductor.write().await.remove_dangling_cells().await?;
         let results = self
             .create_and_add_initialized_cells_for_running_apps(self.clone())
             .await?;
@@ -961,28 +957,24 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
         self: Arc<Self>,
         delta: AppStatusRunningDelta,
     ) -> ConductorResult<()> {
-        match delta {
+        let errors = match delta {
             AppStatusRunningDelta::NoChange => (),
             AppStatusRunningDelta::Run => {
-                let cell_startup_errors =
-                    self.clone().reconcile_cell_status_with_app_status().await?;
+                let errors = self.clone().reconcile_cell_status_with_app_status().await?;
+                self.clone()
+                    .reconcile_app_status_with_cell_status(None)
+                    .await?;
 
                 // TODO: This should probably be emitted over the admin interface
-                if !cell_startup_errors.is_empty() {
-                    error!(
-                        msg = "Failed to create the following active apps",
-                        ?cell_startup_errors
-                    );
+                if !errors.is_empty() {
+                    error!(msg = "Failed to create the following active apps", ?errors);
                 }
             }
             AppStatusRunningDelta::Stop => {
-                self.conductor
-                    .write()
-                    .await
-                    .remove_cells_for_stopped_apps()
-                    .await?
+                self.conductor.write().await.remove_dangling_cells().await?;
             }
-        }
+        };
+
         Ok(())
     }
 

@@ -606,21 +606,20 @@ where
         //    then set it to Paused
     }
 
-    /// Remove Cells from the conductor for each CellId marked stopped. Idempotent.
-    pub(super) async fn remove_cells_for_stopped_apps(&mut self) -> ConductorResult<()> {
+    /// Remove all Cells which are not referenced by any Enabled app.
+    // TODO: test
+    pub(super) async fn remove_dangling_cells(&mut self) -> ConductorResult<()> {
         let state = self.get_state().await?;
-        let stopped_cells: HashSet<CellId> = state
-            .stopped_apps()
+        let keepers: HashSet<CellId> = state
+            .enabled_apps()
             .flat_map(|(_, app)| app.all_cells().cloned().collect::<HashSet<_>>())
             .collect();
-        for (_, cell) in self
-            .cells
-            .iter()
-            .filter(|(id, _)| stopped_cells.contains(id))
-        {
+        for (_, cell) in self.cells.iter().filter(|(id, _)| !keepers.contains(id)) {
+            // cleanup the cell before dropping it from the HashMap
             cell.cell.cleanup().await?;
         }
-        self.cells.retain(|id, _| !stopped_cells.contains(id));
+        // drop all but the keepers
+        self.cells.retain(|id, _| keepers.contains(id));
         Ok(())
     }
 
@@ -651,6 +650,9 @@ where
             .filter(|(_, app)| app.status().is_running())
             .flat_map(|(_id, app)| app.all_cells().collect::<Vec<&CellId>>())
             .collect();
+
+        // calculate the existing cells so we can filter those out, only creating
+        // cells for CellIds that don't have cells
         let on_cells: HashSet<&CellId> = self.cells.iter().map(first).collect();
 
         let tasks = app_cells.difference(&on_cells).map(|&cell_id| {

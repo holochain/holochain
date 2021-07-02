@@ -659,7 +659,7 @@ async fn test_reactivate_app() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_cells_self_deactivate_on_validation_panic() {
+async fn test_cells_pause_on_validation_panic() {
     observability::test_run().ok();
     let bad_zome =
         InlineZome::new_unique(Vec::new()).callback("validate", |_api, _data: ValidateData| {
