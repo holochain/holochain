@@ -258,7 +258,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .conductor_handle
                     .get_app_info(&installed_app_id)
                     .await?
-                    .ok_or_else(|| ConductorError::AppNotInstalled(installed_app_id))?;
+                    .ok_or(ConductorError::AppNotInstalled(installed_app_id))?;
 
                 let errors: Vec<_> = errors
                     .into_iter()

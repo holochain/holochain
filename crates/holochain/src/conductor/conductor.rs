@@ -767,9 +767,9 @@ where
     /// Add fully constructed cells to the cell map in the Conductor
     pub(super) fn update_cell_status(&mut self, cell_ids: &[CellId], status: CellStatus) {
         for cell_id in cell_ids {
-            self.cells
-                .get_mut(cell_id)
-                .map(|mut cell| cell.status = status.clone());
+            if let Some(mut cell) = self.cells.get_mut(cell_id) {
+                cell.status = status.clone();
+            }
         }
     }
 

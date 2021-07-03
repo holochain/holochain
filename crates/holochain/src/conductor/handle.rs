@@ -1124,7 +1124,7 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
             .collect()
             .await;
 
-        let cell_ids: Vec<_> = maybes.into_iter().filter_map(|x| x).collect();
+        let cell_ids: Vec<_> = maybes.into_iter().flatten().collect();
 
         // Update the status of the cells which were able to join the network
         // (may or may not be all cells which were added)
