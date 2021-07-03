@@ -30,7 +30,7 @@ serde_bytes = "0.11"
 thiserror = "1.0.22"
 tracing = "0.1"
 tracing-core = "0.1"
-mockall = { version = "0.9", optional = true }
+mockall = { version = "0.8", optional = true }
 
 [dependencies.tracing-subscriber]
 version = "0.2"

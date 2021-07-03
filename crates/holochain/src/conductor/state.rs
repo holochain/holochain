@@ -147,7 +147,7 @@ impl ConductorState {
         &mut self,
         id: &InstalledAppId,
         transition: AppStatusTransition,
-    ) -> ConductorResult<(&InstalledApp, AppStatusRunningDelta)> {
+    ) -> ConductorResult<(&InstalledApp, AppStatusTransitionEffects)> {
         let app = self
             .installed_apps
             .get_mut(id)

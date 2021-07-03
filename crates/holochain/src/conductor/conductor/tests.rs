@@ -871,6 +871,88 @@ async fn test_app_status_states() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "we don't have the ability to share cells across apps yet, but will need a test for that once we do"]
+async fn test_app_status_states_multi_app() {
+    todo!("write a test similar to the previous one, testing various state transitions, including switching on and off individual Cells");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_cell_and_app_status_reconciliation() {
+    observability::test_run().ok();
+    use AppStatusKind::*;
+    use CellStatus::*;
+    let mk_zome = || InlineZome::new_unique(Vec::new());
+    let dnas = [
+        mk_dna("zome", mk_zome()).await.unwrap().0,
+        mk_dna("zome", mk_zome()).await.unwrap().0,
+        mk_dna("zome", mk_zome()).await.unwrap().0,
+    ];
+    let app_id = "app".to_string();
+    let mut conductor = SweetConductor::from_standard_config().await;
+    conductor.setup_app(&app_id, &dnas).await.unwrap();
+
+    let cell_ids = conductor.list_cell_ids(None).await.unwrap();
+    let cell1 = &cell_ids[0..1];
+
+    let check = || async {
+        (
+            AppStatusKind::from(AppStatus::from(
+                conductor.list_apps(None).await.unwrap()[0].status.clone(),
+            )),
+            conductor.list_cell_ids(Some(Joined)).await.unwrap().len(),
+            conductor
+                .list_cell_ids(Some(PendingJoin))
+                .await
+                .unwrap()
+                .len(),
+        )
+    };
+
+    assert_eq!(check().await, (Running, 3, 0));
+
+    // - Simulate a cell failing to join the network
+    conductor.update_cell_status(cell1, PendingJoin).await;
+    assert_eq!(check().await, (Running, 2, 1));
+
+    // - Reconciled app state is Paused due to one unjoined Cell
+    conductor
+        .reconcile_app_status_with_cell_status(None)
+        .await
+        .unwrap();
+    assert_eq!(check().await, (Paused, 2, 1));
+
+    // - Can start the app again and get all cells joined
+    conductor.start_app(&app_id).await.unwrap();
+    assert_eq!(check().await, (Running, 3, 0));
+
+    // - Simulate a cell being removed due to error
+    conductor.remove_cells(cell1).await;
+    assert_eq!(check().await, (Running, 2, 0));
+
+    // - Again, app state should be reconciled to Paused due to missing cell
+    conductor
+        .reconcile_app_status_with_cell_status(None)
+        .await
+        .unwrap();
+    assert_eq!(check().await, (Paused, 2, 0));
+
+    // - Disabling the app causes all cells to be removed
+    conductor
+        .disable_app(&app_id, DisabledAppReason::User)
+        .await
+        .unwrap();
+    assert_eq!(check().await, (Disabled, 0, 0));
+
+    // - Starting a disabled app does nothing
+    conductor.start_app(&app_id).await.unwrap();
+    assert_eq!(check().await, (Disabled, 0, 0));
+
+    // - ...but enabling one does
+    conductor.enable_app(&app_id).await.unwrap();
+    assert_eq!(check().await, (Running, 3, 0));
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_app_status_filters() {
     observability::test_run().ok();
     let zome = InlineZome::new_unique(Vec::new());

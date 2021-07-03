@@ -568,7 +568,27 @@ pub enum AppStatus {
     Disabled(DisabledAppReason),
 }
 
+/// The AppStatus without the reasons.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[allow(missing_docs)]
+pub enum AppStatusKind {
+    Running,
+    Paused,
+    Disabled,
+}
+
+impl From<AppStatus> for AppStatusKind {
+    fn from(status: AppStatus) -> Self {
+        match status {
+            AppStatus::Running => Self::Running,
+            AppStatus::Paused(_) => Self::Paused,
+            AppStatus::Disabled(_) => Self::Disabled,
+        }
+    }
+}
+
 /// Represents a state transition operation from one state to another
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AppStatusTransition {
     /// Attempt to unpause a Paused app
     Start,
@@ -600,21 +620,21 @@ impl AppStatus {
 
     /// Transition a status from one state to another.
     /// If None, the transition was not valid, and the status did not change.
-    pub fn transition(&mut self, transition: AppStatusTransition) -> AppStatusRunningDelta {
+    pub fn transition(&mut self, transition: AppStatusTransition) -> AppStatusTransitionEffects {
         use AppStatus::*;
-        use AppStatusRunningDelta::*;
         use AppStatusTransition::*;
+        use AppStatusTransitionEffects::*;
         match (&self, transition) {
-            (Running, Pause(reason)) => Some((Paused(reason), Stop)),
-            (Running, Disable(reason)) => Some((Disabled(reason), Stop)),
+            (Running, Pause(reason)) => Some((Paused(reason), SpinDown)),
+            (Running, Disable(reason)) => Some((Disabled(reason), SpinDown)),
             (Running, Start) | (Running, Enable) => None,
 
-            (Paused(_), Start) => Some((Running, Run)),
-            (Paused(_), Enable) => Some((Running, Run)),
-            (Paused(_), Disable(reason)) => Some((Disabled(reason), NoChange)),
+            (Paused(_), Start) => Some((Running, SpinUp)),
+            (Paused(_), Enable) => Some((Running, SpinUp)),
+            (Paused(_), Disable(reason)) => Some((Disabled(reason), SpinDown)),
             (Paused(_), Pause(_)) => None,
 
-            (Disabled(_), Enable) => Some((Running, Run)),
+            (Disabled(_), Enable) => Some((Running, SpinUp)),
             (Disabled(_), Pause(_)) | (Disabled(_), Disable(_)) | (Disabled(_), Start) => None,
         }
         .map(|(new_status, delta)| {
@@ -625,15 +645,15 @@ impl AppStatus {
     }
 }
 
-/// Marks a change in the "running" status of an app
+/// A hint for the side effects of a particular AppStatusTransition
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum AppStatusRunningDelta {
-    /// The app was running, and now it has transitioned to stopped.
-    Stop,
-    /// No change: the previous running/stopped state persists.
+pub enum AppStatusTransitionEffects {
+    /// The transition may cause some Cells to be removed.
+    SpinDown,
+    /// The transition may cause some Cells to be added (fallibly).
+    SpinUp,
+    /// The transition did not result in any change to CellState.
     NoChange,
-    /// The app was stopped, and now it has transitioned to running.
-    Run,
 }
 
 /// The various reasons for why an App is not in the Running state.

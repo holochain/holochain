@@ -170,6 +170,16 @@ impl From<AppStatus> for InstalledAppInfoStatus {
     }
 }
 
+impl From<InstalledAppInfoStatus> for AppStatus {
+    fn from(i: InstalledAppInfoStatus) -> Self {
+        match i {
+            InstalledAppInfoStatus::Running => AppStatus::Running,
+            InstalledAppInfoStatus::Disabled { reason } => AppStatus::Disabled(reason),
+            InstalledAppInfoStatus::Paused { reason } => AppStatus::Paused(reason),
+        }
+    }
+}
+
 #[test]
 fn status_serialization() {
     use kitsune_p2p::dependencies::kitsune_p2p_types::dependencies::serde_json;

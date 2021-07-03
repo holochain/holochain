@@ -41,7 +41,7 @@
 
 use super::api::error::ConductorApiResult;
 use super::api::ZomeCall;
-use super::conductor::CellNetworkStatus;
+use super::conductor::CellStatus;
 use super::config::AdminInterfaceConfig;
 use super::error::ConductorResult;
 use super::integration_dump;
@@ -249,7 +249,7 @@ pub trait ConductorHandleT: Send + Sync {
     ) -> ConductorResult<InstalledApp>;
 
     /// List Cell Ids
-    async fn list_cell_ids(&self) -> ConductorResult<Vec<CellId>>;
+    async fn list_cell_ids(&self, filter: Option<CellStatus>) -> ConductorResult<Vec<CellId>>;
 
     /// List Active AppIds
     async fn list_running_apps(&self) -> ConductorResult<Vec<InstalledAppId>>;
@@ -318,6 +318,47 @@ pub trait ConductorHandleT: Send + Sync {
     #[cfg(any(test, feature = "test_utils"))]
     async fn add_test_app_interface(&self, id: super::state::AppInterfaceId)
         -> ConductorResult<()>;
+
+    /// Manually remove some cells. FOR TESTING ONLY.
+    #[cfg(any(test, feature = "test_utils"))]
+    async fn remove_cells(&self, cell_ids: &[CellId]);
+
+    /// Manually coerce cells to a given CellStatus. FOR TESTING ONLY.
+    #[cfg(any(test, feature = "test_utils"))]
+    async fn update_cell_status(&self, cell_ids: &[CellId], status: CellStatus);
+
+    /// Manually coerce app to a given AppStatus. FOR TESTING ONLY.
+    #[cfg(any(test, feature = "test_utils"))]
+    async fn transition_app_status(
+        &self,
+        app_id: &InstalledAppId,
+        transition: AppStatusTransition,
+    ) -> ConductorResult<(InstalledApp, AppStatusTransitionEffects)>;
+
+    // TODO: would be nice to have methods for accessing the underlying Conductor,
+    // but this trait doesn't know the concrete type of Conductor underlying,
+    // and using generics seems problematic with mockall::automock.
+    // Something like this would be desirable, but ultimately doesn't work.
+    //
+    // type DS: Send + Sync + DnaStore;
+    //
+    // /// Get immutable access to the inner conductor state via a read lock
+    // async fn conductor<F, T>(&self, f: F) -> ConductorApiResult<T>
+    // where
+    //     F: FnOnce(&Conductor<<Self as ConductorHandleT>::DS>) -> ConductorApiResult<T>,
+    // {
+    //     let c = self.conductor.read().await;
+    //     f(&c)
+    // }
+    //
+    // /// Get mutable access to the inner conductor state via a write lock
+    // async fn conductor_mut<F, T>(&self, f: F) -> ConductorApiResult<T>
+    // where
+    //     F: FnOnce(&mut Conductor<<Self as ConductorHandleT>::DS>) -> ConductorApiResult<T>,
+    // {
+    //     let mut c = self.conductor.write().await;
+    //     f(&mut c)
+    // }
 }
 
 /// The current "production" implementation of a ConductorHandle.
@@ -691,6 +732,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(stopped_app)
     }
 
+    #[tracing::instrument(skip(self))]
     async fn reconcile_app_status_with_cell_status(
         &self,
         app_ids: Option<HashSet<InstalledAppId>>,
@@ -702,6 +744,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await
     }
 
+    #[tracing::instrument(skip(self))]
     async fn reconcile_cell_status_with_app_status(
         self: Arc<Self>,
     ) -> ConductorResult<Vec<(CellId, CellError)>> {
@@ -714,6 +757,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(results)
     }
 
+    #[tracing::instrument(skip(self))]
     async fn enable_app(self: Arc<Self>, app_id: &InstalledAppId) -> ConductorResult<InstalledApp> {
         let (app, delta) = self
             .conductor
@@ -725,6 +769,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(app)
     }
 
+    #[tracing::instrument(skip(self))]
     async fn disable_app(
         self: Arc<Self>,
         app_id: &InstalledAppId,
@@ -740,6 +785,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(app)
     }
 
+    #[tracing::instrument(skip(self))]
     async fn start_app(self: Arc<Self>, app_id: &InstalledAppId) -> ConductorResult<InstalledApp> {
         let (app, delta) = self
             .conductor
@@ -751,6 +797,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(app)
     }
 
+    #[tracing::instrument(skip(self))]
     async fn pause_app(
         self: Arc<Self>,
         app_id: &InstalledAppId,
@@ -766,6 +813,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(app)
     }
 
+    #[tracing::instrument(skip(self))]
     async fn uninstall_app(&self, installed_app_id: &InstalledAppId) -> ConductorResult<()> {
         let mut conductor = self.conductor.write().await;
         let app = conductor.remove_app_from_db(installed_app_id).await?;
@@ -774,8 +822,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(())
     }
 
-    async fn list_cell_ids(&self) -> ConductorResult<Vec<CellId>> {
-        self.conductor.read().await.list_cell_ids().await
+    async fn list_cell_ids(&self, filter: Option<CellStatus>) -> ConductorResult<Vec<CellId>> {
+        self.conductor.read().await.list_cell_ids(filter).await
     }
 
     async fn list_running_apps(&self) -> ConductorResult<Vec<InstalledAppId>> {
@@ -933,6 +981,28 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let mut lock = self.conductor.write().await;
         lock.add_test_app_interface(id).await
     }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    async fn remove_cells(&self, cell_ids: &[CellId]) {
+        let mut lock = self.conductor.write().await;
+        lock.remove_cells(cell_ids.to_vec()).await
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    async fn update_cell_status(&self, cell_ids: &[CellId], status: CellStatus) {
+        let mut lock = self.conductor.write().await;
+        lock.update_cell_status(cell_ids, status)
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    async fn transition_app_status(
+        &self,
+        app_id: &InstalledAppId,
+        transition: AppStatusTransition,
+    ) -> ConductorResult<(InstalledApp, AppStatusTransitionEffects)> {
+        let mut lock = self.conductor.write().await;
+        lock.transition_app_status(app_id, transition).await
+    }
 }
 
 impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
@@ -955,23 +1025,27 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
     /// Deal with the side effects of an app status state transition
     async fn process_app_status_delta(
         self: Arc<Self>,
-        delta: AppStatusRunningDelta,
+        delta: AppStatusTransitionEffects,
     ) -> ConductorResult<()> {
-        let errors = match delta {
-            AppStatusRunningDelta::NoChange => (),
-            AppStatusRunningDelta::Run => {
+        tracing::debug!(msg = "Processing app status delta", delta = ?delta);
+        match delta {
+            AppStatusTransitionEffects::NoChange => (),
+            AppStatusTransitionEffects::SpinUp => {
+                // Reconcile cell status so that missing/pending cells can become fully joined
                 let errors = self.clone().reconcile_cell_status_with_app_status().await?;
+                // Reconcile app status in case some cells failed to join, so the app can be paused
                 self.clone()
                     .reconcile_app_status_with_cell_status(None)
                     .await?;
 
                 // TODO: This should probably be emitted over the admin interface
                 if !errors.is_empty() {
-                    error!(msg = "Failed to create the following active apps", ?errors);
+                    error!(msg = "Errors when trying to start an app", ?errors);
                 }
             }
-            AppStatusRunningDelta::Stop => {
-                self.conductor.write().await.remove_dangling_cells().await?;
+            AppStatusTransitionEffects::SpinDown => {
+                let cells_removed = self.conductor.write().await.remove_dangling_cells().await?;
+                tracing::debug!(?cells_removed);
             }
         };
 
@@ -1057,7 +1131,7 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
         self.conductor
             .write()
             .await
-            .update_cell_status(cell_ids.as_slice(), CellNetworkStatus::Joined);
+            .update_cell_status(cell_ids.as_slice(), CellStatus::Joined);
 
         cell_ids
     }

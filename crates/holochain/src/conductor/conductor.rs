@@ -73,7 +73,7 @@ use super::handle::MockConductorHandleT;
 /// essentially immutable, and perhaps we just throw it out and make a new one
 /// when we need to load new config, etc.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CellNetworkStatus {
+pub enum CellStatus {
     /// Kitsune knows about this Cell and it is considered fully "online"
     Joined,
     /// The Cell is on its way to being fully joined. It is a valid Cell from
@@ -84,13 +84,16 @@ pub enum CellNetworkStatus {
     PendingJoin,
 }
 
+/// Declarative filter for CellStatus
+pub type CellStatusFilter = CellStatus;
+
 /// An [Cell] tracked by a Conductor, along with some [CellState]
 struct CellItem<CA>
 where
     CA: CellConductorApiT,
 {
     cell: Arc<Cell<CA>>,
-    status: CellNetworkStatus,
+    status: CellStatus,
 }
 
 impl<CA> CellItem<CA>
@@ -98,11 +101,11 @@ where
     CA: CellConductorApiT,
 {
     pub fn is_running(&self) -> bool {
-        self.status == CellNetworkStatus::Joined
+        self.status == CellStatus::Joined
     }
 
     pub fn is_pending(&self) -> bool {
-        self.status == CellNetworkStatus::PendingJoin
+        self.status == CellStatus::PendingJoin
     }
 }
 
@@ -195,7 +198,7 @@ where
 
     /// Iterator over all cells, regardless of status. Generally used when
     /// responding to kitsune requests.
-    pub(super) fn all_cells(&self) -> impl Iterator<Item = (&CellId, &Cell)> {
+    pub(super) fn _all_cells(&self) -> impl Iterator<Item = (&CellId, &Cell)> {
         self.cells.iter().map(|(id, item)| (id, item.cell.as_ref()))
     }
 
@@ -608,7 +611,7 @@ where
 
     /// Remove all Cells which are not referenced by any Enabled app.
     // TODO: test
-    pub(super) async fn remove_dangling_cells(&mut self) -> ConductorResult<()> {
+    pub(super) async fn remove_dangling_cells(&mut self) -> ConductorResult<usize> {
         let state = self.get_state().await?;
         let keepers: HashSet<CellId> = state
             .enabled_apps()
@@ -620,7 +623,7 @@ where
         }
         // drop all but the keepers
         self.cells.retain(|id, _| keepers.contains(id));
-        Ok(())
+        Ok(keepers.len())
     }
 
     /// Attempt to create all necessary Cells which have not already been created
@@ -712,11 +715,12 @@ where
     }
 
     /// Transition an app's status to a new state.
+    #[tracing::instrument(skip(self))]
     pub(super) async fn transition_app_status(
         &mut self,
         app_id: &InstalledAppId,
         transition: AppStatusTransition,
-    ) -> ConductorResult<(InstalledApp, AppStatusRunningDelta)> {
+    ) -> ConductorResult<(InstalledApp, AppStatusTransitionEffects)> {
         Ok(self
             .update_state_prime(move |mut state| {
                 let (app, delta) = state.transition_app_status(&app_id, transition)?.clone();
@@ -753,7 +757,7 @@ where
                 cell_id,
                 CellItem {
                     cell: Arc::new(cell),
-                    status: CellNetworkStatus::PendingJoin,
+                    status: CellStatus::PendingJoin,
                 },
             );
             triggers.initialize_workflows();
@@ -761,7 +765,7 @@ where
     }
 
     /// Add fully constructed cells to the cell map in the Conductor
-    pub(super) fn update_cell_status(&mut self, cell_ids: &[CellId], status: CellNetworkStatus) {
+    pub(super) fn update_cell_status(&mut self, cell_ids: &[CellId], status: CellStatus) {
         for cell_id in cell_ids {
             self.cells
                 .get_mut(cell_id)
@@ -854,6 +858,9 @@ where
     pub(super) async fn remove_cells(&mut self, cell_ids: Vec<CellId>) {
         for cell_id in cell_ids {
             if let Some(item) = self.cells.remove(&cell_id) {
+                // TODO: make this function async, or ensure that cleanup is fast,
+                //       so we don't hold the conductor lock unduly long while doing cleanup
+                //       (currently cleanup is a noop)
                 if let Err(err) = item.cell.cleanup().await {
                     tracing::error!("Error cleaning up Cell: {:?}\nCellId: {}", err, cell_id);
                 }
@@ -918,8 +925,26 @@ where
         Ok(zome_defs)
     }
 
-    pub(super) async fn list_cell_ids(&self) -> ConductorResult<Vec<CellId>> {
-        Ok(self.cells.keys().cloned().collect())
+    pub(super) async fn list_cell_ids(
+        &self,
+        filter: Option<CellStatusFilter>,
+    ) -> ConductorResult<Vec<CellId>> {
+        Ok(self
+            .cells
+            .iter()
+            .filter_map(|(id, cell)| {
+                let matches = filter
+                    .as_ref()
+                    .map(|status| cell.status == *status)
+                    .unwrap_or(true);
+                if matches {
+                    Some(id)
+                } else {
+                    None
+                }
+            })
+            .cloned()
+            .collect())
     }
 
     pub(super) async fn list_running_apps(&self) -> ConductorResult<Vec<InstalledAppId>> {
