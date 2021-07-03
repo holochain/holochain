@@ -33,13 +33,10 @@ rec {
       cargo run --manifest-path=crates/release-automation/Cargo.toml -- \
           --workspace-path=$PWD \
           --log-level=${logLevel} \
-        release \
-          --dry-run \
+        check \
           --disallowed-version-reqs=">=0.1" \
           --allowed-matched-blockers=UnreleasableViaChangelogFrontmatter \
-          --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
-          --force-branch-creation \
-          --steps=CreateReleaseBranch,BumpReleaseVersions,PublishToCratesIo,CreateCrateTags
+          --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$"
     '';
         # --allowed-dev-dependency-blockers=UnreleasableViaChangelogFrontmatter,MissingReadme \
         # todo: verify why this was needed and isn't any longer
