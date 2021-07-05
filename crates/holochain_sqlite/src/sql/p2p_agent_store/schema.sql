@@ -1,3 +1,5 @@
+-- no-sql-format --
+
 -- p2p store
 CREATE TABLE IF NOT EXISTS p2p_agent_store (
   -- Primary key
