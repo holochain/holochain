@@ -821,9 +821,13 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         installed_app_id: &InstalledAppId,
     ) -> ConductorResult<()> {
         let self_clone = self.clone();
-        let mut conductor = self.conductor.write().await;
-        let app = conductor.remove_app_from_db(installed_app_id).await?;
-        tracing::debug!(msg = "Removed app from db.", app = ?app);
+        {
+            // Ensure that the conductor lock is dropped before the self_clone
+            // is used, or else deadlock will ensue
+            let mut conductor = self.conductor.write().await;
+            let app = conductor.remove_app_from_db(installed_app_id).await?;
+            tracing::debug!(msg = "Removed app from db.", app = ?app);
+        }
         // Remove cells which may now be dangling due to the removed app
         self_clone
             .process_app_status_delta(AppStatusTransitionEffects::SpinDown)
