@@ -346,11 +346,14 @@ pub enum AdminResponse {
     /// [`AdminRequest::ListCellIds`]: enum.AdminRequest.html#variant.ListCellIds
     CellIdsListed(Vec<CellId>),
 
-    /// The succesful response to an [`AdminRequest::ListActiveApps`].
+    /// The succesful response to an [`AdminRequest::ListEnabledApps`].
     ///
     /// Contains a list of all the active `App` ids in the conductor
     ///
-    /// [`AdminRequest::ListActiveApps`]: enum.AdminRequest.html#variant.ListActiveApps
+    /// [`AdminRequest::ListEnabledApps`]: enum.AdminRequest.html#variant.ListEnabledApps
+    EnabledAppsListed(Vec<InstalledAppId>),
+
+    #[deprecated = "alias for EnabledAppsListed"]
     ActiveAppsListed(Vec<InstalledAppId>),
 
     /// The succesful response to an [`AdminRequest::ListApps`].

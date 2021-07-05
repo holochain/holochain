@@ -54,7 +54,8 @@ impl ManagedTaskError {
             Io(_) | Join(_) | Recv(_) => false,
             Conductor(err) => match err {
                 C::ShuttingDown => true,
-                _ => todo!("identify all recoverable cases"),
+                // TODO: identify all recoverable cases
+                _ => false,
             },
         }
     }
