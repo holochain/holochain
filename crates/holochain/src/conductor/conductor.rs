@@ -573,22 +573,22 @@ where
             for (_app_id, app) in apps {
                 match app.status().clone() {
                     Running => {
-                        // If not all cells are running, pause the app
+                        // If not all required cells are running, pause the app
                         let missing: Vec<_> = app
-                            .all_cells()
+                            .required_cells()
                             .filter(|id| !running_cells.contains(id))
                             .collect();
                         if !missing.is_empty() {
                             let reason = PausedAppReason::Error(format!(
-                                "Some cells are not able to run: {:#?}",
+                                "Some cells are missing / not able to run: {:#?}",
                                 missing
                             ));
                             app.status.transition(Pause(reason));
                         }
                     }
                     Paused(_) => {
-                        // If all cells are now running, restart the app
-                        if app.all_cells().all(|id| running_cells.contains(id)) {
+                        // If all required cells are now running, restart the app
+                        if app.required_cells().all(|id| running_cells.contains(id)) {
                             app.status.transition(Start);
                         }
                     }
@@ -601,12 +601,6 @@ where
         })
         .await?;
         Ok(())
-
-        //- Do not change state for Disabled apps. For all others:
-        //- If an app is Paused but all of its (required) Cells are on,
-        //    then set it to Running
-        //- If an app is Running but at least one of its (required) Cells are off,
-        //    then set it to Paused
     }
 
     /// Remove all Cells which are not referenced by any Enabled app.

@@ -194,19 +194,29 @@ async fn run(
                 },
                 Some(TaskOutcome::StopApps(cell_id, error, context)) => {
                     tracing::error!("About to automatically stop apps");
-                    let app_ids = conductor.list_running_apps_for_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
+                    let app_ids = conductor.list_running_apps_for_required_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
                     if error.is_recoverable() {
+                        conductor.remove_cells(&[cell_id]).await;
+
+                        // The following message assumes that only the app_ids calculated will be paused, but other apps
+                        // may have been paused as well.
                         tracing::error!(
                             "PAUSING the following apps due to a recoverable error: {:?}\nError: {:?}\nContext: {}",
                             app_ids,
                             error,
                             context
                         );
-                        for app_id in app_ids.iter() {
-                            conductor.clone().pause_app(&app_id.to_string(), PausedAppReason::Error(error.to_string())).await.map_err(TaskManagerError::internal)?;
-                        }
+
+                        // TODO: it could be helpful to modify this function so that when providing Some(app_ids),
+                        //   you can also pass in a PausedAppReason override, so that the reason for the apps being paused
+                        //   can be set to the specific error message encountered here, rather than having to read it from
+                        //   the logs.
+                        conductor.reconcile_app_status_with_cell_status(None).await.map_err(TaskManagerError::internal)?;
+
                         tracing::error!("Apps paused.");
                     } else {
+                        // Since the error is unrecoverable, we don't expect to be able to use this Cell anymore.
+                        // Therefore, we disable every app which requires that cell.
                         tracing::error!(
                             "DISABLING the following apps due to an unrecoverable error: {:?}\nError: {:?}\nContext: {}",
                             app_ids,

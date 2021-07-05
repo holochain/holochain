@@ -206,7 +206,7 @@ pub trait ConductorHandleT: Send + Sync {
     ) -> ConductorResult<StoppedApp>;
 
     /// Uninstall an app from the state DB and remove all running Cells
-    async fn uninstall_app(&self, app: &InstalledAppId) -> ConductorResult<()>;
+    async fn uninstall_app(self: Arc<Self>, app: &InstalledAppId) -> ConductorResult<()>;
 
     /// Adjust app statuses (via state transitions) to match the current
     /// reality of which Cells are present in the conductor.
@@ -241,7 +241,8 @@ pub trait ConductorHandleT: Send + Sync {
     /// Start an enabled but stopped (paused) app
     async fn start_app(self: Arc<Self>, app_id: &InstalledAppId) -> ConductorResult<InstalledApp>;
 
-    /// Stop a running app while leaving it enabled
+    /// Stop a running app while leaving it enabled. FOR TESTING ONLY.
+    #[cfg(any(test, feature = "test_utils"))]
     async fn pause_app(
         self: Arc<Self>,
         app_id: &InstalledAppId,
@@ -261,7 +262,7 @@ pub trait ConductorHandleT: Send + Sync {
     ) -> ConductorResult<Vec<InstalledAppInfo>>;
 
     /// Get the IDs of all active installed Apps which use this Cell
-    async fn list_running_apps_for_cell_id(
+    async fn list_running_apps_for_required_cell_id(
         &self,
         cell_id: &CellId,
     ) -> ConductorResult<HashSet<InstalledAppId>>;
@@ -294,6 +295,10 @@ pub trait ConductorHandleT: Send + Sync {
     /// Retrieve the environment for this cell.
     async fn get_cell_env_readonly(&self, cell_id: &CellId) -> ConductorApiResult<EnvRead>;
 
+    /// Manually remove some cells. Should only be used when handling errors in Cells,
+    /// allowing individual Cells to be shut down.
+    async fn remove_cells(&self, cell_ids: &[CellId]);
+
     /// Retrieve the environment for this cell. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvWrite>;
@@ -318,10 +323,6 @@ pub trait ConductorHandleT: Send + Sync {
     #[cfg(any(test, feature = "test_utils"))]
     async fn add_test_app_interface(&self, id: super::state::AppInterfaceId)
         -> ConductorResult<()>;
-
-    /// Manually remove some cells. FOR TESTING ONLY.
-    #[cfg(any(test, feature = "test_utils"))]
-    async fn remove_cells(&self, cell_ids: &[CellId]);
 
     /// Manually coerce cells to a given CellStatus. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
@@ -798,6 +799,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     #[tracing::instrument(skip(self))]
+    #[cfg(any(test, feature = "test_utils"))]
     async fn pause_app(
         self: Arc<Self>,
         app_id: &InstalledAppId,
@@ -814,11 +816,18 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     #[tracing::instrument(skip(self))]
-    async fn uninstall_app(&self, installed_app_id: &InstalledAppId) -> ConductorResult<()> {
+    async fn uninstall_app(
+        self: Arc<Self>,
+        installed_app_id: &InstalledAppId,
+    ) -> ConductorResult<()> {
+        let self_clone = self.clone();
         let mut conductor = self.conductor.write().await;
         let app = conductor.remove_app_from_db(installed_app_id).await?;
-        let cell_ids_to_remove = app.all_cells().cloned().collect();
-        conductor.remove_cells(cell_ids_to_remove).await;
+        tracing::debug!(msg = "Removed app from db.", app = ?app);
+        // Remove cells which may now be dangling due to the removed app
+        self_clone
+            .process_app_status_delta(AppStatusTransitionEffects::SpinDown)
+            .await?;
         Ok(())
     }
 
@@ -837,7 +846,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self.conductor.read().await.list_apps(status_filter).await
     }
 
-    async fn list_running_apps_for_cell_id(
+    async fn list_running_apps_for_required_cell_id(
         &self,
         cell_id: &CellId,
     ) -> ConductorResult<HashSet<InstalledAppId>> {
@@ -944,6 +953,11 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(cell.env().clone().into())
     }
 
+    async fn remove_cells(&self, cell_ids: &[CellId]) {
+        let mut lock = self.conductor.write().await;
+        lock.remove_cells(cell_ids.to_vec()).await
+    }
+
     #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvWrite> {
         let cell = self.cell_by_id(cell_id).await?;
@@ -980,12 +994,6 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     ) -> ConductorResult<()> {
         let mut lock = self.conductor.write().await;
         lock.add_test_app_interface(id).await
-    }
-
-    #[cfg(any(test, feature = "test_utils"))]
-    async fn remove_cells(&self, cell_ids: &[CellId]) {
-        let mut lock = self.conductor.write().await;
-        lock.remove_cells(cell_ids.to_vec()).await
     }
 
     #[cfg(any(test, feature = "test_utils"))]
@@ -1033,6 +1041,7 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
             AppStatusTransitionEffects::SpinUp => {
                 // Reconcile cell status so that missing/pending cells can become fully joined
                 let errors = self.clone().reconcile_cell_status_with_app_status().await?;
+
                 // Reconcile app status in case some cells failed to join, so the app can be paused
                 self.clone()
                     .reconcile_app_status_with_cell_status(None)
@@ -1052,6 +1061,8 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
         Ok(())
     }
 
+    /// Create any Cells which are missing for any running apps, then initialize
+    /// and join them. (Joining could take a while.)
     pub(super) async fn create_and_add_initialized_cells_for_running_apps(
         &self,
         conductor_handle: ConductorHandle,
@@ -1085,6 +1096,8 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
             .await
             .add_and_initialize_cells(new_cells);
 
+        // Join these newly created cells to the network
+        // (as well as any others which need joining)
         self.join_all_pending_cells().await;
 
         Ok(errors)
@@ -1092,6 +1105,10 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
 
     /// Attempt to join all PendingJoin cells to the kitsune network.
     /// Returns the cells which were joined during this call.
+    ///
+    /// NB: this could take as long as JOIN_NETWORK_TIMEOUT, which is significant.
+    ///   Be careful to only await this future if it's important that cells be
+    ///   joined before proceeding.
     async fn join_all_pending_cells(&self) -> Vec<CellId> {
         // Join the network but ignore errors because the
         // space retries joining all cells every 5 minutes.

@@ -327,7 +327,7 @@ async fn test_list_running_apps_for_cell_id() {
 
     let list_apps = |conductor: ConductorHandle, cell: SweetCell| async move {
         conductor
-            .list_running_apps_for_cell_id(cell.cell_id())
+            .list_running_apps_for_required_cell_id(cell.cell_id())
             .await
             .unwrap()
     };
@@ -399,7 +399,11 @@ async fn test_uninstall_app() {
         (1, 0)
     );
 
-    conductor.uninstall_app(&"app".to_string()).await.unwrap();
+    conductor
+        .inner_handle()
+        .uninstall_app(&"app".to_string())
+        .await
+        .unwrap();
 
     // - Ensure that the app is removed
     assert_eq_retry_10s!(
