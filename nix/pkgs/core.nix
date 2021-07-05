@@ -30,31 +30,54 @@ rec {
 
   hcReleaseAutomationTest = let
     releaseAutomationCmd = logLevel: ''
-      # todo: need a way to not make the hdk fail despite it being unreleasable
       cargo run --manifest-path=crates/release-automation/Cargo.toml -- \
           --workspace-path=$PWD \
-          --log-level=${logLevel}\
+          --log-level=${logLevel} \
         check \
-          --selection-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
           --disallowed-version-reqs=">=0.1" \
-          --allowed-selection-blockers=UnreleasableViaChangelogFrontmatter \
-          --allowed-dependency-blockers=UnreleasableViaChangelogFrontmatter \
-          --exclude-optional-deps \
-          --exclude-dep-kinds=development
+          --allowed-matched-blockers=UnreleasableViaChangelogFrontmatter \
+          --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$"
     '';
+        # --allowed-dev-dependency-blockers=UnreleasableViaChangelogFrontmatter,MissingReadme \
+        # todo: verify why this was needed and isn't any longer
+        #  --exclude-optional-deps
     in writeShellScriptBin "hc-release-automation-test" ''
     set -euxo pipefail
 
+    # make sure the binary is built
+    cargo build --manifest-path=crates/release-automation/Cargo.toml
     # run the release-automation tests
     cargo test --manifest-path=crates/release-automation/Cargo.toml ''${@}
 
     # check the state of the repository
     (
-      ${releaseAutomationCmd "warn"}
+      ${releaseAutomationCmd "info"}
     ) || (
       ${releaseAutomationCmd "trace"}
     )
   '';
+
+  hcReleaseAutmoation = writeShellScriptBin "hc-release-automation" ''
+    set -euxo pipefail
+
+    cargo run --manifest-path=crates/release-automation/Cargo.toml -- \
+      ''${@}
+  '';
+
+  hcReleaseAutmoationRelease = writeShellScriptBin "hc-release-automation-release" ''
+    set -euxo pipefail
+
+    cargo run --manifest-path=crates/release-automation/Cargo.toml -- \
+        --workspace-path=$PWD \
+        --log-level=trace \
+      release \
+        ''${@} \
+        --disallowed-version-reqs=">=0.1" \
+        --allowed-dev-dependency-blockers=UnreleasableViaChangelogFrontmatter,MissingReadme \
+        --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
+  '';
+      # todo: verify why this was needed and isn't any longer
+      #  --exclude-optional-deps
 
   hcStaticChecks = let
       pathPrefix = lib.makeBinPath
@@ -81,6 +104,19 @@ rec {
     hc-static-checks
     hc-test
   '';
+
+  hcReleaseTest = writeShellScriptBin "hc-release-test" ''
+    set -euxo pipefail
+    export RUST_BACKTRACE=1
+
+    # limit parallel jobs to reduce memory consumption
+    export NUM_JOBS=8
+    export CARGO_BUILD_JOBS=8
+
+    hc-merge-test
+    cargo build --no-default-features --locked --frozen
+  '';
+
 
   hcSpeedTest = writeShellScriptBin "hc-speed-test" ''
     cargo test speed_test_prep --test speed_tests --release --manifest-path=crates/holochain/Cargo.toml --features "build_wasms" -- --ignored
@@ -196,6 +232,10 @@ rec {
     compare=develop
     bench $compare
     add_comment_to_commit $compare $commit
+  '';
+
+  hcRegenReadmes = writeShellScriptBin "hc-regen-readmes" ''
+    cargo-readme readme --project-root=crates/release-automation/ --output=README.md;
   '';
 } // (if stdenv.isLinux then {
   hcCoverageTest = writeShellScriptBin "hc-coverage-test" ''
