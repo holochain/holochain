@@ -50,6 +50,7 @@ impl ManagedTaskError {
     pub fn is_recoverable(&self) -> bool {
         use ConductorError as C;
         use ManagedTaskError::*;
+        #[allow(clippy::match_like_matches_macro)]
         match self {
             Io(_) | Join(_) | Recv(_) => false,
             Conductor(err) => match err {
