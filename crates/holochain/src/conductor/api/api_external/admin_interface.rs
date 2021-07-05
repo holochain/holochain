@@ -224,7 +224,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 );
 
                 let app_ids = self.conductor_handle.list_running_apps().await?;
-                Ok(AdminResponse::ActiveAppsListed(app_ids))
+                Ok(AdminResponse::EnabledAppsListed(app_ids))
             }
             ListApps { status_filter } => {
                 let apps = self.conductor_handle.list_apps(status_filter).await?;
@@ -610,7 +610,7 @@ mod test {
         );
         let expected_activated_app_info: InstalledAppInfo = (&expected_activated_app).into();
         let res = admin_api
-            .handle_admin_request(AdminRequest::ActivateApp {
+            .handle_admin_request(AdminRequest::EnableApp {
                 installed_app_id: "test-by-path".to_string(),
             })
             .await;
@@ -629,16 +629,16 @@ mod test {
             .handle_admin_request(AdminRequest::InstallApp(Box::new(hash_install_payload)))
             .await;
         let _res = admin_api
-            .handle_admin_request(AdminRequest::ActivateApp {
+            .handle_admin_request(AdminRequest::EnableApp {
                 installed_app_id: "test-by-hash".to_string(),
             })
             .await;
 
         let res = admin_api
-            .handle_admin_request(AdminRequest::ListActiveApps)
+            .handle_admin_request(AdminRequest::ListEnabledApps)
             .await;
 
-        assert_matches!(res, AdminResponse::ActiveAppsListed(v) if v.contains(&"test-by-path".to_string()) && v.contains(&"test-by-hash".to_string())
+        assert_matches!(res, AdminResponse::EnabledAppsListed(v) if v.contains(&"test-by-path".to_string()) && v.contains(&"test-by-hash".to_string())
         );
 
         handle.shutdown().await;
