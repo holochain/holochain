@@ -12,7 +12,7 @@ pub fn zome_info(
     _input: (),
 ) -> Result<ZomeInfo, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
-        HostFnAccess{ bindings: Permission::Allow, .. } => {
+        HostFnAccess{ bindings_deterministic: Permission::Allow, .. } => {
             Ok(ZomeInfo {
                 dna_name: ribosome.dna_def().name.clone(),
                 zome_name: call_context.zome.zome_name().clone(),
