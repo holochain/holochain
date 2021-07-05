@@ -130,6 +130,10 @@ CREATE TABLE IF NOT EXISTS DhtOp (
     -- NB: I removed this because it's accessible via Header.entry_hash
     -- entry_hash       BLOB           NULL,
 
+    -- The integration dependency if there is one.
+    dependency          BLOB           NULL,
+
+
     FOREIGN KEY(header_hash) REFERENCES Header(hash)
 );
 CREATE INDEX IF NOT EXISTS DhtOp_type_idx ON DhtOp ( type );
@@ -137,6 +141,7 @@ CREATE INDEX IF NOT EXISTS DhtOp_validation_stage_idx ON DhtOp ( validation_stag
 CREATE INDEX IF NOT EXISTS DhtOp_validation_status_idx ON DhtOp ( validation_status );
 CREATE INDEX IF NOT EXISTS DhtOp_authored_timestamp_ms_idx ON DhtOp ( authored_timestamp_ms );
 CREATE INDEX IF NOT EXISTS DhtOp_storage_center_loc_idx ON DhtOp ( storage_center_loc );
+CREATE INDEX IF NOT EXISTS DhtOp_header_hash_idx ON DhtOp ( header_hash );
 -- CREATE INDEX DhtOp_basis_hash_idx ON DhtOp ( basis_hash );
 
 CREATE TABLE IF NOT EXISTS ValidationReceipt (

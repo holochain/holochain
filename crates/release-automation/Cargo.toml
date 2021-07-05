@@ -1,7 +1,7 @@
 [package]
 name = "release-automation"
 version = "0.1.0"
-authors = ["Stefan Junker <mail@stefanjunker.de>"]
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -30,9 +30,19 @@ env_logger = "0.8"
 fancy-regex = "0.6"
 enumflags2 = "0.7"
 enum-utils = "0.1"
+chrono = "0.4"
+cargo-next = "0.2"
+toml_edit = "0.2"
+thiserror = "1"
+regex = "1.5"
+crates_io_api = "0.7"
+holochain_util = { path = "../holochain_util" }
+crates-index = "0.16"
 
 [dev-dependencies]
 ctor = "0.1"
 prettydiff = "0.4"
 tempfile = "3"
 cargo-test-support = { git = "https://github.com/rust-lang/cargo", branch = "rust-1.53.0" }
+assert_cmd = "1.0"
+predicates = "1.0"
