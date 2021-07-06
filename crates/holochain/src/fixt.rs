@@ -486,7 +486,7 @@ impl Iterator for ZomeCallInvocationFixturator<NamedInvocation> {
             .next()
             .unwrap();
         ret.cell_id = self.0.curve.0.clone();
-        ret.zome = self.0.curve.1.clone().into();
+        ret.zome = self.0.curve.1.into();
         ret.fn_name = self.0.curve.2.clone().into();
         ret.payload = self.0.curve.3.clone();
 

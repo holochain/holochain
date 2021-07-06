@@ -688,23 +688,29 @@ impl SysValidationWorkspace {
             let mut stmt = txn.prepare(
                 "
                 SELECT
-                1
-                FROM Header
-                JOIN
-                DhtOp ON Header.hash = DhtOp.header_hash
-                WHERE
-                Header.author = :author
-                AND
-                DhtOp.when_integrated IS NOT NULL
-                AND
-                DhtOp.type = :activity
-                LIMIT 1
+                EXISTS (
+                    SELECT
+                    1
+                    FROM Header
+                    JOIN
+                    DhtOp ON Header.hash = DhtOp.header_hash
+                    WHERE
+                    Header.author = :author
+                    AND
+                    DhtOp.when_integrated IS NOT NULL
+                    AND
+                    DhtOp.type = :activity
+                    LIMIT 1
+                )
                 ",
             )?;
-            DatabaseResult::Ok(stmt.exists(named_params! {
-                ":author": author,
-                ":activity": DhtOpType::RegisterAgentActivity,
-            })?)
+            DatabaseResult::Ok(stmt.query_row(
+                named_params! {
+                    ":author": author,
+                    ":activity": DhtOpType::RegisterAgentActivity,
+                },
+                |row| row.get(0),
+            )?)
         })?;
         let chain_not_empty = match &self.scratch {
             Some(scratch) => scratch.apply(|scratch| !scratch.is_empty())? || chain_not_empty,
@@ -764,11 +770,13 @@ impl SysValidationWorkspace {
     }
     pub fn full_cascade<Network: HolochainP2pCellT + Clone + 'static + Send>(
         &mut self,
-        network: Network,
-    ) -> Cascade<Network> {
+        _network: Network,
+    ) -> Cascade {
+        // TODO: Put this back to full cascade when we work out the cache contention.
         let cascade = Cascade::empty()
             .with_vault(self.vault.clone().into())
-            .with_network(network, self.cache.clone());
+            // .with_network(network, self.cache.clone());
+            .with_cache(self.cache.clone());
         match &self.scratch {
             Some(scratch) => cascade.with_scratch(scratch.clone()),
             None => cascade,
