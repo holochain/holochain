@@ -21,9 +21,6 @@ pub type EntryHash = HoloHash<hash_type::Entry>;
 /// The hash of a Header
 pub type HeaderHash = HoloHash<hash_type::Header>;
 
-/// The hash of a CounterSigning session.
-pub type CounterSigningHash = HoloHash<hash_type::CounterSigning>;
-
 /// The hash of a network ID
 pub type NetIdHash = HoloHash<hash_type::NetId>;
 
