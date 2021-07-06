@@ -607,7 +607,7 @@ where
     }
 
     /// Remove all Cells which are not referenced by any Enabled app.
-    (Cells belonging to Paused apps are not considered "dangling" and will not be removed)
+    /// (Cells belonging to Paused apps are not considered "dangling" and will not be removed)
     pub(super) async fn remove_dangling_cells(&mut self) -> ConductorResult<usize> {
         let state = self.get_state().await?;
         let keepers: HashSet<CellId> = state
@@ -762,7 +762,7 @@ where
         }
     }
 
-    /// Change the CellStatus of the given Cells in the Conductor. 
+    /// Change the CellStatus of the given Cells in the Conductor.
     /// Silently ignores Cells that don't exist.
     pub(super) fn update_cell_status(&mut self, cell_ids: &[CellId], status: CellStatus) {
         for cell_id in cell_ids {
