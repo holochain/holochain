@@ -601,21 +601,21 @@ mod test {
         let expects = vec![dna_hash.clone()];
         assert_matches!(dna_list, AdminResponse::DnasListed(a) if a == expects);
 
-        let expected_activated_app = InstalledApp::new_running(
+        let expected_enabled_app = InstalledApp::new_running(
             InstalledAppCommon::new_legacy(
                 "test-by-path".to_string(),
                 vec![InstalledCell::new(cell_id2.clone(), "".to_string())],
             )
             .unwrap(),
         );
-        let expected_activated_app_info: InstalledAppInfo = (&expected_activated_app).into();
+        let expected_enabled_app_info: InstalledAppInfo = (&expected_enabled_app).into();
         let res = admin_api
             .handle_admin_request(AdminRequest::EnableApp {
                 installed_app_id: "test-by-path".to_string(),
             })
             .await;
         assert_matches!(res,
-            AdminResponse::AppEnabled {app, ..} if app == expected_activated_app_info
+            AdminResponse::AppEnabled {app, ..} if app == expected_enabled_app_info
         );
 
         let res = admin_api

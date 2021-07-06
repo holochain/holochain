@@ -171,9 +171,9 @@ pub struct EnableApp {
 
 #[derive(Debug, StructOpt, Clone)]
 /// Calls AdminRequest::DisableApp
-/// and deactivates the installed app.
+/// and disables the installed app.
 pub struct DisableApp {
-    /// The InstalledAppId to deactivate.
+    /// The InstalledAppId to disable.
     pub app_id: String,
 }
 
@@ -567,7 +567,7 @@ pub async fn enable_app(cmd: &mut CmdRunner, args: EnableApp) -> anyhow::Result<
     Ok(())
 }
 
-/// Calls [`AdminRequest::DisableApp`] and deactivates the installed app.
+/// Calls [`AdminRequest::DisableApp`] and disables the installed app.
 pub async fn disable_app(cmd: &mut CmdRunner, args: DisableApp) -> anyhow::Result<()> {
     let resp = cmd
         .command(AdminRequest::DisableApp {
@@ -576,7 +576,7 @@ pub async fn disable_app(cmd: &mut CmdRunner, args: DisableApp) -> anyhow::Resul
         .await?;
     ensure!(
         matches!(resp, AdminResponse::AppDisabled),
-        "Failed to deactivate app, got: {:?}",
+        "Failed to disable app, got: {:?}",
         resp
     );
     Ok(())

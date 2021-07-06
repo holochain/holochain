@@ -210,11 +210,6 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Adjust app statuses (via state transitions) to match the current
     /// reality of which Cells are present in the conductor.
-    /// - Do not change state for Disabled apps. For all others:
-    /// - If an app is Paused but all of its (required) Cells are on,
-    ///     then set it to Running
-    /// - If an app is Running but at least one of its (required) Cells are off,
-    ///     then set it to Paused
     async fn reconcile_app_status_with_cell_status(
         &self,
         app_ids: Option<HashSet<InstalledAppId>>,
@@ -231,7 +226,7 @@ pub trait ConductorHandleT: Send + Sync {
     /// Activate an app
     async fn enable_app(self: Arc<Self>, app_id: &InstalledAppId) -> ConductorResult<InstalledApp>;
 
-    /// Deactivate an app
+    /// Disable an app
     async fn disable_app(
         self: Arc<Self>,
         app_id: &InstalledAppId,
@@ -672,7 +667,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .conductor
             .write()
             .await
-            .add_deactivated_app_to_db(app)
+            .add_disabled_app_to_db(app)
             .await?;
 
         Ok(())
@@ -727,7 +722,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .conductor
             .write()
             .await
-            .add_deactivated_app_to_db(app)
+            .add_disabled_app_to_db(app)
             .await?;
 
         Ok(stopped_app)

@@ -40,7 +40,7 @@ pub trait HolochainP2pCellT {
     /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
     async fn join(&self) -> actor::HolochainP2pResult<()>;
 
-    /// If a cell is deactivated, we'll need to \"leave\" the network module as well.
+    /// If a cell is disabled, we'll need to \"leave\" the network module as well.
     async fn leave(&self) -> actor::HolochainP2pResult<()>;
 
     /// Invoke a zome function on a remote node (if you have been granted the capability).
@@ -141,7 +141,7 @@ impl HolochainP2pCellT for HolochainP2pCell {
             .await
     }
 
-    /// If a cell is deactivated, we'll need to \"leave\" the network module as well.
+    /// If a cell is disabled, we'll need to \"leave\" the network module as well.
     async fn leave(&self) -> actor::HolochainP2pResult<()> {
         self.sender
             .leave((*self.dna_hash).clone(), (*self.from_agent).clone())

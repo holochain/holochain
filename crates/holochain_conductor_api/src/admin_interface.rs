@@ -13,7 +13,7 @@ use crate::InstalledAppInfo;
 ///
 /// Expects a serialized object with any contents of the enum on a key `data`
 /// and the enum variant on a key `type`, e.g.
-/// `{ type: 'activate_app', data: { installed_app_id: 'test_app' } }`
+/// `{ type: 'enable_app', data: { installed_app_id: 'test_app' } }`
 ///
 /// [`AdminResponse`]: enum.AdminResponse.html
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -60,14 +60,14 @@ pub enum AdminRequest {
     /// installs all the Dnas with that `AgentPubKey` forming new `Cell`s.
     /// See [`InstallAppPayload`] for full details on the configuration.
     ///
-    /// Note that the new `App` will not be "activated" automatically after installation
-    /// and can be activated by calling [`AdminRequest::ActivateApp`].
+    /// Note that the new `App` will not be enabled automatically after installation
+    /// and can be enabled by calling [`AdminRequest::EnableApp`].
     ///
     /// Will be responded to with an [`AdminResponse::AppInstalled`]
     /// or an [`AdminResponse::Error`]
     ///
     /// [`InstallAppPayload`]: ../../../holochain_types/app/struct.InstallAppPayload.html
-    /// [`AdminRequest::ActivateApp`]: enum.AdminRequest.html#variant.ActivateApp
+    /// [`AdminRequest::EnableApp`]: enum.AdminRequest.html#variant.EnableApp
     /// [`AdminResponse::AppInstalled`]: enum.AdminResponse.html#variant.AppInstalled
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
     InstallApp(Box<InstallAppPayload>),
@@ -80,14 +80,14 @@ pub enum AdminRequest {
     /// installs all the Dnas with that `AgentPubKey` forming new `Cell`s.
     /// See [`InstallAppBundlePayload`] for full details on the configuration.
     ///
-    /// Note that the new `App` will not be "activated" automatically after installation
-    /// and can be activated by calling [`AdminRequest::ActivateApp`].
+    /// Note that the new `App` will not be enabled automatically after installation
+    /// and can be enabled by calling [`AdminRequest::EnableApp`].
     ///
     /// Will be responded to with an [`AdminResponse::AppInstalled`]
     /// or an [`AdminResponse::Error`]
     ///
     /// [`InstallAppBundlePayload`]: ../../../holochain_types/app/struct.InstallAppBundlePayload.html
-    /// [`AdminRequest::ActivateApp`]: enum.AdminRequest.html#variant.ActivateApp
+    /// [`AdminRequest::EnableApp`]: enum.AdminRequest.html#variant.EnableApp
     /// [`AdminResponse::AppInstalled`]: enum.AdminResponse.html#variant.AppInstalled
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
     InstallAppBundle(Box<InstallAppBundlePayload>),
@@ -122,7 +122,7 @@ pub enum AdminRequest {
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
     ListCellIds,
 
-    /// List the ids of all the active (activated) Apps in the conductor.
+    /// List the ids of all the enabled Apps in the conductor.
     /// Takes no arguments.
     ///
     /// Will be responded to with an [`AdminResponse::ActiveAppsListed`]

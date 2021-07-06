@@ -317,7 +317,7 @@ impl From<RunningApp> for InstalledApp {
     }
 }
 
-/// An app which has either never been activated, or has been deactivated.
+/// An app which is either Paused or Disabled, i.e. not Running
 #[derive(
     Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, shrinkwraprs::Shrinkwrap,
 )]

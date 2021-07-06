@@ -151,12 +151,12 @@ async fn app_ids_are_unique() {
     let app = InstalledAppCommon::new_legacy("id".to_string(), vec![installed_cell]).unwrap();
 
     conductor
-        .add_deactivated_app_to_db(app.clone().into())
+        .add_disabled_app_to_db(app.clone().into())
         .await
         .unwrap();
 
     assert_matches!(
-        conductor.add_deactivated_app_to_db(app.clone().into()).await,
+        conductor.add_disabled_app_to_db(app.clone().into()).await,
         Err(ConductorError::AppAlreadyInstalled(id))
         if id == "id".to_string()
     );
@@ -168,7 +168,7 @@ async fn app_ids_are_unique() {
         .unwrap();
 
     assert_matches!(
-        conductor.add_deactivated_app_to_db(app.clone().into()).await,
+        conductor.add_disabled_app_to_db(app.clone().into()).await,
         Err(ConductorError::AppAlreadyInstalled(id))
         if id == "id".to_string()
     );
@@ -589,7 +589,7 @@ pub(crate) fn simple_create_entry_zome() -> InlineZome {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_reactivate_app() {
+async fn test_reenable_app() {
     observability::test_run().ok();
     let zome = simple_create_entry_zome();
     let mut conductor = SweetConductor::from_standard_config().await;
@@ -669,7 +669,7 @@ async fn test_reactivate_app() {
 This is supposed to emulate a panic in a wasm validation callback, but it's not the same.
 However, when wasm panics, it returns an error anyway, so the other similar test
 which tests for validation errors should be sufficient."]
-async fn test_cells_deactivate_on_validation_panic() {
+async fn test_cells_disable_on_validation_panic() {
     observability::test_run().ok();
     let bad_zome =
         InlineZome::new_unique(Vec::new()).callback("validate", |_api, _data: ValidateData| {
@@ -683,7 +683,7 @@ async fn test_cells_deactivate_on_validation_panic() {
     // the app is enabled. Proceed in either case.
     let _ = common_genesis_test_app(&mut conductor, bad_zome).await;
 
-    // - Ensure that the app was deactivated because one Cell panicked during validation
+    // - Ensure that the app was disabled because one Cell panicked during validation
     //   (while publishing genesis elements)
     assert_eq_retry_10s!(
         {
@@ -695,7 +695,7 @@ async fn test_cells_deactivate_on_validation_panic() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_cells_deactivate_on_validation_error() {
+async fn test_cells_disable_on_validation_error() {
     observability::test_run().ok();
     let bad_zome =
         InlineZome::new_unique(Vec::new()).callback("validate", |_api, _data: ValidateData| {
@@ -710,7 +710,7 @@ async fn test_cells_deactivate_on_validation_error() {
     // the app is enabled. Proceed in either case.
     let _ = common_genesis_test_app(&mut conductor, bad_zome).await;
 
-    // - Ensure that the app was deactivated because one Cell had a validation error
+    // - Ensure that the app was disabled because one Cell had a validation error
     //   (while publishing genesis elements)
     assert_eq_retry_10s!(
         {
@@ -774,7 +774,7 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
     // - The failed validation simply causes the zome call to return an error
     assert_matches!(result, Err(_));
 
-    // - The app is not deactivated
+    // - The app is not disabled
     assert_eq_retry_10s!(
         {
             let state = conductor.get_state_from_handle().await.unwrap();
@@ -794,7 +794,7 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
 //   during genesis or not.
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "need to figure out how to write this test"]
-async fn test_apps_deactivate_on_panic_after_genesis() {
+async fn test_apps_disable_on_panic_after_genesis() {
     observability::test_run().ok();
     let unit_entry_def = EntryDef::default_with_id("unit");
     let bad_zome = InlineZome::new_unique(vec![unit_entry_def.clone()])

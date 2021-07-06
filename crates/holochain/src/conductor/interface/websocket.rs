@@ -592,7 +592,7 @@ pub mod test {
         // Get the state
         let state = conductor_handle.get_state_from_handle().await.unwrap();
 
-        // Check it's disabled, and get all cells
+        // Check it's deactivated, and get all cells
         let cell_ids: HashSet<CellId> = state
             .get_app(&app_id)
             .map(|app| {
@@ -606,7 +606,7 @@ pub mod test {
 
         assert_eq!(expected, cell_ids);
 
-        // Check that it is returned in get_app_info as disabled
+        // Check that it is returned in get_app_info as deactivated
         let maybe_info = state.get_app_info(&app_id);
         if let Some(info) = maybe_info {
             assert_eq!(info.installed_app_id, app_id);

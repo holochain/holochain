@@ -163,10 +163,10 @@ impl SweetConductor {
         Ok(())
     }
 
-    /// Install the app and activate it
+    /// Install the app and enable it
     // TODO: make this take a more flexible config for specifying things like
     // membrane proofs
-    async fn setup_app_2_install_and_activate(
+    async fn setup_app_2_install_and_enable(
         &mut self,
         installed_app_id: &str,
         agent: AgentPubKey,
@@ -227,7 +227,7 @@ impl SweetConductor {
         dna_files: &[DnaFile],
     ) -> ConductorApiResult<SweetApp> {
         self.setup_app_1_register_dna(dna_files).await?;
-        self.setup_app_2_install_and_activate(installed_app_id, agent.clone(), dna_files)
+        self.setup_app_2_install_and_enable(installed_app_id, agent.clone(), dna_files)
             .await?;
 
         self.handle()
@@ -272,7 +272,7 @@ impl SweetConductor {
         self.setup_app_1_register_dna(dna_files).await?;
         for agent in agents.iter() {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
-            self.setup_app_2_install_and_activate(&installed_app_id, agent.clone(), dna_files)
+            self.setup_app_2_install_and_enable(&installed_app_id, agent.clone(), dna_files)
                 .await?;
         }
 

@@ -117,7 +117,7 @@ pub enum TaskOutcome {
     MinorError(ManagedTaskError, String),
     /// Close the conductor down because this is an unrecoverable error.
     ShutdownConductor(Box<ManagedTaskError>, String),
-    /// Either pause or deactivate all apps which contain the problematic Cell,
+    /// Either pause or disable all apps which contain the problematic Cell,
     /// depending upon the specific error.
     StopApps(CellId, Box<ManagedTaskError>, String),
 }

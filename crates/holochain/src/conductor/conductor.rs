@@ -547,6 +547,13 @@ where
         }
     }
 
+    /// Adjust app statuses (via state transitions) to match the current
+    /// reality of which Cells are present in the conductor.
+    /// - Do not change state for Disabled apps. For all others:
+    /// - If an app is Paused but all of its (required) Cells are on,
+    ///     then set it to Running
+    /// - If an app is Running but at least one of its (required) Cells are off,
+    ///     then set it to Paused
     pub(super) async fn reconcile_app_status_with_cell_status<S>(
         &mut self,
         app_ids: Option<S>,
@@ -691,8 +698,8 @@ where
         Ok(futures::future::join_all(tasks).await)
     }
 
-    /// Register an app as deactivated in the database
-    pub(super) async fn add_deactivated_app_to_db(
+    /// Register an app as disabled in the database
+    pub(super) async fn add_disabled_app_to_db(
         &mut self,
         app: InstalledAppCommon,
     ) -> ConductorResult<StoppedApp> {
