@@ -68,10 +68,7 @@ use tracing::*;
 #[cfg(any(test, feature = "test_utils"))]
 use super::handle::MockConductorHandleT;
 
-/// Conductor-specific Cell state, this can probably be stored in a database.
-/// Hypothesis: If nothing remains in this struct, then the Conductor state is
-/// essentially immutable, and perhaps we just throw it out and make a new one
-/// when we need to load new config, etc.
+/// The status of an installed Cell, which captures different phases of its lifecycle
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CellStatus {
     /// Kitsune knows about this Cell and it is considered fully "online"
@@ -87,7 +84,7 @@ pub enum CellStatus {
 /// Declarative filter for CellStatus
 pub type CellStatusFilter = CellStatus;
 
-/// An [Cell] tracked by a Conductor, along with some [CellState]
+/// A [`Cell`] tracked by a Conductor, along with its [`CellStatus`]
 struct CellItem<CA>
 where
     CA: CellConductorApiT,
@@ -196,8 +193,7 @@ where
         Ok(item.cell.clone())
     }
 
-    /// Iterator over all cells, regardless of status. Generally used when
-    /// responding to kitsune requests.
+    /// Iterator over all cells, regardless of status.
     pub(super) fn _all_cells(&self) -> impl Iterator<Item = (&CellId, &Cell)> {
         self.cells.iter().map(|(id, item)| (id, item.cell.as_ref()))
     }
@@ -604,7 +600,7 @@ where
     }
 
     /// Remove all Cells which are not referenced by any Enabled app.
-    // TODO: test
+    (Cells belonging to Paused apps are not considered "dangling" and will not be removed)
     pub(super) async fn remove_dangling_cells(&mut self) -> ConductorResult<usize> {
         let state = self.get_state().await?;
         let keepers: HashSet<CellId> = state
@@ -641,6 +637,7 @@ where
         // Closure for creating all cells in an app
         let state = self.get_state().await?;
 
+        // Collect all CellIds across all apps, deduped
         let app_cells: HashSet<&CellId> = state
             .installed_apps()
             .iter()
@@ -758,7 +755,8 @@ where
         }
     }
 
-    /// Add fully constructed cells to the cell map in the Conductor
+    /// Change the CellStatus of the given Cells in the Conductor. 
+    /// Silently ignores Cells that don't exist.
     pub(super) fn update_cell_status(&mut self, cell_ids: &[CellId], status: CellStatus) {
         for cell_id in cell_ids {
             if let Some(mut cell) = self.cells.get_mut(cell_id) {
@@ -854,7 +852,7 @@ where
             if let Some(item) = self.cells.remove(&cell_id) {
                 // TODO: make this function async, or ensure that cleanup is fast,
                 //       so we don't hold the conductor lock unduly long while doing cleanup
-                //       (currently cleanup is a noop)
+                //       (currently cleanup is a noop, so it's not urgent)
                 if let Err(err) = item.cell.cleanup().await {
                     tracing::error!("Error cleaning up Cell: {:?}\nCellId: {}", err, cell_id);
                 }

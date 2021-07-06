@@ -416,7 +416,7 @@ async fn test_uninstall_app() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_setup_cells_idempotency() {
+async fn test_reconciliation_idempotency() {
     observability::test_run().ok();
     let zome = InlineZome::new_unique(Vec::new());
     let mut conductor = SweetConductor::from_standard_config().await;

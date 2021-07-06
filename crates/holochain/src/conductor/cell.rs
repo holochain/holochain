@@ -914,6 +914,6 @@ impl Cell {
 
 impl std::fmt::Debug for Cell {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("Cell(id = {:?})", self.id()))
+        f.debug_struct("Cell").field("id", &self.id()).finish()
     }
 }
