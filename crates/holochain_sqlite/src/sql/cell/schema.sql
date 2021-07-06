@@ -1,3 +1,5 @@
+-- no-sql-format --
+
 -- Initial Holochain Cell schema
 
 CREATE TABLE IF NOT EXISTS Entry (
