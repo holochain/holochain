@@ -193,10 +193,7 @@ pub async fn incoming_dht_ops_workflow(
         });
     }
 
-    // Nothing bad will happen if this fails (the sender was dropped)
-    let _ = rcv.await;
-
-    Ok(())
+    rcv.await.expect("sender dropped")
 }
 
 fn needs_receipt(op: &DhtOp, from_agent: &Option<AgentPubKey>) -> bool {
