@@ -649,6 +649,10 @@ async fn test_reactivate_app() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "Causing a tokio thread to panic is problematic.
+This is supposed to emulate a panic in a wasm validation callback, but it's not the same.
+However, when wasm panics, it returns an error anyway, so the other similar test
+which tests for validation errors should be sufficient."]
 async fn test_cells_self_deactivate_on_validation_panic() {
     observability::test_run().ok();
     let bad_zome =
