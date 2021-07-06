@@ -1,6 +1,7 @@
 use super::Conductor;
 use super::ConductorState;
 use super::*;
+use crate::conductor::api::error::ConductorApiError;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::sweettest::*;
 use crate::test_utils::fake_valid_dna_file;
@@ -354,8 +355,9 @@ async fn mk_dna(name: &str, zome: InlineZome) -> DnaResult<(DnaFile, Zome)> {
 
 /// A function that sets up a SweetApp, used in several tests in this module
 async fn common_genesis_test_app(
+    conductor: &mut SweetConductor,
     custom_zome: InlineZome,
-) -> ConductorResult<(SweetConductor, SweetApp)> {
+) -> ConductorApiResult<SweetApp> {
     let hardcoded_zome = InlineZome::new_unique(Vec::new());
 
     // Just a strong reminder that we need to be careful once we start using existing Cells:
@@ -376,19 +378,17 @@ async fn common_genesis_test_app(
     let (dna_custom, _) = mk_dna("custom", custom_zome).await?;
 
     // Install both DNAs under the same app:
-    let mut conductor = SweetConductor::from_standard_config().await;
-    let app = conductor
+    conductor
         .setup_app(&"app", &[dna_hardcoded, dna_custom])
-        .await?;
-    Ok((conductor, app))
+        .await
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_uninstall_app() {
     observability::test_run().ok();
     let zome = InlineZome::new_unique(Vec::new());
-
-    let (conductor, _) = common_genesis_test_app(zome).await.unwrap();
+    let mut conductor = SweetConductor::from_standard_config().await;
+    common_genesis_test_app(&mut conductor, zome).await.unwrap();
 
     // - Ensure that the app is active
     assert_eq_retry_10s!(
@@ -419,7 +419,8 @@ async fn test_uninstall_app() {
 async fn test_setup_cells_idempotency() {
     observability::test_run().ok();
     let zome = InlineZome::new_unique(Vec::new());
-    let (conductor, _) = common_genesis_test_app(zome).await.unwrap();
+    let mut conductor = SweetConductor::from_standard_config().await;
+    common_genesis_test_app(&mut conductor, zome).await.unwrap();
 
     conductor
         .inner_handle()
@@ -469,7 +470,7 @@ async fn test_signing_error_during_genesis() {
         panic!("this should have been an error")
     };
 
-    assert_matches!(err, ConductorError::GenesisFailed { errors } if errors.len() == 1);
+    assert_matches!(err, ConductorApiError::ConductorError(ConductorError::GenesisFailed { errors }) if errors.len() == 1);
 }
 
 async fn make_signing_call(client: &mut WebsocketSender, cell: &SweetCell) -> AppResponse {
@@ -591,7 +592,8 @@ pub(crate) fn simple_create_entry_zome() -> InlineZome {
 async fn test_reactivate_app() {
     observability::test_run().ok();
     let zome = simple_create_entry_zome();
-    let (conductor, app) = common_genesis_test_app(zome).await.unwrap();
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let app = common_genesis_test_app(&mut conductor, zome).await.unwrap();
 
     let all_apps = conductor.list_apps(None).await.unwrap();
     assert_eq!(all_apps.len(), 1);
@@ -663,7 +665,7 @@ async fn test_reactivate_app() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_cells_pause_on_validation_panic() {
+async fn test_cells_deactivate_on_validation_panic() {
     observability::test_run().ok();
     let bad_zome =
         InlineZome::new_unique(Vec::new()).callback("validate", |_api, _data: ValidateData| {
@@ -671,21 +673,30 @@ async fn test_cells_pause_on_validation_panic() {
             #[allow(unreachable_code)]
             Ok(ValidateResult::Valid)
         });
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let err = common_genesis_test_app(&mut conductor, bad_zome)
+        .await
+        .map(|_| "(original value discarded)")
+        .unwrap_err();
 
-    let (conductor, _) = common_genesis_test_app(bad_zome).await.unwrap();
+    assert_matches!(
+        err,
+        ConductorApiError::ConductorError(ConductorError::CellMissing(_))
+    );
 
     // - Ensure that the app was deactivated because one Cell panicked during validation
+    //   (while publishing genesis elements)
     assert_eq_retry_10s!(
         {
             let state = conductor.get_state_from_handle().await.unwrap();
-            (state.running_apps().count(), state.stopped_apps().count())
+            (state.enabled_apps().count(), state.stopped_apps().count())
         },
         (0, 1)
     );
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_cells_proceed_on_validation_error() {
+async fn test_cells_deactivate_on_validation_error() {
     observability::test_run().ok();
     let bad_zome =
         InlineZome::new_unique(Vec::new()).callback("validate", |_api, _data: ValidateData| {
@@ -694,15 +705,25 @@ async fn test_cells_proceed_on_validation_error() {
             ))
         });
 
-    let (conductor, _) = common_genesis_test_app(bad_zome).await.unwrap();
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let err = common_genesis_test_app(&mut conductor, bad_zome)
+        .await
+        .map(|_| "(original value discarded)")
+        .unwrap_err();
 
-    // - Ensure that the app continues to run even with a validation error
+    assert_matches!(
+        err,
+        ConductorApiError::ConductorError(ConductorError::CellMissing(_))
+    );
+
+    // - Ensure that the app was deactivated because one Cell had a validation error
+    //   (while publishing genesis elements)
     assert_eq_retry_10s!(
         {
             let state = conductor.get_state_from_handle().await.unwrap();
-            (state.running_apps().count(), state.stopped_apps().count())
+            (state.enabled_apps().count(), state.stopped_apps().count())
         },
-        (1, 0)
+        (0, 1)
     );
 }
 
@@ -718,13 +739,14 @@ async fn test_installation_fails_if_genesis_self_check_is_invalid() {
         },
     );
 
-    let err = if let Err(err) = common_genesis_test_app(bad_zome).await {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let err = if let Err(err) = common_genesis_test_app(&mut conductor, bad_zome).await {
         err
     } else {
         panic!("this should have been an error")
     };
 
-    assert_matches!(err, ConductorError::GenesisFailed { errors } if errors.len() == 1);
+    assert_matches!(err, ConductorApiError::ConductorError(ConductorError::GenesisFailed { errors }) if errors.len() == 1);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -744,7 +766,10 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
             Ok(hash)
         });
 
-    let (conductor, app) = common_genesis_test_app(bad_zome).await.unwrap();
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let app = common_genesis_test_app(&mut conductor, bad_zome)
+        .await
+        .unwrap();
 
     let (_, cell_bad) = app.into_tuple();
 
@@ -793,7 +818,10 @@ async fn test_apps_deactivate_on_panic_after_genesis() {
             Ok(hash)
         });
 
-    let (conductor, app) = common_genesis_test_app(bad_zome).await.unwrap();
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let app = common_genesis_test_app(&mut conductor, bad_zome)
+        .await
+        .unwrap();
 
     let (_, cell_bad) = app.into_tuple();
 
@@ -814,7 +842,8 @@ async fn test_apps_deactivate_on_panic_after_genesis() {
 async fn test_app_status_states() {
     observability::test_run().ok();
     let zome = simple_create_entry_zome();
-    let (conductor, _) = common_genesis_test_app(zome).await.unwrap();
+    let mut conductor = SweetConductor::from_standard_config().await;
+    common_genesis_test_app(&mut conductor, zome).await.unwrap();
 
     let all_apps = conductor.list_apps(None).await.unwrap();
     assert_eq!(all_apps.len(), 1);
