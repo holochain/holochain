@@ -4,43 +4,49 @@ use crate::core::ribosome::ZomeCall;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
+use crate::core::ribosome::HostFnAccess;
 
 pub fn call(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     call: Call,
 ) -> Result<ZomeCallResponse, WasmError> {
-    // Get the conductor handle
-    let host_access = call_context.host_access();
-    let conductor_handle = host_access.call_zome_handle();
-    let workspace = host_access.workspace();
+    match HostFnAccess::from(&call_context.host_access()) {
+        HostFnAccess{ write_workspace: Permission::Allow, .. } => {
+            // Get the conductor handle
+            let host_access = call_context.host_access();
+            let conductor_handle = host_access.call_zome_handle();
+            let workspace = host_access.workspace();
 
-    // Get the cell id if it's not passed in
-    let cell_id = call
-        .to_cell
-        .unwrap_or_else(|| conductor_handle.cell_id().clone());
+            // Get the cell id if it's not passed in
+            let cell_id = call
+                .to_cell
+                .unwrap_or_else(|| conductor_handle.cell_id().clone());
 
-    let zome_name = call.zome_name.clone();
+            let zome_name = call.zome_name.clone();
 
-    // Create the invocation for this call
-    let invocation = ZomeCall {
-        cell_id,
-        zome_name,
-        cap: call.cap,
-        fn_name: call.fn_name,
-        payload: call.payload,
-        provenance: call.provenance,
-    };
+            // Create the invocation for this call
+            let invocation = ZomeCall {
+                cell_id,
+                zome_name,
+                cap: call.cap,
+                fn_name: call.fn_name,
+                payload: call.payload,
+                provenance: call.provenance,
+            };
 
-    // Make the call using this workspace
-    tokio_helper::block_forever_on(async move {
-        conductor_handle
-            .call_zome(invocation, workspace)
-            .await
-            .map_err(Box::new)
-    })
-    .map_err(|conductor_api_error| WasmError::Host(conductor_api_error.to_string()))?
-    .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))
+            // Make the call using this workspace
+            tokio_helper::block_forever_on(async move {
+                conductor_handle
+                    .call_zome(invocation, workspace)
+                    .await
+                    .map_err(Box::new)
+            })
+            .map_err(|conductor_api_error| WasmError::Host(conductor_api_error.to_string()))?
+            .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))
+        },
+        _ => unreachable!(),
+    }
 }
 
 #[cfg(test)]

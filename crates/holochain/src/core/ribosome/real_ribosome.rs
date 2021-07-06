@@ -58,7 +58,6 @@ use crate::core::ribosome::host_fn::sign_ephemeral::sign_ephemeral;
 use crate::core::ribosome::host_fn::sleep::sleep;
 use crate::core::ribosome::host_fn::sys_time::sys_time;
 use crate::core::ribosome::host_fn::trace::trace;
-use crate::core::ribosome::host_fn::unreachable::unreachable;
 use crate::core::ribosome::host_fn::update::update;
 use crate::core::ribosome::host_fn::verify_signature::verify_signature;
 use crate::core::ribosome::host_fn::version::version;
@@ -75,6 +74,9 @@ use fallible_iterator::FallibleIterator;
 use holochain_types::prelude::*;
 
 use holochain_wasmer_host::prelude::*;
+use once_cell::sync::Lazy;
+use std::collections::HashMap;
+use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
 /// The only RealRibosome is a Wasm ribosome.
@@ -92,7 +94,8 @@ struct HostFnBuilder {
     store: Store,
     env: Env,
     ribosome_arc: Arc<RealRibosome>,
-    context_arc: Arc<CallContext>,
+    // context_arc: Arc<CallContext>,
+    context_key: u64,
 }
 
 impl HostFnBuilder {
@@ -109,7 +112,7 @@ impl HostFnBuilder {
         O: serde::Serialize + std::fmt::Debug,
     {
         let ribosome_arc = Arc::clone(&self.ribosome_arc);
-        let context_arc = Arc::clone(&self.context_arc);
+        let context_key = self.context_key;
         ns.insert(
             host_function_name,
             Function::new_with_env(
@@ -133,11 +136,24 @@ impl HostFnBuilder {
                             return Err::<_, RuntimeError>(RuntimeError::new(WasmError::PointerMap))
                         }
                     };
+                    let context_arc = {
+                        CONTEXT_MAP
+                            .lock()
+                            .get(&context_key)
+                            .unwrap_or_else(|| {
+                                panic!(
+                                "Context must be set before call, this is a bug. context_key: {}",
+                                &context_key,
+                            )
+                            })
+                            .clone()
+                    };
                     let result = match env.consume_bytes_from_guest(guest_ptr, len) {
                         Ok(input) => {
                             match host_function(
                                 Arc::clone(&ribosome_arc),
-                                Arc::clone(&context_arc),
+                                // Arc::clone(&context_arc),
+                                context_arc,
                                 input,
                             ) {
                                 Ok(output) => Ok::<_, WasmError>(output),
@@ -154,6 +170,42 @@ impl HostFnBuilder {
         );
         &self
     }
+}
+
+type ContextMap = Lazy<Arc<Mutex<HashMap<u64, Arc<CallContext>>>>>;
+/// Map from an instance to it's context for a call.
+static CONTEXT_MAP: ContextMap = Lazy::new(Default::default);
+
+static CONTEXT_KEY: AtomicU64 = AtomicU64::new(0);
+
+/// Create a key for the instance cache.
+/// It will be [WasmHash..DnaHash..context_key] all as bytes.
+fn instance_cache_key(wasm_hash: &WasmHash, dna_hash: &DnaHash, context_key: u64) -> [u8; 32] {
+    let mut bits = [0u8; 32];
+    for (i, byte) in wasm_hash
+        .get_raw_32()
+        .iter()
+        .zip(dna_hash.get_raw_32().iter())
+        .map(|(a, b)| a ^ b)
+        .take(24)
+        .enumerate()
+    {
+        bits[i] = byte;
+    }
+    for (i, byte) in (24..32).zip(context_key.to_le_bytes()) {
+        bits[i] = byte;
+    }
+    bits
+}
+
+/// Get the context key back from the end of the instance cache key.
+fn context_key_from_key(key: &[u8; 32]) -> u64 {
+    let mut bits = [0u8; 8];
+    for (a, b) in key[24..].iter().zip(bits.iter_mut()) {
+        *b = *a;
+    }
+
+    u64::from_le_bytes(bits)
 }
 
 impl RealRibosome {
@@ -188,26 +240,117 @@ impl RealRibosome {
         Ok(key)
     }
 
-    pub fn instance(&self, call_context: CallContext) -> RibosomeResult<Arc<Mutex<Instance>>> {
-        let zome_name = call_context.zome.zome_name().clone();
-        let module = self.module(&zome_name)?;
-        let imports: ImportObject = Self::imports(self, call_context, module.store());
-        let instance = Arc::new(Mutex::new(
-            Instance::new(&module, &imports).map_err(|e| WasmError::Compile(e.to_string()))?,
-        ));
-        Ok(instance)
+    pub fn cache_instance(
+        &self,
+        context_key: u64,
+        instance: Arc<Mutex<Instance>>,
+        zome_name: &ZomeName,
+    ) -> RibosomeResult<()> {
+        use holochain_wasmer_host::module::PlruCache;
+        // Clear the context as the call is done.
+        {
+            CONTEXT_MAP.lock().remove(&context_key);
+        }
+        let key = instance_cache_key(
+            &self
+                .dna_file
+                .dna()
+                .get_wasm_zome(zome_name)
+                .map_err(DnaError::from)?
+                .wasm_hash,
+            self.dna_file.dna_hash(),
+            context_key,
+        );
+        holochain_wasmer_host::module::INSTANCE_CACHE
+            .write()
+            .put_item(key, instance);
+
+        Ok(())
     }
 
-    fn imports(&self, call_context: CallContext, store: &Store) -> ImportObject {
-        let host_fn_access = (&call_context.host_access()).into();
+    pub fn instance(
+        &self,
+        call_context: CallContext,
+    ) -> RibosomeResult<(Arc<Mutex<Instance>>, u64)> {
+        use holochain_wasmer_host::module::PlruCache;
+        let zome_name = call_context.zome.zome_name().clone();
 
+        // Fallback to creating an instance if we don't have a cache hit.
+        let fallback = |context_key| {
+            let module = self.module(&zome_name)?;
+            let imports: ImportObject = Self::imports(self, context_key, module.store());
+            let instance = Arc::new(Mutex::new(
+                Instance::new(&module, &imports).map_err(|e| WasmError::Compile(e.to_string()))?,
+            ));
+            RibosomeResult::Ok(instance)
+        };
+
+        // Get the start of the possible keys.
+        let key_start = instance_cache_key(
+            &self
+                .dna_file
+                .dna()
+                .get_wasm_zome(&zome_name)
+                .map_err(DnaError::from)?
+                .wasm_hash,
+            self.dna_file.dna_hash(),
+            0,
+        );
+        // Get the end of the possible keys.
+        let key_end = instance_cache_key(
+            &self
+                .dna_file
+                .dna()
+                .get_wasm_zome(&zome_name)
+                .map_err(DnaError::from)?
+                .wasm_hash,
+            self.dna_file.dna_hash(),
+            CONTEXT_KEY.load(std::sync::atomic::Ordering::Relaxed),
+        );
+        let mut lock = holochain_wasmer_host::module::INSTANCE_CACHE.write();
+        // Get the first available key.
+        let key = lock
+            .cache()
+            .range(key_start..key_end)
+            .next()
+            .map(|(k, _)| k)
+            .cloned();
+        // Check if we got a key hit.
+        if let Some(key) = key {
+            // If we did then remove that instance.
+            if let Some(instance) = lock.remove_item(&key) {
+                let context_key = context_key_from_key(&key);
+                // We have an instance hit.
+                // Update the context.
+                {
+                    CONTEXT_MAP
+                        .lock()
+                        .insert(context_key, Arc::new(call_context));
+                }
+                // This is the fastest path.
+                return Ok((instance, context_key));
+            }
+        }
+        // We didn't get an instance hit so create a new key.
+        let context_key = CONTEXT_KEY.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        // Update the context.
+        {
+            CONTEXT_MAP
+                .lock()
+                .insert(context_key, Arc::new(call_context));
+        }
+        // Fallback to creating the instance.
+        let instance = fallback(context_key)?;
+        Ok((instance, context_key))
+    }
+
+    fn imports(&self, context_key: u64, store: &Store) -> ImportObject {
         let env = Env::default();
         let mut imports = imports! {};
         let mut ns = Exports::new();
 
         // it is important that RealRibosome and ZomeCallInvocation are cheap to clone here
         let ribosome_arc = std::sync::Arc::new((*self).clone());
-        let context_arc = std::sync::Arc::new(call_context);
 
         // standard memory handling used by the holochain_wasmer guest and host macros
         ns.insert(
@@ -223,170 +366,64 @@ impl RealRibosome {
             store: store.clone(),
             env,
             ribosome_arc,
-            context_arc,
+            context_key,
         };
 
         host_fn_builder
             .with_host_function(&mut ns, "__trace", trace)
             .with_host_function(&mut ns, "__hash_entry", hash_entry)
             .with_host_function(&mut ns, "__version", version)
-            .with_host_function(&mut ns, "__unreachable", unreachable);
-
-        if let HostFnAccess {
-            keystore: Permission::Allow,
-            ..
-        } = host_fn_access
-        {
-            host_fn_builder
-                .with_host_function(&mut ns, "__verify_signature", verify_signature)
-                .with_host_function(&mut ns, "__sign", sign)
-                .with_host_function(&mut ns, "__sign_ephemeral", sign_ephemeral)
-                .with_host_function(&mut ns, "__create_x25519_keypair", create_x25519_keypair)
-                .with_host_function(
-                    &mut ns,
-                    "__x_salsa20_poly1305_encrypt",
-                    x_salsa20_poly1305_encrypt,
-                )
-                .with_host_function(
-                    &mut ns,
-                    "__x_salsa20_poly1305_decrypt",
-                    x_salsa20_poly1305_decrypt,
-                )
-                .with_host_function(
-                    &mut ns,
-                    "__x_25519_x_salsa20_poly1305_encrypt",
-                    x_25519_x_salsa20_poly1305_encrypt,
-                )
-                .with_host_function(
-                    &mut ns,
-                    "__x_25519_x_salsa20_poly1305_decrypt",
-                    x_25519_x_salsa20_poly1305_decrypt,
-                );
-        } else {
-            host_fn_builder
-                .with_host_function(&mut ns, "__verify_signature", unreachable)
-                .with_host_function(&mut ns, "__sign", unreachable)
-                .with_host_function(&mut ns, "__sign_ephemeral", unreachable)
-                .with_host_function(&mut ns, "__create_x25519_keypair", unreachable)
-                .with_host_function(&mut ns, "__x_salsa20_poly1305_encrypt", unreachable)
-                .with_host_function(&mut ns, "__x_salsa20_poly1305_decrypt", unreachable)
-                .with_host_function(&mut ns, "__x_25519_x_salsa20_poly1305_encrypt", unreachable)
-                .with_host_function(&mut ns, "__x_25519_x_salsa20_poly1305_decrypt", unreachable);
-        }
-
-        if let HostFnAccess {
-            dna_bindings: Permission::Allow,
-            ..
-        } = host_fn_access
-        {
-            host_fn_builder
-                .with_host_function(&mut ns, "__zome_info", zome_info)
-                .with_host_function(&mut ns, "__app_info", app_info)
-                .with_host_function(&mut ns, "__dna_info", dna_info)
-                .with_host_function(&mut ns, "__call_info", call_info);
-        } else {
-            host_fn_builder
-                .with_host_function(&mut ns, "__zome_info", unreachable)
-                .with_host_function(&mut ns, "__app_info", unreachable)
-                .with_host_function(&mut ns, "__dna_info", unreachable)
-                .with_host_function(&mut ns, "__call_info", unreachable);
-        }
-
-        if let HostFnAccess {
-            non_determinism: Permission::Allow,
-            ..
-        } = host_fn_access
-        {
-            host_fn_builder
-                .with_host_function(&mut ns, "__random_bytes", random_bytes)
-                .with_host_function(&mut ns, "__sys_time", sys_time)
-                .with_host_function(&mut ns, "__sleep", sleep);
-        } else {
-            host_fn_builder
-                .with_host_function(&mut ns, "__random_bytes", unreachable)
-                .with_host_function(&mut ns, "__sys_time", unreachable)
-                .with_host_function(&mut ns, "__sleep", unreachable);
-        }
-
-        if let HostFnAccess {
-            agent_info: Permission::Allow,
-            ..
-        } = host_fn_access
-        {
-            host_fn_builder
-                .with_host_function(&mut ns, "__agent_info", agent_info)
-                .with_host_function(&mut ns, "__capability_claims", capability_claims)
-                .with_host_function(&mut ns, "__capability_grants", capability_grants)
-                .with_host_function(&mut ns, "__capability_info", capability_info);
-        } else {
-            host_fn_builder
-                .with_host_function(&mut ns, "__agent_info", unreachable)
-                .with_host_function(&mut ns, "__capability_claims", unreachable)
-                .with_host_function(&mut ns, "__capability_grants", unreachable)
-                .with_host_function(&mut ns, "__capability_info", unreachable);
-        }
-
-        if let HostFnAccess {
-            read_workspace: Permission::Allow,
-            ..
-        } = host_fn_access
-        {
-            host_fn_builder
-                .with_host_function(&mut ns, "__get", get)
-                .with_host_function(&mut ns, "__get_details", get_details)
-                .with_host_function(&mut ns, "__get_links", get_links)
-                .with_host_function(&mut ns, "__get_link_details", get_link_details)
-                .with_host_function(&mut ns, "__get_agent_activity", get_agent_activity)
-                .with_host_function(&mut ns, "__query", query);
-        } else {
-            host_fn_builder
-                .with_host_function(&mut ns, "__get", unreachable)
-                .with_host_function(&mut ns, "__get_details", unreachable)
-                .with_host_function(&mut ns, "__get_links", unreachable)
-                .with_host_function(&mut ns, "__get_link_details", unreachable)
-                .with_host_function(&mut ns, "__get_agent_activity", unreachable)
-                .with_host_function(&mut ns, "__query", unreachable);
-        }
-
-        if let HostFnAccess {
-            write_network: Permission::Allow,
-            ..
-        } = host_fn_access
-        {
-            host_fn_builder
-                .with_host_function(&mut ns, "__call_remote", call_remote)
-                .with_host_function(&mut ns, "__remote_signal", remote_signal);
-        } else {
-            host_fn_builder
-                .with_host_function(&mut ns, "__call_remote", unreachable)
-                .with_host_function(&mut ns, "__remote_signal", unreachable);
-        }
-
-        if let HostFnAccess {
-            write_workspace: Permission::Allow,
-            ..
-        } = host_fn_access
-        {
-            host_fn_builder
-                .with_host_function(&mut ns, "__call", call)
-                .with_host_function(&mut ns, "__create", create)
-                .with_host_function(&mut ns, "__emit_signal", emit_signal)
-                .with_host_function(&mut ns, "__create_link", create_link)
-                .with_host_function(&mut ns, "__delete_link", delete_link)
-                .with_host_function(&mut ns, "__update", update)
-                .with_host_function(&mut ns, "__delete", delete)
-                .with_host_function(&mut ns, "__schedule", schedule);
-        } else {
-            host_fn_builder
-                .with_host_function(&mut ns, "__call", unreachable)
-                .with_host_function(&mut ns, "__create", unreachable)
-                .with_host_function(&mut ns, "__emit_signal", unreachable)
-                .with_host_function(&mut ns, "__create_link", unreachable)
-                .with_host_function(&mut ns, "__delete_link", unreachable)
-                .with_host_function(&mut ns, "__update", unreachable)
-                .with_host_function(&mut ns, "__delete", unreachable)
-                .with_host_function(&mut ns, "__schedule", unreachable);
-        }
+            .with_host_function(&mut ns, "__verify_signature", verify_signature)
+            .with_host_function(&mut ns, "__sign", sign)
+            .with_host_function(&mut ns, "__sign_ephemeral", sign_ephemeral)
+            .with_host_function(&mut ns, "__create_x25519_keypair", create_x25519_keypair)
+            .with_host_function(
+                &mut ns,
+                "__x_salsa20_poly1305_encrypt",
+                x_salsa20_poly1305_encrypt,
+            )
+            .with_host_function(
+                &mut ns,
+                "__x_salsa20_poly1305_decrypt",
+                x_salsa20_poly1305_decrypt,
+            )
+            .with_host_function(
+                &mut ns,
+                "__x_25519_x_salsa20_poly1305_encrypt",
+                x_25519_x_salsa20_poly1305_encrypt,
+            )
+            .with_host_function(
+                &mut ns,
+                "__x_25519_x_salsa20_poly1305_decrypt",
+                x_25519_x_salsa20_poly1305_decrypt,
+            )
+            .with_host_function(&mut ns, "__zome_info", zome_info)
+            .with_host_function(&mut ns, "__app_info", app_info)
+            .with_host_function(&mut ns, "__dna_info", dna_info)
+            .with_host_function(&mut ns, "__call_info", call_info)
+            .with_host_function(&mut ns, "__random_bytes", random_bytes)
+            .with_host_function(&mut ns, "__sys_time", sys_time)
+            .with_host_function(&mut ns, "__sleep", sleep)
+            .with_host_function(&mut ns, "__agent_info", agent_info)
+            .with_host_function(&mut ns, "__capability_claims", capability_claims)
+            .with_host_function(&mut ns, "__capability_grants", capability_grants)
+            .with_host_function(&mut ns, "__capability_info", capability_info)
+            .with_host_function(&mut ns, "__get", get)
+            .with_host_function(&mut ns, "__get_details", get_details)
+            .with_host_function(&mut ns, "__get_links", get_links)
+            .with_host_function(&mut ns, "__get_link_details", get_link_details)
+            .with_host_function(&mut ns, "__get_agent_activity", get_agent_activity)
+            .with_host_function(&mut ns, "__query", query)
+            .with_host_function(&mut ns, "__call_remote", call_remote)
+            .with_host_function(&mut ns, "__remote_signal", remote_signal)
+            .with_host_function(&mut ns, "__call", call)
+            .with_host_function(&mut ns, "__create", create)
+            .with_host_function(&mut ns, "__emit_signal", emit_signal)
+            .with_host_function(&mut ns, "__create_link", create_link)
+            .with_host_function(&mut ns, "__delete_link", delete_link)
+            .with_host_function(&mut ns, "__update", update)
+            .with_host_function(&mut ns, "__delete", delete)
+            .with_host_function(&mut ns, "__schedule", schedule);
 
         imports.register("env", ns);
 
@@ -444,16 +481,19 @@ impl RibosomeT for RealRibosome {
                     // there is a callback to_call and it is implemented in the wasm
                     // it is important to fully instantiate this (e.g. don't try to use the module above)
                     // because it builds guards against memory leaks and handles imports correctly
-                    let instance = self.instance(call_context)?;
+                    let (instance, context_key) = self.instance(call_context)?;
 
                     let result: Result<ExternIO, WasmError> = holochain_wasmer_host::guest::call(
-                        instance,
+                        instance.clone(),
                         to_call.as_ref(),
                         // be aware of this clone!
                         // the whole invocation is cloned!
                         // @todo - is this a problem for large payloads like entries?
                         invocation.to_owned().host_input()?,
                     );
+
+                    // Cache this instance.
+                    self.cache_instance(context_key, instance, zome.zome_name())?;
 
                     Ok(Some(result?))
                 } else {

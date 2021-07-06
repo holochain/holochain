@@ -16,6 +16,30 @@ pub mod dependencies {
     pub use ::url2;
 }
 
+/// Typedef for result of `proc_count_now()`.
+/// This value is on the scale of microseconds.
+pub type ProcCountMicros = i64;
+
+/// Monotonically nondecreasing process tick count, backed by std::time::Instant
+/// as an i64 to facilitate reference times that may be less than the first
+/// call to this function.
+/// The returned value is on the scale of microseconds.
+pub fn proc_count_now_us() -> ProcCountMicros {
+    use once_cell::sync::Lazy;
+    use std::time::Instant;
+    static PROC_COUNT: Lazy<Instant> = Lazy::new(Instant::now);
+    let r = *PROC_COUNT;
+    Instant::now().saturating_duration_since(r).as_micros() as i64
+}
+
+/// Get the elapsed process count duration from a captured `ProcCount` to now.
+/// If the duration would be negative, this fn returns a zero Duration.
+pub fn proc_count_us_elapsed(pc: ProcCountMicros) -> std::time::Duration {
+    let dur = proc_count_now_us() - pc;
+    let dur = if dur < 0 { 0 } else { dur as u64 };
+    std::time::Duration::from_micros(dur)
+}
+
 use ::ghost_actor::dependencies::tracing;
 
 pub use ::lair_keystore_api::actor::CertDigest;
@@ -265,15 +289,17 @@ pub mod async_lazy;
 mod auto_stream_select;
 pub use auto_stream_select::*;
 pub mod bin_types;
+pub mod bootstrap;
 pub mod codec;
 pub mod config;
-pub mod dht_arc;
 pub mod metrics;
 pub mod tls;
 pub mod transport;
 pub mod transport_mem;
 pub mod transport_pool;
 pub mod tx2;
+
+pub use kitsune_p2p_dht_arc as dht_arc;
 
 use metrics::metric_task;
 

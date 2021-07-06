@@ -1,21 +1,13 @@
 use crate::types::agent_store::AgentInfoSigned;
-use crate::types::KitsuneBinType;
-use crate::types::KitsuneSpace;
+use kitsune_p2p_types::bootstrap::RandomQuery;
 use once_cell::sync::Lazy;
 use once_cell::sync::OnceCell;
 use std::convert::TryFrom;
 use std::convert::TryInto;
-use std::sync::Arc;
 use url2::Url2;
 
 /// Reuse a single reqwest Client for efficiency as we likely need several connections.
 static CLIENT: Lazy<reqwest::Client> = Lazy::new(reqwest::Client::new);
-
-#[allow(dead_code)]
-/// The number of random agent infos we want to collect from the bootstrap service when we want to
-/// populate an empty local space.
-/// @todo expose this to network config.
-const RANDOM_LIMIT_DEFAULT: u32 = 16;
 
 /// A cell to hold our local offset for calculating a 'now' that is compatible with the remote
 /// service. This is much less precise and comprehensive than NTP style calculations.
@@ -139,35 +131,6 @@ pub async fn now_once(url: Option<Url2>) -> crate::types::actor::KitsuneP2pResul
 
             Ok(u64::try_from(i64::try_from(local_now()?)? + offset)?)
         }
-    }
-}
-
-/// Struct to be encoded for the `random` op.
-#[derive(serde::Deserialize, serde::Serialize)]
-pub struct RandomQuery {
-    // The space to get random agents from.
-    pub space: Arc<KitsuneSpace>,
-    // The maximum number of random agents to retrieve for this query.
-    pub limit: RandomLimit,
-}
-
-impl Default for RandomQuery {
-    fn default() -> Self {
-        Self {
-            // This is useless, it's here as a placeholder so that ..Default::default() syntax
-            // works for limits, not because you'd actually ever want a "default" space.
-            space: Arc::new(KitsuneSpace::new(vec![0; 36])),
-            limit: RandomLimit::default(),
-        }
-    }
-}
-
-#[derive(serde::Deserialize, serde::Serialize, derive_more::From, derive_more::Into)]
-pub struct RandomLimit(u32);
-
-impl Default for RandomLimit {
-    fn default() -> Self {
-        Self(RANDOM_LIMIT_DEFAULT)
     }
 }
 
