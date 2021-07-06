@@ -24,6 +24,8 @@ members = [
   "crates/holochain_util",
   "crates/holochain_zome_types",
 
+  "crates/kitsune_p2p/dht_arc",
+  "crates/kitsune_p2p/bootstrap",
   "crates/kitsune_p2p/direct",
   "crates/kitsune_p2p/direct_api",
   "crates/kitsune_p2p/direct_test",
@@ -35,11 +37,12 @@ members = [
 
   "crates/test_utils/wasm",
   "crates/test_utils/wasm_common",
+  "crates/release-automation",
 ]
 
 exclude = [
   "crates/diagnostics",
-  "crates/release-automation"
+  "crates/release-automation",
 ]
 
 # These are the default params for RELEASE target

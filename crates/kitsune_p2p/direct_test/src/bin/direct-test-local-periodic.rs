@@ -2,7 +2,7 @@
 use futures::future::FutureExt;
 use kitsune_p2p_direct::dependencies::*;
 use kitsune_p2p_direct::prelude::*;
-use kitsune_p2p_direct_test::*;
+use kitsune_p2p_direct_test::direct_test_local_periodic::*;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
