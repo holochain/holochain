@@ -738,10 +738,10 @@ where
     }
 
     /// tell the network module not to handle this list of cells
-    pub(super) async fn network_leave_cells(&mut self, cell_ids: &Vec<CellId>) {
+    pub(super) async fn network_leave_cells(&self, cell_ids: &Vec<CellId>) {
         let mut all = Vec::new();
         for cell_id in cell_ids {
-            if let Some(cell) = self.cells.get_mut(cell_id) {
+            if let Some(cell) = self.cells.get(cell_id) {
                 use holochain_p2p::HolochainP2pCellT;
                 let mut network = cell.cell.holochain_p2p_cell().clone();
                 all.push(async move {
