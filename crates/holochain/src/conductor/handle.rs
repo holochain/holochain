@@ -681,15 +681,29 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         installed_app_id: InstalledAppId,
         reason: DeactivationReason,
     ) -> ConductorResult<()> {
-        let mut conductor = self.conductor.write().await;
-        let cell_ids_to_remove = conductor
+        let cell_ids_to_remove = self
+            .conductor
+            .write()
+            .await
             .deactivate_app_in_db(installed_app_id, reason)
             .await?;
-        conductor.network_leave_cells(&cell_ids_to_remove).await;
+
+        // NOTE - this MUST be a read, because the network is going
+        //        to make a sign request, if we get a write here
+        //        or hold the lock over this call, we get a DEADLOCK
+        self.conductor
+            .read()
+            .await
+            .network_leave_cells(&cell_ids_to_remove)
+            .await;
         // MD: I'm not sure about this. We never add the cells back in after re-activating an app,
         //     so it seems either we shouldn't remove them here, or we should be sure to add them
         //     back in when re-activating.
-        conductor.remove_cells(cell_ids_to_remove).await;
+        self.conductor
+            .write()
+            .await
+            .remove_cells(cell_ids_to_remove)
+            .await;
         Ok(())
     }
 
