@@ -1,7 +1,5 @@
 use super::{standard_config, SweetAgents, SweetAppBatch, SweetConductor};
-use crate::conductor::{
-    api::error::ConductorApiResult, config::ConductorConfig,
-};
+use crate::conductor::{api::error::ConductorApiResult, config::ConductorConfig};
 use futures::future;
 use hdk::prelude::*;
 use holochain_types::prelude::*;
