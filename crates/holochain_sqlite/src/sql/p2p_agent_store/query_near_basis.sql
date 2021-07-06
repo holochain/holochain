@@ -5,8 +5,8 @@ FROM
   (
     SELECT
       encoded AS encoded,
-      /* if we dont store anything */
       CASE
+        /* if we dont store anything */
         WHEN (
           storage_start_loc IS NULL
           OR storage_end_loc IS NULL
@@ -31,7 +31,7 @@ FROM
         END
         /* if we have two logical spans (one wrapping span) */
         ELSE CASE
-          /* if it is inside the covered area */
+          /* if it is covered by the wrapping span */
           WHEN (
             :basis <= storage_end_loc
             OR :basis >= storage_start_loc
