@@ -1,9 +1,11 @@
 #![cfg(feature = "test_utils")]
 
-use hdk3::prelude::*;
+use std::sync::Arc;
+
+use hdk::prelude::*;
 use holochain::{
     conductor::api::error::ConductorApiResult,
-    test_utils::sweetest::{MaybeElement, SweetAgents, SweetConductor, SweetDnaFile},
+    sweettest::{SweetAgents, SweetConductor, SweetDnaFile},
 };
 use holochain::{
     conductor::{api::error::ConductorApiError, CellError},
@@ -11,12 +13,13 @@ use holochain::{
     test_utils::WaitOps,
 };
 use holochain::{
-    core::ribosome::guest_callback::validate::ValidateResult, test_utils::wait_for_integration_10s,
+    core::ribosome::guest_callback::validate::ValidateResult, test_utils::wait_for_integration_1m,
 };
 use holochain::{core::SourceChainError, test_utils::display_agent_infos};
-use holochain_types::{dna::zome::inline_zome::InlineZome, signal::Signal};
+use holochain_types::prelude::*;
+use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::element::ElementEntry;
-use tokio::stream::StreamExt;
+use tokio_stream::StreamExt;
 
 #[derive(
     Debug,
@@ -77,7 +80,7 @@ fn simple_crud_zome() -> InlineZome {
 }
 
 /// Simple scenario involving two agents using the same DNA
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
 async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
     // Bundle the single zome into a DnaFile
@@ -92,7 +95,8 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
     // Install DNA and install and activate apps in conductor
     let apps = conductor
         .setup_app_for_agents("app", &[alice.clone(), bobbo.clone()], &[dna_file])
-        .await;
+        .await
+        .unwrap();
 
     let ((alice,), (bobbo,)) = apps.into_tuples();
 
@@ -102,17 +106,15 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
         .await;
 
     // Wait long enough for Bob to receive gossip
-    wait_for_integration_10s(
+    wait_for_integration_1m(
         bobbo.env(),
         WaitOps::start() + WaitOps::cold_start() + WaitOps::ENTRY,
     )
     .await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Header
-    let element: MaybeElement = conductor.call(&bobbo.zome("zome1"), "read", hash).await;
-    let element = element
-        .0
-        .expect("Element was None: bobbo couldn't `get` it");
+    let element: Option<Element> = conductor.call(&bobbo.zome("zome1"), "read", hash).await;
+    let element = element.expect("Element was None: bobbo couldn't `get` it");
 
     // Assert that the Element bobbo sees matches what alice committed
     assert_eq!(element.header().author(), alice.agent_pubkey());
@@ -125,7 +127,7 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
 }
 
 /// Simple scenario involving three agents using an app with two DNAs
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
 async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     observability::test_run().ok();
@@ -138,7 +140,8 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
 
     let apps = conductor
         .setup_app_for_agents("app", &agents, &[dna_foo, dna_bar])
-        .await;
+        .await
+        .unwrap();
 
     let ((alice_foo, alice_bar), (bobbo_foo, bobbo_bar), (_carol_foo, carol_bar)) =
         apps.into_tuples();
@@ -162,7 +165,7 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
 
     // Wait long enough for others to receive gossip
     for env in [bobbo_foo.env(), carol_bar.env()].iter() {
-        wait_for_integration_10s(
+        wait_for_integration_1m(
             env,
             WaitOps::start() * 1 + WaitOps::cold_start() * 2 + WaitOps::ENTRY * 1,
         )
@@ -171,12 +174,10 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
 
     // Verify that bobbo can run "read" on his cell and get alice's Header
     // on the "foo" DNA
-    let element: MaybeElement = conductor
+    let element: Option<Element> = conductor
         .call(&bobbo_foo.zome("foozome"), "read", hash_foo)
         .await;
-    let element = element
-        .0
-        .expect("Element was None: bobbo couldn't `get` it");
+    let element = element.expect("Element was None: bobbo couldn't `get` it");
     assert_eq!(element.header().author(), alice_foo.agent_pubkey());
     assert_eq!(
         *element.entry(),
@@ -186,12 +187,10 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     // Verify that carol can run "read" on her cell and get alice's Header
     // on the "bar" DNA
     // Let's do it with the SweetZome instead of the SweetCell too, for fun
-    let element: MaybeElement = conductor
+    let element: Option<Element> = conductor
         .call(&carol_bar.zome("barzome"), "read", hash_bar)
         .await;
-    let element = element
-        .0
-        .expect("Element was None: carol couldn't `get` it");
+    let element = element.expect("Element was None: carol couldn't `get` it");
     assert_eq!(element.header().author(), alice_bar.agent_pubkey());
     assert_eq!(
         *element.entry(),
@@ -201,7 +200,7 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
 #[ignore = "Needs to be completed when HolochainP2pEvents is accessible"]
 async fn invalid_cell() -> anyhow::Result<()> {
@@ -218,7 +217,7 @@ async fn invalid_cell() -> anyhow::Result<()> {
     let _app_bar = conductor.setup_app("bar", &[dna_bar]).await;
 
     // Give small amount of time for cells to join the network
-    tokio::time::delay_for(std::time::Duration::from_millis(500)).await;
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
     tracing::debug!(dnas = ?conductor.list_dnas().await.unwrap());
     tracing::debug!(cell_ids = ?conductor.list_cell_ids().await.unwrap());
@@ -232,7 +231,7 @@ async fn invalid_cell() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
 async fn get_deleted() -> anyhow::Result<()> {
     observability::test_run().ok();
@@ -246,6 +245,7 @@ async fn get_deleted() -> anyhow::Result<()> {
     let alice = conductor
         .setup_app("app", &[dna_file])
         .await
+        .unwrap()
         .into_cells()
         .into_iter()
         .next()
@@ -258,14 +258,12 @@ async fn get_deleted() -> anyhow::Result<()> {
         .await;
     let mut expected_count = WaitOps::start() + WaitOps::ENTRY;
 
-    wait_for_integration_10s(alice.env(), expected_count).await;
+    wait_for_integration_1m(alice.env(), expected_count).await;
 
-    let element: MaybeElement = conductor
+    let element: Option<Element> = conductor
         .call(&alice.zome("zome1"), "read", hash.clone())
         .await;
-    let element = element
-        .0
-        .expect("Element was None: bobbo couldn't `get` it");
+    let element = element.expect("Element was None: bobbo couldn't `get` it");
 
     assert_eq!(element.header().author(), alice.agent_pubkey());
     assert_eq!(
@@ -279,17 +277,17 @@ async fn get_deleted() -> anyhow::Result<()> {
         .await;
 
     expected_count += WaitOps::DELETE;
-    wait_for_integration_10s(alice.env(), expected_count).await;
+    wait_for_integration_1m(alice.env(), expected_count).await;
 
-    let element: MaybeElement = conductor
+    let element: Option<Element> = conductor
         .call(&alice.zome("zome1"), "read_entry", entry_hash)
         .await;
-    assert!(element.0.is_none());
+    assert!(element.is_none());
 
     Ok(())
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
 async fn signal_subscription() {
     observability::test_run().ok();
@@ -299,10 +297,10 @@ async fn signal_subscription() {
         .await
         .unwrap();
     let mut conductor = SweetConductor::from_config(Default::default()).await;
-    let app = conductor.setup_app("app", &[dna_file]).await;
+    let app = conductor.setup_app("app", &[dna_file]).await.unwrap();
     let zome = &app.cells()[0].zome("zome1");
 
-    let signals = conductor.signals().await.take(N);
+    let signals = conductor.signals().take(N);
 
     // Emit N signals
     for _ in 0..N {
@@ -339,7 +337,7 @@ fn simple_validation_zome() -> InlineZome {
         })
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn simple_validation() -> anyhow::Result<()> {
     let (dna_file, _) =
         SweetDnaFile::unique_from_inline_zome("zome", simple_validation_zome()).await?;
@@ -347,7 +345,8 @@ async fn simple_validation() -> anyhow::Result<()> {
     let (alice, bobbo) = SweetAgents::two(conductor.keystore()).await;
     let apps = conductor
         .setup_app_for_agents("app", &[alice.clone(), bobbo.clone()], &[dna_file])
-        .await;
+        .await
+        .unwrap();
     let ((alice,), (bobbo,)) = apps.into_tuples();
 
     let alice = alice.zome("zome");
@@ -355,8 +354,8 @@ async fn simple_validation() -> anyhow::Result<()> {
 
     // This call passes validation
     let h1: HeaderHash = conductor.call(&alice, "create", AppString::new("A")).await;
-    let e1: MaybeElement = conductor.call(&alice, "read", &h1).await;
-    let s1: AppString = e1.0.unwrap().entry().to_app_option().unwrap().unwrap();
+    let e1: Option<Element> = conductor.call(&alice, "read", &h1).await;
+    let s1: AppString = e1.unwrap().entry().to_app_option().unwrap().unwrap();
     assert_eq!(s1, AppString::new("A"));
 
     // This call fails validation, and so results in an error
@@ -384,4 +383,38 @@ async fn simple_validation() -> anyhow::Result<()> {
     assert!(correct);
 
     Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn can_call_real_zomes_too() {
+    observability::test_run().ok();
+
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let agent = SweetAgents::one(conductor.keystore()).await;
+    let inline_zome = simple_crud_zome();
+    let (dna, _) = SweetDnaFile::unique_from_zomes(
+        vec![
+            ("inline".into(), ZomeDef::Inline(Arc::new(inline_zome))),
+            TestWasm::Create.into(),
+        ],
+        vec![TestWasm::Create.into()],
+    )
+    .await
+    .unwrap();
+
+    let app = conductor
+        .setup_app_for_agent("app1", agent.clone(), &[dna.clone()])
+        .await
+        .unwrap();
+
+    let (cell,) = app.into_tuple();
+
+    let hash: HeaderHash = conductor
+        .call(&cell.zome("inline"), "create_unit", ())
+        .await;
+
+    let el: Option<Element> = conductor
+        .call(&cell.zome("create_entry"), "get_post", hash.clone())
+        .await;
+    assert_eq!(el.unwrap().header_address(), &hash)
 }

@@ -2,11 +2,11 @@ use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
+use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
 
 #[derive(Clone)]
@@ -23,7 +23,7 @@ impl PostCommitInvocation {
 
 #[derive(Clone, Constructor)]
 pub struct PostCommitHostAccess {
-    pub workspace: CallZomeWorkspaceLock,
+    pub workspace: HostFnWorkspace,
     pub keystore: KeystoreSender,
     pub network: HolochainP2pCell,
 }
@@ -96,7 +96,7 @@ mod test {
     use crate::fixt::PostCommitHostAccessFixturator;
     use crate::fixt::PostCommitInvocationFixturator;
     use ::fixt::prelude::*;
-    use holochain_types::dna::zome::HostFnAccess;
+    use holochain_types::prelude::*;
     use holochain_zome_types::post_commit::PostCommitCallbackResult;
     use holochain_zome_types::ExternIO;
 
@@ -143,7 +143,7 @@ mod test {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn post_commit_invocation_access() {
         let post_commit_host_access = PostCommitHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
@@ -202,7 +202,7 @@ mod slow_tests {
     use holo_hash::fixt::HeaderHashFixturator;
     use holochain_wasm_test_utils::TestWasm;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_post_commit_unimplemented() {
         let host_access = PostCommitHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
@@ -221,7 +221,7 @@ mod slow_tests {
         assert_eq!(result, PostCommitResult::Success,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_post_commit_implemented_success() {
         let host_access = PostCommitHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
@@ -240,7 +240,7 @@ mod slow_tests {
         assert_eq!(result, PostCommitResult::Success,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_post_commit_implemented_fail() {
         let host_access = PostCommitHostAccessFixturator::new(::fixt::Unpredictable)
             .next()

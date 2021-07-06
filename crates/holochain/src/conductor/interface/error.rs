@@ -10,9 +10,9 @@ pub enum InterfaceError {
     #[error(transparent)]
     JoinError(#[from] tokio::task::JoinError),
     #[error("Error while sending a Signal to an Interface: {0:?}")]
-    SignalSend(tokio::sync::broadcast::SendError<Signal>),
+    SignalSend(tokio::sync::broadcast::error::SendError<Signal>),
     #[error(transparent)]
-    SignalReceive(tokio::sync::broadcast::RecvError),
+    SignalReceive(tokio::sync::broadcast::error::TryRecvError),
     #[error(transparent)]
     RequestHandler(Box<ConductorError>),
     #[error("Got an unexpected message: {0}")]
@@ -23,10 +23,8 @@ pub enum InterfaceError {
     Other(String),
     #[error("Interface closed")]
     Closed,
-    // FIXME: update error types in holochain_websocket to use a more specific
-    // type than io::Error
     #[error(transparent)]
-    IoTodo(#[from] std::io::Error),
+    WebsocketError(#[from] holochain_websocket::WebsocketError),
     #[error("Failed to find free port")]
     PortError,
 }

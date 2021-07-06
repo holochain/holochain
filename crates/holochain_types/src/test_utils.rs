@@ -1,9 +1,5 @@
 //! Some common testing helpers.
 
-use crate::dna::zome::WasmZome;
-use crate::dna::DnaDef;
-use crate::dna::DnaFile;
-use crate::dna::JsonProperties;
 use crate::element::SignedHeaderHashedExt;
 use crate::fixt::*;
 use crate::prelude::*;
@@ -18,32 +14,28 @@ struct FakeProperties {
     test: String,
 }
 
-/// simple DnaWasm fixture
-pub fn fake_dna_wasm() -> DnaWasm {
-    DnaWasm::from(vec![0_u8])
+/// A fixture example dna for unit testing.
+pub fn fake_dna_file(uid: &str) -> DnaFile {
+    fake_dna_zomes(uid, vec![("test".into(), vec![].into())])
 }
 
 /// A fixture example dna for unit testing.
-pub fn fake_dna_file(uuid: &str) -> DnaFile {
-    fake_dna_zomes(uuid, vec![("test".into(), vec![].into())])
-}
-
-/// A fixture example dna for unit testing.
-pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
+pub fn fake_dna_zomes(uid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
     let mut dna = DnaDef {
         name: "test".to_string(),
-        properties: JsonProperties::new(serde_json::json!({"p": "hi"}))
+        properties: YamlProperties::new(serde_yaml::from_str("p: hi").unwrap())
             .try_into()
             .unwrap(),
-        uuid: uuid.to_string(),
+        uid: uid.to_string(),
         zomes: Vec::new(),
     };
-    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+    tokio_helper::block_forever_on(async move {
         let mut wasm_code = Vec::new();
         for (zome_name, wasm) in zomes {
             let wasm = crate::dna::wasm::DnaWasmHashed::from_content(wasm).await;
             let (wasm, wasm_hash) = wasm.into_inner();
-            dna.zomes.push((zome_name, WasmZome { wasm_hash }.into()));
+            dna.zomes
+                .push((zome_name, ZomeDef::Wasm(WasmZome { wasm_hash })));
             wasm_code.push(wasm);
         }
         DnaFile::new(dna, wasm_code).await
@@ -53,10 +45,11 @@ pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
 
 /// Save a Dna to a file and return the path and tempdir that contains it
 pub async fn write_fake_dna_file(dna: DnaFile) -> anyhow::Result<(PathBuf, tempdir::TempDir)> {
+    let bundle = DnaBundle::from_dna_file(dna).await?;
     let tmp_dir = tempdir::TempDir::new("fake_dna")?;
     let mut path: PathBuf = tmp_dir.path().into();
-    path.push("test-dna.dna.gz");
-    tokio::fs::write(path.clone(), dna.to_file_content().await?).await?;
+    path.push("test-dna.dna");
+    bundle.write_to_file(&path).await?;
     Ok((path, tmp_dir))
 }
 
@@ -105,4 +98,31 @@ pub async fn fake_unique_element(
         SignedHeaderHashed::new(&keystore, HeaderHashed::from_content_sync(header_1)).await?,
         entry,
     ))
+}
+
+/// Generate a test keystore pre-populated with a couple test keypairs.
+pub fn test_keystore() -> holochain_keystore::KeystoreSender {
+    use holochain_keystore::KeystoreSenderExt;
+
+    tokio_helper::block_on(
+        async move {
+            let keystore = holochain_keystore::test_keystore::spawn_test_keystore()
+                .await
+                .unwrap();
+
+            // pre-populate with our two fixture agent keypairs
+            keystore
+                .generate_sign_keypair_from_pure_entropy()
+                .await
+                .unwrap();
+            keystore
+                .generate_sign_keypair_from_pure_entropy()
+                .await
+                .unwrap();
+
+            keystore
+        },
+        std::time::Duration::from_secs(1),
+    )
+    .expect("timeout elapsed")
 }

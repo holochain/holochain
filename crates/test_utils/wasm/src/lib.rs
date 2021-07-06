@@ -17,6 +17,8 @@ pub enum TestWasm {
     EmitSignal,
     HashEntry,
     Foo,
+    GenesisSelfCheckInvalid,
+    GenesisSelfCheckValid,
     HashPath,
     HdkExtern,
     InitFail,
@@ -61,6 +63,8 @@ impl From<TestWasm> for ZomeName {
             TestWasm::EmitSignal => "emit_signal",
             TestWasm::HashEntry => "hash_entry",
             TestWasm::Foo => "foo",
+            TestWasm::GenesisSelfCheckInvalid => "genesis_self_check_invalid",
+            TestWasm::GenesisSelfCheckValid => "genesis_self_check_valid",
             TestWasm::HashPath => "hash_path",
             TestWasm::HdkExtern => "hdk_extern",
             TestWasm::InitFail => "init_fail",
@@ -119,6 +123,12 @@ impl From<TestWasm> for DnaWasm {
                 get_code("wasm32-unknown-unknown/release/test_wasm_hash_entry.wasm")
             }
             TestWasm::Foo => get_code("wasm32-unknown-unknown/release/test_wasm_foo.wasm"),
+            TestWasm::GenesisSelfCheckInvalid => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_genesis_self_check_invalid.wasm")
+            }
+            TestWasm::GenesisSelfCheckValid => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_genesis_self_check_valid.wasm")
+            }
             TestWasm::HashPath => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_hash_path.wasm")
             }
@@ -216,12 +226,12 @@ fn get_code(path: &'static str) -> Vec<u8> {
 
 impl From<TestWasm> for ZomeDef {
     fn from(test_wasm: TestWasm) -> Self {
-        tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+        tokio_helper::block_forever_on(async move {
             let dna_wasm: DnaWasm = test_wasm.into();
             let (_, wasm_hash) = holochain_types::dna::wasm::DnaWasmHashed::from_content(dna_wasm)
                 .await
                 .into_inner();
-            WasmZome { wasm_hash }.into()
+            ZomeDef::Wasm(WasmZome { wasm_hash })
         })
     }
 }

@@ -2,49 +2,48 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_keystore::keystore_actor::KeystoreSenderExt;
 use holochain_types::prelude::*;
-use std::sync::Arc;
 use holochain_wasmer_host::prelude::WasmError;
+use std::sync::Arc;
+use crate::core::ribosome::HostFnAccess;
 
 pub fn sign(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: Sign,
 ) -> Result<Signature, WasmError> {
-    Ok(
-        tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            call_context
-                .host_access
-                .keystore()
-                .sign(input)
-                .await
-        }).map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))?,
-    )
+    match HostFnAccess::from(&call_context.host_access()) {
+        HostFnAccess { keystore: Permission::Allow, .. } => tokio_helper::block_forever_on(async move {
+            call_context.host_access.keystore().sign(input).await
+        })
+        .map_err(|keystore_error| WasmError::Host(keystore_error.to_string())),
+        _ => unreachable!(),
+    }
 }
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use holochain_wasm_test_utils::TestWasm;
     use ::fixt::prelude::*;
-    use hdk3::prelude::test_utils::fake_agent_pubkey_1;
-    use hdk3::prelude::test_utils::fake_agent_pubkey_2;
-    use hdk3::prelude::*;
+    use hdk::prelude::test_utils::fake_agent_pubkey_1;
+    use hdk::prelude::test_utils::fake_agent_pubkey_2;
+    use hdk::prelude::*;
+    use holochain_state::host_fn_workspace::HostFnWorkspace;
+    use holochain_wasm_test_utils::TestWasm;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_sign_test() {
-        let test_env = holochain_lmdb::test_utils::test_cell_env();
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
-        let mut workspace =
-            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+        let author = fake_agent_pubkey_1();
+        crate::test_utils::fake_genesis(env.clone())
             .await
             .unwrap();
-        let workspace_lock =
-            crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
 
         let mut host_access = fixt!(ZomeCallHostAccess, Predictable);
-        host_access.workspace = workspace_lock;
+        host_access.workspace = workspace;
 
         // signatures should not change for a given pubkey
         for (k, data, expect) in vec![
@@ -94,10 +93,7 @@ pub mod wasm_test {
                     host_access,
                     TestWasm::Sign,
                     "sign",
-                    Sign::new_raw(
-                        k.clone(),
-                        data.clone()
-                    )
+                    Sign::new_raw(k.clone(), data.clone())
                 );
 
                 assert_eq!(expect, output.as_ref().to_vec());

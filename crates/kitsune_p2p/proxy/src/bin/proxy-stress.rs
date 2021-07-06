@@ -3,6 +3,7 @@ use ghost_actor::dependencies::tracing;
 use kitsune_p2p_proxy::*;
 use kitsune_p2p_transport_quic::*;
 use kitsune_p2p_types::{
+    config::KitsuneP2pTuningParams,
     dependencies::{ghost_actor, url2},
     metrics::metric_task,
     transport::*,
@@ -87,7 +88,13 @@ async fn gen_proxy_con(
         TlsConfig::new_ephemeral().await?,
         AcceptProxyCallback::accept_all(),
     );
-    spawn_kitsune_proxy_listener(proxy_config, listener, events).await
+    spawn_kitsune_proxy_listener(
+        proxy_config,
+        KitsuneP2pTuningParams::default(),
+        listener,
+        events,
+    )
+    .await
 }
 
 async fn gen_cli_con(
@@ -100,7 +107,13 @@ async fn gen_cli_con(
     let (listener, events) = gen_base_con(t).await?;
     let proxy_config =
         ProxyConfig::remote_proxy_client(TlsConfig::new_ephemeral().await?, proxy_url.into());
-    spawn_kitsune_proxy_listener(proxy_config, listener, events).await
+    spawn_kitsune_proxy_listener(
+        proxy_config,
+        KitsuneP2pTuningParams::default(),
+        listener,
+        events,
+    )
+    .await
 }
 
 #[derive(Debug)]
@@ -140,7 +153,7 @@ async fn inner() -> TransportResult<()> {
         let mut metric_send = metric_send.clone();
         async move {
             loop {
-                tokio::time::delay_for(std::time::Duration::from_millis(300)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(300)).await;
                 metric_send
                     .send(Metric::Tick)
                     .await
@@ -201,10 +214,8 @@ async fn gen_client(
                 move |evt| async move {
                     match evt {
                         TransportEvent::IncomingChannel(_url, mut write, _read) => {
-                            tokio::time::delay_for(std::time::Duration::from_millis(
-                                process_delay_ms,
-                            ))
-                            .await;
+                            tokio::time::sleep(std::time::Duration::from_millis(process_delay_ms))
+                                .await;
                             let _ = write.write_and_close(b"".to_vec()).await;
                         }
                     }
@@ -226,7 +237,7 @@ async fn client_loop(
     let (con, _my_url) = gen_client(opt.clone(), proxy_url).await?;
 
     loop {
-        tokio::time::delay_for(std::time::Duration::from_millis(
+        tokio::time::sleep(std::time::Duration::from_millis(
             opt.request_interval_ms as u64,
         ))
         .await;

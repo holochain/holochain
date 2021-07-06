@@ -3,8 +3,8 @@ use super::{entry_def_store::error::EntryDefStoreError, state::AppInterfaceId};
 use crate::conductor::cell::error::CellError;
 use crate::core::workflow::error::WorkflowError;
 use holochain_conductor_api::conductor::ConductorConfigError;
-use holochain_lmdb::error::DatabaseError;
-use holochain_types::app::InstalledAppId;
+use holochain_sqlite::error::DatabaseError;
+use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
 use thiserror::Error;
 
@@ -14,6 +14,12 @@ pub type ConductorResult<T> = Result<T, ConductorError>;
 pub enum ConductorError {
     #[error("Internal Cell error: {0}")]
     InternalCellError(#[from] CellError),
+
+    #[error(transparent)]
+    AppError(#[from] AppError),
+
+    #[error(transparent)]
+    AppBundleError(#[from] AppBundleError),
 
     #[error(transparent)]
     DatabaseError(#[from] DatabaseError),
@@ -51,13 +57,16 @@ pub enum ConductorError {
     #[error("Error while trying to send a task to the task manager: {0}")]
     SubmitTaskError(String),
 
+    #[error("ZomeError: {0}")]
+    ZomeError(#[from] holochain_zome_types::zome::error::ZomeError),
+
     #[error("DnaError: {0}")]
     DnaError(#[from] holochain_types::dna::DnaError),
 
     #[error("Workflow error: {0:?}")]
     WorkflowError(#[from] WorkflowError),
 
-    #[error("Attempted to add two app interfaces with the same id: {0}")]
+    #[error("Attempted to add two app interfaces with the same id: {0:?}")]
     AppInterfaceIdCollision(AppInterfaceId),
 
     // Box is to avoid cycle in error definition
@@ -82,7 +91,7 @@ pub enum ConductorError {
     #[error("Tried to install an app using an already-used InstalledAppId: {0}")]
     AppAlreadyInstalled(InstalledAppId),
 
-    #[error("Tried to deactivate an app that was not active: {0}")]
+    #[error("Tried to perform an operation on an app that was not active: {0}")]
     AppNotActive(InstalledAppId),
 
     #[error(transparent)]
@@ -96,6 +105,18 @@ pub enum ConductorError {
 
     #[error(transparent)]
     KitsuneP2pError(#[from] kitsune_p2p::KitsuneP2pError),
+
+    #[error(transparent)]
+    MrBundleError(#[from] mr_bundle::error::MrBundleError),
+
+    #[error(transparent)]
+    StateQueryError(#[from] holochain_state::query::StateQueryError),
+
+    #[error(transparent)]
+    StateMutationError(#[from] holochain_state::mutations::StateMutationError),
+
+    #[error(transparent)]
+    RusqliteError(#[from] rusqlite::Error),
 }
 
 #[derive(Error, Debug)]

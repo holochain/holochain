@@ -8,7 +8,6 @@ use futures::future::FutureExt;
 use ghost_actor::dependencies::tracing;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::stream::StreamExt;
 
 /// Utility trait for test values
 pub trait TestVal: Sized {
@@ -47,3 +46,10 @@ pub(crate) use harness_agent::*;
 
 mod harness_actor;
 pub use harness_actor::*;
+
+// NB: this is a copy of `KdMetricStore` from `kitsune_p2p_direct`, which
+//   is downstream of this crate.
+//   Since we plan to delete much of these tests, I opted to keep that type
+//   downstream, and just copy it upstream here for now.
+mod metric_store;
+pub use metric_store::*;

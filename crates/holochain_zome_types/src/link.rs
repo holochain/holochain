@@ -26,6 +26,10 @@ impl LinkTag {
     {
         Self(t.into())
     }
+
+    pub fn into_inner(self) -> Vec<u8> {
+        self.0
+    }
 }
 
 impl From<Vec<u8>> for LinkTag {
@@ -151,5 +155,12 @@ impl From<LinkDetails> for CreateLinkWithDeleteLinks {
 impl LinkDetails {
     pub fn into_inner(self) -> CreateLinkWithDeleteLinks {
         self.into()
+    }
+}
+
+#[cfg(feature = "full")]
+impl rusqlite::ToSql for LinkTag {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
+        Ok(rusqlite::types::ToSqlOutput::Borrowed((&self.0[..]).into()))
     }
 }

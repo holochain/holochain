@@ -9,8 +9,12 @@ name = "test_wasm_debug"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
-hdk3 = { path = "../../../../hdk3" }
-serde = "=1.0.104"
+serde = "1.0"
 tracing = "0.1"
 tracing-core = "0.1"
 tracing-subscriber = "0.2"
+hdk = { path = "../../../../hdk" }
+
+[features]
+default = []
+mock = ["hdk/mock"]

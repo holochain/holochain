@@ -18,18 +18,6 @@ commands:
       command: ./docker/push.sh << parameters.box >> $CIRCLE_BRANCH
 
 jobs:
-  build-binary-packages:
-    docker:
-     - image: nixos/nix
-    environment:
-     NIXPKGS_ALLOW_UNFREE: 1
-    steps:
-      - checkout
-      - run:
-         name: Build the Nix packages
-         no_output_timeout: 45m
-         command: nix build --verbose -f default.nix pkgs.applications
-
   merge-test:
     docker:
      - image: holochain/holochain:circle.build.develop
@@ -50,7 +38,7 @@ jobs:
       - run:
          name: Run the merge tests
          no_output_timeout: 30m
-         command: nix-shell --pure --argstr flavor "coreDev" --run hc-merge-test
+         command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-merge-test
 
   merge-test-mac:
    macos:
@@ -64,13 +52,13 @@ jobs:
        name: Test on mac
        no_output_timeout: 30m
        command: |
-        # fix for "too many open files" that breaks tokio and lmdb
+        # fix for "too many open files" that breaks tokio
         ulimit -n 10240
         # catalina nixos install
         sh <(curl -L https://nixos.org/nix/install) --darwin-use-unencrypted-nix-store-volume
         . /Users/distiller/.nix-profile/etc/profile.d/nix.sh
         # do tests
-        nix-shell --argstr flavor ci --run hc-merge-test
+        nix-shell --fallback --argstr flavor ci --run hc-merge-test
 
   docker-build-latest:
    resource_class: large
@@ -90,11 +78,6 @@ workflows:
  version: 2.1
  tests:
   jobs:
-   - build-binary-packages:
-      filters:
-       branches:
-        only:
-          - /.*release.*/
    - merge-test
    # - merge-test-mac
 

@@ -1,10 +1,8 @@
 #![allow(missing_docs)]
-#![allow(clippy::ptr_arg)]
 
 use super::CellConductorApiT;
 use super::ZomeCall;
 use crate::conductor::api::error::ConductorApiResult;
-use crate::conductor::entry_def_store::EntryDefBufferKey;
 use crate::conductor::interface::SignalBroadcaster;
 use crate::core::workflow::ZomeCallResult;
 use async_trait::async_trait;
@@ -27,8 +25,6 @@ mock! {
             cell_id: &CellId,
             call: ZomeCall,
         ) -> ConductorApiResult<ZomeCallResult>;
-
-        fn sync_autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()>;
 
         fn sync_dpki_request(&self, method: String, args: String) -> ConductorApiResult<String>;
 
@@ -62,10 +58,6 @@ impl CellConductorApiT for MockCellConductorApi {
 
     async fn dpki_request(&self, method: String, args: String) -> ConductorApiResult<String> {
         self.sync_dpki_request(method, args)
-    }
-
-    async fn autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()> {
-        self.sync_autonomic_cue(cue)
     }
 
     fn keystore(&self) -> &KeystoreSender {

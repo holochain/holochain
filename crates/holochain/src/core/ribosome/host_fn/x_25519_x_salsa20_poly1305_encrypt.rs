@@ -1,24 +1,29 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_keystore::keystore_actor::KeystoreSenderExt;
-use std::sync::Arc;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
+use std::sync::Arc;
+use crate::core::ribosome::HostFnAccess;
 
 pub fn x_25519_x_salsa20_poly1305_encrypt(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: X25519XSalsa20Poly1305Encrypt,
 ) -> Result<XSalsa20Poly1305EncryptedData, WasmError> {
-    Ok(
-        tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            call_context
-                .host_access
-                .keystore()
-                .x_25519_x_salsa20_poly1305_encrypt(input)
-                .await
-        }).map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))?,
-    )
+    match HostFnAccess::from(&call_context.host_access()) {
+        HostFnAccess{ keystore: Permission::Allow, .. } => {
+            tokio_helper::block_forever_on(async move {
+                call_context
+                    .host_access
+                    .keystore()
+                    .x_25519_x_salsa20_poly1305_encrypt(input)
+                    .await
+            })
+            .map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))
+        },
+        _ => unreachable!(),
+    }
 }
 
 #[cfg(test)]
@@ -27,23 +32,23 @@ pub mod wasm_test {
 
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
-    use hdk3::prelude::*;
+    use hdk::prelude::*;
+    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_wasm_test_utils::TestWasm;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn invoke_import_x_25519_x_salsa20_poly1305_encrypt_test() {
-        let test_env = holochain_lmdb::test_utils::test_cell_env();
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
-        let mut workspace =
-            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+        let author = fake_agent_pubkey_1();
+        crate::test_utils::fake_genesis(env.clone())
             .await
             .unwrap();
-
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
 
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock;
+        host_access.workspace = workspace;
         let alice: X25519PubKey = crate::call_test_ribosome!(
             host_access,
             TestWasm::XSalsa20Poly1305,
@@ -101,7 +106,7 @@ pub mod wasm_test {
                 bob.clone(),
                 alice.clone(),
                 encrypt_output.clone(),
-        );
+            );
 
         let decrypt_output: Option<XSalsa20Poly1305Data> = crate::call_test_ribosome!(
             host_access,
@@ -117,7 +122,7 @@ pub mod wasm_test {
                 carol.clone(),
                 alice.clone(),
                 encrypt_output,
-        );
+            );
         let bad_decrypt_output: Option<XSalsa20Poly1305Data> = crate::call_test_ribosome!(
             host_access,
             TestWasm::XSalsa20Poly1305,

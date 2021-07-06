@@ -64,6 +64,7 @@ macro_rules! assert_length {
 ///
 /// There is custom de/serialization implemented in [ser.rs]
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct HoloHash<T: HashType> {
     hash: Vec<u8>,
     hash_type: T,
@@ -174,6 +175,22 @@ impl<T: HashType> AsRef<[u8]> for HoloHash<T> {
     fn as_ref(&self) -> &[u8] {
         assert_length!(HOLO_HASH_FULL_LEN, &self.hash);
         &self.hash
+    }
+}
+
+#[cfg(feature = "rusqlite")]
+impl<T: HashType> rusqlite::ToSql for HoloHash<T> {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
+        Ok(rusqlite::types::ToSqlOutput::Borrowed(self.as_ref().into()))
+    }
+}
+
+#[cfg(feature = "rusqlite")]
+impl<T: HashType> rusqlite::types::FromSql for HoloHash<T> {
+    fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
+        Vec::<u8>::column_result(value).and_then(|bytes| {
+            Self::from_raw_39(bytes).map_err(|_| rusqlite::types::FromSqlError::InvalidType)
+        })
     }
 }
 

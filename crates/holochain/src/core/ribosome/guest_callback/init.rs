@@ -2,12 +2,12 @@ use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holo_hash::EntryHash;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
+use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
 
 #[derive(Debug, Clone)]
@@ -23,7 +23,7 @@ impl InitInvocation {
 
 #[derive(Clone, Constructor)]
 pub struct InitHostAccess {
-    pub workspace: CallZomeWorkspaceLock,
+    pub workspace: HostFnWorkspace,
     pub keystore: KeystoreSender,
     pub network: HolochainP2pCell,
 }
@@ -71,6 +71,7 @@ pub enum InitResult {
     /// no init failed but some zome has unresolved dependencies
     /// ZomeName is the first zome that has unresolved dependencies
     /// Vec<EntryHash> is the list of all missing dependency addresses
+    // TODO: MD: this is probably unnecessary
     UnresolvedDependencies(ZomeName, Vec<EntryHash>),
 }
 
@@ -101,7 +102,7 @@ mod test {
     use crate::fixt::InitInvocationFixturator;
     use crate::fixt::ZomeNameFixturator;
     use ::fixt::prelude::*;
-    use holochain_types::dna::zome::HostFnAccess;
+    use holochain_types::prelude::*;
     use holochain_zome_types::init::InitCallbackResult;
     use holochain_zome_types::ExternIO;
 
@@ -169,7 +170,7 @@ mod test {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn init_access() {
         let init_host_access = InitHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
@@ -221,7 +222,7 @@ mod slow_tests {
     use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_init_unimplemented() {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Crud]))
             .next()
@@ -234,7 +235,7 @@ mod slow_tests {
         assert_eq!(result, InitResult::Pass,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_init_implemented_pass() {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::InitPass]))
             .next()
@@ -247,7 +248,7 @@ mod slow_tests {
         assert_eq!(result, InitResult::Pass,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_init_implemented_fail() {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::InitFail]))
             .next()
@@ -263,7 +264,7 @@ mod slow_tests {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_init_multi_implemented_fail() {
         let ribosome =
             RealRibosomeFixturator::new(Zomes(vec![TestWasm::InitPass, TestWasm::InitFail]))

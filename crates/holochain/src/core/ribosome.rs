@@ -31,7 +31,6 @@ use crate::core::ribosome::guest_callback::validate_link::ValidateLinkResult;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
-use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use error::RibosomeResult;
 use guest_callback::entry_defs::EntryDefsHostAccess;
@@ -44,12 +43,18 @@ use holo_hash::AgentPubKey;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
+use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
 use mockall::automock;
 use std::iter::Iterator;
 
-use self::error::RibosomeError;
-use self::guest_callback::entry_defs::EntryDefsInvocation;
+use self::guest_callback::{
+    entry_defs::EntryDefsInvocation, genesis_self_check::GenesisSelfCheckResult,
+};
+use self::{
+    error::RibosomeError,
+    guest_callback::genesis_self_check::{GenesisSelfCheckHostAccess, GenesisSelfCheckInvocation},
+};
 
 #[derive(Clone)]
 pub struct CallContext {
@@ -74,6 +79,7 @@ impl CallContext {
 #[derive(Clone)]
 pub enum HostAccess {
     ZomeCall(ZomeCallHostAccess),
+    GenesisSelfCheck(GenesisSelfCheckHostAccess),
     Validate(ValidateHostAccess),
     ValidateCreateLink(ValidateLinkHostAccess),
     Init(InitHostAccess),
@@ -86,25 +92,22 @@ pub enum HostAccess {
 impl From<&HostAccess> for HostFnAccess {
     fn from(host_access: &HostAccess) -> Self {
         match host_access {
-            HostAccess::ZomeCall(zome_call_host_access) => zome_call_host_access.into(),
-            HostAccess::Validate(validate_host_access) => validate_host_access.into(),
-            HostAccess::ValidateCreateLink(validate_link_add_host_access) => {
-                validate_link_add_host_access.into()
-            }
-            HostAccess::Init(init_host_access) => init_host_access.into(),
-            HostAccess::EntryDefs(entry_defs_host_access) => entry_defs_host_access.into(),
-            HostAccess::MigrateAgent(migrate_agent_host_access) => migrate_agent_host_access.into(),
-            HostAccess::ValidationPackage(validation_package_host_access) => {
-                validation_package_host_access.into()
-            }
-            HostAccess::PostCommit(post_commit_host_access) => post_commit_host_access.into(),
+            HostAccess::ZomeCall(access) => access.into(),
+            HostAccess::GenesisSelfCheck(access) => access.into(),
+            HostAccess::Validate(access) => access.into(),
+            HostAccess::ValidateCreateLink(access) => access.into(),
+            HostAccess::Init(access) => access.into(),
+            HostAccess::EntryDefs(access) => access.into(),
+            HostAccess::MigrateAgent(access) => access.into(),
+            HostAccess::ValidationPackage(access) => access.into(),
+            HostAccess::PostCommit(access) => access.into(),
         }
     }
 }
 
 impl HostAccess {
     /// Get the workspace, panics if none was provided
-    pub fn workspace(&self) -> &CallZomeWorkspaceLock {
+    pub fn workspace(&self) -> &HostFnWorkspace {
         match self {
             Self::ZomeCall(ZomeCallHostAccess { workspace, .. })
             | Self::Init(InitHostAccess { workspace, .. })
@@ -238,7 +241,7 @@ pub trait Invocation: Clone {
     /// For example, if FnComponents was vec!["foo", "bar", "baz"] it would loop as "foo_bar_baz"
     /// then "foo_bar" then "foo". All of those three callbacks that are defined will be called
     /// _unless a definitive callback result is returned_.
-    /// @see CallbackResult::is_definitive() in zome_types.
+    /// See [ `CallbackResult::is_definitive` ] in zome_types.
     /// All of the individual callback results are then folded into a single overall result value
     /// as a From implementation on the invocation results structs (e.g. zome results vs. ribosome
     /// results).
@@ -260,16 +263,13 @@ impl ZomeCallInvocation {
         let check_agent = self.provenance.clone();
         let check_secret = self.cap;
 
-        tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            let maybe_grant: Option<CapGrant> = host_access
-                .workspace
-                .read()
-                .await
-                .source_chain
-                .valid_cap_grant(&check_function, &check_agent, check_secret.as_ref())?;
+        let maybe_grant: Option<CapGrant> = host_access.workspace.source_chain().valid_cap_grant(
+            &check_function,
+            &check_agent,
+            check_secret.as_ref(),
+        )?;
 
-            Ok(maybe_grant.is_some())
-        })
+        Ok(maybe_grant.is_some())
     }
 }
 
@@ -337,8 +337,8 @@ impl ZomeCallInvocation {
         Self {
             cell_id,
             zome,
-            fn_name,
             cap,
+            fn_name,
             payload,
             provenance,
         }
@@ -368,7 +368,7 @@ impl From<ZomeCallInvocation> for ZomeCall {
 
 #[derive(Clone, Constructor)]
 pub struct ZomeCallHostAccess {
-    pub workspace: CallZomeWorkspaceLock,
+    pub workspace: HostFnWorkspace,
     pub keystore: KeystoreSender,
     pub network: HolochainP2pCell,
     pub signal_tx: SignalBroadcaster,
@@ -450,6 +450,12 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
         // pseudocode
         // self.instance().exports().filter(|e| !e.is_callback())
     }
+
+    fn run_genesis_self_check(
+        &self,
+        access: GenesisSelfCheckHostAccess,
+        invocation: GenesisSelfCheckInvocation,
+    ) -> RibosomeResult<GenesisSelfCheckResult>;
 
     fn run_init(
         &self,
@@ -597,14 +603,5 @@ pub mod wasm_test {
         let expected = vec!["foo_bar_baz", "foo_bar", "foo"];
 
         assert_eq!(fn_components.into_iter().collect::<Vec<String>>(), expected,);
-    }
-}
-
-#[cfg(test)]
-#[cfg(feature = "slow_tests")]
-mod slow_tests {
-    #[tokio::test(threaded_scheduler)]
-    async fn warm_wasm_tests() {
-        crate::test_utils::warm_wasm_tests();
     }
 }

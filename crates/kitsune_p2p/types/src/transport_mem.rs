@@ -159,7 +159,7 @@ mod tests {
         });
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn it_can_mem_transport() -> TransportResult<()> {
         let (bind1, evt1) = spawn_bind_transport_mem().await?;
         test_receiver(evt1);

@@ -2,9 +2,9 @@ use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
+use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
 
 #[derive(Clone)]
@@ -24,7 +24,7 @@ impl MigrateAgentInvocation {
 
 #[derive(Clone, Constructor)]
 pub struct MigrateAgentHostAccess {
-    pub workspace: CallZomeWorkspaceLock,
+    pub workspace: HostFnWorkspace,
 }
 
 impl From<MigrateAgentHostAccess> for HostAccess {
@@ -108,7 +108,6 @@ mod test {
     use crate::fixt::MigrateAgentHostAccessFixturator;
     use crate::fixt::MigrateAgentInvocationFixturator;
     use crate::fixt::ZomeNameFixturator;
-    use holochain_types::dna::zome::HostFnAccess;
     use holochain_types::prelude::*;
     use rand::prelude::*;
 
@@ -160,9 +159,9 @@ mod test {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn migrate_agent_invocation_allow_side_effects() {
-        use holochain_types::dna::zome::Permission::*;
+        use holochain_types::access::Permission::*;
         let migrate_agent_host_access =
             MigrateAgentHostAccessFixturator::new(::fixt::Unpredictable)
                 .next()
@@ -230,7 +229,7 @@ mod slow_tests {
     use crate::fixt::RealRibosomeFixturator;
     use holochain_wasm_test_utils::TestWasm;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_migrate_agent_unimplemented() {
         let host_access = MigrateAgentHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
@@ -249,7 +248,7 @@ mod slow_tests {
         assert_eq!(result, MigrateAgentResult::Pass,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_migrate_agent_implemented_pass() {
         let host_access = MigrateAgentHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
@@ -268,7 +267,7 @@ mod slow_tests {
         assert_eq!(result, MigrateAgentResult::Pass,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_migrate_agent_implemented_fail() {
         let host_access = MigrateAgentHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
@@ -290,7 +289,7 @@ mod slow_tests {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_migrate_agent_multi_implemented_fail() {
         let host_access = MigrateAgentHostAccessFixturator::new(::fixt::Unpredictable)
             .next()

@@ -1,12 +1,11 @@
 use fallible_iterator::FallibleIterator;
-use hdk3::prelude::Element;
-use hdk3::prelude::EntryType;
-use hdk3::prelude::ValidationPackage;
+use hdk::prelude::Element;
+use hdk::prelude::EntryType;
+use hdk::prelude::ValidationPackage;
 use holo_hash::HeaderHash;
-use holochain_lmdb::env::EnvironmentRead;
-use holochain_lmdb::fresh_reader_test;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::HolochainP2pCellT;
+use holochain_sqlite::fresh_reader_test;
 use holochain_test_wasm_common::AgentActivitySearch;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
@@ -35,7 +34,7 @@ const GET_AGENT_ACTIVITY_TIMEOUT_MS: u64 = 1000;
 const NUM_ATTEMPTS: usize = 100;
 const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn get_validation_package_test() {
     observability::test_run().ok();
 
@@ -192,7 +191,7 @@ async fn get_validation_package_test() {
     conductor_test.shutdown_conductor().await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn get_agent_activity_test() {
     observability::test_run().ok();
 
@@ -473,7 +472,7 @@ async fn get_agent_activity_test() {
     conductor_test.shutdown_conductor().await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn get_custom_package_test() {
     observability::test_run().ok();
 
@@ -551,7 +550,7 @@ async fn get_custom_package_test() {
         .unwrap();
 
     {
-        let env: EnvironmentRead = bob_call_data.env.clone().into();
+        let env: EnvRead = bob_call_data.env.clone().into();
         let element_integrated = ElementBuf::vault(env.clone(), false).unwrap();
         let meta_integrated = MetadataBuf::vault(env.clone()).unwrap();
         let mut element_cache = ElementBuf::cache(env.clone()).unwrap();
@@ -569,7 +568,7 @@ async fn get_custom_package_test() {
     conductor_test.shutdown_conductor().await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn get_agent_activity_host_fn_test() {
     observability::test_run().ok();
 
@@ -695,7 +694,7 @@ async fn check_cascade(
     validation_package
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "Only shows a potential problem, doesn't prove something is correct"]
 /// This test shows a potential slow read issue.
 /// The exact same code running here in this test is 10x
@@ -703,8 +702,8 @@ async fn check_cascade(
 ///
 /// This may not turn out to be a real issue, but this illustrates a way to reproduce this behavior,
 /// and may be something we want to investigate more in the future.
-async fn slow_lmdb_reads_test() {
-    let num_commits = std::env::var_os("SLOW_LMDB_COMMITS")
+async fn slow_db_reads_test() {
+    let num_commits = std::env::var_os("SLOW_DB_COMMITS")
         .and_then(|s| s.into_string().ok()?.parse::<usize>().ok())
         .unwrap_or(10);
     observability::test_run().ok();
@@ -799,11 +798,11 @@ async fn slow_lmdb_reads_test() {
     for _ in 0..runs {
         let element_integrated = ElementBuf::vault(alice_env.clone().into(), false).unwrap();
         let meta_integrated = MetadataBuf::vault(alice_env.clone().into()).unwrap();
-        fresh_reader_test!(alice_env, |r| {
+        fresh_reader_test!(alice_env, |mut r| {
             let now = std::time::Instant::now();
             let hashes = meta_integrated
                 .get_activity_sequence(
-                    &r,
+                    &mut r,
                     ChainItemKey::AgentStatus(
                         alice_call_data.cell_id.agent_pubkey().clone(),
                         ValidationStatus::Valid,

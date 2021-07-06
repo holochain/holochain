@@ -1,22 +1,22 @@
+#![allow(deprecated)]
+
 use ::fixt::prelude::*;
-use hdk3::prelude::*;
+use hdk::prelude::*;
 
 use holochain::conductor::api::AppInterfaceApi;
 use holochain::conductor::api::AppRequest;
 use holochain::conductor::api::AppResponse;
 use holochain::conductor::api::RealAppInterfaceApi;
 use holochain::conductor::api::ZomeCall;
-use holochain::conductor::dna_store::MockDnaStore;
 use holochain::conductor::ConductorBuilder;
 use holochain::conductor::ConductorHandle;
 
-use holochain_lmdb::test_utils::test_environments;
+use holochain_state::prelude::test_environments;
+use holochain_state::prelude::TestEnvs;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 pub use holochain_zome_types::capability::CapSecret;
 use observability;
-use std::sync::Arc;
-use tempdir::TempDir;
 
 #[derive(Serialize, Deserialize, SerializedBytes, Debug)]
 struct CreateMessageInput {
@@ -27,7 +27,7 @@ struct CreateMessageInput {
 #[derive(Debug, Serialize, Deserialize, SerializedBytes)]
 pub struct ChannelName(String);
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn ser_entry_hash_test() {
     observability::test_run().ok();
     let eh = fixt!(EntryHash);
@@ -39,7 +39,7 @@ async fn ser_entry_hash_test() {
     let _eh: EntryHash = extern_io.decode().unwrap();
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 /// we can call a fn on a remote
 async fn ser_regression_test() {
     observability::test_run().ok();
@@ -50,7 +50,7 @@ async fn ser_regression_test() {
     let dna_file = DnaFile::new(
         DnaDef {
             name: "ser_regression_test".to_string(),
-            uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+            uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
             zomes: vec![TestWasm::SerRegression.into()].into(),
         },
@@ -174,13 +174,13 @@ async fn ser_regression_test() {
 
     let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
-    shutdown.await.unwrap();
+    shutdown.await.unwrap().unwrap();
 }
 
 pub async fn setup_app(
     cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
     dna_store: MockDnaStore,
-) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
+) -> (TestEnvs, RealAppInterfaceApi, ConductorHandle) {
     let envs = test_environments();
     let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
         .test(&envs)
@@ -205,8 +205,8 @@ pub async fn setup_app(
     let handle = conductor_handle.clone();
 
     (
-        envs.tempdir(),
-        RealAppInterfaceApi::new(conductor_handle, "test-interface".into()),
+        envs,
+        RealAppInterfaceApi::new(conductor_handle, Default::default()),
         handle,
     )
 }

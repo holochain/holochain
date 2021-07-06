@@ -1,8 +1,10 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
+use holochain_cascade::Cascade;
 use holochain_types::prelude::*;
-use std::sync::Arc;
 use holochain_wasmer_host::prelude::WasmError;
+use std::sync::Arc;
+use crate::core::ribosome::HostFnAccess;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_details<'a>(
@@ -10,52 +12,55 @@ pub fn get_details<'a>(
     call_context: Arc<CallContext>,
     input: GetInput,
 ) -> Result<Option<Details>, WasmError> {
-    let GetInput{ any_dht_hash, get_options } = input;
+    match HostFnAccess::from(&call_context.host_access()) {
+        HostFnAccess{ read_workspace: Permission::Allow, .. } => {
+            let GetInput {
+                any_dht_hash,
+                get_options,
+            } = input;
 
-    // Get the network from the context
-    let network = call_context.host_access.network().clone();
+            // Get the network from the context
+            let network = call_context.host_access.network().clone();
 
-    // timeouts must be handled by the network
-    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        let maybe_details = call_context
-            .host_access
-            .workspace()
-            .write()
-            .await
-            .cascade(network)
-            .get_details(any_dht_hash, get_options)
-            .await
-            .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
-        Ok(maybe_details)
-    })
+            // timeouts must be handled by the network
+            tokio_helper::block_forever_on(async move {
+                let workspace = call_context.host_access.workspace();
+                let mut cascade = Cascade::from_workspace_network(workspace, network);
+                let maybe_details = cascade
+                    .get_details(any_dht_hash, get_options)
+                    .await
+                    .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
+                Ok(maybe_details)
+            })
+        },
+        _ => unreachable!(),
+    }
 }
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use hdk3::prelude::*;
-    use crate::core::workflow::CallZomeWorkspace;
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use holochain_wasm_test_utils::TestWasm;
     use ::fixt::prelude::*;
+    use hdk::prelude::*;
+    use holochain_state::host_fn_workspace::HostFnWorkspace;
+    use holochain_wasm_test_utils::TestWasm;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_get_details_test<'a>() {
         observability::test_run().ok();
-
-        let test_env = holochain_lmdb::test_utils::test_cell_env();
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
-
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+        let author = fake_agent_pubkey_1();
+        crate::test_utils::fake_genesis(env.clone())
             .await
             .unwrap();
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
 
-        let workspace_lock =
-            crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock.clone();
+        host_access.workspace = workspace.clone();
 
         // simple replica of the internal type for the TestWasm::Crud entry
         #[derive(Clone, Copy, Serialize, Deserialize, SerializedBytes, Debug, PartialEq)]
@@ -72,8 +77,7 @@ pub mod wasm_test {
             _ => panic!("no element"),
         };
 
-        let check_entry = |details: Option<Details>, count, update, delete, line| match details
-        {
+        let check_entry = |details: Option<Details>, count, update, delete, line| match details {
             Some(Details::Entry(ref entry_details)) => {
                 match entry_details.entry {
                     Entry::App(ref eb) => {

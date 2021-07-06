@@ -1,23 +1,8 @@
 use std::convert::TryFrom;
 use std::sync::Arc;
 
-use hdk3::prelude::CellId;
-use hdk3::prelude::WasmError;
-use holo_hash::AgentPubKey;
-use holo_hash::HeaderHash;
-use holochain_keystore::AgentPubKeyExt;
-use holochain_lmdb::env::EnvironmentWrite;
-use holochain_serialized_bytes::SerializedBytes;
-use holochain_types::prelude::*;
-use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::ZomeCallResponse;
-use kitsune_p2p::KitsuneP2pConfig;
-use matches::assert_matches;
-use tempdir::TempDir;
-use tracing::debug_span;
-
-use crate::conductor::p2p_store::all_agent_infos;
-use crate::conductor::p2p_store::exchange_peer_info;
+use crate::conductor::p2p_agent_store::all_agent_infos;
+use crate::conductor::p2p_agent_store::exchange_peer_info;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
@@ -26,19 +11,34 @@ use crate::test_utils::install_app;
 use crate::test_utils::new_zome_call;
 use crate::test_utils::setup_app_with_network;
 use crate::test_utils::wait_for_integration_with_others;
+use hdk::prelude::CellId;
+use hdk::prelude::WasmError;
+use holo_hash::AgentPubKey;
+use holo_hash::HeaderHash;
+use holochain_keystore::AgentPubKeyExt;
+use holochain_p2p::DnaHashExt;
+use holochain_serialized_bytes::SerializedBytes;
+use holochain_state::prelude::TestEnvs;
+use holochain_types::prelude::*;
+use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::ZomeCallResponse;
+use kitsune_p2p::KitsuneP2pConfig;
+use matches::assert_matches;
 use shrinkwraprs::Shrinkwrap;
 use test_case::test_case;
+use tokio_helper;
+use tracing::debug_span;
 
 const TIMEOUT_ERROR: &'static str = "inner function \'call_create_entry_remotely\' failed: ZomeCallNetworkError(\"Other: timeout\")";
 
 #[test_case(2)]
 #[test_case(5)]
-// #[test_case(10)] 10 works but might be too slow for our regular test run
+// #[test_case(10)]
 fn conductors_call_remote(num_conductors: usize) {
     let f = async move {
         observability::test_run().ok();
 
-        let uuid = nanoid::nanoid!().to_string();
+        let uid = nanoid::nanoid!().to_string();
         let zomes = vec![TestWasm::Create];
         let mut network = KitsuneP2pConfig::default();
         network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
@@ -46,12 +46,12 @@ fn conductors_call_remote(num_conductors: usize) {
             override_host: None,
             override_port: None,
         }];
-        let handles = setup(zomes, Some(network), num_conductors, uuid).await;
+        let handles = setup(zomes, Some(network), num_conductors, uid).await;
 
         init_all(&handles[..]).await;
 
-        // 50 ms should be enough time to hit another conductor locally
-        let results = call_each_other(&handles[..], 50).await;
+        // 100 ms should be enough time to hit another conductor locally.
+        let results = call_each_other(&handles[..], 100).await;
         for (_, _, result) in results {
             match result {
                 Some(r) => match r {
@@ -66,24 +66,28 @@ fn conductors_call_remote(num_conductors: usize) {
             }
         }
 
-        // Let the remote messages be dropped
-        tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
+        // Let the remote messages be dropped.
+        // @todo Why??? what messages? why do these messages cause subsequent calls to fail?
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
 
         let mut envs = Vec::with_capacity(handles.len());
         for h in &handles {
-            envs.push(h.get_p2p_env().await);
+            let space = h.cell_id.dna_hash().to_kitsune();
+            envs.push(h.get_p2p_env(space).await);
         }
 
-        exchange_peer_info(envs);
+        exchange_peer_info(envs).await;
 
         // Give a little longer timeout here because they must find each other to pass the test
-        let results = call_each_other(&handles[..], 500).await;
+        // This can require multiple round trips if the head of the source chain keeps moving.
+        // Each time the chain head moves the call must be retried until a clean commit is made.
+        let results = call_each_other(&handles[..], 1000).await;
         for (_, _, result) in results {
-            assert_matches!(result, Some(Ok(ZomeCallResponse::Ok(_))));
+            self::assert_matches!(result, Some(Ok(ZomeCallResponse::Ok(_))));
         }
         shutdown(handles).await;
     };
-    crate::conductor::tokio_runtime().block_on(f);
+    tokio_helper::block_forever_on(f);
 }
 
 #[test_case(2, 1, 1)]
@@ -110,7 +114,7 @@ fn conductors_local_gossip(num_committers: usize, num_conductors: usize, new_con
         network,
         true,
     );
-    crate::conductor::tokio_runtime().block_on(f);
+    tokio_helper::block_forever_on(f);
 }
 
 #[test_case(2, 1, 1)]
@@ -125,7 +129,7 @@ fn conductors_local_gossip(num_committers: usize, num_conductors: usize, new_con
 #[ignore = "Don't want network tests running on ci"]
 fn conductors_boot_gossip(num_committers: usize, num_conductors: usize, new_conductors: usize) {
     let mut network = KitsuneP2pConfig::default();
-    network.bootstrap_service = Some(url2::url2!("https://bootstrap.holo.host"));
+    network.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host"));
     network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
         bind_to: None,
         override_host: None,
@@ -138,7 +142,39 @@ fn conductors_boot_gossip(num_committers: usize, num_conductors: usize, new_cond
         network,
         false,
     );
-    crate::conductor::tokio_runtime().block_on(f);
+    tokio_helper::block_forever_on(f);
+}
+
+#[test_case(2, 1, 1)]
+#[test_case(5, 1, 1)]
+#[test_case(1, 5, 5)]
+#[test_case(5, 5, 5)]
+#[test_case(1, 10, 1)]
+#[test_case(1, 1, 1)]
+#[test_case(10, 10, 10)]
+#[test_case(8, 8, 8)]
+#[test_case(10, 10, 1)]
+#[ignore = "Don't want network tests running on ci"]
+fn conductors_local_boot_gossip(
+    num_committers: usize,
+    num_conductors: usize,
+    new_conductors: usize,
+) {
+    let mut network = KitsuneP2pConfig::default();
+    network.bootstrap_service = Some(url2::url2!("http://localhost:8787"));
+    network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
+        bind_to: None,
+        override_host: None,
+        override_port: None,
+    }];
+    let f = conductors_gossip_inner(
+        num_committers,
+        num_conductors,
+        new_conductors,
+        network,
+        false,
+    );
+    tokio_helper::block_forever_on(f);
 }
 
 #[test_case(2, 1, 1)]
@@ -185,7 +221,7 @@ fn conductors_remote_gossip(num_committers: usize, num_conductors: usize, new_co
         network,
         true,
     );
-    crate::conductor::tokio_runtime().block_on(f);
+    tokio_helper::block_forever_on(f);
 }
 
 #[test_case(2, 1, 1)]
@@ -209,7 +245,7 @@ fn conductors_remote_boot_gossip(
         override_port: None,
         override_host: None,
     };
-    network.bootstrap_service = Some(url2::url2!("https://bootstrap.holo.host/"));
+    network.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host/"));
     let proxy_config = holochain_p2p::kitsune_p2p::ProxyConfig::RemoteProxyClient{
         proxy_url: url2::url2!("kitsune-proxy://CIW6PxKxsPPlcuvUCbMcKwUpaMSmB7kLD8xyyj4mqcw/kitsune-quic/h/proxy.holochain.org/p/5778/--"),
     };
@@ -224,7 +260,7 @@ fn conductors_remote_boot_gossip(
         network,
         false,
     );
-    crate::conductor::tokio_runtime().block_on(f);
+    tokio_helper::block_forever_on(f);
 }
 
 async fn conductors_gossip_inner(
@@ -235,14 +271,14 @@ async fn conductors_gossip_inner(
     share_peers: bool,
 ) {
     observability::test_run().ok();
-    let uuid = nanoid::nanoid!().to_string();
+    let uid = nanoid::nanoid!().to_string();
 
     let zomes = vec![TestWasm::Create];
     let handles = setup(
         zomes.clone(),
         Some(network.clone()),
         num_committers,
-        uuid.clone(),
+        uid.clone(),
     )
     .await;
 
@@ -252,22 +288,23 @@ async fn conductors_gossip_inner(
         zomes.clone(),
         Some(network.clone()),
         num_conductors,
-        uuid.clone(),
+        uid.clone(),
     )
     .await;
 
     let mut envs = Vec::with_capacity(handles.len() + second_handles.len());
     for h in handles.iter().chain(second_handles.iter()) {
-        envs.push(h.get_p2p_env().await);
+        let space = h.cell_id.dna_hash().to_kitsune();
+        envs.push(h.get_p2p_env(space).await);
     }
 
     if share_peers {
-        exchange_peer_info(envs.clone());
+        exchange_peer_info(envs.clone()).await;
     }
 
     // for _ in 0..600 {
     //     check_peers(envs.clone());
-    //     tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
+    //     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     // }
 
     let all_handles = handles
@@ -285,15 +322,16 @@ async fn conductors_gossip_inner(
 
     shutdown(handles).await;
 
-    let third_handles = setup(zomes.clone(), Some(network.clone()), new_conductors, uuid).await;
+    let third_handles = setup(zomes.clone(), Some(network.clone()), new_conductors, uid).await;
 
     let mut envs = Vec::with_capacity(third_handles.len() + second_handles.len());
     for h in third_handles.iter().chain(second_handles.iter()) {
-        envs.push(h.get_p2p_env().await);
+        let space = h.cell_id.dna_hash().to_kitsune();
+        envs.push(h.get_p2p_env(space).await);
     }
 
     if share_peers {
-        exchange_peer_info(envs.clone());
+        exchange_peer_info(envs.clone()).await;
     }
 
     let all_handles = third_handles
@@ -417,6 +455,7 @@ async fn check_gossip(
         expected_count,
         NUM_ATTEMPTS,
         DELAY_PER_ATTEMPT.clone(),
+        None,
     )
     .await;
     for hash in posts {
@@ -435,13 +474,13 @@ async fn check_gossip(
 }
 
 #[tracing::instrument(skip(envs))]
-fn check_peers(envs: Vec<EnvironmentWrite>) {
+fn check_peers(envs: Vec<EnvWrite>) {
     for (i, a) in envs.iter().enumerate() {
         let peers = all_agent_infos(a.clone().into()).unwrap();
         let num_peers = peers.len();
         let peers = peers
             .into_iter()
-            .map(|a| a.into_agent())
+            .map(|a| a.agent.clone())
             .collect::<Vec<_>>();
         tracing::debug!(?i, ?num_peers, ?peers);
     }
@@ -452,14 +491,14 @@ struct TestHandle {
     #[shrinkwrap(main_field)]
     handle: ConductorHandle,
     cell_id: CellId,
-    __tmpdir: Arc<TempDir>,
+    _envs: Arc<TestEnvs>,
 }
 
 impl TestHandle {
     async fn shutdown(self) {
         let shutdown = self.handle.take_shutdown_handle().await.unwrap();
         self.handle.shutdown().await;
-        shutdown.await.unwrap();
+        shutdown.await.unwrap().unwrap();
     }
 }
 
@@ -473,12 +512,12 @@ async fn setup(
     zomes: Vec<TestWasm>,
     network: Option<KitsuneP2pConfig>,
     num_conductors: usize,
-    uuid: String,
+    uid: String,
 ) -> Vec<TestHandle> {
     let dna_file = DnaFile::new(
         DnaDef {
             name: "conductor_test".to_string(),
-            uuid,
+            uid,
             properties: SerializedBytes::try_from(()).unwrap(),
             zomes: zomes.clone().into_iter().map(Into::into).collect(),
         },
@@ -490,7 +529,7 @@ async fn setup(
     let mut handles = Vec::with_capacity(num_conductors);
     for _ in 0..num_conductors {
         let dnas = vec![dna_file.clone()];
-        let (__tmpdir, _, handle) =
+        let (_envs, _, handle) =
             setup_app_with_network(vec![], vec![], network.clone().unwrap_or_default()).await;
 
         let agent_key = AgentPubKey::new_from_pure_entropy(handle.keystore())
@@ -500,7 +539,7 @@ async fn setup(
         let app = InstalledCell::new(cell_id.clone(), "cell_handle".into());
         install_app("test_app", vec![(app, None)], dnas.clone(), handle.clone()).await;
         handles.push(TestHandle {
-            __tmpdir,
+            _envs: Arc::new(_envs),
             cell_id,
             handle,
         });

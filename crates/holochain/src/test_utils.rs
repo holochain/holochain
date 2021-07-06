@@ -5,21 +5,17 @@ use crate::conductor::api::ZomeCall;
 use crate::conductor::config::AdminInterfaceConfig;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::config::InterfaceDriver;
+use crate::conductor::p2p_agent_store;
 use crate::conductor::ConductorBuilder;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::ZomeCallInvocation;
-use crate::core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
 use ::fixt::prelude::*;
-use fallible_iterator::FallibleIterator;
-use hdk3::prelude::ZomeName;
+use hdk::prelude::ZomeName;
 use holo_hash::fixt::*;
 use holo_hash::*;
 use holochain_cascade::Cascade;
-use holochain_cascade::DbPair;
-use holochain_lmdb::env::EnvironmentWrite;
-use holochain_lmdb::fresh_reader_test;
-use holochain_lmdb::test_utils::test_environments;
-use holochain_lmdb::test_utils::TestEnvironments;
+use holochain_conductor_api::IntegrationStateDump;
+use holochain_conductor_api::IntegrationStateDumps;
 use holochain_p2p::actor::HolochainP2pRefToCell;
 use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::spawn_holochain_p2p;
@@ -28,25 +24,31 @@ use holochain_p2p::HolochainP2pRef;
 use holochain_p2p::HolochainP2pSender;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_serialized_bytes::SerializedBytesError;
-use holochain_state::metadata::MetadataBuf;
-use holochain_state::{element_buf::ElementBuf, prelude::SourceChain};
+use holochain_state::prelude::from_blob;
+use holochain_state::prelude::test_environments;
+use holochain_state::prelude::SourceChainResult;
+use holochain_state::prelude::StateQueryResult;
+use holochain_state::source_chain;
+use holochain_state::test_utils::fresh_reader_test;
+use holochain_state::test_utils::TestEnvs;
 use holochain_types::prelude::*;
 
+use holochain_p2p::DnaHashExt;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
-use std::convert::TryInto;
-use std::sync::Arc;
+use rusqlite::named_params;
 use std::time::Duration;
-use tempdir::TempDir;
 use tokio::sync::mpsc;
 
 pub use itertools;
 
-use self::sweetest::SweetCell;
+use crate::sweettest::SweetCell;
 
 pub mod conductor_setup;
 pub mod host_fn_caller;
-pub mod sweetest;
+
+mod wait_for_any;
+pub use wait_for_any::*;
 
 /// Produce file and line number info at compile-time
 #[macro_export]
@@ -197,7 +199,7 @@ where
     .unwrap();
     let respond_task = tokio::task::spawn(async move {
         use futures::future::FutureExt;
-        use tokio::stream::StreamExt;
+        use tokio_stream::StreamExt;
         while let Some(evt) = recv.next().await {
             if let Some((filter, tx)) = &mut events {
                 if filter(&evt) {
@@ -208,7 +210,7 @@ where
             use holochain_p2p::event::HolochainP2pEvent::*;
             match evt {
                 SignNetworkData { respond, .. } => {
-                    respond.r(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));
+                    respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                 }
                 PutAgentInfoSigned { respond, .. } => {
                     respond.r(Ok(async move { Ok(()) }.boxed().into()));
@@ -236,7 +238,7 @@ pub async fn install_app(
     conductor_handle: ConductorHandle,
 ) {
     for dna in dnas {
-        conductor_handle.install_dna(dna).await.unwrap();
+        conductor_handle.register_dna(dna).await.unwrap();
     }
     conductor_handle
         .clone()
@@ -262,7 +264,7 @@ pub type InstalledCellsWithProofs = Vec<(InstalledCell, Option<SerializedBytes>)
 pub async fn setup_app(
     apps_data: Vec<(&str, InstalledCellsWithProofs)>,
     dnas: Vec<DnaFile>,
-) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
+) -> (TestEnvs, RealAppInterfaceApi, ConductorHandle) {
     setup_app_inner(test_environments(), apps_data, dnas, None).await
 }
 
@@ -272,17 +274,17 @@ pub async fn setup_app_with_network(
     apps_data: Vec<(&str, InstalledCellsWithProofs)>,
     dnas: Vec<DnaFile>,
     network: KitsuneP2pConfig,
-) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
+) -> (TestEnvs, RealAppInterfaceApi, ConductorHandle) {
     setup_app_inner(test_environments(), apps_data, dnas, Some(network)).await
 }
 
 /// Setup an app with full configurability
 pub async fn setup_app_inner(
-    envs: TestEnvironments,
+    envs: TestEnvs,
     apps_data: Vec<(&str, InstalledCellsWithProofs)>,
     dnas: Vec<DnaFile>,
     network: Option<KitsuneP2pConfig>,
-) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
+) -> (TestEnvs, RealAppInterfaceApi, ConductorHandle) {
     let conductor_handle = ConductorBuilder::new()
         .config(ConductorConfig {
             admin_interfaces: Some(vec![AdminInterfaceConfig {
@@ -302,8 +304,8 @@ pub async fn setup_app_inner(
     let handle = conductor_handle.clone();
 
     (
-        envs.tempdir(),
-        RealAppInterfaceApi::new(conductor_handle, "test-interface".into()),
+        envs,
+        RealAppInterfaceApi::new(conductor_handle, Default::default()),
         handle,
     )
 }
@@ -371,18 +373,10 @@ pub async fn consistency(all_cells: &[&SweetCell], num_attempts: usize, delay: D
 }
 
 /// Wait for all cell envs to reach consistency
-pub async fn consistency_envs(
-    all_cell_envs: &[&EnvironmentWrite],
-    num_attempts: usize,
-    delay: Duration,
-) {
+pub async fn consistency_envs(all_cell_envs: &[&EnvWrite], num_attempts: usize, delay: Duration) {
     let mut expected_count = 0;
-    let query = ChainQueryFilter::new().include_entries(true);
     for &env in all_cell_envs.iter() {
-        let chain = SourceChain::new(env.clone().into()).unwrap();
-        let elements = chain.query(&query).unwrap();
-        let elements = elements.iter().collect::<Vec<_>>();
-        let count = produce_op_lights_from_elements(elements).unwrap().len();
+        let count = get_published_ops(env).len();
         expected_count += count;
     }
     for &env in all_cell_envs.iter() {
@@ -390,11 +384,84 @@ pub async fn consistency_envs(
     }
 }
 
-/// Same as wait_for_integration but with a default wait time of 10 seconds
-#[tracing::instrument(skip(env))]
-pub async fn wait_for_integration_10s(env: &EnvironmentWrite, expected_count: usize) {
+/// Same as wait_for_integration but with a default wait time of 60 seconds
+/// Wait for all cells to reach consistency for 10 seconds
+pub async fn consistency_10s_others(all_cells: &[&SweetCell]) {
     const NUM_ATTEMPTS: usize = 100;
     const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
+    consistency_others(all_cells, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
+}
+
+/// Wait for all cells to reach consistency
+#[tracing::instrument(skip(all_cells))]
+pub async fn consistency_others(all_cells: &[&SweetCell], num_attempts: usize, delay: Duration) {
+    let all_cell_envs: Vec<_> = all_cells.iter().map(|c| c.env()).collect();
+    consistency_envs_others(&all_cell_envs[..], num_attempts, delay).await
+}
+
+async fn consistency_envs_others(
+    all_cell_envs: &[&EnvWrite],
+    num_attempts: usize,
+    delay: Duration,
+) {
+    let mut expected_count = 0;
+    for &env in all_cell_envs.iter() {
+        let count = get_published_ops(env).len();
+        expected_count += count;
+    }
+    let start = Some(std::time::Instant::now());
+    for (i, &env) in all_cell_envs.iter().enumerate() {
+        let mut others = all_cell_envs.to_vec();
+        others.remove(i);
+        wait_for_integration_with_others(env, &others, expected_count, num_attempts, delay, start)
+            .await
+    }
+}
+
+fn get_authored_ops(env: &EnvWrite) -> Vec<DhtOpLight> {
+    fresh_reader_test(env.clone(), |txn| {
+        txn.prepare("SELECT blob FROM DhtOp WHERE is_authored = 1")
+            .unwrap()
+            .query_and_then([], |row| from_blob(row.get("blob")?))
+            .unwrap()
+            .collect::<StateQueryResult<_>>()
+            .unwrap()
+    })
+}
+
+fn get_published_ops(env: &EnvWrite) -> Vec<DhtOpLight> {
+    fresh_reader_test(env.clone(), |txn| {
+        txn.prepare(
+            "
+            SELECT
+            DhtOp.blob
+            FROM DhtOp
+            JOIN
+            Header ON DhtOp.header_hash = Header.hash
+            WHERE
+            DhtOp.is_authored = 1
+            AND
+            (DhtOp.type != :store_entry OR Header.private_entry = 0)
+        ",
+        )
+        .unwrap()
+        .query_and_then(
+            named_params! {
+                ":store_entry": DhtOpType::StoreEntry,
+            },
+            |row| from_blob(row.get("blob")?),
+        )
+        .unwrap()
+        .collect::<StateQueryResult<_>>()
+        .unwrap()
+    })
+}
+
+/// Same as wait_for_integration but with a default wait time of 10 seconds
+#[tracing::instrument(skip(env))]
+pub async fn wait_for_integration_1m(env: &EnvWrite, expected_count: usize) {
+    const NUM_ATTEMPTS: usize = 120;
+    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(500);
     wait_for_integration(env, expected_count, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
 }
 
@@ -402,7 +469,7 @@ pub async fn wait_for_integration_10s(env: &EnvironmentWrite, expected_count: us
 /// have been integrated or wait for num_attempts * delay
 #[tracing::instrument(skip(env))]
 pub async fn wait_for_integration(
-    env: &EnvironmentWrite,
+    env: &EnvWrite,
     expected_count: usize,
     num_attempts: usize,
     delay: Duration,
@@ -413,232 +480,187 @@ pub async fn wait_for_integration(
             return;
         } else {
             let total_time_waited = delay * i as u32;
-            tracing::debug!(?count, ?total_time_waited);
+            tracing::debug!(?count, ?total_time_waited, counts = ?count_integration(env).await);
         }
-        tokio::time::delay_for(delay).await;
+        tokio::time::sleep(delay).await;
     }
+}
+
+fn int_ops(env: &EnvWrite) -> Vec<DhtOpLight> {
+    fresh_reader_test(env.clone(), |txn| {
+        txn.prepare("SELECT blob FROM DhtOp WHERE when_integrated IS NOT NULL")
+            .unwrap()
+            .query_and_then([], |row| from_blob(row.get("blob")?))
+            .unwrap()
+            .collect::<StateQueryResult<_>>()
+            .unwrap()
+    })
 }
 
 /// Same as wait for integration but can print other states at the same time
 pub async fn wait_for_integration_with_others_10s(
-    env: &EnvironmentWrite,
-    others: &[&EnvironmentWrite],
+    env: &EnvWrite,
+    others: &[&EnvWrite],
     expected_count: usize,
+    start: Option<std::time::Instant>,
 ) {
     const NUM_ATTEMPTS: usize = 100;
     const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
-    wait_for_integration_with_others(env, others, expected_count, NUM_ATTEMPTS, DELAY_PER_ATTEMPT)
-        .await
+    wait_for_integration_with_others(
+        env,
+        others,
+        expected_count,
+        NUM_ATTEMPTS,
+        DELAY_PER_ATTEMPT,
+        start,
+    )
+    .await
 }
 
-#[tracing::instrument(skip(env, others))]
+#[tracing::instrument(skip(env, others, start))]
 /// Same as wait for integration but can print other states at the same time
 pub async fn wait_for_integration_with_others(
-    env: &EnvironmentWrite,
-    others: &[&EnvironmentWrite],
+    env: &EnvWrite,
+    others: &[&EnvWrite],
     expected_count: usize,
     num_attempts: usize,
     delay: Duration,
+    start: Option<std::time::Instant>,
 ) {
     let mut last_total = 0;
-    for i in 0..num_attempts {
+    let this_start = std::time::Instant::now();
+    for _ in 0..num_attempts {
         let count = count_integration(env).await;
         let counts = get_counts(others).await;
-        let total: usize = counts.clone().into_iter().map(|(_, _, i)| i).sum();
+        let total: usize = counts.0.clone().into_iter().map(|i| i.integrated).sum();
+        let num_conductors = counts.0.len() + 1;
+        let total_expected = num_conductors * expected_count;
+        let progress = if total_expected == 0 {
+            0.0
+        } else {
+            total as f64 / total_expected as f64 * 100.0
+        };
         let change = total.checked_sub(last_total).expect("LOST A VALUE");
         last_total = total;
-        if count.2 == expected_count {
+        if count.integrated == expected_count {
             return;
         } else {
-            let total_time_waited = delay * i as u32;
+            let time_waited = this_start.elapsed().as_secs();
+            let total_time_waited = start.map(|s| s.elapsed().as_secs()).unwrap_or(0);
+            let ops_per_s = if total_time_waited == 0 {
+                0.0
+            } else {
+                total as f64 / total_time_waited as f64
+            };
             tracing::debug!(
-                "Count: {}, val: {}, int: {}\nTime waited: {:?},\nCounts: {:?}\nTotal: {} change:{}\n",
-                count.2,
-                count.1,
-                count.0,
+                "Count: {}, val: {}, int: {}\nTime waited: {}s (total {}s),\nCounts: {:?}\nTotal: {} out of {} {:.4}% change:{} {:.4}ops/s\n",
+                count.integrated,
+                count.validation_limbo,
+                count.integration_limbo,
+                time_waited,
                 total_time_waited,
                 counts,
                 total,
+                total_expected,
+                progress,
                 change,
+                ops_per_s,
             );
         }
-        tokio::time::delay_for(delay).await;
+        tokio::time::sleep(delay).await;
     }
 }
 
 #[tracing::instrument(skip(envs))]
 /// Show authored data for each cell environment
-pub fn show_authored(envs: &[&EnvironmentWrite]) {
+pub fn show_authored(envs: &[&EnvWrite]) {
     for (i, &env) in envs.iter().enumerate() {
-        let chain = SourceChain::new(env.clone().into()).unwrap();
-        let mut items = chain.iter_back().collect::<Vec<_>>().unwrap();
-        items.reverse();
-        for item in items {
-            let header = item.header();
-            let seq_num = header.header_seq();
-            let header_type = header.header_type();
-            let entry = header
-                .entry_hash()
-                .and_then(|e| chain.get_entry(e).unwrap());
-            tracing::debug!(chain = %i, %seq_num, ?header_type, ?entry);
+        fresh_reader_test(env.clone(), |txn| {
+            txn.prepare("SELECT DISTINCT Header.seq, Header.type, Header.entry_hash FROM Header JOIN DhtOp ON Header.hash = DhtOp.hash WHERE is_authored = 1")
+            .unwrap()
+            .query_map([], |row| {
+                let header_type: String = row.get("type")?;
+                let seq: u32 = row.get("seq")?;
+                let entry: Option<EntryHash> = row.get("entry_hash")?;
+                Ok((header_type, seq, entry))
+            })
+            .unwrap()
+            .for_each(|r|{
+                let (header_type, seq, entry) = r.unwrap();
+                tracing::debug!(chain = %i, %seq, ?header_type, ?entry);
+            });
+        });
+    }
+}
+
+#[tracing::instrument(skip(envs))]
+/// Show authored op data for each cell environment
+pub async fn show_authored_ops(envs: &[&EnvWrite]) {
+    let mut all_auth = Vec::new();
+    for (i, env) in envs.iter().enumerate() {
+        let auth = get_authored_ops(env);
+        all_auth.extend(auth.clone());
+        for (j, op) in auth.iter().enumerate() {
+            tracing::debug!(chain = %i, op_num = %j, ?op);
+        }
+    }
+    for (i, env) in envs.iter().enumerate() {
+        let int = int_ops(env);
+        for op in &all_auth {
+            if !int.iter().any(|a| a == op) {
+                tracing::warn!(is_missing = ?op, for_env = %i);
+                show_data(env, op).await;
+            }
         }
     }
 }
 
-async fn get_counts(envs: &[&EnvironmentWrite]) -> Vec<(usize, usize, usize)> {
+async fn show_data(env: &EnvWrite, op: &DhtOpLight) {
+    let mut cascade = Cascade::empty().with_vault(env.clone().into());
+    if let Some(el) = cascade
+        .retrieve(op.header_hash().clone().into(), Default::default())
+        .await
+        .unwrap()
+    {
+        let header = el.header();
+        let entry = format!("{:?}", el.entry());
+        tracing::debug!(seq_num = %header.header_seq(), header_type = ?header.header_type(), op_type = %op.to_string(), ?entry);
+    }
+}
+
+async fn get_counts(envs: &[&EnvWrite]) -> IntegrationStateDumps {
     let mut output = Vec::new();
     for env in envs {
         let env = *env;
         output.push(count_integration(env).await);
     }
-    output
+    IntegrationStateDumps(output)
 }
 
-async fn count_integration(env: &EnvironmentWrite) -> (usize, usize, usize) {
-    let workspace = IncomingDhtOpsWorkspace::new(env.clone().into()).unwrap();
-    let val_limbo: Vec<_> = fresh_reader_test!(env, |r| {
-        workspace
-            .validation_limbo
-            .iter(&r)
-            .unwrap()
-            .map(|(_, v)| Ok(v))
-            .collect()
-            .unwrap()
-    });
-
-    let val_len = val_limbo.len();
-
-    let int_limbo: Vec<_> = fresh_reader_test!(env, |r| {
-        workspace
-            .integration_limbo
-            .iter(&r)
-            .unwrap()
-            .map(|(_, v)| Ok(v))
-            .collect()
-            .unwrap()
-    });
-    let int_limbo_len = int_limbo.len();
-
-    let int: Vec<_> = fresh_reader_test!(env, |r| {
-        workspace
-            .integrated_dht_ops
-            .iter(&r)
-            .unwrap()
-            .map(|(_, v)| Ok(v))
-            .collect()
-            .unwrap()
-    });
-    let int_len = int.len();
-    (val_len, int_limbo_len, int_len)
+async fn count_integration(env: &EnvWrite) -> IntegrationStateDump {
+    crate::conductor::integration_dump(&env.clone().into())
+        .await
+        .unwrap()
 }
 
-async fn display_integration(env: &EnvironmentWrite) -> usize {
-    let workspace = IncomingDhtOpsWorkspace::new(env.clone().into()).unwrap();
-
-    let val_limbo: Vec<_> = fresh_reader_test!(env, |r| {
-        workspace
-            .validation_limbo
-            .iter(&r)
-            .unwrap()
-            .map(|(_, v)| Ok(v))
-            .collect()
-            .unwrap()
-    });
-    tracing::debug!(?val_limbo);
-
-    let int_limbo: Vec<_> = fresh_reader_test!(env, |r| {
-        workspace
-            .integration_limbo
-            .iter(&r)
-            .unwrap()
-            .map(|(_, v)| Ok(v))
-            .collect()
-            .unwrap()
-    });
-    tracing::debug!(?int_limbo);
-
-    let int: Vec<_> = fresh_reader_test!(env, |r| {
-        workspace
-            .integrated_dht_ops
-            .iter(&r)
-            .unwrap()
-            .map(|(_, v)| Ok(v))
-            .collect()
-            .unwrap()
-    });
-    let count = int.len();
-
-    {
-        let s = tracing::trace_span!("wait_for_integration_deep");
-        let _g = s.enter();
-        let element_integrated = ElementBuf::vault(env.clone().into(), false).unwrap();
-        let meta_integrated = MetadataBuf::vault(env.clone().into()).unwrap();
-        let element_rejected = ElementBuf::rejected(env.clone().into()).unwrap();
-        let meta_rejected = MetadataBuf::rejected(env.clone().into()).unwrap();
-        let mut cascade = Cascade::empty()
-            .with_integrated(DbPair::new(&element_integrated, &meta_integrated))
-            .with_rejected(DbPair::new(&element_rejected, &meta_rejected));
-        let mut headers_to_display = Vec::with_capacity(int.len());
-        for iv in int {
-            let el = cascade
-                .retrieve(iv.op.header_hash().clone().into(), Default::default())
-                .await
-                .unwrap()
-                .unwrap();
-            tracing::trace!(op = ?iv.op, ?el);
-            let header = el.header();
-            let entry = format!("{:?}", el.entry());
-            headers_to_display.push((
-                header.header_seq(),
-                header.header_type(),
-                iv.op.to_string(),
-                entry,
-            ))
-        }
-        headers_to_display.sort_by_key(|i| i.0);
-        for (i, h) in headers_to_display.into_iter().enumerate() {
-            tracing::debug!(?i, seq_num = %h.0, header_type = ?h.1, op_type = %h.2, entry = ?h.3);
-        }
-    }
-    count
+async fn display_integration(env: &EnvWrite) -> usize {
+    fresh_reader_test(env.clone(), |txn| {
+        txn.query_row(
+            "SELECT COUNT(hash) FROM DhtOp WHERE DhtOp.when_integrated IS NOT NULL",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap()
+    })
 }
 
 /// Helper for displaying agent infos stored on a conductor
 pub async fn display_agent_infos(conductor: &ConductorHandle) {
-    let agent_info = conductor.get_agent_infos(None).await.unwrap();
-    for info in agent_info {
-        let cell_info = conductor.list_cell_ids().await.unwrap();
-        let agents = cell_info
-            .iter()
-            .map(|c| c.agent_pubkey().clone())
-            .map(|a| (a.clone(), holochain_p2p::agent_holo_to_kit(a)))
-            .collect::<Vec<_>>();
-
-        let dnas = cell_info
-            .iter()
-            .map(|c| c.dna_hash().clone())
-            .map(|d| (d.clone(), holochain_p2p::space_holo_to_kit(d)))
-            .collect::<Vec<_>>();
-
-        let info: kitsune_p2p::agent_store::AgentInfo = (&info).try_into().unwrap();
-        let this_agent = agents.iter().find(|a| *info.as_agent_ref() == a.1).unwrap();
-        let this_dna = dnas.iter().find(|d| *info.as_space_ref() == d.1).unwrap();
-        tracing::debug!("This Agent {:?} is {:?}", this_agent.0, this_agent.1);
-        tracing::debug!("This DNA {:?} is {:?}", this_dna.0, this_dna.1);
-
-        use chrono::{DateTime, Duration, NaiveDateTime, Utc};
-        let duration = Duration::milliseconds(info.signed_at_ms() as i64);
-        let s = duration.num_seconds() as i64;
-        let n = duration.clone().to_std().unwrap().subsec_nanos();
-        let dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(s, n), Utc);
-        let exp = dt + Duration::milliseconds(info.expires_after_ms() as i64);
-        let now = Utc::now();
-
-        tracing::debug!("signed at {}", dt);
-        tracing::debug!("expires at {} in {}mins", exp, (exp - now).num_minutes());
-        tracing::debug!("space: {:?}", info.as_space_ref());
-        tracing::debug!("agent: {:?}", info.as_agent_ref());
-        tracing::debug!("urls: {:?}", info.as_urls_ref());
+    for cell_id in conductor.list_cell_ids().await.unwrap() {
+        let space = cell_id.dna_hash().to_kitsune();
+        let env = conductor.get_p2p_env(space).await;
+        let info = p2p_agent_store::dump_state(env.into(), Some(cell_id)).unwrap();
+        tracing::debug!(%info);
     }
 }
 
@@ -680,4 +702,18 @@ where
         payload: ExternIO::encode(payload)?,
         provenance: cell_id.agent_pubkey().clone(),
     })
+}
+
+/// A fixture example dna for unit testing.
+pub fn fake_valid_dna_file(uid: &str) -> DnaFile {
+    fake_dna_zomes(uid, vec![(TestWasm::Foo.into(), TestWasm::Foo.into())])
+}
+
+/// Run genesis on the source chain for testing.
+pub async fn fake_genesis(vault: EnvWrite) -> SourceChainResult<()> {
+    let dna = fake_dna_file("cool dna");
+    let dna_hash = dna.dna_hash().clone();
+    let agent_pubkey = fake_agent_pubkey_1();
+
+    source_chain::genesis(vault, dna_hash, agent_pubkey, None).await
 }

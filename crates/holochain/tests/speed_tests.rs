@@ -15,8 +15,10 @@
 //! hard to automate piping from tests stderr.
 //!
 
+#![allow(deprecated)]
+
 use ::fixt::prelude::*;
-use hdk3::prelude::*;
+use hdk::prelude::*;
 use holochain::conductor::api::AdminRequest;
 use holochain::conductor::api::AdminResponse;
 use holochain::conductor::api::AppRequest;
@@ -26,15 +28,14 @@ use holochain::conductor::api::ZomeCall;
 use holochain::conductor::config::AdminInterfaceConfig;
 use holochain::conductor::config::ConductorConfig;
 use holochain::conductor::config::InterfaceDriver;
-use holochain::conductor::dna_store::MockDnaStore;
 use holochain::conductor::ConductorBuilder;
 use holochain::conductor::ConductorHandle;
 
-use holochain_lmdb::test_utils::test_environments;
-use holochain_lmdb::test_utils::TestEnvironments;
+use holochain_state::{prelude::test_environments, test_utils::TestEnvs};
 use holochain_test_wasm_common::AnchorInput;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_websocket::WebsocketResult;
 use holochain_websocket::WebsocketSender;
 use matches::assert_matches;
 use observability;
@@ -46,61 +47,58 @@ mod test_utils;
 
 const DEFAULT_NUM: usize = 2000;
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_prep() {
     holochain::test_utils::warm_wasm_tests();
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_timed() {
     let _g = observability::test_run_timed().unwrap();
     speed_test(None).await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_timed_json() {
     let _g = observability::test_run_timed_json().unwrap();
     speed_test(None).await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_timed_flame() {
     let _g = observability::test_run_timed_flame(None).unwrap();
     speed_test(None).await;
-    tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_timed_ice() {
     let _g = observability::test_run_timed_ice(None).unwrap();
     speed_test(None).await;
-    tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_normal() {
     observability::test_run().unwrap();
     speed_test(None).await;
 }
 
-/// Run this test to execute the speed test, but then keep the LMDB env files
-/// around in temp dirs for inspection by e.g. `mdb_stat`
-#[tokio::test(threaded_scheduler)]
+/// Run this test to execute the speed test, but then keep the database files
+/// around in temp dirs for inspection
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_persisted() {
     observability::test_run().unwrap();
     let envs = speed_test(None).await;
-    let tmpdir = envs.tempdir();
-    drop(envs);
-    let tmpdir = std::sync::Arc::try_unwrap(tmpdir).unwrap();
-    let path = tmpdir.into_path();
+    let path = envs.into_tempdir().into_path();
     println!("Run the following to see info about the test that just ran,");
     println!("with the correct cell env dir appended to the path:");
     println!();
@@ -116,11 +114,11 @@ async fn speed_test_persisted() {
 #[ignore = "speed tests are ignored by default; unignore to run"]
 fn speed_test_all(n: usize) {
     observability::test_run().unwrap();
-    holochain::conductor::tokio_runtime().block_on(speed_test(Some(n)));
+    tokio_helper::block_forever_on(speed_test(Some(n)));
 }
 
 #[instrument]
-async fn speed_test(n: Option<usize>) -> TestEnvironments {
+async fn speed_test(n: Option<usize>) -> TestEnvs {
     let num = n.unwrap_or(DEFAULT_NUM);
 
     // ////////////
@@ -130,7 +128,7 @@ async fn speed_test(n: Option<usize>) -> TestEnvironments {
     let dna_file = DnaFile::new(
         DnaDef {
             name: "need_for_speed_test".to_string(),
-            uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+            uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
             zomes: vec![TestWasm::Anchor.into()].into(),
         },
@@ -233,7 +231,7 @@ async fn speed_test(n: Option<usize>) -> TestEnvironments {
     async fn call(
         app_interface: &mut WebsocketSender,
         invocation: ZomeCall,
-    ) -> std::io::Result<AppResponse> {
+    ) -> WebsocketResult<AppResponse> {
         let request = AppRequest::ZomeCall(Box::new(invocation));
         app_interface.request(request).await
     }
@@ -300,20 +298,16 @@ async fn speed_test(n: Option<usize>) -> TestEnvironments {
             break;
         }
     }
-    app_interface
-        .close(1000, "Shutting down".into())
-        .await
-        .unwrap();
     let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
-    shutdown.await.unwrap();
+    shutdown.await.unwrap().unwrap();
     test_env
 }
 
 pub async fn setup_app(
     cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
     dna_store: MockDnaStore,
-) -> (TestEnvironments, RealAppInterfaceApi, ConductorHandle) {
+) -> (TestEnvs, RealAppInterfaceApi, ConductorHandle) {
     let envs = test_environments();
 
     let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
@@ -346,7 +340,7 @@ pub async fn setup_app(
 
     (
         envs,
-        RealAppInterfaceApi::new(conductor_handle, "test-interface".into()),
+        RealAppInterfaceApi::new(conductor_handle, Default::default()),
         handle,
     )
 }

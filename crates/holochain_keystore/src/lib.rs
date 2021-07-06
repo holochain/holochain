@@ -11,7 +11,7 @@
 //! use holochain_keystore::*;
 //! use holochain_serialized_bytes::prelude::*;
 //!
-//! #[tokio::main(threaded_scheduler)]
+//! #[tokio::main(flavor = "multi_thread")]
 //! async fn main() {
 //!     tokio::task::spawn(async move {
 //!         let keystore = test_keystore::spawn_test_keystore().await.unwrap();
@@ -44,5 +44,6 @@ use keystore_actor::*;
 mod agent_pubkey_ext;
 pub use agent_pubkey_ext::*;
 
+pub mod crude_mock_keystore;
 pub mod lair_keystore;
 pub mod test_keystore;

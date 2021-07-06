@@ -1,7 +1,10 @@
-use hdk3::prelude::*;
+use hdk::prelude::*;
 
 #[derive(Clone, serde::Serialize, serde::Deserialize, SerializedBytes, Debug)]
 pub struct AnchorInput(pub String, pub String);
+
+#[derive(Clone, serde::Serialize, serde::Deserialize, SerializedBytes, Debug)]
+pub struct ManyAnchorInput(pub Vec<AnchorInput>);
 
 #[derive(Clone, serde::Serialize, serde::Deserialize, SerializedBytes, Debug)]
 pub struct AgentActivitySearch {

@@ -17,11 +17,12 @@ use crate::zome::FunctionName;
 use crate::zome::ZomeName;
 use crate::Entry;
 use ::fixt::prelude::*;
+use ::fixt::rng;
 use holo_hash::EntryHash;
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::SerializedBytes;
 use std::collections::BTreeMap;
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
 pub use holo_hash::fixt::*;
 
@@ -111,6 +112,7 @@ pub struct KnownCreateLink {
 
 pub struct KnownDeleteLink {
     pub link_add_address: holo_hash::HeaderHash,
+    pub base_address: holo_hash::EntryHash,
 }
 
 impl Iterator for CreateLinkFixturator<KnownCreateLink> {
@@ -130,6 +132,7 @@ impl Iterator for DeleteLinkFixturator<KnownDeleteLink> {
     fn next(&mut self) -> Option<Self::Item> {
         let mut f = fixt!(DeleteLink);
         f.link_add_address = self.0.curve.link_add_address.clone();
+        f.base_address = self.0.curve.base_address.clone();
         Some(f)
     }
 }
@@ -156,7 +159,7 @@ fixturator!(
     CapSecret;
     curve Empty [0; CAP_SECRET_BYTES].into();
     curve Unpredictable {
-        let mut rng = rand::thread_rng();
+        let mut rng = rng();
         let upper = rng.gen::<[u8; CAP_SECRET_BYTES / 2]>();
         let lower = rng.gen::<[u8; CAP_SECRET_BYTES / 2]>();
         let mut inner = [0; CAP_SECRET_BYTES];
@@ -173,11 +176,50 @@ fixturator!(
 );
 
 fixturator!(
+    ZomeInfo;
+    constructor fn new(String, DnaHash, ZomeName, ZomeId, SerializedBytes);
+);
+
+fixturator!(
+    AgentInfo;
+    constructor fn new(AgentPubKey, AgentPubKey);
+);
+
+fixturator!(
     CapClaim;
     constructor fn new(String, AgentPubKey, CapSecret);
 );
 
-newtype_fixturator!(Signature<Bytes>);
+newtype_fixturator!(Signature<SixtyFourBytes>);
+
+pub type SignatureVec = Vec<Signature>;
+fixturator!(
+    SignatureVec;
+    curve Empty vec![];
+    curve Unpredictable {
+        let min_len = 0;
+        let max_len = 5;
+        let mut rng = rng();
+        let len = rng.gen_range(min_len, max_len);
+        let mut signature_fixturator = SignatureFixturator::new(Unpredictable);
+        let mut signatures = vec![];
+        for _ in 0..len {
+            signatures.push(signature_fixturator.next().unwrap());
+        }
+        signatures
+    };
+    curve Predictable {
+        let mut index = get_fixt_index!();
+        let mut signature_fixturator = SignatureFixturator::new_indexed(Predictable, index);
+        let mut signatures = vec![];
+        for _ in 0..3 {
+            signatures.push(signature_fixturator.next().unwrap());
+        }
+        index += 1;
+        set_fixt_index!(index);
+        signatures
+    };
+);
 
 fixturator!(
     MigrateAgent;
@@ -204,7 +246,7 @@ fixturator!(
     CurryPayloads;
     curve Empty CurryPayloads(BTreeMap::new());
     curve Unpredictable {
-        let mut rng = rand::thread_rng();
+        let mut rng = rng();
         let number_of_payloads = rng.gen_range(0, 5);
 
         let mut payloads: BTreeMap<GrantedFunction, SerializedBytes> = BTreeMap::new();
@@ -230,24 +272,24 @@ fixturator!(
 );
 
 fixturator!(
-    ZomeCallCapGrant,
-    {
+    ZomeCallCapGrant;
+    curve Empty {
         ZomeCallCapGrant::new(
             StringFixturator::new(Empty).next().unwrap(),
             CapAccessFixturator::new(Empty).next().unwrap(),
             {
-                let mut rng = rand::thread_rng();
+                let mut rng = rng();
                 let number_of_zomes = rng.gen_range(0, 5);
 
-                let mut granted_functions: GrantedFunctions = HashSet::new();
+                let mut granted_functions: GrantedFunctions = BTreeSet::new();
                 for _ in 0..number_of_zomes {
                     granted_functions.insert(GrantedFunctionFixturator::new(Empty).next().unwrap());
                 }
                 granted_functions
             }, // CurryPayloadsFixturator::new(Empty).next().unwrap(),
         )
-    },
-    {
+    };
+    curve Unpredictable {
         ZomeCallCapGrant::new(
             StringFixturator::new(Unpredictable).next().unwrap(),
             CapAccessFixturator::new(Unpredictable).next().unwrap(),
@@ -255,7 +297,7 @@ fixturator!(
                 let mut rng = rand::thread_rng();
                 let number_of_zomes = rng.gen_range(0, 5);
 
-                let mut granted_functions: GrantedFunctions = HashSet::new();
+                let mut granted_functions: GrantedFunctions = BTreeSet::new();
                 for _ in 0..number_of_zomes {
                     granted_functions.insert(
                         GrantedFunctionFixturator::new(Unpredictable)
@@ -267,8 +309,8 @@ fixturator!(
             },
             // CurryPayloadsFixturator::new(Unpredictable).next().unwrap(),
         )
-    },
-    {
+    };
+    curve Predictable {
         ZomeCallCapGrant::new(
             StringFixturator::new_indexed(Predictable, get_fixt_index!())
                 .next()
@@ -277,7 +319,7 @@ fixturator!(
                 .next()
                 .unwrap(),
             {
-                let mut granted_functions: GrantedFunctions = HashSet::new();
+                let mut granted_functions: GrantedFunctions = BTreeSet::new();
                 for _ in 0..get_fixt_index!() % 3 {
                     granted_functions
                         .insert(GrantedFunctionFixturator::new(Predictable).next().unwrap());
@@ -286,7 +328,7 @@ fixturator!(
             },
             // CurryPayloadsFixturator::new(Predictable).next().unwrap(),
         )
-    }
+    };
 );
 
 fixturator!(
@@ -300,7 +342,7 @@ fixturator!(
             CapAccessVariant::Transferable => CapAccess::from(CapSecretFixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap()),
             CapAccessVariant::Assigned => CapAccess::from((
                 CapSecretFixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap(),
-                HashSet::new()
+                BTreeSet::new()
             ))
         }
     };
@@ -318,7 +360,7 @@ fixturator!(
                 CapAccess::from((
                     CapSecretFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap(),
                     {
-                        let mut set: HashSet<AgentPubKey> = HashSet::new();
+                        let mut set: BTreeSet<AgentPubKey> = BTreeSet::new();
                         for _ in 0..number_of_assigned {
                             set.insert(AgentPubKeyFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap());
                         }
@@ -336,7 +378,7 @@ fixturator!(
             CapAccessVariant::Assigned => CapAccess::from((
                 CapSecretFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
             {
-                let mut set: HashSet<AgentPubKey> = HashSet::new();
+                let mut set: BTreeSet<AgentPubKey> = BTreeSet::new();
                 for _ in 0..get_fixt_index!() % 3 {
                     set.insert(AgentPubKeyFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap());
                 }
@@ -590,5 +632,86 @@ fixturator!(
             Header::Update(_) => Header::Update(fixt!(Update, PublicCurve)),
             other_type => other_type,
         }
+    };
+);
+
+fixturator!(
+    HeaderHashed;
+    constructor fn from_content_sync(Header);
+);
+
+fixturator!(
+    SignedHeaderHashed;
+    constructor fn with_presigned(HeaderHashed, Signature);
+);
+
+fixturator!(
+    Zome;
+    constructor fn new(ZomeName, ZomeDef);
+);
+
+fixturator!(
+    Zomes;
+    curve Empty Vec::new();
+    curve Unpredictable {
+        // @todo implement unpredictable zomes
+        ZomesFixturator::new(Empty).next().unwrap()
+    };
+    curve Predictable {
+        // @todo implement predictable zomes
+        ZomesFixturator::new(Empty).next().unwrap()
+    };
+);
+
+fixturator!(
+    ZomeDef;
+    constructor fn from_hash(WasmHash);
+);
+
+fixturator!(
+    DnaDef;
+    curve Empty DnaDef {
+        name: StringFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap(),
+        uid: StringFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap(),
+        properties: SerializedBytesFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap(),
+        zomes: ZomesFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap(),
+    };
+
+    curve Unpredictable DnaDef {
+        name: StringFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        uid: StringFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        properties: SerializedBytesFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        zomes: ZomesFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+    };
+
+    curve Predictable DnaDef {
+        name: StringFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        uid: StringFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        properties: SerializedBytesFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        zomes: ZomesFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
     };
 );

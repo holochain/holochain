@@ -46,7 +46,7 @@ impl ExternIO {
     where
         O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
-        Ok(holochain_serialized_bytes::decode(&self.0)?)
+        holochain_serialized_bytes::decode(&self.0)
     }
 
     pub fn into_vec(self) -> Vec<u8> {
@@ -81,13 +81,22 @@ wasm_io_types! {
     // These definitions can be copy-pasted into the ribosome's HostFnApi
     // when updated
 
-    fn agent_info (()) -> zt::agent_info::AgentInfo;
+    // Info about the calling agent.
+    fn agent_info (()) -> zt::info::AgentInfo;
+
+    // @todo
+    fn app_info (()) -> zt::info::AppInfo;
+
+    // @todo
+    fn dna_info (()) -> zt::info::DnaInfo;
+
+    // @todo
+    fn call_info (()) -> zt::info::CallInfo;
 
     // Header hash of the DeleteLink element.
     fn call_remote (zt::call_remote::CallRemote) -> zt::ZomeCallResponse;
 
     fn call (zt::call::Call) -> zt::ZomeCallResponse;
-
 
     // @todo List all the local capability claims.
     fn capability_claims (()) -> ();
@@ -98,13 +107,13 @@ wasm_io_types! {
     // @todo Get the capability for the current zome call.
     fn capability_info (()) -> ();
 
+    // Returns HeaderHash of the newly created element.
+    fn create (zt::entry::EntryWithDefId) -> holo_hash::HeaderHash;
+
     // Create a link between two entries.
     fn create_link (zt::link::CreateLinkInput) -> holo_hash::HeaderHash;
 
     fn create_x25519_keypair(()) -> zt::x_salsa20_poly1305::x25519::X25519PubKey;
-
-    // Returns HeaderHash of the newly created element.
-    fn create (zt::entry::EntryWithDefId) -> holo_hash::HeaderHash;
 
     // The debug host import takes a TraceMsg to output wherever the host wants to display it.
     // TraceMsg includes line numbers. so the wasm tells the host about it's own code structure.
@@ -120,10 +129,7 @@ wasm_io_types! {
     // Emit a Signal::App to subscribers on the interface
     fn emit_signal (zt::signal::AppSignal) -> ();
 
-    // @todo
-    fn entry_type_properties (()) -> ();
-
-    fn get_agent_activity (zt::agent_info::GetAgentActivityInput) -> zt::query::AgentActivity;
+    fn get_agent_activity (zt::agent_activity::GetAgentActivityInput) -> zt::query::AgentActivity;
 
     fn get_details (zt::entry::GetInput) -> Option<zt::metadata::Details>;
 
@@ -138,11 +144,8 @@ wasm_io_types! {
     // Hash an entry on the host.
     fn hash_entry (zt::entry::Entry) -> holo_hash::EntryHash;
 
-    // @todo
-    fn property (()) -> ();
-
     // Query the source chain for data.
-    fn query (zt::query::ChainQueryFilter) -> zt::element::ElementVec;
+    fn query (zt::query::ChainQueryFilter) -> Vec<crate::Element>;
 
     // the length of random bytes to create
     fn random_bytes (u32) -> zt::bytes::Bytes;
@@ -157,18 +160,19 @@ wasm_io_types! {
     fn schedule (core::time::Duration) -> ();
 
     // @todo
-    fn show_env (()) -> ();
+    fn sleep (core::time::Duration) -> ();
+
+    // @todo
+    fn version (()) -> zt::version::ZomeApiVersion;
 
     // Attempt to have the keystore sign some data
     // The pubkey in the input needs to be found in the keystore for this to work
     fn sign (zt::signature::Sign) -> zt::signature::Signature;
 
+    fn sign_ephemeral (zt::signature::SignEphemeral) -> zt::signature::EphemeralSignatures;
+
     // Current system time, in the opinion of the host, as a `Duration`.
     fn sys_time (()) -> core::time::Duration;
-
-    // There's nothing to go in or out of a noop.
-    // Used to "defuse" host functions when side effects are not allowed.
-    fn unreachable (()) -> ();
 
     // Same as  but also takes the HeaderHash of the updated element.
     fn update (zt::entry::UpdateInput) -> holo_hash::HeaderHash;
@@ -192,7 +196,7 @@ wasm_io_types! {
     // The zome and agent info are constants specific to the current zome and chain.
     // All the information is provided by core so there is no input value.
     // These are constant for the lifetime of a zome call.
-    fn zome_info (()) -> zt::zome_info::ZomeInfo;
+    fn zome_info (()) -> zt::info::ZomeInfo;
 }
 
 /// Anything that can go wrong while calling a HostFnApi method

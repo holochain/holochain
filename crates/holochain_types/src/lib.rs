@@ -7,7 +7,12 @@
 //! itself depends on.
 
 #![deny(missing_docs)]
+// Toggle this to see what needs to be eventually refactored (as warnings).
+#![allow(deprecated)]
+// We have a lot of usages of type aliases to `&String`, which clippy objects to.
+#![allow(clippy::ptr_arg)]
 
+pub mod access;
 pub mod activity;
 pub mod app;
 pub mod autonomic;
@@ -17,17 +22,18 @@ pub mod dht_op;
 pub mod dna;
 pub mod element;
 pub mod entry;
+pub mod env;
 pub mod fixt;
 pub mod header;
 pub mod link;
 mod macros;
 pub mod metadata;
 pub mod prelude;
+pub mod properties;
 pub mod signal;
 pub mod timestamp;
 pub mod validate;
 
-// #[cfg(test)]
 pub mod test_utils;
 
 pub use entry::EntryHashed;

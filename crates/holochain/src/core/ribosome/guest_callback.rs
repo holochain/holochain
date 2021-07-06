@@ -1,4 +1,5 @@
 pub mod entry_defs;
+pub mod genesis_self_check;
 pub mod init;
 pub mod migrate_agent;
 pub mod post_commit;
@@ -11,7 +12,7 @@ use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeT;
 use fallible_iterator::FallibleIterator;
-use holochain_types::dna::zome::Zome;
+use holochain_types::prelude::*;
 use holochain_zome_types::ExternIO;
 
 pub struct CallIterator<R: RibosomeT, I: Invocation> {
@@ -78,12 +79,11 @@ mod tests {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use crate::fixt::ZomeFixturator;
     use fallible_iterator::FallibleIterator;
-    use holochain_types::dna::zome::Zome;
     use holochain_types::prelude::*;
     use mockall::predicate::*;
     use mockall::Sequence;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn call_iterator_iterates() {
         // stuff we need to test with
         let mut sequence = Sequence::new();

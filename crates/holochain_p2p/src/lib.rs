@@ -9,6 +9,7 @@ use std::sync::Arc;
 mod types;
 pub use types::actor::HolochainP2pRef;
 pub use types::actor::HolochainP2pSender;
+pub use types::AgentPubKeyExt; // why is this not included by * above???
 pub use types::*;
 
 mod spawn;
@@ -30,6 +31,11 @@ pub trait HolochainP2pCellT {
 
     /// owned getter
     fn from_agent(&self) -> AgentPubKey;
+
+    /// Construct the CellId from the defined DnaHash and AgentPubKey
+    fn cell_id(&self) -> CellId {
+        CellId::new(self.dna_hash(), self.from_agent())
+    }
 
     /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
     async fn join(&mut self) -> actor::HolochainP2pResult<()>;
@@ -69,7 +75,7 @@ pub trait HolochainP2pCellT {
         &mut self,
         dht_hash: holo_hash::AnyDhtHash,
         options: actor::GetOptions,
-    ) -> actor::HolochainP2pResult<Vec<GetElementResponse>>;
+    ) -> actor::HolochainP2pResult<Vec<WireOps>>;
 
     /// Get metadata from the DHT.
     async fn get_meta(
@@ -81,9 +87,9 @@ pub trait HolochainP2pCellT {
     /// Get links from the DHT.
     async fn get_links(
         &mut self,
-        link_key: WireLinkMetaKey,
+        link_key: WireLinkKey,
         options: actor::GetLinksOptions,
-    ) -> actor::HolochainP2pResult<Vec<GetLinksResponse>>;
+    ) -> actor::HolochainP2pResult<Vec<WireLinkOps>>;
 
     /// Get agent activity from the DHT.
     async fn get_agent_activity(
@@ -91,7 +97,7 @@ pub trait HolochainP2pCellT {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse>>;
+    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<HeaderHash>>>;
 
     /// Send a validation receipt to a remote node.
     async fn send_validation_receipt(
@@ -99,6 +105,12 @@ pub trait HolochainP2pCellT {
         to_agent: AgentPubKey,
         receipt: SerializedBytes,
     ) -> actor::HolochainP2pResult<()>;
+
+    /// Check if an agent is an authority for a hash.
+    async fn authority_for_hash(
+        &mut self,
+        dht_hash: holo_hash::AnyDhtHash,
+    ) -> actor::HolochainP2pResult<bool>;
 }
 
 /// A wrapper around HolochainP2pSender that partially applies the dna_hash / agent_pub_key.
@@ -199,7 +211,7 @@ impl HolochainP2pCellT for HolochainP2pCell {
         &mut self,
         dht_hash: holo_hash::AnyDhtHash,
         options: actor::GetOptions,
-    ) -> actor::HolochainP2pResult<Vec<GetElementResponse>> {
+    ) -> actor::HolochainP2pResult<Vec<WireOps>> {
         self.sender
             .get(
                 (*self.dna_hash).clone(),
@@ -230,9 +242,9 @@ impl HolochainP2pCellT for HolochainP2pCell {
     /// Get links from the DHT.
     async fn get_links(
         &mut self,
-        link_key: WireLinkMetaKey,
+        link_key: WireLinkKey,
         options: actor::GetLinksOptions,
-    ) -> actor::HolochainP2pResult<Vec<GetLinksResponse>> {
+    ) -> actor::HolochainP2pResult<Vec<WireLinkOps>> {
         self.sender
             .get_links(
                 (*self.dna_hash).clone(),
@@ -249,7 +261,7 @@ impl HolochainP2pCellT for HolochainP2pCell {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse>> {
+    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<HeaderHash>>> {
         self.sender
             .get_agent_activity(
                 (*self.dna_hash).clone(),
@@ -275,6 +287,15 @@ impl HolochainP2pCellT for HolochainP2pCell {
                 receipt,
             )
             .await
+    }
+
+    /// Check if an agent is an authority for a hash.
+    async fn authority_for_hash(
+        &mut self,
+        _dht_hash: holo_hash::AnyDhtHash,
+    ) -> actor::HolochainP2pResult<bool> {
+        // Currently everyone is an authority
+        Ok(true)
     }
 }
 

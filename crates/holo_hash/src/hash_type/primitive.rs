@@ -69,6 +69,7 @@ macro_rules! primitive_hash_type {
     ($name: ident, $display: ident, $visitor: ident, $prefix: ident) => {
         /// The $name PrimitiveHashType
         #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+        #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
         pub struct $name;
 
         impl PrimitiveHashType for $name {
@@ -144,11 +145,15 @@ primitive_hash_type!(Header, HeaderHash, HeaderVisitor, HEADER_PREFIX);
 primitive_hash_type!(NetId, NetIdHash, NetIdVisitor, NET_ID_PREFIX);
 primitive_hash_type!(Wasm, WasmHash, WasmVisitor, WASM_PREFIX);
 
+// DhtOps are mostly hashes
 impl HashTypeSync for DhtOp {}
+// Entries are capped at 16MB, which is small enough to hash synchronously
 impl HashTypeSync for Entry {}
+// Headers are only a few hundred bytes at most
 impl HashTypeSync for Header {}
+// A DnaHash is a hash of the DnaDef, which excludes the wasm bytecode
+impl HashTypeSync for Dna {}
 
-impl HashTypeAsync for Dna {}
 impl HashTypeAsync for NetId {}
 impl HashTypeAsync for Wasm {}
 

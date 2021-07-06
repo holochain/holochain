@@ -4,19 +4,17 @@ use criterion::criterion_main;
 use criterion::BenchmarkId;
 use criterion::Criterion;
 use criterion::Throughput;
-use hdk3::prelude::*;
+use hdk::prelude::*;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holochain::core::ribosome::RibosomeT;
 use holochain::core::ribosome::ZomeCallInvocation;
-use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
 
 static TOKIO_RUNTIME: Lazy<Mutex<tokio::runtime::Runtime>> = Lazy::new(|| {
     Mutex::new(
-        tokio::runtime::Builder::new()
-            .threaded_scheduler()
+        tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
             .unwrap(),
@@ -69,27 +67,25 @@ pub fn wasm_call_n(c: &mut Criterion) {
         group.bench_function(BenchmarkId::from_parameter(n), |b| {
             // bytes
             let bytes = vec![0; n];
+            let _g = TOKIO_RUNTIME.lock().unwrap().enter();
+            let ha = HOST_ACCESS_FIXTURATOR.lock().unwrap().next().unwrap();
 
-            TOKIO_RUNTIME.lock().unwrap().enter(move || {
-                let ha = HOST_ACCESS_FIXTURATOR.lock().unwrap().next().unwrap();
-
-                b.iter(|| {
-                    let zome: Zome = TestWasm::Bench.into();
-                    let i = ZomeCallInvocation {
-                        cell_id: CELL_ID.lock().unwrap().clone(),
-                        zome: zome.clone(),
-                        cap: Some(CAP.lock().unwrap().clone()),
-                        fn_name: "echo_bytes".into(),
-                        payload: ExternIO::encode(&bytes).unwrap(),
-                        provenance: AGENT_KEY.lock().unwrap().clone(),
-                    };
-                    REAL_RIBOSOME
-                        .lock()
-                        .unwrap()
-                        .clone()
-                        .maybe_call(ha.clone().into(), &i, &zome, &i.fn_name)
-                        .unwrap();
-                });
+            b.iter(|| {
+                let zome: Zome = TestWasm::Bench.into();
+                let i = ZomeCallInvocation {
+                    cell_id: CELL_ID.lock().unwrap().clone(),
+                    zome: zome.clone(),
+                    cap: Some(CAP.lock().unwrap().clone()),
+                    fn_name: "echo_bytes".into(),
+                    payload: ExternIO::encode(&bytes).unwrap(),
+                    provenance: AGENT_KEY.lock().unwrap().clone(),
+                };
+                REAL_RIBOSOME
+                    .lock()
+                    .unwrap()
+                    .clone()
+                    .maybe_call(ha.clone().into(), &i, &zome, &i.fn_name)
+                    .unwrap();
             });
         });
     }

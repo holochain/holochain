@@ -1,11 +1,14 @@
 use holochain::conductor::config::ConductorConfig;
 use holochain::conductor::interactive;
+use holochain::conductor::manager::handle_shutdown;
 use holochain::conductor::paths::ConfigFilePath;
 use holochain::conductor::Conductor;
 use holochain::conductor::ConductorHandle;
 use holochain_conductor_api::conductor::ConductorConfigError;
+use holochain_util::tokio_helper;
 use observability::Output;
-use std::error::Error;
+#[cfg(unix)]
+use sd_notify::{notify, NotifyState};
 use std::path::PathBuf;
 use structopt::StructOpt;
 use tracing::*;
@@ -45,9 +48,8 @@ struct Opt {
 }
 
 fn main() {
-    holochain::conductor::tokio_runtime()
-        // the async_main function should only end if our program is done
-        .block_on(async_main())
+    // the async_main function should only end if our program is done
+    tokio_helper::block_forever_on(async_main())
 }
 
 async fn async_main() {
@@ -60,6 +62,8 @@ async fn async_main() {
     observability::init_fmt(opt.structured).expect("Failed to start contextual logging");
     debug!("observability initialized");
 
+    kitsune_p2p_types::metrics::init_sys_info_poll();
+
     let conductor =
         conductor_handle_from_config_path(opt.config_path.clone(), opt.interactive).await;
 
@@ -70,18 +74,21 @@ async fn async_main() {
     // interfaces are running, and can be connected to.
     println!("{}", MAGIC_CONDUCTOR_READY_STRING);
 
+    // Lets systemd units know that holochain is ready via sd_notify socket
+    // Requires NotifyAccess=all and Type=notify attributes on holochain systemd unit
+    // and NotifyAccess=all on dependant systemd unit
+    #[cfg(unix)]
+    let _ = notify(true, &[NotifyState::Ready]);
+
     // Await on the main JoinHandle, keeping the process alive until all
     // Conductor activity has ceased
-    conductor
+    let result = conductor
         .take_shutdown_handle()
         .await
         .expect("The shutdown handle has already been taken.")
-        .await
-        .map_err(|e| {
-            error!(error = &e as &dyn Error, "Failed to join the main task");
-            e
-        })
-        .expect("Error while joining threads during shutdown");
+        .await;
+
+    handle_shutdown(result);
 
     // TODO: on SIGINT/SIGKILL, kill the conductor:
     // conductor.kill().await
@@ -107,19 +114,19 @@ async fn conductor_handle_from_config_path(
         load_config(&config_path, config_path_default)
     };
 
-    // Check if LMDB env dir is present
+    // Check if database is present
     // In interactive mode give the user a chance to create it, otherwise create it automatically
     let env_path = PathBuf::from(config.environment_path.clone());
     if !env_path.is_dir() {
         let result = if interactive {
-            interactive::prompt_for_environment_dir(&env_path)
+            interactive::prompt_for_database_dir(&env_path)
         } else {
             std::fs::create_dir_all(&env_path)
         };
         match result {
-            Ok(()) => println!("Created LMDB environment at {}.", env_path.display()),
+            Ok(()) => println!("Created database at {}.", env_path.display()),
             Err(e) => {
-                println!("Couldn't create LMDB environment: {}", e);
+                println!("Couldn't create database: {}", e);
                 std::process::exit(ERROR_CODE);
             }
         }

@@ -1,0 +1,17 @@
+[package]
+name = "test_wasm_genesis_self_check_invalid"
+version = "0.0.1"
+authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
+edition = "2018"
+
+[lib]
+name = "test_wasm_genesis_self_check_invalid"
+crate-type = [ "cdylib", "rlib" ]
+
+[dependencies]
+serde = "1.0"
+hdk = { path = "../../../../hdk" }
+
+[features]
+default = []
+mock = ["hdk/mock"]

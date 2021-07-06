@@ -1,10 +1,11 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
+use holochain_cascade::Cascade;
 use holochain_p2p::actor::GetLinksOptions;
-use holochain_state::metadata::LinkMetaKey;
 use holochain_types::prelude::*;
-use std::sync::Arc;
 use holochain_wasmer_host::prelude::WasmError;
+use std::sync::Arc;
+use crate::core::ribosome::HostFnAccess;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_links<'a>(
@@ -12,34 +13,42 @@ pub fn get_links<'a>(
     call_context: Arc<CallContext>,
     input: GetLinksInput,
 ) -> Result<Links, WasmError> {
-    let GetLinksInput { base_address, tag_prefix } = input;
+    match HostFnAccess::from(&call_context.host_access()) {
+        HostFnAccess{ read_workspace: Permission::Allow, .. } => {
+            let GetLinksInput {
+                base_address,
+                tag_prefix,
+            } = input;
 
-    // Get zome id
-    let zome_id = ribosome.zome_to_id(&call_context.zome).expect("Failed to get ID for current zome.");
+            // Get zome id
+            let zome_id = ribosome
+                .zome_to_id(&call_context.zome)
+                .expect("Failed to get ID for current zome.");
 
-    // Get the network from the context
-    let network = call_context.host_access.network().clone();
+            // Get the network from the context
+            let network = call_context.host_access.network().clone();
 
-    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        // Create the key
-        let key = match tag_prefix.as_ref() {
-            Some(tag_prefix) => LinkMetaKey::BaseZomeTag(&base_address, zome_id, tag_prefix),
-            None => LinkMetaKey::BaseZome(&base_address, zome_id),
-        };
+            tokio_helper::block_forever_on(async move {
+                // Create the key
+                let key = WireLinkKey {
+                    base: base_address,
+                    zome_id,
+                    tag: tag_prefix,
+                };
+                let workspace = call_context.host_access.workspace();
+                let mut cascade = Cascade::from_workspace_network(workspace, network);
 
-        // Get the links from the dht
-        let links = call_context
-            .host_access
-            .workspace()
-            .write()
-            .await
-            .cascade(network)
-            .dht_get_links(&key, GetLinksOptions::default())
-            .await
-            .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
+                // Get the links from the dht
+                let links = cascade
+                    .dht_get_links(key, GetLinksOptions::default())
+                    .await
+                    .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
 
-        Ok(links.into())
-    })
+                Ok(links.into())
+            })
+        },
+        _ => unreachable!(),
+    }
 }
 
 #[cfg(test)]
@@ -48,30 +57,26 @@ pub mod slow_tests {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use crate::test_utils::conductor_setup::ConductorTestData;
     use crate::test_utils::new_zome_call;
-    use crate::test_utils::wait_for_integration_10s;
+    use crate::test_utils::wait_for_integration_1m;
     use crate::test_utils::WaitOps;
     use ::fixt::prelude::*;
-    use hdk3::prelude::*;
+    use hdk::prelude::*;
+    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_test_wasm_common::*;
     use holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_entry_hash_path_children() {
-        let test_env = holochain_lmdb::test_utils::test_cell_env();
+        observability::test_run().ok();
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
-
-        let mut workspace =
-            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
-
-        // commits fail validation if we don't do genesis
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
-            .await
-            .unwrap();
-
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let author = fake_agent_pubkey_1();
+        crate::test_utils::fake_genesis(env.clone()).await.unwrap();
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock;
+        host_access.workspace = workspace;
 
         // ensure foo.bar twice to ensure idempotency
         let _: () = crate::call_test_ribosome!(
@@ -131,22 +136,16 @@ pub mod slow_tests {
         assert_eq!(links[1].target, foo_baz,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn hash_path_anchor_get_anchor() {
-        let test_env = holochain_lmdb::test_utils::test_cell_env();
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
-
-        let mut workspace =
-            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
-
-        // commits fail validation if we don't do genesis
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
-            .await
-            .unwrap();
-
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let author = fake_agent_pubkey_1();
+        crate::test_utils::fake_genesis(env.clone()).await.unwrap();
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock;
+        host_access.workspace = workspace;
 
         // anchor foo bar
         let anchor_address_one: EntryHash = crate::call_test_ribosome!(
@@ -159,8 +158,8 @@ pub mod slow_tests {
         assert_eq!(
             anchor_address_one.get_raw_32().to_vec(),
             vec![
-                138, 240, 209, 89, 206, 160, 42, 131, 107, 63, 111, 243, 67, 8, 24, 48, 151, 62,
-                108, 99, 102, 109, 57, 253, 219, 26, 255, 164, 83, 134, 245, 254
+                25, 68, 104, 205, 38, 19, 71, 158, 115, 188, 249, 175, 248, 71, 83, 86, 126, 131,
+                246, 20, 10, 222, 185, 123, 219, 175, 209, 66, 12, 140, 83, 215
             ],
         );
 
@@ -175,8 +174,8 @@ pub mod slow_tests {
         assert_eq!(
             anchor_address_two.get_raw_32().to_vec(),
             vec![
-                175, 176, 111, 101, 56, 12, 198, 140, 48, 157, 209, 87, 118, 124, 157, 94, 234,
-                232, 82, 136, 228, 219, 237, 221, 195, 225, 98, 177, 76, 26, 126, 6
+                130, 158, 169, 16, 161, 104, 109, 116, 108, 147, 130, 214, 150, 32, 57, 52, 27, 39,
+                35, 209, 47, 120, 63, 220, 122, 13, 21, 204, 51, 209, 241, 31
             ],
         );
 
@@ -209,8 +208,8 @@ pub mod slow_tests {
                 .get_raw_32()
                 .to_vec(),
             vec![
-                14, 28, 21, 33, 162, 54, 200, 39, 170, 131, 53, 252, 229, 108, 231, 41, 38, 79, 4,
-                232, 36, 95, 237, 120, 101, 249, 248, 91, 140, 51, 61, 124
+                36, 198, 140, 31, 125, 166, 8, 15, 167, 149, 247, 118, 206, 134, 173, 221, 96, 215,
+                1, 227, 209, 230, 139, 169, 117, 216, 143, 92, 107, 122, 183, 189
             ],
         );
 
@@ -247,7 +246,7 @@ pub mod slow_tests {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn dup_path_test() {
         observability::test_run().ok();
         let zomes = vec![TestWasm::Link];
@@ -278,7 +277,7 @@ pub mod slow_tests {
         // Plus one length path for the commit existing.
         expected_count += WaitOps::ENTRY + WaitOps::LINK;
 
-        wait_for_integration_10s(&alice_call_data.env, expected_count).await;
+        wait_for_integration_1m(&alice_call_data.env, expected_count).await;
 
         let invocation = new_zome_call(
             &alice_call_data.cell_id,
@@ -289,7 +288,7 @@ pub mod slow_tests {
         .unwrap();
 
         let result = handle.call_zome(invocation).await.unwrap().unwrap();
-        let links: hdk3::prelude::Links = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
+        let links: hdk::prelude::Links = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
             .decode()
             .unwrap();
         assert_eq!(links.into_inner().len(), 1);

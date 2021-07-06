@@ -1,18 +1,18 @@
 //! Fixturator definitions for kitsune_p2p.
 
-use crate::agent_store::AgentInfo;
 use crate::agent_store::AgentInfoSigned;
-use crate::agent_store::Urls;
+use crate::agent_store::UrlList;
 use crate::dependencies::url2;
 use crate::KitsuneAgent;
 use crate::KitsuneBinType;
 use crate::KitsuneSignature;
 use crate::KitsuneSpace;
 use ::fixt::prelude::*;
+use std::sync::Arc;
 use url2::url2;
 
 fixturator!(
-    Urls;
+    UrlList;
     curve Empty vec![];
     curve Unpredictable {
         let mut rng = ::fixt::rng();
@@ -20,7 +20,7 @@ fixturator!(
         let mut ret = vec![];
 
         for _ in 0..vec_len {
-            ret.push(url2!("https://example.com/{}", fixt!(String)));
+            ret.push(url2!("https://example.com/{}", fixt!(String)).into());
         }
         ret
     };
@@ -30,7 +30,7 @@ fixturator!(
         let mut ret = vec![];
 
         for _ in 0..vec_len {
-            ret.push(url2!("https://example.com/{}", fixt!(String, Predictable)));
+            ret.push(url2!("https://example.com/{}", fixt!(String, Predictable)).into());
         }
         ret
     };
@@ -48,41 +48,63 @@ fixturator!(
 
 fixturator!(
     KitsuneSignature;
-    from SixtyFourBytes;
+    from SixtyFourBytesVec;
 );
 
-fixturator!(
-    AgentInfo;
-    constructor fn new(KitsuneSpace, KitsuneAgent, Urls, U64, U64);
-);
+/// make fixturators sync for now
+fn block_on<F>(f: F) -> F::Output
+where
+    F: 'static + std::future::Future + Send,
+    F::Output: 'static + Send,
+{
+    tokio::task::block_in_place(move || tokio::runtime::Handle::current().block_on(f))
+}
 
 fixturator!(
     AgentInfoSigned;
     curve Empty {
-        let mut data = Vec::new();
-        kitsune_p2p_types::codec::rmp_encode(&mut data, &fixt!(AgentInfo, Empty)).unwrap();
-        AgentInfoSigned::try_new(
-            fixt!(KitsuneAgent, Empty),
-            fixt!(KitsuneSignature, Empty),
-            data,
-        ).unwrap()
+        block_on(async move {
+            AgentInfoSigned::sign(
+                Arc::new(fixt!(KitsuneSpace, Empty)),
+                Arc::new(fixt!(KitsuneAgent, Empty)),
+                u32::MAX / 4,
+                fixt!(UrlList, Empty),
+                0,
+                0,
+                |_| async move {
+                    Ok(Arc::new(fixt!(KitsuneSignature, Empty)))
+                },
+            ).await.unwrap()
+        })
     };
     curve Unpredictable {
-        let mut data = Vec::new();
-        kitsune_p2p_types::codec::rmp_encode(&mut data, &fixt!(AgentInfo)).unwrap();
-        AgentInfoSigned::try_new(
-            fixt!(KitsuneAgent),
-            fixt!(KitsuneSignature),
-            data,
-        ).unwrap()
+        block_on(async move {
+            AgentInfoSigned::sign(
+                Arc::new(fixt!(KitsuneSpace, Unpredictable)),
+                Arc::new(fixt!(KitsuneAgent, Unpredictable)),
+                u32::MAX / 4,
+                fixt!(UrlList, Empty),
+                0,
+                0,
+                |_| async move {
+                    Ok(Arc::new(fixt!(KitsuneSignature, Unpredictable)))
+                },
+            ).await.unwrap()
+        })
     };
     curve Predictable {
-        let mut data = Vec::new();
-        kitsune_p2p_types::codec::rmp_encode(&mut data, &fixt!(AgentInfo, Predictable)).unwrap();
-        AgentInfoSigned::try_new(
-            fixt!(KitsuneAgent, Predictable),
-            fixt!(KitsuneSignature, Predictable),
-            data,
-        ).unwrap()
+        block_on(async move {
+            AgentInfoSigned::sign(
+                Arc::new(fixt!(KitsuneSpace, Predictable)),
+                Arc::new(fixt!(KitsuneAgent, Predictable)),
+                u32::MAX / 4,
+                fixt!(UrlList, Empty),
+                0,
+                0,
+                |_| async move {
+                    Ok(Arc::new(fixt!(KitsuneSignature, Predictable)))
+                },
+            ).await.unwrap()
+        })
     };
 );

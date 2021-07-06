@@ -50,6 +50,12 @@ impl From<TransportError> for () {
     fn from(_: TransportError) {}
 }
 
+impl From<crate::KitsuneError> for TransportError {
+    fn from(k: crate::KitsuneError) -> Self {
+        TransportError::other(k)
+    }
+}
+
 /// Result type for remote communication.
 pub type TransportResult<T> = Result<T, TransportError>;
 
@@ -96,19 +102,19 @@ pub type TransportChannelWrite =
 /// Extension trait for channel writers
 pub trait TransportChannelWriteExt {
     /// Write all data and close channel
-    fn write_and_close<'a>(
-        &'a mut self,
+    fn write_and_close(
+        &mut self,
         data: Vec<u8>,
-    ) -> ghost_actor::dependencies::must_future::MustBoxFuture<'a, TransportResult<()>>;
+    ) -> ghost_actor::dependencies::must_future::MustBoxFuture<TransportResult<()>>;
 }
 
 impl<T: futures::sink::Sink<Vec<u8>, Error = TransportError> + Send + Unpin + 'static>
     TransportChannelWriteExt for T
 {
-    fn write_and_close<'a>(
-        &'a mut self,
+    fn write_and_close(
+        &mut self,
         data: Vec<u8>,
-    ) -> ghost_actor::dependencies::must_future::MustBoxFuture<'a, TransportResult<()>> {
+    ) -> ghost_actor::dependencies::must_future::MustBoxFuture<TransportResult<()>> {
         KitsuneTransportMetrics::count_filter(
             KitsuneTransportMetrics::Write,
             data.len(),

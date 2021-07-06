@@ -2,11 +2,11 @@ use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holo_hash::AnyDhtHash;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
+use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
 use std::sync::Arc;
 
@@ -75,7 +75,7 @@ impl From<ValidateDeleteLinkInvocation> for ValidateDeleteLinkData {
 }
 #[derive(Clone, Constructor)]
 pub struct ValidateLinkHostAccess {
-    pub workspace: CallZomeWorkspaceLock,
+    pub workspace: HostFnWorkspace,
     pub network: HolochainP2pCell,
 }
 
@@ -177,14 +177,14 @@ mod test {
     use crate::core::ribosome::ZomesToInvoke;
     use crate::fixt::*;
     use ::fixt::prelude::*;
-    use holochain_types::dna::zome::HostFnAccess;
-    use holochain_types::dna::zome::Permission;
+    use holochain_types::access::Permission;
+    use holochain_types::prelude::*;
     use holochain_zome_types::validate_link::ValidateCreateLinkData;
     use holochain_zome_types::validate_link::ValidateLinkCallbackResult;
     use holochain_zome_types::ExternIO;
     use rand::seq::SliceRandom;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validate_link_add_callback_result_fold() {
         let mut rng = ::fixt::rng();
 
@@ -217,7 +217,7 @@ mod test {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validate_link_add_invocation_allow_side_effects() {
         let validate_link_add_host_access =
             ValidateLinkHostAccessFixturator::new(::fixt::Unpredictable)
@@ -229,7 +229,7 @@ mod test {
         assert_eq!(HostFnAccess::from(&validate_link_add_host_access), access,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validate_link_add_invocation_zomes() {
         let validate_create_link_invocation =
             ValidateCreateLinkInvocationFixturator::new(::fixt::Unpredictable)
@@ -242,7 +242,7 @@ mod test {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validate_link_add_invocation_fn_components() {
         let validate_create_link_invocation =
             ValidateCreateLinkInvocationFixturator::new(::fixt::Unpredictable)
@@ -255,7 +255,7 @@ mod test {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validate_link_add_invocation_host_input() {
         let validate_create_link_invocation =
             ValidateCreateLinkInvocationFixturator::new(::fixt::Unpredictable)
@@ -282,16 +282,17 @@ mod test {
 mod slow_tests {
     use super::ValidateLinkResult;
     use crate::core::ribosome::RibosomeT;
-    use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
     use crate::fixt::curve::Zomes;
     use crate::fixt::*;
     use ::fixt::prelude::*;
     use holo_hash::HeaderHash;
+    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_state::source_chain::SourceChainResult;
-    use holochain_types::dna::zome::Zome;
+    use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::fake_agent_pubkey_1;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_link_add_unimplemented() {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
@@ -307,7 +308,7 @@ mod slow_tests {
         assert_eq!(result, ValidateLinkResult::Valid,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_implemented_valid() {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateCreateLinkValid]))
             .next()
@@ -324,7 +325,7 @@ mod slow_tests {
         assert_eq!(result, ValidateLinkResult::Valid,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_link_add_implemented_invalid() {
         let ribosome =
             RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateCreateLinkInvalid]))
@@ -348,71 +349,59 @@ mod slow_tests {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn pass_validate_link_add_test<'a>() {
         // test workspace boilerplate
-        let test_env = holochain_lmdb::test_utils::test_cell_env();
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 
+        let author = fake_agent_pubkey_1();
         // commits fail validation if we don't do genesis
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+        crate::test_utils::fake_genesis(env.clone()).await.unwrap();
+
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author)
             .await
             .unwrap();
-
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock.clone();
+        host_access.workspace = workspace.clone();
 
         let output: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::ValidateLink, "add_valid_link", ());
 
         // the chain head should be the committed entry header
-        let chain_head = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            SourceChainResult::Ok(
-                workspace_lock
-                    .read()
-                    .await
-                    .source_chain
-                    .chain_head()?
-                    .to_owned(),
-            )
+        let chain_head = tokio_helper::block_forever_on(async move {
+            SourceChainResult::Ok(workspace.source_chain().chain_head()?.0)
         })
         .unwrap();
 
         assert_eq!(chain_head, output,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn fail_validate_link_add_test<'a>() {
         // test workspace boilerplate
-        let test_env = holochain_lmdb::test_utils::test_cell_env();
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 
+        let author = fake_agent_pubkey_1();
         // commits fail validation if we don't do genesis
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+        crate::test_utils::fake_genesis(env.clone()).await.unwrap();
+
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author)
             .await
             .unwrap();
 
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
-
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock.clone();
+        host_access.workspace = workspace.clone();
 
         let output: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::ValidateLink, "add_invalid_link", ());
 
         // the chain head should be the committed entry header
-        let chain_head = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            SourceChainResult::Ok(
-                workspace_lock
-                    .read()
-                    .await
-                    .source_chain
-                    .chain_head()?
-                    .to_owned(),
-            )
+        let chain_head = tokio_helper::block_forever_on(async move {
+            SourceChainResult::Ok(workspace.source_chain().chain_head()?.0)
         })
         .unwrap();
 

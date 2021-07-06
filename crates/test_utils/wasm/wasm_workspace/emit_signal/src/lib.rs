@@ -1,4 +1,4 @@
-use hdk3::prelude::*;
+use hdk::prelude::*;
 
 #[hdk_extern]
 fn emit(_: ()) -> ExternResult<()> {
@@ -13,12 +13,12 @@ fn signal_others(signal: RemoteSignal) -> ExternResult<()> {
 
 #[hdk_extern]
 fn recv_remote_signal(signal: ExternIO) -> ExternResult<()> {
-    host_call::<AppSignal, ()>(__emit_signal, AppSignal::new(signal))
+    HDK.with(|h| h.borrow().emit_signal(AppSignal::new(signal)))
 }
 
 #[hdk_extern]
 fn init(_: ()) -> ExternResult<InitCallbackResult> {
-    let mut functions: GrantedFunctions = HashSet::new();
+    let mut functions: GrantedFunctions = BTreeSet::new();
     functions.insert((zome_info()?.zome_name, "recv_remote_signal".into()));
     create_cap_grant(CapGrantEntry {
         tag: "".into(),

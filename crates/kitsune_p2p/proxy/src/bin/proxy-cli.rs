@@ -1,6 +1,7 @@
 use futures::stream::StreamExt;
 use kitsune_p2p_proxy::*;
 use kitsune_p2p_transport_quic::*;
+use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::dependencies::ghost_actor;
 use kitsune_p2p_types::metrics::metric_task;
 use kitsune_p2p_types::transport::*;
@@ -34,6 +35,8 @@ async fn main() {
 async fn inner() -> TransportResult<()> {
     let opt = Opt::from_args();
 
+    let tuning_params = KitsuneP2pTuningParams::default();
+
     let (listener, events) = spawn_transport_listener_quic(ConfigListenerQuic::default()).await?;
 
     let proxy_config = ProxyConfig::local_proxy_server(
@@ -42,7 +45,7 @@ async fn inner() -> TransportResult<()> {
     );
 
     let (listener, mut events) =
-        spawn_kitsune_proxy_listener(proxy_config, listener, events).await?;
+        spawn_kitsune_proxy_listener(proxy_config, tuning_params, listener, events).await?;
 
     metric_task(async move {
         while let Some(evt) = events.next().await {
@@ -73,7 +76,7 @@ async fn inner() -> TransportResult<()> {
         match &opt.time_interval_ms {
             None => break,
             Some(ms) => {
-                tokio::time::delay_for(std::time::Duration::from_millis(*ms)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(*ms)).await;
             }
         }
     }

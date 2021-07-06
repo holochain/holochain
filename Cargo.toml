@@ -1,36 +1,48 @@
 [workspace]
 members = [
-  "crates/dna_util",
   "crates/fixt",
   "crates/fixt/test",
-  "crates/hdk3",
-  "crates/hdk3_derive",
+  "crates/hdk",
+  "crates/hdk_derive",
   "crates/holo_hash",
+  "crates/mr_bundle",
 
   "crates/hc",
+  "crates/hc_bundle",
+  "crates/hc_sandbox",
 
   "crates/holochain",
   "crates/holochain_cascade",
   "crates/holochain_conductor_api",
-  "crates/holochain_lmdb",
   "crates/holochain_p2p",
   "crates/holochain_keystore",
+  "crates/holochain_sqlite",
   "crates/holochain_state",
+  "crates/holochain_sqlite",
   "crates/holochain_types",
   "crates/holochain_websocket",
+  "crates/holochain_util",
   "crates/holochain_zome_types",
 
+  "crates/kitsune_p2p/dht_arc",
+  "crates/kitsune_p2p/bootstrap",
+  "crates/kitsune_p2p/direct",
+  "crates/kitsune_p2p/direct_api",
+  "crates/kitsune_p2p/direct_test",
   "crates/kitsune_p2p/kitsune_p2p",
+  "crates/kitsune_p2p/mdns",
+  "crates/kitsune_p2p/proxy",
   "crates/kitsune_p2p/transport_quic",
   "crates/kitsune_p2p/types",
-  "crates/kitsune_p2p/proxy",
 
   "crates/test_utils/wasm",
   "crates/test_utils/wasm_common",
+  "crates/release-automation",
 ]
 
 exclude = [
-
+  "crates/diagnostics",
+  "crates/release-automation",
 ]
 
 # These are the default params for RELEASE target
@@ -44,23 +56,15 @@ incremental = false
 codegen-units = 16
 
 [patch.crates-io]
-
-rkv = { git = "https://github.com/holochain/rkv.git", branch = "master" }
-lmdb-rkv = { git = "https://github.com/holochain/lmdb-rs.git" }
-#lmdb-rkv = { path = "../../rust/lmdb-rs" }
-# observability = { path = "../../rust/observability" }
+# holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "wasmer-patch" }
+# holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "wasmer-patch" }
+# holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "bump-serde" }
+# holochain_serialized_bytes_derive = { git = "https://github.com/holochain/holochain-serialization.git", branch = "bump-serde" }
 # observability = { git = "https://github.com/freesig/observability.git", branch = "main" }
-# holochain_wasmer_guest = { path = "../holochain-wasmer/crates/guest" }
-# holochain_wasmer_host = { path = "../holochain-wasmer/crates/host" }
-# holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "2021-02-05-error" }
-# holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "2021-02-05-error" }
-# holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "remote_signal" }
 # ghost_actor = { path = "../ghost_actor/crates/ghost_actor" }
 # ghost_actor = { git = "https://github.com/holochain/ghost_actor.git", branch = "add_observability" }
-# lair_keystore_api = { git = "https://github.com/holochain/lair.git", branch = "bump_ga" }
-# lair_keystore_client = { git = "https://github.com/holochain/lair.git", branch = "bump_ga" }
+# lair_keystore_api = { git = "https://github.com/holochain/lair.git", branch = "pr/tokio-1" }
+# lair_keystore_client = { git = "https://github.com/holochain/lair.git", branch = "pr/tokio-1" }
 # lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }
 # lair_keystore_client = { path = "../lair/crates/lair_keystore_client" }
 # observability = { path = "../../rust/observability" }
-# holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "try_from_ref" }
-tokio_safe_block_on = { git = "https://github.com/neonphog/tokio_safe_block_on.git", branch = "fix_holochain_bug" }

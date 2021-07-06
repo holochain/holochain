@@ -1,6 +1,7 @@
 use futures::stream::StreamExt;
 use ghost_actor::dependencies::tracing;
 use kitsune_p2p_proxy::*;
+use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::dependencies::ghost_actor;
 use kitsune_p2p_types::transport::*;
 use std::sync::Arc;
@@ -13,7 +14,7 @@ fn init_tracing() {
     );
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_proxy_integration() {
     if let Err(e) = test_inner().await {
         panic!("{:?}", e);
@@ -27,7 +28,9 @@ async fn connect(
     let addr = bind.bound_url().await?;
     tracing::warn!("got bind: {}", addr);
 
-    let (bind, mut evt) = spawn_kitsune_proxy_listener(proxy_config, bind, evt).await?;
+    let (bind, mut evt) =
+        spawn_kitsune_proxy_listener(proxy_config, KitsuneP2pTuningParams::default(), bind, evt)
+            .await?;
     let addr = bind.bound_url().await?;
     tracing::warn!("got proxy: {}", addr);
 

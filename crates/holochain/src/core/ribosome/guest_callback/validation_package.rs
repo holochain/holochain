@@ -2,11 +2,11 @@ use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holo_hash::AnyDhtHash;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
+use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
 
 #[derive(Clone)]
@@ -26,7 +26,7 @@ impl ValidationPackageInvocation {
 
 #[derive(Clone, Constructor)]
 pub struct ValidationPackageHostAccess {
-    pub workspace: CallZomeWorkspaceLock,
+    pub workspace: HostFnWorkspace,
     pub network: HolochainP2pCell,
 }
 
@@ -122,13 +122,13 @@ mod test {
     use crate::core::ribosome::ZomesToInvoke;
     use crate::fixt::ValidationPackageHostAccessFixturator;
     use crate::fixt::ValidationPackageInvocationFixturator;
-    use holochain_types::dna::zome::HostFnAccess;
+    use holochain_types::prelude::*;
     use holochain_zome_types::validate::ValidationPackage;
     use holochain_zome_types::validate::ValidationPackageCallbackResult;
     use holochain_zome_types::ExternIO;
     use rand::prelude::*;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validate_package_callback_result_fold() {
         let mut rng = ::fixt::rng();
 
@@ -168,9 +168,9 @@ mod test {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validation_package_invocation_allow_side_effects() {
-        use holochain_types::dna::zome::Permission::*;
+        use holochain_types::access::Permission::*;
         let validation_package_host_access =
             ValidationPackageHostAccessFixturator::new(::fixt::Unpredictable)
                 .next()
@@ -189,7 +189,7 @@ mod test {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validation_package_invocation_zomes() {
         let validation_package_invocation =
             ValidationPackageInvocationFixturator::new(::fixt::Unpredictable)
@@ -202,7 +202,7 @@ mod test {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validation_package_invocation_fn_components() {
         let validation_package_invocation =
             ValidationPackageInvocationFixturator::new(::fixt::Unpredictable)
@@ -221,7 +221,7 @@ mod test {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validation_package_invocation_host_input() {
         let validation_package_invocation =
             ValidationPackageInvocationFixturator::new(::fixt::Unpredictable)
@@ -246,12 +246,12 @@ mod slow_tests {
     use crate::fixt::RealRibosomeFixturator;
     use crate::fixt::ValidationPackageHostAccessFixturator;
     use crate::fixt::ValidationPackageInvocationFixturator;
-    use hdk3::prelude::AppEntryType;
-    use hdk3::prelude::EntryVisibility;
+    use hdk::prelude::AppEntryType;
+    use hdk::prelude::EntryVisibility;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::validate::ValidationPackage;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_validation_package_unimplemented() {
         let host_access = ValidationPackageHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
@@ -271,7 +271,7 @@ mod slow_tests {
         assert_eq!(result, ValidationPackageResult::NotImplemented,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_validation_package_implemented_success() {
         let host_access = ValidationPackageHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
@@ -296,7 +296,7 @@ mod slow_tests {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_validation_package_implemented_fail() {
         let host_access = ValidationPackageHostAccessFixturator::new(::fixt::Unpredictable)
             .next()

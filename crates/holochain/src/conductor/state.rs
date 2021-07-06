@@ -1,8 +1,8 @@
 //! Structs which allow the Conductor's state to be persisted across
 //! startups and shutdowns
 
-use holochain_conductor_api::config::InterfaceDriver;
 use holochain_conductor_api::signal_subscription::SignalSubscription;
+use holochain_conductor_api::{config::InterfaceDriver, InstalledAppInfo};
 use holochain_types::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
@@ -13,51 +13,63 @@ use std::collections::HashMap;
 /// References between structs (cell configs pointing to
 /// the agent and DNA to be instantiated) are implemented
 /// via string IDs.
-#[derive(Clone, Deserialize, Serialize, Default, Debug)]
+#[derive(Clone, Deserialize, Serialize, Default, Debug, SerializedBytes)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct ConductorState {
     /// Apps that are ready to be activated
     #[serde(default)]
-    pub inactive_apps: HashMap<InstalledAppId, Vec<InstalledCell>>,
+    pub inactive_apps: DeactivatedAppMap,
     /// Apps that are active and will be loaded
     #[serde(default)]
-    pub active_apps: HashMap<InstalledAppId, Vec<InstalledCell>>,
+    pub active_apps: InstalledAppMap,
     /// List of interfaces any UI can use to access zome functions.
     #[serde(default)]
     pub app_interfaces: HashMap<AppInterfaceId, AppInterfaceConfig>,
 }
 
 /// A unique identifier used to refer to an App Interface internally.
-#[derive(
-    Clone,
-    Deserialize,
-    Serialize,
-    Default,
-    Debug,
-    Hash,
-    PartialEq,
-    Eq,
-    derive_more::From,
-    derive_more::Display,
-)]
-pub struct AppInterfaceId(String);
+#[derive(Clone, Deserialize, Serialize, Debug, Hash, PartialEq, Eq)]
+pub struct AppInterfaceId {
+    /// The port used to create this interface
+    port: u16,
+    /// If the port is 0 then it will be assigned by the OS
+    /// so we need a unique identifier for that case.
+    id: Option<String>,
+}
 
-impl From<&str> for AppInterfaceId {
-    fn from(s: &str) -> Self {
-        Self(s.into())
+impl Default for AppInterfaceId {
+    fn default() -> Self {
+        Self::new(0)
+    }
+}
+
+impl AppInterfaceId {
+    /// Create an id from the port
+    pub fn new(port: u16) -> Self {
+        let id = if port == 0 {
+            Some(nanoid::nanoid!())
+        } else {
+            None
+        };
+        Self { port, id }
+    }
+    /// Get the port intended for this interface
+    pub fn port(&self) -> u16 {
+        self.port
     }
 }
 
 impl ConductorState {
     /// Retrieve info about an installed App by its InstalledAppId
     #[allow(clippy::ptr_arg)]
-    pub fn get_app_info(&self, installed_app_id: &InstalledAppId) -> Option<InstalledApp> {
+    pub fn get_app_info(&self, installed_app_id: &InstalledAppId) -> Option<InstalledAppInfo> {
         self.active_apps
             .get(installed_app_id)
-            .or_else(|| self.inactive_apps.get(installed_app_id))
-            .map(|cell_data| InstalledApp {
-                installed_app_id: installed_app_id.clone(),
-                cell_data: cell_data.clone(),
+            .map(|app| InstalledAppInfo::from_installed_app(&app.clone().into()))
+            .or_else(|| {
+                self.inactive_apps
+                    .get(installed_app_id)
+                    .map(|app| InstalledAppInfo::from_installed_app(&app.clone().into()))
             })
     }
 

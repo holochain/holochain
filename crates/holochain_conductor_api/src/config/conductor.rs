@@ -28,7 +28,7 @@ use std::path::PathBuf;
 /// All the config information for the conductor
 #[derive(Clone, Deserialize, Serialize, Default, Debug, PartialEq)]
 pub struct ConductorConfig {
-    /// The path to the LMDB environment for this conductor.
+    /// The path to the database for this conductor.
     /// If omitted, chooses a default path.
     pub environment_path: EnvironmentRootPath,
 
@@ -37,24 +37,6 @@ pub struct ConductorConfig {
     /// DO NOT USE THIS IN PRODUCTION!
     #[serde(default)]
     pub use_dangerous_test_keystore: bool,
-
-    /// Optional URI for a websocket connection to an outsourced signing service.
-    /// Bootstrapping step for Holo closed-alpha.
-    /// If set, all agents with holo_remote_key = true will be emulated by asking for signatures
-    /// over this websocket.
-    pub signing_service_uri: Option<String>,
-
-    /// Optional URI for a websocket connection to an outsourced encryption service.
-    /// Bootstrapping step for Holo closed-alpha.
-    /// If set, all agents with holo_remote_key = true will be emulated by asking for signatures
-    /// over this websocket.
-    pub encryption_service_uri: Option<String>,
-
-    /// Optional URI for a websocket connection to an outsourced decryption service.
-    /// Bootstrapping step for Holo closed-alpha.
-    /// If set, all agents with holo_remote_key = true will be emulated by asking for signatures
-    /// over this websocket.
-    pub decryption_service_uri: Option<String>,
 
     /// Optional DPKI configuration if conductor is using a DPKI app to initalize and manage
     /// keys for new instances
@@ -142,9 +124,6 @@ pub mod tests {
             ConductorConfig {
                 environment_path: PathBuf::from("/path/to/env").into(),
                 network: None,
-                signing_service_uri: None,
-                encryption_service_uri: None,
-                decryption_service_uri: None,
                 dpki: None,
                 passphrase_service: Some(PassphraseServiceConfig::Cmd),
                 keystore_path: None,
@@ -178,7 +157,7 @@ pub mod tests {
           port: 1234
 
     network:
-      bootstrap_service: https://bootstrap.holo.host
+      bootstrap_service: https://bootstrap-staging.holo.host
       transport_pool:
         - type: proxy
           sub_transport:
@@ -195,12 +174,15 @@ pub mod tests {
         default_rpc_multi_remote_agent_count: 42
         default_rpc_multi_timeout_ms: 42
         agent_info_expires_after_ms: 42
-
+        tls_in_mem_session_storage: 42
+        proxy_keepalive_ms: 42
+        proxy_to_expire_ms: 42
+      network_type: quic_bootstrap
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
         use holochain_p2p::kitsune_p2p::*;
         let mut network_config = KitsuneP2pConfig::default();
-        network_config.bootstrap_service = Some(url2::url2!("https://bootstrap.holo.host"));
+        network_config.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host"));
         network_config.transport_pool.push(TransportConfig::Proxy {
             sub_transport: Box::new(TransportConfig::Quic {
                 bind_to: Some(url2::url2!("kitsune-quic://0.0.0.0:0")),
@@ -211,24 +193,24 @@ pub mod tests {
                 proxy_accept_config: Some(ProxyAcceptConfig::RejectAll),
             },
         });
-        {
-            let mut tuning_params = &mut network_config.tuning_params;
-            tuning_params.gossip_loop_iteration_delay_ms = 42;
-            tuning_params.default_notify_remote_agent_count = 42;
-            tuning_params.default_notify_timeout_ms = 42;
-            tuning_params.default_rpc_single_timeout_ms = 42;
-            tuning_params.default_rpc_multi_remote_agent_count = 42;
-            tuning_params.default_rpc_multi_timeout_ms = 42;
-            tuning_params.agent_info_expires_after_ms = 42;
-        }
+        let mut tuning_params =
+            kitsune_p2p::dependencies::kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+        tuning_params.gossip_loop_iteration_delay_ms = 42;
+        tuning_params.default_notify_remote_agent_count = 42;
+        tuning_params.default_notify_timeout_ms = 42;
+        tuning_params.default_rpc_single_timeout_ms = 42;
+        tuning_params.default_rpc_multi_remote_agent_count = 42;
+        tuning_params.default_rpc_multi_timeout_ms = 42;
+        tuning_params.agent_info_expires_after_ms = 42;
+        tuning_params.tls_in_mem_session_storage = 42;
+        tuning_params.proxy_keepalive_ms = 42;
+        tuning_params.proxy_to_expire_ms = 42;
+        network_config.tuning_params = std::sync::Arc::new(tuning_params);
         assert_eq!(
             result.unwrap(),
             ConductorConfig {
                 environment_path: PathBuf::from("/path/to/env").into(),
                 use_dangerous_test_keystore: true,
-                signing_service_uri: Some("ws://localhost:9001".into()),
-                encryption_service_uri: Some("ws://localhost:9002".into()),
-                decryption_service_uri: Some("ws://localhost:9003".into()),
                 dpki: Some(DpkiConfig {
                     instance_id: "some_id".into(),
                     init_params: "some_params".into()
@@ -260,9 +242,6 @@ pub mod tests {
             ConductorConfig {
                 environment_path: PathBuf::from("/path/to/env").into(),
                 network: None,
-                signing_service_uri: None,
-                encryption_service_uri: None,
-                decryption_service_uri: None,
                 dpki: None,
                 passphrase_service: Some(PassphraseServiceConfig::FromConfig {
                     passphrase: "foobar".into()

@@ -1,10 +1,10 @@
 #![cfg(feature = "test_utils")]
 
-use hdk3::prelude::Links;
+use hdk::prelude::Links;
+use holochain::sweettest::SweetAgents;
+use holochain::sweettest::SweetConductor;
+use holochain::sweettest::SweetDnaFile;
 use holochain::test_utils::consistency_10s;
-use holochain::test_utils::sweetest::SweetAgents;
-use holochain::test_utils::sweetest::SweetConductor;
-use holochain::test_utils::sweetest::SweetDnaFile;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
@@ -29,7 +29,7 @@ fn links_zome() -> InlineZome {
 
 /// A single link with an AgentPubKey for the base and target is committed by
 /// one agent, and after a delay, all agents can get the link
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn many_agents_can_reach_consistency_agent_links() {
     observability::test_run().ok();
@@ -45,7 +45,8 @@ async fn many_agents_can_reach_consistency_agent_links() {
     let agents = SweetAgents::get(conductor.keystore(), NUM_AGENTS).await;
     let apps = conductor
         .setup_app_for_agents("app", &agents, &[dna_file])
-        .await;
+        .await
+        .unwrap();
     let cells = apps.cells_flattened();
     let alice = cells[0].zome("links");
 
@@ -80,7 +81,7 @@ async fn many_agents_can_reach_consistency_agent_links() {
 
 /// A single link with a Path for the base and target is committed by one
 /// agent, and after a delay, all agents can get the link
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn many_agents_can_reach_consistency_normal_links() {
     observability::test_run().ok();
@@ -96,7 +97,8 @@ async fn many_agents_can_reach_consistency_normal_links() {
     let agents = SweetAgents::get(conductor.keystore(), NUM_AGENTS).await;
     let apps = conductor
         .setup_app_for_agents("app", &agents, &[dna_file])
-        .await;
+        .await
+        .unwrap();
     let cells = apps.cells_flattened();
     let alice = cells[0].zome(TestWasm::Link);
 
@@ -116,7 +118,7 @@ async fn many_agents_can_reach_consistency_normal_links() {
     assert_eq!(num_seen, NUM_AGENTS);
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
 #[ignore = "Slow test for CI that is only useful for timing"]
 async fn stuck_conductor_wasm_calls() -> anyhow::Result<()> {
@@ -131,6 +133,7 @@ async fn stuck_conductor_wasm_calls() -> anyhow::Result<()> {
     let alice = conductor
         .setup_app("app", &[dna_file])
         .await
+        .unwrap()
         .into_cells()
         .into_iter()
         .next()

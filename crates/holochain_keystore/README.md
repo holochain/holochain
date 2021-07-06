@@ -20,7 +20,7 @@ use holo_hash::AgentPubKey;
 use crate::*;
 use holochain_serialized_bytes::prelude::*;
 
-#[tokio::main(threaded_scheduler)]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() {
     tokio::task::spawn(async move {
         let _ = holochain_crypto::crypto_init_sodium();
@@ -48,7 +48,7 @@ Holochain is an open source project.  We welcome all sorts of participation and 
 ## License
  [![License: CAL 1.0](https://img.shields.io/badge/License-CAL-1.0-blue.svg)](https://github.com/holochain/cryptographic-autonomy-license)
 
-Copyright (C) 2019 - 2020, Holochain Foundation
+Copyright (C) 2019 - 2021, Holochain Foundation
 
 This program is free software: you can redistribute it and/or modify it under the terms of the license
 provided in the LICENSE file (CAL-1.0).  This program is distributed in the hope that it will be useful,

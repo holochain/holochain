@@ -1,4 +1,4 @@
-use hdk3::prelude::*;
+use hdk::prelude::*;
 
 #[derive(Serialize, Deserialize, Debug)]
 enum TemperatureUnit {
@@ -22,17 +22,49 @@ fn twenty_three_degrees_entry_hash(_: ()) -> ExternResult<EntryHash> {
     let header_hash: HeaderHash = create_entry(&temp)?;
     let element: Element = get(header_hash, GetOptions::content())?.unwrap();
     match element.entry() {
-        ElementEntry::Present(entry) => hdk3::prelude::hash_entry(entry.clone()),
+        ElementEntry::Present(entry) => hdk::prelude::hash_entry(entry.clone()),
         _ => unreachable!(),
     }
 }
 
 #[hdk_extern]
 fn twenty_three_degrees_hash(_: ()) -> ExternResult<EntryHash> {
-    hdk3::prelude::hash_entry(&temperature())
+    hdk::prelude::hash_entry(&temperature())
 }
 
 #[hdk_extern]
 fn hash_entry(entry: Entry) -> ExternResult<EntryHash> {
-    hdk3::prelude::hash_entry(entry)
+    hdk::prelude::hash_entry(entry)
+}
+
+#[cfg(test)]
+pub mod tests {
+    use hdk::prelude::*;
+    use ::fixt::prelude::*;
+
+    #[test]
+    fn hash_entry_smoke() {
+        let mut mock_hdk = hdk::prelude::MockHdkT::new();
+
+        let input_entry = fixt!(Entry);
+        let output_hash = fixt!(EntryHash);
+        let output_hash_closure = output_hash.clone();
+        mock_hdk.expect_hash_entry()
+            .with(hdk::prelude::mockall::predicate::eq(
+                input_entry.clone()
+            ))
+            .times(1)
+            .return_once(move |_| Ok(output_hash_closure));
+
+        hdk::prelude::set_hdk(mock_hdk);
+
+        let result = super::hash_entry(input_entry);
+
+        assert_eq!(
+            result,
+            Ok(
+                output_hash
+            )
+        )
+    }
 }
