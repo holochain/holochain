@@ -565,7 +565,7 @@ pub async fn enable_app(cmd: &mut CmdRunner, args: EnableApp) -> anyhow::Result<
             installed_app_id: args.app_id,
         })
         .await?;
-    matches::assert_matches!(resp, AdminResponse::AppEnabled { .. });
+    assert!(matches!(resp, AdminResponse::AppEnabled { .. }));
     Ok(())
 }
 
