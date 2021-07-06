@@ -373,7 +373,7 @@ async fn common_genesis_test_app(
     holochain_types::app::we_must_remember_to_rework_cell_panic_handling_after_implementing_use_existing_cell_resolution(
     );
 
-    // Create one DNA which works, and one which always panics on validation
+    // Create one DNA which always works, and another from a zome that gets passed in
     let (dna_hardcoded, _) = mk_dna("hardcoded", hardcoded_zome).await?;
     let (dna_custom, _) = mk_dna("custom", custom_zome).await?;
 
@@ -665,6 +665,10 @@ async fn test_reactivate_app() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "Causing a tokio thread to panic is problematic.
+This is supposed to emulate a panic in a wasm validation callback, but it's not the same.
+However, when wasm panics, it returns an error anyway, so the other similar test
+which tests for validation errors should be sufficient."]
 async fn test_cells_deactivate_on_validation_panic() {
     observability::test_run().ok();
     let bad_zome =
@@ -674,15 +678,10 @@ async fn test_cells_deactivate_on_validation_panic() {
             Ok(ValidateResult::Valid)
         });
     let mut conductor = SweetConductor::from_standard_config().await;
-    let err = common_genesis_test_app(&mut conductor, bad_zome)
-        .await
-        .map(|_| "(original value discarded)")
-        .unwrap_err();
 
-    assert_matches!(
-        err,
-        ConductorApiError::ConductorError(ConductorError::CellMissing(_))
-    );
+    // This may be an error, depending on if validation runs before or after
+    // the app is enabled. Proceed in either case.
+    let _ = common_genesis_test_app(&mut conductor, bad_zome).await;
 
     // - Ensure that the app was deactivated because one Cell panicked during validation
     //   (while publishing genesis elements)
@@ -706,15 +705,10 @@ async fn test_cells_deactivate_on_validation_error() {
         });
 
     let mut conductor = SweetConductor::from_standard_config().await;
-    let err = common_genesis_test_app(&mut conductor, bad_zome)
-        .await
-        .map(|_| "(original value discarded)")
-        .unwrap_err();
 
-    assert_matches!(
-        err,
-        ConductorApiError::ConductorError(ConductorError::CellMissing(_))
-    );
+    // This may be an error, depending on if validation runs before or after
+    // the app is enabled. Proceed in either case.
+    let _ = common_genesis_test_app(&mut conductor, bad_zome).await;
 
     // - Ensure that the app was deactivated because one Cell had a validation error
     //   (while publishing genesis elements)
