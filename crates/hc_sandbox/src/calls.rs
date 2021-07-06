@@ -234,7 +234,9 @@ pub async fn call(holochain_path: &Path, req: Call) -> anyhow::Result<()> {
                 Ok(cmd) => cmds.push((cmd, None)),
                 Err(e) => {
                     if let holochain_websocket::WebsocketError::Io(e) = &e {
-                        if let std::io::ErrorKind::ConnectionRefused = e.kind() {
+                        if let std::io::ErrorKind::ConnectionRefused
+                        | std::io::ErrorKind::AddrNotAvailable = e.kind()
+                        {
                             let (port, holochain) = run_async(holochain_path, path, None).await?;
                             cmds.push((CmdRunner::new(port).await, Some(holochain)));
                             continue;
