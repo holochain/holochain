@@ -18,6 +18,7 @@ pub mod call;
 pub mod call_remote;
 pub mod capability;
 pub mod cell;
+pub mod countersigning;
 #[allow(missing_docs)]
 pub mod crdt;
 pub mod dna_def;

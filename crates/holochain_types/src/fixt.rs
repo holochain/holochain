@@ -56,7 +56,7 @@ fixturator!(
 
 fn new_entry_element(entry: Entry, header_type: HeaderType, index: usize) -> Element {
     let et = match entry {
-        Entry::App(_) | Entry::CounterSign(_, _, _) => EntryType::App(
+        Entry::App(_) | Entry::CounterSign(_, _) => EntryType::App(
             AppEntryTypeFixturator::new_indexed(Unpredictable, index)
                 .next()
                 .unwrap(),
@@ -98,7 +98,7 @@ fixturator!(
     };
     curve Entry {
         let et = match get_fixt_curve!() {
-            Entry::App(_) | Entry::CounterSign(_, _, _) => EntryType::App(AppEntryTypeFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()),
+            Entry::App(_) | Entry::CounterSign(_, _) => EntryType::App(AppEntryTypeFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()),
             Entry::Agent(_) => EntryType::AgentPubKey,
             Entry::CapClaim(_) => EntryType::CapClaim,
             Entry::CapGrant(_) => EntryType::CapGrant,
