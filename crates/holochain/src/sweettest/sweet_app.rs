@@ -57,7 +57,9 @@ impl SweetApp {
         self.into_cells()
             .into_iter()
             .collect_tuple::<Inner>()
-            .expect("Wrong number of Cells in destructuring pattern, or too many (must be 4 or less)")
+            .expect(
+                "Wrong number of Cells in destructuring pattern, or too many (must be 4 or less)",
+            )
     }
 }
 
