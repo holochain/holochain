@@ -710,6 +710,22 @@ where
         }
     }
 
+    /// tell the network module not to handle this list of cells
+    pub(super) async fn network_leave_cells(&self, cell_ids: &Vec<CellId>) {
+        let mut all = Vec::new();
+        for cell_id in cell_ids {
+            if let Some(cell) = self.cells.get(cell_id) {
+                use holochain_p2p::HolochainP2pCellT;
+                let mut network = cell.cell.holochain_p2p_cell().clone();
+                all.push(async move {
+                    // just making a best effort for now
+                    let _ = network.leave().await;
+                });
+            }
+        }
+        futures::future::join_all(all).await;
+    }
+
     /// Associate a Cell with an existing App
     pub(super) async fn add_clone_cell_to_app(
         &mut self,

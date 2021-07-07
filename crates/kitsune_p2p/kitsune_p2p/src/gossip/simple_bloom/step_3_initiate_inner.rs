@@ -20,6 +20,8 @@ impl SimpleBloomMod {
                             return None;
                         }
 
+                        // any "inactive" agent_infos with zero urls will
+                        // get filtered out at this stage
                         if let Some(url) = agent_info_signed.url_list.get(0) {
                             if let Ok(purl) = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()) {
                                 return Some((

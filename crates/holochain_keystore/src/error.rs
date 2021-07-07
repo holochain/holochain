@@ -16,7 +16,7 @@ pub enum KeystoreError {
     #[error("SerializedBytesError: {0}")]
     SerializedBytesError(#[from] SerializedBytesError),
 
-    /// Used by dependents to specify an invalid signature of some data
+    /// Used by dependants to specify an invalid signature of some data
     #[error("Invalid signature {0:?}, for {1}")]
     InvalidSignature(Signature, String),
 
