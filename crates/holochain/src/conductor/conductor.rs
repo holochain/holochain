@@ -32,6 +32,7 @@ use super::CellError;
 use super::{api::CellConductorApi, state::AppInterfaceConfig};
 use super::{api::CellConductorApiT, interface::AppInterfaceRuntime};
 use super::{api::RealAdminInterfaceApi, manager::TaskManagerClient};
+use crate::conductor::cell::error::CellResult;
 use crate::conductor::cell::Cell;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::error::ConductorResult;
@@ -608,21 +609,27 @@ where
 
     /// Remove all Cells which are not referenced by any Enabled app.
     /// (Cells belonging to Paused apps are not considered "dangling" and will not be removed)
-    pub(super) async fn remove_dangling_cells(&mut self) -> ConductorResult<Vec<Arc<Cell>>> {
+    pub(super) async fn remove_dangling_cells(&mut self) -> ConductorResult<()> {
         let state = self.get_state().await?;
         let keepers: HashSet<CellId> = state
             .enabled_apps()
             .flat_map(|(_, app)| app.all_cells().cloned().collect::<HashSet<_>>())
             .collect();
-        let mut dropped = vec![];
-        for (_, cell) in self.cells.iter().filter(|(id, _)| !keepers.contains(id)) {
-            // cleanup the cell before dropping it from the HashMap
-            cell.cell.cleanup().await?;
-            dropped.push(cell.cell.clone());
-        }
+
+        // Clean up all cells that will be dropped (leave network, etc.)
+        let tasks = self
+            .cells
+            .iter()
+            .filter(|(id, _)| !keepers.contains(id))
+            .map(|(_, cell)| cell.cell.cleanup());
+        futures::future::join_all(tasks)
+            .await
+            .into_iter()
+            .collect::<CellResult<Vec<()>>>()?;
+
         // drop all but the keepers
         self.cells.retain(|id, _| keepers.contains(id));
-        Ok(dropped)
+        Ok(())
     }
 
     /// Attempt to create all necessary Cells which have not already been created
