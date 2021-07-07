@@ -744,9 +744,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn reconcile_cell_status_with_app_status(
         self: Arc<Self>,
     ) -> ConductorResult<Vec<(CellId, CellError)>> {
-        // TODO: first leave the network for any cells that should be removed.
-
         self.conductor.write().await.remove_dangling_cells().await?;
+
         let results = self
             .create_and_add_initialized_cells_for_running_apps(self.clone())
             .await?;
@@ -1048,12 +1047,17 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
 
                 // TODO: This should probably be emitted over the admin interface
                 if !errors.is_empty() {
-                    error!(msg = "Errors when trying to start an app", ?errors);
+                    error!(msg = "Errors when trying to start app(s)", ?errors);
                 }
             }
             AppStatusTransitionEffects::SpinDown => {
-                let cells_removed = self.conductor.write().await.remove_dangling_cells().await?;
-                tracing::debug!(?cells_removed);
+                // Reconcile cell status so that dangling cells can leave the network and be removed
+                let errors = self.clone().reconcile_cell_status_with_app_status().await?;
+
+                // TODO: This should probably be emitted over the admin interface
+                if !errors.is_empty() {
+                    error!(msg = "Errors when trying to stop app(s)", ?errors);
+                }
             }
         };
 

@@ -367,6 +367,7 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[should_panic]
+    #[ignore = "panics in tokio break other tests"]
     async fn unrecoverable_error() {
         observability::test_run().ok();
         let (_tx, rx) = tokio::sync::broadcast::channel(1);
@@ -396,6 +397,7 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[should_panic]
+    #[ignore = "panics in tokio break other tests"]
     async fn unrecoverable_panic() {
         observability::test_run().ok();
         let (_tx, rx) = tokio::sync::broadcast::channel(1);

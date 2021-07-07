@@ -229,10 +229,11 @@ impl AsKitsuneDirect for Kd1 {
         // TODO - pass along code/reason to transport shutdowns
         let r = self.inner.share_mut(|i, c| {
             *c = true;
-            Ok(i.p2p.clone())
+            Ok((i.srv.clone(), i.p2p.clone()))
         });
         async move {
-            if let Ok(p2p) = r {
+            if let Ok((srv, p2p)) = r {
+                srv.close().await;
                 let _ = p2p.ghost_actor_shutdown_immediate().await;
             }
         }
@@ -392,6 +393,21 @@ async fn handle_srv_events(
                                     })
                                 }.boxed()).await;
                             }
+                            KdApi::AppLeaveReq {
+                                msg_id,
+                                root,
+                                agent,
+                                ..
+                            } => {
+                                exec(msg_id.clone(), async {
+                                    kdirect.inner.share_mut(|i, _| {
+                                        Ok(i.p2p.leave(root.to_kitsune_space(), agent.to_kitsune_agent()))
+                                    }).map_err(KdError::other)?.await.map_err(KdError::other)?;
+                                    Ok(KdApi::AppLeaveRes {
+                                        msg_id,
+                                    })
+                                }.boxed()).await;
+                            }
                             KdApi::AgentInfoStoreReq {
                                 msg_id,
                                 agent_info,
@@ -509,7 +525,19 @@ async fn handle_srv_events(
                                 // TODO -- FIXME
                                 unimplemented!("TODO")
                             }
-                            oth => {
+                            oth @ KdApi::ErrorRes { .. } |
+                            oth @ KdApi::HelloReq { .. } |
+                            oth @ KdApi::KeypairGetOrCreateTaggedRes { .. } |
+                            oth @ KdApi::AppJoinRes { .. } |
+                            oth @ KdApi::AppLeaveRes { .. } |
+                            oth @ KdApi::AgentInfoStoreRes { .. } |
+                            oth @ KdApi::AgentInfoGetRes { .. } |
+                            oth @ KdApi::AgentInfoQueryRes { .. } |
+                            oth @ KdApi::MessageSendRes { .. } |
+                            oth @ KdApi::MessageRecvEvt { .. } |
+                            oth @ KdApi::EntryAuthorRes { .. } |
+                            oth @ KdApi::EntryGetRes { .. } |
+                            oth @ KdApi::EntryGetChildrenRes { .. } => {
                                 let reason = format!("unexpected {}", oth);
                                 if let Err(err) = srv.websocket_send(con, KdApi::ErrorRes {
                                     msg_id,

@@ -608,19 +608,21 @@ where
 
     /// Remove all Cells which are not referenced by any Enabled app.
     /// (Cells belonging to Paused apps are not considered "dangling" and will not be removed)
-    pub(super) async fn remove_dangling_cells(&mut self) -> ConductorResult<usize> {
+    pub(super) async fn remove_dangling_cells(&mut self) -> ConductorResult<Vec<Arc<Cell>>> {
         let state = self.get_state().await?;
         let keepers: HashSet<CellId> = state
             .enabled_apps()
             .flat_map(|(_, app)| app.all_cells().cloned().collect::<HashSet<_>>())
             .collect();
+        let mut dropped = vec![];
         for (_, cell) in self.cells.iter().filter(|(id, _)| !keepers.contains(id)) {
             // cleanup the cell before dropping it from the HashMap
             cell.cell.cleanup().await?;
+            dropped.push(cell.cell.clone());
         }
         // drop all but the keepers
         self.cells.retain(|id, _| keepers.contains(id));
-        Ok(keepers.len())
+        Ok(dropped)
     }
 
     /// Attempt to create all necessary Cells which have not already been created

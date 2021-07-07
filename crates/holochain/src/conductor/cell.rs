@@ -864,7 +864,9 @@ impl Cell {
     //        TaskManager can have these Cell TaskManagers as children.
     //        [ B-04176 ]
     pub async fn cleanup(&self) -> CellResult<()> {
-        tracing::info!("Cell removed, but cleanup is not yet implemented.");
+        use holochain_p2p::HolochainP2pCellT;
+        self.holochain_p2p_cell().leave().await?;
+        tracing::info!("Cell removed, but cleanup is not yet fully implemented.");
         Ok(())
     }
 

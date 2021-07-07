@@ -112,7 +112,7 @@ pub(crate) fn peer_connect(
         .url_list
         .get(0)
         .cloned()
-        .ok_or_else(|| KitsuneP2pError::from("no url"));
+        .ok_or_else(|| KitsuneP2pError::from("no url - agent is likely offline"));
 
     async move {
         let url = url?;
