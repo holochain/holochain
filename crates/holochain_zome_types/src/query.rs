@@ -9,7 +9,7 @@ pub use holochain_serialized_bytes::prelude::*;
 
 /// Query arguments
 #[derive(
-    serde::Serialize, serde::Deserialize, SerializedBytes, Default, PartialEq, Clone, Debug,
+    Serialize, Deserialize, SerializedBytes, Default, PartialEq, Clone, Debug,
 )]
 #[non_exhaustive]
 pub struct ChainQueryFilter {
@@ -29,7 +29,7 @@ pub struct ChainQueryFilter {
     pub include_entries: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 /// An agents chain elements returned from a agent_activity_query
 pub struct AgentActivity {
     /// Valid headers on this chain.
