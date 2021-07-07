@@ -380,12 +380,12 @@ async fn call_zome() {
     assert_matches!(response, AdminResponse::DnasListed(a) if a == expects);
 
     // Activate cells
-    let request = AdminRequest::ActivateApp {
+    let request = AdminRequest::EnableApp {
         installed_app_id: "test".to_string(),
     };
     let response = client.request(request);
     let response = check_timeout(&mut holochain, response, 3000).await;
-    assert_matches!(response, AdminResponse::AppActivated(_));
+    assert_matches!(response, AdminResponse::AppEnabled { .. });
 
     // Attach App Interface
     let app_port_rcvd = attach_app_interface(&mut client, &mut holochain, Some(app_port)).await;
@@ -520,12 +520,12 @@ async fn emit_signals() {
     let cell_id = CellId::new(dna_hash.clone(), agent_key.clone());
 
     // Activate cells
-    let request = AdminRequest::ActivateApp {
+    let request = AdminRequest::EnableApp {
         installed_app_id: "test".to_string(),
     };
     let response = admin_tx.request(request);
     let response = check_timeout(&mut holochain, response, 3000).await;
-    assert_matches!(response, AdminResponse::AppActivated(_));
+    assert_matches!(response, AdminResponse::AppEnabled { .. });
 
     // Attach App Interface
     let app_port = attach_app_interface(&mut admin_tx, &mut holochain, None).await;

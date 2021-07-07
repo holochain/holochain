@@ -864,7 +864,9 @@ impl Cell {
     //        TaskManager can have these Cell TaskManagers as children.
     //        [ B-04176 ]
     pub async fn cleanup(&self) -> CellResult<()> {
-        tracing::info!("Cell removed, but cleanup is not yet implemented.");
+        use holochain_p2p::HolochainP2pCellT;
+        self.holochain_p2p_cell().leave().await?;
+        tracing::info!("Cell removed, but cleanup is not yet fully implemented.");
         Ok(())
     }
 
@@ -909,5 +911,11 @@ impl Cell {
     /// Cause workflows to trigger
     pub(crate) fn triggers(&self) -> &QueueTriggers {
         &self.queue_triggers
+    }
+}
+
+impl std::fmt::Debug for Cell {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Cell").field("id", &self.id()).finish()
     }
 }

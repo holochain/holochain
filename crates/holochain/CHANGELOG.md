@@ -4,8 +4,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+### Changed
+
+- Apps now have a more complex status. Apps now can be either enabled/disabled as well as running/stopped, the combination of which is captured by three distinctly named states:
+  - "Running" (enabled + running) -> The app is running normally
+  - "Paused" (enabled + stopped) -> The app is currently stopped due to some minor problem in one of its cells such as failed network access, but will start running again as soon as it's able. Some Cells may still be running normally.
+  - "Disabled" (disabled + stopped) -> The app is stopped and will remain so until explicitly enabled via `EnableApp` admin method. Apps can be disabled manually via `DisableApp`, or automatically due to an unrecoverable error in a Cell.
+- Some admin methods are deprecated due to the app status changes:
+  - `ActivateApp` is deprecated in favor of `EnableApp`
+  - `DeactivateApp` is deprecated in favor of `DisableApp`
+- Apps will be automatically Paused if not all of their cells are able to join the network during startup
+
 ### Added
 
+- `InstallAppBundle` command added to admin conductor API. [#665](https://github.com/holochain/holochain/pull/665)
+- `DnaSource` in conductor_api `RegisterDna` call now can take a `DnaBundle` [#665](https://github.com/holochain/holochain/pull/665)
+- New admin interface methods:
+  - `EnableApp` (replaces `ActivateApp`)
+  - `DisableApp` (replaces `DeactivateApp`)
+  - `StartApp` (used to attempt to manually restart a Paused app)
 - Using the 3 level PLRU instance cache from latest holochain wasmer `v0.0.72`
 
 ## 0.0.101
