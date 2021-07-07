@@ -8,12 +8,12 @@
 use crate::capability::CapClaim;
 use crate::capability::CapGrant;
 use crate::capability::ZomeCallCapGrant;
+use crate::countersigning::CounterSigningSessionData;
 use holo_hash::hash_type;
 use holo_hash::AgentPubKey;
 use holo_hash::HashableContent;
 use holo_hash::HashableContentBytes;
 use holochain_serialized_bytes::prelude::*;
-use crate::countersigning::CounterSigningSessionData;
 
 mod app_entry_bytes;
 mod error;

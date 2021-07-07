@@ -2,8 +2,8 @@
 
 use crate::prelude::*;
 use holo_hash::AgentPubKey;
-use holo_hash::HeaderHash;
 use holo_hash::EntryHash;
+use holo_hash::HeaderHash;
 
 /// The timestamps on headers for a session use this offset relative to the session start time.
 /// This makes it easier for agents to accept a preflight request with headers that are after their current chain top, after network latency.
@@ -11,7 +11,7 @@ pub const SESSION_HEADER_TIME_OFFSET_MILLIS: i64 = 1000;
 
 /// Every countersigning session must complete a full set of headers between the start and end times to be valid.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct CounterSigningSessionTimes{
+pub struct CounterSigningSessionTimes {
     start: Timestamp,
     end: Timestamp,
 }
@@ -187,13 +187,33 @@ pub struct CounterSigningSessionData {
 }
 
 /// Build an unsigned Create header from session data, shared create data and an agent's state.
-impl From<(&CounterSigningSessionData, &CreateBase, &CounterSigningAgentState)> for Create {
-    fn from((session_data, create_base, agent_state): (&CounterSigningSessionData, &CreateBase, &CounterSigningAgentState)) -> Self {
+impl
+    From<(
+        &CounterSigningSessionData,
+        &CreateBase,
+        &CounterSigningAgentState,
+    )> for Create
+{
+    fn from(
+        (session_data, create_base, agent_state): (
+            &CounterSigningSessionData,
+            &CreateBase,
+            &CounterSigningAgentState,
+        ),
+    ) -> Self {
         Create {
-            author: session_data.preflight_request.signing_agents[agent_state.agent_index as usize].0.clone(),
+            author: session_data.preflight_request.signing_agents[agent_state.agent_index as usize]
+                .0
+                .clone(),
             timestamp: Timestamp(
-                session_data.preflight_request.session_times.start.0.checked_add(SESSION_HEADER_TIME_OFFSET_MILLIS).unwrap_or(i64::MAX),
-                session_data.preflight_request.session_times.start.1
+                session_data
+                    .preflight_request
+                    .session_times
+                    .start
+                    .0
+                    .checked_add(SESSION_HEADER_TIME_OFFSET_MILLIS)
+                    .unwrap_or(i64::MAX),
+                session_data.preflight_request.session_times.start.1,
             ),
             header_seq: agent_state.header_seq,
             prev_header: agent_state.chain_top.clone(),
@@ -204,13 +224,33 @@ impl From<(&CounterSigningSessionData, &CreateBase, &CounterSigningAgentState)> 
 }
 
 /// Build an unsigned Update header from session data, shared update data and an agent's state.
-impl From<(&CounterSigningSessionData, &UpdateBase, &CounterSigningAgentState)> for Update {
-    fn from((session_data, update_base, agent_state): (&CounterSigningSessionData, &UpdateBase, &CounterSigningAgentState)) -> Self {
+impl
+    From<(
+        &CounterSigningSessionData,
+        &UpdateBase,
+        &CounterSigningAgentState,
+    )> for Update
+{
+    fn from(
+        (session_data, update_base, agent_state): (
+            &CounterSigningSessionData,
+            &UpdateBase,
+            &CounterSigningAgentState,
+        ),
+    ) -> Self {
         Update {
-            author: session_data.preflight_request.signing_agents[agent_state.agent_index as usize].0.clone(),
+            author: session_data.preflight_request.signing_agents[agent_state.agent_index as usize]
+                .0
+                .clone(),
             timestamp: Timestamp(
-                session_data.preflight_request.session_times.start.0.checked_add(SESSION_HEADER_TIME_OFFSET_MILLIS).unwrap_or(i64::MAX),
-                session_data.preflight_request.session_times.start.1
+                session_data
+                    .preflight_request
+                    .session_times
+                    .start
+                    .0
+                    .checked_add(SESSION_HEADER_TIME_OFFSET_MILLIS)
+                    .unwrap_or(i64::MAX),
+                session_data.preflight_request.session_times.start.1,
             ),
             header_seq: agent_state.header_seq,
             prev_header: agent_state.chain_top.clone(),
@@ -228,13 +268,21 @@ impl From<CounterSigningSessionData> for Vec<Header> {
         for agent_state in session_data.responses.iter() {
             match session_data.preflight_request.header_base {
                 HeaderBase::Create(ref create_base) => {
-                    headers.push(Header::Create(Create::from((&session_data, create_base, agent_state))));
-                },
+                    headers.push(Header::Create(Create::from((
+                        &session_data,
+                        create_base,
+                        agent_state,
+                    ))));
+                }
                 HeaderBase::Update(ref update_base) => {
-                    headers.push(Header::Update(Update::from((&session_data, update_base, agent_state))));
+                    headers.push(Header::Update(Update::from((
+                        &session_data,
+                        update_base,
+                        agent_state,
+                    ))));
                 }
             }
-        };
+        }
         headers
     }
 }
