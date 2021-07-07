@@ -46,6 +46,8 @@ use tokio::sync;
 use tracing::*;
 use tracing_futures::Instrument;
 
+pub const INIT_MUTEX_TIMEOUT_SECS: u64 = 30;
+
 mod validation_package;
 
 #[allow(missing_docs)]
@@ -97,6 +99,7 @@ where
     cache: EnvWrite,
     holochain_p2p_cell: P2pCell,
     queue_triggers: QueueTriggers,
+    init_mutex: tokio::sync::Mutex<()>,
 }
 
 impl Cell {
@@ -145,6 +148,7 @@ impl Cell {
                     cache,
                     holochain_p2p_cell,
                     queue_triggers,
+                    init_mutex: Default::default(),
                 },
                 initial_queue_triggers,
             ))
@@ -805,6 +809,14 @@ impl Cell {
     /// Check if each Zome's init callback has been run, and if not, run it.
     #[tracing::instrument(skip(self))]
     async fn check_or_run_zome_init(&self) -> CellResult<()> {
+        // Ensure that only one init check is run at a time
+        let _guard = tokio::time::timeout(
+            std::time::Duration::from_secs(INIT_MUTEX_TIMEOUT_SECS),
+            self.init_mutex.lock(),
+        )
+        .await
+        .map_err(|_| CellError::InitTimeout)?;
+
         // If not run it
         let env = self.env.clone();
         let keystore = env.keystore().clone();

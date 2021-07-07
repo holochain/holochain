@@ -1,3 +1,6 @@
+use std::sync::atomic::AtomicU32;
+use std::sync::atomic::Ordering;
+
 use super::Conductor;
 use super::ConductorState;
 use super::*;
@@ -1031,4 +1034,49 @@ async fn test_app_status_filters() {
     assert_eq!(list_apps!(Some(Enabled)).len(), 2);
     assert_eq!(list_apps!(Some(Disabled)).len(), 1);
     assert_eq!(list_apps!(Some(Paused)).len(), 0);
+}
+
+/// Check that the init() callback is only ever called once, even under many
+/// concurrent initial zome function calls
+#[tokio::test(flavor = "multi_thread")]
+async fn test_init_concurrency() {
+    observability::test_run().ok();
+    let num_inits = Arc::new(AtomicU32::new(0));
+    let num_calls = Arc::new(AtomicU32::new(0));
+    let num_inits_clone = num_inits.clone();
+    let num_calls_clone = num_calls.clone();
+
+    let zome = InlineZome::new_unique(vec![])
+        .callback("init", move |_, ()| {
+            num_inits.clone().fetch_add(1, Ordering::SeqCst);
+            Ok(InitCallbackResult::Pass)
+        })
+        .callback("zomefunc", move |_, ()| {
+            std::thread::sleep(std::time::Duration::from_millis(5));
+            num_calls.clone().fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        });
+    let dnas = [mk_dna("zome", zome).await.unwrap().0];
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let app = conductor.setup_app("app", &dnas).await.unwrap();
+    let (cell,) = app.into_tuple();
+    let conductor = Arc::new(conductor);
+
+    // Perform 100 concurrent zome calls
+    let num_iters = Arc::new(AtomicU32::new(0));
+    let call_tasks = (0..100 as u32).map(|_i| {
+        let conductor = conductor.clone();
+        let zome = cell.zome("zome");
+        let num_iters = num_iters.clone();
+        tokio::spawn(async move {
+            println!("i: {:?}", _i);
+            num_iters.fetch_add(1, Ordering::SeqCst);
+            let _: () = conductor.call(&zome, "zomefunc", ()).await;
+        })
+    });
+    let _ = futures::future::join_all(call_tasks).await;
+
+    assert_eq!(num_iters.fetch_add(0, Ordering::SeqCst), 100);
+    assert_eq!(num_calls_clone.fetch_add(0, Ordering::SeqCst), 100);
+    assert_eq!(num_inits_clone.fetch_add(0, Ordering::SeqCst), 1);
 }

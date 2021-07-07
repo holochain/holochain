@@ -1,3 +1,4 @@
+use super::INIT_MUTEX_TIMEOUT_SECS;
 use crate::conductor::entry_def_store::error::EntryDefStoreError;
 use crate::conductor::{api::error::ConductorApiError, error::ConductorError};
 use crate::core::ribosome::error::RibosomeError;
@@ -45,6 +46,11 @@ pub enum CellError {
     SourceChainError(#[from] SourceChainError),
     #[error("The cell tried to run the initialize zomes callback but failed because {0:?}")]
     InitFailed(InitResult),
+    #[error(
+        "Another zome function has triggered the `init()` callback, which has been blocking this zome call for longer than {} seconds. Giving up.",
+        INIT_MUTEX_TIMEOUT_SECS
+    )]
+    InitTimeout,
     #[error("Failed to get or create the cache for this dna {0:?}")]
     FailedToCreateCache(Box<ConductorError>),
     #[error(transparent)]
