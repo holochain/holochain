@@ -8,6 +8,7 @@
 //! In normal use cases, a single Holochain user runs a single Conductor in a single process.
 //! However, there's no reason we can't have multiple Conductors in a single process, simulating multiple
 //! users in a testing environment.
+use super::api::RealAppInterfaceApi;
 use super::config::AdminInterfaceConfig;
 use super::config::InterfaceDriver;
 use super::dna_store::RealDnaStore;
@@ -22,13 +23,9 @@ use super::interface::websocket::spawn_websocket_listener;
 use super::interface::websocket::SIGNAL_BUFFER_SIZE;
 use super::interface::SignalBroadcaster;
 use super::manager::keep_alive_task;
-use super::manager::spawn_task_manager;
 use super::manager::ManagedTaskAdd;
 use super::manager::ManagedTaskHandle;
 use super::manager::TaskManagerRunHandle;
-use super::p2p_agent_store::all_agent_infos;
-use super::p2p_agent_store::get_single_agent_info;
-use super::p2p_agent_store::inject_agent_infos;
 use super::paths::EnvironmentRootPath;
 use super::state::AppInterfaceId;
 use super::state::ConductorState;
@@ -36,7 +33,6 @@ use super::CellError;
 use super::{api::CellConductorApi, state::AppInterfaceConfig};
 use super::{api::CellConductorApiT, interface::AppInterfaceRuntime};
 use super::{api::RealAdminInterfaceApi, manager::TaskManagerClient};
-use super::{api::RealAppInterfaceApi, p2p_agent_store};
 use crate::conductor::cell::Cell;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::error::ConductorResult;
@@ -53,21 +49,16 @@ use holo_hash::DnaHash;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::IntegrationStateDump;
-use holochain_conductor_api::JsonDump;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_keystore::KeystoreSender;
 use holochain_keystore::KeystoreSenderExt;
-use holochain_p2p::DnaHashExt;
 use holochain_sqlite::db::DbKind;
 use holochain_sqlite::prelude::*;
 use holochain_state::mutations;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateMutationResult;
-use holochain_state::source_chain;
 use holochain_types::prelude::*;
-use kitsune_p2p::agent_store::AgentInfoSigned;
-use kitsune_p2p::KitsuneSpace;
 use rusqlite::OptionalExtension;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -77,23 +68,8 @@ use tracing::*;
 #[cfg(any(test, feature = "test_utils"))]
 use super::handle::MockConductorHandleT;
 
-/// Conductor-specific Cell state, this can probably be stored in a database.
-/// Hypothesis: If nothing remains in this struct, then the Conductor state is
-/// essentially immutable, and perhaps we just throw it out and make a new one
-/// when we need to load new config, etc.
-pub struct CellState {
-    /// Whether or not we should call any methods on the cell
-    _active: bool,
-}
-
 /// An [Cell] tracked by a Conductor, along with some [CellState]
-struct CellItem<CA>
-where
-    CA: CellConductorApiT,
-{
-    cell: Arc<Cell<CA>>,
-    _state: CellState,
-}
+struct RunningCell<CA: CellConductorApiT>(Arc<Cell<CA>>);
 
 pub(crate) type StopBroadcaster = tokio::sync::broadcast::Sender<()>;
 pub(crate) type StopReceiver = tokio::sync::broadcast::Receiver<()>;
@@ -105,25 +81,17 @@ where
     CA: CellConductorApiT,
 {
     /// The collection of cells associated with this Conductor
-    cells: HashMap<CellId, CellItem<CA>>,
+    cells: HashMap<CellId, RunningCell<CA>>,
 
     /// The database for persisting state related to this Conductor
-    env: EnvWrite,
-
-    /// The caches databases. These are shared across cells.
-    /// There is one per unique Dna.
-    caches: parking_lot::Mutex<HashMap<DnaHash, EnvWrite>>,
+    conductor_env: EnvWrite,
 
     /// A database for storing wasm
     wasm_env: EnvWrite,
 
-    /// The database for storing AgentInfoSigned
-    p2p_env: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
-
-    p2p_metrics_env: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
-
-    /// The database for persisting [ConductorState]
-    // state_db: ConductorStateDb,
+    /// The caches databases. These are shared across cells.
+    /// There is one per unique Dna.
+    caches: parking_lot::Mutex<HashMap<DnaHash, EnvWrite>>,
 
     /// Set to true when `conductor.shutdown()` has been called, so that other
     /// tasks can check on the shutdown status
@@ -139,7 +107,7 @@ where
 
     /// The channels and handles needed to interact with the task_manager task.
     /// If this is None, then the task manager has not yet been initialized.
-    task_manager: Option<TaskManagerClient>,
+    pub(super) task_manager: Option<TaskManagerClient>,
 
     /// Placeholder for what will be the real DNA/Wasm cache
     dna_store: DS,
@@ -183,11 +151,11 @@ where
     DS: DnaStore + 'static,
 {
     pub(super) fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<Arc<Cell>> {
-        let item = self
+        let cell = self
             .cells
             .get(cell_id)
             .ok_or_else(|| ConductorError::CellMissing(cell_id.clone()))?;
-        Ok(item.cell.clone())
+        Ok(cell.0.clone())
     }
 
     /// A gate to put at the top of public functions to ensure that work is not
@@ -527,7 +495,7 @@ where
             .iter()
             .filter(|(id, _)| stopped_cells.contains(id))
         {
-            cell.cell.cleanup().await?;
+            cell.0.cleanup().await?;
         }
         self.cells.retain(|id, _| !stopped_cells.contains(id));
         Ok(())
@@ -700,13 +668,7 @@ where
         for cell in cells {
             let cell_id = cell.id().clone();
             tracing::info!(?cell_id, "ADD CELL");
-            self.cells.insert(
-                cell_id,
-                CellItem {
-                    cell: Arc::new(cell),
-                    _state: CellState { _active: false },
-                },
-            );
+            self.cells.insert(cell_id, RunningCell(Arc::new(cell)));
         }
     }
 
@@ -810,8 +772,8 @@ where
     /// Remove cells from the cell map in the Conductor
     pub(super) async fn remove_cells(&mut self, cell_ids: Vec<CellId>) {
         for cell_id in cell_ids {
-            if let Some(item) = self.cells.remove(&cell_id) {
-                if let Err(err) = item.cell.cleanup().await {
+            if let Some(cell) = self.cells.remove(&cell_id) {
+                if let Err(err) = cell.0.cleanup().await {
                     tracing::error!("Error cleaning up Cell: {:?}\nCellId: {}", err, cell_id);
                 }
             }
@@ -832,50 +794,6 @@ where
         })
         .await?;
         Ok(())
-    }
-
-    pub(super) async fn add_agent_infos(
-        &self,
-        agent_infos: Vec<AgentInfoSigned>,
-    ) -> ConductorApiResult<()> {
-        let mut space_map = HashMap::new();
-        for agent_info_signed in agent_infos {
-            let space = agent_info_signed.space.clone();
-            space_map
-                .entry(space)
-                .or_insert_with(Vec::new)
-                .push(agent_info_signed);
-        }
-        for (space, agent_infos) in space_map {
-            let env = self.p2p_env(space);
-            inject_agent_infos(env, agent_infos.iter()).await?;
-        }
-        Ok(())
-    }
-
-    pub(super) fn get_agent_infos(
-        &self,
-        cell_id: Option<CellId>,
-    ) -> ConductorApiResult<Vec<AgentInfoSigned>> {
-        match cell_id {
-            Some(c) => {
-                let (d, a) = c.into_dna_and_agent();
-                let space = d.to_kitsune();
-                let env = self.p2p_env(space);
-                Ok(get_single_agent_info(env.into(), d, a)?
-                    .map(|a| vec![a])
-                    .unwrap_or_default())
-            }
-            None => {
-                let mut out = Vec::new();
-                // collecting so the mutex lock can close
-                let envs = self.p2p_env.lock().values().cloned().collect::<Vec<_>>();
-                for env in envs {
-                    out.append(&mut all_agent_infos(env.into())?);
-                }
-                Ok(out)
-            }
-        }
     }
 
     pub(super) async fn put_wasm(
@@ -966,59 +884,6 @@ where
             .collect())
     }
 
-    pub(super) async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
-        let cell = self.cell_by_id(cell_id)?;
-        let arc = cell.env();
-
-        let space = cell_id.dna_hash().to_kitsune();
-        let p2p_env = self
-            .p2p_env
-            .lock()
-            .get(&space)
-            .cloned()
-            .expect("invalid cell space");
-
-        let peer_dump = p2p_agent_store::dump_state(p2p_env.into(), Some(cell_id.clone()))?;
-        let source_chain_dump =
-            source_chain::dump_state(arc.clone().into(), cell_id.agent_pubkey().clone()).await?;
-
-        let out = JsonDump {
-            peer_dump,
-            source_chain_dump,
-            integration_dump: integration_dump(&arc.clone().into()).await?,
-        };
-        // Add summary
-        let summary = out.to_string();
-        let out = (out, summary);
-        Ok(serde_json::to_string_pretty(&out)?)
-    }
-
-    pub(super) fn p2p_env(&self, space: Arc<KitsuneSpace>) -> EnvWrite {
-        let mut p2p_env = self.p2p_env.lock();
-        p2p_env
-            .entry(space.clone())
-            .or_insert_with(move || {
-                let root_env_dir = self.root_env_dir.as_ref();
-                let keystore = self.keystore.clone();
-                EnvWrite::open(root_env_dir, DbKind::P2pAgentStore(space), keystore)
-                    .expect("failed to open p2p_agent_store database")
-            })
-            .clone()
-    }
-
-    pub(super) fn p2p_metrics_env(&self, space: Arc<KitsuneSpace>) -> EnvWrite {
-        let mut p2p_metrics_env = self.p2p_metrics_env.lock();
-        p2p_metrics_env
-            .entry(space.clone())
-            .or_insert_with(move || {
-                let root_env_dir = self.root_env_dir.as_ref();
-                let keystore = self.keystore.clone();
-                EnvWrite::open(root_env_dir, DbKind::P2pMetrics(space), keystore)
-                    .expect("failed to open p2p_metrics database")
-            })
-            .clone()
-    }
-
     pub(super) fn print_setup(&self) {
         use std::fmt::Write;
         let mut out = String::new();
@@ -1098,18 +963,14 @@ where
     async fn new(
         env: EnvWrite,
         wasm_env: EnvWrite,
-        p2p_env: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
-        p2p_metrics_env: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
         dna_store: DS,
         keystore: KeystoreSender,
         root_env_dir: EnvironmentRootPath,
         holochain_p2p: holochain_p2p::HolochainP2pRef,
     ) -> ConductorResult<Self> {
         Ok(Self {
-            env,
+            conductor_env: env,
             wasm_env,
-            p2p_env,
-            p2p_metrics_env,
             caches: parking_lot::Mutex::new(HashMap::new()),
             cells: HashMap::new(),
             shutting_down: false,
@@ -1123,25 +984,8 @@ where
         })
     }
 
-    pub(super) async fn start_task_manager(
-        &mut self,
-        handle: ConductorHandle,
-    ) -> ConductorResult<()> {
-        if self.task_manager.is_some() {
-            panic!("Cannot start task manager twice");
-        }
-        let (task_add_sender, run_handle) = spawn_task_manager(handle);
-        let (task_stop_broadcaster, _) = tokio::sync::broadcast::channel::<()>(1);
-        self.task_manager = Some(TaskManagerClient::new(
-            task_add_sender,
-            task_stop_broadcaster,
-            run_handle,
-        ));
-        Ok(())
-    }
-
     pub(super) async fn get_state(&self) -> ConductorResult<ConductorState> {
-        self.env.conn()?.with_reader(|txn| {
+        self.conductor_env.conn()?.with_reader(|txn| {
             let state = txn
                 .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
                     row.get("blob")
@@ -1174,7 +1018,7 @@ where
     {
         self.check_running()?;
         let output = self
-            .env
+            .conductor_env
             .async_commit_in_place(move |txn| {
                 let state = txn
                     .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
@@ -1300,9 +1144,6 @@ mod builder {
             let wasm_environment =
                 EnvWrite::open(env_path.as_ref(), DbKind::Wasm, keystore.clone())?;
 
-            let p2p_env = Arc::new(parking_lot::Mutex::new(HashMap::new()));
-            let p2p_metrics_env = Arc::new(parking_lot::Mutex::new(HashMap::new()));
-
             #[cfg(any(test, feature = "test_utils"))]
             let state = self.state;
 
@@ -1328,8 +1169,6 @@ mod builder {
             let conductor = Conductor::new(
                 environment,
                 wasm_environment,
-                p2p_env,
-                p2p_metrics_env,
                 dna_store,
                 keystore,
                 env_path,
@@ -1340,25 +1179,28 @@ mod builder {
             #[cfg(any(test, feature = "test_utils"))]
             let conductor = Self::update_fake_state(state, conductor).await?;
 
-            Self::finish(conductor, config, p2p_evt).await
-        }
-
-        async fn finish(
-            conductor: Conductor<DS>,
-            conductor_config: ConductorConfig,
-            p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
-        ) -> ConductorResult<ConductorHandle> {
             // Get data before handle
             let keystore = conductor.keystore.clone();
             let holochain_p2p = conductor.holochain_p2p.clone();
 
             // Create handle
             let handle: ConductorHandle = Arc::new(ConductorHandleImpl {
+                root_env_dir: config.environment_path.clone(),
                 conductor: RwLock::new(conductor),
                 keystore,
                 holochain_p2p,
+                p2p_env: Arc::new(parking_lot::Mutex::new(HashMap::new())),
+                p2p_metrics_env: Arc::new(parking_lot::Mutex::new(HashMap::new())),
             });
 
+            Self::finish(handle, config, p2p_evt).await
+        }
+
+        async fn finish(
+            handle: ConductorHandle,
+            conductor_config: ConductorConfig,
+            p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
+        ) -> ConductorResult<ConductorHandle> {
             let configs = conductor_config.admin_interfaces.unwrap_or_default();
             handle.clone().initialize_conductor(configs).await?;
 
@@ -1416,8 +1258,10 @@ mod builder {
 
         /// Build a Conductor with a test environment
         #[cfg(any(test, feature = "test_utils"))]
-        pub async fn test(self, envs: &TestEnvs) -> ConductorResult<ConductorHandle> {
+        pub async fn test(mut self, envs: &TestEnvs) -> ConductorResult<ConductorHandle> {
             let keystore = envs.conductor().keystore().clone();
+
+            self.config.environment_path = envs.path().to_path_buf().into();
 
             let (holochain_p2p, p2p_evt) =
                 holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default(), holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig::new_ephemeral().await.unwrap())
@@ -1426,18 +1270,30 @@ mod builder {
             let conductor = Conductor::new(
                 envs.conductor(),
                 envs.wasm(),
-                envs.p2p(),
-                envs.p2p_metrics(),
                 self.dna_store,
                 keystore,
-                envs.path().to_path_buf().into(),
+                self.config.environment_path.clone(),
                 holochain_p2p,
             )
             .await?;
 
             let conductor = Self::update_fake_state(self.state, conductor).await?;
 
-            Self::finish(conductor, self.config, p2p_evt).await
+            // Get data before handle
+            let keystore = conductor.keystore.clone();
+            let holochain_p2p = conductor.holochain_p2p.clone();
+
+            // Create handle
+            let handle: ConductorHandle = Arc::new(ConductorHandleImpl {
+                root_env_dir: self.config.environment_path.clone(),
+                conductor: RwLock::new(conductor),
+                keystore,
+                holochain_p2p,
+                p2p_env: envs.p2p(),
+                p2p_metrics_env: envs.p2p_metrics(),
+            });
+
+            Self::finish(handle, self.config, p2p_evt).await
         }
     }
 }
