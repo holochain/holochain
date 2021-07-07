@@ -931,15 +931,20 @@ impl HolochainP2pHandler for HolochainP2pActor {
     fn handle_publish(
         &mut self,
         dna_hash: DnaHash,
-        from_agent: AgentPubKey,
+        _from_agent: AgentPubKey,
         request_validation_receipt: bool,
         dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
         timeout_ms: Option<u64>,
     ) -> HolochainP2pHandlerResult<()> {
+        use kitsune_p2p_types::KitsuneTimeout;
+
         let space = dna_hash.into_kitsune();
-        let from_agent = from_agent.into_kitsune();
         let basis = dht_hash.to_kitsune();
+        let timeout = match timeout_ms {
+            Some(ms) => KitsuneTimeout::from_millis(ms),
+            None => KitsuneTimeout::from_millis(30_000),
+        };
 
         let payload = crate::wire::WireMessage::publish(request_validation_receipt, dht_hash, ops)
             .encode()?;
@@ -947,14 +952,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
             kitsune_p2p
-                .notify_multi(kitsune_p2p::actor::NotifyMulti {
-                    space,
-                    from_agent,
-                    basis,
-                    remote_agent_count: None, // default best-effort
-                    timeout_ms,
-                    payload,
-                })
+                .broadcast(space, basis, timeout, payload)
                 .await?;
             Ok(())
         }

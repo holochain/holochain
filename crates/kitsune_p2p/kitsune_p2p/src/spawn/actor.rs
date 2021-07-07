@@ -282,6 +282,19 @@ impl KitsuneP2pActor {
                                 }
                             }
                             IncomingNotify(Tx2EpIncomingNotify { con, data, .. }) => match data {
+                                wire::Wire::DelegateBroadcast(wire::DelegateBroadcast {
+                                    /*
+                                    space,
+                                    basis,
+                                    to_agent,
+                                    mod_idx,
+                                    mod_cnt,
+                                    data,
+                                    */
+                                    ..
+                                }) => {
+                                    println!("!!! GOT DELEGATE BROADCAST");
+                                }
                                 wire::Wire::Gossip(wire::Gossip { space, data }) => {
                                     let data: Vec<u8> = data.into();
                                     let data: Box<[u8]> = data.into_boxed_slice();
@@ -567,6 +580,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         .into())
     }
 
+    /*
     fn handle_notify_multi(&mut self, input: actor::NotifyMulti) -> KitsuneP2pHandlerResult<u8> {
         let space_sender = match self.spaces.get_mut(&input.space) {
             None => return Err(KitsuneP2pError::RoutingSpaceError(input.space)),
@@ -575,6 +589,26 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         Ok(async move {
             let (space_sender, _) = space_sender.await;
             space_sender.notify_multi(input).await
+        }
+        .boxed()
+        .into())
+    }
+    */
+
+    fn handle_broadcast(
+        &mut self,
+        space: Arc<KitsuneSpace>,
+        basis: Arc<KitsuneBasis>,
+        timeout: KitsuneTimeout,
+        payload: Vec<u8>,
+    ) -> KitsuneP2pHandlerResult<()> {
+        let space_sender = match self.spaces.get_mut(&space) {
+            None => return Err(KitsuneP2pError::RoutingSpaceError(space)),
+            Some(space) => space.get(),
+        };
+        Ok(async move {
+            let (space_sender, _) = space_sender.await;
+            space_sender.broadcast(space, basis, timeout, payload).await
         }
         .boxed()
         .into())

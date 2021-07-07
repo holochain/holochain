@@ -44,8 +44,22 @@ kitsune_p2p_types::write_codec_enum! {
         NotifyResp(0x21) {
         },
 
+        /// "DelegateBroadcast" to the remote.
+        /// Remote should in turn connect to nodes in neighborhood,
+        /// and call "Notify" per broadcast algorithm.
+        /// uses low-level notify, not request
+        DelegateBroadcast(0x22) {
+            space.0: Arc<KitsuneSpace>,
+            basis.1: Arc<KitsuneBasis>,
+            to_agent.2: Arc<KitsuneAgent>,
+            mod_idx.3: u32,
+            mod_cnt.4: u32,
+            data.5: WireData,
+        },
+
         /// Gossip op with opaque data section,
         /// to be forwarded to gossip module.
+        /// uses low-level notify, not request
         Gossip(0x42) {
             space.0: Arc<KitsuneSpace>,
             data.1: WireData,

@@ -81,6 +81,7 @@ mod tests {
         Ok(())
     }
 
+    /*
     #[tokio::test(flavor = "multi_thread")]
     async fn test_transport_notify_coms() -> Result<(), KitsuneP2pError> {
         observability::test_run().ok();
@@ -120,6 +121,7 @@ mod tests {
 
         Ok(())
     }
+    */
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_peer_info_store() -> Result<(), KitsuneP2pError> {
@@ -199,6 +201,7 @@ mod tests {
         Ok(())
     }
 
+    /*
     #[tokio::test(flavor = "multi_thread")]
     async fn test_broadcast_workflow() -> Result<(), KitsuneP2pError> {
         observability::test_run_open().ok();
@@ -247,6 +250,7 @@ mod tests {
         observability::span_context!(span);
         Ok(())
     }
+    */
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_multi_request_workflow() -> Result<(), KitsuneP2pError> {

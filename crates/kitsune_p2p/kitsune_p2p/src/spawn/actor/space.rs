@@ -126,6 +126,7 @@ impl SpaceInternalHandler for Space {
         .boxed()
         .into())
     }
+
     fn handle_update_single_agent_info(
         &mut self,
         agent: Arc<KitsuneAgent>,
@@ -185,6 +186,7 @@ struct UpdateAgentInfoInput<'borrow> {
     mdns_handles: &'borrow mut HashMap<Vec<u8>, Arc<AtomicBool>>,
     bootstrap_service: &'borrow Option<Url2>,
 }
+
 async fn update_single_agent_info(input: UpdateAgentInfoInput<'_>) -> KitsuneP2pResult<()> {
     let UpdateAgentInfoInput {
         expires_after,
@@ -455,6 +457,7 @@ impl KitsuneP2pHandler for Space {
         self.handle_rpc_multi_inner(input)
     }
 
+    /*
     fn handle_notify_multi(
         &mut self,
         mut input: actor::NotifyMulti,
@@ -492,6 +495,81 @@ impl KitsuneP2pHandler for Space {
         } else {
             Ok(inner_fut)
         }
+    }
+    */
+
+    fn handle_broadcast(
+        &mut self,
+        space: Arc<KitsuneSpace>,
+        basis: Arc<KitsuneBasis>,
+        timeout: KitsuneTimeout,
+        payload: Vec<u8>,
+    ) -> KitsuneP2pHandlerResult<()> {
+        let ro_inner = self.ro_inner.clone();
+        let discover_fut =
+            discover::search_remotes_covering_basis(ro_inner.clone(), basis.get_loc(), timeout);
+        Ok(async move {
+            // TODO - temporarily publish to all local nodes here
+
+            let cover_nodes = discover_fut.await?;
+            if cover_nodes.is_empty() {
+                return Err("failed to discover neighboring peers".into());
+            }
+
+            let mut all = Vec::new();
+
+            // is there a better way to do this??
+            let half_timeout =
+                KitsuneTimeout::from_millis(timeout.time_remaining().as_millis() as u64 / 2);
+            for info in cover_nodes {
+                let ro_inner = ro_inner.clone();
+                all.push(async move {
+                    use discover::PeerDiscoverResult;
+                    let con_hnd = match discover::peer_connect(ro_inner, &info, half_timeout).await
+                    {
+                        PeerDiscoverResult::OkShortcut => return None,
+                        PeerDiscoverResult::OkRemote { con_hnd, .. } => con_hnd,
+                        PeerDiscoverResult::Err(_) => return None,
+                    };
+                    Some((info.agent.clone(), con_hnd))
+                });
+            }
+
+            let con_list = futures::future::join_all(all)
+                .await
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>();
+
+            if con_list.is_empty() {
+                return Err("failed to connect to neighboring peers".into());
+            }
+
+            let mut all = Vec::new();
+
+            let mod_cnt = con_list.len();
+            for (mod_idx, (agent, con_hnd)) in con_list.into_iter().enumerate() {
+                let payload = wire::Wire::delegate_broadcast(
+                    space.clone(),
+                    basis.clone(),
+                    agent,
+                    mod_idx as u32,
+                    mod_cnt as u32,
+                    payload.clone().into(),
+                );
+                all.push(async move {
+                    if let Err(err) = con_hnd.notify(&payload, timeout).await {
+                        tracing::warn!(?err, "delegate broadcast error");
+                    }
+                });
+            }
+
+            futures::future::join_all(all).await;
+
+            Ok(())
+        }
+        .boxed()
+        .into())
     }
 }
 
@@ -816,6 +894,7 @@ impl Space {
         .into())
     }
 
+    /*
     /// actual logic for handle_notify_multi ...
     /// the top-level handler may or may not spawn a task for this
     fn handle_notify_multi_inner(
@@ -877,4 +956,5 @@ impl Space {
         .boxed()
         .into())
     }
+    */
 }

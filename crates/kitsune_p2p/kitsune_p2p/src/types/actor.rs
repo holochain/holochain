@@ -1,5 +1,6 @@
 //! Definitions related to the KitsuneP2p peer-to-peer / dht communications actor.
 
+use kitsune_p2p_types::KitsuneTimeout;
 use std::sync::Arc;
 use url2::Url2;
 
@@ -38,6 +39,7 @@ pub struct RpcMultiResponse {
     pub response: Vec<u8>,
 }
 
+/*
 /// Publish data to a "neighborhood" of remote nodes surrounding the "basis" hash.
 /// Returns an approximate number of nodes reached.
 #[derive(Clone, Debug)]
@@ -62,6 +64,7 @@ pub struct NotifyMulti {
     /// Notify data.
     pub payload: Vec<u8>,
 }
+*/
 
 ghost_actor::ghost_chan! {
     /// The KitsuneP2pSender allows async remote-control of the KitsuneP2p actor.
@@ -83,9 +86,23 @@ ghost_actor::ghost_chan! {
         /// The remote sides will see these messages as "Call" events.
         fn rpc_multi(input: RpcMulti) -> Vec<RpcMultiResponse>;
 
+        /*
         /// Publish data to a "neighborhood" of remote nodes surrounding the "basis" hash.
         /// Returns an approximate number of nodes reached.
         /// The remote sides will see these messages as "Notify" events.
         fn notify_multi(input: NotifyMulti) -> u8;
+        */
+
+        /// Publish data to a "neighborhood" of remote nodes surrounding the
+        /// "basis" hash. This is a multi-step fire-and-forget algorithm.
+        /// An Ok(()) result only means that we were able to establish at
+        /// least one connection with a node in the target neighborhood.
+        /// The remote sides will see these messages as "Notify" events.
+        fn broadcast(
+            space: Arc<super::KitsuneSpace>,
+            basis: Arc<super::KitsuneBasis>,
+            timeout: KitsuneTimeout,
+            payload: Vec<u8>
+        ) -> ();
     }
 }
