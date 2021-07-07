@@ -71,7 +71,7 @@ impl MockNetwork {
 #[async_trait::async_trait]
 impl HolochainP2pCellT for PassThroughNetwork {
     async fn get_validation_package(
-        &mut self,
+        &self,
         _request_from: AgentPubKey,
         _header_hash: HeaderHash,
     ) -> actor::HolochainP2pResult<ValidationPackageResponse> {
@@ -79,7 +79,7 @@ impl HolochainP2pCellT for PassThroughNetwork {
     }
 
     async fn get(
-        &mut self,
+        &self,
         dht_hash: holo_hash::AnyDhtHash,
         options: actor::GetOptions,
     ) -> actor::HolochainP2pResult<Vec<WireOps>> {
@@ -113,14 +113,14 @@ impl HolochainP2pCellT for PassThroughNetwork {
         Ok(out)
     }
     async fn get_meta(
-        &mut self,
+        &self,
         _dht_hash: holo_hash::AnyDhtHash,
         _options: actor::GetMetaOptions,
     ) -> actor::HolochainP2pResult<Vec<MetadataSet>> {
         todo!()
     }
     async fn get_links(
-        &mut self,
+        &self,
         link_key: WireLinkKey,
         options: actor::GetLinksOptions,
     ) -> actor::HolochainP2pResult<Vec<WireLinkOps>> {
@@ -134,7 +134,7 @@ impl HolochainP2pCellT for PassThroughNetwork {
         Ok(out)
     }
     async fn get_agent_activity(
-        &mut self,
+        &self,
         agent: AgentPubKey,
         query: QueryFilter,
         options: actor::GetActivityOptions,
@@ -155,7 +155,7 @@ impl HolochainP2pCellT for PassThroughNetwork {
     }
 
     async fn authority_for_hash(
-        &mut self,
+        &self,
         _dht_hash: holo_hash::AnyDhtHash,
     ) -> actor::HolochainP2pResult<bool> {
         Ok(self.authority)
@@ -169,16 +169,16 @@ impl HolochainP2pCellT for PassThroughNetwork {
         todo!()
     }
 
-    async fn join(&mut self) -> actor::HolochainP2pResult<()> {
+    async fn join(&self) -> actor::HolochainP2pResult<()> {
         todo!()
     }
 
-    async fn leave(&mut self) -> actor::HolochainP2pResult<()> {
+    async fn leave(&self) -> actor::HolochainP2pResult<()> {
         todo!()
     }
 
     async fn call_remote(
-        &mut self,
+        &self,
         _to_agent: AgentPubKey,
         _zome_name: holochain_zome_types::ZomeName,
         _fn_name: holochain_zome_types::FunctionName,
@@ -189,7 +189,7 @@ impl HolochainP2pCellT for PassThroughNetwork {
     }
 
     async fn publish(
-        &mut self,
+        &self,
         _request_validation_receipt: bool,
         _dht_hash: holo_hash::AnyDhtHash,
         _ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
@@ -199,7 +199,7 @@ impl HolochainP2pCellT for PassThroughNetwork {
     }
 
     async fn send_validation_receipt(
-        &mut self,
+        &self,
         _to_agent: AgentPubKey,
         _receipt: holochain_serialized_bytes::SerializedBytes,
     ) -> actor::HolochainP2pResult<()> {
@@ -258,7 +258,7 @@ pub fn fill_db_as_author(env: &EnvWrite, op: DhtOpHashed) {
 #[async_trait::async_trait]
 impl HolochainP2pCellT for MockNetwork {
     async fn get_validation_package(
-        &mut self,
+        &self,
         request_from: AgentPubKey,
         header_hash: HeaderHash,
     ) -> actor::HolochainP2pResult<ValidationPackageResponse> {
@@ -270,7 +270,7 @@ impl HolochainP2pCellT for MockNetwork {
     }
 
     async fn get(
-        &mut self,
+        &self,
         dht_hash: holo_hash::AnyDhtHash,
         options: actor::GetOptions,
     ) -> actor::HolochainP2pResult<Vec<WireOps>> {
@@ -278,7 +278,7 @@ impl HolochainP2pCellT for MockNetwork {
     }
 
     async fn get_meta(
-        &mut self,
+        &self,
         dht_hash: holo_hash::AnyDhtHash,
         options: actor::GetMetaOptions,
     ) -> actor::HolochainP2pResult<Vec<MetadataSet>> {
@@ -286,7 +286,7 @@ impl HolochainP2pCellT for MockNetwork {
     }
 
     async fn get_links(
-        &mut self,
+        &self,
         link_key: WireLinkKey,
         options: actor::GetLinksOptions,
     ) -> actor::HolochainP2pResult<Vec<WireLinkOps>> {
@@ -294,7 +294,7 @@ impl HolochainP2pCellT for MockNetwork {
     }
 
     async fn get_agent_activity(
-        &mut self,
+        &self,
         agent: AgentPubKey,
         query: QueryFilter,
         options: actor::GetActivityOptions,
@@ -307,7 +307,7 @@ impl HolochainP2pCellT for MockNetwork {
     }
 
     async fn authority_for_hash(
-        &mut self,
+        &self,
         dht_hash: holo_hash::AnyDhtHash,
     ) -> actor::HolochainP2pResult<bool> {
         self.0.lock().await.authority_for_hash(dht_hash).await
@@ -321,16 +321,16 @@ impl HolochainP2pCellT for MockNetwork {
         todo!()
     }
 
-    async fn join(&mut self) -> actor::HolochainP2pResult<()> {
+    async fn join(&self) -> actor::HolochainP2pResult<()> {
         todo!()
     }
 
-    async fn leave(&mut self) -> actor::HolochainP2pResult<()> {
+    async fn leave(&self) -> actor::HolochainP2pResult<()> {
         todo!()
     }
 
     async fn call_remote(
-        &mut self,
+        &self,
         _to_agent: AgentPubKey,
         _zome_name: holochain_zome_types::ZomeName,
         _fn_name: holochain_zome_types::FunctionName,
@@ -341,7 +341,7 @@ impl HolochainP2pCellT for MockNetwork {
     }
 
     async fn publish(
-        &mut self,
+        &self,
         _request_validation_receipt: bool,
         _dht_hash: holo_hash::AnyDhtHash,
         _ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
@@ -351,7 +351,7 @@ impl HolochainP2pCellT for MockNetwork {
     }
 
     async fn send_validation_receipt(
-        &mut self,
+        &self,
         _to_agent: AgentPubKey,
         _receipt: holochain_serialized_bytes::SerializedBytes,
     ) -> actor::HolochainP2pResult<()> {

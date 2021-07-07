@@ -333,7 +333,11 @@ pub async fn setup_app(
         .await
         .unwrap();
 
-    let errors = conductor_handle.clone().setup_cells().await.unwrap();
+    let errors = conductor_handle
+        .clone()
+        .reconcile_cell_status_with_app_status()
+        .await
+        .unwrap();
 
     assert!(errors.is_empty());
 

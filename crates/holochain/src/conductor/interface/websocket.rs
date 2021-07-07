@@ -253,7 +253,11 @@ pub mod test_utils {
             .await
             .unwrap();
 
-        let errors = conductor_handle.clone().setup_cells().await.unwrap();
+        let errors = conductor_handle
+            .clone()
+            .reconcile_cell_status_with_app_status()
+            .await
+            .unwrap();
 
         assert!(errors.is_empty());
 
@@ -352,7 +356,11 @@ pub mod test {
             .await
             .unwrap();
 
-        let errors = conductor_handle.clone().setup_cells().await.unwrap();
+        let errors = conductor_handle
+            .clone()
+            .reconcile_cell_status_with_app_status()
+            .await
+            .unwrap();
 
         assert!(errors.is_empty());
 
@@ -522,7 +530,7 @@ pub mod test {
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AdminResponse::AppEnabled(_));
+            assert_matches!(response, AdminResponse::AppEnabled { .. });
             async { Ok(()) }.boxed().into()
         };
         let respond = Respond::Request(Box::new(respond));
@@ -584,7 +592,7 @@ pub mod test {
         // Get the state
         let state = conductor_handle.get_state_from_handle().await.unwrap();
 
-        // Check it's disabled, and get all cells
+        // Check it's deactivated, and get all cells
         let cell_ids: HashSet<CellId> = state
             .get_app(&app_id)
             .map(|app| {
@@ -598,7 +606,7 @@ pub mod test {
 
         assert_eq!(expected, cell_ids);
 
-        // Check that it is returned in get_app_info as disabled
+        // Check that it is returned in get_app_info as deactivated
         let maybe_info = state.get_app_info(&app_id);
         if let Some(info) = maybe_info {
             assert_eq!(info.installed_app_id, app_id);

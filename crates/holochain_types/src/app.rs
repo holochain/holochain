@@ -317,7 +317,7 @@ impl From<RunningApp> for InstalledApp {
     }
 }
 
-/// An app which has either never been activated, or has been deactivated.
+/// An app which is either Paused or Disabled, i.e. not Running
 #[derive(
     Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, shrinkwraprs::Shrinkwrap,
 )]
@@ -436,6 +436,13 @@ impl InstalledAppCommon {
             .chain(self.cloned_cells())
     }
 
+    /// Iterator of all "required" cells, meaning Cells which must be running
+    /// for this App to be able to run. The notion of "required cells" is not
+    /// yet solidified, so for now this placeholder equates to "all cells".
+    pub fn required_cells(&self) -> impl Iterator<Item = &CellId> {
+        self.all_cells()
+    }
+
     /// Accessor for particular slot
     pub fn slot(&self, slot_id: &SlotId) -> AppResult<&AppSlot> {
         self.slots
@@ -548,18 +555,40 @@ pub enum AppStatus {
     /// The app is enabled and running normally.
     Running,
 
-    /// Enabled, but stopped. App can be Started, and will restart on conductor reboot.
-    /// If optional string is None, this was a manual pause.
-    /// Otherwise, the reason for automatically pausing is given.
+    /// Enabled, but stopped due to some recoverable problem.
+    /// The app "hopes" to be Running again as soon as possible.
+    /// Holochain may restart the app automatically if it can. It may also be
+    /// restarted manually via the `StartApp` admin method.
+    /// Paused apps will be automatically set to Running when the conductor restarts.
     Paused(PausedAppReason),
 
-    /// Disabled and stopped. App must be Enabled before running, and will not restart on conductor reboot.
-    /// If optional string is None, this was a manual stop.
-    /// Otherwise, the reason for automatically stopping is given.
+    /// Disabled and stopped, either manually by the user, or automatically due
+    /// to an unrecoverable error. App must be Enabled before running again,
+    /// and will not restart automaticaly on conductor reboot.
     Disabled(DisabledAppReason),
 }
 
+/// The AppStatus without the reasons.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[allow(missing_docs)]
+pub enum AppStatusKind {
+    Running,
+    Paused,
+    Disabled,
+}
+
+impl From<AppStatus> for AppStatusKind {
+    fn from(status: AppStatus) -> Self {
+        match status {
+            AppStatus::Running => Self::Running,
+            AppStatus::Paused(_) => Self::Paused,
+            AppStatus::Disabled(_) => Self::Disabled,
+        }
+    }
+}
+
 /// Represents a state transition operation from one state to another
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AppStatusTransition {
     /// Attempt to unpause a Paused app
     Start,
@@ -590,22 +619,22 @@ impl AppStatus {
     }
 
     /// Transition a status from one state to another.
-    /// If None, the transition is not valid, and the status did not change.
-    pub fn transition(&mut self, transition: AppStatusTransition) -> AppStatusRunningDelta {
+    /// If None, the transition was not valid, and the status did not change.
+    pub fn transition(&mut self, transition: AppStatusTransition) -> AppStatusTransitionEffects {
         use AppStatus::*;
-        use AppStatusRunningDelta::*;
         use AppStatusTransition::*;
+        use AppStatusTransitionEffects::*;
         match (&self, transition) {
-            (Running, Pause(reason)) => Some((Paused(reason), Stop)),
-            (Running, Disable(reason)) => Some((Disabled(reason), Stop)),
+            (Running, Pause(reason)) => Some((Paused(reason), SpinDown)),
+            (Running, Disable(reason)) => Some((Disabled(reason), SpinDown)),
             (Running, Start) | (Running, Enable) => None,
 
-            (Paused(_), Start) => Some((Running, Run)),
-            (Paused(_), Enable) => Some((Running, Run)),
-            (Paused(_), Disable(reason)) => Some((Disabled(reason), NoChange)),
+            (Paused(_), Start) => Some((Running, SpinUp)),
+            (Paused(_), Enable) => Some((Running, SpinUp)),
+            (Paused(_), Disable(reason)) => Some((Disabled(reason), SpinDown)),
             (Paused(_), Pause(_)) => None,
 
-            (Disabled(_), Enable) => Some((Running, Run)),
+            (Disabled(_), Enable) => Some((Running, SpinUp)),
             (Disabled(_), Pause(_)) | (Disabled(_), Disable(_)) | (Disabled(_), Start) => None,
         }
         .map(|(new_status, delta)| {
@@ -616,15 +645,15 @@ impl AppStatus {
     }
 }
 
-/// Marks a change in the "running" status of an app
+/// A hint for the side effects of a particular AppStatusTransition
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum AppStatusRunningDelta {
-    /// The app was running, and now it has transitioned to stopped.
-    Stop,
-    /// No change: the previous running/stopped state persists.
+pub enum AppStatusTransitionEffects {
+    /// The transition may cause some Cells to be removed.
+    SpinDown,
+    /// The transition may cause some Cells to be added (fallibly).
+    SpinUp,
+    /// The transition did not result in any change to CellState.
     NoChange,
-    /// The app was stopped, and now it has transitioned to running.
-    Run,
 }
 
 /// The various reasons for why an App is not in the Running state.
@@ -640,16 +669,10 @@ pub enum AppStatusRunningDelta {
 )]
 #[serde(rename_all = "snake_case")]
 pub enum StoppedAppReason {
-    /// Enabled, but stopped. App can be Started, and will restart on conductor reboot.
-    /// If optional string is None, this was a manual pause.
-    /// Otherwise, the reason for automatically pausing is given.
-    /// Same as [`InstalledAppStatus::Paused`].
+    /// Same meaning as [`InstalledAppStatus::Paused`].
     Paused(PausedAppReason),
 
-    /// Disabled and stopped. App must be Enabled before running, and will not restart on conductor reboot.
-    /// If optional string is None, this was a manual stop.
-    /// Otherwise, the reason for automatically stopping is given.
-    /// Same as [`InstalledAppStatus::Disabled`].
+    /// Same meaning as [`InstalledAppStatus::Disabled`].
     Disabled(DisabledAppReason),
 }
 

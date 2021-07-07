@@ -129,7 +129,7 @@ async fn stuck_conductor_wasm_calls() -> anyhow::Result<()> {
     // Create a Conductor
     let mut conductor = SweetConductor::from_standard_config().await;
 
-    // Install DNA and install and activate apps in conductor
+    // Install DNA and install and enable apps in conductor
     let alice = conductor
         .setup_app("app", &[dna_file])
         .await

@@ -14,7 +14,6 @@ use super::config::InterfaceDriver;
 use super::dna_store::RealDnaStore;
 use super::entry_def_store::get_entry_defs;
 use super::error::ConductorError;
-use super::error::CreateAppError;
 use super::handle::ConductorHandleImpl;
 use super::interface::error::InterfaceResult;
 use super::interface::websocket::spawn_admin_interface_task;
@@ -33,6 +32,7 @@ use super::CellError;
 use super::{api::CellConductorApi, state::AppInterfaceConfig};
 use super::{api::CellConductorApiT, interface::AppInterfaceRuntime};
 use super::{api::RealAdminInterfaceApi, manager::TaskManagerClient};
+use crate::conductor::cell::error::CellResult;
 use crate::conductor::cell::Cell;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::error::ConductorResult;
@@ -61,6 +61,7 @@ use holochain_state::prelude::StateMutationResult;
 use holochain_types::prelude::*;
 use rusqlite::OptionalExtension;
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::*;
@@ -68,8 +69,43 @@ use tracing::*;
 #[cfg(any(test, feature = "test_utils"))]
 use super::handle::MockConductorHandleT;
 
-/// An [Cell] tracked by a Conductor, along with some [CellState]
-struct RunningCell<CA: CellConductorApiT>(Arc<Cell<CA>>);
+/// The status of an installed Cell, which captures different phases of its lifecycle
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CellStatus {
+    /// Kitsune knows about this Cell and it is considered fully "online"
+    Joined,
+    /// The Cell is on its way to being fully joined. It is a valid Cell from
+    /// the perspective of the conductor, and can handle HolochainP2pEvents,
+    /// but it is considered not to be fully running from the perspective of
+    /// app status, i.e. if any app has a required Cell with this status,
+    /// the app is considered to be in the Paused state.
+    PendingJoin,
+}
+
+/// Declarative filter for CellStatus
+pub type CellStatusFilter = CellStatus;
+
+/// A [`Cell`] tracked by a Conductor, along with its [`CellStatus`]
+struct CellItem<CA>
+where
+    CA: CellConductorApiT,
+{
+    cell: Arc<Cell<CA>>,
+    status: CellStatus,
+}
+
+impl<CA> CellItem<CA>
+where
+    CA: CellConductorApiT,
+{
+    pub fn is_running(&self) -> bool {
+        self.status == CellStatus::Joined
+    }
+
+    pub fn is_pending(&self) -> bool {
+        self.status == CellStatus::PendingJoin
+    }
+}
 
 pub(crate) type StopBroadcaster = tokio::sync::broadcast::Sender<()>;
 pub(crate) type StopReceiver = tokio::sync::broadcast::Receiver<()>;
@@ -81,7 +117,7 @@ where
     CA: CellConductorApiT,
 {
     /// The collection of cells associated with this Conductor
-    cells: HashMap<CellId, RunningCell<CA>>,
+    cells: HashMap<CellId, CellItem<CA>>,
 
     /// The database for persisting state related to this Conductor
     conductor_env: EnvWrite,
@@ -151,11 +187,40 @@ where
     DS: DnaStore + 'static,
 {
     pub(super) fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<Arc<Cell>> {
-        let cell = self
+        let item = self
             .cells
             .get(cell_id)
             .ok_or_else(|| ConductorError::CellMissing(cell_id.clone()))?;
-        Ok(cell.0.clone())
+        Ok(item.cell.clone())
+    }
+
+    /// Iterator over all cells, regardless of status.
+    pub(super) fn _all_cells(&self) -> impl Iterator<Item = (&CellId, &Cell)> {
+        self.cells.iter().map(|(id, item)| (id, item.cell.as_ref()))
+    }
+
+    /// Iterator over only the cells which are fully running. Generally used
+    /// to handle conductor interface requests
+    pub(super) fn running_cells(&self) -> impl Iterator<Item = (&CellId, &Cell)> {
+        self.cells.iter().filter_map(|(id, item)| {
+            if item.is_running() {
+                Some((id, item.cell.as_ref()))
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Iterator over only the cells which are pending validation. Used to
+    /// discover which cells need to be joined to the network.
+    pub(super) fn pending_cells(&self) -> impl Iterator<Item = (&CellId, &Cell)> {
+        self.cells.iter().filter_map(|(id, item)| {
+            if item.is_pending() {
+                Some((id, item.cell.as_ref()))
+            } else {
+                None
+            }
+        })
     }
 
     /// A gate to put at the top of public functions to ensure that work is not
@@ -483,32 +548,102 @@ where
         }
     }
 
-    /// Remove Cells from the conductor for each CellId marked stopped. Idempotent.
-    pub(super) async fn remove_cells_for_stopped_apps(&mut self) -> ConductorResult<()> {
-        let state = self.get_state().await?;
-        let stopped_cells: HashSet<CellId> = state
-            .stopped_apps()
-            .flat_map(|(_, app)| app.all_cells().cloned().collect::<HashSet<_>>())
-            .collect();
-        for (_, cell) in self
-            .cells
-            .iter()
-            .filter(|(id, _)| stopped_cells.contains(id))
-        {
-            cell.0.cleanup().await?;
-        }
-        self.cells.retain(|id, _| !stopped_cells.contains(id));
+    /// Adjust app statuses (via state transitions) to match the current
+    /// reality of which Cells are present in the conductor.
+    /// - Do not change state for Disabled apps. For all others:
+    /// - If an app is Paused but all of its (required) Cells are on,
+    ///     then set it to Running
+    /// - If an app is Running but at least one of its (required) Cells are off,
+    ///     then set it to Paused
+    pub(super) async fn reconcile_app_status_with_cell_status<S>(
+        &mut self,
+        app_ids: Option<S>,
+    ) -> ConductorResult<()>
+    where
+        S: Into<HashSet<InstalledAppId>>,
+    {
+        use AppStatus::*;
+        use AppStatusTransition::*;
+
+        let app_ids: Option<HashSet<InstalledAppId>> = app_ids.map(S::into);
+        let running_cells: HashSet<CellId> = self.running_cells().map(first).cloned().collect();
+        self.update_state(move |mut state| {
+            let apps = state.installed_apps_mut().iter_mut().filter(|(id, _)| {
+                app_ids
+                    .as_ref()
+                    .map(|ids| ids.contains(&**id))
+                    .unwrap_or(true)
+            });
+            for (_app_id, app) in apps {
+                match app.status().clone() {
+                    Running => {
+                        // If not all required cells are running, pause the app
+                        let missing: Vec<_> = app
+                            .required_cells()
+                            .filter(|id| !running_cells.contains(id))
+                            .collect();
+                        if !missing.is_empty() {
+                            let reason = PausedAppReason::Error(format!(
+                                "Some cells are missing / not able to run: {:#?}",
+                                missing
+                            ));
+                            app.status.transition(Pause(reason));
+                        }
+                    }
+                    Paused(_) => {
+                        // If all required cells are now running, restart the app
+                        if app.required_cells().all(|id| running_cells.contains(id)) {
+                            app.status.transition(Start);
+                        }
+                    }
+                    Disabled(_) => {
+                        // Disabled status should never automatically change.
+                    }
+                }
+            }
+            Ok(state)
+        })
+        .await?;
         Ok(())
     }
 
-    /// Create Cells to be added to the Conductor for each CellId marked running in the ConductorState db.
-    /// This only creates Cells that haven't already been created, so this is idempotent.
+    /// Remove all Cells which are not referenced by any Enabled app.
+    /// (Cells belonging to Paused apps are not considered "dangling" and will not be removed)
+    pub(super) async fn remove_dangling_cells(&mut self) -> ConductorResult<()> {
+        let state = self.get_state().await?;
+        let keepers: HashSet<CellId> = state
+            .enabled_apps()
+            .flat_map(|(_, app)| app.all_cells().cloned().collect::<HashSet<_>>())
+            .collect();
+
+        // Clean up all cells that will be dropped (leave network, etc.)
+        let tasks = self
+            .cells
+            .iter()
+            .filter(|(id, _)| !keepers.contains(id))
+            .map(|(_, cell)| cell.cell.cleanup());
+        futures::future::join_all(tasks)
+            .await
+            .into_iter()
+            .collect::<CellResult<Vec<()>>>()?;
+
+        // drop all but the keepers
+        self.cells.retain(|id, _| keepers.contains(id));
+        Ok(())
+    }
+
+    /// Attempt to create all necessary Cells which have not already been created
+    /// and added to the conductor, namely the cells which are referenced by
+    /// Running apps. If there are no cells to create, this function does nothing.
+    ///
+    /// Returns a Result for each attempt so that successful creations can be
+    /// handled alongside the failures.
     pub(super) async fn create_cells_for_running_apps(
         &self,
         conductor_handle: ConductorHandle,
-    ) -> ConductorResult<Vec<Result<Vec<(Cell, InitialQueueTriggers)>, CreateAppError>>> {
+    ) -> ConductorResult<Vec<Result<(Cell, InitialQueueTriggers), (CellId, CellError)>>> {
         // Data required to create apps
-        let root_env_dir = self.root_env_dir.clone();
+        let root_env_dir = PathBuf::from(self.root_env_dir.clone());
         let keystore = self.keystore.clone();
         let task_manager = self
             .task_manager
@@ -517,98 +652,54 @@ where
 
         // Closure for creating all cells in an app
         let state = self.get_state().await?;
-        let tasks =
-            state
-                .running_apps()
-                .map(move |(app_id, app): (&InstalledAppId, RunningApp)| {
-                    // Clone data for async block
-                    let root_env_dir = std::path::PathBuf::from(root_env_dir.clone());
-                    let conductor_handle = conductor_handle.clone();
-                    let keystore = keystore.clone();
 
-                    // Task that creates the cells
-                    async move {
-                        // Only create cells not already created
-                        let cells_to_create = app
-                            .all_cells()
-                            .filter(|cell_id| !self.cells.contains_key(cell_id))
-                            .map(|cell_id| {
-                                (
-                                    cell_id,
-                                    root_env_dir.clone(),
-                                    keystore.clone(),
-                                    conductor_handle.clone(),
-                                )
-                            });
+        // Collect all CellIds across all apps, deduped
+        let app_cells: HashSet<&CellId> = state
+            .installed_apps()
+            .iter()
+            .filter(|(_, app)| app.status().is_running())
+            .flat_map(|(_id, app)| app.all_cells().collect::<Vec<&CellId>>())
+            .collect();
 
-                        use holochain_p2p::actor::HolochainP2pRefToCell;
+        // calculate the existing cells so we can filter those out, only creating
+        // cells for CellIds that don't have cells
+        let on_cells: HashSet<&CellId> = self.cells.iter().map(first).collect();
 
-                        // Create each cell
-                        let cells_tasks = cells_to_create.map(
-                            |(cell_id, dir, keystore, conductor_handle)| async move {
-                                let holochain_p2p_cell = self.holochain_p2p.to_cell(
-                                    cell_id.dna_hash().clone(),
-                                    cell_id.agent_pubkey().clone(),
-                                );
+        let tasks = app_cells.difference(&on_cells).map(|&cell_id| {
+            let root_env_dir = root_env_dir.clone();
+            let keystore = keystore.clone();
+            let conductor_handle = conductor_handle.clone();
+            async move {
+                use holochain_p2p::actor::HolochainP2pRefToCell;
+                let holochain_p2p_cell = self
+                    .holochain_p2p
+                    .to_cell(cell_id.dna_hash().clone(), cell_id.agent_pubkey().clone());
 
-                                let env = EnvWrite::open(
-                                    &dir,
-                                    DbKind::Cell(cell_id.clone()),
-                                    keystore.clone(),
-                                )?;
-                                let cache = self
-                                    .get_or_create_cache(cell_id.dna_hash())
-                                    .map_err(|e| CellError::FailedToCreateCache(e.into()))?;
-                                Cell::create(
-                                    cell_id.clone(),
-                                    conductor_handle.clone(),
-                                    env,
-                                    cache,
-                                    holochain_p2p_cell,
-                                    task_manager.task_add_sender().clone(),
-                                    task_manager.task_stop_broadcaster().clone(),
-                                )
-                                .await
-                            },
-                        );
+                let env = EnvWrite::open(
+                    &root_env_dir,
+                    DbKind::Cell(cell_id.clone()),
+                    keystore.clone(),
+                )
+                .map_err(|err| (cell_id.clone(), err.into()))?;
 
-                        // Join all the cell create tasks for this app
-                        // and separate any errors
-                        let (success, errors): (Vec<_>, Vec<_>) =
-                            futures::future::join_all(cells_tasks)
-                                .await
-                                .into_iter()
-                                .partition(Result::is_ok);
-                        // unwrap safe because of the partition
-                        let success = success.into_iter().map(Result::unwrap);
+                let cache = self
+                    .get_or_create_cache(cell_id.dna_hash())
+                    .map_err(|e| CellError::FailedToCreateCache(e.into()))
+                    .map_err(|err| (cell_id.clone(), err))?;
 
-                        // If there were errors, cleanup and return the errors
-                        if !errors.is_empty() {
-                            for cell in success {
-                                // Error needs to capture which app failed
-                                cell.0.destroy().await.map_err(|e| CreateAppError::Failed {
-                                    installed_app_id: app_id.clone(),
-                                    errors: vec![e],
-                                })?;
-                            }
-                            // match needed to avoid Debug requirement on unwrap_err
-                            let errors = errors
-                                .into_iter()
-                                .map(|e| match e {
-                                    Err(e) => e,
-                                    Ok(_) => unreachable!("Safe because of the partition"),
-                                })
-                                .collect();
-                            Err(CreateAppError::Failed {
-                                installed_app_id: app_id.clone(),
-                                errors,
-                            })
-                        } else {
-                            // No errors so return the cells
-                            Ok(success.collect())
-                        }
-                    }
-                });
+                Cell::create(
+                    cell_id.clone(),
+                    conductor_handle.clone(),
+                    env,
+                    cache,
+                    holochain_p2p_cell,
+                    task_manager.task_add_sender().clone(),
+                    task_manager.task_stop_broadcaster().clone(),
+                )
+                .await
+                .map_err(|err| (cell_id.clone(), err))
+            }
+        });
 
         // Join on all apps and return a list of
         // apps that had succelly created cells
@@ -616,8 +707,8 @@ where
         Ok(futures::future::join_all(tasks).await)
     }
 
-    /// Register an app as deactivated in the database
-    pub(super) async fn add_deactivated_app_to_db(
+    /// Register an app as disabled in the database
+    pub(super) async fn add_disabled_app_to_db(
         &mut self,
         app: InstalledAppCommon,
     ) -> ConductorResult<StoppedApp> {
@@ -631,11 +722,12 @@ where
     }
 
     /// Transition an app's status to a new state.
+    #[tracing::instrument(skip(self))]
     pub(super) async fn transition_app_status(
         &mut self,
         app_id: &InstalledAppId,
         transition: AppStatusTransition,
-    ) -> ConductorResult<(InstalledApp, AppStatusRunningDelta)> {
+    ) -> ConductorResult<(InstalledApp, AppStatusTransitionEffects)> {
         Ok(self
             .update_state_prime(move |mut state| {
                 let (app, delta) = state.transition_app_status(&app_id, transition)?.clone();
@@ -664,28 +756,29 @@ where
     }
 
     /// Add fully constructed cells to the cell map in the Conductor
-    pub(super) fn add_cells(&mut self, cells: Vec<Cell>) {
-        for cell in cells {
+    pub(super) fn add_and_initialize_cells(&mut self, cells: Vec<(Cell, InitialQueueTriggers)>) {
+        for (cell, triggers) in cells {
             let cell_id = cell.id().clone();
             tracing::info!(?cell_id, "ADD CELL");
-            self.cells.insert(cell_id, RunningCell(Arc::new(cell)));
+            self.cells.insert(
+                cell_id,
+                CellItem {
+                    cell: Arc::new(cell),
+                    status: CellStatus::PendingJoin,
+                },
+            );
+            triggers.initialize_workflows();
         }
     }
 
-    /// tell the network module not to handle this list of cells
-    pub(super) async fn network_leave_cells(&self, cell_ids: &Vec<CellId>) {
-        let mut all = Vec::new();
+    /// Change the CellStatus of the given Cells in the Conductor.
+    /// Silently ignores Cells that don't exist.
+    pub(super) fn update_cell_status(&mut self, cell_ids: &[CellId], status: CellStatus) {
         for cell_id in cell_ids {
-            if let Some(cell) = self.cells.get(cell_id) {
-                use holochain_p2p::HolochainP2pCellT;
-                let mut network = cell.cell.holochain_p2p_cell().clone();
-                all.push(async move {
-                    // just making a best effort for now
-                    let _ = network.leave().await;
-                });
+            if let Some(mut cell) = self.cells.get_mut(cell_id) {
+                cell.status = status.clone();
             }
         }
-        futures::future::join_all(all).await;
     }
 
     /// Associate a Cell with an existing App
@@ -772,8 +865,11 @@ where
     /// Remove cells from the cell map in the Conductor
     pub(super) async fn remove_cells(&mut self, cell_ids: Vec<CellId>) {
         for cell_id in cell_ids {
-            if let Some(cell) = self.cells.remove(&cell_id) {
-                if let Err(err) = cell.0.cleanup().await {
+            if let Some(item) = self.cells.remove(&cell_id) {
+                // TODO: make this function async, or ensure that cleanup is fast,
+                //       so we don't hold the conductor lock unduly long while doing cleanup
+                //       (currently cleanup is a noop, so it's not urgent)
+                if let Err(err) = item.cell.cleanup().await {
                     tracing::error!("Error cleaning up Cell: {:?}\nCellId: {}", err, cell_id);
                 }
             }
@@ -837,8 +933,26 @@ where
         Ok(zome_defs)
     }
 
-    pub(super) async fn list_cell_ids(&self) -> ConductorResult<Vec<CellId>> {
-        Ok(self.cells.keys().cloned().collect())
+    pub(super) async fn list_cell_ids(
+        &self,
+        filter: Option<CellStatusFilter>,
+    ) -> ConductorResult<Vec<CellId>> {
+        Ok(self
+            .cells
+            .iter()
+            .filter_map(|(id, cell)| {
+                let matches = filter
+                    .as_ref()
+                    .map(|status| cell.status == *status)
+                    .unwrap_or(true);
+                if matches {
+                    Some(id)
+                } else {
+                    None
+                }
+            })
+            .cloned()
+            .collect())
     }
 
     pub(super) async fn list_running_apps(&self) -> ConductorResult<Vec<InstalledAppId>> {
@@ -1208,7 +1322,10 @@ mod builder {
 
             tokio::task::spawn(p2p_event_task(p2p_evt, handle.clone()));
 
-            let cell_startup_errors = handle.clone().setup_cells().await?;
+            let cell_startup_errors = handle
+                .clone()
+                .reconcile_cell_status_with_app_status()
+                .await?;
 
             // TODO: This should probably be emitted over the admin interface
             if !cell_startup_errors.is_empty() {

@@ -1,10 +1,11 @@
+use std::collections::HashSet;
+
 use super::InterfaceApi;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::error::ConductorApiResult;
-
 use crate::conductor::api::error::SerializationError;
-
-use crate::conductor::error::CreateAppError;
+use crate::conductor::conductor::CellStatus;
+use crate::conductor::error::ConductorError;
 use crate::conductor::interface::error::InterfaceError;
 use crate::conductor::interface::error::InterfaceResult;
 use crate::conductor::ConductorHandle;
@@ -211,7 +212,10 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 Ok(AdminResponse::AgentPubKeyGenerated(agent_pub_key))
             }
             ListCellIds => {
-                let cell_ids = self.conductor_handle.list_cell_ids().await?;
+                let cell_ids = self
+                    .conductor_handle
+                    .list_cell_ids(Some(CellStatus::Joined))
+                    .await?;
                 Ok(AdminResponse::CellIdsListed(cell_ids))
             }
             ListEnabledApps => {
@@ -234,27 +238,38 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .enable_app(&installed_app_id)
                     .await?;
 
-                // Create cells
-                let errors = self.conductor_handle.clone().setup_cells().await?;
+                let app_cells: HashSet<_> = app.required_cells().collect();
 
-                // Check if this app was created successfully
-                errors
+                // Create cells
+                let errors = self
+                    .conductor_handle
+                    .clone()
+                    .reconcile_cell_status_with_app_status()
+                    .await?;
+
+                self.conductor_handle
+                    .clone()
+                    .reconcile_app_status_with_cell_status(Some(
+                        vec![installed_app_id.clone()].into_iter().collect(),
+                    ))
+                    .await?;
+
+                let app_info = self
+                    .conductor_handle
+                    .get_app_info(&installed_app_id)
+                    .await?
+                    .ok_or(ConductorError::AppNotInstalled(installed_app_id))?;
+
+                let errors: Vec<_> = errors
                     .into_iter()
-                    // We only care about this app for the activate command
-                    .find(|cell_error| match cell_error {
-                        CreateAppError::Failed {
-                            installed_app_id: error_app_id,
-                            ..
-                        } => error_app_id == &installed_app_id,
-                    })
-                    // There was an error in this app so return it
-                    .map(|this_app_error| Ok(AdminResponse::Error(this_app_error.into())))
-                    // No error, return success
-                    .unwrap_or_else(|| {
-                        Ok(AdminResponse::AppEnabled(
-                            InstalledAppInfo::from_installed_app(&app),
-                        ))
-                    })
+                    .filter(|(cell_id, _)| app_cells.contains(cell_id))
+                    .map(|(cell_id, error)| (cell_id, error.to_string()))
+                    .collect();
+
+                Ok(AdminResponse::AppEnabled {
+                    app: app_info,
+                    errors,
+                })
             }
             DisableApp { installed_app_id } => {
                 // Disable app
@@ -265,6 +280,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 Ok(AdminResponse::AppDisabled)
             }
             StartApp { installed_app_id } => {
+                // TODO: check to see if app was actually started
                 let app = self
                     .conductor_handle
                     .clone()
@@ -585,21 +601,21 @@ mod test {
         let expects = vec![dna_hash.clone()];
         assert_matches!(dna_list, AdminResponse::DnasListed(a) if a == expects);
 
-        let expected_activated_app = InstalledApp::new_running(
+        let expected_enabled_app = InstalledApp::new_running(
             InstalledAppCommon::new_legacy(
                 "test-by-path".to_string(),
                 vec![InstalledCell::new(cell_id2.clone(), "".to_string())],
             )
             .unwrap(),
         );
-        let expected_activated_app_info: InstalledAppInfo = (&expected_activated_app).into();
+        let expected_enabled_app_info: InstalledAppInfo = (&expected_enabled_app).into();
         let res = admin_api
             .handle_admin_request(AdminRequest::EnableApp {
                 installed_app_id: "test-by-path".to_string(),
             })
             .await;
         assert_matches!(res,
-            AdminResponse::AppEnabled(info) if info == expected_activated_app_info
+            AdminResponse::AppEnabled {app, ..} if app == expected_enabled_app_info
         );
 
         let res = admin_api
