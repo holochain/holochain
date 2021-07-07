@@ -149,10 +149,10 @@ pub async fn incoming_dht_ops_workflow(
         // there was no already running batch task, so spawn one:
         tokio::task::spawn(async move {
             while let Some(entries) = maybe_batch {
-                match vault
+                let senders = Arc::new(parking_lot::Mutex::new(Vec::new()));
+                let senders2 = senders.clone();
+                if let Err(err) = vault
                     .async_commit(move |txn| {
-                        let mut senders = Vec::new();
-
                         for entry in entries {
                             let InOpBatchEntry {
                                 snd,
@@ -166,34 +166,33 @@ pub async fn incoming_dht_ops_workflow(
                                 request_validation_receipt,
                                 ops,
                             );
+
                             // we can't send the results here...
                             // we haven't comitted
-                            senders.push((snd, res));
+                            senders2.lock().push((snd, res));
                         }
 
-                        WorkflowResult::Ok(senders)
+                        WorkflowResult::Ok(())
                     })
                     .await
                 {
-                    Err(err) => {
-                        tracing::error!(?err, "incoming_dht_ops_workflow error");
-                    }
-                    Ok(senders) => {
-                        for (snd, res) in senders {
-                            let _ = snd.send(res);
-                        }
-
-                        // trigger validation of queued ops
-                        sys_validation_trigger.trigger();
-                    }
+                    tracing::error!(?err, "incoming_dht_ops_workflow error");
                 }
+
+                for (snd, res) in senders.lock().drain(..) {
+                    let _ = snd.send(res);
+                }
+
+                // trigger validation of queued ops
+                sys_validation_trigger.trigger();
 
                 maybe_batch = batch_check_end(kind.clone());
             }
         });
     }
 
-    rcv.await.expect("sender dropped")
+    rcv.await
+        .map_err(|_| super::error::WorkflowError::RecvError)?
 }
 
 fn needs_receipt(op: &DhtOp, from_agent: &Option<AgentPubKey>) -> bool {

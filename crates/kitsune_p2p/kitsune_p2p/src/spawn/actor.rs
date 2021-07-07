@@ -143,6 +143,9 @@ impl KitsuneP2pActor {
                 loop {
                     // see if we need a new connection to the proxy
                     if con.is_none() || con.as_ref().unwrap().is_closed() {
+                        if ep_hnd.is_closed() {
+                            break;
+                        }
                         match ep_hnd
                             .get_connection(use_proxy.clone(), tuning_params.implicit_timeout())
                             .await
@@ -159,6 +162,7 @@ impl KitsuneP2pActor {
                     // this is very naive... just running every 5 seconds
                     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                 }
+                tracing::warn!("proxy con refresh loop shutdown");
             });
 
             ProxyUrl::new(proxy_url.as_base().as_str(), this_digest)
@@ -175,114 +179,125 @@ impl KitsuneP2pActor {
         tokio::task::spawn({
             let evt_sender = evt_sender.clone();
             let tuning_params = config.tuning_params.clone();
-            ep.for_each_concurrent(tuning_params.concurrent_limit_per_thread, move |event| {
-                let evt_sender = evt_sender.clone();
-                let tuning_params = tuning_params.clone();
-                let i_s = i_s.clone();
-                async move {
-                    macro_rules! resp {
-                        ($r:expr, $e:expr) => {
-                            // this can only error as channel closed
-                            // it would be noise to output tracing errors
-                            let _ = $r.respond($e, tuning_params.implicit_timeout()).await;
-                        };
-                    }
+            async move {
+                ep.for_each_concurrent(tuning_params.concurrent_limit_per_thread, move |event| {
+                    let evt_sender = evt_sender.clone();
+                    let tuning_params = tuning_params.clone();
+                    let i_s = i_s.clone();
+                    async move {
+                        macro_rules! resp {
+                            ($r:expr, $e:expr) => {
+                                // this can only error as channel closed
+                                // it would be noise to output tracing errors
+                                let _ = $r.respond($e, tuning_params.implicit_timeout()).await;
+                            };
+                        }
 
-                    let evt_sender = &evt_sender;
-                    use tx2_api::Tx2EpEvent::*;
-                    #[allow(clippy::single_match)]
-                    match event {
-                        IncomingRequest(Tx2EpIncomingRequest { data, respond, .. }) => match data {
-                            wire::Wire::Call(wire::Call {
-                                space,
-                                from_agent,
-                                to_agent,
-                                data,
-                                ..
-                            }) => {
-                                let res = match evt_sender
-                                    .call(space, to_agent, from_agent, data.into())
-                                    .await
-                                {
-                                    Err(err) => {
-                                        let reason = format!("{:?}", err);
-                                        let fail = wire::Wire::failure(reason);
-                                        resp!(respond, fail);
-                                        return;
-                                    }
-                                    Ok(r) => r,
-                                };
-                                let resp = wire::Wire::call_resp(res.into());
-                                resp!(respond, resp);
-                            }
-                            wire::Wire::Notify(wire::Notify {
-                                space,
-                                from_agent,
-                                to_agent,
-                                data,
-                                ..
-                            }) => {
-                                if let Err(err) = evt_sender
-                                    .notify(space, to_agent, from_agent, data.into())
-                                    .await
-                                {
-                                    let reason = format!("{:?}", err);
-                                    let fail = wire::Wire::failure(reason);
-                                    resp!(respond, fail);
-                                    return;
-                                }
-                                let resp = wire::Wire::notify_resp();
-                                resp!(respond, resp);
-                            }
-                            wire::Wire::PeerGet(wire::PeerGet { space, agent }) => {
-                                if let Ok(Some(agent_info_signed)) = evt_sender
-                                    .get_agent_info_signed(GetAgentInfoSignedEvt { space, agent })
-                                    .await
-                                {
-                                    let resp = wire::Wire::peer_get_resp(agent_info_signed);
-                                    resp!(respond, resp);
-                                } else {
-                                    let resp = wire::Wire::failure("no such agent".into());
-                                    resp!(respond, resp);
-                                }
-                            }
-                            wire::Wire::PeerQuery(wire::PeerQuery { space, basis_loc }) => {
-                                // this *does* go over the network...
-                                // so we don't want it to be too many
-                                const LIMIT: u32 = 8;
-                                match evt_sender
-                                    .query_agent_info_signed_near_basis(space, basis_loc, LIMIT)
-                                    .await
-                                {
-                                    Ok(list) if !list.is_empty() => {
-                                        let resp = wire::Wire::peer_query_resp(list);
+                        let evt_sender = &evt_sender;
+                        use tx2_api::Tx2EpEvent::*;
+                        #[allow(clippy::single_match)]
+                        match event {
+                            IncomingRequest(Tx2EpIncomingRequest { data, respond, .. }) => {
+                                match data {
+                                    wire::Wire::Call(wire::Call {
+                                        space,
+                                        from_agent,
+                                        to_agent,
+                                        data,
+                                        ..
+                                    }) => {
+                                        let res = match evt_sender
+                                            .call(space, to_agent, from_agent, data.into())
+                                            .await
+                                        {
+                                            Err(err) => {
+                                                let reason = format!("{:?}", err);
+                                                let fail = wire::Wire::failure(reason);
+                                                resp!(respond, fail);
+                                                return;
+                                            }
+                                            Ok(r) => r,
+                                        };
+                                        let resp = wire::Wire::call_resp(res.into());
                                         resp!(respond, resp);
                                     }
-                                    res => {
-                                        let resp = wire::Wire::failure(format!(
-                                            "error getting agents: {:?}",
-                                            res
-                                        ));
+                                    wire::Wire::Notify(wire::Notify {
+                                        space,
+                                        from_agent,
+                                        to_agent,
+                                        data,
+                                        ..
+                                    }) => {
+                                        if let Err(err) = evt_sender
+                                            .notify(space, to_agent, from_agent, data.into())
+                                            .await
+                                        {
+                                            let reason = format!("{:?}", err);
+                                            let fail = wire::Wire::failure(reason);
+                                            resp!(respond, fail);
+                                            return;
+                                        }
+                                        let resp = wire::Wire::notify_resp();
                                         resp!(respond, resp);
                                     }
+                                    wire::Wire::PeerGet(wire::PeerGet { space, agent }) => {
+                                        if let Ok(Some(agent_info_signed)) = evt_sender
+                                            .get_agent_info_signed(GetAgentInfoSignedEvt {
+                                                space,
+                                                agent,
+                                            })
+                                            .await
+                                        {
+                                            let resp = wire::Wire::peer_get_resp(agent_info_signed);
+                                            resp!(respond, resp);
+                                        } else {
+                                            let resp = wire::Wire::failure("no such agent".into());
+                                            resp!(respond, resp);
+                                        }
+                                    }
+                                    wire::Wire::PeerQuery(wire::PeerQuery { space, basis_loc }) => {
+                                        // this *does* go over the network...
+                                        // so we don't want it to be too many
+                                        const LIMIT: u32 = 8;
+                                        match evt_sender
+                                            .query_agent_info_signed_near_basis(
+                                                space, basis_loc, LIMIT,
+                                            )
+                                            .await
+                                        {
+                                            Ok(list) if !list.is_empty() => {
+                                                let resp = wire::Wire::peer_query_resp(list);
+                                                resp!(respond, resp);
+                                            }
+                                            res => {
+                                                let resp = wire::Wire::failure(format!(
+                                                    "error getting agents: {:?}",
+                                                    res
+                                                ));
+                                                resp!(respond, resp);
+                                            }
+                                        }
+                                    }
+                                    data => unimplemented!("{:?}", data),
                                 }
                             }
-                            data => unimplemented!("{:?}", data),
-                        },
-                        IncomingNotify(Tx2EpIncomingNotify { con, data, .. }) => match data {
-                            wire::Wire::Gossip(wire::Gossip { space, data }) => {
-                                let data: Vec<u8> = data.into();
-                                let data: Box<[u8]> = data.into_boxed_slice();
-                                if let Err(e) = i_s.incoming_gossip(space, con, data).await {
-                                    tracing::warn!("failed to handle incoming gossip: {:?}", e);
+                            IncomingNotify(Tx2EpIncomingNotify { con, data, .. }) => match data {
+                                wire::Wire::Gossip(wire::Gossip { space, data }) => {
+                                    let data: Vec<u8> = data.into();
+                                    let data: Box<[u8]> = data.into_boxed_slice();
+                                    if let Err(e) = i_s.incoming_gossip(space, con, data).await {
+                                        tracing::warn!("failed to handle incoming gossip: {:?}", e);
+                                    }
                                 }
-                            }
-                            data => unimplemented!("{:?}", data),
-                        },
-                        _ => (),
+                                data => unimplemented!("{:?}", data),
+                            },
+                            _ => (),
+                        }
                     }
-                }
-            })
+                })
+                .await;
+                tracing::warn!("KitsuneP2p tx2:ep poll shutdown");
+            }
         });
 
         Ok(Self {
@@ -297,7 +312,24 @@ impl KitsuneP2pActor {
     }
 }
 
-impl ghost_actor::GhostControlHandler for KitsuneP2pActor {}
+use ghost_actor::dependencies::must_future::MustBoxFuture;
+impl ghost_actor::GhostControlHandler for KitsuneP2pActor {
+    fn handle_ghost_actor_shutdown(mut self) -> MustBoxFuture<'static, ()> {
+        use futures::sink::SinkExt;
+        use ghost_actor::GhostControlSender;
+        async move {
+            // this is a curtesy, ok if fails
+            let _ = self.evt_sender.close().await;
+            self.ep_hnd.close(500, "").await;
+            for (_, space) in self.spaces.into_iter() {
+                let (space, _) = space.get().await;
+                let _ = space.ghost_actor_shutdown_immediate().await;
+            }
+        }
+        .boxed()
+        .into()
+    }
+}
 
 impl ghost_actor::GhostHandler<Internal> for KitsuneP2pActor {}
 
