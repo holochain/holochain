@@ -267,7 +267,19 @@ async fn update_single_agent_info(input: UpdateAgentInfoInput<'_>) -> KitsuneP2p
     Ok(())
 }
 
-impl ghost_actor::GhostControlHandler for Space {}
+use ghost_actor::dependencies::must_future::MustBoxFuture;
+impl ghost_actor::GhostControlHandler for Space {
+    fn handle_ghost_actor_shutdown(mut self) -> MustBoxFuture<'static, ()> {
+        async move {
+            use futures::sink::SinkExt;
+            // this is a curtesy, ok if fails
+            let _ = self.evt_sender.close().await;
+            self.gossip_mod.close();
+        }
+        .boxed()
+        .into()
+    }
+}
 
 impl ghost_actor::GhostHandler<KitsuneP2p> for Space {}
 
@@ -349,8 +361,8 @@ impl KitsuneP2pHandler for Space {
         agent: Arc<KitsuneAgent>,
     ) -> KitsuneP2pHandlerResult<()> {
         self.local_joined_agents.remove(&agent);
-        self.gossip_mod.local_agent_leave(agent);
-        Ok(async move { Ok(()) }.boxed().into())
+        self.gossip_mod.local_agent_leave(agent.clone());
+        self.publish_leave_agent_info(agent)
     }
 
     fn handle_rpc_single(
@@ -558,6 +570,11 @@ impl Space {
                 let mut delay_len = START_DELAY;
 
                 loop {
+                    use ghost_actor::GhostControlSender;
+                    if !i_s_c.ghost_actor_is_active() {
+                        break;
+                    }
+
                     tokio::time::sleep(delay_len).await;
                     if delay_len <= MAX_DELAY {
                         delay_len *= 2;
@@ -576,6 +593,9 @@ impl Space {
                             tracing::error!(msg = "Failed to get peers from bootstrap", ?e);
                         }
                         Ok(list) => {
+                            if !i_s_c.ghost_actor_is_active() {
+                                break;
+                            }
                             for item in list {
                                 // TODO - someday some validation here
                                 let agent = item.agent.clone();
@@ -604,6 +624,7 @@ impl Space {
                         }
                     }
                 }
+                tracing::warn!("bootstrap fetch loop ending");
             });
         }
 
@@ -629,6 +650,72 @@ impl Space {
             mdns_listened_spaces: HashSet::new(),
             gossip_mod,
         }
+    }
+
+    fn publish_leave_agent_info(
+        &mut self,
+        agent: Arc<KitsuneAgent>,
+    ) -> KitsuneP2pHandlerResult<()> {
+        let space = self.space.clone();
+        let network_type = self.config.network_type.clone();
+        let evt_sender = self.evt_sender.clone();
+        let bootstrap_service = self.config.bootstrap_service.clone();
+        let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
+        Ok(async move {
+            let signed_at_ms = crate::spawn::actor::bootstrap::now_once(None).await?;
+            let expires_at_ms = signed_at_ms + expires_after;
+            use kitsune_p2p_types::agent_info::AgentInfoSigned;
+            let agent_info_signed = AgentInfoSigned::sign(
+                space.clone(),
+                agent.clone(),
+                0,          // no storage arc
+                Vec::new(), // no urls
+                signed_at_ms,
+                expires_at_ms,
+                |d| {
+                    let data = Arc::new(d.to_vec());
+                    async {
+                        let sign_req = SignNetworkDataEvt {
+                            space: space.clone(),
+                            agent: agent.clone(),
+                            data,
+                        };
+                        evt_sender
+                            .sign_network_data(sign_req)
+                            .await
+                            .map(Arc::new)
+                            .map_err(KitsuneError::other)
+                    }
+                },
+            )
+            .await?;
+
+            tracing::debug!(?agent_info_signed);
+
+            evt_sender
+                .put_agent_info_signed(PutAgentInfoSignedEvt {
+                    space: space.clone(),
+                    agent: agent.clone(),
+                    agent_info_signed: agent_info_signed.clone(),
+                })
+                .await?;
+
+            // Push to the network as well
+            match network_type {
+                NetworkType::QuicMdns => tracing::warn!("NOT publishing leaves to mdns"),
+                NetworkType::QuicBootstrap => {
+                    crate::spawn::actor::bootstrap::put(
+                        bootstrap_service.clone(),
+                        agent_info_signed,
+                    )
+                    .await?;
+                }
+            }
+
+            Ok(())
+        }
+        .boxed()
+        .into())
     }
 
     /// actual logic for handle_rpc_multi ...

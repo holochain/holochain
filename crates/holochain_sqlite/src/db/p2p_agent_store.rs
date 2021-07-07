@@ -118,6 +118,8 @@ fn tx_p2p_put(txn: &mut Transaction, record: P2pRecord) -> DatabaseResult<()> {
             ":expires_at_ms": &record.expires_at_ms,
             ":storage_center_loc": &record.storage_center_loc,
 
+            ":is_active": &record.is_active,
+
             ":storage_start_loc": &record.storage_start_loc,
             ":storage_end_loc": &record.storage_end_loc,
         },
@@ -260,6 +262,9 @@ struct P2pRecord {
     expires_at_ms: i64,
     storage_center_loc: u32,
 
+    // is this record active?
+    is_active: bool,
+
     // generated fields
     storage_start_loc: Option<u32>,
     storage_end_loc: Option<u32>,
@@ -285,6 +290,8 @@ impl P2pRecord {
 
         let storage_center_loc = arc.center_loc.into();
 
+        let is_active = !signed.url_list.is_empty();
+
         let (storage_start_loc, storage_end_loc) = arc.primitive_range_detached();
 
         Ok(Self {
@@ -295,6 +302,8 @@ impl P2pRecord {
             signed_at_ms: clamp64(signed_at_ms),
             expires_at_ms: clamp64(expires_at_ms),
             storage_center_loc,
+
+            is_active,
 
             storage_start_loc,
             storage_end_loc,

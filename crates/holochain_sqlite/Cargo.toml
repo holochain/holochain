@@ -61,6 +61,10 @@ rusqlite = { version = "0.25", features = [
 [dev-dependencies]
 observability = { version = "0.1.3" }
 
+[build-dependencies]
+pretty_assertions = "0.7.2"
+sqlformat = "0.1.6"
+
 [features]
 default = [ "test_utils", "no-deps" ]
 

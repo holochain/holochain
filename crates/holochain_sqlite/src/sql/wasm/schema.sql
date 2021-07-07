@@ -1,3 +1,5 @@
+-- no-sql-format --
+
 -- Initial Holochain Wasm schema
 
 CREATE TABLE IF NOT EXISTS Wasm (

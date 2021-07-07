@@ -1,14 +1,19 @@
+use crate::crate_selection::Crate;
+use crate::release::ReleaseWorkspace;
 use crate::Fallible;
+use anyhow::bail;
 use comrak::nodes::Ast;
 use comrak::nodes::{AstNode, NodeValue};
 use comrak::{format_commonmark, parse_document, Arena, ComrakOptions};
-use log::trace;
+use log::{debug, trace, warn};
 use once_cell::unsync::OnceCell;
 use semver::Version;
 use serde::Deserialize;
-use std::cell::RefCell;
-use std::path::PathBuf;
-use std::time::SystemTime;
+use std::io::Write;
+use std::ops::Add;
+use std::path::{Path, PathBuf};
+use std::{cell::RefCell, convert::TryFrom};
+use std::{collections::HashSet, convert::TryInto};
 
 #[derive(Default, Debug, PartialEq, Deserialize)]
 pub(crate) struct Frontmatter {
@@ -24,133 +29,274 @@ impl Frontmatter {
     }
 }
 
-pub(crate) enum ChangeType {
-    Unreleased,
-    Release,
+/// Trims potential brackets and spaces
+pub(crate) fn normalize_heading_name(input: &str) -> String {
+    input.replace("[", "").replace("]", "").replace(" ", "")
 }
 
-impl ChangeType {
-    pub(crate) fn from_title(title: &str) -> Self {
-        if title.to_lowercase().contains("unreleased") {
-            Self::Unreleased
-        } else {
-            Self::Release
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum ReleaseChange {
+    CrateReleaseChange(String),
+    WorkspaceReleaseChange(String, Vec<String>),
+}
+
+impl ReleaseChange {
+    pub(crate) fn title(&self) -> &str {
+        match self {
+            ReleaseChange::CrateReleaseChange(t) => t,
+            ReleaseChange::WorkspaceReleaseChange(t, _) => t,
         }
     }
-
-    pub(crate) fn is_unreleased(&self) -> bool {
-        matches!(self, Self::Unreleased)
-    }
 }
 
-/// The `WorkspaceChangelog` has further level-1 headings.
-/// With the exception of the potential unreleased heading, all level-1 headings correspond to previous workspace releases.
-/// Within each workspace release the level-2 headings correspond to the crate's that were released together.
-pub(crate) struct WorkspaceChangelog<'a> {
-    path: PathBuf,
-    arena: Arena<AstNode<'a>>,
-    root: OnceCell<&'a comrak::arena_tree::Node<'a, RefCell<Ast>>>,
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum ChangeT {
+    Release(ReleaseChange),
+    Unreleased,
+    Changelog,
+    None,
 }
 
-#[derive(Debug, PartialEq, Default)]
-pub(crate) struct WorkspaceChange {
-    pub(crate) title: String,
-    pub(crate) crate_changes: Vec<CrateChange>,
-}
+impl<'a> ChangeT {
+    pub(crate) fn from_heading_node(
+        node: &'a comrak::arena_tree::Node<'a, RefCell<Ast>>,
+        level: u32,
+    ) -> Fallible<Self> {
+        let mut change = Self::None;
 
-impl WorkspaceChange {
-    pub(crate) fn change_type(&self) -> ChangeType {
-        ChangeType::from_title(&self.title)
-    }
-}
+        for sibling in node.following_siblings() {
+            if let NodeValue::Heading(heading) = sibling.data.borrow().value {
+                if heading.level == level {
+                    if change != ChangeT::None {
+                        break;
+                    }
 
-impl<'a> WorkspaceChangelog<'a> {
-    /// Try to instantiate from parse.
-    /// FIXME: Eagerly parse the changelog to raise errors from this fn instead of `Self::root()`.
-    pub(crate) fn try_from_path(path: &PathBuf) -> Fallible<Self> {
-        let path = path.to_owned();
-        let arena = Arena::new();
-        let root = { Default::default() };
+                    let title = get_heading_text(sibling)
+                        .ok_or_else(|| anyhow::anyhow!("no heading text found"))?;
 
-        Ok(Self { path, arena, root })
-    }
+                    let trimmed = normalize_heading_name(&title).to_lowercase();
 
-    pub(crate) fn changes(&self) -> Fallible<Vec<WorkspaceChange>> {
-        changes(&self.path, 1, |title, crate_headings| {
-            if title == "Changelog" {
-                return None;
-            }
-
-            Some(WorkspaceChange {
-                title,
-                crate_changes: crate_headings
-                    .into_iter()
-                    .filter_map(|(level, subheading)| {
-                        if level == 2 {
-                            Some(CrateChange { title: subheading })
-                        } else {
-                            None
+                    match trimmed.as_str() {
+                        "unreleased" => {
+                            change = Self::Unreleased;
+                            break;
                         }
-                    })
-                    .collect(),
-            })
+                        "changelog" => {
+                            change = Self::Changelog;
+                            break;
+                        }
+                        _ => {}
+                    }
+
+                    match level {
+                        WorkspaceChangelog::RELEASE_HEADING_LEVEL => {
+                            change = ChangeT::Release(ReleaseChange::WorkspaceReleaseChange(
+                                title,
+                                vec![],
+                            ));
+                        }
+                        CrateChangelog::RELEASE_HEADING_LEVEL => {
+                            change = ChangeT::Release(ReleaseChange::CrateReleaseChange(title));
+                        }
+
+                        _ => {}
+                    }
+                } else if heading.level == level + 1
+                    && level == WorkspaceChangelog::RELEASE_HEADING_LEVEL
+                {
+                    if let ChangeT::Release(ReleaseChange::WorkspaceReleaseChange(
+                        _,
+                        ref mut crate_releases,
+                    )) = change
+                    {
+                        let crate_release_title = get_heading_text(sibling)
+                            .ok_or_else(|| anyhow::anyhow!("no heading text found"))?;
+
+                        crate_releases.push(crate_release_title);
+                    };
+                }
+            }
+        }
+
+        Ok(change)
+    }
+}
+
+impl From<ChangeT> for Option<ReleaseChange> {
+    fn from(c: ChangeT) -> Self {
+        match c {
+            ChangeT::Release(rc) => Some(rc),
+            _ => None,
+        }
+    }
+}
+
+impl ChangeT {
+    pub(crate) fn title(&self) -> Option<String> {
+        match self {
+            Self::Release(rc) => Some(rc.title().to_string()),
+            _ => None,
+        }
+    }
+}
+
+#[derive(custom_debug::Debug)]
+pub(crate) struct Machinery<'a> {
+    path: PathBuf,
+    #[debug(skip)]
+    arena: Arena<AstNode<'a>>,
+    #[debug(skip)]
+    root: OnceCell<&'a comrak::arena_tree::Node<'a, RefCell<Ast>>>,
+    #[debug(skip)]
+    options: ComrakOptions,
+}
+
+impl Machinery<'_> {
+    pub(crate) fn with_path(path: &Path) -> Self {
+        Self {
+            path: path.to_owned(),
+
+            ..Default::default()
+        }
+    }
+}
+
+impl<'a> Default for Machinery<'a> {
+    fn default() -> Self {
+        let path = Default::default();
+        let arena = Arena::new();
+        let root = Default::default();
+
+        let mut options = ComrakOptions::default();
+        options.parse.smart = true;
+        options.extension.front_matter_delimiter = Some("---".to_owned());
+        options.render.hardbreaks = true;
+
+        Self {
+            path,
+            arena,
+            root,
+            options,
+        }
+    }
+}
+
+/// Workaround until Rust supports passing enum variants as types.
+#[derive(Debug)]
+pub(crate) enum ChangelogType {
+    Crate,
+    Workspace,
+}
+
+#[derive(Debug)]
+pub(crate) enum Changelog<'a> {
+    Crate(Machinery<'a>),
+    Workspace(Machinery<'a>),
+}
+
+pub(crate) const WORKSPACE_RELEASE_HEADING_LEVEL: u32 = 1;
+pub(crate) const CRATE_RELEASE_HEADING_LEVEL: u32 = 2;
+
+use core::marker::PhantomData;
+
+#[derive(Debug)]
+pub(crate) struct CrateChangelog;
+#[derive(Debug)]
+pub(crate) struct WorkspaceChangelog;
+#[derive(Debug)]
+pub(crate) struct ChangelogT<'a, T>(Machinery<'a>, PhantomData<T>);
+pub(crate) trait HeadingLevel {
+    const RELEASE_HEADING_LEVEL: u32;
+}
+
+impl HeadingLevel for CrateChangelog {
+    const RELEASE_HEADING_LEVEL: u32 = CRATE_RELEASE_HEADING_LEVEL;
+}
+
+impl HeadingLevel for WorkspaceChangelog {
+    const RELEASE_HEADING_LEVEL: u32 = WORKSPACE_RELEASE_HEADING_LEVEL;
+}
+
+impl<'a, T> ChangelogT<'a, T>
+where
+    T: HeadingLevel,
+{
+    pub(crate) fn at_path(path: &Path) -> Self {
+        Self(Machinery::with_path(path), PhantomData::<T>)
+    }
+
+    fn root(&'a self) -> Fallible<&&'a comrak::arena_tree::Node<'a, RefCell<Ast>>> {
+        self.0.root.get_or_try_init(|| {
+            let s = std::fs::read_to_string(&self.0.path)?;
+            Ok(parse_document(&self.0.arena, &s, &self.0.options))
         })
     }
-}
 
-/// The `CrateChangelog` only has one level-1 heading, namely `# Changelog`.
-/// With the exception of the potential unreleased heading, all level-2 headings correspond to previous versions of the crate.
-pub(crate) struct CrateChangelog<'a> {
-    path: PathBuf,
-    arena: Arena<AstNode<'a>>,
-    root: OnceCell<&'a comrak::arena_tree::Node<'a, RefCell<Ast>>>,
-}
-
-#[derive(Debug, PartialEq, Default)]
-pub(crate) struct CrateChange {
-    pub(crate) title: String,
-}
-
-impl CrateChange {
-    pub(crate) fn change_type(&self) -> ChangeType {
-        ChangeType::from_title(&self.title)
+    pub(crate) fn path(&'a self) -> &'a Path {
+        &self.0.path
     }
-}
 
-impl std::fmt::Debug for CrateChangelog<'_> {
-    fn fmt(
-        &self,
-        formatter: &mut std::fmt::Formatter<'_>,
-    ) -> std::result::Result<(), std::fmt::Error> {
-        write!(formatter, "CrateChangelog {{ path: {:?} }}", self.path)?;
-
-        Ok(())
+    fn arena(&'a self) -> &Arena<AstNode<'a>> {
+        &self.0.arena
     }
-}
 
-impl<'a> CrateChangelog<'a> {
-    /// Try to instantiate from parse.
-    /// FIXME: Eagerly parse the changelog to raise errors from this fn instead of `Self::root()`.
-    pub(crate) fn try_from_path(path: &PathBuf) -> Fallible<Self> {
-        let path = path.to_owned();
-        let arena = Arena::new();
-        let root = { Default::default() };
+    fn options(&'a self) -> &ComrakOptions {
+        &self.0.options
+    }
 
-        Ok(Self { path, arena, root })
+    pub(crate) fn changes(&'a self) -> Fallible<Vec<ChangeT>> {
+        let root = self.root()?;
+        let mut changes = vec![];
+
+        for (i, node) in root.children().enumerate() {
+            // we're only interested in the headings here
+            if let NodeValue::Heading(heading) = node.data.borrow().value {
+                let mut msg = format!("[{}] heading at level {}", i, heading.level);
+
+                if heading.level == T::RELEASE_HEADING_LEVEL {
+                    match ChangeT::from_heading_node(node, T::RELEASE_HEADING_LEVEL)? {
+                        ChangeT::None => {}
+                        change => {
+                            msg += &format!(" => [{}] derived change '{:?}'", i, change);
+                            changes.push(change);
+                        }
+                    }
+                }
+
+                trace!("{}", msg);
+            }
+        }
+
+        Ok(changes)
+    }
+
+    fn changes_filtered<F>(&'a self, filter: F) -> Fallible<Vec<ChangeT>>
+    where
+        F: FnMut(&ChangeT) -> bool,
+    {
+        Ok(self.changes()?.into_iter().filter(filter).collect())
+    }
+
+    pub(crate) fn topmost_release(&'a self) -> Fallible<Option<ReleaseChange>> {
+        Ok(self
+            .changes_filtered(|change| matches!(change, ChangeT::Release(_)))?
+            .into_iter()
+            .map(Into::into)
+            .take(1)
+            .next()
+            .flatten())
     }
 
     /// Find and parse the frontmatter of this crate's changelog file.
     pub(crate) fn front_matter(&'a self) -> Fallible<Option<Frontmatter>> {
-        let root = self.root()?;
-
-        for (i, node) in root.children().enumerate() {
+        for (i, node) in self.root()?.children().enumerate() {
             {
-                let children = node.children().collect::<Vec<_>>().len();
-                let descendants = node.descendants().collect::<Vec<_>>().len();
+                let children = node.children().count();
+                let descendants = node.descendants().count();
                 let debug = format!("{:#?}", node.data.borrow().value);
                 let ty = debug
                     .split(&['(', ' '][..])
-                    .nth(0)
+                    .next()
                     .ok_or_else(|| format!("error extracting type from '{}'", debug))
                     .map_err(anyhow::Error::msg)?;
                 trace!(
@@ -162,142 +308,702 @@ impl<'a> CrateChangelog<'a> {
                 );
             }
 
-            match &mut node.data.borrow_mut().value {
-                &mut NodeValue::FrontMatter(ref fm) => {
-                    let fm_str = String::from_utf8(fm.to_vec())?
-                        .replace("---", "")
-                        .trim()
-                        .to_owned();
+            // we're only interested in the frontmatter here
+            if let NodeValue::FrontMatter(ref fm) = &mut node.data.borrow_mut().value {
+                let fm_str = String::from_utf8(fm.to_vec())?
+                    .replace("---", "")
+                    .trim()
+                    .to_owned();
 
-                    let fm: Frontmatter = if fm_str.is_empty() {
-                        Frontmatter::default()
-                    } else {
-                        serde_yaml::from_str(&fm_str)?
-                    };
+                let fm: Frontmatter = if fm_str.is_empty() {
+                    Frontmatter::default()
+                } else {
+                    serde_yaml::from_str(&fm_str)?
+                };
 
-                    trace!(
-                        "[{}] found a YAML front matter: {:#?}\nsource string: \n'{}'",
-                        i,
-                        fm,
-                        fm_str
-                    );
+                trace!(
+                    "[{}] found a YAML front matter: {:#?}\nsource string: \n'{}'",
+                    i,
+                    fm,
+                    fm_str
+                );
 
-                    return Ok(Some(fm));
-                }
-
-                // we're only interested in the frontmatter here
-                _ => {}
+                return Ok(Some(fm));
             }
         }
 
         Ok(None)
     }
-
-    /// Find a list of releases, including the unreleased changes, for this crate.
-    pub(crate) fn changes(&self) -> Fallible<Vec<CrateChange>> {
-        changes(&self.path, 2, |title, _| Some(CrateChange { title }))
-    }
-
-    fn root(&'a self) -> Fallible<&&'a comrak::arena_tree::Node<'a, RefCell<Ast>>> {
-        self.root.get_or_try_init(|| {
-            let s = std::fs::read_to_string(&self.path)?;
-            let mut options = ComrakOptions::default();
-            options.parse.smart = true;
-            options.extension.front_matter_delimiter = Some("---".to_owned());
-            options.render.hardbreaks = true;
-            Ok(parse_document(&self.arena, &s, &options))
-        })
-    }
 }
 
-fn changes<F, T>(path: &PathBuf, level: u32, f: F) -> Fallible<Vec<T>>
-where
-    F: Fn(String, Vec<(u32, String)>) -> Option<T>,
-    T: core::fmt::Debug,
-{
-    let mut options = ComrakOptions::default();
-    options.parse.smart = true;
-    options.extension.front_matter_delimiter = Some("---".to_owned());
-    options.render.hardbreaks = true;
+impl<'a> HeadingLevel for ChangelogT<'a, CrateChangelog> {
+    const RELEASE_HEADING_LEVEL: u32 = CrateChangelog::RELEASE_HEADING_LEVEL;
+}
 
-    let arena = Arena::new();
-    let root = parse_document(&arena, &std::fs::read_to_string(&path)?, &options);
+impl<'a> ChangelogT<'a, CrateChangelog> {
+    /// Create a new release heading for the items currently under the Unreleased heading.
+    /// The target heading will be created regardless of whether one with the same name exists.
+    pub(crate) fn add_release(&'a self, title: String) -> Fallible<()> {
+        let root = self.root()?;
 
-    let mut changes = vec![];
+        let mut unreleased_node = None;
+        let mut topmost_release = None;
 
-    for (i, node) in root.children().enumerate() {
-        match &node.data.borrow().value {
-            &NodeValue::Heading(heading) => {
+        for (i, node) in root.children().enumerate() {
+            if let NodeValue::Heading(heading) = &node.data.borrow().value {
                 let mut msg = format!("[{}] heading at level {}", i, heading.level);
 
-                if heading.level == level {
+                if heading.level == CrateChangelog::RELEASE_HEADING_LEVEL {
                     if let Some(text_str) = get_heading_text(node) {
-                        let descending_headings = node
-                            .following_siblings()
-                            .skip(1)
-                            .take_while(|node_k| match &node_k.data.borrow().value {
-                                &NodeValue::Heading(heading_k) => heading_k.level > level,
+                        msg += &format!(" => [{}] found heading text '{}'", i, text_str);
 
-                                _ => true,
-                            })
-                            .filter_map(|node_k| match &node_k.data.borrow().value {
-                                &NodeValue::Heading(heading_k) => {
-                                    get_heading_text(node_k).map(|s| (heading_k.level, s))
-                                }
+                        if text_str.to_lowercase().contains("unreleased") {
+                            // identified unreleased heading
 
-                                _ => None,
-                            })
-                            .collect::<Vec<_>>();
+                            if let Some(top) = topmost_release {
+                                bail!(
+                                    "expected the unreleased heading to be first heading with level {}. found instead: {:?}",
+                                    Self::RELEASE_HEADING_LEVEL,
+                                    get_heading_text(top)
+                                );
+                            }
 
-                        let change = f(text_str.to_string(), descending_headings);
+                            msg += " => found unreleased section";
+                            unreleased_node = Some(node);
+                            break;
+                        };
+                    }
 
-                        msg += &format!(
-                            " => [{}] derived release '{:?}' from text '{}'",
-                            i, change, text_str
-                        );
-                        changes.push(change);
+                    if topmost_release.is_none() {
+                        topmost_release = Some(node);
                     }
                 }
 
                 trace!("{}", msg);
             }
-
-            _ => {}
         }
-    }
 
-    Ok(changes.into_iter().filter_map(|o| o).collect())
+        // construct the new heading node
+        let heading_value = NodeValue::Heading(comrak::nodes::NodeHeading {
+            level: Self::RELEASE_HEADING_LEVEL,
+            setext: false,
+        });
+        let heading_ast = comrak::nodes::Ast::new(heading_value);
+        let heading = self
+            .arena()
+            .alloc(comrak::arena_tree::Node::new(core::cell::RefCell::new(
+                heading_ast,
+            )));
+
+        let text_value = NodeValue::Text(title.into_bytes());
+        let text_ast = comrak::nodes::Ast::new(text_value);
+        let text = self
+            .arena()
+            .alloc(comrak::arena_tree::Node::new(core::cell::RefCell::new(
+                text_ast,
+            )));
+        heading.append(text);
+
+        match (topmost_release, unreleased_node) {
+            (Some(_), Some(_)) => {
+                unreachable!("the loop should have bailed on this condition")
+            }
+
+            // no release nor unreleased headings found, append at the end of the document.
+            (None, None) => root.append(heading),
+
+            // no unreleased heading found, insert before the first release heading.
+            (Some(top), None) => top.insert_before(heading),
+
+            // unreleased heading found, insert immediately after it, thus
+            // passing on its content to the new release heading.
+            (None, Some(unreleased)) => unreleased.insert_after(heading),
+        };
+
+        // write the file
+        let mut buf = vec![];
+        format_commonmark(root, self.options(), &mut buf).unwrap();
+        let mut output_file = std::fs::File::create(&self.path())?;
+        output_file.write_all(&buf)?;
+
+        Ok(())
+    }
 }
 
-fn get_heading_text<'a>(node: &'a comrak::arena_tree::Node<'a, RefCell<Ast>>) -> Option<String> {
-    node.descendants().skip(1).fold(None, |acc, node_l| {
+impl<'a> HeadingLevel for ChangelogT<'a, WorkspaceChangelog> {
+    const RELEASE_HEADING_LEVEL: u32 = WorkspaceChangelog::RELEASE_HEADING_LEVEL;
+}
+
+impl<'a> ChangelogT<'a, WorkspaceChangelog> {
+    pub(crate) fn aggregate(&'a self, inputs: &[&'a Crate<'a>]) -> Fallible<()> {
+        let root = self.root()?;
+        let arena = self.arena();
+
+        let mut unreleased_node = None;
+        let mut remove_other = false;
+        let mut topmost_release = None;
+
+        for (i, node) in root.children().enumerate() {
+            match &node.data.borrow().value {
+                &NodeValue::Heading(heading) => {
+                    let mut msg = format!(
+                        "[{:?}/{}] heading at level {}",
+                        self.path(),
+                        i,
+                        heading.level
+                    );
+
+                    match (unreleased_node, heading.level) {
+                        (Some(_), 1) => {
+                            msg += " => arrived at next release section, stopping.";
+                            topmost_release = Some(node);
+                            break;
+                        }
+                        (Some(_), _) => {
+                            // todo: only remove entries for crates that are given as inputs?
+                            msg += " => detaching";
+                            remove_other = true;
+                            node.detach();
+                        }
+                        (None, 1) => {
+                            if let Some(text_str) = get_heading_text(node) {
+                                msg += &format!(" => [{}] found heading text '{}'", i, text_str);
+
+                                if text_str.to_lowercase().contains("unreleased") {
+                                    msg += " => found unreleased section";
+                                    unreleased_node = Some(node);
+                                    remove_other = false;
+                                };
+                            }
+                        }
+                        (None, _) => {}
+                    };
+
+                    trace!("{}", msg);
+                }
+
+                other => {
+                    let mut msg = format!("[{}] ", i);
+                    if remove_other {
+                        msg += "detaching ";
+                        node.detach();
+                    } else {
+                        msg += "keeping ";
+                    }
+
+                    match other {
+                        NodeValue::Text(ref text) => {
+                            msg += &format!("'{}'", String::from_utf8_lossy(text))
+                        }
+                        _ => msg += &format!("{:?}", other),
+                    }
+
+                    trace!("{}", msg);
+                }
+            };
+        }
+
+        if unreleased_node.is_none() {
+            todo!("insert unrelased node?")
+        }
+
+        // insert the unreleased content into the output file
+        for (name, crate_changelog) in inputs.iter().map(|crt| (crt.name(), crt.changelog())) {
+            let crate_root = if let Some(cl) = crate_changelog {
+                cl.root()?
+            } else {
+                debug!("crate {} has no changelog", name);
+                continue;
+            };
+
+            let mut content_unreleased_heading = None;
+
+            for (i, node) in crate_root.children().enumerate() {
+                {
+                    let children = node.children().count();
+                    let descendants = node.descendants().count();
+                    let debug = format!("{:#?}", node.data.borrow().value);
+                    let ty = debug.split(&['(', ' '][..]).next().unwrap();
+                    trace!(
+                        "[{}/{}] {} with {} child(ren) and {} descendant(s)",
+                        name,
+                        i,
+                        ty,
+                        children,
+                        descendants
+                    );
+                }
+
+                if let NodeValue::Heading(heading) = &mut node.data.borrow_mut().value {
+                    trace!(
+                        "[{}/{}] found heading with level {}",
+                        name,
+                        i,
+                        heading.level
+                    );
+
+                    // look for the 'unreleased' heading
+                    if heading.level == CrateChangelog::RELEASE_HEADING_LEVEL
+                        && content_unreleased_heading.is_none()
+                    {
+                        // `descendants()` starts with the node itself so we skip it
+                        let search = node.descendants().skip(1).collect::<Vec<_>>();
+
+                        trace!("[{}/{}] searching through {} nodes", name, i, search.len());
+
+                        let mut recent_link_index = None;
+
+                        'two: for (j, node_j) in search
+                            .iter()
+                            .take_while(|child| child.data.try_borrow().is_ok())
+                            .enumerate()
+                        {
+                            match &mut node_j.data.borrow_mut().value {
+                                NodeValue::Link(ref mut _link) => {
+                                    trace!("[{}/{}/{}] found link", name, i, j);
+                                    recent_link_index = Some(j);
+                                }
+
+                                NodeValue::Text(ref mut text) => {
+                                    let text_str = String::from_utf8_lossy(text);
+                                    if text_str.to_lowercase().contains("unreleased") {
+                                        trace!(
+                                            "[{}/{}/{}] found unreleased heading: {:#?}",
+                                            name,
+                                            i,
+                                            j,
+                                            text_str
+                                        );
+                                        content_unreleased_heading = Some(node);
+
+                                        *text = name.to_string().as_bytes().to_vec();
+
+                                        trace!("[{}/{}/{}] changing name to {}", name, i, j, name);
+
+                                        let url =
+                                                // todo: derive this path dynamically
+                                                format!("crates/{}/CHANGELOG.md#unreleased", name);
+
+                                        if let Some(link_index) = recent_link_index {
+                                            if let NodeValue::Link(ref mut link) =
+                                                search[link_index].data.borrow_mut().value
+                                            {
+                                                link.url = url.as_bytes().to_vec();
+                                                trace!(
+                                                    "[{}/{}/{}] changing link to: {:#?}",
+                                                    name,
+                                                    i,
+                                                    j,
+                                                    url
+                                                );
+                                            }
+                                        } else {
+                                            let link_value =
+                                                NodeValue::Link(comrak::nodes::NodeLink {
+                                                    url: url.as_bytes().to_vec(),
+                                                    title: Default::default(),
+                                                });
+                                            let ast = comrak::nodes::Ast::new(link_value);
+                                            let link = arena.alloc(comrak::arena_tree::Node::new(
+                                                core::cell::RefCell::new(ast),
+                                            ));
+                                            // insert the link node before the text node
+                                            node_j.insert_before(link);
+
+                                            // attach the text node as a child of the link
+                                            node_j.detach();
+                                            link.append(node_j);
+                                        }
+
+                                        break 'two;
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                };
+            }
+
+            let target = match (unreleased_node, topmost_release) {
+                (_, Some(topmost)) => topmost,
+                (Some(unreleased), _) => unreleased,
+                _ => panic!("expected at least one set"),
+            };
+
+            // add all siblings between here and the next headline
+            let count = content_unreleased_heading
+                .map(|content_unreleased_heading| {
+                    let mut new_nodes = vec![content_unreleased_heading];
+
+                    new_nodes.extend(
+                        content_unreleased_heading
+                            .following_siblings()
+                            .skip(1)
+                            .take_while(|node| {
+                                node.descendants().all(|descendant| {
+                                    match descendant.data.borrow().value {
+                                        NodeValue::Heading(heading) => {
+                                            let heading_text = get_nested_text(descendant);
+                                            let add = heading.level
+                                                > CrateChangelog::RELEASE_HEADING_LEVEL;
+                                            trace!(
+                                                "adding heading with text '{}' and level {}? {}",
+                                                heading_text,
+                                                heading.level,
+                                                add
+                                            );
+                                            add
+                                        }
+
+                                        _ => true,
+                                    }
+                                })
+                            }),
+                    );
+                    if new_nodes.len() == 1 {
+                        trace!("[{}] skipping empty unreleased heading", name);
+
+                        0
+                    } else {
+                        for new_node in &new_nodes {
+                            let text = get_nested_text(new_node);
+                            trace!("[{}] adding node with text: {:#?}", name, text);
+                            target.insert_before(new_node);
+                        }
+
+                        new_nodes.len()
+                    }
+                })
+                .unwrap_or_default();
+
+            trace!("[{}] added {} items", name, count);
+        }
+
+        // write the file
+        let mut buf = vec![];
+        format_commonmark(root, self.options(), &mut buf).unwrap();
+        let mut output_file = std::fs::File::create(&self.path())?;
+        output_file.write_all(&buf)?;
+
+        Ok(())
+    }
+
+    /// Add a new release to this WorkspaceChangelog.
+    pub(crate) fn add_release(
+        &'a self,
+        title: String,
+        crate_release_headings: &[WorkspaceCrateReleaseHeading<'a>],
+    ) -> Fallible<()> {
+        let root = self.root()?;
+
+        let mut maybe_previous_release = None;
+        let mut maybe_unreleased = None;
+
+        // locate the previous release heading and unreleased heading if they exist
+        for (i, node) in root.children().enumerate() {
+            if let NodeValue::Heading(heading) = &node.data.borrow().value {
+                let mut msg = format!("[{}] heading at level {}", i, heading.level);
+
+                if heading.level == WorkspaceChangelog::RELEASE_HEADING_LEVEL {
+                    let heading_text = if let Some(heading_text) = get_heading_text(node) {
+                        heading_text
+                    } else {
+                        continue;
+                    };
+
+                    msg += &format!(" => [{}] found heading text '{}'", i, heading_text);
+
+                    if maybe_previous_release.is_none()
+                        && !heading_text.to_lowercase().contains("changelog")
+                    {
+                        if heading_text.to_lowercase().contains("unreleased") {
+                            msg += " => unreleased heading";
+                            maybe_unreleased = Some(node);
+                        } else {
+                            msg += &format!(" => found previous release: {}", heading_text);
+                            maybe_previous_release = Some(node);
+                        }
+                    }
+                }
+
+                trace!("{}", msg);
+            }
+        }
+
+        // construct the new heading node
+        let heading_value = NodeValue::Heading(comrak::nodes::NodeHeading {
+            level: Self::RELEASE_HEADING_LEVEL,
+            setext: false,
+        });
+        let heading_ast = comrak::nodes::Ast::new(heading_value);
+        let heading = self
+            .arena()
+            .alloc(comrak::arena_tree::Node::new(core::cell::RefCell::new(
+                heading_ast,
+            )));
+
+        let text_value = NodeValue::Text(title.into_bytes());
+        let text_ast = comrak::nodes::Ast::new(text_value);
+        let text = self
+            .arena()
+            .alloc(comrak::arena_tree::Node::new(core::cell::RefCell::new(
+                text_ast,
+            )));
+        heading.append(text);
+
+        // collect all new nodes for the new release heading and start with the heading itself
+        let mut new_nodes: Vec<&'a comrak::arena_tree::Node<'a, RefCell<Ast>>> = vec![heading];
+
+        if let Some(unreleased_node) = maybe_unreleased {
+            // look for the crates that were released and remove their headings
+
+            let release_crate_names = crate_release_headings
+                .iter()
+                .map(|wcrh| normalize_heading_name(&wcrh.prefix).to_lowercase())
+                .collect::<HashSet<_>>();
+            trace!(
+                "will remove headings that match '{:?}'",
+                release_crate_names
+            );
+
+            let mut remove_other = false;
+            let mut first_heading_found = false;
+
+            for (i, node) in unreleased_node.following_siblings().skip(1).enumerate() {
+                let mut remove_nodes = vec![];
+
+                if matches!(node.data.borrow().value, NodeValue::Heading(_)) {
+                    first_heading_found = true;
+                }
+
+                match node.data.borrow().value {
+                    NodeValue::Heading(found_heading_value)
+                        if found_heading_value.level < CrateChangelog::RELEASE_HEADING_LEVEL =>
+                    {
+                        trace!(
+                            "[{}] reached next workspace release heading '{:?}'. stopping search for crate heading. found? {}",
+                            i,
+                            get_heading_text(node),
+                            !remove_nodes.is_empty()
+                        );
+                        break;
+                    }
+
+                    NodeValue::Heading(found_heading_value)
+                        if found_heading_value.level == CrateChangelog::RELEASE_HEADING_LEVEL =>
+                    {
+                        if !remove_nodes.is_empty() {
+                            trace!(
+                                "[{}] reached next crate heading '{:?}'. stopping search for crate heading. found? {}",
+                                i,
+                                get_heading_text(node),
+                                 !remove_nodes.is_empty()
+                            );
+                            break;
+                        }
+
+                        if let Some(heading_text) = get_heading_text(node) {
+                            let normalized_heading_text = normalize_heading_name(&heading_text);
+                            let res = release_crate_names.contains(&normalized_heading_text);
+                            trace!(
+                                "[{}] is '{}' to be removed? {}",
+                                i,
+                                &normalized_heading_text,
+                                res
+                            );
+                            if res {
+                                trace!(
+                                    "[{:?}] removing unreleased crate heading '{}'",
+                                    self.path(),
+                                    heading_text,
+                                );
+                                remove_nodes.push(node);
+                                remove_other = true;
+                            } else {
+                                remove_other = false;
+                            }
+                        }
+                    }
+
+                    _ if remove_other => remove_nodes.push(node),
+
+                    _ if !first_heading_found => {
+                        remove_nodes.push(node);
+                        new_nodes.push(node);
+                    }
+
+                    _ => {}
+                }
+
+                for node in remove_nodes.iter().rev() {
+                    node.detach();
+                }
+            }
+        }
+
+        // todo: add non-heading sibling items from the unreleased heading
+        // if let Some(unreleased) = maybe
+
+        // iterate over all crates and add their respective changes
+        for WorkspaceCrateReleaseHeading {
+            prefix,
+            suffix: _,
+            changelog,
+        } in crate_release_headings.iter().rev()
+        {
+            let recent_release = changelog
+                .topmost_release()?
+                .ok_or_else(|| anyhow::anyhow!("expect {} to have a previous release", prefix))?
+                .title()
+                .to_owned();
+            trace!(
+                "[{:?}] looking for heading with text '{}'",
+                changelog.path(),
+                recent_release,
+            );
+            for node in changelog.root()?.children() {
+                // we're only interested in the headings here
+                if let NodeValue::Heading(found_heading_value) = node.data.borrow().value {
+                    if found_heading_value.level == CrateChangelog::RELEASE_HEADING_LEVEL {
+                        let found_heading_text = if let Some(text_str) = get_heading_text(node) {
+                            text_str
+                        } else {
+                            continue;
+                        };
+
+                        trace!(
+                            "[{:?}] found heading with level {}: {}",
+                            changelog.path(),
+                            found_heading_value.level,
+                            found_heading_text,
+                        );
+
+                        if !found_heading_text.contains(&recent_release) {
+                            continue;
+                        }
+
+                        trace!(
+                            "[{:?}] found heading with text '{}', queueing for insertion...",
+                            changelog.path(),
+                            found_heading_text
+                        );
+
+                        {
+                            // create and append the crate release heading for placement in the workspace changelog
+
+                            let heading_value = NodeValue::Heading(comrak::nodes::NodeHeading {
+                                level: CrateChangelog::RELEASE_HEADING_LEVEL,
+                                setext: false,
+                            });
+                            let heading_ast = comrak::nodes::Ast::new(heading_value);
+                            let heading_node = self.arena().alloc(comrak::arena_tree::Node::new(
+                                core::cell::RefCell::new(heading_ast),
+                            ));
+
+                            let heading_text_value = NodeValue::Text(
+                                format!("{}-{}", prefix, found_heading_text).into_bytes(),
+                            );
+                            let text_ast = comrak::nodes::Ast::new(heading_text_value);
+                            let text_node = self.arena().alloc(comrak::arena_tree::Node::new(
+                                core::cell::RefCell::new(text_ast),
+                            ));
+
+                            let link_value = NodeValue::Link(comrak::nodes::NodeLink {
+                                // todo: derive this path dynamically
+                                url: format!("crates/{}/CHANGELOG.md#{}", prefix, recent_release)
+                                    .as_bytes()
+                                    .to_vec(),
+                                title: Default::default(),
+                            });
+                            let link_ast = comrak::nodes::Ast::new(link_value);
+                            let link_node = self.arena().alloc(comrak::arena_tree::Node::new(
+                                core::cell::RefCell::new(link_ast),
+                            ));
+                            link_node.append(text_node);
+                            heading_node.append(link_node);
+
+                            new_nodes.push(heading_node);
+                        }
+
+                        // add all siblings until the next release heading is reached
+                        for sibling in node.following_siblings().skip(1) {
+                            match sibling.data.borrow().value {
+                                NodeValue::Heading(sibling_heading_value)
+                                    if sibling_heading_value.level
+                                        == CrateChangelog::RELEASE_HEADING_LEVEL =>
+                                {
+                                    break
+                                }
+
+                                _ => new_nodes.push(sibling),
+                            };
+                        }
+                    }
+                }
+            }
+        }
+
+        for node in new_nodes {
+            if let Some(previous_release) = maybe_previous_release {
+                // by default try to insert before the previous release heading.
+                trace!(
+                    "adding before the top release '{}'",
+                    get_nested_text(previous_release)
+                );
+                previous_release.insert_before(node);
+            } else {
+                // otherwise append at the end of the document.
+                root.append(node);
+            }
+        }
+
+        // write the file
+        let mut buf = vec![];
+        format_commonmark(root, self.options(), &mut buf).unwrap();
+        let mut output_file = std::fs::File::create(&self.path())?;
+        output_file.write_all(&buf)?;
+
+        Ok(())
+    }
+}
+
+fn get_nested_text<'a>(node: &'a comrak::arena_tree::Node<'a, RefCell<Ast>>) -> String {
+    node.descendants().fold("".to_string(), |acc, node_l| {
         if let NodeValue::Text(ref text) = &node_l.data.borrow().value {
-            let text_str = String::from_utf8_lossy(text).to_string();
-            acc.map_or(Some(text_str.clone()), |v| Some(v + &text_str))
+            acc + String::from_utf8_lossy(text).to_string().as_str()
         } else {
             acc
         }
     })
 }
 
-fn process_unreleased(inputs: &[(&str, PathBuf)], output: &PathBuf) -> Fallible<()> {
-    let result = process_unreleased_strings(
-        &inputs
-            .iter()
-            .map(|(name, path)| (*name, std::fs::read_to_string(path).unwrap()))
-            .collect::<Vec<_>>(),
-        &std::fs::read_to_string(output)?,
-    )?;
-
-    let mut output_file = std::fs::File::create(output)?;
-
-    use std::io::Write;
-    output_file.write_all(result.as_bytes())?;
-
-    Ok(())
+fn get_heading_text<'a>(node: &'a comrak::arena_tree::Node<'a, RefCell<Ast>>) -> Option<String> {
+    node.descendants().skip(1).fold(None, |acc, node_l| {
+        if let NodeValue::Text(ref text) = &node_l.data.borrow().value {
+            let text_str = String::from_utf8_lossy(text).to_string();
+            acc.map_or(Some(text_str.clone()), |v| Some(v + text_str.as_str()))
+        } else {
+            acc
+        }
+    })
 }
 
-fn sanitize(s: String) -> String {
+/// Used to pass information about the new crate release headings to `WorkspaceChangelog::add_release`.
+pub(crate) struct WorkspaceCrateReleaseHeading<'a> {
+    pub(crate) prefix: String,
+    pub(crate) suffix: String,
+    pub(crate) changelog: &'a ChangelogT<'a, CrateChangelog>,
+}
+
+impl<'a> WorkspaceCrateReleaseHeading<'a> {
+    pub(crate) fn title(&self) -> String {
+        format!("{}-{}", self.prefix, self.suffix)
+    }
+}
+
+/// Applies an opinionated format to  a Markdown string.
+pub(crate) fn sanitize(s: String) -> String {
     let arena = Arena::new();
     let mut options = ComrakOptions::default();
     options.parse.smart = true;
@@ -339,256 +1045,43 @@ fn recursive_detach<'a>(
     recursive_node_fn(node, false, |n| n.detach());
 }
 
-fn process_unreleased_strings(
-    inputs: &[(&str, String)],
-    output_original: &str,
-) -> Fallible<String> {
-    let mut options = ComrakOptions::default();
-    options.parse.smart = true;
-    options.extension.front_matter_delimiter = Some("---".to_owned());
-    options.render.hardbreaks = true;
+/// Implements the "aggregate" CLI subcommand.
+pub(crate) fn cmd(
+    args: &crate::cli::Args,
+    cmd_args: &crate::cli::ChangelogArgs,
+) -> crate::CommandResult {
+    debug!("cmd_args: {:#?}", cmd_args);
 
-    let output_arena = Arena::new();
-    let output_root = parse_document(&output_arena, output_original, &options);
+    let ws = ReleaseWorkspace::try_new(args.workspace_path.clone())?;
 
-    let mut unreleased_node = None;
-    let mut remove_other = false;
-    let mut topmost_release = None;
+    match &cmd_args.command {
+        // todo: respect selection filter
+        // todo: respect output path
+        crate::cli::ChangelogCommands::Aggregate(_aggregate_args) => ws
+            .changelog()
+            .ok_or_else(|| anyhow::anyhow!("workspace doesn't have a changelog"))?
+            .aggregate(ws.members()?)?,
+    };
 
-    'root: for (i, node) in output_root.children().enumerate() {
-        match &node.data.borrow().value {
-            &NodeValue::Heading(heading) => {
-                let mut msg = format!("[{}] heading at level {}", i, heading.level);
-
-                match (unreleased_node, heading.level) {
-                    (Some(_), 1) => {
-                        msg += " => arrived at next release section, stopping.";
-                        topmost_release = Some(node);
-                        break 'root;
-                    }
-                    (Some(_), _) => {
-                        msg += " => detaching";
-                        remove_other = true;
-                        node.detach();
-                    }
-                    (None, 1) => {
-                        if let Some(text_str) = get_heading_text(node) {
-                            msg += &format!(" => [{}] found heading text '{}'", i, text_str);
-
-                            if text_str.to_lowercase().contains("unreleased") {
-                                msg += " => found unreleased section";
-                                unreleased_node = Some(node);
-                                remove_other = false;
-                            };
-                        }
-                    }
-                    (None, _) => {}
-                };
-
-                trace!("{}", msg);
-            }
-
-            other => {
-                let mut msg = format!("[{}] ", i);
-                if remove_other {
-                    msg += "detaching ";
-                    node.detach();
-                } else {
-                    msg += "keeping ";
-                }
-
-                match other {
-                    NodeValue::Text(ref text) => {
-                        msg += &format!("'{}'", String::from_utf8_lossy(text))
-                    }
-                    _ => msg += &format!("{:?}", other),
-                }
-
-                trace!("{}", msg);
-            }
-        };
-    }
-
-    let input_arena = Arena::new();
-    // insert the unreleased content into the output file
-    if let Some(ref mut _unreleased_node) = unreleased_node {
-        for (name, content) in inputs {
-            let root = parse_document(&input_arena, content, &options);
-
-            let mut content_unreleased_heading = None;
-            let mut content_topmost_release = None;
-
-            for (i, node) in root.children().enumerate() {
-                {
-                    let children = node.children().collect::<Vec<_>>().len();
-                    let descendants = node.descendants().collect::<Vec<_>>().len();
-                    let debug = format!("{:#?}", node.data.borrow().value);
-                    let ty = debug.split(&['(', ' '][..]).nth(0).unwrap();
-                    trace!(
-                        "[{}/{}] {} with {} child(ren) and {} descendant(s)",
-                        name,
-                        i,
-                        ty,
-                        children,
-                        descendants
-                    );
-                }
-
-                match &mut node.data.borrow_mut().value {
-                    &mut NodeValue::Heading(heading) => {
-                        trace!(
-                            "[{}/{}] found heading with level {}",
-                            name,
-                            i,
-                            heading.level
-                        );
-                        // look for the 'unreleased' heading
-                        if heading.level == 2
-                            && content_unreleased_heading.is_some()
-                            && content_topmost_release.is_none()
-                        {
-                            trace!("[{}/{}] found topmost release", name, i);
-                            content_topmost_release = Some(node);
-                        } else if heading.level == 2 {
-                            // `descendants()` starts with the node itself so we skip it
-                            let search = node.descendants().skip(1).collect::<Vec<_>>();
-
-                            trace!("[{}/{}] searching through {} nodes", name, i, search.len());
-
-                            let mut recent_link_index = None;
-
-                            for (j, node_j) in search
-                                .iter()
-                                .take_while(|child| child.data.try_borrow().is_ok())
-                                .enumerate()
-                            {
-                                match &mut node_j.data.borrow_mut().value {
-                                    NodeValue::Link(ref mut link) => {
-                                        trace!("[{}/{}/{}] found link {:#?}", name, i, j, link);
-                                        recent_link_index = Some(j);
-                                    }
-
-                                    NodeValue::Heading(heading) if heading.level < 3 => {
-                                        trace!(
-                                            "[{}/{}/{}] arrived at first release heading, stopping.",
-                                            name, i, j
-                                        );
-                                        break;
-                                    }
-                                    NodeValue::Text(ref mut text) => {
-                                        let text_str = String::from_utf8_lossy(text);
-                                        if text_str.to_lowercase().contains("unreleased") {
-                                            trace!(
-                                                "[{}/{}/{}] found unreleased heading: {:#?}",
-                                                name,
-                                                i,
-                                                j,
-                                                text_str
-                                            );
-                                            content_unreleased_heading = Some(node);
-
-                                            *text = format!("{}", name,).as_bytes().to_vec();
-
-                                            trace!(
-                                                "[{}/{}/{}] changed name to {}",
-                                                name,
-                                                i,
-                                                j,
-                                                name
-                                            );
-
-                                            let url =
-                                                format!("crates/{}/CHANGELOG.md#unreleased", name);
-
-                                            if let Some(link_index) = recent_link_index {
-                                                if let NodeValue::Link(ref mut link) =
-                                                    search[link_index].data.borrow_mut().value
-                                                {
-                                                    link.url = url.as_bytes().to_vec();
-                                                    trace!(
-                                                        "[{}/{}/{}] changing link to: {:#?}",
-                                                        name,
-                                                        i,
-                                                        j,
-                                                        url
-                                                    );
-                                                }
-                                            } else {
-                                                let link_value =
-                                                    NodeValue::Link(comrak::nodes::NodeLink {
-                                                        url: url.as_bytes().to_vec(),
-                                                        title: Default::default(),
-                                                    });
-                                                let ast = comrak::nodes::Ast::new(link_value);
-                                                let link = output_arena.alloc(
-                                                    comrak::arena_tree::Node::new(
-                                                        core::cell::RefCell::new(ast),
-                                                    ),
-                                                );
-                                                // insert the link node before the text node
-                                                node_j.insert_before(link);
-
-                                                // attach the text node as a child of the link
-                                                node_j.detach();
-                                                link.append(node_j);
-                                            }
-
-                                            break;
-                                        }
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
-                    }
-                    _ => {}
-                };
-            }
-
-            let target = match (unreleased_node, topmost_release) {
-                (_, Some(node)) => node,
-                (Some(node), _) => node,
-                _ => panic!("expected at least one set"),
-            };
-
-            // add all siblings between here and the next headline and add all their descendants recursively
-            let count = content_unreleased_heading
-                .unwrap()
-                .following_siblings()
-                .take_while(|node| {
-                    if let Some(content_topmost_release) = content_topmost_release {
-                        !node.same_node(content_topmost_release)
-                    } else {
-                        todo!("handle the case where no previous release was found");
-                    }
-                })
-                .inspect(|node| {
-                    target.insert_before(node);
-                })
-                .count();
-
-            trace!("added {} items", count);
-        }
-    }
-
-    let mut buf = vec![];
-    format_commonmark(output_root, &options, &mut buf)?;
-    String::from_utf8(buf).map_err(Into::into)
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::workspace_mocker::example_workspace_1;
+    use crate::tests::workspace_mocker::{
+        example_workspace_1, example_workspace_1_aggregated_changelog,
+    };
+    use crate::CrateStateFlags;
     use comrak::*;
+    use enumflags2::make_bitflags;
 
     #[test]
     fn empty_frontmatter() {
         let workspace_mocker = example_workspace_1().unwrap();
-        let changelog = CrateChangelog::try_from_path(
+        let changelog = ChangelogT::<WorkspaceChangelog>::at_path(
             &workspace_mocker.root().join("crates/crate_a/CHANGELOG.md"),
-        )
-        .unwrap();
+        );
         let fm: Result<Option<Frontmatter>, String> =
             changelog.front_matter().map_err(|e| e.to_string());
 
@@ -598,10 +1091,9 @@ mod tests {
     #[test]
     fn no_frontmatter() {
         let workspace_mocker = example_workspace_1().unwrap();
-        let changelog = CrateChangelog::try_from_path(
+        let changelog = ChangelogT::<WorkspaceChangelog>::at_path(
             &workspace_mocker.root().join("crates/crate_b/CHANGELOG.md"),
-        )
-        .unwrap();
+        );
         let fm: Result<Option<Frontmatter>, String> =
             changelog.front_matter().map_err(|e| e.to_string());
 
@@ -611,10 +1103,9 @@ mod tests {
     #[test]
     fn nonempty_frontmatter() {
         let workspace_mocker = example_workspace_1().unwrap();
-        let changelog = CrateChangelog::try_from_path(
+        let changelog = ChangelogT::<WorkspaceChangelog>::at_path(
             &workspace_mocker.root().join("crates/crate_c/CHANGELOG.md"),
-        )
-        .unwrap();
+        );
         let fm: Result<Option<Frontmatter>, String> =
             changelog.front_matter().map_err(|e| e.to_string());
 
@@ -628,22 +1119,133 @@ mod tests {
     }
 
     #[test]
-    fn changelog_aggregation() {
+    fn workspace_changelog_aggregation() {
         let workspace_mocker = example_workspace_1().unwrap();
 
-        let inputs: &[(&str, PathBuf)] = &[
-            (
-                "crate_a",
-                workspace_mocker.root().join("crates/crate_a/CHANGELOG.md"),
+        let workspace = ReleaseWorkspace::try_new(workspace_mocker.root()).unwrap();
+
+        let workspace_changelog = workspace.changelog().unwrap();
+        workspace_changelog
+            .aggregate(workspace.members().unwrap())
+            .unwrap();
+
+        let result = sanitize(std::fs::read_to_string(workspace_changelog.path()).unwrap());
+
+        let expected = example_workspace_1_aggregated_changelog();
+
+        assert_eq!(
+            result,
+            expected,
+            "{}",
+            prettydiff::text::diff_lines(&result, &expected).format()
+        );
+    }
+
+    /// mock a release for crate_e and crate_f and the workspace, we expect these
+    /// crates to be removed from the Unreleased heading when aggregating the
+    /// changelog.
+    #[test]
+    fn changelog_mock_release() {
+        let workspace_mocker = example_workspace_1().unwrap();
+
+        let workspace = ReleaseWorkspace::try_new_with_criteria(
+            workspace_mocker.root(),
+            crate::release::SelectionCriteria {
+                match_filter: fancy_regex::Regex::new("^crate_(c|e)$").unwrap(),
+                allowed_dev_dependency_blockers: make_bitflags!(CrateStateFlags::{MissingReadme}),
+                allowed_selection_blockers: make_bitflags!(CrateStateFlags::{MissingReadme}),
+
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let ws_changelog = workspace.changelog().unwrap();
+
+        fn test_crate_changelog<'a>(
+            workspace: &'a ReleaseWorkspace<'a>,
+            name: &str,
+            release_name: &str,
+            expected: &str,
+        ) -> WorkspaceCrateReleaseHeading<'a> {
+            let cl = workspace
+                .members()
+                .unwrap()
+                .iter()
+                .find(|crt| crt.name() == name)
+                .unwrap()
+                .changelog()
+                .unwrap();
+
+            cl.add_release(String::from(release_name)).unwrap();
+
+            let result = std::fs::read_to_string(cl.path()).unwrap();
+            let expected = sanitize(String::from(expected));
+
+            assert_eq!(
+                result,
+                expected,
+                "\ndiff:\n{}",
+                prettydiff::text::diff_lines(&result, &expected).format()
+            );
+
+            WorkspaceCrateReleaseHeading {
+                prefix: String::from(name),
+                suffix: String::from(release_name),
+                changelog: cl,
+            }
+        }
+
+        let crate_releases = vec![
+            test_crate_changelog(
+                &workspace,
+                "crate_c",
+                "0.0.1",
+                indoc::indoc! {r#"
+                ---
+                unreleasable: true
+                default_unreleasable: true
+                ---
+                # Changelog
+                Hello
+
+                ## [Unreleased]
+
+                ## 0.0.1
+                Awesome changes!
+
+                ### Breaking
+                Breaking changes, be careful.
+
+                [Unreleased]: file:///dev/null
+                "#
+                },
             ),
-            (
-                "crate_b",
-                workspace_mocker.root().join("crates/crate_b/CHANGELOG.md"),
+            test_crate_changelog(
+                &workspace,
+                "crate_e",
+                "0.0.1",
+                indoc::indoc! {r#"
+                # Changelog
+                Hello. This crate is releasable.
+
+                ## [Unreleased]
+
+                ## 0.0.1
+                Awesome changes!
+
+                [Unreleased]: file:///dev/null
+                "#
+                },
             ),
         ];
-        let output_original = workspace_mocker.root().join("CHANGELOG.md");
 
-        const OUTPUT_FINAL_EXPECTED: &str = indoc::indoc!(
+        let release_name = "2021.mock";
+        ws_changelog
+            .add_release(release_name.to_string(), &crate_releases)
+            .unwrap();
+
+        let result = std::fs::read_to_string(ws_changelog.path()).unwrap();
+        let expected = indoc::formatdoc!(
             r#"
             # Changelog
             This file conveniently consolidates all of the crates individual CHANGELOG.md files and groups them by timestamps at which crates were released.
@@ -653,24 +1255,30 @@ mod tests {
             This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
             # [Unreleased]
+
+            ## Something outdated maybe
+            This will be removed by aggregation.
+
+
+            ## [crate\_a](crates/crate_a/CHANGELOG.md#unreleased)
+            ### Added
+            - `InstallAppBundle`
+
+            ## [crate\_f](crates/crate_f/CHANGELOG.md#unreleased)
+
+            This will be released in the future.
+
+            # {}
             The text beneath this heading will be retained which allows adding overarching release notes.
 
-            ## [crate_a](crates/crate_a/CHANGELOG.md#unreleased)
+            ## [crate_e-0.0.1](crates/crate_e/CHANGELOG.md#0.0.1)
+            Awesome changes!
 
-            ### Added
+            ## [crate_c-0.0.1](crates/crate_c/CHANGELOG.md#0.0.1)
+            Awesome changes!
 
-            - `InstallAppBundle` command added to admin conductor API. [#665](https://github.com/holochain/holochain/pull/665)
-            - `DnaSource` in conductor_api `RegisterDna` call now can take a `DnaBundle` [#665](https://github.com/holochain/holochain/pull/665)
-
-            ### Removed
-
-            - BREAKING:  `InstallAppDnaPayload` in admin conductor API `InstallApp` command now only accepts a hash.  Both properties and path have been removed as per deprecation warning.  Use either `RegisterDna` or `InstallAppBundle` instead. [#665](https://github.com/holochain/holochain/pull/665)
-            - BREAKING: `DnaSource(Path)` in conductor_api `RegisterDna` call now must point to `DnaBundle` as created by `hc dna pack` not a `DnaFile` created by `dna_util` [#665](https://github.com/holochain/holochain/pull/665)
-
-            ## [crate_b](crates/crate_b/CHANGELOG.md#unreleased)
-
-            ### Changed
-            - `Signature` is a 64 byte 'secure primitive'
+            ### Breaking
+            Breaking changes, be careful.
 
             # [20210304.120604]
             This will include the hdk-0.0.100 release.
@@ -679,61 +1287,51 @@ mod tests {
 
             ### Changed
             - hdk: fixup the autogenerated hdk documentation.
-            "#
+            "#,
+            release_name
         );
 
-        crate::changelog::process_unreleased(inputs, &output_original).unwrap();
-        let result = sanitize(std::fs::read_to_string(output_original).unwrap());
-
-        let output_final_expected_sanitized = sanitize(OUTPUT_FINAL_EXPECTED.to_string());
+        let expected = sanitize(expected);
         assert_eq!(
             result,
-            output_final_expected_sanitized,
-            "{}",
-            prettydiff::text::diff_lines(&result, &output_final_expected_sanitized).format()
+            expected,
+            "\ndiff:\n{}",
+            prettydiff::text::diff_lines(&result, &expected).format()
         );
     }
 
     #[test]
-    fn find_crate_changes() -> () {
+    fn find_crate_changes() {
         let workspace_mocker = example_workspace_1().unwrap();
 
-        let inputs: &[(&str, PathBuf, Vec<CrateChange>)] = &[
+        let inputs: &[(&str, PathBuf, Vec<ChangeT>)] = &[
             (
                 "crate_a",
                 workspace_mocker.root().join("crates/crate_a/CHANGELOG.md"),
                 vec![
-                    CrateChange {
-                        title: "Unreleased".to_string(),
-                    },
-                    CrateChange {
-                        title: "0.0.1".to_string(),
-                    },
+                    ChangeT::Unreleased,
+                    ChangeT::Release(ReleaseChange::CrateReleaseChange("0.0.1".to_string())),
                 ],
             ),
             (
                 "crate_b",
                 workspace_mocker.root().join("crates/crate_b/CHANGELOG.md"),
                 vec![
-                    CrateChange {
-                        title: "Unreleased".to_string(),
-                    },
-                    CrateChange {
-                        title: "0.0.1-alpha.1".to_string(),
-                    },
+                    ChangeT::Unreleased,
+                    ChangeT::Release(ReleaseChange::CrateReleaseChange(
+                        "0.0.0-alpha.1".to_string(),
+                    )),
                 ],
             ),
             (
                 "crate_c",
                 workspace_mocker.root().join("crates/crate_c/CHANGELOG.md"),
-                vec![CrateChange {
-                    title: "Unreleased".to_string(),
-                }],
+                vec![ChangeT::Unreleased],
             ),
         ];
 
         for (name, changelog_path, expected_changes) in inputs {
-            let changelog = CrateChangelog::try_from_path(changelog_path).unwrap();
+            let changelog = ChangelogT::<CrateChangelog>::at_path(changelog_path);
 
             let changes = changelog.changes().unwrap();
 
@@ -742,39 +1340,21 @@ mod tests {
     }
 
     #[test]
-    fn find_workspace_changes() -> () {
+    fn find_workspace_changes() {
         let workspace_mocker = example_workspace_1().unwrap();
 
         let changelog_path = workspace_mocker.root().join("CHANGELOG.md");
-
-        let changelog = WorkspaceChangelog::try_from_path(&changelog_path).unwrap();
+        let changelog = ChangelogT::<WorkspaceChangelog>::at_path(&changelog_path);
         let changes = changelog.changes().unwrap();
-
-        assert!(
-            changes[0].change_type().is_unreleased(),
-            "first change not unreleased: {:?}",
-            changes[0]
-        );
 
         assert_eq!(
             vec![
-                WorkspaceChange {
-                    title: "[Unreleased]".to_string(),
-                    crate_changes: vec![
-                        CrateChange {
-                            title: "Something outdated maybe".to_string(),
-                        },
-                        CrateChange {
-                            title: "crate_a".to_string(),
-                        }
-                    ]
-                },
-                WorkspaceChange {
-                    title: "[20210304.120604]".to_string(),
-                    crate_changes: vec![CrateChange {
-                        title: "hdk-0.0.100".to_string(),
-                    }]
-                },
+                ChangeT::Changelog,
+                ChangeT::Unreleased,
+                ChangeT::Release(ReleaseChange::WorkspaceReleaseChange(
+                    "[20210304.120604]".to_string(),
+                    vec!["hdk-0.0.100".to_string()]
+                )),
             ],
             changes
         );
