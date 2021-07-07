@@ -94,6 +94,14 @@ pub struct PreflightResponse {
     request: PreflightRequest,
     /// The agent must provide their current chain state, state their position in the preflight and sign everything.
     agent_state: CounterSigningAgentState,
+    signature: Signature,
+}
+
+impl PreflightResponse {
+    pub fn verify_signature(&self) -> Result<bool> {
+        self.request.signing_agents[self.agent_state.agent_index as usize]
+            .verify_signature(self.signature, (self.request, self.agent_state))
+    }
 }
 
 impl PreflightResponse {
@@ -118,8 +126,6 @@ pub struct CounterSigningAgentState {
     chain_top: HeaderHash,
     /// The header sequence of the agent's chain top.
     header_seq: u32,
-    /// The signature of all preflight request data and agent state data.
-    signature: Signature,
 }
 
 impl CounterSigningAgentState {
@@ -184,6 +190,7 @@ pub struct UpdateBase {
 pub struct CounterSigningSessionData {
     preflight_request: PreflightRequest,
     responses: Vec<CounterSigningAgentState>,
+    signatures: Vec<Signature>,
 }
 
 /// Build an unsigned Create header from session data, shared create data and an agent's state.
