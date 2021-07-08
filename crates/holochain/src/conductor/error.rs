@@ -73,9 +73,6 @@ pub enum ConductorError {
     #[error(transparent)]
     InterfaceError(#[from] Box<InterfaceError>),
 
-    #[error(transparent)]
-    CreateAppFailed(#[from] CreateAppError),
-
     #[error("Failed to run genesis on the following cells in the app: {errors:?}")]
     GenesisFailed { errors: Vec<CellError> },
 
@@ -85,14 +82,14 @@ pub enum ConductorError {
     #[error("Wasm code was not found in the wasm store")]
     WasmMissing,
 
-    #[error("Tried to activate an app that was not installed: {0}")]
+    #[error("Tried to access an app that was not installed: {0}")]
     AppNotInstalled(InstalledAppId),
 
     #[error("Tried to install an app using an already-used InstalledAppId: {0}")]
     AppAlreadyInstalled(InstalledAppId),
 
-    #[error("Tried to perform an operation on an app that was not active: {0}")]
-    AppNotActive(InstalledAppId),
+    #[error("Tried to perform an operation on an app that was not running: {0}")]
+    AppNotRunning(InstalledAppId),
 
     #[error(transparent)]
     HolochainP2pError(#[from] holochain_p2p::HolochainP2pError),
@@ -117,15 +114,6 @@ pub enum ConductorError {
 
     #[error(transparent)]
     RusqliteError(#[from] rusqlite::Error),
-}
-
-#[derive(Error, Debug)]
-pub enum CreateAppError {
-    #[error("Failed to create the following cells in the {installed_app_id} app: {errors:?}")]
-    Failed {
-        installed_app_id: InstalledAppId,
-        errors: Vec<CellError>,
-    },
 }
 
 // TODO: can this be removed?

@@ -1,10 +1,10 @@
 use crate::core::ribosome::CallContext;
+use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeT;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
-use crate::core::ribosome::HostFnAccess;
 
 pub fn call_remote(
     _ribosome: Arc<impl RibosomeT>,
@@ -12,27 +12,30 @@ pub fn call_remote(
     input: CallRemote,
 ) -> Result<ZomeCallResponse, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
-        HostFnAccess{ write_network: Permission::Allow, .. } => {
-    // it is the network's responsibility to handle timeouts and return an Err result in that case
-    let result: Result<SerializedBytes, _> = tokio_helper::block_forever_on(async move {
-        let mut network = call_context.host_context().network().clone();
-        network
-            .call_remote(
-                input.target_agent_as_ref().to_owned(),
-                input.zome_name_as_ref().to_owned(),
-                input.fn_name_as_ref().to_owned(),
-                input.cap_as_ref().to_owned(),
-                input.payload_as_ref().to_owned(),
-            )
-            .await
-    });
-    let result = match result {
-        Ok(r) => ZomeCallResponse::try_from(r)?,
-        Err(e) => ZomeCallResponse::NetworkError(e.to_string()),
-    };
+        HostFnAccess {
+            write_network: Permission::Allow,
+            ..
+        } => {
+            // it is the network's responsibility to handle timeouts and return an Err result in that case
+            let result: Result<SerializedBytes, _> = tokio_helper::block_forever_on(async move {
+                let network = call_context.host_context().network().clone();
+                network
+                    .call_remote(
+                        input.target_agent_as_ref().to_owned(),
+                        input.zome_name_as_ref().to_owned(),
+                        input.fn_name_as_ref().to_owned(),
+                        input.cap_as_ref().to_owned(),
+                        input.payload_as_ref().to_owned(),
+                    )
+                    .await
+            });
+            let result = match result {
+                Ok(r) => ZomeCallResponse::try_from(r)?,
+                Err(e) => ZomeCallResponse::NetworkError(e.to_string()),
+            };
 
             Ok(result)
-        },
+        }
         _ => unreachable!(),
     }
 }
