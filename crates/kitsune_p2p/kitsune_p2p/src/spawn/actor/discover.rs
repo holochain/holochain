@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 use super::*;
-use ghost_actor::dependencies::must_future::MustBoxFuture;
+//use ghost_actor::dependencies::must_future::MustBoxFuture;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
-use std::collections::HashSet;
+//use std::collections::HashSet;
 use std::future::Future;
 
 /// This enum represents the outcomes from peer discovery
@@ -272,6 +272,7 @@ pub(crate) fn get_cached_remotes_near_basis(
     }
 }
 
+/*
 /// attempt to send messages to remote nodes in a staged timeout format
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn message_neighborhood<T, F>(
@@ -438,3 +439,4 @@ pub(crate) fn get_5_or_less_non_local_agents_near_basis(
     .boxed()
     .into()
 }
+*/

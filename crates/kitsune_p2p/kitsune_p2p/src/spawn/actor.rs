@@ -32,6 +32,16 @@ ghost_actor::ghost_chan! {
         /// Register space event handler
         fn register_space_event_handler(recv: futures::channel::mpsc::Receiver<KitsuneP2pEvent>) -> ();
 
+        /// Incoming Delegate Broadcast
+        fn incoming_delegate_broadcast(
+            space: Arc<KitsuneSpace>,
+            basis: Arc<KitsuneBasis>,
+            to_agent: Arc<KitsuneAgent>,
+            mod_idx: u32,
+            mod_cnt: u32,
+            data: crate::wire::WireData,
+        ) -> ();
+
         /// Incoming Gossip
         fn incoming_gossip(space: Arc<KitsuneSpace>, con: Tx2ConHnd<wire::Wire>, data: Box<[u8]>) -> ();
     }
@@ -221,6 +231,7 @@ impl KitsuneP2pActor {
                                         let resp = wire::Wire::call_resp(res.into());
                                         resp!(respond, resp);
                                     }
+                                    /*
                                     wire::Wire::Notify(wire::Notify {
                                         space,
                                         from_agent,
@@ -240,6 +251,7 @@ impl KitsuneP2pActor {
                                         let resp = wire::Wire::notify_resp();
                                         resp!(respond, resp);
                                     }
+                                    */
                                     wire::Wire::PeerGet(wire::PeerGet { space, agent }) => {
                                         if let Ok(Some(agent_info_signed)) = evt_sender
                                             .get_agent_info_signed(GetAgentInfoSignedEvt {
@@ -283,17 +295,37 @@ impl KitsuneP2pActor {
                             }
                             IncomingNotify(Tx2EpIncomingNotify { con, data, .. }) => match data {
                                 wire::Wire::DelegateBroadcast(wire::DelegateBroadcast {
-                                    /*
                                     space,
                                     basis,
                                     to_agent,
                                     mod_idx,
                                     mod_cnt,
                                     data,
-                                    */
+                                }) => {
+                                    if let Err(err) = i_s
+                                        .incoming_delegate_broadcast(
+                                            space, basis, to_agent, mod_idx, mod_cnt, data,
+                                        )
+                                        .await
+                                    {
+                                        tracing::warn!(
+                                            ?err,
+                                            "failed to handle incoming delegate broadcast"
+                                        );
+                                    }
+                                }
+                                wire::Wire::Broadcast(wire::Broadcast {
+                                    space,
+                                    to_agent,
+                                    data,
                                     ..
                                 }) => {
-                                    println!("!!! GOT DELEGATE BROADCAST");
+                                    if let Err(err) = evt_sender
+                                        .notify(space, to_agent.clone(), to_agent, data.into())
+                                        .await
+                                    {
+                                        tracing::warn!(?err, "error processing incoming broadcast");
+                                    }
                                 }
                                 wire::Wire::Gossip(wire::Gossip { space, data }) => {
                                     let data: Vec<u8> = data.into();
@@ -355,6 +387,35 @@ impl InternalHandler for KitsuneP2pActor {
         Ok(async move {
             f.await?;
             Ok(())
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_incoming_delegate_broadcast(
+        &mut self,
+        space: Arc<KitsuneSpace>,
+        basis: Arc<KitsuneBasis>,
+        to_agent: Arc<KitsuneAgent>,
+        mod_idx: u32,
+        mod_cnt: u32,
+        data: crate::wire::WireData,
+    ) -> InternalHandlerResult<()> {
+        let space_sender = match self.spaces.get_mut(&space) {
+            None => {
+                tracing::warn!(
+                    "received delegate_broadcast for unhandled space: {:?}",
+                    space
+                );
+                return Ok(async move { Ok(()) }.boxed().into());
+            }
+            Some(space) => space.get(),
+        };
+        Ok(async move {
+            let (_, space_inner) = space_sender.await;
+            space_inner
+                .incoming_delegate_broadcast(space, basis, to_agent, mod_idx, mod_cnt, data)
+                .await
         }
         .boxed()
         .into())

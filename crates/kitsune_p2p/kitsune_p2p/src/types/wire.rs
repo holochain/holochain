@@ -32,6 +32,7 @@ kitsune_p2p_types::write_codec_enum! {
             data.0: WireData,
         },
 
+        /*
         /// "Notify" the remote.
         Notify(0x20) {
             space.0: Arc<KitsuneSpace>,
@@ -43,6 +44,7 @@ kitsune_p2p_types::write_codec_enum! {
         /// "Notify" response from the remote.
         NotifyResp(0x21) {
         },
+        */
 
         /// "DelegateBroadcast" to the remote.
         /// Remote should in turn connect to nodes in neighborhood,
@@ -55,6 +57,15 @@ kitsune_p2p_types::write_codec_enum! {
             mod_idx.3: u32,
             mod_cnt.4: u32,
             data.5: WireData,
+        },
+
+        /// Fire-and-forget broadcast message.
+        /// uses low-level notify, not request
+        Broadcast(0x23) {
+            space.0: Arc<KitsuneSpace>,
+            basis.1: Arc<KitsuneBasis>,
+            to_agent.2: Arc<KitsuneAgent>,
+            data.3: WireData,
         },
 
         /// Gossip op with opaque data section,

@@ -27,6 +27,16 @@ ghost_actor::ghost_chan! {
         /// see if an agent is locally joined
         fn is_agent_local(agent: Arc<KitsuneAgent>) -> bool;
 
+        /// Incoming Delegate Broadcast
+        fn incoming_delegate_broadcast(
+            space: Arc<KitsuneSpace>,
+            basis: Arc<KitsuneBasis>,
+            to_agent: Arc<KitsuneAgent>,
+            mod_idx: u32,
+            mod_cnt: u32,
+            data: crate::wire::WireData,
+        ) -> ();
+
         /// Incoming Gossip
         fn incoming_gossip(space: Arc<KitsuneSpace>, con: Tx2ConHnd<wire::Wire>, data: Box<[u8]>) -> ();
     }
@@ -163,6 +173,59 @@ impl SpaceInternalHandler for Space {
     ) -> SpaceInternalHandlerResult<bool> {
         let res = self.local_joined_agents.contains(&agent);
         Ok(async move { Ok(res) }.boxed().into())
+    }
+
+    fn handle_incoming_delegate_broadcast(
+        &mut self,
+        space: Arc<KitsuneSpace>,
+        basis: Arc<KitsuneBasis>,
+        _to_agent: Arc<KitsuneAgent>,
+        mod_idx: u32,
+        mod_cnt: u32,
+        data: crate::wire::WireData,
+    ) -> InternalHandlerResult<()> {
+        // TODO - post this to local agents
+
+        let ro_inner = self.ro_inner.clone();
+        let timeout = ro_inner.config.tuning_params.implicit_timeout();
+        let fut =
+            discover::get_cached_remotes_near_basis(ro_inner.clone(), basis.get_loc(), timeout);
+
+        Ok(async move {
+            let info_list = fut.await?;
+
+            let mut all = Vec::new();
+            for info in info_list
+                .into_iter()
+                .filter(|info| info.agent.get_loc() % mod_cnt == mod_idx)
+            {
+                let ro_inner = ro_inner.clone();
+                let space = space.clone();
+                let basis = basis.clone();
+                let data = data.clone();
+                all.push(async move {
+                    use discover::PeerDiscoverResult;
+                    let con_hnd = match discover::peer_connect(ro_inner, &info, timeout).await {
+                        PeerDiscoverResult::OkShortcut => return,
+                        PeerDiscoverResult::OkRemote { con_hnd, .. } => con_hnd,
+                        PeerDiscoverResult::Err(err) => {
+                            tracing::warn!(?err, "broadcast error");
+                            return;
+                        }
+                    };
+                    let payload = wire::Wire::broadcast(space, basis, info.agent.clone(), data);
+                    if let Err(err) = con_hnd.notify(&payload, timeout).await {
+                        tracing::warn!(?err, "broadcast error");
+                    }
+                })
+            }
+
+            futures::future::join_all(all).await;
+
+            Ok(())
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_incoming_gossip(
@@ -592,7 +655,7 @@ pub(crate) struct Space {
     pub(crate) this_addr: url2::Url2,
     pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
     pub(crate) evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
-    pub(crate) ep_hnd: Tx2EpHnd<wire::Wire>,
+    //pub(crate) ep_hnd: Tx2EpHnd<wire::Wire>,
     pub(crate) local_joined_agents: HashSet<Arc<KitsuneAgent>>,
     pub(crate) config: Arc<KitsuneP2pConfig>,
     mdns_handles: HashMap<Vec<u8>, Arc<AtomicBool>>,
@@ -711,7 +774,7 @@ impl Space {
             this_addr: this_addr.clone(),
             i_s: i_s.clone(),
             evt_sender: evt_sender.clone(),
-            ep_hnd: ep_hnd.clone(),
+            ep_hnd,
             config: config.clone(),
         });
 
@@ -721,7 +784,7 @@ impl Space {
             this_addr,
             i_s,
             evt_sender,
-            ep_hnd,
+            //ep_hnd,
             local_joined_agents: HashSet::new(),
             config,
             mdns_handles: HashMap::new(),
