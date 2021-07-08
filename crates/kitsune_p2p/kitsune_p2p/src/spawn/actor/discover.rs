@@ -1,8 +1,6 @@
 #![allow(dead_code)]
 use super::*;
-//use ghost_actor::dependencies::must_future::MustBoxFuture;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
-//use std::collections::HashSet;
 use std::future::Future;
 
 /// This enum represents the outcomes from peer discovery
