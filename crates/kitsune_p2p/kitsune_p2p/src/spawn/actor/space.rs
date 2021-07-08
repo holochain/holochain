@@ -563,60 +563,71 @@ impl KitsuneP2pHandler for Space {
         Ok(async move {
             futures::future::join_all(local_events).await;
 
-            let cover_nodes = discover_fut.await?;
-            if cover_nodes.is_empty() {
-                return Err("failed to discover neighboring peers".into());
-            }
+            // TODO - FIXME
+            // Holochain currently does all its testing without any remote nodes
+            // if we do this inline, it takes us to the 30 second timeout
+            // on every one of those... so spawning for now, which means
+            // we won't get notified if we are unable to publish to anyone.
+            // Also, if conductor spams us with publishes, we could fill
+            // the memory with publish tasks.
+            tokio::task::spawn(async move {
+                let cover_nodes = discover_fut.await?;
+                if cover_nodes.is_empty() {
+                    return Err("failed to discover neighboring peers".into());
+                }
 
-            let mut all = Vec::new();
+                let mut all = Vec::new();
 
-            // is there a better way to do this??
-            let half_timeout =
-                KitsuneTimeout::from_millis(timeout.time_remaining().as_millis() as u64 / 2);
-            for info in cover_nodes {
-                let ro_inner = ro_inner.clone();
-                all.push(async move {
-                    use discover::PeerDiscoverResult;
-                    let con_hnd = match discover::peer_connect(ro_inner, &info, half_timeout).await
-                    {
-                        PeerDiscoverResult::OkShortcut => return None,
-                        PeerDiscoverResult::OkRemote { con_hnd, .. } => con_hnd,
-                        PeerDiscoverResult::Err(_) => return None,
-                    };
-                    Some((info.agent.clone(), con_hnd))
-                });
-            }
+                // is there a better way to do this??
+                let half_timeout =
+                    KitsuneTimeout::from_millis(timeout.time_remaining().as_millis() as u64 / 2);
+                for info in cover_nodes {
+                    let ro_inner = ro_inner.clone();
+                    all.push(async move {
+                        use discover::PeerDiscoverResult;
+                        let con_hnd =
+                            match discover::peer_connect(ro_inner, &info, half_timeout).await {
+                                PeerDiscoverResult::OkShortcut => return None,
+                                PeerDiscoverResult::OkRemote { con_hnd, .. } => con_hnd,
+                                PeerDiscoverResult::Err(_) => return None,
+                            };
+                        Some((info.agent.clone(), con_hnd))
+                    });
+                }
 
-            let con_list = futures::future::join_all(all)
-                .await
-                .into_iter()
-                .flatten()
-                .collect::<Vec<_>>();
+                let con_list = futures::future::join_all(all)
+                    .await
+                    .into_iter()
+                    .flatten()
+                    .collect::<Vec<_>>();
 
-            if con_list.is_empty() {
-                return Err("failed to connect to neighboring peers".into());
-            }
+                if con_list.is_empty() {
+                    return Err("failed to connect to neighboring peers".into());
+                }
 
-            let mut all = Vec::new();
+                let mut all = Vec::new();
 
-            let mod_cnt = con_list.len();
-            for (mod_idx, (agent, con_hnd)) in con_list.into_iter().enumerate() {
-                let payload = wire::Wire::delegate_broadcast(
-                    space.clone(),
-                    basis.clone(),
-                    agent,
-                    mod_idx as u32,
-                    mod_cnt as u32,
-                    payload.clone().into(),
-                );
-                all.push(async move {
-                    if let Err(err) = con_hnd.notify(&payload, timeout).await {
-                        tracing::warn!(?err, "delegate broadcast error");
-                    }
-                });
-            }
+                let mod_cnt = con_list.len();
+                for (mod_idx, (agent, con_hnd)) in con_list.into_iter().enumerate() {
+                    let payload = wire::Wire::delegate_broadcast(
+                        space.clone(),
+                        basis.clone(),
+                        agent,
+                        mod_idx as u32,
+                        mod_cnt as u32,
+                        payload.clone().into(),
+                    );
+                    all.push(async move {
+                        if let Err(err) = con_hnd.notify(&payload, timeout).await {
+                            tracing::warn!(?err, "delegate broadcast error");
+                        }
+                    });
+                }
 
-            futures::future::join_all(all).await;
+                futures::future::join_all(all).await;
+
+                KitsuneP2pResult::Ok(())
+            });
 
             Ok(())
         }
