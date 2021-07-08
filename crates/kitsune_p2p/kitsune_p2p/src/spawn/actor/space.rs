@@ -184,7 +184,20 @@ impl SpaceInternalHandler for Space {
         mod_cnt: u32,
         data: crate::wire::WireData,
     ) -> InternalHandlerResult<()> {
-        // TODO - post this to local agents
+        let mut local_events = Vec::new();
+        for agent in self.local_joined_agents.iter().cloned() {
+            let fut = self.evt_sender.notify(
+                space.clone(),
+                agent.clone(),
+                agent.clone(),
+                data.clone().into(),
+            );
+            local_events.push(async move {
+                if let Err(err) = fut.await {
+                    tracing::warn!(?err, "failed local broadcast");
+                }
+            });
+        }
 
         let ro_inner = self.ro_inner.clone();
         let timeout = ro_inner.config.tuning_params.implicit_timeout();
@@ -192,6 +205,8 @@ impl SpaceInternalHandler for Space {
             discover::get_cached_remotes_near_basis(ro_inner.clone(), basis.get_loc(), timeout);
 
         Ok(async move {
+            futures::future::join_all(local_events).await;
+
             let info_list = fut.await?;
 
             let mut all = Vec::new();
@@ -568,11 +583,26 @@ impl KitsuneP2pHandler for Space {
         timeout: KitsuneTimeout,
         payload: Vec<u8>,
     ) -> KitsuneP2pHandlerResult<()> {
+        let mut local_events = Vec::new();
+        for agent in self.local_joined_agents.iter().cloned() {
+            let fut = self.evt_sender.notify(
+                space.clone(),
+                agent.clone(),
+                agent.clone(),
+                payload.clone(),
+            );
+            local_events.push(async move {
+                if let Err(err) = fut.await {
+                    tracing::warn!(?err, "failed local broadcast");
+                }
+            });
+        }
+
         let ro_inner = self.ro_inner.clone();
         let discover_fut =
             discover::search_remotes_covering_basis(ro_inner.clone(), basis.get_loc(), timeout);
         Ok(async move {
-            // TODO - temporarily publish to all local nodes here
+            futures::future::join_all(local_events).await;
 
             let cover_nodes = discover_fut.await?;
             if cover_nodes.is_empty() {
