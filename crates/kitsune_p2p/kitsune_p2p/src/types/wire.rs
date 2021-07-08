@@ -32,20 +32,6 @@ kitsune_p2p_types::write_codec_enum! {
             data.0: WireData,
         },
 
-        /*
-        /// "Notify" the remote.
-        Notify(0x20) {
-            space.0: Arc<KitsuneSpace>,
-            from_agent.1: Arc<KitsuneAgent>,
-            to_agent.2: Arc<KitsuneAgent>,
-            data.3: WireData,
-        },
-
-        /// "Notify" response from the remote.
-        NotifyResp(0x21) {
-        },
-        */
-
         /// "DelegateBroadcast" to the remote.
         /// Remote should in turn connect to nodes in neighborhood,
         /// and call "Notify" per broadcast algorithm.

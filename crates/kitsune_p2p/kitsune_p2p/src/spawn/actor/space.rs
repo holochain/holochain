@@ -535,47 +535,6 @@ impl KitsuneP2pHandler for Space {
         self.handle_rpc_multi_inner(input)
     }
 
-    /*
-    fn handle_notify_multi(
-        &mut self,
-        mut input: actor::NotifyMulti,
-    ) -> KitsuneP2pHandlerResult<u8> {
-        // if the user doesn't care about remote_agent_count, apply default
-        match input.remote_agent_count {
-            None | Some(0) => {
-                input.remote_agent_count =
-                    Some(self.config.tuning_params.default_notify_remote_agent_count as u8);
-            }
-            _ => {}
-        }
-
-        // if the user doesn't care about timeout_ms, apply default
-        // also - if set to 0, we want to return immediately, but
-        // spawn a task with that default timeout.
-        let do_spawn = match input.timeout_ms {
-            None | Some(0) => {
-                input.timeout_ms = Some(self.config.tuning_params.default_notify_timeout_ms as u64);
-                true
-            }
-            _ => false,
-        };
-
-        // gather the inner future
-        let inner_fut = match self.handle_notify_multi_inner(input) {
-            Err(e) => return Err(e),
-            Ok(f) => f,
-        };
-
-        // either spawn or return the future depending on timeout_ms logic
-        if do_spawn {
-            tokio::task::spawn(inner_fut);
-            Ok(async move { Ok(0) }.boxed().into())
-        } else {
-            Ok(inner_fut)
-        }
-    }
-    */
-
     fn handle_broadcast(
         &mut self,
         space: Arc<KitsuneSpace>,
@@ -685,7 +644,6 @@ pub(crate) struct Space {
     pub(crate) this_addr: url2::Url2,
     pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
     pub(crate) evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
-    //pub(crate) ep_hnd: Tx2EpHnd<wire::Wire>,
     pub(crate) local_joined_agents: HashSet<Arc<KitsuneAgent>>,
     pub(crate) config: Arc<KitsuneP2pConfig>,
     mdns_handles: HashMap<Vec<u8>, Arc<AtomicBool>>,
@@ -814,7 +772,6 @@ impl Space {
             this_addr,
             i_s,
             evt_sender,
-            //ep_hnd,
             local_joined_agents: HashSet::new(),
             config,
             mdns_handles: HashMap::new(),
@@ -986,68 +943,4 @@ impl Space {
         .boxed()
         .into())
     }
-
-    /*
-    /// actual logic for handle_notify_multi ...
-    /// the top-level handler may or may not spawn a task for this
-    fn handle_notify_multi_inner(
-        &mut self,
-        input: actor::NotifyMulti,
-    ) -> KitsuneP2pHandlerResult<u8> {
-        let actor::NotifyMulti {
-            space,
-            from_agent,
-            basis,
-            remote_agent_count,
-            timeout_ms,
-            payload,
-        } = input;
-
-        let remote_agent_count = remote_agent_count.expect("set by handle_notify_multi");
-        let timeout_ms = timeout_ms.expect("set by handle_notify_multi");
-        let stage_1_timeout_ms = timeout_ms / 2;
-
-        // as an optimization - broadcast to all local joins
-        // but don't count that toward our publish total
-        let local_all = self
-            .local_joined_agents
-            .iter()
-            .map(|agent| {
-                self.evt_sender.notify(
-                    space.clone(),
-                    agent.clone(),
-                    from_agent.clone(),
-                    payload.clone(),
-                )
-            })
-            .collect::<Vec<_>>();
-
-        let remote_fut = discover::message_neighborhood(
-            self,
-            from_agent.clone(),
-            remote_agent_count,
-            stage_1_timeout_ms,
-            timeout_ms,
-            basis,
-            wire::Wire::notify(
-                space.clone(),
-                from_agent.clone(),
-                from_agent,
-                payload.into(),
-            ),
-            |_, w| match w {
-                wire::Wire::NotifyResp(_) => Ok(()),
-                _ => Err(()),
-            },
-        );
-
-        Ok(async move {
-            futures::future::try_join_all(local_all).await?;
-
-            Ok(remote_fut.await.len() as u8)
-        }
-        .boxed()
-        .into())
-    }
-    */
 }

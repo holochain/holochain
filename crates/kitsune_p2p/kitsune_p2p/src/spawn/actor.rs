@@ -231,27 +231,6 @@ impl KitsuneP2pActor {
                                         let resp = wire::Wire::call_resp(res.into());
                                         resp!(respond, resp);
                                     }
-                                    /*
-                                    wire::Wire::Notify(wire::Notify {
-                                        space,
-                                        from_agent,
-                                        to_agent,
-                                        data,
-                                        ..
-                                    }) => {
-                                        if let Err(err) = evt_sender
-                                            .notify(space, to_agent, from_agent, data.into())
-                                            .await
-                                        {
-                                            let reason = format!("{:?}", err);
-                                            let fail = wire::Wire::failure(reason);
-                                            resp!(respond, fail);
-                                            return;
-                                        }
-                                        let resp = wire::Wire::notify_resp();
-                                        resp!(respond, resp);
-                                    }
-                                    */
                                     wire::Wire::PeerGet(wire::PeerGet { space, agent }) => {
                                         if let Ok(Some(agent_info_signed)) = evt_sender
                                             .get_agent_info_signed(GetAgentInfoSignedEvt {
@@ -645,21 +624,6 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         .boxed()
         .into())
     }
-
-    /*
-    fn handle_notify_multi(&mut self, input: actor::NotifyMulti) -> KitsuneP2pHandlerResult<u8> {
-        let space_sender = match self.spaces.get_mut(&input.space) {
-            None => return Err(KitsuneP2pError::RoutingSpaceError(input.space)),
-            Some(space) => space.get(),
-        };
-        Ok(async move {
-            let (space_sender, _) = space_sender.await;
-            space_sender.notify_multi(input).await
-        }
-        .boxed()
-        .into())
-    }
-    */
 
     fn handle_broadcast(
         &mut self,
