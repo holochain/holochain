@@ -55,7 +55,11 @@ rec {
       (builtins.removeAttrs coreDev [ "shellHook" ])
     ];
     nativeBuildInputs = builtins.attrValues pkgs.happ
-      ++ [ pkgs.sqlcipher ]
+      ++ (with holonix.pkgs; [
+        lair-keystore
+        sqlcipher
+        binaryen
+      ])
       ;
   };
 
