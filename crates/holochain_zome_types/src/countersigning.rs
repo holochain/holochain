@@ -9,6 +9,14 @@ use holo_hash::HeaderHash;
 /// This makes it easier for agents to accept a preflight request with headers that are after their current chain top, after network latency.
 pub const SESSION_HEADER_TIME_OFFSET_MILLIS: i64 = 1000;
 
+/// Errors related to the secure primitive macro.
+#[derive(Debug, thiserror::Error)]
+pub enum CounterSigningError {
+    /// Agent index is out of bounds for the signing session.
+    #[error("Agent index is out of bounds for the signing session.")]
+    AgentIndexOutOfBounds,
+}
+
 /// Every countersigning session must complete a full set of headers between the start and end times to be valid.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CounterSigningSessionTimes {
@@ -144,11 +152,6 @@ impl CounterSigningAgentState {
     }
 }
 
-/// A vector of agents to countersign a shared entry.
-/// The vector must be sorted to generate a CounterSigningTag.
-#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
-pub struct CounterSigningAgentStates(Vec<CounterSigningAgentState>);
-
 /// Enum to mirror Header for all the shared data required to build session headers.
 /// Does NOT hold any agent specific information.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -186,23 +189,16 @@ pub struct CounterSigningSessionData {
     responses: Vec<CounterSigningAgentState>,
 }
 
-/// Build an unsigned Create header from session data, shared create data and an agent's state.
-impl
-    From<(
-        &CounterSigningSessionData,
-        &CreateBase,
-        &CounterSigningAgentState,
-    )> for Create
-{
-    fn from(
-        (session_data, create_base, agent_state): (
-            &CounterSigningSessionData,
-            &CreateBase,
-            &CounterSigningAgentState,
-        ),
-    ) -> Self {
-        Create {
-            author: session_data.preflight_request.signing_agents[agent_state.agent_index as usize]
+impl Create {
+    /// Build an unsigned Create header from session data, shared create data and an agent's state.
+    fn from_countersigning_data(
+        session_data: &CounterSigningSessionData,
+        create_base: &CreateBase,
+        agent_state: &CounterSigningAgentState,
+    ) -> Result<Self, CounterSigningError> {
+        Ok(Create {
+            author: session_data.preflight_request.signing_agents.get(agent_state.agent_index as usize)
+                .ok_or(CounterSigningError::AgentIndexOutOfBounds)?
                 .0
                 .clone(),
             timestamp: Timestamp(
@@ -219,27 +215,20 @@ impl
             prev_header: agent_state.chain_top.clone(),
             entry_type: create_base.entry_type.clone(),
             entry_hash: create_base.entry_hash.clone(),
-        }
+        })
     }
 }
 
-/// Build an unsigned Update header from session data, shared update data and an agent's state.
-impl
-    From<(
-        &CounterSigningSessionData,
-        &UpdateBase,
-        &CounterSigningAgentState,
-    )> for Update
-{
-    fn from(
-        (session_data, update_base, agent_state): (
-            &CounterSigningSessionData,
-            &UpdateBase,
-            &CounterSigningAgentState,
-        ),
-    ) -> Self {
-        Update {
-            author: session_data.preflight_request.signing_agents[agent_state.agent_index as usize]
+impl Update {
+    /// Build an unsigned Update header from session data, shared update data and an agent's state.
+    fn from_countersigning_data(
+        session_data: &CounterSigningSessionData,
+        update_base: &UpdateBase,
+        agent_state: &CounterSigningAgentState,
+    ) -> Result<Self, CounterSigningError> {
+        Ok(Update {
+            author: session_data.preflight_request.signing_agents.get(agent_state.agent_index as usize)
+                .ok_or(CounterSigningError::AgentIndexOutOfBounds)?
                 .0
                 .clone(),
             timestamp: Timestamp(
@@ -258,31 +247,34 @@ impl
             original_entry_address: update_base.original_entry_address.clone(),
             entry_type: update_base.entry_type.clone(),
             entry_hash: update_base.entry_hash.clone(),
-        }
+        })
     }
 }
 
-impl From<CounterSigningSessionData> for Vec<Header> {
-    fn from(session_data: CounterSigningSessionData) -> Self {
+impl CounterSigningSessionData {
+    /// Attempt to map countersigning session data to a set of headers.
+    /// A given countersigning session always maps to the same ordered set of headers or an error.
+    /// Note the headers are not signed as the intent is to build headers for other agents without their private keys.
+    pub fn build_header_set(&self) -> Result<Vec<Header>, CounterSigningError> {
         let mut headers = vec![];
-        for agent_state in session_data.responses.iter() {
-            match session_data.preflight_request.header_base {
+        for agent_state in self.responses.iter() {
+            match self.preflight_request.header_base {
                 HeaderBase::Create(ref create_base) => {
-                    headers.push(Header::Create(Create::from((
-                        &session_data,
+                    headers.push(Header::Create(Create::from_countersigning_data(
+                        self,
                         create_base,
                         agent_state,
-                    ))));
+                    )?));
                 }
                 HeaderBase::Update(ref update_base) => {
-                    headers.push(Header::Update(Update::from((
-                        &session_data,
+                    headers.push(Header::Update(Update::from_countersigning_data(
+                        self,
                         update_base,
                         agent_state,
-                    ))));
+                    )?));
                 }
             }
         }
-        headers
+        Ok(headers)
     }
 }
