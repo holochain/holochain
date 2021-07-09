@@ -12,6 +12,7 @@ use holochain_keystore::KeystoreError;
 use holochain_sqlite::error::DatabaseError;
 use holochain_state::workspace::WorkspaceError;
 use holochain_types::prelude::*;
+use holochain_zome_types::countersigning::CounterSigningSessionTimes;
 use holochain_zome_types::countersigning::PreflightResponse;
 use thiserror::Error;
 
@@ -88,6 +89,8 @@ impl<E> TryFrom<OutcomeOrError<ValidationOutcome, E>> for ValidationOutcome {
 pub enum ValidationOutcome {
     #[error("The element with signature {0:?} and header {1:?} was found to be counterfeit")]
     Counterfeit(Signature, Header),
+    #[error("The countersigning session times were not valid {0:?}")]
+    CounterSigningSessionTimes(CounterSigningSessionTimes),
     #[error("The dependency {0:?} was not found on the DHT")]
     DepMissingFromDht(AnyDhtHash),
     #[error("The app entry type {0:?} entry def id was out of range")]

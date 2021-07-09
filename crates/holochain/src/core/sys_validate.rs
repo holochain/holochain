@@ -9,7 +9,9 @@ use crate::conductor::entry_def_store::get_entry_def;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::HolochainP2pCell;
 use holochain_types::prelude::*;
+use holochain_zome_types::countersigning::CounterSigningSessionTimes;
 use holochain_zome_types::countersigning::PreflightResponse;
+use holochain_zome_types::countersigning::SESSION_HEADER_TIME_OFFSET_MILLIS;
 use std::convert::TryInto;
 
 pub(super) use error::*;
@@ -75,6 +77,51 @@ pub async fn check_countersigning_preflight_response_signature(
             })?,
         )
         .await?)
+}
+
+/// Verify the difference between the end and start time is larger than the session header time offset.
+pub fn check_countersigning_session_times(
+    session_times: &CounterSigningSessionTimes,
+) -> SysValidationResult<bool> {
+    Ok(&Timestamp(0, 0) < session_times.as_start_ref()
+        && session_times.as_start_ref()
+            < &(session_times.as_end_ref()
+                - core::time::Duration::from_millis(SESSION_HEADER_TIME_OFFSET_MILLIS as u64))
+            .map_err(|_| {
+                SysValidationError::ValidationOutcome(
+                    ValidationOutcome::CounterSigningSessionTimes((*session_times).clone()),
+                )
+            })?)
+}
+
+/// Verify the session times on a preflight response as per default session time handling.
+pub fn check_countersigning_preflight_response_session_times(
+    preflight_response: &PreflightResponse,
+) -> SysValidationResult<bool> {
+    check_countersigning_session_times(preflight_response.request_ref().session_times_ref())
+}
+
+/// Verify the enzyme index is in bounds of the signing agent if set.
+pub fn check_countersigning_preflight_response_enzyme_index(
+    preflight_response: &PreflightResponse,
+) -> SysValidationResult<bool> {
+    Ok(match preflight_response.request_ref().enzyme_index_ref() {
+        Some(index) => {
+            (*index as usize) < preflight_response.request_ref().signing_agents_ref().len()
+        }
+        None => true,
+    })
+}
+
+/// Combined preflight response validation call.
+pub async fn check_countersigning_preflight_response(
+    preflight_response: &PreflightResponse,
+) -> SysValidationResult<bool> {
+    Ok(
+        check_countersigning_preflight_response_enzyme_index(preflight_response)?
+            && check_countersigning_preflight_response_session_times(preflight_response)?
+            && check_countersigning_preflight_response_signature(preflight_response).await?,
+    )
 }
 
 /// Check that previous header makes sense
