@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use hc_sandbox::calls::ActivateApp;
+use hc_sandbox::calls::EnableApp;
 use hc_sandbox::expect_match;
 use hc_sandbox::CmdRunner;
 use holochain_cli_sandbox as hc_sandbox;
@@ -66,9 +66,9 @@ async fn main() -> anyhow::Result<()> {
         let installed_app = expect_match!(installed_app => AdminResponse::AppBundleInstalled, "Failed to install app");
 
         // Activate the app using the simple calls api.
-        hc_sandbox::calls::activate_app(
+        hc_sandbox::calls::enable_app(
             &mut cmd,
-            ActivateApp {
+            EnableApp {
                 app_id: installed_app.installed_app_id,
             },
         )

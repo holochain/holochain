@@ -1,7 +1,6 @@
 //! Errors occurring during a [CellConductorApi] or [InterfaceApi] call
 
 use crate::conductor::error::ConductorError;
-use crate::conductor::error::CreateAppError;
 use crate::conductor::interface::error::InterfaceError;
 use crate::conductor::CellError;
 use crate::core::ribosome::error::RibosomeError;
@@ -155,11 +154,5 @@ impl From<SerializationError> for ExternalApiWireError {
 impl From<RibosomeError> for ExternalApiWireError {
     fn from(e: RibosomeError) -> Self {
         ExternalApiWireError::RibosomeError(e.to_string())
-    }
-}
-
-impl From<CreateAppError> for ExternalApiWireError {
-    fn from(e: CreateAppError) -> Self {
-        ExternalApiWireError::ActivateApp(e.to_string())
     }
 }
