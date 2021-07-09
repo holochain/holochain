@@ -9,6 +9,7 @@ use crate::conductor::entry_def_store::get_entry_def;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::HolochainP2pCell;
 use holochain_types::prelude::*;
+use holochain_zome_types::countersigning::PreflightResponse;
 use std::convert::TryInto;
 
 pub(super) use error::*;
@@ -49,6 +50,28 @@ pub async fn verify_header_signature(
 /// TODO: This is just a stub until we have dpki.
 pub async fn author_key_is_valid(_author: &AgentPubKey) -> SysValidationResult<bool> {
     Ok(true)
+}
+
+pub async fn check_countersigning_preflight_response_signature(
+    preflight_response: &PreflightResponse,
+) -> SysValidationResult<bool> {
+    Ok(preflight_response
+        .request_ref()
+        .signing_agents_ref()
+        .get(preflight_response.agent_state_ref().agent_index() as usize)
+        .ok_or(SysValidationError::ValidationOutcome(
+            ValidationOutcome::PreflightResponseSignature((*preflight_response).clone()),
+        ))?
+        .0
+        .verify_signature_raw(
+            preflight_response.signature_ref(),
+            &preflight_response.encode_for_signature().map_err(|_| {
+                SysValidationError::ValidationOutcome(
+                    ValidationOutcome::PreflightResponseSignature((*preflight_response).clone()),
+                )
+            })?,
+        )
+        .await?)
 }
 
 /// Check that previous header makes sense

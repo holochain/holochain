@@ -102,7 +102,7 @@ pub enum Entry {
     /// The application entry data for entries that aren't system created entries
     App(AppEntryBytes),
     /// Application entry data for entries that need countersigning to move forward multiple chains together.
-    CounterSign(CounterSigningSessionData, AppEntryBytes),
+    CounterSign(Box<CounterSigningSessionData>, AppEntryBytes),
     /// The capability claim system entry which allows committing a granted permission
     /// for later use
     CapClaim(CapClaimEntry),

@@ -97,6 +97,7 @@ impl PreflightRequest {
 
 /// Every agent must send back a preflight response.
 /// All the preflight response data is signed by each agent and included in the session data.
+#[derive(Debug, Clone)]
 pub struct PreflightResponse {
     /// The request this is a response to.
     request: PreflightRequest,
@@ -106,13 +107,10 @@ pub struct PreflightResponse {
 }
 
 impl PreflightResponse {
-    pub fn verify_signature(&self) -> Result<bool> {
-        self.request.signing_agents[self.agent_state.agent_index as usize]
-            .verify_signature(self.signature, (self.request, self.agent_state))
+    /// Consistent serialization for the preflight response so it can be signed and the signatures verified.
+    pub fn encode_for_signature(&self) -> Result<Vec<u8>, SerializedBytesError> {
+        holochain_serialized_bytes::encode(&(&self.request, &self.agent_state))
     }
-}
-
-impl PreflightResponse {
     /// Request accessor.
     pub fn request_ref(&self) -> &PreflightRequest {
         &self.request
@@ -121,6 +119,11 @@ impl PreflightResponse {
     /// Agent state accessor.
     pub fn agent_state_ref(&self) -> &CounterSigningAgentState {
         &self.agent_state
+    }
+
+    /// Signature accessor.
+    pub fn signature_ref(&self) -> &Signature {
+        &self.signature
     }
 }
 
@@ -150,11 +153,6 @@ impl CounterSigningAgentState {
     /// Header seq accessor.
     pub fn header_seq(&self) -> u32 {
         self.header_seq
-    }
-
-    /// Signature accessor.
-    pub fn signature_ref(&self) -> &Signature {
-        &self.signature
     }
 }
 
@@ -204,7 +202,10 @@ impl Create {
         agent_state: &CounterSigningAgentState,
     ) -> Result<Self, CounterSigningError> {
         Ok(Create {
-            author: session_data.preflight_request.signing_agents.get(agent_state.agent_index as usize)
+            author: session_data
+                .preflight_request
+                .signing_agents
+                .get(agent_state.agent_index as usize)
                 .ok_or(CounterSigningError::AgentIndexOutOfBounds)?
                 .0
                 .clone(),
@@ -234,7 +235,10 @@ impl Update {
         agent_state: &CounterSigningAgentState,
     ) -> Result<Self, CounterSigningError> {
         Ok(Update {
-            author: session_data.preflight_request.signing_agents.get(agent_state.agent_index as usize)
+            author: session_data
+                .preflight_request
+                .signing_agents
+                .get(agent_state.agent_index as usize)
                 .ok_or(CounterSigningError::AgentIndexOutOfBounds)?
                 .0
                 .clone(),

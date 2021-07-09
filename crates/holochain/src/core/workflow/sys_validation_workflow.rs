@@ -207,6 +207,7 @@ fn handle_failed(error: ValidationOutcome) -> Outcome {
         }
         ValidationOutcome::PrevHeaderError(_) => Rejected,
         ValidationOutcome::PrivateEntry => Rejected,
+        ValidationOutcome::PreflightResponseSignature(_) => Rejected,
         ValidationOutcome::UpdateTypeMismatch(_, _) => Rejected,
         ValidationOutcome::VerifySignature(_, _) => Rejected,
         ValidationOutcome::ZomeId(_) => Rejected,

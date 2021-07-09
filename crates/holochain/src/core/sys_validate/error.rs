@@ -12,6 +12,7 @@ use holochain_keystore::KeystoreError;
 use holochain_sqlite::error::DatabaseError;
 use holochain_state::workspace::WorkspaceError;
 use holochain_types::prelude::*;
+use holochain_zome_types::countersigning::PreflightResponse;
 use thiserror::Error;
 
 /// Validation can result in either
@@ -107,6 +108,8 @@ pub enum ValidationOutcome {
     NotNewEntry(Header),
     #[error("The dependency {0:?} is not held")]
     NotHoldingDep(AnyDhtHash),
+    #[error("The preflight response had an invalid signature {0:?}")]
+    PreflightResponseSignature(PreflightResponse),
     #[error(transparent)]
     PrevHeaderError(#[from] PrevHeaderError),
     #[error("StoreEntry should not be gossiped for private entries")]
