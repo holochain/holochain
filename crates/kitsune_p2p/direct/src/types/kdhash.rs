@@ -26,10 +26,10 @@ pub trait KdHashExt: Sized {
     /// convert from kitsune op hash
     fn from_kitsune_op_hash(op_hash: &KitsuneOpHash) -> Self;
 
-    /// convert to kitsune op hash
+    /// convert to kitsune basis
     fn to_kitsune_basis(&self) -> Arc<KitsuneBasis>;
 
-    /// convert from kitsune op hash
+    /// convert from kitsune basis
     fn from_kitsune_basis(basis: &KitsuneBasis) -> Self;
 
     /// Treating this hash as a sodoken pubkey,
