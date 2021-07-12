@@ -91,6 +91,12 @@ pub enum ValidationOutcome {
     Counterfeit(Signature, Header),
     #[error("The countersigning session times were not valid {0:?}")]
     CounterSigningSessionTimes(CounterSigningSessionTimes),
+    #[error("The countersigning session responses ({0}) did not match the number of signing agents ({1})")]
+    CounterSigningSessionResponsesLength(usize, usize),
+    #[error(
+        "The countersigning session response with agent index {0} was found in index position {1}"
+    )]
+    CounterSigningSessionResponsesOrder(u8, usize),
     #[error("The dependency {0:?} was not found on the DHT")]
     DepMissingFromDht(AnyDhtHash),
     #[error("The app entry type {0:?} entry def id was out of range")]

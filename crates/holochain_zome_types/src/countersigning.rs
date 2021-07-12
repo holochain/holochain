@@ -42,7 +42,7 @@ pub struct PreflightBytes(#[serde(with = "serde_bytes")] Vec<u8>);
 
 /// Agents can have a role specific to each countersigning session.
 /// The role is app defined and opaque to the subconscious.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct Role(u8);
 
 /// Alias for a list of agents and their roles.
@@ -107,6 +107,19 @@ pub struct PreflightResponse {
 }
 
 impl PreflightResponse {
+    /// Constructor.
+    pub fn new(
+        request: PreflightRequest,
+        agent_state: CounterSigningAgentState,
+        signature: Signature,
+    ) -> Self {
+        Self {
+            request,
+            agent_state,
+            signature,
+        }
+    }
+
     /// Consistent serialization for the preflight response so it can be signed and the signatures verified.
     pub fn encode_for_signature(&self) -> Result<Vec<u8>, SerializedBytesError> {
         holochain_serialized_bytes::encode(&(&self.request, &self.agent_state))
@@ -186,14 +199,6 @@ pub struct UpdateBase {
     entry_hash: EntryHash,
 }
 
-/// All the data required for a countersigning session.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct CounterSigningSessionData {
-    preflight_request: PreflightRequest,
-    responses: Vec<CounterSigningAgentState>,
-    signatures: Vec<Signature>,
-}
-
 impl Create {
     /// Build an unsigned Create header from session data, shared create data and an agent's state.
     fn from_countersigning_data(
@@ -262,13 +267,20 @@ impl Update {
     }
 }
 
+/// All the data required for a countersigning session.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CounterSigningSessionData {
+    preflight_request: PreflightRequest,
+    responses: Vec<(CounterSigningAgentState, Signature)>,
+}
+
 impl CounterSigningSessionData {
     /// Attempt to map countersigning session data to a set of headers.
     /// A given countersigning session always maps to the same ordered set of headers or an error.
     /// Note the headers are not signed as the intent is to build headers for other agents without their private keys.
     pub fn build_header_set(&self) -> Result<Vec<Header>, CounterSigningError> {
         let mut headers = vec![];
-        for agent_state in self.responses.iter() {
+        for (agent_state, _response_signature) in self.responses.iter() {
             match self.preflight_request.header_base {
                 HeaderBase::Create(ref create_base) => {
                     headers.push(Header::Create(Create::from_countersigning_data(
@@ -287,5 +299,15 @@ impl CounterSigningSessionData {
             }
         }
         Ok(headers)
+    }
+
+    /// Accessor to the preflight request.
+    pub fn preflight_request_ref(&self) -> &PreflightRequest {
+        &self.preflight_request
+    }
+
+    /// Accessor to responses.
+    pub fn responses_ref(&self) -> &Vec<(CounterSigningAgentState, Signature)> {
+        &self.responses
     }
 }

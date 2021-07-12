@@ -9,7 +9,8 @@ use crate::conductor::entry_def_store::get_entry_def;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::HolochainP2pCell;
 use holochain_types::prelude::*;
-use holochain_zome_types::countersigning::CounterSigningSessionTimes;
+use holochain_zome_types::countersigning::CounterSigningSessionData;
+use holochain_zome_types::countersigning::PreflightRequest;
 use holochain_zome_types::countersigning::PreflightResponse;
 use holochain_zome_types::countersigning::SESSION_HEADER_TIME_OFFSET_MILLIS;
 use std::convert::TryInto;
@@ -34,6 +35,11 @@ pub const MAX_ENTRY_SIZE: usize = 16_000_000;
 /// Tags are used as keys to the database to allow
 /// fast lookup so they should be small.
 pub const MAX_TAG_SIZE: usize = 1000;
+
+/// Need at least two to countersign.
+pub const MIN_COUNTERSIGNING_AGENTS: usize = 2;
+/// 16 seems like a lot of agents to countersign.
+pub const MAX_COUNTERSIGNING_AGENTS: usize = 16;
 
 /// Verify the signature for this header
 pub async fn verify_header_signature(
@@ -80,37 +86,69 @@ pub async fn check_countersigning_preflight_response_signature(
 }
 
 /// Verify the difference between the end and start time is larger than the session header time offset.
-pub fn check_countersigning_session_times(
-    session_times: &CounterSigningSessionTimes,
+pub fn check_countersigning_preflight_request_session_times(
+    preflight_request: &PreflightRequest,
 ) -> SysValidationResult<bool> {
-    Ok(&Timestamp(0, 0) < session_times.as_start_ref()
-        && session_times.as_start_ref()
-            < &(session_times.as_end_ref()
-                - core::time::Duration::from_millis(SESSION_HEADER_TIME_OFFSET_MILLIS as u64))
-            .map_err(|_| {
-                SysValidationError::ValidationOutcome(
-                    ValidationOutcome::CounterSigningSessionTimes((*session_times).clone()),
-                )
-            })?)
-}
-
-/// Verify the session times on a preflight response as per default session time handling.
-pub fn check_countersigning_preflight_response_session_times(
-    preflight_response: &PreflightResponse,
-) -> SysValidationResult<bool> {
-    check_countersigning_session_times(preflight_response.request_ref().session_times_ref())
+    Ok(
+        &Timestamp(0, 0) < preflight_request.session_times_ref().as_start_ref()
+            && preflight_request.session_times_ref().as_start_ref()
+                < &(preflight_request.session_times_ref().as_end_ref()
+                    - core::time::Duration::from_millis(SESSION_HEADER_TIME_OFFSET_MILLIS as u64))
+                .map_err(|_| {
+                    SysValidationError::ValidationOutcome(
+                        ValidationOutcome::CounterSigningSessionTimes(
+                            (*preflight_request.session_times_ref()).clone(),
+                        ),
+                    )
+                })?,
+    )
 }
 
 /// Verify the enzyme index is in bounds of the signing agent if set.
-pub fn check_countersigning_preflight_response_enzyme_index(
-    preflight_response: &PreflightResponse,
+pub fn check_countersigning_preflight_request_enzyme_index(
+    preflight_request: &PreflightRequest,
 ) -> SysValidationResult<bool> {
-    Ok(match preflight_response.request_ref().enzyme_index_ref() {
-        Some(index) => {
-            (*index as usize) < preflight_response.request_ref().signing_agents_ref().len()
-        }
+    Ok(match preflight_request.enzyme_index_ref() {
+        Some(index) => (*index as usize) < preflight_request.signing_agents_ref().len(),
         None => true,
     })
+}
+
+/// Verify the number of signing agents is within the correct range.
+pub fn check_countersigning_preflight_request_agents_len(
+    preflight_request: &PreflightRequest,
+) -> SysValidationResult<bool> {
+    Ok(MIN_COUNTERSIGNING_AGENTS <= preflight_request.signing_agents_ref().len() && preflight_request.signing_agents_ref().len() <= MAX_COUNTERSIGNING_AGENTS)
+}
+
+/// Verify there are no duplicate agents to sign.
+pub fn check_countersigning_preflight_request_agents_dupes(
+    preflight_request: &PreflightRequest,
+) -> SysValidationResult<bool> {
+    let set: std::collections::HashSet<_> =
+        preflight_request.signing_agents_ref().clone().drain(..).collect();
+    Ok(set.len() == preflight_request.signing_agents_ref().len())
+}
+
+/// Verify the preflight request agents.
+pub fn check_countersigning_preflight_request_agents(
+    preflight_request: &PreflightRequest,
+) -> SysValidationResult<bool> {
+    Ok(
+        check_countersigning_preflight_request_agents_len(preflight_request)?
+            && check_countersigning_preflight_request_agents_dupes(preflight_request)?,
+    )
+}
+
+/// Verify a countersigning preflight request integrity.
+pub fn check_countersigning_preflight_request(
+    preflight_request: &PreflightRequest,
+) -> SysValidationResult<bool> {
+    Ok(
+        check_countersigning_preflight_request_enzyme_index(preflight_request)?
+            && check_countersigning_preflight_request_session_times(preflight_request)?
+            && check_countersigning_preflight_request_agents(preflight_request)?,
+    )
 }
 
 /// Combined preflight response validation call.
@@ -118,10 +156,74 @@ pub async fn check_countersigning_preflight_response(
     preflight_response: &PreflightResponse,
 ) -> SysValidationResult<bool> {
     Ok(
-        check_countersigning_preflight_response_enzyme_index(preflight_response)?
-            && check_countersigning_preflight_response_session_times(preflight_response)?
+        check_countersigning_preflight_request(preflight_response.request_ref())?
             && check_countersigning_preflight_response_signature(preflight_response).await?,
     )
+}
+
+/// Check the responses vector is indexed and sized correctly.
+pub fn check_countersigning_session_data_responses_indexes(
+    session_data: &CounterSigningSessionData,
+) -> SysValidationResult<bool> {
+    if session_data
+        .preflight_request_ref()
+        .signing_agents_ref()
+        .len()
+        != session_data.responses_ref().len()
+    {
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::CounterSigningSessionResponsesLength(
+                session_data.responses_ref().len(),
+                session_data
+                    .preflight_request_ref()
+                    .signing_agents_ref()
+                    .len(),
+            ),
+        ))
+    } else {
+        for (i, (response, _response_signature)) in session_data.responses_ref().iter().enumerate()
+        {
+            if response.agent_index() as usize != i {
+                return Err(SysValidationError::ValidationOutcome(
+                    ValidationOutcome::CounterSigningSessionResponsesOrder(
+                        response.agent_index(),
+                        i,
+                    ),
+                ));
+            }
+        }
+        Ok(true)
+    }
+}
+
+/// Verify all the countersigning session data together.
+pub async fn check_countersigning_session_data(
+    session_data: &CounterSigningSessionData,
+) -> SysValidationResult<bool> {
+    if !check_countersigning_session_data_responses_indexes(session_data)? {
+        return Ok(false)
+    }
+
+    let tasks: Vec<_> = session_data.responses_ref().into_iter()
+        .map(|(response, signature)| async move {
+            check_countersigning_preflight_response(&PreflightResponse::new(
+                session_data.preflight_request_ref().clone(),
+                response.clone(),
+                signature.clone()
+            )).await
+        }).collect();
+
+    let results: Vec<SysValidationResult<bool>> = futures::future::join_all(tasks).await;
+    results.into_iter().fold(Ok(true), |acc, result| {
+        match acc {
+            Ok(true) => result,
+            Ok(false) => match result {
+                Err(_) => result,
+                _ => acc,
+            },
+            Err(_) => acc,
+        }
+    })
 }
 
 /// Check that previous header makes sense

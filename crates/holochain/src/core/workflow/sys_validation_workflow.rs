@@ -193,6 +193,8 @@ fn handle_failed(error: ValidationOutcome) -> Outcome {
             unreachable!("Counterfeit ops are dropped before sys validation")
         }
         ValidationOutcome::CounterSigningSessionTimes(_) => Rejected,
+        ValidationOutcome::CounterSigningSessionResponsesLength(_, _) => Rejected,
+        ValidationOutcome::CounterSigningSessionResponsesOrder(_, _) => Rejected,
         ValidationOutcome::DepMissingFromDht(_) => MissingDhtDep,
         ValidationOutcome::EntryDefId(_) => Rejected,
         ValidationOutcome::EntryHash => Rejected,
