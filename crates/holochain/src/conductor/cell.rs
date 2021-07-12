@@ -34,6 +34,7 @@ use hash_type::AnyDht;
 use holo_hash::*;
 use holochain_cascade::authority;
 use holochain_cascade::Cascade;
+use holochain_p2p::dht_arc::ArcInterval;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
@@ -611,17 +612,18 @@ impl Cell {
     /// the network module is requesting a list of dht op hashes
     async fn handle_fetch_op_hashes_for_constraints(
         &self,
-        dht_arc: holochain_p2p::dht_arc::DhtArc,
+        dht_arc: ArcInterval,
         since: Timestamp,
         until: Timestamp,
     ) -> CellResult<Vec<DhtOpHash>> {
         // FIXME: Test this query.
-        let full = (dht_arc.coverage() - 1.0).abs() < f64::EPSILON;
+
         let result = self
             .env()
             .async_reader(move |txn| {
-                let r = if full {
-                    txn.prepare_cached(holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_FULL)?
+                DatabaseResult::Ok(match dht_arc {
+                    ArcInterval::Full => txn
+                        .prepare_cached(holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_FULL)?
                         .query_map(
                             named_params! {
                                 ":from": since.to_sql_ms_lossy(),
@@ -629,28 +631,27 @@ impl Cell {
                             },
                             |row| row.get("hash"),
                         )?
-                        .collect::<rusqlite::Result<Vec<_>>>()?
-                } else if let Some((start_loc, end_loc)) = dht_arc.primitive_range_grouped() {
-                    let sql = if start_loc <= end_loc {
-                        holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_CONTINUOUS
-                    } else {
-                        holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_WRAPPED
-                    };
-                    txn.prepare_cached(sql)?
-                        .query_map(
-                            named_params! {
-                                ":from": since.to_sql_ms_lossy(),
-                                ":to": until.to_sql_ms_lossy(),
-                                ":storage_start_loc": start_loc,
-                                ":storage_end_loc": end_loc,
-                            },
-                            |row| row.get("hash"),
-                        )?
-                        .collect::<rusqlite::Result<Vec<_>>>()?
-                } else {
-                    Vec::new()
-                };
-                DatabaseResult::Ok(r)
+                        .collect::<rusqlite::Result<Vec<_>>>()?,
+                    ArcInterval::Bounded(start_loc, end_loc) => {
+                        let sql = if start_loc <= end_loc {
+                            holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_CONTINUOUS
+                        } else {
+                            holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_WRAPPED
+                        };
+                        txn.prepare_cached(sql)?
+                            .query_map(
+                                named_params! {
+                                    ":from": since.to_sql_ms_lossy(),
+                                    ":to": until.to_sql_ms_lossy(),
+                                    ":storage_start_loc": start_loc,
+                                    ":storage_end_loc": end_loc,
+                                },
+                                |row| row.get("hash"),
+                            )?
+                            .collect::<rusqlite::Result<Vec<_>>>()?
+                    }
+                    ArcInterval::Empty => Vec::new(),
+                })
             })
             .await?;
         Ok(result)

@@ -2,10 +2,10 @@
 
 use crate::*;
 use futures::future::BoxFuture;
+use kitsune_p2p::dht_arc::ArcInterval;
 use kitsune_p2p::event::MetricDatum;
 use kitsune_p2p::event::MetricQuery;
 use kitsune_p2p::event::MetricQueryAnswer;
-use kitsune_p2p_types::dht_arc::DhtArc;
 use kitsune_p2p_types::tls::TlsConfig;
 use std::future::Future;
 
@@ -79,7 +79,7 @@ pub trait AsKdPersist: 'static + Send + Sync {
         agent: KdHash,
         created_at_start_s: f32,
         created_at_end_s: f32,
-        dht_arc: DhtArc,
+        dht_arc: ArcInterval,
     ) -> BoxFuture<'static, KdResult<Vec<KdEntrySigned>>>;
 
     /// Get ui file
@@ -216,7 +216,7 @@ impl KdPersist {
         agent: KdHash,
         created_at_start_s: f32,
         created_at_end_s: f32,
-        dht_arc: DhtArc,
+        dht_arc: ArcInterval,
     ) -> impl Future<Output = KdResult<Vec<KdEntrySigned>>> + 'static + Send {
         AsKdPersist::query_entries(
             &*self.0,

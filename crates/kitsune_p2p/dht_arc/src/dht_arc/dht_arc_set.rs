@@ -219,6 +219,23 @@ impl ArcInterval {
     pub fn from_bounds(bounds: (T, T)) -> Self {
         Self::Bounded(bounds.0, bounds.1)
     }
+
+    /// Represent an arc as an optional range of inclusive endpoints.
+    /// If none, the arc length is 0
+    pub fn to_bounds_grouped(&self) -> Option<(u32, u32)> {
+        match self {
+            Self::Empty => None,
+            Self::Full => Some((0, u32::MAX)),
+            &Self::Bounded(lo, hi) => Some((lo, hi)),
+        }
+    }
+
+    /// Same as primitive_range, but with the return type "inside-out"
+    pub fn primitive_range_detached(&self) -> (Option<u32>, Option<u32>) {
+        self.to_bounds_grouped()
+            .map(|(a, b)| (Some(a), Some(b)))
+            .unwrap_or_default()
+    }
 }
 
 /// Check whether a bounded interval is equivalent to the Full interval

@@ -344,6 +344,8 @@ async fn periodic_agent_hook_task(
 
 #[cfg(test)]
 mod tests {
+    use kitsune_p2p_direct::dependencies::kitsune_p2p_types::dht_arc::ArcInterval;
+
     use super::*;
 
     #[tokio::test(flavor = "multi_thread")]
@@ -436,7 +438,7 @@ mod tests {
                         agent.clone(),
                         f32::MIN,
                         f32::MAX,
-                        DhtArc::new(0, u32::MAX),
+                        ArcInterval::Full,
                     )
                     .await
                     .unwrap();

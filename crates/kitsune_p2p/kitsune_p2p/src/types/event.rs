@@ -11,7 +11,7 @@ pub struct FetchOpHashesForConstraintsEvt {
     /// The "agent" context.
     pub agent: Arc<super::KitsuneAgent>,
     /// The dht arc to query.
-    pub dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+    pub dht_arc: kitsune_p2p_types::dht_arc::ArcInterval,
     /// Only retreive items received since this time (INCLUSIVE).
     pub since_utc_epoch_s: i64,
     /// Only retreive items received until this time (EXCLUSIVE).
