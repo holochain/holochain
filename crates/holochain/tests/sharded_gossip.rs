@@ -13,7 +13,7 @@ struct AppString(String);
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
-async fn sharded_gossip() -> anyhow::Result<()> {
+async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
     use holochain::test_utils::inline_zomes::simple_create_read_zome;
 
     let _g = observability::test_run().ok();
