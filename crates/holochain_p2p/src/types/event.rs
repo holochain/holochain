@@ -127,7 +127,7 @@ ghost_actor::ghost_chan! {
             until_ms: u64,
             arc_set: Arc<kitsune_p2p_types::dht_arc::DhtArcSet>,
         ) -> Vec<(Arc<kitsune_p2p::KitsuneAgent>, kitsune_p2p_types::dht_arc::ArcInterval)>;
-        
+
         /// query agent info in order of closeness to a basis location.
         fn query_agent_info_signed_near_basis(dna_hash: DnaHash, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, basis_loc: u32, limit: u32) -> Vec<AgentInfoSigned>;
 

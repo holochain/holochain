@@ -379,3 +379,30 @@ impl std::fmt::Display for DhtArc {
         writeln!(f, "[{}]", out)
     }
 }
+
+// FIXME: Remove this and change fetch op hashes to use ArcInterval.
+impl From<ArcInterval> for DhtArc {
+    fn from(interval: ArcInterval) -> Self {
+        match interval {
+            ArcInterval::Empty => todo!(),
+            ArcInterval::Full => todo!(),
+            ArcInterval::Bounded(start, end) => match end.cmp(&start) {
+                std::cmp::Ordering::Less => {
+                    let half_length = MAX_HALF_LENGTH - ((start - end) / 2);
+                    let center = Wrapping(start) + Wrapping(half_length);
+                    Self::new(center.0, half_length)
+                }
+                std::cmp::Ordering::Equal => {
+                    let half_length = 1;
+                    let center = start;
+                    Self::new(center, half_length)
+                }
+                std::cmp::Ordering::Greater => {
+                    let half_length = (end - start) / 2;
+                    let center = start + half_length;
+                    Self::new(center, half_length)
+                }
+            },
+        }
+    }
+}

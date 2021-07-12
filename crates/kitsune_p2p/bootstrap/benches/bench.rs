@@ -34,7 +34,7 @@ fn bootstrap(bench: &mut Criterion) {
     let mut url = url2!("http://127.0.0.1:0");
     let (tx, rx) = oneshot::channel();
     runtime.spawn(async move {
-        kitsune_bootstrap::run(([127, 0, 0, 1], 0), tx).await;
+        kitsune_p2p_bootstrap::run(([127, 0, 0, 1], 0), tx).await;
         println!("BOOTSTRAP CLOSED");
     });
     let addr = runtime.block_on(async { rx.await.unwrap() });
