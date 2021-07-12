@@ -39,7 +39,7 @@ pub const MAX_TAG_SIZE: usize = 1000;
 /// Need at least two to countersign.
 pub const MIN_COUNTERSIGNING_AGENTS: usize = 2;
 /// 16 seems like a lot of agents to countersign.
-pub const MAX_COUNTERSIGNING_AGENTS: usize = 16;
+pub const MAX_COUNTERSIGNING_AGENTS: usize = 8;
 
 /// Verify the signature for this header
 pub async fn verify_header_signature(
