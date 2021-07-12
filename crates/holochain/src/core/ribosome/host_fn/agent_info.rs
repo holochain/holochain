@@ -11,10 +11,10 @@ pub fn agent_info<'a>(
     call_context: Arc<CallContext>,
     _input: (),
 ) -> Result<AgentInfo, WasmError> {
-    match HostFnAccess::from(&call_context.host_access()) {
+    match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ agent_info: Permission::Allow, .. } => {
             let agent_pubkey = call_context
-                .host_access
+                .host_context
                 .workspace()
                 .source_chain()
                 .agent_pubkey()
@@ -54,7 +54,7 @@ pub mod test {
         host_access.workspace = workspace;
 
         let agent_info: AgentInfo =
-            crate::call_test_ribosome!(host_access, TestWasm::AgentInfo, "agent_info", ());
+            crate::call_test_ribosome!(host_access, TestWasm::AgentInfo, "agent_info", ()).unwrap();
         assert_eq!(agent_info.agent_initial_pubkey, fake_agent_pubkey_1(),);
         assert_eq!(agent_info.agent_latest_pubkey, fake_agent_pubkey_1(),);
     }

@@ -13,7 +13,7 @@ use holochain_types::dht_op::{DhtOpHashed, DhtOpType};
 use holochain_types::prelude::DhtOpError;
 use holochain_types::prelude::DnaDefHashed;
 use holochain_types::prelude::DnaWasmHashed;
-use holochain_types::EntryHashed;
+use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::*;
 
 pub use error::*;

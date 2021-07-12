@@ -17,7 +17,7 @@ fixturator!(
 
 fixturator!(
     HostFnAccess;
-    constructor fn new(Permission, Permission, Permission, Permission, Permission, Permission, Permission);
+    constructor fn new(Permission, Permission, Permission, Permission, Permission, Permission, Permission, Permission, Permission, Permission);
 );
 
 fixturator!(
