@@ -21,6 +21,7 @@ serde_bytes = "0.11"
 subtle = "2"
 thiserror = "1.0.22"
 tracing = "0.1"
+holochain_wasmer_common = "=0.0.72"
 
 # fixturator dependencies
 fixt = { version = "0.0.4-dev.0", path = "../fixt", optional = true }

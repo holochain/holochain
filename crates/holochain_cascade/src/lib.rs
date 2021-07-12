@@ -406,10 +406,10 @@ where
             }
         }
 
-        // If we are not in the process of authoring this hash and we are not the
-        // authority, we should attempt a network fetch, otherwise we can skip it.
+        // If we are not in the process of authoring this hash or its
+        // authority we need a network call.
         // TODO: do we want to put this behind an option, to allow cache-only queries?
-        if !authoring && !authority {
+        if !(authoring || authority) {
             self.fetch_element(entry_hash.into(), options.into())
                 .await?;
         }
@@ -447,10 +447,10 @@ where
             }
         }
 
-        // If we are not in the process of authoring this hash and we are not the
-        // authority, we should attempt a network fetch, otherwise we can skip it.
+        // If we are not in the process of authoring this hash or its
+        // authority we need a network call.
         // TODO: do we want to put this behind an option, to allow cache-only queries?
-        if !authoring && !authority {
+        if !(authoring || authority) {
             self.fetch_element(header_hash.into(), options.into())
                 .await?;
         }
@@ -492,10 +492,10 @@ where
             }
         }
 
-        // If we are not in the process of authoring this hash and we are not the
-        // authority, we should attempt a network fetch, otherwise we can skip it.
+        // If we are not in the process of authoring this hash or its
+        // authority we need a network call.
         // TODO: do we want to put this behind an option, to allow cache-only queries?
-        if !authoring && !authority {
+        if !(authoring || authority) {
             self.fetch_element(header_hash.into(), options.into())
                 .await?;
         }
@@ -531,10 +531,10 @@ where
             }
         }
 
-        // If we are not in the process of authoring this hash and we are not the
-        // authority, we should attempt a network fetch, otherwise we can skip it.
+        // If we are not in the process of authoring this hash or its
+        // authority we need a network call.
         // TODO: do we want to put this behind an option, to allow cache-only queries?
-        if !authoring && !authority {
+        if !(authoring || authority) {
             self.fetch_element(entry_hash.into(), options.into())
                 .await?;
         }

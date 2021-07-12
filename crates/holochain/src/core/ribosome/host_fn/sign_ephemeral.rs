@@ -14,7 +14,7 @@ pub fn sign_ephemeral(
     call_context: Arc<CallContext>,
     input: SignEphemeral,
 ) -> Result<EphemeralSignatures, WasmError> {
-    match HostFnAccess::from(&call_context.host_access()) {
+    match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ keystore: Permission::Allow, .. } => {
             let rng = SystemRandom::new();
             let mut seed = [0; 32];
@@ -64,7 +64,7 @@ pub mod wasm_test {
         host_access.workspace = workspace;
 
         let output: Vec<EphemeralSignatures> =
-            crate::call_test_ribosome!(host_access, TestWasm::Sign, "sign_ephemeral", ());
+            crate::call_test_ribosome!(host_access, TestWasm::Sign, "sign_ephemeral", ()).unwrap();
 
         #[derive(Serialize, Deserialize, Debug)]
         struct One([u8; 2]);
