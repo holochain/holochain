@@ -181,7 +181,7 @@ macro_rules! secure_primitive {
         /// side channel issue trying to be 'human friendly'.
         /// It seems better to never try to encode secrets.
         ///
-        /// Note that using this crate with feature "subtle-encoding", a hex
+        /// Note that when using this crate with feature "subtle-encoding", a hex
         /// representation will be used.
         ///
         /// @todo maybe we want something like **HIDDEN** by default and putting the actual bytes
