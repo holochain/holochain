@@ -143,7 +143,9 @@ impl ShardedGossip {
             missing_hashes.extend(
                 hashes
                     .into_iter()
-                    .filter(|hash| !remote_bloom.check(&Arc::new(MetaOpKey::Op(hash.clone())))),
+                    .filter(|hash| !remote_bloom.check(&Arc::new(MetaOpKey::Op(hash.clone()))))
+                    // Don't pull out hashes we already have ops for.
+                    .filter(|hash| !missing_ops.contains_key(hash)),
             );
             missing_ops.extend(
                 self.evt_sender

@@ -115,6 +115,9 @@ impl ShardedGossip {
         // an appropriate gossip window based on the type of
         // gossip (recent vs historical) and maybe the amount
         // of ops?
+
+        // Blooms optimize for lots of new data.
+        // Hashes optimize no recent changes.
         Ok((0, u64::MAX))
     }
 
