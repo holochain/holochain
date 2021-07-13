@@ -9,7 +9,7 @@
 //! use holochain::conductor::{Conductor, ConductorBuilder, ConductorHandle};
 //! let envs = test_environments();
 //! let handle: ConductorHandle = ConductorBuilder::new()
-//!    .test(&envs)
+//!    .test(&envs, &[])
 //!    .await
 //!    .unwrap();
 //!
@@ -96,6 +96,9 @@ use crate::core::queue_consumer::QueueTriggers;
 /// A handle to the Conductor that can easily be passed around and cheaply cloned
 pub type ConductorHandle = Arc<dyn ConductorHandleT>;
 
+/// A list of Cells which failed to start, and why
+pub type CellStartupErrors = Vec<(CellId, CellError)>;
+
 /// Base trait for ConductorHandle
 #[mockall::automock]
 #[async_trait::async_trait]
@@ -114,7 +117,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn initialize_conductor(
         self: Arc<Self>,
         admin_configs: Vec<AdminInterfaceConfig>,
-    ) -> ConductorResult<()>;
+    ) -> ConductorResult<CellStartupErrors>;
 
     /// Add a collection of admin interfaces from config
     async fn add_admin_interfaces(
@@ -213,7 +216,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn reconcile_app_status_with_cell_status(
         &self,
         app_ids: Option<HashSet<InstalledAppId>>,
-    ) -> ConductorResult<()>;
+    ) -> ConductorResult<AppStatusFx>;
 
     /// Adjust which cells are present in the Conductor (adding and removing as
     /// needed) to match the current reality of all app statuses.
@@ -221,10 +224,13 @@ pub trait ConductorHandleT: Send + Sync {
     /// - If a Cell is used by no running apps, then ensure it is removed.
     async fn reconcile_cell_status_with_app_status(
         self: Arc<Self>,
-    ) -> ConductorResult<Vec<(CellId, CellError)>>;
+    ) -> ConductorResult<CellStartupErrors>;
 
     /// Activate an app
-    async fn enable_app(self: Arc<Self>, app_id: &InstalledAppId) -> ConductorResult<InstalledApp>;
+    async fn enable_app(
+        self: Arc<Self>,
+        app_id: &InstalledAppId,
+    ) -> ConductorResult<(InstalledApp, CellStartupErrors)>;
 
     /// Disable an app
     async fn disable_app(
@@ -329,7 +335,7 @@ pub trait ConductorHandleT: Send + Sync {
         &self,
         app_id: &InstalledAppId,
         transition: AppStatusTransition,
-    ) -> ConductorResult<(InstalledApp, AppStatusTransitionEffects)>;
+    ) -> ConductorResult<(InstalledApp, AppStatusFx)>;
 
     // TODO: would be nice to have methods for accessing the underlying Conductor,
     // but this trait doesn't know the concrete type of Conductor underlying,
@@ -399,31 +405,37 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn initialize_conductor(
         self: Arc<Self>,
         admin_configs: Vec<AdminInterfaceConfig>,
-    ) -> ConductorResult<()> {
-        let mut conductor = self.conductor.write().await;
+    ) -> ConductorResult<CellStartupErrors> {
+        self.load_dnas().await?;
 
-        // Start the task manager
-        if conductor.task_manager.is_some() {
-            panic!("Cannot start task manager twice");
-        }
-        let (task_add_sender, run_handle) = spawn_task_manager(self.clone());
-        let (task_stop_broadcaster, _) = tokio::sync::broadcast::channel::<()>(1);
-        conductor.task_manager = Some(TaskManagerClient::new(
-            task_add_sender,
-            task_stop_broadcaster,
-            run_handle,
-        ));
+        let delta = {
+            let mut conductor = self.conductor.write().await;
 
-        conductor
-            .add_admin_interfaces_via_handle(admin_configs, self.clone())
-            .await?;
+            // Start the task manager
+            if conductor.task_manager.is_some() {
+                panic!("Cannot start task manager twice");
+            }
+            let (task_add_sender, run_handle) = spawn_task_manager(self.clone());
+            let (task_stop_broadcaster, _) = tokio::sync::broadcast::channel::<()>(1);
+            conductor.task_manager = Some(TaskManagerClient::new(
+                task_add_sender,
+                task_stop_broadcaster,
+                run_handle,
+            ));
 
-        conductor
-            .startup_app_interfaces_via_handle(self.clone())
-            .await?;
+            conductor
+                .add_admin_interfaces_via_handle(admin_configs, self.clone())
+                .await?;
 
-        conductor.start_paused_apps().await?;
-        Ok(())
+            conductor
+                .startup_app_interfaces_via_handle(self.clone())
+                .await?;
+
+            conductor.start_paused_apps().await?
+        };
+
+        tracing::debug!(delta = ?delta, "Paused apps started");
+        self.process_app_status_fx(delta, None).await
     }
 
     async fn add_app_interface(self: Arc<Self>, port: u16) -> ConductorResult<u16> {
@@ -732,7 +744,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn reconcile_app_status_with_cell_status(
         &self,
         app_ids: Option<HashSet<InstalledAppId>>,
-    ) -> ConductorResult<()> {
+    ) -> ConductorResult<AppStatusFx> {
         self.conductor
             .write()
             .await
@@ -743,7 +755,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     #[tracing::instrument(skip(self))]
     async fn reconcile_cell_status_with_app_status(
         self: Arc<Self>,
-    ) -> ConductorResult<Vec<(CellId, CellError)>> {
+    ) -> ConductorResult<CellStartupErrors> {
         self.conductor.write().await.remove_dangling_cells().await?;
 
         let results = self
@@ -753,15 +765,20 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     #[tracing::instrument(skip(self))]
-    async fn enable_app(self: Arc<Self>, app_id: &InstalledAppId) -> ConductorResult<InstalledApp> {
+    async fn enable_app(
+        self: Arc<Self>,
+        app_id: &InstalledAppId,
+    ) -> ConductorResult<(InstalledApp, CellStartupErrors)> {
         let (app, delta) = self
             .conductor
             .write()
             .await
             .transition_app_status(&app_id, AppStatusTransition::Enable)
             .await?;
-        self.process_app_status_delta(delta).await?;
-        Ok(app)
+        let errors = self
+            .process_app_status_fx(delta, Some(vec![app_id.to_owned()].into_iter().collect()))
+            .await?;
+        Ok((app, errors))
     }
 
     #[tracing::instrument(skip(self))]
@@ -776,7 +793,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await
             .transition_app_status(&app_id, AppStatusTransition::Disable(reason))
             .await?;
-        self.process_app_status_delta(delta).await?;
+        self.process_app_status_fx(delta, Some(vec![app_id.to_owned()].into_iter().collect()))
+            .await?;
         Ok(app)
     }
 
@@ -788,7 +806,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await
             .transition_app_status(&app_id, AppStatusTransition::Start)
             .await?;
-        self.process_app_status_delta(delta).await?;
+        self.process_app_status_fx(delta, Some(vec![app_id.to_owned()].into_iter().collect()))
+            .await?;
         Ok(app)
     }
 
@@ -805,7 +824,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await
             .transition_app_status(&app_id, AppStatusTransition::Pause(reason))
             .await?;
-        self.process_app_status_delta(delta).await?;
+        self.process_app_status_fx(delta, Some(vec![app_id.clone()].into_iter().collect()))
+            .await?;
         Ok(app)
     }
 
@@ -824,7 +844,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         }
         // Remove cells which may now be dangling due to the removed app
         self_clone
-            .process_app_status_delta(AppStatusTransitionEffects::SpinDown)
+            .process_app_status_fx(AppStatusFx::SpinDown, None)
             .await?;
         Ok(())
     }
@@ -1005,7 +1025,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         &self,
         app_id: &InstalledAppId,
         transition: AppStatusTransition,
-    ) -> ConductorResult<(InstalledApp, AppStatusTransitionEffects)> {
+    ) -> ConductorResult<(InstalledApp, AppStatusFx)> {
         let mut lock = self.conductor.write().await;
         lock.transition_app_status(app_id, transition).await
     }
@@ -1029,39 +1049,49 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
     }
 
     /// Deal with the side effects of an app status state transition
-    async fn process_app_status_delta(
+    async fn process_app_status_fx(
         self: Arc<Self>,
-        delta: AppStatusTransitionEffects,
-    ) -> ConductorResult<()> {
-        tracing::debug!(msg = "Processing app status delta", delta = ?delta);
-        match delta {
-            AppStatusTransitionEffects::NoChange => (),
-            AppStatusTransitionEffects::SpinUp => {
-                // Reconcile cell status so that missing/pending cells can become fully joined
-                let errors = self.clone().reconcile_cell_status_with_app_status().await?;
+        delta: AppStatusFx,
+        app_ids: Option<HashSet<InstalledAppId>>,
+    ) -> ConductorResult<CellStartupErrors> {
+        use AppStatusFx::*;
+        let mut last = (delta, vec![]);
+        loop {
+            tracing::debug!(msg = "Processing app status delta", delta = ?last.0);
+            last = match last.0 {
+                NoChange => break,
+                SpinDown => {
+                    // Reconcile cell status so that dangling cells can leave the network and be removed
+                    let errors = self.clone().reconcile_cell_status_with_app_status().await?;
 
-                // Reconcile app status in case some cells failed to join, so the app can be paused
-                self.clone()
-                    .reconcile_app_status_with_cell_status(None)
-                    .await?;
+                    // TODO: This should probably be emitted over the admin interface
+                    if !errors.is_empty() {
+                        error!(msg = "Errors when trying to stop app(s)", ?errors);
+                    }
 
-                // TODO: This should probably be emitted over the admin interface
-                if !errors.is_empty() {
-                    error!(msg = "Errors when trying to start app(s)", ?errors);
+                    (NoChange, errors)
                 }
-            }
-            AppStatusTransitionEffects::SpinDown => {
-                // Reconcile cell status so that dangling cells can leave the network and be removed
-                let errors = self.clone().reconcile_cell_status_with_app_status().await?;
+                SpinUp | Both => {
+                    // Reconcile cell status so that missing/pending cells can become fully joined
+                    let errors = self.clone().reconcile_cell_status_with_app_status().await?;
 
-                // TODO: This should probably be emitted over the admin interface
-                if !errors.is_empty() {
-                    error!(msg = "Errors when trying to stop app(s)", ?errors);
+                    // Reconcile app status in case some cells failed to join, so the app can be paused
+                    let delta = self
+                        .clone()
+                        .reconcile_app_status_with_cell_status(app_ids.clone())
+                        .await?;
+
+                    // TODO: This should probably be emitted over the admin interface
+                    if !errors.is_empty() {
+                        error!(msg = "Errors when trying to start app(s)", ?errors);
+                    }
+
+                    (delta, errors)
                 }
-            }
-        };
+            };
+        }
 
-        Ok(())
+        Ok(last.1)
     }
 
     /// Create any Cells which are missing for any running apps, then initialize
@@ -1069,7 +1099,7 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
     pub(super) async fn create_and_add_initialized_cells_for_running_apps(
         &self,
         conductor_handle: ConductorHandle,
-    ) -> ConductorResult<Vec<(CellId, CellError)>> {
+    ) -> ConductorResult<CellStartupErrors> {
         let results = self
             .conductor
             .read()

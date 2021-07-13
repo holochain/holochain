@@ -558,7 +558,7 @@ where
     pub(super) async fn reconcile_app_status_with_cell_status<S>(
         &mut self,
         app_ids: Option<S>,
-    ) -> ConductorResult<()>
+    ) -> ConductorResult<AppStatusFx>
     where
         S: Into<HashSet<InstalledAppId>>,
     {
@@ -567,44 +567,53 @@ where
 
         let app_ids: Option<HashSet<InstalledAppId>> = app_ids.map(S::into);
         let running_cells: HashSet<CellId> = self.running_cells().map(first).cloned().collect();
-        self.update_state(move |mut state| {
-            let apps = state.installed_apps_mut().iter_mut().filter(|(id, _)| {
-                app_ids
-                    .as_ref()
-                    .map(|ids| ids.contains(&**id))
-                    .unwrap_or(true)
-            });
-            for (_app_id, app) in apps {
-                match app.status().clone() {
-                    Running => {
-                        // If not all required cells are running, pause the app
-                        let missing: Vec<_> = app
-                            .required_cells()
-                            .filter(|id| !running_cells.contains(id))
-                            .collect();
-                        if !missing.is_empty() {
-                            let reason = PausedAppReason::Error(format!(
-                                "Some cells are missing / not able to run: {:#?}",
-                                missing
-                            ));
-                            app.status.transition(Pause(reason));
+        let (_, delta) = self
+            .update_state_prime(move |mut state| {
+                let apps = state.installed_apps_mut().iter_mut().filter(|(id, _)| {
+                    app_ids
+                        .as_ref()
+                        .map(|ids| ids.contains(&**id))
+                        .unwrap_or(true)
+                });
+                let delta = apps
+                    .into_iter()
+                    .map(|(_app_id, app)| {
+                        match app.status().clone() {
+                            Running => {
+                                // If not all required cells are running, pause the app
+                                let missing: Vec<_> = app
+                                    .required_cells()
+                                    .filter(|id| !running_cells.contains(id))
+                                    .collect();
+                                if !missing.is_empty() {
+                                    let reason = PausedAppReason::Error(format!(
+                                        "Some cells are missing / not able to run: {:#?}",
+                                        missing
+                                    ));
+                                    app.status.transition(Pause(reason))
+                                } else {
+                                    AppStatusFx::NoChange
+                                }
+                            }
+                            Paused(_) => {
+                                // If all required cells are now running, restart the app
+                                if app.required_cells().all(|id| running_cells.contains(id)) {
+                                    app.status.transition(Start)
+                                } else {
+                                    AppStatusFx::NoChange
+                                }
+                            }
+                            Disabled(_) => {
+                                // Disabled status should never automatically change.
+                                AppStatusFx::NoChange
+                            }
                         }
-                    }
-                    Paused(_) => {
-                        // If all required cells are now running, restart the app
-                        if app.required_cells().all(|id| running_cells.contains(id)) {
-                            app.status.transition(Start);
-                        }
-                    }
-                    Disabled(_) => {
-                        // Disabled status should never automatically change.
-                    }
-                }
-            }
-            Ok(state)
-        })
-        .await?;
-        Ok(())
+                    })
+                    .fold(AppStatusFx::default(), AppStatusFx::combine);
+                Ok((state, delta))
+            })
+            .await?;
+        Ok(delta)
     }
 
     /// Remove all Cells which are not referenced by any Enabled app.
@@ -727,7 +736,7 @@ where
         &mut self,
         app_id: &InstalledAppId,
         transition: AppStatusTransition,
-    ) -> ConductorResult<(InstalledApp, AppStatusTransitionEffects)> {
+    ) -> ConductorResult<(InstalledApp, AppStatusFx)> {
         Ok(self
             .update_state_prime(move |mut state| {
                 let (app, delta) = state.transition_app_status(&app_id, transition)?.clone();
@@ -757,7 +766,8 @@ where
 
     /// Add fully constructed cells to the cell map in the Conductor
     pub(super) fn add_and_initialize_cells(&mut self, cells: Vec<(Cell, InitialQueueTriggers)>) {
-        for (cell, triggers) in cells {
+        let (cells, triggers): (Vec<_>, Vec<_>) = cells.into_iter().unzip();
+        for cell in cells {
             let cell_id = cell.id().clone();
             tracing::info!(?cell_id, "ADD CELL");
             self.cells.insert(
@@ -767,7 +777,9 @@ where
                     status: CellStatus::PendingJoin,
                 },
             );
-            triggers.initialize_workflows();
+        }
+        for trigger in triggers {
+            trigger.initialize_workflows();
         }
     }
 
@@ -877,19 +889,28 @@ where
     }
 
     /// Restart every paused app
-    pub(super) async fn start_paused_apps(&mut self) -> ConductorResult<()> {
-        self.update_state(|mut state| {
-            let ids = state.paused_apps().map(first).cloned().collect::<Vec<_>>();
-            if !ids.is_empty() {
-                tracing::info!("Restarting {} paused apps: {:#?}", ids.len(), ids);
-            }
-            for id in ids {
-                state.transition_app_status(&id, AppStatusTransition::Start)?;
-            }
-            Ok(state)
-        })
-        .await?;
-        Ok(())
+    pub(super) async fn start_paused_apps(&mut self) -> ConductorResult<AppStatusFx> {
+        let (_, delta) = self
+            .update_state_prime(|mut state| {
+                let ids = state.paused_apps().map(first).cloned().collect::<Vec<_>>();
+                if !ids.is_empty() {
+                    tracing::info!("Restarting {} paused apps: {:#?}", ids.len(), ids);
+                }
+                let deltas: Vec<AppStatusFx> = ids
+                    .into_iter()
+                    .map(|id| {
+                        state
+                            .transition_app_status(&id, AppStatusTransition::Start)
+                            .map(second)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                let delta = deltas
+                    .into_iter()
+                    .fold(AppStatusFx::default(), AppStatusFx::combine);
+                Ok((state, delta))
+            })
+            .await?;
+        Ok(delta)
     }
 
     pub(super) async fn put_wasm(
@@ -1315,17 +1336,10 @@ mod builder {
             conductor_config: ConductorConfig,
             p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
         ) -> ConductorResult<ConductorHandle> {
-            let configs = conductor_config.admin_interfaces.unwrap_or_default();
-            handle.clone().initialize_conductor(configs).await?;
-
-            handle.load_dnas().await?;
-
             tokio::task::spawn(p2p_event_task(p2p_evt, handle.clone()));
 
-            let cell_startup_errors = handle
-                .clone()
-                .reconcile_cell_status_with_app_status()
-                .await?;
+            let configs = conductor_config.admin_interfaces.unwrap_or_default();
+            let cell_startup_errors = handle.clone().initialize_conductor(configs).await?;
 
             // TODO: This should probably be emitted over the admin interface
             if !cell_startup_errors.is_empty() {
@@ -1375,7 +1389,11 @@ mod builder {
 
         /// Build a Conductor with a test environment
         #[cfg(any(test, feature = "test_utils"))]
-        pub async fn test(mut self, envs: &TestEnvs) -> ConductorResult<ConductorHandle> {
+        pub async fn test(
+            mut self,
+            envs: &TestEnvs,
+            extra_dnas: &[DnaFile],
+        ) -> ConductorResult<ConductorHandle> {
             let keystore = envs.conductor().keystore().clone();
 
             self.config.environment_path = envs.path().to_path_buf().into();
@@ -1409,6 +1427,16 @@ mod builder {
                 p2p_env: envs.p2p(),
                 p2p_metrics_env: envs.p2p_metrics(),
             });
+
+            // Install extra DNAs, in particular:
+            // the ones with InlineZomes will not be registered in the Wasm DB
+            // and cannot be automatically loaded on conductor restart.
+            for dna_file in extra_dnas {
+                handle
+                    .register_dna(dna_file.clone())
+                    .await
+                    .expect("Could not install DNA");
+            }
 
             Self::finish(handle, self.config, p2p_evt).await
         }

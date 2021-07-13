@@ -211,7 +211,8 @@ async fn run(
                         //   you can also pass in a PausedAppReason override, so that the reason for the apps being paused
                         //   can be set to the specific error message encountered here, rather than having to read it from
                         //   the logs.
-                        conductor.reconcile_app_status_with_cell_status(None).await.map_err(TaskManagerError::internal)?;
+                        let delta = conductor.reconcile_app_status_with_cell_status(None).await.map_err(TaskManagerError::internal)?;
+                        tracing::debug!(delta = ?delta);
 
                         tracing::error!("Apps paused.");
                     } else {
