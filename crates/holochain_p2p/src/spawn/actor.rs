@@ -292,7 +292,7 @@ impl WrapEvtSender {
         &self,
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
-        dht_arc: kitsune_p2p::dht_arc::DhtArc,
+        dht_arc: kitsune_p2p::dht_arc::ArcInterval,
         since: holochain_types::Timestamp,
         until: holochain_types::Timestamp,
     ) -> impl Future<Output = HolochainP2pResult<Vec<holo_hash::DhtOpHash>>> + 'static + Send {

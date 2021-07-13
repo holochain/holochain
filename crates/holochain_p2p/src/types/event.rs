@@ -211,7 +211,7 @@ ghost_actor::ghost_chan! {
         fn fetch_op_hashes_for_constraints(
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
-            dht_arc: kitsune_p2p::dht_arc::DhtArc,
+            dht_arc: kitsune_p2p::dht_arc::ArcInterval,
             since: holochain_types::Timestamp,
             until: holochain_types::Timestamp,
         ) -> Vec<holo_hash::DhtOpHash>;

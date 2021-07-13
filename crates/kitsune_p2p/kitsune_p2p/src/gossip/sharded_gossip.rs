@@ -53,6 +53,7 @@ type Outgoing = (GossipTgt, HowToConnect, ShardedGossipWire);
 
 type StateKey = Tx2Cert;
 
+#[derive(Default)]
 struct ShardedGossipInner {
     local_agents: HashSet<Arc<KitsuneAgent>>,
     initiate_tgt: Option<GossipTgt>,
@@ -86,7 +87,7 @@ impl ShardedGossip {
             ep_hnd,
             // send_interval_ms,
             evt_sender,
-            inner: Share::new(ShardedGossipInner::new()),
+            inner: Share::new(ShardedGossipInner::default()),
             gossip_type,
         });
         metric_task({
@@ -118,7 +119,10 @@ impl ShardedGossip {
 
         // Blooms optimize for lots of new data.
         // Hashes optimize no recent changes.
-        Ok((0, u64::MAX))
+        match self.gossip_type {
+            GossipType::Historical => Ok((0, u64::MAX)),
+            GossipType::Recent => Ok((0, u64::MAX)),
+        }
     }
 
     async fn process_incoming_outgoing(&self) -> KitsuneResult<()> {
@@ -196,8 +200,6 @@ impl ShardedGossip {
                     self.incoming_missing_ops(state, ops).await?;
                 }
             }
-
-            _ => todo!(),
         }
         Ok(())
     }
@@ -223,7 +225,7 @@ impl ShardedGossip {
             }
             HowToConnect::Url(url) => self.ep_hnd.get_connection(url, timeout).await?,
         };
-        // TODO: Wait for bandwidth enough available outgoing bandwidth here before
+        // TODO: Wait for enough available outgoing bandwidth here before
         // actually sending the gossip.
         con.notify(&gossip, timeout).await?;
         Ok(())
@@ -316,18 +318,6 @@ kitsune_p2p_types::write_codec_enum! {
             ops.0: Vec<Arc<(Arc<KitsuneOpHash>, Vec<u8>)>>,
             finished.1: bool,
         },
-    }
-}
-
-impl ShardedGossipInner {
-    fn new() -> Self {
-        Self {
-            local_agents: Default::default(),
-            initiate_tgt: Default::default(),
-            incoming: Default::default(),
-            outgoing: Default::default(),
-            state_map: Default::default(),
-        }
     }
 }
 

@@ -4,10 +4,10 @@ use crate::types::metric_store::KdMetricStore;
 use crate::types::persist::*;
 use crate::*;
 use futures::future::{BoxFuture, FutureExt};
+use kitsune_p2p::dht_arc::ArcInterval;
 use kitsune_p2p::event::MetricDatum;
 use kitsune_p2p::event::MetricQuery;
 use kitsune_p2p::event::MetricQueryAnswer;
-use kitsune_p2p_types::dht_arc::DhtArc;
 use kitsune_p2p_types::tls::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use std::collections::hash_map::Entry;
@@ -454,7 +454,7 @@ impl AsKdPersist for PersistMem {
         agent: KdHash,
         _created_at_start_s: f32,
         _created_at_end_s: f32,
-        _dht_arc: DhtArc,
+        _dht_arc: ArcInterval,
     ) -> BoxFuture<'static, KdResult<Vec<KdEntrySigned>>> {
         // TODO - actually filter
 

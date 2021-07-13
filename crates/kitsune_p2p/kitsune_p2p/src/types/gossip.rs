@@ -61,7 +61,7 @@ impl GossipModuleFactory {
     }
 }
 
-/// The specific provenance/destination of gossip is to a particular Agent on
+/// The specific provenance/destination of gossip is a particular Agent on
 /// a connection specified by a Tx2Cert
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, derive_more::Constructor)]
 pub struct GossipTgt {

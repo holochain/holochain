@@ -49,7 +49,7 @@ impl Inner {
                 .fetch_op_hashes_for_constraints(FetchOpHashesForConstraintsEvt {
                     space: space.clone(),
                     agent: agent.clone(),
-                    dht_arc: DhtArc::new(0, u32::MAX),
+                    dht_arc: ArcInterval::Full,
                     since_utc_epoch_s: i64::MIN,
                     until_utc_epoch_s: i64::MAX,
                 })
