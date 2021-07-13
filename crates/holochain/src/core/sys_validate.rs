@@ -118,15 +118,21 @@ pub fn check_countersigning_preflight_request_enzyme_index(
 pub fn check_countersigning_preflight_request_agents_len(
     preflight_request: &PreflightRequest,
 ) -> SysValidationResult<bool> {
-    Ok(MIN_COUNTERSIGNING_AGENTS <= preflight_request.signing_agents_ref().len() && preflight_request.signing_agents_ref().len() <= MAX_COUNTERSIGNING_AGENTS)
+    Ok(
+        MIN_COUNTERSIGNING_AGENTS <= preflight_request.signing_agents_ref().len()
+            && preflight_request.signing_agents_ref().len() <= MAX_COUNTERSIGNING_AGENTS,
+    )
 }
 
 /// Verify there are no duplicate agents to sign.
 pub fn check_countersigning_preflight_request_agents_dupes(
     preflight_request: &PreflightRequest,
 ) -> SysValidationResult<bool> {
-    let set: std::collections::HashSet<_> =
-        preflight_request.signing_agents_ref().clone().drain(..).collect();
+    let set: std::collections::HashSet<_> = preflight_request
+        .signing_agents_ref()
+        .clone()
+        .drain(..)
+        .collect();
     Ok(set.len() == preflight_request.signing_agents_ref().len())
 }
 
@@ -196,33 +202,72 @@ pub fn check_countersigning_session_data_responses_indexes(
     }
 }
 
+/// Verify the countersigning session contains the specified header.
+pub fn check_countersigning_session_data_contains_header(
+    session_data: &CounterSigningSessionData,
+    header: NewEntryHeaderRef<'_>,
+) -> SysValidationResult<bool> {
+    let header_is_in_session = session_data
+        .build_header_set()
+        .map_err(|e| {
+            SysValidationError::ValidationOutcome(ValidationOutcome::FailedToBuildHeaderSet(e))
+        })?
+        .iter()
+        .any(|session_header| match (&header, session_header) {
+            (NewEntryHeaderRef::Create(create), Header::Create(session_create)) => {
+                create == &session_create
+            }
+            (NewEntryHeaderRef::Update(update), Header::Update(session_update)) => {
+                update == &session_update
+            }
+            _ => false,
+        });
+    if !header_is_in_session {
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::HeaderNotInCounterSigningSession(
+                session_data.to_owned(),
+                header.to_new_entry_header(),
+            ),
+        ))
+    } else {
+        Ok(true)
+    }
+}
+
 /// Verify all the countersigning session data together.
 pub async fn check_countersigning_session_data(
     session_data: &CounterSigningSessionData,
+    header: NewEntryHeaderRef<'_>,
 ) -> SysValidationResult<bool> {
     if !check_countersigning_session_data_responses_indexes(session_data)? {
-        return Ok(false)
+        return Ok(false);
     }
 
-    let tasks: Vec<_> = session_data.responses_ref().into_iter()
+    if !check_countersigning_session_data_contains_header(session_data, header)? {
+        return Ok(false);
+    }
+
+    let tasks: Vec<_> = session_data
+        .responses_ref()
+        .iter()
         .map(|(response, signature)| async move {
             check_countersigning_preflight_response(&PreflightResponse::new(
                 session_data.preflight_request_ref().clone(),
                 response.clone(),
-                signature.clone()
-            )).await
-        }).collect();
+                signature.clone(),
+            ))
+            .await
+        })
+        .collect();
 
     let results: Vec<SysValidationResult<bool>> = futures::future::join_all(tasks).await;
-    results.into_iter().fold(Ok(true), |acc, result| {
-        match acc {
-            Ok(true) => result,
-            Ok(false) => match result {
-                Err(_) => result,
-                _ => acc,
-            },
-            Err(_) => acc,
-        }
+    results.into_iter().fold(Ok(true), |acc, result| match acc {
+        Ok(true) => result,
+        Ok(false) => match result {
+            Err(_) => result,
+            _ => acc,
+        },
+        Err(_) => acc,
     })
 }
 

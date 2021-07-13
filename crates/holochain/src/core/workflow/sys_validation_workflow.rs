@@ -192,6 +192,8 @@ fn handle_failed(error: ValidationOutcome) -> Outcome {
         ValidationOutcome::Counterfeit(_, _) => {
             unreachable!("Counterfeit ops are dropped before sys validation")
         }
+        ValidationOutcome::HeaderNotInCounterSigningSession(_, _) => Rejected,
+        ValidationOutcome::FailedToBuildHeaderSet(_) => Rejected,
         ValidationOutcome::CounterSigningSessionTimes(_) => Rejected,
         ValidationOutcome::CounterSigningSessionResponsesLength(_, _) => Rejected,
         ValidationOutcome::CounterSigningSessionResponsesOrder(_, _) => Rejected,
@@ -473,6 +475,7 @@ async fn store_entry(
         let entry_def = check_app_entry_type(app_entry_type, conductor_api).await?;
         check_not_private(&entry_def)?;
     }
+
     check_entry_hash(entry_hash, entry).await?;
     check_entry_size(entry)?;
 
@@ -487,6 +490,11 @@ async fn store_entry(
                 ValidationOutcome::DepMissingFromDht(original_header_address.clone().into())
             })?;
         update_check(entry_update, original_header.header())?;
+    }
+
+    // Additional checks if this is a countersigned entry.
+    if let Entry::CounterSign(session_data, _) = entry {
+        check_countersigning_session_data(session_data, header).await?;
     }
     Ok(())
 }

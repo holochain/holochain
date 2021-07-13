@@ -12,6 +12,8 @@ use holochain_keystore::KeystoreError;
 use holochain_sqlite::error::DatabaseError;
 use holochain_state::workspace::WorkspaceError;
 use holochain_types::prelude::*;
+use holochain_zome_types::countersigning::CounterSigningError;
+use holochain_zome_types::countersigning::CounterSigningSessionData;
 use holochain_zome_types::countersigning::CounterSigningSessionTimes;
 use holochain_zome_types::countersigning::PreflightResponse;
 use thiserror::Error;
@@ -91,6 +93,10 @@ pub enum ValidationOutcome {
     Counterfeit(Signature, Header),
     #[error("The countersigning session times were not valid {0:?}")]
     CounterSigningSessionTimes(CounterSigningSessionTimes),
+    #[error("The header {1:?} is not found in the countersigning session data {0:?}")]
+    HeaderNotInCounterSigningSession(CounterSigningSessionData, NewEntryHeader),
+    #[error("The header set could not be built for the counter signing session data: {0}")]
+    FailedToBuildHeaderSet(CounterSigningError),
     #[error("The countersigning session responses ({0}) did not match the number of signing agents ({1})")]
     CounterSigningSessionResponsesLength(usize, usize),
     #[error(
