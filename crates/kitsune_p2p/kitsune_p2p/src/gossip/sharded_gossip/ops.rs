@@ -1,6 +1,6 @@
 use super::*;
 
-impl ShardedGossip {
+impl<E: KitsuneP2pEventSender> ShardedGossip<E> {
     /// Incoming ops bloom.
     /// - Send back chunks of missing ops.
     /// - Don't send a chunk larger then MAX_SEND_BUF_SIZE.

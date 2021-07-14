@@ -1,6 +1,6 @@
 use super::*;
 
-impl ShardedGossip {
+impl<E: KitsuneP2pEventSender> ShardedGossip<E> {
     /// Incoming agents bloom filter.
     /// - Check for any missing agents and send them back.
     pub(super) async fn incoming_agents(

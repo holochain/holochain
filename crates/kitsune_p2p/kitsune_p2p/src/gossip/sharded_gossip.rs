@@ -29,7 +29,6 @@ mod store;
 const MAX_SEND_BUF_BYTES: usize = 16000;
 
 type BloomFilter = bloomfilter::Bloom<Arc<MetaOpKey>>;
-type EventSender = futures::channel::mpsc::Sender<event::KitsuneP2pEvent>;
 
 #[derive(Debug, Clone, Copy)]
 enum GossipType {
@@ -37,7 +36,7 @@ enum GossipType {
     Historical,
 }
 
-struct ShardedGossip {
+struct ShardedGossip<EventSender: KitsuneP2pEventSender> {
     gossip_type: GossipType,
     tuning_params: KitsuneP2pTuningParams,
     ep_hnd: Tx2EpHnd<wire::Wire>,
@@ -71,14 +70,14 @@ struct RoundState {
     until_ms: u64,
 }
 
-impl ShardedGossip {
+impl<EventSender: KitsuneP2pEventSender> ShardedGossip<EventSender> {
     const TGT_FP: f64 = 0.01;
 
     pub fn new(
         tuning_params: KitsuneP2pTuningParams,
         space: Arc<KitsuneSpace>,
         ep_hnd: Tx2EpHnd<wire::Wire>,
-        evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
+        evt_sender: EventSender,
         gossip_type: GossipType,
     ) -> Arc<Self> {
         let this = Arc::new(Self {
@@ -321,7 +320,7 @@ kitsune_p2p_types::write_codec_enum! {
     }
 }
 
-impl AsGossipModule for ShardedGossip {
+impl<E: KitsuneP2pEventSender> AsGossipModule for ShardedGossip<E> {
     fn incoming_gossip(
         &self,
         con: Tx2ConHnd<wire::Wire>,

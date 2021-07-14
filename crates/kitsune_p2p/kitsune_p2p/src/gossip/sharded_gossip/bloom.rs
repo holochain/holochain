@@ -1,6 +1,6 @@
 use super::*;
 
-impl ShardedGossip {
+impl<E: KitsuneP2pEventSender> ShardedGossip<E> {
     /// Generate a bloom filter of all agents.
     /// - Agents are only included if they are within the common arc set.
     /// - The bloom is `KitsuneAgent` + `signed_at_ms`. So multiple agent infos could
