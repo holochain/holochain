@@ -23,6 +23,9 @@ mod initiate;
 mod ops;
 mod store;
 
+#[cfg(test)]
+mod test;
+
 /// max send buffer size (keep it under 16384 with a little room for overhead)
 /// (this is not a tuning_param because it must be coordinated
 /// with the constant in PoolBuf which cannot be set at runtime)
