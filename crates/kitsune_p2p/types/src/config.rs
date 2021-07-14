@@ -97,12 +97,6 @@ pub mod tuning_params_struct {
         /// [Default: 5 minute]
         gossip_peer_on_error_next_gossip_delay_ms: u32 = 1000 * 60 * 5,
 
-        /// Default agent count for remote notify. [Default: 5]
-        default_notify_remote_agent_count: u32 = 5,
-
-        /// Default timeout for remote notify. [Default: 30s]
-        default_notify_timeout_ms: u32 = 1000 * 30,
-
         /// Default timeout for rpc single. [Default: 30s]
         default_rpc_single_timeout_ms: u32 = 1000 * 30,
 

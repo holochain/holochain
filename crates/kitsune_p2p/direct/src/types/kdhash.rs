@@ -26,6 +26,12 @@ pub trait KdHashExt: Sized {
     /// convert from kitsune op hash
     fn from_kitsune_op_hash(op_hash: &KitsuneOpHash) -> Self;
 
+    /// convert to kitsune basis
+    fn to_kitsune_basis(&self) -> Arc<KitsuneBasis>;
+
+    /// convert from kitsune basis
+    fn from_kitsune_basis(basis: &KitsuneBasis) -> Self;
+
     /// Treating this hash as a sodoken pubkey,
     /// verify the given data / signature
     fn verify_signature(
@@ -66,8 +72,14 @@ impl KdHashExt for KdHash {
         (*arrayref::array_ref![&op_hash.0, 0, 36]).into()
     }
 
-    /// Treating this hash as a sodoken pubkey,
-    /// verify the given data / signature
+    fn to_kitsune_basis(&self) -> Arc<KitsuneBasis> {
+        Arc::new(KitsuneBasis(self.0 .1[3..].to_vec()))
+    }
+
+    fn from_kitsune_basis(basis: &KitsuneBasis) -> Self {
+        (*arrayref::array_ref![&basis.0, 0, 36]).into()
+    }
+
     fn verify_signature(
         &self,
         data: sodoken::Buffer,
@@ -89,7 +101,6 @@ impl KdHashExt for KdHash {
         .boxed()
     }
 
-    /// Generate a KdHash from data
     fn from_data(data: &[u8]) -> BoxFuture<'static, KdResult<Self>> {
         let r = Buffer::from_ref(data);
         async move {
@@ -107,7 +118,6 @@ impl KdHashExt for KdHash {
         .boxed()
     }
 
-    /// Coerce 32 bytes of signing pubkey data into a KdHash
     fn from_coerced_pubkey(data: [u8; 32]) -> BoxFuture<'static, KdResult<Self>> {
         async move {
             let r = Buffer::from_ref(data);

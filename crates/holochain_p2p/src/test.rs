@@ -326,9 +326,11 @@ mod tests {
             holo_hash::hash_type::AnyDht::Header,
         );
 
-        p2p.publish(dna, a1, true, header_hash, vec![], Some(200))
-            .await
-            .unwrap();
+        // this will fail because we can't reach any remote nodes
+        // but, it still published locally, so our test will work
+        let _ = p2p
+            .publish(dna, a1, true, header_hash, vec![], Some(200))
+            .await;
 
         assert_eq!(3, recv_count.load(std::sync::atomic::Ordering::SeqCst));
 

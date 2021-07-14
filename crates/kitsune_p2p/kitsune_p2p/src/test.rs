@@ -82,46 +82,6 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn test_transport_notify_coms() -> Result<(), KitsuneP2pError> {
-        observability::test_run().ok();
-        let (harness, evt) = spawn_test_harness_mem().await?;
-        let mut rcv = evt.receive();
-
-        let space = harness.add_space().await?;
-        let (a1, p2p1) = harness.add_direct_agent("one".into()).await?;
-        let (_a2, _p2p2) = harness.add_direct_agent("two".into()).await?;
-        let (_a3, _p2p3) = harness.add_direct_agent("tre".into()).await?;
-
-        // needed until we have some way of bootstrapping
-        harness.magic_peer_info_exchange().await?;
-
-        p2p1.notify_multi(actor::NotifyMulti {
-            space: space,
-            from_agent: a1,
-            // this is just a dummy value right now
-            basis: TestVal::test_val(),
-            remote_agent_count: Some(42),
-            timeout_ms: Some(40),
-            payload: b"test-broadcast".to_vec(),
-        })
-        .await?;
-
-        harness.ghost_actor_shutdown().await?;
-
-        let mut recv_count = 0_usize;
-        while let Some(evt) = tokio_stream::StreamExt::next(&mut rcv).await {
-            if let test_util::HarnessEventType::Notify { payload, .. } = &evt.ty {
-                assert_eq!(&**payload, "test-broadcast");
-                recv_count += 1;
-            }
-        }
-
-        assert_eq!(3, recv_count);
-
-        Ok(())
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
     async fn test_peer_info_store() -> Result<(), KitsuneP2pError> {
         observability::test_run().ok();
 
@@ -196,55 +156,6 @@ mod tests {
         assert_eq!(b"echo: hello".to_vec(), res);
 
         harness.ghost_actor_shutdown().await?;
-        Ok(())
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_broadcast_workflow() -> Result<(), KitsuneP2pError> {
-        observability::test_run_open().ok();
-        let span = tracing::debug_span!("test");
-        let _g = span.enter();
-        observability::span_context!(span);
-
-        let (harness, evt) = spawn_test_harness_quic().await?;
-        let mut rcv = evt.receive();
-
-        let space = harness.add_space().await?;
-        let (a1, p2p) = harness.add_direct_agent("DIRECT".into()).await?;
-        // TODO when networking works, just add_*_agent again...
-        // but for now, we need the two agents to be on the same node:
-        let a2: Arc<KitsuneAgent> = TestVal::test_val();
-        p2p.join(space.clone(), a2.clone()).await?;
-        let a3: Arc<KitsuneAgent> = TestVal::test_val();
-        p2p.join(space.clone(), a3.clone()).await?;
-
-        p2p.notify_multi(actor::NotifyMulti {
-            space: space,
-            from_agent: a1,
-            // this is just a dummy value right now
-            basis: TestVal::test_val(),
-            remote_agent_count: Some(42),
-            timeout_ms: Some(40),
-            payload: b"test-broadcast".to_vec(),
-        })
-        .await?;
-
-        harness.ghost_actor_shutdown().await?;
-
-        let mut recv_count = 0_usize;
-        while let Some(evt) = tokio_stream::StreamExt::next(&mut rcv).await {
-            if &**evt.nick != "DIRECT" {
-                continue;
-            }
-            if let test_util::HarnessEventType::Notify { payload, .. } = &evt.ty {
-                assert_eq!(&**payload, "test-broadcast");
-                recv_count += 1;
-            }
-        }
-
-        assert_eq!(3, recv_count);
-
-        observability::span_context!(span);
         Ok(())
     }
 

@@ -1,5 +1,6 @@
 //! Definitions related to the KitsuneP2p peer-to-peer / dht communications actor.
 
+use kitsune_p2p_types::KitsuneTimeout;
 use std::sync::Arc;
 use url2::Url2;
 
@@ -38,31 +39,6 @@ pub struct RpcMultiResponse {
     pub response: Vec<u8>,
 }
 
-/// Publish data to a "neighborhood" of remote nodes surrounding the "basis" hash.
-/// Returns an approximate number of nodes reached.
-#[derive(Clone, Debug)]
-pub struct NotifyMulti {
-    /// The "space" context.
-    pub space: Arc<super::KitsuneSpace>,
-    /// The agent making the request.
-    pub from_agent: Arc<super::KitsuneAgent>,
-    /// The "basis" hash/coordinate of destination neigborhood.
-    pub basis: Arc<super::KitsuneBasis>,
-    /// The desired count of remote nodes to reach.
-    /// Kitsune will keep searching for new nodes to broadcast to until:
-    ///  - (A) this target count is reached, or
-    ///  - (B) the below timeout is exceeded.
-    /// Set to None if you just want a default best-effort.
-    pub remote_agent_count: Option<u8>,
-    /// The timeout to await for sucessful broadcasts.
-    /// Set to None if you don't care to get a count -
-    /// broadcast will immediately return 0, but give a best effort to meet
-    /// remote_agent_count.
-    pub timeout_ms: Option<u64>,
-    /// Notify data.
-    pub payload: Vec<u8>,
-}
-
 ghost_actor::ghost_chan! {
     /// The KitsuneP2pSender allows async remote-control of the KitsuneP2p actor.
     pub chan KitsuneP2p<super::KitsuneP2pError> {
@@ -83,9 +59,16 @@ ghost_actor::ghost_chan! {
         /// The remote sides will see these messages as "Call" events.
         fn rpc_multi(input: RpcMulti) -> Vec<RpcMultiResponse>;
 
-        /// Publish data to a "neighborhood" of remote nodes surrounding the "basis" hash.
-        /// Returns an approximate number of nodes reached.
+        /// Publish data to a "neighborhood" of remote nodes surrounding the
+        /// "basis" hash. This is a multi-step fire-and-forget algorithm.
+        /// An Ok(()) result only means that we were able to establish at
+        /// least one connection with a node in the target neighborhood.
         /// The remote sides will see these messages as "Notify" events.
-        fn notify_multi(input: NotifyMulti) -> u8;
+        fn broadcast(
+            space: Arc<super::KitsuneSpace>,
+            basis: Arc<super::KitsuneBasis>,
+            timeout: KitsuneTimeout,
+            payload: Vec<u8>
+        ) -> ();
     }
 }
