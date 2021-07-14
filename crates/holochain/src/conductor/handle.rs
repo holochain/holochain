@@ -408,7 +408,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     ) -> ConductorResult<CellStartupErrors> {
         self.load_dnas().await?;
 
-        let delta = {
+        {
             let mut conductor = self.conductor.write().await;
 
             // Start the task manager
@@ -431,11 +431,12 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 .startup_app_interfaces_via_handle(self.clone())
                 .await?;
 
-            conductor.start_paused_apps().await?
+            // We don't care what fx are returned here, since all cells need to
+            // be spun up
+            let _ = conductor.start_paused_apps().await?;
         };
 
-        tracing::debug!(delta = ?delta, "Paused apps started");
-        self.process_app_status_fx(delta, None).await
+        self.process_app_status_fx(AppStatusFx::SpinUp, None).await
     }
 
     async fn add_app_interface(self: Arc<Self>, port: u16) -> ConductorResult<u16> {

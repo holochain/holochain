@@ -392,6 +392,7 @@ async fn call_zome() {
     assert_eq!(app_port, app_port_rcvd);
 
     // Call Zome
+    tracing::info!("Calling zome");
     call_foo_fn(app_port, original_dna_hash.clone(), &mut holochain).await;
 
     // Ensure that the other client does not receive any messages, i.e. that
@@ -408,12 +409,14 @@ async fn call_zome() {
     holochain.kill().await.expect("Failed to kill holochain");
     std::mem::drop(client);
 
-    // Call zome after resart
+    // Call zome after restart
+    tracing::info!("Restarting conductor");
     let mut holochain = start_holochain(config_path).await;
 
     tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
 
     // Call Zome again on the existing app interface port
+    tracing::info!("Calling zome again");
     call_foo_fn(app_port, original_dna_hash, &mut holochain).await;
 
     // Shutdown holochain
