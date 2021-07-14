@@ -34,7 +34,7 @@ where
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let hash = HoloHashOf::<C>::arbitrary(u)?;
         let content = C::arbitrary(u)?;
-        Ok(Self { hash, content })
+        Ok(Self { content, hash })
     }
 }
 impl<C> HoloHashed<C>

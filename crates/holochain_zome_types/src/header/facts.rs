@@ -53,7 +53,7 @@ impl Fact<Header> for ValidChainFact {
     fn mutate(&self, header: &mut Header, u: &mut Unstructured<'static>) {
         if let Some(stored_hash) = self.hash.as_ref() {
             // This is not the first header we've seen
-            while let None = header.prev_header() {
+            while header.prev_header().is_none() {
                 // Generate arbitrary headers until we get one with a prev header
                 *header = Header::arbitrary(u).unwrap();
             }
@@ -103,10 +103,7 @@ pub fn valid_chain() -> Facts<'static, Header> {
 /// Fact: The header must be a NewEntryHeader
 pub fn new_entry_header() -> Facts<'static, Header> {
     facts![brute("Is a NewEntryHeader", |h: &Header| {
-        match h.header_type() {
-            HeaderType::Create | HeaderType::Update => true,
-            _ => false,
-        }
+        matches!(h.header_type(), HeaderType::Create | HeaderType::Update)
     }),]
 }
 
@@ -195,7 +192,7 @@ impl Header {
     /// returns the previous header except for the DNA header which doesn't have a previous
     pub fn prev_header_mut(&mut self) -> Option<&mut HeaderHash> {
         match self {
-            Self::Dna(Dna { .. }) => return None,
+            Self::Dna(Dna { .. }) => None,
             Self::AgentValidationPkg(AgentValidationPkg {
                 ref mut prev_header,
                 ..
