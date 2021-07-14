@@ -39,7 +39,7 @@ base64 = {version = "0.13", optional = true}
 
 # contrafact
 # contrafact = { git = "https://github.com/maackle/contrafact.git", branch = "main", optional = true }
-contrafact = { path = "../../../contrafact", optional = true }
+contrafact = { version = "0.1.0-dev.1", optional = true }
 
 [dev-dependencies]
 anyhow = "1.0.26"
