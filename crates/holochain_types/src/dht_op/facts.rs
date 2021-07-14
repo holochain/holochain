@@ -1,7 +1,6 @@
 //! Facts about DhtOps
 
 use super::*;
-use crate::prelude::*;
 use ::contrafact::*;
 use holo_hash::*;
 
@@ -12,12 +11,12 @@ use holo_hash::*;
 /// - If the header does not reference an Entry, the entry will be None
 pub fn valid_dht_op(keystore: KeystoreSender) -> Facts<'static, DhtOp> {
     facts![
-        custom("Header type matches Entry existence", |op: &DhtOp| {
+        brute("Header type matches Entry existence", |op: &DhtOp| {
             let has_header = op.header().entry_data().is_some();
             let has_entry = op.entry().is_some();
             has_header == has_entry
         }),
-        conditional(
+        mapped(
             "If there is entry data, the header must point to it",
             |op: &DhtOp| {
                 if let Some(entry) = op.entry() {
@@ -34,7 +33,7 @@ pub fn valid_dht_op(keystore: KeystoreSender) -> Facts<'static, DhtOp> {
                 }
             }
         ),
-        conditional("The Signature matches the Header", move |op: &DhtOp| {
+        mapped("The Signature matches the Header", move |op: &DhtOp| {
             use holochain_keystore::AgentPubKeyExt;
             let header = op.header();
             let agent = header.author();
@@ -55,7 +54,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_valid_dht_op() {
-        todo!("Must add constraint on dht op variant wrt header variant");
+        // TODO: Must add constraint on dht op variant wrt header variant
 
         let mut uu = Unstructured::new(&NOISE);
         let u = &mut uu;
@@ -80,11 +79,11 @@ mod tests {
         let op3 = DhtOp::StoreElement(sn.clone(), hn.clone(), Some(Box::new(e.clone())));
         let op4 = DhtOp::StoreElement(sn.clone(), hn.clone(), None);
 
-        let mut fact = valid_dht_op(keystore);
+        let fact = valid_dht_op(keystore);
 
         fact.check(&op1).unwrap();
-        assert!(fact.check(&op2).ok().is_err());
-        assert!(fact.check(&op3).ok().is_err());
+        assert!(fact.check(&op2).is_err());
+        assert!(fact.check(&op3).is_err());
         fact.check(&op4).unwrap();
     }
 }

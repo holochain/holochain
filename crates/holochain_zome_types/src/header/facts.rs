@@ -24,17 +24,17 @@ struct ValidChainFact {
 }
 
 impl Fact<Header> for ValidChainFact {
-    fn check(&mut self, header: &Header) -> CheckResult {
+    fn check(&self, header: &Header) -> Check {
         let header_hash = HeaderHash::with_data_sync(header);
         let result = match (header.prev_header(), self.hash.as_ref()) {
             (Some(prev), Some(stored)) => {
                 if prev == stored {
-                    CheckResult::pass()
+                    Check::pass()
                 } else {
                     vec![format!("Hashes don't match: {} != {}", prev, stored)].into()
                 }
             }
-            (None, None) => CheckResult::pass(),
+            (None, None) => Check::pass(),
             (None, Some(_)) => vec![format!(
                 "Found Dna in position other than beginning of the chain. Hash: {}",
                 header_hash
@@ -46,12 +46,11 @@ impl Fact<Header> for ValidChainFact {
             )]
             .into(),
         };
-        self.hash = Some(header_hash);
-        self.seq += 1;
+
         result
     }
 
-    fn mutate(&mut self, header: &mut Header, u: &mut Unstructured<'static>) {
+    fn mutate(&self, header: &mut Header, u: &mut Unstructured<'static>) {
         if let Some(stored_hash) = self.hash.as_ref() {
             // This is not the first header we've seen
             while let None = header.prev_header() {
@@ -68,18 +67,22 @@ impl Fact<Header> for ValidChainFact {
             // This is the first header we've seen, so it must be a Dna
             *header = Header::Dna(Dna::arbitrary(u).unwrap());
         }
-        self.hash = Some(HeaderHash::with_data_sync(header));
-        self.seq += 1;
+
         println!(
             "{}  =>  {:?}\n",
             self.hash.as_ref().unwrap(),
             header.prev_header()
         );
     }
+
+    fn advance(&mut self, header: &Header) {
+        self.hash = Some(HeaderHash::with_data_sync(header));
+        self.seq += 1;
+    }
 }
 
 pub fn is_of_type(header_type: HeaderType) -> Facts<'static, Header> {
-    facts![custom("header is of type", move |h: &Header| h
+    facts![brute("header is of type", move |h: &Header| h
         .header_type()
         == header_type)]
 }
@@ -99,7 +102,7 @@ pub fn valid_chain() -> Facts<'static, Header> {
 
 /// Fact: The header must be a NewEntryHeader
 pub fn new_entry_header() -> Facts<'static, Header> {
-    facts![custom("Is a NewEntryHeader", |h: &Header| {
+    facts![brute("Is a NewEntryHeader", |h: &Header| {
         match h.header_type() {
             HeaderType::Create | HeaderType::Update => true,
             _ => false,

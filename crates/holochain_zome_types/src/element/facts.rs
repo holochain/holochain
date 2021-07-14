@@ -1,7 +1,6 @@
 //! Facts for Elements
 
 use crate::prelude::*;
-use arbitrary::{Arbitrary, Unstructured};
 use contrafact::*;
 use holo_hash::*;
 
@@ -23,7 +22,7 @@ type Pair = (Header, Option<Entry>);
 
 pub fn header_and_entry_match() -> Facts<'static, Pair> {
     facts![
-        custom(
+        brute(
             "Header type matches Entry existence",
             |(header, entry): &Pair| {
                 let has_header = header.entry_data().is_some();
@@ -31,7 +30,7 @@ pub fn header_and_entry_match() -> Facts<'static, Pair> {
                 has_header == has_entry
             }
         ),
-        conditional(
+        mapped(
             "If there is entry data, the header must point to it",
             |pair: &Pair| {
                 if let Some(entry) = &pair.1 {
@@ -55,6 +54,7 @@ pub fn header_and_entry_match() -> Facts<'static, Pair> {
 mod tests {
     use super::*;
     use crate::header::facts as header_facts;
+    use arbitrary::{Arbitrary, Unstructured};
 
     #[test]
     fn test_header_and_entry_match() {
@@ -72,11 +72,11 @@ mod tests {
         let pair3: Pair = dbg!((he.clone(), None));
         let pair4: Pair = dbg!((he.clone(), Some(e.clone())));
 
-        let mut fact = header_and_entry_match();
+        let fact = header_and_entry_match();
 
         fact.check(&pair1).unwrap();
-        assert!(fact.check(&pair2).ok().is_err());
-        assert!(fact.check(&pair3).ok().is_err());
+        assert!(fact.check(&pair2).is_err());
+        assert!(fact.check(&pair3).is_err());
         fact.check(&pair4).unwrap();
     }
 }
