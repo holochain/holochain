@@ -165,11 +165,11 @@ async fn app_ids_are_unique() {
     );
 
     //- it doesn't matter whether the app is active or inactive
-    conductor
+    let (_, delta) = conductor
         .transition_app_status(&"id".to_string(), AppStatusTransition::Enable)
         .await
         .unwrap();
-
+    assert_eq!(delta, AppStatusFx::SpinUp);
     assert_matches!(
         conductor.add_disabled_app_to_db(app.clone().into()).await,
         Err(ConductorError::AppAlreadyInstalled(id))
@@ -198,7 +198,7 @@ async fn can_set_fake_state() {
     let state = ConductorState::default();
     let conductor = ConductorBuilder::new()
         .fake_state(state.clone())
-        .test(&envs)
+        .test(&envs, &[])
         .await
         .unwrap();
     assert_eq!(state, conductor.get_state_from_handle().await.unwrap());
@@ -450,7 +450,7 @@ async fn test_signing_error_during_genesis() {
     let envs = test_envs_with_keystore(bad_keystore);
     let config = ConductorConfig::default();
     let mut conductor = SweetConductor::new(
-        SweetConductor::handle_from_existing(&envs, &config).await,
+        SweetConductor::handle_from_existing(&envs, &config, &[]).await,
         envs,
         config,
     )
@@ -514,7 +514,7 @@ async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
     let envs = test_envs_with_keystore(good_keystore.clone());
     let config = standard_config();
     let mut conductor = SweetConductor::new(
-        SweetConductor::handle_from_existing(&envs, &config).await,
+        SweetConductor::handle_from_existing(&envs, &config, &[]).await,
         envs,
         config,
     )
@@ -909,6 +909,7 @@ async fn test_app_status_states_multi_app() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_cell_and_app_status_reconciliation() {
     observability::test_run().ok();
+    use AppStatusFx::*;
     use AppStatusKind::*;
     use CellStatus::*;
     let mk_zome = || InlineZome::new_unique(Vec::new());
@@ -945,10 +946,11 @@ async fn test_cell_and_app_status_reconciliation() {
     assert_eq!(check().await, (Running, 2, 1));
 
     // - Reconciled app state is Paused due to one unjoined Cell
-    conductor
+    let delta = conductor
         .reconcile_app_status_with_cell_status(None)
         .await
         .unwrap();
+    assert_eq!(delta, SpinDown);
     assert_eq!(check().await, (Paused, 2, 1));
 
     // - Can start the app again and get all cells joined
@@ -960,10 +962,11 @@ async fn test_cell_and_app_status_reconciliation() {
     assert_eq!(check().await, (Running, 2, 0));
 
     // - Again, app state should be reconciled to Paused due to missing cell
-    conductor
+    let delta = conductor
         .reconcile_app_status_with_cell_status(None)
         .await
         .unwrap();
+    assert_eq!(delta, SpinDown);
     assert_eq!(check().await, (Paused, 2, 0));
 
     // - Disabling the app causes all cells to be removed
@@ -1019,21 +1022,33 @@ async fn test_app_status_filters() {
     use AppStatusFilter::*;
 
     assert_eq!(list_apps!(None).len(), 3);
-    assert_eq!(list_apps!(Some(Running)).len(), 1);
-    assert_eq!(list_apps!(Some(Stopped)).len(), 2);
-    assert_eq!(list_apps!(Some(Enabled)).len(), 2);
-    assert_eq!(list_apps!(Some(Disabled)).len(), 1);
-    assert_eq!(list_apps!(Some(Paused)).len(), 1);
+    assert_eq!(
+        (
+            list_apps!(Some(Running)).len(),
+            list_apps!(Some(Stopped)).len(),
+            list_apps!(Some(Enabled)).len(),
+            list_apps!(Some(Disabled)).len(),
+            list_apps!(Some(Paused)).len(),
+        ),
+        (1, 2, 2, 1, 1,)
+    );
 
     // check that paused apps move to Running state on conductor restart
 
     conductor.shutdown().await;
     conductor.startup().await;
-    assert_eq!(list_apps!(Some(Running)).len(), 2);
-    assert_eq!(list_apps!(Some(Stopped)).len(), 1);
-    assert_eq!(list_apps!(Some(Enabled)).len(), 2);
-    assert_eq!(list_apps!(Some(Disabled)).len(), 1);
-    assert_eq!(list_apps!(Some(Paused)).len(), 0);
+
+    assert_eq!(list_apps!(None).len(), 3);
+    assert_eq!(
+        (
+            list_apps!(Some(Running)).len(),
+            list_apps!(Some(Stopped)).len(),
+            list_apps!(Some(Enabled)).len(),
+            list_apps!(Some(Disabled)).len(),
+            list_apps!(Some(Paused)).len(),
+        ),
+        (2, 1, 2, 1, 0,)
+    );
 }
 
 /// Check that the init() callback is only ever called once, even under many

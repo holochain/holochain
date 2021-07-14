@@ -4,7 +4,7 @@
 use super::{SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetConductorHandle};
 use crate::conductor::{
     api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult,
-    handle::ConductorHandle, Conductor, ConductorBuilder,
+    handle::ConductorHandle, CellError, Conductor, ConductorBuilder,
 };
 use hdk::prelude::*;
 use holo_hash::DnaHash;
@@ -83,7 +83,7 @@ impl SweetConductor {
     /// Create a SweetConductor with a new set of TestEnvs from the given config
     pub async fn from_config(config: ConductorConfig) -> SweetConductor {
         let envs = test_environments();
-        let handle = Self::handle_from_existing(&envs, &config).await;
+        let handle = Self::handle_from_existing(&envs, &config, &[]).await;
         Self::new(handle, envs, config).await
     }
 
@@ -93,7 +93,7 @@ impl SweetConductor {
     ) -> SweetConductor {
         let envs = test_environments();
         let config = builder.config.clone();
-        let handle = builder.test(&envs).await.unwrap();
+        let handle = builder.test(&envs, &[]).await.unwrap();
         Self::new(handle, envs, config).await
     }
 
@@ -101,10 +101,11 @@ impl SweetConductor {
     pub async fn handle_from_existing(
         envs: &TestEnvs,
         config: &ConductorConfig,
+        extra_dnas: &[DnaFile],
     ) -> ConductorHandle {
         Conductor::builder()
             .config(config.clone())
-            .test(envs)
+            .test(envs, extra_dnas)
             .await
             .unwrap()
     }
@@ -125,7 +126,10 @@ impl SweetConductor {
     }
 
     /// Convenience function that uses the internal handle to enable an app
-    pub async fn enable_app(&self, id: &InstalledAppId) -> ConductorResult<InstalledApp> {
+    pub async fn enable_app(
+        &self,
+        id: &InstalledAppId,
+    ) -> ConductorResult<(InstalledApp, Vec<(CellId, CellError)>)> {
         self.handle().0.enable_app(id).await
     }
 
@@ -337,16 +341,8 @@ impl SweetConductor {
     pub async fn startup(&mut self) {
         if self.handle.is_none() {
             self.handle = Some(SweetConductorHandle(
-                Self::handle_from_existing(&self.envs, &self.config).await,
+                Self::handle_from_existing(&self.envs, &self.config, self.dnas.as_slice()).await,
             ));
-
-            // MD: this feels wrong, why should we have to reinstall DNAs on restart?
-
-            for dna_file in self.dnas.iter() {
-                self.register_dna(dna_file.clone())
-                    .await
-                    .expect("Could not install DNA");
-            }
         } else {
             panic!("Attempted to start conductor which was already started");
         }

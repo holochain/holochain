@@ -620,10 +620,10 @@ impl AppStatus {
 
     /// Transition a status from one state to another.
     /// If None, the transition was not valid, and the status did not change.
-    pub fn transition(&mut self, transition: AppStatusTransition) -> AppStatusTransitionEffects {
+    pub fn transition(&mut self, transition: AppStatusTransition) -> AppStatusFx {
         use AppStatus::*;
+        use AppStatusFx::*;
         use AppStatusTransition::*;
-        use AppStatusTransitionEffects::*;
         match (&self, transition) {
             (Running, Pause(reason)) => Some((Paused(reason), SpinDown)),
             (Running, Disable(reason)) => Some((Disabled(reason), SpinDown)),
@@ -645,15 +645,45 @@ impl AppStatus {
     }
 }
 
-/// A hint for the side effects of a particular AppStatusTransition
+/// A declaration of the side effects of a particular AppStatusTransition.
+///
+/// Two values of this type may also be combined into one,
+/// to capture the overall effect of a series of transitions.
+///
+/// The intent of this type is to make sure that any operation which causes an
+/// app state transition is followed up with a call to process_app_status_fx
+/// in order to reconcile the cell state with the new app state.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum AppStatusTransitionEffects {
+#[must_use = "be sure to run this value through `process_app_status_fx` to handle any transition effects"]
+pub enum AppStatusFx {
+    /// The transition did not result in any change to CellState.
+    NoChange,
     /// The transition may cause some Cells to be removed.
     SpinDown,
     /// The transition may cause some Cells to be added (fallibly).
     SpinUp,
-    /// The transition did not result in any change to CellState.
-    NoChange,
+    /// The transition may cause some Cells to be removed and some to be (fallibly) added.
+    Both,
+}
+
+impl Default for AppStatusFx {
+    fn default() -> Self {
+        Self::NoChange
+    }
+}
+
+impl AppStatusFx {
+    /// Combine two effects into one. Think "monoidal append", if that helps.
+    pub fn combine(self, other: Self) -> Self {
+        use AppStatusFx::*;
+        match (self, other) {
+            (NoChange, a) | (a, NoChange) => a,
+            (SpinDown, SpinDown) => SpinDown,
+            (SpinUp, SpinUp) => SpinUp,
+            (Both, _) | (_, Both) => Both,
+            (SpinDown, SpinUp) | (SpinUp, SpinDown) => Both,
+        }
+    }
 }
 
 /// The various reasons for why an App is not in the Running state.
