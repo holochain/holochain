@@ -34,6 +34,14 @@ impl<T: 'static + Send> Share<T> {
         Self(Arc::new(parking_lot::Mutex::new(None)))
     }
 
+    /// Attempt to unwrap the inner value, assuming this is the only instance.
+    pub fn try_unwrap(self) -> Result<Option<T>, Self> {
+        match Arc::try_unwrap(self.0) {
+            Ok(inner) => Ok(inner.into_inner()),
+            Err(inner) => Err(Self(inner)),
+        }
+    }
+
     /// Execute code with mut access to the internal state.
     /// The second param, if set to true, will drop the shared state,
     /// any further access will `Err(KitsuneError::Closed)`.

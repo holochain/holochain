@@ -1,17 +1,12 @@
 use super::*;
 use crate::types::gossip::GossipModule;
 use ghost_actor::dependencies::tracing;
-use ghost_actor::dependencies::tracing_futures::Instrument;
 use kitsune_p2p_mdns::*;
 use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
 use url2::Url2;
-
-/// if the user specifies None or zero (0) for race_timeout_ms
-/// (david.b) this is not currently used
-const DEFAULT_RPC_MULTI_RACE_TIMEOUT_MS: u64 = 200;
 
 ghost_actor::ghost_chan! {
     pub(crate) chan SpaceInternal<crate::KitsuneP2pError> {
@@ -494,45 +489,177 @@ impl KitsuneP2pHandler for Space {
         .into())
     }
 
+    #[allow(clippy::redundant_clone)] // david.b - keep adding / removing tasks
+                                      //           let me keep the code
+                                      //           the same without adding/
+                                      //           removing clone on the last
+                                      //           one every time i change it
     fn handle_rpc_multi(
         &mut self,
-        mut input: actor::RpcMulti,
+        input: actor::RpcMulti,
     ) -> KitsuneP2pHandlerResult<Vec<actor::RpcMultiResponse>> {
-        // if the user doesn't care about remote_agent_count, apply default
-        match input.remote_agent_count {
-            None | Some(0) => {
-                input.remote_agent_count = Some(
-                    self.config
-                        .tuning_params
-                        .default_rpc_multi_remote_agent_count as u8,
-                );
+        let RpcMulti {
+            space,
+            from_agent,
+            basis: _, // ignored for now
+            payload,
+            max_remote_agent_count: _, // ignored for now
+            max_timeout,
+            remote_request_grace_ms,
+        } = input;
+
+        use kitsune_p2p_types::tx2::tx2_utils::*;
+
+        // we've got a bunch of parallel tasks going on
+        // this struct coordinates between them
+        struct Inner {
+            kill: Arc<tokio::sync::Notify>,
+            got_data: Arc<tokio::sync::Notify>,
+            resp: Vec<actor::RpcMultiResponse>,
+            grace_timeout: KitsuneTimeout,
+        }
+
+        // store this inner data in a share
+        let inner = Share::new(Inner {
+            kill: Arc::new(tokio::sync::Notify::new()),
+            got_data: Arc::new(tokio::sync::Notify::new()),
+            resp: Vec::new(),
+            grace_timeout: KitsuneTimeout::from_millis(0),
+        });
+
+        // prepare to close tasks on notification
+        use std::future::Future;
+        fn wrap<F>(i: Share<Inner>, f: F) -> impl Future<Output = ()> + 'static + Send
+        where
+            F: Future<Output = ()> + 'static + Send,
+        {
+            let f = f.boxed();
+            let n = i
+                .share_mut(|i, _| Ok(i.kill.clone()))
+                .expect("we never close this share");
+            async move {
+                let _ = futures::future::select(f, n.notified().boxed()).await;
             }
-            _ => {}
         }
 
-        // if the user doesn't care about timeout_ms, apply default
-        match input.timeout_ms {
-            None | Some(0) => {
-                input.timeout_ms =
-                    Some(self.config.tuning_params.default_rpc_multi_timeout_ms as u64);
-            }
-            _ => {}
+        // join all our tasks here
+        let mut all = Vec::new();
+
+        // die on max timeout
+        {
+            let inner = inner.clone();
+            all.push(
+                wrap(inner.clone(), async move {
+                    tokio::time::sleep(max_timeout.time_remaining()).await;
+                    let _ = inner.share_mut(|i, _| {
+                        i.kill.notify_waiters();
+                        Ok(())
+                    });
+                })
+                .boxed(),
+            );
         }
 
-        // if the user doesn't care about race_timeout_ms, apply default
-        match input.race_timeout_ms {
-            None | Some(0) => {
-                input.race_timeout_ms = Some(DEFAULT_RPC_MULTI_RACE_TIMEOUT_MS);
-            }
-            _ => {}
+        // die when we've got the correct timing / data
+        {
+            let inner = inner.clone();
+            all.push(
+                wrap(inner.clone(), async move {
+                    let got_data = inner
+                        .share_mut(|i, _| Ok(i.got_data.clone()))
+                        .expect("we never close this share");
+
+                    // first we wait for any data in the response
+                    got_data.notified().await;
+
+                    loop {
+                        let grace_timeout = inner
+                            .share_mut(|i, _| Ok(i.grace_timeout))
+                            .expect("we never close this share");
+
+                        // if the grace_timeout is expired, we can die
+                        if grace_timeout.is_expired() {
+                            break;
+                        }
+
+                        // if not, wait the timeout, and check again
+                        tokio::time::sleep(grace_timeout.time_remaining()).await;
+                    }
+
+                    // we have data, and grace timeout elapsed, we can die
+                    let _ = inner.share_mut(|i, _| {
+                        i.kill.notify_waiters();
+                        Ok(())
+                    });
+                })
+                .boxed(),
+            );
         }
 
-        // race timeout > timeout is nonesense
-        if input.as_race && input.race_timeout_ms.unwrap() > input.timeout_ms.unwrap() {
-            input.race_timeout_ms = Some(input.timeout_ms.unwrap());
+        // fetch data from all local agents
+        {
+            let space = space.clone();
+            let from_agent = from_agent.clone();
+            let payload = payload.clone();
+            let local_joined_agents = self.local_joined_agents.clone();
+            let evt_sender = self.evt_sender.clone();
+            let inner = inner.clone();
+            all.push(
+                wrap(inner.clone(), async move {
+                    for agent in local_joined_agents {
+                        inner
+                            .share_mut(move |i, _| {
+                                i.grace_timeout =
+                                    KitsuneTimeout::from_millis(remote_request_grace_ms);
+                                Ok(())
+                            })
+                            .expect("we never close this share");
+                        let response = match evt_sender
+                            .call(
+                                space.clone(),
+                                agent.clone(),
+                                from_agent.clone(),
+                                payload.clone(),
+                            )
+                            .await
+                        {
+                            Ok(res) => res,
+                            Err(err) => {
+                                tracing::warn!(?err, "local rpc multi error");
+                                continue;
+                            }
+                        };
+                        inner
+                            .share_mut(move |i, _| {
+                                i.resp.push(RpcMultiResponse { agent, response });
+                                i.got_data.notify_waiters();
+                                Ok(())
+                            })
+                            .expect("we never close this share");
+                    }
+                })
+                .boxed(),
+            );
         }
 
-        self.handle_rpc_multi_inner(input)
+        // TODO remote calls
+
+        Ok(async move {
+            futures::future::join_all(all).await;
+
+            let Inner { resp, .. } = inner
+                .try_unwrap()
+                // this should never happen...
+                // all other copies die with the join_all/kill above
+                .unwrap_or(None)
+                // this should never happen...
+                // we never close the share anywhere
+                .expect("failed to unwrap shared");
+
+            Ok(resp)
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_broadcast(
@@ -853,104 +980,6 @@ impl Space {
 
             Ok(())
         }
-        .boxed()
-        .into())
-    }
-
-    /// actual logic for handle_rpc_multi ...
-    /// the top-level handler may or may not spawn a task for this
-    #[tracing::instrument(skip(self, input))]
-    fn handle_rpc_multi_inner(
-        &mut self,
-        input: actor::RpcMulti,
-    ) -> KitsuneP2pHandlerResult<Vec<actor::RpcMultiResponse>> {
-        let actor::RpcMulti {
-            space,
-            from_agent,
-            //basis,
-            //remote_agent_count,
-            //timeout_ms,
-            //as_race,
-            //race_timeout_ms,
-            payload,
-            ..
-        } = input;
-
-        // TODO - FIXME - david.b - removing the parts of this that
-        // actually make remote requests. We can get this data locally
-        // while we are still full sync after gossip, and the timeouts
-        // are not structured correctly.
-        //
-        // Better to re-write as part of sharding.
-
-        //let remote_agent_count = remote_agent_count.unwrap();
-        //let timeout_ms = timeout_ms.unwrap();
-        //let stage_1_timeout_ms = timeout_ms / 2;
-
-        // as an optimization - request to all local joins
-        // but don't count that toward our request total
-        let local_all = self
-            .local_joined_agents
-            .iter()
-            .map(|agent| {
-                let agent = agent.clone();
-                self.evt_sender
-                    .call(
-                        space.clone(),
-                        agent.clone(),
-                        from_agent.clone(),
-                        payload.clone(),
-                    )
-                    .then(|r| async move { (r, agent) })
-            })
-            .collect::<Vec<_>>();
-
-        /*
-        let remote_fut = discover::message_neighborhood(
-            self,
-            from_agent.clone(),
-            remote_agent_count,
-            stage_1_timeout_ms,
-            timeout_ms,
-            basis,
-            wire::Wire::call(
-                space.clone(),
-                from_agent.clone(),
-                from_agent,
-                payload.clone().into(),
-            ),
-            |a, w| match w {
-                wire::Wire::CallResp(c) => Ok(actor::RpcMultiResponse {
-                    agent: a,
-                    response: c.data.into(),
-                }),
-                _ => Err(()),
-            },
-        )
-        .instrument(tracing::debug_span!("message_neighborhood", payload = ?payload.iter().take(5).collect::<Vec<_>>()));
-        */
-
-        Ok(async move {
-            let out: Vec<actor::RpcMultiResponse> = futures::future::join_all(local_all)
-                .await
-                .into_iter()
-                .filter_map(|(r, a)| {
-                    if let Ok(r) = r {
-                        Some(actor::RpcMultiResponse {
-                            agent: a,
-                            response: r,
-                        })
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-
-            //out.append(&mut remote_fut.await);
-
-            Ok(out)
-        }
-        .instrument(tracing::debug_span!("multi_inner"))
         .boxed()
         .into())
     }
