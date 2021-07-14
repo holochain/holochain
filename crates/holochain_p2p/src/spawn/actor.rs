@@ -312,6 +312,7 @@ impl WrapEvtSender {
 }
 
 pub(crate) struct HolochainP2pActor {
+    tuning_params: kitsune_p2p_types::config::KitsuneP2pTuningParams,
     evt_sender: WrapEvtSender,
     kitsune_p2p: ghost_actor::GhostSender<kitsune_p2p::actor::KitsuneP2p>,
 }
@@ -326,12 +327,14 @@ impl HolochainP2pActor {
         channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
         evt_sender: futures::channel::mpsc::Sender<HolochainP2pEvent>,
     ) -> HolochainP2pResult<Self> {
+        let tuning_params = config.tuning_params.clone();
         let (kitsune_p2p, kitsune_p2p_events) =
             kitsune_p2p::spawn_kitsune_p2p(config, tls_config).await?;
 
         channel_factory.attach_receiver(kitsune_p2p_events).await?;
 
         Ok(Self {
+            tuning_params,
             evt_sender: WrapEvtSender(evt_sender),
             kitsune_p2p,
         })
@@ -943,7 +946,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         let basis = dht_hash.to_kitsune();
         let timeout = match timeout_ms {
             Some(ms) => KitsuneTimeout::from_millis(ms),
-            None => KitsuneTimeout::from_millis(30_000),
+            None => self.tuning_params.implicit_timeout(),
         };
 
         let payload = crate::wire::WireMessage::publish(request_validation_receipt, dht_hash, ops)
