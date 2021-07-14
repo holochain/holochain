@@ -197,7 +197,10 @@ impl Create {
         agent_state: &CounterSigningAgentState,
     ) -> Result<Self, CounterSigningError> {
         Ok(Create {
-            author: session_data.preflight_request.signing_agents.get(agent_state.agent_index as usize)
+            author: session_data
+                .preflight_request
+                .signing_agents
+                .get(agent_state.agent_index as usize)
                 .ok_or(CounterSigningError::AgentIndexOutOfBounds)?
                 .0
                 .clone(),
@@ -227,7 +230,10 @@ impl Update {
         agent_state: &CounterSigningAgentState,
     ) -> Result<Self, CounterSigningError> {
         Ok(Update {
-            author: session_data.preflight_request.signing_agents.get(agent_state.agent_index as usize)
+            author: session_data
+                .preflight_request
+                .signing_agents
+                .get(agent_state.agent_index as usize)
                 .ok_or(CounterSigningError::AgentIndexOutOfBounds)?
                 .0
                 .clone(),
