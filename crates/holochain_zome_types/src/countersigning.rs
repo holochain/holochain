@@ -42,7 +42,7 @@ pub struct PreflightBytes(#[serde(with = "serde_bytes")] Vec<u8>);
 
 /// Agents can have a role specific to each countersigning session.
 /// The role is app defined and opaque to the subconscious.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct Role(u8);
 
 /// Alias for a list of agents and their roles.
@@ -97,14 +97,33 @@ impl PreflightRequest {
 
 /// Every agent must send back a preflight response.
 /// All the preflight response data is signed by each agent and included in the session data.
+#[derive(Debug, Clone)]
 pub struct PreflightResponse {
     /// The request this is a response to.
     request: PreflightRequest,
     /// The agent must provide their current chain state, state their position in the preflight and sign everything.
     agent_state: CounterSigningAgentState,
+    signature: Signature,
 }
 
 impl PreflightResponse {
+    /// Constructor.
+    pub fn new(
+        request: PreflightRequest,
+        agent_state: CounterSigningAgentState,
+        signature: Signature,
+    ) -> Self {
+        Self {
+            request,
+            agent_state,
+            signature,
+        }
+    }
+
+    /// Consistent serialization for the preflight response so it can be signed and the signatures verified.
+    pub fn encode_for_signature(&self) -> Result<Vec<u8>, SerializedBytesError> {
+        holochain_serialized_bytes::encode(&(&self.request, &self.agent_state))
+    }
     /// Request accessor.
     pub fn request_ref(&self) -> &PreflightRequest {
         &self.request
@@ -113,6 +132,11 @@ impl PreflightResponse {
     /// Agent state accessor.
     pub fn agent_state_ref(&self) -> &CounterSigningAgentState {
         &self.agent_state
+    }
+
+    /// Signature accessor.
+    pub fn signature_ref(&self) -> &Signature {
+        &self.signature
     }
 }
 
@@ -126,8 +150,6 @@ pub struct CounterSigningAgentState {
     chain_top: HeaderHash,
     /// The header sequence of the agent's chain top.
     header_seq: u32,
-    /// The signature of all preflight request data and agent state data.
-    signature: Signature,
 }
 
 impl CounterSigningAgentState {
@@ -144,11 +166,6 @@ impl CounterSigningAgentState {
     /// Header seq accessor.
     pub fn header_seq(&self) -> u32 {
         self.header_seq
-    }
-
-    /// Signature accessor.
-    pub fn signature_ref(&self) -> &Signature {
-        &self.signature
     }
 }
 
@@ -180,13 +197,6 @@ pub struct UpdateBase {
     original_entry_address: EntryHash,
     entry_type: EntryType,
     entry_hash: EntryHash,
-}
-
-/// All the data required for a countersigning session.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct CounterSigningSessionData {
-    preflight_request: PreflightRequest,
-    responses: Vec<CounterSigningAgentState>,
 }
 
 impl Create {
@@ -257,13 +267,20 @@ impl Update {
     }
 }
 
+/// All the data required for a countersigning session.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CounterSigningSessionData {
+    preflight_request: PreflightRequest,
+    responses: Vec<(CounterSigningAgentState, Signature)>,
+}
+
 impl CounterSigningSessionData {
     /// Attempt to map countersigning session data to a set of headers.
     /// A given countersigning session always maps to the same ordered set of headers or an error.
     /// Note the headers are not signed as the intent is to build headers for other agents without their private keys.
     pub fn build_header_set(&self) -> Result<Vec<Header>, CounterSigningError> {
         let mut headers = vec![];
-        for agent_state in self.responses.iter() {
+        for (agent_state, _response_signature) in self.responses.iter() {
             match self.preflight_request.header_base {
                 HeaderBase::Create(ref create_base) => {
                     headers.push(Header::Create(Create::from_countersigning_data(
@@ -282,5 +299,15 @@ impl CounterSigningSessionData {
             }
         }
         Ok(headers)
+    }
+
+    /// Accessor to the preflight request.
+    pub fn preflight_request_ref(&self) -> &PreflightRequest {
+        &self.preflight_request
+    }
+
+    /// Accessor to responses.
+    pub fn responses_ref(&self) -> &Vec<(CounterSigningAgentState, Signature)> {
+        &self.responses
     }
 }

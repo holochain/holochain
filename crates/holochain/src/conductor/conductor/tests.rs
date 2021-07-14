@@ -473,7 +473,11 @@ async fn test_signing_error_during_genesis() {
         panic!("this should have been an error")
     };
 
-    assert_matches!(err, ConductorApiError::ConductorError(ConductorError::GenesisFailed { errors }) if errors.len() == 1);
+    if let ConductorApiError::ConductorError(inner) = err {
+        assert_matches!(*inner, ConductorError::GenesisFailed { errors } if errors.len() == 1);
+    } else {
+        panic!("this should have been an error too");
+    }
 }
 
 async fn make_signing_call(client: &mut WebsocketSender, cell: &SweetCell) -> AppResponse {
@@ -743,7 +747,11 @@ async fn test_installation_fails_if_genesis_self_check_is_invalid() {
         panic!("this should have been an error")
     };
 
-    assert_matches!(err, ConductorApiError::ConductorError(ConductorError::GenesisFailed { errors }) if errors.len() == 1);
+    if let ConductorApiError::ConductorError(inner) = err {
+        assert_matches!(*inner, ConductorError::GenesisFailed { errors } if errors.len() == 1);
+    } else {
+        panic!("this should have been an error too");
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]

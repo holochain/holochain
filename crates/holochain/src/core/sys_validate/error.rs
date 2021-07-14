@@ -12,6 +12,10 @@ use holochain_keystore::KeystoreError;
 use holochain_sqlite::error::DatabaseError;
 use holochain_state::workspace::WorkspaceError;
 use holochain_types::prelude::*;
+use holochain_zome_types::countersigning::CounterSigningError;
+use holochain_zome_types::countersigning::CounterSigningSessionData;
+use holochain_zome_types::countersigning::CounterSigningSessionTimes;
+use holochain_zome_types::countersigning::PreflightResponse;
 use thiserror::Error;
 
 /// Validation can result in either
@@ -87,6 +91,18 @@ impl<E> TryFrom<OutcomeOrError<ValidationOutcome, E>> for ValidationOutcome {
 pub enum ValidationOutcome {
     #[error("The element with signature {0:?} and header {1:?} was found to be counterfeit")]
     Counterfeit(Signature, Header),
+    #[error("The countersigning session times were not valid {0:?}")]
+    CounterSigningSessionTimes(CounterSigningSessionTimes),
+    #[error("The header {1:?} is not found in the countersigning session data {0:?}")]
+    HeaderNotInCounterSigningSession(CounterSigningSessionData, NewEntryHeader),
+    #[error("The header set could not be built for the counter signing session data: {0}")]
+    FailedToBuildHeaderSet(CounterSigningError),
+    #[error("The countersigning session responses ({0}) did not match the number of signing agents ({1})")]
+    CounterSigningSessionResponsesLength(usize, usize),
+    #[error(
+        "The countersigning session response with agent index {0} was found in index position {1}"
+    )]
+    CounterSigningSessionResponsesOrder(u8, usize),
     #[error("The dependency {0:?} was not found on the DHT")]
     DepMissingFromDht(AnyDhtHash),
     #[error("The app entry type {0:?} entry def id was out of range")]
@@ -107,6 +123,8 @@ pub enum ValidationOutcome {
     NotNewEntry(Header),
     #[error("The dependency {0:?} is not held")]
     NotHoldingDep(AnyDhtHash),
+    #[error("The preflight response had an invalid signature {0:?}")]
+    PreflightResponseSignature(PreflightResponse),
     #[error(transparent)]
     PrevHeaderError(#[from] PrevHeaderError),
     #[error("StoreEntry should not be gossiped for private entries")]

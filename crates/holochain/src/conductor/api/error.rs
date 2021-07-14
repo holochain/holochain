@@ -34,7 +34,7 @@ pub enum ConductorApiError {
 
     /// Conductor threw an error during API call.
     #[error("Conductor returned an error while using a ConductorApi: {0:?}")]
-    ConductorError(#[from] ConductorError),
+    ConductorError(#[from] Box<ConductorError>),
 
     /// Io error.
     #[error("Io error while using a Interface Api: {0:?}")]
@@ -116,6 +116,12 @@ impl ConductorApiError {
     /// promote a custom error type to a KitsuneP2pError
     pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
         Self::Other(e.into())
+    }
+}
+
+impl From<ConductorError> for ConductorApiError {
+    fn from(conductor_api_error: ConductorError) -> Self {
+        Self::from(Box::new(conductor_api_error))
     }
 }
 
