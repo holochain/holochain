@@ -1,5 +1,5 @@
 use super::{standard_config, SweetAgents, SweetAppBatch, SweetConductor};
-use crate::conductor::{config::ConductorConfig, error::ConductorResult};
+use crate::conductor::{api::error::ConductorApiResult, config::ConductorConfig};
 use futures::future;
 use hdk::prelude::*;
 use holochain_types::prelude::*;
@@ -27,17 +27,17 @@ impl SweetConductorBatch {
         Self::from_configs(std::iter::repeat_with(standard_config).take(num)).await
     }
 
-    /// Get the underlying data
+    /// Iterate over the SweetConductors
     pub fn iter(&self) -> impl Iterator<Item = &SweetConductor> {
         self.0.iter()
     }
 
-    /// Get the underlying data
+    /// Iterate over the SweetConductors, mutably
     pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut SweetConductor> {
         self.0.iter_mut()
     }
 
-    /// Get the underlying data
+    /// Convert to a Vec
     pub fn into_inner(self) -> Vec<SweetConductor> {
         self.0
     }
@@ -49,7 +49,7 @@ impl SweetConductorBatch {
         &mut self,
         installed_app_id: &str,
         dna_files: &[DnaFile],
-    ) -> ConductorResult<SweetAppBatch> {
+    ) -> ConductorApiResult<SweetAppBatch> {
         let apps = self
             .0
             .iter_mut()
@@ -82,7 +82,7 @@ impl SweetConductorBatch {
         installed_app_id: &str,
         agents: &[AgentPubKey],
         dna_files: &[DnaFile],
-    ) -> ConductorResult<SweetAppBatch> {
+    ) -> ConductorApiResult<SweetAppBatch> {
         if agents.len() != self.0.len() {
             panic!(
                 "setup_app_for_zipped_agents must take as many Agents as there are Conductors in this batch."
@@ -107,8 +107,13 @@ impl SweetConductorBatch {
 
     /// Let each conductor know about each others' agents so they can do networking
     pub async fn exchange_peer_info(&self) {
-        let envs = self.0.iter().map(|c| c.envs().p2p()).collect();
-        crate::conductor::p2p_store::exchange_peer_info(envs);
+        let mut all = Vec::new();
+        for c in self.0.iter() {
+            for env in c.envs().p2p().lock().values() {
+                all.push(env.clone());
+            }
+        }
+        crate::conductor::p2p_agent_store::exchange_peer_info(all).await;
     }
 }
 

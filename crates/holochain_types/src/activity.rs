@@ -22,6 +22,53 @@ pub struct AgentActivityResponse<T = SignedHeaderHashed> {
     pub highest_observed: Option<HighestObserved>,
 }
 
+holochain_serial!(AgentActivityResponse<HeaderHash>);
+
+impl<A> AgentActivityResponse<A> {
+    /// Convert an empty response to a different type.
+    pub fn from_empty<B>(other: AgentActivityResponse<B>) -> Self {
+        let convert_activity = |items: &ChainItems<B>| match items {
+            ChainItems::Full(_) => ChainItems::Full(Vec::with_capacity(0)),
+            ChainItems::Hashes(_) => ChainItems::Hashes(Vec::with_capacity(0)),
+            ChainItems::NotRequested => ChainItems::NotRequested,
+        };
+        AgentActivityResponse {
+            agent: other.agent,
+            valid_activity: convert_activity(&other.valid_activity),
+            rejected_activity: convert_activity(&other.rejected_activity),
+            status: ChainStatus::Empty,
+            highest_observed: other.highest_observed,
+        }
+    }
+
+    /// Convert an status only response to a different type.
+    pub fn status_only<B>(other: AgentActivityResponse<B>) -> Self {
+        AgentActivityResponse {
+            agent: other.agent,
+            valid_activity: ChainItems::NotRequested,
+            rejected_activity: ChainItems::NotRequested,
+            status: ChainStatus::Empty,
+            highest_observed: other.highest_observed,
+        }
+    }
+
+    /// Convert an hashes only response to a different type.
+    pub fn hashes_only<B>(other: AgentActivityResponse<B>) -> Self {
+        let convert_activity = |items: ChainItems<B>| match items {
+            ChainItems::Full(_) => ChainItems::Full(Vec::with_capacity(0)),
+            ChainItems::Hashes(h) => ChainItems::Hashes(h),
+            ChainItems::NotRequested => ChainItems::NotRequested,
+        };
+        AgentActivityResponse {
+            agent: other.agent,
+            valid_activity: convert_activity(other.valid_activity),
+            rejected_activity: convert_activity(other.rejected_activity),
+            status: other.status,
+            highest_observed: other.highest_observed,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// The type of agent activity returned in this request
 pub enum ChainItems<T = SignedHeaderHashed> {

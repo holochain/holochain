@@ -15,6 +15,12 @@ thread_local!(pub static HDK: RefCell<Box<dyn HdkT>> = RefCell::new(Box::new(Err
 #[cfg(not(feature = "mock"))]
 thread_local!(pub static HDK: RefCell<Box<dyn HdkT>> = RefCell::new(Box::new(HostHdk)));
 
+/// When mocking is enabled the mockall crate automatically builds a MockHdkT for us.
+/// ```ignore
+/// let mut mock = MockHdkT::new();
+/// mock_hdk.expect_foo().times(1).etc().etc();
+/// set_hdk(mock_hdk);
+/// ```
 #[cfg_attr(feature = "mock", automock)]
 pub trait HdkT: Send + Sync {
     // Chain
@@ -34,6 +40,15 @@ pub trait HdkT: Send + Sync {
     fn hash_entry(&self, entry: Entry) -> ExternResult<EntryHash>;
     fn get(&self, get_input: GetInput) -> ExternResult<Option<Element>>;
     fn get_details(&self, get_input: GetInput) -> ExternResult<Option<Details>>;
+    fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed>;
+    fn must_get_header(
+        &self,
+        must_get_header_input: MustGetHeaderInput,
+    ) -> ExternResult<SignedHeaderHashed>;
+    fn must_get_valid_element(
+        &self,
+        must_get_valid_element_input: MustGetValidElementInput,
+    ) -> ExternResult<Element>;
     // Info
     fn agent_info(&self, agent_info_input: ()) -> ExternResult<AgentInfo>;
     fn app_info(&self, app_info_input: ()) -> ExternResult<AppInfo>;
@@ -79,6 +94,7 @@ pub trait HdkT: Send + Sync {
 }
 
 /// Used as a placeholder before any other Hdk is registered.
+/// Generally only useful for testing but technically can be set any time.
 pub struct ErrHdk;
 
 impl ErrHdk {
@@ -87,6 +103,7 @@ impl ErrHdk {
     }
 }
 
+/// Every call is an error for the ErrHdk.
 impl HdkT for ErrHdk {
     fn get_agent_activity(&self, _: GetAgentActivityInput) -> ExternResult<AgentActivity> {
         Self::err()
@@ -119,6 +136,15 @@ impl HdkT for ErrHdk {
         Self::err()
     }
     fn get_details(&self, _: GetInput) -> ExternResult<Option<Details>> {
+        Self::err()
+    }
+    fn must_get_entry(&self, _: MustGetEntryInput) -> ExternResult<EntryHashed> {
+        Self::err()
+    }
+    fn must_get_header(&self, _: MustGetHeaderInput) -> ExternResult<SignedHeaderHashed> {
+        Self::err()
+    }
+    fn must_get_valid_element(&self, _: MustGetValidElementInput) -> ExternResult<Element> {
         Self::err()
     }
     fn agent_info(&self, _: ()) -> ExternResult<AgentInfo> {
@@ -213,6 +239,10 @@ impl HdkT for ErrHdk {
 /// The HDK implemented as externs provided by the host.
 pub struct HostHdk;
 
+/// The real hdk implements `host_call` for every hdk function.
+/// This is deferring to the standard `holochain_wasmer_guest` crate functionality.
+/// Every function works exactly the same way with the same basic signatures and patterns.
+/// Elsewhere in the hdk are more high level wrappers around this basic trait.
 #[cfg(not(feature = "mock"))]
 impl HdkT for HostHdk {
     fn get_agent_activity(
@@ -256,7 +286,27 @@ impl HdkT for HostHdk {
     fn get_details(&self, get_input: GetInput) -> ExternResult<Option<Details>> {
         host_call::<GetInput, Option<Details>>(__get_details, get_input)
     }
-
+    fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed> {
+        host_call::<MustGetEntryInput, EntryHashed>(__must_get_entry, must_get_entry_input)
+    }
+    fn must_get_header(
+        &self,
+        must_get_header_input: MustGetHeaderInput,
+    ) -> ExternResult<SignedHeaderHashed> {
+        host_call::<MustGetHeaderInput, SignedHeaderHashed>(
+            __must_get_header,
+            must_get_header_input,
+        )
+    }
+    fn must_get_valid_element(
+        &self,
+        must_get_valid_element_input: MustGetValidElementInput,
+    ) -> ExternResult<Element> {
+        host_call::<MustGetValidElementInput, Element>(
+            __must_get_valid_element,
+            must_get_valid_element_input,
+        )
+    }
     fn agent_info(&self, _: ()) -> ExternResult<AgentInfo> {
         host_call::<(), AgentInfo>(__agent_info, ())
     }
@@ -358,6 +408,9 @@ impl HdkT for HostHdk {
     }
 }
 
+/// At any time the global HDK can be set to a different hdk.
+/// Generally this is only useful during rust unit testing.
+/// When executing wasm without the `mock` feature, the host will be assumed.
 pub fn set_hdk<H: 'static>(hdk: H)
 where
     H: HdkT,

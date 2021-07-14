@@ -1,8 +1,10 @@
 [package]
 name = "holochain_wasm_test_utils"
-version = "0.0.1"
+version = "0.0.2-dev.0"
 authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
 edition = "2018"
+description = "Utilities for Wasm testing for Holochain"
+license = "Apache-2.0"
 
 [lib]
 name = "holochain_wasm_test_utils"
@@ -16,14 +18,14 @@ only_check = []
 
 
 [dependencies]
-fixt = { path = "../../fixt" }
-holo_hash = { path = "../../holo_hash" }
-holochain_types = { path = "../../holochain_types" }
-holochain_zome_types = { path = "../../holochain_zome_types" }
+fixt = { path = "../../fixt", version = "0.0.4-dev.0"}
+holo_hash = { path = "../../holo_hash", version = "0.0.4-dev.0"}
+holochain_types = { path = "../../holochain_types", version = "0.0.2-dev.0"}
+holochain_zome_types = { path = "../../holochain_zome_types", version = "0.0.4-dev.0"}
 rand = "0.7"
 strum = "0.18.0"
 strum_macros = "0.18.0"
-tokio_helper = { version = "0.0.1", path = "../../tokio_helper" }
+holochain_util = { version = "0.0.2-dev.0", path = "../../holochain_util" }
 
 [build-dependencies]
 toml = "0.5"

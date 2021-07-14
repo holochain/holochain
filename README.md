@@ -32,11 +32,21 @@ nix-shell --argstr flavor happDev
 
 This nix-shell flavor installs wrapper binaries for `holochain` and `hc` that will automatically compile and run the binaries.  This is very useful if you are tracking changes in the holochain repo because when you check out a new rev, running holochain will compile automatically to the version at that rev.
 
-### Building with cargo if you already have rust installed:
+### Building with a pre-installed cargo
+
+Another way to install the `holochain` and `hc` binaries (if the previous didn't work) is by using rust
+
+[Install Rust](https://www.rust-lang.org/tools/install) 
+
+Install holochain binaries:
 ```
 cargo install --path crates/holochain
 cargo install --path crates/hc
 ```
+
+be sure to add `$HOME/.cargo/bin` to your PATH to be able to run the installed binaries
+
+
 ## Usage
 
 ``` bash
@@ -63,14 +73,14 @@ There is no conductor config YAML file at the path specified (/home/eric/.config
 Would you like to create a default config file at this location? [Y/n]
 Y
 Conductor config written.
-There is no database environment set at the path specified (/home/eric/.local/share/holochain/databases)
+There is no database set at the path specified (/home/eric/.local/share/holochain/databases)
 Would you like to create one now? [Y/n]
 Y
-LMDB environment created.
+Database created.
 Conductor ready.
 ```
 
-As well as creating the config file this process also instantiates the initial LMDB database environment.   If you provide a config file on first run with just the `-c` flag `holochain` will also initialize the environment even if not in interactive mode.
+As well as creating the config file this process also instantiates the database.   If you provide a config file on first run with just the `-c` flag `holochain` will also initialize the environment even if not in interactive mode.
 
 ## Development Environment
 

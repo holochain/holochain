@@ -100,10 +100,10 @@ macro_rules! destructure_test_cells {
             .map(|(_, v)| {
                 v.into_iter()
                     .collect_tuple()
-                    .expect("Can't destructure more than 4 DNAs")
+                    .expect("Wrong number of DNAs in destructuring pattern, or too many (must be 4 or less)")
             })
             .collect_tuple()
-            .expect("Can't destructure more than 4 Agents")
+            .expect("Wrong number of Agents in destructuring pattern, or too many (must be 4 or less)")
     }};
 }
 #[macro_export]
@@ -114,7 +114,7 @@ macro_rules! destructure_test_cell_vec {
         vec.into_iter()
             .map(|blob| destructure_test_cells!(blob))
             .collect_tuple()
-            .expect("Can't destructure more than 4 Conductors")
+            .expect("Wrong number of Conductors in destructuring pattern, or too many (must be 4 or less)")
     }};
 }
 

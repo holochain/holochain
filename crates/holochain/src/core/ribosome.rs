@@ -31,7 +31,6 @@ use crate::core::ribosome::guest_callback::validate_link::ValidateLinkResult;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
-use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use error::RibosomeResult;
 use guest_callback::entry_defs::EntryDefsHostAccess;
@@ -44,6 +43,7 @@ use holo_hash::AgentPubKey;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
+use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
 use mockall::automock;
 use std::iter::Iterator;
@@ -59,55 +59,55 @@ use self::{
 #[derive(Clone)]
 pub struct CallContext {
     pub(crate) zome: Zome,
-    pub(crate) host_access: HostAccess,
+    pub(crate) host_context: HostContext,
 }
 
 impl CallContext {
-    pub fn new(zome: Zome, host_access: HostAccess) -> Self {
-        Self { zome, host_access }
+    pub fn new(zome: Zome, host_context: HostContext) -> Self {
+        Self { zome, host_context }
     }
 
     pub fn zome(&self) -> Zome {
         self.zome.clone()
     }
 
-    pub fn host_access(&self) -> HostAccess {
-        self.host_access.clone()
+    pub fn host_context(&self) -> HostContext {
+        self.host_context.clone()
     }
 }
 
 #[derive(Clone)]
-pub enum HostAccess {
-    ZomeCall(ZomeCallHostAccess),
-    GenesisSelfCheck(GenesisSelfCheckHostAccess),
-    Validate(ValidateHostAccess),
-    ValidateCreateLink(ValidateLinkHostAccess),
-    Init(InitHostAccess),
+pub enum HostContext {
     EntryDefs(EntryDefsHostAccess),
+    GenesisSelfCheck(GenesisSelfCheckHostAccess),
+    Init(InitHostAccess),
     MigrateAgent(MigrateAgentHostAccess),
-    ValidationPackage(ValidationPackageHostAccess),
     PostCommit(PostCommitHostAccess), // TODO: add emit_signal access here?
+    ValidateCreateLink(ValidateLinkHostAccess),
+    Validate(ValidateHostAccess),
+    ValidationPackage(ValidationPackageHostAccess),
+    ZomeCall(ZomeCallHostAccess),
 }
 
-impl From<&HostAccess> for HostFnAccess {
-    fn from(host_access: &HostAccess) -> Self {
+impl From<&HostContext> for HostFnAccess {
+    fn from(host_access: &HostContext) -> Self {
         match host_access {
-            HostAccess::ZomeCall(access) => access.into(),
-            HostAccess::GenesisSelfCheck(access) => access.into(),
-            HostAccess::Validate(access) => access.into(),
-            HostAccess::ValidateCreateLink(access) => access.into(),
-            HostAccess::Init(access) => access.into(),
-            HostAccess::EntryDefs(access) => access.into(),
-            HostAccess::MigrateAgent(access) => access.into(),
-            HostAccess::ValidationPackage(access) => access.into(),
-            HostAccess::PostCommit(access) => access.into(),
+            HostContext::ZomeCall(access) => access.into(),
+            HostContext::GenesisSelfCheck(access) => access.into(),
+            HostContext::Validate(access) => access.into(),
+            HostContext::ValidateCreateLink(access) => access.into(),
+            HostContext::Init(access) => access.into(),
+            HostContext::EntryDefs(access) => access.into(),
+            HostContext::MigrateAgent(access) => access.into(),
+            HostContext::ValidationPackage(access) => access.into(),
+            HostContext::PostCommit(access) => access.into(),
         }
     }
 }
 
-impl HostAccess {
+impl HostContext {
     /// Get the workspace, panics if none was provided
-    pub fn workspace(&self) -> &CallZomeWorkspaceLock {
+    pub fn workspace(&self) -> &HostFnWorkspace {
         match self {
             Self::ZomeCall(ZomeCallHostAccess { workspace, .. })
             | Self::Init(InitHostAccess { workspace, .. })
@@ -263,16 +263,13 @@ impl ZomeCallInvocation {
         let check_agent = self.provenance.clone();
         let check_secret = self.cap;
 
-        tokio_helper::block_forever_on(async move {
-            let maybe_grant: Option<CapGrant> = host_access
-                .workspace
-                .read()
-                .await
-                .source_chain
-                .valid_cap_grant(&check_function, &check_agent, check_secret.as_ref())?;
+        let maybe_grant: Option<CapGrant> = host_access.workspace.source_chain().valid_cap_grant(
+            &check_function,
+            &check_agent,
+            check_secret.as_ref(),
+        )?;
 
-            Ok(maybe_grant.is_some())
-        })
+        Ok(maybe_grant.is_some())
     }
 }
 
@@ -340,8 +337,8 @@ impl ZomeCallInvocation {
         Self {
             cell_id,
             zome,
-            fn_name,
             cap,
+            fn_name,
             payload,
             provenance,
         }
@@ -371,7 +368,7 @@ impl From<ZomeCallInvocation> for ZomeCall {
 
 #[derive(Clone, Constructor)]
 pub struct ZomeCallHostAccess {
-    pub workspace: CallZomeWorkspaceLock,
+    pub workspace: HostFnWorkspace,
     pub keystore: KeystoreSender,
     pub network: HolochainP2pCell,
     pub signal_tx: SignalBroadcaster,
@@ -382,7 +379,7 @@ pub struct ZomeCallHostAccess {
     pub cell_id: CellId,
 }
 
-impl From<ZomeCallHostAccess> for HostAccess {
+impl From<ZomeCallHostAccess> for HostContext {
     fn from(zome_call_host_access: ZomeCallHostAccess) -> Self {
         Self::ZomeCall(zome_call_host_access)
     }
@@ -428,13 +425,13 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
 
     fn call_iterator<I: Invocation + 'static>(
         &self,
-        access: HostAccess,
+        host_context: HostContext,
         invocation: I,
     ) -> CallIterator<Self, I>;
 
     fn maybe_call<I: Invocation + 'static>(
         &self,
-        access: HostAccess,
+        host_context: HostContext,
         invocation: &I,
         zome: &Zome,
         to_call: &FunctionName,
@@ -549,7 +546,7 @@ pub mod wasm_test {
                     .next()
                     .unwrap();
 
-                let author = $crate::fixt::AgentPubKeyFixturator::new(Predictable)
+                let author = $crate::fixt::AgentPubKeyFixturator::new(::fixt::prelude::Predictable)
                     .next()
                     .unwrap();
 
@@ -575,25 +572,17 @@ pub mod wasm_test {
                     ))
                     .next()
                     .unwrap();
-                let zome_invocation_response =
-                    match ribosome.call_zome_function(host_access, invocation.clone()) {
-                        Ok(v) => v,
-                        Err(e) => {
-                            dbg!("call_zome_function error", &invocation, &e);
-                            panic!();
-                        }
-                    };
 
-                let output = match zome_invocation_response {
-                    crate::core::ribosome::ZomeCallResponse::Ok(guest_output) => {
-                        guest_output.decode().unwrap()
+                match ribosome.call_zome_function(host_access, invocation.clone()) {
+                    Ok(crate::core::ribosome::ZomeCallResponse::Ok(guest_output)) => {
+                        Ok(guest_output.decode().unwrap())
                     }
-                    crate::core::ribosome::ZomeCallResponse::Unauthorized(_, _, _, _) => {
+                    Ok(crate::core::ribosome::ZomeCallResponse::Unauthorized(_, _, _, _)) => {
                         unreachable!()
                     }
-                    crate::core::ribosome::ZomeCallResponse::NetworkError(_) => unreachable!(),
-                };
-                output
+                    Ok(crate::core::ribosome::ZomeCallResponse::NetworkError(_)) => unreachable!(),
+                    Err(e) => Err(e),
+                }
             })
             .await
             .unwrap()

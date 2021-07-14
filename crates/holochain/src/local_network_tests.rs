@@ -1,23 +1,8 @@
 use std::convert::TryFrom;
 use std::sync::Arc;
 
-use hdk::prelude::CellId;
-use hdk::prelude::WasmError;
-use holo_hash::AgentPubKey;
-use holo_hash::HeaderHash;
-use holochain_keystore::AgentPubKeyExt;
-use holochain_lmdb::env::EnvironmentWrite;
-use holochain_serialized_bytes::SerializedBytes;
-use holochain_types::prelude::*;
-use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::ZomeCallResponse;
-use kitsune_p2p::KitsuneP2pConfig;
-use matches::assert_matches;
-use tempdir::TempDir;
-use tracing::debug_span;
-
-use crate::conductor::p2p_store::all_agent_infos;
-use crate::conductor::p2p_store::exchange_peer_info;
+use crate::conductor::p2p_agent_store::all_agent_infos;
+use crate::conductor::p2p_agent_store::exchange_peer_info;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
@@ -26,15 +11,29 @@ use crate::test_utils::install_app;
 use crate::test_utils::new_zome_call;
 use crate::test_utils::setup_app_with_network;
 use crate::test_utils::wait_for_integration_with_others;
+use hdk::prelude::CellId;
+use hdk::prelude::WasmError;
+use holo_hash::AgentPubKey;
+use holo_hash::HeaderHash;
+use holochain_keystore::AgentPubKeyExt;
+use holochain_p2p::DnaHashExt;
+use holochain_serialized_bytes::SerializedBytes;
+use holochain_state::prelude::TestEnvs;
+use holochain_types::prelude::*;
+use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::ZomeCallResponse;
+use kitsune_p2p::KitsuneP2pConfig;
+use matches::assert_matches;
 use shrinkwraprs::Shrinkwrap;
 use test_case::test_case;
+use tokio_helper;
+use tracing::debug_span;
 
 const TIMEOUT_ERROR: &'static str = "inner function \'call_create_entry_remotely\' failed: ZomeCallNetworkError(\"Other: timeout\")";
 
 #[test_case(2)]
 #[test_case(5)]
-// #[test_case(10)] 10 works but might be too slow for our regular test run
-// FIXME: this test is flaky!
+// #[test_case(10)]
 fn conductors_call_remote(num_conductors: usize) {
     let f = async move {
         observability::test_run().ok();
@@ -51,15 +50,15 @@ fn conductors_call_remote(num_conductors: usize) {
 
         init_all(&handles[..]).await;
 
-        // 50 ms should be enough time to hit another conductor locally
-        let results = call_each_other(&handles[..], 50).await;
+        // 100 ms should be enough time to hit another conductor locally.
+        let results = call_each_other(&handles[..], 100).await;
         for (_, _, result) in results {
             match result {
                 Some(r) => match r {
                     Err(RibosomeError::WasmError(WasmError::Guest(e))) => {
                         assert_eq!(e, TIMEOUT_ERROR)
                     }
-                    _ => unreachable!(),
+                    _ => panic!("Unexpected result: {:?}", r),
                 },
                 // None also means a timeout which is what we want before the
                 // agent info is shared
@@ -67,18 +66,22 @@ fn conductors_call_remote(num_conductors: usize) {
             }
         }
 
-        // Let the remote messages be dropped
-        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        // Let the remote messages be dropped.
+        // @todo Why??? what messages? why do these messages cause subsequent calls to fail?
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
 
         let mut envs = Vec::with_capacity(handles.len());
         for h in &handles {
-            envs.push(h.get_p2p_env().await);
+            let space = h.cell_id.dna_hash().to_kitsune();
+            envs.push(h.get_p2p_env(space).await);
         }
 
-        exchange_peer_info(envs);
+        exchange_peer_info(envs).await;
 
         // Give a little longer timeout here because they must find each other to pass the test
-        let results = call_each_other(&handles[..], 500).await;
+        // This can require multiple round trips if the head of the source chain keeps moving.
+        // Each time the chain head moves the call must be retried until a clean commit is made.
+        let results = call_each_other(&handles[..], 1000).await;
         for (_, _, result) in results {
             self::assert_matches!(result, Some(Ok(ZomeCallResponse::Ok(_))));
         }
@@ -291,11 +294,12 @@ async fn conductors_gossip_inner(
 
     let mut envs = Vec::with_capacity(handles.len() + second_handles.len());
     for h in handles.iter().chain(second_handles.iter()) {
-        envs.push(h.get_p2p_env().await);
+        let space = h.cell_id.dna_hash().to_kitsune();
+        envs.push(h.get_p2p_env(space).await);
     }
 
     if share_peers {
-        exchange_peer_info(envs.clone());
+        exchange_peer_info(envs.clone()).await;
     }
 
     // for _ in 0..600 {
@@ -322,11 +326,12 @@ async fn conductors_gossip_inner(
 
     let mut envs = Vec::with_capacity(third_handles.len() + second_handles.len());
     for h in third_handles.iter().chain(second_handles.iter()) {
-        envs.push(h.get_p2p_env().await);
+        let space = h.cell_id.dna_hash().to_kitsune();
+        envs.push(h.get_p2p_env(space).await);
     }
 
     if share_peers {
-        exchange_peer_info(envs.clone());
+        exchange_peer_info(envs.clone()).await;
     }
 
     let all_handles = third_handles
@@ -469,13 +474,13 @@ async fn check_gossip(
 }
 
 #[tracing::instrument(skip(envs))]
-fn check_peers(envs: Vec<EnvironmentWrite>) {
+fn check_peers(envs: Vec<EnvWrite>) {
     for (i, a) in envs.iter().enumerate() {
         let peers = all_agent_infos(a.clone().into()).unwrap();
         let num_peers = peers.len();
         let peers = peers
             .into_iter()
-            .map(|a| a.into_agent())
+            .map(|a| a.agent.clone())
             .collect::<Vec<_>>();
         tracing::debug!(?i, ?num_peers, ?peers);
     }
@@ -486,7 +491,7 @@ struct TestHandle {
     #[shrinkwrap(main_field)]
     handle: ConductorHandle,
     cell_id: CellId,
-    __tmpdir: Arc<TempDir>,
+    _envs: Arc<TestEnvs>,
 }
 
 impl TestHandle {
@@ -524,7 +529,7 @@ async fn setup(
     let mut handles = Vec::with_capacity(num_conductors);
     for _ in 0..num_conductors {
         let dnas = vec![dna_file.clone()];
-        let (__tmpdir, _, handle) =
+        let (_envs, _, handle) =
             setup_app_with_network(vec![], vec![], network.clone().unwrap_or_default()).await;
 
         let agent_key = AgentPubKey::new_from_pure_entropy(handle.keystore())
@@ -534,7 +539,7 @@ async fn setup(
         let app = InstalledCell::new(cell_id.clone(), "cell_handle".into());
         install_app("test_app", vec![(app, None)], dnas.clone(), handle.clone()).await;
         handles.push(TestHandle {
-            __tmpdir,
+            _envs: Arc::new(_envs),
             cell_id,
             handle,
         });

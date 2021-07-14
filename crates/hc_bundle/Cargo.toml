@@ -1,8 +1,8 @@
 [package]
 name = "holochain_cli_bundle"
-version = "0.0.1"
+version = "0.0.2-dev.0"
 description = "DNA and hApp bundling functionality for the `hc` Holochain CLI utility"
-license-file = "LICENSE_CAL-1.0"
+license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://github.com/holochain/holochain"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
@@ -20,10 +20,10 @@ path = "src/bin/hc-dna.rs"
 
 [dependencies]
 anyhow = "1.0"
-ffs = { path = "../ffs", features =["backtrace"] }
+holochain_util = { path = "../holochain_util", features = ["backtrace"], version = "0.0.2-dev.0"}
 holochain_serialized_bytes = "=0.0.50"
-holochain_types = { version = "0.0.1", path = "../holochain_types" }
-mr_bundle = {version = "0.0.1", path = "../mr_bundle"}
+holochain_types = { version = "0.0.2-dev.0", path = "../holochain_types" }
+mr_bundle = {version = "0.0.2-dev.0", path = "../mr_bundle"}
 serde = { version = "1.0", features = [ "derive" ] }
 serde_bytes = "0.11"
 serde_yaml = "0.8"

@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_mdns"
-version = "0.0.1"
+version = "0.0.2-dev.0"
 description = "p2p / mdns discovery framework"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -9,6 +9,14 @@ authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo", "p2p", "mdns", "networking" ]
 categories = [ "network-programming" ]
 edition = "2018"
+
+[[example]]
+name = "broadcast"
+path = "examples/broadcast.rs"
+
+[[example]]
+name = "discover"
+path = "examples/discover.rs"
 
 [dependencies]
 libmdns = "=0.6.0"

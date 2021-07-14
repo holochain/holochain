@@ -37,6 +37,7 @@ pub fn fill_with_latency_info(buf: &mut [u8]) {
 
 /// Return the duration since the time encoded in a latency info buffer.
 /// Returns a unit error if we could not parse the buffer into time data.
+#[allow(clippy::result_unit_err)]
 pub fn parse_latency_info(buf: &[u8]) -> Result<std::time::Duration, ()> {
     // if the buffer is smaller than 16 bytes, we cannot decode it
     if buf.len() < 16 {

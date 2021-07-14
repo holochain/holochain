@@ -1,6 +1,5 @@
 [workspace]
 members = [
-  "crates/ffs",
   "crates/fixt",
   "crates/fixt/test",
   "crates/hdk",
@@ -15,26 +14,35 @@ members = [
   "crates/holochain",
   "crates/holochain_cascade",
   "crates/holochain_conductor_api",
-  "crates/holochain_lmdb",
   "crates/holochain_p2p",
   "crates/holochain_keystore",
+  "crates/holochain_sqlite",
   "crates/holochain_state",
+  "crates/holochain_sqlite",
   "crates/holochain_types",
   "crates/holochain_websocket",
+  "crates/holochain_util",
   "crates/holochain_zome_types",
 
+  "crates/kitsune_p2p/dht_arc",
+  "crates/kitsune_p2p/bootstrap",
+  "crates/kitsune_p2p/direct",
+  "crates/kitsune_p2p/direct_api",
+  "crates/kitsune_p2p/direct_test",
   "crates/kitsune_p2p/kitsune_p2p",
+  "crates/kitsune_p2p/mdns",
+  "crates/kitsune_p2p/proxy",
   "crates/kitsune_p2p/transport_quic",
   "crates/kitsune_p2p/types",
-  "crates/kitsune_p2p/proxy",
-  "crates/kitsune_p2p/mdns",
 
   "crates/test_utils/wasm",
   "crates/test_utils/wasm_common",
+  "crates/release-automation",
 ]
 
 exclude = [
-  "crates/diagnostics"
+  "crates/diagnostics",
+  "crates/release-automation",
 ]
 
 # These are the default params for RELEASE target
@@ -48,12 +56,8 @@ incremental = false
 codegen-units = 16
 
 [patch.crates-io]
-
-rkv = { git = "https://github.com/holochain/rkv.git", branch = "master" }
-lmdb-rkv = { git = "https://github.com/holochain/lmdb-rs.git" }
-# holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "bump-serde" }
-# holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "bump-serde" }
-# holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "bump-serde" }
+# holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "wasmer-patch" }
+# holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "wasmer-patch" }
 holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "arbitrary" }
 holochain_serialized_bytes_derive = { git = "https://github.com/holochain/holochain-serialization.git", branch = "arbitrary" }
 # observability = { git = "https://github.com/freesig/observability.git", branch = "main" }

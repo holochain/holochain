@@ -1,13 +1,13 @@
 use crate::core::ribosome::FnComponents;
-use crate::core::ribosome::HostAccess;
+use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
-use holo_hash::EntryHash;
+use holo_hash::AnyDhtHash;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
+use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
 
 #[derive(Debug, Clone)]
@@ -23,12 +23,12 @@ impl InitInvocation {
 
 #[derive(Clone, Constructor)]
 pub struct InitHostAccess {
-    pub workspace: CallZomeWorkspaceLock,
+    pub workspace: HostFnWorkspace,
     pub keystore: KeystoreSender,
     pub network: HolochainP2pCell,
 }
 
-impl From<InitHostAccess> for HostAccess {
+impl From<InitHostAccess> for HostContext {
     fn from(init_host_access: InitHostAccess) -> Self {
         Self::Init(init_host_access)
     }
@@ -71,7 +71,8 @@ pub enum InitResult {
     /// no init failed but some zome has unresolved dependencies
     /// ZomeName is the first zome that has unresolved dependencies
     /// Vec<EntryHash> is the list of all missing dependency addresses
-    UnresolvedDependencies(ZomeName, Vec<EntryHash>),
+    // TODO: MD: this is probably unnecessary
+    UnresolvedDependencies(ZomeName, Vec<AnyDhtHash>),
 }
 
 impl From<Vec<(ZomeName, InitCallbackResult)>> for InitResult {
@@ -101,7 +102,7 @@ mod test {
     use crate::fixt::InitInvocationFixturator;
     use crate::fixt::ZomeNameFixturator;
     use ::fixt::prelude::*;
-    use holochain_types::dna::zome::HostFnAccess;
+    use holochain_types::prelude::*;
     use holochain_zome_types::init::InitCallbackResult;
     use holochain_zome_types::ExternIO;
 

@@ -4,7 +4,6 @@ use super::*;
 use crate::conductor::manager::ManagedTaskResult;
 use crate::core::workflow::app_validation_workflow::app_validation_workflow;
 use crate::core::workflow::app_validation_workflow::AppValidationWorkspace;
-use holochain_lmdb::env::EnvironmentWrite;
 use holochain_p2p::*;
 use tokio::task::JoinHandle;
 use tracing::*;
@@ -12,6 +11,7 @@ use tracing::*;
 /// Spawn the QueueConsumer for AppValidation workflow
 #[instrument(skip(
     env,
+    cache,
     conductor_handle,
     stop,
     trigger_integration,
@@ -19,10 +19,11 @@ use tracing::*;
     network
 ))]
 pub fn spawn_app_validation_consumer(
-    env: EnvironmentWrite,
+    env: EnvWrite,
+    cache: EnvWrite,
     conductor_handle: ConductorHandle,
     mut stop: sync::broadcast::Receiver<()>,
-    mut trigger_integration: TriggerSender,
+    trigger_integration: TriggerSender,
     conductor_api: impl CellConductorApiT + 'static,
     network: HolochainP2pCell,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
@@ -39,12 +40,10 @@ pub fn spawn_app_validation_consumer(
             }
 
             // Run the workflow
-            let workspace = AppValidationWorkspace::new(env.clone().into())
-                .expect("Could not create Workspace");
+            let workspace = AppValidationWorkspace::new(env.clone(), cache.clone());
             let result = app_validation_workflow(
                 workspace,
-                env.clone().into(),
-                &mut trigger_integration,
+                trigger_integration.clone(),
                 conductor_api.clone(),
                 network.clone(),
             )

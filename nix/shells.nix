@@ -39,7 +39,8 @@ rec {
   # * everything needed to compile this repos' crates
   # * CI scripts
   coreDev = hcMkShell {
-    nativeBuildInputs = builtins.attrValues (pkgs.core);
+    nativeBuildInputs = builtins.attrValues (pkgs.core)
+      ++ [ holonix.pkgs.sqlcipher ];
   };
 
   ci = hcMkShell {
@@ -53,7 +54,13 @@ rec {
     inputsFrom = [
       (builtins.removeAttrs coreDev [ "shellHook" ])
     ];
-    nativeBuildInputs = builtins.attrValues pkgs.happ;
+    nativeBuildInputs = builtins.attrValues pkgs.happ
+      ++ (with holonix.pkgs; [
+        lair-keystore
+        sqlcipher
+        binaryen
+      ])
+      ;
   };
 
   coreDevRustup = coreDev.overrideAttrs (attrs: {

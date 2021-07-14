@@ -10,14 +10,14 @@ use holochain_serialized_bytes::prelude::*;
 pub struct CapClaim {
     /// A string by which to later query for saved claims.
     /// This does not need to be unique within a source chain.
-    tag: String,
+    pub tag: String,
     /// AgentPubKey of agent who authored the corresponding CapGrant.
-    grantor: AgentPubKey,
+    pub grantor: AgentPubKey,
     /// The secret needed to exercise this capability.
     /// This is the only bit sent over the wire to attempt a remote call.
     /// Note that the grantor may have revoked the corresponding grant since we received the claim
     /// so claims are only ever a 'best effort' basis.
-    secret: CapSecret,
+    pub secret: CapSecret,
 }
 
 impl CapClaim {

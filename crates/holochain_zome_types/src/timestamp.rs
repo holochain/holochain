@@ -166,9 +166,8 @@ impl<D: Into<core::time::Duration>> Add<D> for Timestamp {
     type Output = TimestampResult<Timestamp>;
 
     fn add(self, rhs: D) -> Self::Output {
-        Ok(self
-            .checked_add(&rhs.into())
-            .ok_or(TimestampError::Overflow)?)
+        self.checked_add(&rhs.into())
+            .ok_or(TimestampError::Overflow)
     }
 }
 
@@ -185,9 +184,8 @@ impl<D: Into<core::time::Duration>> Sub<D> for Timestamp {
     type Output = TimestampResult<Timestamp>;
 
     fn sub(self, rhs: D) -> Self::Output {
-        Ok(self
-            .checked_sub(&rhs.into())
-            .ok_or(TimestampError::Overflow)?)
+        self.checked_sub(&rhs.into())
+            .ok_or(TimestampError::Overflow)
     }
 }
 
@@ -199,6 +197,7 @@ impl<D: Into<core::time::Duration>> Sub<D> for &Timestamp {
     }
 }
 
+// TODO: This is not needed, `?` can be used with Option.
 macro_rules! try_opt {
     ($e:expr) => {
         match $e {
@@ -330,6 +329,16 @@ impl Timestamp {
         let nanos: i64 = try_opt!(i64::from(self.1).checked_sub(dur_nanos));
         Some(try_opt!(Timestamp::normalize(seconds, nanos)))
     }
+
+    /// Convert this timestamp to fit into a sqlite integer which is
+    /// an i64. The value will be clamped between 0 and i64::MAX.
+    pub fn to_sql_ms_lossy(self) -> i64 {
+        use std::time::Duration;
+        let s = Duration::from_secs(self.0.max(0) as u64);
+        let ns = Duration::from_nanos(self.1 as u64);
+        let ts = s.checked_add(ns).unwrap_or(s);
+        ts.as_millis().clamp(0, i64::MAX as u128) as i64
+    }
 }
 
 /// Distance between two Timestamps as a chrono::Duration (subject to overflow).  A Timestamp
@@ -339,9 +348,15 @@ impl Sub<Timestamp> for Timestamp {
     type Output = TimestampResult<chrono::Duration>;
 
     fn sub(self, rhs: Timestamp) -> Self::Output {
-        Ok(self
-            .checked_difference_signed(&rhs)
-            .ok_or(TimestampError::Overflow)?)
+        self.checked_difference_signed(&rhs)
+            .ok_or(TimestampError::Overflow)
+    }
+}
+
+#[cfg(feature = "full")]
+impl rusqlite::ToSql for Timestamp {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
+        Ok(rusqlite::types::ToSqlOutput::Owned(self.0.into()))
     }
 }
 
