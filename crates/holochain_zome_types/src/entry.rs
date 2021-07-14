@@ -8,6 +8,7 @@
 use crate::capability::CapClaim;
 use crate::capability::CapGrant;
 use crate::capability::ZomeCallCapGrant;
+use crate::countersigning::CounterSigningSessionData;
 use holo_hash::hash_type;
 use holo_hash::AgentPubKey;
 use holo_hash::EntryHash;
@@ -111,6 +112,8 @@ pub enum Entry {
     Agent(AgentPubKey),
     /// The application entry data for entries that aren't system created entries
     App(AppEntryBytes),
+    /// Application entry data for entries that need countersigning to move forward multiple chains together.
+    CounterSign(CounterSigningSessionData, AppEntryBytes),
     /// The capability claim system entry which allows committing a granted permission
     /// for later use
     CapClaim(CapClaimEntry),
