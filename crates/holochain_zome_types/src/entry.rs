@@ -11,8 +11,10 @@ use crate::capability::ZomeCallCapGrant;
 use crate::countersigning::CounterSigningSessionData;
 use holo_hash::hash_type;
 use holo_hash::AgentPubKey;
+use holo_hash::EntryHash;
 use holo_hash::HashableContent;
 use holo_hash::HashableContentBytes;
+use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 
 mod app_entry_bytes;
@@ -32,6 +34,15 @@ pub type CapGrantEntry = ZomeCallCapGrant;
 
 /// The data type written to the source chain to denote a capability claim
 pub type CapClaimEntry = CapClaim;
+
+/// An Entry paired with its EntryHash
+pub type EntryHashed = holo_hash::HoloHashed<Entry>;
+
+impl From<EntryHashed> for Entry {
+    fn from(entry_hashed: EntryHashed) -> Self {
+        entry_hashed.into_content()
+    }
+}
 
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 /// Options for controlling how get works
@@ -202,7 +213,7 @@ impl AsRef<crate::EntryDefId> for EntryWithDefId {
     }
 }
 
-/// Zome IO inner for get and get_details calls.
+/// Zome IO for get and get_details calls.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct GetInput {
     /// Any DHT hash to pass to get or get_details.
@@ -218,6 +229,54 @@ impl GetInput {
             any_dht_hash,
             get_options,
         }
+    }
+}
+
+/// Zome IO for must_get_valid_element.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct MustGetValidElementInput(HeaderHash);
+
+impl MustGetValidElementInput {
+    /// Constructor.
+    pub fn new(header_hash: HeaderHash) -> Self {
+        Self(header_hash)
+    }
+
+    /// Consumes self for inner.
+    pub fn into_inner(self) -> HeaderHash {
+        self.0
+    }
+}
+
+/// Zome IO for must_get_entry.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct MustGetEntryInput(EntryHash);
+
+impl MustGetEntryInput {
+    /// Constructor.
+    pub fn new(entry_hash: EntryHash) -> Self {
+        Self(entry_hash)
+    }
+
+    /// Consumes self for inner.
+    pub fn into_inner(self) -> EntryHash {
+        self.0
+    }
+}
+
+/// Zome IO for must_get_header.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct MustGetHeaderInput(HeaderHash);
+
+impl MustGetHeaderInput {
+    /// Constructor.
+    pub fn new(header_hash: HeaderHash) -> Self {
+        Self(header_hash)
+    }
+
+    /// Consumes self for inner.
+    pub fn into_inner(self) -> HeaderHash {
+        self.0
     }
 }
 

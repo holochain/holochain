@@ -10,11 +10,11 @@ pub fn query(
     call_context: Arc<CallContext>,
     input: ChainQueryFilter,
 ) -> Result<Vec<Element>, WasmError> {
-    match HostFnAccess::from(&call_context.host_access()) {
+    match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ read_workspace: Permission::Allow, .. } => {
             tokio_helper::block_forever_on(async move {
                 let elements: Vec<Element> = call_context
-                    .host_access
+                    .host_context
                     .workspace()
                     .source_chain()
                     .query(input)
@@ -59,16 +59,16 @@ pub mod slow_tests {
         let (_test_env, host_access) = setup().await;
 
         let _hash_a: EntryHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Query, "add_path", "a".to_string());
+            crate::call_test_ribosome!(host_access, TestWasm::Query, "add_path", "a".to_string()).unwrap();
         let _hash_b: EntryHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Query, "add_path", "b".to_string());
+            crate::call_test_ribosome!(host_access, TestWasm::Query, "add_path", "b".to_string()).unwrap();
 
         let elements: Vec<Element> = crate::call_test_ribosome!(
             host_access,
             TestWasm::Query,
             "query",
             ChainQueryFilter::default()
-        );
+        ).unwrap();
 
         assert_eq!(elements.len(), 5);
     }

@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased](https://github.com/holochain/holochain/compare/hdk-v0.0.100...HEAD)
 
+### Changed
+
+- hdk: fixed wrong order of recipient and sender in `x_25519_x_salsa20_poly1305_decrypt`
+
 ## 0.0.101
 
 ### Changed

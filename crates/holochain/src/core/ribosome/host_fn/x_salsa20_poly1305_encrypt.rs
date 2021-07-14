@@ -14,7 +14,7 @@ pub fn x_salsa20_poly1305_encrypt(
     call_context: Arc<CallContext>,
     input: XSalsa20Poly1305Encrypt,
 ) -> Result<XSalsa20Poly1305EncryptedData, WasmError> {
-    match HostFnAccess::from(&call_context.host_access()) {
+    match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ keystore: Permission::Allow, .. } => {
             let system_random = ring::rand::SystemRandom::new();
             let mut nonce_bytes = [0; holochain_zome_types::x_salsa20_poly1305::nonce::NONCE_BYTES];
@@ -83,7 +83,7 @@ pub mod wasm_test {
             TestWasm::XSalsa20Poly1305,
             "x_salsa20_poly1305_encrypt",
             input
-        );
+        ).unwrap();
         let decrypt_output: Option<XSalsa20Poly1305Data> = crate::call_test_ribosome!(
             host_access,
             TestWasm::XSalsa20Poly1305,
@@ -92,7 +92,7 @@ pub mod wasm_test {
                 key_ref,
                 output.clone(),
             )
-        );
+        ).unwrap();
         assert_eq!(&decrypt_output, &Some(data),);
 
         let bad_key_ref = XSalsa20Poly1305KeyRef::from([2; 32]);
@@ -104,7 +104,7 @@ pub mod wasm_test {
                 bad_key_ref,
                 output
             )
-        );
+        ).unwrap();
         assert_eq!(None, bad_output);
     }
 }
