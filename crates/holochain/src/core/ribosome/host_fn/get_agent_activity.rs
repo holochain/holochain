@@ -12,7 +12,7 @@ pub fn get_agent_activity(
     call_context: Arc<CallContext>,
     input: GetAgentActivityInput,
 ) -> Result<AgentActivity, WasmError> {
-    match HostFnAccess::from(&call_context.host_access()) {
+    match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ read_workspace: Permission::Allow, .. } => {
             let GetAgentActivityInput {
                 agent_pubkey,
@@ -32,17 +32,17 @@ pub fn get_agent_activity(
                 },
             };
 
-            // Get the network from the context
-            let network = call_context.host_access.network().clone();
+    // Get the network from the context
+    let network = call_context.host_context.network().clone();
 
-            // timeouts must be handled by the network
-            tokio_helper::block_forever_on(async move {
-                let workspace = call_context.host_access.workspace();
-                let mut cascade = Cascade::from_workspace_network(workspace, network);
-                let activity = cascade
-                    .get_agent_activity(agent_pubkey, chain_query_filter, options)
-                    .await
-                    .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
+    // timeouts must be handled by the network
+    tokio_helper::block_forever_on(async move {
+        let workspace = call_context.host_context.workspace();
+        let mut cascade = Cascade::from_workspace_network(workspace, network);
+        let activity = cascade
+            .get_agent_activity(agent_pubkey, chain_query_filter, options)
+            .await
+            .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
 
                 Ok(activity.into())
             })

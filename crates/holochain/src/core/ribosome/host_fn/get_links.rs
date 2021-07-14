@@ -13,7 +13,7 @@ pub fn get_links<'a>(
     call_context: Arc<CallContext>,
     input: GetLinksInput,
 ) -> Result<Links, WasmError> {
-    match HostFnAccess::from(&call_context.host_access()) {
+    match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ read_workspace: Permission::Allow, .. } => {
             let GetLinksInput {
                 base_address,
@@ -25,18 +25,18 @@ pub fn get_links<'a>(
                 .zome_to_id(&call_context.zome)
                 .expect("Failed to get ID for current zome.");
 
-            // Get the network from the context
-            let network = call_context.host_access.network().clone();
+    // Get the network from the context
+    let network = call_context.host_context.network().clone();
 
-            tokio_helper::block_forever_on(async move {
-                // Create the key
-                let key = WireLinkKey {
-                    base: base_address,
-                    zome_id,
-                    tag: tag_prefix,
-                };
-                let workspace = call_context.host_access.workspace();
-                let mut cascade = Cascade::from_workspace_network(workspace, network);
+    tokio_helper::block_forever_on(async move {
+        // Create the key
+        let key = WireLinkKey {
+            base: base_address,
+            zome_id,
+            tag: tag_prefix,
+        };
+        let workspace = call_context.host_context.workspace();
+        let mut cascade = Cascade::from_workspace_network(workspace, network);
 
                 // Get the links from the dht
                 let links = cascade
@@ -84,13 +84,13 @@ pub mod slow_tests {
             TestWasm::HashPath,
             "ensure",
             "foo.bar".to_string()
-        );
+        ).unwrap();
         let _: () = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "ensure",
             "foo.bar".to_string()
-        );
+        ).unwrap();
 
         // ensure foo.baz
         let _: () = crate::call_test_ribosome!(
@@ -98,14 +98,14 @@ pub mod slow_tests {
             TestWasm::HashPath,
             "ensure",
             "foo.baz".to_string()
-        );
+        ).unwrap();
 
         let exists_output: bool = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "exists",
             "foo".to_string()
-        );
+        ).unwrap();
 
         assert_eq!(true, exists_output,);
 
@@ -114,21 +114,21 @@ pub mod slow_tests {
             TestWasm::HashPath,
             "hash",
             "foo.bar".to_string()
-        );
+        ).unwrap();
 
         let foo_baz: holo_hash::EntryHash = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "hash",
             "foo.baz".to_string()
-        );
+        ).unwrap();
 
         let children_output: holochain_zome_types::link::Links = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "children",
             "foo".to_string()
-        );
+        ).unwrap();
 
         let links = children_output.into_inner();
         assert_eq!(2, links.len());
@@ -153,7 +153,7 @@ pub mod slow_tests {
             TestWasm::Anchor,
             "anchor",
             AnchorInput("foo".to_string(), "bar".to_string())
-        );
+        ).unwrap();
 
         assert_eq!(
             anchor_address_one.get_raw_32().to_vec(),
@@ -169,7 +169,7 @@ pub mod slow_tests {
             TestWasm::Anchor,
             "anchor",
             AnchorInput("foo".to_string(), "baz".to_string())
-        );
+        ).unwrap();
 
         assert_eq!(
             anchor_address_two.get_raw_32().to_vec(),
@@ -184,7 +184,7 @@ pub mod slow_tests {
             TestWasm::Anchor,
             "get_anchor",
             anchor_address_one
-        );
+        ).unwrap();
 
         assert_eq!(
             Some(Anchor {
@@ -199,7 +199,7 @@ pub mod slow_tests {
             TestWasm::Anchor,
             "list_anchor_type_addresses",
             ()
-        );
+        ).unwrap();
 
         // should be 1 anchor type, "foo"
         assert_eq!(list_anchor_type_addresses_output.0.len(), 1,);
@@ -219,7 +219,7 @@ pub mod slow_tests {
                 TestWasm::Anchor,
                 "list_anchor_addresses",
                 "foo".to_string()
-            )
+            ).unwrap()
         };
 
         // should be 2 anchors under "foo" sorted by hash
@@ -238,7 +238,7 @@ pub mod slow_tests {
             TestWasm::Anchor,
             "list_anchor_tags",
             "foo".to_string()
-        );
+        ).unwrap();
 
         assert_eq!(
             vec!["bar".to_string(), "baz".to_string()],

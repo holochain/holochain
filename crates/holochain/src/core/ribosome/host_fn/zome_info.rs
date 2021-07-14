@@ -11,8 +11,8 @@ pub fn zome_info(
     call_context: Arc<CallContext>,
     _input: (),
 ) -> Result<ZomeInfo, WasmError> {
-    match HostFnAccess::from(&call_context.host_access()) {
-        HostFnAccess{ dna_bindings: Permission::Allow, .. } => {
+    match HostFnAccess::from(&call_context.host_context()) {
+        HostFnAccess{ bindings_deterministic: Permission::Allow, .. } => {
             Ok(ZomeInfo {
                 dna_name: ribosome.dna_def().name.clone(),
                 zome_name: call_context.zome.zome_name().clone(),
@@ -52,7 +52,7 @@ pub mod test {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace;
         let zome_info: ZomeInfo =
-            crate::call_test_ribosome!(host_access, TestWasm::ZomeInfo, "zome_info", ());
+            crate::call_test_ribosome!(host_access, TestWasm::ZomeInfo, "zome_info", ()).unwrap();
         assert_eq!(zome_info.dna_name, "test",);
     }
 }

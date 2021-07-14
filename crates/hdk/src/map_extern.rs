@@ -50,16 +50,13 @@ macro_rules! map_extern {
                         }
                     };
 
-                    // Call the function.
-                    let output: $output = match super::$f(inner) {
-                        Ok(v) => Ok(v),
-                        Err(wasm_error) => return $crate::prelude::return_err_ptr(wasm_error),
-                    };
-
-                    // Serialize the output for the host.
-                    match $crate::prelude::ExternIO::encode(output.unwrap()) {
-                        Ok(v) => $crate::prelude::return_ptr::<$crate::prelude::ExternIO>(v),
-                        Err(serialized_bytes_error) => $crate::prelude::return_err_ptr($crate::prelude::WasmError::Serialize(serialized_bytes_error)),
+                    // Call the function and handle the output.
+                    match super::$f(inner) {
+                        Ok(v) => match $crate::prelude::ExternIO::encode(v) {
+                            Ok(v) => $crate::prelude::return_ptr::<$crate::prelude::ExternIO>(v),
+                            Err(serialized_bytes_error) => $crate::prelude::return_err_ptr($crate::prelude::WasmError::Serialize(serialized_bytes_error)),
+                        },
+                        Err(e) => $crate::prelude::return_err_ptr(e),
                     }
                 }
             }

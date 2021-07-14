@@ -5,7 +5,6 @@ use crate::core::ribosome::RibosomeT;
 use holochain_wasmer_host::prelude::WasmError;
 use crate::core::ribosome::HostFnAccess;
 
-use holo_hash::HasHash;
 use holochain_types::prelude::*;
 use std::sync::Arc;
 
@@ -15,7 +14,7 @@ pub fn update<'a>(
     call_context: Arc<CallContext>,
     input: UpdateInput,
 ) -> Result<HeaderHash, WasmError> {
-    match HostFnAccess::from(&call_context.host_access()) {
+    match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ write_workspace: Permission::Allow, .. } => {
             // destructure the args out into an app type def id and entry
             let UpdateInput {
@@ -23,10 +22,9 @@ pub fn update<'a>(
                 entry_with_def_id,
             } = input;
 
-            // build the entry hash
-            let async_entry = AsRef::<Entry>::as_ref(&entry_with_def_id).to_owned();
-            let entry_hash =
-                holochain_types::entry::EntryHashed::from_content_sync(async_entry).into_hash();
+    // build the entry hash
+    let entry_hash =
+    EntryHash::with_data_sync(AsRef::<Entry>::as_ref(&entry_with_def_id));
 
             // extract the zome position
             let header_zome_id = ribosome
@@ -60,7 +58,7 @@ pub fn update<'a>(
                 entry_hash,
             };
 
-            let workspace = call_context.host_access.workspace();
+    let workspace = call_context.host_context.workspace();
 
             // return the hash of the updated entry
             // note that validation is handled by the workflow

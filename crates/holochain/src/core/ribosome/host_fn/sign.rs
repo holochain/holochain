@@ -11,9 +11,9 @@ pub fn sign(
     call_context: Arc<CallContext>,
     input: Sign,
 ) -> Result<Signature, WasmError> {
-    match HostFnAccess::from(&call_context.host_access()) {
+    match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess { keystore: Permission::Allow, .. } => tokio_helper::block_forever_on(async move {
-            call_context.host_access.keystore().sign(input).await
+            call_context.host_context.keystore().sign(input).await
         })
         .map_err(|keystore_error| WasmError::Host(keystore_error.to_string())),
         _ => unreachable!(),
@@ -94,7 +94,7 @@ pub mod wasm_test {
                     TestWasm::Sign,
                     "sign",
                     Sign::new_raw(k.clone(), data.clone())
-                );
+                ).unwrap();
 
                 assert_eq!(expect, output.as_ref().to_vec());
             }
