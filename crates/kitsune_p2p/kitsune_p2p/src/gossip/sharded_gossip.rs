@@ -24,7 +24,7 @@ mod ops;
 mod store;
 
 #[cfg(test)]
-mod test;
+mod tests;
 
 /// max send buffer size (keep it under 16384 with a little room for overhead)
 /// (this is not a tuning_param because it must be coordinated

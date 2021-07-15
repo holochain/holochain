@@ -207,3 +207,39 @@ ghost_actor::ghost_chan! {
 
 /// Receiver type for incoming connection events.
 pub type KitsuneP2pEventReceiver = futures::channel::mpsc::Receiver<KitsuneP2pEvent>;
+
+#[cfg(test)]
+mockall::mock! {
+    pub KitsuneP2pEventSender {
+        fn put_agent_info_signed(input: PutAgentInfoSignedEvt) -> ();
+        fn get_agent_info_signed(input: GetAgentInfoSignedEvt) -> Option<crate::types::agent_store::AgentInfoSigned>;
+        fn query_agent_info_signed(input: QueryAgentInfoSignedEvt) -> Vec<crate::types::agent_store::AgentInfoSigned>;
+        fn query_gossip_agents(input: QueryGossipAgentsEvt) -> Vec<(Arc<crate::KitsuneAgent>, kitsune_p2p_types::dht_arc::ArcInterval)>;
+        fn query_agent_info_signed_near_basis(space: Arc<super::KitsuneSpace>, basis_loc: u32, limit: u32) -> Vec<crate::types::agent_store::AgentInfoSigned>;
+        fn put_metric_datum(datum: MetricDatum) -> ();
+        fn query_metrics(query: MetricQuery) -> MetricQueryAnswer;
+        fn call(space: Arc<super::KitsuneSpace>, to_agent: Arc<super::KitsuneAgent>, from_agent: Arc<super::KitsuneAgent>, payload: Vec<u8>) -> Vec<u8>;
+        fn notify(space: Arc<super::KitsuneSpace>, to_agent: Arc<super::KitsuneAgent>, from_agent: Arc<super::KitsuneAgent>, payload: Vec<u8>) -> ();
+        fn gossip(
+            space: Arc<super::KitsuneSpace>,
+            to_agent: Arc<super::KitsuneAgent>,
+            from_agent: Arc<super::KitsuneAgent>,
+            op_hash: Arc<super::KitsuneOpHash>,
+            op_data: Vec<u8>,
+        ) -> ();
+        fn fetch_op_hashes_for_constraints(input: FetchOpHashesForConstraintsEvt) -> Vec<Arc<super::KitsuneOpHash>>;
+        fn fetch_op_hash_data(input: FetchOpHashDataEvt) -> Vec<(Arc<super::KitsuneOpHash>, Vec<u8>)>;
+        fn sign_network_data(input: SignNetworkDataEvt) -> super::KitsuneSignature;
+    }
+
+    trait Clone {
+        fn clone(&self) -> Self;
+    }
+}
+
+#[cfg(test)]
+impl ghost_actor::GhostChannelSender<KitsuneP2pEvent> for MockKitsuneP2pEventSender {
+    fn ghost_actor_channel_send(&self, _event: KitsuneP2pEvent) -> ghost_actor::GhostFuture<()> {
+        todo!()
+    }
+}
