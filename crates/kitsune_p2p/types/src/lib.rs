@@ -294,6 +294,7 @@ pub mod codec;
 pub mod config;
 pub mod metrics;
 pub mod reverse_semaphore;
+pub mod task_agg;
 pub mod tls;
 pub mod transport;
 pub mod transport_mem;

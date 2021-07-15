@@ -516,15 +516,21 @@ impl KitsuneP2pHandler for Space {
             kill: Arc<tokio::sync::Notify>,
             got_data: Arc<tokio::sync::Notify>,
             resp: Vec<actor::RpcMultiResponse>,
-            grace_timeout: KitsuneTimeout,
+            grace_rs: kitsune_p2p_types::reverse_semaphore::ReverseSemaphore,
         }
+
+        let grace_rs = kitsune_p2p_types::reverse_semaphore::ReverseSemaphore::new();
+
+        // capture startup permits first thing to ensure we don't
+        // close things down before they even get started : )
+        let local_startup_permit = grace_rs.acquire();
 
         // store this inner data in a share
         let inner = Share::new(Inner {
             kill: Arc::new(tokio::sync::Notify::new()),
             got_data: Arc::new(tokio::sync::Notify::new()),
             resp: Vec::new(),
-            grace_timeout: KitsuneTimeout::from_millis(0),
+            grace_rs,
         });
 
         // prepare to close tasks on notification
@@ -542,13 +548,12 @@ impl KitsuneP2pHandler for Space {
             }
         }
 
-        // join all our tasks here
-        let mut all = Vec::new();
+        let (driver, agg) = kitsune_p2p_types::task_agg::TaskAgg::new();
 
         // die on max timeout
         {
             let inner = inner.clone();
-            all.push(
+            agg.push(
                 wrap(inner.clone(), async move {
                     tokio::time::sleep(max_timeout.time_remaining()).await;
                     let _ = inner.share_mut(|i, _| {
@@ -563,7 +568,7 @@ impl KitsuneP2pHandler for Space {
         // die when we've got the correct timing / data
         {
             let inner = inner.clone();
-            all.push(
+            agg.push(
                 wrap(inner.clone(), async move {
                     let got_data = inner
                         .share_mut(|i, _| Ok(i.got_data.clone()))
@@ -572,19 +577,14 @@ impl KitsuneP2pHandler for Space {
                     // first we wait for any data in the response
                     got_data.notified().await;
 
-                    loop {
-                        let grace_timeout = inner
-                            .share_mut(|i, _| Ok(i.grace_timeout))
-                            .expect("we never close this share");
+                    // obtain a future that resolves when we're done waiting
+                    // for graceful permits
+                    let grace_fut = inner
+                        .share_mut(|i, _| Ok(i.grace_rs.wait_on_zero_permits()))
+                        .expect("we never close this share");
 
-                        // if the grace_timeout is expired, we can die
-                        if grace_timeout.is_expired() {
-                            break;
-                        }
-
-                        // if not, wait the timeout, and check again
-                        tokio::time::sleep(grace_timeout.time_remaining()).await;
-                    }
+                    // wait on the graceful permit future
+                    grace_fut.await;
 
                     // we have data, and grace timeout elapsed, we can die
                     let _ = inner.share_mut(|i, _| {
@@ -604,16 +604,37 @@ impl KitsuneP2pHandler for Space {
             let local_joined_agents = self.local_joined_agents.clone();
             let evt_sender = self.evt_sender.clone();
             let inner = inner.clone();
-            all.push(
+            let agg2 = agg.clone();
+            agg.push(
                 wrap(inner.clone(), async move {
+                    // store our prev permit, so we can acquire a new one
+                    // before releasing the previous one
+                    let mut prev_permit = Share::new(local_startup_permit);
+
                     for agent in local_joined_agents {
-                        inner
-                            .share_mut(move |i, _| {
-                                i.grace_timeout =
-                                    KitsuneTimeout::from_millis(remote_request_grace_ms);
-                                Ok(())
-                            })
+                        let permit = inner
+                            .share_mut(move |i, _| Ok(i.grace_rs.acquire()))
                             .expect("we never close this share");
+                        let permit = Share::new(permit);
+                        let permit2 = permit.clone();
+
+                        // drop this permit after our grace period times out
+                        agg2.push(
+                            async move {
+                                tokio::time::sleep(std::time::Duration::from_millis(
+                                    remote_request_grace_ms,
+                                ))
+                                .await;
+                                permit2.close();
+                            }
+                            .boxed(),
+                        );
+
+                        // make sure our prev_permit is dropped
+                        // after we pick up a permit for this iteration
+                        prev_permit.close();
+                        prev_permit = permit;
+
                         let response = match evt_sender
                             .call(
                                 space.clone(),
@@ -637,6 +658,7 @@ impl KitsuneP2pHandler for Space {
                             })
                             .expect("we never close this share");
                     }
+                    prev_permit.close();
                 })
                 .boxed(),
             );
@@ -645,7 +667,7 @@ impl KitsuneP2pHandler for Space {
         // TODO remote calls
 
         Ok(async move {
-            futures::future::join_all(all).await;
+            driver.await;
 
             let Inner { resp, .. } = inner
                 .try_unwrap()

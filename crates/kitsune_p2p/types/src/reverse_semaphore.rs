@@ -77,6 +77,9 @@ impl Drop for ReverseSemaphorePermit {
         let mut lock = self.0.write();
         lock.c -= 1;
         if lock.c == 0 {
+            // alas, we need to maintain the lock while we notify,
+            // otherwise a new permit could be acquired and be notified
+            // erroneously.
             lock.n.notify_waiters();
         }
     }
@@ -88,12 +91,15 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_reverse_semaphore() {
-        let s = std::time::Instant::now();
         let rs = ReverseSemaphore::new();
+
+        let s = std::time::Instant::now();
         rs.wait_on_zero_permits().await;
         let es = s.elapsed().as_secs_f64();
         assert!(es < 0.00015);
         println!("zero wait, after {} s", es);
+
+        let s = std::time::Instant::now();
         for t in 10..15 {
             let permit = rs.acquire();
             tokio::task::spawn(async move {
