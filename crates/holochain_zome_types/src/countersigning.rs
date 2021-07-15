@@ -19,6 +19,7 @@ pub enum CounterSigningError {
 
 /// Every countersigning session must complete a full set of headers between the start and end times to be valid.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct CounterSigningSessionTimes {
     start: Timestamp,
     end: Timestamp,
@@ -38,11 +39,13 @@ impl CounterSigningSessionTimes {
 
 /// Every preflight request can have optional arbitrary bytes that can be agreed to.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct PreflightBytes(#[serde(with = "serde_bytes")] Vec<u8>);
 
 /// Agents can have a role specific to each countersigning session.
 /// The role is app defined and opaque to the subconscious.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Role(u8);
 
 /// Alias for a list of agents and their roles.
@@ -52,6 +55,7 @@ pub type CounterSigningAgents = Vec<(AgentPubKey, Vec<Role>)>;
 /// Each agent signs this data as part of their PreflightResponse.
 /// Every preflight must be identical and signed by every agent for a session to be valid.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct PreflightRequest {
     /// The agents that are participating in this countersignature session.
     signing_agents: CounterSigningAgents,
@@ -119,6 +123,7 @@ impl PreflightResponse {
 /// Every countersigning agent must sign against their chain state.
 /// The chain must be frozen until each agent decides to sign or exit the session.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct CounterSigningAgentState {
     /// The index of the agent in the preflight request agent vector.
     agent_index: u8,
@@ -155,6 +160,7 @@ impl CounterSigningAgentState {
 /// Enum to mirror Header for all the shared data required to build session headers.
 /// Does NOT hold any agent specific information.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum HeaderBase {
     /// Mirrors Header::Create.
     Create(CreateBase),
@@ -168,6 +174,7 @@ pub enum HeaderBase {
 
 /// Base data for Create headers.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct CreateBase {
     entry_type: EntryType,
     entry_hash: EntryHash,
@@ -175,6 +182,7 @@ pub struct CreateBase {
 
 /// Base data for Update headers.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct UpdateBase {
     original_header_address: HeaderHash,
     original_entry_address: EntryHash,
@@ -184,6 +192,7 @@ pub struct UpdateBase {
 
 /// All the data required for a countersigning session.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct CounterSigningSessionData {
     preflight_request: PreflightRequest,
     responses: Vec<CounterSigningAgentState>,

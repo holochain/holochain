@@ -37,6 +37,16 @@ derive_builder = { version = "0.9", optional = true }
 nanoid = { version = "0.3", optional = true }
 shrinkwraprs = { version = "0.3", optional = true }
 
+# arbitrary
+arbitrary = { version = "1.0", features = ["derive"], optional = true}
+
+# contrafact
+contrafact = { version = "0.1.0-dev.1", optional = true }
+once_cell = { version = "1.4", optional = true }
+
+[dev-dependencies]
+once_cell = { version = "1.4", optional = false }
+
 [features]
 default = ["full-dna-def", "fixturators", "test_utils"]
 
@@ -48,4 +58,13 @@ full = ["default", "rusqlite", "num_enum"]
 
 fixturators = ["fixt", "rand", "strum", "holo_hash/fixturators", ]
 
-test_utils = ["holo_hash/hashing", "holo_hash/test_utils", "full-dna-def"]
+test_utils = [
+  "arbitrary",
+  "contrafact",
+  "once_cell",
+  "holo_hash/arbitrary",
+  "holo_hash/hashing",
+  "holo_hash/test_utils",
+  "holochain_serialized_bytes/arbitrary",
+  "full-dna-def"
+]
