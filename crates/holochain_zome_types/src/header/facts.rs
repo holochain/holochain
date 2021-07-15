@@ -68,11 +68,11 @@ impl Fact<Header> for ValidChainFact {
             *header = Header::Dna(Dna::arbitrary(u).unwrap());
         }
 
-        println!(
-            "{}  =>  {:?}\n",
-            self.hash.as_ref().unwrap(),
-            header.prev_header()
-        );
+        // println!(
+        //     "{}  =>  {:?}\n",
+        //     HeaderHash::with_data_sync(header),
+        //     header.prev_header()
+        // );
     }
 
     fn advance(&mut self, header: &Header) {
