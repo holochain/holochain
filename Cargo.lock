@@ -2605,7 +2605,7 @@ dependencies = [
 [[package]]
 name = "holochain_serialized_bytes"
 version = "0.0.50"
-source = "git+https://github.com/holochain/holochain-serialization.git?branch=arbitrary#89566601b79dc44639cb4e5fde3db62477215063"
+source = "git+https://github.com/holochain/holochain-serialization.git?branch=develop#dabd0c2cf3c6fff96023c1228eaafa96ba1edf64"
 dependencies = [
  "arbitrary",
  "holochain_serialized_bytes_derive",
@@ -2620,7 +2620,7 @@ dependencies = [
 [[package]]
 name = "holochain_serialized_bytes_derive"
 version = "0.0.50"
-source = "git+https://github.com/holochain/holochain-serialization.git?branch=arbitrary#89566601b79dc44639cb4e5fde3db62477215063"
+source = "git+https://github.com/holochain/holochain-serialization.git?branch=develop#dabd0c2cf3c6fff96023c1228eaafa96ba1edf64"
 dependencies = [
  "quote 1.0.9",
  "syn 1.0.73",
