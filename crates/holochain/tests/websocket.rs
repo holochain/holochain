@@ -496,17 +496,17 @@ async fn emit_signals() {
     // actually runs the holochain binary
 
     // TODO: B-01453: can we make this port 0 and find out the dynamic port later?
-    let port = 9911;
+    let admin_port = 9911;
 
-    let tmp_dir = TempDir::new("conductor_cfg_3").unwrap();
+    let tmp_dir = TempDir::new("conductor_cfg_emit_signals").unwrap();
     let path = tmp_dir.path().to_path_buf();
     let environment_path = path.clone();
-    let config = create_config(port, environment_path);
+    let config = create_config(admin_port, environment_path);
     let config_path = write_config(path, &config);
 
     let _holochain = start_holochain(config_path.clone()).await;
 
-    let (mut admin_tx, _) = websocket_client_by_port(port).await.unwrap();
+    let (mut admin_tx, _) = websocket_client_by_port(admin_port).await.unwrap();
 
     let uuid = uuid::Uuid::new_v4();
     let dna = fake_dna_zomes(
@@ -708,10 +708,10 @@ async fn concurrent_install_app() {
     // actually runs the holochain binary
 
     // TODO: B-01453: can we make this port 0 and find out the dynamic port later?
-    let admin_port = 9911;
+    let admin_port = 9912;
     // let app_port = 9914;
 
-    let tmp_dir = TempDir::new("conductor_cfg_3").unwrap();
+    let tmp_dir = TempDir::new("conductor_cfg_concurrent_install_app").unwrap();
     let path = tmp_dir.path().to_path_buf();
     let environment_path = path.clone();
     let config = create_config(admin_port, environment_path);
