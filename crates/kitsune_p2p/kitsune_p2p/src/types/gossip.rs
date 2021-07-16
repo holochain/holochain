@@ -1,4 +1,3 @@
-use crate::event::KitsuneP2pEventSender;
 use crate::types::*;
 use kitsune_p2p_types::config::*;
 use kitsune_p2p_types::tx2::tx2_api::*;

@@ -1,6 +1,6 @@
 use super::*;
 
-impl<E: KitsuneP2pEventSender> ShardedGossip<E> {
+impl ShardedGossip {
     /// Try to initiate gossip if we don't currently
     /// have an outgoing gossip.
     pub(super) async fn try_initiate(&self) -> KitsuneResult<()> {

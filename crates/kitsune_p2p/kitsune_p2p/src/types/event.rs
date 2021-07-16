@@ -207,10 +207,3 @@ ghost_actor::ghost_chan! {
 
 /// Receiver type for incoming connection events.
 pub type KitsuneP2pEventReceiver = futures::channel::mpsc::Receiver<KitsuneP2pEvent>;
-
-#[cfg(test)]
-impl ghost_actor::GhostChannelSender<KitsuneP2pEvent> for MockKitsuneP2pEventSender {
-    fn ghost_actor_channel_send(&self, _event: KitsuneP2pEvent) -> ghost_actor::GhostFuture<()> {
-        todo!()
-    }
-}

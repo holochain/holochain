@@ -1,9 +1,13 @@
-use crate::event::KitsuneP2pEventSender;
+use crate::spawn::MockKitsuneP2pEventHandler;
 
 use super::*;
 
-impl<E: KitsuneP2pEventSender> ShardedGossip<E> {
-    pub fn test(gossip_type: GossipType, evt_sender: E, inner: ShardedGossipInner) -> Self {
+impl ShardedGossip {
+    pub fn test(
+        gossip_type: GossipType,
+        evt_sender: EventSender,
+        inner: ShardedGossipInner,
+    ) -> Self {
         // TODO: randomize space
         let space = Arc::new(KitsuneSpace::new([0; 36].to_vec()));
         Self {
@@ -18,7 +22,8 @@ impl<E: KitsuneP2pEventSender> ShardedGossip<E> {
 
 #[test]
 fn test_initiate_accept() {
-    let evt_sender = MockKitsuneP2pEventSender::new();
+    let evt_handler = MockKitsuneP2pEventHandler::new();
+    let evt_sender = todo!("make sender from handler");
     let gossip = ShardedGossip::test(GossipType::Recent, evt_sender, Default::default());
 
     gossip

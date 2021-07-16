@@ -32,6 +32,7 @@ mod tests;
 const MAX_SEND_BUF_BYTES: usize = 16000;
 
 type BloomFilter = bloomfilter::Bloom<Arc<MetaOpKey>>;
+type EventSender = futures::channel::mpsc::Sender<event::KitsuneP2pEvent>;
 
 #[derive(Debug, Clone, Copy)]
 enum GossipType {
@@ -40,13 +41,13 @@ enum GossipType {
 }
 
 #[derive(shrinkwraprs::Shrinkwrap)]
-struct ShardedGossipNetworked<EventSender: KitsuneP2pEventSender> {
+struct ShardedGossipNetworked {
     #[shrinkwrap(main_field)]
-    gossip: ShardedGossip<EventSender>,
+    gossip: ShardedGossip,
     ep_hnd: Tx2EpHnd<wire::Wire>,
 }
 
-impl<EventSender: KitsuneP2pEventSender> ShardedGossipNetworked<EventSender> {
+impl ShardedGossipNetworked {
     pub fn new(
         tuning_params: KitsuneP2pTuningParams,
         space: Arc<KitsuneSpace>,
@@ -126,7 +127,7 @@ impl<EventSender: KitsuneP2pEventSender> ShardedGossipNetworked<EventSender> {
     }
 }
 
-struct ShardedGossip<EventSender: KitsuneP2pEventSender> {
+struct ShardedGossip {
     gossip_type: GossipType,
     tuning_params: KitsuneP2pTuningParams,
     space: Arc<KitsuneSpace>,
@@ -159,7 +160,7 @@ struct RoundState {
     until_ms: u64,
 }
 
-impl<EventSender: KitsuneP2pEventSender> ShardedGossip<EventSender> {
+impl ShardedGossip {
     const TGT_FP: f64 = 0.01;
 
     /// Calculate the time range for a gossip round.
@@ -334,7 +335,7 @@ kitsune_p2p_types::write_codec_enum! {
     }
 }
 
-impl<E: KitsuneP2pEventSender> AsGossipModule for ShardedGossipNetworked<E> {
+impl AsGossipModule for ShardedGossipNetworked {
     fn incoming_gossip(
         &self,
         con: Tx2ConHnd<wire::Wire>,

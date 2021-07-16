@@ -16,8 +16,10 @@ use crate::event::{
 };
 use crate::types::event::KitsuneP2pEventSender;
 
+use super::EventSender;
+
 /// Get all agent info signed for a space.
-pub(super) async fn all_agent_info<EventSender: KitsuneP2pEventSender>(
+pub(super) async fn all_agent_info(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
     agent: &Arc<KitsuneAgent>,
@@ -33,7 +35,7 @@ pub(super) async fn all_agent_info<EventSender: KitsuneP2pEventSender>(
 }
 
 /// Get a single agent info.
-pub(super) async fn get_agent_info<EventSender: KitsuneP2pEventSender>(
+pub(super) async fn get_agent_info(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
     agent: &Arc<KitsuneAgent>,
@@ -49,7 +51,7 @@ pub(super) async fn get_agent_info<EventSender: KitsuneP2pEventSender>(
 }
 
 /// Get all `AgentInfoSigned` for local agents in a space.
-pub(super) async fn local_agent_info<'iter, EventSender: KitsuneP2pEventSender>(
+pub(super) async fn local_agent_info<'iter>(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
     agent: &Arc<KitsuneAgent>,
@@ -62,7 +64,7 @@ pub(super) async fn local_agent_info<'iter, EventSender: KitsuneP2pEventSender>(
 }
 
 /// Get the arc intervals for all local agents.
-pub(super) async fn local_agent_arcs<EventSender: KitsuneP2pEventSender>(
+pub(super) async fn local_agent_arcs(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
     local_agents: &HashSet<Arc<KitsuneAgent>>,
@@ -75,7 +77,7 @@ pub(super) async fn local_agent_arcs<EventSender: KitsuneP2pEventSender>(
 }
 
 /// Get `AgentInfoSigned` for all agents within a `DhtArcSet`.
-pub(super) async fn agent_info_within_arc_set<EventSender: KitsuneP2pEventSender>(
+pub(super) async fn agent_info_within_arc_set(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
     agent: &Arc<KitsuneAgent>,
@@ -96,7 +98,7 @@ pub(super) async fn agent_info_within_arc_set<EventSender: KitsuneP2pEventSender
 }
 
 /// Get agents and their intervals within a `DhtArcSet`.
-pub(super) async fn agents_within_arcset<EventSender: KitsuneP2pEventSender>(
+pub(super) async fn agents_within_arcset(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
     agent: &Arc<KitsuneAgent>,
@@ -120,7 +122,7 @@ pub(super) async fn agents_within_arcset<EventSender: KitsuneP2pEventSender>(
 /// Get all ops that are in the intersections
 /// between an agents interval and the common
 /// arc set.
-pub(super) async fn ops_within_common_set<EventSender: KitsuneP2pEventSender>(
+pub(super) async fn ops_within_common_set(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
     agent: &Arc<KitsuneAgent>,
@@ -151,7 +153,7 @@ pub(super) async fn ops_within_common_set<EventSender: KitsuneP2pEventSender>(
 
 /// Get all ops for all agents intersections with
 /// the common arc set.
-pub(super) async fn all_ops_within_common_set<EventSender: KitsuneP2pEventSender>(
+pub(super) async fn all_ops_within_common_set(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
     agents: &Vec<(Arc<KitsuneAgent>, ArcInterval)>,
@@ -162,7 +164,7 @@ pub(super) async fn all_ops_within_common_set<EventSender: KitsuneP2pEventSender
     let mut missing_hashes = Vec::new();
     for (agent, interval) in agents {
         let hashes = ops_within_common_set(
-            evt_sender,
+            &evt_sender,
             &space,
             &agent,
             &interval,
@@ -177,7 +179,7 @@ pub(super) async fn all_ops_within_common_set<EventSender: KitsuneP2pEventSender
 }
 
 /// Add new agent info to the p2p store.
-pub(super) async fn put_agent_info<EventSender: KitsuneP2pEventSender>(
+pub(super) async fn put_agent_info(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
     agents_within_common_arc: HashSet<Arc<KitsuneAgent>>,
@@ -212,7 +214,7 @@ pub(super) async fn put_agent_info<EventSender: KitsuneP2pEventSender>(
 }
 
 /// Put new ops into agents that should hold them.
-pub(super) async fn put_ops<EventSender: KitsuneP2pEventSender>(
+pub(super) async fn put_ops(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
     agents_within_common_arc: HashSet<Arc<KitsuneAgent>>,
