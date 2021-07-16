@@ -127,19 +127,7 @@ async fn call_admin() {
         vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
     );
 
-    let cmd = std::process::Command::cargo_bin("holochain").unwrap();
-    let mut cmd = Command::from(cmd);
-    cmd.arg("--structured")
-        .arg("--config-path")
-        .arg(config_path)
-        .env("RUST_LOG", "debug")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .kill_on_drop(true);
-    // TODO: create a wrapper type that kills the process on drop
-    let mut holochain = cmd.spawn().expect("Failed to spawn holochain");
-    spawn_output(&mut holochain);
-    check_started(&mut holochain).await;
+    let _holochain = start_holochain(config_path.clone()).await;
 
     let (mut client, _) = websocket_client_by_port(port).await.unwrap();
 
@@ -186,8 +174,6 @@ how_many: 42
 
     let expects = vec![dna.dna_hash().clone()];
     assert_matches!(response, AdminResponse::DnasListed(a) if a == expects);
-
-    holochain.kill().await.expect("Failed to kill holochain");
 }
 
 /// Wrapper that synchronously waits for the Child to terminate on drop.
