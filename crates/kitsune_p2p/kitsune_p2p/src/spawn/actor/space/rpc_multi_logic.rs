@@ -45,11 +45,12 @@ fn check_local_agent(inner: &Share<Inner>, agent: &Arc<KitsuneAgent>) -> bool {
 fn check_remote_agent(inner: &Share<Inner>, agent: &Arc<KitsuneAgent>) -> bool {
     inner
         .share_mut(|i, _| {
-            if i.remain_remote_count == 0 {
-                return Ok(true);
+            if i.remain_remote_count == 0 || check_already_tried(i, agent) {
+                Ok(true)
+            } else {
+                i.remain_remote_count -= 1;
+                Ok(false)
             }
-            i.remain_remote_count -= 1;
-            Ok(check_already_tried(i, agent))
         })
         .expect("we never close this share")
 }
