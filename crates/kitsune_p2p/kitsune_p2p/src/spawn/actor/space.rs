@@ -501,9 +501,9 @@ impl KitsuneP2pHandler for Space {
         let RpcMulti {
             space,
             from_agent,
-            basis: _, // ignored for now
+            basis,
             payload,
-            max_remote_agent_count: _, // ignored for now
+            max_remote_agent_count,
             max_timeout,
             remote_request_grace_ms,
         } = input;
@@ -517,6 +517,8 @@ impl KitsuneP2pHandler for Space {
             got_data: Arc<tokio::sync::Notify>,
             resp: Vec<actor::RpcMultiResponse>,
             grace_rs: kitsune_p2p_types::reverse_semaphore::ReverseSemaphore,
+            remain_remote_count: u8,
+            already_tried: HashSet<Arc<KitsuneAgent>>,
         }
 
         let grace_rs = kitsune_p2p_types::reverse_semaphore::ReverseSemaphore::new();
@@ -524,6 +526,7 @@ impl KitsuneP2pHandler for Space {
         // capture startup permits first thing to ensure we don't
         // close things down before they even get started : )
         let local_startup_permit = grace_rs.acquire();
+        let remote_startup_permit = grace_rs.acquire();
 
         // store this inner data in a share
         let inner = Share::new(Inner {
@@ -531,6 +534,8 @@ impl KitsuneP2pHandler for Space {
             got_data: Arc::new(tokio::sync::Notify::new()),
             resp: Vec::new(),
             grace_rs,
+            remain_remote_count: max_remote_agent_count,
+            already_tried: HashSet::new(),
         });
 
         // prepare to close tasks on notification
@@ -612,8 +617,12 @@ impl KitsuneP2pHandler for Space {
                     let mut prev_permit = Share::new(local_startup_permit);
 
                     for agent in local_joined_agents {
+                        let agent2 = agent.clone();
                         let permit = inner
-                            .share_mut(move |i, _| Ok(i.grace_rs.acquire()))
+                            .share_mut(move |i, _| {
+                                i.already_tried.insert(agent2);
+                                Ok(i.grace_rs.acquire())
+                            })
                             .expect("we never close this share");
                         let permit = Share::new(permit);
                         let permit2 = permit.clone();
@@ -664,7 +673,138 @@ impl KitsuneP2pHandler for Space {
             );
         }
 
-        // TODO remote calls
+        // fetch data from remote agents
+        {
+            use kitsune_p2p_types::agent_info::AgentInfoSigned;
+
+            let space = space.clone();
+            let from_agent = from_agent.clone();
+            let payload = payload.clone();
+            //let local_joined_agents = self.local_joined_agents.clone();
+            //let evt_sender = self.evt_sender.clone();
+            let agg2 = agg.clone();
+            let inner = inner.clone();
+            let ro_inner = self.ro_inner.clone();
+            agg.push(
+                wrap(inner.clone(), async move {
+                    let startup_permit = Share::new(remote_startup_permit);
+
+                    let space = &space;
+                    let from_agent = &from_agent;
+                    let payload = &payload;
+                    let agg2 = &agg2;
+                    let inner = &inner;
+                    let ro_inner = &ro_inner;
+
+                    let make_req = move |info: AgentInfoSigned| {
+                        async move {
+                            let cont = inner.share_mut(|i, _| {
+                                if i.remain_remote_count > 0 {
+                                    i.remain_remote_count -= 1;
+                                    Ok(true)
+                                } else {
+                                    Ok(false)
+                                }
+                            })
+                            .expect("we never close this share");
+
+                            if !cont {
+                                return false;
+                            }
+
+                            let agent2 = info.agent.clone();
+                            let permit = inner
+                                .share_mut(move |i, _| {
+                                    i.already_tried.insert(agent2);
+                                    Ok(i.grace_rs.acquire())
+                                })
+                                .expect("we never close this share");
+                            let permit = Share::new(permit);
+                            let permit2 = permit.clone();
+
+                            // drop this permit after our grace period times out
+                            agg2.push(
+                                async move {
+                                    tokio::time::sleep(std::time::Duration::from_millis(
+                                        remote_request_grace_ms,
+                                    ))
+                                    .await;
+                                    permit2.close();
+                                }
+                                .boxed(),
+                            );
+
+                            let space = space.clone();
+                            let from_agent = from_agent.clone();
+                            let payload = payload.clone();
+                            let inner = inner.clone();
+                            let ro_inner = ro_inner.clone();
+                            agg2.push(async move {
+                                use discover::PeerDiscoverResult;
+                                // now we need to defer this to task aggregation
+                                let con_hnd = match discover::peer_connect(
+                                    ro_inner.clone(),
+                                    &info,
+                                    max_timeout,
+                                ).await {
+                                    PeerDiscoverResult::OkShortcut => {
+                                        permit.close();
+                                        return;
+                                    }
+                                    PeerDiscoverResult::Err(_) => {
+                                        permit.close();
+                                        return;
+                                    }
+                                    PeerDiscoverResult::OkRemote { con_hnd, .. } => con_hnd,
+                                };
+
+                                let msg = wire::Wire::call(
+                                    space.clone(),
+                                    from_agent.clone(),
+                                    info.agent.clone(),
+                                    payload.clone().into(),
+                                );
+
+                                let res = con_hnd.request(&msg, max_timeout).await;
+                                match res {
+                                    Ok(wire::Wire::CallResp(c)) => {
+                                        let agent = info.agent.clone();
+                                        let response = c.data.into();
+                                        inner
+                                            .share_mut(move |i, _| {
+                                                i.resp.push(RpcMultiResponse { agent, response });
+                                                i.got_data.notify_waiters();
+                                                Ok(())
+                                            })
+                                            .expect("we never close this share");
+                                    }
+                                    _ => (),
+                                }
+
+                                permit.close();
+                            }.boxed());
+
+                            true
+                        }
+                    };
+
+                    if let Ok(infos) = discover::get_cached_remotes_near_basis(
+                        ro_inner.clone(),
+                        basis.get_loc(),
+                        max_timeout,
+                    ).await {
+                        for info in infos {
+                            make_req(info).await;
+                        }
+                    }
+
+                    // we've initiated our requests...
+                    // we can let our startup permit lapse
+                    startup_permit.close();
+                })
+                .boxed(),
+            );
+        }
 
         Ok(async move {
             driver.await;
