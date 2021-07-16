@@ -237,7 +237,7 @@ pub mod test_utils {
         let envs = test_environments();
 
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-            .test(&envs)
+            .test(&envs, &[])
             .await
             .unwrap();
 
@@ -321,7 +321,7 @@ pub mod test {
 
     async fn setup_admin() -> (Arc<TempDir>, ConductorHandle) {
         let envs = test_environments();
-        let conductor_handle = Conductor::builder().test(&envs).await.unwrap();
+        let conductor_handle = Conductor::builder().test(&envs, &[]).await.unwrap();
         (Arc::new(envs.into_tempdir()), conductor_handle)
     }
 
@@ -331,7 +331,7 @@ pub mod test {
     ) -> (Arc<TempDir>, ConductorHandle) {
         let envs = test_environments();
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-            .test(&envs)
+            .test(&envs, &[])
             .await
             .unwrap();
 

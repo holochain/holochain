@@ -232,27 +232,13 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             }
             EnableApp { installed_app_id } => {
                 // Enable app
-                let app = self
+                let (app, errors) = self
                     .conductor_handle
                     .clone()
                     .enable_app(&installed_app_id)
                     .await?;
 
                 let app_cells: HashSet<_> = app.required_cells().collect();
-
-                // Create cells
-                let errors = self
-                    .conductor_handle
-                    .clone()
-                    .reconcile_cell_status_with_app_status()
-                    .await?;
-
-                self.conductor_handle
-                    .clone()
-                    .reconcile_app_status_with_cell_status(Some(
-                        vec![installed_app_id.clone()].into_iter().collect(),
-                    ))
-                    .await?;
 
                 let app_info = self
                     .conductor_handle
@@ -398,7 +384,7 @@ mod test {
     async fn register_list_dna_app() -> Result<()> {
         observability::test_run().ok();
         let envs = test_environments();
-        let handle = Conductor::builder().test(&envs.into()).await?;
+        let handle = Conductor::builder().test(&envs.into(), &[]).await?;
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
         let uid = Uuid::new_v4();
@@ -530,7 +516,7 @@ mod test {
     async fn install_list_dna_app() {
         observability::test_run().ok();
         let envs = test_environments();
-        let handle = Conductor::builder().test(&envs.into()).await.unwrap();
+        let handle = Conductor::builder().test(&envs.into(), &[]).await.unwrap();
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
         let uid = Uuid::new_v4();

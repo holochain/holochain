@@ -317,7 +317,7 @@ pub async fn setup_app(
             }]),
             ..Default::default()
         })
-        .test(&envs)
+        .test(&envs, &[])
         .await
         .unwrap();
 
