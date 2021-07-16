@@ -14,6 +14,7 @@ pub use crate::app::error::*;
 pub use crate::app::*;
 pub use crate::autonomic::*;
 pub use crate::chain::*;
+pub use crate::combinators::*;
 pub use crate::db::*;
 pub use crate::dht_op::error::*;
 pub use crate::dht_op::*;

@@ -271,6 +271,24 @@ impl SignedHeaderHashed {
     }
 }
 
+impl From<SignedHeaderHashed> for HeaderHashed {
+    fn from(signed_header_hashed: SignedHeaderHashed) -> HeaderHashed {
+        signed_header_hashed.header
+    }
+}
+
+impl From<HeaderHashed> for Header {
+    fn from(header_hashed: HeaderHashed) -> Header {
+        header_hashed.into_content()
+    }
+}
+
+impl From<SignedHeaderHashed> for Header {
+    fn from(signed_header_hashed: SignedHeaderHashed) -> Header {
+        HeaderHashed::from(signed_header_hashed).into()
+    }
+}
+
 impl From<(Header, Signature)> for SignedHeader {
     fn from((h, s): (Header, Signature)) -> Self {
         Self(h, s)

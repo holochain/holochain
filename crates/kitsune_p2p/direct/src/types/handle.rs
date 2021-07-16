@@ -51,6 +51,9 @@ pub trait AsKdHnd: 'static + Send + Sync {
     /// Join an agent to an app root hash
     fn app_join(&self, root: KdHash, agent: KdHash) -> BoxFuture<'static, KdResult<()>>;
 
+    /// Remove an agent from an app root hash ("leave" the network)
+    fn app_leave(&self, root: KdHash, agent: KdHash) -> BoxFuture<'static, KdResult<()>>;
+
     /// Inject an agent info record into the store from an outside source
     fn agent_info_store(&self, agent_info: KdAgentInfo) -> BoxFuture<'static, KdResult<()>>;
 
@@ -144,6 +147,15 @@ impl KdHnd {
         agent: KdHash,
     ) -> impl Future<Output = KdResult<()>> + 'static + Send {
         AsKdHnd::app_join(&*self.0, root, agent)
+    }
+
+    /// Remove an agent from an app root hash ("leave" the network)
+    pub fn app_leave(
+        &self,
+        root: KdHash,
+        agent: KdHash,
+    ) -> impl Future<Output = KdResult<()>> + 'static + Send {
+        AsKdHnd::app_leave(&*self.0, root, agent)
     }
 
     /// Inject an agent info record into the store from an outside source

@@ -31,7 +31,7 @@ holochain_sqlite = { version = "0.0.2-dev.0", path = "../holochain_sqlite" }
 holochain_serialized_bytes = "=0.0.50"
 holochain_state = { version = "0.0.2-dev.0", path = "../holochain_state" }
 holochain_types = { version = "0.0.2-dev.0", path = "../holochain_types" }
-holochain_wasmer_host = "0.0.71"
+holochain_wasmer_host = "=0.0.72"
 holochain_websocket = { version = "0.0.2-dev.0", path = "../holochain_websocket" }
 holochain_zome_types = { version = "0.0.4-dev.0", path = "../holochain_zome_types" }
 human-panic = "1.0.3"

@@ -112,7 +112,7 @@ pub(crate) fn peer_connect(
         .url_list
         .get(0)
         .cloned()
-        .ok_or_else(|| KitsuneP2pError::from("no url"));
+        .ok_or_else(|| KitsuneP2pError::from("no url - agent is likely offline"));
 
     async move {
         let url = url?;
@@ -175,15 +175,14 @@ pub(crate) fn search_remotes_covering_basis(
                 return Ok(cover_nodes);
             }
 
+            // if we've exhausted our timeout, we should exit
+            timeout.ok()?;
+
             if near_nodes.is_empty() {
                 // maybe just wait and try again?
                 backoff.wait().await;
                 continue;
             }
-
-            // the next step involves making network requests
-            // so check our timeout first
-            timeout.ok()?;
 
             // shuffle the returned nodes so we don't keep hammering the same one
             use rand::prelude::*;

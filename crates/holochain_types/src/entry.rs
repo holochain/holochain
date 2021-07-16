@@ -16,9 +16,6 @@ use crate::header::WireDelete;
 use crate::header::WireNewEntryHeader;
 use crate::header::WireUpdateRelationship;
 
-/// An Entry paired with its EntryHash
-pub type EntryHashed = HoloHashed<Entry>;
-
 /// Convenience function for when you have an ElementEntry but need
 /// a Option EntryHashed
 pub fn option_entry_hashed(entry: ElementEntry) -> Option<EntryHashed> {
