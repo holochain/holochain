@@ -272,12 +272,12 @@ pub async fn retry_admin_interface(
     }
 }
 
-async fn generate_agent_pubkey(client: &mut WebsocketSender) -> anyhow::Result<AgentPubKey> {
+async fn generate_agent_pubkey(client: &mut WebsocketSender) -> AgentPubKey {
     let request = AdminRequest::GenerateAgentPubKey;
     let response = client.request(request);
     let response = check_timeout(response, 6000).await;
 
-    Ok(unwrap_to::unwrap_to!(response => AdminResponse::AgentPubKeyGenerated).clone())
+    unwrap_to::unwrap_to!(response => AdminResponse::AgentPubKeyGenerated).clone()
 }
 
 async fn register_and_install_dna(
@@ -701,6 +701,8 @@ async fn too_many_open() {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn concurrent_install_app() {
+    use futures::StreamExt;
+
     observability::test_run().ok();
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
@@ -722,42 +724,44 @@ async fn concurrent_install_app() {
 
     let before = std::time::Instant::now();
 
-    let install_tasks = (0..10u8)
-        .into_iter()
-        .map(|i| {
-            let zomes = vec![(TestWasm::Foo.into(), TestWasm::Foo.into())];
-            let mut client = client.clone();
-            tokio::spawn(async move {
-                let nick = format!("fake_dna_{}", i);
+    let install_tasks_stream = futures::stream::iter((0..10u8).into_iter().map(|i| {
+        let zomes = vec![(TestWasm::Foo.into(), TestWasm::Foo.into())];
+        let mut client = client.clone();
+        tokio::spawn(async move {
+            let nick = format!("fake_dna_{}", i);
 
-                // TODO: install happ bundles instead of dna
-                // Install Dna
-                let dna =
-                    fake_dna_zomes_named(&uuid::Uuid::new_v4().to_string(), &nick, zomes.clone());
-                let original_dna_hash = dna.dna_hash().clone();
-                let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-                let agent_key = generate_agent_pubkey(&mut client).await.unwrap();
+            // TODO: install happ bundles instead of dna
+            // Install Dna
+            let dna = fake_dna_zomes_named(&uuid::Uuid::new_v4().to_string(), &nick, zomes.clone());
+            let original_dna_hash = dna.dna_hash().clone();
+            let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
+            let agent_key = generate_agent_pubkey(&mut client).await;
+            println!("[{}] Agent pub key generated", i);
 
-                let dna_hash = register_and_install_dna_named(
-                    &mut client,
-                    original_dna_hash.clone(),
-                    agent_key,
-                    fake_dna_path.clone(),
-                    None,
-                    nick.clone(),
-                    nick.clone(),
-                )
-                .await;
+            let dna_hash = register_and_install_dna_named(
+                &mut client,
+                original_dna_hash.clone(),
+                agent_key,
+                fake_dna_path.clone(),
+                None,
+                nick.clone(),
+                nick.clone(),
+            )
+            .await;
 
-                println!(
-                    "[{}] installed dna with hash {} and name {}",
-                    i, dna_hash, nick
-                );
-            })
+            println!(
+                "[{}] installed dna with hash {} and name {}",
+                i, dna_hash, nick
+            );
         })
-        .collect::<Vec<_>>();
+    }))
+    .buffer_unordered(10);
 
-    futures::future::join_all(install_tasks).await;
+    let install_tasks = futures::StreamExt::collect::<Vec<_>>(install_tasks_stream);
+
+    for r in install_tasks.await {
+        r.unwrap();
+    }
 
     println!("dna installation took {:?}", before.elapsed());
 }
