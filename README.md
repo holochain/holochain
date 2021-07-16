@@ -130,12 +130,9 @@ rough advice, because anything we say today could be out of date tomorrow:
 
 ## Application Developer
 
-[Read the wasm API docs](./crates/hdk/README.md)
-
-Build the hdk docs:
-```bash
-cargo doc --manifest-path=crates/hdk/Cargo.toml --open
-```
+- [Read the HDK API docs](https://docs.rs/hdk)
+- [Get started developing hApps](https://github.com/holochain/happ-build-tutorial/)
+- [Read the wasm API docs](./crates/hdk/README.md)
 
 ## Core Developer
 
