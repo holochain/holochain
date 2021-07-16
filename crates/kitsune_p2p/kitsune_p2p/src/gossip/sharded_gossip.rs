@@ -39,10 +39,96 @@ enum GossipType {
     Historical,
 }
 
+#[derive(shrinkwraprs::Shrinkwrap)]
+struct ShardedGossipNetworked<EventSender: KitsuneP2pEventSender> {
+    #[shrinkwrap(main_field)]
+    gossip: ShardedGossip<EventSender>,
+    ep_hnd: Tx2EpHnd<wire::Wire>,
+}
+
+impl<EventSender: KitsuneP2pEventSender> ShardedGossipNetworked<EventSender> {
+    pub fn new(
+        tuning_params: KitsuneP2pTuningParams,
+        space: Arc<KitsuneSpace>,
+        ep_hnd: Tx2EpHnd<wire::Wire>,
+        evt_sender: EventSender,
+        gossip_type: GossipType,
+    ) -> Arc<Self> {
+        let this = Arc::new(Self {
+            ep_hnd,
+            gossip: ShardedGossip {
+                tuning_params,
+                space,
+                // ep_hnd,
+                // send_interval_ms,
+                evt_sender,
+                inner: Share::new(ShardedGossipInner::default()),
+                gossip_type,
+            },
+        });
+        metric_task({
+            let this = this.clone();
+            async move {
+                loop {
+                    // TODO: Use parameters for sleep time
+                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                    this.run_one_iteration().await;
+                }
+                KitsuneResult::Ok(())
+            }
+        });
+        this
+    }
+
+    async fn process_outgoing(&self, outgoing: Outgoing) -> KitsuneResult<()> {
+        let (endpoint, how, gossip) = outgoing;
+        let gossip = gossip.encode_vec().map_err(KitsuneError::other)?;
+        let sending_bytes = gossip.len();
+        let gossip = wire::Wire::gossip(self.space.clone(), gossip.into());
+
+        let timeout = self.tuning_params.implicit_timeout();
+
+        let con = match how {
+            HowToConnect::Con(con) => {
+                // TODO: Uncomment this and make it work.
+                // if con.is_closed() {
+                //     let url = pick_url_for_cert(inner, &peer_cert)?;
+                //     ep_hnd.get_connection(url, t).await?
+                // } else {
+                //     con
+                // }
+                con
+            }
+            HowToConnect::Url(url) => self.ep_hnd.get_connection(url, timeout).await?,
+        };
+        // TODO: Wait for enough available outgoing bandwidth here before
+        // actually sending the gossip.
+        con.notify(&gossip, timeout).await?;
+        Ok(())
+    }
+
+    async fn process_incoming_outgoing(&self) -> KitsuneResult<()> {
+        let (incoming, outgoing) = self.pop_queues()?;
+        if let Some(incoming) = incoming {
+            self.process_incoming(incoming).await?;
+        }
+        if let Some(outgoing) = outgoing {
+            self.process_outgoing(outgoing).await?;
+        }
+        // TODO: Locally sync agents.
+        Ok(())
+    }
+
+    async fn run_one_iteration(&self) -> () {
+        // TODO: Handle errors
+        self.try_initiate().await.unwrap();
+        self.process_incoming_outgoing().await.unwrap();
+    }
+}
+
 struct ShardedGossip<EventSender: KitsuneP2pEventSender> {
     gossip_type: GossipType,
     tuning_params: KitsuneP2pTuningParams,
-    ep_hnd: Tx2EpHnd<wire::Wire>,
     space: Arc<KitsuneSpace>,
     evt_sender: EventSender,
     inner: Share<ShardedGossipInner>,
@@ -76,42 +162,6 @@ struct RoundState {
 impl<EventSender: KitsuneP2pEventSender> ShardedGossip<EventSender> {
     const TGT_FP: f64 = 0.01;
 
-    pub fn new(
-        tuning_params: KitsuneP2pTuningParams,
-        space: Arc<KitsuneSpace>,
-        ep_hnd: Tx2EpHnd<wire::Wire>,
-        evt_sender: EventSender,
-        gossip_type: GossipType,
-    ) -> Arc<Self> {
-        let this = Arc::new(Self {
-            tuning_params,
-            space,
-            ep_hnd,
-            // send_interval_ms,
-            evt_sender,
-            inner: Share::new(ShardedGossipInner::default()),
-            gossip_type,
-        });
-        metric_task({
-            let this = this.clone();
-            async move {
-                loop {
-                    // TODO: Use parameters for sleep time
-                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-                    this.run_one_iteration().await;
-                }
-                KitsuneResult::Ok(())
-            }
-        });
-        this
-    }
-
-    async fn run_one_iteration(&self) -> () {
-        // TODO: Handle errors
-        self.try_initiate().await.unwrap();
-        self.process_incoming_outgoing().await.unwrap();
-    }
-
     /// Calculate the time range for a gossip round.
     fn calculate_time_range(&self) -> KitsuneResult<(u64, u64)> {
         // TODO: This is where we need to actually choose
@@ -125,18 +175,6 @@ impl<EventSender: KitsuneP2pEventSender> ShardedGossip<EventSender> {
             GossipType::Historical => Ok((0, u64::MAX)),
             GossipType::Recent => Ok((0, u64::MAX)),
         }
-    }
-
-    async fn process_incoming_outgoing(&self) -> KitsuneResult<()> {
-        let (incoming, outgoing) = self.pop_queues()?;
-        if let Some(incoming) = incoming {
-            self.process_incoming(incoming).await?;
-        }
-        if let Some(outgoing) = outgoing {
-            self.process_outgoing(outgoing).await?;
-        }
-        // TODO: Locally sync agents.
-        Ok(())
     }
 
     fn pop_queues(&self) -> KitsuneResult<(Option<Incoming>, Option<Outgoing>)> {
@@ -203,33 +241,6 @@ impl<EventSender: KitsuneP2pEventSender> ShardedGossip<EventSender> {
                 }
             }
         }
-        Ok(())
-    }
-
-    async fn process_outgoing(&self, outgoing: Outgoing) -> KitsuneResult<()> {
-        let (endpoint, how, gossip) = outgoing;
-        let gossip = gossip.encode_vec().map_err(KitsuneError::other)?;
-        let sending_bytes = gossip.len();
-        let gossip = wire::Wire::gossip(self.space.clone(), gossip.into());
-
-        let timeout = self.tuning_params.implicit_timeout();
-
-        let con = match how {
-            HowToConnect::Con(con) => {
-                // TODO: Uncomment this and make it work.
-                // if con.is_closed() {
-                //     let url = pick_url_for_cert(inner, &peer_cert)?;
-                //     ep_hnd.get_connection(url, t).await?
-                // } else {
-                //     con
-                // }
-                con
-            }
-            HowToConnect::Url(url) => self.ep_hnd.get_connection(url, timeout).await?,
-        };
-        // TODO: Wait for enough available outgoing bandwidth here before
-        // actually sending the gossip.
-        con.notify(&gossip, timeout).await?;
         Ok(())
     }
 
@@ -323,7 +334,7 @@ kitsune_p2p_types::write_codec_enum! {
     }
 }
 
-impl<E: KitsuneP2pEventSender> AsGossipModule for ShardedGossip<E> {
+impl<E: KitsuneP2pEventSender> AsGossipModule for ShardedGossipNetworked<E> {
     fn incoming_gossip(
         &self,
         con: Tx2ConHnd<wire::Wire>,
@@ -369,7 +380,7 @@ impl AsGossipModuleFactory for ShardedGossipFactory {
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
     ) -> GossipModule {
-        GossipModule(ShardedGossip::new(
+        GossipModule(ShardedGossipNetworked::new(
             tuning_params,
             space,
             ep_hnd,
