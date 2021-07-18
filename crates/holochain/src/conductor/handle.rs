@@ -404,6 +404,7 @@ pub struct ConductorHandleImpl<DS: DnaStore + 'static> {
 impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     /// Check that shutdown has not been called
     async fn check_running(&self) -> ConductorResult<()> {
+        tracing::trace!("ConductorHandle::check_running");
         self.conductor.read().await.check_running()
     }
 
@@ -411,6 +412,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self: Arc<Self>,
         configs: Vec<AdminInterfaceConfig>,
     ) -> ConductorResult<()> {
+        tracing::trace!("ConductorHandle::add_admin_interfaces");
         let mut lock = self.conductor.write().await;
         lock.add_admin_interfaces_via_handle(configs, self.clone())
             .await
@@ -420,6 +422,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self: Arc<Self>,
         admin_configs: Vec<AdminInterfaceConfig>,
     ) -> ConductorResult<CellStartupErrors> {
+        tracing::trace!("ConductorHandle::initialize_conductor");
         self.load_dnas().await?;
 
         {
@@ -454,21 +457,30 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn add_app_interface(self: Arc<Self>, port: u16) -> ConductorResult<u16> {
+        tracing::trace!("ConductorHandle::add_app_interface");
         let mut lock = self.conductor.write().await;
         lock.add_app_interface_via_handle(either::Left(port), self.clone())
             .await
     }
 
     async fn list_app_interfaces(&self) -> ConductorResult<Vec<u16>> {
+        tracing::trace!("ConductorHandle::list_app_interfaces");
         self.conductor.read().await.list_app_interfaces().await
     }
 
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()> {
+        tracing::trace!("ConductorHandle::register_dna");
+        let hash = dna.dna_hash().clone();
+        tracing::debug!("registering DNA: {:?}", hash);
         self.register_genotype(dna.clone()).await?;
-        self.conductor.write().await.register_phenotype(dna).await
+        tracing::debug!("registered genotype for DNA: {:?}", hash);
+        self.conductor.write().await.register_phenotype(dna).await?;
+        tracing::debug!("registered phenotype for DNA: {:?}", hash);
+        Ok(())
     }
 
     async fn load_dnas(&self) -> ConductorResult<()> {
+        tracing::trace!("ConductorHandle::load_dnas");
         let (dnas, entry_defs) = self
             .conductor
             .read()
@@ -482,18 +494,22 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn list_dnas(&self) -> ConductorResult<Vec<DnaHash>> {
+        tracing::trace!("ConductorHandle::list_dnas");
         Ok(self.conductor.read().await.dna_store().list())
     }
 
     async fn get_dna(&self, hash: &DnaHash) -> Option<DnaFile> {
+        tracing::trace!("ConductorHandle::get_dna");
         self.conductor.read().await.dna_store().get(hash)
     }
 
     async fn get_ribosome(&self, dna_hash: &DnaHash) -> ConductorResult<RealRibosome> {
+        tracing::trace!("ConductorHandle::get_ribosome");
         self.conductor.read().await.get_ribosome(dna_hash)
     }
 
     async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
+        tracing::trace!("ConductorHandle::get_entry_def");
         self.conductor.read().await.dna_store().get_entry_def(key)
     }
 
@@ -502,6 +518,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         &self,
         event: holochain_p2p::event::HolochainP2pEvent,
     ) -> ConductorApiResult<()> {
+        tracing::trace!("ConductorHandle::dispatch_holochain_p2p_event");
         let space = event.dna_hash().to_kitsune();
         trace!(dispatch_event = ?event);
         match event {
@@ -704,6 +721,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn call_zome(&self, call: ZomeCall) -> ConductorApiResult<ZomeCallResult> {
+        tracing::trace!("ConductorHandle::call_zome");
         let cell = self.cell_by_id(&call.cell_id).await?;
         Ok(cell.call_zome(call, None).await?)
     }
@@ -713,16 +731,19 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         call: ZomeCall,
         workspace_lock: HostFnWorkspace,
     ) -> ConductorApiResult<ZomeCallResult> {
+        tracing::trace!("ConductorHandle::call_zome_with_workspace");
         debug!(cell_id = ?call.cell_id);
         let cell = self.cell_by_id(&call.cell_id).await?;
         Ok(cell.call_zome(call, Some(workspace_lock)).await?)
     }
 
     async fn take_shutdown_handle(&self) -> Option<TaskManagerRunHandle> {
+        tracing::trace!("ConductorHandle::take_shutdown_handle");
         self.conductor.write().await.take_shutdown_handle()
     }
 
     async fn get_arbitrary_admin_websocket_port(&self) -> Option<u16> {
+        tracing::trace!("ConductorHandle::get_arbitrary_admin_websocket_port");
         self.conductor
             .read()
             .await
@@ -730,6 +751,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn shutdown(&self) {
+        tracing::trace!("ConductorHandle::shutdown");
         self.conductor.write().await.shutdown()
     }
 
@@ -745,6 +767,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self: Arc<Self>,
         payload: CreateCloneCellPayload,
     ) -> ConductorResult<CellId> {
+        tracing::trace!("ConductorHandle::create_clone_cell");
         let CreateCloneCellPayload {
             properties,
             dna_hash,
@@ -778,6 +801,9 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         installed_app_id: InstalledAppId,
         cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
     ) -> ConductorResult<()> {
+        tracing::trace!("ConductorHandle::install_app");
+        tracing::debug!("Running genesis for app '{}'", installed_app_id);
+
         self.conductor
             .read()
             .await
@@ -790,8 +816,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             )
             .await?;
 
+        tracing::debug!("Adding app '{}' to conductor", installed_app_id);
+
         let cell_data = cell_data.into_iter().map(|(c, _)| c);
-        let app = InstalledAppCommon::new_legacy(installed_app_id, cell_data)?;
+        let app = InstalledAppCommon::new_legacy(installed_app_id.clone(), cell_data)?;
 
         // Update the db
         let _ = self
@@ -801,6 +829,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .add_disabled_app_to_db(app)
             .await?;
 
+        tracing::debug!("Installation complete for app '{}'", installed_app_id);
         Ok(())
     }
 
@@ -808,6 +837,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self: Arc<Self>,
         payload: InstallAppBundlePayload,
     ) -> ConductorResult<StoppedApp> {
+        tracing::trace!("ConductorHandle::install_app_bundle");
         let InstallAppBundlePayload {
             source,
             agent_key,
@@ -864,6 +894,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         &self,
         app_ids: Option<HashSet<InstalledAppId>>,
     ) -> ConductorResult<AppStatusFx> {
+        tracing::trace!("ConductorHandle::reconcile_app_status_with_cell_status");
         self.conductor
             .write()
             .await
@@ -875,6 +906,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn reconcile_cell_status_with_app_status(
         self: Arc<Self>,
     ) -> ConductorResult<CellStartupErrors> {
+        tracing::trace!("ConductorHandle::reconcile_cell_status_with_app_status");
         self.conductor.write().await.remove_dangling_cells().await?;
 
         let results = self
@@ -888,6 +920,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self: Arc<Self>,
         app_id: &InstalledAppId,
     ) -> ConductorResult<(InstalledApp, CellStartupErrors)> {
+        tracing::trace!("ConductorHandle::enable_app");
         let (app, delta) = self
             .conductor
             .write()
@@ -906,6 +939,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         app_id: &InstalledAppId,
         reason: DisabledAppReason,
     ) -> ConductorResult<InstalledApp> {
+        tracing::trace!("ConductorHandle::disable_app");
         let (app, delta) = self
             .conductor
             .write()
@@ -919,6 +953,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     #[tracing::instrument(skip(self))]
     async fn start_app(self: Arc<Self>, app_id: &InstalledAppId) -> ConductorResult<InstalledApp> {
+        tracing::trace!("ConductorHandle::start_app");
         let (app, delta) = self
             .conductor
             .write()
@@ -937,6 +972,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         app_id: &InstalledAppId,
         reason: PausedAppReason,
     ) -> ConductorResult<InstalledApp> {
+        tracing::trace!("ConductorHandle::pause_app");
         let (app, delta) = self
             .conductor
             .write()
@@ -953,6 +989,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self: Arc<Self>,
         installed_app_id: &InstalledAppId,
     ) -> ConductorResult<()> {
+        tracing::trace!("ConductorHandle::uninstall_app");
         let self_clone = self.clone();
         {
             // Ensure that the conductor lock is dropped before the self_clone
@@ -969,10 +1006,12 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn list_cell_ids(&self, filter: Option<CellStatus>) -> ConductorResult<Vec<CellId>> {
+        tracing::trace!("ConductorHandle::list_cell_ids");
         self.conductor.read().await.list_cell_ids(filter).await
     }
 
     async fn list_running_apps(&self) -> ConductorResult<Vec<InstalledAppId>> {
+        tracing::trace!("ConductorHandle::list_running_apps");
         self.conductor.read().await.list_running_apps().await
     }
 
@@ -980,6 +1019,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         &self,
         status_filter: Option<AppStatusFilter>,
     ) -> ConductorResult<Vec<InstalledAppInfo>> {
+        tracing::trace!("ConductorHandle::list_apps");
         self.conductor.read().await.list_apps(status_filter).await
     }
 
@@ -987,6 +1027,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         &self,
         cell_id: &CellId,
     ) -> ConductorResult<HashSet<InstalledAppId>> {
+        tracing::trace!("ConductorHandle::list_running_apps_for_required_cell_id");
         self.conductor
             .read()
             .await
@@ -995,6 +1036,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
+        tracing::trace!("ConductorHandle::dump_cell_state");
         let conductor = self.conductor.read().await;
 
         let cell = conductor.cell_by_id(cell_id)?;
@@ -1031,6 +1073,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         &self,
         installed_app_id: &InstalledAppId,
     ) -> ConductorResult<Option<InstalledAppInfo>> {
+        tracing::trace!("ConductorHandle::get_app_info");
         Ok(self
             .conductor
             .read()
@@ -1041,6 +1084,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn add_agent_infos(&self, agent_infos: Vec<AgentInfoSigned>) -> ConductorApiResult<()> {
+        tracing::trace!("ConductorHandle::add_agent_infos");
         let mut space_map = HashMap::new();
         for agent_info_signed in agent_infos {
             let space = agent_info_signed.space.clone();
@@ -1060,6 +1104,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         &self,
         cell_id: Option<CellId>,
     ) -> ConductorApiResult<Vec<AgentInfoSigned>> {
+        tracing::trace!("ConductorHandle::get_agent_infos");
         match cell_id {
             Some(c) => {
                 let (d, a) = c.into_dna_and_agent();
@@ -1082,15 +1127,18 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn print_setup(&self) {
+        tracing::trace!("ConductorHandle::print_setup");
         self.conductor.read().await.print_setup()
     }
 
     async fn get_cell_env_readonly(&self, cell_id: &CellId) -> ConductorApiResult<EnvRead> {
+        tracing::trace!("ConductorHandle::get_cell_env_readonly");
         let cell = self.cell_by_id(cell_id).await?;
         Ok(cell.env().clone().into())
     }
 
     async fn remove_cells(&self, cell_ids: &[CellId]) {
+        tracing::trace!("ConductorHandle::remove_cells");
         let mut lock = self.conductor.write().await;
         lock.remove_cells(cell_ids.to_vec()).await
     }

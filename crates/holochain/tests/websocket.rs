@@ -19,7 +19,7 @@ use holochain::{
 };
 use holochain_types::{
     prelude::*,
-    test_utils::{fake_agent_pubkey_1, fake_dna_zomes, write_fake_dna_file},
+    test_utils::{fake_agent_pubkey_1, fake_dna_zomes, fake_dna_zomes_named, write_fake_dna_file},
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
@@ -764,4 +764,54 @@ async fn concurrent_install_app() {
     }
 
     println!("dna installation took {:?}", before.elapsed());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[cfg(feature = "slow_tests")]
+async fn concurrent_list_apps() {
+    use futures::StreamExt;
+
+    observability::test_run().ok();
+    // NOTE: This is a full integration test that
+    // actually runs the holochain binary
+
+    // TODO: B-01453: can we make this port 0 and find out the dynamic port later?
+    let admin_port = 9912;
+    // let app_port = 9914;
+
+    let tmp_dir = TempDir::new("conductor_cfg_concurrent_install_app").unwrap();
+    let path = tmp_dir.path().to_path_buf();
+    let environment_path = path.clone();
+    let config = create_config(admin_port, environment_path);
+    let config_path = write_config(path, &config);
+
+    let _holochain = start_holochain(config_path.clone()).await;
+
+    let (client, _) = websocket_client_by_port(admin_port).await.unwrap();
+    // let (_, receiver2) = websocket_client_by_port(admin_port).await.unwrap();
+
+    let before = std::time::Instant::now();
+
+    let list_apps_stream = futures::stream::iter((0..10u8).into_iter().map(|i| {
+        let mut client = client.clone();
+        tokio::spawn(async move {
+            let request = AdminRequest::ListApps {
+                status_filter: None,
+            };
+            let response = client.request(request);
+            let response = check_timeout(response, 6000).await;
+            assert!(matches!(response, AdminResponse::AppsListed(_)));
+
+            println!("[{}] listed apps: {:#?}", i, response);
+        })
+    }))
+    .buffer_unordered(10);
+
+    let list_tasks = futures::StreamExt::collect::<Vec<_>>(list_apps_stream);
+
+    for r in list_tasks.await {
+        r.unwrap();
+    }
+
+    println!("listing took {:?}", before.elapsed());
 }
