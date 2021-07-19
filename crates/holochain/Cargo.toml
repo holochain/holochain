@@ -97,7 +97,7 @@ hdk = { version = "0.0.102-dev.0", path = "../hdk", optional = false }
 matches = {version = "0.1.8", optional = false }
 holochain_test_wasm_common = { version = "0.0.2-dev.0", path = "../test_utils/wasm_common", optional = false  }
 unwrap_to = { version = "0.1.0", optional = false }
-
+arbitrary = { version = "1.0", features = ["derive"] }
 
 [[bench]]
 name = "bench"

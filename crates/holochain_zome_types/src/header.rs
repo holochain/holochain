@@ -252,6 +252,7 @@ impl_hashable_content!(Header, Header);
     Deserialize,
     SerializedBytes,
 )]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct ZomeId(u8);
 
 #[derive(
@@ -267,6 +268,7 @@ pub struct ZomeId(u8);
     Deserialize,
     SerializedBytes,
 )]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct EntryDefIndex(pub u8);
 
 /// The Dna Header is always the first header in a source chain
@@ -440,6 +442,7 @@ pub struct DeleteHeader {
 /// referencing. Useful for examining Headers without needing to fetch the
 /// corresponding Entries.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum EntryType {
     /// An AgentPubKey
     AgentPubKey,
@@ -484,6 +487,7 @@ impl_to_sql_via_display!(EntryType);
 
 /// Information about a class of Entries provided by the DNA
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct AppEntryType {
     /// u8 identifier of what entry type this is
     /// this needs to match the position of the entry type returned by entry defs

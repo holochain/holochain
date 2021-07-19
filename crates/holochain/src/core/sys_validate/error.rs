@@ -89,10 +89,16 @@ impl<E> TryFrom<OutcomeOrError<ValidationOutcome, E>> for ValidationOutcome {
 /// failed validation.
 #[derive(Error, Debug)]
 pub enum ValidationOutcome {
+    #[error("The signing agents list contains duplicates {0:?}")]
+    AgentsDupes(Vec<AgentPubKey>),
+    #[error("The signing agents list is too long or short {0:?}")]
+    AgentsLength(usize),
     #[error("The element with signature {0:?} and header {1:?} was found to be counterfeit")]
     Counterfeit(Signature, Header),
     #[error("The countersigning session times were not valid {0:?}")]
     CounterSigningSessionTimes(CounterSigningSessionTimes),
+    #[error("The enzyme index {1:?} is out of bounds for signing agents list of length {0:?}")]
+    EnzymeIndex(usize, usize),
     #[error("The header {1:?} is not found in the countersigning session data {0:?}")]
     HeaderNotInCounterSigningSession(CounterSigningSessionData, NewEntryHeader),
     #[error("The header set could not be built for the counter signing session data: {0}")]

@@ -126,13 +126,15 @@ pub async fn incoming_dht_ops_workflow(
     let mut filter_ops = Vec::new();
 
     for (hash, op) in ops {
-        if should_keep(&op).await? {
-            filter_ops.push((hash, op));
-        } else {
-            tracing::warn!(
-                msg = "Dropping op because it failed counterfeit checks",
-                ?op
-            );
+        match should_keep(&op).await {
+            Ok(()) => filter_ops.push((hash, op)),
+            Err(e) => {
+                tracing::warn!(
+                    msg = "Dropping op because it failed counterfeit checks",
+                    ?op
+                );
+                return Err(e);
+            }
         }
     }
 
@@ -204,7 +206,7 @@ fn needs_receipt(op: &DhtOp, from_agent: &Option<AgentPubKey>) -> bool {
 
 #[instrument(skip(op))]
 /// If this op fails the counterfeit check it should be dropped
-async fn should_keep(op: &DhtOp) -> WorkflowResult<bool> {
+async fn should_keep(op: &DhtOp) -> WorkflowResult<()> {
     let header = op.header();
     let signature = op.signature();
     Ok(counterfeit_check(signature, &header).await?)

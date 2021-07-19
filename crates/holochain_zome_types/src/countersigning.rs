@@ -19,6 +19,7 @@ pub enum CounterSigningError {
 
 /// Every countersigning session must complete a full set of headers between the start and end times to be valid.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct CounterSigningSessionTimes {
     start: Timestamp,
     end: Timestamp,
@@ -26,24 +27,45 @@ pub struct CounterSigningSessionTimes {
 
 impl CounterSigningSessionTimes {
     /// Start time accessor.
-    pub fn as_start_ref(&self) -> &Timestamp {
+    pub fn start(&self) -> &Timestamp {
         &self.start
     }
 
+    /// Mutable start time accessor for testing.
+    #[cfg(feature = "test_utils")]
+    pub fn start_mut(&mut self) -> &mut Timestamp {
+        &mut self.start
+    }
+
     /// End time accessor.
-    pub fn as_end_ref(&self) -> &Timestamp {
+    pub fn end(&self) -> &Timestamp {
         &self.end
+    }
+
+    /// Mutable end time accessor for testing.
+    #[cfg(feature = "test_utils")]
+    pub fn end_mut(&mut self) -> &mut Timestamp {
+        &mut self.end
     }
 }
 
 /// Every preflight request can have optional arbitrary bytes that can be agreed to.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct PreflightBytes(#[serde(with = "serde_bytes")] Vec<u8>);
 
 /// Agents can have a role specific to each countersigning session.
 /// The role is app defined and opaque to the subconscious.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Role(u8);
+
+impl Role {
+    /// Constructor.
+    pub fn new(role: u8) -> Self {
+        Self(role)
+    }
+}
 
 /// Alias for a list of agents and their roles.
 pub type CounterSigningAgents = Vec<(AgentPubKey, Vec<Role>)>;
@@ -52,6 +74,7 @@ pub type CounterSigningAgents = Vec<(AgentPubKey, Vec<Role>)>;
 /// Each agent signs this data as part of their PreflightResponse.
 /// Every preflight must be identical and signed by every agent for a session to be valid.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct PreflightRequest {
     /// The agents that are participating in this countersignature session.
     signing_agents: CounterSigningAgents,
@@ -70,34 +93,65 @@ pub struct PreflightRequest {
 
 impl PreflightRequest {
     /// Signing agents accessor.
-    pub fn signing_agents_ref(&self) -> &CounterSigningAgents {
+    pub fn signing_agents(&self) -> &CounterSigningAgents {
         &self.signing_agents
     }
 
+    /// Mutable signing agents accessor for testing.
+    #[cfg(feature = "test_utils")]
+    pub fn signing_agents_mut(&mut self) -> &mut CounterSigningAgents {
+        &mut self.signing_agents
+    }
+
     /// Enzyme index accessor.
-    pub fn enzyme_index_ref(&self) -> &Option<u8> {
+    pub fn enzyme_index(&self) -> &Option<u8> {
         &self.enzyme_index
     }
 
+    /// Mutable enzyme index accessor for testing.
+    #[cfg(feature = "test_utils")]
+    pub fn enzyme_index_mut(&mut self) -> &mut Option<u8> {
+        &mut self.enzyme_index
+    }
+
     /// Session times accessor.
-    pub fn session_times_ref(&self) -> &CounterSigningSessionTimes {
+    pub fn session_times(&self) -> &CounterSigningSessionTimes {
         &self.session_times
     }
 
+    /// Mutable session times accessor for testing.
+    #[cfg(feature = "test_utils")]
+    pub fn session_times_mut(&mut self) -> &mut CounterSigningSessionTimes {
+        &mut self.session_times
+    }
+
     /// Header base accessor.
-    pub fn header_base_ref(&self) -> &HeaderBase {
+    pub fn header_base(&self) -> &HeaderBase {
         &self.header_base
     }
 
+    /// Mutable header base accessor for testing.
+    #[cfg(feature = "test_utils")]
+    pub fn header_base_mut(&mut self) -> &mut HeaderBase {
+        &mut self.header_base
+    }
+
     /// Preflight bytes accessor.
-    pub fn preflight_bytes_ref(&self) -> &PreflightBytes {
+    pub fn preflight_bytes(&self) -> &PreflightBytes {
         &self.preflight_bytes
+    }
+
+    /// Mutable preflight bytes accessor for testing.
+    #[cfg(feature = "test_utils")]
+    pub fn preflight_bytes_mut(&mut self) -> &mut PreflightBytes {
+        &mut self.preflight_bytes
     }
 }
 
 /// Every agent must send back a preflight response.
 /// All the preflight response data is signed by each agent and included in the session data.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct PreflightResponse {
     /// The request this is a response to.
     request: PreflightRequest,
@@ -125,24 +179,43 @@ impl PreflightResponse {
         holochain_serialized_bytes::encode(&(&self.request, &self.agent_state))
     }
     /// Request accessor.
-    pub fn request_ref(&self) -> &PreflightRequest {
+    pub fn request(&self) -> &PreflightRequest {
         &self.request
     }
 
+    /// Mutable request accessor for testing.
+    #[cfg(feature = "test_utils")]
+    pub fn request_mut(&mut self) -> &mut PreflightRequest {
+        &mut self.request
+    }
+
     /// Agent state accessor.
-    pub fn agent_state_ref(&self) -> &CounterSigningAgentState {
+    pub fn agent_state(&self) -> &CounterSigningAgentState {
         &self.agent_state
     }
 
+    /// Mutable agent state accessor for testing.
+    #[cfg(feature = "test_utils")]
+    pub fn agent_state_mut(&mut self) -> &mut CounterSigningAgentState {
+        &mut self.agent_state
+    }
+
     /// Signature accessor.
-    pub fn signature_ref(&self) -> &Signature {
+    pub fn signature(&self) -> &Signature {
         &self.signature
+    }
+
+    /// Mutable signature accessor for testing.
+    #[cfg(feature = "test_utils")]
+    pub fn signature_mut(&mut self) -> &mut Signature {
+        &mut self.signature
     }
 }
 
 /// Every countersigning agent must sign against their chain state.
 /// The chain must be frozen until each agent decides to sign or exit the session.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct CounterSigningAgentState {
     /// The index of the agent in the preflight request agent vector.
     agent_index: u8,
@@ -154,24 +227,43 @@ pub struct CounterSigningAgentState {
 
 impl CounterSigningAgentState {
     /// Agent index accessor.
-    pub fn agent_index(&self) -> u8 {
-        self.agent_index
+    pub fn agent_index(&self) -> &u8 {
+        &self.agent_index
+    }
+
+    /// Mutable agent index accessor for testing.
+    #[cfg(feature = "test_utils")]
+    pub fn agent_index_mut(&mut self) -> &mut u8 {
+        &mut self.agent_index
     }
 
     /// Chain top accessor.
-    pub fn chain_top_ref(&self) -> &HeaderHash {
+    pub fn chain_top(&self) -> &HeaderHash {
         &self.chain_top
     }
 
+    /// Mutable chain top accessor for testing.
+    #[cfg(feature = "test_utils")]
+    pub fn chain_top_mut(&mut self) -> &mut HeaderHash {
+        &mut self.chain_top
+    }
+
     /// Header seq accessor.
-    pub fn header_seq(&self) -> u32 {
-        self.header_seq
+    pub fn header_seq(&self) -> &u32 {
+        &self.header_seq
+    }
+
+    /// Mutable header seq accessor for testing.
+    #[cfg(feature = "test_utils")]
+    pub fn header_seq_mut(&mut self) -> &mut u32 {
+        &mut self.header_seq
     }
 }
 
 /// Enum to mirror Header for all the shared data required to build session headers.
 /// Does NOT hold any agent specific information.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum HeaderBase {
     /// Mirrors Header::Create.
     Create(CreateBase),
@@ -185,6 +277,7 @@ pub enum HeaderBase {
 
 /// Base data for Create headers.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct CreateBase {
     entry_type: EntryType,
     entry_hash: EntryHash,
@@ -192,6 +285,7 @@ pub struct CreateBase {
 
 /// Base data for Update headers.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct UpdateBase {
     original_header_address: HeaderHash,
     original_entry_address: EntryHash,
@@ -269,6 +363,7 @@ impl Update {
 
 /// All the data required for a countersigning session.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct CounterSigningSessionData {
     preflight_request: PreflightRequest,
     responses: Vec<(CounterSigningAgentState, Signature)>,
@@ -302,12 +397,12 @@ impl CounterSigningSessionData {
     }
 
     /// Accessor to the preflight request.
-    pub fn preflight_request_ref(&self) -> &PreflightRequest {
+    pub fn preflight_request(&self) -> &PreflightRequest {
         &self.preflight_request
     }
 
     /// Accessor to responses.
-    pub fn responses_ref(&self) -> &Vec<(CounterSigningAgentState, Signature)> {
+    pub fn responses(&self) -> &Vec<(CounterSigningAgentState, Signature)> {
         &self.responses
     }
 }

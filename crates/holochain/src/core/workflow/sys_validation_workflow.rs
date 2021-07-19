@@ -192,6 +192,9 @@ fn handle_failed(error: ValidationOutcome) -> Outcome {
         ValidationOutcome::Counterfeit(_, _) => {
             unreachable!("Counterfeit ops are dropped before sys validation")
         }
+        ValidationOutcome::AgentsDupes(_) => Rejected,
+        ValidationOutcome::AgentsLength(_) => Rejected,
+        ValidationOutcome::EnzymeIndex(_, _) => Rejected,
         ValidationOutcome::HeaderNotInCounterSigningSession(_, _) => Rejected,
         ValidationOutcome::FailedToBuildHeaderSet(_) => Rejected,
         ValidationOutcome::CounterSigningSessionTimes(_) => Rejected,
@@ -363,9 +366,7 @@ async fn sys_validate_element_inner(
     let header = element.header();
     let entry = element.entry().as_option();
     let incoming_dht_ops_sender = None;
-    if !counterfeit_check(signature, header).await? {
-        return Err(ValidationOutcome::Counterfeit(signature.clone(), header.clone()).into());
-    }
+    counterfeit_check(signature, header).await?;
     store_element(header, workspace, network.clone()).await?;
     if let Some((entry, EntryVisibility::Public)) =
         &entry.and_then(|e| header.entry_type().map(|et| (e, et.visibility())))
@@ -402,12 +403,10 @@ async fn sys_validate_element_inner(
 
 /// Check if the op has valid signature and author.
 /// Ops that fail this check should be dropped.
-pub async fn counterfeit_check(
-    signature: &Signature,
-    header: &Header,
-) -> SysValidationResult<bool> {
-    Ok(verify_header_signature(&signature, &header).await?
-        && author_key_is_valid(header.author()).await?)
+pub async fn counterfeit_check(signature: &Signature, header: &Header) -> SysValidationResult<()> {
+    verify_header_signature(&signature, &header).await?;
+    author_key_is_valid(header.author()).await?;
+    Ok(())
 }
 
 async fn register_agent_activity(

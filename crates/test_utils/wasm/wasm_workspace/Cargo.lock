@@ -21,6 +21,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "arbitrary"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "237430fd6ed3740afe94eefcc278ae21e050285be882804e0d6e8695f0c94691"
+dependencies = [
+ "derive_arbitrary",
+]
+
+[[package]]
 name = "arrayref"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -150,6 +159,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d9b5a2f4ac4969822c62224815d069952656cadc7084fdca9751e6d959189b72"
 dependencies = [
  "darling_core",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "derive_arbitrary"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f1281ee141df08871db9fe261ab5312179eac32d1e314134ceaa8dd7c042f5a"
+dependencies = [
+ "proc-macro2",
  "quote",
  "syn",
 ]
@@ -310,6 +330,7 @@ dependencies = [
 name = "holo_hash"
 version = "0.0.4-dev.0"
 dependencies = [
+ "arbitrary",
  "base64",
  "blake2b_simd",
  "derive_more",
@@ -383,6 +404,7 @@ dependencies = [
 name = "holochain_zome_types"
 version = "0.0.4-dev.0"
 dependencies = [
+ "arbitrary",
  "chrono",
  "derive_builder",
  "fixt",

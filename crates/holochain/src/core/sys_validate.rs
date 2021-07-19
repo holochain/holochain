@@ -13,13 +13,16 @@ use holochain_zome_types::countersigning::CounterSigningSessionData;
 use holochain_zome_types::countersigning::PreflightRequest;
 use holochain_zome_types::countersigning::PreflightResponse;
 use holochain_zome_types::countersigning::SESSION_HEADER_TIME_OFFSET_MILLIS;
+use std::collections::HashSet;
 use std::convert::TryInto;
+use std::iter::FromIterator;
 
 pub(super) use error::*;
 pub use holo_hash::*;
 pub use holochain_state::source_chain::SourceChainError;
 pub use holochain_state::source_chain::SourceChainResult;
 pub use holochain_types::Timestamp;
+use holochain_zome_types::countersigning::CounterSigningSessionTimes;
 pub use holochain_zome_types::HeaderHashed;
 
 #[allow(missing_docs)]
@@ -38,36 +41,35 @@ pub const MAX_TAG_SIZE: usize = 1000;
 
 /// Need at least two to countersign.
 pub const MIN_COUNTERSIGNING_AGENTS: usize = 2;
-/// 16 seems like a lot of agents to countersign.
+/// 8 seems like enough agents to countersign.
 pub const MAX_COUNTERSIGNING_AGENTS: usize = 8;
 
 /// Verify the signature for this header
-pub async fn verify_header_signature(
-    sig: &Signature,
-    header: &Header,
-) -> SysValidationResult<bool> {
+pub async fn verify_header_signature(sig: &Signature, header: &Header) -> SysValidationResult<()> {
     if header.author().verify_signature(sig, header).await? {
-        Ok(true)
+        Ok(())
     } else {
-        Ok(false)
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::Counterfeit((*sig).clone(), (*header).clone()),
+        ))
     }
 }
 
 /// Verify the author key was valid at the time
 /// of signing with dpki
 /// TODO: This is just a stub until we have dpki.
-pub async fn author_key_is_valid(_author: &AgentPubKey) -> SysValidationResult<bool> {
-    Ok(true)
+pub async fn author_key_is_valid(_author: &AgentPubKey) -> SysValidationResult<()> {
+    Ok(())
 }
 
 /// Verify that the signature on a preflight request is valid.
 pub async fn check_countersigning_preflight_response_signature(
     preflight_response: &PreflightResponse,
-) -> SysValidationResult<bool> {
-    Ok(preflight_response
-        .request_ref()
-        .signing_agents_ref()
-        .get(preflight_response.agent_state_ref().agent_index() as usize)
+) -> SysValidationResult<()> {
+    let signature_is_valid = preflight_response
+        .request()
+        .signing_agents()
+        .get(*preflight_response.agent_state().agent_index() as usize)
         .ok_or_else(|| {
             SysValidationError::ValidationOutcome(ValidationOutcome::PreflightResponseSignature(
                 (*preflight_response).clone(),
@@ -75,130 +77,152 @@ pub async fn check_countersigning_preflight_response_signature(
         })?
         .0
         .verify_signature_raw(
-            preflight_response.signature_ref(),
+            preflight_response.signature(),
             &preflight_response.encode_for_signature().map_err(|_| {
                 SysValidationError::ValidationOutcome(
                     ValidationOutcome::PreflightResponseSignature((*preflight_response).clone()),
                 )
             })?,
         )
-        .await?)
+        .await?;
+    if signature_is_valid {
+        Ok(())
+    } else {
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::PreflightResponseSignature((*preflight_response).clone()),
+        ))
+    }
 }
 
 /// Verify the difference between the end and start time is larger than the session header time offset.
-pub fn check_countersigning_preflight_request_session_times(
-    preflight_request: &PreflightRequest,
-) -> SysValidationResult<bool> {
-    Ok(
-        &Timestamp(0, 0) < preflight_request.session_times_ref().as_start_ref()
-            && preflight_request.session_times_ref().as_start_ref()
-                < &(preflight_request.session_times_ref().as_end_ref()
-                    - core::time::Duration::from_millis(SESSION_HEADER_TIME_OFFSET_MILLIS as u64))
-                .map_err(|_| {
-                    SysValidationError::ValidationOutcome(
-                        ValidationOutcome::CounterSigningSessionTimes(
-                            (*preflight_request.session_times_ref()).clone(),
-                        ),
-                    )
-                })?,
-    )
+pub fn check_countersigning_session_times(
+    session_times: &CounterSigningSessionTimes,
+) -> SysValidationResult<()> {
+    let times_are_valid = &Timestamp(0, 0) < session_times.start()
+        && session_times.start()
+            <= &(session_times.end()
+                - core::time::Duration::from_millis(SESSION_HEADER_TIME_OFFSET_MILLIS as u64))
+            .map_err(|_| {
+                SysValidationError::ValidationOutcome(
+                    ValidationOutcome::CounterSigningSessionTimes((*session_times).clone()),
+                )
+            })?;
+    if times_are_valid {
+        Ok(())
+    } else {
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::CounterSigningSessionTimes((*session_times).clone()),
+        ))
+    }
 }
 
 /// Verify the enzyme index is in bounds of the signing agent if set.
 pub fn check_countersigning_preflight_request_enzyme_index(
     preflight_request: &PreflightRequest,
-) -> SysValidationResult<bool> {
-    Ok(match preflight_request.enzyme_index_ref() {
-        Some(index) => (*index as usize) < preflight_request.signing_agents_ref().len(),
-        None => true,
-    })
+) -> SysValidationResult<()> {
+    match preflight_request.enzyme_index() {
+        Some(index) => {
+            if (*index as usize) < preflight_request.signing_agents().len() {
+                Ok(())
+            } else {
+                Err(SysValidationError::ValidationOutcome(
+                    ValidationOutcome::EnzymeIndex(
+                        preflight_request.signing_agents().len(),
+                        *index as usize,
+                    ),
+                ))
+            }
+        }
+        None => Ok(()),
+    }
 }
 
 /// Verify the number of signing agents is within the correct range.
 pub fn check_countersigning_preflight_request_agents_len(
     preflight_request: &PreflightRequest,
-) -> SysValidationResult<bool> {
-    Ok(
-        MIN_COUNTERSIGNING_AGENTS <= preflight_request.signing_agents_ref().len()
-            && preflight_request.signing_agents_ref().len() <= MAX_COUNTERSIGNING_AGENTS,
-    )
+) -> SysValidationResult<()> {
+    if MIN_COUNTERSIGNING_AGENTS <= preflight_request.signing_agents().len()
+        && preflight_request.signing_agents().len() <= MAX_COUNTERSIGNING_AGENTS
+    {
+        Ok(())
+    } else {
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::AgentsLength(preflight_request.signing_agents().len()),
+        ))
+    }
 }
 
 /// Verify there are no duplicate agents to sign.
 pub fn check_countersigning_preflight_request_agents_dupes(
     preflight_request: &PreflightRequest,
-) -> SysValidationResult<bool> {
-    let set: std::collections::HashSet<_> = preflight_request
-        .signing_agents_ref()
-        .clone()
-        .drain(..)
+) -> SysValidationResult<()> {
+    let v: Vec<AgentPubKey> = preflight_request
+        .signing_agents()
+        .iter()
+        .map(|(agent, _roles)| agent.clone())
         .collect();
-    Ok(set.len() == preflight_request.signing_agents_ref().len())
+    if HashSet::<AgentPubKey>::from_iter(v.clone()).len()
+        == preflight_request.signing_agents().len()
+    {
+        Ok(())
+    } else {
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::AgentsDupes(v),
+        ))
+    }
 }
 
 /// Verify the preflight request agents.
 pub fn check_countersigning_preflight_request_agents(
     preflight_request: &PreflightRequest,
-) -> SysValidationResult<bool> {
-    Ok(
-        check_countersigning_preflight_request_agents_len(preflight_request)?
-            && check_countersigning_preflight_request_agents_dupes(preflight_request)?,
-    )
+) -> SysValidationResult<()> {
+    check_countersigning_preflight_request_agents_len(preflight_request)?;
+    check_countersigning_preflight_request_agents_dupes(preflight_request)?;
+    Ok(())
 }
 
 /// Verify a countersigning preflight request integrity.
 pub fn check_countersigning_preflight_request(
     preflight_request: &PreflightRequest,
-) -> SysValidationResult<bool> {
-    Ok(
-        check_countersigning_preflight_request_enzyme_index(preflight_request)?
-            && check_countersigning_preflight_request_session_times(preflight_request)?
-            && check_countersigning_preflight_request_agents(preflight_request)?,
-    )
+) -> SysValidationResult<()> {
+    check_countersigning_preflight_request_enzyme_index(preflight_request)?;
+    check_countersigning_session_times(preflight_request.session_times())?;
+    check_countersigning_preflight_request_agents(preflight_request)?;
+    Ok(())
 }
 
 /// Combined preflight response validation call.
 pub async fn check_countersigning_preflight_response(
     preflight_response: &PreflightResponse,
-) -> SysValidationResult<bool> {
-    Ok(
-        check_countersigning_preflight_request(preflight_response.request_ref())?
-            && check_countersigning_preflight_response_signature(preflight_response).await?,
-    )
+) -> SysValidationResult<()> {
+    check_countersigning_preflight_request(preflight_response.request())?;
+    check_countersigning_preflight_response_signature(preflight_response).await?;
+    Ok(())
 }
 
 /// Check the responses vector is indexed and sized correctly.
 pub fn check_countersigning_session_data_responses_indexes(
     session_data: &CounterSigningSessionData,
-) -> SysValidationResult<bool> {
-    if session_data
-        .preflight_request_ref()
-        .signing_agents_ref()
-        .len()
-        != session_data.responses_ref().len()
-    {
+) -> SysValidationResult<()> {
+    if session_data.preflight_request().signing_agents().len() != session_data.responses().len() {
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::CounterSigningSessionResponsesLength(
-                session_data.responses_ref().len(),
-                session_data
-                    .preflight_request_ref()
-                    .signing_agents_ref()
-                    .len(),
+                session_data.responses().len(),
+                session_data.preflight_request().signing_agents().len(),
             ),
         ))
     } else {
-        for (i, (response, _response_signature)) in session_data.responses_ref().iter().enumerate()
-        {
-            if response.agent_index() as usize != i {
+        for (i, (response, _response_signature)) in session_data.responses().iter().enumerate() {
+            if *response.agent_index() as usize != i {
                 return Err(SysValidationError::ValidationOutcome(
                     ValidationOutcome::CounterSigningSessionResponsesOrder(
-                        response.agent_index(),
+                        *response.agent_index(),
                         i,
                     ),
                 ));
             }
         }
-        Ok(true)
+        Ok(())
     }
 }
 
@@ -206,7 +230,7 @@ pub fn check_countersigning_session_data_responses_indexes(
 pub fn check_countersigning_session_data_contains_header(
     session_data: &CounterSigningSessionData,
     header: NewEntryHeaderRef<'_>,
-) -> SysValidationResult<bool> {
+) -> SysValidationResult<()> {
     let header_is_in_session = session_data
         .build_header_set()
         .map_err(|e| {
@@ -230,7 +254,7 @@ pub fn check_countersigning_session_data_contains_header(
             ),
         ))
     } else {
-        Ok(true)
+        Ok(())
     }
 }
 
@@ -238,21 +262,16 @@ pub fn check_countersigning_session_data_contains_header(
 pub async fn check_countersigning_session_data(
     session_data: &CounterSigningSessionData,
     header: NewEntryHeaderRef<'_>,
-) -> SysValidationResult<bool> {
-    if !check_countersigning_session_data_responses_indexes(session_data)? {
-        return Ok(false);
-    }
-
-    if !check_countersigning_session_data_contains_header(session_data, header)? {
-        return Ok(false);
-    }
+) -> SysValidationResult<()> {
+    check_countersigning_session_data_responses_indexes(session_data)?;
+    check_countersigning_session_data_contains_header(session_data, header)?;
 
     let tasks: Vec<_> = session_data
-        .responses_ref()
+        .responses()
         .iter()
         .map(|(response, signature)| async move {
             check_countersigning_preflight_response(&PreflightResponse::new(
-                session_data.preflight_request_ref().clone(),
+                session_data.preflight_request().clone(),
                 response.clone(),
                 signature.clone(),
             ))
@@ -260,13 +279,9 @@ pub async fn check_countersigning_session_data(
         })
         .collect();
 
-    let results: Vec<SysValidationResult<bool>> = futures::future::join_all(tasks).await;
-    results.into_iter().fold(Ok(true), |acc, result| match acc {
-        Ok(true) => result,
-        Ok(false) => match result {
-            Err(_) => result,
-            _ => acc,
-        },
+    let results: Vec<SysValidationResult<()>> = futures::future::join_all(tasks).await;
+    results.into_iter().fold(Ok(()), |acc, result| match acc {
+        Ok(()) => result,
         Err(_) => acc,
     })
 }
@@ -801,4 +816,233 @@ fn make_register_agent_activity(element: Element) -> Option<(DhtOpHash, DhtOp)> 
     let op = DhtOp::RegisterAgentActivity(signature, header);
     let hash = DhtOpHash::with_data_sync(&op);
     Some((hash, op))
+}
+
+#[cfg(test)]
+pub mod test {
+    use crate::core::check_countersigning_preflight_request_agents_dupes;
+    use crate::core::check_countersigning_preflight_request_agents_len;
+    use crate::core::check_countersigning_preflight_request_enzyme_index;
+    use crate::core::check_countersigning_preflight_response_signature;
+    use crate::core::check_countersigning_session_data_responses_indexes;
+    use crate::core::check_countersigning_session_times;
+    use crate::core::sys_validate::error::SysValidationError;
+    use crate::core::ValidationOutcome;
+    use arbitrary::Arbitrary;
+    use fixt::fixt;
+    use fixt::Predictable;
+    use hdk::prelude::AgentPubKeyFixturator;
+    use holochain_keystore::AgentPubKeyExt;
+    use holochain_state::test_utils::test_keystore;
+    use holochain_zome_types::countersigning::CounterSigningSessionData;
+    use holochain_zome_types::countersigning::CounterSigningSessionTimes;
+    use holochain_zome_types::countersigning::PreflightRequest;
+    use holochain_zome_types::countersigning::PreflightResponse;
+    use holochain_zome_types::countersigning::Role;
+    use holochain_zome_types::countersigning::SESSION_HEADER_TIME_OFFSET_MILLIS;
+    use matches::assert_matches;
+
+    #[tokio::test(flavor = "multi_thread")]
+    pub async fn test_check_countersigning_preflight_response_signature() {
+        let keystore = test_keystore();
+        let mut u = arbitrary::Unstructured::new(&[0]);
+        let mut preflight_response = PreflightResponse::arbitrary(&mut u).unwrap();
+        assert_matches!(
+            check_countersigning_preflight_response_signature(&preflight_response).await,
+            Err(SysValidationError::ValidationOutcome(
+                ValidationOutcome::PreflightResponseSignature(_)
+            ))
+        );
+
+        let alice = fixt!(AgentPubKey, Predictable);
+        let bob = fixt!(AgentPubKey, Predictable, 1);
+
+        (*preflight_response.request_mut().signing_agents_mut()).push((alice.clone(), vec![]));
+        (*preflight_response.request_mut().signing_agents_mut()).push((bob, vec![]));
+
+        *preflight_response.signature_mut() = alice
+            .sign_raw(
+                &keystore,
+                &preflight_response.encode_for_signature().unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            check_countersigning_preflight_response_signature(&preflight_response)
+                .await
+                .unwrap(),
+            (),
+        );
+    }
+
+    #[test]
+    pub fn test_check_countersigning_session_times() {
+        let mut u = arbitrary::Unstructured::new(&[0]);
+        let mut session_times = CounterSigningSessionTimes::arbitrary(&mut u).unwrap();
+
+        // Zero start and end won't pass.
+        assert_matches!(
+            check_countersigning_session_times(&session_times),
+            Err(SysValidationError::ValidationOutcome(
+                ValidationOutcome::CounterSigningSessionTimes(_),
+            ))
+        );
+
+        // Shifting the end forward 1 milli won't help.
+        *session_times.end_mut() =
+            (session_times.end() + core::time::Duration::from_millis(1)).unwrap();
+        assert_matches!(
+            check_countersigning_session_times(&session_times),
+            Err(SysValidationError::ValidationOutcome(
+                ValidationOutcome::CounterSigningSessionTimes(_),
+            ))
+        );
+
+        // Shifting the end forward by the session offset will _almost_ fix it.
+        *session_times.end_mut() = (session_times.end()
+            + core::time::Duration::from_millis(SESSION_HEADER_TIME_OFFSET_MILLIS as u64))
+        .unwrap();
+        assert_matches!(
+            check_countersigning_session_times(&session_times),
+            Err(SysValidationError::ValidationOutcome(
+                ValidationOutcome::CounterSigningSessionTimes(_),
+            ))
+        );
+
+        // making the the start non-zero should fix it.
+        *session_times.start_mut() =
+            (session_times.start() + core::time::Duration::from_millis(1)).unwrap();
+        assert_eq!(
+            check_countersigning_session_times(&session_times).unwrap(),
+            (),
+        );
+
+        // making the diff between start and end less than the header offset will break it again.
+        *session_times.start_mut() =
+            (session_times.start() + core::time::Duration::from_millis(1)).unwrap();
+        assert_matches!(
+            check_countersigning_session_times(&session_times),
+            Err(SysValidationError::ValidationOutcome(
+                ValidationOutcome::CounterSigningSessionTimes(_),
+            ))
+        );
+    }
+
+    #[test]
+    pub fn test_check_countersigning_preflight_request_enzyme_index() {
+        let mut u = arbitrary::Unstructured::new(&[0]);
+        let mut preflight_request = PreflightRequest::arbitrary(&mut u).unwrap();
+
+        // None is always a pass.
+        assert_eq!(
+            check_countersigning_preflight_request_enzyme_index(&preflight_request).unwrap(),
+            ()
+        );
+
+        let alice = fixt!(AgentPubKey, Predictable);
+        (*preflight_request.signing_agents_mut()).push((alice.clone(), vec![]));
+
+        // 0 is the first signing agent so is a valid enzyme.
+        *preflight_request.enzyme_index_mut() = Some(0);
+
+        assert_eq!(
+            check_countersigning_preflight_request_enzyme_index(&preflight_request).unwrap(),
+            (),
+        );
+
+        // 1 is out of bounds for zero signing agents.
+        *preflight_request.enzyme_index_mut() = Some(1);
+
+        assert_matches!(
+            check_countersigning_preflight_request_enzyme_index(&preflight_request),
+            Err(SysValidationError::ValidationOutcome(
+                ValidationOutcome::EnzymeIndex(_, _)
+            ))
+        );
+    }
+
+    #[test]
+    pub fn test_check_countersigning_preflight_request_agents_len() {
+        let mut u = arbitrary::Unstructured::new(&[0]);
+        let mut preflight_request = PreflightRequest::arbitrary(&mut u).unwrap();
+
+        // Empty is a fail.
+        assert_matches!(
+            check_countersigning_preflight_request_agents_len(&preflight_request),
+            Err(SysValidationError::ValidationOutcome(
+                ValidationOutcome::AgentsLength(_)
+            ))
+        );
+
+        // One signer is a fail.
+        let alice = fixt!(AgentPubKey, Predictable);
+        (*preflight_request.signing_agents_mut()).push((alice.clone(), vec![]));
+
+        assert_matches!(
+            check_countersigning_preflight_request_agents_len(&preflight_request),
+            Err(SysValidationError::ValidationOutcome(
+                ValidationOutcome::AgentsLength(_)
+            ))
+        );
+
+        // Two signers is a pass.
+        let bob = fixt!(AgentPubKey, Predictable, 1);
+        (*preflight_request.signing_agents_mut()).push((bob.clone(), vec![]));
+
+        assert_eq!(
+            check_countersigning_preflight_request_agents_len(&preflight_request).unwrap(),
+            (),
+        );
+    }
+
+    #[test]
+    pub fn test_check_countersigning_preflight_request_agents_dupes() {
+        let mut u = arbitrary::Unstructured::new(&[0]);
+        let mut preflight_request = PreflightRequest::arbitrary(&mut u).unwrap();
+
+        let alice = fixt!(AgentPubKey, Predictable);
+        let bob = fixt!(AgentPubKey, Predictable, 1);
+
+        assert_eq!(
+            check_countersigning_preflight_request_agents_dupes(&preflight_request).unwrap(),
+            (),
+        );
+
+        (*preflight_request.signing_agents_mut()).push((alice.clone(), vec![]));
+        assert_eq!(
+            check_countersigning_preflight_request_agents_dupes(&preflight_request).unwrap(),
+            (),
+        );
+
+        (*preflight_request.signing_agents_mut()).push((bob.clone(), vec![]));
+        assert_eq!(
+            check_countersigning_preflight_request_agents_dupes(&preflight_request).unwrap(),
+            (),
+        );
+
+        // Another alice is a dupe, even if roles are different.
+        (*preflight_request.signing_agents_mut()).push((alice.clone(), vec![Role::new(0_u8)]));
+        assert_matches!(
+            check_countersigning_preflight_request_agents_dupes(&preflight_request),
+            Err(SysValidationError::ValidationOutcome(
+                ValidationOutcome::AgentsDupes(_),
+            ))
+        );
+    }
+
+    #[test]
+    pub fn test_check_countersigning_session_data_responses_indexes() {
+        let mut u = arbitrary::Unstructured::new(&[0]);
+        let session_data = CounterSigningSessionData::arbitrary(&mut u).unwrap();
+
+        let _alice = fixt!(AgentPubKey, Predictable);
+        let _bob = fixt!(AgentPubKey, Predictable, 1);
+
+        // When everything is empty the indexes line up by default.
+        assert_eq!(
+            check_countersigning_session_data_responses_indexes(&session_data).unwrap(),
+            ()
+        );
+    }
 }

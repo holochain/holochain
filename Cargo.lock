@@ -2351,6 +2351,7 @@ name = "holochain"
 version = "0.0.102-dev.0"
 dependencies = [
  "anyhow",
+ "arbitrary",
  "assert_cmd",
  "async-trait",
  "base64",
@@ -2858,6 +2859,7 @@ dependencies = [
 name = "holochain_zome_types"
 version = "0.0.4-dev.0"
 dependencies = [
+ "arbitrary",
  "chrono",
  "derive_builder",
  "fixt",
