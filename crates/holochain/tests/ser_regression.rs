@@ -183,7 +183,7 @@ pub async fn setup_app(
 ) -> (TestEnvs, RealAppInterfaceApi, ConductorHandle) {
     let envs = test_environments();
     let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-        .test(&envs)
+        .test(&envs, &[])
         .await
         .unwrap();
 
