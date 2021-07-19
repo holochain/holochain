@@ -38,5 +38,14 @@ async fn test_initiate_accept() {
     let (evt_sender, _) = spawn_handler(evt_handler).await;
     let gossip = ShardedGossip::test(GossipType::Recent, evt_sender, Default::default());
 
-    todo!("feed in a single incoming gossip and see what comes out");
+    // TODO: Arbitrary impl for Tx2Cert
+    let cert = Tx2Cert(Arc::new((CertDigest::from(vec![0]), "".into(), "".into())));
+    let msg = ShardedGossipWire::Initiate(Initiate { intervals: vec![] });
+    let outgoing = gossip.process_incoming(cert, msg).await.unwrap();
+
+    assert_eq!(outgoing, vec![]);
+    gossip
+        .inner
+        .share_mut(|i, _| Ok(todo!("make assertions about internal state")))
+        .unwrap();
 }

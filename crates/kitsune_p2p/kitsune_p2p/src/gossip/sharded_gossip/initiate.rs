@@ -3,7 +3,7 @@ use super::*;
 impl ShardedGossip {
     /// Try to initiate gossip if we don't currently
     /// have an outgoing gossip.
-    pub(super) async fn try_initiate(&self) -> KitsuneResult<Option<ShardedGossipWire>> {
+    pub(super) async fn try_initiate(&self) -> KitsuneResult<Option<Outgoing>> {
         // Get local agents
         let (has_target, local_agents) = self.inner.share_mut(|i, _| {
             // TODO: Set initiate_tgt to None when round is finished.
@@ -39,7 +39,7 @@ impl ShardedGossip {
             Ok(if let Some((endpoint, url)) = remote_agent {
                 let gossip = ShardedGossipWire::initiate(intervals);
                 inner.initiate_tgt = Some(endpoint.clone());
-                Some(gossip)
+                Some((endpoint, HowToConnect::Url(url), gossip))
             } else {
                 None
             })

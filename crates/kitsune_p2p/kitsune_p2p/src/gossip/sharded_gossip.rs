@@ -110,8 +110,8 @@ impl ShardedGossipNetworking {
 
     async fn process_incoming_outgoing(&self) -> KitsuneResult<()> {
         let (incoming, outgoing) = self.pop_queues()?;
-        if let Some(incoming) = incoming {
-            self.gossip.process_incoming(incoming).await?;
+        if let Some((con, msg)) = incoming {
+            self.gossip.process_incoming(con.peer_cert(), msg).await?;
         }
         if let Some(outgoing) = outgoing {
             self.process_outgoing(outgoing).await?;
@@ -122,8 +122,14 @@ impl ShardedGossipNetworking {
 
     async fn run_one_iteration(&self) -> () {
         // TODO: Handle errors
-        let maybe_gossip = self.gossip.try_initiate().await.unwrap();
-        todo!("push maybe_gossip into outgoing queue if Some");
+        if let Some(outgoing) = self.gossip.try_initiate().await.unwrap() {
+            self.inner
+                .share_mut(|mut i, _| {
+                    i.outgoing.push_back(outgoing);
+                    Ok(())
+                })
+                .unwrap();
+        }
         self.process_incoming_outgoing().await.unwrap();
     }
 
@@ -209,10 +215,12 @@ impl ShardedGossip {
         self.inner.share_mut(|i, _| Ok(i.state_map.remove(id)))
     }
 
-    async fn process_incoming(&self, incoming: Incoming) -> KitsuneResult<Vec<ShardedGossipWire>> {
+    async fn process_incoming(
+        &self,
+        cert: Tx2Cert,
+        msg: ShardedGossipWire,
+    ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         // TODO: How do we route the gossip to the right loop type (recent vs historical)
-        let (con, msg) = incoming;
-        let cert = con.peer_cert();
         Ok(match msg {
             ShardedGossipWire::Initiate(Initiate { intervals }) => {
                 self.incoming_initiate(cert, intervals).await?
