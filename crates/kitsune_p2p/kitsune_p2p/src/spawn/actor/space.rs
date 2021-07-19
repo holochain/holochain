@@ -25,6 +25,10 @@ ghost_actor::ghost_chan! {
         fn is_agent_local(agent: Arc<KitsuneAgent>) -> bool;
 
         /// Incoming Delegate Broadcast
+        /// We are being requested to delegate a broadcast to our neighborhood
+        /// on behalf of an author. `mod_idx` / `mod_cnt` inform us which
+        /// neighbors we are responsible for.
+        /// (See comments in actual method impl for more detail.)
         fn incoming_delegate_broadcast(
             space: Arc<KitsuneSpace>,
             basis: Arc<KitsuneBasis>,
