@@ -123,16 +123,9 @@ impl Outer {
     fn finish(self) -> Vec<actor::RpcMultiResponse> {
         let Self { inner, .. } = self;
 
-        let Inner { response, .. } = inner
-            .try_unwrap()
-            // this should never happen...
-            // all other copies die with the join_all/kill above
-            .unwrap_or(None)
-            // this should never happen...
-            // we never close the share anywhere
-            .expect("failed to unwrap shared");
-
-        response
+        inner
+            .share_mut(|i, _| Ok(i.response.drain(..).collect()))
+            .expect("we never close this share")
     }
 
     /// add a task that will be dropped if `kill` is notified.
