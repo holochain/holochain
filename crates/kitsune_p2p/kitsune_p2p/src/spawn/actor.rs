@@ -33,6 +33,9 @@ ghost_actor::ghost_chan! {
         fn register_space_event_handler(recv: futures::channel::mpsc::Receiver<KitsuneP2pEvent>) -> ();
 
         /// Incoming Delegate Broadcast
+        /// We are being requested to delegate a broadcast to our neighborhood
+        /// on behalf of an author. `mod_idx` / `mod_cnt` inform us which
+        /// neighbors we are responsible for.
         fn incoming_delegate_broadcast(
             space: Arc<KitsuneSpace>,
             basis: Arc<KitsuneBasis>,

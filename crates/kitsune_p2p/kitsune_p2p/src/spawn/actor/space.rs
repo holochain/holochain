@@ -181,6 +181,8 @@ impl SpaceInternalHandler for Space {
         mod_cnt: u32,
         data: crate::wire::WireData,
     ) -> InternalHandlerResult<()> {
+        // first, forward this incoming broadcast to all connected
+        // local agents.
         let mut local_events = Vec::new();
         for agent in self.local_joined_agents.iter().cloned() {
             let fut = self.evt_sender.notify(
@@ -196,6 +198,8 @@ impl SpaceInternalHandler for Space {
             });
         }
 
+        // next, gather a list of agents covering this data to be
+        // published to.
         let ro_inner = self.ro_inner.clone();
         let timeout = ro_inner.config.tuning_params.implicit_timeout();
         let fut =
@@ -206,6 +210,9 @@ impl SpaceInternalHandler for Space {
 
             let info_list = fut.await?;
 
+            // for all agents in the gathered list, check the modulo params
+            // i.e. if `agent.get_loc() % mod_cnt == mod_idx` we know we are
+            // responsible for delegating the broadcast to that agent.
             let mut all = Vec::new();
             for info in info_list
                 .into_iter()
@@ -217,6 +224,8 @@ impl SpaceInternalHandler for Space {
                 let data = data.clone();
                 all.push(async move {
                     use discover::PeerDiscoverResult;
+
+                    // attempt to establish a connection
                     let con_hnd = match discover::peer_connect(ro_inner, &info, timeout).await {
                         PeerDiscoverResult::OkShortcut => return,
                         PeerDiscoverResult::OkRemote { con_hnd, .. } => con_hnd,
@@ -225,7 +234,11 @@ impl SpaceInternalHandler for Space {
                             return;
                         }
                     };
+
+                    // generate our broadcast payload
                     let payload = wire::Wire::broadcast(space, basis, info.agent.clone(), data);
+
+                    // forward the data
                     if let Err(err) = con_hnd.notify(&payload, timeout).await {
                         tracing::warn!(?err, "broadcast error");
                     }
@@ -510,6 +523,7 @@ impl KitsuneP2pHandler for Space {
         timeout: KitsuneTimeout,
         payload: Vec<u8>,
     ) -> KitsuneP2pHandlerResult<()> {
+        // first, forward this data to all connected local agents.
         let mut local_events = Vec::new();
         for agent in self.local_joined_agents.iter().cloned() {
             let fut = self.evt_sender.notify(
@@ -525,6 +539,8 @@ impl KitsuneP2pHandler for Space {
             });
         }
 
+        // then, find a list of agents in a potentially remote neighborhood
+        // that should be responsible for holding the data.
         let ro_inner = self.ro_inner.clone();
         let discover_fut =
             discover::search_remotes_covering_basis(ro_inner.clone(), basis.get_loc(), timeout);
@@ -547,8 +563,17 @@ impl KitsuneP2pHandler for Space {
                 let mut all = Vec::new();
 
                 // is there a better way to do this??
+                //
+                // since we're gathering the connections in one place,
+                // if any of them take the full timeout, we won't have any
+                // time to actually forward the message to them.
+                //
+                // and if a node is that slow anyways, maybe we don't want
+                // to trust them to forward the message in any case...
                 let half_timeout =
                     KitsuneTimeout::from_millis(timeout.time_remaining().as_millis() as u64 / 2);
+
+                // attempt to open connections to the discovered remote nodes
                 for info in cover_nodes {
                     let ro_inner = ro_inner.clone();
                     all.push(async move {
@@ -575,8 +600,14 @@ impl KitsuneP2pHandler for Space {
 
                 let mut all = Vec::new();
 
+                // determine the total number of nodes we'll be publishing to
+                // we'll make each remote responsible for a subset of delegate
+                // broadcasting by having them apply the formula:
+                // `agent.get_loc() % mod_cnt == mod_idx` -- if true,
+                // they'll be responsible for forwarding the data to that node.
                 let mod_cnt = con_list.len();
                 for (mod_idx, (agent, con_hnd)) in con_list.into_iter().enumerate() {
+                    // build our delegate message
                     let payload = wire::Wire::delegate_broadcast(
                         space.clone(),
                         basis.clone(),
@@ -585,6 +616,8 @@ impl KitsuneP2pHandler for Space {
                         mod_cnt as u32,
                         payload.clone().into(),
                     );
+
+                    // notify the remote node
                     all.push(async move {
                         if let Err(err) = con_hnd.notify(&payload, timeout).await {
                             tracing::warn!(?err, "delegate broadcast error");

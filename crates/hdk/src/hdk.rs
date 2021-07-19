@@ -9,10 +9,10 @@ pub const HDK_NOT_REGISTERED: &str = "HDK not registered";
 /// Every test needs its own mock so each test needs to set it.
 use core::cell::RefCell;
 
-#[cfg(feature = "mock")]
+#[cfg(any(feature = "mock", not(target_arch = "wasm32")))]
 thread_local!(pub static HDK: RefCell<Box<dyn HdkT>> = RefCell::new(Box::new(ErrHdk)));
 
-#[cfg(not(feature = "mock"))]
+#[cfg(all(not(feature = "mock"), target_arch = "wasm32"))]
 thread_local!(pub static HDK: RefCell<Box<dyn HdkT>> = RefCell::new(Box::new(HostHdk)));
 
 /// When mocking is enabled the mockall crate automatically builds a MockHdkT for us.
@@ -243,7 +243,7 @@ pub struct HostHdk;
 /// This is deferring to the standard `holochain_wasmer_guest` crate functionality.
 /// Every function works exactly the same way with the same basic signatures and patterns.
 /// Elsewhere in the hdk are more high level wrappers around this basic trait.
-#[cfg(not(feature = "mock"))]
+#[cfg(all(not(feature = "mock"), target_arch = "wasm32"))]
 impl HdkT for HostHdk {
     fn get_agent_activity(
         &self,
