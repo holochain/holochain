@@ -40,8 +40,14 @@ kitsune_p2p_types::write_codec_enum! {
             space.0: Arc<KitsuneSpace>,
             basis.1: Arc<KitsuneBasis>,
             to_agent.2: Arc<KitsuneAgent>,
+
+            /// If `tgt_agent.get_loc() % mod_cnt == mod_idx`,
+            /// we are responsible for broadcasting to tgt_agent.
             mod_idx.3: u32,
+
+            /// see mod_idx description
             mod_cnt.4: u32,
+
             data.5: WireData,
         },
 
