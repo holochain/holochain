@@ -40,14 +40,12 @@ enum GossipType {
     Historical,
 }
 
-#[derive(shrinkwraprs::Shrinkwrap)]
-struct ShardedGossipNetworked {
-    #[shrinkwrap(main_field)]
+struct ShardedGossipNetworking {
     gossip: ShardedGossip,
     ep_hnd: Tx2EpHnd<wire::Wire>,
 }
 
-impl ShardedGossipNetworked {
+impl ShardedGossipNetworking {
     pub fn new(
         tuning_params: KitsuneP2pTuningParams,
         space: Arc<KitsuneSpace>,
@@ -85,9 +83,9 @@ impl ShardedGossipNetworked {
         let (endpoint, how, gossip) = outgoing;
         let gossip = gossip.encode_vec().map_err(KitsuneError::other)?;
         let sending_bytes = gossip.len();
-        let gossip = wire::Wire::gossip(self.space.clone(), gossip.into());
+        let gossip = wire::Wire::gossip(self.gossip.space.clone(), gossip.into());
 
-        let timeout = self.tuning_params.implicit_timeout();
+        let timeout = self.gossip.tuning_params.implicit_timeout();
 
         let con = match how {
             HowToConnect::Con(con) => {
@@ -109,9 +107,9 @@ impl ShardedGossipNetworked {
     }
 
     async fn process_incoming_outgoing(&self) -> KitsuneResult<()> {
-        let (incoming, outgoing) = self.pop_queues()?;
+        let (incoming, outgoing) = self.gossip.pop_queues()?;
         if let Some(incoming) = incoming {
-            self.process_incoming(incoming).await?;
+            self.gossip.process_incoming(incoming).await?;
         }
         if let Some(outgoing) = outgoing {
             self.process_outgoing(outgoing).await?;
@@ -122,7 +120,7 @@ impl ShardedGossipNetworked {
 
     async fn run_one_iteration(&self) -> () {
         // TODO: Handle errors
-        self.try_initiate().await.unwrap();
+        self.gossip.try_initiate().await.unwrap();
         self.process_incoming_outgoing().await.unwrap();
     }
 }
@@ -335,7 +333,7 @@ kitsune_p2p_types::write_codec_enum! {
     }
 }
 
-impl AsGossipModule for ShardedGossipNetworked {
+impl AsGossipModule for ShardedGossipNetworking {
     fn incoming_gossip(
         &self,
         con: Tx2ConHnd<wire::Wire>,
@@ -344,7 +342,7 @@ impl AsGossipModule for ShardedGossipNetworked {
         use kitsune_p2p_types::codec::*;
         let (_, gossip) =
             ShardedGossipWire::decode_ref(&gossip_data).map_err(KitsuneError::other)?;
-        self.inner.share_mut(move |i, _| {
+        self.gossip.inner.share_mut(move |i, _| {
             i.incoming.push_back((con, gossip));
             if i.incoming.len() > 20 {
                 tracing::warn!(
@@ -357,14 +355,14 @@ impl AsGossipModule for ShardedGossipNetworked {
     }
 
     fn local_agent_join(&self, a: Arc<KitsuneAgent>) {
-        let _ = self.inner.share_mut(move |i, _| {
+        let _ = self.gossip.inner.share_mut(move |i, _| {
             i.local_agents.insert(a);
             Ok(())
         });
     }
 
     fn local_agent_leave(&self, a: Arc<KitsuneAgent>) {
-        let _ = self.inner.share_mut(move |i, _| {
+        let _ = self.gossip.inner.share_mut(move |i, _| {
             i.local_agents.remove(&a);
             Ok(())
         });
@@ -381,7 +379,7 @@ impl AsGossipModuleFactory for ShardedGossipFactory {
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
     ) -> GossipModule {
-        GossipModule(ShardedGossipNetworked::new(
+        GossipModule(ShardedGossipNetworking::new(
             tuning_params,
             space,
             ep_hnd,
