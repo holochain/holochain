@@ -111,7 +111,17 @@ impl ShardedGossipNetworking {
     async fn process_incoming_outgoing(&self) -> KitsuneResult<()> {
         let (incoming, outgoing) = self.pop_queues()?;
         if let Some((con, msg)) = incoming {
-            self.gossip.process_incoming(con.peer_cert(), msg).await?;
+            let outgoing = self.gossip.process_incoming(con.peer_cert(), msg).await?;
+            self.inner.share_mut(|i, _| {
+                i.outgoing.extend(outgoing.into_iter().map(|msg| {
+                    (
+                        GossipTgt::new(Vec::with_capacity(0), con.peer_cert()),
+                        HowToConnect::Con(con.clone()),
+                        msg,
+                    )
+                }));
+                Ok(())
+            })?;
         }
         if let Some(outgoing) = outgoing {
             self.process_outgoing(outgoing).await?;
