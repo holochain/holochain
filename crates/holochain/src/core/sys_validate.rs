@@ -834,12 +834,12 @@ pub mod test {
     use hdk::prelude::AgentPubKeyFixturator;
     use holochain_keystore::AgentPubKeyExt;
     use holochain_state::test_utils::test_keystore;
+    use holochain_zome_types::countersigning::CounterSigningAgentState;
     use holochain_zome_types::countersigning::CounterSigningSessionData;
     use holochain_zome_types::countersigning::CounterSigningSessionTimes;
     use holochain_zome_types::countersigning::PreflightRequest;
     use holochain_zome_types::countersigning::PreflightResponse;
     use holochain_zome_types::countersigning::Role;
-    use holochain_zome_types::countersigning::CounterSigningAgentState;
     use holochain_zome_types::countersigning::SESSION_HEADER_TIME_OFFSET_MILLIS;
     use holochain_zome_types::Signature;
     use matches::assert_matches;
