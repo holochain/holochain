@@ -839,7 +839,9 @@ pub mod test {
     use holochain_zome_types::countersigning::PreflightRequest;
     use holochain_zome_types::countersigning::PreflightResponse;
     use holochain_zome_types::countersigning::Role;
+    use holochain_zome_types::countersigning::CounterSigningAgentState;
     use holochain_zome_types::countersigning::SESSION_HEADER_TIME_OFFSET_MILLIS;
+    use holochain_zome_types::Signature;
     use matches::assert_matches;
 
     #[tokio::test(flavor = "multi_thread")]
@@ -1034,15 +1036,50 @@ pub mod test {
     #[test]
     pub fn test_check_countersigning_session_data_responses_indexes() {
         let mut u = arbitrary::Unstructured::new(&[0]);
-        let session_data = CounterSigningSessionData::arbitrary(&mut u).unwrap();
+        let mut session_data = CounterSigningSessionData::arbitrary(&mut u).unwrap();
 
-        let _alice = fixt!(AgentPubKey, Predictable);
-        let _bob = fixt!(AgentPubKey, Predictable, 1);
+        let alice = fixt!(AgentPubKey, Predictable);
+        let bob = fixt!(AgentPubKey, Predictable, 1);
 
         // When everything is empty the indexes line up by default.
         assert_eq!(
             check_countersigning_session_data_responses_indexes(&session_data).unwrap(),
             ()
+        );
+
+        // When the signing agents and responses are out of sync it must error.
+        (*session_data.preflight_request_mut().signing_agents_mut()).push((alice.clone(), vec![]));
+        assert_matches!(
+            check_countersigning_session_data_responses_indexes(&session_data),
+            Err(SysValidationError::ValidationOutcome(
+                ValidationOutcome::CounterSigningSessionResponsesLength(_, _)
+            ))
+        );
+
+        // When signing agents indexes are not in the correct order it must error.
+        (*session_data.preflight_request_mut().signing_agents_mut()).push((bob.clone(), vec![]));
+
+        let alice_state = CounterSigningAgentState::arbitrary(&mut u).unwrap();
+        let alice_signature = Signature::arbitrary(&mut u).unwrap();
+        let mut bob_state = CounterSigningAgentState::arbitrary(&mut u).unwrap();
+        let bob_signature = Signature::arbitrary(&mut u).unwrap();
+
+        (*session_data.responses_mut()).push((alice_state, alice_signature));
+        (*session_data.responses_mut()).push((bob_state.clone(), bob_signature.clone()));
+
+        assert_matches!(
+            check_countersigning_session_data_responses_indexes(&session_data),
+            Err(SysValidationError::ValidationOutcome(
+                ValidationOutcome::CounterSigningSessionResponsesOrder(_, _)
+            ))
+        );
+
+        *bob_state.agent_index_mut() = 1;
+        (*session_data.responses_mut()).pop();
+        (*session_data.responses_mut()).push((bob_state, bob_signature));
+        assert_eq!(
+            check_countersigning_session_data_responses_indexes(&session_data).unwrap(),
+            (),
         );
     }
 }

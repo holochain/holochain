@@ -401,8 +401,20 @@ impl CounterSigningSessionData {
         &self.preflight_request
     }
 
+    /// Mutable preflight_request accessor for testing.
+    #[cfg(feature = "test_utils")]
+    pub fn preflight_request_mut(&mut self) -> &mut PreflightRequest {
+        &mut self.preflight_request
+    }
+
     /// Accessor to responses.
     pub fn responses(&self) -> &Vec<(CounterSigningAgentState, Signature)> {
         &self.responses
+    }
+
+    /// Mutable responses accessor for testing.
+    #[cfg(feature = "test_utils")]
+    pub fn responses_mut(&mut self) -> &mut Vec<(CounterSigningAgentState, Signature)> {
+        &mut self.responses
     }
 }
