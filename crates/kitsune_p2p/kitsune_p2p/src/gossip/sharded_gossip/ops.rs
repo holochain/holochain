@@ -6,10 +6,10 @@ impl ShardedGossip {
     /// - Don't send a chunk larger then MAX_SEND_BUF_SIZE.
     pub(super) async fn incoming_ops(
         &self,
-        con: Tx2ConHnd<wire::Wire>,
+        peer_cert: Tx2Cert,
         state: RoundState,
         remote_bloom: BloomFilter,
-    ) -> KitsuneResult<()> {
+    ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         // Get the local agents to check against the remote bloom.
         let (agent, local_agents) = self.inner.share_mut(|inner, _| {
             let agent = inner.local_agents.iter().cloned().next();
@@ -17,7 +17,7 @@ impl ShardedGossip {
         })?;
         let agent = match agent {
             Some(a) => a,
-            None => return Ok(()),
+            None => return Ok(vec![]),
         };
 
         let mut gossip = Vec::with_capacity(1);
@@ -41,26 +41,13 @@ impl ShardedGossip {
             .check_ops_bloom(&local_agents_within_common_arc, state, remote_bloom)
             .await?;
 
-        let peer_cert = con.peer_cert();
-
         // Chunk the ops into multiple gossip messages if needed.
         into_chunks(&mut gossip, ops);
 
-        // Send the gossip.
-        self.inner.share_mut(|inner, _| {
-            for g in gossip {
-                inner.outgoing.push_back((
-                    GossipTgt::new(Vec::with_capacity(0), peer_cert.clone()),
-                    HowToConnect::Con(con.clone()),
-                    g,
-                ));
-            }
-            Ok(())
-        })?;
         // TODO: Send empty finished missing ops to close.
         // TODO: what if there's no missing agents or the bloom is empty?
         // How will we remove the state?
-        Ok(())
+        Ok(gossip)
     }
 
     /// Incoming ops that were missing from this nodes bloom filter.

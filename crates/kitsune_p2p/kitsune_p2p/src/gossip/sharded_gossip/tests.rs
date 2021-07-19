@@ -38,11 +38,5 @@ async fn test_initiate_accept() {
     let (evt_sender, _) = spawn_handler(evt_handler).await;
     let gossip = ShardedGossip::test(GossipType::Recent, evt_sender, Default::default());
 
-    gossip
-        .inner
-        .share_mut(|mut state, _| {
-            state.incoming.push_back(todo!());
-            Ok(())
-        })
-        .unwrap();
+    todo!("feed in a single incoming gossip and see what comes out");
 }

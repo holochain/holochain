@@ -3,7 +3,7 @@ use super::*;
 impl ShardedGossip {
     /// Try to initiate gossip if we don't currently
     /// have an outgoing gossip.
-    pub(super) async fn try_initiate(&self) -> KitsuneResult<()> {
+    pub(super) async fn try_initiate(&self) -> KitsuneResult<Option<ShardedGossipWire>> {
         // Get local agents
         let (has_target, local_agents) = self.inner.share_mut(|i, _| {
             // TODO: Set initiate_tgt to None when round is finished.
@@ -13,7 +13,7 @@ impl ShardedGossip {
         // There's already a target so there's nothing to do.
         if has_target {
             // TODO: Check if current target has timed out.
-            return Ok(());
+            return Ok(None);
         }
 
         // Choose any local agent so we can send requests to the store.
@@ -23,7 +23,7 @@ impl ShardedGossip {
         let agent = match agent {
             Some(agent) => agent,
             // No local agents so there's no one to initiate gossip from.
-            None => return Ok(()),
+            None => return Ok(None),
         };
 
         // Get the local agents intervals.
@@ -35,17 +35,16 @@ impl ShardedGossip {
             .find_remote_agent_within_arc(&agent, Arc::new(intervals.clone().into()), &local_agents)
             .await?;
 
-        self.inner.share_mut(|inner, _| {
-            if let Some((endpoint, url)) = remote_agent {
+        let maybe_gossip = self.inner.share_mut(|inner, _| {
+            Ok(if let Some((endpoint, url)) = remote_agent {
                 let gossip = ShardedGossipWire::initiate(intervals);
                 inner.initiate_tgt = Some(endpoint.clone());
-                inner
-                    .outgoing
-                    .push_back((endpoint, HowToConnect::Url(url), gossip));
-            }
-            Ok(())
+                Some(gossip)
+            } else {
+                None
+            })
         })?;
-        Ok(())
+        Ok(maybe_gossip)
     }
 
     /// Receiving an incoming initiate.
@@ -53,9 +52,9 @@ impl ShardedGossip {
     /// - Only send the agent bloom if this is a recent gossip type.
     pub(super) async fn incoming_initiate(
         &self,
-        con: Tx2ConHnd<wire::Wire>,
+        peer_cert: Tx2Cert,
         remote_arc_set: Vec<ArcInterval>,
-    ) -> KitsuneResult<()> {
+    ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let local_agents = self.inner.share_mut(|i, _| Ok(i.local_agents.clone()))?;
 
         // Choose any local agent so we can send requests to the store.
@@ -65,14 +64,12 @@ impl ShardedGossip {
         let agent = match agent {
             Some(agent) => agent,
             // No local agents so there's no one to initiate gossip from.
-            None => return Ok(()),
+            None => return Ok(vec![]),
         };
 
         // Get the local intervals.
         let local_intervals =
             store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents, &agent).await?;
-
-        let peer_cert = con.peer_cert();
 
         let mut gossip = Vec::with_capacity(3);
 
@@ -92,16 +89,9 @@ impl ShardedGossip {
 
         self.inner.share_mut(|inner, _| {
             inner.state_map.insert(peer_cert.clone(), state);
-            for g in gossip {
-                inner.outgoing.push_back((
-                    GossipTgt::new(Vec::with_capacity(0), peer_cert.clone()),
-                    HowToConnect::Con(con.clone()),
-                    g,
-                ));
-            }
             Ok(())
         })?;
-        Ok(())
+        Ok(gossip)
     }
 
     /// Generate the bloom filters and generate a new state.
