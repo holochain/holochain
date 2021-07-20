@@ -424,7 +424,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.72"
+version = "0.0.73"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aff3c48ca9201c8d94dc056cad2e68a5a3f7c52e5b082ec4cd16356d263e2e48"
 dependencies = [
@@ -436,7 +436,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_guest"
-version = "0.0.72"
+version = "0.0.73"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e8af2ef8b6fdb7921c65ef24aecff917340e34562f25cab6c5dd50f2cb484c4"
 dependencies = [
