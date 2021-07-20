@@ -1,11 +1,14 @@
+use arbitrary::Arbitrary;
 use futures::FutureExt;
 use ghost_actor::{GhostControlHandler, GhostResult};
 
-use crate::spawn::MockKitsuneP2pEventHandler;
+use crate::{spawn::MockKitsuneP2pEventHandler, NOISE};
 
 use super::*;
 use crate::fixt::*;
 use fixt::prelude::*;
+
+mod test_local_sync;
 
 impl ShardedGossipLocal {
     pub fn test(
@@ -25,6 +28,7 @@ impl ShardedGossipLocal {
     }
 }
 
+/// Create a handler task and produce a Sender for interacting with it
 async fn spawn_handler<H: KitsuneP2pEventHandler + GhostControlHandler>(
     h: H,
 ) -> (EventSender, tokio::task::JoinHandle<GhostResult<()>>) {
@@ -37,12 +41,12 @@ async fn spawn_handler<H: KitsuneP2pEventHandler + GhostControlHandler>(
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_initiate_accept() {
+    let mut u = arbitrary::Unstructured::new(&NOISE);
     let evt_handler = MockKitsuneP2pEventHandler::new();
     let (evt_sender, _) = spawn_handler(evt_handler).await;
     let gossip = ShardedGossipLocal::test(GossipType::Recent, evt_sender, Default::default());
 
-    // TODO: Arbitrary impl for Tx2Cert
-    let cert = Tx2Cert(Arc::new((CertDigest::from(vec![0]), "".into(), "".into())));
+    let cert = Tx2Cert::arbitrary(&mut u).unwrap();
     let msg = ShardedGossipWire::Initiate(Initiate { intervals: vec![] });
     let outgoing = gossip.process_incoming(cert, msg).await.unwrap();
 
@@ -55,6 +59,7 @@ async fn test_initiate_accept() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn sharded_sanity_test() {
+    let mut u = arbitrary::Unstructured::new(&NOISE);
     let alice_agent_info = fixt!(AgentInfoSigned);
     let alice_agent = alice_agent_info.agent.clone();
     let mut evt_handler = MockKitsuneP2pEventHandler::new();
@@ -124,8 +129,7 @@ async fn sharded_sanity_test() {
         })
         .unwrap();
 
-    // TODO: Arbitrary impl for Tx2Cert
-    let cert = Tx2Cert(Arc::new((CertDigest::from(vec![0]), "".into(), "".into())));
+    let cert = Tx2Cert::arbitrary(&mut u).unwrap();
 
     // Set bob initial state
     bob.inner

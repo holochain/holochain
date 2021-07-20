@@ -46,6 +46,7 @@ pub use ::lair_keystore_api::actor::CertDigest;
 
 /// Wrapper around CertDigest that provides some additional debugging helpers.
 #[derive(Clone)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Tx2Cert(pub Arc<(CertDigest, String, String)>);
 
 impl Tx2Cert {

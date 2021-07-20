@@ -3227,6 +3227,7 @@ dependencies = [
 name = "kitsune_p2p"
 version = "0.0.2-dev.0"
 dependencies = [
+ "arbitrary",
  "arrayref",
  "base64",
  "bloomfilter",
@@ -3401,6 +3402,7 @@ dependencies = [
 name = "kitsune_p2p_types"
 version = "0.0.2-dev.0"
 dependencies = [
+ "arbitrary",
  "base64",
  "criterion",
  "derive_more",
@@ -3442,9 +3444,9 @@ dependencies = [
 [[package]]
 name = "lair_keystore_api"
 version = "0.0.1-alpha.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "378b0a3a794a22602bf689574d098d749763ac591ed819c3245e8e6c246dd432"
+source = "git+https://github.com/holochain/lair.git?branch=arbitrary#43587f9500395b48c3e8484d466cec68c5848a6c"
 dependencies = [
+ "arbitrary",
  "blake2b_simd",
  "block-padding 0.2.1",
  "byteorder",
