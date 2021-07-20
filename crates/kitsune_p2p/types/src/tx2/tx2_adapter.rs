@@ -196,25 +196,27 @@ pub mod test_utils {
             };
 
             let gen_in_chan_recv = move || {
-                gen_mock_in_chan_recv_adapt(
-                    futures::stream::repeat_with(move || {
+                // return one result
+                let mut m = MockAsFramedReader::new();
+                let mut sent_one = false;
+                m.expect_read().returning(move |_t| {
+                    if sent_one {
+                        futures::future::pending().boxed()
+                    } else {
+                        sent_one = true;
                         async move {
-                            let mut m = MockAsFramedReader::new();
-                            m.expect_read().returning(move |_t| {
-                                async move {
-                                    let mut buf = PoolBuf::new();
-                                    buf.extend_from_slice(b"test");
-                                    Ok((0.into(), buf))
-                                }
-                                .boxed()
-                            });
-                            let out: InChan = Box::new(m);
-                            Ok(out)
+                            let mut buf = PoolBuf::new();
+                            buf.extend_from_slice(b"test");
+                            Ok((0.into(), buf))
                         }
                         .boxed()
-                    })
-                    .boxed(),
-                )
+                    }
+                });
+                let once: InChan = Box::new(m);
+                let once = futures::stream::once(async move { async move { Ok(once) }.boxed() });
+                // then return Poll::Pending forever
+                let s = once.chain(futures::stream::pending());
+                gen_mock_in_chan_recv_adapt(s.boxed())
             };
 
             let gen_ep = move || {
@@ -227,12 +229,12 @@ pub mod test_utils {
             };
 
             let gen_con_recv = move || {
-                gen_mock_con_recv_adapt(
-                    futures::stream::repeat_with(move || {
-                        async move { Ok((gen_con(), gen_in_chan_recv())) }.boxed()
-                    })
-                    .boxed(),
-                )
+                // return one result
+                let once = (gen_con(), gen_in_chan_recv());
+                let once = futures::stream::once(async move { async move { Ok(once) }.boxed() });
+                // then return Poll::Pending forever
+                let s = once.chain(futures::stream::pending());
+                gen_mock_con_recv_adapt(s.boxed())
             };
 
             let mut m = MockBindAdapt::new();
