@@ -8,14 +8,13 @@ impl ShardedGossip {
     pub(super) async fn try_initiate(&self) -> KitsuneResult<Option<Outgoing>> {
         // Get local agents
         let (has_target, local_agents, current_rounds) = self.inner.share_mut(|i, _| {
-            // TODO: Set initiate_tgt to None when round is finished.
+            i.check_tgt_expired();
             let has_target = i.initiate_tgt.is_some();
-            let current_rounds = i.state_map.keys().cloned().collect::<HashSet<_>>();
+            let current_rounds = i.state_map.current_rounds();
             Ok((has_target, i.local_agents.clone(), current_rounds))
         })?;
         // There's already a target so there's nothing to do.
         if has_target {
-            // TODO: Check if current target has timed out.
             return Ok(None);
         }
 
@@ -64,7 +63,7 @@ impl ShardedGossip {
         remote_arc_set: Vec<ArcInterval>,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let (local_agents, round_already_in_progress) = self.inner.share_mut(|i, _| {
-            let round_already_in_progress = i.state_map.contains_key(&peer_cert);
+            let round_already_in_progress = i.state_map.round_exists(&peer_cert);
             Ok((i.local_agents.clone(), round_already_in_progress))
         })?;
 

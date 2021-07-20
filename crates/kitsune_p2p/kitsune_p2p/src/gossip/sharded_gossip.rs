@@ -17,6 +17,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use self::initiate::decode_timed_bloom_filter;
+use self::state_map::StateMap;
 
 use super::simple_bloom::{HowToConnect, MetaOpKey};
 
@@ -25,6 +26,7 @@ mod agents;
 mod bloom;
 mod initiate;
 mod ops;
+mod state_map;
 mod store;
 
 #[cfg(test)]
@@ -143,7 +145,7 @@ impl ShardedGossipNetworking {
         // TODO: Handle errors
         if let Some(outgoing) = self.gossip.try_initiate().await.unwrap() {
             self.inner
-                .share_mut(|mut i, _| {
+                .share_mut(|i, _| {
                     i.outgoing.push_back(outgoing);
                     Ok(())
                 })
@@ -183,29 +185,31 @@ struct ShardedGossipInner {
     initiate_tgt: Option<GossipTgt>,
     // TODO: Figure out how to properly clean up old
     // gossip round states.
-    state_map: HashMap<StateKey, RoundState>,
+    state_map: StateMap,
 }
 
 impl ShardedGossipInner {
-    /// Get the state if it hasn't timed out.
-    fn get_state(&mut self, key: &StateKey) -> Option<RoundState> {
-        match self.state_map.get(key) {
-            Some(state) => {
-                if state.created_at.elapsed().as_millis() as u32
-                    > self
-                        .tuning_params
-                        .gossip_peer_on_success_next_gossip_delay_ms
-                {
-                    self.state_map.remove(key);
-                    None
-                } else {
-                    Some(state.clone())
-                }
+    fn remove_state(&mut self, state_key: &StateKey) -> Option<RoundState> {
+        if self
+            .initiate_tgt
+            .as_ref()
+            .map(|tgt| tgt.cert() == state_key)
+            .unwrap_or(false)
+        {
+            self.initiate_tgt = None;
+        }
+        self.state_map.remove(state_key)
+    }
+
+    fn check_tgt_expired(&mut self) {
+        if let Some(cert) = self.initiate_tgt.as_ref().map(|tgt| tgt.cert().clone()) {
+            if self.state_map.check_timeout(&cert) {
+                self.initiate_tgt = None;
             }
-            None => None,
         }
     }
 }
+
 #[derive(Default)]
 struct ShardedGossipNetworkingInner {
     incoming: VecDeque<Incoming>,
@@ -218,6 +222,8 @@ struct RoundState {
     num_ops_blooms: u8,
     increment_ops_complete: bool,
     created_at: std::time::Instant,
+    /// Amount of time before a round is considered expired.
+    round_timeout: u32,
 }
 
 impl ShardedGossip {
@@ -255,11 +261,16 @@ impl ShardedGossip {
             num_ops_blooms: 0,
             increment_ops_complete: false,
             created_at: std::time::Instant::now(),
+            // TODO: Check if the node is a successful peer or not and set the timeout accordingly
+            round_timeout: self
+                .tuning_params
+                .gossip_peer_on_success_next_gossip_delay_ms,
         })
     }
 
     async fn get_state(&self, id: &StateKey) -> KitsuneResult<Option<RoundState>> {
-        self.inner.share_mut(|i, _| Ok(i.get_state(id)))
+        self.inner
+            .share_mut(|i, _| Ok(i.state_map.get(id).cloned()))
     }
 
     async fn incoming_ops_finished(
@@ -275,7 +286,7 @@ impl ShardedGossip {
                 })
                 .unwrap_or(true)
             {
-                Ok(i.state_map.remove(state_id))
+                Ok(i.remove_state(state_id))
             } else {
                 Ok(i.state_map.get(state_id).cloned())
             }
@@ -294,7 +305,7 @@ impl ShardedGossip {
                 })
                 .unwrap_or(true)
             {
-                Ok(i.state_map.remove(state_id))
+                Ok(i.remove_state(state_id))
             } else {
                 Ok(i.state_map.get(state_id).cloned())
             }
