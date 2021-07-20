@@ -72,7 +72,7 @@ pub enum GossipType {
 pub struct ShardedGossip {
     /// ShardedGossipLocal handles the non-networking concerns of gossip
     gossip: ShardedGossipLocal,
-    /// TODO: what is this?
+    // The endpoint to use for all outgoing comms
     ep_hnd: Tx2EpHnd<wire::Wire>,
     /// The internal mutable state
     inner: Share<ShardedGossipState>,
@@ -254,9 +254,11 @@ pub struct ShardedGossipState {
 pub struct RoundState {
     /// The common ground with our gossip partner for the purposes of this round
     common_arc_set: Arc<DhtArcSet>,
-    /// TODO: what is this?
+    /// Number of ops blooms we have sent for this round, which is also the
+    /// number of MissingOps sets we expect in response
     num_ops_blooms: u8,
-    /// TODO: what is this?
+    /// We've received the last op bloom filter from our partner
+    /// (the one with `finished` == true)
     increment_ops_complete: bool,
     /// Round start time
     created_at: std::time::Instant,
@@ -406,9 +408,10 @@ impl ShardedGossipLocal {
                 vec![]
             }
             ShardedGossipWire::NoAgents(_) | ShardedGossipWire::AlreadyInProgress(_) => {
-                // maackle: Why remove state if gossip already in progress?
-                //          Don't we want to keep it? I guess I need to see how
-                //          and why this message would get transmitted.
+                // maackle: We may not need the AlreadyInProgress if we can just detect
+                //          when both nodes have attempted to simultaneously initiate
+                //          with each other, and we have a tie-breaker to decide
+                //          who will send the first agent bloom to kick off the round
                 self.remove_state(&cert).await?;
                 vec![]
             }
@@ -526,7 +529,7 @@ kitsune_p2p_types::write_codec_enum! {
         Ops(0x50) {
             /// The bloom filter for op data
             filter.0: PoolBuf,
-            /// TODO: what is this?
+            /// Is this the last bloom to be sent?
             finished.1: bool,
         },
 
@@ -534,7 +537,8 @@ kitsune_p2p_types::write_codec_enum! {
         MissingOps(0x60) {
             /// The missing ops
             ops.0: Vec<Arc<(Arc<KitsuneOpHash>, Vec<u8>)>>,
-            /// TODO: what is this?
+            /// Is this the last chunk of ops to be sent in response
+            /// to the bloom filter that we're responding to?
             finished.1: bool,
         },
 
@@ -543,7 +547,8 @@ kitsune_p2p_types::write_codec_enum! {
         },
 
         /// The node you are trying to gossip with has no agents anymore.
-        // maackle: seems like an optimization, can we just
+        // maackle: perhaps this should be a flag on the Agents (bloom) message,
+        //          since it would still be useful to gossip peer data
         NoAgents(0x80) {
         },
     }
