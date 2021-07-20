@@ -4,14 +4,20 @@ use holochain_types::signal::Signal;
 use holochain_types::prelude::*;
 use std::sync::Arc;
 use holochain_wasmer_host::prelude::WasmError;
+use crate::core::ribosome::HostFnAccess;
 
 pub fn emit_signal(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: AppSignal,
 ) -> Result<(), WasmError> {
-    let cell_id = call_context.host_access().cell_id().clone();
-    let signal = Signal::App(cell_id, input);
-    call_context.host_access().signal_tx().send(signal).map_err(|interface_error| WasmError::Host(interface_error.to_string()))?;
-    Ok(())
+    match HostFnAccess::from(&call_context.host_context()) {
+        HostFnAccess{ write_workspace: Permission::Allow, .. } => {
+            let cell_id = call_context.host_context().cell_id().clone();
+            let signal = Signal::App(cell_id, input);
+            call_context.host_context().signal_tx().send(signal).map_err(|interface_error| WasmError::Host(interface_error.to_string()))?;
+            Ok(())
+        },
+        _ => unreachable!(),
+    }
 }

@@ -1,10 +1,11 @@
+use std::collections::HashSet;
+
 use super::InterfaceApi;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::error::ConductorApiResult;
-
 use crate::conductor::api::error::SerializationError;
-
-use crate::conductor::error::CreateAppError;
+use crate::conductor::conductor::CellStatus;
+use crate::conductor::error::ConductorError;
 use crate::conductor::interface::error::InterfaceError;
 use crate::conductor::interface::error::InterfaceResult;
 use crate::conductor::ConductorHandle;
@@ -179,7 +180,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let installed_cells = cell_ids_with_proofs
                     .into_iter()
                     .map(|(cell_data, _)| cell_data);
-                let app = InstalledApp::new_inactive(InstalledAppCommon::new_legacy(
+                let app = InstalledApp::new_fresh(InstalledAppCommon::new_legacy(
                     installed_app_id,
                     installed_cells,
                 )?);
@@ -211,48 +212,67 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 Ok(AdminResponse::AgentPubKeyGenerated(agent_pub_key))
             }
             ListCellIds => {
-                let cell_ids = self.conductor_handle.list_cell_ids().await?;
+                let cell_ids = self
+                    .conductor_handle
+                    .list_cell_ids(Some(CellStatus::Joined))
+                    .await?;
                 Ok(AdminResponse::CellIdsListed(cell_ids))
             }
-            ListActiveApps => {
-                let app_ids = self.conductor_handle.list_active_apps().await?;
-                Ok(AdminResponse::ActiveAppsListed(app_ids))
+            ListEnabledApps => {
+                tracing::warn!(
+                    "AdminRequest::ListEnabledApps is deprecated, use AdminRequest::ListApps (TODO: update conductor-api)"
+                );
+
+                let app_ids = self.conductor_handle.list_running_apps().await?;
+                Ok(AdminResponse::EnabledAppsListed(app_ids))
             }
-            ActivateApp { installed_app_id } => {
-                // Activate app
+            ListApps { status_filter } => {
+                let apps = self.conductor_handle.list_apps(status_filter).await?;
+                Ok(AdminResponse::AppsListed(apps))
+            }
+            EnableApp { installed_app_id } => {
+                // Enable app
+                let (app, errors) = self
+                    .conductor_handle
+                    .clone()
+                    .enable_app(&installed_app_id)
+                    .await?;
+
+                let app_cells: HashSet<_> = app.required_cells().collect();
+
+                let app_info = self
+                    .conductor_handle
+                    .get_app_info(&installed_app_id)
+                    .await?
+                    .ok_or(ConductorError::AppNotInstalled(installed_app_id))?;
+
+                let errors: Vec<_> = errors
+                    .into_iter()
+                    .filter(|(cell_id, _)| app_cells.contains(cell_id))
+                    .map(|(cell_id, error)| (cell_id, error.to_string()))
+                    .collect();
+
+                Ok(AdminResponse::AppEnabled {
+                    app: app_info,
+                    errors,
+                })
+            }
+            DisableApp { installed_app_id } => {
+                // Disable app
+                self.conductor_handle
+                    .clone()
+                    .disable_app(&installed_app_id, DisabledAppReason::User)
+                    .await?;
+                Ok(AdminResponse::AppDisabled)
+            }
+            StartApp { installed_app_id } => {
+                // TODO: check to see if app was actually started
                 let app = self
                     .conductor_handle
-                    .activate_app(installed_app_id.clone())
+                    .clone()
+                    .start_app(&installed_app_id)
                     .await?;
-
-                // Create cells
-                let errors = self.conductor_handle.clone().setup_cells().await?;
-
-                // Check if this app was created successfully
-                errors
-                    .into_iter()
-                    // We only care about this app for the activate command
-                    .find(|cell_error| match cell_error {
-                        CreateAppError::Failed {
-                            installed_app_id: error_app_id,
-                            ..
-                        } => error_app_id == &installed_app_id,
-                    })
-                    // There was an error in this app so return it
-                    .map(|this_app_error| Ok(AdminResponse::Error(this_app_error.into())))
-                    // No error, return success
-                    .unwrap_or_else(|| {
-                        Ok(AdminResponse::AppActivated(
-                            InstalledAppInfo::from_installed_app(&InstalledApp::Active(app)),
-                        ))
-                    })
-            }
-            DeactivateApp { installed_app_id } => {
-                // Activate app
-                self.conductor_handle
-                    .deactivate_app(installed_app_id.clone(), DeactivationReason::Normal)
-                    .await?;
-                Ok(AdminResponse::AppDeactivated)
+                Ok(AdminResponse::AppStarted(app.status().is_running()))
             }
             AttachAppInterface { port } => {
                 let port = port.unwrap_or(0);
@@ -278,6 +298,22 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             RequestAgentInfo { cell_id } => {
                 let r = self.conductor_handle.get_agent_infos(cell_id).await?;
                 Ok(AdminResponse::AgentInfoRequested(r))
+            }
+
+            // deprecated aliases
+            ListActiveApps => {
+                tracing::warn!("Admin method ListActiveApps is deprecated: use ListApps instead.");
+                self.handle_admin_request_inner(ListEnabledApps).await
+            }
+            ActivateApp { installed_app_id } => {
+                tracing::warn!("Admin method ActivateApp is deprecated: use EnableApp instead (functionality is identical).");
+                self.handle_admin_request_inner(EnableApp { installed_app_id })
+                    .await
+            }
+            DeactivateApp { installed_app_id } => {
+                tracing::warn!("Admin method DeactivateApp is deprecated: use DisableApp instead (functionality is identical).");
+                self.handle_admin_request_inner(DisableApp { installed_app_id })
+                    .await
             }
         }
     }
@@ -348,7 +384,7 @@ mod test {
     async fn register_list_dna_app() -> Result<()> {
         observability::test_run().ok();
         let envs = test_environments();
-        let handle = Conductor::builder().test(&envs.into()).await?;
+        let handle = Conductor::builder().test(&envs.into(), &[]).await?;
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
         let uid = Uuid::new_v4();
@@ -480,7 +516,7 @@ mod test {
     async fn install_list_dna_app() {
         observability::test_run().ok();
         let envs = test_environments();
-        let handle = Conductor::builder().test(&envs.into()).await.unwrap();
+        let handle = Conductor::builder().test(&envs.into(), &[]).await.unwrap();
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
         let uid = Uuid::new_v4();
@@ -526,7 +562,7 @@ mod test {
         let agent_key2 = fake_agent_pubkey_2();
         let path_payload = InstallAppDnaPayload::hash_only(dna_hash.clone(), "".to_string());
         let cell_id2 = CellId::new(dna_hash.clone(), agent_key2.clone());
-        let expected_installed_app = InstalledApp::new_inactive(
+        let expected_installed_app = InstalledApp::new_fresh(
             InstalledAppCommon::new_legacy(
                 "test-by-path".to_string(),
                 vec![InstalledCell::new(cell_id2.clone(), "".to_string())],
@@ -551,21 +587,21 @@ mod test {
         let expects = vec![dna_hash.clone()];
         assert_matches!(dna_list, AdminResponse::DnasListed(a) if a == expects);
 
-        let expected_activated_app = InstalledApp::new_active(
+        let expected_enabled_app = InstalledApp::new_running(
             InstalledAppCommon::new_legacy(
                 "test-by-path".to_string(),
                 vec![InstalledCell::new(cell_id2.clone(), "".to_string())],
             )
             .unwrap(),
         );
-        let expected_activated_app_info: InstalledAppInfo = (&expected_activated_app).into();
+        let expected_enabled_app_info: InstalledAppInfo = (&expected_enabled_app).into();
         let res = admin_api
-            .handle_admin_request(AdminRequest::ActivateApp {
+            .handle_admin_request(AdminRequest::EnableApp {
                 installed_app_id: "test-by-path".to_string(),
             })
             .await;
         assert_matches!(res,
-            AdminResponse::AppActivated(info) if info == expected_activated_app_info
+            AdminResponse::AppEnabled {app, ..} if app == expected_enabled_app_info
         );
 
         let res = admin_api
@@ -579,16 +615,16 @@ mod test {
             .handle_admin_request(AdminRequest::InstallApp(Box::new(hash_install_payload)))
             .await;
         let _res = admin_api
-            .handle_admin_request(AdminRequest::ActivateApp {
+            .handle_admin_request(AdminRequest::EnableApp {
                 installed_app_id: "test-by-hash".to_string(),
             })
             .await;
 
         let res = admin_api
-            .handle_admin_request(AdminRequest::ListActiveApps)
+            .handle_admin_request(AdminRequest::ListEnabledApps)
             .await;
 
-        assert_matches!(res, AdminResponse::ActiveAppsListed(v) if v.contains(&"test-by-path".to_string()) && v.contains(&"test-by-hash".to_string())
+        assert_matches!(res, AdminResponse::EnabledAppsListed(v) if v.contains(&"test-by-path".to_string()) && v.contains(&"test-by-hash".to_string())
         );
 
         handle.shutdown().await;

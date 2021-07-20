@@ -11,6 +11,7 @@ use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::*;
 use std::collections::{HashMap, HashSet};
+use std::sync::atomic;
 use std::sync::Arc;
 
 /// max send buffer size (keep it under 16384 with a little room for overhead)
@@ -152,21 +153,20 @@ pub(crate) struct SimpleBloomModInner {
     /// Metrics to be recorded at the end of this round of gossip
     pending_metrics: Vec<(Vec<Arc<KitsuneAgent>>, NodeInfo)>,
 
-    last_initiate_check: std::time::Instant,
+    last_initiate_check_us: ProcCountMicros,
     initiate_tgt: Option<GossipTgt>,
 
     incoming: Vec<(Tx2ConHnd<wire::Wire>, GossipWire)>,
 
-    last_outgoing: std::time::Instant,
+    last_outgoing_us: ProcCountMicros,
     outgoing: Vec<(GossipTgt, HowToConnect, GossipWire)>,
 }
 
 impl SimpleBloomModInner {
     pub fn new() -> Self {
         // pick an old instant for initialization
-        let old = std::time::Instant::now()
-            .checked_sub(std::time::Duration::from_secs(60 * 60 * 24))
-            .unwrap();
+        const ONE_DAY_MICROS: i64 = 1000 * 1000 * 60 * 60 * 24;
+        let old_us = proc_count_now_us() - ONE_DAY_MICROS;
 
         Self {
             local_agents: HashSet::new(),
@@ -176,12 +176,12 @@ impl SimpleBloomModInner {
 
             pending_metrics: Vec::new(),
 
-            last_initiate_check: old,
+            last_initiate_check_us: old_us,
             initiate_tgt: None,
 
             incoming: Vec::new(),
 
-            last_outgoing: old,
+            last_outgoing_us: old_us,
             outgoing: Vec::new(),
         }
     }
@@ -210,6 +210,7 @@ enum CheckResult {
 }
 
 pub(crate) struct SimpleBloomMod {
+    cont: Arc<atomic::AtomicBool>,
     tuning_params: KitsuneP2pTuningParams,
     send_interval_ms: u64,
     space: Arc<KitsuneSpace>,
@@ -237,7 +238,10 @@ impl SimpleBloomMod {
             / tuning_params.gossip_output_target_mbps
         ) as u64;
 
+        let cont = Arc::new(atomic::AtomicBool::new(true));
+
         let this = Arc::new(Self {
+            cont: cont.clone(),
             tuning_params,
             space,
             ep_hnd,
@@ -252,16 +256,20 @@ impl SimpleBloomMod {
         let gossip = this.clone();
         metric_task(async move {
             loop {
+                if !cont.load(atomic::Ordering::Relaxed) {
+                    break;
+                }
+
                 tokio::time::sleep(std::time::Duration::from_millis(
                     loop_check_interval_ms as u64,
                 ))
                 .await;
 
                 if let GossipIterationResult::Close = gossip.run_one_iteration().await {
-                    tracing::warn!("gossip loop ending");
                     break;
                 }
             }
+            tracing::warn!("gossip loop ending");
 
             KitsuneResult::Ok(())
         });
@@ -434,6 +442,10 @@ impl SimpleBloomMod {
 }
 
 impl AsGossipModule for SimpleBloomMod {
+    fn close(&self) {
+        self.cont.store(false, atomic::Ordering::Relaxed);
+    }
+
     fn incoming_gossip(
         &self,
         con: Tx2ConHnd<wire::Wire>,

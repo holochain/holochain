@@ -237,7 +237,7 @@ pub mod test_utils {
         let envs = test_environments();
 
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-            .test(&envs)
+            .test(&envs, &[])
             .await
             .unwrap();
 
@@ -248,18 +248,23 @@ pub mod test_utils {
             .unwrap();
 
         conductor_handle
-            .activate_app("test app".to_string())
+            .clone()
+            .enable_app(&"test app".to_string())
             .await
             .unwrap();
 
-        let errors = conductor_handle.clone().setup_cells().await.unwrap();
+        let errors = conductor_handle
+            .clone()
+            .reconcile_cell_status_with_app_status()
+            .await
+            .unwrap();
 
         assert!(errors.is_empty());
 
         let handle = conductor_handle.clone();
 
         (
-            envs.tempdir(),
+            Arc::new(envs.into_tempdir()),
             RealAppInterfaceApi::new(conductor_handle, Default::default()),
             handle,
         )
@@ -316,8 +321,8 @@ pub mod test {
 
     async fn setup_admin() -> (Arc<TempDir>, ConductorHandle) {
         let envs = test_environments();
-        let conductor_handle = Conductor::builder().test(&envs).await.unwrap();
-        (envs.tempdir(), conductor_handle)
+        let conductor_handle = Conductor::builder().test(&envs, &[]).await.unwrap();
+        (Arc::new(envs.into_tempdir()), conductor_handle)
     }
 
     async fn setup_admin_fake_cells(
@@ -326,7 +331,7 @@ pub mod test {
     ) -> (Arc<TempDir>, ConductorHandle) {
         let envs = test_environments();
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-            .test(&envs)
+            .test(&envs, &[])
             .await
             .unwrap();
 
@@ -341,16 +346,21 @@ pub mod test {
             .await
             .unwrap();
 
-        (envs.tempdir(), conductor_handle)
+        (Arc::new(envs.into_tempdir()), conductor_handle)
     }
 
     async fn activate(conductor_handle: ConductorHandle) -> ConductorHandle {
         conductor_handle
-            .activate_app("test app".to_string())
+            .clone()
+            .enable_app(&"test app".to_string())
             .await
             .unwrap();
 
-        let errors = conductor_handle.clone().setup_cells().await.unwrap();
+        let errors = conductor_handle
+            .clone()
+            .reconcile_cell_status_with_app_status()
+            .await
+            .unwrap();
 
         assert!(errors.is_empty());
 
@@ -476,7 +486,7 @@ pub mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn activate_app() {
+    async fn enable_disable_app() {
         observability::test_run().ok();
         let agent_key = fake_agent_pubkey_1();
         let mut dnas = Vec::new();
@@ -511,15 +521,16 @@ pub mod test {
         let (_tmpdir, conductor_handle) =
             setup_admin_fake_cells(cell_ids_with_proofs, dna_store).await;
         let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
+        let app_id = "test app".to_string();
 
         // Activate the app
-        let msg = AdminRequest::ActivateApp {
-            installed_app_id: "test app".to_string(),
+        let msg = AdminRequest::EnableApp {
+            installed_app_id: app_id.clone(),
         };
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AdminResponse::AppActivated(_));
+            assert_matches!(response, AdminResponse::AppEnabled { .. });
             async { Ok(()) }.boxed().into()
         };
         let respond = Respond::Request(Box::new(respond));
@@ -532,14 +543,13 @@ pub mod test {
         // Get the state
         let state: ConductorState = conductor_handle.get_state_from_handle().await.unwrap();
 
-        // Check it is not in inactive apps
-        let r = state.inactive_apps.get("test app");
-        assert_eq!(r, None);
-
-        // Check it is in active apps
+        // Check it is running, and get all cells
         let cell_ids: HashSet<CellId> = state
-            .active_apps
-            .get("test app")
+            .get_app(&app_id)
+            .map(|app| {
+                assert_eq!(*app.status(), AppStatus::Running);
+                app
+            })
             .unwrap()
             .all_cells()
             .cloned()
@@ -553,23 +563,23 @@ pub mod test {
 
         assert_eq!(expected, cell_ids);
 
-        // Check that it is returned in get_app_info as active
-        let maybe_info = state.get_app_info(&"test app".to_string());
+        // Check that it is returned in get_app_info as running
+        let maybe_info = state.get_app_info(&app_id);
         if let Some(info) = maybe_info {
-            assert_eq!(info.installed_app_id, "test app");
-            assert_matches!(info.status, InstalledAppStatus::Active);
+            assert_eq!(info.installed_app_id, app_id);
+            assert_matches!(info.status, InstalledAppInfoStatus::Running);
         } else {
             assert!(false);
         }
 
         // Now deactivate app
         let msg = AdminRequest::DeactivateApp {
-            installed_app_id: "test app".to_string(),
+            installed_app_id: app_id.clone(),
         };
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AdminResponse::AppDeactivated);
+            assert_matches!(response, AdminResponse::AppDisabled);
             async { Ok(()) }.boxed().into()
         };
         let respond = Respond::Request(Box::new(respond));
@@ -582,14 +592,13 @@ pub mod test {
         // Get the state
         let state = conductor_handle.get_state_from_handle().await.unwrap();
 
-        // Check it's removed from active
-        let r = state.active_apps.get("test app");
-        assert_eq!(r, None);
-
-        // Check it's added to inactive
+        // Check it's deactivated, and get all cells
         let cell_ids: HashSet<CellId> = state
-            .inactive_apps
-            .get("test app")
+            .get_app(&app_id)
+            .map(|app| {
+                assert_matches!(*app.status(), AppStatus::Disabled(_));
+                app
+            })
             .unwrap()
             .all_cells()
             .cloned()
@@ -597,11 +606,11 @@ pub mod test {
 
         assert_eq!(expected, cell_ids);
 
-        // Check that it is returned in get_app_info as not active
-        let maybe_info = state.get_app_info(&"test app".to_string());
+        // Check that it is returned in get_app_info as deactivated
+        let maybe_info = state.get_app_info(&app_id);
         if let Some(info) = maybe_info {
-            assert_eq!(info.installed_app_id, "test app");
-            assert_matches!(info.status, InstalledAppStatus::Inactive { .. });
+            assert_eq!(info.installed_app_id, app_id);
+            assert_matches!(info.status, InstalledAppInfoStatus::Disabled { .. });
         } else {
             assert!(false);
         }
@@ -692,9 +701,9 @@ pub mod test {
         .unwrap()
     }
 
-    #[tokio::test(flavor = "multi_thread")]
     /// Check that we can add and get agent info for a conductor
     /// across the admin websocket.
+    #[tokio::test(flavor = "multi_thread")]
     async fn add_agent_info_via_admin() {
         observability::test_run().ok();
         let test_envs = test_environments();
@@ -719,7 +728,7 @@ pub mod test {
             {
                 let mut count = 0;
                 for env in p2p.lock().values() {
-                    count += env.conn().unwrap().p2p_list().unwrap().len();
+                    count += env.conn().unwrap().p2p_list_agents().unwrap().len();
                 }
                 count
             },

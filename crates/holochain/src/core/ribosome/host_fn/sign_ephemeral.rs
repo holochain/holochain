@@ -7,29 +7,36 @@ use ring::rand::SystemRandom;
 use ring::signature::Ed25519KeyPair;
 use ring::signature::KeyPair;
 use std::sync::Arc;
+use crate::core::ribosome::HostFnAccess;
 
 pub fn sign_ephemeral(
     _ribosome: Arc<impl RibosomeT>,
-    _call_context: Arc<CallContext>,
+    call_context: Arc<CallContext>,
     input: SignEphemeral,
 ) -> Result<EphemeralSignatures, WasmError> {
-    let rng = SystemRandom::new();
-    let mut seed = [0; 32];
-    rng.fill(&mut seed)
-        .map_err(|e| WasmError::Guest(e.to_string()))?;
-    let ephemeral_keypair =
-        Ed25519KeyPair::from_seed_unchecked(&seed).map_err(|e| WasmError::Host(e.to_string()))?;
+    match HostFnAccess::from(&call_context.host_context()) {
+        HostFnAccess{ keystore: Permission::Allow, .. } => {
+            let rng = SystemRandom::new();
+            let mut seed = [0; 32];
+            rng.fill(&mut seed)
+                .map_err(|e| WasmError::Guest(e.to_string()))?;
+            let ephemeral_keypair =
+                Ed25519KeyPair::from_seed_unchecked(&seed).map_err(|e| WasmError::Host(e.to_string()))?;
 
-    let signatures: Result<Vec<Signature>, _> = input
-        .into_inner()
-        .into_iter()
-        .map(|data| ephemeral_keypair.sign(&data).as_ref().try_into())
-        .collect();
+            let signatures: Result<Vec<Signature>, _> = input
+                .into_inner()
+                .into_iter()
+                .map(|data| ephemeral_keypair.sign(&data).as_ref().try_into())
+                .collect();
 
-    Ok(EphemeralSignatures {
-        signatures: signatures.map_err(|e| WasmError::Host(e.to_string()))?,
-        key: AgentPubKey::from_raw_32(ephemeral_keypair.public_key().as_ref().to_vec()),
-    })
+            Ok(EphemeralSignatures {
+                signatures: signatures.map_err(|e| WasmError::Host(e.to_string()))?,
+                key: AgentPubKey::from_raw_32(ephemeral_keypair.public_key().as_ref().to_vec()),
+            })
+        },
+        _ => unreachable!(),
+    }
+
 }
 
 #[cfg(test)]
@@ -57,7 +64,7 @@ pub mod wasm_test {
         host_access.workspace = workspace;
 
         let output: Vec<EphemeralSignatures> =
-            crate::call_test_ribosome!(host_access, TestWasm::Sign, "sign_ephemeral", ());
+            crate::call_test_ribosome!(host_access, TestWasm::Sign, "sign_ephemeral", ()).unwrap();
 
         #[derive(Serialize, Deserialize, Debug)]
         struct One([u8; 2]);

@@ -91,20 +91,20 @@ impl XSalsa20Poly1305Decrypt {
 
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct X25519XSalsa20Poly1305Decrypt {
-    sender: X25519PubKey,
     recipient: X25519PubKey,
+    sender: X25519PubKey,
     encrypted_data: XSalsa20Poly1305EncryptedData,
 }
 
 impl X25519XSalsa20Poly1305Decrypt {
     pub fn new(
-        sender: X25519PubKey,
         recipient: X25519PubKey,
+        sender: X25519PubKey,
         encrypted_data: XSalsa20Poly1305EncryptedData,
     ) -> Self {
         Self {
-            sender,
             recipient,
+            sender,
             encrypted_data,
         }
     }

@@ -23,7 +23,7 @@ use crate::core::ribosome::guest_callback::validation_package::ValidationPackage
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::FnComponents;
-use crate::core::ribosome::HostAccess;
+use crate::core::ribosome::HostContext;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::ZomesToInvoke;
@@ -418,7 +418,7 @@ fixturator!(
 );
 
 fixturator!(
-    HostAccess;
+    HostContext;
     variants [
         ZomeCall(ZomeCallHostAccess)
         Validate(ValidateHostAccess)
@@ -432,7 +432,7 @@ fixturator!(
 
 fixturator!(
     CallContext;
-    constructor fn new(Zome, HostAccess);
+    constructor fn new(Zome, HostContext);
 );
 
 fixturator!(
@@ -486,7 +486,7 @@ impl Iterator for ZomeCallInvocationFixturator<NamedInvocation> {
             .next()
             .unwrap();
         ret.cell_id = self.0.curve.0.clone();
-        ret.zome = self.0.curve.1.clone().into();
+        ret.zome = self.0.curve.1.into();
         ret.fn_name = self.0.curve.2.clone().into();
         ret.payload = self.0.curve.3.clone();
 

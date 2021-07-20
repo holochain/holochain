@@ -1,9 +1,10 @@
 use crate::test_utils::conductor_setup::ConductorTestData;
+use crate::test_utils::consistency_envs;
 use crate::test_utils::new_zome_call;
-use crate::test_utils::wait_for_integration;
 use hdk::prelude::*;
 use holochain_p2p::{AgentPubKeyExt, DnaHashExt};
 use holochain_sqlite::prelude::*;
+use holochain_state::prelude::dump_tmp;
 use holochain_state::prelude::fresh_reader_test;
 use holochain_test_wasm_common::AnchorInput;
 use holochain_wasm_test_utils::TestWasm;
@@ -42,18 +43,13 @@ async fn gossip_test() {
     let bob_cell_id = &bob_call_data.cell_id;
 
     // Give gossip some time to finish
-    const NUM_ATTEMPTS: usize = 100;
+    const NUM_ATTEMPTS: usize = 200;
     const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
 
-    // 13 ops per anchor plus 7 for genesis + 2 for init + 2 for cap
-    let expected_count = NUM * 13 + 7 * 2 + 2 + 2;
-    wait_for_integration(
-        &bob_call_data.env,
-        expected_count,
-        NUM_ATTEMPTS,
-        DELAY_PER_ATTEMPT.clone(),
-    )
-    .await;
+    let all_cell_envs = vec![&bob_call_data.env, &conductor_test.alice_call_data().env];
+    consistency_envs(&all_cell_envs, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await;
+
+    dump_tmp(&bob_call_data.env);
 
     // Bob list anchors
     let invocation = new_zome_call(
@@ -111,8 +107,8 @@ async fn agent_info_test() {
     let p2p_env = handle.get_p2p_env(dna_kit.clone()).await;
 
     let (agent_info, len) = fresh_reader_test(p2p_env.clone(), |txn| {
-        let agent_info = txn.p2p_get(&alice_kit).unwrap();
-        let len = txn.p2p_list().unwrap().len();
+        let agent_info = txn.p2p_get_agent(&alice_kit).unwrap();
+        let len = txn.p2p_list_agents().unwrap().len();
         (agent_info, len)
     });
     tracing::debug!(?agent_info);
@@ -134,9 +130,9 @@ async fn agent_info_test() {
     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
     let (alice_agent_info, bob_agent_info, len) = fresh_reader_test(p2p_env.clone(), |txn| {
-        let alice_agent_info = txn.p2p_get(&alice_kit).unwrap();
-        let bob_agent_info = txn.p2p_get(&bob_kit).unwrap();
-        let len = txn.p2p_list().unwrap().len();
+        let alice_agent_info = txn.p2p_get_agent(&alice_kit).unwrap();
+        let bob_agent_info = txn.p2p_get_agent(&bob_kit).unwrap();
+        let len = txn.p2p_list_agents().unwrap().len();
         (alice_agent_info, bob_agent_info, len)
     });
     tracing::debug!(?alice_agent_info);

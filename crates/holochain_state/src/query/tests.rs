@@ -7,8 +7,8 @@ use holochain_sqlite::rusqlite::{Transaction, NO_PARAMS};
 use holochain_sqlite::{rusqlite::Connection, schema::SCHEMA_CELL};
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::OpOrder;
-use holochain_types::EntryHashed;
 use holochain_types::{dht_op::DhtOp, header::NewEntryHeader};
+use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::*;
 
 use super::link::*;

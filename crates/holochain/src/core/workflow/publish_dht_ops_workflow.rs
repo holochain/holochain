@@ -37,7 +37,7 @@ pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(5);
 #[instrument(skip(env, network))]
 pub async fn publish_dht_ops_workflow(
     env: EnvWrite,
-    mut network: HolochainP2pCell,
+    network: HolochainP2pCell,
 ) -> WorkflowResult<WorkComplete> {
     let (to_publish, hashes) =
         publish_dht_ops_workflow_inner(env.clone().into(), network.from_agent()).await?;
@@ -271,16 +271,21 @@ mod tests {
 
     /// There is a test that shows that if the validation_receipt_count > R
     /// for a DHTOp we don't re-publish it
-    #[test_case(1, 1)]
-    #[test_case(1, 10)]
-    #[test_case(1, 100)]
-    #[test_case(10, 1)]
-    #[test_case(10, 10)]
-    #[test_case(10, 100)]
-    #[test_case(100, 1)]
-    #[test_case(100, 10)]
-    #[test_case(100, 100)]
-    fn test_no_republish(num_agents: u32, num_hash: u32) {
+    // #[test_case(1, 1)]
+    // #[test_case(1, 10)]
+    // #[test_case(1, 100)]
+    // #[test_case(10, 1)]
+    // #[test_case(10, 10)]
+    // #[test_case(10, 100)]
+    // #[test_case(100, 1)]
+    // #[test_case(100, 10)]
+    // #[test_case(100, 100)]
+    #[test]
+    #[ignore = "Publish currently doesn't respect receipt count so this test is of no use until we add that back"]
+    // fn test_no_republish(num_agents: u32, num_hash: u32) {
+    fn test_no_republish() {
+        let num_agents = 0;
+        let num_hash = 0;
         tokio_helper::block_forever_on(async {
             observability::test_run().ok();
 

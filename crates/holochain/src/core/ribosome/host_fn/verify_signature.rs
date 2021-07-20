@@ -4,19 +4,23 @@ use holochain_keystore::AgentPubKeyExt;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
+use crate::core::ribosome::HostFnAccess;
 
 pub fn verify_signature(
     _ribosome: Arc<impl RibosomeT>,
-    _call_context: Arc<CallContext>,
+    call_context: Arc<CallContext>,
     input: VerifySignature,
 ) -> Result<bool, WasmError> {
-    tokio_helper::block_forever_on(async move {
-        input
-            .key
-            .verify_signature_raw(input.as_ref(), input.as_data_ref())
-            .await
-    })
-    .map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))
+    match HostFnAccess::from(&call_context.host_context()) {
+        HostFnAccess { keystore_deterministic: Permission::Allow, .. } => tokio_helper::block_forever_on(async move {
+            input
+                .key
+                .verify_signature_raw(input.as_ref(), input.as_data_ref())
+                .await
+        })
+        .map_err(|keystore_error| WasmError::Host(keystore_error.to_string())),
+        _ => unreachable!(),
+    }
 }
 
 #[cfg(test)]
@@ -149,7 +153,7 @@ pub mod wasm_test {
                     TestWasm::Sign,
                     "verify_signature_raw",
                     VerifySignature::new_raw(k.clone(), sig.clone().into(), data.clone())
-                );
+                ).unwrap();
 
                 assert_eq!(expect, output_raw, "raw: {}", name);
             }
@@ -175,6 +179,6 @@ pub mod wasm_test {
             TestWasm::Sign,
             "verify_signature",
             fake_agent_pubkey_1()
-        );
+        ).unwrap();
     }
 }

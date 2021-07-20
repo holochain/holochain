@@ -6,7 +6,7 @@ impl SimpleBloomMod {
 
         // get the remote certs we might want to speak to
         let endpoints: HashMap<GossipTgt, TxUrl> = self.inner.share_mut(|inner, _| {
-            inner.last_initiate_check = std::time::Instant::now();
+            inner.last_initiate_check_us = proc_count_now_us();
             // TODO: In the future we'll pull the endpoints from a p2p store query that
             //       finds nodes which overlap our arc.
             //       For now we use `local_data_map`.
@@ -20,6 +20,8 @@ impl SimpleBloomMod {
                             return None;
                         }
 
+                        // any "inactive" agent_infos with zero urls will
+                        // get filtered out at this stage
                         if let Some(url) = agent_info_signed.url_list.get(0) {
                             if let Ok(purl) = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()) {
                                 return Some((

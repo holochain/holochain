@@ -1,6 +1,6 @@
 [package]
 name = "hdk"
-version = "0.0.101-alpha.0"
+version = "0.0.102-dev.0"
 description = "The Holochain HDK"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain/tree/develop/crates/hdk"
@@ -20,21 +20,21 @@ mock = ["hdk_derive/mock", "mockall"]
 test_utils = [ "holochain_zome_types/test_utils" ]
 
 [dependencies]
-hdk_derive = { version = "^0.0.2-alpha.1", path = "../hdk_derive" }
-holo_hash = { version = "0.0.2-alpha.1", path = "../holo_hash" }
-holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", tag = "v0.0.69" }
-holochain_zome_types = { version = "0.0.2-alpha.1", path = "../holochain_zome_types" }
+hdk_derive = { version = "0.0.4-dev.0", path = "../hdk_derive" }
+holo_hash = { version = "0.0.4-dev.0", path = "../holo_hash" }
+holochain_wasmer_guest = "=0.0.72"
+holochain_zome_types = { version = "0.0.4-dev.0", path = "../holochain_zome_types" }
 paste = "=1.0.5"
 serde = "1.0"
 serde_bytes = "0.11"
 thiserror = "1.0.22"
 tracing = "0.1"
 tracing-core = "0.1"
-mockall = { version = "0.9", optional = true }
+mockall = { version = "0.8", optional = true }
 
 [dependencies.tracing-subscriber]
 version = "0.2"
 features = []
 
 [dev-dependencies]
-fixt = { path = "../fixt" }
+fixt = { path = "../fixt" ,version = "0.0.4-dev.0"}

@@ -1,5 +1,5 @@
 use crate::core::ribosome::FnComponents;
-use crate::core::ribosome::HostAccess;
+use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
@@ -79,7 +79,7 @@ pub struct ValidateLinkHostAccess {
     pub network: HolochainP2pCell,
 }
 
-impl From<ValidateLinkHostAccess> for HostAccess {
+impl From<ValidateLinkHostAccess> for HostContext {
     fn from(validate_link_add_host_access: ValidateLinkHostAccess) -> Self {
         Self::ValidateCreateLink(validate_link_add_host_access)
     }
@@ -88,8 +88,9 @@ impl From<ValidateLinkHostAccess> for HostAccess {
 impl From<&ValidateLinkHostAccess> for HostFnAccess {
     fn from(_: &ValidateLinkHostAccess) -> Self {
         let mut access = Self::none();
-        access.read_workspace = Permission::Allow;
-        access.dna_bindings = Permission::Allow;
+        access.keystore_deterministic = Permission::Allow;
+        access.read_workspace_deterministic = Permission::Allow;
+        access.bindings_deterministic = Permission::Allow;
         access
     }
 }
@@ -224,8 +225,9 @@ mod test {
                 .next()
                 .unwrap();
         let mut access = HostFnAccess::none();
-        access.read_workspace = Permission::Allow;
-        access.dna_bindings = Permission::Allow;
+        access.read_workspace_deterministic = Permission::Allow;
+        access.bindings_deterministic = Permission::Allow;
+        access.keystore_deterministic = Permission::Allow;
         assert_eq!(HostFnAccess::from(&validate_link_add_host_access), access,);
     }
 
@@ -367,7 +369,8 @@ mod slow_tests {
         host_access.workspace = workspace.clone();
 
         let output: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::ValidateLink, "add_valid_link", ());
+            crate::call_test_ribosome!(host_access, TestWasm::ValidateLink, "add_valid_link", ())
+                .unwrap();
 
         // the chain head should be the committed entry header
         let chain_head = tokio_helper::block_forever_on(async move {
@@ -397,7 +400,8 @@ mod slow_tests {
         host_access.workspace = workspace.clone();
 
         let output: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::ValidateLink, "add_invalid_link", ());
+            crate::call_test_ribosome!(host_access, TestWasm::ValidateLink, "add_invalid_link", ())
+                .unwrap();
 
         // the chain head should be the committed entry header
         let chain_head = tokio_helper::block_forever_on(async move {

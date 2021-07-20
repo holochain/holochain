@@ -12,6 +12,7 @@ use anyhow::bail;
 use anyhow::ensure;
 use holochain_conductor_api::AdminRequest;
 use holochain_conductor_api::AdminResponse;
+use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::{AdminInterfaceConfig, InstalledAppInfo};
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
@@ -67,8 +68,10 @@ pub enum AdminRequestCli {
     ListCells,
     /// Calls AdminRequest::ListActiveApps.
     ListActiveApps,
-    ActivateApp(ActivateApp),
-    DeactivateApp(DeactivateApp),
+    /// Calls AdminRequest::ListApps.
+    ListApps(ListApps),
+    EnableApp(EnableApp),
+    DisableApp(DisableApp),
     DumpState(DumpState),
     /// Calls AdminRequest::AddAgentInfo.
     /// [Unimplemented].
@@ -159,18 +162,18 @@ pub struct InstallAppBundle {
 }
 
 #[derive(Debug, StructOpt, Clone)]
-/// Calls AdminRequest::ActivateApp
+/// Calls AdminRequest::EnableApp
 /// and activates the installed app.
-pub struct ActivateApp {
+pub struct EnableApp {
     /// The InstalledAppId to activate.
     pub app_id: String,
 }
 
 #[derive(Debug, StructOpt, Clone)]
-/// Calls AdminRequest::DeactivateApp
-/// and deactivates the installed app.
-pub struct DeactivateApp {
-    /// The InstalledAppId to deactivate.
+/// Calls AdminRequest::DisableApp
+/// and disables the installed app.
+pub struct DisableApp {
+    /// The InstalledAppId to disable.
     pub app_id: String,
 }
 
@@ -201,6 +204,16 @@ pub struct ListAgents {
     pub dna: Option<DnaHash>,
 }
 
+#[derive(Debug, StructOpt, Clone)]
+/// Calls AdminRequest::ListApps
+/// and pretty prints the list of apps
+/// installed in this conductor.
+pub struct ListApps {
+    #[structopt(short, long, parse(try_from_str = parse_status_filter))]
+    /// Optionally request agent info for a particular cell id.
+    pub status: Option<AppStatusFilter>,
+}
+
 #[doc(hidden)]
 pub async fn call(holochain_path: &Path, req: Call) -> anyhow::Result<()> {
     let Call {
@@ -221,7 +234,9 @@ pub async fn call(holochain_path: &Path, req: Call) -> anyhow::Result<()> {
                 Ok(cmd) => cmds.push((cmd, None)),
                 Err(e) => {
                     if let holochain_websocket::WebsocketError::Io(e) = &e {
-                        if let std::io::ErrorKind::ConnectionRefused = e.kind() {
+                        if let std::io::ErrorKind::ConnectionRefused
+                        | std::io::ErrorKind::AddrNotAvailable = e.kind()
+                        {
                             let (port, holochain) = run_async(holochain_path, path, None).await?;
                             cmds.push((CmdRunner::new(port).await, Some(holochain)));
                             continue;
@@ -288,17 +303,21 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
             msg!("Cell Ids: {:?}", cells);
         }
         AdminRequestCli::ListActiveApps => {
-            let apps = list_active_apps(cmd).await?;
+            let apps = list_running_apps(cmd).await?;
             msg!("Active Apps: {:?}", apps);
         }
-        AdminRequestCli::ActivateApp(args) => {
+        AdminRequestCli::ListApps(args) => {
+            let apps = list_apps(cmd, args).await?;
+            msg!("List Apps: {:?}", apps);
+        }
+        AdminRequestCli::EnableApp(args) => {
             let app_id = args.app_id.clone();
-            activate_app(cmd, args).await?;
+            enable_app(cmd, args).await?;
             msg!("Activated app: {:?}", app_id);
         }
-        AdminRequestCli::DeactivateApp(args) => {
+        AdminRequestCli::DisableApp(args) => {
             let app_id = args.app_id.clone();
-            deactivate_app(cmd, args).await?;
+            disable_app(cmd, args).await?;
             msg!("Deactivated app: {:?}", app_id);
         }
         AdminRequestCli::DumpState(args) => {
@@ -443,9 +462,9 @@ pub async fn install_app(
     let installed_app = cmd.command(r).await?;
     let installed_app =
         expect_match!(installed_app => AdminResponse::AppInstalled, "Failed to install app");
-    activate_app(
+    enable_app(
         cmd,
-        ActivateApp {
+        EnableApp {
             app_id: installed_app.installed_app_id.clone(),
         },
     )
@@ -484,9 +503,9 @@ pub async fn install_app_bundle(
     let installed_app = cmd.command(r).await?;
     let installed_app =
         expect_match!(installed_app => AdminResponse::AppBundleInstalled, "Failed to install app");
-    activate_app(
+    enable_app(
         cmd,
-        ActivateApp {
+        EnableApp {
             app_id: installed_app.installed_app_id.clone(),
         },
     )
@@ -521,32 +540,45 @@ pub async fn list_cell_ids(cmd: &mut CmdRunner) -> anyhow::Result<Vec<CellId>> {
 }
 
 /// Calls [`AdminRequest::ListActiveApps`].
-pub async fn list_active_apps(cmd: &mut CmdRunner) -> anyhow::Result<Vec<String>> {
+pub async fn list_running_apps(cmd: &mut CmdRunner) -> anyhow::Result<Vec<String>> {
     let resp = cmd.command(AdminRequest::ListActiveApps).await?;
     Ok(expect_match!(resp => AdminResponse::ActiveAppsListed, "Failed to list active apps"))
 }
 
-/// Calls [`AdminRequest::ActivateApp`] and activates the installed app.
-pub async fn activate_app(cmd: &mut CmdRunner, args: ActivateApp) -> anyhow::Result<()> {
+/// Calls [`AdminRequest::ListApps`].
+pub async fn list_apps(
+    cmd: &mut CmdRunner,
+    args: ListApps,
+) -> anyhow::Result<Vec<InstalledAppInfo>> {
     let resp = cmd
-        .command(AdminRequest::ActivateApp {
+        .command(AdminRequest::ListApps {
+            status_filter: args.status,
+        })
+        .await?;
+    Ok(expect_match!(resp => AdminResponse::AppsListed, "Failed to list apps"))
+}
+
+/// Calls [`AdminRequest::EnableApp`] and activates the installed app.
+pub async fn enable_app(cmd: &mut CmdRunner, args: EnableApp) -> anyhow::Result<()> {
+    let resp = cmd
+        .command(AdminRequest::EnableApp {
             installed_app_id: args.app_id,
         })
         .await?;
-    expect_match!(resp => AdminResponse::AppActivated, format!("Failed to activate app, got: {:?}", resp));
+    assert!(matches!(resp, AdminResponse::AppEnabled { .. }));
     Ok(())
 }
 
-/// Calls [`AdminRequest::DeactivateApp`] and deactivates the installed app.
-pub async fn deactivate_app(cmd: &mut CmdRunner, args: DeactivateApp) -> anyhow::Result<()> {
+/// Calls [`AdminRequest::DisableApp`] and disables the installed app.
+pub async fn disable_app(cmd: &mut CmdRunner, args: DisableApp) -> anyhow::Result<()> {
     let resp = cmd
-        .command(AdminRequest::DeactivateApp {
+        .command(AdminRequest::DisableApp {
             installed_app_id: args.app_id,
         })
         .await?;
     ensure!(
-        matches!(resp, AdminResponse::AppDeactivated),
-        "Failed to deactivate app, got: {:?}",
+        matches!(resp, AdminResponse::AppDisabled),
+        "Failed to disable app, got: {:?}",
         resp
     );
     Ok(())
@@ -612,6 +644,17 @@ fn parse_agent_key(arg: &str) -> anyhow::Result<AgentPubKey> {
 
 fn parse_dna_hash(arg: &str) -> anyhow::Result<DnaHash> {
     DnaHash::try_from(arg).map_err(|e| anyhow::anyhow!("{:?}", e))
+}
+
+fn parse_status_filter(arg: &str) -> anyhow::Result<AppStatusFilter> {
+    match arg {
+        "active" => Ok(AppStatusFilter::Enabled),
+        "inactive" => Ok(AppStatusFilter::Disabled),
+        _ => Err(anyhow::anyhow!(
+            "Bad app status filter value: {}, only 'active' and 'inactive' are possible",
+            arg
+        )),
+    }
 }
 
 impl From<CellId> for DumpState {

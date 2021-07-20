@@ -9,7 +9,7 @@
 //! use holochain::conductor::{Conductor, ConductorBuilder, ConductorHandle};
 //! let envs = test_environments();
 //! let handle: ConductorHandle = ConductorBuilder::new()
-//!    .test(&envs)
+//!    .test(&envs, &[])
 //!    .await
 //!    .unwrap();
 //!
@@ -41,33 +41,49 @@
 
 use super::api::error::ConductorApiResult;
 use super::api::ZomeCall;
+use super::conductor::CellStatus;
 use super::config::AdminInterfaceConfig;
 use super::error::ConductorResult;
-use super::error::CreateAppError;
+use super::integration_dump;
 use super::interface::SignalBroadcaster;
+use super::manager::spawn_task_manager;
+use super::manager::TaskManagerClient;
 use super::manager::TaskManagerRunHandle;
+use super::p2p_agent_store;
+use super::p2p_agent_store::all_agent_infos;
 use super::p2p_agent_store::get_agent_info_signed;
+use super::p2p_agent_store::inject_agent_infos;
 use super::p2p_agent_store::put_agent_info_signed;
 use super::p2p_agent_store::query_agent_info_signed;
+use super::p2p_agent_store::query_agent_info_signed_near_basis;
 use super::Cell;
+use super::CellError;
 use super::Conductor;
+use crate::conductor::p2p_agent_store::get_single_agent_info;
 use crate::conductor::p2p_metrics::put_metric_datum;
 use crate::conductor::p2p_metrics::query_metrics;
+use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::workflow::ZomeCallResult;
-use crate::core::{queue_consumer::InitialQueueTriggers, ribosome::real_ribosome::RealRibosome};
 use derive_more::From;
 use futures::future::FutureExt;
 use futures::StreamExt;
+use holochain_conductor_api::conductor::EnvironmentRootPath;
+use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InstalledAppInfo;
+use holochain_conductor_api::JsonDump;
 use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_p2p::DnaHashExt;
+use holochain_p2p::HolochainP2pCell;
 use holochain_p2p::HolochainP2pCellT;
+use holochain_sqlite::db::DbKind;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
+use holochain_state::source_chain;
 use holochain_types::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::KitsuneSpace;
 use kitsune_p2p_types::config::JOIN_NETWORK_TIMEOUT;
+use std::collections::HashMap;
 use std::{collections::HashSet, sync::Arc};
 use tokio::sync::RwLock;
 use tracing::*;
@@ -79,6 +95,9 @@ use crate::core::queue_consumer::QueueTriggers;
 
 /// A handle to the Conductor that can easily be passed around and cheaply cloned
 pub type ConductorHandle = Arc<dyn ConductorHandleT>;
+
+/// A list of Cells which failed to start, and why
+pub type CellStartupErrors = Vec<(CellId, CellError)>;
 
 /// Base trait for ConductorHandle
 #[mockall::automock]
@@ -98,7 +117,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn initialize_conductor(
         self: Arc<Self>,
         admin_configs: Vec<AdminInterfaceConfig>,
-    ) -> ConductorResult<()>;
+    ) -> ConductorResult<CellStartupErrors>;
 
     /// Add a collection of admin interfaces from config
     async fn add_admin_interfaces(
@@ -114,9 +133,6 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Install a [Dna] in this Conductor
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()>;
-
-    /// Install just the "code parts" (the wasm and entry defs) of a dna
-    async fn register_genotype(&self, dna: DnaFile) -> ConductorResult<()>;
 
     /// Get the list of hashes of installed Dnas in this Conductor
     async fn list_dnas(&self) -> ConductorResult<Vec<DnaHash>>;
@@ -137,7 +153,6 @@ pub trait ConductorHandleT: Send + Sync {
     /// Warning: returning an error from this function kills the network for the conductor.
     async fn dispatch_holochain_p2p_event(
         &self,
-        cell_id: &CellId,
         event: holochain_p2p::event::HolochainP2pEvent,
     ) -> ConductorApiResult<()>;
 
@@ -191,33 +206,64 @@ pub trait ConductorHandleT: Send + Sync {
     async fn install_app_bundle(
         self: Arc<Self>,
         payload: InstallAppBundlePayload,
-    ) -> ConductorResult<InactiveApp>;
+    ) -> ConductorResult<StoppedApp>;
 
     /// Uninstall an app from the state DB and remove all running Cells
-    async fn uninstall_app(&self, app: &InstalledAppId) -> ConductorResult<()>;
+    async fn uninstall_app(self: Arc<Self>, app: &InstalledAppId) -> ConductorResult<()>;
 
-    /// Setup the cells from the database
-    /// Only creates any cells that are not already created
-    async fn setup_cells(self: Arc<Self>) -> ConductorResult<Vec<CreateAppError>>;
+    /// Adjust app statuses (via state transitions) to match the current
+    /// reality of which Cells are present in the conductor.
+    async fn reconcile_app_status_with_cell_status(
+        &self,
+        app_ids: Option<HashSet<InstalledAppId>>,
+    ) -> ConductorResult<AppStatusFx>;
+
+    /// Adjust which cells are present in the Conductor (adding and removing as
+    /// needed) to match the current reality of all app statuses.
+    /// - If a Cell is used by at least one Running app, then ensure it is added
+    /// - If a Cell is used by no running apps, then ensure it is removed.
+    async fn reconcile_cell_status_with_app_status(
+        self: Arc<Self>,
+    ) -> ConductorResult<CellStartupErrors>;
 
     /// Activate an app
-    async fn activate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<ActiveApp>;
+    async fn enable_app(
+        self: Arc<Self>,
+        app_id: &InstalledAppId,
+    ) -> ConductorResult<(InstalledApp, CellStartupErrors)>;
 
-    /// Deactivate an app
-    async fn deactivate_app(
-        &self,
-        installed_app_id: InstalledAppId,
-        reason: DeactivationReason,
-    ) -> ConductorResult<()>;
+    /// Disable an app
+    async fn disable_app(
+        self: Arc<Self>,
+        app_id: &InstalledAppId,
+        reason: DisabledAppReason,
+    ) -> ConductorResult<InstalledApp>;
+
+    /// Start an enabled but stopped (paused) app
+    async fn start_app(self: Arc<Self>, app_id: &InstalledAppId) -> ConductorResult<InstalledApp>;
+
+    /// Stop a running app while leaving it enabled. FOR TESTING ONLY.
+    #[cfg(any(test, feature = "test_utils"))]
+    async fn pause_app(
+        self: Arc<Self>,
+        app_id: &InstalledAppId,
+        reason: PausedAppReason,
+    ) -> ConductorResult<InstalledApp>;
 
     /// List Cell Ids
-    async fn list_cell_ids(&self) -> ConductorResult<Vec<CellId>>;
+    async fn list_cell_ids(&self, filter: Option<CellStatus>) -> ConductorResult<Vec<CellId>>;
 
     /// List Active AppIds
-    async fn list_active_apps(&self) -> ConductorResult<Vec<InstalledAppId>>;
+    async fn list_running_apps(&self) -> ConductorResult<Vec<InstalledAppId>>;
+
+    /// List Apps with their information
+    async fn list_apps(
+        &self,
+        status_filter: Option<AppStatusFilter>,
+    ) -> ConductorResult<Vec<InstalledAppInfo>>;
 
     /// Get the IDs of all active installed Apps which use this Cell
-    async fn list_active_apps_for_cell_id(
+    async fn list_running_apps_for_required_cell_id(
         &self,
         cell_id: &CellId,
     ) -> ConductorResult<HashSet<InstalledAppId>>;
@@ -250,6 +296,10 @@ pub trait ConductorHandleT: Send + Sync {
     /// Retrieve the environment for this cell.
     async fn get_cell_env_readonly(&self, cell_id: &CellId) -> ConductorApiResult<EnvRead>;
 
+    /// Manually remove some cells. Should only be used when handling errors in Cells,
+    /// allowing individual Cells to be shut down.
+    async fn remove_cells(&self, cell_ids: &[CellId]);
+
     /// Retrieve the environment for this cell. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvWrite>;
@@ -274,6 +324,43 @@ pub trait ConductorHandleT: Send + Sync {
     #[cfg(any(test, feature = "test_utils"))]
     async fn add_test_app_interface(&self, id: super::state::AppInterfaceId)
         -> ConductorResult<()>;
+
+    /// Manually coerce cells to a given CellStatus. FOR TESTING ONLY.
+    #[cfg(any(test, feature = "test_utils"))]
+    async fn update_cell_status(&self, cell_ids: &[CellId], status: CellStatus);
+
+    /// Manually coerce app to a given AppStatus. FOR TESTING ONLY.
+    #[cfg(any(test, feature = "test_utils"))]
+    async fn transition_app_status(
+        &self,
+        app_id: &InstalledAppId,
+        transition: AppStatusTransition,
+    ) -> ConductorResult<(InstalledApp, AppStatusFx)>;
+
+    // TODO: would be nice to have methods for accessing the underlying Conductor,
+    // but this trait doesn't know the concrete type of Conductor underlying,
+    // and using generics seems problematic with mockall::automock.
+    // Something like this would be desirable, but ultimately doesn't work.
+    //
+    // type DS: Send + Sync + DnaStore;
+    //
+    // /// Get immutable access to the inner conductor state via a read lock
+    // async fn conductor<F, T>(&self, f: F) -> ConductorApiResult<T>
+    // where
+    //     F: FnOnce(&Conductor<<Self as ConductorHandleT>::DS>) -> ConductorApiResult<T>,
+    // {
+    //     let c = self.conductor.read().await;
+    //     f(&c)
+    // }
+    //
+    // /// Get mutable access to the inner conductor state via a write lock
+    // async fn conductor_mut<F, T>(&self, f: F) -> ConductorApiResult<T>
+    // where
+    //     F: FnOnce(&mut Conductor<<Self as ConductorHandleT>::DS>) -> ConductorApiResult<T>,
+    // {
+    //     let mut c = self.conductor.write().await;
+    //     f(&mut c)
+    // }
 }
 
 /// The current "production" implementation of a ConductorHandle.
@@ -285,9 +372,18 @@ pub trait ConductorHandleT: Send + Sync {
 /// using an actor model.
 #[derive(From)]
 pub struct ConductorHandleImpl<DS: DnaStore + 'static> {
-    pub(crate) conductor: RwLock<Conductor<DS>>,
-    pub(crate) keystore: KeystoreSender,
-    pub(crate) holochain_p2p: holochain_p2p::HolochainP2pRef,
+    pub(super) conductor: RwLock<Conductor<DS>>,
+    pub(super) keystore: KeystoreSender,
+    pub(super) holochain_p2p: holochain_p2p::HolochainP2pRef,
+
+    /// The root environment directory where all environments are created
+    pub(super) root_env_dir: EnvironmentRootPath,
+
+    /// The database for storing AgentInfoSigned
+    pub(super) p2p_env: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
+
+    /// The database for storing p2p MetricDatum(s)
+    pub(super) p2p_metrics_env: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
 }
 
 #[async_trait::async_trait]
@@ -309,16 +405,38 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn initialize_conductor(
         self: Arc<Self>,
         admin_configs: Vec<AdminInterfaceConfig>,
-    ) -> ConductorResult<()> {
-        let mut conductor = self.conductor.write().await;
-        conductor.start_task_manager(self.clone()).await?;
-        conductor
-            .add_admin_interfaces_via_handle(admin_configs, self.clone())
-            .await?;
-        conductor
-            .startup_app_interfaces_via_handle(self.clone())
-            .await?;
-        Ok(())
+    ) -> ConductorResult<CellStartupErrors> {
+        self.load_dnas().await?;
+
+        {
+            let mut conductor = self.conductor.write().await;
+
+            // Start the task manager
+            if conductor.task_manager.is_some() {
+                panic!("Cannot start task manager twice");
+            }
+            let (task_add_sender, run_handle) = spawn_task_manager(self.clone());
+            let (task_stop_broadcaster, _) = tokio::sync::broadcast::channel::<()>(1);
+            conductor.task_manager = Some(TaskManagerClient::new(
+                task_add_sender,
+                task_stop_broadcaster,
+                run_handle,
+            ));
+
+            conductor
+                .add_admin_interfaces_via_handle(admin_configs, self.clone())
+                .await?;
+
+            conductor
+                .startup_app_interfaces_via_handle(self.clone())
+                .await?;
+
+            // We don't care what fx are returned here, since all cells need to
+            // be spun up
+            let _ = conductor.start_paused_apps().await?;
+        };
+
+        self.process_app_status_fx(AppStatusFx::SpinUp, None).await
     }
 
     async fn add_app_interface(self: Arc<Self>, port: u16) -> ConductorResult<u16> {
@@ -334,16 +452,6 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()> {
         self.register_genotype(dna.clone()).await?;
         self.conductor.write().await.register_phenotype(dna).await
-    }
-
-    async fn register_genotype(&self, dna: DnaFile) -> ConductorResult<()> {
-        let entry_defs = self.conductor.read().await.register_dna_wasm(dna).await?;
-        self.conductor
-            .write()
-            .await
-            .register_dna_entry_defs(entry_defs)
-            .await?;
-        Ok(())
     }
 
     async fn load_dnas(&self) -> ConductorResult<()> {
@@ -378,19 +486,17 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     #[instrument(skip(self))]
     async fn dispatch_holochain_p2p_event(
         &self,
-        cell_id: &CellId,
         event: holochain_p2p::event::HolochainP2pEvent,
     ) -> ConductorApiResult<()> {
-        let space = cell_id.dna_hash().to_kitsune();
-        trace!(agent = ?cell_id.agent_pubkey(), dispatch_event = ?event);
+        let space = event.dna_hash().to_kitsune();
+        trace!(dispatch_event = ?event);
         match event {
             PutAgentInfoSigned {
                 agent_info_signed,
                 respond,
                 ..
             } => {
-                // TODO: This read lock isn't needed to get the p2p_env.
-                let env = { self.conductor.read().await.p2p_env(space) };
+                let env = { self.p2p_env(space) };
                 let res = put_agent_info_signed(env, agent_info_signed)
                     .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
@@ -402,7 +508,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 respond,
                 ..
             } => {
-                let env = { self.conductor.read().await.p2p_env(space) };
+                let env = { self.p2p_env(space) };
                 let res = get_agent_info_signed(env, kitsune_space, kitsune_agent)
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
@@ -412,8 +518,20 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 respond,
                 ..
             } => {
-                let env = { self.conductor.read().await.p2p_env(space) };
+                let env = { self.p2p_env(space) };
                 let res = query_agent_info_signed(env, kitsune_space)
+                    .map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
+            }
+            QueryAgentInfoSignedNearBasis {
+                kitsune_space,
+                basis_loc,
+                limit,
+                respond,
+                ..
+            } => {
+                let env = { self.p2p_env(space) };
+                let res = query_agent_info_signed_near_basis(env, kitsune_space, basis_loc, limit)
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
@@ -424,27 +542,28 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 timestamp,
                 ..
             } => {
-                let env = { self.conductor.read().await.p2p_metrics_env(space) };
+                let env = { self.p2p_metrics_env(space) };
                 let res = put_metric_datum(env, agent, metric, timestamp)
                     .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
             QueryMetrics { respond, query, .. } => {
-                let env = { self.conductor.read().await.p2p_metrics_env(space) };
+                let env = { self.p2p_metrics_env(space) };
                 let res = query_metrics(env, query)
                     .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
-            SignNetworkData { respond, data, .. } => {
-                let signature = cell_id
-                    .agent_pubkey()
-                    .sign_raw(self.keystore(), &data)
-                    .await?;
+            SignNetworkData {
+                respond,
+                to_agent,
+                data,
+                ..
+            } => {
+                let signature = to_agent.sign_raw(self.keystore(), &data).await?;
                 respond.respond(Ok(async move { Ok(signature) }.boxed().into()));
             }
-
             HolochainP2pEvent::CallRemote { .. }
             | Publish { .. }
             | GetValidationPackage { .. }
@@ -455,7 +574,11 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             | ValidationReceiptReceived { .. }
             | FetchOpHashesForConstraints { .. }
             | FetchOpHashData { .. } => {
-                let cell = self.cell_by_id(cell_id).await?;
+                let cell_id = CellId::new(
+                    event.dna_hash().clone(),
+                    event.target_agent_as_ref().clone(),
+                );
+                let cell = self.cell_by_id(&cell_id).await?;
                 cell.handle_holochain_p2p_event(event).await?;
             }
         }
@@ -557,7 +680,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .conductor
             .write()
             .await
-            .add_inactive_app_to_db(app)
+            .add_disabled_app_to_db(app)
             .await?;
 
         Ok(())
@@ -566,7 +689,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn install_app_bundle(
         self: Arc<Self>,
         payload: InstallAppBundlePayload,
-    ) -> ConductorResult<InactiveApp> {
+    ) -> ConductorResult<StoppedApp> {
         let InstallAppBundlePayload {
             source,
             agent_key,
@@ -608,96 +731,178 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let app = InstalledAppCommon::new(installed_app_id, agent_key, slots);
 
         // Update the db
-        let app = self
+        let stopped_app = self
             .conductor
             .write()
             .await
-            .add_inactive_app_to_db(app.clone())
+            .add_disabled_app_to_db(app)
             .await?;
 
-        Ok(app)
+        Ok(stopped_app)
     }
 
-    async fn setup_cells(self: Arc<Self>) -> ConductorResult<Vec<CreateAppError>> {
-        let cells = {
-            let lock = self.conductor.read().await;
-            lock.create_active_app_cells(self.clone())
-                .await?
-                .into_iter()
-        };
-        let add_cells_tasks = cells.map(|result| async {
-            match result {
-                Ok(cells) => {
-                    self.initialize_cells(cells).await;
-                    None
-                }
-                Err(e) => Some(e),
-            }
-        });
-        let r = futures::future::join_all(add_cells_tasks)
-            .await
-            .into_iter()
-            .flatten()
-            .collect();
-        Ok(r)
-    }
-
-    async fn activate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<ActiveApp> {
-        let app = self
-            .conductor
-            .write()
-            .await
-            .activate_app_in_db(installed_app_id)
-            .await?;
-        Ok(app)
-        // MD: Should we be doing `Conductor::add_cells()` here? (see below comment)
-    }
-
-    async fn deactivate_app(
+    #[tracing::instrument(skip(self))]
+    async fn reconcile_app_status_with_cell_status(
         &self,
-        installed_app_id: InstalledAppId,
-        reason: DeactivationReason,
-    ) -> ConductorResult<()> {
-        let mut conductor = self.conductor.write().await;
-        let cell_ids_to_remove = conductor
-            .deactivate_app_in_db(installed_app_id, reason)
+        app_ids: Option<HashSet<InstalledAppId>>,
+    ) -> ConductorResult<AppStatusFx> {
+        self.conductor
+            .write()
+            .await
+            .reconcile_app_status_with_cell_status(app_ids)
+            .await
+    }
+
+    #[tracing::instrument(skip(self))]
+    async fn reconcile_cell_status_with_app_status(
+        self: Arc<Self>,
+    ) -> ConductorResult<CellStartupErrors> {
+        self.conductor.write().await.remove_dangling_cells().await?;
+
+        let results = self
+            .create_and_add_initialized_cells_for_running_apps(self.clone())
             .await?;
-        // MD: I'm not sure about this. We never add the cells back in after re-activating an app,
-        //     so it seems either we shouldn't remove them here, or we should be sure to add them
-        //     back in when re-activating.
-        conductor.remove_cells(cell_ids_to_remove).await;
-        Ok(())
+        Ok(results)
     }
 
-    async fn uninstall_app(&self, installed_app_id: &InstalledAppId) -> ConductorResult<()> {
-        let mut conductor = self.conductor.write().await;
-        if let Some(cell_ids_to_remove) = conductor.remove_app_from_db(installed_app_id).await? {
-            conductor.remove_cells(cell_ids_to_remove).await;
+    #[tracing::instrument(skip(self))]
+    async fn enable_app(
+        self: Arc<Self>,
+        app_id: &InstalledAppId,
+    ) -> ConductorResult<(InstalledApp, CellStartupErrors)> {
+        let (app, delta) = self
+            .conductor
+            .write()
+            .await
+            .transition_app_status(&app_id, AppStatusTransition::Enable)
+            .await?;
+        let errors = self
+            .process_app_status_fx(delta, Some(vec![app_id.to_owned()].into_iter().collect()))
+            .await?;
+        Ok((app, errors))
+    }
+
+    #[tracing::instrument(skip(self))]
+    async fn disable_app(
+        self: Arc<Self>,
+        app_id: &InstalledAppId,
+        reason: DisabledAppReason,
+    ) -> ConductorResult<InstalledApp> {
+        let (app, delta) = self
+            .conductor
+            .write()
+            .await
+            .transition_app_status(&app_id, AppStatusTransition::Disable(reason))
+            .await?;
+        self.process_app_status_fx(delta, Some(vec![app_id.to_owned()].into_iter().collect()))
+            .await?;
+        Ok(app)
+    }
+
+    #[tracing::instrument(skip(self))]
+    async fn start_app(self: Arc<Self>, app_id: &InstalledAppId) -> ConductorResult<InstalledApp> {
+        let (app, delta) = self
+            .conductor
+            .write()
+            .await
+            .transition_app_status(&app_id, AppStatusTransition::Start)
+            .await?;
+        self.process_app_status_fx(delta, Some(vec![app_id.to_owned()].into_iter().collect()))
+            .await?;
+        Ok(app)
+    }
+
+    #[tracing::instrument(skip(self))]
+    #[cfg(any(test, feature = "test_utils"))]
+    async fn pause_app(
+        self: Arc<Self>,
+        app_id: &InstalledAppId,
+        reason: PausedAppReason,
+    ) -> ConductorResult<InstalledApp> {
+        let (app, delta) = self
+            .conductor
+            .write()
+            .await
+            .transition_app_status(&app_id, AppStatusTransition::Pause(reason))
+            .await?;
+        self.process_app_status_fx(delta, Some(vec![app_id.clone()].into_iter().collect()))
+            .await?;
+        Ok(app)
+    }
+
+    #[tracing::instrument(skip(self))]
+    async fn uninstall_app(
+        self: Arc<Self>,
+        installed_app_id: &InstalledAppId,
+    ) -> ConductorResult<()> {
+        let self_clone = self.clone();
+        {
+            // Ensure that the conductor lock is dropped before the self_clone
+            // is used, or else deadlock will ensue
+            let mut conductor = self.conductor.write().await;
+            let app = conductor.remove_app_from_db(installed_app_id).await?;
+            tracing::debug!(msg = "Removed app from db.", app = ?app);
         }
+        // Remove cells which may now be dangling due to the removed app
+        self_clone
+            .process_app_status_fx(AppStatusFx::SpinDown, None)
+            .await?;
         Ok(())
     }
 
-    async fn list_cell_ids(&self) -> ConductorResult<Vec<CellId>> {
-        self.conductor.read().await.list_cell_ids().await
+    async fn list_cell_ids(&self, filter: Option<CellStatus>) -> ConductorResult<Vec<CellId>> {
+        self.conductor.read().await.list_cell_ids(filter).await
     }
 
-    async fn list_active_apps(&self) -> ConductorResult<Vec<InstalledAppId>> {
-        self.conductor.read().await.list_active_apps().await
+    async fn list_running_apps(&self) -> ConductorResult<Vec<InstalledAppId>> {
+        self.conductor.read().await.list_running_apps().await
     }
 
-    async fn list_active_apps_for_cell_id(
+    async fn list_apps(
+        &self,
+        status_filter: Option<AppStatusFilter>,
+    ) -> ConductorResult<Vec<InstalledAppInfo>> {
+        self.conductor.read().await.list_apps(status_filter).await
+    }
+
+    async fn list_running_apps_for_required_cell_id(
         &self,
         cell_id: &CellId,
     ) -> ConductorResult<HashSet<InstalledAppId>> {
         self.conductor
             .read()
             .await
-            .list_active_apps_for_cell_id(cell_id)
+            .list_running_apps_for_cell_id(cell_id)
             .await
     }
 
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
-        self.conductor.read().await.dump_cell_state(cell_id).await
+        let conductor = self.conductor.read().await;
+
+        let cell = conductor.cell_by_id(cell_id)?;
+        let arc = cell.env();
+
+        let space = cell_id.dna_hash().to_kitsune();
+        let p2p_env = self
+            .p2p_env
+            .lock()
+            .get(&space)
+            .cloned()
+            .expect("invalid cell space");
+
+        let peer_dump = p2p_agent_store::dump_state(p2p_env.into(), Some(cell_id.clone()))?;
+        let source_chain_dump =
+            source_chain::dump_state(arc.clone().into(), cell_id.agent_pubkey().clone()).await?;
+
+        let out = JsonDump {
+            peer_dump,
+            source_chain_dump,
+            integration_dump: integration_dump(&arc.clone().into()).await?,
+        };
+        // Add summary
+        let summary = out.to_string();
+        let out = (out, summary);
+        Ok(serde_json::to_string_pretty(&out)?)
     }
 
     async fn signal_broadcaster(&self) -> SignalBroadcaster {
@@ -718,18 +923,44 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn add_agent_infos(&self, agent_infos: Vec<AgentInfoSigned>) -> ConductorApiResult<()> {
-        self.conductor
-            .read()
-            .await
-            .add_agent_infos(agent_infos)
-            .await
+        let mut space_map = HashMap::new();
+        for agent_info_signed in agent_infos {
+            let space = agent_info_signed.space.clone();
+            space_map
+                .entry(space)
+                .or_insert_with(Vec::new)
+                .push(agent_info_signed);
+        }
+        for (space, agent_infos) in space_map {
+            let env = self.p2p_env(space);
+            inject_agent_infos(env, agent_infos.iter()).await?;
+        }
+        Ok(())
     }
 
     async fn get_agent_infos(
         &self,
         cell_id: Option<CellId>,
     ) -> ConductorApiResult<Vec<AgentInfoSigned>> {
-        self.conductor.read().await.get_agent_infos(cell_id)
+        match cell_id {
+            Some(c) => {
+                let (d, a) = c.into_dna_and_agent();
+                let space = d.to_kitsune();
+                let env = self.p2p_env(space);
+                Ok(get_single_agent_info(env.into(), d, a)?
+                    .map(|a| vec![a])
+                    .unwrap_or_default())
+            }
+            None => {
+                let mut out = Vec::new();
+                // collecting so the mutex lock can close
+                let envs = self.p2p_env.lock().values().cloned().collect::<Vec<_>>();
+                for env in envs {
+                    out.append(&mut all_agent_infos(env.into())?);
+                }
+                Ok(out)
+            }
+        }
     }
 
     async fn print_setup(&self) {
@@ -739,6 +970,11 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn get_cell_env_readonly(&self, cell_id: &CellId) -> ConductorApiResult<EnvRead> {
         let cell = self.cell_by_id(cell_id).await?;
         Ok(cell.env().clone().into())
+    }
+
+    async fn remove_cells(&self, cell_ids: &[CellId]) {
+        let mut lock = self.conductor.write().await;
+        lock.remove_cells(cell_ids.to_vec()).await
     }
 
     #[cfg(any(test, feature = "test_utils"))]
@@ -755,8 +991,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     #[cfg(any(test, feature = "test_utils"))]
     async fn get_p2p_env(&self, space: Arc<KitsuneSpace>) -> EnvWrite {
-        let lock = self.conductor.read().await;
-        lock.p2p_env(space)
+        self.p2p_env(space)
     }
 
     #[cfg(any(test, feature = "test_utils"))]
@@ -779,6 +1014,22 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let mut lock = self.conductor.write().await;
         lock.add_test_app_interface(id).await
     }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    async fn update_cell_status(&self, cell_ids: &[CellId], status: CellStatus) {
+        let mut lock = self.conductor.write().await;
+        lock.update_cell_status(cell_ids, status)
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    async fn transition_app_status(
+        &self,
+        app_id: &InstalledAppId,
+        transition: AppStatusTransition,
+    ) -> ConductorResult<(InstalledApp, AppStatusFx)> {
+        let mut lock = self.conductor.write().await;
+        lock.transition_app_status(app_id, transition).await
+    }
 }
 
 impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
@@ -787,36 +1038,178 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
         Ok(lock.cell_by_id(cell_id)?)
     }
 
-    /// Add cells to the map then join the network then initialize workflows.
-    async fn initialize_cells(&self, cells: Vec<(Cell, InitialQueueTriggers)>) {
-        let (cells, triggers): (Vec<_>, Vec<_>) = cells.into_iter().unzip();
-        let networks: Vec<_> = cells
-            .iter()
-            .map(|cell| cell.holochain_p2p_cell().clone())
+    /// Install just the "code parts" (the wasm and entry defs) of a dna
+    async fn register_genotype(&self, dna: DnaFile) -> ConductorResult<()> {
+        let entry_defs = self.conductor.read().await.register_dna_wasm(dna).await?;
+        self.conductor
+            .write()
+            .await
+            .register_dna_entry_defs(entry_defs)
+            .await?;
+        Ok(())
+    }
+
+    /// Deal with the side effects of an app status state transition
+    async fn process_app_status_fx(
+        self: Arc<Self>,
+        delta: AppStatusFx,
+        app_ids: Option<HashSet<InstalledAppId>>,
+    ) -> ConductorResult<CellStartupErrors> {
+        use AppStatusFx::*;
+        let mut last = (delta, vec![]);
+        loop {
+            tracing::debug!(msg = "Processing app status delta", delta = ?last.0);
+            last = match last.0 {
+                NoChange => break,
+                SpinDown => {
+                    // Reconcile cell status so that dangling cells can leave the network and be removed
+                    let errors = self.clone().reconcile_cell_status_with_app_status().await?;
+
+                    // TODO: This should probably be emitted over the admin interface
+                    if !errors.is_empty() {
+                        error!(msg = "Errors when trying to stop app(s)", ?errors);
+                    }
+
+                    (NoChange, errors)
+                }
+                SpinUp | Both => {
+                    // Reconcile cell status so that missing/pending cells can become fully joined
+                    let errors = self.clone().reconcile_cell_status_with_app_status().await?;
+
+                    // Reconcile app status in case some cells failed to join, so the app can be paused
+                    let delta = self
+                        .clone()
+                        .reconcile_app_status_with_cell_status(app_ids.clone())
+                        .await?;
+
+                    // TODO: This should probably be emitted over the admin interface
+                    if !errors.is_empty() {
+                        error!(msg = "Errors when trying to start app(s)", ?errors);
+                    }
+
+                    (delta, errors)
+                }
+            };
+        }
+
+        Ok(last.1)
+    }
+
+    /// Create any Cells which are missing for any running apps, then initialize
+    /// and join them. (Joining could take a while.)
+    pub(super) async fn create_and_add_initialized_cells_for_running_apps(
+        &self,
+        conductor_handle: ConductorHandle,
+    ) -> ConductorResult<CellStartupErrors> {
+        let results = self
+            .conductor
+            .read()
+            .await
+            .create_cells_for_running_apps(conductor_handle)
+            .await?;
+        let (new_cells, errors): (Vec<_>, Vec<_>) = results.into_iter().partition(Result::is_ok);
+
+        let new_cells = new_cells
+            .into_iter()
+            // We can unwrap the successes because of the partition
+            .map(Result::unwrap)
             .collect();
-        // Add the cells to the conductor map.
-        // This write lock can't be held while join is awaited as join calls the conductor.
-        // Cells need to be in the map before join is called so it can route the call.
-        self.conductor.write().await.add_cells(cells);
+
+        let errors = errors
+            .into_iter()
+            // throw away the non-Debug types which will be unwrapped away anyway
+            .map(|r| r.map(|_| ()))
+            // We can unwrap the errors because of the partition
+            .map(Result::unwrap_err)
+            .collect();
+
+        // Add the newly created cells to the Conductor with the PendingJoin
+        // status, and start their workflow loops
+        self.conductor
+            .write()
+            .await
+            .add_and_initialize_cells(new_cells);
+
+        // Join these newly created cells to the network
+        // (as well as any others which need joining)
+        self.join_all_pending_cells().await;
+
+        Ok(errors)
+    }
+
+    /// Attempt to join all PendingJoin cells to the kitsune network.
+    /// Returns the cells which were joined during this call.
+    ///
+    /// NB: this could take as long as JOIN_NETWORK_TIMEOUT, which is significant.
+    ///   Be careful to only await this future if it's important that cells be
+    ///   joined before proceeding.
+    async fn join_all_pending_cells(&self) -> Vec<CellId> {
         // Join the network but ignore errors because the
         // space retries joining all cells every 5 minutes.
-        futures::stream::iter(networks)
-            .for_each_concurrent(100, |mut network| async move {
+
+        let pending_cells: Vec<(CellId, HolochainP2pCell)> = self
+            .conductor
+            .read()
+            .await
+            .pending_cells()
+            .map(|(id, cell)| (id.clone(), cell.holochain_p2p_cell().clone()))
+            .collect();
+
+        let tasks = pending_cells.into_iter()
+            .map(|(cell_id, network)| async move {
                 match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join()).await {
                     Ok(Err(e)) => {
-                        tracing::info!(failed_to_join_network = ?e);
+                        tracing::info!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");
+                        None
                     }
                     Err(_) => {
-                        tracing::info!("Timed out trying to join the network");
+                        tracing::info!(cell_id = ?cell_id, "Timed out trying to join the network");
+                        None
                     }
-                    Ok(Ok(_)) => (),
+                    Ok(Ok(_)) => Some(cell_id),
                 }
-            })
+            });
+
+        let maybes: Vec<_> = futures::stream::iter(tasks)
+            .buffer_unordered(100)
+            .collect()
             .await;
 
-        // Now we can trigger the workflows.
-        for trigger in triggers {
-            trigger.initialize_workflows();
-        }
+        let cell_ids: Vec<_> = maybes.into_iter().flatten().collect();
+
+        // Update the status of the cells which were able to join the network
+        // (may or may not be all cells which were added)
+        self.conductor
+            .write()
+            .await
+            .update_cell_status(cell_ids.as_slice(), CellStatus::Joined);
+
+        cell_ids
+    }
+
+    pub(super) fn p2p_env(&self, space: Arc<KitsuneSpace>) -> EnvWrite {
+        let mut p2p_env = self.p2p_env.lock();
+        p2p_env
+            .entry(space.clone())
+            .or_insert_with(move || {
+                let root_env_dir = self.root_env_dir.as_ref();
+                let keystore = self.keystore.clone();
+                EnvWrite::open(root_env_dir, DbKind::P2pAgentStore(space), keystore)
+                    .expect("failed to open p2p_agent_store database")
+            })
+            .clone()
+    }
+
+    pub(super) fn p2p_metrics_env(&self, space: Arc<KitsuneSpace>) -> EnvWrite {
+        let mut p2p_metrics_env = self.p2p_metrics_env.lock();
+        p2p_metrics_env
+            .entry(space.clone())
+            .or_insert_with(move || {
+                let root_env_dir = self.root_env_dir.as_ref();
+                let keystore = self.keystore.clone();
+                EnvWrite::open(root_env_dir, DbKind::P2pMetrics(space), keystore)
+                    .expect("failed to open p2p_metrics database")
+            })
+            .clone()
     }
 }

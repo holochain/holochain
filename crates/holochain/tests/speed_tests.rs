@@ -98,10 +98,7 @@ async fn speed_test_normal() {
 async fn speed_test_persisted() {
     observability::test_run().unwrap();
     let envs = speed_test(None).await;
-    let tmpdir = envs.tempdir();
-    drop(envs);
-    let tmpdir = std::sync::Arc::try_unwrap(tmpdir).unwrap();
-    let path = tmpdir.into_path();
+    let path = envs.into_tempdir().into_path();
     println!("Run the following to see info about the test that just ran,");
     println!("with the correct cell env dir appended to the path:");
     println!();
@@ -320,7 +317,7 @@ pub async fn setup_app(
             }]),
             ..Default::default()
         })
-        .test(&envs)
+        .test(&envs, &[])
         .await
         .unwrap();
 
@@ -331,11 +328,16 @@ pub async fn setup_app(
         .unwrap();
 
     conductor_handle
-        .activate_app("test app".to_string())
+        .clone()
+        .enable_app(&"test app".to_string())
         .await
         .unwrap();
 
-    let errors = conductor_handle.clone().setup_cells().await.unwrap();
+    let errors = conductor_handle
+        .clone()
+        .reconcile_cell_status_with_app_status()
+        .await
+        .unwrap();
 
     assert!(errors.is_empty());
 

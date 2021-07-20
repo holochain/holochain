@@ -9,6 +9,7 @@ use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use crate::core::ribosome::HostFnAccess;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn delete<'a>(
@@ -16,23 +17,28 @@ pub fn delete<'a>(
     call_context: Arc<CallContext>,
     input: HeaderHash,
 ) -> Result<HeaderHash, WasmError> {
-    let deletes_entry_address = get_original_address(call_context.clone(), input.clone())?;
+    match HostFnAccess::from(&call_context.host_context()) {
+        HostFnAccess{ write_workspace: Permission::Allow, .. } => {
+            let deletes_entry_address = get_original_address(call_context.clone(), input.clone())?;
 
-    let host_access = call_context.host_access();
+    let host_access = call_context.host_context();
 
-    // handle timeouts at the source chain layer
-    tokio_helper::block_forever_on(async move {
-        let source_chain = host_access.workspace().source_chain();
-        let header_builder = builder::Delete {
-            deletes_address: input,
-            deletes_entry_address,
-        };
-        let header_hash = source_chain
-            .put(header_builder, None)
-            .await
-            .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
-        Ok(header_hash)
-    })
+            // handle timeouts at the source chain layer
+            tokio_helper::block_forever_on(async move {
+                let source_chain = host_access.workspace().source_chain();
+                let header_builder = builder::Delete {
+                    deletes_address: input,
+                    deletes_entry_address,
+                };
+                let header_hash = source_chain
+                    .put(header_builder, None)
+                    .await
+                    .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
+                Ok(header_hash)
+            })
+        },
+        _ => unreachable!(),
+    }
 }
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -40,8 +46,8 @@ pub(crate) fn get_original_address<'a>(
     call_context: Arc<CallContext>,
     address: HeaderHash,
 ) -> Result<EntryHash, WasmError> {
-    let network = call_context.host_access.network().clone();
-    let workspace = call_context.host_access.workspace();
+    let network = call_context.host_context.network().clone();
+    let workspace = call_context.host_context.workspace();
 
     tokio_helper::block_forever_on(async move {
         let mut cascade = Cascade::from_workspace_network(workspace, network);
@@ -101,9 +107,9 @@ pub mod wasm_test {
         host_access.workspace = workspace.clone();
 
         let thing_a: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Crd, "create", ());
+            crate::call_test_ribosome!(host_access, TestWasm::Crd, "create", ()).unwrap();
         let get_thing: Option<Element> =
-            crate::call_test_ribosome!(host_access, TestWasm::Crd, "reed", thing_a);
+            crate::call_test_ribosome!(host_access, TestWasm::Crd, "reed", thing_a).unwrap();
         match get_thing {
             Some(element) => assert!(element.entry().as_option().is_some()),
 
@@ -111,10 +117,10 @@ pub mod wasm_test {
         }
 
         let _: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Crd, "delete", thing_a);
+            crate::call_test_ribosome!(host_access, TestWasm::Crd, "delete", thing_a).unwrap();
 
         let get_thing: Option<Element> =
-            crate::call_test_ribosome!(host_access, TestWasm::Crd, "reed", thing_a);
+            crate::call_test_ribosome!(host_access, TestWasm::Crd, "reed", thing_a).unwrap();
         match get_thing {
             None => {
                 // this is what we want, deletion => None for a get

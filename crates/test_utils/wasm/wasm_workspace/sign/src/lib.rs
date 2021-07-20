@@ -95,7 +95,7 @@ fn verify_signature(
 #[cfg(test)]
 pub mod tests {
     use hdk::prelude::*;
-    use ::fixt::prelude::{paste, fixt, Unpredictable, Predictable};
+    use ::fixt::prelude::{fixt, Predictable};
 
     #[test]
     fn sign_ephemeral_smoke() {
