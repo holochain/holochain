@@ -1,7 +1,8 @@
 -- Use this query only in the continuous arc case,
 -- i.e. when :storage_start_loc <= :storage_end_loc
 SELECT
-    hash, authored_timestamp_ms
+  hash,
+  authored_timestamp_ms
 FROM
   DHtOp
 WHERE

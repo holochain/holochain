@@ -30,7 +30,7 @@ impl ShardedGossip {
         let agent = match agent {
             Some(agent) => agent,
             // No local agents so there's no one to initiate gossip from.
-            None => return Ok(vec![]),
+            None => return Ok(vec![ShardedGossipWire::no_agents()]),
         };
 
         // Get the local intervals.
@@ -40,7 +40,7 @@ impl ShardedGossip {
         let mut gossip = Vec::with_capacity(2);
 
         // Generate the bloom filters and new state.
-        let state = match self
+        let state = self
             .generate_blooms(
                 &agent,
                 &local_agents,
@@ -48,11 +48,8 @@ impl ShardedGossip {
                 remote_arc_set,
                 &mut gossip,
             )
-            .await?
-        {
-            Some(s) => s,
-            None => return Ok(vec![]),
-        };
+            .await?;
+        // FIXME: This is wrong, gossip needs to send back empty blooms to signal the end of gossip.
 
         self.inner.share_mut(|inner, _| {
             // TODO: What happen if we are in the middle of a new outgoing and

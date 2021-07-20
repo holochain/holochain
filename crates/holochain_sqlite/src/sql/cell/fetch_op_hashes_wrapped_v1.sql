@@ -3,7 +3,8 @@
 --
 -- This is one version of this query. There is another version which may be faster.
 SELECT
-    hash, authored_timestamp_ms
+  hash,
+  authored_timestamp_ms
 FROM
   DHtOp
 WHERE

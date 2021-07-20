@@ -18,7 +18,7 @@ impl ShardedGossip {
         })?;
         let agent = match agent {
             Some(a) => a,
-            None => return Ok(vec![]),
+            None => return Ok(vec![ShardedGossipWire::no_agents()]),
         };
 
         // Get all agents within common arc and filter out
@@ -40,6 +40,7 @@ impl ShardedGossip {
         Ok(if !missing.is_empty() {
             vec![ShardedGossipWire::missing_agents(missing)]
         } else {
+            // FIXME: Send back empty message.
             vec![]
         })
     }

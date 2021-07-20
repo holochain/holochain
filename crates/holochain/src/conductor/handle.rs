@@ -545,7 +545,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 ..
             } => {
                 use holochain_sqlite::db::AsP2pAgentStoreConExt;
-                let env = { self.conductor.read().await.p2p_env(space) };
+                let env = { self.p2p_env(space) };
                 let res = env
                     .conn()?
                     .p2p_gossip_query_agents(since_ms, until_ms, (*arc_set).clone())

@@ -273,6 +273,10 @@ impl ShardedGossip {
             .share_mut(|i, _| Ok(i.state_map.get(id).cloned()))
     }
 
+    async fn remove_state(&self, id: &StateKey) -> KitsuneResult<Option<RoundState>> {
+        self.inner.share_mut(|i, _| Ok(i.remove_state(id)))
+    }
+
     async fn incoming_ops_finished(
         &self,
         state_id: &StateKey,
@@ -361,6 +365,10 @@ impl ShardedGossip {
                 if let Some(state) = state {
                     self.incoming_missing_ops(state, ops).await?;
                 }
+                vec![]
+            }
+            ShardedGossipWire::NoAgents(_) | ShardedGossipWire::AlreadyInProgress(_) => {
+                self.remove_state(&cert).await?;
                 vec![]
             }
         })
@@ -477,6 +485,14 @@ kitsune_p2p_types::write_codec_enum! {
         MissingOps(0x60) {
             ops.0: Vec<Arc<(Arc<KitsuneOpHash>, Vec<u8>)>>,
             finished.1: bool,
+        },
+
+        /// A round is already in progress with this node.
+        AlreadyInProgress(0x70) {
+        },
+
+        /// The node you are trying to gossip with has no agents anymore.
+        NoAgents(0x80) {
         },
     }
 }

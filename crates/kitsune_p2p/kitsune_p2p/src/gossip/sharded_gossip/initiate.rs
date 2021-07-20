@@ -70,7 +70,7 @@ impl ShardedGossip {
         // This round is already in progress so don't start another one.
         if round_already_in_progress {
             // TODO: Should we reject the message somehow or just ignore it?
-            return Ok(vec![]);
+            return Ok(vec![ShardedGossipWire::already_in_progress()]);
         }
 
         // Choose any local agent so we can send requests to the store.
@@ -80,7 +80,7 @@ impl ShardedGossip {
         let agent = match agent {
             Some(agent) => agent,
             // No local agents so there's no one to initiate gossip from.
-            None => return Ok(vec![]),
+            None => return Ok(vec![ShardedGossipWire::no_agents()]),
         };
 
         // Get the local intervals.
@@ -93,7 +93,7 @@ impl ShardedGossip {
         gossip.push(ShardedGossipWire::accept(local_intervals.clone()));
 
         // Generate the bloom filters and new state.
-        let state = match self
+        let state = self
             .generate_blooms(
                 &agent,
                 &local_agents,
@@ -101,11 +101,7 @@ impl ShardedGossip {
                 remote_arc_set,
                 &mut gossip,
             )
-            .await?
-        {
-            Some(s) => s,
-            None => return Ok(vec![]),
-        };
+            .await?;
 
         self.inner.share_mut(|inner, _| {
             inner.state_map.insert(peer_cert.clone(), state);
@@ -125,7 +121,7 @@ impl ShardedGossip {
         local_intervals: Vec<ArcInterval>,
         remote_arc_set: Vec<ArcInterval>,
         gossip: &mut Vec<ShardedGossipWire>,
-    ) -> KitsuneResult<Option<RoundState>> {
+    ) -> KitsuneResult<RoundState> {
         // Create the common arc set from the remote and local arcs.
         let arc_set: DhtArcSet = local_intervals.into();
         let remote_arc_set: DhtArcSet = remote_arc_set.into();
@@ -161,7 +157,7 @@ impl ShardedGossip {
             }
         }
 
-        Ok(Some(state))
+        Ok(state)
     }
 }
 
@@ -182,7 +178,7 @@ pub(super) fn decode_timed_bloom_filter(bytes: &[u8]) -> TimedBloomFilter {
     // TODO: Handle this error.
     let start = u64::from_le_bytes(bytes[len - 16..len - 8].try_into().unwrap());
     // TODO: Handle this error.
-    let end = u64::from_le_bytes(bytes[len - 0..len].try_into().unwrap());
+    let end = u64::from_le_bytes(bytes[len - 8..len].try_into().unwrap());
     TimedBloomFilter {
         bloom: filter,
         time: start..end,

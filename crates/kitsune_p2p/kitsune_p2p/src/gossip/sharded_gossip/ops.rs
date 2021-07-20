@@ -16,7 +16,7 @@ impl ShardedGossip {
         })?;
         let agent = match agent {
             Some(a) => a,
-            None => return Ok(vec![]),
+            None => return Ok(vec![ShardedGossipWire::no_agents()]),
         };
 
         let mut gossip = Vec::with_capacity(1);
