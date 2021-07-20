@@ -5,10 +5,9 @@ impl ShardedGossip {
     /// - Check for any missing agents and send them back.
     pub(super) async fn incoming_agents(
         &self,
-        con: Tx2ConHnd<wire::Wire>,
         state: RoundState,
         remote_bloom: BloomFilter,
-    ) -> KitsuneResult<()> {
+    ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         // Unpack this rounds state.
         let RoundState { common_arc_set, .. } = state;
 
@@ -19,7 +18,7 @@ impl ShardedGossip {
         })?;
         let agent = match agent {
             Some(a) => a,
-            None => return Ok(()),
+            None => return Ok(vec![]),
         };
 
         // Get all agents within common arc and filter out
@@ -37,20 +36,12 @@ impl ShardedGossip {
                 .map(Arc::new)
                 .collect();
 
-        let peer_cert = con.peer_cert();
-
         // Send any missing.
-        if !missing.is_empty() {
-            self.inner.share_mut(|inner, _| {
-                inner.outgoing.push_back((
-                    GossipTgt::new(Vec::with_capacity(0), peer_cert),
-                    HowToConnect::Con(con.clone()),
-                    ShardedGossipWire::missing_agents(missing),
-                ));
-                Ok(())
-            })?;
-        }
-        Ok(())
+        Ok(if !missing.is_empty() {
+            vec![ShardedGossipWire::missing_agents(missing)]
+        } else {
+            vec![]
+        })
     }
 
     /// Incoming missing agents.

@@ -1,0 +1,51 @@
+use ghost_actor::{GhostControlHandler, GhostHandler, GhostResult};
+
+use crate::spawn::MockKitsuneP2pEventHandler;
+
+use super::*;
+
+impl ShardedGossip {
+    pub fn test(
+        gossip_type: GossipType,
+        evt_sender: EventSender,
+        inner: ShardedGossipInner,
+    ) -> Self {
+        // TODO: randomize space
+        let space = Arc::new(KitsuneSpace::new([0; 36].to_vec()));
+        Self {
+            gossip_type,
+            tuning_params: Default::default(),
+            space,
+            evt_sender,
+            inner: Share::new(inner),
+        }
+    }
+}
+
+async fn spawn_handler<H: KitsuneP2pEventHandler + GhostControlHandler>(
+    h: H,
+) -> (EventSender, tokio::task::JoinHandle<GhostResult<()>>) {
+    let builder = ghost_actor::actor_builder::GhostActorBuilder::new();
+    let (tx, rx) = futures::channel::mpsc::channel(4096);
+    builder.channel_factory().attach_receiver(rx).await.unwrap();
+    let driver = builder.spawn(h);
+    (tx, tokio::task::spawn(driver))
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_initiate_accept() {
+    let evt_handler = MockKitsuneP2pEventHandler::new();
+    let (evt_sender, _) = spawn_handler(evt_handler).await;
+    let gossip = ShardedGossip::test(GossipType::Recent, evt_sender, Default::default());
+
+    // TODO: Arbitrary impl for Tx2Cert
+    let cert = Tx2Cert(Arc::new((CertDigest::from(vec![0]), "".into(), "".into())));
+    let msg = ShardedGossipWire::Initiate(Initiate { intervals: vec![] });
+    let outgoing = gossip.process_incoming(cert, msg).await.unwrap();
+
+    assert_eq!(outgoing, vec![]);
+    gossip
+        .inner
+        .share_mut(|i, _| Ok(todo!("make assertions about internal state")))
+        .unwrap();
+}

@@ -5,7 +5,7 @@ use super::*;
 impl ShardedGossip {
     /// Try to initiate gossip if we don't currently
     /// have an outgoing gossip.
-    pub(super) async fn try_initiate(&self) -> KitsuneResult<()> {
+    pub(super) async fn try_initiate(&self) -> KitsuneResult<Option<Outgoing>> {
         // Get local agents
         let (has_target, local_agents, current_rounds) = self.inner.share_mut(|i, _| {
             // TODO: Set initiate_tgt to None when round is finished.
@@ -16,7 +16,7 @@ impl ShardedGossip {
         // There's already a target so there's nothing to do.
         if has_target {
             // TODO: Check if current target has timed out.
-            return Ok(());
+            return Ok(None);
         }
 
         // Choose any local agent so we can send requests to the store.
@@ -26,7 +26,7 @@ impl ShardedGossip {
         let agent = match agent {
             Some(agent) => agent,
             // No local agents so there's no one to initiate gossip from.
-            None => return Ok(()),
+            None => return Ok(None),
         };
 
         // Get the local agents intervals.
@@ -43,17 +43,16 @@ impl ShardedGossip {
             )
             .await?;
 
-        self.inner.share_mut(|inner, _| {
-            if let Some((endpoint, url)) = remote_agent {
+        let maybe_gossip = self.inner.share_mut(|inner, _| {
+            Ok(if let Some((endpoint, url)) = remote_agent {
                 let gossip = ShardedGossipWire::initiate(intervals);
                 inner.initiate_tgt = Some(endpoint.clone());
-                inner
-                    .outgoing
-                    .push_back((endpoint, HowToConnect::Url(url), gossip));
-            }
-            Ok(())
+                Some((endpoint, HowToConnect::Url(url), gossip))
+            } else {
+                None
+            })
         })?;
-        Ok(())
+        Ok(maybe_gossip)
     }
 
     /// Receiving an incoming initiate.
@@ -61,18 +60,18 @@ impl ShardedGossip {
     /// - Only send the agent bloom if this is a recent gossip type.
     pub(super) async fn incoming_initiate(
         &self,
-        con: Tx2ConHnd<wire::Wire>,
+        peer_cert: Tx2Cert,
         remote_arc_set: Vec<ArcInterval>,
-    ) -> KitsuneResult<()> {
+    ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let (local_agents, round_already_in_progress) = self.inner.share_mut(|i, _| {
-            let round_already_in_progress = i.state_map.contains_key(&con.peer_cert());
+            let round_already_in_progress = i.state_map.contains_key(&peer_cert);
             Ok((i.local_agents.clone(), round_already_in_progress))
         })?;
 
         // This round is already in progress so don't start another one.
         if round_already_in_progress {
             // TODO: Should we reject the message somehow or just ignore it?
-            return Ok(());
+            return Ok(vec![]);
         }
 
         // Choose any local agent so we can send requests to the store.
@@ -82,14 +81,12 @@ impl ShardedGossip {
         let agent = match agent {
             Some(agent) => agent,
             // No local agents so there's no one to initiate gossip from.
-            None => return Ok(()),
+            None => return Ok(vec![]),
         };
 
         // Get the local intervals.
         let local_intervals =
             store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents, &agent).await?;
-
-        let peer_cert = con.peer_cert();
 
         let mut gossip = Vec::with_capacity(3);
 
@@ -108,21 +105,14 @@ impl ShardedGossip {
             .await?
         {
             Some(s) => s,
-            None => return Ok(()),
+            None => return Ok(vec![]),
         };
 
         self.inner.share_mut(|inner, _| {
             inner.state_map.insert(peer_cert.clone(), state);
-            for g in gossip {
-                inner.outgoing.push_back((
-                    GossipTgt::new(Vec::with_capacity(0), peer_cert.clone()),
-                    HowToConnect::Con(con.clone()),
-                    g,
-                ));
-            }
             Ok(())
         })?;
-        Ok(())
+        Ok(gossip)
     }
 
     /// Generate the bloom filters and generate a new state.
@@ -143,7 +133,7 @@ impl ShardedGossip {
         let common_arc_set = Arc::new(arc_set.intersection(&remote_arc_set));
 
         // Generate the new state.
-        let mut state = self.new_state(common_arc_set).await?;
+        let mut state = self.new_state(common_arc_set)?;
 
         // Generate the agent bloom.
         if let GossipType::Recent = self.gossip_type {

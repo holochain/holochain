@@ -27,6 +27,9 @@ mod initiate;
 mod ops;
 mod store;
 
+#[cfg(test)]
+mod tests;
+
 /// max send buffer size (keep it under 16384 with a little room for overhead)
 /// (this is not a tuning_param because it must be coordinated
 /// with the constant in PoolBuf which cannot be set at runtime)
@@ -46,10 +49,121 @@ enum GossipType {
     Historical,
 }
 
+struct ShardedGossipNetworking {
+    gossip: ShardedGossip,
+    ep_hnd: Tx2EpHnd<wire::Wire>,
+    inner: Share<ShardedGossipNetworkingInner>,
+}
+
+impl ShardedGossipNetworking {
+    pub fn new(
+        tuning_params: KitsuneP2pTuningParams,
+        space: Arc<KitsuneSpace>,
+        ep_hnd: Tx2EpHnd<wire::Wire>,
+        evt_sender: EventSender,
+        gossip_type: GossipType,
+    ) -> Arc<Self> {
+        let mut inner = ShardedGossipInner::default();
+        inner.tuning_params = tuning_params.clone();
+        let this = Arc::new(Self {
+            ep_hnd,
+            inner: Share::new(Default::default()),
+            gossip: ShardedGossip {
+                tuning_params,
+                space,
+                evt_sender,
+                inner: Share::new(inner),
+                gossip_type,
+            },
+        });
+        metric_task({
+            let this = this.clone();
+            async move {
+                loop {
+                    // TODO: Use parameters for sleep time
+                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                    this.run_one_iteration().await;
+                }
+                KitsuneResult::Ok(())
+            }
+        });
+        this
+    }
+
+    async fn process_outgoing(&self, outgoing: Outgoing) -> KitsuneResult<()> {
+        let (endpoint, how, gossip) = outgoing;
+        let gossip = gossip.encode_vec().map_err(KitsuneError::other)?;
+        let sending_bytes = gossip.len();
+        let gossip = wire::Wire::gossip(self.gossip.space.clone(), gossip.into());
+
+        let timeout = self.gossip.tuning_params.implicit_timeout();
+
+        let con = match how {
+            HowToConnect::Con(con) => {
+                // TODO: Uncomment this and make it work.
+                // if con.is_closed() {
+                //     let url = pick_url_for_cert(inner, &peer_cert)?;
+                //     ep_hnd.get_connection(url, t).await?
+                // } else {
+                //     con
+                // }
+                con
+            }
+            HowToConnect::Url(url) => self.ep_hnd.get_connection(url, timeout).await?,
+        };
+        // TODO: Wait for enough available outgoing bandwidth here before
+        // actually sending the gossip.
+        con.notify(&gossip, timeout).await?;
+        Ok(())
+    }
+
+    async fn process_incoming_outgoing(&self) -> KitsuneResult<()> {
+        let (incoming, outgoing) = self.pop_queues()?;
+        if let Some((con, msg)) = incoming {
+            let outgoing = self.gossip.process_incoming(con.peer_cert(), msg).await?;
+            self.inner.share_mut(|i, _| {
+                i.outgoing.extend(outgoing.into_iter().map(|msg| {
+                    (
+                        GossipTgt::new(Vec::with_capacity(0), con.peer_cert()),
+                        HowToConnect::Con(con.clone()),
+                        msg,
+                    )
+                }));
+                Ok(())
+            })?;
+        }
+        if let Some(outgoing) = outgoing {
+            self.process_outgoing(outgoing).await?;
+        }
+        // TODO: Locally sync agents.
+        Ok(())
+    }
+
+    async fn run_one_iteration(&self) -> () {
+        // TODO: Handle errors
+        if let Some(outgoing) = self.gossip.try_initiate().await.unwrap() {
+            self.inner
+                .share_mut(|mut i, _| {
+                    i.outgoing.push_back(outgoing);
+                    Ok(())
+                })
+                .unwrap();
+        }
+        self.process_incoming_outgoing().await.unwrap();
+    }
+
+    fn pop_queues(&self) -> KitsuneResult<(Option<Incoming>, Option<Outgoing>)> {
+        self.inner.share_mut(move |inner, _| {
+            let incoming = inner.incoming.pop_front();
+            let outgoing = inner.outgoing.pop_front();
+            Ok((incoming, outgoing))
+        })
+    }
+}
+
 struct ShardedGossip {
     gossip_type: GossipType,
     tuning_params: KitsuneP2pTuningParams,
-    ep_hnd: Tx2EpHnd<wire::Wire>,
     space: Arc<KitsuneSpace>,
     evt_sender: EventSender,
     inner: Share<ShardedGossipInner>,
@@ -67,8 +181,6 @@ struct ShardedGossipInner {
     local_agents: HashSet<Arc<KitsuneAgent>>,
     tuning_params: KitsuneP2pTuningParams,
     initiate_tgt: Option<GossipTgt>,
-    incoming: VecDeque<Incoming>,
-    outgoing: VecDeque<Outgoing>,
     // TODO: Figure out how to properly clean up old
     // gossip round states.
     state_map: HashMap<StateKey, RoundState>,
@@ -94,6 +206,11 @@ impl ShardedGossipInner {
         }
     }
 }
+#[derive(Default)]
+struct ShardedGossipNetworkingInner {
+    incoming: VecDeque<Incoming>,
+    outgoing: VecDeque<Outgoing>,
+}
 
 #[derive(Debug, Clone)]
 struct RoundState {
@@ -108,44 +225,6 @@ impl ShardedGossip {
     /// This should give us just under 16MB for the bloom filter.
     /// Based on a compression of 75%.
     const UPPER_HASHES_BOUND: usize = 500;
-
-    pub fn new(
-        tuning_params: KitsuneP2pTuningParams,
-        space: Arc<KitsuneSpace>,
-        ep_hnd: Tx2EpHnd<wire::Wire>,
-        evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
-        gossip_type: GossipType,
-    ) -> Arc<Self> {
-        let mut inner = ShardedGossipInner::default();
-        inner.tuning_params = tuning_params.clone();
-        let this = Arc::new(Self {
-            tuning_params,
-            space,
-            ep_hnd,
-            // send_interval_ms,
-            evt_sender,
-            inner: Share::new(inner),
-            gossip_type,
-        });
-        metric_task({
-            let this = this.clone();
-            async move {
-                loop {
-                    // TODO: Use parameters for sleep time
-                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-                    this.run_one_iteration().await;
-                }
-                KitsuneResult::Ok(())
-            }
-        });
-        this
-    }
-
-    async fn run_one_iteration(&self) -> () {
-        // TODO: Handle errors
-        self.try_initiate().await.unwrap();
-        self.process_incoming_outgoing().await.unwrap();
-    }
 
     /// Calculate the time range for a gossip round.
     fn calculate_time_ranges(&self) -> Vec<Range<u64>> {
@@ -170,27 +249,7 @@ impl ShardedGossip {
         }
     }
 
-    async fn process_incoming_outgoing(&self) -> KitsuneResult<()> {
-        let (incoming, outgoing) = self.pop_queues()?;
-        if let Some(incoming) = incoming {
-            self.process_incoming(incoming).await?;
-        }
-        if let Some(outgoing) = outgoing {
-            self.process_outgoing(outgoing).await?;
-        }
-        // TODO: Locally sync agents.
-        Ok(())
-    }
-
-    fn pop_queues(&self) -> KitsuneResult<(Option<Incoming>, Option<Outgoing>)> {
-        self.inner.share_mut(move |inner, _| {
-            let incoming = inner.incoming.pop_front();
-            let outgoing = inner.outgoing.pop_front();
-            Ok((incoming, outgoing))
-        })
-    }
-
-    async fn new_state(&self, common_arc_set: Arc<DhtArcSet>) -> KitsuneResult<RoundState> {
+    fn new_state(&self, common_arc_set: Arc<DhtArcSet>) -> KitsuneResult<RoundState> {
         Ok(RoundState {
             common_arc_set,
             num_ops_blooms: 0,
@@ -199,31 +258,34 @@ impl ShardedGossip {
         })
     }
 
-    async fn get_state(&self, id: StateKey) -> KitsuneResult<Option<RoundState>> {
-        self.inner.share_mut(|i, _| Ok(i.get_state(&id)))
+    async fn get_state(&self, id: &StateKey) -> KitsuneResult<Option<RoundState>> {
+        self.inner.share_mut(|i, _| Ok(i.get_state(id)))
     }
 
-    async fn incoming_ops_finished(&self, state_id: StateKey) -> KitsuneResult<Option<RoundState>> {
+    async fn incoming_ops_finished(
+        &self,
+        state_id: &StateKey,
+    ) -> KitsuneResult<Option<RoundState>> {
         self.inner.share_mut(|i, _| {
             if i.state_map
-                .get_mut(&state_id)
+                .get_mut(state_id)
                 .map(|state| {
                     state.increment_ops_complete = true;
                     state.num_ops_blooms == 0
                 })
                 .unwrap_or(true)
             {
-                Ok(i.state_map.remove(&state_id))
+                Ok(i.state_map.remove(state_id))
             } else {
-                Ok(i.state_map.get(&state_id).cloned())
+                Ok(i.state_map.get(state_id).cloned())
             }
         })
     }
 
-    async fn decrement_ops_blooms(&self, state_id: StateKey) -> KitsuneResult<Option<RoundState>> {
+    async fn decrement_ops_blooms(&self, state_id: &StateKey) -> KitsuneResult<Option<RoundState>> {
         self.inner.share_mut(|i, _| {
             if i.state_map
-                .get_mut(&state_id)
+                .get_mut(state_id)
                 .and_then(|state| {
                     state.num_ops_blooms.checked_sub(1).map(|num_ops_blooms| {
                         state.num_ops_blooms = num_ops_blooms;
@@ -232,85 +294,65 @@ impl ShardedGossip {
                 })
                 .unwrap_or(true)
             {
-                Ok(i.state_map.remove(&state_id))
+                Ok(i.state_map.remove(state_id))
             } else {
-                Ok(i.state_map.get(&state_id).cloned())
+                Ok(i.state_map.get(state_id).cloned())
             }
         })
     }
 
-    async fn process_incoming(&self, incoming: Incoming) -> KitsuneResult<()> {
+    async fn process_incoming(
+        &self,
+        cert: Tx2Cert,
+        msg: ShardedGossipWire,
+    ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         // TODO: How do we route the gossip to the right loop type (recent vs historical)
-        let (con, gossip) = incoming;
-        match gossip {
+        Ok(match msg {
             ShardedGossipWire::Initiate(Initiate { intervals }) => {
-                self.incoming_initiate(con, intervals).await?
+                self.incoming_initiate(cert, intervals).await?
             }
             ShardedGossipWire::Accept(Accept { intervals }) => {
-                self.incoming_accept(con, intervals).await?
+                self.incoming_accept(cert, intervals).await?
             }
             ShardedGossipWire::Agents(Agents { filter }) => {
-                if let Some(state) = self.get_state(con.peer_cert()).await? {
+                if let Some(state) = self.get_state(&cert).await? {
                     let filter = decode_bloom_filter(&filter);
-                    self.incoming_agents(con, state, filter).await?;
+                    self.incoming_agents(state, filter).await?
+                } else {
+                    vec![]
                 }
             }
             ShardedGossipWire::MissingAgents(MissingAgents { agents }) => {
-                if let Some(state) = self.get_state(con.peer_cert()).await? {
+                if let Some(state) = self.get_state(&cert).await? {
                     self.incoming_missing_agents(state, agents).await?;
                 }
+                vec![]
             }
             ShardedGossipWire::Ops(Ops { filter, finished }) => {
                 let state = if finished {
-                    self.incoming_ops_finished(con.peer_cert()).await?
+                    self.incoming_ops_finished(&cert).await?
                 } else {
-                    self.get_state(con.peer_cert()).await?
+                    self.get_state(&cert).await?
                 };
                 if let Some(state) = state {
                     let filter = decode_timed_bloom_filter(&filter);
-                    self.incoming_ops(con.clone(), state.clone(), filter)
-                        .await?
+                    self.incoming_ops(state.clone(), filter).await?
+                } else {
+                    vec![]
                 }
             }
             ShardedGossipWire::MissingOps(MissingOps { ops, finished }) => {
                 let state = if finished {
-                    self.decrement_ops_blooms(con.peer_cert()).await?
+                    self.decrement_ops_blooms(&cert).await?
                 } else {
-                    self.get_state(con.peer_cert()).await?
+                    self.get_state(&cert).await?
                 };
                 if let Some(state) = state {
                     self.incoming_missing_ops(state, ops).await?;
                 }
+                vec![]
             }
-        }
-        Ok(())
-    }
-
-    async fn process_outgoing(&self, outgoing: Outgoing) -> KitsuneResult<()> {
-        let (endpoint, how, gossip) = outgoing;
-        let gossip = gossip.encode_vec().map_err(KitsuneError::other)?;
-        let sending_bytes = gossip.len();
-        let gossip = wire::Wire::gossip(self.space.clone(), gossip.into());
-
-        let timeout = self.tuning_params.implicit_timeout();
-
-        let con = match how {
-            HowToConnect::Con(con) => {
-                // TODO: Uncomment this and make it work.
-                // if con.is_closed() {
-                //     let url = pick_url_for_cert(inner, &peer_cert)?;
-                //     ep_hnd.get_connection(url, t).await?
-                // } else {
-                //     con
-                // }
-                con
-            }
-            HowToConnect::Url(url) => self.ep_hnd.get_connection(url, timeout).await?,
-        };
-        // TODO: Wait for enough available outgoing bandwidth here before
-        // actually sending the gossip.
-        con.notify(&gossip, timeout).await?;
-        Ok(())
+        })
     }
 
     /// Find a remote endpoint from agents within arc set.
@@ -428,7 +470,7 @@ kitsune_p2p_types::write_codec_enum! {
     }
 }
 
-impl AsGossipModule for ShardedGossip {
+impl AsGossipModule for ShardedGossipNetworking {
     fn incoming_gossip(
         &self,
         con: Tx2ConHnd<wire::Wire>,
@@ -450,17 +492,21 @@ impl AsGossipModule for ShardedGossip {
     }
 
     fn local_agent_join(&self, a: Arc<KitsuneAgent>) {
-        let _ = self.inner.share_mut(move |i, _| {
+        let _ = self.gossip.inner.share_mut(move |i, _| {
             i.local_agents.insert(a);
             Ok(())
         });
     }
 
     fn local_agent_leave(&self, a: Arc<KitsuneAgent>) {
-        let _ = self.inner.share_mut(move |i, _| {
+        let _ = self.gossip.inner.share_mut(move |i, _| {
             i.local_agents.remove(&a);
             Ok(())
         });
+    }
+
+    fn close(&self) {
+        todo!()
     }
 }
 
@@ -474,7 +520,7 @@ impl AsGossipModuleFactory for ShardedGossipFactory {
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
     ) -> GossipModule {
-        GossipModule(ShardedGossip::new(
+        GossipModule(ShardedGossipNetworking::new(
             tuning_params,
             space,
             ep_hnd,
