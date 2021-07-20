@@ -26,7 +26,7 @@ flate2 = "1.0.14"
 futures = "0.3"
 holo_hash = { version = "0.0.4-dev.0", path = "../holo_hash", features = ["string-encoding"] }
 holochain_keystore = { version = "0.0.2-dev.0", path = "../holochain_keystore" }
-holochain_serialized_bytes = "=0.0.50"
+holochain_serialized_bytes = "=0.0.51"
 holochain_sqlite = { path = "../holochain_sqlite", version = "0.0.2-dev.0"}
 holochain_zome_types = { path = "../holochain_zome_types", version = "0.0.4-dev.0"}
 itertools = { version = "0.10" }

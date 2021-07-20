@@ -1837,7 +1837,7 @@ dependencies = [
 name = "fixt"
 version = "0.0.4-dev.0"
 dependencies = [
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.51",
  "lazy_static",
  "parking_lot 0.10.2",
  "paste 1.0.5",
@@ -2351,7 +2351,7 @@ dependencies = [
  "blake2b_simd",
  "derive_more",
  "fixt",
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.51",
  "rand 0.7.3",
  "rusqlite",
  "serde",
@@ -2386,7 +2386,7 @@ dependencies = [
  "holochain_conductor_api",
  "holochain_keystore",
  "holochain_p2p",
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.51",
  "holochain_sqlite",
  "holochain_state",
  "holochain_test_wasm_common",
@@ -2456,7 +2456,7 @@ dependencies = [
  "hdk_derive",
  "holo_hash",
  "holochain_p2p",
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.51",
  "holochain_sqlite",
  "holochain_state",
  "holochain_types",
@@ -2493,7 +2493,7 @@ version = "0.0.2-dev.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.51",
  "holochain_types",
  "holochain_util",
  "matches",
@@ -2543,7 +2543,7 @@ dependencies = [
  "directories 2.0.2",
  "holo_hash",
  "holochain_p2p",
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.51",
  "holochain_state",
  "holochain_types",
  "holochain_zome_types",
@@ -2565,7 +2565,7 @@ version = "0.0.2-dev.0"
 dependencies = [
  "ghost_actor 0.3.0-alpha.1",
  "holo_hash",
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.51",
  "holochain_sqlite",
  "holochain_zome_types",
  "lair_keystore_api",
@@ -2587,7 +2587,7 @@ dependencies = [
  "ghost_actor 0.3.0-alpha.1",
  "holo_hash",
  "holochain_keystore",
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.51",
  "holochain_types",
  "holochain_util",
  "holochain_zome_types",
@@ -2604,11 +2604,27 @@ dependencies = [
 
 [[package]]
 name = "holochain_serialized_bytes"
-version = "0.0.50"
-source = "git+https://github.com/holochain/holochain-serialization.git?branch=develop#dabd0c2cf3c6fff96023c1228eaafa96ba1edf64"
+version = "0.0.51"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e77d1f384e8c8908f12d12301d5fc7861779fa68e6f74078d8876ed6aedf7eab"
+dependencies = [
+ "holochain_serialized_bytes_derive 0.0.51",
+ "rmp-serde",
+ "serde",
+ "serde-transcode",
+ "serde_bytes",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "holochain_serialized_bytes"
+version = "0.0.51"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9805b3e01e7b5c144782a0823db4dc895fec18a9ccd45a492ce7c7bf157a9e38"
 dependencies = [
  "arbitrary",
- "holochain_serialized_bytes_derive",
+ "holochain_serialized_bytes_derive 0.0.51",
  "rmp-serde",
  "serde",
  "serde-transcode",
@@ -2619,8 +2635,19 @@ dependencies = [
 
 [[package]]
 name = "holochain_serialized_bytes_derive"
-version = "0.0.50"
-source = "git+https://github.com/holochain/holochain-serialization.git?branch=develop#dabd0c2cf3c6fff96023c1228eaafa96ba1edf64"
+version = "0.0.51"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "085fe272d95591beeffe3e37c2996372c399baf33bc60ca88ae0906ce4d52207"
+dependencies = [
+ "quote 1.0.9",
+ "syn 1.0.73",
+]
+
+[[package]]
+name = "holochain_serialized_bytes_derive"
+version = "0.0.51"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1077232d0c427d64feb9e138fa22800e447eafb1810682d6c13beb95333cb32c"
 dependencies = [
  "quote 1.0.9",
  "syn 1.0.73",
@@ -2642,7 +2669,7 @@ dependencies = [
  "fixt",
  "futures",
  "holo_hash",
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.51",
  "holochain_util",
  "holochain_zome_types",
  "kitsune_p2p",
@@ -2689,7 +2716,7 @@ dependencies = [
  "holo_hash",
  "holochain_keystore",
  "holochain_p2p",
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.51",
  "holochain_sqlite",
  "holochain_types",
  "holochain_util",
@@ -2740,7 +2767,7 @@ dependencies = [
  "futures",
  "holo_hash",
  "holochain_keystore",
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.51",
  "holochain_sqlite",
  "holochain_util",
  "holochain_zome_types",
@@ -2806,7 +2833,7 @@ version = "0.0.72"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aff3c48ca9201c8d94dc056cad2e68a5a3f7c52e5b082ec4cd16356d263e2e48"
 dependencies = [
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.51",
  "serde",
  "serde_bytes",
  "thiserror",
@@ -2818,7 +2845,7 @@ version = "0.0.72"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e8af2ef8b6fdb7921c65ef24aecff917340e34562f25cab6c5dd50f2cb484c4"
 dependencies = [
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.51",
  "holochain_wasmer_common",
  "parking_lot 0.11.1",
  "serde",
@@ -2832,7 +2859,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "30f16b431b0345110134ada31f5e4573db378ce77720c63adba9799160bc8a85"
 dependencies = [
  "bimap",
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.51",
  "holochain_wasmer_common",
  "once_cell",
  "parking_lot 0.11.1",
@@ -2849,7 +2876,7 @@ dependencies = [
  "criterion",
  "futures",
  "ghost_actor 0.4.0-alpha.5",
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.51",
  "holochain_types",
  "linefeed",
  "must_future",
@@ -2880,7 +2907,7 @@ dependencies = [
  "derive_builder",
  "fixt",
  "holo_hash",
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.51",
  "holochain_wasmer_common",
  "nanoid",
  "num_enum",
@@ -4219,7 +4246,7 @@ checksum = "04ee3ae3ce7a7b9f875526d3f956c106f991114f1c61a0e10553918256efc8fc"
 dependencies = [
  "chrono",
  "derive_more",
- "holochain_serialized_bytes",
+ "holochain_serialized_bytes 0.0.51",
  "inferno",
  "once_cell",
  "opentelemetry",

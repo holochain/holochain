@@ -28,7 +28,7 @@ holochain_conductor_api = { version = "0.0.2-dev.0", path = "../holochain_conduc
 holochain_keystore = { version = "0.0.2-dev.0", path = "../holochain_keystore" }
 holochain_p2p = { version = "0.0.2-dev.0", path = "../holochain_p2p" }
 holochain_sqlite = { version = "0.0.2-dev.0", path = "../holochain_sqlite" }
-holochain_serialized_bytes = "=0.0.50"
+holochain_serialized_bytes = "=0.0.51"
 holochain_state = { version = "0.0.2-dev.0", path = "../holochain_state" }
 holochain_types = { version = "0.0.2-dev.0", path = "../holochain_types" }
 holochain_wasmer_host = "=0.0.72"
