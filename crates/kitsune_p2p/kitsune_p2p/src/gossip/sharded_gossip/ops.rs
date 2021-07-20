@@ -1,6 +1,6 @@
 use super::*;
 
-impl ShardedGossip {
+impl ShardedGossipLocal {
     /// Incoming ops bloom.
     /// - Send back chunks of missing ops.
     /// - Don't send a chunk larger then MAX_SEND_BUF_SIZE.

@@ -11,7 +11,7 @@ pub mod dependencies {
 mod types;
 pub use types::*;
 
-mod gossip;
+pub mod gossip;
 
 mod config;
 pub use config::*;

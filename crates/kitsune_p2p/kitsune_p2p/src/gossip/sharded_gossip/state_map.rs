@@ -2,11 +2,11 @@ use super::*;
 
 /// Map of gossip round state that checks for timed out rounds on gets.
 #[derive(Default)]
-pub(super) struct StateMap {
+pub(super) struct RoundStateMap {
     map: HashMap<StateKey, RoundState>,
 }
 
-impl StateMap {
+impl RoundStateMap {
     /// Check if round has timed out and remove it if it has.
     pub(super) fn check_timeout(&mut self, key: &StateKey) -> bool {
         let mut timed_out = false;

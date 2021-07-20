@@ -2,7 +2,7 @@ use std::convert::TryInto;
 
 use super::*;
 
-impl ShardedGossip {
+impl ShardedGossipLocal {
     /// Try to initiate gossip if we don't currently
     /// have an outgoing gossip.
     pub(super) async fn try_initiate(&self) -> KitsuneResult<Option<Outgoing>> {
@@ -10,7 +10,7 @@ impl ShardedGossip {
         let (has_target, local_agents, current_rounds) = self.inner.share_mut(|i, _| {
             i.check_tgt_expired();
             let has_target = i.initiate_tgt.is_some();
-            let current_rounds = i.state_map.current_rounds();
+            let current_rounds = i.round_map.current_rounds();
             Ok((has_target, i.local_agents.clone(), current_rounds))
         })?;
         // There's already a target so there's nothing to do.
@@ -63,7 +63,7 @@ impl ShardedGossip {
         remote_arc_set: Vec<ArcInterval>,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let (local_agents, round_already_in_progress) = self.inner.share_mut(|i, _| {
-            let round_already_in_progress = i.state_map.round_exists(&peer_cert);
+            let round_already_in_progress = i.round_map.round_exists(&peer_cert);
             Ok((i.local_agents.clone(), round_already_in_progress))
         })?;
 
@@ -104,7 +104,7 @@ impl ShardedGossip {
             .await?;
 
         self.inner.share_mut(|inner, _| {
-            inner.state_map.insert(peer_cert.clone(), state);
+            inner.round_map.insert(peer_cert.clone(), state);
             Ok(())
         })?;
         Ok(gossip)

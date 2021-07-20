@@ -1,6 +1,6 @@
 use super::*;
 
-impl ShardedGossip {
+impl ShardedGossipLocal {
     /// Incoming accept gossip round message.
     /// - Send back the agent bloom and ops bloom gossip messages.
     /// - Only send the agent bloom if this is a recent gossip type.
@@ -54,7 +54,7 @@ impl ShardedGossip {
         self.inner.share_mut(|inner, _| {
             // TODO: What happen if we are in the middle of a new outgoing and
             // a stale accept comes in for the same peer cert?
-            inner.state_map.insert(peer_cert.clone(), state);
+            inner.round_map.insert(peer_cert.clone(), state);
             Ok(())
         })?;
         Ok(gossip)

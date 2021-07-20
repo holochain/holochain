@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use crate::agent_store::AgentInfoSigned;
 use crate::event::MetricQuery;
 use crate::event::MetricQueryAnswer;

@@ -1,3 +1,7 @@
+//! The main (and only) Sharded gossiping strategy
+
+#![warn(missing_docs)]
+
 use crate::agent_store::AgentInfoSigned;
 use crate::gossip::simple_bloom::{decode_bloom_filter, encode_bloom_filter};
 use crate::types::event::*;
@@ -17,7 +21,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use self::initiate::decode_timed_bloom_filter;
-use self::state_map::StateMap;
+use self::state_map::RoundStateMap;
 
 use super::simple_bloom::{HowToConnect, MetaOpKey};
 
@@ -45,20 +49,37 @@ struct TimedBloomFilter {
     time: std::ops::Range<u64>,
 }
 
+/// Gossip has two distinct variants which share a lot of similarities but
+/// are fundamentally different and serve different purposes
 #[derive(Debug, Clone, Copy)]
 pub enum GossipType {
+    /// The Recent gossip type is aimed at rapidly syncing the most recent
+    /// data. It runs frequently and expects frequent diffs at each round.
     Recent,
+    /// The Historical gossip type is aimed at comprehensively syncing the
+    /// entire common history of two nodes, filling in gaps in the historical
+    /// data. It runs less frequently, and expects diffs to be infrequent
+    /// at each round.
     #[allow(dead_code)]
     Historical,
 }
 
-struct ShardedGossipNetworking {
-    gossip: ShardedGossip,
+/// The entry point for the sharded gossip strategy.
+///
+/// This struct encapsulates the network communication concerns, mainly
+/// managing the incoming and outgoing gossip queues. It contains a struct
+/// which handles all other (local) aspects of gossip.
+pub struct ShardedGossip {
+    /// ShardedGossipLocal handles the non-networking concerns of gossip
+    gossip: ShardedGossipLocal,
+    /// TODO: what is this?
     ep_hnd: Tx2EpHnd<wire::Wire>,
-    inner: Share<ShardedGossipNetworkingInner>,
+    /// The internal mutable state
+    inner: Share<ShardedGossipState>,
 }
 
-impl ShardedGossipNetworking {
+impl ShardedGossip {
+    /// Constructor
     pub fn new(
         tuning_params: KitsuneP2pTuningParams,
         space: Arc<KitsuneSpace>,
@@ -66,12 +87,12 @@ impl ShardedGossipNetworking {
         evt_sender: EventSender,
         gossip_type: GossipType,
     ) -> Arc<Self> {
-        let mut inner = ShardedGossipInner::default();
+        let mut inner = ShardedGossipLocalState::default();
         inner.tuning_params = tuning_params.clone();
         let this = Arc::new(Self {
             ep_hnd,
             inner: Share::new(Default::default()),
-            gossip: ShardedGossip {
+            gossip: ShardedGossipLocal {
                 tuning_params,
                 space,
                 evt_sender,
@@ -165,12 +186,17 @@ impl ShardedGossipNetworking {
     }
 }
 
-struct ShardedGossip {
+/// The parts of sharded gossip which are concerned only with the gossiping node:
+/// - managing local state
+/// - making requests to the local backend
+/// - processing incoming messages to produce outgoing messages (which actually)
+///     get sent by the enclosing `ShardedGossip`
+pub struct ShardedGossipLocal {
     gossip_type: GossipType,
     tuning_params: KitsuneP2pTuningParams,
     space: Arc<KitsuneSpace>,
     evt_sender: EventSender,
-    inner: Share<ShardedGossipInner>,
+    inner: Share<ShardedGossipLocalState>,
 }
 
 /// Incoming gossip.
@@ -180,17 +206,20 @@ type Outgoing = (GossipTgt, HowToConnect, ShardedGossipWire);
 
 type StateKey = Tx2Cert;
 
+/// The internal mutable state for [`ShardedGossipLocal`]
 #[derive(Default)]
-struct ShardedGossipInner {
+pub struct ShardedGossipLocalState {
+    /// The list of agents on this node
     local_agents: HashSet<Arc<KitsuneAgent>>,
     tuning_params: KitsuneP2pTuningParams,
+    /// If Some, we are in the process of trying to initiate gossip with this target.
     initiate_tgt: Option<GossipTgt>,
     // TODO: Figure out how to properly clean up old
     // gossip round states.
-    state_map: StateMap,
+    round_map: RoundStateMap,
 }
 
-impl ShardedGossipInner {
+impl ShardedGossipLocalState {
     fn remove_state(&mut self, state_key: &StateKey) -> Option<RoundState> {
         if self
             .initiate_tgt
@@ -200,35 +229,42 @@ impl ShardedGossipInner {
         {
             self.initiate_tgt = None;
         }
-        self.state_map.remove(state_key)
+        self.round_map.remove(state_key)
     }
 
     fn check_tgt_expired(&mut self) {
         if let Some(cert) = self.initiate_tgt.as_ref().map(|tgt| tgt.cert().clone()) {
-            if self.state_map.check_timeout(&cert) {
+            if self.round_map.check_timeout(&cert) {
                 self.initiate_tgt = None;
             }
         }
     }
 }
 
+/// The internal mutable state for [`ShardedGossip`]
 #[derive(Default)]
-struct ShardedGossipNetworkingInner {
+pub struct ShardedGossipState {
     incoming: VecDeque<Incoming>,
     outgoing: VecDeque<Outgoing>,
 }
 
+/// The state representing a single active ongoing "round" of gossip with a
+/// remote node
 #[derive(Debug, Clone)]
-struct RoundState {
+pub struct RoundState {
+    /// The common ground with our gossip partner for the purposes of this round
     common_arc_set: Arc<DhtArcSet>,
+    /// TODO: what is this?
     num_ops_blooms: u8,
+    /// TODO: what is this?
     increment_ops_complete: bool,
+    /// Round start time
     created_at: std::time::Instant,
     /// Amount of time before a round is considered expired.
     round_timeout: u32,
 }
 
-impl ShardedGossip {
+impl ShardedGossipLocal {
     const TGT_FP: f64 = 0.01;
     /// This should give us just under 16MB for the bloom filter.
     /// Based on a compression of 75%.
@@ -272,7 +308,7 @@ impl ShardedGossip {
 
     async fn get_state(&self, id: &StateKey) -> KitsuneResult<Option<RoundState>> {
         self.inner
-            .share_mut(|i, _| Ok(i.state_map.get(id).cloned()))
+            .share_mut(|i, _| Ok(i.round_map.get(id).cloned()))
     }
 
     async fn remove_state(&self, id: &StateKey) -> KitsuneResult<Option<RoundState>> {
@@ -284,7 +320,7 @@ impl ShardedGossip {
         state_id: &StateKey,
     ) -> KitsuneResult<Option<RoundState>> {
         self.inner.share_mut(|i, _| {
-            if i.state_map
+            if i.round_map
                 .get_mut(state_id)
                 .map(|state| {
                     state.increment_ops_complete = true;
@@ -294,14 +330,14 @@ impl ShardedGossip {
             {
                 Ok(i.remove_state(state_id))
             } else {
-                Ok(i.state_map.get(state_id).cloned())
+                Ok(i.round_map.get(state_id).cloned())
             }
         })
     }
 
     async fn decrement_ops_blooms(&self, state_id: &StateKey) -> KitsuneResult<Option<RoundState>> {
         self.inner.share_mut(|i, _| {
-            if i.state_map
+            if i.round_map
                 .get_mut(state_id)
                 .and_then(|state| {
                     state.num_ops_blooms.checked_sub(1).map(|num_ops_blooms| {
@@ -313,7 +349,7 @@ impl ShardedGossip {
             {
                 Ok(i.remove_state(state_id))
             } else {
-                Ok(i.state_map.get(state_id).cloned())
+                Ok(i.round_map.get(state_id).cloned())
             }
         })
     }
@@ -370,6 +406,9 @@ impl ShardedGossip {
                 vec![]
             }
             ShardedGossipWire::NoAgents(_) | ShardedGossipWire::AlreadyInProgress(_) => {
+                // maackle: Why remove state if gossip already in progress?
+                //          Don't we want to keep it? I guess I need to see how
+                //          and why this message would get transmitted.
                 self.remove_state(&cert).await?;
                 vec![]
             }
@@ -459,33 +498,43 @@ kitsune_p2p_types::write_codec_enum! {
     codec ShardedGossipWire {
         /// Initiate a round of gossip with a remote node
         Initiate(0x10) {
+            /// The list of arc intervals (equivalent to a [`DhtArcSet`])
+            /// for all local agents
             intervals.0: Vec<ArcInterval>,
         },
 
         /// Accept an incoming round of gossip from a remote node
         Accept(0x20) {
+            /// The list of arc intervals (equivalent to a [`DhtArcSet`])
+            /// for all local agents
             intervals.0: Vec<ArcInterval>,
         },
 
         /// Send Agent Info Boom
         Agents(0x30) {
+            /// The bloom filter for agent data
             filter.0: PoolBuf,
         },
 
-        /// Any agents that were missing from the bloom.
+        /// Any agents that were missing from the remote bloom.
         MissingAgents(0x40) {
+            /// The missing agents
             agents.0: Vec<Arc<AgentInfoSigned>>,
         },
 
         /// Send Agent Info Boom
         Ops(0x50) {
+            /// The bloom filter for op data
             filter.0: PoolBuf,
+            /// TODO: what is this?
             finished.1: bool,
         },
 
         /// Any ops that were missing from the remote bloom.
         MissingOps(0x60) {
+            /// The missing ops
             ops.0: Vec<Arc<(Arc<KitsuneOpHash>, Vec<u8>)>>,
+            /// TODO: what is this?
             finished.1: bool,
         },
 
@@ -494,12 +543,13 @@ kitsune_p2p_types::write_codec_enum! {
         },
 
         /// The node you are trying to gossip with has no agents anymore.
+        // maackle: seems like an optimization, can we just
         NoAgents(0x80) {
         },
     }
 }
 
-impl AsGossipModule for ShardedGossipNetworking {
+impl AsGossipModule for ShardedGossip {
     fn incoming_gossip(
         &self,
         con: Tx2ConHnd<wire::Wire>,
@@ -549,7 +599,7 @@ impl AsGossipModuleFactory for ShardedGossipFactory {
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
     ) -> GossipModule {
-        GossipModule(ShardedGossipNetworking::new(
+        GossipModule(ShardedGossip::new(
             tuning_params,
             space,
             ep_hnd,
@@ -558,6 +608,8 @@ impl AsGossipModuleFactory for ShardedGossipFactory {
         ))
     }
 }
+
+/// Create a [`GossipModuleFactory`]
 pub fn factory() -> GossipModuleFactory {
     GossipModuleFactory(Arc::new(ShardedGossipFactory))
 }

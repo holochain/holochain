@@ -7,11 +7,11 @@ use super::*;
 use crate::fixt::*;
 use fixt::prelude::*;
 
-impl ShardedGossip {
+impl ShardedGossipLocal {
     pub fn test(
         gossip_type: GossipType,
         evt_sender: EventSender,
-        inner: ShardedGossipInner,
+        inner: ShardedGossipLocalState,
     ) -> Self {
         // TODO: randomize space
         let space = Arc::new(KitsuneSpace::new([0; 36].to_vec()));
@@ -39,7 +39,7 @@ async fn spawn_handler<H: KitsuneP2pEventHandler + GhostControlHandler>(
 async fn test_initiate_accept() {
     let evt_handler = MockKitsuneP2pEventHandler::new();
     let (evt_sender, _) = spawn_handler(evt_handler).await;
-    let gossip = ShardedGossip::test(GossipType::Recent, evt_sender, Default::default());
+    let gossip = ShardedGossipLocal::test(GossipType::Recent, evt_sender, Default::default());
 
     // TODO: Arbitrary impl for Tx2Cert
     let cert = Tx2Cert(Arc::new((CertDigest::from(vec![0]), "".into(), "".into())));
@@ -84,7 +84,7 @@ async fn sharded_sanity_test() {
             )
         });
     let (evt_sender, _) = spawn_handler(evt_handler).await;
-    let alice = ShardedGossip::test(GossipType::Historical, evt_sender, Default::default());
+    let alice = ShardedGossipLocal::test(GossipType::Historical, evt_sender, Default::default());
 
     let mut evt_handler = MockKitsuneP2pEventHandler::new();
     evt_handler
@@ -112,14 +112,14 @@ async fn sharded_sanity_test() {
             )
         });
     let (evt_sender, _) = spawn_handler(evt_handler).await;
-    let bob = ShardedGossip::test(GossipType::Historical, evt_sender, Default::default());
+    let bob = ShardedGossipLocal::test(GossipType::Historical, evt_sender, Default::default());
 
     // Set alice initial state
     alice
         .inner
         .share_mut(|i, _| {
             i.local_agents.insert(alice_agent);
-            assert_eq!(i.state_map.current_rounds().len(), 0);
+            assert_eq!(i.round_map.current_rounds().len(), 0);
             Ok(())
         })
         .unwrap();
@@ -131,7 +131,7 @@ async fn sharded_sanity_test() {
     bob.inner
         .share_mut(|i, _| {
             i.local_agents.insert(Arc::new(fixt!(KitsuneAgent)));
-            assert_eq!(i.state_map.current_rounds().len(), 0);
+            assert_eq!(i.round_map.current_rounds().len(), 0);
             Ok(())
         })
         .unwrap();
@@ -148,7 +148,7 @@ async fn sharded_sanity_test() {
     alice
         .inner
         .share_mut(|i, _| {
-            assert_eq!(i.state_map.current_rounds().len(), 1);
+            assert_eq!(i.round_map.current_rounds().len(), 1);
             Ok(())
         })
         .unwrap();
@@ -163,7 +163,7 @@ async fn sharded_sanity_test() {
     assert_eq!(bob_outgoing.len(), 4);
     bob.inner
         .share_mut(|i, _| {
-            assert_eq!(i.state_map.current_rounds().len(), 1);
+            assert_eq!(i.round_map.current_rounds().len(), 1);
             Ok(())
         })
         .unwrap();
