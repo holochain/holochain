@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use super::*;
 
 impl ShardedGossip {
@@ -14,24 +16,14 @@ impl ShardedGossip {
         agent: &Arc<KitsuneAgent>,
         state: RoundState,
     ) -> KitsuneResult<Option<BloomFilter>> {
-        let RoundState {
-            since_ms,
-            until_ms,
-            common_arc_set,
-        } = state;
+        let RoundState { common_arc_set, .. } = state;
         // Get the time range for this gossip.
         // Get all the agent info that is within the common arc set.
-        let agents_within_arc: Vec<_> = store::agent_info_within_arc_set(
-            &self.evt_sender,
-            &self.space,
-            agent,
-            common_arc_set,
-            since_ms,
-            until_ms,
-        )
-        .await?
-        // Need to collect to know the length for the bloom filter.
-        .collect();
+        let agents_within_arc: Vec<_> =
+            store::agent_info_within_arc_set(&self.evt_sender, &self.space, agent, common_arc_set)
+                .await?
+                // Need to collect to know the length for the bloom filter.
+                .collect();
 
         // There was no agents so we don't create a bloom.
         if agents_within_arc.is_empty() {
@@ -62,21 +54,15 @@ impl ShardedGossip {
         &self,
         local_agents: &HashSet<Arc<KitsuneAgent>>,
         agent: &Arc<KitsuneAgent>,
-        state: RoundState,
-    ) -> KitsuneResult<Option<BloomFilter>> {
-        let RoundState {
-            since_ms,
-            until_ms,
-            common_arc_set,
-        } = state;
+        common_arc_set: &Arc<DhtArcSet>,
+        time_range: Range<u64>,
+    ) -> KitsuneResult<Option<TimedBloomFilter>> {
         // Get the agents withing the arc set and filter by local.
         let local_agents_within_arc_set: Vec<_> = store::agents_within_arcset(
             &self.evt_sender,
             &self.space,
             &agent,
             common_arc_set.clone(),
-            since_ms,
-            until_ms,
         )
         .await?
         .into_iter()
@@ -84,20 +70,21 @@ impl ShardedGossip {
         .collect();
 
         // Get the op hashes which fit within the common arc set from these local agents.
-        let ops_within_common_arc = store::all_ops_within_common_set(
+        let result = store::all_ops_within_common_set(
             &self.evt_sender,
             &self.space,
-            &local_agents_within_arc_set,
-            &common_arc_set,
-            clamp64(since_ms),
-            clamp64(until_ms),
+            local_agents_within_arc_set,
+            common_arc_set,
+            time_range,
+            Self::UPPER_HASHES_BOUND,
         )
         .await?;
 
         // If there are none then don't create a bloom.
-        if ops_within_common_arc.is_empty() {
-            return Ok(None);
-        }
+        let (ops_within_common_arc, time) = match result {
+            Some(r) => r,
+            None => return Ok(None),
+        };
 
         // Create the bloom from the op hashes.
         let mut bloom =
@@ -105,6 +92,7 @@ impl ShardedGossip {
         for hash in ops_within_common_arc {
             bloom.set(&Arc::new(MetaOpKey::Op(hash)));
         }
+        let bloom = TimedBloomFilter { bloom, time };
         Ok(Some(bloom))
     }
 
@@ -120,13 +108,13 @@ impl ShardedGossip {
         &self,
         local_agents_within_arc_set: &Vec<(Arc<KitsuneAgent>, ArcInterval)>,
         state: RoundState,
-        remote_bloom: BloomFilter,
+        remote_bloom: TimedBloomFilter,
     ) -> KitsuneResult<HashMap<Arc<KitsuneOpHash>, Vec<u8>>> {
-        let RoundState {
-            since_ms,
-            until_ms,
-            common_arc_set,
-        } = state;
+        let RoundState { common_arc_set, .. } = state;
+        let TimedBloomFilter {
+            bloom: remote_bloom,
+            time,
+        } = remote_bloom;
         let mut missing_ops = HashMap::new();
         for (agent, interval) in local_agents_within_arc_set {
             let mut missing_hashes = Vec::new();
@@ -136,8 +124,8 @@ impl ShardedGossip {
                 &agent,
                 &interval,
                 &common_arc_set,
-                clamp64(since_ms),
-                clamp64(until_ms),
+                clamp64(time.start),
+                clamp64(time.end),
             )
             .await?;
             missing_hashes.extend(

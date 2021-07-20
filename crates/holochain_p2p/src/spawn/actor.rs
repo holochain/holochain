@@ -305,6 +305,25 @@ impl WrapEvtSender {
         )
     }
 
+    fn hashes_for_time_window(
+        &self,
+        dna_hash: DnaHash,
+        to_agents: Vec<(AgentPubKey, kitsune_p2p::dht_arc::DhtArcSet)>,
+        window: std::ops::Range<u64>,
+        max_ops: usize,
+    ) -> impl Future<
+        Output = HolochainP2pResult<Option<(Vec<holo_hash::DhtOpHash>, std::ops::Range<u64>)>>,
+    >
+           + 'static
+           + Send {
+        timing_trace!(
+            {
+                self.0
+                    .hashes_for_time_window(dna_hash, to_agents, window, max_ops)
+            },
+            "(hp2p:handle) hashes_for_time_window",
+        )
+    }
     fn fetch_op_hash_data(
         &self,
         dna_hash: DnaHash,
@@ -864,6 +883,34 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         .into())
     }
 
+    fn handle_hashes_for_time_window(
+        &mut self,
+        input: kitsune_p2p::event::HashesForTimeWindowEvt,
+    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<
+        Option<(Vec<Arc<kitsune_p2p::KitsuneOpHash>>, std::ops::Range<u64>)>,
+    > {
+        let kitsune_p2p::event::HashesForTimeWindowEvt {
+            space,
+            agents,
+            window,
+            max_ops,
+        } = input;
+        let space = DnaHash::from_kitsune(&space);
+        let agents = agents
+            .into_iter()
+            .map(|(agent, set)| (AgentPubKey::from_kitsune(&agent), set))
+            .collect();
+
+        let evt_sender = self.evt_sender.clone();
+        Ok(async move {
+            Ok(evt_sender
+                .hashes_for_time_window(space, agents, window, max_ops)
+                .await?
+                .map(|(h, time)| (h.into_iter().map(|h| h.into_kitsune()).collect(), time)))
+        }
+        .boxed()
+        .into())
+    }
     #[allow(clippy::needless_collect)]
     #[tracing::instrument(skip(self), level = "trace")]
     fn handle_fetch_op_hash_data(

@@ -649,6 +649,9 @@ async fn handle_events(
                         .boxed()
                         .into()));
                 }
+                event::KitsuneP2pEvent::HashesForTimeWindow { .. } => {
+                    todo!()
+                }
                 event::KitsuneP2pEvent::SignNetworkData { respond, input, .. } => {
                     respond.r(Ok(handle_sign_network_data(kdirect.clone(), input)
                         .map_err(KitsuneP2pError::other)

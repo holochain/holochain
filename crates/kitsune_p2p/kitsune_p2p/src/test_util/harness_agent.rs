@@ -264,6 +264,14 @@ impl KitsuneP2pEventHandler for AgentHarness {
         Ok(async move { Ok(hashes) }.boxed().into())
     }
 
+    fn handle_hashes_for_time_window(
+        &mut self,
+        _input: HashesForTimeWindowEvt,
+    ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<super::KitsuneOpHash>>, std::ops::Range<u64>)>>
+    {
+        todo!()
+    }
+
     fn handle_fetch_op_hash_data(
         &mut self,
         input: FetchOpHashDataEvt,

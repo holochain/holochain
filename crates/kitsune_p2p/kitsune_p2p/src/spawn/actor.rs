@@ -442,6 +442,13 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
         Ok(self.evt_sender.fetch_op_hash_data(input))
     }
 
+    fn handle_hashes_for_time_window(
+        &mut self,
+        input: HashesForTimeWindowEvt,
+    ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, std::ops::Range<u64>)>> {
+        Ok(self.evt_sender.hashes_for_time_window(input))
+    }
+
     fn handle_sign_network_data(
         &mut self,
         input: SignNetworkDataEvt,

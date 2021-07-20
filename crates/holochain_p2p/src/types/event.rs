@@ -216,6 +216,14 @@ ghost_actor::ghost_chan! {
             until: holochain_types::Timestamp,
         ) -> Vec<holo_hash::DhtOpHash>;
 
+        /// Get the oldest and newest times for ops within a time window and max number of ops.
+        fn hashes_for_time_window(
+            dna_hash: DnaHash,
+            to_agents: Vec<(AgentPubKey, kitsune_p2p::dht_arc::DhtArcSet)>,
+            window: std::ops::Range<u64>,
+            max_ops: usize,
+        ) -> Option<(Vec<holo_hash::DhtOpHash>, std::ops::Range<u64>)>;
+
         /// The p2p module needs access to the content for a given set of DhtOpHashes.
         fn fetch_op_hash_data(
             dna_hash: DnaHash,
@@ -266,12 +274,14 @@ impl HolochainP2pEvent {
     pub fn dna_hash(&self) -> &DnaHash {
         match_p2p_evt!(self => |dna_hash| { dna_hash }, {
             HolochainP2pEvent::QueryAgentInfoSignedNearBasis { dna_hash, .. } => { dna_hash }
+            HolochainP2pEvent::HashesForTimeWindow { dna_hash, .. } => { dna_hash }
         })
     }
 
     /// The agent_pub_key associated with this network p2p event.
     pub fn target_agent_as_ref(&self) -> &AgentPubKey {
         match_p2p_evt!(self => |to_agent| { to_agent }, {
+            HolochainP2pEvent::HashesForTimeWindow { .. } => { unimplemented!() }
             HolochainP2pEvent::QueryAgentInfoSignedNearBasis { .. } => { unimplemented!() }
         })
     }

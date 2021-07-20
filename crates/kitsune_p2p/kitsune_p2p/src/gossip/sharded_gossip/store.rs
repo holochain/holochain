@@ -1,7 +1,7 @@
 //! This module is the ideal interface we would have for the conductor (or other store that kitsune uses).
 //! We should update the conductor to match this interface.
 
-use std::{collections::HashSet, sync::Arc};
+use std::{collections::HashSet, ops::Range, sync::Arc};
 
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
@@ -11,8 +11,8 @@ use kitsune_p2p_types::{
 };
 
 use crate::event::{
-    FetchOpHashesForConstraintsEvt, GetAgentInfoSignedEvt, PutAgentInfoSignedEvt,
-    QueryAgentInfoSignedEvt, QueryGossipAgentsEvt,
+    FetchOpHashesForConstraintsEvt, GetAgentInfoSignedEvt, HashesForTimeWindowEvt,
+    PutAgentInfoSignedEvt, QueryAgentInfoSignedEvt, QueryGossipAgentsEvt,
 };
 use crate::types::event::KitsuneP2pEventSender;
 
@@ -82,15 +82,12 @@ pub(super) async fn agent_info_within_arc_set(
     space: &Arc<KitsuneSpace>,
     agent: &Arc<KitsuneAgent>,
     arc_set: Arc<DhtArcSet>,
-    since_ms: u64,
-    until_ms: u64,
 ) -> KitsuneResult<impl Iterator<Item = AgentInfoSigned>> {
-    let set: HashSet<_> =
-        agents_within_arcset(evt_sender, space, agent, arc_set, since_ms, until_ms)
-            .await?
-            .into_iter()
-            .map(|(a, _)| a)
-            .collect();
+    let set: HashSet<_> = agents_within_arcset(evt_sender, space, agent, arc_set)
+        .await?
+        .into_iter()
+        .map(|(a, _)| a)
+        .collect();
     Ok(all_agent_info(evt_sender, space, agent)
         .await?
         .into_iter()
@@ -103,15 +100,13 @@ pub(super) async fn agents_within_arcset(
     space: &Arc<KitsuneSpace>,
     agent: &Arc<KitsuneAgent>,
     arc_set: Arc<DhtArcSet>,
-    since_ms: u64,
-    until_ms: u64,
 ) -> KitsuneResult<Vec<(Arc<KitsuneAgent>, ArcInterval)>> {
     Ok(evt_sender
         .query_gossip_agents(QueryGossipAgentsEvt {
             space: space.clone(),
             agent: agent.clone(),
-            since_ms,
-            until_ms,
+            since_ms: 0,
+            until_ms: u64::MAX,
             arc_set,
         })
         .await
@@ -156,26 +151,28 @@ pub(super) async fn ops_within_common_set(
 pub(super) async fn all_ops_within_common_set(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
-    agents: &Vec<(Arc<KitsuneAgent>, ArcInterval)>,
+    agents: Vec<(Arc<KitsuneAgent>, ArcInterval)>,
     common_arc_set: &Arc<DhtArcSet>,
-    since_utc_epoch_s: i64,
-    until_utc_epoch_s: i64,
-) -> KitsuneResult<Vec<Arc<KitsuneOpHash>>> {
-    let mut missing_hashes = Vec::new();
-    for (agent, interval) in agents {
-        let hashes = ops_within_common_set(
-            &evt_sender,
-            &space,
-            &agent,
-            &interval,
-            &common_arc_set,
-            since_utc_epoch_s,
-            until_utc_epoch_s,
-        )
-        .await?;
-        missing_hashes.extend(hashes);
-    }
-    Ok(missing_hashes)
+    time_window: std::ops::Range<u64>,
+    max_ops: usize,
+) -> KitsuneResult<Option<(Vec<Arc<KitsuneOpHash>>, Range<u64>)>> {
+    let agents = agents
+        .into_iter()
+        .map(|(a, i)| {
+            let intersection = common_arc_set.intersection(&DhtArcSet::from_interval(i));
+            (a, intersection)
+        })
+        .collect();
+    Ok(evt_sender
+        .hashes_for_time_window(HashesForTimeWindowEvt {
+            space: space.clone(),
+            agents,
+            window: time_window,
+            max_ops,
+        })
+        .await
+        // TODO: Handle Error
+        .unwrap())
 }
 
 /// Add new agent info to the p2p store.

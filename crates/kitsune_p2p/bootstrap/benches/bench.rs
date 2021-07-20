@@ -15,7 +15,6 @@ use kitsune_p2p_types::bootstrap::RandomLimit;
 use kitsune_p2p_types::bootstrap::RandomQuery;
 use tokio::runtime::Builder;
 use tokio::runtime::Runtime;
-use tokio::sync::oneshot;
 
 criterion_group!(benches, bootstrap);
 

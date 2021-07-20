@@ -1,3 +1,5 @@
+use std::convert::TryInto;
+
 use super::*;
 
 impl ShardedGossip {
@@ -5,10 +7,11 @@ impl ShardedGossip {
     /// have an outgoing gossip.
     pub(super) async fn try_initiate(&self) -> KitsuneResult<()> {
         // Get local agents
-        let (has_target, local_agents) = self.inner.share_mut(|i, _| {
+        let (has_target, local_agents, current_rounds) = self.inner.share_mut(|i, _| {
             // TODO: Set initiate_tgt to None when round is finished.
             let has_target = i.initiate_tgt.is_some();
-            Ok((has_target, i.local_agents.clone()))
+            let current_rounds = i.state_map.keys().cloned().collect::<HashSet<_>>();
+            Ok((has_target, i.local_agents.clone(), current_rounds))
         })?;
         // There's already a target so there's nothing to do.
         if has_target {
@@ -32,7 +35,12 @@ impl ShardedGossip {
 
         // Choose a remote agent to gossip with.
         let remote_agent = self
-            .find_remote_agent_within_arc(&agent, Arc::new(intervals.clone().into()), &local_agents)
+            .find_remote_agent_within_arc(
+                &agent,
+                Arc::new(intervals.clone().into()),
+                &local_agents,
+                current_rounds,
+            )
             .await?;
 
         self.inner.share_mut(|inner, _| {
@@ -56,7 +64,16 @@ impl ShardedGossip {
         con: Tx2ConHnd<wire::Wire>,
         remote_arc_set: Vec<ArcInterval>,
     ) -> KitsuneResult<()> {
-        let local_agents = self.inner.share_mut(|i, _| Ok(i.local_agents.clone()))?;
+        let (local_agents, round_already_in_progress) = self.inner.share_mut(|i, _| {
+            let round_already_in_progress = i.state_map.contains_key(&con.peer_cert());
+            Ok((i.local_agents.clone(), round_already_in_progress))
+        })?;
+
+        // This round is already in progress so don't start another one.
+        if round_already_in_progress {
+            // TODO: Should we reject the message somehow or just ignore it?
+            return Ok(());
+        }
 
         // Choose any local agent so we can send requests to the store.
         let agent = local_agents.iter().cloned().next();
@@ -80,7 +97,7 @@ impl ShardedGossip {
         gossip.push(ShardedGossipWire::accept(local_intervals.clone()));
 
         // Generate the bloom filters and new state.
-        let state = self
+        let state = match self
             .generate_blooms(
                 &agent,
                 &local_agents,
@@ -88,7 +105,11 @@ impl ShardedGossip {
                 remote_arc_set,
                 &mut gossip,
             )
-            .await?;
+            .await?
+        {
+            Some(s) => s,
+            None => return Ok(()),
+        };
 
         self.inner.share_mut(|inner, _| {
             inner.state_map.insert(peer_cert.clone(), state);
@@ -115,14 +136,14 @@ impl ShardedGossip {
         local_intervals: Vec<ArcInterval>,
         remote_arc_set: Vec<ArcInterval>,
         gossip: &mut Vec<ShardedGossipWire>,
-    ) -> KitsuneResult<RoundState> {
+    ) -> KitsuneResult<Option<RoundState>> {
         // Create the common arc set from the remote and local arcs.
         let arc_set: DhtArcSet = local_intervals.into();
         let remote_arc_set: DhtArcSet = remote_arc_set.into();
         let common_arc_set = Arc::new(arc_set.intersection(&remote_arc_set));
 
         // Generate the new state.
-        let state = self.new_state(common_arc_set)?;
+        let mut state = self.new_state(common_arc_set).await?;
 
         // Generate the agent bloom.
         if let GossipType::Recent = self.gossip_type {
@@ -133,15 +154,48 @@ impl ShardedGossip {
             }
         }
 
+        let time_ranges = self.calculate_time_ranges();
+        let len = time_ranges.len();
         // Generate the ops bloom for all local agents within the common arc.
-        let bloom = self
-            .generate_ops_bloom(&local_agents, &agent, state.clone())
-            .await?;
-        if let Some(bloom) = bloom {
-            let bloom = encode_bloom_filter(&bloom);
-            gossip.push(ShardedGossipWire::ops(bloom));
+        for (i, time_range) in time_ranges.into_iter().enumerate() {
+            let bloom = self
+                .generate_ops_bloom(&local_agents, &agent, &state.common_arc_set, time_range)
+                .await?;
+            if let Some(bloom) = bloom {
+                let bloom = encode_timed_bloom_filter(&bloom);
+                state.increment_ops_blooms();
+                if i == len - 1 {
+                    gossip.push(ShardedGossipWire::ops(bloom, true));
+                } else {
+                    gossip.push(ShardedGossipWire::ops(bloom, false));
+                }
+            }
         }
 
-        Ok(state)
+        Ok(Some(state))
+    }
+}
+
+pub(super) fn encode_timed_bloom_filter(bloom: &TimedBloomFilter) -> PoolBuf {
+    let mut buf = encode_bloom_filter(&bloom.bloom);
+    let start = bloom.time.start.to_le_bytes();
+    let end = bloom.time.end.to_le_bytes();
+
+    buf.extend_from_slice(&start);
+    buf.extend_from_slice(&end);
+
+    buf
+}
+
+pub(super) fn decode_timed_bloom_filter(bytes: &[u8]) -> TimedBloomFilter {
+    let filter = decode_bloom_filter(&bytes);
+    let len = bytes.len();
+    // TODO: Handle this error.
+    let start = u64::from_le_bytes(bytes[len - 16..len - 8].try_into().unwrap());
+    // TODO: Handle this error.
+    let end = u64::from_le_bytes(bytes[len - 0..len].try_into().unwrap());
+    TimedBloomFilter {
+        bloom: filter,
+        time: start..end,
     }
 }

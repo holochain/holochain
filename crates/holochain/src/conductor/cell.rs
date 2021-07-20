@@ -35,6 +35,7 @@ use holo_hash::*;
 use holochain_cascade::authority;
 use holochain_cascade::Cascade;
 use holochain_p2p::dht_arc::ArcInterval;
+use holochain_p2p::dht_arc::DhtArcSet;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
@@ -230,6 +231,8 @@ impl Cell {
             | GetAgentInfoSigned { .. }
             | QueryAgentInfoSigned { .. }
             | QueryGossipAgents { .. }
+            // This event is an aggregate over a set of cells, so needs to be handled at the conductor level.
+            | HashesForTimeWindow { .. }
             | QueryAgentInfoSignedNearBasis { .. } => {
                 // PutAgentInfoSigned needs to be handled at the conductor level where the p2p
                 // store lives.
@@ -655,6 +658,62 @@ impl Cell {
             })
             .await?;
         Ok(result)
+    }
+
+    #[instrument(skip(self))]
+    /// Get the [`DhtOpHash`] and authored timestamps for a given time window.
+    pub(super) async fn handle_hashes_for_time_window(
+        &self,
+        dht_arc_set: DhtArcSet,
+        window: std::ops::Range<u64>,
+    ) -> CellResult<Vec<(DhtOpHash, u64)>> {
+        let mut results = Vec::new();
+
+        // The exclusive window bounds.
+        let start = window.start;
+        let end = window.end;
+
+        // For each interval in the set, fetch the hashes and timestamps.
+        for interval in dht_arc_set.intervals() {
+            let result = self
+                .env()
+                .async_reader(move |txn| {
+                    DatabaseResult::Ok(match interval {
+                        ArcInterval::Full => txn
+                            .prepare_cached(holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_FULL)?
+                            .query_map(
+                                named_params! {
+                                    ":from": start,
+                                    ":to": end,
+                                },
+                                |row| Ok((row.get("hash")?, row.get("authored_timestamp_ms")?)),
+                            )?
+                            .collect::<rusqlite::Result<Vec<_>>>()?,
+                        ArcInterval::Bounded(start_loc, end_loc) => {
+                            let sql = if start_loc <= end_loc {
+                                holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_CONTINUOUS
+                            } else {
+                                holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_WRAPPED
+                            };
+                            txn.prepare_cached(sql)?
+                                .query_map(
+                                    named_params! {
+                                        ":from": start,
+                                        ":to": end,
+                                        ":storage_start_loc": start_loc,
+                                        ":storage_end_loc": end_loc,
+                                    },
+                                    |row| Ok((row.get("hash")?, row.get("authored_timestamp_ms")?)),
+                                )?
+                                .collect::<rusqlite::Result<Vec<_>>>()?
+                        }
+                        ArcInterval::Empty => Vec::new(),
+                    })
+                })
+                .await?;
+            results.extend(result);
+        }
+        Ok(results)
     }
 
     #[instrument(skip(self, op_hashes))]

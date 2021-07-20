@@ -9,7 +9,19 @@ impl ShardedGossip {
         con: Tx2ConHnd<wire::Wire>,
         remote_arc_set: Vec<ArcInterval>,
     ) -> KitsuneResult<()> {
-        let local_agents = self.inner.share_mut(|i, _| Ok(i.local_agents.clone()))?;
+        let (local_agents, accept_is_from_target) = self.inner.share_mut(|i, _| {
+            let accept_is_from_target = i
+                .initiate_tgt
+                .as_ref()
+                .map(|tgt| *tgt.cert() == con.peer_cert())
+                .unwrap_or(false);
+            Ok((i.local_agents.clone(), accept_is_from_target))
+        })?;
+
+        // This accept is not from our current target so ignore.
+        if !accept_is_from_target {
+            return Ok(());
+        }
 
         // Choose any local agent so we can send requests to the store.
         let agent = local_agents.iter().cloned().next();
@@ -30,7 +42,7 @@ impl ShardedGossip {
         let mut gossip = Vec::with_capacity(2);
 
         // Generate the bloom filters and new state.
-        let state = self
+        let state = match self
             .generate_blooms(
                 &agent,
                 &local_agents,
@@ -38,7 +50,11 @@ impl ShardedGossip {
                 remote_arc_set,
                 &mut gossip,
             )
-            .await?;
+            .await?
+        {
+            Some(s) => s,
+            None => return Ok(()),
+        };
 
         self.inner.share_mut(|inner, _| {
             // TODO: What happen if we are in the middle of a new outgoing and

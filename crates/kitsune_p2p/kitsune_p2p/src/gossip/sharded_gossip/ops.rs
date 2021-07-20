@@ -8,7 +8,7 @@ impl ShardedGossip {
         &self,
         con: Tx2ConHnd<wire::Wire>,
         state: RoundState,
-        remote_bloom: BloomFilter,
+        remote_bloom: TimedBloomFilter,
     ) -> KitsuneResult<()> {
         // Get the local agents to check against the remote bloom.
         let (agent, local_agents) = self.inner.share_mut(|inner, _| {
@@ -28,8 +28,6 @@ impl ShardedGossip {
             &self.space,
             &agent,
             state.common_arc_set.clone(),
-            state.since_ms,
-            state.until_ms,
         )
         .await?
         .into_iter()
@@ -70,11 +68,7 @@ impl ShardedGossip {
         ops: Vec<Arc<(Arc<KitsuneOpHash>, Vec<u8>)>>,
     ) -> KitsuneResult<()> {
         // Unpack the state and get the local agents.
-        let RoundState {
-            since_ms,
-            until_ms,
-            common_arc_set,
-        } = state;
+        let RoundState { common_arc_set, .. } = state;
         let (agent, local_agents) = self.inner.share_mut(|inner, _| {
             let agent = inner.local_agents.iter().cloned().next();
             Ok((agent, inner.local_agents.clone()))
@@ -85,19 +79,13 @@ impl ShardedGossip {
         };
 
         // Get the local agents that are relevant to this common arc set.
-        let agents_within_common_arc: HashSet<_> = store::agents_within_arcset(
-            &self.evt_sender,
-            &self.space,
-            &agent,
-            common_arc_set,
-            since_ms,
-            until_ms,
-        )
-        .await?
-        .into_iter()
-        .map(|(a, _)| a)
-        .filter(|a| local_agents.contains(a))
-        .collect();
+        let agents_within_common_arc: HashSet<_> =
+            store::agents_within_arcset(&self.evt_sender, &self.space, &agent, common_arc_set)
+                .await?
+                .into_iter()
+                .map(|(a, _)| a)
+                .filter(|a| local_agents.contains(a))
+                .collect();
 
         // Put the ops in the agents that contain the ops within their arcs.
         store::put_ops(&self.evt_sender, &self.space, agents_within_common_arc, ops).await?;

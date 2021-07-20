@@ -2,7 +2,7 @@
 -- i.e. when :storage_start_loc <= :storage_end_loc
 
 SELECT
-    hash
+    hash, authored_timestamp_ms
 FROM
     DHtOp
 WHERE

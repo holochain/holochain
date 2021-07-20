@@ -12,7 +12,11 @@ use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::*;
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::ops::Range;
 use std::sync::Arc;
+use std::time::{Duration, SystemTime};
+
+use self::initiate::decode_timed_bloom_filter;
 
 use super::simple_bloom::{HowToConnect, MetaOpKey};
 
@@ -30,6 +34,11 @@ const MAX_SEND_BUF_BYTES: usize = 16000;
 
 type BloomFilter = bloomfilter::Bloom<Arc<MetaOpKey>>;
 type EventSender = futures::channel::mpsc::Sender<event::KitsuneP2pEvent>;
+
+struct TimedBloomFilter {
+    bloom: BloomFilter,
+    time: std::ops::Range<u64>,
+}
 
 #[derive(Debug, Clone, Copy)]
 enum GossipType {
@@ -56,6 +65,7 @@ type StateKey = Tx2Cert;
 #[derive(Default)]
 struct ShardedGossipInner {
     local_agents: HashSet<Arc<KitsuneAgent>>,
+    tuning_params: KitsuneP2pTuningParams,
     initiate_tgt: Option<GossipTgt>,
     incoming: VecDeque<Incoming>,
     outgoing: VecDeque<Outgoing>,
@@ -64,15 +74,40 @@ struct ShardedGossipInner {
     state_map: HashMap<StateKey, RoundState>,
 }
 
+impl ShardedGossipInner {
+    /// Get the state if it hasn't timed out.
+    fn get_state(&mut self, key: &StateKey) -> Option<RoundState> {
+        match self.state_map.get(key) {
+            Some(state) => {
+                if state.created_at.elapsed().as_millis() as u32
+                    > self
+                        .tuning_params
+                        .gossip_peer_on_success_next_gossip_delay_ms
+                {
+                    self.state_map.remove(key);
+                    None
+                } else {
+                    Some(state.clone())
+                }
+            }
+            None => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 struct RoundState {
     common_arc_set: Arc<DhtArcSet>,
-    since_ms: u64,
-    until_ms: u64,
+    num_ops_blooms: u8,
+    increment_ops_complete: bool,
+    created_at: std::time::Instant,
 }
 
 impl ShardedGossip {
     const TGT_FP: f64 = 0.01;
+    /// This should give us just under 16MB for the bloom filter.
+    /// Based on a compression of 75%.
+    const UPPER_HASHES_BOUND: usize = 500;
 
     pub fn new(
         tuning_params: KitsuneP2pTuningParams,
@@ -81,13 +116,15 @@ impl ShardedGossip {
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
         gossip_type: GossipType,
     ) -> Arc<Self> {
+        let mut inner = ShardedGossipInner::default();
+        inner.tuning_params = tuning_params.clone();
         let this = Arc::new(Self {
             tuning_params,
             space,
             ep_hnd,
             // send_interval_ms,
             evt_sender,
-            inner: Share::new(ShardedGossipInner::default()),
+            inner: Share::new(inner),
             gossip_type,
         });
         metric_task({
@@ -111,17 +148,25 @@ impl ShardedGossip {
     }
 
     /// Calculate the time range for a gossip round.
-    fn calculate_time_range(&self) -> KitsuneResult<(u64, u64)> {
-        // TODO: This is where we need to actually choose
-        // an appropriate gossip window based on the type of
-        // gossip (recent vs historical) and maybe the amount
-        // of ops?
-
-        // Blooms optimize for lots of new data.
-        // Hashes optimize no recent changes.
+    fn calculate_time_ranges(&self) -> Vec<Range<u64>> {
+        const NOW: Duration = Duration::from_secs(0);
+        const HOUR: Duration = Duration::from_secs(60 * 60);
+        const DAY: Duration = Duration::from_secs(60 * 60 * 24);
+        const WEEK: Duration = Duration::from_secs(60 * 60 * 24 * 7);
+        const MONTH: Duration = Duration::from_secs(60 * 60 * 24 * 7 * 30);
+        const START_OF_TIME: Duration = Duration::MAX;
         match self.gossip_type {
-            GossipType::Historical => Ok((0, u64::MAX)),
-            GossipType::Recent => Ok((0, u64::MAX)),
+            GossipType::Recent => {
+                vec![time_range(HOUR, NOW)]
+            }
+            GossipType::Historical => {
+                vec![
+                    time_range(DAY, HOUR),
+                    time_range(WEEK, DAY),
+                    time_range(MONTH, WEEK),
+                    time_range(START_OF_TIME, MONTH),
+                ]
+            }
         }
     }
 
@@ -145,22 +190,53 @@ impl ShardedGossip {
         })
     }
 
-    fn new_state(&self, common_arc_set: Arc<DhtArcSet>) -> KitsuneResult<RoundState> {
-        let (since_ms, until_ms) = self.calculate_time_range()?;
+    async fn new_state(&self, common_arc_set: Arc<DhtArcSet>) -> KitsuneResult<RoundState> {
         Ok(RoundState {
             common_arc_set,
-            since_ms,
-            until_ms,
+            num_ops_blooms: 0,
+            increment_ops_complete: false,
+            created_at: std::time::Instant::now(),
         })
     }
 
     async fn get_state(&self, id: StateKey) -> KitsuneResult<Option<RoundState>> {
-        self.inner
-            .share_mut(|i, _| Ok(i.state_map.get(&id).cloned()))
+        self.inner.share_mut(|i, _| Ok(i.get_state(&id)))
     }
 
-    async fn remove_state(&self, id: StateKey) -> KitsuneResult<Option<RoundState>> {
-        self.inner.share_mut(|i, _| Ok(i.state_map.remove(&id)))
+    async fn incoming_ops_finished(&self, state_id: StateKey) -> KitsuneResult<Option<RoundState>> {
+        self.inner.share_mut(|i, _| {
+            if i.state_map
+                .get_mut(&state_id)
+                .map(|state| {
+                    state.increment_ops_complete = true;
+                    state.num_ops_blooms == 0
+                })
+                .unwrap_or(true)
+            {
+                Ok(i.state_map.remove(&state_id))
+            } else {
+                Ok(i.state_map.get(&state_id).cloned())
+            }
+        })
+    }
+
+    async fn decrement_ops_blooms(&self, state_id: StateKey) -> KitsuneResult<Option<RoundState>> {
+        self.inner.share_mut(|i, _| {
+            if i.state_map
+                .get_mut(&state_id)
+                .and_then(|state| {
+                    state.num_ops_blooms.checked_sub(1).map(|num_ops_blooms| {
+                        state.num_ops_blooms = num_ops_blooms;
+                        state.num_ops_blooms == 0 && state.increment_ops_complete
+                    })
+                })
+                .unwrap_or(true)
+            {
+                Ok(i.state_map.remove(&state_id))
+            } else {
+                Ok(i.state_map.get(&state_id).cloned())
+            }
+        })
     }
 
     async fn process_incoming(&self, incoming: Incoming) -> KitsuneResult<()> {
@@ -184,15 +260,21 @@ impl ShardedGossip {
                     self.incoming_missing_agents(state, agents).await?;
                 }
             }
-            ShardedGossipWire::Ops(Ops { filter }) => {
-                if let Some(state) = self.get_state(con.peer_cert()).await? {
-                    let filter = decode_bloom_filter(&filter);
-                    self.incoming_ops(con, state, filter).await?
+            ShardedGossipWire::Ops(Ops { filter, finished }) => {
+                let state = if finished {
+                    self.incoming_ops_finished(con.peer_cert()).await?
+                } else {
+                    self.get_state(con.peer_cert()).await?
+                };
+                if let Some(state) = state {
+                    let filter = decode_timed_bloom_filter(&filter);
+                    self.incoming_ops(con.clone(), state.clone(), filter)
+                        .await?
                 }
             }
             ShardedGossipWire::MissingOps(MissingOps { ops, finished }) => {
                 let state = if finished {
-                    self.remove_state(con.peer_cert()).await?
+                    self.decrement_ops_blooms(con.peer_cert()).await?
                 } else {
                     self.get_state(con.peer_cert()).await?
                 };
@@ -237,20 +319,14 @@ impl ShardedGossip {
         agent: &Arc<KitsuneAgent>,
         arc_set: Arc<DhtArcSet>,
         local_agents: &HashSet<Arc<KitsuneAgent>>,
+        current_rounds: HashSet<Tx2Cert>,
     ) -> KitsuneResult<Option<(GossipTgt, TxUrl)>> {
         // Get the time range for this gossip.
-        let (since_ms, until_ms) = self.calculate_time_range()?;
-        let mut remote_agents_within_arc_set = store::agents_within_arcset(
-            &self.evt_sender,
-            &self.space,
-            &agent,
-            arc_set.clone(),
-            since_ms,
-            until_ms,
-        )
-        .await?
-        .into_iter()
-        .filter(|(a, _)| !local_agents.contains(a));
+        let mut remote_agents_within_arc_set =
+            store::agents_within_arcset(&self.evt_sender, &self.space, &agent, arc_set.clone())
+                .await?
+                .into_iter()
+                .filter(|(a, _)| !local_agents.contains(a));
 
         // Get the first remote endpoint.
         // TODO: Make this more intelligent and don't just choose the first.
@@ -263,26 +339,56 @@ impl ShardedGossip {
                         // TODO: Handle error.
                         .unwrap()
                         .and_then(|ra| {
-                            ra.url_list.get(0).cloned().and_then(|url| {
-                                kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str())
-                                    .map_err(|e| tracing::error!("Failed to parse url {:?}", e))
-                                    .ok()
-                                    .map(|purl| {
-                                        (
-                                            GossipTgt::new(
-                                                vec![ra.agent.clone()],
-                                                Tx2Cert::from(purl.digest()),
-                                            ),
-                                            TxUrl::from(url.as_str()),
-                                        )
-                                    })
-                            })
+                            ra.url_list
+                                .iter()
+                                .filter_map(|url| {
+                                    kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str())
+                                        .map_err(|e| tracing::error!("Failed to parse url {:?}", e))
+                                        .ok()
+                                        .map(|purl| {
+                                            (
+                                                GossipTgt::new(
+                                                    vec![ra.agent.clone()],
+                                                    Tx2Cert::from(purl.digest()),
+                                                ),
+                                                TxUrl::from(url.as_str()),
+                                            )
+                                        })
+                                        .filter(|(tgt, _)| !current_rounds.contains(tgt.cert()))
+                                })
+                                .next()
                         }),
                 )
             }
             None => Ok(None),
         }
     }
+}
+
+impl RoundState {
+    fn increment_ops_blooms(&mut self) -> u8 {
+        self.num_ops_blooms += 1;
+        self.num_ops_blooms
+    }
+}
+
+/// Time range from now into the past.
+/// Start must be < end.
+fn time_range(start: Duration, end: Duration) -> Range<u64> {
+    let now = SystemTime::now();
+    let start = now
+        .checked_sub(start)
+        .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
+        .map(|t| t.as_secs())
+        .unwrap_or(0);
+
+    let end = now
+        .checked_sub(end)
+        .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
+        .map(|t| t.as_secs())
+        .unwrap_or(0);
+
+    start..end
 }
 
 kitsune_p2p_types::write_codec_enum! {
@@ -311,6 +417,7 @@ kitsune_p2p_types::write_codec_enum! {
         /// Send Agent Info Boom
         Ops(0x50) {
             filter.0: PoolBuf,
+            finished.1: bool,
         },
 
         /// Any ops that were missing from the remote bloom.

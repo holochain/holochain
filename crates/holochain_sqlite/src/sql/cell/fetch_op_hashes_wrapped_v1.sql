@@ -4,7 +4,7 @@
 -- This is one version of this query. There is another version which may be faster.
 
 SELECT
-    hash
+    hash, authored_timestamp_ms
 FROM
     DHtOp
 WHERE

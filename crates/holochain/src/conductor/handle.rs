@@ -517,6 +517,68 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 let cell = self.cell_by_id(&cell_id).await?;
                 cell.handle_holochain_p2p_event(event).await?;
             }
+            HashesForTimeWindow {
+                to_agents,
+                dna_hash,
+                window,
+                max_ops,
+                respond,
+                ..
+            } => {
+                let mut hashes_and_times = Vec::with_capacity(to_agents.len());
+
+                // For each cell collect the hashes and times that fit within the
+                // agents interval and time window.
+                for (agent, arc_set) in to_agents {
+                    let cell_id = CellId::new(dna_hash.clone(), agent);
+                    let cell = self.cell_by_id(&cell_id).await?;
+                    match cell
+                        .handle_hashes_for_time_window(arc_set, window.clone())
+                        .await
+                    {
+                        Ok(t) => hashes_and_times.extend(t),
+                        Err(e) => {
+                            // If there's an error for any cell we want to fail the whole call.
+                            respond.respond(Ok(async move {
+                                Err(holochain_p2p::HolochainP2pError::other(e))
+                            }
+                            .boxed()
+                            .into()));
+                            return Ok(());
+                        }
+                    }
+                }
+                // Remove any duplicate hashes.
+                // Note vec must be sorted to remove duplicates.
+                hashes_and_times.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+                hashes_and_times.dedup_by(|a, b| a.0 == b.0);
+
+                // Now sort by time so we can take up to max_ops.
+                hashes_and_times.sort_unstable_by_key(|(_, t)| *t);
+
+                // The start time bound if there is one.
+                let start = hashes_and_times.first().map(|(_, t)| *t);
+
+                // The end time bound if there is one.
+                let end = hashes_and_times
+                    .iter()
+                    .take(max_ops)
+                    .last()
+                    .map(|(_, t)| *t);
+
+                // Extract the hashes.
+                let hashes = hashes_and_times
+                    .into_iter()
+                    .map(|(h, _)| h)
+                    .take(max_ops)
+                    .collect();
+
+                // The range is exclusive so we add one to the end.
+                let range =
+                    start.and_then(|s| end.map(|e| (hashes, s..(e.checked_add(1).unwrap_or(0)))));
+
+                respond.respond(Ok(async move { Ok(range) }.boxed().into()));
+            }
         }
         Ok(())
     }
