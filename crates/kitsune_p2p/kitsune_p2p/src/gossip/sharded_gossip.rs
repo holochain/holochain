@@ -46,8 +46,9 @@ struct TimedBloomFilter {
 }
 
 #[derive(Debug, Clone, Copy)]
-enum GossipType {
+pub enum GossipType {
     Recent,
+    #[allow(dead_code)]
     Historical,
 }
 
@@ -80,6 +81,8 @@ impl ShardedGossipNetworking {
         });
         metric_task({
             let this = this.clone();
+
+            #[allow(unreachable_code)]
             async move {
                 loop {
                     // TODO: Use parameters for sleep time
@@ -93,9 +96,8 @@ impl ShardedGossipNetworking {
     }
 
     async fn process_outgoing(&self, outgoing: Outgoing) -> KitsuneResult<()> {
-        let (endpoint, how, gossip) = outgoing;
+        let (_endpoint, how, gossip) = outgoing;
         let gossip = gossip.encode_vec().map_err(KitsuneError::other)?;
-        let sending_bytes = gossip.len();
         let gossip = wire::Wire::gossip(self.gossip.space.clone(), gossip.into());
 
         let timeout = self.gossip.tuning_params.implicit_timeout();
