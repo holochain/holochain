@@ -32,6 +32,20 @@ ghost_actor::ghost_chan! {
         /// Register space event handler
         fn register_space_event_handler(recv: futures::channel::mpsc::Receiver<KitsuneP2pEvent>) -> ();
 
+        /// Incoming Delegate Broadcast
+        /// We are being requested to delegate a broadcast to our neighborhood
+        /// on behalf of an author. `mod_idx` / `mod_cnt` inform us which
+        /// neighbors we are responsible for.
+        /// (See comments in actual method impl for more detail.)
+        fn incoming_delegate_broadcast(
+            space: Arc<KitsuneSpace>,
+            basis: Arc<KitsuneBasis>,
+            to_agent: Arc<KitsuneAgent>,
+            mod_idx: u32,
+            mod_cnt: u32,
+            data: crate::wire::WireData,
+        ) -> ();
+
         /// Incoming Gossip
         fn incoming_gossip(space: Arc<KitsuneSpace>, con: Tx2ConHnd<wire::Wire>, data: Box<[u8]>) -> ();
     }
@@ -221,25 +235,6 @@ impl KitsuneP2pActor {
                                         let resp = wire::Wire::call_resp(res.into());
                                         resp!(respond, resp);
                                     }
-                                    wire::Wire::Notify(wire::Notify {
-                                        space,
-                                        from_agent,
-                                        to_agent,
-                                        data,
-                                        ..
-                                    }) => {
-                                        if let Err(err) = evt_sender
-                                            .notify(space, to_agent, from_agent, data.into())
-                                            .await
-                                        {
-                                            let reason = format!("{:?}", err);
-                                            let fail = wire::Wire::failure(reason);
-                                            resp!(respond, fail);
-                                            return;
-                                        }
-                                        let resp = wire::Wire::notify_resp();
-                                        resp!(respond, resp);
-                                    }
                                     wire::Wire::PeerGet(wire::PeerGet { space, agent }) => {
                                         if let Ok(Some(agent_info_signed)) = evt_sender
                                             .get_agent_info_signed(GetAgentInfoSignedEvt {
@@ -282,6 +277,44 @@ impl KitsuneP2pActor {
                                 }
                             }
                             IncomingNotify(Tx2EpIncomingNotify { con, data, .. }) => match data {
+                                wire::Wire::DelegateBroadcast(wire::DelegateBroadcast {
+                                    space,
+                                    basis,
+                                    to_agent,
+                                    mod_idx,
+                                    mod_cnt,
+                                    data,
+                                }) => {
+                                    // one might be tempted to notify here
+                                    // as in Broadcast below... but we
+                                    // notify all relevent agents inside
+                                    // the space incoming_delegate_broadcast
+                                    // handler.
+                                    if let Err(err) = i_s
+                                        .incoming_delegate_broadcast(
+                                            space, basis, to_agent, mod_idx, mod_cnt, data,
+                                        )
+                                        .await
+                                    {
+                                        tracing::warn!(
+                                            ?err,
+                                            "failed to handle incoming delegate broadcast"
+                                        );
+                                    }
+                                }
+                                wire::Wire::Broadcast(wire::Broadcast {
+                                    space,
+                                    to_agent,
+                                    data,
+                                    ..
+                                }) => {
+                                    if let Err(err) = evt_sender
+                                        .notify(space, to_agent.clone(), to_agent, data.into())
+                                        .await
+                                    {
+                                        tracing::warn!(?err, "error processing incoming broadcast");
+                                    }
+                                }
                                 wire::Wire::Gossip(wire::Gossip { space, data }) => {
                                     let data: Vec<u8> = data.into();
                                     let data: Box<[u8]> = data.into_boxed_slice();
@@ -342,6 +375,35 @@ impl InternalHandler for KitsuneP2pActor {
         Ok(async move {
             f.await?;
             Ok(())
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_incoming_delegate_broadcast(
+        &mut self,
+        space: Arc<KitsuneSpace>,
+        basis: Arc<KitsuneBasis>,
+        to_agent: Arc<KitsuneAgent>,
+        mod_idx: u32,
+        mod_cnt: u32,
+        data: crate::wire::WireData,
+    ) -> InternalHandlerResult<()> {
+        let space_sender = match self.spaces.get_mut(&space) {
+            None => {
+                tracing::warn!(
+                    "received delegate_broadcast for unhandled space: {:?}",
+                    space
+                );
+                return Ok(async move { Ok(()) }.boxed().into());
+            }
+            Some(space) => space.get(),
+        };
+        Ok(async move {
+            let (_, space_inner) = space_sender.await;
+            space_inner
+                .incoming_delegate_broadcast(space, basis, to_agent, mod_idx, mod_cnt, data)
+                .await
         }
         .boxed()
         .into())
@@ -567,14 +629,20 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         .into())
     }
 
-    fn handle_notify_multi(&mut self, input: actor::NotifyMulti) -> KitsuneP2pHandlerResult<u8> {
-        let space_sender = match self.spaces.get_mut(&input.space) {
-            None => return Err(KitsuneP2pError::RoutingSpaceError(input.space)),
+    fn handle_broadcast(
+        &mut self,
+        space: Arc<KitsuneSpace>,
+        basis: Arc<KitsuneBasis>,
+        timeout: KitsuneTimeout,
+        payload: Vec<u8>,
+    ) -> KitsuneP2pHandlerResult<()> {
+        let space_sender = match self.spaces.get_mut(&space) {
+            None => return Err(KitsuneP2pError::RoutingSpaceError(space)),
             Some(space) => space.get(),
         };
         Ok(async move {
             let (space_sender, _) = space_sender.await;
-            space_sender.notify_multi(input).await
+            space_sender.broadcast(space, basis, timeout, payload).await
         }
         .boxed()
         .into())
