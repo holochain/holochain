@@ -8,7 +8,7 @@ use crate::conductor::ConductorHandle;
 use crate::core::ribosome::host_fn;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::CallContext;
-use crate::core::ribosome::HostAccess;
+use crate::core::ribosome::HostContext;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
@@ -326,8 +326,8 @@ impl HostFnCaller {
         let (_, ribosome, call_context, workspace_lock) = self.unpack().await;
 
         let output = {
-            let host_access = call_context.host_access();
-            let zcha = unwrap_to!(host_access => HostAccess::ZomeCall).clone();
+            let host_access = call_context.host_context();
+            let zcha = unwrap_to!(host_access => HostContext::ZomeCall).clone();
             ribosome.call_zome_function(zcha, invocation).unwrap()
         };
 

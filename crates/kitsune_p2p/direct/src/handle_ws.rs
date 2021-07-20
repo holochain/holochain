@@ -168,6 +168,23 @@ impl AsKdHnd for Hnd {
         .boxed()
     }
 
+    fn app_leave(&self, root: KdHash, agent: KdHash) -> BoxFuture<'static, KdResult<()>> {
+        let msg_id = new_msg_id();
+        let api = KdApi::AppLeaveReq {
+            msg_id,
+            root,
+            agent,
+        };
+        let api = self.request(api);
+        async move {
+            match api.await {
+                Ok(KdApi::AppLeaveRes { .. }) => Ok(()),
+                oth => Err(format!("unexpected: {:?}", oth).into()),
+            }
+        }
+        .boxed()
+    }
+
     fn agent_info_store(&self, agent_info: KdAgentInfo) -> BoxFuture<'static, KdResult<()>> {
         let msg_id = new_msg_id();
         let api = KdApi::AgentInfoStoreReq { msg_id, agent_info };
@@ -335,6 +352,10 @@ async fn handle_ws_recv(
                 let api: KdApi = match match evt {
                     Ok(tungstenite::Message::Text(json)) => serde_json::from_str(&json),
                     Ok(tungstenite::Message::Binary(json)) => serde_json::from_slice(&json),
+                    Ok(tungstenite::Message::Close(_)) => {
+                        tracing::debug!("kdhnd recv ws close");
+                        return;
+                    }
                     evt => {
                         tracing::warn!(?evt, "invalid websocket message");
                         return;
@@ -381,4 +402,5 @@ async fn handle_ws_recv(
             },
         )
         .await;
+    tracing::debug!("kdhnd recv shutdown");
 }

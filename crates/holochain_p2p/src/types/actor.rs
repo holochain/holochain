@@ -200,7 +200,7 @@ ghost_actor::ghost_chan! {
         /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
         fn join(dna_hash: DnaHash, agent_pub_key: AgentPubKey) -> ();
 
-        /// If a cell is deactivated, we'll need to \"leave\" the network module as well.
+        /// If a cell is disabled, we'll need to \"leave\" the network module as well.
         fn leave(dna_hash: DnaHash, agent_pub_key: AgentPubKey) -> ();
 
         /// Invoke a zome function on a remote node (if you have been granted the capability).

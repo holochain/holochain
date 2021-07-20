@@ -13,7 +13,7 @@ pub fn create_link<'a>(
     call_context: Arc<CallContext>,
     input: CreateLinkInput,
 ) -> Result<HeaderHash, WasmError> {
-    match HostFnAccess::from(&call_context.host_access()) {
+    match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ write_workspace: Permission::Allow, .. } => {
             let CreateLinkInput {
                 base_address,
@@ -29,18 +29,18 @@ pub fn create_link<'a>(
             // Construct the link add
             let header_builder = builder::CreateLink::new(base_address, target_address, zome_id, tag);
 
-            let header_hash = tokio_helper::block_forever_on(tokio::task::spawn(async move {
-                // push the header into the source chain
-                let header_hash = call_context
-                    .host_access
-                    .workspace()
-                    .source_chain()
-                    .put(header_builder, None)
-                    .await?;
-                Ok::<HeaderHash, RibosomeError>(header_hash)
-            }))
-            .map_err(|join_error| WasmError::Host(join_error.to_string()))?
-            .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?;
+    let header_hash = tokio_helper::block_forever_on(tokio::task::spawn(async move {
+        // push the header into the source chain
+        let header_hash = call_context
+            .host_context
+            .workspace()
+            .source_chain()
+            .put(header_builder, None)
+            .await?;
+        Ok::<HeaderHash, RibosomeError>(header_hash)
+    }))
+    .map_err(|join_error| WasmError::Host(join_error.to_string()))?
+    .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?;
 
             // return the hash of the committed link
             // note that validation is handled by the workflow

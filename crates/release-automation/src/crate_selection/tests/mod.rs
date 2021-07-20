@@ -30,8 +30,8 @@ fn detect_changed_files() {
     let workspace = ReleaseWorkspace::try_new(workspace_mocker.root()).unwrap();
 
     assert_eq!(
-        vec![PathBuf::from(&workspace.root().unwrap()).join("README")],
-        changed_files(&workspace.root().unwrap(), &before, &after).unwrap()
+        vec![PathBuf::from(workspace.root()).join("README")],
+        changed_files(workspace.root(), &before, &after).unwrap()
     );
 }
 
@@ -43,8 +43,8 @@ fn workspace_members() {
     let result = workspace
         .members()
         .unwrap()
-        .into_iter()
-        .map(|crt| crt.name().to_owned())
+        .iter()
+        .map(|crt| crt.name())
         .collect::<HashSet<_>>();
 
     let expected_result = ["crate_a", "crate_b", "crate_c", "crate_e", "crate_f"]
@@ -71,17 +71,17 @@ fn detect_changed_crates() {
     let workspace = ReleaseWorkspace::try_new(workspace_mocker.root()).unwrap();
 
     assert_eq!(
-        vec![PathBuf::from(&workspace.root().unwrap()).join("README")],
-        changed_files(&workspace.root().unwrap(), &before, &after).unwrap()
+        vec![PathBuf::from(workspace.root()).join("README")],
+        changed_files(workspace.root(), &before, &after).unwrap()
     );
 }
 
 #[test]
 fn release_selection() {
     let criteria = SelectionCriteria {
-        selection_filter: fancy_regex::Regex::new("crate_(b|a|e)").unwrap(),
+        match_filter: fancy_regex::Regex::new("crate_(b|a|e)").unwrap(),
         disallowed_version_reqs: vec![semver::VersionReq::from_str(">=0.1.0").unwrap()],
-        allowed_dependency_blockers: make_bitflags!(CrateStateFlags::{MissingReadme}),
+        allowed_dev_dependency_blockers: make_bitflags!(CrateStateFlags::{MissingReadme}),
         allowed_selection_blockers: make_bitflags!(CrateStateFlags::{MissingReadme}),
 
         ..Default::default()
@@ -105,15 +105,22 @@ fn release_selection() {
 #[test]
 fn members_dependencies() {
     let workspace_mocker = example_workspace_2().unwrap();
-    let workspace = ReleaseWorkspace::try_new(workspace_mocker.root()).unwrap();
+    let workspace = ReleaseWorkspace::try_new_with_criteria(
+        workspace_mocker.root(),
+        SelectionCriteria {
+            exclude_optional_deps: true,
+            ..Default::default()
+        },
+    )
+    .unwrap();
 
     let result = workspace
         .members()
         .unwrap()
-        .into_iter()
+        .iter()
         .map(|crt| {
             (
-                crt.name().to_owned(),
+                crt.name(),
                 crt.dependencies_in_workspace()
                     .unwrap()
                     .into_iter()
@@ -152,12 +159,12 @@ fn members_sorted_ws1() {
     let workspace = ReleaseWorkspace::try_new_with_criteria(
         workspace_mocker.root(),
         SelectionCriteria {
-            allowed_dependency_blockers: (&[
+            allowed_dev_dependency_blockers: (&[
                 IsWorkspaceDependency,
                 UnreleasableViaChangelogFrontmatter,
                 MissingChangelog,
             ] as &[CrateStateFlags])
-                .into_iter()
+                .iter()
                 .cloned()
                 .collect(),
 
@@ -169,8 +176,8 @@ fn members_sorted_ws1() {
     let result = workspace
         .members()
         .unwrap()
-        .into_iter()
-        .map(|crt| crt.name().to_owned())
+        .iter()
+        .map(|crt| crt.name())
         .collect::<Vec<_>>();
 
     let expected_result = ["crate_b", "crate_a", "crate_c", "crate_e", "crate_f"]
@@ -189,8 +196,8 @@ fn members_sorted_ws2() {
     let result = workspace
         .members()
         .unwrap()
-        .into_iter()
-        .map(|crt| crt.name().to_owned())
+        .iter()
+        .map(|crt| crt.name())
         .collect::<Vec<_>>();
 
     let expected_result = ["crate_b", "crate_c", "crate_a", "crate_d"]
@@ -215,6 +222,7 @@ use CrateStateFlags::ChangedSincePreviousRelease;
 use CrateStateFlags::DisallowedVersionReqViolated;
 use CrateStateFlags::EnforcedVersionReqViolated;
 use CrateStateFlags::IsWorkspaceDependency;
+use CrateStateFlags::IsWorkspaceDevDependency;
 use CrateStateFlags::Matched;
 use CrateStateFlags::MissingChangelog;
 use CrateStateFlags::MissingReadme;
@@ -227,18 +235,18 @@ fn crate_state_block_consistency() {
         DisallowedVersionReqViolated,
         UnreleasableViaChangelogFrontmatter,
     ] as &[CrateStateFlags])
-        .into_iter()
+        .iter()
         .cloned()
         .collect();
 
-    let allowed_dependency_blockers: BitFlags<CrateStateFlags> = (&[
+    let allowed_dev_dependency_blockers: BitFlags<CrateStateFlags> = (&[
         // CrateStateFlags::MissingChangelog
         ]
         as &[CrateStateFlags])
-        .into_iter()
+        .iter()
         .cloned()
         .collect();
-    let state = CrateState::new(flags, allowed_dependency_blockers, Default::default());
+    let state = CrateState::new(flags, allowed_dev_dependency_blockers, Default::default());
 
     assert!(
         !state.blocked_by().is_empty(),
@@ -255,14 +263,14 @@ fn crate_state_block_consistency() {
 }
 
 #[test]
-fn crate_state_allowed_dependency_blockers() {
+fn crate_state_allowed_dev_dependency_blockers() {
     let flags: BitFlags<CrateStateFlags> = (&[
-        IsWorkspaceDependency,
+        IsWorkspaceDevDependency,
         UnreleasableViaChangelogFrontmatter,
         MissingChangelog,
         EnforcedVersionReqViolated,
     ] as &[CrateStateFlags])
-        .into_iter()
+        .iter()
         .cloned()
         .collect();
 
@@ -271,16 +279,17 @@ fn crate_state_allowed_dependency_blockers() {
         MissingChangelog,
         EnforcedVersionReqViolated,
     ] as &[CrateStateFlags])
-        .into_iter()
+        .iter()
         .cloned()
         .collect();
 
     let state = CrateState::new(flags, allowed_blockers, Default::default());
 
     assert!(
-        !state.blocked() && state.blocked_by().is_empty(),
-        "{:#?}",
-        state.blocked_by()
+        state.blocked() && !state.blocked_by().is_empty() && state.disallowed_blockers().is_empty(),
+        "blocked by: {:#?}, disallowed blockers: {:#?}",
+        state.blocked_by(),
+        state.disallowed_blockers(),
     );
 }
 
@@ -292,7 +301,7 @@ fn crate_state_allowed_selection_blockers() {
         MissingChangelog,
         EnforcedVersionReqViolated,
     ] as &[CrateStateFlags])
-        .into_iter()
+        .iter()
         .cloned()
         .collect();
 
@@ -301,15 +310,24 @@ fn crate_state_allowed_selection_blockers() {
         MissingChangelog,
         EnforcedVersionReqViolated,
     ] as &[CrateStateFlags])
-        .into_iter()
+        .iter()
         .cloned()
         .collect();
 
     let state = CrateState::new(flags, Default::default(), allowed_blockers);
 
     assert!(
-        !state.blocked() && state.blocked_by().is_empty(),
-        "{:#?}",
-        state.blocked_by()
+        state.blocked() && !state.blocked_by().is_empty() && state.disallowed_blockers().is_empty(),
+        "blocked by: {:#?}, disallowed blockers: {:#?}",
+        state.blocked_by(),
+        state.disallowed_blockers(),
     );
 }
+
+// todo: add git tests here
+// #[test]
+// fn git_branch_management() -> {
+//     let workspace_mocker = example_workspace_1().unwrap();
+//     let workspace = ReleaseWorkspace::try_new(workspace_mocker.root()).unwrap();
+
+// }

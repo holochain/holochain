@@ -10,7 +10,7 @@ pub fn sys_time(
     call_context: Arc<CallContext>,
     _input: (),
 ) -> Result<core::time::Duration, WasmError> {
-    match HostFnAccess::from(&call_context.host_access()) {
+    match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ non_determinism: Permission::Allow, .. } => {
             let start = std::time::SystemTime::now();
             let since_the_epoch = start
@@ -46,6 +46,6 @@ pub mod wasm_test {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace;
         let _: core::time::Duration =
-            crate::call_test_ribosome!(host_access, TestWasm::SysTime, "sys_time", ());
+            crate::call_test_ribosome!(host_access, TestWasm::SysTime, "sys_time", ()).unwrap();
     }
 }

@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 /// Represents an interchangeable gossip strategy module
 pub trait AsGossipModule: 'static + Send + Sync {
+    fn close(&self);
     fn incoming_gossip(
         &self,
         con: Tx2ConHnd<wire::Wire>,
@@ -18,6 +19,10 @@ pub trait AsGossipModule: 'static + Send + Sync {
 pub struct GossipModule(pub Arc<dyn AsGossipModule>);
 
 impl GossipModule {
+    pub fn close(&self) {
+        self.0.close()
+    }
+
     pub fn incoming_gossip(
         &self,
         con: Tx2ConHnd<wire::Wire>,

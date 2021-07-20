@@ -1,8 +1,8 @@
 use crate::element::Element;
-use crate::zome_io::ExternIO;
 use crate::CallbackResult;
 use holo_hash::AnyDhtHash;
 use holochain_serialized_bytes::prelude::*;
+use holochain_wasmer_common::WasmError;
 
 /// The validation status for an op or element
 /// much of this happens in the subconscious
@@ -59,13 +59,19 @@ impl CallbackResult for ValidateCallbackResult {
     fn is_definitive(&self) -> bool {
         matches!(self, ValidateCallbackResult::Invalid(_))
     }
-}
-
-impl From<ExternIO> for ValidateCallbackResult {
-    fn from(guest_output: ExternIO) -> Self {
-        match guest_output.decode() {
-            Ok(v) => v,
-            Err(e) => Self::Invalid(format!("{:?}", e)),
+    fn try_from_wasm_error(wasm_error: WasmError) -> Result<Self, WasmError> {
+        match wasm_error {
+            WasmError::Guest(_) | WasmError::Serialize(_) | WasmError::Deserialize(_) => {
+                Ok(ValidateCallbackResult::Invalid(wasm_error.to_string()))
+            }
+            WasmError::Host(_)
+            | WasmError::HostShortCircuit(_)
+            | WasmError::GuestResultHandling(_)
+            | WasmError::Compile(_)
+            | WasmError::CallError(_)
+            | WasmError::PointerMap
+            | WasmError::ErrorWhileError
+            | WasmError::Memory => Err(wasm_error),
         }
     }
 }
@@ -94,18 +100,24 @@ pub enum ValidationPackageCallbackResult {
     UnresolvedDependencies(Vec<AnyDhtHash>),
 }
 
-impl From<ExternIO> for ValidationPackageCallbackResult {
-    fn from(guest_output: ExternIO) -> Self {
-        match guest_output.decode() {
-            Ok(v) => v,
-            Err(e) => ValidationPackageCallbackResult::Fail(format!("{:?}", e)),
-        }
-    }
-}
-
 impl CallbackResult for ValidationPackageCallbackResult {
     fn is_definitive(&self) -> bool {
         matches!(self, ValidationPackageCallbackResult::Fail(_))
+    }
+    fn try_from_wasm_error(wasm_error: WasmError) -> Result<Self, WasmError> {
+        match wasm_error {
+            WasmError::Guest(_) | WasmError::Serialize(_) | WasmError::Deserialize(_) => Ok(
+                ValidationPackageCallbackResult::Fail(wasm_error.to_string()),
+            ),
+            WasmError::Host(_)
+            | WasmError::HostShortCircuit(_)
+            | WasmError::GuestResultHandling(_)
+            | WasmError::Compile(_)
+            | WasmError::CallError(_)
+            | WasmError::PointerMap
+            | WasmError::ErrorWhileError
+            | WasmError::Memory => Err(wasm_error),
+        }
     }
 }
 

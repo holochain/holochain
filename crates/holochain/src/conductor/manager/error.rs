@@ -45,3 +45,19 @@ pub enum ManagedTaskError {
 }
 
 pub type ManagedTaskResult = Result<(), ManagedTaskError>;
+
+impl ManagedTaskError {
+    pub fn is_recoverable(&self) -> bool {
+        use ConductorError as C;
+        use ManagedTaskError::*;
+        #[allow(clippy::match_like_matches_macro)]
+        match self {
+            Io(_) | Join(_) | Recv(_) => false,
+            Conductor(err) => match err {
+                C::ShuttingDown => true,
+                // TODO: identify all recoverable cases
+                _ => false,
+            },
+        }
+    }
+}
