@@ -11,7 +11,7 @@ edition = "2018"
 [dependencies]
 futures = "0.3"
 ghost_actor = "0.4.0-alpha.5"
-holochain_serialized_bytes = "=0.0.50"
+holochain_serialized_bytes = "=0.0.51"
 nanoid = "0.3"
 net2 = "0.2"
 must_future = "0.1"
