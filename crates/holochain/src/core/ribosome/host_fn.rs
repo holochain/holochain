@@ -61,8 +61,8 @@ host_fn_api_impls! {
 
     fn call (zt::call::Call) -> zt::ZomeCallResponse;
 
-    // Header hash of the DeleteLink element.
-    fn call_remote (zt::call_remote::CallRemote) -> zt::ZomeCallResponse;
+    // Call a zome on a remote agent.
+    fn call_remote (zt::call_remote::CallRemote) -> Vec<zt::ZomeCallResponse>;
 
     // @todo List all the local capability claims.
     fn capability_claims (()) -> ();

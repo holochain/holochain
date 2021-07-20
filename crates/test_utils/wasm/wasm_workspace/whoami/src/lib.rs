@@ -26,12 +26,12 @@ fn whoami(_: ()) -> ExternResult<AgentInfo> {
 #[hdk_extern]
 fn whoarethey(agent_pubkey: AgentPubKey) -> ExternResult<AgentInfo> {
     let zome_call_response: ZomeCallResponse = call_remote(
-        agent_pubkey,
+        vec![agent_pubkey],
         zome_info()?.zome_name,
         "whoami".to_string().into(),
         None,
         &(),
-    )?;
+    )?.into_iter().next().unwrap();
     match zome_call_response {
         // The decode() type needs to match the return type of "whoami"
         ZomeCallResponse::Ok(v) => Ok(v.decode()?),

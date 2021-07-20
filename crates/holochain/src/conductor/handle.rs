@@ -574,10 +574,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             | ValidationReceiptReceived { .. }
             | FetchOpHashesForConstraints { .. }
             | FetchOpHashData { .. } => {
-                let cell_id = CellId::new(
-                    event.dna_hash().clone(),
-                    event.target_agent_as_ref().clone(),
-                );
+                let cell_id = CellId::new(event.dna_hash().clone(), event.target_agents().clone());
                 let cell = self.cell_by_id(&cell_id).await?;
                 cell.handle_holochain_p2p_event(event).await?;
             }

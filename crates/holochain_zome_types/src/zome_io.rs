@@ -94,7 +94,7 @@ wasm_io_types! {
     fn call_info (()) -> zt::info::CallInfo;
 
     // Header hash of the DeleteLink element.
-    fn call_remote (zt::call_remote::CallRemote) -> zt::ZomeCallResponse;
+    fn call_remote (zt::call_remote::CallRemote) -> Vec<zt::ZomeCallResponse>;
 
     fn call (zt::call::Call) -> zt::ZomeCallResponse;
 

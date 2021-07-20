@@ -59,18 +59,18 @@ where
 /// ...
 /// ```
 pub fn call_remote<I>(
-    agent: AgentPubKey,
+    agents: Vec<AgentPubKey>,
     zome: ZomeName,
     fn_name: FunctionName,
     cap_secret: Option<CapSecret>,
     payload: I,
-) -> ExternResult<ZomeCallResponse>
+) -> ExternResult<Vec<ZomeCallResponse>>
 where
     I: serde::Serialize + std::fmt::Debug,
 {
     HDK.with(|h| {
         h.borrow().call_remote(CallRemote::new(
-            agent,
+            agents,
             zome,
             fn_name,
             cap_secret,
