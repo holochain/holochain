@@ -274,7 +274,7 @@ dependencies = [
  "memchr",
  "num_cpus",
  "once_cell",
- "pin-project-lite 0.2.7",
+ "pin-project-lite",
  "pin-utils",
  "slab",
  "wasm-bindgen-futures",
@@ -1825,7 +1825,7 @@ dependencies = [
  "holochain_serialized_bytes",
  "lazy_static",
  "parking_lot 0.10.2",
- "paste 1.0.5",
+ "paste",
  "rand 0.7.3",
  "rand_core 0.5.1",
  "serde",
@@ -1838,7 +1838,7 @@ name = "fixt_test"
 version = "0.0.1"
 dependencies = [
  "fixt",
- "paste 1.0.5",
+ "paste",
 ]
 
 [[package]]
@@ -1971,7 +1971,7 @@ dependencies = [
  "futures-io",
  "memchr",
  "parking",
- "pin-project-lite 0.2.7",
+ "pin-project-lite",
  "waker-fn",
 ]
 
@@ -2014,7 +2014,7 @@ dependencies = [
  "futures-sink",
  "futures-task",
  "memchr",
- "pin-project-lite 0.2.7",
+ "pin-project-lite",
  "pin-utils",
  "proc-macro-hack",
  "proc-macro-nested",
@@ -2094,14 +2094,15 @@ dependencies = [
 
 [[package]]
 name = "ghost_actor"
-version = "0.3.0-alpha.1"
+version = "0.3.0-alpha.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d5180a86962ed70e36dd39b469d1c17d1a4cfefa610e63be5bbb10a4cec9bcc"
+checksum = "22877bceb1241ee31bf21ebd4e622988d15370cfa36c0088a4b7309079e09918"
 dependencies = [
  "futures",
+ "mockall 0.10.2",
  "must_future",
  "observability",
- "paste 0.1.18",
+ "paste",
  "thiserror",
  "tracing",
  "tracing-futures",
@@ -2249,7 +2250,7 @@ dependencies = [
  "holochain_wasmer_guest",
  "holochain_zome_types",
  "mockall 0.8.3",
- "paste 1.0.5",
+ "paste",
  "serde",
  "serde_bytes",
  "thiserror",
@@ -2263,7 +2264,7 @@ name = "hdk_derive"
 version = "0.0.4-dev.0"
 dependencies = [
  "holochain_zome_types",
- "paste 1.0.5",
+ "paste",
  "proc-macro2 1.0.27",
  "quote 1.0.9",
  "syn 1.0.73",
@@ -2364,7 +2365,7 @@ dependencies = [
  "fallible-iterator",
  "fixt",
  "futures",
- "ghost_actor 0.3.0-alpha.1",
+ "ghost_actor 0.3.0-alpha.2",
  "hdk",
  "holo_hash",
  "holochain_cascade",
@@ -2436,7 +2437,7 @@ dependencies = [
  "fallible-iterator",
  "fixt",
  "futures",
- "ghost_actor 0.3.0-alpha.1",
+ "ghost_actor 0.3.0-alpha.2",
  "hdk",
  "hdk_derive",
  "holo_hash",
@@ -2548,7 +2549,7 @@ dependencies = [
 name = "holochain_keystore"
 version = "0.0.2-dev.0"
 dependencies = [
- "ghost_actor 0.3.0-alpha.1",
+ "ghost_actor 0.3.0-alpha.2",
  "holo_hash",
  "holochain_serialized_bytes",
  "holochain_sqlite",
@@ -2569,7 +2570,7 @@ dependencies = [
  "async-trait",
  "fixt",
  "futures",
- "ghost_actor 0.3.0-alpha.1",
+ "ghost_actor 0.3.0-alpha.2",
  "holo_hash",
  "holochain_keystore",
  "holochain_serialized_bytes",
@@ -2866,7 +2867,7 @@ dependencies = [
  "holochain_wasmer_common",
  "nanoid",
  "num_enum",
- "paste 1.0.5",
+ "paste",
  "rand 0.7.3",
  "rusqlite",
  "serde",
@@ -2917,7 +2918,7 @@ checksum = "60daa14be0e0786db0f03a9e57cb404c9d756eed2b6c62b9ea98ec5743ec75a9"
 dependencies = [
  "bytes",
  "http",
- "pin-project-lite 0.2.7",
+ "pin-project-lite",
 ]
 
 [[package]]
@@ -2969,7 +2970,7 @@ dependencies = [
  "httparse",
  "httpdate",
  "itoa",
- "pin-project-lite 0.2.7",
+ "pin-project-lite",
  "socket2 0.4.0",
  "tokio",
  "tower-service",
@@ -3212,13 +3213,14 @@ dependencies = [
  "derive_more",
  "fixt",
  "futures",
- "ghost_actor 0.3.0-alpha.1",
+ "ghost_actor 0.3.0-alpha.2",
  "kitsune_p2p_mdns",
  "kitsune_p2p_proxy",
  "kitsune_p2p_transport_quic",
  "kitsune_p2p_types",
  "lair_keystore_api",
  "matches",
+ "mockall 0.10.2",
  "observability",
  "once_cell",
  "rand 0.7.3",
@@ -3383,7 +3385,7 @@ dependencies = [
  "criterion",
  "derive_more",
  "futures",
- "ghost_actor 0.3.0-alpha.1",
+ "ghost_actor 0.3.0-alpha.2",
  "kitsune_p2p_dht_arc",
  "lair_keystore_api",
  "lru",
@@ -3392,7 +3394,7 @@ dependencies = [
  "observability",
  "once_cell",
  "parking_lot 0.11.1",
- "paste 1.0.5",
+ "paste",
  "rmp-serde",
  "rustls",
  "serde",
@@ -3431,7 +3433,7 @@ dependencies = [
  "derive_more",
  "directories 3.0.2",
  "futures",
- "ghost_actor 0.3.0-alpha.1",
+ "ghost_actor 0.3.0-alpha.2",
  "nanoid",
  "num_cpus",
  "once_cell",
@@ -3451,7 +3453,7 @@ version = "0.0.1-alpha.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d5474d1cee8bc9c09a78809debd815f05b7026042d2426ecaaf372062278f4b5"
 dependencies = [
- "ghost_actor 0.3.0-alpha.1",
+ "ghost_actor 0.3.0-alpha.2",
  "lair_keystore_api",
  "tempfile",
  "tokio",
@@ -4411,28 +4413,9 @@ dependencies = [
 
 [[package]]
 name = "paste"
-version = "0.1.18"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45ca20c77d80be666aef2b45486da86238fabe33e38306bd3118fe4af33fa880"
-dependencies = [
- "paste-impl",
- "proc-macro-hack",
-]
-
-[[package]]
-name = "paste"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "acbf547ad0c65e31259204bd90935776d1c693cec2f4ff7abb7a1bbbd40dfe58"
-
-[[package]]
-name = "paste-impl"
-version = "0.1.18"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d95a7db200b97ef370c8e6de0088252f7e0dfff7d047a28528e47456c0fc98b6"
-dependencies = [
- "proc-macro-hack",
-]
 
 [[package]]
 name = "pem"
@@ -4577,12 +4560,6 @@ dependencies = [
  "quote 1.0.9",
  "syn 1.0.73",
 ]
-
-[[package]]
-name = "pin-project-lite"
-version = "0.1.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "257b64915a082f7811703966789728173279bdebb956b143dbcd23f6f970a777"
 
 [[package]]
 name = "pin-project-lite"
@@ -5374,7 +5351,7 @@ dependencies = [
  "mime",
  "native-tls",
  "percent-encoding 2.1.0",
- "pin-project-lite 0.2.7",
+ "pin-project-lite",
  "serde",
  "serde_json",
  "serde_urlencoded",
@@ -6409,7 +6386,7 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "parking_lot 0.11.1",
- "pin-project-lite 0.2.7",
+ "pin-project-lite",
  "signal-hook-registry",
  "tokio-macros",
  "winapi",
@@ -6443,7 +6420,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8864d706fdb3cc0843a49647ac892720dac98a6eeb818b77190592cf4994066"
 dependencies = [
  "futures-core",
- "pin-project-lite 0.2.7",
+ "pin-project-lite",
  "tokio",
  "tokio-util",
 ]
@@ -6486,7 +6463,7 @@ dependencies = [
  "futures-core",
  "futures-sink",
  "log",
- "pin-project-lite 0.2.7",
+ "pin-project-lite",
  "tokio",
 ]
 
@@ -6518,13 +6495,13 @@ checksum = "360dfd1d6d30e05fda32ace2c8c70e9c0a9da713275777f5a4dbb8a1893930c6"
 
 [[package]]
 name = "tracing"
-version = "0.1.21"
+version = "0.1.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0987850db3733619253fe60e17cb59b82d37c7e6c0236bb81e4d6b87c879f27"
+checksum = "09adeb8c97449311ccd28a427f96fb563e7fd31aabf994189879d9da2394b89d"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "log",
- "pin-project-lite 0.1.12",
+ "pin-project-lite",
  "tracing-attributes",
  "tracing-core",
 ]

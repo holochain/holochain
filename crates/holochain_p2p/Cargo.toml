@@ -14,7 +14,7 @@ edition = "2018"
 async-trait = "0.1"
 fixt = { path = "../fixt", version = "0.0.4-dev.0"}
 futures = "0.3"
-ghost_actor = "0.3.0-alpha.1"
+ghost_actor = "=0.3.0-alpha.2"
 holo_hash = { version = "0.0.4-dev.0", path = "../holo_hash" }
 holochain_keystore = { version = "0.0.2-dev.0", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.50"

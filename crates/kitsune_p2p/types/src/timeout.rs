@@ -36,7 +36,10 @@ impl KitsuneBackoff {
             cur,
             std::cmp::min(
                 self.max_ms,
-                self.timeout.time_remaining().as_millis() as u64,
+                // add 1ms to our time remaining so we don't have a weird
+                // race condition where we don't wait at all, but our
+                // timer hasn't quite expired yet...
+                self.timeout.time_remaining().as_millis() as u64 + 1,
             ),
         );
 

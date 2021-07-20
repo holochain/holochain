@@ -10,19 +10,25 @@ use url2::Url2;
 
 mod rpc_multi_logic;
 
+type KSpace = Arc<KitsuneSpace>;
+type KAgent = Arc<KitsuneAgent>;
+type KBasis = Arc<KitsuneBasis>;
+type WireConHnd = Tx2ConHnd<wire::Wire>;
+type Payload = Box<[u8]>;
+
 ghost_actor::ghost_chan! {
     pub(crate) chan SpaceInternal<crate::KitsuneP2pError> {
         /// List online agents that claim to be covering a basis hash
-        fn list_online_agents_for_basis_hash(space: Arc<KitsuneSpace>, from_agent: Arc<KitsuneAgent>, basis: Arc<KitsuneBasis>) -> HashSet<Arc<KitsuneAgent>>;
+        fn list_online_agents_for_basis_hash(space: KSpace, from_agent: KAgent, basis: KBasis) -> HashSet<KAgent>;
 
         /// Update / publish our agent info
         fn update_agent_info() -> ();
 
         /// Update / publish a single agent info
-        fn update_single_agent_info(agent: Arc<KitsuneAgent>) -> ();
+        fn update_single_agent_info(agent: KAgent) -> ();
 
         /// see if an agent is locally joined
-        fn is_agent_local(agent: Arc<KitsuneAgent>) -> bool;
+        fn is_agent_local(agent: KAgent) -> bool;
 
         /// Incoming Delegate Broadcast
         /// We are being requested to delegate a broadcast to our neighborhood
@@ -30,16 +36,16 @@ ghost_actor::ghost_chan! {
         /// neighbors we are responsible for.
         /// (See comments in actual method impl for more detail.)
         fn incoming_delegate_broadcast(
-            space: Arc<KitsuneSpace>,
-            basis: Arc<KitsuneBasis>,
-            to_agent: Arc<KitsuneAgent>,
+            space: KSpace,
+            basis: KBasis,
+            to_agent: KAgent,
             mod_idx: u32,
             mod_cnt: u32,
             data: crate::wire::WireData,
         ) -> ();
 
         /// Incoming Gossip
-        fn incoming_gossip(space: Arc<KitsuneSpace>, con: Tx2ConHnd<wire::Wire>, data: Box<[u8]>) -> ();
+        fn incoming_gossip(space: KSpace, con: WireConHnd, data: Payload) -> ();
     }
 }
 
