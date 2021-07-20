@@ -127,6 +127,7 @@ impl std::fmt::Debug for MsgId {
 type RR = (MsgId, PoolBuf);
 
 /// Efficiently read framed data.
+#[cfg_attr(feature = "test_utils", mockall::automock)]
 pub trait AsFramedReader: 'static + Send + Unpin {
     /// Read a frame of data from this AsFramedReader instance.
     /// This returns a Vec in case the first read contains multiple small items.
@@ -232,6 +233,7 @@ impl AsFramedReader for FramedReader {
 }
 
 /// Efficiently write framed data.
+#[cfg_attr(feature = "test_utils", mockall::automock)]
 pub trait AsFramedWriter: 'static + Send + Unpin {
     /// Write a frame of data to this FramedWriter instance.
     /// If timeout is exceeded, a timeout error is returned,
@@ -381,5 +383,32 @@ mod tests {
         }
 
         wt.await.unwrap().unwrap();
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "test_utils")]
+    async fn test_mock_framed() {
+        let mut f = MockAsFramedReader::new();
+        f.expect_read().returning(|_t| {
+            async move {
+                let mut buf = PoolBuf::new();
+                buf.extend_from_slice(b"test");
+                Ok((0.into(), buf))
+            }
+            .boxed()
+        });
+        let (_, buf) = f.read(KitsuneTimeout::from_millis(100)).await.unwrap();
+        assert_eq!(b"test", buf.as_ref());
+
+        let mut f = MockAsFramedWriter::new();
+        f.expect_write().returning(|_, buf, _| {
+            assert_eq!(b"test2", buf.as_ref());
+            async move { Ok(()) }.boxed()
+        });
+        let mut buf = PoolBuf::new();
+        buf.extend_from_slice(b"test2");
+        f.write(0.into(), buf, KitsuneTimeout::from_millis(100))
+            .await
+            .unwrap();
     }
 }

@@ -2248,7 +2248,7 @@ dependencies = [
  "holo_hash",
  "holochain_wasmer_guest",
  "holochain_zome_types",
- "mockall",
+ "mockall 0.8.3",
  "paste 1.0.5",
  "serde",
  "serde_bytes",
@@ -2388,7 +2388,7 @@ dependencies = [
  "lazy_static",
  "maplit",
  "matches",
- "mockall",
+ "mockall 0.8.3",
  "mr_bundle",
  "must_future",
  "nanoid",
@@ -2448,7 +2448,7 @@ dependencies = [
  "holochain_zome_types",
  "kitsune_p2p",
  "matches",
- "mockall",
+ "mockall 0.8.3",
  "observability",
  "pretty_assertions 0.7.2",
  "serde",
@@ -2578,7 +2578,7 @@ dependencies = [
  "holochain_zome_types",
  "kitsune_p2p",
  "kitsune_p2p_types",
- "mockall",
+ "mockall 0.8.3",
  "observability",
  "serde",
  "serde_bytes",
@@ -2682,7 +2682,7 @@ dependencies = [
  "holochain_zome_types",
  "kitsune_p2p",
  "matches",
- "mockall",
+ "mockall 0.8.3",
  "observability",
  "parking_lot 0.10.2",
  "pretty_assertions 0.6.1",
@@ -2732,7 +2732,7 @@ dependencies = [
  "lazy_static",
  "maplit",
  "matches",
- "mockall",
+ "mockall 0.8.3",
  "mr_bundle",
  "must_future",
  "nanoid",
@@ -3387,6 +3387,7 @@ dependencies = [
  "kitsune_p2p_dht_arc",
  "lair_keystore_api",
  "lru",
+ "mockall 0.10.2",
  "nanoid",
  "observability",
  "once_cell",
@@ -3819,7 +3820,22 @@ dependencies = [
  "downcast",
  "fragile",
  "lazy_static",
- "mockall_derive",
+ "mockall_derive 0.8.3",
+ "predicates 1.0.8",
+ "predicates-tree",
+]
+
+[[package]]
+name = "mockall"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ab571328afa78ae322493cacca3efac6a0f2e0a67305b4df31fd439ef129ac0"
+dependencies = [
+ "cfg-if 1.0.0",
+ "downcast",
+ "fragile",
+ "lazy_static",
+ "mockall_derive 0.10.2",
  "predicates 1.0.8",
  "predicates-tree",
 ]
@@ -3831,6 +3847,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c461918bf7f59eefb1459252756bf2351a995d6bd510d0b2061bd86bcdabfa6"
 dependencies = [
  "cfg-if 0.1.10",
+ "proc-macro2 1.0.27",
+ "quote 1.0.9",
+ "syn 1.0.73",
+]
+
+[[package]]
+name = "mockall_derive"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7e25b214433f669161f414959594216d8e6ba83b6679d3db96899c0b4639033"
+dependencies = [
+ "cfg-if 1.0.0",
  "proc-macro2 1.0.27",
  "quote 1.0.9",
  "syn 1.0.73",
