@@ -66,6 +66,7 @@ use structopt::StructOpt;
 pub(crate) mod changelog;
 pub(crate) mod check;
 pub(crate) mod common;
+pub(crate) mod crate_;
 pub(crate) mod crate_selection;
 pub(crate) mod release;
 
@@ -79,8 +80,11 @@ type Fallible<T> = anyhow::Result<T>;
 type CommandResult = Fallible<()>;
 
 pub(crate) mod cli {
+    use crate::crate_::CrateArgs;
+
     use super::*;
     use crate_selection::SelectionCriteria;
+    use semver::Version;
     use std::ffi::OsStr;
     use std::path::PathBuf;
 
@@ -103,6 +107,7 @@ pub(crate) mod cli {
         Changelog(ChangelogArgs),
         Release(ReleaseArgs),
         Check(CheckArgs),
+        Crate(CrateArgs),
     }
 
     #[derive(Debug, StructOpt)]
@@ -291,6 +296,7 @@ fn main() -> CommandResult {
 
     env_logger::builder()
         .filter_level(args.log_level.to_level_filter())
+        .filter(Some("cargo::core::workspace"), log::LevelFilter::Error)
         .format_timestamp(None)
         .init();
 
@@ -300,5 +306,6 @@ fn main() -> CommandResult {
         cli::Commands::Changelog(cmd_args) => crate::changelog::cmd(&args, cmd_args),
         cli::Commands::Check(cmd_args) => crate::check::cmd(&args, cmd_args),
         cli::Commands::Release(cmd_args) => crate::release::cmd(&args, cmd_args),
+        cli::Commands::Crate(cmd_args) => crate::crate_::cmd(&args, cmd_args),
     }
 }
