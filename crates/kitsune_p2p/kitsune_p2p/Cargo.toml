@@ -43,5 +43,6 @@ tracing-subscriber = "0.2"
 [features]
 test_utils = [
   "ghost_actor/test_utils",
+  "kitsune_p2p_types/test_utils",
   "mockall",
 ]
