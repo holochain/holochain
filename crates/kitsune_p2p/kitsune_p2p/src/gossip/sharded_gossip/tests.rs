@@ -65,7 +65,7 @@ async fn sharded_sanity_test() {
     let mut u = arbitrary::Unstructured::new(&NOISE);
     let bob_cert = Tx2Cert::arbitrary(&mut u).unwrap();
 
-    let mut agents = agents().into_iter();
+    let mut agents = agents(2).into_iter();
     let alice_agent = agents.next().unwrap();
     let bob_agent = agents.next().unwrap();
 
@@ -256,10 +256,7 @@ async fn setup_player(
     num_agents: usize,
     with_data: bool,
 ) -> ShardedGossipLocal {
-    let agents = std::iter::repeat_with(|| Arc::new(fixt!(KitsuneAgent)))
-        .take(num_agents)
-        .collect();
-    let evt_handler = standard_responses(agents, with_data).await;
+    let evt_handler = standard_responses(agents(num_agents), with_data).await;
     let (evt_sender, _) = spawn_handler(evt_handler).await;
     ShardedGossipLocal::test(GossipType::Historical, evt_sender, state)
 }
@@ -269,18 +266,15 @@ async fn setup_standard_player(state: ShardedGossipLocalState) -> ShardedGossipL
 }
 
 async fn setup_empty_player(state: ShardedGossipLocalState) -> ShardedGossipLocal {
-    let evt_handler = standard_responses(agents(), false).await;
+    let evt_handler = standard_responses(agents(2), false).await;
     let (evt_sender, _) = spawn_handler(evt_handler).await;
     ShardedGossipLocal::test(GossipType::Historical, evt_sender, state)
 }
 
-// maackle: why does this need to be static, can't we just create new agents each time?
-fn agents() -> Vec<Arc<KitsuneAgent>> {
-    static AGENTS: once_cell::sync::Lazy<Vec<Arc<KitsuneAgent>>> =
-        once_cell::sync::Lazy::new(|| {
-            vec![Arc::new(fixt!(KitsuneAgent)), Arc::new(fixt!(KitsuneAgent))]
-        });
-    AGENTS.clone()
+fn agents(num_agents: usize) -> Vec<Arc<KitsuneAgent>> {
+    std::iter::repeat_with(|| Arc::new(fixt!(KitsuneAgent)))
+        .take(num_agents)
+        .collect()
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -474,7 +468,7 @@ async fn no_data_still_finishes() {
     let alice_cert = Tx2Cert::arbitrary(&mut u).unwrap();
     let bob_cert = Tx2Cert::arbitrary(&mut u).unwrap();
 
-    let agents = agents();
+    let agents = agents(2);
     let alice = setup_empty_player(ShardedGossipLocalState {
         local_agents: maplit::hashset!(agents[0].clone()),
         round_map: maplit::hashmap! {
@@ -542,7 +536,7 @@ async fn no_data_still_finishes() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn double_initiate_is_handled() {
-    let agents = agents();
+    let agents = agents(2);
     let alice = setup_empty_player(ShardedGossipLocalState {
         local_agents: maplit::hashset!(agents[0].clone()),
         ..Default::default()
