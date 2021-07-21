@@ -17,7 +17,7 @@ holochain_sqlite = { version = "0.0.2-dev.0", path = "../holochain_sqlite" }
 holo_hash = { version = "0.0.4-dev.0", path = "../holo_hash", features = ["full"] }
 fallible-iterator = "0.2.0"
 holochain_keystore = { version = "0.0.2-dev.0", path = "../holochain_keystore" }
-holochain_serialized_bytes = "=0.0.50"
+holochain_serialized_bytes = "=0.0.51"
 holochain_p2p = { version = "0.0.2-dev.0", path = "../holochain_p2p" }
 holochain_types = { version = "0.0.2-dev.0", path = "../holochain_types" }
 holochain_util = { version = "0.0.2-dev.0", path = "../holochain_util" }
@@ -37,6 +37,9 @@ tracing-futures = "0.2.4"
 tempdir = { version = "0.3", optional = true }
 base64 = {version = "0.13", optional = true}
 
+# contrafact
+contrafact = { version = "0.1.0-dev.1", optional = true }
+
 [dev-dependencies]
 anyhow = "1.0.26"
 fixt = { version = "0.0.4-dev.0", path = "../fixt" }
@@ -55,6 +58,7 @@ test_utils = [
     "holochain_types/test_utils",
     "holochain_zome_types/test_utils",
     "holochain_wasm_test_utils",
-    "tempdir",
     "base64",
+    "contrafact",
+    "tempdir",
 ]
