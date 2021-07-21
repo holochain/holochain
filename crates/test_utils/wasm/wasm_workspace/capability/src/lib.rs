@@ -70,13 +70,13 @@ fn needs_cap_claim(_: ()) -> ExternResult<()> {
 
 #[hdk_extern]
 fn try_cap_claim(cap_for: crate::CapFor) -> ExternResult<ZomeCallResponse> {
-    Ok(call_remote(
-        vec![cap_for.1],
+    call_remote(
+        cap_for.1,
         zome_info()?.zome_name,
         "needs_cap_claim".to_string().into(),
         Some(cap_for.0),
         &(),
-    )?.into_iter().next().unwrap())
+    )
 }
 
 #[hdk_extern]
@@ -98,7 +98,7 @@ fn send_assigned_cap_claim(agent: AgentPubKey) -> ExternResult<()> {
 
     // send the assigned cap token
     call_remote(
-        vec![agent],
+        agent,
         this_zome,
         "accept_cap_claim".into(),
         None,

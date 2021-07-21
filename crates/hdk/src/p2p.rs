@@ -58,7 +58,7 @@ where
 /// let foo: Foo = call_remote(bob, "foo_zome", "do_it", secret, serializable_payload)?;
 /// ...
 /// ```
-pub fn call_remote<I>(
+pub fn call_remote_multi<I>(
     agents: Vec<AgentPubKey>,
     zome: ZomeName,
     fn_name: FunctionName,
@@ -77,6 +77,35 @@ where
             ExternIO::encode(payload)?,
         ))
     })
+}
+
+pub fn call_remote<I>(
+    agent: AgentPubKey,
+    zome: ZomeName,
+    fn_name: FunctionName,
+    cap_secret: Option<CapSecret>,
+    payload: I,
+) -> ExternResult<ZomeCallResponse>
+where
+    I: serde::Serialize + std::fmt::Debug,
+{
+    // Unwrap because the host has to give us a vec of length 1 because we gave it 1 agent.
+    Ok(
+        call_remote_multi(vec![agent], zome, fn_name, cap_secret, payload)?
+            .into_iter()
+            .next()
+            .unwrap(),
+    )
+}
+
+pub fn accept_countersigning_preflight_request(
+    _preflight_request: &PreflightRequest,
+) -> ExternResult<PreflightResponse> {
+    // Host should:
+    // - Check system constraints on request
+    // - Freeze chain for session end
+    // - Build response
+    todo!();
 }
 
 /// Emit an app-defined Signal.
