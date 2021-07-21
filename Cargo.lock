@@ -3240,6 +3240,7 @@ dependencies = [
  "kitsune_p2p_transport_quic",
  "kitsune_p2p_types",
  "lair_keystore_api",
+ "maplit",
  "matches",
  "mockall",
  "observability",

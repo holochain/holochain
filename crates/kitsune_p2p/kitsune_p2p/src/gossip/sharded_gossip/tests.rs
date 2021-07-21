@@ -62,35 +62,29 @@ async fn test_initiate_accept() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn sharded_sanity_test() {
-    let (alice, _) = setup_player().await;
-    let (bob, bob_cert) = setup_player().await;
+    let mut u = arbitrary::Unstructured::new(&NOISE);
+    let bob_cert = Tx2Cert::arbitrary(&mut u).unwrap();
+
     let mut agents = agents().into_iter();
     let alice_agent = agents.next().unwrap();
     let bob_agent = agents.next().unwrap();
 
-    // Set alice initial state
-    alice
-        .inner
-        .share_mut(|i, _| {
-            i.local_agents.insert(alice_agent.clone());
-            assert_eq!(i.round_map.current_rounds().len(), 0);
-            Ok(())
-        })
-        .unwrap();
+    let alice = setup_standard_player(ShardedGossipLocalState {
+        local_agents: maplit::hashset! { alice_agent.clone() },
+        ..Default::default()
+    })
+    .await;
 
-    // Set bob initial state
-    bob.inner
-        .share_mut(|i, _| {
-            i.local_agents.insert(bob_agent.clone());
-            assert_eq!(i.round_map.current_rounds().len(), 0);
-            Ok(())
-        })
-        .unwrap();
+    let bob = setup_standard_player(ShardedGossipLocalState {
+        local_agents: maplit::hashset! { bob_agent.clone() },
+        ..Default::default()
+    })
+    .await;
 
     let (_, _, bob_outgoing) = bob.try_initiate().await.unwrap().unwrap();
     let alices_cert = bob
         .inner
-        .share_mut(|i, _| Ok(i.initiate_tgt.as_ref().unwrap().cert().clone()))
+        .share_ref(|i| Ok(i.initiate_tgt.as_ref().unwrap().cert().clone()))
         .unwrap();
 
     let alice_outgoing = alice
@@ -257,36 +251,57 @@ async fn standard_responses(
     evt_handler
 }
 
-async fn setup_player() -> (ShardedGossipLocal, Tx2Cert) {
-    let mut u = arbitrary::Unstructured::new(&NOISE);
-    let bob_agent = Arc::new(fixt!(KitsuneAgent));
-    let alice_agent = Arc::new(fixt!(KitsuneAgent));
-
-    let evt_handler = standard_responses(vec![alice_agent, bob_agent], true).await;
+async fn setup_player(
+    state: ShardedGossipLocalState,
+    num_agents: usize,
+    with_data: bool,
+) -> ShardedGossipLocal {
+    let agents = std::iter::repeat_with(|| Arc::new(fixt!(KitsuneAgent)))
+        .take(num_agents)
+        .collect();
+    let evt_handler = standard_responses(agents, with_data).await;
     let (evt_sender, _) = spawn_handler(evt_handler).await;
-    let bob = ShardedGossipLocal::test(GossipType::Historical, evt_sender, Default::default());
-    let cert = Tx2Cert::arbitrary(&mut u).unwrap();
-    (bob, cert)
+    ShardedGossipLocal::test(GossipType::Historical, evt_sender, state)
+}
+
+async fn setup_standard_player(state: ShardedGossipLocalState) -> ShardedGossipLocal {
+    setup_player(state, 2, true).await
+}
+
+async fn setup_empty_player(state: ShardedGossipLocalState) -> ShardedGossipLocal {
+    let evt_handler = standard_responses(agents(), false).await;
+    let (evt_sender, _) = spawn_handler(evt_handler).await;
+    ShardedGossipLocal::test(GossipType::Historical, evt_sender, state)
+}
+
+// maackle: why does this need to be static, can't we just create new agents each time?
+fn agents() -> Vec<Arc<KitsuneAgent>> {
+    static AGENTS: once_cell::sync::Lazy<Vec<Arc<KitsuneAgent>>> =
+        once_cell::sync::Lazy::new(|| {
+            vec![Arc::new(fixt!(KitsuneAgent)), Arc::new(fixt!(KitsuneAgent))]
+        });
+    AGENTS.clone()
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn partial_missing_doesnt_finish() {
-    let (bob, cert) = setup_player().await;
-    bob.inner
-        .share_mut(|i, _| {
-            i.round_map.insert(
-                cert.clone(),
-                RoundState {
-                    common_arc_set: Arc::new(ArcInterval::Full.into()),
-                    num_ops_blooms: 1,
-                    increment_ops_complete: true,
-                    created_at: std::time::Instant::now(),
-                    round_timeout: u32::MAX,
-                },
-            );
-            Ok(())
-        })
-        .unwrap();
+    let mut u = arbitrary::Unstructured::new(&NOISE);
+    let cert = Tx2Cert::arbitrary(&mut u).unwrap();
+
+    let bob = setup_standard_player(ShardedGossipLocalState {
+        round_map: maplit::hashmap! {
+            cert.clone() => RoundState {
+                common_arc_set: Arc::new(ArcInterval::Full.into()),
+                num_ops_blooms: 1,
+                increment_ops_complete: true,
+                created_at: std::time::Instant::now(),
+                round_timeout: u32::MAX,
+            }
+        }
+        .into(),
+        ..Default::default()
+    })
+    .await;
 
     let incoming = ShardedGossipWire::MissingOps(MissingOps {
         ops: vec![],
@@ -307,23 +322,23 @@ async fn partial_missing_doesnt_finish() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn missing_ops_finishes() {
-    let (bob, cert) = setup_player().await;
+    let mut u = arbitrary::Unstructured::new(&NOISE);
+    let cert = Tx2Cert::arbitrary(&mut u).unwrap();
 
-    bob.inner
-        .share_mut(|i, _| {
-            i.round_map.insert(
-                cert.clone(),
-                RoundState {
-                    common_arc_set: Arc::new(ArcInterval::Full.into()),
-                    num_ops_blooms: 1,
-                    increment_ops_complete: true,
-                    created_at: std::time::Instant::now(),
-                    round_timeout: u32::MAX,
-                },
-            );
-            Ok(())
-        })
-        .unwrap();
+    let bob = setup_standard_player(ShardedGossipLocalState {
+        round_map: maplit::hashmap! {
+            cert.clone() => RoundState {
+                common_arc_set: Arc::new(ArcInterval::Full.into()),
+                num_ops_blooms: 1,
+                increment_ops_complete: true,
+                created_at: std::time::Instant::now(),
+                round_timeout: u32::MAX,
+            }
+        }
+        .into(),
+        ..Default::default()
+    })
+    .await;
 
     let incoming = ShardedGossipWire::MissingOps(MissingOps {
         ops: vec![],
@@ -344,22 +359,23 @@ async fn missing_ops_finishes() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
-    let (bob, cert) = setup_player().await;
-    bob.inner
-        .share_mut(|i, _| {
-            i.round_map.insert(
-                cert.clone(),
-                RoundState {
-                    common_arc_set: Arc::new(ArcInterval::Full.into()),
-                    num_ops_blooms: 1,
-                    increment_ops_complete: false,
-                    created_at: std::time::Instant::now(),
-                    round_timeout: u32::MAX,
-                },
-            );
-            Ok(())
-        })
-        .unwrap();
+    let mut u = arbitrary::Unstructured::new(&NOISE);
+    let cert = Tx2Cert::arbitrary(&mut u).unwrap();
+
+    let bob = setup_standard_player(ShardedGossipLocalState {
+        round_map: maplit::hashmap! {
+            cert.clone() => RoundState {
+                common_arc_set: Arc::new(ArcInterval::Full.into()),
+                num_ops_blooms: 1,
+                increment_ops_complete: false,
+                created_at: std::time::Instant::now(),
+                round_timeout: u32::MAX,
+            }
+        }
+        .into(),
+        ..Default::default()
+    })
+    .await;
 
     let incoming = ShardedGossipWire::MissingOps(MissingOps {
         ops: vec![],
@@ -380,22 +396,23 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn bloom_response_finishes() {
-    let (bob, cert) = setup_player().await;
-    bob.inner
-        .share_mut(|i, _| {
-            i.round_map.insert(
-                cert.clone(),
-                RoundState {
-                    common_arc_set: Arc::new(ArcInterval::Full.into()),
-                    num_ops_blooms: 0,
-                    increment_ops_complete: false,
-                    created_at: std::time::Instant::now(),
-                    round_timeout: u32::MAX,
-                },
-            );
-            Ok(())
-        })
-        .unwrap();
+    let mut u = arbitrary::Unstructured::new(&NOISE);
+    let cert = Tx2Cert::arbitrary(&mut u).unwrap();
+
+    let bob = setup_standard_player(ShardedGossipLocalState {
+        round_map: maplit::hashmap! {
+            cert.clone() => RoundState {
+                common_arc_set: Arc::new(ArcInterval::Full.into()),
+                num_ops_blooms: 0,
+                increment_ops_complete: false,
+                created_at: std::time::Instant::now(),
+                round_timeout: u32::MAX,
+            }
+        }
+        .into(),
+        ..Default::default()
+    })
+    .await;
 
     let incoming = ShardedGossipWire::Ops(Ops {
         filter: empty_bloom(),
@@ -416,22 +433,23 @@ async fn bloom_response_finishes() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn bloom_response_doesnt_finish_outstanding_incoming() {
-    let (bob, cert) = setup_player().await;
-    bob.inner
-        .share_mut(|i, _| {
-            i.round_map.insert(
-                cert.clone(),
-                RoundState {
-                    common_arc_set: Arc::new(ArcInterval::Full.into()),
-                    num_ops_blooms: 1,
-                    increment_ops_complete: false,
-                    created_at: std::time::Instant::now(),
-                    round_timeout: u32::MAX,
-                },
-            );
-            Ok(())
-        })
-        .unwrap();
+    let mut u = arbitrary::Unstructured::new(&NOISE);
+    let cert = Tx2Cert::arbitrary(&mut u).unwrap();
+
+    let bob = setup_standard_player(ShardedGossipLocalState {
+        round_map: maplit::hashmap! {
+            cert.clone() => RoundState {
+                common_arc_set: Arc::new(ArcInterval::Full.into()),
+                num_ops_blooms: 1,
+                increment_ops_complete: false,
+                created_at: std::time::Instant::now(),
+                round_timeout: u32::MAX,
+            }
+        }
+        .into(),
+        ..Default::default()
+    })
+    .await;
 
     let incoming = ShardedGossipWire::Ops(Ops {
         filter: empty_bloom(),
@@ -450,62 +468,44 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
         .unwrap();
 }
 
-fn agents() -> Vec<Arc<KitsuneAgent>> {
-    static AGENTS: once_cell::sync::Lazy<Vec<Arc<KitsuneAgent>>> =
-        once_cell::sync::Lazy::new(|| {
-            vec![Arc::new(fixt!(KitsuneAgent)), Arc::new(fixt!(KitsuneAgent))]
-        });
-    AGENTS.clone()
-}
-
-async fn setup_empty_player() -> (ShardedGossipLocal, Tx2Cert) {
-    let mut u = arbitrary::Unstructured::new(&NOISE);
-
-    let evt_handler = standard_responses(agents(), false).await;
-    let (evt_sender, _) = spawn_handler(evt_handler).await;
-    let bob = ShardedGossipLocal::test(GossipType::Historical, evt_sender, Default::default());
-    let cert = Tx2Cert::arbitrary(&mut u).unwrap();
-    (bob, cert)
-}
-
 #[tokio::test(flavor = "multi_thread")]
 async fn no_data_still_finishes() {
+    let mut u = arbitrary::Unstructured::new(&NOISE);
+    let alice_cert = Tx2Cert::arbitrary(&mut u).unwrap();
+    let bob_cert = Tx2Cert::arbitrary(&mut u).unwrap();
+
     let agents = agents();
-    let (alice, alice_cert) = setup_empty_player().await;
-    let (bob, bob_cert) = setup_empty_player().await;
-    alice
-        .inner
-        .share_mut(|i, _| {
-            i.round_map.insert(
-                bob_cert.clone(),
-                RoundState {
-                    common_arc_set: Arc::new(ArcInterval::Full.into()),
-                    num_ops_blooms: 0,
-                    increment_ops_complete: false,
-                    created_at: std::time::Instant::now(),
-                    round_timeout: u32::MAX,
-                },
-            );
-            i.local_agents.insert(agents[0].clone());
-            Ok(())
-        })
-        .unwrap();
-    bob.inner
-        .share_mut(|i, _| {
-            i.round_map.insert(
-                alice_cert.clone(),
-                RoundState {
-                    common_arc_set: Arc::new(ArcInterval::Full.into()),
-                    num_ops_blooms: 1,
-                    increment_ops_complete: true,
-                    created_at: std::time::Instant::now(),
-                    round_timeout: u32::MAX,
-                },
-            );
-            i.local_agents.insert(agents[1].clone());
-            Ok(())
-        })
-        .unwrap();
+    let alice = setup_empty_player(ShardedGossipLocalState {
+        local_agents: maplit::hashset!(agents[0].clone()),
+        round_map: maplit::hashmap! {
+            bob_cert.clone() => RoundState {
+                common_arc_set: Arc::new(ArcInterval::Full.into()),
+                num_ops_blooms: 0,
+                increment_ops_complete: false,
+                created_at: std::time::Instant::now(),
+                round_timeout: u32::MAX,
+            }
+        }
+        .into(),
+        ..Default::default()
+    })
+    .await;
+
+    let bob = setup_empty_player(ShardedGossipLocalState {
+        local_agents: maplit::hashset!(agents[1].clone()),
+        round_map: maplit::hashmap! {
+            alice_cert.clone() => RoundState {
+                common_arc_set: Arc::new(ArcInterval::Full.into()),
+                num_ops_blooms: 1,
+                increment_ops_complete: true,
+                created_at: std::time::Instant::now(),
+                round_timeout: u32::MAX,
+            }
+        }
+        .into(),
+        ..Default::default()
+    })
+    .await;
 
     let incoming = ShardedGossipWire::Ops(Ops {
         filter: empty_bloom(),
@@ -543,21 +543,17 @@ async fn no_data_still_finishes() {
 #[tokio::test(flavor = "multi_thread")]
 async fn double_initiate_is_handled() {
     let agents = agents();
-    let (alice, _) = setup_empty_player().await;
-    let (bob, _) = setup_empty_player().await;
-    alice
-        .inner
-        .share_mut(|i, _| {
-            i.local_agents.insert(agents[0].clone());
-            Ok(())
-        })
-        .unwrap();
-    bob.inner
-        .share_mut(|i, _| {
-            i.local_agents.insert(agents[1].clone());
-            Ok(())
-        })
-        .unwrap();
+    let alice = setup_empty_player(ShardedGossipLocalState {
+        local_agents: maplit::hashset!(agents[0].clone()),
+        ..Default::default()
+    })
+    .await;
+
+    let bob = setup_empty_player(ShardedGossipLocalState {
+        local_agents: maplit::hashset!(agents[1].clone()),
+        ..Default::default()
+    })
+    .await;
 
     let (alice_tgt, _, alice_initiate) = alice.try_initiate().await.unwrap().unwrap();
     let (bob_tgt, _, bob_initiate) = bob.try_initiate().await.unwrap().unwrap();
@@ -567,7 +563,7 @@ async fn double_initiate_is_handled() {
     dbg!(&bob_cert);
     alice
         .inner
-        .share_mut(|i, _| {
+        .share_ref(|i| {
             dbg!(&i.initiate_tgt);
             dbg!(&i.round_map);
             Ok(())

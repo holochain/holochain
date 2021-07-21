@@ -34,6 +34,18 @@ impl<T: 'static + Send> Share<T> {
         Self(Arc::new(parking_lot::Mutex::new(None)))
     }
 
+    /// Execute code with immutable access to the internal state.
+    pub fn share_ref<R, F>(&self, f: F) -> KitsuneResult<R>
+    where
+        F: FnOnce(&T) -> KitsuneResult<R>,
+    {
+        let t = self.0.lock();
+        if t.is_none() {
+            return Err(KitsuneErrorKind::Closed.into());
+        }
+        f(t.as_ref().unwrap())
+    }
+
     /// Execute code with mut access to the internal state.
     /// The second param, if set to true, will drop the shared state,
     /// any further access will `Err(KitsuneError::Closed)`.
