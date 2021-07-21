@@ -59,7 +59,7 @@ host_fn_api_impls! {
     // @todo
     fn call_info (()) -> zt::info::CallInfo;
 
-    fn call (zt::call::Call) -> zt::ZomeCallResponse;
+    fn call (zt::call::Call) -> Vec<zt::ZomeCallResponse>;
 
     // Call a zome on a remote agent.
     fn call_remote (zt::call_remote::CallRemote) -> Vec<zt::ZomeCallResponse>;

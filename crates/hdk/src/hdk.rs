@@ -61,7 +61,7 @@ pub trait HdkT: Send + Sync {
     fn get_links(&self, get_links_input: GetLinksInput) -> ExternResult<Links>;
     fn get_link_details(&self, get_links_input: GetLinksInput) -> ExternResult<LinkDetails>;
     // P2P
-    fn call(&self, call: Call) -> ExternResult<ZomeCallResponse>;
+    fn call(&self, call: Call) -> ExternResult<Vec<ZomeCallResponse>>;
     fn call_remote(&self, call_remote: CallRemote) -> ExternResult<Vec<ZomeCallResponse>>;
     fn emit_signal(&self, app_signal: AppSignal) -> ExternResult<()>;
     fn remote_signal(&self, remote_signal: RemoteSignal) -> ExternResult<()>;
@@ -176,7 +176,7 @@ impl HdkT for ErrHdk {
         Self::err()
     }
     // P2P
-    fn call(&self, _: Call) -> ExternResult<ZomeCallResponse> {
+    fn call(&self, _: Call) -> ExternResult<Vec<ZomeCallResponse>> {
         Self::err()
     }
     fn call_remote(&self, _: CallRemote) -> ExternResult<Vec<ZomeCallResponse>> {
@@ -335,9 +335,8 @@ impl HdkT for HostHdk {
     fn get_link_details(&self, get_links_input: GetLinksInput) -> ExternResult<LinkDetails> {
         host_call::<GetLinksInput, LinkDetails>(__get_link_details, get_links_input)
     }
-
-    fn call(&self, call: Call) -> ExternResult<ZomeCallResponse> {
-        host_call::<Call, ZomeCallResponse>(__call, call)
+    fn call(&self, call: Call) -> ExternResult<Vec<ZomeCallResponse>> {
+        host_call::<Call, Vec<ZomeCallResponse>>(__call, call)
     }
     fn call_remote(&self, call_remote: CallRemote) -> ExternResult<Vec<ZomeCallResponse>> {
         host_call::<CallRemote, Vec<ZomeCallResponse>>(__call_remote, call_remote)
@@ -348,11 +347,9 @@ impl HdkT for HostHdk {
     fn remote_signal(&self, remote_signal: RemoteSignal) -> ExternResult<()> {
         host_call::<RemoteSignal, ()>(__remote_signal, remote_signal)
     }
-
     fn random_bytes(&self, number_of_bytes: u32) -> ExternResult<Bytes> {
         host_call::<u32, Bytes>(__random_bytes, number_of_bytes)
     }
-
     fn sys_time(&self, _: ()) -> ExternResult<core::time::Duration> {
         host_call::<(), core::time::Duration>(__sys_time, ())
     }

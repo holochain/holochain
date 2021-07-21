@@ -21,11 +21,29 @@ pub fn call<I>(
 where
     I: serde::Serialize + std::fmt::Debug,
 {
+    Ok(
+        call_multi(vec![to_cell], zome_name, fn_name, cap_secret, payload)?
+            .into_iter()
+            .next()
+            .unwrap(),
+    )
+}
+
+pub fn call_multi<I>(
+    to_cells: Vec<Option<CellId>>,
+    zome_name: ZomeName,
+    fn_name: FunctionName,
+    cap_secret: Option<CapSecret>,
+    payload: I,
+) -> ExternResult<Vec<ZomeCallResponse>>
+where
+    I: serde::Serialize + std::fmt::Debug,
+{
     // @todo is this secure to set this in the wasm rather than have the host inject it?
     let provenance = agent_info()?.agent_latest_pubkey;
     HDK.with(|h| {
         h.borrow().call(Call::new(
-            to_cell,
+            to_cells,
             zome_name,
             fn_name,
             cap_secret,
@@ -96,16 +114,6 @@ where
             .next()
             .unwrap(),
     )
-}
-
-pub fn accept_countersigning_preflight_request(
-    _preflight_request: &PreflightRequest,
-) -> ExternResult<PreflightResponse> {
-    // Host should:
-    // - Check system constraints on request
-    // - Freeze chain for session end
-    // - Build response
-    todo!();
 }
 
 /// Emit an app-defined Signal.

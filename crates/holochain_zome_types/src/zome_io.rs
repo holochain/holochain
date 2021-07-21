@@ -96,7 +96,7 @@ wasm_io_types! {
     // Header hash of the DeleteLink element.
     fn call_remote (zt::call_remote::CallRemote) -> Vec<zt::ZomeCallResponse>;
 
-    fn call (zt::call::Call) -> zt::ZomeCallResponse;
+    fn call (zt::call::Call) -> Vec<zt::ZomeCallResponse>;
 
     // @todo List all the local capability claims.
     fn capability_claims (()) -> ();
