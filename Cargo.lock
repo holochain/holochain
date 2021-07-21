@@ -3244,6 +3244,7 @@ dependencies = [
  "mockall 0.10.2",
  "observability",
  "once_cell",
+ "parking_lot 0.11.1",
  "rand 0.7.3",
  "reqwest",
  "serde",

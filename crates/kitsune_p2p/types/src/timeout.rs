@@ -52,12 +52,12 @@ impl KitsuneBackoff {
 
 /// Kitsune Timeout
 #[derive(Debug, Clone, Copy)]
-pub struct KitsuneTimeout(std::time::Instant);
+pub struct KitsuneTimeout(tokio::time::Instant);
 
 impl KitsuneTimeout {
     /// Create a new timeout for duration in the future.
     pub fn new(duration: std::time::Duration) -> Self {
-        Self(std::time::Instant::now().checked_add(duration).unwrap())
+        Self(tokio::time::Instant::now().checked_add(duration).unwrap())
     }
 
     /// Convenience fn to create a new timeout for an amount of milliseconds.
@@ -72,12 +72,13 @@ impl KitsuneTimeout {
 
     /// Get Duration until timeout expires.
     pub fn time_remaining(&self) -> std::time::Duration {
-        self.0.saturating_duration_since(std::time::Instant::now())
+        self.0
+            .saturating_duration_since(tokio::time::Instant::now())
     }
 
     /// Has this timeout expired?
     pub fn is_expired(&self) -> bool {
-        self.0 <= std::time::Instant::now()
+        self.0 <= tokio::time::Instant::now()
     }
 
     /// `Ok(())` if not expired, `Err(KitsuneError::TimedOut)` if expired.
@@ -131,7 +132,7 @@ mod tests {
     async fn kitsune_backoff() {
         let t = KitsuneTimeout::from_millis(100);
         let mut times = Vec::new();
-        let start = std::time::Instant::now();
+        let start = tokio::time::Instant::now();
         let bo = t.backoff(2, 15);
         while !t.is_expired() {
             times.push(start.elapsed().as_millis() as u64);

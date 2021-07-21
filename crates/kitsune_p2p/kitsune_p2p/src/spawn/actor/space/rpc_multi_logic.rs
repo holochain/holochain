@@ -182,6 +182,8 @@ impl Outer {
 
             // end all processing
             kill.notify_waiters();
+
+            tracing::trace!("(rpc_multi_logic) max time elapsed");
         });
     }
 
@@ -193,14 +195,20 @@ impl Outer {
         let grace_rs = self.grace_rs.clone();
 
         self.add_task(async move {
+            tracing::trace!("(rpc_multi_logic) grace time check start");
+
             // wait to have any data
             got_data.notified().await;
+            tracing::trace!("(rpc_multi_logic) grace time got data");
 
             // wait for any pending grace permits
             grace_rs.wait_on_zero_permits().await;
+            tracing::trace!("(rpc_multi_logic) grace time zero permits");
 
             // end all processing
             kill.notify_waiters();
+
+            tracing::trace!("(rpc_multi_logic) grace time elapsed");
         });
     }
 
@@ -366,6 +374,9 @@ impl Outer {
         self.add_task(async move {
             let _startup_permit = startup_permit;
 
+            let agent_count = local_joined_agents.len();
+            tracing::trace!(%agent_count, "(rpc_multi_logic) local get start");
+
             for agent in local_joined_agents {
                 if check_local_agent(&inner, &agent) {
                     continue;
@@ -376,6 +387,8 @@ impl Outer {
 
                 local_call(agent, permit);
             }
+
+            tracing::trace!("(rpc_multi_logic) local get done");
         });
     }
 
@@ -395,6 +408,8 @@ impl Outer {
                 let first_discover_permit = grace_permit();
                 drop(startup_permit);
 
+                tracing::trace!("(rpc_multi_logic) remote get cached start");
+
                 // first try remotes we already know about
                 if let Ok(infos) = discover::get_cached_remotes_near_basis(
                     ro_inner.clone(),
@@ -403,6 +418,12 @@ impl Outer {
                 )
                 .await
                 {
+                    let cached_remote_count = infos.len();
+                    tracing::trace!(
+                        %cached_remote_count,
+                        "(rpc_multi_logic) remote get cached",
+                    );
+
                     for info in infos {
                         if check_remote_agent(&inner, &info.agent) {
                             continue;
@@ -424,9 +445,12 @@ impl Outer {
                     })
                     .expect("we never close this share");
                 if already_done {
+                    tracing::trace!("(rpc_multi_logic) remote get done after cached");
                     first_discover_permit.close();
                     return;
                 }
+
+                tracing::trace!("(rpc_multi_logic) remote get searched start");
 
                 let second_discover_permit = grace_permit();
                 first_discover_permit.close();
@@ -439,6 +463,12 @@ impl Outer {
                 )
                 .await
                 {
+                    let searched_remote_count = infos.len();
+                    tracing::trace!(
+                        %searched_remote_count,
+                        "(rpc_multi_logic) remote get searched",
+                    );
+
                     for info in infos {
                         if check_remote_agent(&inner, &info.agent) {
                             continue;
@@ -450,6 +480,8 @@ impl Outer {
                 }
 
                 second_discover_permit.close();
+
+                tracing::trace!("(rpc_multi_logic) remote get done");
             }
             .boxed(),
         );
