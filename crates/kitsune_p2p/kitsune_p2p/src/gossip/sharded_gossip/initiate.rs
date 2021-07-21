@@ -146,14 +146,19 @@ impl ShardedGossipLocal {
             let bloom = self
                 .generate_ops_bloom(&local_agents, &agent, &state.common_arc_set, time_range)
                 .await?;
-            if let Some(bloom) = bloom {
-                let bloom = encode_timed_bloom_filter(&bloom);
-                state.increment_ops_blooms();
-                if i == len - 1 {
-                    gossip.push(ShardedGossipWire::ops(bloom, true));
-                } else {
-                    gossip.push(ShardedGossipWire::ops(bloom, false));
+
+            let bloom = match bloom {
+                Some(bloom) => {
+                    let bloom = encode_timed_bloom_filter(&bloom);
+                    state.increment_ops_blooms();
+                    Some(bloom)
                 }
+                None => None,
+            };
+            if i == len - 1 {
+                gossip.push(ShardedGossipWire::ops(bloom, true));
+            } else {
+                gossip.push(ShardedGossipWire::ops(bloom, false));
             }
         }
 

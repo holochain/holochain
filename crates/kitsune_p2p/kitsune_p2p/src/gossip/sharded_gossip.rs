@@ -341,11 +341,10 @@ impl ShardedGossipLocal {
         self.inner.share_mut(|i, _| {
             if i.round_map
                 .get_mut(state_id)
-                .and_then(|state| {
-                    state.num_ops_blooms.checked_sub(1).map(|num_ops_blooms| {
-                        state.num_ops_blooms = num_ops_blooms;
-                        state.num_ops_blooms == 0 && state.increment_ops_complete
-                    })
+                .map(|state| {
+                    let num_ops_blooms = state.num_ops_blooms.checked_sub(1).unwrap_or(0);
+                    state.num_ops_blooms = num_ops_blooms;
+                    state.num_ops_blooms == 0 && state.increment_ops_complete
                 })
                 .unwrap_or(true)
             {
@@ -389,11 +388,12 @@ impl ShardedGossipLocal {
                 } else {
                     self.get_state(&cert).await?
                 };
-                if let Some(state) = state {
-                    let filter = decode_timed_bloom_filter(&filter);
-                    self.incoming_ops(state.clone(), filter).await?
-                } else {
-                    vec![]
+                match (state, filter) {
+                    (Some(state), Some(filter)) => {
+                        let filter = decode_timed_bloom_filter(&filter);
+                        self.incoming_ops(state.clone(), filter).await?
+                    }
+                    _ => Vec::with_capacity(0),
                 }
             }
             ShardedGossipWire::MissingOps(MissingOps { ops, finished }) => {
@@ -528,7 +528,7 @@ kitsune_p2p_types::write_codec_enum! {
         /// Send Agent Info Boom
         Ops(0x50) {
             /// The bloom filter for op data
-            filter.0: PoolBuf,
+            filter.0: Option<PoolBuf>,
             /// Is this the last bloom to be sent?
             finished.1: bool,
         },

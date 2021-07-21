@@ -85,6 +85,12 @@ fn into_chunks(gossip: &mut Vec<ShardedGossipWire>, ops: HashMap<Arc<KitsuneOpHa
     let mut chunk = Vec::with_capacity(ops.len());
     let mut size = 0;
 
+    // If there are no ops missing we send back an empty final chunk
+    // so the other side knows we're done.
+    if ops.is_empty() {
+        gossip.push(ShardedGossipWire::missing_ops(Vec::with_capacity(0), true));
+    }
+
     for op in ops {
         // Bytes for this op.
         let bytes = op.0.len() + op.1.len();

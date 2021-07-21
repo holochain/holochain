@@ -2,7 +2,10 @@ use arbitrary::Arbitrary;
 use futures::FutureExt;
 use ghost_actor::{GhostControlHandler, GhostResult};
 
-use crate::{spawn::MockKitsuneP2pEventHandler, NOISE};
+use crate::{
+    gossip::sharded_gossip::initiate::encode_timed_bloom_filter, spawn::MockKitsuneP2pEventHandler,
+    NOISE,
+};
 
 use super::*;
 use crate::fixt::*;
@@ -41,16 +44,16 @@ async fn spawn_handler<H: KitsuneP2pEventHandler + GhostControlHandler>(
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_initiate_accept() {
-    let mut u = arbitrary::Unstructured::new(&NOISE);
-    let evt_handler = MockKitsuneP2pEventHandler::new();
-    let (evt_sender, _) = spawn_handler(evt_handler).await;
-    let gossip = ShardedGossipLocal::test(GossipType::Recent, evt_sender, Default::default());
+    // let mut u = arbitrary::Unstructured::new(&NOISE);
+    // let evt_handler = MockKitsuneP2pEventHandler::new();
+    // let (evt_sender, _) = spawn_handler(evt_handler).await;
+    // let gossip = ShardedGossipLocal::test(GossipType::Recent, evt_sender, Default::default());
 
-    let cert = Tx2Cert::arbitrary(&mut u).unwrap();
-    let msg = ShardedGossipWire::Initiate(Initiate { intervals: vec![] });
-    let outgoing = gossip.process_incoming(cert, msg).await.unwrap();
+    // let cert = Tx2Cert::arbitrary(&mut u).unwrap();
+    // let msg = ShardedGossipWire::Initiate(Initiate { intervals: vec![] });
+    // let outgoing = gossip.process_incoming(cert, msg).await.unwrap();
 
-    assert_eq!(outgoing, vec![]);
+    // assert_eq!(outgoing, vec![]);
     // gossip
     //     .inner
     //     .share_mut(|i, _| Ok(todo!("make assertions about internal state")))
@@ -59,92 +62,39 @@ async fn test_initiate_accept() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn sharded_sanity_test() {
-    let mut u = arbitrary::Unstructured::new(&NOISE);
-    let alice_agent_info = fixt!(AgentInfoSigned);
-    let alice_agent = alice_agent_info.agent.clone();
-    let mut evt_handler = MockKitsuneP2pEventHandler::new();
-    evt_handler
-        .expect_handle_query_agent_info_signed()
-        .return_once(move |_| {
-            Ok(async move { Ok(vec![alice_agent_info.clone()]) }
-                .boxed()
-                .into())
-        });
-    evt_handler
-        .expect_handle_query_gossip_agents()
-        .returning(|_| {
-            Ok(
-                async { Ok(vec![(Arc::new(fixt!(KitsuneAgent)), ArcInterval::Full)]) }
-                    .boxed()
-                    .into(),
-            )
-        });
-    evt_handler
-        .expect_handle_hashes_for_time_window()
-        .returning(|_| {
-            Ok(
-                async { Ok(Some((vec![Arc::new(KitsuneOpHash(vec![0]))], 0..u64::MAX))) }
-                    .boxed()
-                    .into(),
-            )
-        });
-    let (evt_sender, _) = spawn_handler(evt_handler).await;
-    let alice = ShardedGossipLocal::test(GossipType::Historical, evt_sender, Default::default());
-
-    let mut evt_handler = MockKitsuneP2pEventHandler::new();
-    evt_handler
-        .expect_handle_query_agent_info_signed()
-        .returning(|_| Ok(async { Ok(vec![fixt!(AgentInfoSigned)]) }.boxed().into()));
-    evt_handler
-        .expect_handle_get_agent_info_signed()
-        .returning(|_| Ok(async { Ok(Some(fixt!(AgentInfoSigned))) }.boxed().into()));
-    evt_handler
-        .expect_handle_query_gossip_agents()
-        .returning(|_| {
-            Ok(
-                async { Ok(vec![(Arc::new(fixt!(KitsuneAgent)), ArcInterval::Full)]) }
-                    .boxed()
-                    .into(),
-            )
-        });
-    evt_handler
-        .expect_handle_hashes_for_time_window()
-        .returning(|_| {
-            Ok(
-                async { Ok(Some((vec![Arc::new(KitsuneOpHash(vec![0]))], 0..u64::MAX))) }
-                    .boxed()
-                    .into(),
-            )
-        });
-    let (evt_sender, _) = spawn_handler(evt_handler).await;
-    let bob = ShardedGossipLocal::test(GossipType::Historical, evt_sender, Default::default());
+    let (alice, _) = setup_player().await;
+    let (bob, bob_cert) = setup_player().await;
+    let mut agents = agents().into_iter();
+    let alice_agent = agents.next().unwrap();
+    let bob_agent = agents.next().unwrap();
 
     // Set alice initial state
     alice
         .inner
         .share_mut(|i, _| {
-            i.local_agents.insert(alice_agent);
+            i.local_agents.insert(alice_agent.clone());
             assert_eq!(i.round_map.current_rounds().len(), 0);
             Ok(())
         })
         .unwrap();
 
-    let cert = Tx2Cert::arbitrary(&mut u).unwrap();
-
     // Set bob initial state
     bob.inner
         .share_mut(|i, _| {
-            i.local_agents.insert(Arc::new(fixt!(KitsuneAgent)));
+            i.local_agents.insert(bob_agent.clone());
             assert_eq!(i.round_map.current_rounds().len(), 0);
             Ok(())
         })
         .unwrap();
 
     let (_, _, bob_outgoing) = bob.try_initiate().await.unwrap().unwrap();
-    dbg!(&bob_outgoing);
+    let alices_cert = bob
+        .inner
+        .share_mut(|i, _| Ok(i.initiate_tgt.as_ref().unwrap().cert().clone()))
+        .unwrap();
 
     let alice_outgoing = alice
-        .process_incoming(cert.clone(), bob_outgoing)
+        .process_incoming(bob_cert.clone(), bob_outgoing)
         .await
         .unwrap();
 
@@ -158,17 +108,510 @@ async fn sharded_sanity_test() {
         .unwrap();
 
     let mut bob_outgoing = Vec::new();
+    dbg!("SENDING TO BOB");
     for incoming in alice_outgoing {
-        dbg!(&incoming);
-        let outgoing = bob.process_incoming(cert.clone(), incoming).await.unwrap();
-        dbg!(&outgoing);
+        let outgoing = bob
+            .process_incoming(alices_cert.clone(), incoming)
+            .await
+            .unwrap();
         bob_outgoing.extend(outgoing);
     }
-    assert_eq!(bob_outgoing.len(), 4);
+    assert_eq!(bob_outgoing.len(), 8);
     bob.inner
         .share_mut(|i, _| {
             assert_eq!(i.round_map.current_rounds().len(), 1);
             Ok(())
         })
         .unwrap();
+
+    let mut alice_outgoing = Vec::new();
+    dbg!("SENDING TO ALICE");
+    for incoming in bob_outgoing {
+        let outgoing = alice
+            .process_incoming(bob_cert.clone(), incoming)
+            .await
+            .unwrap();
+        alice_outgoing.extend(outgoing);
+    }
+    assert_eq!(alice_outgoing.len(), 4);
+    alice
+        .inner
+        .share_mut(|i, _| {
+            assert!(i.initiate_tgt.is_none());
+            assert_eq!(i.round_map.current_rounds().len(), 0);
+            Ok(())
+        })
+        .unwrap();
+
+    dbg!("SENDING TO BOB");
+    let mut bob_outgoing = Vec::new();
+    for incoming in alice_outgoing {
+        let outgoing = bob
+            .process_incoming(alices_cert.clone(), incoming)
+            .await
+            .unwrap();
+        bob_outgoing.extend(outgoing);
+    }
+    assert_eq!(bob_outgoing.len(), 0);
+    bob.inner
+        .share_mut(|i, _| {
+            assert!(i.initiate_tgt.is_none());
+            assert_eq!(i.round_map.current_rounds().len(), 0);
+            Ok(())
+        })
+        .unwrap();
+}
+
+async fn standard_responses(
+    agents: Vec<Arc<KitsuneAgent>>,
+    with_data: bool,
+) -> MockKitsuneP2pEventHandler {
+    let mut evt_handler = MockKitsuneP2pEventHandler::new();
+    evt_handler
+        .expect_handle_query_agent_info_signed()
+        .returning({
+            let agents = agents.clone();
+            move |_| {
+                let agents = agents.clone();
+                Ok(async move {
+                    let mut infos = Vec::new();
+                    for agent in agents {
+                        infos.push(agent_info(agent).await);
+                    }
+                    Ok(infos)
+                }
+                .boxed()
+                .into())
+            }
+        });
+    evt_handler
+        .expect_handle_get_agent_info_signed()
+        .returning({
+            let agents = agents.clone();
+            move |input| {
+                let agents = agents.clone();
+                let agent = agents.iter().find(|a| **a == input.agent).unwrap().clone();
+                Ok(async move { Ok(Some(agent_info(agent).await)) }
+                    .boxed()
+                    .into())
+            }
+        });
+    evt_handler.expect_handle_query_gossip_agents().returning({
+        move |_| {
+            let agents = agents.clone();
+            Ok(async move {
+                let agents = agents.clone();
+                let mut infos = Vec::new();
+                for agent in agents {
+                    infos.push((agent.clone(), ArcInterval::Full));
+                }
+                Ok(infos)
+            }
+            .boxed()
+            .into())
+        }
+    });
+    if with_data {
+        evt_handler
+            .expect_handle_hashes_for_time_window()
+            .returning(|_| {
+                Ok(async {
+                    Ok(Some((
+                        vec![Arc::new(KitsuneOpHash(vec![0; 36]))],
+                        0..u64::MAX,
+                    )))
+                }
+                .boxed()
+                .into())
+            });
+        evt_handler
+            .expect_handle_fetch_op_hashes_for_constraints()
+            .returning(|_| {
+                Ok(async { Ok(vec![Arc::new(KitsuneOpHash(vec![0; 36]))]) }
+                    .boxed()
+                    .into())
+            });
+        evt_handler
+            .expect_handle_fetch_op_hash_data()
+            .returning(|_| {
+                Ok(
+                    async { Ok(vec![(Arc::new(KitsuneOpHash(vec![0; 36])), vec![0])]) }
+                        .boxed()
+                        .into(),
+                )
+            });
+    } else {
+        evt_handler
+            .expect_handle_hashes_for_time_window()
+            .returning(|_| Ok(async { Ok(None) }.boxed().into()));
+        evt_handler
+            .expect_handle_fetch_op_hashes_for_constraints()
+            .returning(|_| Ok(async { Ok(vec![]) }.boxed().into()));
+        evt_handler
+            .expect_handle_fetch_op_hash_data()
+            .returning(|_| Ok(async { Ok(vec![]) }.boxed().into()));
+    }
+    evt_handler
+        .expect_handle_gossip()
+        .returning(|_, _, _, _, _| Ok(async { Ok(()) }.boxed().into()));
+    evt_handler
+}
+
+async fn setup_player() -> (ShardedGossipLocal, Tx2Cert) {
+    let mut u = arbitrary::Unstructured::new(&NOISE);
+    let bob_agent = Arc::new(fixt!(KitsuneAgent));
+    let alice_agent = Arc::new(fixt!(KitsuneAgent));
+
+    let evt_handler = standard_responses(vec![alice_agent, bob_agent], true).await;
+    let (evt_sender, _) = spawn_handler(evt_handler).await;
+    let bob = ShardedGossipLocal::test(GossipType::Historical, evt_sender, Default::default());
+    let cert = Tx2Cert::arbitrary(&mut u).unwrap();
+    (bob, cert)
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn partial_missing_doesnt_finish() {
+    let (bob, cert) = setup_player().await;
+    bob.inner
+        .share_mut(|i, _| {
+            i.round_map.insert(
+                cert.clone(),
+                RoundState {
+                    common_arc_set: Arc::new(ArcInterval::Full.into()),
+                    num_ops_blooms: 1,
+                    increment_ops_complete: true,
+                    created_at: std::time::Instant::now(),
+                    round_timeout: u32::MAX,
+                },
+            );
+            Ok(())
+        })
+        .unwrap();
+
+    let incoming = ShardedGossipWire::MissingOps(MissingOps {
+        ops: vec![],
+        finished: false,
+    });
+
+    let outgoing = bob.process_incoming(cert.clone(), incoming).await.unwrap();
+    assert_eq!(outgoing.len(), 0);
+
+    bob.inner
+        .share_mut(|i, _| {
+            assert!(i.initiate_tgt.is_none());
+            assert_eq!(i.round_map.current_rounds().len(), 1);
+            Ok(())
+        })
+        .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn missing_ops_finishes() {
+    let (bob, cert) = setup_player().await;
+
+    bob.inner
+        .share_mut(|i, _| {
+            i.round_map.insert(
+                cert.clone(),
+                RoundState {
+                    common_arc_set: Arc::new(ArcInterval::Full.into()),
+                    num_ops_blooms: 1,
+                    increment_ops_complete: true,
+                    created_at: std::time::Instant::now(),
+                    round_timeout: u32::MAX,
+                },
+            );
+            Ok(())
+        })
+        .unwrap();
+
+    let incoming = ShardedGossipWire::MissingOps(MissingOps {
+        ops: vec![],
+        finished: true,
+    });
+
+    let outgoing = bob.process_incoming(cert.clone(), incoming).await.unwrap();
+    assert_eq!(outgoing.len(), 0);
+
+    bob.inner
+        .share_mut(|i, _| {
+            assert!(i.initiate_tgt.is_none());
+            assert_eq!(i.round_map.current_rounds().len(), 0);
+            Ok(())
+        })
+        .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
+    let (bob, cert) = setup_player().await;
+    bob.inner
+        .share_mut(|i, _| {
+            i.round_map.insert(
+                cert.clone(),
+                RoundState {
+                    common_arc_set: Arc::new(ArcInterval::Full.into()),
+                    num_ops_blooms: 1,
+                    increment_ops_complete: false,
+                    created_at: std::time::Instant::now(),
+                    round_timeout: u32::MAX,
+                },
+            );
+            Ok(())
+        })
+        .unwrap();
+
+    let incoming = ShardedGossipWire::MissingOps(MissingOps {
+        ops: vec![],
+        finished: true,
+    });
+
+    let outgoing = bob.process_incoming(cert.clone(), incoming).await.unwrap();
+    assert_eq!(outgoing.len(), 0);
+
+    bob.inner
+        .share_mut(|i, _| {
+            assert!(i.initiate_tgt.is_none());
+            assert_eq!(i.round_map.current_rounds().len(), 1);
+            Ok(())
+        })
+        .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn bloom_response_finishes() {
+    let (bob, cert) = setup_player().await;
+    bob.inner
+        .share_mut(|i, _| {
+            i.round_map.insert(
+                cert.clone(),
+                RoundState {
+                    common_arc_set: Arc::new(ArcInterval::Full.into()),
+                    num_ops_blooms: 0,
+                    increment_ops_complete: false,
+                    created_at: std::time::Instant::now(),
+                    round_timeout: u32::MAX,
+                },
+            );
+            Ok(())
+        })
+        .unwrap();
+
+    let incoming = ShardedGossipWire::Ops(Ops {
+        filter: empty_bloom(),
+        finished: true,
+    });
+
+    let outgoing = bob.process_incoming(cert.clone(), incoming).await.unwrap();
+    assert_eq!(outgoing.len(), 1);
+
+    bob.inner
+        .share_mut(|i, _| {
+            assert!(i.initiate_tgt.is_none());
+            assert_eq!(i.round_map.current_rounds().len(), 0);
+            Ok(())
+        })
+        .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn bloom_response_doesnt_finish_outstanding_incoming() {
+    let (bob, cert) = setup_player().await;
+    bob.inner
+        .share_mut(|i, _| {
+            i.round_map.insert(
+                cert.clone(),
+                RoundState {
+                    common_arc_set: Arc::new(ArcInterval::Full.into()),
+                    num_ops_blooms: 1,
+                    increment_ops_complete: false,
+                    created_at: std::time::Instant::now(),
+                    round_timeout: u32::MAX,
+                },
+            );
+            Ok(())
+        })
+        .unwrap();
+
+    let incoming = ShardedGossipWire::Ops(Ops {
+        filter: empty_bloom(),
+        finished: true,
+    });
+
+    let outgoing = bob.process_incoming(cert.clone(), incoming).await.unwrap();
+    assert_eq!(outgoing.len(), 1);
+
+    bob.inner
+        .share_mut(|i, _| {
+            assert!(i.initiate_tgt.is_none());
+            assert_eq!(i.round_map.current_rounds().len(), 1);
+            Ok(())
+        })
+        .unwrap();
+}
+
+fn agents() -> Vec<Arc<KitsuneAgent>> {
+    static AGENTS: once_cell::sync::Lazy<Vec<Arc<KitsuneAgent>>> =
+        once_cell::sync::Lazy::new(|| {
+            vec![Arc::new(fixt!(KitsuneAgent)), Arc::new(fixt!(KitsuneAgent))]
+        });
+    AGENTS.clone()
+}
+
+async fn setup_empty_player() -> (ShardedGossipLocal, Tx2Cert) {
+    let mut u = arbitrary::Unstructured::new(&NOISE);
+
+    let evt_handler = standard_responses(agents(), false).await;
+    let (evt_sender, _) = spawn_handler(evt_handler).await;
+    let bob = ShardedGossipLocal::test(GossipType::Historical, evt_sender, Default::default());
+    let cert = Tx2Cert::arbitrary(&mut u).unwrap();
+    (bob, cert)
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn no_data_still_finishes() {
+    let agents = agents();
+    let (alice, alice_cert) = setup_empty_player().await;
+    let (bob, bob_cert) = setup_empty_player().await;
+    alice
+        .inner
+        .share_mut(|i, _| {
+            i.round_map.insert(
+                bob_cert.clone(),
+                RoundState {
+                    common_arc_set: Arc::new(ArcInterval::Full.into()),
+                    num_ops_blooms: 0,
+                    increment_ops_complete: false,
+                    created_at: std::time::Instant::now(),
+                    round_timeout: u32::MAX,
+                },
+            );
+            i.local_agents.insert(agents[0].clone());
+            Ok(())
+        })
+        .unwrap();
+    bob.inner
+        .share_mut(|i, _| {
+            i.round_map.insert(
+                alice_cert.clone(),
+                RoundState {
+                    common_arc_set: Arc::new(ArcInterval::Full.into()),
+                    num_ops_blooms: 1,
+                    increment_ops_complete: true,
+                    created_at: std::time::Instant::now(),
+                    round_timeout: u32::MAX,
+                },
+            );
+            i.local_agents.insert(agents[1].clone());
+            Ok(())
+        })
+        .unwrap();
+
+    let incoming = ShardedGossipWire::Ops(Ops {
+        filter: empty_bloom(),
+        finished: true,
+    });
+
+    let outgoing = alice
+        .process_incoming(bob_cert.clone(), incoming)
+        .await
+        .unwrap();
+    assert_eq!(outgoing.len(), 1);
+    let outgoing = bob
+        .process_incoming(alice_cert.clone(), outgoing.into_iter().next().unwrap())
+        .await
+        .unwrap();
+    assert_eq!(outgoing.len(), 0);
+
+    alice
+        .inner
+        .share_mut(|i, _| {
+            assert!(i.initiate_tgt.is_none());
+            assert_eq!(i.round_map.current_rounds().len(), 0);
+            Ok(())
+        })
+        .unwrap();
+    bob.inner
+        .share_mut(|i, _| {
+            assert!(i.initiate_tgt.is_none());
+            assert_eq!(i.round_map.current_rounds().len(), 0);
+            Ok(())
+        })
+        .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn double_initiate_is_handled() {
+    let agents = agents();
+    let (alice, _) = setup_empty_player().await;
+    let (bob, _) = setup_empty_player().await;
+    alice
+        .inner
+        .share_mut(|i, _| {
+            i.local_agents.insert(agents[0].clone());
+            Ok(())
+        })
+        .unwrap();
+    bob.inner
+        .share_mut(|i, _| {
+            i.local_agents.insert(agents[1].clone());
+            Ok(())
+        })
+        .unwrap();
+
+    let (alice_tgt, _, alice_initiate) = alice.try_initiate().await.unwrap().unwrap();
+    let (bob_tgt, _, bob_initiate) = bob.try_initiate().await.unwrap().unwrap();
+    let bob_cert = alice_tgt.cert();
+    let alice_cert = bob_tgt.cert();
+    dbg!(&alice_cert);
+    dbg!(&bob_cert);
+    alice
+        .inner
+        .share_mut(|i, _| {
+            dbg!(&i.initiate_tgt);
+            dbg!(&i.round_map);
+            Ok(())
+        })
+        .unwrap();
+
+    let alice_outgoing = alice
+        .process_incoming(bob_cert.clone(), bob_initiate)
+        .await
+        .unwrap();
+    assert_eq!(alice_outgoing.len(), 5);
+    let bob_outgoing = bob
+        .process_incoming(alice_cert.clone(), alice_initiate)
+        .await
+        .unwrap();
+    dbg!(&bob_outgoing);
+    assert_eq!(bob_outgoing.len(), 5);
+    todo!()
+    // let outgoing = bob
+    //     .process_incoming(alice_cert.clone(), outgoing.into_iter().next().unwrap())
+    //     .await
+    //     .unwrap();
+    // assert_eq!(outgoing.len(), 0);
+}
+
+async fn agent_info(agent: Arc<KitsuneAgent>) -> AgentInfoSigned {
+    AgentInfoSigned::sign(
+            Arc::new(fixt!(KitsuneSpace)),
+            agent,
+            u32::MAX / 4,
+            vec![url2::url2!("kitsune-proxy://CIW6PxKxsPPlcuvUCbMcKwUpaMSmB7kLD8xyyj4mqcw/kitsune-quic/h/localhost/p/5778/-").into()],
+            0,
+            0,
+            |_| async move { Ok(Arc::new(fixt!(KitsuneSignature, Predictable))) },
+        )
+        .await
+        .unwrap()
+}
+
+fn empty_bloom() -> Option<PoolBuf> {
+    let bloom = bloomfilter::Bloom::new_for_fp_rate(1, 0.1);
+    let bloom = TimedBloomFilter {
+        bloom,
+        time: 0..u64::MAX,
+    };
+    Some(encode_timed_bloom_filter(&bloom))
 }
