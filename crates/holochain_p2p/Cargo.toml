@@ -17,7 +17,7 @@ futures = "0.3"
 ghost_actor = "=0.3.0-alpha.2"
 holo_hash = { version = "0.0.4-dev.0", path = "../holo_hash" }
 holochain_keystore = { version = "0.0.2-dev.0", path = "../holochain_keystore" }
-holochain_serialized_bytes = "=0.0.50"
+holochain_serialized_bytes = "=0.0.51"
 holochain_types = { version = "0.0.2-dev.0", path = "../holochain_types" }
 holochain_zome_types = { version = "0.0.4-dev.0", path = "../holochain_zome_types" }
 kitsune_p2p = { version = "0.0.2-dev.0", path = "../kitsune_p2p/kitsune_p2p" }

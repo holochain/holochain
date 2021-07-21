@@ -154,6 +154,7 @@ impl ZomeDef {
 
 /// ZomeName as a String.
 #[derive(Clone, Debug, Serialize, Hash, Deserialize, Ord, Eq, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[repr(transparent)]
 pub struct ZomeName(pub String);
 
@@ -184,6 +185,7 @@ impl From<String> for ZomeName {
 /// A single function name.
 #[repr(transparent)]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, PartialOrd, Ord, Eq, Hash)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct FunctionName(pub String);
 
 impl std::fmt::Display for FunctionName {
