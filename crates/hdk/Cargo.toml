@@ -1,6 +1,6 @@
 [package]
 name = "hdk"
-version = "0.0.101"
+version = "0.0.102-dev.0"
 description = "The Holochain HDK"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain/tree/develop/crates/hdk"
@@ -20,10 +20,10 @@ mock = ["hdk_derive/mock", "mockall"]
 test_utils = [ "holochain_zome_types/test_utils" ]
 
 [dependencies]
-hdk_derive = { version = "0.0.3", path = "../hdk_derive" }
-holo_hash = { version = "0.0.3", path = "../holo_hash" }
+hdk_derive = { version = "0.0.4-dev.0", path = "../hdk_derive" }
+holo_hash = { version = "0.0.4-dev.0", path = "../holo_hash" }
 holochain_wasmer_guest = "=0.0.73"
-holochain_zome_types = { version = "0.0.3", path = "../holochain_zome_types" }
+holochain_zome_types = { version = "0.0.4-dev.0", path = "../holochain_zome_types" }
 paste = "=1.0.5"
 serde = "1.0"
 serde_bytes = "0.11"
@@ -37,4 +37,4 @@ version = "0.2"
 features = []
 
 [dev-dependencies]
-fixt = { path = "../fixt" ,version = "0.0.3"}
+fixt = { path = "../fixt" ,version = "0.0.4-dev.0"}
