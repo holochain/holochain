@@ -45,7 +45,7 @@ async fn sharded_sanity_test() {
     let (_, _, bob_outgoing) = bob.try_initiate().await.unwrap().unwrap();
     let alices_cert = bob
         .inner
-        .share_ref(|i| Ok(i.initiate_tgt.as_ref().unwrap().cert().clone()))
+        .share_ref(|i| Ok(i.initiate_tgt.as_ref().unwrap().0.cert().clone()))
         .unwrap();
 
     let alice_outgoing = alice
@@ -393,32 +393,43 @@ async fn double_initiate_is_handled() {
     let (bob_tgt, _, bob_initiate) = bob.try_initiate().await.unwrap().unwrap();
     let bob_cert = alice_tgt.cert();
     let alice_cert = bob_tgt.cert();
-    dbg!(&alice_cert);
-    dbg!(&bob_cert);
-    alice
-        .inner
-        .share_ref(|i| {
-            dbg!(&i.initiate_tgt);
-            dbg!(&i.round_map);
-            Ok(())
-        })
-        .unwrap();
 
     let alice_outgoing = alice
         .process_incoming(bob_cert.clone(), bob_initiate)
         .await
         .unwrap();
-    assert_eq!(alice_outgoing.len(), 5);
     let bob_outgoing = bob
         .process_incoming(alice_cert.clone(), alice_initiate)
         .await
         .unwrap();
-    dbg!(&bob_outgoing);
+
+    // Check we always have at least one node not proceeding with initiate.
+    assert!((bob_outgoing.len() == 0 || alice_outgoing.len() == 0));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn initiate_after_target_is_set() {
+    let agents = agents(2);
+    let alice = setup_empty_player(ShardedGossipLocalState {
+        local_agents: maplit::hashset!(agents[0].clone()),
+        ..Default::default()
+    })
+    .await;
+
+    let bob = setup_empty_player(ShardedGossipLocalState {
+        local_agents: maplit::hashset!(agents[1].clone()),
+        ..Default::default()
+    })
+    .await;
+
+    let (tgt, _, alice_initiate) = alice.try_initiate().await.unwrap().unwrap();
+    let cert = tgt.cert();
+    let bob_outgoing = bob
+        .process_incoming(cert.clone(), alice_initiate)
+        .await
+        .unwrap();
     assert_eq!(bob_outgoing.len(), 5);
-    todo!()
-    // let outgoing = bob
-    //     .process_incoming(alice_cert.clone(), outgoing.into_iter().next().unwrap())
-    //     .await
-    //     .unwrap();
-    // assert_eq!(outgoing.len(), 0);
+
+    let bob_initiate = bob.try_initiate().await.unwrap();
+    assert!(bob_initiate.is_none());
 }

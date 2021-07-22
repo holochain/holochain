@@ -1,5 +1,7 @@
 use std::convert::TryInto;
 
+use rand::Rng;
+
 use super::*;
 
 impl ShardedGossipLocal {
@@ -41,11 +43,12 @@ impl ShardedGossipLocal {
                 current_rounds,
             )
             .await?;
+        let id = rand::thread_rng().gen();
 
         let maybe_gossip = self.inner.share_mut(|inner, _| {
             Ok(if let Some((endpoint, url)) = remote_agent {
-                let gossip = ShardedGossipWire::initiate(intervals);
-                inner.initiate_tgt = Some(endpoint.clone());
+                let gossip = ShardedGossipWire::initiate(intervals, id);
+                inner.initiate_tgt = Some((endpoint.clone(), id));
                 Some((endpoint, HowToConnect::Url(url), gossip))
             } else {
                 None
@@ -61,16 +64,31 @@ impl ShardedGossipLocal {
         &self,
         peer_cert: Tx2Cert,
         remote_arc_set: Vec<ArcInterval>,
+        remote_id: u8,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
-        let (local_agents, round_already_in_progress) = self.inner.share_mut(|i, _| {
-            let round_already_in_progress = i.round_map.round_exists(&peer_cert);
-            Ok((i.local_agents.clone(), round_already_in_progress))
+        let (local_agents, same_as_target) = self.inner.share_mut(|i, _| {
+            let same_as_target = i
+                .initiate_tgt
+                .as_ref()
+                .filter(|tgt| *tgt.0.cert() == peer_cert)
+                .map(|tgt| tgt.1);
+            Ok((i.local_agents.clone(), same_as_target))
         })?;
 
-        // This round is already in progress so don't start another one.
-        if round_already_in_progress {
-            // TODO: Should we reject the message somehow or just ignore it?
-            return Ok(vec![ShardedGossipWire::already_in_progress()]);
+        // If this is the same connection as our current target then we need to decide who proceeds.
+        if let Some(our_id) = same_as_target {
+            // If we have a lower id then we proceed
+            // and the remote will exit.
+            // If we have a higher id then the remote
+            // then we exit and the remote will proceed.
+            // If we tie then we both exit (This will be very rare).
+            if our_id >= remote_id {
+                self.inner.share_mut(|i, _| {
+                    i.initiate_tgt = None;
+                    Ok(())
+                })?;
+                return Ok(Vec::with_capacity(0));
+            }
         }
 
         // Choose any local agent so we can send requests to the store.

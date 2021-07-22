@@ -47,10 +47,4 @@ impl RoundStateMap {
             .retain(|_, v| (v.created_at.elapsed().as_millis() as u32) < v.round_timeout);
         self.map.keys().cloned().collect::<HashSet<_>>()
     }
-
-    /// Check if a non-expired round exists.
-    pub(super) fn round_exists(&mut self, key: &StateKey) -> bool {
-        self.check_timeout(key);
-        self.map.contains_key(key)
-    }
 }

@@ -13,7 +13,7 @@ impl ShardedGossipLocal {
             let accept_is_from_target = i
                 .initiate_tgt
                 .as_ref()
-                .map(|tgt| *tgt.cert() == peer_cert)
+                .map(|tgt| *tgt.0.cert() == peer_cert)
                 .unwrap_or(false);
             Ok((i.local_agents.clone(), accept_is_from_target))
         })?;

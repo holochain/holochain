@@ -213,7 +213,7 @@ pub struct ShardedGossipLocalState {
     local_agents: HashSet<Arc<KitsuneAgent>>,
     tuning_params: KitsuneP2pTuningParams,
     /// If Some, we are in the process of trying to initiate gossip with this target.
-    initiate_tgt: Option<GossipTgt>,
+    initiate_tgt: Option<(GossipTgt, u8)>,
     // TODO: Figure out how to properly clean up old
     // gossip round states.
     round_map: RoundStateMap,
@@ -224,7 +224,7 @@ impl ShardedGossipLocalState {
         if self
             .initiate_tgt
             .as_ref()
-            .map(|tgt| tgt.cert() == state_key)
+            .map(|tgt| tgt.0.cert() == state_key)
             .unwrap_or(false)
         {
             self.initiate_tgt = None;
@@ -233,7 +233,7 @@ impl ShardedGossipLocalState {
     }
 
     fn check_tgt_expired(&mut self) {
-        if let Some(cert) = self.initiate_tgt.as_ref().map(|tgt| tgt.cert().clone()) {
+        if let Some(cert) = self.initiate_tgt.as_ref().map(|tgt| tgt.0.cert().clone()) {
             if self.round_map.check_timeout(&cert) {
                 self.initiate_tgt = None;
             }
@@ -362,8 +362,8 @@ impl ShardedGossipLocal {
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         // TODO: How do we route the gossip to the right loop type (recent vs historical)
         Ok(match msg {
-            ShardedGossipWire::Initiate(Initiate { intervals }) => {
-                self.incoming_initiate(cert, intervals).await?
+            ShardedGossipWire::Initiate(Initiate { intervals, id }) => {
+                self.incoming_initiate(cert, intervals, id).await?
             }
             ShardedGossipWire::Accept(Accept { intervals }) => {
                 self.incoming_accept(cert, intervals).await?
@@ -407,11 +407,7 @@ impl ShardedGossipLocal {
                 }
                 vec![]
             }
-            ShardedGossipWire::NoAgents(_) | ShardedGossipWire::AlreadyInProgress(_) => {
-                // maackle: We may not need the AlreadyInProgress if we can just detect
-                //          when both nodes have attempted to simultaneously initiate
-                //          with each other, and we have a tie-breaker to decide
-                //          who will send the first agent bloom to kick off the round
+            ShardedGossipWire::NoAgents(_) => {
                 self.remove_state(&cert).await?;
                 vec![]
             }
@@ -504,6 +500,8 @@ kitsune_p2p_types::write_codec_enum! {
             /// The list of arc intervals (equivalent to a [`DhtArcSet`])
             /// for all local agents
             intervals.0: Vec<ArcInterval>,
+            /// A random number to resolve concurrent initiates.
+            id.1: u8,
         },
 
         /// Accept an incoming round of gossip from a remote node
@@ -542,13 +540,10 @@ kitsune_p2p_types::write_codec_enum! {
             finished.1: bool,
         },
 
-        /// A round is already in progress with this node.
-        AlreadyInProgress(0x70) {
-        },
-
         /// The node you are trying to gossip with has no agents anymore.
         // maackle: perhaps this should be a flag on the Agents (bloom) message,
-        //          since it would still be useful to gossip peer data
+        //          since it would still be useful to gossip peer data.
+        // FS: No this literally means there's no local agents to gossip with.
         NoAgents(0x80) {
         },
     }
