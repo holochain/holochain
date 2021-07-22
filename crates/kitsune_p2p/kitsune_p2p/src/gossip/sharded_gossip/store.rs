@@ -7,7 +7,7 @@ use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
     bin_types::{KitsuneAgent, KitsuneBinType, KitsuneOpHash, KitsuneSpace},
     dht_arc::{ArcInterval, DhtArcSet},
-    KitsuneResult,
+    KitsuneError, KitsuneResult,
 };
 
 use crate::event::{
@@ -30,8 +30,7 @@ pub(super) async fn all_agent_info(
             agent: agent.clone(),
         })
         .await
-        // TODO: Handle error.
-        .unwrap())
+        .map_err(KitsuneError::other)?)
 }
 
 /// Get a single agent info.
@@ -46,8 +45,7 @@ pub(super) async fn get_agent_info(
             agent: agent.clone(),
         })
         .await
-        // TODO: Handle error.
-        .unwrap())
+        .map_err(KitsuneError::other)?)
 }
 
 /// Get all `AgentInfoSigned` for local agents in a space.
@@ -110,8 +108,7 @@ pub(super) async fn agents_within_arcset(
             arc_set,
         })
         .await
-        // TODO: Handle error.
-        .unwrap())
+        .map_err(KitsuneError::other)?)
 }
 
 /// Get all ops that are in the intersections
@@ -139,8 +136,7 @@ pub(super) async fn ops_within_common_set(
                 until_utc_epoch_s,
             })
             .await
-            // TODO: Handle Error
-            .unwrap();
+            .map_err(KitsuneError::other)?;
         within_common_arc.extend(hashes);
     }
     Ok(within_common_arc)
@@ -171,8 +167,7 @@ pub(super) async fn all_ops_within_common_set(
             max_ops,
         })
         .await
-        // TODO: Handle Error
-        .unwrap())
+        .map_err(KitsuneError::other)?)
 }
 
 /// Add new agent info to the p2p store.
@@ -201,8 +196,7 @@ pub(super) async fn put_agent_info(
                             agent_info_signed: (**new_info).clone(),
                         })
                         .await
-                        // TODO: Handle Error
-                        .unwrap();
+                        .map_err(KitsuneError::other)?;
                 }
             }
         }
@@ -240,8 +234,7 @@ pub(super) async fn put_ops(
                             op.clone(),
                         )
                         .await
-                        // TODO: Handle Error
-                        .unwrap();
+                        .map_err(KitsuneError::other)?;
                 }
             }
         }

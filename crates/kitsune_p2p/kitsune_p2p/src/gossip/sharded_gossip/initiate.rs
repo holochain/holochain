@@ -195,15 +195,21 @@ pub(super) fn encode_timed_bloom_filter(bloom: &TimedBloomFilter) -> PoolBuf {
     buf
 }
 
-pub(super) fn decode_timed_bloom_filter(bytes: &[u8]) -> TimedBloomFilter {
+pub(super) fn decode_timed_bloom_filter(bytes: &[u8]) -> Option<TimedBloomFilter> {
     let filter = decode_bloom_filter(&bytes);
     let len = bytes.len();
-    // TODO: Handle this error.
-    let start = u64::from_le_bytes(bytes[len - 16..len - 8].try_into().unwrap());
-    // TODO: Handle this error.
-    let end = u64::from_le_bytes(bytes[len - 8..len].try_into().unwrap());
-    TimedBloomFilter {
+    let start = u64::from_le_bytes(
+        bytes
+            .get(len - 16..len - 8)
+            .and_then(|arr| arr.try_into().ok())?,
+    );
+    let end = u64::from_le_bytes(
+        bytes
+            .get(len - 8..len)
+            .and_then(|arr| arr.try_into().ok())?,
+    );
+    Some(TimedBloomFilter {
         bloom: filter,
         time: start..end,
-    }
+    })
 }

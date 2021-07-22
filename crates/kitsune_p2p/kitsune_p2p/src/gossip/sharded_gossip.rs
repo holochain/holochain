@@ -145,7 +145,13 @@ impl ShardedGossip {
     async fn process_incoming_outgoing(&self) -> KitsuneResult<()> {
         let (incoming, outgoing) = self.pop_queues()?;
         if let Some((con, msg)) = incoming {
-            let outgoing = self.gossip.process_incoming(con.peer_cert(), msg).await?;
+            let outgoing = match self.gossip.process_incoming(con.peer_cert(), msg).await {
+                Ok(r) => r,
+                Err(e) => {
+                    self.gossip.remove_state(&con.peer_cert()).await?;
+                    vec![ShardedGossipWire::error(e.to_string())]
+                }
+            };
             self.inner.share_mut(|i, _| {
                 i.outgoing.extend(outgoing.into_iter().map(|msg| {
                     (
@@ -158,23 +164,38 @@ impl ShardedGossip {
             })?;
         }
         if let Some(outgoing) = outgoing {
-            self.process_outgoing(outgoing).await?;
+            let cert = outgoing.0.cert().clone();
+            if let Err(err) = self.process_outgoing(outgoing).await {
+                self.gossip.remove_state(&cert).await?;
+                tracing::error!(
+                    "Gossip failed to send outgoing message because of: {:?}",
+                    err
+                );
+            }
         }
         // TODO: Locally sync agents.
         Ok(())
     }
 
-    async fn run_one_iteration(&self) -> () {
-        // TODO: Handle errors
-        if let Some(outgoing) = self.gossip.try_initiate().await.unwrap() {
-            self.inner
-                .share_mut(|i, _| {
+    async fn run_one_iteration(&self) {
+        match self.gossip.try_initiate().await {
+            Ok(Some(outgoing)) => {
+                if let Err(err) = self.inner.share_mut(|i, _| {
                     i.outgoing.push_back(outgoing);
                     Ok(())
-                })
-                .unwrap();
+                }) {
+                    tracing::error!(
+                        "Gossip failed to get share nut when trying to initiate with {:?}",
+                        err
+                    );
+                }
+            }
+            Ok(None) => (),
+            Err(err) => tracing::error!("Gossip failed when trying to initiate with {:?}", err),
         }
-        self.process_incoming_outgoing().await.unwrap();
+        if let Err(err) = self.process_incoming_outgoing().await {
+            tracing::error!("Gossip failed to process a message because of: {:?}", err);
+        }
     }
 
     fn pop_queues(&self) -> KitsuneResult<(Option<Incoming>, Option<Outgoing>)> {
@@ -214,8 +235,6 @@ pub struct ShardedGossipLocalState {
     tuning_params: KitsuneP2pTuningParams,
     /// If Some, we are in the process of trying to initiate gossip with this target.
     initiate_tgt: Option<(GossipTgt, u8)>,
-    // TODO: Figure out how to properly clean up old
-    // gossip round states.
     round_map: RoundStateMap,
 }
 
@@ -390,11 +409,11 @@ impl ShardedGossipLocal {
                 } else {
                     self.get_state(&cert).await?
                 };
-                match (state, filter) {
-                    (Some(state), Some(filter)) => {
-                        let filter = decode_timed_bloom_filter(&filter);
-                        self.incoming_ops(state.clone(), filter).await?
-                    }
+                match (
+                    state,
+                    filter.and_then(|filter| decode_timed_bloom_filter(&filter)),
+                ) {
+                    (Some(state), Some(filter)) => self.incoming_ops(state.clone(), filter).await?,
                     _ => Vec::with_capacity(0),
                 }
             }
@@ -410,6 +429,11 @@ impl ShardedGossipLocal {
                 Vec::with_capacity(0)
             }
             ShardedGossipWire::NoAgents(_) => {
+                self.remove_state(&cert).await?;
+                Vec::with_capacity(0)
+            }
+            ShardedGossipWire::Error(Error { message }) => {
+                tracing::warn!("gossiping with: {:?} and got error: {}", cert, message);
                 self.remove_state(&cert).await?;
                 Vec::with_capacity(0)
             }
@@ -438,9 +462,7 @@ impl ShardedGossipLocal {
                 Ok(
                     // Get the agent info for the chosen remote agent.
                     store::get_agent_info(&self.evt_sender, &self.space, &remote_agent)
-                        .await
-                        // TODO: Handle error.
-                        .unwrap()
+                        .await?
                         .and_then(|ra| {
                             ra.url_list
                                 .iter()
@@ -547,6 +569,13 @@ kitsune_p2p_types::write_codec_enum! {
         //          since it would still be useful to gossip peer data.
         // FS: No this literally means there's no local agents to gossip with.
         NoAgents(0x80) {
+        },
+
+        /// The node you are gossiping with has hit an error condition
+        /// and failed to respond to a request.
+        Error(0x90) {
+            /// The error message.
+            message.0: String,
         },
     }
 }

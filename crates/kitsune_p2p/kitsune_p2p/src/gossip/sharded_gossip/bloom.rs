@@ -143,8 +143,7 @@ impl ShardedGossipLocal {
                         op_hashes: missing_hashes,
                     })
                     .await
-                    // TODO: Handle Error
-                    .unwrap(),
+                    .map_err(KitsuneError::other)?,
             );
         }
         Ok(missing_ops)
