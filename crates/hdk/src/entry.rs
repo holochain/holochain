@@ -209,9 +209,18 @@ pub fn get<H>(hash: H, options: GetOptions) -> ExternResult<Option<Element>>
 where
     AnyDhtHash: From<H>,
 {
+    Ok(get_multi(vec![hash], options)?.into_iter().next().unwrap())
+}
+
+pub fn get_multi<H>(hashes: Vec<H>, options: GetOptions) -> ExternResult<Vec<Option<Element>>>
+where
+    AnyDhtHash: From<H>,
+{
     HDK.with(|h| {
-        h.borrow()
-            .get(GetInput::new(AnyDhtHash::from(hash), options))
+        h.borrow().get(GetInput::new(
+            hashes.into_iter().map(AnyDhtHash::from).collect(),
+            options,
+        ))
     })
 }
 
@@ -366,7 +375,22 @@ pub fn get_details<H: Into<AnyDhtHash>>(
     hash: H,
     options: GetOptions,
 ) -> ExternResult<Option<Details>> {
-    HDK.with(|h| h.borrow().get_details(GetInput::new(hash.into(), options)))
+    Ok(get_details_multi(vec![hash], options)?
+        .into_iter()
+        .next()
+        .unwrap())
+}
+
+pub fn get_details_multi<H: Into<AnyDhtHash>>(
+    hashes: Vec<H>,
+    options: GetOptions,
+) -> ExternResult<Vec<Option<Details>>> {
+    HDK.with(|h| {
+        h.borrow().get_details(GetInput::new(
+            hashes.into_iter().map(|hash| hash.into()).collect(),
+            options,
+        ))
+    })
 }
 
 /// Trait for binding static [ `EntryDef` ] property access for a type.

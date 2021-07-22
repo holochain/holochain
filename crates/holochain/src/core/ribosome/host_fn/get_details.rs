@@ -5,36 +5,35 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
+use futures::future::join_all;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_details<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: GetInput,
-) -> Result<Option<Details>, WasmError> {
+) -> Result<Vec<Option<Details>>, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ read_workspace: Permission::Allow, .. } => {
             let GetInput {
-                any_dht_hash,
+                any_dht_hashes,
                 get_options,
             } = input;
 
-    // Get the network from the context
-    let network = call_context.host_context.network().clone();
-
-    // timeouts must be handled by the network
-    tokio_helper::block_forever_on(async move {
-        let workspace = call_context.host_context.workspace();
-        let mut cascade = Cascade::from_workspace_network(workspace, network);
-        let maybe_details = cascade
-            .get_details(any_dht_hash, get_options)
-            .await
-            .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
-        Ok(maybe_details)
-    })
-    },
-    _ => unreachable!(),
-}
+            // timeouts must be handled by the network
+            let results: Vec<Result<Option<Details>, _>> = tokio_helper::block_forever_on(async move {
+                join_all(any_dht_hashes.into_iter().map(|any_dht_hash|
+                    Cascade::from_workspace_network(
+                        call_context.host_context.workspace(),
+                        call_context.host_context.network().to_owned(),
+                    ).into_get_details(any_dht_hash, get_options.clone()))
+                ).await
+            });
+            let results: Result<Vec<_>, _> = results.into_iter().map(|result| result.map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))).collect();
+            Ok(results?)
+        },
+        _ => unreachable!(),
+    }
 }
 
 #[cfg(test)]

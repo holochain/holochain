@@ -113,11 +113,11 @@ host_fn_api_impls! {
     fn trace (zt::trace::TraceMsg) -> ();
 
     // Attempt to get a live entry from the cascade.
-    fn get (zt::entry::GetInput) -> Option<zt::element::Element>;
+    fn get (zt::entry::GetInput) -> Vec<Option<zt::element::Element>>;
 
     fn get_agent_activity (zt::agent_activity::GetAgentActivityInput) -> zt::query::AgentActivity;
 
-    fn get_details (zt::entry::GetInput) -> Option<zt::metadata::Details>;
+    fn get_details (zt::entry::GetInput) -> Vec<Option<zt::metadata::Details>>;
 
     // Get links by entry hash from the cascade.
     fn get_links (zt::link::GetLinksInput) -> zt::link::Links;

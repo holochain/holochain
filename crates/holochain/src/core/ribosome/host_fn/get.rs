@@ -5,34 +5,36 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
+use futures::future::join_all;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: GetInput,
-) -> Result<Option<Element>, WasmError> {
+) -> Result<Vec<Option<Element>>, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ read_workspace: Permission::Allow, .. } => {
             let GetInput {
-                any_dht_hash,
+                any_dht_hashes,
                 get_options,
             } = input;
 
-    // Get the network from the context
-    let network = call_context.host_context.network().clone();
-
-    // timeouts must be handled by the network
-    tokio_helper::block_forever_on(async move {
-        let workspace = call_context.host_context.workspace();
-        let mut cascade = Cascade::from_workspace_network(workspace, network);
-        let maybe_element = cascade
-            .dht_get(any_dht_hash, get_options)
-            .await
-            .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
-
-                Ok(maybe_element)
-            })
+            // timeouts must be handled by the network
+            let results: Vec<Result<Option<Element>, _>> = tokio_helper::block_forever_on(async move {
+                join_all(any_dht_hashes.into_iter().map(|any_dht_hash|
+                        Cascade::from_workspace_network(
+                            call_context.host_context.workspace(),
+                            call_context.host_context.network().clone()
+                        )
+                        .into_dht_get(any_dht_hash, get_options.clone())
+                )).await
+            });
+            let results: Result<Vec<_>, _> = results.into_iter().map(|result| match result {
+                Ok(v) => Ok(v),
+                Err(cascade_error) => Err(WasmError::Host(cascade_error.to_string())),
+            }).collect();
+            Ok(results?)
         },
         _ => unreachable!(),
     }

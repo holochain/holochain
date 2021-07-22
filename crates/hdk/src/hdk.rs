@@ -38,8 +38,8 @@ pub trait HdkT: Send + Sync {
     fn update(&self, update_input: UpdateInput) -> ExternResult<HeaderHash>;
     fn delete(&self, hash: HeaderHash) -> ExternResult<HeaderHash>;
     fn hash_entry(&self, entry: Entry) -> ExternResult<EntryHash>;
-    fn get(&self, get_input: GetInput) -> ExternResult<Option<Element>>;
-    fn get_details(&self, get_input: GetInput) -> ExternResult<Option<Details>>;
+    fn get(&self, get_input: GetInput) -> ExternResult<Vec<Option<Element>>>;
+    fn get_details(&self, get_input: GetInput) -> ExternResult<Vec<Option<Details>>>;
     fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed>;
     fn must_get_header(
         &self,
@@ -132,10 +132,10 @@ impl HdkT for ErrHdk {
     fn hash_entry(&self, _: Entry) -> ExternResult<EntryHash> {
         Self::err()
     }
-    fn get(&self, _: GetInput) -> ExternResult<Option<Element>> {
+    fn get(&self, _: GetInput) -> ExternResult<Vec<Option<Element>>> {
         Self::err()
     }
-    fn get_details(&self, _: GetInput) -> ExternResult<Option<Details>> {
+    fn get_details(&self, _: GetInput) -> ExternResult<Vec<Option<Details>>> {
         Self::err()
     }
     fn must_get_entry(&self, _: MustGetEntryInput) -> ExternResult<EntryHashed> {
@@ -257,7 +257,6 @@ impl HdkT for HostHdk {
     fn query(&self, filter: ChainQueryFilter) -> ExternResult<Vec<Element>> {
         host_call::<ChainQueryFilter, Vec<Element>>(__query, filter)
     }
-
     fn sign(&self, sign: Sign) -> ExternResult<Signature> {
         host_call::<Sign, Signature>(__sign, sign)
     }
@@ -267,7 +266,6 @@ impl HdkT for HostHdk {
     fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool> {
         host_call::<VerifySignature, bool>(__verify_signature, verify_signature)
     }
-
     fn create(&self, entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
         host_call::<EntryWithDefId, HeaderHash>(__create, entry_with_def_id)
     }
@@ -280,11 +278,11 @@ impl HdkT for HostHdk {
     fn hash_entry(&self, entry: Entry) -> ExternResult<EntryHash> {
         host_call::<Entry, EntryHash>(__hash_entry, entry)
     }
-    fn get(&self, get_input: GetInput) -> ExternResult<Option<Element>> {
-        host_call::<GetInput, Option<Element>>(__get, get_input)
+    fn get(&self, get_input: GetInput) -> ExternResult<Vec<Option<Element>>> {
+        host_call::<GetInput, Vec<Option<Element>>>(__get, get_input)
     }
-    fn get_details(&self, get_input: GetInput) -> ExternResult<Option<Details>> {
-        host_call::<GetInput, Option<Details>>(__get_details, get_input)
+    fn get_details(&self, get_input: GetInput) -> ExternResult<Vec<Option<Details>>> {
+        host_call::<GetInput, Vec<Option<Details>>>(__get_details, get_input)
     }
     fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed> {
         host_call::<MustGetEntryInput, EntryHashed>(__must_get_entry, must_get_entry_input)
@@ -322,7 +320,6 @@ impl HdkT for HostHdk {
     fn call_info(&self, _: ()) -> ExternResult<CallInfo> {
         host_call::<(), CallInfo>(__call_info, ())
     }
-
     fn create_link(&self, create_link_input: CreateLinkInput) -> ExternResult<HeaderHash> {
         host_call::<CreateLinkInput, HeaderHash>(__create_link, create_link_input)
     }
@@ -359,11 +356,9 @@ impl HdkT for HostHdk {
     fn sleep(&self, wake_after: std::time::Duration) -> ExternResult<()> {
         host_call::<std::time::Duration, ()>(__sleep, wake_after)
     }
-
     fn trace(&self, trace_msg: TraceMsg) -> ExternResult<()> {
         host_call::<TraceMsg, ()>(__trace, trace_msg)
     }
-
     fn create_x25519_keypair(&self, _: ()) -> ExternResult<X25519PubKey> {
         host_call::<(), X25519PubKey>(__create_x25519_keypair, ())
     }

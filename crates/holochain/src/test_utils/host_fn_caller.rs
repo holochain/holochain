@@ -235,9 +235,9 @@ impl HostFnCaller {
         output
     }
 
-    pub async fn get(&self, entry_hash: AnyDhtHash, options: GetOptions) -> Option<Element> {
+    pub async fn get(&self, entry_hash: AnyDhtHash, options: GetOptions) -> Vec<Option<Element>> {
         let (_, ribosome, call_context, _) = self.unpack().await;
-        let input = GetInput::new(entry_hash, options);
+        let input = GetInput::new(vec![entry_hash], options);
         host_fn::get::get(ribosome, call_context, input).unwrap()
     }
 
@@ -245,9 +245,9 @@ impl HostFnCaller {
         &self,
         entry_hash: AnyDhtHash,
         options: GetOptions,
-    ) -> Option<Details> {
+    ) -> Vec<Option<Details>> {
         let (_, ribosome, call_context, _) = self.unpack().await;
-        let input = GetInput::new(entry_hash, options);
+        let input = GetInput::new(vec![entry_hash], options);
         host_fn::get_details::get_details(ribosome, call_context, input).unwrap()
     }
 

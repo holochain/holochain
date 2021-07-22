@@ -580,6 +580,17 @@ where
         }
     }
 
+    /// Takes ownership of `self` to perform a `dht_get`.
+    /// Useful for async closures that will drop a `&mut self` reference before the async completes.
+    #[instrument(skip(self))]
+    pub async fn into_dht_get(
+        mut self,
+        hash: AnyDhtHash,
+        options: GetOptions,
+    ) -> CascadeResult<Option<Element>> {
+        self.dht_get(hash, options).await
+    }
+
     #[instrument(skip(self))]
     pub async fn get_details(
         &mut self,
@@ -596,6 +607,16 @@ where
                 .await?
                 .map(Details::Element)),
         }
+    }
+
+    /// Takes ownership of `self` to perform a `get_details`.
+    /// Useful for async closures that will drop a `&mut self` reference before the async completes.
+    pub async fn into_get_details(
+        mut self,
+        hash: AnyDhtHash,
+        options: GetOptions,
+    ) -> CascadeResult<Option<Details>> {
+        self.get_details(hash, options).await
     }
 
     #[instrument(skip(self, options))]
