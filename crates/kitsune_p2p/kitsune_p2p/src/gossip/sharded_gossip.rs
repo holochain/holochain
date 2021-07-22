@@ -361,6 +361,8 @@ impl ShardedGossipLocal {
         msg: ShardedGossipWire,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         // TODO: How do we route the gossip to the right loop type (recent vs historical)
+
+        // If we don't have the state for a message then the other node will need to timeout.
         Ok(match msg {
             ShardedGossipWire::Initiate(Initiate { intervals, id }) => {
                 self.incoming_initiate(cert, intervals, id).await?
@@ -373,14 +375,14 @@ impl ShardedGossipLocal {
                     let filter = decode_bloom_filter(&filter);
                     self.incoming_agents(state, filter).await?
                 } else {
-                    vec![]
+                    Vec::with_capacity(0)
                 }
             }
             ShardedGossipWire::MissingAgents(MissingAgents { agents }) => {
                 if let Some(state) = self.get_state(&cert).await? {
                     self.incoming_missing_agents(state, agents).await?;
                 }
-                vec![]
+                Vec::with_capacity(0)
             }
             ShardedGossipWire::Ops(Ops { filter, finished }) => {
                 let state = if finished {
@@ -405,11 +407,11 @@ impl ShardedGossipLocal {
                 if let Some(state) = state {
                     self.incoming_missing_ops(state, ops).await?;
                 }
-                vec![]
+                Vec::with_capacity(0)
             }
             ShardedGossipWire::NoAgents(_) => {
                 self.remove_state(&cert).await?;
-                vec![]
+                Vec::with_capacity(0)
             }
         })
     }

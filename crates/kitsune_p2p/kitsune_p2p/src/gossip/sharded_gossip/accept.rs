@@ -20,6 +20,8 @@ impl ShardedGossipLocal {
 
         // This accept is not from our current target so ignore.
         if !accept_is_from_target {
+            // The other node will have to timeout on this but nodes should
+            // not be sending accepts to nodes that aren't targeting them.
             return Ok(vec![]);
         }
 
@@ -49,7 +51,6 @@ impl ShardedGossipLocal {
                 &mut gossip,
             )
             .await?;
-        // FIXME: This is wrong, gossip needs to send back empty blooms to signal the end of gossip.
 
         self.inner.share_mut(|inner, _| {
             // TODO: What happen if we are in the middle of a new outgoing and

@@ -41,9 +41,6 @@ impl ShardedGossipLocal {
         // Chunk the ops into multiple gossip messages if needed.
         into_chunks(&mut gossip, ops);
 
-        // TODO: Send empty finished missing ops to close.
-        // TODO: what if there's no missing agents or the bloom is empty?
-        // How will we remove the state?
         Ok(gossip)
     }
 

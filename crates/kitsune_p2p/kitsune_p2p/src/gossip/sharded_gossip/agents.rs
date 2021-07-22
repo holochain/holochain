@@ -40,7 +40,8 @@ impl ShardedGossipLocal {
         Ok(if !missing.is_empty() {
             vec![ShardedGossipWire::missing_agents(missing)]
         } else {
-            // FIXME: Send back empty message.
+            // It's ok if we don't respond to agent blooms because
+            // rounds are ended by ops not agents.
             vec![]
         })
     }
