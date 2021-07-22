@@ -4,6 +4,13 @@ use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::*;
 use std::sync::Arc;
 
+#[derive(Clone, Debug, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+pub enum GossipModuleType {
+    Simple,
+    ShardedRecent,
+    ShardedHistorical,
+}
+
 /// Represents an interchangeable gossip strategy module
 pub trait AsGossipModule: 'static + Send + Sync {
     fn close(&self);

@@ -124,8 +124,10 @@ impl ShardedGossipLocal {
                 &agent,
                 &interval,
                 &common_arc_set,
-                clamp64(time.start),
-                clamp64(time.end),
+                // Convert to seconds.
+                clamp64(time.start / 1000),
+                // Convert to seconds and adjust for exclusive range.
+                clamp64(time.end / 1000 + 1),
             )
             .await?;
             missing_hashes.extend(

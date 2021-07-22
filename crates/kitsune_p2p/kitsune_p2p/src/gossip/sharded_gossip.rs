@@ -60,7 +60,6 @@ pub enum GossipType {
     /// entire common history of two nodes, filling in gaps in the historical
     /// data. It runs less frequently, and expects diffs to be infrequent
     /// at each round.
-    #[allow(dead_code)]
     Historical,
 }
 
@@ -119,7 +118,11 @@ impl ShardedGossip {
     async fn process_outgoing(&self, outgoing: Outgoing) -> KitsuneResult<()> {
         let (_endpoint, how, gossip) = outgoing;
         let gossip = gossip.encode_vec().map_err(KitsuneError::other)?;
-        let gossip = wire::Wire::gossip(self.gossip.space.clone(), gossip.into());
+        let gossip = wire::Wire::gossip(
+            self.gossip.space.clone(),
+            gossip.into(),
+            self.gossip.gossip_type.into(),
+        );
 
         let timeout = self.gossip.tuning_params.implicit_timeout();
 
@@ -504,13 +507,13 @@ fn time_range(start: Duration, end: Duration) -> Range<u64> {
     let start = now
         .checked_sub(start)
         .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
-        .map(|t| t.as_secs())
+        .map(|t| t.as_millis() as u64)
         .unwrap_or(0);
 
     let end = now
         .checked_sub(end)
         .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
-        .map(|t| t.as_secs())
+        .map(|t| t.as_millis() as u64)
         .unwrap_or(0);
 
     start..end
@@ -620,9 +623,9 @@ impl AsGossipModule for ShardedGossip {
     }
 }
 
-struct ShardedGossipFactory;
+struct ShardedRecentGossipFactory;
 
-impl AsGossipModuleFactory for ShardedGossipFactory {
+impl AsGossipModuleFactory for ShardedRecentGossipFactory {
     fn spawn_gossip_task(
         &self,
         tuning_params: KitsuneP2pTuningParams,
@@ -640,9 +643,34 @@ impl AsGossipModuleFactory for ShardedGossipFactory {
     }
 }
 
+struct ShardedHistoricalGossipFactory;
+
+impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
+    fn spawn_gossip_task(
+        &self,
+        tuning_params: KitsuneP2pTuningParams,
+        space: Arc<KitsuneSpace>,
+        ep_hnd: Tx2EpHnd<wire::Wire>,
+        evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
+    ) -> GossipModule {
+        GossipModule(ShardedGossip::new(
+            tuning_params,
+            space,
+            ep_hnd,
+            evt_sender,
+            GossipType::Historical,
+        ))
+    }
+}
+
+/// Create a recent [`GossipModuleFactory`]
+pub fn recent_factory() -> GossipModuleFactory {
+    GossipModuleFactory(Arc::new(ShardedRecentGossipFactory))
+}
+
 /// Create a [`GossipModuleFactory`]
-pub fn factory() -> GossipModuleFactory {
-    GossipModuleFactory(Arc::new(ShardedGossipFactory))
+pub fn historical_factory() -> GossipModuleFactory {
+    GossipModuleFactory(Arc::new(ShardedHistoricalGossipFactory))
 }
 
 fn clamp64(u: u64) -> i64 {
@@ -650,5 +678,14 @@ fn clamp64(u: u64) -> i64 {
         i64::MAX
     } else {
         u as i64
+    }
+}
+
+impl From<GossipType> for GossipModuleType {
+    fn from(g: GossipType) -> Self {
+        match g {
+            GossipType::Recent => GossipModuleType::ShardedRecent,
+            GossipType::Historical => GossipModuleType::ShardedHistorical,
+        }
     }
 }

@@ -4,6 +4,7 @@ use crate::actor;
 use crate::actor::*;
 use crate::event::*;
 use crate::metrics::KitsuneMetrics;
+use crate::types::gossip::GossipModuleType;
 use crate::*;
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
@@ -47,7 +48,7 @@ ghost_actor::ghost_chan! {
         ) -> ();
 
         /// Incoming Gossip
-        fn incoming_gossip(space: Arc<KitsuneSpace>, con: Tx2ConHnd<wire::Wire>, data: Box<[u8]>) -> ();
+        fn incoming_gossip(space: Arc<KitsuneSpace>, con: Tx2ConHnd<wire::Wire>, data: Box<[u8]>, module_type: crate::types::gossip::GossipModuleType) -> ();
     }
 }
 
@@ -315,10 +316,16 @@ impl KitsuneP2pActor {
                                         tracing::warn!(?err, "error processing incoming broadcast");
                                     }
                                 }
-                                wire::Wire::Gossip(wire::Gossip { space, data }) => {
+                                wire::Wire::Gossip(wire::Gossip {
+                                    space,
+                                    data,
+                                    module,
+                                }) => {
                                     let data: Vec<u8> = data.into();
                                     let data: Box<[u8]> = data.into_boxed_slice();
-                                    if let Err(e) = i_s.incoming_gossip(space, con, data).await {
+                                    if let Err(e) =
+                                        i_s.incoming_gossip(space, con, data, module).await
+                                    {
                                         tracing::warn!("failed to handle incoming gossip: {:?}", e);
                                     }
                                 }
@@ -414,6 +421,7 @@ impl InternalHandler for KitsuneP2pActor {
         space: Arc<KitsuneSpace>,
         con: Tx2ConHnd<wire::Wire>,
         data: Box<[u8]>,
+        module_type: GossipModuleType,
     ) -> InternalHandlerResult<()> {
         let space_sender = match self.spaces.get_mut(&space) {
             None => {
@@ -424,7 +432,9 @@ impl InternalHandler for KitsuneP2pActor {
         };
         Ok(async move {
             let (_, space_inner) = space_sender.await;
-            space_inner.incoming_gossip(space, con, data).await
+            space_inner
+                .incoming_gossip(space, con, data, module_type)
+                .await
         }
         .boxed()
         .into())

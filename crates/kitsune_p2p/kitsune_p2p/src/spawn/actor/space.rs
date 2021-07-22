@@ -42,7 +42,12 @@ ghost_actor::ghost_chan! {
         ) -> ();
 
         /// Incoming Gossip
-        fn incoming_gossip(space: Arc<KitsuneSpace>, con: Tx2ConHnd<wire::Wire>, data: Box<[u8]>) -> ();
+        fn incoming_gossip(
+            space: Arc<KitsuneSpace>,
+            con: Tx2ConHnd<wire::Wire>,
+            data: Box<[u8]>, module_type:
+            crate::types::gossip::GossipModuleType
+        ) -> ();
     }
 }
 
@@ -265,8 +270,15 @@ impl SpaceInternalHandler for Space {
         _space: Arc<KitsuneSpace>,
         con: Tx2ConHnd<wire::Wire>,
         data: Box<[u8]>,
+        module_type: GossipModuleType,
     ) -> InternalHandlerResult<()> {
-        self.gossip_mod.incoming_gossip(con, data)?;
+        match self.gossip_mod.get(&module_type) {
+            Some(module) => module.incoming_gossip(con, data)?,
+            None => tracing::warn!(
+                "Received gossip for {:?} but this gossip module isn't running",
+                module_type
+            ),
+        }
         Ok(async move { Ok(()) }.boxed().into())
     }
 }
@@ -371,7 +383,9 @@ impl ghost_actor::GhostControlHandler for Space {
             use futures::sink::SinkExt;
             // this is a curtesy, ok if fails
             let _ = self.evt_sender.close().await;
-            self.gossip_mod.close();
+            for module in self.gossip_mod.values_mut() {
+                module.close();
+            }
         }
         .boxed()
         .into()
@@ -393,7 +407,9 @@ impl KitsuneP2pHandler for Space {
         agent: Arc<KitsuneAgent>,
     ) -> KitsuneP2pHandlerResult<()> {
         self.local_joined_agents.insert(agent.clone());
-        self.gossip_mod.local_agent_join(agent.clone());
+        for module in self.gossip_mod.values() {
+            module.local_agent_join(agent.clone());
+        }
         let fut = self.i_s.update_single_agent_info(agent);
         let evt_sender = self.evt_sender.clone();
         match self.config.network_type {
@@ -458,7 +474,9 @@ impl KitsuneP2pHandler for Space {
         agent: Arc<KitsuneAgent>,
     ) -> KitsuneP2pHandlerResult<()> {
         self.local_joined_agents.remove(&agent);
-        self.gossip_mod.local_agent_leave(agent.clone());
+        for module in self.gossip_mod.values() {
+            module.local_agent_leave(agent.clone());
+        }
         self.publish_leave_agent_info(agent)
     }
 
@@ -696,7 +714,7 @@ pub(crate) struct Space {
     pub(crate) config: Arc<KitsuneP2pConfig>,
     mdns_handles: HashMap<Vec<u8>, Arc<AtomicBool>>,
     mdns_listened_spaces: HashSet<String>,
-    gossip_mod: GossipModule,
+    gossip_mod: HashMap<GossipModuleType, GossipModule>,
 }
 
 impl Space {
@@ -709,20 +727,42 @@ impl Space {
         ep_hnd: Tx2EpHnd<wire::Wire>,
         config: Arc<KitsuneP2pConfig>,
     ) -> Self {
-        let gossip_mod_fact = match config.tuning_params.gossip_strategy.as_str() {
-            "simple-bloom" => crate::gossip::simple_bloom::factory(),
-            "sharded-gossip" => crate::gossip::sharded_gossip::factory(),
-            _ => panic!(
-                "unknown gossip strategy: {}",
-                config.tuning_params.gossip_strategy
-            ),
-        };
-        let gossip_mod = gossip_mod_fact.spawn_gossip_task(
-            config.tuning_params.clone(),
-            space.clone(),
-            ep_hnd.clone(),
-            evt_sender.clone(),
-        );
+        let gossip_mod = config
+            .tuning_params
+            .gossip_strategy
+            .split(",")
+            .flat_map(|module| match module {
+                "simple-bloom" => vec![(
+                    GossipModuleType::Simple,
+                    crate::gossip::simple_bloom::factory(),
+                )],
+                "sharded-gossip" => vec![
+                    (
+                        GossipModuleType::ShardedRecent,
+                        crate::gossip::sharded_gossip::recent_factory(),
+                    ),
+                    (
+                        GossipModuleType::ShardedHistorical,
+                        crate::gossip::sharded_gossip::historical_factory(),
+                    ),
+                ],
+                _ => {
+                    tracing::warn!("unknown gossip strategy: {}", module);
+                    vec![]
+                }
+            })
+            .map(|(module, factory)| {
+                (
+                    module,
+                    factory.spawn_gossip_task(
+                        config.tuning_params.clone(),
+                        space.clone(),
+                        ep_hnd.clone(),
+                        evt_sender.clone(),
+                    ),
+                )
+            })
+            .collect();
 
         let i_s_c = i_s.clone();
         tokio::task::spawn(async move {

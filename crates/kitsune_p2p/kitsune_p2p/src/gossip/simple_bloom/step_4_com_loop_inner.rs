@@ -95,7 +95,7 @@ pub(crate) async fn step_4_com_loop_inner_outgoing(
     gossip: GossipWire,
 ) -> KitsuneResult<()> {
     let gossip = gossip.encode_vec().map_err(KitsuneError::other)?;
-    let gossip = wire::Wire::gossip(space, gossip.into());
+    let gossip = wire::Wire::gossip(space, gossip.into(), GossipModuleType::Simple);
 
     let t = tuning_params.implicit_timeout();
 
