@@ -3277,7 +3277,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht_arc"
-version = "0.0.2-dev.0"
+version = "0.0.1"
 dependencies = [
  "derive_more",
  "gcollections",
@@ -3338,7 +3338,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_mdns"
-version = "0.0.2-dev.0"
+version = "0.0.1"
 dependencies = [
  "async-stream",
  "base64",
