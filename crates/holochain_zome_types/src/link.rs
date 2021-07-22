@@ -97,17 +97,17 @@ impl CreateLinkInput {
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct GetLinksInput {
-    pub base_address: holo_hash::EntryHash,
+    pub base_addresses: Vec<holo_hash::EntryHash>,
     pub tag_prefix: Option<crate::link::LinkTag>,
 }
 
 impl GetLinksInput {
     pub fn new(
-        base_address: holo_hash::EntryHash,
+        base_addresses: Vec<holo_hash::EntryHash>,
         tag_prefix: Option<crate::link::LinkTag>,
     ) -> Self {
         Self {
-            base_address,
+            base_addresses,
             tag_prefix,
         }
     }

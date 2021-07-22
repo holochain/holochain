@@ -58,8 +58,8 @@ pub trait HdkT: Send + Sync {
     // Link
     fn create_link(&self, create_link_input: CreateLinkInput) -> ExternResult<HeaderHash>;
     fn delete_link(&self, add_link_header: HeaderHash) -> ExternResult<HeaderHash>;
-    fn get_links(&self, get_links_input: GetLinksInput) -> ExternResult<Links>;
-    fn get_link_details(&self, get_links_input: GetLinksInput) -> ExternResult<LinkDetails>;
+    fn get_links(&self, get_links_input: GetLinksInput) -> ExternResult<Vec<Links>>;
+    fn get_link_details(&self, get_links_input: GetLinksInput) -> ExternResult<Vec<LinkDetails>>;
     // P2P
     fn call(&self, call: Call) -> ExternResult<Vec<ZomeCallResponse>>;
     fn call_remote(&self, call_remote: CallRemote) -> ExternResult<Vec<ZomeCallResponse>>;
@@ -169,10 +169,10 @@ impl HdkT for ErrHdk {
     fn delete_link(&self, _: HeaderHash) -> ExternResult<HeaderHash> {
         Self::err()
     }
-    fn get_links(&self, _: GetLinksInput) -> ExternResult<Links> {
+    fn get_links(&self, _: GetLinksInput) -> ExternResult<Vec<Links>> {
         Self::err()
     }
-    fn get_link_details(&self, _: GetLinksInput) -> ExternResult<LinkDetails> {
+    fn get_link_details(&self, _: GetLinksInput) -> ExternResult<Vec<LinkDetails>> {
         Self::err()
     }
     // P2P
@@ -326,11 +326,11 @@ impl HdkT for HostHdk {
     fn delete_link(&self, add_link_header: HeaderHash) -> ExternResult<HeaderHash> {
         host_call::<HeaderHash, HeaderHash>(__delete_link, add_link_header)
     }
-    fn get_links(&self, get_links_input: GetLinksInput) -> ExternResult<Links> {
-        host_call::<GetLinksInput, Links>(__get_links, get_links_input)
+    fn get_links(&self, get_links_input: GetLinksInput) -> ExternResult<Vec<Links>> {
+        host_call::<GetLinksInput, Vec<Links>>(__get_links, get_links_input)
     }
-    fn get_link_details(&self, get_links_input: GetLinksInput) -> ExternResult<LinkDetails> {
-        host_call::<GetLinksInput, LinkDetails>(__get_link_details, get_links_input)
+    fn get_link_details(&self, get_links_input: GetLinksInput) -> ExternResult<Vec<LinkDetails>> {
+        host_call::<GetLinksInput, Vec<LinkDetails>>(__get_link_details, get_links_input)
     }
     fn call(&self, call: Call) -> ExternResult<Vec<ZomeCallResponse>> {
         host_call::<Call, Vec<ZomeCallResponse>>(__call, call)

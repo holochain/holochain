@@ -23,7 +23,7 @@ fn links_zome() -> InlineZome {
             Ok(hash)
         })
         .callback("get_links", move |api, base: EntryHash| {
-            Ok(api.get_links(GetLinksInput::new(base, None))?)
+            Ok(api.get_links(GetLinksInput::new(vec![base], None))?)
         })
 }
 

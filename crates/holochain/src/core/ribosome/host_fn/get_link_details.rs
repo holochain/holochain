@@ -6,17 +6,18 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
+use futures::future::join_all;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_link_details<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: GetLinksInput,
-) -> Result<LinkDetails, WasmError> {
+) -> Result<Vec<LinkDetails>, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ read_workspace: Permission::Allow, .. } => {
             let GetLinksInput {
-                base_address,
+                base_addresses,
                 tag_prefix,
             } = input;
 
@@ -25,29 +26,27 @@ pub fn get_link_details<'a>(
                 .zome_to_id(&call_context.zome)
                 .expect("Failed to get ID for current zome.");
 
-    // Get the network from the context
-    let network = call_context.host_context.network().clone();
-
-            tokio_helper::block_forever_on(async move {
-                // Create the key
-                let key = WireLinkKey {
-                    base: base_address,
-                    zome_id,
-                    tag: tag_prefix,
-                };
-
-        let workspace = call_context.host_context.workspace();
-        let mut cascade = Cascade::from_workspace_network(workspace, network);
-        // Get the links from the dht
-        let link_details = LinkDetails::from(
-            cascade
-                .get_link_details(key, GetLinksOptions::default())
-                .await
-                .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?,
-        );
-
-                Ok(link_details)
-            })
+            let results: Vec<Result<Vec<_>, _>> = tokio_helper::block_forever_on(async move {
+                join_all(base_addresses.into_iter().map(|base_address| {
+                    // Create the key
+                    let key = WireLinkKey {
+                        base: base_address,
+                        zome_id,
+                        tag: tag_prefix.clone(),
+                    };
+                    Cascade::from_workspace_network(
+                        call_context.host_context.workspace(),
+                        call_context.host_context.network().to_owned(),
+                    ).into_get_link_details(key, GetLinksOptions::default())
+                })).await
+            });
+            let results: Result<Vec<_>, _> = results.into_iter().map(|result|
+                match result {
+                    Ok(v) => Ok(v.into()),
+                    Err(cascade_error) => Err(WasmError::Host(cascade_error.to_string())),
+                }
+            ).collect();
+            Ok(results?)
         },
         _ => unreachable!(),
     }

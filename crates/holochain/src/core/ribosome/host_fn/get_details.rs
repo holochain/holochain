@@ -20,7 +20,6 @@ pub fn get_details<'a>(
                 get_options,
             } = input;
 
-            // timeouts must be handled by the network
             let results: Vec<Result<Option<Details>, _>> = tokio_helper::block_forever_on(async move {
                 join_all(any_dht_hashes.into_iter().map(|any_dht_hash|
                     Cascade::from_workspace_network(
