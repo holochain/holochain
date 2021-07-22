@@ -725,9 +725,6 @@ async fn handle_events(
                         .boxed()
                         .into()));
                 }
-                event::KitsuneP2pEvent::HashesForTimeWindow { .. } => {
-                    todo!()
-                }
                 event::KitsuneP2pEvent::SignNetworkData { respond, input, .. } => {
                     respond.r(Ok(handle_sign_network_data(kdirect.clone(), input)
                         .map_err(KitsuneP2pError::other)
@@ -895,37 +892,42 @@ async fn handle_gossip(
     Ok(())
 }
 
+#[allow(warnings)]
 async fn handle_fetch_op_hashes_for_constraints(
     kdirect: Arc<Kd1>,
     input: FetchOpHashesForConstraintsEvt,
-) -> KdResult<Vec<Arc<KitsuneOpHash>>> {
+) -> KdResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindow)>> {
     let FetchOpHashesForConstraintsEvt {
         space,
-        agent,
-        dht_arc,
-        since_utc_epoch_s,
-        until_utc_epoch_s,
+        agents,
+        window,
+        max_ops,
         ..
     } = input;
 
-    let root = KdHash::from_kitsune_space(&space);
-    let agent = KdHash::from_kitsune_agent(&agent);
-    let c_start = since_utc_epoch_s as f32;
-    let c_end = until_utc_epoch_s as f32;
+    todo!(
+        "reimplement for new api,
+        in particular making sure the time window lines up"
+    );
 
-    // TODO - it's ok for now to just get the full entries
-    //        since they'll just get Arc::clone-d
-    //        but once this is a persisted database
-    //        we'll want an api to just get the hashes
-    let entries = kdirect
-        .persist
-        .query_entries(root, agent, c_start, c_end, dht_arc)
-        .await?;
+    // let root = KdHash::from_kitsune_space(&space);
+    // let agent = KdHash::from_kitsune_agent(&agent);
+    // let c_start = since_utc_epoch_s as f32;
+    // let c_end = until_utc_epoch_s as f32;
 
-    Ok(entries
-        .into_iter()
-        .map(|e| e.hash().clone().to_kitsune_op_hash())
-        .collect())
+    // // TODO - it's ok for now to just get the full entries
+    // //        since they'll just get Arc::clone-d
+    // //        but once this is a persisted database
+    // //        we'll want an api to just get the hashes
+    // let entries = kdirect
+    //     .persist
+    //     .query_entries(root, agent, c_start, c_end, dht_arc)
+    //     .await?;
+
+    // Ok(entries
+    //     .into_iter()
+    //     .map(|e| e.hash().clone().to_kitsune_op_hash())
+    //     .collect())
 }
 
 async fn handle_fetch_op_hash_data(
@@ -934,24 +936,25 @@ async fn handle_fetch_op_hash_data(
 ) -> KdResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> {
     let FetchOpHashDataEvt {
         space,
-        agent,
+        agents,
         op_hashes,
         ..
     } = input;
 
-    let root = KdHash::from_kitsune_space(&space);
-    let agent = KdHash::from_kitsune_agent(&agent);
-
     let mut out = Vec::new();
+    let root = KdHash::from_kitsune_space(&space);
 
     for op_hash in op_hashes {
-        let hash = KdHash::from_kitsune_op_hash(&op_hash);
-        if let Ok(entry) = kdirect
-            .persist
-            .get_entry(root.clone(), agent.clone(), hash)
-            .await
-        {
-            out.push((op_hash, entry.as_wire_data_ref().to_vec()));
+        for agent in agents.iter() {
+            let agent = KdHash::from_kitsune_agent(agent);
+            let hash = KdHash::from_kitsune_op_hash(&op_hash);
+            if let Ok(entry) = kdirect
+                .persist
+                .get_entry(root.clone(), agent.clone(), hash)
+                .await
+            {
+                out.push((op_hash.clone(), entry.as_wire_data_ref().to_vec()));
+            }
         }
     }
 

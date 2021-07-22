@@ -291,23 +291,6 @@ impl WrapEvtSender {
     fn fetch_op_hashes_for_constraints(
         &self,
         dna_hash: DnaHash,
-        to_agent: AgentPubKey,
-        dht_arc: kitsune_p2p::dht_arc::ArcInterval,
-        since: holochain_types::Timestamp,
-        until: holochain_types::Timestamp,
-    ) -> impl Future<Output = HolochainP2pResult<Vec<holo_hash::DhtOpHash>>> + 'static + Send {
-        timing_trace!(
-            {
-                self.0
-                    .fetch_op_hashes_for_constraints(dna_hash, to_agent, dht_arc, since, until)
-            },
-            "(hp2p:handle) fetch_op_hashes_for_constraints",
-        )
-    }
-
-    fn hashes_for_time_window(
-        &self,
-        dna_hash: DnaHash,
         to_agents: Vec<(AgentPubKey, kitsune_p2p::dht_arc::DhtArcSet)>,
         window: std::ops::Range<u64>,
         max_ops: usize,
@@ -319,11 +302,12 @@ impl WrapEvtSender {
         timing_trace!(
             {
                 self.0
-                    .hashes_for_time_window(dna_hash, to_agents, window, max_ops)
+                    .fetch_op_hashes_for_constraints(dna_hash, to_agents, window, max_ops)
             },
-            "(hp2p:handle) hashes_for_time_window",
+            "(hp2p:handle) fetch_op_hashes_for_constraints",
         )
     }
+
     fn fetch_op_hash_data(
         &self,
         dna_hash: DnaHash,
@@ -859,40 +843,10 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
     fn handle_fetch_op_hashes_for_constraints(
         &mut self,
         input: kitsune_p2p::event::FetchOpHashesForConstraintsEvt,
-    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<Vec<Arc<kitsune_p2p::KitsuneOpHash>>>
-    {
-        let kitsune_p2p::event::FetchOpHashesForConstraintsEvt {
-            space,
-            agent,
-            dht_arc,
-            since_utc_epoch_s,
-            until_utc_epoch_s,
-        } = input;
-        let space = DnaHash::from_kitsune(&space);
-        let agent = AgentPubKey::from_kitsune(&agent);
-        let since = Timestamp(since_utc_epoch_s, 0);
-        let until = Timestamp(until_utc_epoch_s, 0);
-
-        let evt_sender = self.evt_sender.clone();
-        Ok(async move {
-            Ok(evt_sender
-                .fetch_op_hashes_for_constraints(space, agent, dht_arc, since, until)
-                .await?
-                .into_iter()
-                .map(|h| h.into_kitsune())
-                .collect())
-        }
-        .boxed()
-        .into())
-    }
-
-    fn handle_hashes_for_time_window(
-        &mut self,
-        input: kitsune_p2p::event::HashesForTimeWindowEvt,
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<
         Option<(Vec<Arc<kitsune_p2p::KitsuneOpHash>>, std::ops::Range<u64>)>,
     > {
-        let kitsune_p2p::event::HashesForTimeWindowEvt {
+        let kitsune_p2p::event::FetchOpHashesForConstraintsEvt {
             space,
             agents,
             window,
@@ -907,13 +861,14 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
             Ok(evt_sender
-                .hashes_for_time_window(space, agents, window, max_ops)
+                .fetch_op_hashes_for_constraints(space, agents, window, max_ops)
                 .await?
                 .map(|(h, time)| (h.into_iter().map(|h| h.into_kitsune()).collect(), time)))
         }
         .boxed()
         .into())
     }
+
     #[allow(clippy::needless_collect)]
     #[tracing::instrument(skip(self), level = "trace")]
     fn handle_fetch_op_hash_data(
@@ -924,34 +879,36 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
     > {
         let kitsune_p2p::event::FetchOpHashDataEvt {
             space,
-            agent,
+            agents,
             op_hashes,
         } = input;
         let space = DnaHash::from_kitsune(&space);
-        let agent = AgentPubKey::from_kitsune(&agent);
+        let agents: Vec<_> = agents.iter().map(AgentPubKey::from_kitsune).collect();
         let op_hashes = op_hashes
             .into_iter()
             .map(|h| DhtOpHash::from_kitsune(&h))
-            // the allowance of clippy::needless_collcect refers to the following call
+            // the allowance of clippy::needless_collect refers to the following call
             .collect::<Vec<_>>();
 
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
             let mut out = vec![];
-            for (dht_hash, op_hash, dht_op) in evt_sender
-                .fetch_op_hash_data(space, agent.clone(), op_hashes)
-                .await?
-            {
-                out.push((
-                    op_hash.into_kitsune(),
-                    crate::wire::WireDhtOpData {
-                        from_agent: agent.clone(),
-                        dht_hash,
-                        op_data: dht_op,
-                    }
-                    .encode()
-                    .map_err(kitsune_p2p::KitsuneP2pError::other)?,
-                ));
+            for agent in agents {
+                for (dht_hash, op_hash, dht_op) in evt_sender
+                    .fetch_op_hash_data(space.clone(), agent.clone(), op_hashes.clone())
+                    .await?
+                {
+                    out.push((
+                        op_hash.into_kitsune(),
+                        crate::wire::WireDhtOpData {
+                            from_agent: agent.clone(),
+                            dht_hash,
+                            op_data: dht_op,
+                        }
+                        .encode()
+                        .map_err(kitsune_p2p::KitsuneP2pError::other)?,
+                    ));
+                }
             }
             Ok(out)
         }

@@ -387,24 +387,7 @@ impl Cell {
                 .instrument(debug_span!("cell_handle_validation_receipt_received"))
                 .await;
             }
-            FetchOpHashesForConstraints {
-                span_context: _,
-                respond,
-                dht_arc,
-                since,
-                until,
-                ..
-            } => {
-                async {
-                    let res = self
-                        .handle_fetch_op_hashes_for_constraints(dht_arc, since, until)
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other);
-                    respond.respond(Ok(async move { res }.boxed().into()));
-                }
-                .instrument(debug_span!("cell_handle_fetch_op_hashes_for_constraints"))
-                .await;
-            }
+
             FetchOpHashData {
                 span_context: _,
                 respond,
@@ -615,58 +598,10 @@ impl Cell {
         Ok(())
     }
 
-    #[instrument(skip(self, dht_arc, since, until))]
-    /// the network module is requesting a list of dht op hashes
-    async fn handle_fetch_op_hashes_for_constraints(
-        &self,
-        dht_arc: ArcInterval,
-        since: Timestamp,
-        until: Timestamp,
-    ) -> CellResult<Vec<DhtOpHash>> {
-        // FIXME: Test this query.
-
-        let result = self
-            .env()
-            .async_reader(move |txn| {
-                DatabaseResult::Ok(match dht_arc {
-                    ArcInterval::Full => txn
-                        .prepare_cached(holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_FULL)?
-                        .query_map(
-                            named_params! {
-                                ":from": since.to_sql_ms_lossy(),
-                                ":to": until.to_sql_ms_lossy(),
-                            },
-                            |row| row.get("hash"),
-                        )?
-                        .collect::<rusqlite::Result<Vec<_>>>()?,
-                    ArcInterval::Bounded(start_loc, end_loc) => {
-                        let sql = if start_loc <= end_loc {
-                            holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_CONTINUOUS
-                        } else {
-                            holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_WRAPPED
-                        };
-                        txn.prepare_cached(sql)?
-                            .query_map(
-                                named_params! {
-                                    ":from": since.to_sql_ms_lossy(),
-                                    ":to": until.to_sql_ms_lossy(),
-                                    ":storage_start_loc": start_loc,
-                                    ":storage_end_loc": end_loc,
-                                },
-                                |row| row.get("hash"),
-                            )?
-                            .collect::<rusqlite::Result<Vec<_>>>()?
-                    }
-                    ArcInterval::Empty => Vec::new(),
-                })
-            })
-            .await?;
-        Ok(result)
-    }
-
     #[instrument(skip(self))]
-    /// Get the [`DhtOpHash`] and authored timestamps for a given time window.
-    pub(super) async fn handle_hashes_for_time_window(
+    /// the network module is requesting a list of dht op hashes
+    /// Get the [`DhtOpHash`]es and authored timestamps for a given time window.
+    pub(super) async fn handle_fetch_op_hashes_for_constraints(
         &self,
         dht_arc_set: DhtArcSet,
         window: std::ops::Range<u64>,

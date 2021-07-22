@@ -62,23 +62,16 @@ async fn standard_responses(
     });
     if with_data {
         evt_handler
-            .expect_handle_hashes_for_time_window()
+            .expect_handle_fetch_op_hashes_for_constraints()
             .returning(|_| {
                 Ok(async {
                     Ok(Some((
                         vec![Arc::new(KitsuneOpHash(vec![0; 36]))],
-                        0..u64::MAX,
+                        u64::MIN..u64::MAX,
                     )))
                 }
                 .boxed()
                 .into())
-            });
-        evt_handler
-            .expect_handle_fetch_op_hashes_for_constraints()
-            .returning(|_| {
-                Ok(async { Ok(vec![Arc::new(KitsuneOpHash(vec![0; 36]))]) }
-                    .boxed()
-                    .into())
             });
         evt_handler
             .expect_handle_fetch_op_hash_data()
@@ -91,11 +84,8 @@ async fn standard_responses(
             });
     } else {
         evt_handler
-            .expect_handle_hashes_for_time_window()
-            .returning(|_| Ok(async { Ok(None) }.boxed().into()));
-        evt_handler
             .expect_handle_fetch_op_hashes_for_constraints()
-            .returning(|_| Ok(async { Ok(vec![]) }.boxed().into()));
+            .returning(|_| Ok(async { Ok(None) }.boxed().into()));
         evt_handler
             .expect_handle_fetch_op_hash_data()
             .returning(|_| Ok(async { Ok(vec![]) }.boxed().into()));

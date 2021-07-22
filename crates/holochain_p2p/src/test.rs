@@ -389,7 +389,7 @@ mod tests {
                         respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                     }
                     FetchOpHashesForConstraints { respond, .. } => {
-                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                        respond.r(Ok(async move { Ok(None) }.boxed().into()));
                     }
                     evt => println!("unhandled: {:?}", evt),
                 }

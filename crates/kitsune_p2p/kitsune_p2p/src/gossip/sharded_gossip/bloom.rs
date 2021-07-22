@@ -1,4 +1,4 @@
-use std::ops::Range;
+use std::{hash::Hash, ops::Range};
 
 use super::*;
 
@@ -115,39 +115,35 @@ impl ShardedGossipLocal {
             bloom: remote_bloom,
             time,
         } = remote_bloom;
-        let mut missing_ops = HashMap::new();
-        for (agent, interval) in local_agents_within_arc_set {
-            let mut missing_hashes = Vec::new();
-            let hashes = store::ops_within_common_set(
-                &self.evt_sender,
-                &self.space,
-                &agent,
-                &interval,
-                &common_arc_set,
-                // Convert to seconds.
-                clamp64(time.start / 1000),
-                // Convert to seconds and adjust for exclusive range.
-                clamp64(time.end / 1000 + 1),
-            )
-            .await?;
-            missing_hashes.extend(
-                hashes
-                    .into_iter()
-                    .filter(|hash| !remote_bloom.check(&Arc::new(MetaOpKey::Op(hash.clone()))))
-                    // Don't pull out hashes we already have ops for.
-                    .filter(|hash| !missing_ops.contains_key(hash)),
-            );
-            missing_ops.extend(
-                self.evt_sender
-                    .fetch_op_hash_data(FetchOpHashDataEvt {
-                        space: self.space.clone(),
-                        agent: agent.clone(),
-                        op_hashes: missing_hashes,
-                    })
-                    .await
-                    .map_err(KitsuneError::other)?,
-            );
+        if let Some((missing_hashes, _)) = store::all_ops_within_common_set(
+            &self.evt_sender,
+            &self.space,
+            local_agents_within_arc_set.clone(),
+            &common_arc_set,
+            time,
+            usize::MAX,
+        )
+        .await?
+        {
+            todo!("ensure time window is in s/ms");
+            todo!("accept max ops param");
+            let agents = local_agents_within_arc_set
+                .iter()
+                .map(|(a, _)| a)
+                .cloned()
+                .collect();
+            let missing_ops = self
+                .evt_sender
+                .fetch_op_hash_data(FetchOpHashDataEvt {
+                    space: self.space.clone(),
+                    agents,
+                    op_hashes: missing_hashes,
+                })
+                .await
+                .map_err(KitsuneError::other)?;
+            Ok(missing_ops.into_iter().collect())
+        } else {
+            Ok(HashMap::new())
         }
-        Ok(missing_ops)
     }
 }
