@@ -61,7 +61,7 @@ pub mod test {
                 GetInput::new(vec![input_header_hash.clone().into()], GetOptions::latest())
             ))
             .times(1)
-            .return_once(move |_| Ok(None));
+            .return_once(move |_| vec![Ok(None)]);
 
         hdk::prelude::set_hdk(mock_hdk);
 

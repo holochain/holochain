@@ -8,6 +8,7 @@ use holochain::test_utils::consistency_10s;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::inline_zome::BoxApi;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]
 struct BaseTarget(EntryHash, EntryHash);
@@ -22,9 +23,14 @@ fn links_zome() -> InlineZome {
             ))?;
             Ok(hash)
         })
-        .callback("get_links", move |api, base: EntryHash| {
-            Ok(api.get_links(GetLinksInput::new(vec![base], None))?)
-        })
+        .callback(
+            "get_links",
+            move |api: BoxApi, base: EntryHash| -> InlineZomeResult<Vec<Links>> {
+                let result = api.get_links(GetLinksInput::new(vec![base], None));
+                dbg!(&result);
+                Ok(result?)
+            },
+        )
 }
 
 /// A single link with an AgentPubKey for the base and target is committed by
@@ -70,10 +76,10 @@ async fn many_agents_can_reach_consistency_agent_links() {
 
     for (i, cell) in cells.iter().enumerate() {
         // let links: Links = conductor.call(&cell.zome(TestWasm::Link), "get_links", ()).await;
-        let links: Links = conductor
+        let links: Vec<Links> = conductor
             .call(&cell.zome("links"), "get_links", base.clone())
             .await;
-        seen[i] = links.into_inner().len();
+        seen[i] = links.into_iter().next().unwrap().into_inner().len();
     }
 
     assert_eq!(seen.to_vec(), [1; NUM_AGENTS].to_vec());

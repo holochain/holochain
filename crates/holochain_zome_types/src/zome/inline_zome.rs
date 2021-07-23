@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 pub mod error;
 
-type BoxApi = Box<dyn HostFnApiT>;
+pub type BoxApi = Box<dyn HostFnApiT>;
 
 /// An InlineZome, which consists
 pub struct InlineZome {
