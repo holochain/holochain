@@ -45,13 +45,12 @@ impl Inner {
 
         // collect all local agents' ops
         for agent in local_agents.iter() {
-            if let Ok(ops) = evt_sender
+            if let Ok(Some((ops, _))) = evt_sender
                 .fetch_op_hashes_for_constraints(FetchOpHashesForConstraintsEvt {
                     space: space.clone(),
-                    agent: agent.clone(),
-                    dht_arc: ArcInterval::Full,
-                    since_utc_epoch_s: i64::MIN,
-                    until_utc_epoch_s: i64::MAX,
+                    agents: vec![(agent.clone(), ArcInterval::Full.into())],
+                    window_ms: u64::MIN..u64::MAX,
+                    max_ops: usize::MAX,
                 })
                 .await
             {
@@ -204,7 +203,7 @@ async fn data_map_get(
             let mut op = evt_sender
                 .fetch_op_hash_data(FetchOpHashDataEvt {
                     space: space.clone(),
-                    agent: agent.clone(),
+                    agents: vec![agent.clone()],
                     op_hashes: vec![key.clone()],
                 })
                 .await

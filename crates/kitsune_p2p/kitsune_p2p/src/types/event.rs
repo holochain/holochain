@@ -4,24 +4,10 @@ use crate::types::agent_store::AgentInfoSigned;
 use std::{sync::Arc, time::SystemTime};
 
 /// Gather a list of op-hashes from our implementor that meet criteria.
-#[derive(Debug)]
-pub struct FetchOpHashesForConstraintsEvt {
-    /// The "space" context.
-    pub space: Arc<super::KitsuneSpace>,
-    /// The "agent" context.
-    pub agent: Arc<super::KitsuneAgent>,
-    /// The dht arc to query.
-    pub dht_arc: kitsune_p2p_types::dht_arc::ArcInterval,
-    /// Only retreive items received since this time (INCLUSIVE).
-    pub since_utc_epoch_s: i64,
-    /// Only retreive items received until this time (EXCLUSIVE).
-    pub until_utc_epoch_s: i64,
-}
-
-/// Get the start and end times for ops within a time window
+/// Also get the start and end times for ops within a time window
 /// up to a maximum number.
 #[derive(Debug)]
-pub struct HashesForTimeWindowEvt {
+pub struct FetchOpHashesForConstraintsEvt {
     /// The "space" context.
     pub space: Arc<super::KitsuneSpace>,
     /// The "agents" context.
@@ -30,7 +16,7 @@ pub struct HashesForTimeWindowEvt {
         kitsune_p2p_types::dht_arc::DhtArcSet,
     )>,
     /// The time window to search within.
-    pub window: std::ops::Range<u64>,
+    pub window_ms: TimeWindowMs,
     /// Maximum number of ops to return.
     pub max_ops: usize,
 }
@@ -41,7 +27,7 @@ pub struct FetchOpHashDataEvt {
     /// The "space" context.
     pub space: Arc<super::KitsuneSpace>,
     /// The "agent" context.
-    pub agent: Arc<super::KitsuneAgent>,
+    pub agents: Vec<Arc<super::KitsuneAgent>>,
     /// The op-hashes to fetch
     pub op_hashes: Vec<Arc<super::KitsuneOpHash>>,
 }
@@ -171,6 +157,9 @@ pub enum MetricQueryAnswer {
     Oldest(Option<Arc<super::KitsuneAgent>>),
 }
 
+/// A time range, measured in milliseconds
+pub type TimeWindowMs = std::ops::Range<u64>;
+
 ghost_actor::ghost_chan! {
     /// The KitsuneP2pEvent stream allows handling events generated from the
     /// KitsuneP2p actor.
@@ -212,10 +201,8 @@ ghost_actor::ghost_chan! {
         ) -> ();
 
         /// Gather a list of op-hashes from our implementor that meet criteria.
-        fn fetch_op_hashes_for_constraints(input: FetchOpHashesForConstraintsEvt) -> Vec<Arc<super::KitsuneOpHash>>;
-
         /// Get the oldest and newest times for ops within a time window and max number of ops.
-        fn hashes_for_time_window(input: HashesForTimeWindowEvt) -> Option<(Vec<Arc<super::KitsuneOpHash>>, std::ops::Range<u64>)>;
+        fn fetch_op_hashes_for_constraints(input: FetchOpHashesForConstraintsEvt) -> Option<(Vec<Arc<super::KitsuneOpHash>>, TimeWindowMs)>;
 
         /// Gather all op-hash data for a list of op-hashes from our implementor.
         fn fetch_op_hash_data(input: FetchOpHashDataEvt) -> Vec<(Arc<super::KitsuneOpHash>, Vec<u8>)>;

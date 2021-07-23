@@ -532,13 +532,6 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
             .gossip(space, to_agent, from_agent, op_hash, op_data))
     }
 
-    fn handle_fetch_op_hashes_for_constraints(
-        &mut self,
-        input: FetchOpHashesForConstraintsEvt,
-    ) -> KitsuneP2pEventHandlerResult<Vec<Arc<KitsuneOpHash>>> {
-        Ok(self.evt_sender.fetch_op_hashes_for_constraints(input))
-    }
-
     fn handle_fetch_op_hash_data(
         &mut self,
         input: FetchOpHashDataEvt,
@@ -546,11 +539,11 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
         Ok(self.evt_sender.fetch_op_hash_data(input))
     }
 
-    fn handle_hashes_for_time_window(
+    fn handle_fetch_op_hashes_for_constraints(
         &mut self,
-        input: HashesForTimeWindowEvt,
-    ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, std::ops::Range<u64>)>> {
-        Ok(self.evt_sender.hashes_for_time_window(input))
+        input: FetchOpHashesForConstraintsEvt,
+    ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowMs)>> {
+        Ok(self.evt_sender.fetch_op_hashes_for_constraints(input))
     }
 
     fn handle_sign_network_data(
@@ -751,7 +744,7 @@ mockall::mock! {
         fn handle_fetch_op_hashes_for_constraints(
             &mut self,
             input: FetchOpHashesForConstraintsEvt,
-        ) -> KitsuneP2pEventHandlerResult<Vec<Arc<KitsuneOpHash>>> ;
+        ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowMs)>>;
 
         fn handle_fetch_op_hash_data(
             &mut self,
@@ -763,10 +756,6 @@ mockall::mock! {
             input: SignNetworkDataEvt,
         ) -> KitsuneP2pEventHandlerResult<KitsuneSignature> ;
 
-        fn handle_hashes_for_time_window(
-            &mut self,
-            input: HashesForTimeWindowEvt,
-        ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, std::ops::Range<u64>)>>;
     }
 }
 

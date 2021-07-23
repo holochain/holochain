@@ -53,6 +53,28 @@ fn test_dht_arc() {
 }
 
 #[test]
+fn test_arc_interval_conversion() {
+    assert_eq!(
+        DhtArc::new(0, MAX_HALF_LENGTH).interval(),
+        ArcInterval::Full,
+    );
+    assert_eq!(DhtArc::new(0, u32::MAX).interval(), ArcInterval::Full,);
+    assert_eq!(
+        DhtArc::new(0, u32::MAX / 3).interval(),
+        ArcInterval::Bounded(u32::MAX - u32::MAX / 3 + 2, u32::MAX / 3 - 1),
+    );
+    assert_eq!(
+        DhtArc::new(0, u32::MAX / 4).interval(),
+        ArcInterval::Bounded(u32::MAX - u32::MAX / 4 + 2, u32::MAX / 4 - 1),
+    );
+    assert_eq!(
+        DhtArc::new(1000, 5).interval(),
+        ArcInterval::Bounded(996, 1004),
+    );
+    assert_eq!(DhtArc::new(1000, 0).interval(), ArcInterval::Empty,);
+}
+
+#[test]
 fn test_arc_start_end() {
     use std::ops::Bound::*;
 

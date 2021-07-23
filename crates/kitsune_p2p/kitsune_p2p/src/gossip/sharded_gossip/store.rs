@@ -11,8 +11,8 @@ use kitsune_p2p_types::{
 };
 
 use crate::event::{
-    FetchOpHashesForConstraintsEvt, GetAgentInfoSignedEvt, HashesForTimeWindowEvt,
-    PutAgentInfoSignedEvt, QueryAgentInfoSignedEvt, QueryGossipAgentsEvt,
+    FetchOpHashesForConstraintsEvt, GetAgentInfoSignedEvt, PutAgentInfoSignedEvt,
+    QueryAgentInfoSignedEvt, QueryGossipAgentsEvt, TimeWindowMs,
 };
 use crate::types::event::KitsuneP2pEventSender;
 
@@ -111,37 +111,6 @@ pub(super) async fn agents_within_arcset(
         .map_err(KitsuneError::other)?)
 }
 
-/// Get all ops that are in the intersections
-/// between an agents interval and the common
-/// arc set.
-pub(super) async fn ops_within_common_set(
-    evt_sender: &EventSender,
-    space: &Arc<KitsuneSpace>,
-    agent: &Arc<KitsuneAgent>,
-    interval: &ArcInterval,
-    common_arc_set: &Arc<DhtArcSet>,
-    since_utc_epoch_s: i64,
-    until_utc_epoch_s: i64,
-) -> KitsuneResult<Vec<Arc<KitsuneOpHash>>> {
-    let mut within_common_arc = Vec::new();
-    let intersection = common_arc_set.intersection(&interval.clone().into());
-    let intervals = intersection.intervals();
-    for interval in intervals {
-        let hashes = evt_sender
-            .fetch_op_hashes_for_constraints(FetchOpHashesForConstraintsEvt {
-                space: space.clone(),
-                agent: agent.clone(),
-                dht_arc: interval.into(),
-                since_utc_epoch_s,
-                until_utc_epoch_s,
-            })
-            .await
-            .map_err(KitsuneError::other)?;
-        within_common_arc.extend(hashes);
-    }
-    Ok(within_common_arc)
-}
-
 /// Get all ops for all agents intersections with
 /// the common arc set.
 pub(super) async fn all_ops_within_common_set(
@@ -149,7 +118,7 @@ pub(super) async fn all_ops_within_common_set(
     space: &Arc<KitsuneSpace>,
     agents: Vec<(Arc<KitsuneAgent>, ArcInterval)>,
     common_arc_set: &Arc<DhtArcSet>,
-    time_window: std::ops::Range<u64>,
+    window_ms: TimeWindowMs,
     max_ops: usize,
 ) -> KitsuneResult<Option<(Vec<Arc<KitsuneOpHash>>, Range<u64>)>> {
     let agents = agents
@@ -160,10 +129,10 @@ pub(super) async fn all_ops_within_common_set(
         })
         .collect();
     Ok(evt_sender
-        .hashes_for_time_window(HashesForTimeWindowEvt {
+        .fetch_op_hashes_for_constraints(FetchOpHashesForConstraintsEvt {
             space: space.clone(),
             agents,
-            window: time_window,
+            window_ms,
             max_ops,
         })
         .await

@@ -403,7 +403,7 @@ async fn data_map_get(
         .evt_sender
         .fetch_op_hash_data(FetchOpHashDataEvt {
             space,
-            agent,
+            agents: vec![agent],
             op_hashes: vec![op_key],
         })
         .await

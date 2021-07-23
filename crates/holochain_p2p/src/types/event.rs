@@ -7,7 +7,7 @@ use crate::*;
 use holochain_zome_types::signature::Signature;
 use kitsune_p2p::{
     agent_store::AgentInfoSigned,
-    event::{MetricKind, MetricQuery, MetricQueryAnswer},
+    event::{MetricKind, MetricQuery, MetricQueryAnswer, TimeWindowMs},
 };
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
@@ -208,21 +208,15 @@ ghost_actor::ghost_chan! {
         ) -> ();
 
         /// The p2p module wishes to query our DhtOpHash store.
+        /// Gets all ops from a set of agents within a time window
+        /// and max number of ops.
+        /// Returns the actual time window of returned ops as well.
         fn fetch_op_hashes_for_constraints(
             dna_hash: DnaHash,
-            to_agent: AgentPubKey,
-            dht_arc: kitsune_p2p::dht_arc::ArcInterval,
-            since: holochain_types::Timestamp,
-            until: holochain_types::Timestamp,
-        ) -> Vec<holo_hash::DhtOpHash>;
-
-        /// Get the oldest and newest times for ops within a time window and max number of ops.
-        fn hashes_for_time_window(
-            dna_hash: DnaHash,
             to_agents: Vec<(AgentPubKey, kitsune_p2p::dht_arc::DhtArcSet)>,
-            window: std::ops::Range<u64>,
+            window_ms: TimeWindowMs,
             max_ops: usize,
-        ) -> Option<(Vec<holo_hash::DhtOpHash>, std::ops::Range<u64>)>;
+        ) -> Option<(Vec<holo_hash::DhtOpHash>, TimeWindowMs)>;
 
         /// The p2p module needs access to the content for a given set of DhtOpHashes.
         fn fetch_op_hash_data(
@@ -255,7 +249,6 @@ macro_rules! match_p2p_evt {
             HolochainP2pEvent::GetLinks { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetAgentActivity { $i, .. } => { $($t)* }
             HolochainP2pEvent::ValidationReceiptReceived { $i, .. } => { $($t)* }
-            HolochainP2pEvent::FetchOpHashesForConstraints { $i, .. } => { $($t)* }
             HolochainP2pEvent::FetchOpHashData { $i, .. } => { $($t)* }
             HolochainP2pEvent::SignNetworkData { $i, .. } => { $($t)* }
             HolochainP2pEvent::PutAgentInfoSigned { $i, .. } => { $($t)* }
@@ -273,16 +266,16 @@ impl HolochainP2pEvent {
     /// The dna_hash associated with this network p2p event.
     pub fn dna_hash(&self) -> &DnaHash {
         match_p2p_evt!(self => |dna_hash| { dna_hash }, {
+            HolochainP2pEvent::FetchOpHashesForConstraints { dna_hash, .. } => { dna_hash }
             HolochainP2pEvent::QueryAgentInfoSignedNearBasis { dna_hash, .. } => { dna_hash }
-            HolochainP2pEvent::HashesForTimeWindow { dna_hash, .. } => { dna_hash }
         })
     }
 
     /// The agent_pub_key associated with this network p2p event.
     pub fn target_agent_as_ref(&self) -> &AgentPubKey {
         match_p2p_evt!(self => |to_agent| { to_agent }, {
-            HolochainP2pEvent::HashesForTimeWindow { .. } => { unimplemented!() }
-            HolochainP2pEvent::QueryAgentInfoSignedNearBasis { .. } => { unimplemented!() }
+            HolochainP2pEvent::FetchOpHashesForConstraints { .. } => { unimplemented!("There is no single agent target for FetchOpHashesForConstraints") }
+            HolochainP2pEvent::QueryAgentInfoSignedNearBasis { .. } => { unimplemented!("There is no single agent target for QueryAgentInfoSignedNearBasis") },
         })
     }
 }

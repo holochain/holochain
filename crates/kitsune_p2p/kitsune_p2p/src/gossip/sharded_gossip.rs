@@ -52,7 +52,7 @@ type EventSender = futures::channel::mpsc::Sender<event::KitsuneP2pEvent>;
 
 struct TimedBloomFilter {
     bloom: BloomFilter,
-    time: std::ops::Range<u64>,
+    time: TimeWindowMs,
 }
 
 /// Gossip has two distinct variants which share a lot of similarities but
@@ -432,7 +432,9 @@ impl ShardedGossipLocal {
                     state,
                     filter.and_then(|filter| decode_timed_bloom_filter(&filter)),
                 ) {
-                    (Some(state), Some(filter)) => self.incoming_ops(state.clone(), filter).await?,
+                    (Some(state), Some(filter)) => {
+                        self.incoming_ops(state.clone(), filter, usize::MAX).await?
+                    }
                     _ => Vec::with_capacity(0),
                 }
             }
@@ -697,6 +699,7 @@ pub fn historical_factory() -> GossipModuleFactory {
     GossipModuleFactory(Arc::new(ShardedHistoricalGossipFactory))
 }
 
+#[allow(dead_code)]
 fn clamp64(u: u64) -> i64 {
     if u > i64::MAX as u64 {
         i64::MAX
