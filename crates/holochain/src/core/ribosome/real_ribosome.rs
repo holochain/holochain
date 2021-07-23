@@ -195,8 +195,8 @@ fn instance_cache_key(wasm_hash: &WasmHash, dna_hash: &DnaHash, context_key: u64
     {
         bits[i] = byte;
     }
-    for (i, byte) in (24..32).zip(context_key.to_le_bytes()) {
-        bits[i] = byte;
+    for (i, byte) in (24..32).zip(&context_key.to_le_bytes()) {
+        bits[i] = *byte;
     }
     bits
 }
