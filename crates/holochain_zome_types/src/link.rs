@@ -16,6 +16,7 @@ use holochain_serialized_bytes::prelude::*;
     Eq,
     SerializedBytes,
 )]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct LinkTag(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 impl LinkTag {

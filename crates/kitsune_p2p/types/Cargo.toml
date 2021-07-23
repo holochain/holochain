@@ -15,8 +15,8 @@ base64 = "0.13"
 derive_more = "0.99.7"
 futures = "0.3"
 ghost_actor = "0.3.0-alpha.1"
-kitsune_p2p_dht_arc = { version = "0.0.2-dev.0", path = "../dht_arc" }
-lair_keystore_api = "=0.0.1-alpha.12"
+kitsune_p2p_dht_arc = { version = "0.0.1", path = "../dht_arc" }
+lair_keystore_api = "=0.0.1-alpha.13"
 lru = "0.6.5"
 nanoid = "0.3"
 observability = "0.1.3"
