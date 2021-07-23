@@ -101,6 +101,9 @@ impl ShardedGossipLocal {
         }
 
         // Choose any local agent so we can send requests to the store.
+        // maackle: FIXME: this looks like an assumption that we are
+        //    operating full-sync, yes? We need to take the union of all
+        //    agents' arcs.
         let agent = local_agents.iter().cloned().next();
 
         // If we don't have a local agent then there's nothing to do.

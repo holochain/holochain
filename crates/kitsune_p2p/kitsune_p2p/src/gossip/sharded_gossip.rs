@@ -475,6 +475,10 @@ impl ShardedGossipLocal {
         })
     }
 
+    async fn local_sync(&self) -> KitsuneResult<()> {
+        todo!("local sync")
+    }
+
     /// Find a remote endpoint from agents within arc set.
     async fn find_remote_agent_within_arc(
         &self,
