@@ -592,6 +592,9 @@ kitsune_p2p_types::write_codec_enum! {
         /// Send Agent Info Boom
         Ops(0x50) {
             /// The bloom filter for op data
+            // maackle: what is the meaning and purpose of this ever being None?
+            //          currently looks like it means the same thing as
+            //          `finished == true`
             filter.0: Option<PoolBuf>,
             /// Is this the last bloom to be sent?
             finished.1: bool,

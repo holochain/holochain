@@ -49,12 +49,12 @@ pub(super) async fn get_agent_info(
 }
 
 /// Get all `AgentInfoSigned` for local agents in a space.
-pub(super) async fn local_agent_info(
+pub(super) async fn local_agent_info<'iter>(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
     agent: &Arc<KitsuneAgent>,
-    local_agents: &HashSet<Arc<KitsuneAgent>>,
-) -> KitsuneResult<impl Iterator<Item = AgentInfoSigned> + '_> {
+    local_agents: &'iter HashSet<Arc<KitsuneAgent>>,
+) -> KitsuneResult<impl Iterator<Item = AgentInfoSigned> + 'iter> {
     Ok(all_agent_info(evt_sender, space, agent)
         .await?
         .into_iter()

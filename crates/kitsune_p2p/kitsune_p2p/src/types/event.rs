@@ -1,5 +1,7 @@
 //! Definitions for events emited from the KitsuneP2p actor.
 
+use kitsune_p2p_types::dht_arc::DhtArcSet;
+
 use crate::types::agent_store::AgentInfoSigned;
 use std::{sync::Arc, time::SystemTime};
 
@@ -10,7 +12,7 @@ use std::{sync::Arc, time::SystemTime};
 pub struct FetchOpHashesForConstraintsEvt {
     /// The "space" context.
     pub space: Arc<super::KitsuneSpace>,
-    /// The "agents" context.
+    /// The agents from which to fetch, along with a DhtArcSet to filter by.
     pub agents: Vec<(
         Arc<super::KitsuneAgent>,
         kitsune_p2p_types::dht_arc::DhtArcSet,
@@ -157,8 +159,11 @@ pub enum MetricQueryAnswer {
     Oldest(Option<Arc<super::KitsuneAgent>>),
 }
 
-/// A time range, measured in milliseconds
-pub type TimeWindowMs = std::ops::Range<u64>;
+/// A UNIX timestamp, measured in milliseconds
+pub type TimestampMs = u64;
+
+/// A range of timestamps, measured in milliseconds
+pub type TimeWindowMs = std::ops::Range<TimestampMs>;
 
 ghost_actor::ghost_chan! {
     /// The KitsuneP2pEvent stream allows handling events generated from the

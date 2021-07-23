@@ -12,10 +12,11 @@ pub async fn spawn_handler<H: KitsuneP2pEventHandler + GhostControlHandler>(
 }
 
 async fn standard_responses(
-    agents: Vec<Arc<KitsuneAgent>>,
+    agents_with_arcs: Vec<(Arc<KitsuneAgent>, ArcInterval)>,
     with_data: bool,
 ) -> MockKitsuneP2pEventHandler {
     let mut evt_handler = MockKitsuneP2pEventHandler::new();
+    let agents: Vec<_> = agents_with_arcs.iter().map(|(a, _)| a.clone()).collect();
     evt_handler
         .expect_handle_query_agent_info_signed()
         .returning({
@@ -47,17 +48,8 @@ async fn standard_responses(
         });
     evt_handler.expect_handle_query_gossip_agents().returning({
         move |_| {
-            let agents = agents.clone();
-            Ok(async move {
-                let agents = agents.clone();
-                let mut infos = Vec::new();
-                for agent in agents {
-                    infos.push((agent.clone(), ArcInterval::Full));
-                }
-                Ok(infos)
-            }
-            .boxed()
-            .into())
+            let agents_with_arcs = agents_with_arcs.clone();
+            Ok(async move { Ok(agents_with_arcs) }.boxed().into())
         }
     });
     if with_data {
@@ -101,7 +93,7 @@ pub async fn setup_player(
     num_agents: usize,
     with_data: bool,
 ) -> ShardedGossipLocal {
-    let evt_handler = standard_responses(agents(num_agents), with_data).await;
+    let evt_handler = standard_responses(agents_with_full_arcs(num_agents), with_data).await;
     let (evt_sender, _) = spawn_handler(evt_handler).await;
     ShardedGossipLocal::test(GossipType::Historical, evt_sender, state)
 }
@@ -111,7 +103,7 @@ pub async fn setup_standard_player(state: ShardedGossipLocalState) -> ShardedGos
 }
 
 pub async fn setup_empty_player(state: ShardedGossipLocalState) -> ShardedGossipLocal {
-    let evt_handler = standard_responses(agents(2), false).await;
+    let evt_handler = standard_responses(agents_with_full_arcs(2), false).await;
     let (evt_sender, _) = spawn_handler(evt_handler).await;
     ShardedGossipLocal::test(GossipType::Historical, evt_sender, state)
 }
@@ -122,7 +114,15 @@ pub fn agents(num_agents: usize) -> Vec<Arc<KitsuneAgent>> {
         .collect()
 }
 
-async fn agent_info(agent: Arc<KitsuneAgent>) -> AgentInfoSigned {
+pub fn agents_with_full_arcs(num_agents: usize) -> Vec<(Arc<KitsuneAgent>, ArcInterval)> {
+    itertools::zip(
+        agents(num_agents).into_iter(),
+        std::iter::repeat(ArcInterval::Full),
+    )
+    .collect()
+}
+
+pub async fn agent_info(agent: Arc<KitsuneAgent>) -> AgentInfoSigned {
     AgentInfoSigned::sign(
             Arc::new(fixt!(KitsuneSpace)),
             agent,

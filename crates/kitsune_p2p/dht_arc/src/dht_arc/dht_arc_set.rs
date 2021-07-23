@@ -122,6 +122,10 @@ impl DhtArcSet {
         }
     }
 
+    pub fn contains(&self, t: T) -> bool {
+        self.overlap(&DhtArcSet::from(vec![(t.clone(), t)]))
+    }
+
     /// Cheap check if the two sets have a non-null intersection
     pub fn overlap(&self, other: &Self) -> bool {
         match (self, other) {
@@ -220,6 +224,21 @@ impl ArcInterval {
         Self::Bounded(bounds.0, bounds.1)
     }
 
+    pub fn contains<B: std::borrow::Borrow<T>>(&self, t: B) -> bool {
+        match self {
+            Self::Empty => false,
+            Self::Full => true,
+            Self::Bounded(lo, hi) => {
+                let t = t.borrow();
+                if lo <= hi {
+                    lo <= t && t <= hi
+                } else {
+                    lo <= t || t <= hi
+                }
+            }
+        }
+    }
+
     /// Represent an arc as an optional range of inclusive endpoints.
     /// If none, the arc length is 0
     pub fn to_bounds_grouped(&self) -> Option<(u32, u32)> {
@@ -241,4 +260,31 @@ impl ArcInterval {
 /// Check whether a bounded interval is equivalent to the Full interval
 fn is_full(start: u32, end: u32) -> bool {
     (start == MIN && end >= MAX) || end == start.wrapping_sub(1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn arc_contains() {
+        let convergent = ArcInterval::Bounded(10, 20);
+        let divergent = ArcInterval::Bounded(20, 10);
+
+        assert!(!convergent.contains(0));
+        assert!(!convergent.contains(5));
+        assert!(convergent.contains(10));
+        assert!(convergent.contains(15));
+        assert!(convergent.contains(20));
+        assert!(!convergent.contains(25));
+        assert!(!convergent.contains(u32::MAX));
+
+        assert!(divergent.contains(0));
+        assert!(divergent.contains(5));
+        assert!(divergent.contains(10));
+        assert!(!divergent.contains(15));
+        assert!(divergent.contains(20));
+        assert!(divergent.contains(25));
+        assert!(divergent.contains(u32::MAX));
+    }
 }

@@ -36,12 +36,7 @@ impl ShardedGossipLocal {
 
         // Check which ops are missing.
         let ops = self
-            .check_ops_bloom(
-                &local_agents_within_common_arc,
-                state,
-                remote_bloom,
-                max_ops,
-            )
+            .check_ops_bloom(local_agents_within_common_arc, state, remote_bloom, max_ops)
             .await?;
 
         // Chunk the ops into multiple gossip messages if needed.
