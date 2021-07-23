@@ -1,4 +1,4 @@
-use std::{hash::Hash, ops::Range};
+use std::ops::Range;
 
 use super::*;
 
@@ -109,24 +109,27 @@ impl ShardedGossipLocal {
         local_agents_within_arc_set: &Vec<(Arc<KitsuneAgent>, ArcInterval)>,
         state: RoundState,
         remote_bloom: TimedBloomFilter,
+        max_ops: usize,
     ) -> KitsuneResult<HashMap<Arc<KitsuneOpHash>, Vec<u8>>> {
         let RoundState { common_arc_set, .. } = state;
         let TimedBloomFilter {
             bloom: remote_bloom,
             time,
         } = remote_bloom;
-        if let Some((missing_hashes, _)) = store::all_ops_within_common_set(
+        if let Some((hashes, _)) = store::all_ops_within_common_set(
             &self.evt_sender,
             &self.space,
             local_agents_within_arc_set.clone(),
             &common_arc_set,
             time,
-            usize::MAX,
+            max_ops,
         )
         .await?
         {
-            todo!("ensure time window is in s/ms");
-            todo!("accept max ops param");
+            let missing_hashes = hashes
+                .into_iter()
+                .filter(|hash| !remote_bloom.check(&Arc::new(MetaOpKey::Op(hash.clone()))))
+                .collect();
             let agents = local_agents_within_arc_set
                 .iter()
                 .map(|(a, _)| a)

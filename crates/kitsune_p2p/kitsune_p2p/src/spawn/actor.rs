@@ -542,7 +542,7 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
     fn handle_fetch_op_hashes_for_constraints(
         &mut self,
         input: FetchOpHashesForConstraintsEvt,
-    ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, std::ops::Range<u64>)>> {
+    ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowMs)>> {
         Ok(self.evt_sender.fetch_op_hashes_for_constraints(input))
     }
 
@@ -744,7 +744,7 @@ mockall::mock! {
         fn handle_fetch_op_hashes_for_constraints(
             &mut self,
             input: FetchOpHashesForConstraintsEvt,
-        ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindow)>>;
+        ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowMs)>>;
 
         fn handle_fetch_op_hash_data(
             &mut self,

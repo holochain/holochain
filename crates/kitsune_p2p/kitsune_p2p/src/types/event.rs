@@ -16,7 +16,7 @@ pub struct FetchOpHashesForConstraintsEvt {
         kitsune_p2p_types::dht_arc::DhtArcSet,
     )>,
     /// The time window to search within.
-    pub window: std::ops::Range<u64>,
+    pub window_ms: TimeWindowMs,
     /// Maximum number of ops to return.
     pub max_ops: usize,
 }
@@ -157,8 +157,8 @@ pub enum MetricQueryAnswer {
     Oldest(Option<Arc<super::KitsuneAgent>>),
 }
 
-/// A time range, measured in (s? ms?)
-pub type TimeWindow = std::ops::Range<u64>;
+/// A time range, measured in milliseconds
+pub type TimeWindowMs = std::ops::Range<u64>;
 
 ghost_actor::ghost_chan! {
     /// The KitsuneP2pEvent stream allows handling events generated from the
@@ -202,7 +202,7 @@ ghost_actor::ghost_chan! {
 
         /// Gather a list of op-hashes from our implementor that meet criteria.
         /// Get the oldest and newest times for ops within a time window and max number of ops.
-        fn fetch_op_hashes_for_constraints(input: FetchOpHashesForConstraintsEvt) -> Option<(Vec<Arc<super::KitsuneOpHash>>, TimeWindow)>;
+        fn fetch_op_hashes_for_constraints(input: FetchOpHashesForConstraintsEvt) -> Option<(Vec<Arc<super::KitsuneOpHash>>, TimeWindowMs)>;
 
         /// Gather all op-hash data for a list of op-hashes from our implementor.
         fn fetch_op_hash_data(input: FetchOpHashDataEvt) -> Vec<(Arc<super::KitsuneOpHash>, Vec<u8>)>;

@@ -623,7 +623,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             //       is meant for a single Cell, i.e. allow batching in general
             HolochainP2pEvent::FetchOpHashesForConstraints {
                 dna_hash,
-                window,
+                window_ms: window,
                 max_ops,
                 respond,
                 ..

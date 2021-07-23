@@ -8,6 +8,7 @@ use kitsune_p2p::event::MetricDatum;
 use kitsune_p2p::event::MetricKind;
 use kitsune_p2p::event::MetricQuery;
 use kitsune_p2p::event::MetricQueryAnswer;
+use kitsune_p2p::event::TimeWindowMs;
 
 use crate::types::AgentPubKeyExt;
 
@@ -292,17 +293,15 @@ impl WrapEvtSender {
         &self,
         dna_hash: DnaHash,
         to_agents: Vec<(AgentPubKey, kitsune_p2p::dht_arc::DhtArcSet)>,
-        window: std::ops::Range<u64>,
+        window_ms: TimeWindowMs,
         max_ops: usize,
-    ) -> impl Future<
-        Output = HolochainP2pResult<Option<(Vec<holo_hash::DhtOpHash>, std::ops::Range<u64>)>>,
-    >
+    ) -> impl Future<Output = HolochainP2pResult<Option<(Vec<holo_hash::DhtOpHash>, TimeWindowMs)>>>
            + 'static
            + Send {
         timing_trace!(
             {
                 self.0
-                    .fetch_op_hashes_for_constraints(dna_hash, to_agents, window, max_ops)
+                    .fetch_op_hashes_for_constraints(dna_hash, to_agents, window_ms, max_ops)
             },
             "(hp2p:handle) fetch_op_hashes_for_constraints",
         )
@@ -844,12 +843,12 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         &mut self,
         input: kitsune_p2p::event::FetchOpHashesForConstraintsEvt,
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<
-        Option<(Vec<Arc<kitsune_p2p::KitsuneOpHash>>, std::ops::Range<u64>)>,
+        Option<(Vec<Arc<kitsune_p2p::KitsuneOpHash>>, TimeWindowMs)>,
     > {
         let kitsune_p2p::event::FetchOpHashesForConstraintsEvt {
             space,
             agents,
-            window,
+            window_ms: window,
             max_ops,
         } = input;
         let space = DnaHash::from_kitsune(&space);

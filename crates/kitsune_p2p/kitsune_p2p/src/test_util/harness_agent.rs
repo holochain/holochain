@@ -257,8 +257,7 @@ impl KitsuneP2pEventHandler for AgentHarness {
     fn handle_fetch_op_hashes_for_constraints(
         &mut self,
         _input: FetchOpHashesForConstraintsEvt,
-    ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<super::KitsuneOpHash>>, std::ops::Range<u64>)>>
-    {
+    ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<super::KitsuneOpHash>>, TimeWindowMs)>> {
         let hashes: Vec<Arc<super::KitsuneOpHash>> = self.gossip_store.keys().cloned().collect();
         let slug_hashes: Vec<Slug> = hashes.iter().map(|h| h.into()).collect();
         tracing::trace!(?slug_hashes, "FETCH_OP_HASHES");

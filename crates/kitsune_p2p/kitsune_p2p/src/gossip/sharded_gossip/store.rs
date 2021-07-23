@@ -12,7 +12,7 @@ use kitsune_p2p_types::{
 
 use crate::event::{
     FetchOpHashesForConstraintsEvt, GetAgentInfoSignedEvt, PutAgentInfoSignedEvt,
-    QueryAgentInfoSignedEvt, QueryGossipAgentsEvt,
+    QueryAgentInfoSignedEvt, QueryGossipAgentsEvt, TimeWindowMs,
 };
 use crate::types::event::KitsuneP2pEventSender;
 
@@ -118,7 +118,7 @@ pub(super) async fn all_ops_within_common_set(
     space: &Arc<KitsuneSpace>,
     agents: Vec<(Arc<KitsuneAgent>, ArcInterval)>,
     common_arc_set: &Arc<DhtArcSet>,
-    time_window: std::ops::Range<u64>,
+    window_ms: TimeWindowMs,
     max_ops: usize,
 ) -> KitsuneResult<Option<(Vec<Arc<KitsuneOpHash>>, Range<u64>)>> {
     let agents = agents
@@ -132,7 +132,7 @@ pub(super) async fn all_ops_within_common_set(
         .fetch_op_hashes_for_constraints(FetchOpHashesForConstraintsEvt {
             space: space.clone(),
             agents,
-            window: time_window,
+            window_ms,
             max_ops,
         })
         .await

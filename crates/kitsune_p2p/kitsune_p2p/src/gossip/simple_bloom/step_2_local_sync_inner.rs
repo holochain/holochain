@@ -49,7 +49,7 @@ impl Inner {
                 .fetch_op_hashes_for_constraints(FetchOpHashesForConstraintsEvt {
                     space: space.clone(),
                     agents: vec![(agent.clone(), ArcInterval::Full.into())],
-                    window: u64::MIN..u64::MAX,
+                    window_ms: u64::MIN..u64::MAX,
                     max_ops: usize::MAX,
                 })
                 .await

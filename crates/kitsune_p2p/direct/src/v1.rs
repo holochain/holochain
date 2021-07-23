@@ -896,18 +896,18 @@ async fn handle_gossip(
 async fn handle_fetch_op_hashes_for_constraints(
     kdirect: Arc<Kd1>,
     input: FetchOpHashesForConstraintsEvt,
-) -> KdResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindow)>> {
+) -> KdResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowMs)>> {
     let FetchOpHashesForConstraintsEvt {
         space,
         agents,
-        window,
+        window_ms: window,
         max_ops,
         ..
     } = input;
 
     todo!(
         "reimplement for new api,
-        in particular making sure the time window lines up"
+        in particular making sure the time window lines up (s -> ms)"
     );
 
     // let root = KdHash::from_kitsune_space(&space);

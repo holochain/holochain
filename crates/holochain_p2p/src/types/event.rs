@@ -7,7 +7,7 @@ use crate::*;
 use holochain_zome_types::signature::Signature;
 use kitsune_p2p::{
     agent_store::AgentInfoSigned,
-    event::{MetricKind, MetricQuery, MetricQueryAnswer},
+    event::{MetricKind, MetricQuery, MetricQueryAnswer, TimeWindowMs},
 };
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
@@ -214,9 +214,9 @@ ghost_actor::ghost_chan! {
         fn fetch_op_hashes_for_constraints(
             dna_hash: DnaHash,
             to_agents: Vec<(AgentPubKey, kitsune_p2p::dht_arc::DhtArcSet)>,
-            window: std::ops::Range<u64>,
+            window_ms: TimeWindowMs,
             max_ops: usize,
-        ) -> Option<(Vec<holo_hash::DhtOpHash>, std::ops::Range<u64>)>;
+        ) -> Option<(Vec<holo_hash::DhtOpHash>, TimeWindowMs)>;
 
         /// The p2p module needs access to the content for a given set of DhtOpHashes.
         fn fetch_op_hash_data(

@@ -604,13 +604,13 @@ impl Cell {
     pub(super) async fn handle_fetch_op_hashes_for_constraints(
         &self,
         dht_arc_set: DhtArcSet,
-        window: std::ops::Range<u64>,
+        window_ms: TimeWindowMs,
     ) -> CellResult<Vec<(DhtOpHash, u64)>> {
         let mut results = Vec::new();
 
         // The exclusive window bounds.
-        let start = window.start;
-        let end = window.end;
+        let start = window_ms.start;
+        let end = window_ms.end;
 
         // For each interval in the set, fetch the hashes and timestamps.
         for interval in dht_arc_set.intervals() {
