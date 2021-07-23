@@ -86,6 +86,10 @@ pub mod tuning_params_struct {
         /// The gossip loop will attempt to rate-limit output
         /// to this count mega bits per second. [Default: 0.5]
         gossip_output_target_mbps: f64 = 0.5,
+        
+        /// The gossip loop will attempt to rate-limit input
+        /// to this count mega bits per second. [Default: 0.5]
+        gossip_inbound_target_mbps: f64 = 0.5,
 
         /// How long should we hold off talking to a peer
         /// we've previously spoken successfully to.

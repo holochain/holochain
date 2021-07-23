@@ -8,6 +8,9 @@ use crate::types::event::*;
 use crate::types::gossip::*;
 use crate::types::*;
 use ghost_actor::dependencies::tracing;
+use governor::clock::DefaultClock;
+use governor::state::{InMemoryState, NotKeyed};
+use governor::RateLimiter;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::*;
 use kitsune_p2p_types::dht_arc::{ArcInterval, DhtArcSet};
@@ -20,6 +23,7 @@ use std::ops::Range;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
+use self::bandwidth::Bandwidth;
 use self::initiate::decode_timed_bloom_filter;
 use self::state_map::RoundStateMap;
 
@@ -32,6 +36,8 @@ mod initiate;
 mod ops;
 mod state_map;
 mod store;
+
+mod bandwidth;
 
 #[cfg(test)]
 mod tests;
@@ -75,6 +81,8 @@ pub struct ShardedGossip {
     ep_hnd: Tx2EpHnd<wire::Wire>,
     /// The internal mutable state
     inner: Share<ShardedGossipState>,
+    /// Bandwidth for incoming and outgoing gossip.
+    bandwidth: Bandwidth,
 }
 
 impl ShardedGossip {
@@ -87,6 +95,10 @@ impl ShardedGossip {
         gossip_type: GossipType,
     ) -> Arc<Self> {
         let mut inner = ShardedGossipLocalState::default();
+        let bandwidth = Bandwidth::new(
+            tuning_params.gossip_inbound_target_mbps,
+            tuning_params.gossip_output_target_mbps,
+        );
         inner.tuning_params = tuning_params.clone();
         let this = Arc::new(Self {
             ep_hnd,
@@ -98,6 +110,7 @@ impl ShardedGossip {
                 inner: Share::new(inner),
                 gossip_type,
             },
+            bandwidth,
         });
         metric_task({
             let this = this.clone();
@@ -118,6 +131,7 @@ impl ShardedGossip {
     async fn process_outgoing(&self, outgoing: Outgoing) -> KitsuneResult<()> {
         let (_endpoint, how, gossip) = outgoing;
         let gossip = gossip.encode_vec().map_err(KitsuneError::other)?;
+        let bytes = gossip.len();
         let gossip = wire::Wire::gossip(
             self.gossip.space.clone(),
             gossip.into(),
@@ -139,15 +153,17 @@ impl ShardedGossip {
             }
             HowToConnect::Url(url) => self.ep_hnd.get_connection(url, timeout).await?,
         };
-        // TODO: Wait for enough available outgoing bandwidth here before
+        // Wait for enough available outgoing bandwidth here before
         // actually sending the gossip.
+        self.bandwidth.outgoing_bytes(bytes).await;
         con.notify(&gossip, timeout).await?;
         Ok(())
     }
 
     async fn process_incoming_outgoing(&self) -> KitsuneResult<()> {
         let (incoming, outgoing) = self.pop_queues()?;
-        if let Some((con, msg)) = incoming {
+        if let Some((con, msg, bytes)) = incoming {
+            self.bandwidth.incoming_bytes(bytes).await;
             let outgoing = match self.gossip.process_incoming(con.peer_cert(), msg).await {
                 Ok(r) => r,
                 Err(e) => {
@@ -224,7 +240,7 @@ pub struct ShardedGossipLocal {
 }
 
 /// Incoming gossip.
-type Incoming = (Tx2ConHnd<wire::Wire>, ShardedGossipWire);
+type Incoming = (Tx2ConHnd<wire::Wire>, ShardedGossipWire, usize);
 /// Outgoing gossip.
 type Outgoing = (GossipTgt, HowToConnect, ShardedGossipWire);
 
@@ -452,15 +468,22 @@ impl ShardedGossipLocal {
         current_rounds: HashSet<Tx2Cert>,
     ) -> KitsuneResult<Option<(GossipTgt, TxUrl)>> {
         // Get the time range for this gossip.
-        let mut remote_agents_within_arc_set =
+        let mut remote_agents_within_arc_set: Vec<_> =
             store::agents_within_arcset(&self.evt_sender, &self.space, &agent, arc_set.clone())
                 .await?
                 .into_iter()
-                .filter(|(a, _)| !local_agents.contains(a));
+                .filter(|(a, _)| !local_agents.contains(a))
+                .collect();
 
-        // Get the first remote endpoint.
-        // TODO: Make this more intelligent and don't just choose the first.
-        match remote_agents_within_arc_set.next() {
+        // Get a random remote endpoint.
+        {
+            use rand::prelude::*;
+            let mut rng = thread_rng();
+            // randomize the keys
+            remote_agents_within_arc_set.shuffle(&mut rng);
+        }
+
+        match remote_agents_within_arc_set.into_iter().next() {
             Some((remote_agent, _)) => {
                 Ok(
                     // Get the agent info for the chosen remote agent.
@@ -590,10 +613,10 @@ impl AsGossipModule for ShardedGossip {
         gossip_data: Box<[u8]>,
     ) -> KitsuneResult<()> {
         use kitsune_p2p_types::codec::*;
-        let (_, gossip) =
+        let (bytes, gossip) =
             ShardedGossipWire::decode_ref(&gossip_data).map_err(KitsuneError::other)?;
         self.inner.share_mut(move |i, _| {
-            i.incoming.push_back((con, gossip));
+            i.incoming.push_back((con, gossip, bytes as usize));
             if i.incoming.len() > 20 {
                 tracing::warn!(
                     "Overloaded with incoming gossip.. {} messages",
@@ -619,6 +642,7 @@ impl AsGossipModule for ShardedGossip {
     }
 
     fn close(&self) {
+        // TODO: Close.
         todo!()
     }
 }
