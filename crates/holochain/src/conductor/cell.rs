@@ -41,6 +41,7 @@ use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
+use kitsune_p2p::event::TimeWindowMs;
 use observability::OpenSpanExt;
 use std::hash::Hash;
 use std::hash::Hasher;
@@ -235,15 +236,11 @@ impl Cell {
             | GetAgentInfoSigned { .. }
             | QueryAgentInfoSigned { .. }
             | QueryGossipAgents { .. }
-            // This event is an aggregate over a set of cells, so needs to be handled at the conductor level.
-            | HashesForTimeWindow { .. }
-            | QueryAgentInfoSignedNearBasis { .. } => {
-                // PutAgentInfoSigned needs to be handled at the conductor level where the p2p
-                // store lives.
-                unreachable!()
-            }
-            PutMetricDatum { .. } | QueryMetrics { .. } => {
-                // Same goes for metrics
+            | FetchOpHashesForConstraints { .. }
+            | QueryAgentInfoSignedNearBasis { .. }
+            | PutMetricDatum { .. }
+            | QueryMetrics { .. } => {
+                // These events are aggregated over a set of cells, so need to be handled at the conductor level.
                 unreachable!()
             }
             CallRemote {

@@ -623,7 +623,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             //       is meant for a single Cell, i.e. allow batching in general
             HolochainP2pEvent::FetchOpHashesForConstraints {
                 dna_hash,
-                window_ms: window,
+                to_agents,
+                window_ms,
                 max_ops,
                 respond,
                 ..
@@ -636,7 +637,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                     let cell_id = CellId::new(dna_hash.clone(), agent);
                     let cell = self.cell_by_id(&cell_id).await?;
                     match cell
-                        .handle_fetch_op_hashes_for_constraints(arc_set, window.clone())
+                        .handle_fetch_op_hashes_for_constraints(arc_set, window_ms.clone())
                         .await
                     {
                         Ok(t) => hashes_and_times.extend(t),
