@@ -12,27 +12,25 @@ use futures::future::join_all;
 pub fn get_links<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: GetLinksInput,
+    inputs: Vec<GetLinksInput>,
 ) -> Result<Vec<Links>, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ read_workspace: Permission::Allow, .. } => {
-            let GetLinksInput {
-                base_addresses,
-                tag_prefix,
-            } = input;
-
-            // Get zome id
-            let zome_id = ribosome
-                .zome_to_id(&call_context.zome)
-                .expect("Failed to get ID for current zome.");
-
             let results: Vec<Result<Vec<Link>, _>> = tokio_helper::block_forever_on(async move {
-                join_all(base_addresses.into_iter().map(|base_address| {
+                join_all(inputs.into_iter().map(|input| {
+                    let GetLinksInput {
+                        base_address,
+                        tag_prefix,
+                    } = input;
+                    // Get zome id
+                    let zome_id = ribosome
+                        .zome_to_id(&call_context.zome)
+                        .expect("Failed to get ID for current zome.");
                     // Create the key
                     let key = WireLinkKey {
                         base: base_address,
                         zome_id,
-                        tag: tag_prefix.clone(),
+                        tag: tag_prefix,
                     };
                     Cascade::from_workspace_network(
                         call_context.host_context.workspace(),

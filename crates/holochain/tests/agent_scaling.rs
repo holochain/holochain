@@ -26,9 +26,7 @@ fn links_zome() -> InlineZome {
         .callback(
             "get_links",
             move |api: BoxApi, base: EntryHash| -> InlineZomeResult<Vec<Links>> {
-                let result = api.get_links(GetLinksInput::new(vec![base], None));
-                dbg!(&result);
-                Ok(result?)
+                Ok(api.get_links(vec![GetLinksInput::new(base, None)])?)
             },
         )
 }

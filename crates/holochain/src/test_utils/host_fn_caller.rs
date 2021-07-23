@@ -285,9 +285,9 @@ impl HostFnCaller {
         _options: GetLinksOptions,
     ) -> Vec<Link> {
         let (_, ribosome, call_context, workspace_lock) = self.unpack().await;
-        let input = GetLinksInput::new(vec![base], link_tag);
+        let input = GetLinksInput::new(base, link_tag);
         let output = {
-            host_fn::get_links::get_links(ribosome, call_context, input)
+            host_fn::get_links::get_links(ribosome, call_context, vec![input])
                 .unwrap()
                 .into_iter()
                 .next()
@@ -307,9 +307,9 @@ impl HostFnCaller {
         _options: GetLinksOptions,
     ) -> Vec<(SignedHeaderHashed, Vec<SignedHeaderHashed>)> {
         let (_, ribosome, call_context, workspace_lock) = self.unpack().await;
-        let input = GetLinksInput::new(vec![base], Some(tag));
+        let input = GetLinksInput::new(base, Some(tag));
         let output = {
-            host_fn::get_link_details::get_link_details(ribosome, call_context, input)
+            host_fn::get_link_details::get_link_details(ribosome, call_context, vec![input])
                 .unwrap()
                 .into_iter()
                 .next()

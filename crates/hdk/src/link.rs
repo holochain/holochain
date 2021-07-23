@@ -116,17 +116,14 @@ pub fn delete_link(add_link_header: HeaderHash) -> ExternResult<HeaderHash> {
 ///
 /// See [ `get_link_details` ].
 pub fn get_links(base: EntryHash, link_tag: Option<LinkTag>) -> ExternResult<Links> {
-    Ok(get_links_multi(vec![base], link_tag)?
+    Ok(HDK
+        .with(|h| {
+            h.borrow()
+                .get_links(vec![GetLinksInput::new(base, link_tag)])
+        })?
         .into_iter()
         .next()
         .unwrap())
-}
-
-pub fn get_links_multi(
-    bases: Vec<EntryHash>,
-    link_tag: Option<LinkTag>,
-) -> ExternResult<Vec<Links>> {
-    HDK.with(|h| h.borrow().get_links(GetLinksInput::new(bases, link_tag)))
 }
 
 /// Get all link creates and deletes that reference a base entry hash, optionally filtered by tag
@@ -149,18 +146,12 @@ pub fn get_links_multi(
 ///
 /// See [ `get_links` ].
 pub fn get_link_details(base: EntryHash, link_tag: Option<LinkTag>) -> ExternResult<LinkDetails> {
-    Ok(get_link_details_multi(vec![base], link_tag)?
+    Ok(HDK
+        .with(|h| {
+            h.borrow()
+                .get_link_details(vec![GetLinksInput::new(base, link_tag)])
+        })?
         .into_iter()
         .next()
         .unwrap())
-}
-
-pub fn get_link_details_multi(
-    bases: Vec<EntryHash>,
-    link_tag: Option<LinkTag>,
-) -> ExternResult<Vec<LinkDetails>> {
-    HDK.with(|h| {
-        h.borrow()
-            .get_link_details(GetLinksInput::new(bases, link_tag))
-    })
 }
