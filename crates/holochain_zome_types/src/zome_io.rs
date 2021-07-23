@@ -131,7 +131,7 @@ wasm_io_types! {
 
     fn get_agent_activity (zt::agent_activity::GetAgentActivityInput) -> zt::query::AgentActivity;
 
-    fn get_details (zt::entry::GetInput) -> Vec<Option<zt::metadata::Details>>;
+    fn get_details (Vec<zt::entry::GetInput>) -> Vec<Option<zt::metadata::Details>>;
 
     fn get_link_details (zt::link::GetLinksInput) -> Vec<zt::link::LinkDetails>;
 
@@ -139,7 +139,7 @@ wasm_io_types! {
     fn get_links (zt::link::GetLinksInput) -> Vec<zt::link::Links>;
 
     // Attempt to get a live entry from the cascade.
-    fn get (zt::entry::GetInput) -> Vec<Option<zt::element::Element>>;
+    fn get (Vec<zt::entry::GetInput>) -> Vec<Option<zt::element::Element>>;
 
     // Hash an entry on the host.
     fn hash_entry (zt::entry::Entry) -> holo_hash::EntryHash;

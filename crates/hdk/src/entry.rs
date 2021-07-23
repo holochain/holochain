@@ -209,19 +209,14 @@ pub fn get<H>(hash: H, options: GetOptions) -> ExternResult<Option<Element>>
 where
     AnyDhtHash: From<H>,
 {
-    Ok(get_multi(vec![hash], options)?.into_iter().next().unwrap())
-}
-
-pub fn get_multi<H>(hashes: Vec<H>, options: GetOptions) -> ExternResult<Vec<Option<Element>>>
-where
-    AnyDhtHash: From<H>,
-{
-    HDK.with(|h| {
-        h.borrow().get(GetInput::new(
-            hashes.into_iter().map(AnyDhtHash::from).collect(),
-            options,
-        ))
-    })
+    Ok(HDK
+        .with(|h| {
+            h.borrow()
+                .get(vec![GetInput::new(AnyDhtHash::from(hash), options)])
+        })?
+        .into_iter()
+        .next()
+        .unwrap())
 }
 
 /// MUST get an EntryHashed at a given EntryHash.
@@ -375,22 +370,14 @@ pub fn get_details<H: Into<AnyDhtHash>>(
     hash: H,
     options: GetOptions,
 ) -> ExternResult<Option<Details>> {
-    Ok(get_details_multi(vec![hash], options)?
+    Ok(HDK
+        .with(|h| {
+            h.borrow()
+                .get_details(vec![GetInput::new(hash.into(), options)])
+        })?
         .into_iter()
         .next()
         .unwrap())
-}
-
-pub fn get_details_multi<H: Into<AnyDhtHash>>(
-    hashes: Vec<H>,
-    options: GetOptions,
-) -> ExternResult<Vec<Option<Details>>> {
-    HDK.with(|h| {
-        h.borrow().get_details(GetInput::new(
-            hashes.into_iter().map(|hash| hash.into()).collect(),
-            options,
-        ))
-    })
 }
 
 /// Trait for binding static [ `EntryDef` ] property access for a type.

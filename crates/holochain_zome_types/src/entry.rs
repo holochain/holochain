@@ -218,19 +218,16 @@ impl AsRef<crate::EntryDefId> for EntryWithDefId {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct GetInput {
     /// Any DHT hash to pass to get or get_details.
-    pub any_dht_hashes: Vec<holo_hash::AnyDhtHash>,
+    pub any_dht_hash: holo_hash::AnyDhtHash,
     /// Options for the call.
     pub get_options: crate::entry::GetOptions,
 }
 
 impl GetInput {
     /// Constructor.
-    pub fn new(
-        any_dht_hashes: Vec<holo_hash::AnyDhtHash>,
-        get_options: crate::entry::GetOptions,
-    ) -> Self {
+    pub fn new(any_dht_hash: holo_hash::AnyDhtHash, get_options: crate::entry::GetOptions) -> Self {
         Self {
-            any_dht_hashes,
+            any_dht_hash,
             get_options,
         }
     }

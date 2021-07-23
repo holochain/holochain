@@ -65,11 +65,11 @@ fn simple_crud_zome() -> InlineZome {
             Ok(hash)
         })
         .callback("read", |api, hash: HeaderHash| {
-            api.get(GetInput::new(vec![hash.into()], GetOptions::default()))
+            api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
                 .map_err(Into::into)
         })
         .callback("read_entry", |api, hash: EntryHash| {
-            api.get(GetInput::new(vec![hash.into()], GetOptions::default()))
+            api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
                 .map_err(Into::into)
         })
         // TODO: let this accept a usize, once the hdk refactor is merged
@@ -340,7 +340,7 @@ fn simple_validation_zome() -> InlineZome {
             Ok(hash)
         })
         .callback("read", |api, hash: HeaderHash| {
-            api.get(GetInput::new(vec![hash.into()], GetOptions::default()))
+            api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
                 .map_err(Into::into)
         })
         .callback("validate_create_entry", |_api, data: ValidateData| {

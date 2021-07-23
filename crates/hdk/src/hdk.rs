@@ -38,8 +38,8 @@ pub trait HdkT: Send + Sync {
     fn update(&self, update_input: UpdateInput) -> ExternResult<HeaderHash>;
     fn delete(&self, hash: HeaderHash) -> ExternResult<HeaderHash>;
     fn hash_entry(&self, entry: Entry) -> ExternResult<EntryHash>;
-    fn get(&self, get_input: GetInput) -> ExternResult<Vec<Option<Element>>>;
-    fn get_details(&self, get_input: GetInput) -> ExternResult<Vec<Option<Details>>>;
+    fn get(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Element>>>;
+    fn get_details(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Details>>>;
     fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed>;
     fn must_get_header(
         &self,
@@ -132,10 +132,10 @@ impl HdkT for ErrHdk {
     fn hash_entry(&self, _: Entry) -> ExternResult<EntryHash> {
         Self::err()
     }
-    fn get(&self, _: GetInput) -> ExternResult<Vec<Option<Element>>> {
+    fn get(&self, _: Vec<GetInput>) -> ExternResult<Vec<Option<Element>>> {
         Self::err()
     }
-    fn get_details(&self, _: GetInput) -> ExternResult<Vec<Option<Details>>> {
+    fn get_details(&self, _: Vec<GetInput>) -> ExternResult<Vec<Option<Details>>> {
         Self::err()
     }
     fn must_get_entry(&self, _: MustGetEntryInput) -> ExternResult<EntryHashed> {
@@ -278,11 +278,11 @@ impl HdkT for HostHdk {
     fn hash_entry(&self, entry: Entry) -> ExternResult<EntryHash> {
         host_call::<Entry, EntryHash>(__hash_entry, entry)
     }
-    fn get(&self, get_input: GetInput) -> ExternResult<Vec<Option<Element>>> {
-        host_call::<GetInput, Vec<Option<Element>>>(__get, get_input)
+    fn get(&self, get_inputs: Vec<GetInput>) -> ExternResult<Vec<Option<Element>>> {
+        host_call::<Vec<GetInput>, Vec<Option<Element>>>(__get, get_inputs)
     }
-    fn get_details(&self, get_input: GetInput) -> ExternResult<Vec<Option<Details>>> {
-        host_call::<GetInput, Vec<Option<Details>>>(__get_details, get_input)
+    fn get_details(&self, get_inputs: Vec<GetInput>) -> ExternResult<Vec<Option<Details>>> {
+        host_call::<Vec<GetInput>, Vec<Option<Details>>>(__get_details, get_inputs)
     }
     fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed> {
         host_call::<MustGetEntryInput, EntryHashed>(__must_get_entry, must_get_entry_input)
