@@ -50,6 +50,7 @@ macro_rules! make_kitsune_bin_type {
                 serde::Serialize,
                 serde::Deserialize,
             )]
+            #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
             #[shrinkwrap(mutable)]
             pub struct $name(#[serde(with = "serde_bytes")] pub Vec<u8>);
 

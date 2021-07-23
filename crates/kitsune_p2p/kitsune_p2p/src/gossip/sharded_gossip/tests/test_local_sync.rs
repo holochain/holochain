@@ -14,18 +14,19 @@ use super::*;
 /// This has the effect of allowing arbitrary overlapping arcs to be defined,
 /// backed by real op hash data, without worrying about particular DHT locations
 /// (which would have to be searched for).
-fn generate_ops_for_overlapping_arcs(
+fn generate_ops_for_overlapping_arcs<'a>(
+    entropy: &mut arbitrary::Unstructured<'a>,
     ownership: Vec<HashSet<Arc<KitsuneAgent>>>,
 ) -> Vec<(
     Arc<KitsuneAgent>,
     ArcInterval,
     Vec<(KitsuneOpHash, TimestampMs)>,
 )> {
-    let mut arcs = HashMap::new();
+    let mut arcs: HashMap<Arc<KitsuneAgent>, ((u32, u32), Vec<KitsuneOpHash>)> = HashMap::new();
     // create one op per "ownership" item
-    let mut ops: Vec<_> = ownership
+    let mut ops: Vec<KitsuneOpHash> = ownership
         .iter()
-        .map(|_| todo!("KitsuneOpHash fixture"))
+        .map(|_| KitsuneOpHash::arbitrary(entropy).unwrap())
         .collect();
     // sort ops by location
     ops.sort_by_key(|op| op.get_loc());
@@ -53,7 +54,7 @@ fn generate_ops_for_overlapping_arcs(
 #[tokio::test(flavor = "multi_thread")]
 async fn local_sync_scenario() {
     let mut u = arbitrary::Unstructured::new(&NOISE);
-    let agents = generate_ops_for_overlapping_arcs(vec![]);
+    let agents = generate_ops_for_overlapping_arcs(&mut u, vec![]);
     let evt_handler = handler_builder(agents).await;
     let (evt_sender, _) = spawn_handler(evt_handler).await;
     let _gossip = ShardedGossipLocal::test(GossipType::Recent, evt_sender, Default::default());
