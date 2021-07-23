@@ -130,6 +130,8 @@ impl ShardedGossip {
 
     async fn process_outgoing(&self, outgoing: Outgoing) -> KitsuneResult<()> {
         let (_endpoint, how, gossip) = outgoing;
+        let s = tracing::trace_span!("process_outgoing", cert = ?_endpoint.cert());
+        s.in_scope(|| tracing::trace!("{:?}: {:?}", _endpoint.cert(), gossip));
         let gossip = gossip.encode_vec().map_err(KitsuneError::other)?;
         let bytes = gossip.len();
         let gossip = wire::Wire::gossip(
@@ -398,8 +400,19 @@ impl ShardedGossipLocal {
         cert: Tx2Cert,
         msg: ShardedGossipWire,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
-        // TODO: How do we route the gossip to the right loop type (recent vs historical)
-
+        let s = tracing::trace_span!("process_incoming", ?cert, ?msg);
+        self.inner
+            .share_mut(|i, _| {
+                s.in_scope(|| {
+                    tracing::trace!(
+                        "Tgt: {:?}, State: {:?}",
+                        i.initiate_tgt.as_ref().map(|t| t.0.cert()),
+                        i.round_map
+                    )
+                });
+                Ok(())
+            })
+            .ok();
         // If we don't have the state for a message then the other node will need to timeout.
         Ok(match msg {
             ShardedGossipWire::Initiate(Initiate { intervals, id }) => {

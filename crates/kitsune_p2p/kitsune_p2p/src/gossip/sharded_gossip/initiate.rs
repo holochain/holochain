@@ -66,14 +66,23 @@ impl ShardedGossipLocal {
         remote_arc_set: Vec<ArcInterval>,
         remote_id: u8,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
-        let (local_agents, same_as_target) = self.inner.share_mut(|i, _| {
-            let same_as_target = i
-                .initiate_tgt
-                .as_ref()
-                .filter(|tgt| *tgt.0.cert() == peer_cert)
-                .map(|tgt| tgt.1);
-            Ok((i.local_agents.clone(), same_as_target))
-        })?;
+        let (local_agents, same_as_target, already_in_progress) =
+            self.inner.share_mut(|i, _| {
+                let already_in_progress = i.round_map.round_exists(&peer_cert);
+                let same_as_target = i
+                    .initiate_tgt
+                    .as_ref()
+                    .filter(|tgt| *tgt.0.cert() == peer_cert)
+                    .map(|tgt| tgt.1);
+                Ok((i.local_agents.clone(), same_as_target, already_in_progress))
+            })?;
+
+        // The round is already in progress from our side.
+        // The remote side should not be initiating.
+        if already_in_progress {
+            // TODO: Send back a response.
+            return Ok(Vec::with_capacity(0));
+        }
 
         // If this is the same connection as our current target then we need to decide who proceeds.
         if let Some(our_id) = same_as_target {

@@ -75,13 +75,14 @@ impl ShardedGossipLocal {
             &self.space,
             local_agents_within_arc_set,
             common_arc_set,
-            time_range,
+            time_range.clone(),
+            // FIXME: Does this make any sense for historical bloom?
             Self::UPPER_HASHES_BOUND,
         )
         .await?;
 
         // If there are none then don't create a bloom.
-        let (ops_within_common_arc, time) = match result {
+        let (ops_within_common_arc, _time) = match result {
             Some(r) => r,
             None => return Ok(None),
         };
@@ -92,7 +93,12 @@ impl ShardedGossipLocal {
         for hash in ops_within_common_arc {
             bloom.set(&Arc::new(MetaOpKey::Op(hash)));
         }
-        let bloom = TimedBloomFilter { bloom, time };
+        // FIXME: This time not right but we need to generate blooms for the
+        // whole time range for this to work.
+        let bloom = TimedBloomFilter {
+            bloom,
+            time: time_range,
+        };
         Ok(Some(bloom))
     }
 
@@ -126,7 +132,7 @@ impl ShardedGossipLocal {
         )
         .await?
         {
-            let missing_hashes = hashes
+            let missing_hashes: Vec<_> = hashes
                 .into_iter()
                 .filter(|hash| !remote_bloom.check(&Arc::new(MetaOpKey::Op(hash.clone()))))
                 .collect();

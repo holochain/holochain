@@ -156,7 +156,7 @@ pub struct DhtArc {
     pub center_loc: DhtLocation,
 
     /// The "half-length" of this dht arc
-    pub half_length: u32,
+    half_length: u32,
 }
 
 impl DhtArc {

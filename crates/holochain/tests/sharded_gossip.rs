@@ -53,7 +53,9 @@ async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
 
     // Wait long enough for Bob to receive gossip
     consistency_10s(&all_cells).await;
-
+    // let p2p = conductors[0].envs().p2p().lock().values().next().cloned().unwrap();
+    // holochain_state::prelude::dump_tmp(&p2p);
+    // holochain_state::prelude::dump_tmp(&alice.env());
     // Verify that bobbo can run "read" on his cell and get alice's Header
     let element: Option<Element> = conductors[1].call(&bobbo.zome("zome1"), "read", hash).await;
     let element = element.expect("Element was None: bobbo couldn't `get` it");
