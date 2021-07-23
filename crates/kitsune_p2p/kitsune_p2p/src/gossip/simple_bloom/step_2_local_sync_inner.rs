@@ -81,7 +81,7 @@ impl Inner {
             if let Ok(agent_infos) = evt_sender
                 .query_agent_info_signed(QueryAgentInfoSignedEvt {
                     space: space.clone(),
-                    agent: agent.clone(),
+                    agents: None,
                 })
                 .await
             {

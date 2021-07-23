@@ -13,14 +13,13 @@ impl ShardedGossipLocal {
     /// - Expect this function to complete in an average of 10 ms and worst case 100 ms.
     pub(super) async fn generate_agent_bloom(
         &self,
-        agent: &Arc<KitsuneAgent>,
         state: RoundState,
     ) -> KitsuneResult<Option<BloomFilter>> {
         let RoundState { common_arc_set, .. } = state;
         // Get the time range for this gossip.
         // Get all the agent info that is within the common arc set.
         let agents_within_arc: Vec<_> =
-            store::agent_info_within_arc_set(&self.evt_sender, &self.space, agent, common_arc_set)
+            store::agent_info_within_arc_set(&self.evt_sender, &self.space, common_arc_set)
                 .await?
                 // Need to collect to know the length for the bloom filter.
                 .collect();
@@ -53,21 +52,16 @@ impl ShardedGossipLocal {
     pub(super) async fn generate_ops_bloom(
         &self,
         local_agents: &HashSet<Arc<KitsuneAgent>>,
-        agent: &Arc<KitsuneAgent>,
         common_arc_set: &Arc<DhtArcSet>,
         time_range: Range<u64>,
     ) -> KitsuneResult<Option<TimedBloomFilter>> {
         // Get the agents withing the arc set and filter by local.
-        let local_agents_within_arc_set: Vec<_> = store::agents_within_arcset(
-            &self.evt_sender,
-            &self.space,
-            &agent,
-            common_arc_set.clone(),
-        )
-        .await?
-        .into_iter()
-        .filter(|(a, _)| local_agents.contains(a))
-        .collect();
+        let local_agents_within_arc_set: Vec<_> =
+            store::agents_within_arcset(&self.evt_sender, &self.space, common_arc_set.clone())
+                .await?
+                .into_iter()
+                .filter(|(a, _)| local_agents.contains(a))
+                .collect();
 
         // Get the op hashes which fit within the common arc set from these local agents.
         let result = store::all_ops_within_common_set(

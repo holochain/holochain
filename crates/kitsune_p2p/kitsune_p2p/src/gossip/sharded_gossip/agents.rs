@@ -24,7 +24,7 @@ impl ShardedGossipLocal {
         // Get all agents within common arc and filter out
         // the ones in the remote bloom.
         let missing: Vec<_> =
-            store::agent_info_within_arc_set(&self.evt_sender, &self.space, &agent, common_arc_set)
+            store::agent_info_within_arc_set(&self.evt_sender, &self.space, common_arc_set)
                 .await?
                 .filter(|info| {
                     // Check them against the bloom
@@ -69,7 +69,7 @@ impl ShardedGossipLocal {
         // Get all the local agents that are relevant to this
         // common arc set.
         let agents_within_common_arc: HashSet<_> =
-            store::agents_within_arcset(&self.evt_sender, &self.space, &agent, common_arc_set)
+            store::agents_within_arcset(&self.evt_sender, &self.space, common_arc_set)
                 .await?
                 .into_iter()
                 .map(|(a, _)| a)

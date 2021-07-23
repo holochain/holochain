@@ -22,12 +22,11 @@ use super::EventSender;
 pub(super) async fn all_agent_info(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
-    agent: &Arc<KitsuneAgent>,
 ) -> KitsuneResult<Vec<AgentInfoSigned>> {
     Ok(evt_sender
         .query_agent_info_signed(QueryAgentInfoSignedEvt {
             space: space.clone(),
-            agent: agent.clone(),
+            agents: None,
         })
         .await
         .map_err(KitsuneError::other)?)
@@ -49,16 +48,18 @@ pub(super) async fn get_agent_info(
 }
 
 /// Get all `AgentInfoSigned` for local agents in a space.
-pub(super) async fn local_agent_info<'iter>(
+pub(super) async fn query_agent_info(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
-    agent: &Arc<KitsuneAgent>,
-    local_agents: &'iter HashSet<Arc<KitsuneAgent>>,
-) -> KitsuneResult<impl Iterator<Item = AgentInfoSigned> + 'iter> {
-    Ok(all_agent_info(evt_sender, space, agent)
-        .await?
-        .into_iter()
-        .filter(move |info| local_agents.contains(info.agent.as_ref())))
+    agents: &HashSet<Arc<KitsuneAgent>>,
+) -> KitsuneResult<Vec<AgentInfoSigned>> {
+    Ok(evt_sender
+        .query_agent_info_signed(QueryAgentInfoSignedEvt {
+            space: space.clone(),
+            agents: Some(agents.into_iter().cloned().collect()),
+        })
+        .await
+        .map_err(KitsuneError::other)?)
 }
 
 /// Get the arc intervals for all local agents.
@@ -66,10 +67,10 @@ pub(super) async fn local_agent_arcs(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
     local_agents: &HashSet<Arc<KitsuneAgent>>,
-    agent: &Arc<KitsuneAgent>,
 ) -> KitsuneResult<Vec<ArcInterval>> {
-    Ok(local_agent_info(evt_sender, space, agent, local_agents)
+    Ok(query_agent_info(evt_sender, space, local_agents)
         .await?
+        .into_iter()
         .map(|info| info.storage_arc.interval())
         .collect::<Vec<_>>())
 }
@@ -78,15 +79,14 @@ pub(super) async fn local_agent_arcs(
 pub(super) async fn agent_info_within_arc_set(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
-    agent: &Arc<KitsuneAgent>,
     arc_set: Arc<DhtArcSet>,
 ) -> KitsuneResult<impl Iterator<Item = AgentInfoSigned>> {
-    let set: HashSet<_> = agents_within_arcset(evt_sender, space, agent, arc_set)
+    let set: HashSet<_> = agents_within_arcset(evt_sender, space, arc_set)
         .await?
         .into_iter()
         .map(|(a, _)| a)
         .collect();
-    Ok(all_agent_info(evt_sender, space, agent)
+    Ok(all_agent_info(evt_sender, space)
         .await?
         .into_iter()
         .filter(move |info| set.contains(info.agent.as_ref())))
@@ -96,13 +96,12 @@ pub(super) async fn agent_info_within_arc_set(
 pub(super) async fn agents_within_arcset(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
-    agent: &Arc<KitsuneAgent>,
     arc_set: Arc<DhtArcSet>,
 ) -> KitsuneResult<Vec<(Arc<KitsuneAgent>, ArcInterval)>> {
     Ok(evt_sender
         .query_gossip_agents(QueryGossipAgentsEvt {
             space: space.clone(),
-            agent: agent.clone(),
+            agents: None,
             since_ms: 0,
             until_ms: u64::MAX,
             arc_set,
@@ -147,7 +146,7 @@ pub(super) async fn put_agent_info(
     agents: Vec<Arc<AgentInfoSigned>>,
 ) -> KitsuneResult<()> {
     if let Some(agent) = agents_within_common_arc.iter().next() {
-        for this_agent_info in all_agent_info(evt_sender, space, agent)
+        for this_agent_info in all_agent_info(evt_sender, space)
             .await?
             .into_iter()
             .filter(|a| agents_within_common_arc.contains(a.agent.as_ref()))
@@ -181,7 +180,7 @@ pub(super) async fn put_ops(
     ops: Vec<Arc<(Arc<KitsuneOpHash>, Vec<u8>)>>,
 ) -> KitsuneResult<()> {
     if let Some(agent) = agents_within_common_arc.iter().next() {
-        for this_agent_info in all_agent_info(evt_sender, space, agent)
+        for this_agent_info in all_agent_info(evt_sender, space)
             .await?
             .into_iter()
             .filter(|a| agents_within_common_arc.contains(a.agent.as_ref()))

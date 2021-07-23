@@ -489,7 +489,7 @@ impl ShardedGossipLocal {
     ) -> KitsuneResult<Option<(GossipTgt, TxUrl)>> {
         // Get the time range for this gossip.
         let mut remote_agents_within_arc_set: Vec<_> =
-            store::agents_within_arcset(&self.evt_sender, &self.space, &agent, arc_set.clone())
+            store::agents_within_arcset(&self.evt_sender, &self.space, arc_set.clone())
                 .await?
                 .into_iter()
                 .filter(|(a, _)| !local_agents.contains(a))

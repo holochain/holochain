@@ -32,7 +32,7 @@ impl ShardedGossipLocal {
 
         // Get the local agents intervals.
         let intervals =
-            store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents, &agent).await?;
+            store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents).await?;
 
         // Choose a remote agent to gossip with.
         let remote_agent = self
@@ -115,7 +115,7 @@ impl ShardedGossipLocal {
 
         // Get the local intervals.
         let local_intervals =
-            store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents, &agent).await?;
+            store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents).await?;
 
         let mut gossip = Vec::with_capacity(3);
 
@@ -162,7 +162,7 @@ impl ShardedGossipLocal {
 
         // Generate the agent bloom.
         if let GossipType::Recent = self.gossip_type {
-            let bloom = self.generate_agent_bloom(&agent, state.clone()).await?;
+            let bloom = self.generate_agent_bloom(state.clone()).await?;
             if let Some(bloom) = bloom {
                 let bloom = encode_bloom_filter(&bloom);
                 gossip.push(ShardedGossipWire::agents(bloom));
@@ -174,7 +174,7 @@ impl ShardedGossipLocal {
         // Generate the ops bloom for all local agents within the common arc.
         for (i, time_range) in time_ranges.into_iter().enumerate() {
             let bloom = self
-                .generate_ops_bloom(&local_agents, &agent, &state.common_arc_set, time_range)
+                .generate_ops_bloom(&local_agents, &state.common_arc_set, time_range)
                 .await?;
 
             let bloom = match bloom {

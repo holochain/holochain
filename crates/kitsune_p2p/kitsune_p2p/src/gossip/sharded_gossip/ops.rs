@@ -26,7 +26,6 @@ impl ShardedGossipLocal {
         let local_agents_within_common_arc: Vec<_> = store::agents_within_arcset(
             &self.evt_sender,
             &self.space,
-            &agent,
             state.common_arc_set.clone(),
         )
         .await?
@@ -64,7 +63,7 @@ impl ShardedGossipLocal {
 
         // Get the local agents that are relevant to this common arc set.
         let agents_within_common_arc: HashSet<_> =
-            store::agents_within_arcset(&self.evt_sender, &self.space, &agent, common_arc_set)
+            store::agents_within_arcset(&self.evt_sender, &self.space, common_arc_set)
                 .await?
                 .into_iter()
                 .map(|(a, _)| a)

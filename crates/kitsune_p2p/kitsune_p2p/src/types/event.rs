@@ -71,8 +71,8 @@ pub struct GetAgentInfoSignedEvt {
 pub struct QueryAgentInfoSignedEvt {
     /// The "space" context.
     pub space: Arc<super::KitsuneSpace>,
-    /// The "agent" context.
-    pub agent: Arc<super::KitsuneAgent>,
+    /// The optional list of agents to filter by.
+    pub agents: Option<Vec<Arc<super::KitsuneAgent>>>,
 }
 
 /// Get agent info which satisfies a query.
@@ -80,8 +80,8 @@ pub struct QueryAgentInfoSignedEvt {
 pub struct QueryGossipAgentsEvt {
     /// The "space" context.
     pub space: Arc<super::KitsuneSpace>,
-    /// The "agent" context.
-    pub agent: Arc<super::KitsuneAgent>,
+    /// The optional list of agents to filter by.
+    pub agents: Option<Vec<Arc<super::KitsuneAgent>>>,
     /// Start of the time window.
     pub since_ms: u64,
     /// End of the time window.

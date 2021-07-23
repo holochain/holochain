@@ -93,7 +93,7 @@ impl SpaceInternalHandler for Space {
     fn handle_list_online_agents_for_basis_hash(
         &mut self,
         _space: Arc<KitsuneSpace>,
-        from_agent: Arc<KitsuneAgent>,
+        _from_agent: Arc<KitsuneAgent>,
         // during short-circuit / full-sync mode,
         // we're ignoring the basis_hash and just returning everyone.
         _basis: Arc<KitsuneBasis>,
@@ -104,7 +104,7 @@ impl SpaceInternalHandler for Space {
             .evt_sender
             .query_agent_info_signed(QueryAgentInfoSignedEvt {
                 space: self.space.clone(),
-                agent: from_agent,
+                agents: None,
             });
         Ok(async move {
             for peer in all_peers_fut.await? {

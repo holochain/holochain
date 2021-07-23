@@ -116,12 +116,12 @@ ghost_actor::ghost_chan! {
         fn get_agent_info_signed(dna_hash: DnaHash, to_agent: AgentPubKey, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>) -> Option<AgentInfoSigned>;
 
         /// We need to get previously stored agent info.
-        fn query_agent_info_signed(dna_hash: DnaHash, to_agent: AgentPubKey, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>) -> Vec<AgentInfoSigned>;
+        fn query_agent_info_signed(dna_hash: DnaHash, agents: Option<Vec<AgentPubKey>>, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>) -> Vec<AgentInfoSigned>;
 
         /// We need to get agents that fit into an arc set for gossip.
         fn query_gossip_agents(
             dna_hash: DnaHash,
-            to_agent: AgentPubKey,
+            agents: Option<Vec<AgentPubKey>>,
             kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
             since_ms: u64,
             until_ms: u64,
@@ -253,8 +253,6 @@ macro_rules! match_p2p_evt {
             HolochainP2pEvent::SignNetworkData { $i, .. } => { $($t)* }
             HolochainP2pEvent::PutAgentInfoSigned { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetAgentInfoSigned { $i, .. } => { $($t)* }
-            HolochainP2pEvent::QueryAgentInfoSigned { $i, .. } => { $($t)* }
-            HolochainP2pEvent::QueryGossipAgents { $i, .. } => { $($t)* }
             HolochainP2pEvent::PutMetricDatum { $i, .. } => { $($t)* }
             HolochainP2pEvent::QueryMetrics { $i, .. } => { $($t)* }
             $($t2)*
@@ -267,7 +265,9 @@ impl HolochainP2pEvent {
     pub fn dna_hash(&self) -> &DnaHash {
         match_p2p_evt!(self => |dna_hash| { dna_hash }, {
             HolochainP2pEvent::FetchOpHashesForConstraints { dna_hash, .. } => { dna_hash }
+            HolochainP2pEvent::QueryAgentInfoSigned { dna_hash, .. } => { dna_hash }
             HolochainP2pEvent::QueryAgentInfoSignedNearBasis { dna_hash, .. } => { dna_hash }
+            HolochainP2pEvent::QueryGossipAgents { dna_hash, .. } => { dna_hash }
         })
     }
 
@@ -275,7 +275,9 @@ impl HolochainP2pEvent {
     pub fn target_agent_as_ref(&self) -> &AgentPubKey {
         match_p2p_evt!(self => |to_agent| { to_agent }, {
             HolochainP2pEvent::FetchOpHashesForConstraints { .. } => { unimplemented!("There is no single agent target for FetchOpHashesForConstraints") }
+            HolochainP2pEvent::QueryAgentInfoSigned { .. } => { unimplemented!("There is no single agent target for QueryAgentInfoSigned") },
             HolochainP2pEvent::QueryAgentInfoSignedNearBasis { .. } => { unimplemented!("There is no single agent target for QueryAgentInfoSignedNearBasis") },
+            HolochainP2pEvent::QueryGossipAgents { .. } => { unimplemented!("There is no single agent target for QueryGossipAgents") },
         })
     }
 }
