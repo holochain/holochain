@@ -145,27 +145,25 @@ pub(super) async fn put_agent_info(
     agents_within_common_arc: HashSet<Arc<KitsuneAgent>>,
     agents: Vec<Arc<AgentInfoSigned>>,
 ) -> KitsuneResult<()> {
-    if let Some(agent) = agents_within_common_arc.iter().next() {
-        for this_agent_info in all_agent_info(evt_sender, space)
-            .await?
-            .into_iter()
-            .filter(|a| agents_within_common_arc.contains(a.agent.as_ref()))
-        {
-            for new_info in &agents {
-                if this_agent_info
-                    .storage_arc
-                    .contains(new_info.agent.get_loc())
-                {
-                    // TODO; PERF: Batch this.
-                    evt_sender
-                        .put_agent_info_signed(PutAgentInfoSignedEvt {
-                            space: space.clone(),
-                            agent: this_agent_info.agent.clone(),
-                            agent_info_signed: (**new_info).clone(),
-                        })
-                        .await
-                        .map_err(KitsuneError::other)?;
-                }
+    for this_agent_info in all_agent_info(evt_sender, space)
+        .await?
+        .into_iter()
+        .filter(|a| agents_within_common_arc.contains(a.agent.as_ref()))
+    {
+        for new_info in &agents {
+            if this_agent_info
+                .storage_arc
+                .contains(new_info.agent.get_loc())
+            {
+                // TODO; PERF: Batch this.
+                evt_sender
+                    .put_agent_info_signed(PutAgentInfoSignedEvt {
+                        space: space.clone(),
+                        agent: this_agent_info.agent.clone(),
+                        agent_info_signed: (**new_info).clone(),
+                    })
+                    .await
+                    .map_err(KitsuneError::other)?;
             }
         }
     }
@@ -179,33 +177,32 @@ pub(super) async fn put_ops(
     agents_within_common_arc: HashSet<Arc<KitsuneAgent>>,
     ops: Vec<Arc<(Arc<KitsuneOpHash>, Vec<u8>)>>,
 ) -> KitsuneResult<()> {
-    if let Some(agent) = agents_within_common_arc.iter().next() {
-        for this_agent_info in all_agent_info(evt_sender, space)
-            .await?
-            .into_iter()
-            .filter(|a| agents_within_common_arc.contains(a.agent.as_ref()))
-        {
-            for data in &ops {
-                let hash = &data.0;
-                let op = &data.1;
-                if this_agent_info.storage_arc.contains(hash.get_loc()) {
-                    // FIXME: This absolutely should be batched. Sending one op
-                    // at a time to the conductor is very slow.
-                    evt_sender
-                        .gossip(
-                            space.clone(),
-                            this_agent_info.agent.clone(),
-                            // FIXME: I don't know which agent this is coming from.
-                            // It's wrong to say it's from self.
-                            this_agent_info.agent.clone(),
-                            hash.clone(),
-                            op.clone(),
-                        )
-                        .await
-                        .map_err(KitsuneError::other)?;
-                }
+    for this_agent_info in all_agent_info(evt_sender, space)
+        .await?
+        .into_iter()
+        .filter(|a| agents_within_common_arc.contains(a.agent.as_ref()))
+    {
+        for data in &ops {
+            let hash = &data.0;
+            let op = &data.1;
+            if this_agent_info.storage_arc.contains(hash.get_loc()) {
+                // FIXME: This absolutely should be batched. Sending one op
+                // at a time to the conductor is very slow.
+                evt_sender
+                    .gossip(
+                        space.clone(),
+                        this_agent_info.agent.clone(),
+                        // FIXME: I don't know which agent this is coming from.
+                        // It's wrong to say it's from self.
+                        this_agent_info.agent.clone(),
+                        hash.clone(),
+                        op.clone(),
+                    )
+                    .await
+                    .map_err(KitsuneError::other)?;
             }
         }
     }
+
     Ok(())
 }

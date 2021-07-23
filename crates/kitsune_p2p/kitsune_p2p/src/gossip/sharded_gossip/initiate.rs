@@ -20,15 +20,11 @@ impl ShardedGossipLocal {
             return Ok(None);
         }
 
-        // Choose any local agent so we can send requests to the store.
-        let agent = local_agents.iter().cloned().next();
-
         // If we don't have a local agent then there's nothing to do.
-        let agent = match agent {
-            Some(agent) => agent,
+        if local_agents.is_empty() {
             // No local agents so there's no one to initiate gossip from.
-            None => return Ok(None),
-        };
+            return Ok(None);
+        }
 
         // Get the local agents intervals.
         let intervals =
@@ -37,7 +33,6 @@ impl ShardedGossipLocal {
         // Choose a remote agent to gossip with.
         let remote_agent = self
             .find_remote_agent_within_arc(
-                &agent,
                 Arc::new(intervals.clone().into()),
                 &local_agents,
                 current_rounds,
@@ -100,18 +95,11 @@ impl ShardedGossipLocal {
             }
         }
 
-        // Choose any local agent so we can send requests to the store.
-        // maackle: FIXME: this looks like an assumption that we are
-        //    operating full-sync, yes? We need to take the union of all
-        //    agents' arcs.
-        let agent = local_agents.iter().cloned().next();
-
         // If we don't have a local agent then there's nothing to do.
-        let agent = match agent {
-            Some(agent) => agent,
+        if local_agents.is_empty() {
             // No local agents so there's no one to initiate gossip from.
-            None => return Ok(vec![ShardedGossipWire::no_agents()]),
-        };
+            return Ok(vec![ShardedGossipWire::no_agents()]);
+        }
 
         // Get the local intervals.
         let local_intervals =
@@ -124,13 +112,7 @@ impl ShardedGossipLocal {
 
         // Generate the bloom filters and new state.
         let state = self
-            .generate_blooms(
-                &agent,
-                &local_agents,
-                local_intervals,
-                remote_arc_set,
-                &mut gossip,
-            )
+            .generate_blooms(&local_agents, local_intervals, remote_arc_set, &mut gossip)
             .await?;
 
         self.inner.share_mut(|inner, _| {
@@ -146,7 +128,6 @@ impl ShardedGossipLocal {
     /// - A new state is created for this round.
     pub(super) async fn generate_blooms(
         &self,
-        agent: &Arc<KitsuneAgent>,
         local_agents: &HashSet<Arc<KitsuneAgent>>,
         local_intervals: Vec<ArcInterval>,
         remote_arc_set: Vec<ArcInterval>,

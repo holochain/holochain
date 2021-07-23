@@ -77,21 +77,19 @@ impl Inner {
 
         // agent store is shared between agents in one space
         // we only have to query it once for all local_agents
-        if let Some(agent) = local_agents.iter().next() {
-            if let Ok(agent_infos) = evt_sender
-                .query_agent_info_signed(QueryAgentInfoSignedEvt {
-                    space: space.clone(),
-                    agents: None,
-                })
-                .await
-            {
-                for agent_info in agent_infos {
-                    let data = Arc::new(MetaOpData::Agent(agent_info));
-                    let key = data.key();
-                    data_map.insert(key.clone(), data);
-                    for (_agent, has) in has_map.iter_mut() {
-                        has.insert(key.clone());
-                    }
+        if let Ok(agent_infos) = evt_sender
+            .query_agent_info_signed(QueryAgentInfoSignedEvt {
+                space: space.clone(),
+                agents: Some(local_agents.clone().into_iter().collect()),
+            })
+            .await
+        {
+            for agent_info in agent_infos {
+                let data = Arc::new(MetaOpData::Agent(agent_info));
+                let key = data.key();
+                data_map.insert(key.clone(), data);
+                for (_agent, has) in has_map.iter_mut() {
+                    has.insert(key.clone());
                 }
             }
         }

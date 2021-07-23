@@ -11,16 +11,6 @@ impl ShardedGossipLocal {
         // Unpack this rounds state.
         let RoundState { common_arc_set, .. } = state;
 
-        // Get any agent for the store and return if there isn't one.
-        let agent = self.inner.share_mut(|inner, _| {
-            let agent = inner.local_agents.iter().cloned().next();
-            Ok(agent)
-        })?;
-        let agent = match agent {
-            Some(a) => a,
-            None => return Ok(vec![ShardedGossipWire::no_agents()]),
-        };
-
         // Get all agents within common arc and filter out
         // the ones in the remote bloom.
         let missing: Vec<_> =
@@ -57,14 +47,9 @@ impl ShardedGossipLocal {
     ) -> KitsuneResult<()> {
         // Unpack state, get any agent and get all local agents.
         let RoundState { common_arc_set, .. } = state;
-        let (agent, local_agents) = self.inner.share_mut(|inner, _| {
-            let agent = inner.local_agents.iter().cloned().next();
-            Ok((agent, inner.local_agents.clone()))
-        })?;
-        let agent = match agent {
-            Some(a) => a,
-            None => return Ok(()),
-        };
+        let local_agents = self
+            .inner
+            .share_mut(|inner, _| Ok(inner.local_agents.clone()))?;
 
         // Get all the local agents that are relevant to this
         // common arc set.

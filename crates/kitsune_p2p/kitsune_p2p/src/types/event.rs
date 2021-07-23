@@ -1,8 +1,7 @@
 //! Definitions for events emited from the KitsuneP2p actor.
 
-use kitsune_p2p_types::dht_arc::DhtArcSet;
-
 use crate::types::agent_store::AgentInfoSigned;
+use kitsune_p2p_types::dht_arc::DhtArcSet;
 use std::{sync::Arc, time::SystemTime};
 
 /// Gather a list of op-hashes from our implementor that meet criteria.
@@ -13,10 +12,7 @@ pub struct FetchOpHashesForConstraintsEvt {
     /// The "space" context.
     pub space: Arc<super::KitsuneSpace>,
     /// The agents from which to fetch, along with a DhtArcSet to filter by.
-    pub agents: Vec<(
-        Arc<super::KitsuneAgent>,
-        kitsune_p2p_types::dht_arc::DhtArcSet,
-    )>,
+    pub agents: Vec<(Arc<super::KitsuneAgent>, DhtArcSet)>,
     /// The time window to search within.
     pub window_ms: TimeWindowMs,
     /// Maximum number of ops to return.

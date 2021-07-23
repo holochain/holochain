@@ -11,14 +11,9 @@ impl ShardedGossipLocal {
         max_ops: usize,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         // Get the local agents to check against the remote bloom.
-        let (agent, local_agents) = self.inner.share_mut(|inner, _| {
-            let agent = inner.local_agents.iter().cloned().next();
-            Ok((agent, inner.local_agents.clone()))
-        })?;
-        let agent = match agent {
-            Some(a) => a,
-            None => return Ok(vec![ShardedGossipWire::no_agents()]),
-        };
+        let local_agents = self
+            .inner
+            .share_mut(|inner, _| Ok(inner.local_agents.clone()))?;
 
         let mut gossip = Vec::with_capacity(1);
 
@@ -52,14 +47,9 @@ impl ShardedGossipLocal {
     ) -> KitsuneResult<()> {
         // Unpack the state and get the local agents.
         let RoundState { common_arc_set, .. } = state;
-        let (agent, local_agents) = self.inner.share_mut(|inner, _| {
-            let agent = inner.local_agents.iter().cloned().next();
-            Ok((agent, inner.local_agents.clone()))
-        })?;
-        let agent = match agent {
-            Some(a) => a,
-            None => return Ok(()),
-        };
+        let local_agents = self
+            .inner
+            .share_mut(|inner, _| Ok(inner.local_agents.clone()))?;
 
         // Get the local agents that are relevant to this common arc set.
         let agents_within_common_arc: HashSet<_> =

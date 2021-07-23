@@ -25,15 +25,10 @@ impl ShardedGossipLocal {
             return Ok(vec![]);
         }
 
-        // Choose any local agent so we can send requests to the store.
-        let agent = local_agents.iter().cloned().next();
-
         // If we don't have a local agent then there's nothing to do.
-        let agent = match agent {
-            Some(agent) => agent,
-            // No local agents so there's no one to initiate gossip from.
-            None => return Ok(vec![ShardedGossipWire::no_agents()]),
-        };
+        if local_agents.is_empty() {
+            return Ok(vec![ShardedGossipWire::no_agents()]);
+        }
 
         // Get the local intervals.
         let local_intervals =
@@ -43,13 +38,7 @@ impl ShardedGossipLocal {
 
         // Generate the bloom filters and new state.
         let state = self
-            .generate_blooms(
-                &agent,
-                &local_agents,
-                local_intervals,
-                remote_arc_set,
-                &mut gossip,
-            )
+            .generate_blooms(&local_agents, local_intervals, remote_arc_set, &mut gossip)
             .await?;
 
         self.inner.share_mut(|inner, _| {

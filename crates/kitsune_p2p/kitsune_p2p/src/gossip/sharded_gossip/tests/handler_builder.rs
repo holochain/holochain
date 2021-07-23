@@ -18,7 +18,7 @@ pub async fn handler_builder(
         .iter()
         .map(|(agent, arc, _)| (agent.clone(), arc.clone()))
         .collect();
-    let agents_ops: Vec<_> = agent_data
+    let _agents_ops: Vec<_> = agent_data
         .iter()
         .map(|(agent, _, op)| (agent.clone(), op.clone()))
         .collect();
@@ -89,13 +89,14 @@ pub async fn handler_builder(
                 .flatten()
                 .collect();
 
-            ops.sort_by_key(|(op, time)| time);
+            ops.sort_by_key(|(_, time)| time);
             ops.dedup();
             let result: Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowMs)> =
                 if let (Some((_, first)), Some((_, last))) = (ops.first(), ops.last()) {
                     let ops = ops
                         .into_iter()
                         .map(|(op, _)| Arc::new(op.clone()))
+                        .take(max_ops)
                         .collect();
                     Some((ops, *first..*last))
                 } else {
