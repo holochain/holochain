@@ -362,14 +362,15 @@ impl ShardedGossipLocal {
         state_id: &StateKey,
     ) -> KitsuneResult<Option<RoundState>> {
         self.inner.share_mut(|i, _| {
-            if i.round_map
+            let finished = i
+                .round_map
                 .get_mut(state_id)
                 .map(|state| {
                     state.increment_ops_complete = true;
                     state.num_ops_blooms == 0
                 })
-                .unwrap_or(true)
-            {
+                .unwrap_or(true);
+            if finished {
                 Ok(i.remove_state(state_id))
             } else {
                 Ok(i.round_map.get(state_id).cloned())
@@ -382,7 +383,7 @@ impl ShardedGossipLocal {
             if i.round_map
                 .get_mut(state_id)
                 .map(|state| {
-                    let num_ops_blooms = state.num_ops_blooms.checked_sub(1).unwrap_or(0);
+                    let num_ops_blooms = state.num_ops_blooms.saturating_sub(1);
                     state.num_ops_blooms = num_ops_blooms;
                     state.num_ops_blooms == 0 && state.increment_ops_complete
                 })

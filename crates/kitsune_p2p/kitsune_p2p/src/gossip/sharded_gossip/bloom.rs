@@ -112,7 +112,7 @@ impl ShardedGossipLocal {
     /// - The expected performance per op is average 10ms and worst 100 ms.
     pub(super) async fn check_ops_bloom(
         &self,
-        local_agents_within_arc_set: &Vec<(Arc<KitsuneAgent>, ArcInterval)>,
+        local_agents_within_arc_set: &[(Arc<KitsuneAgent>, ArcInterval)],
         state: RoundState,
         remote_bloom: TimedBloomFilter,
         max_ops: usize,

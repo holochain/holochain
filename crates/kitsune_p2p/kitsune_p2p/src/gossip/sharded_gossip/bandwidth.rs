@@ -44,7 +44,7 @@ impl Bandwidth {
     pub(super) async fn incoming_bytes(&self, bytes: usize) {
         if let Some(bits) = NonZeroU32::new(bytes as u32 * 8) {
             if let Some(inbound) = &self.inbound {
-                if let Err(_) = inbound.until_n_ready(bits).await {
+                if inbound.until_n_ready(bits).await.is_err() {
                     tracing::error!("Tried to receive a message larger then the max message size");
                 }
             }

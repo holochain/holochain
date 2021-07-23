@@ -730,7 +730,7 @@ impl Space {
         let gossip_mod = config
             .tuning_params
             .gossip_strategy
-            .split(",")
+            .split(',')
             .flat_map(|module| match module {
                 "simple-bloom" => vec![(
                     GossipModuleType::Simple,
