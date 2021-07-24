@@ -116,7 +116,7 @@ pub(super) async fn all_ops_within_common_set(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
     agents: Vec<(Arc<KitsuneAgent>, ArcInterval)>,
-    common_arc_set: &Arc<DhtArcSet>,
+    common_arc_set: &DhtArcSet,
     window_ms: TimeWindowMs,
     max_ops: usize,
 ) -> KitsuneResult<Option<(Vec<Arc<KitsuneOpHash>>, Range<u64>)>> {

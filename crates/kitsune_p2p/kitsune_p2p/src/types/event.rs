@@ -161,6 +161,11 @@ pub type TimestampMs = u64;
 /// A range of timestamps, measured in milliseconds
 pub type TimeWindowMs = std::ops::Range<TimestampMs>;
 
+/// A time window which covers all of recordable time
+pub fn full_time_window() -> TimeWindowMs {
+    TimestampMs::MIN..TimestampMs::MAX
+}
+
 ghost_actor::ghost_chan! {
     /// The KitsuneP2pEvent stream allows handling events generated from the
     /// KitsuneP2p actor.

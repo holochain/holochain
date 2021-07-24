@@ -476,7 +476,25 @@ impl ShardedGossipLocal {
     }
 
     async fn local_sync(&self) -> KitsuneResult<()> {
-        todo!("local sync")
+        let local_agents = self.inner.share_mut(|i, _| Ok(i.local_agents.clone()))?;
+        let local_arcs =
+            store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents).await?;
+        let arcset = local_sync_arcset(local_arcs.as_slice());
+        let agent_arcs = itertools::zip(local_agents, local_arcs).collect();
+        let op_hashes = store::all_ops_within_common_set(
+            &self.evt_sender,
+            &self.space,
+            agent_arcs,
+            &arcset,
+            full_time_window(),
+            usize::MAX,
+        )
+        .await?;
+
+        let ops = todo!("get ops from the agents who have them");
+
+        store::put_ops(&self.evt_sender, &self.space, local_agents, ops).await?;
+        Ok(())
     }
 
     /// Find a remote endpoint from agents within arc set.
@@ -533,6 +551,33 @@ impl ShardedGossipLocal {
             None => Ok(None),
         }
     }
+}
+
+/// Calculates the arcset used during local sync. This arcset determines the
+/// minimum set of ops to be spread across all local agents in order to reach
+/// local consistency
+fn local_sync_arcset(arcs: &[ArcInterval]) -> DhtArcSet {
+    arcs.iter()
+        .enumerate()
+        // For each agent's arc,
+        .map(|(i, arc_i)| {
+            // find the union of all arcs *other than this one,
+            let other_arcset = arcs
+                .iter()
+                .enumerate()
+                .filter_map(|(j, arc_j)| {
+                    if i == j {
+                        None
+                    } else {
+                        Some(DhtArcSet::from(arc_j))
+                    }
+                })
+                .fold(DhtArcSet::new_empty(), |a, b| DhtArcSet::union(&a, &b));
+            // and return the intersection of this arc with the union of the others.
+            DhtArcSet::from(arc_i).intersection(&other_arcset)
+        })
+        // and take the union of all of the intersections
+        .fold(DhtArcSet::new_empty(), |a, b| DhtArcSet::union(&a, &b))
 }
 
 impl RoundState {

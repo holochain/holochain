@@ -291,7 +291,7 @@ impl WrapEvtSender {
     fn fetch_op_hashes_for_constraints(
         &self,
         dna_hash: DnaHash,
-        to_agents: Vec<(AgentPubKey, kitsune_p2p::dht_arc::DhtArcSet)>,
+        agents: Vec<(AgentPubKey, kitsune_p2p::dht_arc::DhtArcSet)>,
         window_ms: TimeWindowMs,
         max_ops: usize,
     ) -> impl Future<Output = HolochainP2pResult<Option<(Vec<holo_hash::DhtOpHash>, TimeWindowMs)>>>
@@ -300,7 +300,7 @@ impl WrapEvtSender {
         timing_trace!(
             {
                 self.0
-                    .fetch_op_hashes_for_constraints(dna_hash, to_agents, window_ms, max_ops)
+                    .fetch_op_hashes_for_constraints(dna_hash, agents, window_ms, max_ops)
             },
             "(hp2p:handle) fetch_op_hashes_for_constraints",
         )

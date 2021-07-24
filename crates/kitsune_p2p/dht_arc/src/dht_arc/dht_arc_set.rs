@@ -1,6 +1,6 @@
 use gcollections::ops::*;
 use interval::{interval_set::*, IntervalSet};
-use std::{collections::VecDeque, fmt::Debug};
+use std::{borrow::Borrow, collections::VecDeque, fmt::Debug};
 
 type T = u32;
 
@@ -70,11 +70,11 @@ impl DhtArcSet {
         }
     }
 
-    pub fn from_interval(arc: ArcInterval) -> Self {
-        match arc {
+    pub fn from_interval<A: Borrow<ArcInterval>>(arc: A) -> Self {
+        match arc.borrow() {
             ArcInterval::Full => Self::new_full(),
             ArcInterval::Empty => Self::new_empty(),
-            ArcInterval::Bounded(start, end) => Self::from_bounds(start, end),
+            ArcInterval::Bounded(start, end) => Self::from_bounds(*start, *end),
         }
     }
 
@@ -156,15 +156,29 @@ impl DhtArcSet {
     }
 }
 
+impl From<&ArcInterval> for DhtArcSet {
+    fn from(arc: &ArcInterval) -> Self {
+        Self::from_interval(arc)
+    }
+}
+
 impl From<ArcInterval> for DhtArcSet {
     fn from(arc: ArcInterval) -> Self {
         Self::from_interval(arc)
     }
 }
 
+impl From<&[ArcInterval]> for DhtArcSet {
+    fn from(arcs: &[ArcInterval]) -> Self {
+        arcs.into_iter()
+            .map(Self::from)
+            .fold(Self::new_empty(), |a, b| a.union(&b))
+    }
+}
+
 impl From<Vec<ArcInterval>> for DhtArcSet {
     fn from(arcs: Vec<ArcInterval>) -> Self {
-        arcs.into_iter()
+        arcs.iter()
             .map(Self::from)
             .fold(Self::new_empty(), |a, b| a.union(&b))
     }
@@ -174,7 +188,7 @@ impl From<Vec<(T, T)>> for DhtArcSet {
     fn from(pairs: Vec<(T, T)>) -> Self {
         pairs
             .into_iter()
-            .map(|(a, b)| Self::from(ArcInterval::new(a, b)))
+            .map(|(a, b)| Self::from(&ArcInterval::new(a, b)))
             .fold(Self::new_empty(), |a, b| a.union(&b))
     }
 }
