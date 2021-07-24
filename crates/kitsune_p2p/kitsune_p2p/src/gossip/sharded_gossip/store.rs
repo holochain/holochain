@@ -47,7 +47,7 @@ pub(super) async fn get_agent_info(
         .map_err(KitsuneError::other)?)
 }
 
-/// Get all `AgentInfoSigned` for local agents in a space.
+/// Get all `AgentInfoSigned` for agents in a space.
 pub(super) async fn query_agent_info(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,

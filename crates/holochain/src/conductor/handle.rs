@@ -53,9 +53,9 @@ use super::p2p_agent_store;
 use super::p2p_agent_store::all_agent_infos;
 use super::p2p_agent_store::get_agent_info_signed;
 use super::p2p_agent_store::inject_agent_infos;
+use super::p2p_agent_store::list_all_agent_info;
+use super::p2p_agent_store::list_all_agent_info_signed_near_basis;
 use super::p2p_agent_store::put_agent_info_signed;
-use super::p2p_agent_store::query_agent_info_signed;
-use super::p2p_agent_store::query_agent_info_signed_near_basis;
 use super::Cell;
 use super::CellError;
 use super::Conductor;
@@ -533,7 +533,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 ..
             } => {
                 let env = { self.p2p_env(space) };
-                let res = query_agent_info_signed(env, kitsune_space)
+                let res = list_all_agent_info(env, kitsune_space)
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
@@ -567,8 +567,9 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 ..
             } => {
                 let env = { self.p2p_env(space) };
-                let res = query_agent_info_signed_near_basis(env, kitsune_space, basis_loc, limit)
-                    .map_err(holochain_p2p::HolochainP2pError::other);
+                let res =
+                    list_all_agent_info_signed_near_basis(env, kitsune_space, basis_loc, limit)
+                        .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
             PutMetricDatum {
