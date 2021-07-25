@@ -43,7 +43,7 @@ impl ShardedGossipLocal {
     pub(super) async fn incoming_missing_agents(
         &self,
         state: RoundState,
-        agents: Vec<Arc<AgentInfoSigned>>,
+        agents: &[Arc<AgentInfoSigned>],
     ) -> KitsuneResult<()> {
         // Unpack state, get any agent and get all local agents.
         let RoundState { common_arc_set, .. } = state;

@@ -208,6 +208,7 @@ ghost_actor::ghost_chan! {
 
         /// Gather a list of op-hashes from our implementor that meet criteria.
         /// Get the oldest and newest times for ops within a time window and max number of ops.
+        // maackle: do we really need to *individually* wrap all these op hashes in Arcs?
         fn fetch_op_hashes_for_constraints(input: FetchOpHashesForConstraintsEvt) -> Option<(Vec<Arc<super::KitsuneOpHash>>, TimeWindowMs)>;
 
         /// Gather all op-hash data for a list of op-hashes from our implementor.

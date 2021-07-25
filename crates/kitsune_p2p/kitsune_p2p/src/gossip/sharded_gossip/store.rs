@@ -11,8 +11,8 @@ use kitsune_p2p_types::{
 };
 
 use crate::event::{
-    FetchOpHashesForConstraintsEvt, GetAgentInfoSignedEvt, PutAgentInfoSignedEvt,
-    QueryAgentInfoSignedEvt, QueryGossipAgentsEvt, TimeWindowMs,
+    FetchOpHashDataEvt, FetchOpHashesForConstraintsEvt, GetAgentInfoSignedEvt,
+    PutAgentInfoSignedEvt, QueryAgentInfoSignedEvt, QueryGossipAgentsEvt, TimeWindowMs,
 };
 use crate::types::event::KitsuneP2pEventSender;
 
@@ -110,21 +110,22 @@ pub(super) async fn agents_within_arcset(
         .map_err(KitsuneError::other)?)
 }
 
-/// Get all ops for all agents intersections with
-/// the common arc set.
-pub(super) async fn all_ops_within_common_set(
+/// Get all ops for all agents that fall within the specified arcset.
+pub(super) async fn all_op_hashes_within_arcset(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
-    agents: Vec<(Arc<KitsuneAgent>, ArcInterval)>,
+    agents: &[(Arc<KitsuneAgent>, ArcInterval)],
     common_arc_set: &DhtArcSet,
     window_ms: TimeWindowMs,
     max_ops: usize,
 ) -> KitsuneResult<Option<(Vec<Arc<KitsuneOpHash>>, Range<u64>)>> {
-    let agents = agents
+    let agents: Vec<_> = agents
         .into_iter()
         .map(|(a, i)| {
+            // Intersect this agent's arc with the arcset to find the minimal
+            // arcset relevant to this agent
             let intersection = common_arc_set.intersection(&DhtArcSet::from_interval(i));
-            (a, intersection)
+            (a.clone(), intersection)
         })
         .collect();
     Ok(evt_sender
@@ -143,14 +144,14 @@ pub(super) async fn put_agent_info(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
     agents_within_common_arc: HashSet<Arc<KitsuneAgent>>,
-    agents: Vec<Arc<AgentInfoSigned>>,
+    agents: &[Arc<AgentInfoSigned>],
 ) -> KitsuneResult<()> {
     for this_agent_info in all_agent_info(evt_sender, space)
         .await?
         .into_iter()
         .filter(|a| agents_within_common_arc.contains(a.agent.as_ref()))
     {
-        for new_info in &agents {
+        for new_info in agents {
             if this_agent_info
                 .storage_arc
                 .contains(new_info.agent.get_loc())
@@ -170,11 +171,28 @@ pub(super) async fn put_agent_info(
     Ok(())
 }
 
+pub(super) async fn fetch_ops(
+    evt_sender: &EventSender,
+    space: &Arc<KitsuneSpace>,
+    agents: &HashSet<Arc<KitsuneAgent>>,
+    op_hashes: Vec<Arc<KitsuneOpHash>>,
+) -> KitsuneResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> {
+    evt_sender
+        .fetch_op_hash_data(FetchOpHashDataEvt {
+            space: space.clone(),
+            agents: agents.into_iter().cloned().collect(),
+            op_hashes,
+        })
+        .await
+        .map_err(KitsuneError::other)
+}
+
 /// Put new ops into agents that should hold them.
 pub(super) async fn put_ops(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
     agents_within_common_arc: HashSet<Arc<KitsuneAgent>>,
+    // maackle: this seems silly, like we should just not have the op hashes in an arc
     ops: Vec<Arc<(Arc<KitsuneOpHash>, Vec<u8>)>>,
 ) -> KitsuneResult<()> {
     for this_agent_info in all_agent_info(evt_sender, space)

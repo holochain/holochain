@@ -64,10 +64,10 @@ impl ShardedGossipLocal {
                 .collect();
 
         // Get the op hashes which fit within the common arc set from these local agents.
-        let result = store::all_ops_within_common_set(
+        let result = store::all_op_hashes_within_arcset(
             &self.evt_sender,
             &self.space,
-            local_agents_within_arc_set,
+            local_agents_within_arc_set.as_slice(),
             common_arc_set,
             time_range.clone(),
             // FIXME: Does this make any sense for historical bloom?
@@ -116,10 +116,10 @@ impl ShardedGossipLocal {
             bloom: remote_bloom,
             time,
         } = remote_bloom;
-        if let Some((hashes, _)) = store::all_ops_within_common_set(
+        if let Some((hashes, _)) = store::all_op_hashes_within_arcset(
             &self.evt_sender,
             &self.space,
-            local_agents_within_arc_set.clone(),
+            local_agents_within_arc_set.as_slice(),
             &common_arc_set,
             time,
             max_ops,

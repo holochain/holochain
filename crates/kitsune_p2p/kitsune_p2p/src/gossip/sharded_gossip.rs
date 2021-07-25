@@ -432,7 +432,8 @@ impl ShardedGossipLocal {
             }
             ShardedGossipWire::MissingAgents(MissingAgents { agents }) => {
                 if let Some(state) = self.get_state(&cert).await? {
-                    self.incoming_missing_agents(state, agents).await?;
+                    self.incoming_missing_agents(state, agents.as_slice())
+                        .await?;
                 }
                 Vec::with_capacity(0)
             }
@@ -480,19 +481,25 @@ impl ShardedGossipLocal {
         let local_arcs =
             store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents).await?;
         let arcset = local_sync_arcset(local_arcs.as_slice());
-        let agent_arcs = itertools::zip(local_agents, local_arcs).collect();
-        let op_hashes = store::all_ops_within_common_set(
+        let agent_arcs: Vec<_> = itertools::zip(local_agents.clone(), local_arcs).collect();
+        let op_hashes = store::all_op_hashes_within_arcset(
             &self.evt_sender,
             &self.space,
-            agent_arcs,
+            agent_arcs.as_slice(),
             &arcset,
             full_time_window(),
             usize::MAX,
         )
-        .await?;
+        .await?
+        .map(|(ops, _window)| ops)
+        .unwrap_or_default();
 
-        let ops = todo!("get ops from the agents who have them");
-
+        let ops = store::fetch_ops(&self.evt_sender, &self.space, &local_agents, op_hashes)
+            .await?
+            .into_iter()
+            // maackle: this seems silly
+            .map(Arc::new)
+            .collect();
         store::put_ops(&self.evt_sender, &self.space, local_agents, ops).await?;
         Ok(())
     }

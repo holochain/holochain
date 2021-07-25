@@ -1,77 +1,15 @@
 use maplit::hashset;
 
 use super::common::*;
-use super::handler_builder::handler_builder;
+use super::handler_builder::{generate_ops_for_overlapping_arcs, handler_builder, OwnershipData};
 use super::*;
 
-/// Given a list of ownership requirements, returns a list of triples, each
-/// item of which consists of:
-/// - an agent
-/// - its Arc
-/// - a list of ops that it holds
-///
-/// The list of ops is guaranteed to fit within the arc it is matched with.
-/// Also, the arcs and ops will overlap as specified by the `ownership` input.
-///
-/// The ownership requirements are defined as so:
-/// - Each item corresponds to a to-be-created op hash.
-/// - The set of Agents specifies which Agent is holding that op.
-/// - Then, op hashes are assigned, in increasing DHT location order, to each set
-///     of agents specified.
-///
-/// This has the effect of allowing arbitrary overlapping arcs to be defined,
-/// backed by real op hash data, without worrying about particular DHT locations
-/// (which would have to be searched for).
-fn generate_ops_for_overlapping_arcs<'a>(
-    entropy: &mut arbitrary::Unstructured<'a>,
-    ownership: &[HashSet<Arc<KitsuneAgent>>],
-) -> Vec<(
-    Arc<KitsuneAgent>,
-    ArcInterval,
-    Vec<(KitsuneOpHash, TimestampMs)>,
-)> {
-    let mut arcs: HashMap<Arc<KitsuneAgent>, ((u32, u32), Vec<KitsuneOpHash>)> = HashMap::new();
-    // create one op per "ownership" item
-    let mut ops: Vec<KitsuneOpHash> = ownership
-        .iter()
-        .map(|_| KitsuneOpHash::arbitrary(entropy).unwrap())
-        .collect();
-
-    // sort ops by location
-    ops.sort_by_key(|op| op.get_loc());
-
-    // associate ops with relevant agents, growing arcs at the same time
-    for (owners, op) in itertools::zip(ownership.into_iter(), ops.into_iter()) {
-        for owner in owners.clone() {
-            arcs.entry(owner)
-                .and_modify(|((_, hi), ops)| {
-                    *hi = op.get_loc();
-                    ops.push(op.clone())
-                })
-                .or_insert(((op.get_loc(), op.get_loc()), vec![op.clone()]));
-        }
-    }
-
-    // Construct the ArcIntervals, and for now, associate an arbitrary timestamp
-    // with each op
-    let arcs = arcs
-        .into_iter()
-        .map(|(agent, ((lo, hi), ops))| {
-            let ops = ops.into_iter().map(|op| (op, 1111)).collect();
-            (agent, ArcInterval::Bounded(lo, hi), ops)
-        })
-        .collect();
-    arcs
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn local_sync_scenario() {
-    let mut u = arbitrary::Unstructured::new(&NOISE);
+fn three_way_sharded_ownership() -> (HashSet<Arc<KitsuneAgent>>, OwnershipData<6>) {
     let agents = agents(3);
     let alice = agents[0].clone();
     let bobbo = agents[1].clone();
     let carol = agents[2].clone();
-    let ownership = &[
+    let ownership = [
         hashset![alice.clone()],
         hashset![alice.clone(), bobbo.clone()],
         hashset![bobbo.clone()],
@@ -79,11 +17,63 @@ async fn local_sync_scenario() {
         hashset![carol.clone()],
         hashset![carol.clone(), alice.clone()],
     ];
+    (hashset![alice, bobbo, carol], ownership)
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_three_way_sharded_ownership() {
+    let mut u = arbitrary::Unstructured::new(&NOISE);
+    let space = Arc::new(KitsuneSpace::arbitrary(&mut u).unwrap());
+    let (agents, ownership) = three_way_sharded_ownership();
+    let data = generate_ops_for_overlapping_arcs(&mut u, ownership);
+    let agent_arcs: Vec<_> = data
+        .iter()
+        .map(|(agent, arc, _)| (agent.clone(), arc.clone()))
+        .collect();
+
+    let mut evt_handler = handler_builder(data).await;
+    let (evt_sender, _) = spawn_handler(evt_handler).await;
+
+    let get_op_hashes = |a: usize| async move {
+        store::all_op_hashes_within_arcset(
+            &evt_sender,
+            &space,
+            // Only look at one agent at a time
+            &agent_arcs[a..a + 1],
+            &DhtArcSet::Full,
+            full_time_window(),
+            usize::MAX,
+        )
+        .await
+        .unwrap()
+        .unwrap()
+        .0
+    };
+
+    let op_hashes_0 = (get_op_hashes.clone())(0).await;
+    let op_hashes_1 = (get_op_hashes.clone())(1).await;
+    let op_hashes_2 = (get_op_hashes.clone())(2).await;
+    assert_eq!(
+        (op_hashes_0.len(), op_hashes_1.len(), op_hashes_2.len()),
+        (2, 2, 2)
+    );
+
+    // let ops = store::fetch_ops(&evt_sender, &space, &agents, op_hashes_0)
+    //     .await
+    //     .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn local_sync_scenario() {
+    let mut u = arbitrary::Unstructured::new(&NOISE);
+    let (agents, ownership) = three_way_sharded_ownership();
     let data = generate_ops_for_overlapping_arcs(&mut u, ownership);
     let mut evt_handler = handler_builder(data).await;
 
     let (evt_sender, _) = spawn_handler(evt_handler).await;
     let gossip = ShardedGossipLocal::test(GossipType::Recent, evt_sender, Default::default());
+
+    // store::fetch_ops(&evt_sender, space, agents, op_hashes);
 
     gossip.local_sync().await.unwrap();
 
