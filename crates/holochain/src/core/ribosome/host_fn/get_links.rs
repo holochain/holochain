@@ -245,6 +245,79 @@ pub mod slow_tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn multi_get_links() {
+        observability::test_run().ok();
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
+        let env = test_env.env();
+        let author = fixt!(AgentPubKey, Predictable, 0);
+        crate::test_utils::fake_genesis(env.clone()).await.unwrap();
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
+        let mut host_access = fixt!(ZomeCallHostAccess);
+        host_access.workspace = workspace;
+        let _: HeaderHash = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::Link,
+            "create_link",
+            ()
+        ).unwrap();
+        let _: HeaderHash = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::Link,
+            "create_back_link",
+            ()
+        ).unwrap();
+        let forward_links: Links = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::Link,
+            "get_links",
+            ()
+        ).unwrap();
+        let back_links: Links = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::Link,
+            "get_back_links",
+            ()
+        ).unwrap();
+        let links_bidi: Vec<Links> = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::Link,
+            "get_links_bidi",
+            ()
+        ).unwrap();
+
+        assert_eq!(
+            links_bidi,
+            vec![forward_links, back_links],
+        );
+
+        let forward_link_details: LinkDetails = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::Link,
+            "get_link_details",
+            ()
+        ).unwrap();
+
+        let back_link_details: LinkDetails = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::Link,
+            "get_back_link_details",
+            ()
+        ).unwrap();
+
+        let link_details_bidi: Vec<LinkDetails> = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::Link,
+            "get_link_details_bidi",
+            ()
+        ).unwrap();
+        assert_eq!(
+            link_details_bidi,
+            vec![forward_link_details, back_link_details],
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn dup_path_test() {
         observability::test_run().ok();
         let zomes = vec![TestWasm::Link];
