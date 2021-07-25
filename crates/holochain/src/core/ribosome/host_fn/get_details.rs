@@ -55,7 +55,6 @@ pub mod wasm_test {
             .unwrap();
         let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
 
-
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace.clone();
 
@@ -63,7 +62,7 @@ pub mod wasm_test {
         #[derive(Clone, Copy, Serialize, Deserialize, SerializedBytes, Debug, PartialEq)]
         struct CounTree(u32);
 
-        let check = |details: Option<Details>, count, delete| match details {
+        let check = |details: &Option<Details>, count, delete| match details {
             Some(Details::Element(ref element_details)) => {
                 match element_details.element.entry().to_app_option::<CounTree>() {
                     Ok(Some(CounTree(u))) => assert_eq!(u, count),
@@ -74,7 +73,7 @@ pub mod wasm_test {
             _ => panic!("no element"),
         };
 
-        let check_entry = |details: Option<Details>, count, update, delete, line| match details {
+        let check_entry = |details: &Option<Details>, count, update, delete, line| match details {
             Some(Details::Entry(ref entry_details)) => {
                 match entry_details.entry {
                     Entry::App(ref eb) => {
@@ -100,13 +99,15 @@ pub mod wasm_test {
             crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_hash", CounTree(2)).unwrap();
 
         let zero_a: HeaderHash = crate::call_test_ribosome!(host_access, TestWasm::Crud, "new", ()).unwrap();
+        let header_details_0: Vec<Option<Details>> = crate::call_test_ribosome!(host_access, TestWasm::Crud, "header_details", vec![zero_a.clone()]).unwrap();
+        let entry_details_0: Vec<Option<Details>> = crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", vec![zero_hash.clone()]).unwrap();
         check(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "header_details", zero_a).unwrap(),
+            &header_details_0[0],
             0,
             0,
         );
         check_entry(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", zero_hash).unwrap(),
+            &entry_details_0[0],
             0,
             0,
             0,
@@ -115,25 +116,27 @@ pub mod wasm_test {
 
         let one_a: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::Crud, "inc", zero_a).unwrap();
+        let header_details_1: Vec<Option<Details>> = crate::call_test_ribosome!(host_access, TestWasm::Crud, "header_details", vec![zero_a.clone(), one_a.clone()]).unwrap();
+        let entry_details_1: Vec<Option<Details>> = crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", vec![zero_hash.clone(), one_hash.clone()]).unwrap();
         check(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "header_details", zero_a).unwrap(),
+            &header_details_1[0],
             0,
             0,
         );
         check(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "header_details", one_a).unwrap(),
+            &header_details_1[1],
             1,
             0,
         );
         check_entry(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", zero_hash).unwrap(),
+            &entry_details_1[0],
             0,
             1,
             0,
             line!(),
         );
         check_entry(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", one_hash).unwrap(),
+            &entry_details_1[1],
             1,
             0,
             0,
@@ -142,25 +145,27 @@ pub mod wasm_test {
 
         let one_b: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::Crud, "inc", zero_a).unwrap();
+        let header_details_2: Vec<Option<Details>> = crate::call_test_ribosome!(host_access, TestWasm::Crud, "header_details", vec![zero_a, one_b.clone()]).unwrap();
+        let entry_details_2: Vec<Option<Details>> = crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", vec![zero_hash.clone(), one_hash.clone()]).unwrap();
         check(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "header_details", zero_a).unwrap(),
+            &header_details_2[0],
             0,
             0,
         );
         check(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "header_details", one_b).unwrap(),
+            &header_details_2[1],
             1,
             0,
         );
         check_entry(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", zero_hash).unwrap(),
+            &entry_details_2[0],
             0,
             2,
             0,
             line!(),
         );
         check_entry(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", one_hash).unwrap(),
+            &entry_details_2[1],
             1,
             0,
             0,
@@ -168,32 +173,34 @@ pub mod wasm_test {
         );
 
         let two: HeaderHash = crate::call_test_ribosome!(host_access, TestWasm::Crud, "inc", one_b).unwrap();
+        let header_details_3: Vec<Option<Details>> = crate::call_test_ribosome!(host_access, TestWasm::Crud, "header_details", vec![one_b.clone(), two]).unwrap();
+        let entry_details_3: Vec<Option<Details>> = crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", vec![zero_hash.clone(), one_hash.clone(), two_hash.clone()]).unwrap();
         check(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "header_details", one_b).unwrap(),
+            &header_details_3[0],
             1,
             0,
         );
         check(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "header_details", two).unwrap(),
+            &header_details_3[1],
             2,
             0,
         );
         check_entry(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", zero_hash).unwrap(),
+            &entry_details_3[0],
             0,
             2,
             0,
             line!(),
         );
         check_entry(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", one_hash).unwrap(),
+            &entry_details_3[1],
             1,
             1,
             0,
             line!(),
         );
         check_entry(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", two_hash).unwrap(),
+            &entry_details_3[2],
             2,
             0,
             0,
@@ -202,42 +209,42 @@ pub mod wasm_test {
 
         let zero_b: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::Crud, "dec", one_a).unwrap();
+        let header_details_4: Vec<Option<Details>> = crate::call_test_ribosome!(host_access, TestWasm::Crud, "header_details", vec![one_a, one_b, zero_b]).unwrap();
+        let entry_details_4: Vec<Option<Details>> = crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", vec![zero_hash, one_hash, two_hash]).unwrap();
         check(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "header_details", one_a).unwrap(),
+            &header_details_4[0],
             1,
             1,
         );
         check(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "header_details", one_b).unwrap(),
+            &header_details_4[1],
             1,
             0,
         );
         check_entry(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", zero_hash).unwrap(),
+            &entry_details_4[0],
             0,
             2,
             0,
             line!(),
         );
         check_entry(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", one_hash).unwrap(),
+            &entry_details_4[1],
             1,
             1,
             1,
             line!(),
         );
         check_entry(
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", two_hash).unwrap(),
+            &entry_details_4[2],
             2,
             0,
             0,
             line!(),
         );
 
-        let zero_b_details: Option<Details> =
-            crate::call_test_ribosome!(host_access, TestWasm::Crud, "header_details", zero_b).unwrap();
-        match zero_b_details {
-            Some(Details::Element(element_details)) => {
+        match header_details_4[2] {
+            Some(Details::Element(ref element_details)) => {
                 match element_details.element.entry().as_option() {
                     None => {
                         // this is the delete so it should be none
