@@ -22,11 +22,9 @@ pub fn get_links<'a>(
                         base_address,
                         tag_prefix,
                     } = input;
-                    // Get zome id
                     let zome_id = ribosome
                         .zome_to_id(&call_context.zome)
                         .expect("Failed to get ID for current zome.");
-                    // Create the key
                     let key = WireLinkKey {
                         base: base_address,
                         zome_id,

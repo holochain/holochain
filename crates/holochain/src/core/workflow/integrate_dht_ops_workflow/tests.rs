@@ -792,7 +792,7 @@ async fn get_entry(env: EnvWrite, entry_hash: EntryHash) -> Option<Entry> {
 
     let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
 
-    let input = GetInput::new(vec![entry_hash.clone().into()], GetOptions::latest());
+    let input = GetInput::new(entry_hash.clone().into(), GetOptions::latest());
 
     let output = {
         let mut host_access = fixt!(ZomeCallHostAccess);
@@ -800,7 +800,7 @@ async fn get_entry(env: EnvWrite, entry_hash: EntryHash) -> Option<Entry> {
         call_context.host_context = host_access.into();
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
-        host_fn::get::get(ribosome.clone(), call_context.clone(), input).unwrap()
+        host_fn::get::get(ribosome.clone(), call_context.clone(), vec![input]).unwrap()
     };
     output.and_then(|el| el.into())
 }

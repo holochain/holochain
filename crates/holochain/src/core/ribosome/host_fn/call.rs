@@ -42,7 +42,6 @@ pub fn call(
                     Ok(v) => Ok(v),
                     Err(ribosome_error) => Err(WasmError::Host(ribosome_error.to_string())),
                 },
-                // Ok(v) => Ok(v),
                 Err(conductor_api_error) => Err(WasmError::Host(conductor_api_error.to_string())),
             }).collect();
             Ok(results?)
