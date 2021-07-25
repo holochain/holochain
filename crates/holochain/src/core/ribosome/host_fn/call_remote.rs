@@ -1,7 +1,6 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeT;
-use holochain_p2p::HolochainP2pCellT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
@@ -10,7 +9,7 @@ use futures::future::join_all;
 pub fn call_remote(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: CallRemote,
+    inputs: Vec<CallRemote>,
 ) -> Result<Vec<ZomeCallResponse>, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
@@ -19,20 +18,22 @@ pub fn call_remote(
         } => {
             // it is the network's responsibility to handle timeouts and return an Err result in that case
             let results: Vec<Result<SerializedBytes, _>> = tokio_helper::block_forever_on(async move {
-                let network = call_context.host_context().network().clone();
-
-                let tasks = input.target_agents().iter().map(|agent| {
-                    network
-                        .call_remote(
-                            agent.to_owned(),
-                            input.zome_name().to_owned(),
-                            input.fn_name().to_owned(),
-                            input.cap().to_owned(),
-                            input.payload().to_owned(),
-                        )
-                });
-
-                join_all(tasks).await
+                join_all(inputs.into_iter().map(|input| {
+                    let CallRemote {
+                        target_agent,
+                        zome_name,
+                        fn_name,
+                        cap,
+                        payload,
+                    } = input;
+                    call_context.host_context().network().clone().into_call_remote(
+                        target_agent,
+                        zome_name,
+                        fn_name,
+                        cap,
+                        payload,
+                    )
+                })).await
             });
             let results: Result<Vec<_>, _> = results.into_iter().map(|result| match result {
                 Ok(r) => match ZomeCallResponse::try_from(r) {

@@ -64,8 +64,8 @@ pub trait HdkT: Send + Sync {
         get_links_input: Vec<GetLinksInput>,
     ) -> ExternResult<Vec<LinkDetails>>;
     // P2P
-    fn call(&self, call: Call) -> ExternResult<Vec<ZomeCallResponse>>;
-    fn call_remote(&self, call_remote: CallRemote) -> ExternResult<Vec<ZomeCallResponse>>;
+    fn call(&self, call: Vec<Call>) -> ExternResult<Vec<ZomeCallResponse>>;
+    fn call_remote(&self, call_remote: Vec<CallRemote>) -> ExternResult<Vec<ZomeCallResponse>>;
     fn emit_signal(&self, app_signal: AppSignal) -> ExternResult<()>;
     fn remote_signal(&self, remote_signal: RemoteSignal) -> ExternResult<()>;
     // Random
@@ -179,10 +179,10 @@ impl HdkT for ErrHdk {
         Self::err()
     }
     // P2P
-    fn call(&self, _: Call) -> ExternResult<Vec<ZomeCallResponse>> {
+    fn call(&self, _: Vec<Call>) -> ExternResult<Vec<ZomeCallResponse>> {
         Self::err()
     }
-    fn call_remote(&self, _: CallRemote) -> ExternResult<Vec<ZomeCallResponse>> {
+    fn call_remote(&self, _: Vec<CallRemote>) -> ExternResult<Vec<ZomeCallResponse>> {
         Self::err()
     }
     fn emit_signal(&self, _: AppSignal) -> ExternResult<()> {
@@ -338,11 +338,11 @@ impl HdkT for HostHdk {
     ) -> ExternResult<Vec<LinkDetails>> {
         host_call::<Vec<GetLinksInput>, Vec<LinkDetails>>(__get_link_details, get_links_input)
     }
-    fn call(&self, call: Call) -> ExternResult<Vec<ZomeCallResponse>> {
-        host_call::<Call, Vec<ZomeCallResponse>>(__call, call)
+    fn call(&self, call: Vec<Call>) -> ExternResult<Vec<ZomeCallResponse>> {
+        host_call::<Vec<Call>, Vec<ZomeCallResponse>>(__call, call)
     }
-    fn call_remote(&self, call_remote: CallRemote) -> ExternResult<Vec<ZomeCallResponse>> {
-        host_call::<CallRemote, Vec<ZomeCallResponse>>(__call_remote, call_remote)
+    fn call_remote(&self, call_remote: Vec<CallRemote>) -> ExternResult<Vec<ZomeCallResponse>> {
+        host_call::<Vec<CallRemote>, Vec<ZomeCallResponse>>(__call_remote, call_remote)
     }
     fn emit_signal(&self, app_signal: AppSignal) -> ExternResult<()> {
         host_call::<AppSignal, ()>(__emit_signal, app_signal)

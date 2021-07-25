@@ -21,36 +21,22 @@ pub fn call<I>(
 where
     I: serde::Serialize + std::fmt::Debug,
 {
-    Ok(
-        call_multi(vec![to_cell], zome_name, fn_name, cap_secret, payload)?
-            .into_iter()
-            .next()
-            .unwrap(),
-    )
-}
-
-pub fn call_multi<I>(
-    to_cells: Vec<Option<CellId>>,
-    zome_name: ZomeName,
-    fn_name: FunctionName,
-    cap_secret: Option<CapSecret>,
-    payload: I,
-) -> ExternResult<Vec<ZomeCallResponse>>
-where
-    I: serde::Serialize + std::fmt::Debug,
-{
     // @todo is this secure to set this in the wasm rather than have the host inject it?
     let provenance = agent_info()?.agent_latest_pubkey;
-    HDK.with(|h| {
-        h.borrow().call(Call::new(
-            to_cells,
-            zome_name,
-            fn_name,
-            cap_secret,
-            ExternIO::encode(payload)?,
-            provenance,
-        ))
-    })
+    Ok(HDK
+        .with(|h| {
+            h.borrow().call(vec![Call::new(
+                to_cell,
+                zome_name,
+                fn_name,
+                cap_secret,
+                ExternIO::encode(payload)?,
+                provenance,
+            )])
+        })?
+        .into_iter()
+        .next()
+        .unwrap())
 }
 
 /// Wrapper for __call_remote host function.
@@ -76,27 +62,6 @@ where
 /// let foo: Foo = call_remote(bob, "foo_zome", "do_it", secret, serializable_payload)?;
 /// ...
 /// ```
-pub fn call_remote_multi<I>(
-    agents: Vec<AgentPubKey>,
-    zome: ZomeName,
-    fn_name: FunctionName,
-    cap_secret: Option<CapSecret>,
-    payload: I,
-) -> ExternResult<Vec<ZomeCallResponse>>
-where
-    I: serde::Serialize + std::fmt::Debug,
-{
-    HDK.with(|h| {
-        h.borrow().call_remote(CallRemote::new(
-            agents,
-            zome,
-            fn_name,
-            cap_secret,
-            ExternIO::encode(payload)?,
-        ))
-    })
-}
-
 pub fn call_remote<I>(
     agent: AgentPubKey,
     zome: ZomeName,
@@ -107,13 +72,19 @@ pub fn call_remote<I>(
 where
     I: serde::Serialize + std::fmt::Debug,
 {
-    // Unwrap because the host has to give us a vec of length 1 because we gave it 1 agent.
-    Ok(
-        call_remote_multi(vec![agent], zome, fn_name, cap_secret, payload)?
-            .into_iter()
-            .next()
-            .unwrap(),
-    )
+    Ok(HDK
+        .with(|h| {
+            h.borrow().call_remote(vec![CallRemote::new(
+                agent,
+                zome,
+                fn_name,
+                cap_secret,
+                ExternIO::encode(payload)?,
+            )])
+        })?
+        .into_iter()
+        .next()
+        .unwrap())
 }
 
 /// Emit an app-defined Signal.

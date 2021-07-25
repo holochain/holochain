@@ -7,7 +7,7 @@ use holo_hash::AgentPubKey;
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Call {
-    pub to_cells: Vec<Option<CellId>>,
+    pub to_cell: Option<CellId>,
     pub zome_name: ZomeName,
     pub fn_name: FunctionName,
     pub cap: Option<CapSecret>,
@@ -17,7 +17,7 @@ pub struct Call {
 
 impl Call {
     pub fn new(
-        to_cells: Vec<Option<CellId>>,
+        to_cell: Option<CellId>,
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap: Option<CapSecret>,
@@ -25,7 +25,7 @@ impl Call {
         provenance: AgentPubKey,
     ) -> Self {
         Self {
-            to_cells,
+            to_cell,
             zome_name,
             fn_name,
             cap,
