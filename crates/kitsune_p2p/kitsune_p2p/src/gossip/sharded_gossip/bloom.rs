@@ -93,10 +93,11 @@ impl ShardedGossipLocal {
                 bloom.set(&Arc::new(MetaOpKey::Op(hash)));
             }
 
-
             // If we found the maximum number of ops we can then
             // there might still be more ops in the search window.
-            if num_found >= Self::UPPER_HASHES_BOUND && found_time_window.end < search_time_window.end {
+            if num_found >= Self::UPPER_HASHES_BOUND
+                && found_time_window.end < search_time_window.end
+            {
                 let bloom = TimedBloomFilter {
                     bloom,
                     time: search_time_window.start..found_time_window.end,
