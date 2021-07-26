@@ -494,12 +494,18 @@ impl ShardedGossipLocal {
         .map(|(ops, _window)| ops)
         .unwrap_or_default();
 
-        let ops = store::fetch_ops(&self.evt_sender, &self.space, &local_agents, op_hashes)
-            .await?
-            .into_iter()
-            // maackle: this seems silly
-            .map(Arc::new)
-            .collect();
+        let ops = store::fetch_ops(
+            &self.evt_sender,
+            &self.space,
+            local_agents.iter(),
+            op_hashes,
+        )
+        .await?
+        .into_iter()
+        // maackle: this seems silly
+        .map(Arc::new)
+        .collect();
+
         store::put_ops(&self.evt_sender, &self.space, local_agents, ops).await?;
         Ok(())
     }
