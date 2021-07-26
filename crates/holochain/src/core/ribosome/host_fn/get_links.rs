@@ -18,22 +18,24 @@ pub fn get_links<'a>(
         HostFnAccess{ read_workspace: Permission::Allow, .. } => {
             let results: Vec<Result<Vec<Link>, _>> = tokio_helper::block_forever_on(async move {
                 join_all(inputs.into_iter().map(|input| {
-                    let GetLinksInput {
-                        base_address,
-                        tag_prefix,
-                    } = input;
-                    let zome_id = ribosome
-                        .zome_to_id(&call_context.zome)
-                        .expect("Failed to get ID for current zome.");
-                    let key = WireLinkKey {
-                        base: base_address,
-                        zome_id,
-                        tag: tag_prefix,
-                    };
-                    Cascade::from_workspace_network(
-                        call_context.host_context.workspace(),
-                        call_context.host_context.network().to_owned(),
-                    ).into_dht_get_links(key, GetLinksOptions::default())
+                    async {
+                        let GetLinksInput {
+                            base_address,
+                            tag_prefix,
+                        } = input;
+                        let zome_id = ribosome
+                            .zome_to_id(&call_context.zome)
+                            .expect("Failed to get ID for current zome.");
+                        let key = WireLinkKey {
+                            base: base_address,
+                            zome_id,
+                            tag: tag_prefix,
+                        };
+                        Cascade::from_workspace_network(
+                            call_context.host_context.workspace(),
+                            call_context.host_context.network().to_owned(),
+                        ).dht_get_links(key, GetLinksOptions::default()).await
+                    }
                 }
                 )).await
             });

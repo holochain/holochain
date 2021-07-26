@@ -17,6 +17,7 @@ pub fn get<'a>(
         HostFnAccess{ read_workspace: Permission::Allow, .. } => {
             let results: Vec<Result<Option<Element>, _>> = tokio_helper::block_forever_on(async move {
                 join_all(inputs.into_iter().map(|input| {
+                    async {
                         let GetInput {
                             any_dht_hash,
                             get_options,
@@ -25,7 +26,8 @@ pub fn get<'a>(
                             call_context.host_context.workspace(),
                             call_context.host_context.network().clone()
                         )
-                        .into_dht_get(any_dht_hash, get_options)
+                        .dht_get(any_dht_hash, get_options).await
+                    }
                 })).await
             });
             let results: Result<Vec<_>, _> = results.into_iter().map(|result| match result {

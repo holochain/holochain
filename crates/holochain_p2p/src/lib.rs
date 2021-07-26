@@ -122,21 +122,6 @@ pub struct HolochainP2pCell {
     from_agent: Arc<AgentPubKey>,
 }
 
-impl HolochainP2pCell {
-    /// call_remote wrapper that takes ownership of self.
-    pub async fn into_call_remote(
-        self,
-        to_agent: AgentPubKey,
-        zome_name: ZomeName,
-        fn_name: FunctionName,
-        cap: Option<CapSecret>,
-        payload: ExternIO,
-    ) -> actor::HolochainP2pResult<SerializedBytes> {
-        self.call_remote(to_agent, zome_name, fn_name, cap, payload)
-            .await
-    }
-}
-
 #[async_trait::async_trait]
 impl HolochainP2pCellT for HolochainP2pCell {
     /// owned getter

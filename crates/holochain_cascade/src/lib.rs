@@ -580,17 +580,6 @@ where
         }
     }
 
-    /// Takes ownership of `self` to perform a `dht_get`.
-    /// Useful for async closures that will drop a `&mut self` reference before the async completes.
-    #[instrument(skip(self))]
-    pub async fn into_dht_get(
-        mut self,
-        hash: AnyDhtHash,
-        options: GetOptions,
-    ) -> CascadeResult<Option<Element>> {
-        self.dht_get(hash, options).await
-    }
-
     #[instrument(skip(self))]
     pub async fn get_details(
         &mut self,
@@ -607,16 +596,6 @@ where
                 .await?
                 .map(Details::Element)),
         }
-    }
-
-    /// Takes ownership of `self` to perform a `get_details`.
-    /// Useful for async closures that will drop a `&mut self` reference before the async completes.
-    pub async fn into_get_details(
-        mut self,
-        hash: AnyDhtHash,
-        options: GetOptions,
-    ) -> CascadeResult<Option<Details>> {
-        self.get_details(hash, options).await
     }
 
     #[instrument(skip(self, options))]
@@ -636,17 +615,6 @@ where
         Ok(results)
     }
 
-    #[instrument(skip(self, options))]
-    /// Takes ownership of `self` to perform a `dht_get_links`.
-    /// Useful for async closures tht will drop a `&mut self` reference before the async completes.
-    pub async fn into_dht_get_links(
-        mut self,
-        key: WireLinkKey,
-        options: GetLinksOptions,
-    ) -> CascadeResult<Vec<Link>> {
-        self.dht_get_links(key, options).await
-    }
-
     #[instrument(skip(self, key, options))]
     /// Return all CreateLink headers
     /// and DeleteLink headers ordered by time.
@@ -662,17 +630,6 @@ where
         let query = GetLinkDetailsQuery::new(key.base, key.zome_id, key.tag);
         let results = self.cascading(query)?;
         Ok(results)
-    }
-
-    #[instrument(skip(self, key, options))]
-    /// Takes ownership of `self` to perform a `get_link_details`.
-    /// Useful for async closures tht will drop a `&mut self` reference before the async completes.
-    pub async fn into_get_link_details(
-        mut self,
-        key: WireLinkKey,
-        options: GetLinksOptions,
-    ) -> CascadeResult<Vec<(SignedHeaderHashed, Vec<SignedHeaderHashed>)>> {
-        self.get_link_details(key, options).await
     }
 
     #[instrument(skip(self, agent, query, options))]

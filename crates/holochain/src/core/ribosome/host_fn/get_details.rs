@@ -17,14 +17,16 @@ pub fn get_details<'a>(
         HostFnAccess{ read_workspace: Permission::Allow, .. } => {
             let results: Vec<Result<Option<Details>, _>> = tokio_helper::block_forever_on(async move {
                 join_all(inputs.into_iter().map(|input| {
-                    let GetInput {
-                        any_dht_hash,
-                        get_options,
-                    } = input;
-                    Cascade::from_workspace_network(
-                        call_context.host_context.workspace(),
-                        call_context.host_context.network().to_owned(),
-                    ).into_get_details(any_dht_hash, get_options)
+                    async {
+                        let GetInput {
+                            any_dht_hash,
+                            get_options,
+                        } = input;
+                        Cascade::from_workspace_network(
+                            call_context.host_context.workspace(),
+                            call_context.host_context.network().to_owned(),
+                        ).get_details(any_dht_hash, get_options).await
+                    }
                 })).await
             });
             let results: Result<Vec<_>, _> = results.into_iter().map(|result| result.map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))).collect();

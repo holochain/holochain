@@ -14,27 +14,31 @@ pub fn call(
 ) -> Result<Vec<ZomeCallResponse>, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ write_workspace: Permission::Allow, .. } => {
-            let host_context = call_context.host_context();
             let results: Vec<Result<Result<ZomeCallResponse, _>, _>> = tokio_helper::block_forever_on(async move {
                 join_all(inputs.into_iter().map(|input| {
-                    let Call {
-                        to_cell,
-                        zome_name,
-                        fn_name,
-                        cap,
-                        payload,
-                        provenance,
-                    } = input;
-                    let cell_id = to_cell.unwrap_or_else(|| host_context.call_zome_handle().cell_id().clone());
-                    let invocation = ZomeCall {
-                        cell_id,
-                        zome_name,
-                        fn_name,
-                        payload,
-                        cap,
-                        provenance,
-                    };
-                    host_context.call_zome_handle().call_zome(invocation, call_context.host_context().workspace().clone())
+                    async {
+                        let Call {
+                            to_cell,
+                            zome_name,
+                            fn_name,
+                            cap,
+                            payload,
+                            provenance,
+                        } = input;
+                        let cell_id = to_cell.unwrap_or_else(|| call_context.host_context().call_zome_handle().cell_id().clone());
+                        let invocation = ZomeCall {
+                            cell_id,
+                            zome_name,
+                            fn_name,
+                            payload,
+                            cap,
+                            provenance,
+                        };
+                        call_context.host_context().call_zome_handle().call_zome(
+                            invocation,
+                            call_context.host_context().workspace().clone()
+                        ).await
+                    }
                 })).await
             });
             let results: Result<Vec<_>, _> = results.into_iter().map(|result| match result {

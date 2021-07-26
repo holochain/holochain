@@ -5,6 +5,7 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 use futures::future::join_all;
+use holochain_p2p::HolochainP2pCellT;
 
 pub fn call_remote(
     _ribosome: Arc<impl RibosomeT>,
@@ -19,20 +20,22 @@ pub fn call_remote(
             // it is the network's responsibility to handle timeouts and return an Err result in that case
             let results: Vec<Result<SerializedBytes, _>> = tokio_helper::block_forever_on(async move {
                 join_all(inputs.into_iter().map(|input| {
-                    let CallRemote {
-                        target_agent,
-                        zome_name,
-                        fn_name,
-                        cap,
-                        payload,
-                    } = input;
-                    call_context.host_context().network().clone().into_call_remote(
-                        target_agent,
-                        zome_name,
-                        fn_name,
-                        cap,
-                        payload,
-                    )
+                    async {
+                        let CallRemote {
+                            target_agent,
+                            zome_name,
+                            fn_name,
+                            cap,
+                            payload,
+                        } = input;
+                        call_context.host_context().network().call_remote(
+                            target_agent,
+                            zome_name,
+                            fn_name,
+                            cap,
+                            payload,
+                        ).await
+                    }
                 })).await
             });
             let results: Result<Vec<_>, _> = results.into_iter().map(|result| match result {

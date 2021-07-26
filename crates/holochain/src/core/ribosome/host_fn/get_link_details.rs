@@ -18,22 +18,24 @@ pub fn get_link_details<'a>(
         HostFnAccess{ read_workspace: Permission::Allow, .. } => {
             let results: Vec<Result<Vec<_>, _>> = tokio_helper::block_forever_on(async move {
                 join_all(inputs.into_iter().map(|input| {
-                    let GetLinksInput {
-                        base_address,
-                        tag_prefix,
-                    } = input;
-                    let zome_id = ribosome
-                        .zome_to_id(&call_context.zome)
-                        .expect("Failed to get ID for current zome.");
-                    let key = WireLinkKey {
-                        base: base_address,
-                        zome_id,
-                        tag: tag_prefix,
-                    };
-                    Cascade::from_workspace_network(
-                        call_context.host_context.workspace(),
-                        call_context.host_context.network().to_owned(),
-                    ).into_get_link_details(key, GetLinksOptions::default())
+                    async {
+                        let GetLinksInput {
+                            base_address,
+                            tag_prefix,
+                        } = input;
+                        let zome_id = ribosome
+                            .zome_to_id(&call_context.zome)
+                            .expect("Failed to get ID for current zome.");
+                        let key = WireLinkKey {
+                            base: base_address,
+                            zome_id,
+                            tag: tag_prefix,
+                        };
+                        Cascade::from_workspace_network(
+                            call_context.host_context.workspace(),
+                            call_context.host_context.network().to_owned(),
+                        ).get_link_details(key, GetLinksOptions::default()).await
+                    }
                 })).await
             });
             let results: Result<Vec<_>, _> = results.into_iter().map(|result|
