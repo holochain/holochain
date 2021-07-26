@@ -189,7 +189,7 @@ pub fn generate_ops_for_overlapping_arcs<'a, const N: usize>(
     ops.sort_by_key(|op| op.get_loc());
 
     // associate ops with relevant agents, growing arcs at the same time
-    for (owners, op) in itertools::zip(ownership.into_iter(), ops.into_iter()) {
+    for (owners, op) in itertools::zip(ownership.iter(), ops.into_iter()) {
         for owner in owners.clone() {
             arcs.entry(owner)
                 .and_modify(|((_, hi), ops)| {
@@ -210,6 +210,31 @@ pub fn generate_ops_for_overlapping_arcs<'a, const N: usize>(
         })
         .collect();
     arcs
+}
+
+/// Given some mock persistence data, calculate the diff for each agent, i.e.
+/// the ops that would be sent via local sync given the current state.
+pub fn calculate_missing_ops(
+    data: &MockAgentPersistence,
+) -> Vec<(Arc<KitsuneAgent>, Vec<KitsuneOpHash>)> {
+    let all_hashes: HashSet<_> = data
+        .iter()
+        .flat_map(|(_, _, hs)| hs.iter().map(|(h, _)| h))
+        .collect();
+    data.iter()
+        .map(|(agent, arc, hs)| {
+            let owned: HashSet<&KitsuneOpHash> = hs.iter().map(|(h, _)| h).collect();
+            println!("arc: |{}|", arc.to_ascii(32));
+            (
+                agent.clone(),
+                all_hashes
+                    .difference(&owned)
+                    .filter(|h| arc.contains(h.get_loc()))
+                    .map(|s| s.to_owned().to_owned())
+                    .collect(),
+            )
+        })
+        .collect()
 }
 
 /// Test that the above functions work as expected in one specific case:

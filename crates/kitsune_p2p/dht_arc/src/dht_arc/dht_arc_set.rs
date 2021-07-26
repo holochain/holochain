@@ -269,6 +269,33 @@ impl ArcInterval {
             .map(|(a, b)| (Some(a), Some(b)))
             .unwrap_or_default()
     }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    pub fn to_ascii(&self, len: usize) -> String {
+        match self {
+            Self::Full => "(FULL)".to_string(),
+            Self::Empty => "(EMPTY)".to_string(),
+            Self::Bounded(lo, hi) => {
+                let factor = len as f64 / u32::MAX as f64;
+                let lo = (factor * *lo as f64) as usize;
+                let hi = (factor * *hi as f64) as usize;
+                if lo <= hi {
+                    vec![
+                        " ".repeat(lo),
+                        "-".repeat(hi - lo + 1),
+                        " ".repeat(usize::max(len - hi - 1, 0)),
+                    ]
+                } else {
+                    vec![
+                        "-".repeat(hi + 1),
+                        " ".repeat(usize::max(lo - hi - 1, 0)),
+                        "-".repeat(len - lo),
+                    ]
+                }
+                .join("")
+            }
+        }
+    }
 }
 
 /// Check whether a bounded interval is equivalent to the Full interval
@@ -300,5 +327,40 @@ mod tests {
         assert!(divergent.contains(20));
         assert!(divergent.contains(25));
         assert!(divergent.contains(u32::MAX));
+    }
+
+    #[test]
+    fn test_ascii() {
+        let cent = u32::MAX / 100 + 1;
+        assert_eq!(
+            ArcInterval::Bounded(cent * 30, cent * 60).to_ascii(10),
+            "   ----   ".to_string()
+        );
+        assert_eq!(
+            ArcInterval::Bounded(cent * 33, cent * 63).to_ascii(10),
+            "   ----   ".to_string()
+        );
+        assert_eq!(
+            ArcInterval::Bounded(cent * 29, cent * 59).to_ascii(10),
+            "  ----    ".to_string()
+        );
+
+        assert_eq!(
+            ArcInterval::Bounded(cent * 60, cent * 30).to_ascii(10),
+            "----  ----".to_string()
+        );
+        assert_eq!(
+            ArcInterval::Bounded(cent * 63, cent * 33).to_ascii(10),
+            "----  ----".to_string()
+        );
+        assert_eq!(
+            ArcInterval::Bounded(cent * 59, cent * 29).to_ascii(10),
+            "---  -----".to_string()
+        );
+
+        assert_eq!(
+            ArcInterval::Bounded(cent * 99, cent * 0).to_ascii(10),
+            "-        -".to_string()
+        );
     }
 }

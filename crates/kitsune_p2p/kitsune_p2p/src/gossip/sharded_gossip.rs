@@ -600,7 +600,7 @@ fn local_sync_arcset(arcs: &[ArcInterval]) -> DhtArcSet {
         .enumerate()
         // For each agent's arc,
         .map(|(i, arc_i)| {
-            // find the union of all arcs *other than this one,
+            // find the union of all arcs *other* than this one,
             let other_arcset = arcs
                 .iter()
                 .enumerate()
