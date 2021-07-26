@@ -118,7 +118,9 @@ impl ShardedGossip {
             #[allow(unreachable_code)]
             async move {
                 loop {
-                    // TODO: Use parameters for sleep time
+                    // TODO: This sleep isn't really needed except to stop a hot loop.
+                    // It could be much lower but we need to first implement how quickly we
+                    // call nodes to avoid hot looping.
                     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
                     this.run_one_iteration().await;
                 }

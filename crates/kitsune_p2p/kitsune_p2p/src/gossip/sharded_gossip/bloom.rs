@@ -53,7 +53,7 @@ impl ShardedGossipLocal {
         &self,
         local_agents: &HashSet<Arc<KitsuneAgent>>,
         common_arc_set: &Arc<DhtArcSet>,
-        search_time_window: Range<u64>,
+        mut search_time_window: Range<u64>,
     ) -> KitsuneResult<Vec<TimedBloomFilter>> {
         let mut results = Vec::new();
         loop {
@@ -88,16 +88,21 @@ impl ShardedGossipLocal {
             // Create the bloom from the op hashes.
             let mut bloom =
                 bloomfilter::Bloom::new_for_fp_rate(ops_within_common_arc.len(), Self::TGT_FP);
+
             for hash in ops_within_common_arc {
                 bloom.set(&Arc::new(MetaOpKey::Op(hash)));
             }
-            // FIXME: This time not right but we need to generate blooms for the
-            // whole time range for this to work.
-            if num_found >= Self::UPPER_HASHES_BOUND {
+
+
+            // If we found the maximum number of ops we can then
+            // there might still be more ops in the search window.
+            if num_found >= Self::UPPER_HASHES_BOUND && found_time_window.end < search_time_window.end {
                 let bloom = TimedBloomFilter {
                     bloom,
                     time: search_time_window.start..found_time_window.end,
                 };
+                // Adjust the search window to search the remaining time window.
+                search_time_window = found_time_window.end..search_time_window.end;
                 results.push(bloom);
             } else {
                 let bloom = TimedBloomFilter {
