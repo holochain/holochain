@@ -296,10 +296,10 @@ pub struct RoundState {
     common_arc_set: Arc<DhtArcSet>,
     /// Number of ops blooms we have sent for this round, which is also the
     /// number of MissingOps sets we expect in response
-    num_ops_blooms: u8,
+    num_sent_ops_blooms: u8,
     /// We've received the last op bloom filter from our partner
     /// (the one with `finished` == true)
-    increment_ops_complete: bool,
+    received_all_incoming_ops_blooms: bool,
     /// Round start time
     created_at: std::time::Instant,
     /// Amount of time before a round is considered expired.
@@ -338,8 +338,8 @@ impl ShardedGossipLocal {
     fn new_state(&self, common_arc_set: Arc<DhtArcSet>) -> KitsuneResult<RoundState> {
         Ok(RoundState {
             common_arc_set,
-            num_ops_blooms: 0,
-            increment_ops_complete: false,
+            num_sent_ops_blooms: 0,
+            received_all_incoming_ops_blooms: false,
             created_at: std::time::Instant::now(),
             // TODO: Check if the node is a successful peer or not and set the timeout accordingly
             round_timeout: self
@@ -366,8 +366,8 @@ impl ShardedGossipLocal {
                 .round_map
                 .get_mut(state_id)
                 .map(|state| {
-                    state.increment_ops_complete = true;
-                    state.num_ops_blooms == 0
+                    state.received_all_incoming_ops_blooms = true;
+                    state.num_sent_ops_blooms == 0
                 })
                 .unwrap_or(true);
             if finished {
@@ -383,9 +383,9 @@ impl ShardedGossipLocal {
             if i.round_map
                 .get_mut(state_id)
                 .map(|state| {
-                    let num_ops_blooms = state.num_ops_blooms.saturating_sub(1);
-                    state.num_ops_blooms = num_ops_blooms;
-                    state.num_ops_blooms == 0 && state.increment_ops_complete
+                    let num_ops_blooms = state.num_sent_ops_blooms.saturating_sub(1);
+                    state.num_sent_ops_blooms = num_ops_blooms;
+                    state.num_sent_ops_blooms == 0 && state.received_all_incoming_ops_blooms
                 })
                 .unwrap_or(true)
             {
@@ -588,9 +588,9 @@ fn local_sync_arcset(arcs: &[ArcInterval]) -> DhtArcSet {
 }
 
 impl RoundState {
-    fn increment_ops_blooms(&mut self) -> u8 {
-        self.num_ops_blooms += 1;
-        self.num_ops_blooms
+    fn increment_sent_ops_blooms(&mut self) -> u8 {
+        self.num_sent_ops_blooms += 1;
+        self.num_sent_ops_blooms
     }
 }
 

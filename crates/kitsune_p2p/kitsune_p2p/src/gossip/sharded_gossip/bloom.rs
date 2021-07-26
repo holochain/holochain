@@ -49,51 +49,66 @@ impl ShardedGossipLocal {
     /// No empty bloom filters.
     /// - Bloom has a 1% chance of false positive (which will lead to agents not being sent back).
     /// - Expect this function to complete in an average of 10 ms and worst case 100 ms.
-    pub(super) async fn generate_ops_bloom(
+    pub(super) async fn generate_ops_blooms_for_time_window(
         &self,
         local_agents: &HashSet<Arc<KitsuneAgent>>,
         common_arc_set: &Arc<DhtArcSet>,
-        time_range: Range<u64>,
-    ) -> KitsuneResult<Option<TimedBloomFilter>> {
-        // Get the agents withing the arc set and filter by local.
-        let local_agents_within_arc_set: Vec<_> =
-            store::agents_within_arcset(&self.evt_sender, &self.space, common_arc_set.clone())
-                .await?
-                .into_iter()
-                .filter(|(a, _)| local_agents.contains(a))
-                .collect();
+        search_time_window: Range<u64>,
+    ) -> KitsuneResult<Vec<TimedBloomFilter>> {
+        let mut results = Vec::new();
+        loop {
+            // Get the agents withing the arc set and filter by local.
+            let local_agents_within_arc_set: Vec<_> =
+                store::agents_within_arcset(&self.evt_sender, &self.space, common_arc_set.clone())
+                    .await?
+                    .into_iter()
+                    .filter(|(a, _)| local_agents.contains(a))
+                    .collect();
 
-        // Get the op hashes which fit within the common arc set from these local agents.
-        let result = store::all_op_hashes_within_arcset(
-            &self.evt_sender,
-            &self.space,
-            local_agents_within_arc_set.as_slice(),
-            common_arc_set,
-            time_range.clone(),
-            // FIXME: Does this make any sense for historical bloom?
-            Self::UPPER_HASHES_BOUND,
-        )
-        .await?;
+            // Get the op hashes which fit within the common arc set from these local agents.
+            let result = store::all_op_hashes_within_arcset(
+                &self.evt_sender,
+                &self.space,
+                local_agents_within_arc_set.as_slice(),
+                common_arc_set,
+                search_time_window.clone(),
+                // FIXME: Does this make any sense for historical bloom?
+                Self::UPPER_HASHES_BOUND,
+            )
+            .await?;
 
-        // If there are none then don't create a bloom.
-        let (ops_within_common_arc, _time) = match result {
-            Some(r) => r,
-            None => return Ok(None),
-        };
+            // If there are none then don't create a bloom.
+            let (ops_within_common_arc, found_time_window) = match result {
+                Some(r) => r,
+                None => break,
+            };
 
-        // Create the bloom from the op hashes.
-        let mut bloom =
-            bloomfilter::Bloom::new_for_fp_rate(ops_within_common_arc.len(), Self::TGT_FP);
-        for hash in ops_within_common_arc {
-            bloom.set(&Arc::new(MetaOpKey::Op(hash)));
+            let num_found = ops_within_common_arc.len();
+
+            // Create the bloom from the op hashes.
+            let mut bloom =
+                bloomfilter::Bloom::new_for_fp_rate(ops_within_common_arc.len(), Self::TGT_FP);
+            for hash in ops_within_common_arc {
+                bloom.set(&Arc::new(MetaOpKey::Op(hash)));
+            }
+            // FIXME: This time not right but we need to generate blooms for the
+            // whole time range for this to work.
+            if num_found >= Self::UPPER_HASHES_BOUND {
+                let bloom = TimedBloomFilter {
+                    bloom,
+                    time: search_time_window.start..found_time_window.end,
+                };
+                results.push(bloom);
+            } else {
+                let bloom = TimedBloomFilter {
+                    bloom,
+                    time: search_time_window,
+                };
+                results.push(bloom);
+                break;
+            }
         }
-        // FIXME: This time not right but we need to generate blooms for the
-        // whole time range for this to work.
-        let bloom = TimedBloomFilter {
-            bloom,
-            time: time_range,
-        };
-        Ok(Some(bloom))
+        Ok(results)
     }
 
     /// Check a bloom filter for missing ops.

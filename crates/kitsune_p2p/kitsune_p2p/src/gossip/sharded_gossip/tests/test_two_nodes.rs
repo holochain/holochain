@@ -126,8 +126,8 @@ async fn partial_missing_doesnt_finish() {
         round_map: maplit::hashmap! {
             cert.clone() => RoundState {
                 common_arc_set: Arc::new(ArcInterval::Full.into()),
-                num_ops_blooms: 1,
-                increment_ops_complete: true,
+                num_sent_ops_blooms: 1,
+                received_all_incoming_ops_blooms: true,
                 created_at: std::time::Instant::now(),
                 round_timeout: u32::MAX,
             }
@@ -163,8 +163,8 @@ async fn missing_ops_finishes() {
         round_map: maplit::hashmap! {
             cert.clone() => RoundState {
                 common_arc_set: Arc::new(ArcInterval::Full.into()),
-                num_ops_blooms: 1,
-                increment_ops_complete: true,
+                num_sent_ops_blooms: 1,
+                received_all_incoming_ops_blooms: true,
                 created_at: std::time::Instant::now(),
                 round_timeout: u32::MAX,
             }
@@ -200,8 +200,8 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
         round_map: maplit::hashmap! {
             cert.clone() => RoundState {
                 common_arc_set: Arc::new(ArcInterval::Full.into()),
-                num_ops_blooms: 1,
-                increment_ops_complete: false,
+                num_sent_ops_blooms: 1,
+                received_all_incoming_ops_blooms: false,
                 created_at: std::time::Instant::now(),
                 round_timeout: u32::MAX,
             }
@@ -237,8 +237,8 @@ async fn bloom_response_finishes() {
         round_map: maplit::hashmap! {
             cert.clone() => RoundState {
                 common_arc_set: Arc::new(ArcInterval::Full.into()),
-                num_ops_blooms: 0,
-                increment_ops_complete: false,
+                num_sent_ops_blooms: 0,
+                received_all_incoming_ops_blooms: false,
                 created_at: std::time::Instant::now(),
                 round_timeout: u32::MAX,
             }
@@ -274,8 +274,8 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
         round_map: maplit::hashmap! {
             cert.clone() => RoundState {
                 common_arc_set: Arc::new(ArcInterval::Full.into()),
-                num_ops_blooms: 1,
-                increment_ops_complete: false,
+                num_sent_ops_blooms: 1,
+                received_all_incoming_ops_blooms: false,
                 created_at: std::time::Instant::now(),
                 round_timeout: u32::MAX,
             }
@@ -314,8 +314,8 @@ async fn no_data_still_finishes() {
         round_map: maplit::hashmap! {
             bob_cert.clone() => RoundState {
                 common_arc_set: Arc::new(ArcInterval::Full.into()),
-                num_ops_blooms: 0,
-                increment_ops_complete: false,
+                num_sent_ops_blooms: 0,
+                received_all_incoming_ops_blooms: false,
                 created_at: std::time::Instant::now(),
                 round_timeout: u32::MAX,
             }
@@ -330,8 +330,8 @@ async fn no_data_still_finishes() {
         round_map: maplit::hashmap! {
             alice_cert.clone() => RoundState {
                 common_arc_set: Arc::new(ArcInterval::Full.into()),
-                num_ops_blooms: 1,
-                increment_ops_complete: true,
+                num_sent_ops_blooms: 1,
+                received_all_incoming_ops_blooms: true,
                 created_at: std::time::Instant::now(),
                 round_timeout: u32::MAX,
             }
