@@ -177,13 +177,13 @@ pub(super) async fn put_agent_info(
 pub(super) async fn fetch_ops(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
-    agents: &HashSet<Arc<KitsuneAgent>>,
+    agents: impl Iterator<Item = &Arc<KitsuneAgent>>,
     op_hashes: Vec<Arc<KitsuneOpHash>>,
 ) -> KitsuneResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> {
     evt_sender
         .fetch_op_hash_data(FetchOpHashDataEvt {
             space: space.clone(),
-            agents: agents.into_iter().cloned().collect(),
+            agents: agents.cloned().collect(),
             op_hashes,
         })
         .await
