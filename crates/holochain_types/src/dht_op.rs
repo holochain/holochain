@@ -25,11 +25,15 @@ pub mod error;
 #[cfg(test)]
 pub mod tests;
 
+#[cfg(feature = "test_utils")]
+pub mod facts;
+
 /// A unit of DHT gossip. Used to notify an authority of new (meta)data to hold
 /// as well as changes to the status of already held data.
 #[derive(
     Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, derive_more::Display,
 )]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum DhtOp {
     #[display(fmt = "StoreElement")]
     /// Used to notify the authority for a header that it has been created.

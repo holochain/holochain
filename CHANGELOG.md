@@ -6,46 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
-## [fixt](crates/fixt/CHANGELOG.md#unreleased)
+# 20210624.155736
 
-### Changed
+***:exclamation: Performance impact***
 
-- Named bytes fixturators like `SixtyFourBytes` are now fixed length arrays
+Please navigate to the holochain crate release notes further down for details on the performance impact in this release.
 
-### Added
+## [holochain-0.0.101](crates/holochain/CHANGELOG.md#0.0.101)
 
-- Added `SixtyFourBytesVec` to work like the old `Vec<u8>` implementation
+This version contains breaking changes to the conductor API as well as a major upgrade to the underlying Wasm runtime.
 
-## [holochain\_zome\_types](crates/holochain_zome_types/CHANGELOG.md#unreleased)
+***:exclamation: Performance impact***
 
-### Changed
+The version of wasmer that is used in this holochain release contains bugs in the scoping of wasmer modules vs. instances, such that it blocks the proper release of memory and slows down execution of concurrent Wasm instances. While we were able to at least mitigate these effects and are coordinating with wasmer to find a proper solution as soon as possible.
 
-- `Signature` is a 64 byte ‘secure primitive’
-
-## [hdk](crates/hdk/CHANGELOG.md#unreleased)
-
-### Changed
-
-- Migrated to wasmer 1+ and latest `holochain_wasmer` crates to match
-- Added `HdkT` trait to support mocking the host and native rust unit tests
-
-### Added
-
-- Added `sign_ephemeral` and `sign_ephemeral_raw`
-
-## [holochain\_types](crates/holochain_types/CHANGELOG.md#unreleased)
-
-### Changed
-
-- BREAKING: All references to `"uuid"` in the context of DNA has been renamed to `"uid"` to reflect that these IDs are not universally unique, but merely unique with regards to the zome code (the genotype) [\#727](https://github.com/holochain/holochain/pull/727)
-
-## [holochain\_cli](crates/holochain_cli/CHANGELOG.md#unreleased)
-
-### Removed
-
-- temporarily removed `install_app` from `hc`: its not clear if we should restore yet as mostly should be using `install_app_bundle` [\#665](https://github.com/holochain/holochain/pull/665)
-
-## [holochain](crates/holochain/CHANGELOG.md#unreleased)
+The severity of these issues increases with cell concurrency, i.e. using multiple cells with the same DNA. Application development with a single conductor and a few cells are expected to work well unless your machine has serious resource restrictions.
 
 ### Added
 
@@ -56,6 +31,91 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - BREAKING:  `InstallAppDnaPayload` in admin conductor API `InstallApp` command now only accepts a hash.  Both properties and path have been removed as per deprecation warning.  Use either `RegisterDna` or `InstallAppBundle` instead. [\#665](https://github.com/holochain/holochain/pull/665)
 - BREAKING: `DnaSource(Path)` in conductor\_api `RegisterDna` call now must point to `DnaBundle` as created by `hc dna pack` not a `DnaFile` created by `dna_util` [\#665](https://github.com/holochain/holochain/pull/665)
+
+### CHANGED
+
+- Updated to a version of `holochain_wasmer` that includes a migration to wasmer v2+. [\#773](https://github.com/holochain/holochain/pull/773/files), [\#801](https://github.com/holochain/holochain/pull/80), [\#836](https://github.com/holochain/holochain/pull/836)
+- Introduced a simple instance cache to mitigate and potentially outweigh the effects of the aforementioned wasmer conditions [\#848](https://github.com/holochain/holochain/pull/848)
+
+## [holochain\_test\_wasm\_common-0.0.1](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.1)
+
+## [holochain\_cascade-0.0.1](crates/holochain_cascade/CHANGELOG.md#0.0.1)
+
+## [holochain\_cli-0.0.2](crates/holochain_cli/CHANGELOG.md#0.0.2)
+
+### Removed
+
+- temporarily removed `install_app` from `hc`: its not clear if we should restore yet as mostly should be using `install_app_bundle` [\#665](https://github.com/holochain/holochain/pull/665)
+
+## [holochain\_cli\_sandbox-0.0.2](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.2)
+
+## [holochain\_websocket-0.0.1](crates/holochain_websocket/CHANGELOG.md#0.0.1)
+
+## [holochain\_conductor\_api-0.0.1](crates/holochain_conductor_api/CHANGELOG.md#0.0.1)
+
+## [holochain\_state-0.0.1](crates/holochain_state/CHANGELOG.md#0.0.1)
+
+## [holochain\_wasm\_test\_utils-0.0.1](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.1)
+
+## [holochain\_p2p-0.0.1](crates/holochain_p2p/CHANGELOG.md#0.0.1)
+
+## [holochain\_cli\_bundle-0.0.1](crates/holochain_cli_bundle/CHANGELOG.md#0.0.1)
+
+## [holochain\_types-0.0.1](crates/holochain_types/CHANGELOG.md#0.0.1)
+
+### Changed
+
+- BREAKING: All references to `"uuid"` in the context of DNA has been renamed to `"uid"` to reflect that these IDs are not universally unique, but merely unique with regards to the zome code (the genotype) [\#727](https://github.com/holochain/holochain/pull/727)
+
+## [holochain\_keystore-0.0.1](crates/holochain_keystore/CHANGELOG.md#0.0.1)
+
+## [holochain\_sqlite-0.0.1](crates/holochain_sqlite/CHANGELOG.md#0.0.1)
+
+## [kitsune\_p2p-0.0.1](crates/kitsune_p2p/CHANGELOG.md#0.0.1)
+
+## [kitsune\_p2p\_proxy-0.0.1](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.1)
+
+## [kitsune\_p2p\_transport\_quic-0.0.1](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.1)
+
+## [kitsune\_p2p\_types-0.0.1](crates/kitsune_p2p_types/CHANGELOG.md#0.0.1)
+
+## [kitsune\_p2p\_dht\_arc-0.0.1](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.0.1)
+
+## [kitsune\_p2p\_mdns-0.0.1](crates/kitsune_p2p_mdns/CHANGELOG.md#0.0.1)
+
+## [mr\_bundle-0.0.1](crates/mr_bundle/CHANGELOG.md#0.0.1)
+
+## [holochain\_util-0.0.1](crates/holochain_util/CHANGELOG.md#0.0.1)
+
+## [hdk-0.0.101](crates/hdk/CHANGELOG.md#0.0.101)
+
+### Changed
+
+- Added `HdkT` trait to support mocking the host and native rust unit tests
+
+### Added
+
+- Added `sign_ephemeral` and `sign_ephemeral_raw`
+
+## [hdk\_derive-0.0.3](crates/hdk_derive/CHANGELOG.md#0.0.3)
+
+## [holochain\_zome\_types-0.0.3](crates/holochain_zome_types/CHANGELOG.md#0.0.3)
+
+### Changed
+
+- `Signature` is a 64 byte ‘secure primitive’
+
+## [holo\_hash-0.0.3](crates/holo_hash/CHANGELOG.md#0.0.3)
+
+## [fixt-0.0.3](crates/fixt/CHANGELOG.md#0.0.3)
+
+### Changed
+
+- Named bytes fixturators like `SixtyFourBytes` are now fixed length arrays
+
+### Added
+
+- Added `SixtyFourBytesVec` to work like the old `Vec<u8>` implementation
 
 # \[20210304.120604\]
 

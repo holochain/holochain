@@ -1,5 +1,5 @@
 use crate::core::ribosome::FnComponents;
-use crate::core::ribosome::HostAccess;
+use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
@@ -10,7 +10,7 @@ use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
 use std::sync::Arc;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ValidateInvocation {
     pub zomes_to_invoke: ZomesToInvoke,
     // Arc here as entry may be very large
@@ -32,7 +32,7 @@ pub struct ValidateHostAccess {
     pub network: HolochainP2pCell,
 }
 
-impl From<ValidateHostAccess> for HostAccess {
+impl From<ValidateHostAccess> for HostContext {
     fn from(validate_host_access: ValidateHostAccess) -> Self {
         Self::Validate(validate_host_access)
     }
@@ -41,9 +41,9 @@ impl From<ValidateHostAccess> for HostAccess {
 impl From<&ValidateHostAccess> for HostFnAccess {
     fn from(_: &ValidateHostAccess) -> Self {
         let mut access = Self::none();
-        access.read_workspace = Permission::Allow;
-        access.keystore = Permission::Allow;
-        access.dna_bindings = Permission::Allow;
+        access.read_workspace_deterministic = Permission::Allow;
+        access.keystore_deterministic = Permission::Allow;
+        access.bindings_deterministic = Permission::Allow;
         access
     }
 }
@@ -191,9 +191,9 @@ mod test {
             .next()
             .unwrap();
         let mut access = HostFnAccess::none();
-        access.read_workspace = Permission::Allow;
-        access.keystore = Permission::Allow;
-        access.dna_bindings = Permission::Allow;
+        access.read_workspace_deterministic = Permission::Allow;
+        access.keystore_deterministic = Permission::Allow;
+        access.bindings_deterministic = Permission::Allow;
         assert_eq!(HostFnAccess::from(&validate_host_access), access);
     }
 
@@ -385,7 +385,8 @@ mod slow_tests {
         host_access.workspace = workspace.clone();
 
         let output: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Validate, "always_validates", ());
+            crate::call_test_ribosome!(host_access, TestWasm::Validate, "always_validates", ())
+                .unwrap();
 
         // the chain head should be the committed entry header
         let chain_head = tokio_helper::block_forever_on(async move {
@@ -412,7 +413,8 @@ mod slow_tests {
         host_access.workspace = workspace.clone();
 
         let output: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Validate, "never_validates", ());
+            crate::call_test_ribosome!(host_access, TestWasm::Validate, "never_validates", ())
+                .unwrap();
 
         // the chain head should be the committed entry header
         let chain_head = tokio_helper::block_forever_on(async move {

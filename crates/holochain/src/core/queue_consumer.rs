@@ -165,8 +165,8 @@ pub async fn spawn_queue_consumer_tasks(
     )
 }
 
-#[derive(Clone)]
 /// The entry points for kicking off a chain reaction of queue activity
+#[derive(Clone)]
 pub struct QueueTriggers {
     /// Notify the SysValidation workflow to run, i.e. after handling gossip
     pub sys_validation: TriggerSender,
@@ -175,6 +175,7 @@ pub struct QueueTriggers {
 }
 
 /// The triggers to run once at the start of a cell
+#[derive(Clone)]
 pub struct InitialQueueTriggers {
     /// These triggers can only be run once
     /// so they are private

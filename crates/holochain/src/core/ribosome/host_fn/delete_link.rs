@@ -14,20 +14,20 @@ pub fn delete_link<'a>(
     call_context: Arc<CallContext>,
     input: HeaderHash,
 ) -> Result<HeaderHash, WasmError> {
-    match HostFnAccess::from(&call_context.host_access()) {
+    match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ write_workspace: Permission::Allow, .. } => {
             // get the base address from the add link header
             // don't allow the wasm developer to get this wrong
             // it is never valid to have divergent base address for add/remove links
             // the subconscious will validate the base address match but we need to fetch it here to
             // include it in the remove link header
-            let network = call_context.host_access.network().clone();
+            let network = call_context.host_context.network().clone();
             let address = input.clone();
             let call_context_2 = call_context.clone();
 
             // handle timeouts at the network layer
             let maybe_add_link: Option<SignedHeaderHashed> = tokio_helper::block_forever_on(async move {
-                let workspace = call_context_2.host_access.workspace();
+                let workspace = call_context_2.host_context.workspace();
                 CascadeResult::Ok(
                     Cascade::from_workspace_network(workspace, network)
                         .dht_get(address.into(), GetOptions::content())
@@ -55,7 +55,7 @@ pub fn delete_link<'a>(
             }
             .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?;
 
-            let source_chain = call_context.host_access.workspace().source_chain();
+    let source_chain = call_context.host_context.workspace().source_chain();
 
             // handle timeouts at the source chain layer
 
@@ -101,52 +101,52 @@ pub mod slow_tests {
         host_access.workspace = workspace;
 
         // links should start empty
-        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ());
+        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
 
         assert!(links.into_inner().len() == 0);
 
         // add a couple of links
         let link_one: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Link, "create_link", ());
+            crate::call_test_ribosome!(host_access, TestWasm::Link, "create_link", ()).unwrap();
 
         // add a couple of links
         let link_two: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Link, "create_link", ());
+            crate::call_test_ribosome!(host_access, TestWasm::Link, "create_link", ()).unwrap();
 
-        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ());
+        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
 
         assert!(links.into_inner().len() == 2);
 
         // remove a link
         let _: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Link, "delete_link", link_one);
+            crate::call_test_ribosome!(host_access, TestWasm::Link, "delete_link", link_one).unwrap();
 
-        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ());
+        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
 
         assert!(links.into_inner().len() == 1);
 
         // remove a link
         let _: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Link, "delete_link", link_two);
+            crate::call_test_ribosome!(host_access, TestWasm::Link, "delete_link", link_two).unwrap();
 
-        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ());
+        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
 
         assert!(links.into_inner().len() == 0);
 
         // Add some links then delete them all
         let _h: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Link, "create_link", ());
+            crate::call_test_ribosome!(host_access, TestWasm::Link, "create_link", ()).unwrap();
         let _h: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Link, "create_link", ());
+            crate::call_test_ribosome!(host_access, TestWasm::Link, "create_link", ()).unwrap();
 
-        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ());
+        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
 
         assert!(links.into_inner().len() == 2);
 
-        crate::call_test_ribosome!(host_access, TestWasm::Link, "delete_all_links", ());
+        let _: () = crate::call_test_ribosome!(host_access, TestWasm::Link, "delete_all_links", ()).unwrap();
 
         // Should be no links left
-        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ());
+        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
 
         assert!(links.into_inner().len() == 0);
     }

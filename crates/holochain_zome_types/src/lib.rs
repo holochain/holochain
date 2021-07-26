@@ -18,6 +18,7 @@ pub mod call;
 pub mod call_remote;
 pub mod capability;
 pub mod cell;
+pub mod countersigning;
 #[allow(missing_docs)]
 pub mod crdt;
 pub mod dna_def;
@@ -77,15 +78,24 @@ pub use prelude::*;
 pub mod dependencies {
     pub use ::subtle;
 }
+use holochain_wasmer_common::WasmError;
 
 #[allow(missing_docs)]
-pub trait CallbackResult {
+pub trait CallbackResult: Sized {
     /// if a callback result is definitive we should halt any further iterations over remaining
     /// calls e.g. over sparse names or subsequent zomes
     /// typically a clear failure is definitive but success and missing dependencies are not
     /// in the case of success or missing deps, a subsequent callback could give us a definitive
     /// answer like a fail, and we don't want to over-optimise wasm calls and miss a clear failure
     fn is_definitive(&self) -> bool;
+    /// when a WasmError is returned from a callback (e.g. via `?` operator) it might mean either:
+    ///
+    /// - There was an error that prevented the callback from coming to a CallbackResult (e.g. failing to connect to database)
+    /// - There was an error that should be interpreted as a CallbackResult::Fail (e.g. data failed to deserialize)
+    ///
+    /// Typically this can be split as host/wasm errors are the former, and serialization/guest errors the latter.
+    /// This function allows each CallbackResult to explicitly map itself.
+    fn try_from_wasm_error(wasm_error: WasmError) -> Result<Self, WasmError>;
 }
 
 #[macro_export]
@@ -261,3 +271,14 @@ macro_rules! impl_to_sql_via_display {
         }
     };
 }
+
+/// 10MB of entropy free for the taking.
+/// Useful for initializing arbitrary::Unstructured data
+#[cfg(any(test, feature = "test_utils"))]
+pub static NOISE: once_cell::sync::Lazy<Vec<u8>> = once_cell::sync::Lazy::new(|| {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    std::iter::repeat_with(|| rng.gen())
+        .take(10_000_000)
+        .collect()
+});

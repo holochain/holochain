@@ -13,7 +13,7 @@ use holochain_types::element::SignedHeaderHashedExt;
 use holochain_types::env::EnvRead;
 use holochain_types::env::EnvWrite;
 use holochain_types::timestamp;
-use holochain_types::EntryHashed;
+use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::header;
 use holochain_zome_types::CapAccess;
 use holochain_zome_types::CapGrant;

@@ -1,5 +1,5 @@
 use crate::core::ribosome::FnComponents;
-use crate::core::ribosome::HostAccess;
+use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
@@ -27,7 +27,7 @@ pub struct MigrateAgentHostAccess {
     pub workspace: HostFnWorkspace,
 }
 
-impl From<MigrateAgentHostAccess> for HostAccess {
+impl From<MigrateAgentHostAccess> for HostContext {
     fn from(migrate_agent_host_access: MigrateAgentHostAccess) -> Self {
         Self::MigrateAgent(migrate_agent_host_access)
     }
@@ -37,9 +37,9 @@ impl From<&MigrateAgentHostAccess> for HostFnAccess {
     fn from(_: &MigrateAgentHostAccess) -> Self {
         let mut access = Self::none();
         // TODO: insert zome_name
-        access.read_workspace = Permission::Allow;
+        access.read_workspace_deterministic = Permission::Allow;
         access.agent_info = Permission::Allow;
-        access.dna_bindings = Permission::Allow;
+        access.bindings_deterministic = Permission::Allow;
         access
     }
 }
@@ -170,12 +170,15 @@ mod test {
             HostFnAccess::from(&migrate_agent_host_access),
             HostFnAccess {
                 agent_info: Allow,
-                read_workspace: Allow,
+                read_workspace: Deny,
+                read_workspace_deterministic: Allow,
                 write_workspace: Deny,
                 non_determinism: Deny,
                 write_network: Deny,
-                dna_bindings: Allow,
+                bindings: Deny,
+                bindings_deterministic: Allow,
                 keystore: Deny,
+                keystore_deterministic: Deny,
             }
         );
     }

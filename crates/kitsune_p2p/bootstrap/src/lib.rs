@@ -24,6 +24,9 @@ mod sync;
 // TODO: Maybe even that's too high?
 const SIZE_LIMIT: u64 = 1024;
 
+/// how often should we prune the expired entries?
+const PRUNE_EXPIRED_FREQ_S: u64 = 5;
+
 pub type BootstrapDriver = futures::future::BoxFuture<'static, ()>;
 
 pub async fn run(
@@ -31,6 +34,15 @@ pub async fn run(
 ) -> Result<(BootstrapDriver, SocketAddr), String> {
     let store = Store::new();
     let waiter = NodeSync::new();
+    {
+        let store = store.clone();
+        tokio::task::spawn(async move {
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(PRUNE_EXPIRED_FREQ_S)).await;
+                store.prune();
+            }
+        });
+    }
     let boot = now::now()
         .or(put::put(store.clone()))
         .or(random::random(store.clone()))

@@ -1,5 +1,5 @@
 use crate::core::ribosome::FnComponents;
-use crate::core::ribosome::HostAccess;
+use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
@@ -14,7 +14,7 @@ pub struct GenesisSelfCheckInvocation {
 #[derive(Clone, Constructor)]
 pub struct GenesisSelfCheckHostAccess;
 
-impl From<GenesisSelfCheckHostAccess> for HostAccess {
+impl From<GenesisSelfCheckHostAccess> for HostContext {
     fn from(host_access: GenesisSelfCheckHostAccess) -> Self {
         Self::GenesisSelfCheck(host_access)
     }
@@ -23,7 +23,7 @@ impl From<GenesisSelfCheckHostAccess> for HostAccess {
 impl From<&GenesisSelfCheckHostAccess> for HostFnAccess {
     fn from(_: &GenesisSelfCheckHostAccess) -> Self {
         let mut access = Self::none();
-        access.keystore = Permission::Allow;
+        access.keystore_deterministic = Permission::Allow;
         access
     }
 }
@@ -52,36 +52,27 @@ pub enum GenesisSelfCheckResult {
     Invalid(String),
 }
 
-impl CallbackResult for GenesisSelfCheckResult {
-    fn is_definitive(&self) -> bool {
-        matches!(self, Self::Invalid(_))
-    }
-}
-
-impl From<ExternIO> for GenesisSelfCheckResult {
-    fn from(guest_output: ExternIO) -> Self {
-        match guest_output.decode() {
-            Ok(v) => v,
-            Err(e) => Self::Invalid(format!("{:?}", e)),
-        }
-    }
-}
-
-impl From<Vec<(ZomeName, GenesisSelfCheckResult)>> for GenesisSelfCheckResult {
-    fn from(a: Vec<(ZomeName, GenesisSelfCheckResult)>) -> Self {
+impl From<Vec<(ZomeName, ValidateCallbackResult)>> for GenesisSelfCheckResult {
+    fn from(a: Vec<(ZomeName, ValidateCallbackResult)>) -> Self {
         a.into_iter().map(|(_, v)| v).collect::<Vec<_>>().into()
     }
 }
 
-impl From<Vec<GenesisSelfCheckResult>> for GenesisSelfCheckResult {
-    fn from(callback_results: Vec<GenesisSelfCheckResult>) -> Self {
+impl From<Vec<ValidateCallbackResult>> for GenesisSelfCheckResult {
+    fn from(callback_results: Vec<ValidateCallbackResult>) -> Self {
         callback_results.into_iter().fold(Self::Valid, |acc, x| {
             match x {
                 // validation is invalid if any x is invalid
-                GenesisSelfCheckResult::Invalid(i) => Self::Invalid(i),
+                ValidateCallbackResult::Invalid(i) => GenesisSelfCheckResult::Invalid(i),
 
                 // valid x allows validation to continue
-                GenesisSelfCheckResult::Valid => acc,
+                ValidateCallbackResult::Valid => acc,
+
+                // this can't happen because self check has no DHT access.
+                // don't want to panic so i guess it is invalid.
+                ValidateCallbackResult::UnresolvedDependencies(_) => {
+                    GenesisSelfCheckResult::Invalid(format!("{:?}", x))
+                }
             }
         })
     }

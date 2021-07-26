@@ -380,18 +380,19 @@ async fn call_zome() {
     assert_matches!(response, AdminResponse::DnasListed(a) if a == expects);
 
     // Activate cells
-    let request = AdminRequest::ActivateApp {
+    let request = AdminRequest::EnableApp {
         installed_app_id: "test".to_string(),
     };
     let response = client.request(request);
     let response = check_timeout(&mut holochain, response, 3000).await;
-    assert_matches!(response, AdminResponse::AppActivated(_));
+    assert_matches!(response, AdminResponse::AppEnabled { .. });
 
     // Attach App Interface
     let app_port_rcvd = attach_app_interface(&mut client, &mut holochain, Some(app_port)).await;
     assert_eq!(app_port, app_port_rcvd);
 
     // Call Zome
+    tracing::info!("Calling zome");
     call_foo_fn(app_port, original_dna_hash.clone(), &mut holochain).await;
 
     // Ensure that the other client does not receive any messages, i.e. that
@@ -408,12 +409,14 @@ async fn call_zome() {
     holochain.kill().await.expect("Failed to kill holochain");
     std::mem::drop(client);
 
-    // Call zome after resart
+    // Call zome after restart
+    tracing::info!("Restarting conductor");
     let mut holochain = start_holochain(config_path).await;
 
     tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
 
     // Call Zome again on the existing app interface port
+    tracing::info!("Calling zome again");
     call_foo_fn(app_port, original_dna_hash, &mut holochain).await;
 
     // Shutdown holochain
@@ -520,12 +523,12 @@ async fn emit_signals() {
     let cell_id = CellId::new(dna_hash.clone(), agent_key.clone());
 
     // Activate cells
-    let request = AdminRequest::ActivateApp {
+    let request = AdminRequest::EnableApp {
         installed_app_id: "test".to_string(),
     };
     let response = admin_tx.request(request);
     let response = check_timeout(&mut holochain, response, 3000).await;
-    assert_matches!(response, AdminResponse::AppActivated(_));
+    assert_matches!(response, AdminResponse::AppEnabled { .. });
 
     // Attach App Interface
     let app_port = attach_app_interface(&mut admin_tx, &mut holochain, None).await;

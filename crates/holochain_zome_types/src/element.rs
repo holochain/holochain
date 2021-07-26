@@ -16,9 +16,13 @@ use holo_hash::HeaderHash;
 use holo_hash::HoloHashed;
 use holochain_serialized_bytes::prelude::*;
 
+#[cfg(feature = "test_utils")]
+pub mod facts;
+
 /// a chain element containing the signed header along with the
 /// entry if the header type has one.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Element {
     /// The signed header for this element
     signed_header: SignedHeaderHashed,
@@ -107,6 +111,7 @@ impl Element {
 /// Represents the different ways the entry_address reference within a Header
 /// can be intepreted
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum ElementEntry {
     /// The Header has an entry_address reference, and the Entry is accessible.
     Present(Entry),
@@ -176,6 +181,7 @@ impl ElementEntry {
 ///
 /// Has implementations From and Into its tuple form.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct SignedHeader(pub Header, pub Signature);
 
 impl SignedHeader {
@@ -208,6 +214,7 @@ impl HashableContent for SignedHeader {
 
 /// The header and the signature that signed it
 #[derive(Clone, Debug, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct SignedHeaderHashed {
     /// The hashed but unsigned header.
     header: HeaderHashed,
@@ -268,6 +275,24 @@ impl SignedHeaderHashed {
     /// Access the signature portion.
     pub fn signature(&self) -> &Signature {
         &self.signature
+    }
+}
+
+impl From<SignedHeaderHashed> for HeaderHashed {
+    fn from(signed_header_hashed: SignedHeaderHashed) -> HeaderHashed {
+        signed_header_hashed.header
+    }
+}
+
+impl From<HeaderHashed> for Header {
+    fn from(header_hashed: HeaderHashed) -> Header {
+        header_hashed.into_content()
+    }
+}
+
+impl From<SignedHeaderHashed> for Header {
+    fn from(signed_header_hashed: SignedHeaderHashed) -> Header {
+        HeaderHashed::from(signed_header_hashed).into()
     }
 }
 

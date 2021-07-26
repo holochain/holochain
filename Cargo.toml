@@ -37,11 +37,12 @@ members = [
 
   "crates/test_utils/wasm",
   "crates/test_utils/wasm_common",
+  "crates/release-automation",
 ]
 
 exclude = [
   "crates/diagnostics",
-  "crates/release-automation"
+  "crates/release-automation",
 ]
 
 # These are the default params for RELEASE target
@@ -57,8 +58,8 @@ codegen-units = 16
 [patch.crates-io]
 # holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "wasmer-patch" }
 # holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "wasmer-patch" }
-# holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "bump-serde" }
-# holochain_serialized_bytes_derive = { git = "https://github.com/holochain/holochain-serialization.git", branch = "bump-serde" }
+# holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "develop" }
+# holochain_serialized_bytes_derive = { git = "https://github.com/holochain/holochain-serialization.git", branch = "develop" }
 # observability = { git = "https://github.com/freesig/observability.git", branch = "main" }
 # ghost_actor = { path = "../ghost_actor/crates/ghost_actor" }
 # ghost_actor = { git = "https://github.com/holochain/ghost_actor.git", branch = "add_observability" }
