@@ -20,6 +20,7 @@ use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::*;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::ops::Range;
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
@@ -109,15 +110,19 @@ impl ShardedGossip {
                 evt_sender,
                 inner: Share::new(inner),
                 gossip_type,
+                closing: AtomicBool::new(false),
             },
             bandwidth,
         });
         metric_task({
             let this = this.clone();
 
-            #[allow(unreachable_code)]
             async move {
-                loop {
+                while !this
+                    .gossip
+                    .closing
+                    .load(std::sync::atomic::Ordering::Relaxed)
+                {
                     // TODO: This sleep isn't really needed except to stop a hot loop.
                     // It could be much lower but we need to first implement how quickly we
                     // call nodes to avoid hot looping.
@@ -146,14 +151,13 @@ impl ShardedGossip {
 
         let con = match how {
             HowToConnect::Con(con) => {
-                // TODO: Uncomment this and make it work.
-                // if con.is_closed() {
-                //     let url = pick_url_for_cert(inner, &peer_cert)?;
-                //     ep_hnd.get_connection(url, t).await?
-                // } else {
-                //     con
-                // }
-                con
+                if con.is_closed() {
+                    self.ep_hnd
+                        .get_connection(con.peer_addr()?, timeout)
+                        .await?
+                } else {
+                    con
+                }
             }
             HowToConnect::Url(url) => self.ep_hnd.get_connection(url, timeout).await?,
         };
@@ -241,6 +245,7 @@ pub struct ShardedGossipLocal {
     space: Arc<KitsuneSpace>,
     evt_sender: EventSender,
     inner: Share<ShardedGossipLocalState>,
+    closing: AtomicBool,
 }
 
 /// Incoming gossip.
@@ -343,7 +348,9 @@ impl ShardedGossipLocal {
             num_sent_ops_blooms: 0,
             received_all_incoming_ops_blooms: false,
             created_at: std::time::Instant::now(),
-            // TODO: Check if the node is a successful peer or not and set the timeout accordingly
+            // TODO: Check if the node is a successful peer or not and set the timeout accordingly.
+            // TODO: Actually I think this is the wrong time out? This is
+            // how long we wait to timeout a round.
             round_timeout: self
                 .tuning_params
                 .gossip_peer_on_success_next_gossip_delay_ms,
@@ -357,6 +364,19 @@ impl ShardedGossipLocal {
 
     async fn remove_state(&self, id: &StateKey) -> KitsuneResult<Option<RoundState>> {
         self.inner.share_mut(|i, _| Ok(i.remove_state(id)))
+    }
+
+    async fn remove_target(&self, id: &StateKey) -> KitsuneResult<()> {
+        self.inner.share_mut(|i, _| {
+            if i.initiate_tgt
+                .as_ref()
+                .map(|tgt| tgt.0.cert() == id)
+                .unwrap_or(false)
+            {
+                i.initiate_tgt = None;
+            }
+            Ok(())
+        })
     }
 
     async fn incoming_ops_finished(
@@ -468,6 +488,10 @@ impl ShardedGossipLocal {
             }
             ShardedGossipWire::NoAgents(_) => {
                 self.remove_state(&cert).await?;
+                Vec::with_capacity(0)
+            }
+            ShardedGossipWire::AlreadyInProgress(_) => {
+                self.remove_target(&cert).await?;
                 Vec::with_capacity(0)
             }
             ShardedGossipWire::Error(Error { message }) => {
@@ -673,9 +697,14 @@ kitsune_p2p_types::write_codec_enum! {
         NoAgents(0x80) {
         },
 
+        /// You have sent a stale initiate to a node
+        /// that already has an active round with you.
+        AlreadyInProgress(0x90) {
+        },
+
         /// The node you are gossiping with has hit an error condition
         /// and failed to respond to a request.
-        Error(0x90) {
+        Error(0x11) {
             /// The error message.
             message.0: String,
         },
@@ -718,8 +747,9 @@ impl AsGossipModule for ShardedGossip {
     }
 
     fn close(&self) {
-        // TODO: Close.
-        todo!()
+        self.gossip
+            .closing
+            .store(true, std::sync::atomic::Ordering::Relaxed);
     }
 }
 

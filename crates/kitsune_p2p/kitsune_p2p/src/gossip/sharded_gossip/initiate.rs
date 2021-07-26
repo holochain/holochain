@@ -75,8 +75,9 @@ impl ShardedGossipLocal {
         // The round is already in progress from our side.
         // The remote side should not be initiating.
         if already_in_progress {
-            // TODO: Send back a response.
-            return Ok(Vec::with_capacity(0));
+            // This means one side has already started a round but
+            // a stale initiate was received.
+            return Ok(vec![ShardedGossipWire::already_in_progress()]);
         }
 
         // If this is the same connection as our current target then we need to decide who proceeds.

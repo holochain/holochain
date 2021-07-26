@@ -62,7 +62,6 @@ impl ShardedGossipLocal {
                 .collect();
 
         // Add the agents to the stores.
-        // TODO: This is probably too slow.
         store::put_agent_info(
             &self.evt_sender,
             &self.space,

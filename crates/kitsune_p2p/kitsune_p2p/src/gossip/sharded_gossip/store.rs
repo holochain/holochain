@@ -156,7 +156,10 @@ pub(super) async fn put_agent_info(
                 .storage_arc
                 .contains(new_info.agent.get_loc())
             {
-                // TODO; PERF: Batch this.
+                // TODO: PERF: Batch this.
+                // We need to change this event type to take a list of agent infos
+                // as it takes a lock on the db to write new info and is very
+                // slow if not batched.
                 evt_sender
                     .put_agent_info_signed(PutAgentInfoSignedEvt {
                         space: space.clone(),
@@ -206,12 +209,18 @@ pub(super) async fn put_ops(
             if this_agent_info.storage_arc.contains(hash.get_loc()) {
                 // FIXME: This absolutely should be batched. Sending one op
                 // at a time to the conductor is very slow.
+                // This requires changing the event type to take multiple ops.
                 evt_sender
                     .gossip(
                         space.clone(),
                         this_agent_info.agent.clone(),
                         // FIXME: I don't know which agent this is coming from.
                         // It's wrong to say it's from self.
+                        // This is hard to fix. We could just choose any agent
+                        // on the remote node or we could divide up each set of
+                        // ops into which agent they came from and send across
+                        // a hashmap. But this would require iterating through
+                        // all the ops multiple times.
                         this_agent_info.agent.clone(),
                         hash.clone(),
                         op.clone(),

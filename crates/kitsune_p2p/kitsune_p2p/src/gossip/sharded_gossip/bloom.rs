@@ -72,7 +72,6 @@ impl ShardedGossipLocal {
                 local_agents_within_arc_set.as_slice(),
                 common_arc_set,
                 search_time_window.clone(),
-                // FIXME: Does this make any sense for historical bloom?
                 Self::UPPER_HASHES_BOUND,
             )
             .await?;
