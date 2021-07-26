@@ -154,22 +154,37 @@ impl ShardedGossipLocal {
         let len = time_ranges.len();
         // Generate the ops bloom for all local agents within the common arc.
         for (i, time_range) in time_ranges.into_iter().enumerate() {
-            let bloom = self
-                .generate_ops_bloom(&local_agents, &state.common_arc_set, time_range)
+            let blooms = self
+                .generate_ops_blooms_for_time_window(
+                    &local_agents,
+                    &state.common_arc_set,
+                    time_range,
+                )
                 .await?;
 
-            let bloom = match bloom {
-                Some(bloom) => {
-                    let bloom = encode_timed_bloom_filter(&bloom);
-                    state.increment_ops_blooms();
-                    Some(bloom)
+            // If no blooms were found for this time window then return an empty bloom.
+            if blooms.is_empty() {
+                // Check if this is the final time window.
+                if i == len - 1 {
+                    gossip.push(ShardedGossipWire::ops(None, true));
+                } else {
+                    gossip.push(ShardedGossipWire::ops(None, false));
                 }
-                None => None,
-            };
-            if i == len - 1 {
-                gossip.push(ShardedGossipWire::ops(bloom, true));
-            } else {
-                gossip.push(ShardedGossipWire::ops(bloom, false));
+            }
+
+            let inner_len = blooms.len();
+
+            // Encode each bloom found for this time window.
+            for (j, bloom) in blooms.into_iter().enumerate() {
+                let bloom = encode_timed_bloom_filter(&bloom);
+                state.increment_sent_ops_blooms();
+
+                // Check if this is the final time window and the final bloom for this window.
+                if i == len - 1 && j == inner_len - 1 {
+                    gossip.push(ShardedGossipWire::ops(Some(bloom), true));
+                } else {
+                    gossip.push(ShardedGossipWire::ops(Some(bloom), false));
+                }
             }
         }
 
