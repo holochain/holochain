@@ -19,11 +19,11 @@ futures = "0.3"
 ghost_actor = "0.3.0-alpha.1"
 governor = "0.3.2"
 itertools = "0.10"
-kitsune_p2p_mdns = { version = "0.0.2-dev.0", path = "../mdns" }
+kitsune_p2p_mdns = { version = "0.0.1", path = "../mdns" }
 kitsune_p2p_types = { version = "0.0.2-dev.0", path = "../types", features = ["test_utils"] }
 kitsune_p2p_proxy = { version = "0.0.2-dev.0", path = "../proxy" }
 kitsune_p2p_transport_quic = { version = "0.0.2-dev.0", path = "../transport_quic" }
-lair_keystore_api = "=0.0.1-alpha.12"
+lair_keystore_api = "=0.0.1-alpha.13"
 rand = "0.7"
 shrinkwraprs = "0.3.0"
 thiserror = "1.0.22"

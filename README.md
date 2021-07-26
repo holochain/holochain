@@ -82,7 +82,13 @@ Conductor ready.
 
 As well as creating the config file this process also instantiates the database.   If you provide a config file on first run with just the `-c` flag `holochain` will also initialize the environment even if not in interactive mode.
 
-## Development Environment
+## Documentation for Application Developers
+
+- [Read the HDK API docs](https://docs.rs/hdk)
+- [Get started developing hApps](https://github.com/holochain/happ-build-tutorial/)
+- [Read the wasm API docs](./crates/hdk/README.md)
+
+## Environment for Development on this Project
 
 Assuming you have [installed the nix shell](https://nixos.wiki/wiki/Nix_Installation_Guide):
 
@@ -128,13 +134,7 @@ rough advice, because anything we say today could be out of date tomorrow:
 - Write your own scaffolding, build and development tools
 - Plan for dependency management as we ship new binaries
 
-## Application Developer
-
-- [Read the HDK API docs](https://docs.rs/hdk)
-- [Get started developing hApps](https://github.com/holochain/happ-build-tutorial/)
-- [Read the wasm API docs](./crates/hdk/README.md)
-
-## Core Developer
+### Additional Documentation
 
 Build the holochain docs:
 ```bash
