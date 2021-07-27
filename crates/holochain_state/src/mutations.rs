@@ -7,18 +7,55 @@ use holo_hash::encode::blake2b_256;
 use holo_hash::*;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Transaction;
-use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::DhtOpLight;
 use holochain_types::dht_op::OpOrder;
+use holochain_types::dht_op::{DhtOpHashed, DhtOpType};
 use holochain_types::prelude::DhtOpError;
 use holochain_types::prelude::DnaDefHashed;
 use holochain_types::prelude::DnaWasmHashed;
-use holochain_types::EntryHashed;
+use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::*;
 
 pub use error::*;
 
 mod error;
+
+#[derive(Debug)]
+pub enum Dependency {
+    Header(HeaderHash),
+    Entry(AnyDhtHash),
+    Null,
+}
+
+pub fn get_dependency(op_type: DhtOpType, header: &Header) -> Dependency {
+    match op_type {
+        DhtOpType::StoreElement | DhtOpType::StoreEntry => Dependency::Null,
+        DhtOpType::RegisterAgentActivity => header
+            .prev_header()
+            .map(|p| Dependency::Header(p.clone()))
+            .unwrap_or_else(|| Dependency::Null),
+        DhtOpType::RegisterUpdatedContent | DhtOpType::RegisterUpdatedElement => match header {
+            Header::Update(update) => Dependency::Header(update.original_header_address.clone()),
+            _ => Dependency::Null,
+        },
+        DhtOpType::RegisterDeletedBy | DhtOpType::RegisterDeletedEntryHeader => match header {
+            Header::Delete(delete) => Dependency::Header(delete.deletes_address.clone()),
+            _ => Dependency::Null,
+        },
+        DhtOpType::RegisterAddLink => match header {
+            Header::CreateLink(create_link) => {
+                Dependency::Entry(create_link.base_address.clone().into())
+            }
+            _ => Dependency::Null,
+        },
+        DhtOpType::RegisterRemoveLink => match header {
+            Header::DeleteLink(delete_link) => {
+                Dependency::Header(delete_link.link_add_address.clone())
+            }
+            _ => Dependency::Null,
+        },
+    }
+}
 
 #[macro_export]
 macro_rules! sql_insert {
@@ -101,11 +138,20 @@ pub fn insert_op(
         );
         insert_entry(txn, entry_hashed)?;
     }
+    let dependency = get_dependency(op_light.get_type(), &header);
     let header_hashed = HeaderHashed::with_pre_hashed(header, op_light.header_hash().to_owned());
     let header_hashed = SignedHeaderHashed::with_presigned(header_hashed, signature);
     let op_order = OpOrder::new(op_light.get_type(), header_hashed.header().timestamp());
     insert_header(txn, header_hashed)?;
-    insert_op_lite(txn, op_light, hash, is_authored, op_order, timestamp)?;
+    insert_op_lite(
+        txn,
+        op_light,
+        hash.clone(),
+        is_authored,
+        op_order,
+        timestamp,
+    )?;
+    set_dependency(txn, hash, dependency)?;
     Ok(())
 }
 
@@ -207,6 +253,27 @@ pub fn set_validation_status(
     dht_op_update!(txn, hash, {
         "validation_status": status,
     })?;
+    Ok(())
+}
+/// Set the integration dependency of a [`DhtOp`] in the database.
+pub fn set_dependency(
+    txn: &mut Transaction,
+    hash: DhtOpHash,
+    dependency: Dependency,
+) -> StateMutationResult<()> {
+    match dependency {
+        Dependency::Header(dep) => {
+            dht_op_update!(txn, hash, {
+                "dependency": dep,
+            })?;
+        }
+        Dependency::Entry(dep) => {
+            dht_op_update!(txn, hash, {
+                "dependency": dep,
+            })?;
+        }
+        Dependency::Null => (),
+    }
     Ok(())
 }
 

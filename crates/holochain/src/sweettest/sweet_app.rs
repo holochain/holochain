@@ -57,7 +57,9 @@ impl SweetApp {
         self.into_cells()
             .into_iter()
             .collect_tuple::<Inner>()
-            .expect("Can't destructure more than 4 Cells")
+            .expect(
+                "Wrong number of Cells in destructuring pattern, or too many (must be 4 or less)",
+            )
     }
 }
 
@@ -93,10 +95,10 @@ impl SweetAppBatch {
                 a.into_cells()
                     .into_iter()
                     .collect_tuple::<Inner>()
-                    .expect("Can't destructure more than 4 DNAs")
+                    .expect("Wrong number of DNAs in destructuring pattern, or too many (must be 4 or less)")
             })
             .collect_tuple::<Outer>()
-            .expect("Can't destructure more than 4 Agents")
+            .expect("Wrong number of Agents in destructuring pattern, or too many (must be 4 or less)")
     }
 
     /// Access all Cells across all Apps, with Cells from the same App being contiguous

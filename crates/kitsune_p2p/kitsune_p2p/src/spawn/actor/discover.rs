@@ -1,8 +1,6 @@
 #![allow(dead_code)]
 use super::*;
-use ghost_actor::dependencies::must_future::MustBoxFuture;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
-use std::collections::HashSet;
 use std::future::Future;
 
 /// This enum represents the outcomes from peer discovery
@@ -112,7 +110,7 @@ pub(crate) fn peer_connect(
         .url_list
         .get(0)
         .cloned()
-        .ok_or_else(|| KitsuneP2pError::from("no url"));
+        .ok_or_else(|| KitsuneP2pError::from("no url - agent is likely offline"));
 
     async move {
         let url = url?;
@@ -175,15 +173,14 @@ pub(crate) fn search_remotes_covering_basis(
                 return Ok(cover_nodes);
             }
 
+            // if we've exhausted our timeout, we should exit
+            timeout.ok()?;
+
             if near_nodes.is_empty() {
                 // maybe just wait and try again?
                 backoff.wait().await;
                 continue;
             }
-
-            // the next step involves making network requests
-            // so check our timeout first
-            timeout.ok()?;
 
             // shuffle the returned nodes so we don't keep hammering the same one
             use rand::prelude::*;
@@ -271,171 +268,4 @@ pub(crate) fn get_cached_remotes_near_basis(
 
         Ok(nodes)
     }
-}
-
-/// attempt to send messages to remote nodes in a staged timeout format
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn message_neighborhood<T, F>(
-    space: &mut Space,
-    from_agent: Arc<KitsuneAgent>,
-    target_node_count: u8,
-    stage_1_timeout_if_any_ms: u64,
-    stage_2_timeout_even_if_none_ms: u64,
-    // ignored while full-sync
-    _basis: Arc<KitsuneBasis>,
-    payload: wire::Wire,
-    accept_result_cb: F,
-) -> MustBoxFuture<'static, Vec<T>>
-where
-    T: 'static + Send,
-    F: Fn(Arc<KitsuneAgent>, wire::Wire) -> Result<T, ()> + 'static + Send + Sync,
-{
-    // TODO - FIXME - this maybe we want to init two timeouts here
-    //                for the if any / even if none distinction?
-    let timeout_even_if_none = KitsuneTimeout::from_millis(stage_2_timeout_even_if_none_ms);
-
-    let i_s = space.i_s.clone();
-    let evt_sender = space.evt_sender.clone();
-    let ep_hnd = space.ep_hnd.clone();
-    let space = space.space.clone();
-    let accept_result_cb = Arc::new(accept_result_cb);
-    async move {
-        let out = Arc::new(tokio::sync::Mutex::new(Vec::new()));
-
-        let mut sent_to = HashSet::new();
-        let start_time = std::time::Instant::now();
-        let mut interval_ms = 50;
-
-        loop {
-            // It is somewhat convoluted to manage both awaits on
-            // our message responses and a loop deciding to send
-            // more outgoing requests simultaneously.
-            //
-            // as a comprimize attempting to favor readable code
-            // we'll check the fetch count / timing after every full
-            // iteration before deciding to send more requests.
-
-            let fetched_count = out.lock().await.len();
-            if fetched_count >= target_node_count as usize {
-                break;
-            }
-
-            let elapsed_ms = start_time.elapsed().as_millis() as u64;
-
-            if elapsed_ms >= stage_1_timeout_if_any_ms && fetched_count > 0 {
-                break;
-            }
-
-            if elapsed_ms >= stage_2_timeout_even_if_none_ms {
-                break;
-            }
-
-            if let Ok(nodes) = get_5_or_less_non_local_agents_near_basis(
-                space.clone(),
-                from_agent.clone(),
-                _basis.clone(),
-                i_s.clone(),
-                evt_sender.clone(),
-            )
-            .await
-            {
-                for node in nodes {
-                    let to_agent = node.agent.clone();
-                    if !sent_to.contains(&to_agent) {
-                        sent_to.insert(to_agent.clone());
-                        let url = match node.url_list.get(0) {
-                            None => continue,
-                            Some(url) => url.clone(),
-                        };
-                        let fut = ep_hnd.get_connection(url, timeout_even_if_none);
-                        let mut payload = payload.clone();
-                        let accept_result_cb = accept_result_cb.clone();
-                        let out = out.clone();
-                        tokio::task::spawn(async move {
-                            let con_hnd = fut.await?;
-                            match &mut payload {
-                                wire::Wire::Notify(n) => {
-                                    n.to_agent = to_agent.clone();
-                                }
-                                wire::Wire::Call(c) => {
-                                    c.to_agent = to_agent.clone();
-                                }
-                                _ => panic!("cannot message {:?}", payload),
-                            }
-                            let res = con_hnd.request(&payload, timeout_even_if_none).await?;
-                            if let Ok(res) = accept_result_cb(to_agent, res) {
-                                out.lock().await.push(res);
-                            }
-
-                            KitsuneP2pResult::Ok(())
-                        });
-                    }
-                }
-            }
-
-            let elapsed_ms = start_time.elapsed().as_millis() as u64;
-
-            if elapsed_ms >= stage_2_timeout_even_if_none_ms {
-                break;
-            }
-
-            interval_ms *= 2;
-            if interval_ms > stage_2_timeout_even_if_none_ms - elapsed_ms {
-                interval_ms = stage_2_timeout_even_if_none_ms - elapsed_ms;
-            }
-
-            tokio::time::sleep(std::time::Duration::from_millis(interval_ms)).await;
-        }
-
-        let mut lock = out.lock().await;
-        lock.drain(..).collect()
-    }
-    .boxed()
-    .into()
-}
-
-/// search for agents to contact
-pub(crate) fn get_5_or_less_non_local_agents_near_basis(
-    space: Arc<KitsuneSpace>,
-    from_agent: Arc<KitsuneAgent>,
-    // ignored while full-sync
-    _basis: Arc<KitsuneBasis>,
-    i_s: ghost_actor::GhostSender<SpaceInternal>,
-    evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
-) -> MustBoxFuture<'static, KitsuneP2pResult<HashSet<AgentInfoSigned>>> {
-    async move {
-        let mut out = HashSet::new();
-
-        if let Ok(mut list) = evt_sender
-            .query_agent_info_signed(QueryAgentInfoSignedEvt {
-                space: space.clone(),
-                agent: from_agent.clone(),
-            })
-            .await
-        {
-            // randomize the results
-            rand::seq::SliceRandom::shuffle(&mut list[..], &mut rand::thread_rng());
-            for item in list {
-                match i_s.is_agent_local(item.agent.clone()).await {
-                    Ok(is_local) => {
-                        if !is_local {
-                            out.insert(item);
-                        }
-                    }
-                    Err(err) => tracing::error!(?err),
-                }
-                if out.len() >= 5 {
-                    return Ok(out);
-                }
-            }
-        }
-
-        if out.is_empty() {
-            return Err("could not find any peers".into());
-        }
-
-        Ok(out)
-    }
-    .boxed()
-    .into()
 }

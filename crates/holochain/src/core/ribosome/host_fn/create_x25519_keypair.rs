@@ -13,10 +13,10 @@ pub fn create_x25519_keypair(
     call_context: Arc<CallContext>,
     _input: (),
 ) -> Result<X25519PubKey, WasmError> {
-    match HostFnAccess::from(&call_context.host_access()) {
+    match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ keystore: Permission::Allow, .. } => tokio_helper::block_forever_on(async move {
             call_context
-                .host_access
+                .host_context
                 .keystore()
                 .create_x25519_keypair()
                 .await

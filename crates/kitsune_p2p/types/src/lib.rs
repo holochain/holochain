@@ -187,11 +187,11 @@ pub enum KitsuneErrorKind {
     Unit,
 
     /// The operation timed out.
-    #[error("TimedOut")]
+    #[error("Operation timed out")]
     TimedOut,
 
     /// This object is closed, calls on it are invalid.
-    #[error("Closed")]
+    #[error("This object is closed, calls on it are invalid.")]
     Closed,
 
     /// Unspecified error.

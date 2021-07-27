@@ -9,10 +9,10 @@ pub const HDK_NOT_REGISTERED: &str = "HDK not registered";
 /// Every test needs its own mock so each test needs to set it.
 use core::cell::RefCell;
 
-#[cfg(feature = "mock")]
+#[cfg(any(feature = "mock", not(target_arch = "wasm32")))]
 thread_local!(pub static HDK: RefCell<Box<dyn HdkT>> = RefCell::new(Box::new(ErrHdk)));
 
-#[cfg(not(feature = "mock"))]
+#[cfg(all(not(feature = "mock"), target_arch = "wasm32"))]
 thread_local!(pub static HDK: RefCell<Box<dyn HdkT>> = RefCell::new(Box::new(HostHdk)));
 
 /// When mocking is enabled the mockall crate automatically builds a MockHdkT for us.
@@ -40,6 +40,15 @@ pub trait HdkT: Send + Sync {
     fn hash_entry(&self, entry: Entry) -> ExternResult<EntryHash>;
     fn get(&self, get_input: GetInput) -> ExternResult<Option<Element>>;
     fn get_details(&self, get_input: GetInput) -> ExternResult<Option<Details>>;
+    fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed>;
+    fn must_get_header(
+        &self,
+        must_get_header_input: MustGetHeaderInput,
+    ) -> ExternResult<SignedHeaderHashed>;
+    fn must_get_valid_element(
+        &self,
+        must_get_valid_element_input: MustGetValidElementInput,
+    ) -> ExternResult<Element>;
     // Info
     fn agent_info(&self, agent_info_input: ()) -> ExternResult<AgentInfo>;
     fn app_info(&self, app_info_input: ()) -> ExternResult<AppInfo>;
@@ -127,6 +136,15 @@ impl HdkT for ErrHdk {
         Self::err()
     }
     fn get_details(&self, _: GetInput) -> ExternResult<Option<Details>> {
+        Self::err()
+    }
+    fn must_get_entry(&self, _: MustGetEntryInput) -> ExternResult<EntryHashed> {
+        Self::err()
+    }
+    fn must_get_header(&self, _: MustGetHeaderInput) -> ExternResult<SignedHeaderHashed> {
+        Self::err()
+    }
+    fn must_get_valid_element(&self, _: MustGetValidElementInput) -> ExternResult<Element> {
         Self::err()
     }
     fn agent_info(&self, _: ()) -> ExternResult<AgentInfo> {
@@ -225,7 +243,7 @@ pub struct HostHdk;
 /// This is deferring to the standard `holochain_wasmer_guest` crate functionality.
 /// Every function works exactly the same way with the same basic signatures and patterns.
 /// Elsewhere in the hdk are more high level wrappers around this basic trait.
-#[cfg(not(feature = "mock"))]
+#[cfg(all(not(feature = "mock"), target_arch = "wasm32"))]
 impl HdkT for HostHdk {
     fn get_agent_activity(
         &self,
@@ -268,7 +286,27 @@ impl HdkT for HostHdk {
     fn get_details(&self, get_input: GetInput) -> ExternResult<Option<Details>> {
         host_call::<GetInput, Option<Details>>(__get_details, get_input)
     }
-
+    fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed> {
+        host_call::<MustGetEntryInput, EntryHashed>(__must_get_entry, must_get_entry_input)
+    }
+    fn must_get_header(
+        &self,
+        must_get_header_input: MustGetHeaderInput,
+    ) -> ExternResult<SignedHeaderHashed> {
+        host_call::<MustGetHeaderInput, SignedHeaderHashed>(
+            __must_get_header,
+            must_get_header_input,
+        )
+    }
+    fn must_get_valid_element(
+        &self,
+        must_get_valid_element_input: MustGetValidElementInput,
+    ) -> ExternResult<Element> {
+        host_call::<MustGetValidElementInput, Element>(
+            __must_get_valid_element,
+            must_get_valid_element_input,
+        )
+    }
     fn agent_info(&self, _: ()) -> ExternResult<AgentInfo> {
         host_call::<(), AgentInfo>(__agent_info, ())
     }

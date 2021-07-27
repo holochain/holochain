@@ -1,5 +1,5 @@
 use super::{standard_config, SweetAgents, SweetAppBatch, SweetConductor};
-use crate::conductor::{config::ConductorConfig, error::ConductorResult};
+use crate::conductor::{api::error::ConductorApiResult, config::ConductorConfig};
 use futures::future;
 use hdk::prelude::*;
 use holochain_types::prelude::*;
@@ -49,7 +49,7 @@ impl SweetConductorBatch {
         &mut self,
         installed_app_id: &str,
         dna_files: &[DnaFile],
-    ) -> ConductorResult<SweetAppBatch> {
+    ) -> ConductorApiResult<SweetAppBatch> {
         let apps = self
             .0
             .iter_mut()
@@ -82,7 +82,7 @@ impl SweetConductorBatch {
         installed_app_id: &str,
         agents: &[AgentPubKey],
         dna_files: &[DnaFile],
-    ) -> ConductorResult<SweetAppBatch> {
+    ) -> ConductorApiResult<SweetAppBatch> {
         if agents.len() != self.0.len() {
             panic!(
                 "setup_app_for_zipped_agents must take as many Agents as there are Conductors in this batch."

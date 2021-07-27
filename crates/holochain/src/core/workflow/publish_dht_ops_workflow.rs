@@ -37,7 +37,7 @@ pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(5);
 #[instrument(skip(env, network))]
 pub async fn publish_dht_ops_workflow(
     env: EnvWrite,
-    mut network: HolochainP2pCell,
+    network: HolochainP2pCell,
 ) -> WorkflowResult<WorkComplete> {
     let (to_publish, hashes) =
         publish_dht_ops_workflow_inner(env.clone().into(), network.from_agent()).await?;

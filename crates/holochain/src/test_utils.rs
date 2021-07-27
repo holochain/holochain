@@ -2,6 +2,7 @@
 
 use crate::conductor::api::RealAppInterfaceApi;
 use crate::conductor::api::ZomeCall;
+use crate::conductor::conductor::CellStatus;
 use crate::conductor::config::AdminInterfaceConfig;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::config::InterfaceDriver;
@@ -247,11 +248,15 @@ pub async fn install_app(
         .unwrap();
 
     conductor_handle
-        .activate_app(name.to_string())
+        .clone()
+        .enable_app(&name.to_string())
         .await
         .unwrap();
 
-    let errors = conductor_handle.setup_cells().await.unwrap();
+    let errors = conductor_handle
+        .reconcile_cell_status_with_app_status()
+        .await
+        .unwrap();
 
     assert!(errors.is_empty(), "{:?}", errors);
 }
@@ -293,7 +298,7 @@ pub async fn setup_app_inner(
             network,
             ..Default::default()
         })
-        .test(&envs)
+        .test(&envs, &[])
         .await
         .unwrap();
 
@@ -656,7 +661,11 @@ async fn display_integration(env: &EnvWrite) -> usize {
 
 /// Helper for displaying agent infos stored on a conductor
 pub async fn display_agent_infos(conductor: &ConductorHandle) {
-    for cell_id in conductor.list_cell_ids().await.unwrap() {
+    for cell_id in conductor
+        .list_cell_ids(Some(CellStatus::Joined))
+        .await
+        .unwrap()
+    {
         let space = cell_id.dna_hash().to_kitsune();
         let env = conductor.get_p2p_env(space).await;
         let info = p2p_agent_store::dump_state(env.into(), Some(cell_id)).unwrap();

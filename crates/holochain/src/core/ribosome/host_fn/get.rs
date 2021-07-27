@@ -12,24 +12,24 @@ pub fn get<'a>(
     call_context: Arc<CallContext>,
     input: GetInput,
 ) -> Result<Option<Element>, WasmError> {
-    match HostFnAccess::from(&call_context.host_access()) {
+    match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ read_workspace: Permission::Allow, .. } => {
             let GetInput {
                 any_dht_hash,
                 get_options,
             } = input;
 
-            // Get the network from the context
-            let network = call_context.host_access.network().clone();
+    // Get the network from the context
+    let network = call_context.host_context.network().clone();
 
-            // timeouts must be handled by the network
-            tokio_helper::block_forever_on(async move {
-                let workspace = call_context.host_access.workspace();
-                let mut cascade = Cascade::from_workspace_network(workspace, network);
-                let maybe_element = cascade
-                    .dht_get(any_dht_hash, get_options)
-                    .await
-                    .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
+    // timeouts must be handled by the network
+    tokio_helper::block_forever_on(async move {
+        let workspace = call_context.host_context.workspace();
+        let mut cascade = Cascade::from_workspace_network(workspace, network);
+        let maybe_element = cascade
+            .dht_get(any_dht_hash, get_options)
+            .await
+            .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
 
                 Ok(maybe_element)
             })

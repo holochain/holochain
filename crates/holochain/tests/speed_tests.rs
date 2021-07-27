@@ -317,7 +317,7 @@ pub async fn setup_app(
             }]),
             ..Default::default()
         })
-        .test(&envs)
+        .test(&envs, &[])
         .await
         .unwrap();
 
@@ -328,11 +328,16 @@ pub async fn setup_app(
         .unwrap();
 
     conductor_handle
-        .activate_app("test app".to_string())
+        .clone()
+        .enable_app(&"test app".to_string())
         .await
         .unwrap();
 
-    let errors = conductor_handle.clone().setup_cells().await.unwrap();
+    let errors = conductor_handle
+        .clone()
+        .reconcile_cell_status_with_app_status()
+        .await
+        .unwrap();
 
     assert!(errors.is_empty());
 

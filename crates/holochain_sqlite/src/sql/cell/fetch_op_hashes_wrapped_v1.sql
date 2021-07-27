@@ -2,15 +2,14 @@
 -- i.e. when :storage_start_loc > :storage_end_loc
 --
 -- This is one version of this query. There is another version which may be faster.
-
 SELECT
-    hash
+  hash
 FROM
-    DHtOp
+  DHtOp
 WHERE
-    DhtOp.authored_timestamp_ms >= :from
-    AND DhtOp.authored_timestamp_ms < :to
-    AND (
-        storage_center_loc < :storage_end_loc
-        OR storage_center_loc > :storage_start_loc
-    )
+  DhtOp.authored_timestamp_ms >= :from
+  AND DhtOp.authored_timestamp_ms < :to
+  AND (
+    storage_center_loc < :storage_end_loc
+    OR storage_center_loc > :storage_start_loc
+  )

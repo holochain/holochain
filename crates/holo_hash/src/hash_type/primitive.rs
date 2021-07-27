@@ -76,9 +76,11 @@ macro_rules! primitive_hash_type {
             fn new() -> Self {
                 Self
             }
+
             fn static_prefix() -> &'static [u8] {
                 &$prefix
             }
+
             fn hash_name(self) -> &'static str {
                 stringify!($display)
             }

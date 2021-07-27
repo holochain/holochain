@@ -98,6 +98,30 @@ pub enum KdApi {
         msg_id: String,
     },
 
+    /// Remove an agent from an app root hash
+    #[serde(rename = "appLeaveReq")]
+    AppLeaveReq {
+        /// message id
+        #[serde(rename = "msgId")]
+        msg_id: String,
+
+        /// root app hash
+        #[serde(rename = "root")]
+        root: KdHash,
+
+        /// the agent/author to join
+        #[serde(rename = "agent")]
+        agent: KdHash,
+    },
+
+    /// Success result of leaving
+    #[serde(rename = "appLeaveRes")]
+    AppLeaveRes {
+        /// message id
+        #[serde(rename = "msgId")]
+        msg_id: String,
+    },
+
     /// Inject an agent info record into the store from an outside source
     #[serde(rename = "agentInfoStoreReq")]
     AgentInfoStoreReq {
@@ -367,6 +391,8 @@ impl KdApi {
             Self::KeypairGetOrCreateTaggedRes { msg_id, .. } => msg_id,
             Self::AppJoinReq { msg_id, .. } => msg_id,
             Self::AppJoinRes { msg_id, .. } => msg_id,
+            Self::AppLeaveReq { msg_id, .. } => msg_id,
+            Self::AppLeaveRes { msg_id, .. } => msg_id,
             Self::AgentInfoStoreReq { msg_id, .. } => msg_id,
             Self::AgentInfoStoreRes { msg_id, .. } => msg_id,
             Self::AgentInfoGetReq { msg_id, .. } => msg_id,
@@ -393,6 +419,7 @@ impl KdApi {
             Self::HelloRes { .. } => true,
             Self::KeypairGetOrCreateTaggedRes { .. } => true,
             Self::AppJoinRes { .. } => true,
+            Self::AppLeaveRes { .. } => true,
             Self::AgentInfoStoreRes { .. } => true,
             Self::AgentInfoGetRes { .. } => true,
             Self::AgentInfoQueryRes { .. } => true,
