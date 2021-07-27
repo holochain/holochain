@@ -17,6 +17,8 @@ pub enum TestWasm {
     EmitSignal,
     HashEntry,
     Foo,
+    GenesisSelfCheckInvalid,
+    GenesisSelfCheckValid,
     HashPath,
     HdkExtern,
     InitFail,
@@ -25,6 +27,7 @@ pub enum TestWasm {
     MigrateAgentFail,
     MigrateAgentPass,
     MultipleCalls,
+    MustGet,
     PostCommitFail,
     PostCommitSuccess,
     Query,
@@ -61,6 +64,8 @@ impl From<TestWasm> for ZomeName {
             TestWasm::EmitSignal => "emit_signal",
             TestWasm::HashEntry => "hash_entry",
             TestWasm::Foo => "foo",
+            TestWasm::GenesisSelfCheckInvalid => "genesis_self_check_invalid",
+            TestWasm::GenesisSelfCheckValid => "genesis_self_check_valid",
             TestWasm::HashPath => "hash_path",
             TestWasm::HdkExtern => "hdk_extern",
             TestWasm::InitFail => "init_fail",
@@ -69,6 +74,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::MigrateAgentFail => "migrate_agent_fail",
             TestWasm::MigrateAgentPass => "migrate_agent_pass",
             TestWasm::MultipleCalls => "multiple_calls",
+            TestWasm::MustGet => "must_get",
             TestWasm::PostCommitFail => "post_commit_fail",
             TestWasm::PostCommitSuccess => "post_commit_success",
             TestWasm::Query => "query",
@@ -119,6 +125,12 @@ impl From<TestWasm> for DnaWasm {
                 get_code("wasm32-unknown-unknown/release/test_wasm_hash_entry.wasm")
             }
             TestWasm::Foo => get_code("wasm32-unknown-unknown/release/test_wasm_foo.wasm"),
+            TestWasm::GenesisSelfCheckInvalid => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_genesis_self_check_invalid.wasm")
+            }
+            TestWasm::GenesisSelfCheckValid => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_genesis_self_check_valid.wasm")
+            }
             TestWasm::HashPath => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_hash_path.wasm")
             }
@@ -141,6 +153,7 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::MultipleCalls => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_multiple_calls.wasm")
             }
+            TestWasm::MustGet => get_code("wasm32-unknown-unknown/release/test_wasm_must_get.wasm"),
             TestWasm::PostCommitFail => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_post_commit_fail.wasm")
             }
@@ -221,7 +234,7 @@ impl From<TestWasm> for ZomeDef {
             let (_, wasm_hash) = holochain_types::dna::wasm::DnaWasmHashed::from_content(dna_wasm)
                 .await
                 .into_inner();
-            WasmZome { wasm_hash }.into()
+            ZomeDef::Wasm(WasmZome { wasm_hash })
         })
     }
 }

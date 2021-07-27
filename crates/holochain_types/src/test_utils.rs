@@ -1,14 +1,11 @@
 //! Some common testing helpers.
 
-use crate::dna::zome::WasmZome;
-use crate::dna::DnaDef;
-use crate::dna::DnaFile;
-use crate::dna::YamlProperties;
+use crate::dna::wasm::DnaWasm;
 use crate::element::SignedHeaderHashedExt;
 use crate::fixt::*;
 use crate::prelude::*;
 use crate::timestamp;
-use crate::{dna::wasm::DnaWasm, EntryHashed};
+use holochain_zome_types::prelude::EntryHashed;
 use std::path::PathBuf;
 
 pub use holochain_zome_types::test_utils::*;
@@ -16,11 +13,6 @@ pub use holochain_zome_types::test_utils::*;
 #[derive(Serialize, Deserialize, SerializedBytes, Debug)]
 struct FakeProperties {
     test: String,
-}
-
-/// simple DnaWasm fixture
-pub fn fake_dna_wasm() -> DnaWasm {
-    DnaWasm::from(vec![0_u8])
 }
 
 /// A fixture example dna for unit testing.
@@ -43,7 +35,8 @@ pub fn fake_dna_zomes(uid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
         for (zome_name, wasm) in zomes {
             let wasm = crate::dna::wasm::DnaWasmHashed::from_content(wasm).await;
             let (wasm, wasm_hash) = wasm.into_inner();
-            dna.zomes.push((zome_name, WasmZome { wasm_hash }.into()));
+            dna.zomes
+                .push((zome_name, ZomeDef::Wasm(WasmZome { wasm_hash })));
             wasm_code.push(wasm);
         }
         DnaFile::new(dna, wasm_code).await
@@ -106,4 +99,31 @@ pub async fn fake_unique_element(
         SignedHeaderHashed::new(&keystore, HeaderHashed::from_content_sync(header_1)).await?,
         entry,
     ))
+}
+
+/// Generate a test keystore pre-populated with a couple test keypairs.
+pub fn test_keystore() -> holochain_keystore::KeystoreSender {
+    use holochain_keystore::KeystoreSenderExt;
+
+    tokio_helper::block_on(
+        async move {
+            let keystore = holochain_keystore::test_keystore::spawn_test_keystore()
+                .await
+                .unwrap();
+
+            // pre-populate with our two fixture agent keypairs
+            keystore
+                .generate_sign_keypair_from_pure_entropy()
+                .await
+                .unwrap();
+            keystore
+                .generate_sign_keypair_from_pure_entropy()
+                .await
+                .unwrap();
+
+            keystore
+        },
+        std::time::Duration::from_secs(1),
+    )
+    .expect("timeout elapsed")
 }

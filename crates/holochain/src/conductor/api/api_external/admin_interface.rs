@@ -1,10 +1,11 @@
+use std::collections::HashSet;
+
 use super::InterfaceApi;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::error::ConductorApiResult;
-
 use crate::conductor::api::error::SerializationError;
-
-use crate::conductor::error::CreateAppError;
+use crate::conductor::conductor::CellStatus;
+use crate::conductor::error::ConductorError;
 use crate::conductor::interface::error::InterfaceError;
 use crate::conductor::interface::error::InterfaceResult;
 use crate::conductor::ConductorHandle;
@@ -75,52 +76,51 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             }
             RegisterDna(payload) => {
                 trace!(register_dna_payload = ?payload);
+                let RegisterDnaPayload {
+                    uid,
+                    properties,
+                    source,
+                } = *payload;
                 // uid and properties from the register call will override any in the bundle
-                let (mut dna, maybe_uid, maybe_properties) = match payload.source {
+                let dna = match source {
                     DnaSource::Hash(ref hash) => {
-                        if payload.properties.is_none() && payload.uid.is_none() {
+                        if properties.is_none() && uid.is_none() {
                             return Err(ConductorApiError::DnaReadError(
                                 "Hash Dna source requires properties or uid to create a derived Dna"
                                     .to_string(),
                             ));
                         }
-                        let dna = self.conductor_handle.get_dna(hash).await.ok_or_else(|| {
-                            ConductorApiError::DnaReadError(format!(
-                                "Unable to create derived Dna: {} not registered",
-                                hash
-                            ))
-                        })?;
-                        (dna, payload.uid.clone(), payload.properties.clone())
+                        let mut dna =
+                            self.conductor_handle.get_dna(hash).await.ok_or_else(|| {
+                                ConductorApiError::DnaReadError(format!(
+                                    "Unable to create derived Dna: {} not registered",
+                                    hash
+                                ))
+                            })?;
+                        if let Some(props) = properties {
+                            let properties = SerializedBytes::try_from(props)
+                                .map_err(SerializationError::from)?;
+                            dna = dna.with_properties(properties).await?;
+                        }
+                        if let Some(uid) = uid {
+                            dna = dna.with_uid(uid).await?;
+                        }
+                        dna
                     }
                     DnaSource::Path(ref path) => {
                         let bundle = Bundle::read_from_file(path).await?;
                         let bundle: DnaBundle = bundle.into();
-                        let (uid, properties) = resolve_phenotype(
-                            bundle.manifest(),
-                            payload.uid.as_ref(),
-                            payload.properties.as_ref(),
-                        );
-                        let dna = bundle.into_dna_file().await?;
-                        (dna, uid, properties)
+                        let (dna_file, _original_hash) =
+                            bundle.into_dna_file(uid, properties).await?;
+                        dna_file
                     }
                     DnaSource::Bundle(bundle) => {
-                        let (uid, properties) = resolve_phenotype(
-                            bundle.manifest(),
-                            payload.uid.as_ref(),
-                            payload.properties.as_ref(),
-                        );
-                        let dna = bundle.into_dna_file().await?;
-                        (dna, uid, properties)
+                        let (dna_file, _original_hash) =
+                            bundle.into_dna_file(uid, properties).await?;
+                        dna_file
                     }
                 };
-                if let Some(props) = maybe_properties {
-                    let properties =
-                        SerializedBytes::try_from(props).map_err(SerializationError::from)?;
-                    dna = dna.with_properties(properties).await?;
-                }
-                if let Some(uid) = maybe_uid {
-                    dna = dna.with_uid(uid).await?;
-                }
+
                 let hash = dna.dna_hash().clone();
                 let dna_list = self.conductor_handle.list_dnas().await?;
                 if !dna_list.contains(&hash) {
@@ -180,16 +180,23 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let installed_cells = cell_ids_with_proofs
                     .into_iter()
                     .map(|(cell_data, _)| cell_data);
-                let app = InstalledApp::new_legacy(installed_app_id, installed_cells)?;
-                Ok(AdminResponse::AppInstalled(app))
+                let app = InstalledApp::new_fresh(InstalledAppCommon::new_legacy(
+                    installed_app_id,
+                    installed_cells,
+                )?);
+                let info = InstalledAppInfo::from_installed_app(&app);
+                Ok(AdminResponse::AppInstalled(info))
             }
             InstallAppBundle(payload) => {
-                let app = self
+                let app: InstalledApp = self
                     .conductor_handle
                     .clone()
                     .install_app_bundle(*payload)
-                    .await?;
-                Ok(AdminResponse::AppBundleInstalled(app))
+                    .await?
+                    .into();
+                Ok(AdminResponse::AppBundleInstalled(
+                    InstalledAppInfo::from_installed_app(&app),
+                ))
             }
             ListDnas => {
                 let dna_list = self.conductor_handle.list_dnas().await?;
@@ -205,43 +212,67 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 Ok(AdminResponse::AgentPubKeyGenerated(agent_pub_key))
             }
             ListCellIds => {
-                let cell_ids = self.conductor_handle.list_cell_ids().await?;
+                let cell_ids = self
+                    .conductor_handle
+                    .list_cell_ids(Some(CellStatus::Joined))
+                    .await?;
                 Ok(AdminResponse::CellIdsListed(cell_ids))
             }
-            ListActiveApps => {
-                let app_ids = self.conductor_handle.list_active_apps().await?;
-                Ok(AdminResponse::ActiveAppsListed(app_ids))
+            ListEnabledApps => {
+                tracing::warn!(
+                    "AdminRequest::ListEnabledApps is deprecated, use AdminRequest::ListApps (TODO: update conductor-api)"
+                );
+
+                let app_ids = self.conductor_handle.list_running_apps().await?;
+                Ok(AdminResponse::EnabledAppsListed(app_ids))
             }
-            ActivateApp { installed_app_id } => {
-                // Activate app
-                self.conductor_handle
-                    .activate_app(installed_app_id.clone())
+            ListApps { status_filter } => {
+                let apps = self.conductor_handle.list_apps(status_filter).await?;
+                Ok(AdminResponse::AppsListed(apps))
+            }
+            EnableApp { installed_app_id } => {
+                // Enable app
+                let (app, errors) = self
+                    .conductor_handle
+                    .clone()
+                    .enable_app(&installed_app_id)
                     .await?;
 
-                // Create cells
-                let errors = self.conductor_handle.clone().setup_cells().await?;
+                let app_cells: HashSet<_> = app.required_cells().collect();
 
-                // Check if this app was created successfully
-                errors
+                let app_info = self
+                    .conductor_handle
+                    .get_app_info(&installed_app_id)
+                    .await?
+                    .ok_or(ConductorError::AppNotInstalled(installed_app_id))?;
+
+                let errors: Vec<_> = errors
                     .into_iter()
-                    // We only care about this app for the activate command
-                    .find(|cell_error| match cell_error {
-                        CreateAppError::Failed {
-                            installed_app_id: error_app_id,
-                            ..
-                        } => error_app_id == &installed_app_id,
-                    })
-                    // There was an error in this app so return it
-                    .map(|this_app_error| Ok(AdminResponse::Error(this_app_error.into())))
-                    // No error, return success
-                    .unwrap_or(Ok(AdminResponse::AppActivated))
+                    .filter(|(cell_id, _)| app_cells.contains(cell_id))
+                    .map(|(cell_id, error)| (cell_id, error.to_string()))
+                    .collect();
+
+                Ok(AdminResponse::AppEnabled {
+                    app: app_info,
+                    errors,
+                })
             }
-            DeactivateApp { installed_app_id } => {
-                // Activate app
+            DisableApp { installed_app_id } => {
+                // Disable app
                 self.conductor_handle
-                    .deactivate_app(installed_app_id.clone())
+                    .clone()
+                    .disable_app(&installed_app_id, DisabledAppReason::User)
                     .await?;
-                Ok(AdminResponse::AppDeactivated)
+                Ok(AdminResponse::AppDisabled)
+            }
+            StartApp { installed_app_id } => {
+                // TODO: check to see if app was actually started
+                let app = self
+                    .conductor_handle
+                    .clone()
+                    .start_app(&installed_app_id)
+                    .await?;
+                Ok(AdminResponse::AppStarted(app.status().is_running()))
             }
             AttachAppInterface { port } => {
                 let port = port.unwrap_or(0);
@@ -268,11 +299,29 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let r = self.conductor_handle.get_agent_infos(cell_id).await?;
                 Ok(AdminResponse::AgentInfoRequested(r))
             }
+
+            // deprecated aliases
+            ListActiveApps => {
+                tracing::warn!("Admin method ListActiveApps is deprecated: use ListApps instead.");
+                self.handle_admin_request_inner(ListEnabledApps).await
+            }
+            ActivateApp { installed_app_id } => {
+                tracing::warn!("Admin method ActivateApp is deprecated: use EnableApp instead (functionality is identical).");
+                self.handle_admin_request_inner(EnableApp { installed_app_id })
+                    .await
+            }
+            DeactivateApp { installed_app_id } => {
+                tracing::warn!("Admin method DeactivateApp is deprecated: use DisableApp instead (functionality is identical).");
+                self.handle_admin_request_inner(DisableApp { installed_app_id })
+                    .await
+            }
         }
     }
 }
 
-fn resolve_phenotype(
+/// Return the proper phenotype for a Dna, given a manifest and some optional
+/// overrides
+fn _resolve_phenotype(
     manifest: &DnaManifest,
     payload_uid: Option<&Uid>,
     payload_properties: Option<&YamlProperties>,
@@ -321,7 +370,7 @@ mod test {
     use super::*;
     use crate::conductor::Conductor;
     use anyhow::Result;
-    use holochain_lmdb::test_utils::test_environments;
+    use holochain_state::prelude::*;
     use holochain_types::app::InstallAppDnaPayload;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_zomes;
@@ -335,7 +384,7 @@ mod test {
     async fn register_list_dna_app() -> Result<()> {
         observability::test_run().ok();
         let envs = test_environments();
-        let handle = Conductor::builder().test(&envs).await?;
+        let handle = Conductor::builder().test(&envs.into(), &[]).await?;
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
         let uid = Uuid::new_v4();
@@ -464,10 +513,10 @@ mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn install_list_dna_app() -> Result<()> {
+    async fn install_list_dna_app() {
         observability::test_run().ok();
         let envs = test_environments();
-        let handle = Conductor::builder().test(&envs).await?;
+        let handle = Conductor::builder().test(&envs.into(), &[]).await.unwrap();
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
         let uid = Uuid::new_v4();
@@ -513,11 +562,14 @@ mod test {
         let agent_key2 = fake_agent_pubkey_2();
         let path_payload = InstallAppDnaPayload::hash_only(dna_hash.clone(), "".to_string());
         let cell_id2 = CellId::new(dna_hash.clone(), agent_key2.clone());
-        let expected_cell_ids = InstalledApp::new_legacy(
-            "test-by-path".to_string(),
-            vec![InstalledCell::new(cell_id2.clone(), "".to_string())],
-        )
-        .unwrap();
+        let expected_installed_app = InstalledApp::new_fresh(
+            InstalledAppCommon::new_legacy(
+                "test-by-path".to_string(),
+                vec![InstalledCell::new(cell_id2.clone(), "".to_string())],
+            )
+            .unwrap(),
+        );
+        let expected_installed_app_info: InstalledAppInfo = (&expected_installed_app).into();
         let path_install_payload = InstallAppPayload {
             dnas: vec![path_payload],
             installed_app_id: "test-by-path".to_string(),
@@ -529,18 +581,28 @@ mod test {
             .await;
         assert_matches!(
             install_response,
-            AdminResponse::AppInstalled(cell_ids) if cell_ids == expected_cell_ids
+            AdminResponse::AppInstalled(info) if info == expected_installed_app_info
         );
         let dna_list = admin_api.handle_admin_request(AdminRequest::ListDnas).await;
         let expects = vec![dna_hash.clone()];
         assert_matches!(dna_list, AdminResponse::DnasListed(a) if a == expects);
 
+        let expected_enabled_app = InstalledApp::new_running(
+            InstalledAppCommon::new_legacy(
+                "test-by-path".to_string(),
+                vec![InstalledCell::new(cell_id2.clone(), "".to_string())],
+            )
+            .unwrap(),
+        );
+        let expected_enabled_app_info: InstalledAppInfo = (&expected_enabled_app).into();
         let res = admin_api
-            .handle_admin_request(AdminRequest::ActivateApp {
+            .handle_admin_request(AdminRequest::EnableApp {
                 installed_app_id: "test-by-path".to_string(),
             })
             .await;
-        assert_matches!(res, AdminResponse::AppActivated);
+        assert_matches!(res,
+            AdminResponse::AppEnabled {app, ..} if app == expected_enabled_app_info
+        );
 
         let res = admin_api
             .handle_admin_request(AdminRequest::ListCellIds)
@@ -553,22 +615,21 @@ mod test {
             .handle_admin_request(AdminRequest::InstallApp(Box::new(hash_install_payload)))
             .await;
         let _res = admin_api
-            .handle_admin_request(AdminRequest::ActivateApp {
+            .handle_admin_request(AdminRequest::EnableApp {
                 installed_app_id: "test-by-hash".to_string(),
             })
             .await;
 
         let res = admin_api
-            .handle_admin_request(AdminRequest::ListActiveApps)
+            .handle_admin_request(AdminRequest::ListEnabledApps)
             .await;
 
-        assert_matches!(res, AdminResponse::ActiveAppsListed(v) if v.contains(&"test-by-path".to_string()) && v.contains(&"test-by-hash".to_string())
+        assert_matches!(res, AdminResponse::EnabledAppsListed(v) if v.contains(&"test-by-path".to_string()) && v.contains(&"test-by-hash".to_string())
         );
 
         handle.shutdown().await;
         tokio::time::timeout(std::time::Duration::from_secs(1), shutdown)
             .await
             .ok();
-        Ok(())
     }
 }

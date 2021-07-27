@@ -1,77 +1,198 @@
 //! The workflow and queue consumer for DhtOp integration
 
 use super::error::WorkflowResult;
-use super::integrate_dht_ops_workflow::integrate_single_data;
-use super::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult;
 use super::sys_validation_workflow::counterfeit_check;
 use crate::core::queue_consumer::TriggerSender;
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
-use holochain_cascade::integrate_single_metadata;
-use holochain_lmdb::buffer::BufferedStore;
-use holochain_lmdb::buffer::KvBufFresh;
-use holochain_lmdb::db::INTEGRATED_DHT_OPS;
-use holochain_lmdb::db::INTEGRATION_LIMBO;
-use holochain_lmdb::env::EnvironmentWrite;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::prelude::EnvironmentRead;
-use holochain_lmdb::prelude::GetDb;
-use holochain_lmdb::prelude::IntegratedPrefix;
-use holochain_lmdb::prelude::PendingPrefix;
-use holochain_lmdb::prelude::Writer;
+use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
+use holochain_types::dht_op::DhtOp;
 use holochain_types::prelude::*;
-use holochain_zome_types::query::HighestObserved;
+use once_cell::sync::Lazy;
+use std::collections::HashMap;
 use tracing::instrument;
 
 #[cfg(test)]
 mod test;
 
-#[instrument(skip(state_env, sys_validation_trigger, ops))]
+type InOpBatchSnd = tokio::sync::oneshot::Sender<WorkflowResult<()>>;
+type InOpBatchRcv = tokio::sync::oneshot::Receiver<WorkflowResult<()>>;
+
+struct InOpBatchEntry {
+    snd: InOpBatchSnd,
+    from_agent: Option<AgentPubKey>,
+    request_validation_receipt: bool,
+    ops: Vec<(DhtOpHash, DhtOp)>,
+}
+
+struct InOpBatch {
+    is_running: bool,
+    pending: Vec<InOpBatchEntry>,
+}
+
+impl Default for InOpBatch {
+    fn default() -> Self {
+        Self {
+            is_running: false,
+            pending: Vec::new(),
+        }
+    }
+}
+
+static IN_OP_BATCH: Lazy<parking_lot::Mutex<HashMap<DbKind, InOpBatch>>> =
+    Lazy::new(|| parking_lot::Mutex::new(HashMap::new()));
+
+/// if result.0.is_none() -- we queued it to send later
+/// if result.0.is_some() -- the batch should be run now
+fn batch_check_insert(
+    kind: DbKind,
+    from_agent: Option<AgentPubKey>,
+    request_validation_receipt: bool,
+    ops: Vec<(DhtOpHash, DhtOp)>,
+) -> (Option<Vec<InOpBatchEntry>>, InOpBatchRcv) {
+    let (snd, rcv) = tokio::sync::oneshot::channel();
+    let entry = InOpBatchEntry {
+        snd,
+        from_agent,
+        request_validation_receipt,
+        ops,
+    };
+    let mut lock = IN_OP_BATCH.lock();
+    let batch = lock.entry(kind).or_insert_with(InOpBatch::default);
+    if batch.is_running {
+        // there is already a batch running, just queue this
+        batch.pending.push(entry);
+        (None, rcv)
+    } else {
+        // no batch running, run this (and assert we never collect straglers
+        assert!(batch.pending.is_empty());
+        batch.is_running = true;
+        (Some(vec![entry]), rcv)
+    }
+}
+
+/// if result.is_none() -- we are done, end the loop for now
+/// if result.is_some() -- we got more items to process
+fn batch_check_end(kind: DbKind) -> Option<Vec<InOpBatchEntry>> {
+    let mut lock = IN_OP_BATCH.lock();
+    let batch = lock.entry(kind).or_insert_with(InOpBatch::default);
+    assert!(batch.is_running);
+    let out: Vec<InOpBatchEntry> = batch.pending.drain(..).collect();
+    if out.is_empty() {
+        // pending was empty, we can end the loop for now
+        batch.is_running = false;
+        None
+    } else {
+        // we have some more pending, continue the running loop
+        Some(out)
+    }
+}
+
+fn batch_process_entry(
+    txn: &mut rusqlite::Transaction<'_>,
+    from_agent: Option<AgentPubKey>,
+    request_validation_receipt: bool,
+    ops: Vec<(DhtOpHash, DhtOp)>,
+) -> WorkflowResult<()> {
+    // add incoming ops to the validation limbo
+    let mut to_pending = Vec::with_capacity(ops.len());
+    for (hash, op) in ops {
+        if !op_exists_inner(txn, &hash)? {
+            let op = DhtOpHashed::from_content_sync(op);
+            to_pending.push(op);
+        } else {
+            // Check if we should set receipt to send.
+            if needs_receipt(&op, &from_agent) && request_validation_receipt {
+                set_send_receipt(txn, hash.clone())?;
+            }
+        }
+    }
+
+    add_to_pending(txn, to_pending, from_agent, request_validation_receipt)?;
+
+    Ok(())
+}
+
+#[instrument(skip(vault, sys_validation_trigger, ops))]
 pub async fn incoming_dht_ops_workflow(
-    state_env: &EnvironmentWrite,
+    vault: &EnvWrite,
     mut sys_validation_trigger: TriggerSender,
     ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     from_agent: Option<AgentPubKey>,
     request_validation_receipt: bool,
 ) -> WorkflowResult<()> {
-    // set up our workspace
-    let mut workspace = IncomingDhtOpsWorkspace::new(state_env.clone().into())?;
+    let mut filter_ops = Vec::new();
 
-    // add incoming ops to the validation limbo
     for (hash, op) in ops {
-        if !workspace.op_exists(&hash)? {
-            tracing::debug!(?hash, ?op);
-            if should_keep(&op).await? {
-                workspace.add_to_pending(
-                    hash,
-                    op,
-                    from_agent.clone(),
-                    request_validation_receipt,
-                )?;
-            } else {
-                tracing::warn!(
-                    msg = "Dropping op because it failed counterfeit checks",
-                    ?op
-                );
-            }
+        if should_keep(&op).await? {
+            filter_ops.push((hash, op));
         } else {
-            // Check if we should set receipt to send.
-            if needs_receipt(&op, &from_agent) && request_validation_receipt {
-                workspace.set_send_receipt(hash)?;
-            }
+            tracing::warn!(
+                msg = "Dropping op because it failed counterfeit checks",
+                ?op
+            );
         }
     }
 
-    // commit our transaction
-    let writer: crate::core::queue_consumer::OneshotWriter = state_env.clone().into();
+    let kind = vault.kind().clone();
+    let (mut maybe_batch, rcv) = batch_check_insert(
+        kind.clone(),
+        from_agent,
+        request_validation_receipt,
+        filter_ops,
+    );
 
-    writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
+    let vault = vault.clone();
+    if maybe_batch.is_some() {
+        // there was no already running batch task, so spawn one:
+        tokio::task::spawn(async move {
+            while let Some(entries) = maybe_batch {
+                let senders = Arc::new(parking_lot::Mutex::new(Vec::new()));
+                let senders2 = senders.clone();
+                if let Err(err) = vault
+                    .async_commit(move |txn| {
+                        for entry in entries {
+                            let InOpBatchEntry {
+                                snd,
+                                from_agent,
+                                request_validation_receipt,
+                                ops,
+                            } = entry;
+                            let res = batch_process_entry(
+                                txn,
+                                from_agent,
+                                request_validation_receipt,
+                                ops,
+                            );
 
-    // trigger validation of queued ops
-    sys_validation_trigger.trigger();
+                            // we can't send the results here...
+                            // we haven't comitted
+                            senders2.lock().push((snd, res));
+                        }
 
-    Ok(())
+                        WorkflowResult::Ok(())
+                    })
+                    .await
+                {
+                    tracing::error!(?err, "incoming_dht_ops_workflow error");
+                }
+
+                for (snd, res) in senders.lock().drain(..) {
+                    let _ = snd.send(res);
+                }
+
+                // trigger validation of queued ops
+                sys_validation_trigger.trigger();
+
+                maybe_batch = batch_check_end(kind.clone());
+            }
+        });
+    }
+
+    rcv.await
+        .map_err(|_| super::error::WorkflowError::RecvError)?
 }
 
 fn needs_receipt(op: &DhtOp, from_agent: &Option<AgentPubKey>) -> bool {
@@ -89,111 +210,47 @@ async fn should_keep(op: &DhtOp) -> WorkflowResult<bool> {
     Ok(counterfeit_check(signature, &header).await?)
 }
 
-#[allow(missing_docs)]
-pub struct IncomingDhtOpsWorkspace {
-    pub integration_limbo: IntegrationLimboStore,
-    pub integrated_dht_ops: IntegratedDhtOpsStore,
-    pub validation_limbo: ValidationLimboStore,
-    pub element_pending: ElementBuf<PendingPrefix>,
-    pub meta_pending: MetadataBuf<PendingPrefix>,
-    pub meta_integrated: MetadataBuf<IntegratedPrefix>,
-}
-
-impl Workspace for IncomingDhtOpsWorkspace {
-    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
-        self.validation_limbo.0.flush_to_txn_ref(writer)?;
-        self.element_pending.flush_to_txn_ref(writer)?;
-        self.meta_pending.flush_to_txn_ref(writer)?;
-        self.meta_integrated.flush_to_txn_ref(writer)?;
-        Ok(())
-    }
-}
-
-impl IncomingDhtOpsWorkspace {
-    pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
-        let db = env.get_db(&*INTEGRATED_DHT_OPS)?;
-        let integrated_dht_ops = KvBufFresh::new(env.clone(), db);
-
-        let db = env.get_db(&*INTEGRATION_LIMBO)?;
-        let integration_limbo = KvBufFresh::new(env.clone(), db);
-
-        let validation_limbo = ValidationLimboStore::new(env.clone())?;
-
-        let element_pending = ElementBuf::pending(env.clone())?;
-        let meta_pending = MetadataBuf::pending(env.clone())?;
-
-        let meta_integrated = MetadataBuf::vault(env)?;
-
-        Ok(Self {
-            integration_limbo,
-            integrated_dht_ops,
-            validation_limbo,
-            element_pending,
-            meta_pending,
-            meta_integrated,
-        })
-    }
-
-    fn add_to_pending(
-        &mut self,
-        hash: DhtOpHash,
-        op: DhtOp,
-        from_agent: Option<AgentPubKey>,
-        request_validation_receipt: bool,
-    ) -> DhtOpConvertResult<()> {
+fn add_to_pending(
+    txn: &mut rusqlite::Transaction<'_>,
+    ops: Vec<DhtOpHashed>,
+    from_agent: Option<AgentPubKey>,
+    request_validation_receipt: bool,
+) -> StateMutationResult<()> {
+    for op in ops {
         let send_receipt = needs_receipt(&op, &from_agent) && request_validation_receipt;
-        let basis = op.dht_basis();
-        let op_light = op.to_light();
-        tracing::debug!(?op_light);
-
-        // register the highest observed header in an agents chain
-        if let DhtOp::RegisterAgentActivity(_, header) = &op {
-            self.meta_integrated.register_activity_observed(
-                header.author(),
-                HighestObserved {
-                    header_seq: header.header_seq(),
-                    hash: vec![op_light.header_hash().clone()],
-                },
-            )?;
-        }
-
-        integrate_single_data(op, &mut self.element_pending)?;
-        integrate_single_metadata(
-            op_light.clone(),
-            &self.element_pending,
-            &mut self.meta_pending,
-        )?;
-        let vlv = ValidationLimboValue {
-            status: ValidationLimboStatus::Pending,
-            op: op_light,
-            basis,
-            time_added: timestamp::now(),
-            last_try: None,
-            num_tries: 0,
-            from_agent,
-            send_receipt,
-        };
-        self.validation_limbo.put(hash, vlv)?;
-        Ok(())
+        let op_hash = op.as_hash().clone();
+        insert_op(txn, op, false)?;
+        set_require_receipt(txn, op_hash, send_receipt)?;
     }
+    StateMutationResult::Ok(())
+}
 
-    pub fn op_exists(&self, hash: &DhtOpHash) -> DatabaseResult<bool> {
-        Ok(self.integrated_dht_ops.contains(&hash)?
-            || self.integration_limbo.contains(&hash)?
-            || self.validation_limbo.contains(&hash)?)
-    }
+fn op_exists_inner(txn: &rusqlite::Transaction<'_>, hash: &DhtOpHash) -> DatabaseResult<bool> {
+    DatabaseResult::Ok(txn.query_row(
+        "
+        SELECT EXISTS(
+            SELECT
+            1
+            FROM DhtOp
+            WHERE
+            DhtOp.hash = :hash
+        )
+        ",
+        named_params! {
+            ":hash": hash,
+        },
+        |row| row.get(0),
+    )?)
+}
 
-    pub fn set_send_receipt(&mut self, hash: DhtOpHash) -> DatabaseResult<()> {
-        if let Some(mut v) = self.integrated_dht_ops.get(&hash)? {
-            v.send_receipt = true;
-            self.integrated_dht_ops.put(hash, v)?;
-        } else if let Some(mut v) = self.integration_limbo.get(&hash)? {
-            v.send_receipt = true;
-            self.integration_limbo.put(hash, v)?;
-        } else if let Some(mut v) = self.validation_limbo.get(&hash)? {
-            v.send_receipt = true;
-            self.validation_limbo.put(hash, v)?;
-        }
-        Ok(())
-    }
+pub fn op_exists(vault: &EnvWrite, hash: &DhtOpHash) -> DatabaseResult<bool> {
+    vault.conn()?.with_reader(|txn| op_exists_inner(&txn, hash))
+}
+
+fn set_send_receipt(
+    txn: &mut rusqlite::Transaction<'_>,
+    hash: DhtOpHash,
+) -> StateMutationResult<()> {
+    set_require_receipt(txn, hash, true)?;
+    StateMutationResult::Ok(())
 }

@@ -1,10 +1,10 @@
 #![cfg(feature = "test_utils")]
 
 use hdk::prelude::Links;
+use holochain::sweettest::SweetAgents;
+use holochain::sweettest::SweetConductor;
+use holochain::sweettest::SweetDnaFile;
 use holochain::test_utils::consistency_10s;
-use holochain::test_utils::sweetest::SweetAgents;
-use holochain::test_utils::sweetest::SweetConductor;
-use holochain::test_utils::sweetest::SweetDnaFile;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
@@ -45,7 +45,8 @@ async fn many_agents_can_reach_consistency_agent_links() {
     let agents = SweetAgents::get(conductor.keystore(), NUM_AGENTS).await;
     let apps = conductor
         .setup_app_for_agents("app", &agents, &[dna_file])
-        .await;
+        .await
+        .unwrap();
     let cells = apps.cells_flattened();
     let alice = cells[0].zome("links");
 
@@ -96,7 +97,8 @@ async fn many_agents_can_reach_consistency_normal_links() {
     let agents = SweetAgents::get(conductor.keystore(), NUM_AGENTS).await;
     let apps = conductor
         .setup_app_for_agents("app", &agents, &[dna_file])
-        .await;
+        .await
+        .unwrap();
     let cells = apps.cells_flattened();
     let alice = cells[0].zome(TestWasm::Link);
 
@@ -127,10 +129,11 @@ async fn stuck_conductor_wasm_calls() -> anyhow::Result<()> {
     // Create a Conductor
     let mut conductor = SweetConductor::from_standard_config().await;
 
-    // Install DNA and install and activate apps in conductor
+    // Install DNA and install and enable apps in conductor
     let alice = conductor
         .setup_app("app", &[dna_file])
         .await
+        .unwrap()
         .into_cells()
         .into_iter()
         .next()

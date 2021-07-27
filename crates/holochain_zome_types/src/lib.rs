@@ -18,18 +18,22 @@ pub mod call;
 pub mod call_remote;
 pub mod capability;
 pub mod cell;
+pub mod countersigning;
 #[allow(missing_docs)]
 pub mod crdt;
+pub mod dna_def;
 pub mod element;
 pub mod entry;
 #[allow(missing_docs)]
 pub mod entry_def;
+pub mod genesis;
 #[allow(missing_docs)]
 pub mod header;
 #[allow(missing_docs)]
 pub mod info;
 #[allow(missing_docs)]
 pub mod init;
+pub mod judged;
 #[allow(missing_docs)]
 pub mod link;
 pub mod metadata;
@@ -70,15 +74,28 @@ pub mod test_utils;
 pub use entry::Entry;
 pub use header::Header;
 pub use prelude::*;
+/// Re-exported dependencies
+pub mod dependencies {
+    pub use ::subtle;
+}
+use holochain_wasmer_common::WasmError;
 
 #[allow(missing_docs)]
-pub trait CallbackResult {
+pub trait CallbackResult: Sized {
     /// if a callback result is definitive we should halt any further iterations over remaining
     /// calls e.g. over sparse names or subsequent zomes
     /// typically a clear failure is definitive but success and missing dependencies are not
     /// in the case of success or missing deps, a subsequent callback could give us a definitive
     /// answer like a fail, and we don't want to over-optimise wasm calls and miss a clear failure
     fn is_definitive(&self) -> bool;
+    /// when a WasmError is returned from a callback (e.g. via `?` operator) it might mean either:
+    ///
+    /// - There was an error that prevented the callback from coming to a CallbackResult (e.g. failing to connect to database)
+    /// - There was an error that should be interpreted as a CallbackResult::Fail (e.g. data failed to deserialize)
+    ///
+    /// Typically this can be split as host/wasm errors are the former, and serialization/guest errors the latter.
+    /// This function allows each CallbackResult to explicitly map itself.
+    fn try_from_wasm_error(wasm_error: WasmError) -> Result<Self, WasmError>;
 }
 
 #[macro_export]
@@ -168,7 +185,7 @@ macro_rules! secure_primitive {
         /// This type of attack has been successfully demonstrated over a network despite varied latencies.
         impl PartialEq for $t {
             fn eq(&self, other: &Self) -> bool {
-                use subtle::ConstantTimeEq;
+                use $crate::dependencies::subtle::ConstantTimeEq;
                 self.0.ct_eq(&other.0).into()
             }
         }
@@ -212,7 +229,7 @@ macro_rules! secure_primitive {
 
         impl TryFrom<&[u8]> for $t {
             type Error = $crate::SecurePrimitiveError;
-            fn try_from(slice: &[u8]) -> Result<$t, Self::Error> {
+            fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
                 if slice.len() == $len {
                     let mut inner = [0; $len];
                     inner.copy_from_slice(slice);
@@ -223,6 +240,13 @@ macro_rules! secure_primitive {
             }
         }
 
+        impl TryFrom<Vec<u8>> for $t {
+            type Error = $crate::SecurePrimitiveError;
+            fn try_from(v: Vec<u8>) -> Result<Self, Self::Error> {
+                Self::try_from(v.as_ref())
+            }
+        }
+
         impl AsRef<[u8]> for $t {
             fn as_ref(&self) -> &[u8] {
                 &self.0
@@ -230,3 +254,42 @@ macro_rules! secure_primitive {
         }
     };
 }
+
+/// Helper macro for implementing ToSql, when using rusqlite as a dependency
+#[macro_export]
+macro_rules! impl_to_sql_via_as_ref {
+    ($s: ty) => {
+        impl ::rusqlite::ToSql for $s {
+            fn to_sql(&self) -> ::rusqlite::Result<::rusqlite::types::ToSqlOutput<'_>> {
+                Ok(::rusqlite::types::ToSqlOutput::Borrowed(
+                    self.as_ref().into(),
+                ))
+            }
+        }
+    };
+}
+
+/// Helper macro for implementing ToSql, when using rusqlite as a dependency
+#[macro_export]
+macro_rules! impl_to_sql_via_display {
+    ($s: ty) => {
+        impl ::rusqlite::ToSql for $s {
+            fn to_sql(&self) -> ::rusqlite::Result<::rusqlite::types::ToSqlOutput<'_>> {
+                Ok(::rusqlite::types::ToSqlOutput::Owned(
+                    self.to_string().into(),
+                ))
+            }
+        }
+    };
+}
+
+/// 10MB of entropy free for the taking.
+/// Useful for initializing arbitrary::Unstructured data
+#[cfg(any(test, feature = "test_utils"))]
+pub static NOISE: once_cell::sync::Lazy<Vec<u8>> = once_cell::sync::Lazy::new(|| {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    std::iter::repeat_with(|| rng.gen())
+        .take(10_000_000)
+        .collect()
+});

@@ -1,9 +1,11 @@
 #![cfg(feature = "test_utils")]
 
+use std::sync::Arc;
+
 use hdk::prelude::*;
 use holochain::{
     conductor::api::error::ConductorApiResult,
-    test_utils::sweetest::{SweetAgents, SweetConductor, SweetDnaFile},
+    sweettest::{SweetAgents, SweetConductor, SweetDnaFile},
 };
 use holochain::{
     conductor::{api::error::ConductorApiError, CellError},
@@ -14,7 +16,8 @@ use holochain::{
     core::ribosome::guest_callback::validate::ValidateResult, test_utils::wait_for_integration_1m,
 };
 use holochain::{core::SourceChainError, test_utils::display_agent_infos};
-use holochain_types::{dna::zome::inline_zome::InlineZome, signal::Signal};
+use holochain_types::prelude::*;
+use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::element::ElementEntry;
 use tokio_stream::StreamExt;
 
@@ -89,10 +92,11 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
     // Get two agents
     let (alice, bobbo) = SweetAgents::two(conductor.keystore()).await;
 
-    // Install DNA and install and activate apps in conductor
+    // Install DNA and install and enable apps in conductor
     let apps = conductor
         .setup_app_for_agents("app", &[alice.clone(), bobbo.clone()], &[dna_file])
-        .await;
+        .await
+        .unwrap();
 
     let ((alice,), (bobbo,)) = apps.into_tuples();
 
@@ -136,7 +140,8 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
 
     let apps = conductor
         .setup_app_for_agents("app", &agents, &[dna_foo, dna_bar])
-        .await;
+        .await
+        .unwrap();
 
     let ((alice_foo, alice_bar), (bobbo_foo, bobbo_bar), (_carol_foo, carol_bar)) =
         apps.into_tuples();
@@ -215,8 +220,8 @@ async fn invalid_cell() -> anyhow::Result<()> {
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
     tracing::debug!(dnas = ?conductor.list_dnas().await.unwrap());
-    tracing::debug!(cell_ids = ?conductor.list_cell_ids().await.unwrap());
-    tracing::debug!(apps = ?conductor.list_active_apps().await.unwrap());
+    tracing::debug!(cell_ids = ?conductor.list_cell_ids(None).await.unwrap());
+    tracing::debug!(apps = ?conductor.list_running_apps().await.unwrap());
 
     display_agent_infos(&conductor).await;
 
@@ -236,10 +241,11 @@ async fn get_deleted() -> anyhow::Result<()> {
     // Create a Conductor
     let mut conductor = SweetConductor::from_config(Default::default()).await;
 
-    // Install DNA and install and activate apps in conductor
+    // Install DNA and install and enable apps in conductor
     let alice = conductor
         .setup_app("app", &[dna_file])
         .await
+        .unwrap()
         .into_cells()
         .into_iter()
         .next()
@@ -291,7 +297,7 @@ async fn signal_subscription() {
         .await
         .unwrap();
     let mut conductor = SweetConductor::from_config(Default::default()).await;
-    let app = conductor.setup_app("app", &[dna_file]).await;
+    let app = conductor.setup_app("app", &[dna_file]).await.unwrap();
     let zome = &app.cells()[0].zome("zome1");
 
     let signals = conductor.signals().take(N);
@@ -339,7 +345,8 @@ async fn simple_validation() -> anyhow::Result<()> {
     let (alice, bobbo) = SweetAgents::two(conductor.keystore()).await;
     let apps = conductor
         .setup_app_for_agents("app", &[alice.clone(), bobbo.clone()], &[dna_file])
-        .await;
+        .await
+        .unwrap();
     let ((alice,), (bobbo,)) = apps.into_tuples();
 
     let alice = alice.zome("zome");
@@ -376,4 +383,38 @@ async fn simple_validation() -> anyhow::Result<()> {
     assert!(correct);
 
     Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn can_call_real_zomes_too() {
+    observability::test_run().ok();
+
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let agent = SweetAgents::one(conductor.keystore()).await;
+    let inline_zome = simple_crud_zome();
+    let (dna, _) = SweetDnaFile::unique_from_zomes(
+        vec![
+            ("inline".into(), ZomeDef::Inline(Arc::new(inline_zome))),
+            TestWasm::Create.into(),
+        ],
+        vec![TestWasm::Create.into()],
+    )
+    .await
+    .unwrap();
+
+    let app = conductor
+        .setup_app_for_agent("app1", agent.clone(), &[dna.clone()])
+        .await
+        .unwrap();
+
+    let (cell,) = app.into_tuple();
+
+    let hash: HeaderHash = conductor
+        .call(&cell.zome("inline"), "create_unit", ())
+        .await;
+
+    let el: Option<Element> = conductor
+        .call(&cell.zome("create_entry"), "get_post", hash.clone())
+        .await;
+    assert_eq!(el.unwrap().header_address(), &hash)
 }

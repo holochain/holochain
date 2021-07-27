@@ -4,9 +4,9 @@ use assert_cmd::prelude::*;
 use futures::future;
 use futures::Future;
 use hdk::prelude::RemoteSignal;
-use holochain::test_utils::sweetest::SweetAgents;
-use holochain::test_utils::sweetest::SweetConductorBatch;
-use holochain::test_utils::sweetest::SweetDnaFile;
+use holochain::sweettest::SweetAgents;
+use holochain::sweettest::SweetConductorBatch;
+use holochain::sweettest::SweetDnaFile;
 use holochain::{
     conductor::api::ZomeCall,
     conductor::{
@@ -77,9 +77,6 @@ fn create_config(port: u16, environment_path: PathBuf) -> ConductorConfig {
         }]),
         environment_path: environment_path.into(),
         network: None,
-        signing_service_uri: None,
-        encryption_service_uri: None,
-        decryption_service_uri: None,
         dpki: None,
         passphrase_service: Some(PassphraseServiceConfig::FromConfig {
             passphrase: "password".into(),
@@ -151,7 +148,7 @@ async fn call_admin() {
     let original_dna_hash = dna.dna_hash().clone();
 
     // Make properties
-    let properties = holochain_types::dna::YamlProperties::new(
+    let properties = holochain_types::properties::YamlProperties::new(
         serde_yaml::from_str(
             r#"
 test: "example"
@@ -169,6 +166,7 @@ how_many: 42
         &mut holochain,
         &mut client,
         orig_dna_hash,
+        fake_agent_pubkey_1(),
         fake_dna_path,
         Some(properties.clone()),
         "nick".into(),
@@ -178,7 +176,7 @@ how_many: 42
     // List Dnas
     let request = AdminRequest::ListDnas;
     let response = client.request(request);
-    let response = check_timeout(&mut holochain, response, 3000).await;
+    let response = check_timeout(&mut holochain, response, 6000).await;
 
     let tmp_wasm = dna.code().values().cloned().collect::<Vec<_>>();
     let mut tmp_dna = dna.dna_def().clone();
@@ -206,10 +204,10 @@ pub async fn start_holochain(config_path: PathBuf) -> Child {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
-    let mut holochain = cmd.spawn().expect("Failed to spawn holochain");
-    spawn_output(&mut holochain);
-    check_started(&mut holochain).await;
-    holochain
+    let mut child = cmd.spawn().expect("Failed to spawn holochain");
+    spawn_output(&mut child);
+    check_started(&mut child).await;
+    child
 }
 
 pub async fn call_foo_fn(app_port: u16, original_dna_hash: DnaHash, holochain: &mut Child) {
@@ -248,7 +246,7 @@ pub async fn call_zome_fn<S>(
     .into();
     let request = AppRequest::ZomeCallInvocation(Box::new(call));
     let response = app_tx.request(request);
-    let call_response = check_timeout(holochain, response, 3000).await;
+    let call_response = check_timeout(holochain, response, 6000).await;
     trace!(?call_response);
     assert_matches!(call_response, AppResponse::ZomeCallInvocation(_));
 }
@@ -260,7 +258,7 @@ pub async fn attach_app_interface(
 ) -> u16 {
     let request = AdminRequest::AttachAppInterface { port };
     let response = client.request(request);
-    let response = check_timeout(holochain, response, 1000).await;
+    let response = check_timeout(holochain, response, 3000).await;
     match response {
         AdminResponse::AppInterfaceAttached { port } => port,
         _ => panic!("Attach app interface failed: {:?}", response),
@@ -294,6 +292,7 @@ async fn register_and_install_dna(
     mut holochain: &mut Child,
     client: &mut WebsocketSender,
     orig_dna_hash: DnaHash,
+    agent_key: AgentPubKey,
     dna_path: PathBuf,
     properties: Option<YamlProperties>,
     nick: String,
@@ -305,7 +304,7 @@ async fn register_and_install_dna(
     };
     let request = AdminRequest::RegisterDna(Box::new(register_payload));
     let response = client.request(request);
-    let response = check_timeout(&mut holochain, response, 3000).await;
+    let response = check_timeout(&mut holochain, response, 6000).await;
     assert_matches!(response, AdminResponse::DnaRegistered(_));
     let dna_hash = if let AdminResponse::DnaRegistered(h) = response {
         h.clone()
@@ -318,7 +317,6 @@ async fn register_and_install_dna(
         nick,
         membrane_proof: None,
     };
-    let agent_key = fake_agent_pubkey_1();
     let payload = InstallAppPayload {
         dnas: vec![dna_payload],
         installed_app_id: "test".to_string(),
@@ -326,7 +324,7 @@ async fn register_and_install_dna(
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
     let response = client.request(request);
-    let response = check_timeout(&mut holochain, response, 3000).await;
+    let response = check_timeout(&mut holochain, response, 6000).await;
     assert_matches!(response, AdminResponse::AppInstalled(_));
     dna_hash
 }
@@ -366,6 +364,7 @@ async fn call_zome() {
         &mut holochain,
         &mut client,
         original_dna_hash.clone(),
+        fake_agent_pubkey_1(),
         fake_dna_path,
         None,
         "".into(),
@@ -375,24 +374,25 @@ async fn call_zome() {
     // List Dnas
     let request = AdminRequest::ListDnas;
     let response = client.request(request);
-    let response = check_timeout(&mut holochain, response, 1000).await;
+    let response = check_timeout(&mut holochain, response, 3000).await;
 
     let expects = vec![original_dna_hash.clone()];
     assert_matches!(response, AdminResponse::DnasListed(a) if a == expects);
 
     // Activate cells
-    let request = AdminRequest::ActivateApp {
+    let request = AdminRequest::EnableApp {
         installed_app_id: "test".to_string(),
     };
     let response = client.request(request);
-    let response = check_timeout(&mut holochain, response, 1000).await;
-    assert_matches!(response, AdminResponse::AppActivated);
+    let response = check_timeout(&mut holochain, response, 3000).await;
+    assert_matches!(response, AdminResponse::AppEnabled { .. });
 
     // Attach App Interface
     let app_port_rcvd = attach_app_interface(&mut client, &mut holochain, Some(app_port)).await;
     assert_eq!(app_port, app_port_rcvd);
 
     // Call Zome
+    tracing::info!("Calling zome");
     call_foo_fn(app_port, original_dna_hash.clone(), &mut holochain).await;
 
     // Ensure that the other client does not receive any messages, i.e. that
@@ -409,12 +409,14 @@ async fn call_zome() {
     holochain.kill().await.expect("Failed to kill holochain");
     std::mem::drop(client);
 
-    // Call zome after resart
+    // Call zome after restart
+    tracing::info!("Restarting conductor");
     let mut holochain = start_holochain(config_path).await;
 
     tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
 
     // Call Zome again on the existing app interface port
+    tracing::info!("Calling zome again");
     call_foo_fn(app_port, original_dna_hash, &mut holochain).await;
 
     // Shutdown holochain
@@ -440,7 +442,8 @@ async fn remote_signals() -> anyhow::Result<()> {
 
     let apps = conductors
         .setup_app_for_zipped_agents("app", &all_agents, &[dna_file])
-        .await;
+        .await
+        .unwrap();
 
     conductors.exchange_peer_info().await;
 
@@ -511,6 +514,7 @@ async fn emit_signals() {
         &mut holochain,
         &mut admin_tx,
         orig_dna_hash,
+        fake_agent_pubkey_1(),
         fake_dna_path,
         None,
         "".into(),
@@ -519,12 +523,12 @@ async fn emit_signals() {
     let cell_id = CellId::new(dna_hash.clone(), agent_key.clone());
 
     // Activate cells
-    let request = AdminRequest::ActivateApp {
+    let request = AdminRequest::EnableApp {
         installed_app_id: "test".to_string(),
     };
     let response = admin_tx.request(request);
-    let response = check_timeout(&mut holochain, response, 1000).await;
-    assert_matches!(response, AdminResponse::AppActivated);
+    let response = check_timeout(&mut holochain, response, 3000).await;
+    assert_matches!(response, AdminResponse::AppEnabled { .. });
 
     // Attach App Interface
     let app_port = attach_app_interface(&mut admin_tx, &mut holochain, None).await;
@@ -677,8 +681,7 @@ async fn too_many_open() {
     let conductor_handle = Conductor::builder().config(config).build().await.unwrap();
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");
-    for i in 0..1000 {
-        dbg!(i);
+    for _i in 0..1000 {
         holochain_websocket::connect(
             url2!("ws://127.0.0.1:{}", port),
             Arc::new(WebsocketConfig {

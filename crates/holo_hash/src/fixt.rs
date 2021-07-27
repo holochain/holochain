@@ -74,6 +74,7 @@ fn append_location(mut base: Vec<u8>) -> Vec<u8> {
 }
 
 fixturator!(
+    // with_vec 0 5;
     AgentPubKey;
     curve Empty AgentPubKey::from_raw_36(ThirtySixHashBytesFixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap());
     curve Unpredictable AgentPubKey::from_raw_36(ThirtySixHashBytesFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap());
@@ -89,6 +90,7 @@ fixturator!(
         agents[get_fixt_index!() % agents.len()].clone()
     };
 );
+
 fixturator!(
     AgentPubKeyB64;
     constructor fn new(AgentPubKey);

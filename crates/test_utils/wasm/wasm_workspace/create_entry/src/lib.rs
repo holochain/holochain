@@ -38,7 +38,7 @@ fn priv_msg() -> PrivMsg {
 
 #[hdk_extern]
 fn create_entry(_: ()) -> ExternResult<HeaderHash> {
-    Ok(hdk::prelude::create_entry(&post())?)
+    hdk::prelude::create_entry(&post())
 }
 
 #[hdk_extern]
@@ -100,7 +100,7 @@ fn get_activity(
 #[hdk_extern]
 fn init(_: ()) -> ExternResult<InitCallbackResult> {
     // grant unrestricted access to accept_cap_claim so other agents can send us claims
-    let mut functions: GrantedFunctions = HashSet::new();
+    let mut functions: GrantedFunctions = BTreeSet::new();
     functions.insert((zome_info()?.zome_name, "create_entry".into()));
     create_cap_grant(CapGrantEntry {
         tag: "".into(),
@@ -130,15 +130,16 @@ fn call_create_entry(_: ()) -> ExternResult<HeaderHash> {
 
     match zome_call_response {
         ZomeCallResponse::Ok(v) => Ok(v.decode()?),
-        // Should handle this in real code.
-        _ => unreachable!(),
+        ZomeCallResponse::Unauthorized(cell_id, zome_name, function_name, agent_pubkey) => Err(WasmError::Guest(format!("Unauthorized: {} {} {} {}", cell_id, zome_name, function_name, agent_pubkey))),
+        // Unbounded recursion.
+        ZomeCallResponse::NetworkError(_) => call_create_entry(()),
     }
 }
 
 #[hdk_extern]
 fn call_create_entry_remotely(agent: AgentPubKey) -> ExternResult<HeaderHash> {
     let zome_call_response: ZomeCallResponse = call_remote(
-        agent,
+        agent.clone(),
         "create_entry".to_string().into(),
         "create_entry".to_string().into(),
         None,
@@ -147,7 +148,8 @@ fn call_create_entry_remotely(agent: AgentPubKey) -> ExternResult<HeaderHash> {
 
     match zome_call_response {
         ZomeCallResponse::Ok(v) => Ok(v.decode()?),
-        // Handle this in real code.
-        _ => unreachable!(),
+        ZomeCallResponse::Unauthorized(cell_id, zome_name, function_name, agent_pubkey) => Err(WasmError::Guest(format!("Unauthorized: {} {} {} {}", cell_id, zome_name, function_name, agent_pubkey))),
+        // Unbounded recursion.
+        ZomeCallResponse::NetworkError(_) => call_create_entry_remotely(agent),
     }
 }

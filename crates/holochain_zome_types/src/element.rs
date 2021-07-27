@@ -16,9 +16,13 @@ use holo_hash::HeaderHash;
 use holo_hash::HoloHashed;
 use holochain_serialized_bytes::prelude::*;
 
-/// a chain element which is a triple containing the signature of the header along with the
+#[cfg(feature = "test_utils")]
+pub mod facts;
+
+/// a chain element containing the signed header along with the
 /// entry if the header type has one.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Element {
     /// The signed header for this element
     signed_header: SignedHeaderHashed,
@@ -28,13 +32,31 @@ pub struct Element {
 }
 
 impl Element {
+    /// Mutable reference to the Header content.
+    /// This is useless and dangerous in production usage.
+    /// Guaranteed to make hashes and signatures mismatch whatever the Header is mutated to (at least).
+    /// This may be useful for tests that rely heavily on mocked and fixturated data.
+    #[cfg(feature = "test_utils")]
+    pub fn as_header_mut(&mut self) -> &mut Header {
+        self.signed_header.header.as_content_mut()
+    }
+
+    /// Mutable reference to the ElementEntry.
+    /// This is useless and dangerous in production usage.
+    /// Guaranteed to make hashes and signatures mismatch whatever the ElementEntry is mutated to (at least).
+    /// This may be useful for tests that rely heavily on mocked and fixturated data.
+    #[cfg(feature = "test_utils")]
+    pub fn as_entry_mut(&mut self) -> &mut ElementEntry {
+        &mut self.entry
+    }
+
     /// Raw element constructor.  Used only when we know that the values are valid.
     pub fn new(signed_header: SignedHeaderHashed, maybe_entry: Option<Entry>) -> Self {
-        let maybe_visibilty = signed_header
+        let maybe_visibility = signed_header
             .header()
             .entry_data()
             .map(|(_, entry_type)| entry_type.visibility());
-        let entry = match (maybe_entry, maybe_visibilty) {
+        let entry = match (maybe_entry, maybe_visibility) {
             (Some(entry), Some(_)) => ElementEntry::Present(entry),
             (None, Some(EntryVisibility::Private)) => ElementEntry::Hidden,
             (None, None) => ElementEntry::NotApplicable,
@@ -54,32 +76,32 @@ impl Element {
         (self.signed_header, self.entry)
     }
 
-    /// The inner signed header
+    /// The inner signed-header
     pub fn signed_header(&self) -> &SignedHeaderHashed {
         &self.signed_header
     }
 
-    /// Access the signature portion of this triple.
+    /// Access the signature from this element's signed header
     pub fn signature(&self) -> &Signature {
         self.signed_header.signature()
     }
 
-    /// Access the header address
+    /// Access the header address from this element's signed header
     pub fn header_address(&self) -> &HeaderHash {
         self.signed_header.header_address()
     }
 
-    /// Access the Header portion of this triple.
+    /// Access the Header from this element's signed header
     pub fn header(&self) -> &Header {
         self.signed_header.header()
     }
 
-    /// Access the HeaderHashed portion.
+    /// Access the HeaderHashed from this element's signed header portion
     pub fn header_hashed(&self) -> &HeaderHashed {
         self.signed_header.header_hashed()
     }
 
-    /// Access the Entry portion of this triple as a ElementEntry,
+    /// Access the Entry portion of this element as an ElementEntry,
     /// which includes the context around the presence or absence of the entry.
     pub fn entry(&self) -> &ElementEntry {
         &self.entry
@@ -89,6 +111,7 @@ impl Element {
 /// Represents the different ways the entry_address reference within a Header
 /// can be intepreted
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum ElementEntry {
     /// The Header has an entry_address reference, and the Entry is accessible.
     Present(Entry),
@@ -157,7 +180,8 @@ impl ElementEntry {
 /// A combination of a Header and its signature.
 ///
 /// Has implementations From and Into its tuple form.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct SignedHeader(pub Header, pub Signature);
 
 impl SignedHeader {
@@ -189,10 +213,26 @@ impl HashableContent for SignedHeader {
 }
 
 /// The header and the signature that signed it
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct SignedHeaderHashed {
+    /// The hashed but unsigned header.
     header: HeaderHashed,
+    /// The signature of the header.
     signature: Signature,
+}
+
+impl std::hash::Hash for SignedHeaderHashed {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.signature.hash(state);
+        self.as_hash().hash(state);
+    }
+}
+
+impl PartialEq for SignedHeaderHashed {
+    fn eq(&self, other: &Self) -> bool {
+        self.signature.eq(&other.signature) && self.as_hash() == other.as_hash()
+    }
 }
 
 #[allow(missing_docs)]
@@ -238,6 +278,24 @@ impl SignedHeaderHashed {
     }
 }
 
+impl From<SignedHeaderHashed> for HeaderHashed {
+    fn from(signed_header_hashed: SignedHeaderHashed) -> HeaderHashed {
+        signed_header_hashed.header
+    }
+}
+
+impl From<HeaderHashed> for Header {
+    fn from(header_hashed: HeaderHashed) -> Header {
+        header_hashed.into_content()
+    }
+}
+
+impl From<SignedHeaderHashed> for Header {
+    fn from(signed_header_hashed: SignedHeaderHashed) -> Header {
+        HeaderHashed::from(signed_header_hashed).into()
+    }
+}
+
 impl From<(Header, Signature)> for SignedHeader {
     fn from((h, s): (Header, Signature)) -> Self {
         Self(h, s)
@@ -265,6 +323,13 @@ impl From<SignedHeaderHashed> for HoloHashed<SignedHeader> {
     fn from(shh: SignedHeaderHashed) -> HoloHashed<SignedHeader> {
         let (signed_header, hash) = shh.into_inner();
         HoloHashed::with_pre_hashed(signed_header, hash)
+    }
+}
+
+impl From<SignedHeaderHashed> for SignedHeader {
+    fn from(shh: SignedHeaderHashed) -> SignedHeader {
+        let (signed_header, _) = shh.into_inner();
+        signed_header
     }
 }
 

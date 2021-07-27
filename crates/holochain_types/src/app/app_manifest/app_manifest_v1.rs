@@ -9,10 +9,8 @@ use super::{
 };
 use crate::prelude::{SlotId, YamlProperties};
 use holo_hash::{DnaHash, DnaHashB64};
+use holochain_zome_types::Uid;
 use std::collections::HashMap;
-
-/// Placeholder for a real UID type
-pub type Uid = String;
 
 /// Version 1 of the App manifest schema
 #[derive(
@@ -284,8 +282,8 @@ pub mod tests {
     use futures::future::join_all;
 
     use super::*;
+    use crate::app::app_manifest::AppManifest;
     use crate::prelude::*;
-    use crate::{app::app_manifest::AppManifest, prelude::DnaDef};
     use ::fixt::prelude::*;
     use std::path::PathBuf;
 
@@ -297,14 +295,19 @@ pub mod tests {
         salad: String,
     }
 
+    pub fn app_manifest_properties_fixture() -> YamlProperties {
+        YamlProperties::new(
+            serde_yaml::to_value(Props {
+                salad: "bar".to_string(),
+            })
+            .unwrap(),
+        )
+    }
+
     pub async fn app_manifest_fixture<I: IntoIterator<Item = DnaDef>>(
         location: Option<mr_bundle::Location>,
         dnas: I,
     ) -> (AppManifest, Vec<DnaHashB64>) {
-        let props = Props {
-            salad: "bar".to_string(),
-        };
-
         let hashes = join_all(
             dnas.into_iter()
                 .map(|dna| async move { DnaHash::with_data_sync(&dna).into() }),
@@ -317,7 +320,7 @@ pub mod tests {
             id: "nick".into(),
             dna: AppSlotDnaManifest {
                 location,
-                properties: Some(YamlProperties::new(serde_yaml::to_value(props).unwrap())),
+                properties: Some(app_manifest_properties_fixture()),
                 uid: Some("uid".into()),
                 version: Some(version),
                 clone_limit: 50,

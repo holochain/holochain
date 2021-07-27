@@ -10,13 +10,14 @@
 //! outside world
 
 #![deny(missing_docs)]
+
 // TODO: clean up allows once parent is fully documented
 
 pub mod api;
 mod cell;
 #[allow(clippy::module_inception)]
 #[allow(missing_docs)]
-mod conductor;
+pub mod conductor;
 #[allow(missing_docs)]
 pub mod config;
 #[allow(missing_docs)]
@@ -28,13 +29,14 @@ pub mod handle;
 pub mod interactive;
 pub mod interface;
 pub mod manager;
-pub mod p2p_store;
+pub mod p2p_agent_store;
+pub mod p2p_metrics;
 pub mod paths;
 pub mod state;
 
 pub use cell::error::CellError;
 pub use cell::Cell;
+pub use conductor::integration_dump;
 pub use conductor::Conductor;
 pub use conductor::ConductorBuilder;
-pub use conductor::ConductorStateDb;
 pub use handle::ConductorHandle;

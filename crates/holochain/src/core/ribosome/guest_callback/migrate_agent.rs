@@ -1,10 +1,10 @@
 use crate::core::ribosome::FnComponents;
-use crate::core::ribosome::HostAccess;
+use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
+use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
 
 #[derive(Clone)]
@@ -24,10 +24,10 @@ impl MigrateAgentInvocation {
 
 #[derive(Clone, Constructor)]
 pub struct MigrateAgentHostAccess {
-    pub workspace: CallZomeWorkspaceLock,
+    pub workspace: HostFnWorkspace,
 }
 
-impl From<MigrateAgentHostAccess> for HostAccess {
+impl From<MigrateAgentHostAccess> for HostContext {
     fn from(migrate_agent_host_access: MigrateAgentHostAccess) -> Self {
         Self::MigrateAgent(migrate_agent_host_access)
     }
@@ -37,9 +37,9 @@ impl From<&MigrateAgentHostAccess> for HostFnAccess {
     fn from(_: &MigrateAgentHostAccess) -> Self {
         let mut access = Self::none();
         // TODO: insert zome_name
-        access.read_workspace = Permission::Allow;
+        access.read_workspace_deterministic = Permission::Allow;
         access.agent_info = Permission::Allow;
-        access.dna_bindings = Permission::Allow;
+        access.bindings_deterministic = Permission::Allow;
         access
     }
 }
@@ -108,7 +108,6 @@ mod test {
     use crate::fixt::MigrateAgentHostAccessFixturator;
     use crate::fixt::MigrateAgentInvocationFixturator;
     use crate::fixt::ZomeNameFixturator;
-    use holochain_types::dna::zome::HostFnAccess;
     use holochain_types::prelude::*;
     use rand::prelude::*;
 
@@ -162,7 +161,7 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn migrate_agent_invocation_allow_side_effects() {
-        use holochain_types::dna::zome::Permission::*;
+        use holochain_types::access::Permission::*;
         let migrate_agent_host_access =
             MigrateAgentHostAccessFixturator::new(::fixt::Unpredictable)
                 .next()
@@ -171,12 +170,15 @@ mod test {
             HostFnAccess::from(&migrate_agent_host_access),
             HostFnAccess {
                 agent_info: Allow,
-                read_workspace: Allow,
+                read_workspace: Deny,
+                read_workspace_deterministic: Allow,
                 write_workspace: Deny,
                 non_determinism: Deny,
                 write_network: Deny,
-                dna_bindings: Allow,
+                bindings: Deny,
+                bindings_deterministic: Allow,
                 keystore: Deny,
+                keystore_deterministic: Deny,
             }
         );
     }

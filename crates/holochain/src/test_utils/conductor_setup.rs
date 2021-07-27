@@ -12,24 +12,21 @@ use crate::core::ribosome::real_ribosome::RealRibosome;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
-use holochain_lmdb::env::EnvironmentWrite;
-use holochain_lmdb::test_utils::test_environments;
-use holochain_lmdb::test_utils::TestEnvironments;
 use holochain_p2p::actor::HolochainP2pRefToCell;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::SerializedBytes;
+use holochain_state::{prelude::test_environments, test_utils::TestEnvs};
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::sync::Arc;
-use tempdir::TempDir;
 
 /// A "factory" for HostFnCaller, which will produce them when given a ZomeName
 pub struct CellHostFnCaller {
     pub cell_id: CellId,
-    pub env: EnvironmentWrite,
+    pub env: EnvWrite,
+    pub cache: EnvWrite,
     pub ribosome: RealRibosome,
     pub network: HolochainP2pCell,
     pub keystore: KeystoreSender,
@@ -41,6 +38,7 @@ pub struct CellHostFnCaller {
 impl CellHostFnCaller {
     pub async fn new(cell_id: &CellId, handle: &ConductorHandle, dna_file: &DnaFile) -> Self {
         let env = handle.get_cell_env(cell_id).await.unwrap();
+        let cache = handle.get_cache_env(cell_id).await.unwrap();
         let keystore = env.keystore().clone();
         let network = handle
             .holochain_p2p()
@@ -53,6 +51,7 @@ impl CellHostFnCaller {
         CellHostFnCaller {
             cell_id: cell_id.clone(),
             env,
+            cache,
             ribosome,
             network,
             keystore,
@@ -69,6 +68,7 @@ impl CellHostFnCaller {
         let call_zome_handle = self.cell_conductor_api.clone().into_call_zome_handle();
         HostFnCaller {
             env: self.env.clone(),
+            cache: self.cache.clone(),
             ribosome: self.ribosome.clone(),
             zome_path,
             network: self.network.clone(),
@@ -82,14 +82,14 @@ impl CellHostFnCaller {
 /// Everything you need to run a test that uses the conductor
 // TODO: refactor this to be the "Test Conductor" wrapper
 pub struct ConductorTestData {
-    __tmpdir: Arc<TempDir>,
+    _envs: TestEnvs,
     handle: ConductorHandle,
     cell_apis: HashMap<CellId, CellHostFnCaller>,
 }
 
 impl ConductorTestData {
     pub async fn new(
-        envs: TestEnvironments,
+        envs: TestEnvs,
         dna_files: Vec<DnaFile>,
         agents: Vec<AgentPubKey>,
         network_config: KitsuneP2pConfig,
@@ -111,7 +111,7 @@ impl ConductorTestData {
             cell_id_by_dna_file.push((dna_file, cell_ids));
         }
 
-        let (__tmpdir, _app_api, handle) = setup_app_inner(
+        let (_envs, _app_api, handle) = setup_app_inner(
             envs,
             vec![("test_app", cells)],
             dna_files.clone(),
@@ -131,7 +131,7 @@ impl ConductorTestData {
         }
 
         let this = Self {
-            __tmpdir,
+            _envs,
             // app_api,
             handle,
             cell_apis,

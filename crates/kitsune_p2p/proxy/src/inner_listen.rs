@@ -339,11 +339,10 @@ impl InternalHandler for InnerListen {
 
         // first check to see if we should proxy this
         // to a client we are servicing.
-        let proxy_to = if let Some(proxy_to) = self.proxy_list.get(&dest_proxy_url) {
-            Some(proxy_to.base_connection_url.clone())
-        } else {
-            None
-        };
+        let proxy_to = self
+            .proxy_list
+            .get(&dest_proxy_url)
+            .map(|proxy_to| proxy_to.base_connection_url.clone());
 
         // if we're not proxying for a client,
         // check to see if our owner is the destination.
@@ -525,14 +524,13 @@ impl TransportListenerHandler for InnerListen {
     fn handle_debug(&mut self) -> TransportListenerHandlerResult<serde_json::Value> {
         let url = self.this_url.to_string();
         let sub = self.sub_sender.debug();
-        let proxy_count = self.proxy_list.iter().count();
+        let proxy_count = self.proxy_list.len();
         Ok(async move {
             let sub = sub.await?;
             Ok(serde_json::json! {{
                 "sub_transport": sub,
                 "url": url,
                 "proxy_count": proxy_count,
-                "tokio_task_count": kitsune_p2p_types::metrics::metric_task_count(),
                 "sys_info": kitsune_p2p_types::metrics::get_sys_info(),
             }})
         }

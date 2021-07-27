@@ -1,10 +1,11 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
+use holochain_cascade::Cascade;
 use holochain_p2p::actor::GetLinksOptions;
-use holochain_state::metadata::LinkMetaKey;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
+use crate::core::ribosome::HostFnAccess;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_link_details<'a>(
@@ -12,41 +13,44 @@ pub fn get_link_details<'a>(
     call_context: Arc<CallContext>,
     input: GetLinksInput,
 ) -> Result<LinkDetails, WasmError> {
-    let GetLinksInput {
-        base_address,
-        tag_prefix,
-    } = input;
+    match HostFnAccess::from(&call_context.host_context()) {
+        HostFnAccess{ read_workspace: Permission::Allow, .. } => {
+            let GetLinksInput {
+                base_address,
+                tag_prefix,
+            } = input;
 
-    // Get zome id
-    let zome_id = ribosome
-        .zome_to_id(&call_context.zome)
-        .expect("Failed to get ID for current zome.");
+            // Get zome id
+            let zome_id = ribosome
+                .zome_to_id(&call_context.zome)
+                .expect("Failed to get ID for current zome.");
 
     // Get the network from the context
-    let network = call_context.host_access.network().clone();
+    let network = call_context.host_context.network().clone();
 
-    tokio_helper::block_forever_on(async move {
-        // Create the key
-        let key = match tag_prefix.as_ref() {
-            Some(tag_prefix) => LinkMetaKey::BaseZomeTag(&base_address, zome_id, tag_prefix),
-            None => LinkMetaKey::BaseZome(&base_address, zome_id),
-        };
+            tokio_helper::block_forever_on(async move {
+                // Create the key
+                let key = WireLinkKey {
+                    base: base_address,
+                    zome_id,
+                    tag: tag_prefix,
+                };
 
+        let workspace = call_context.host_context.workspace();
+        let mut cascade = Cascade::from_workspace_network(workspace, network);
         // Get the links from the dht
         let link_details = LinkDetails::from(
-            call_context
-                .host_access
-                .workspace()
-                .write()
-                .await
-                .cascade(network)
-                .get_link_details(&key, GetLinksOptions::default())
+            cascade
+                .get_link_details(key, GetLinksOptions::default())
                 .await
                 .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?,
         );
 
-        Ok(link_details)
-    })
+                Ok(link_details)
+            })
+        },
+        _ => unreachable!(),
+    }
 }
 
 #[cfg(test)]
@@ -54,26 +58,24 @@ pub fn get_link_details<'a>(
 pub mod slow_tests {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
+    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::element::SignedHeaderHashed;
     use holochain_zome_types::Header;
+    use holochain_zome_types::fake_agent_pubkey_1;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_entry_hash_path_children_details() {
-        let test_env = holochain_lmdb::test_utils::test_cell_env();
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_cache = holochain_state::test_utils::test_cache_env();
         let env = test_env.env();
-
-        let mut workspace =
-            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
-
-        // commits fail validation if we don't do genesis
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+        let author = fake_agent_pubkey_1();
+        crate::test_utils::fake_genesis(env.clone())
             .await
             .unwrap();
-
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock;
+        host_access.workspace = workspace;
 
         // ensure foo.bar twice to ensure idempotency
         let _: () = crate::call_test_ribosome!(
@@ -81,13 +83,13 @@ pub mod slow_tests {
             TestWasm::HashPath,
             "ensure",
             "foo.bar".to_string()
-        );
+        ).unwrap();
         let _: () = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "ensure",
             "foo.bar".to_string()
-        );
+        ).unwrap();
 
         // ensure foo.baz
         let _: () = crate::call_test_ribosome!(
@@ -95,14 +97,14 @@ pub mod slow_tests {
             TestWasm::HashPath,
             "ensure",
             "foo.baz".to_string()
-        );
+        ).unwrap();
 
         let exists_output: bool = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "exists",
             "foo".to_string()
-        );
+        ).unwrap();
 
         assert_eq!(true, exists_output,);
 
@@ -111,21 +113,21 @@ pub mod slow_tests {
             TestWasm::HashPath,
             "hash",
             "foo.bar".to_string()
-        );
+        ).unwrap();
 
         let _foo_baz: holo_hash::EntryHash = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "hash",
             "foo.baz".to_string()
-        );
+        ).unwrap();
 
         let children_details_output: holochain_zome_types::link::LinkDetails = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "children_details",
             "foo".to_string()
-        );
+        ).unwrap();
 
         let link_details = children_details_output.into_inner();
 
@@ -138,14 +140,14 @@ pub mod slow_tests {
             TestWasm::HashPath,
             "delete_link",
             to_remove_hash
-        );
+        ).unwrap();
 
         let children_details_output_2: holochain_zome_types::link::LinkDetails = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "children_details",
             "foo".to_string()
-        );
+        ).unwrap();
 
         let children_details_output_2_vec = children_details_output_2.into_inner();
         assert_eq!(2, children_details_output_2_vec.len());

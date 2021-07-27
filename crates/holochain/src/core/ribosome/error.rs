@@ -3,13 +3,13 @@
 
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::interface::error::InterfaceError;
-use crate::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
 use holo_hash::AnyDhtHash;
 use holochain_cascade::error::CascadeError;
 use holochain_serialized_bytes::prelude::SerializedBytesError;
 use holochain_state::source_chain::SourceChainError;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
+use holochain_zome_types::inline_zome::error::InlineZomeError;
 use thiserror::Error;
 use tokio::task::JoinError;
 
@@ -37,7 +37,7 @@ pub enum RibosomeError {
     ZomeFnNotExists(ZomeName, FunctionName),
 
     /// a problem with entry defs
-    #[error("An error with entry defs: {0}")]
+    #[error("An error with entry defs in zome '{0}': {1}")]
     EntryDefs(ZomeName, String),
 
     /// a mandatory dependency for an element doesn't exist
@@ -57,7 +57,7 @@ pub enum RibosomeError {
 
     /// ident
     #[error(transparent)]
-    DatabaseError(#[from] holochain_lmdb::error::DatabaseError),
+    DatabaseError(#[from] holochain_sqlite::error::DatabaseError),
 
     /// ident
     #[error(transparent)]
@@ -86,10 +86,6 @@ pub enum RibosomeError {
     /// ident
     #[error(transparent)]
     P2pError(#[from] holochain_p2p::HolochainP2pError),
-
-    /// ident
-    #[error(transparent)]
-    DhtOpConvertError(#[from] Box<DhtOpConvertError>),
 
     /// ident
     #[error("xsalsa20poly1305 error {0}")]

@@ -664,13 +664,13 @@ impl Websocket {
             Ok(_) => {
                 // We are done responding, nothing
                 // else to do in this loop so continue.
-                return Task::cont();
+                Task::cont()
             }
             Err(e) => {
                 // Failed to handle the response so we need to
                 // shutdown.
                 tracing::error!(handle_response_error = ?e);
-                return Task::exit();
+                Task::exit()
             }
         }
     }
@@ -801,7 +801,7 @@ mod tests {
 
         let msg = SerializedBytes::from(UnsafeBytes::from(vec![0u8]));
         sender
-            .request_timeout::<_, SerializedBytes, _, _>(msg, std::time::Duration::from_secs(1))
+            .request_timeout::<_, SerializedBytes>(msg, std::time::Duration::from_secs(1))
             .await
             .ok();
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;

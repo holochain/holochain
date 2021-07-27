@@ -15,7 +15,7 @@ impl WireDhtOpData {
 
     pub fn decode(data: Vec<u8>) -> Result<Self, SerializedBytesError> {
         let request: SerializedBytes = UnsafeBytes::from(data).into();
-        Ok(request.try_into()?)
+        request.try_into()
     }
 }
 
@@ -47,7 +47,7 @@ pub(crate) enum WireMessage {
         options: event::GetMetaOptions,
     },
     GetLinks {
-        link_key: WireLinkMetaKey,
+        link_key: WireLinkKey,
         options: event::GetLinksOptions,
     },
     GetAgentActivity {
@@ -112,7 +112,7 @@ impl WireMessage {
         Self::GetMeta { dht_hash, options }
     }
 
-    pub fn get_links(link_key: WireLinkMetaKey, options: event::GetLinksOptions) -> WireMessage {
+    pub fn get_links(link_key: WireLinkKey, options: event::GetLinksOptions) -> WireMessage {
         Self::GetLinks { link_key, options }
     }
 

@@ -1,12 +1,12 @@
 use crate::core::ribosome::FnComponents;
-use crate::core::ribosome::HostAccess;
+use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
+use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
 
 #[derive(Clone)]
@@ -23,12 +23,12 @@ impl PostCommitInvocation {
 
 #[derive(Clone, Constructor)]
 pub struct PostCommitHostAccess {
-    pub workspace: CallZomeWorkspaceLock,
+    pub workspace: HostFnWorkspace,
     pub keystore: KeystoreSender,
     pub network: HolochainP2pCell,
 }
 
-impl From<PostCommitHostAccess> for HostAccess {
+impl From<PostCommitHostAccess> for HostContext {
     fn from(post_commit_host_access: PostCommitHostAccess) -> Self {
         Self::PostCommit(post_commit_host_access)
     }
@@ -96,7 +96,7 @@ mod test {
     use crate::fixt::PostCommitHostAccessFixturator;
     use crate::fixt::PostCommitInvocationFixturator;
     use ::fixt::prelude::*;
-    use holochain_types::dna::zome::HostFnAccess;
+    use holochain_types::prelude::*;
     use holochain_zome_types::post_commit::PostCommitCallbackResult;
     use holochain_zome_types::ExternIO;
 
