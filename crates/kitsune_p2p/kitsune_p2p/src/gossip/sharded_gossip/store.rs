@@ -9,6 +9,7 @@ use kitsune_p2p_types::{
     dht_arc::{ArcInterval, DhtArcSet},
     KitsuneError, KitsuneResult,
 };
+use observability::tracing;
 
 use crate::event::{
     FetchOpHashDataEvt, FetchOpHashesForConstraintsEvt, GetAgentInfoSignedEvt,
@@ -206,6 +207,9 @@ pub(super) async fn put_ops(
         for data in &ops {
             let hash = &data.0;
             let op = &data.1;
+
+            tracing::debug!("Gossiping {} to {}", hash, this_agent_info.agent);
+
             if this_agent_info.storage_arc.contains(hash.get_loc()) {
                 // FIXME: This absolutely should be batched. Sending one op
                 // at a time to the conductor is very slow.

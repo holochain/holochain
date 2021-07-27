@@ -148,11 +148,44 @@ impl HandlerBuilder {
     }
 }
 
-/// Concise representation of data held by various agents in a sharded scenario.
+/// Concise representation of data held by various agents in a sharded scenario,
+/// without having to refer to explicit op hashes or locations.
 /// See [`generate_ops_for_overlapping_arcs`] for usage detail.
-//
-// This could have been a Vec<>, but it's nice to be able to use this as a slice.
-pub type OwnershipData<const N: usize> = [HashSet<Arc<KitsuneAgent>>; N];
+pub struct OwnershipData {
+    /// Total number of op hashes to be generated
+    total_ops: usize,
+    /// Declares arcs and ownership in terms of indices into a vec of generated op hashes.
+    agents: Vec<OwnershipDataAgent>,
+}
+
+impl OwnershipData {
+    pub fn from_compact(
+        total_ops: usize,
+        v: Vec<(Arc<KitsuneAgent>, (usize, usize), Vec<usize>)>,
+    ) -> Self {
+        Self {
+            total_ops,
+            agents: v
+                .into_iter()
+                .map(|(agent, arc_indices, hash_indices)| OwnershipDataAgent {
+                    agent,
+                    arc_indices,
+                    hash_indices,
+                })
+                .collect(),
+        }
+    }
+}
+
+/// Declares arcs and ownership in terms of indices into a vec of generated op hashes.
+pub struct OwnershipDataAgent {
+    /// The agent in question
+    agent: Arc<KitsuneAgent>,
+    /// The start and end indices of the arc for this agent
+    arc_indices: (usize, usize),
+    /// The indices of ops to consider as owned
+    hash_indices: Vec<usize>,
+}
 
 /// Given a list of ownership requirements, returns a list of triples, each
 /// item of which consists of:
@@ -174,42 +207,41 @@ pub type OwnershipData<const N: usize> = [HashSet<Arc<KitsuneAgent>>; N];
 /// (which would have to be searched for).
 ///
 /// See the test below for a thorough example.
-pub fn generate_ops_for_overlapping_arcs<'a, const N: usize>(
+pub fn mock_agent_persistence<'a>(
     entropy: &mut arbitrary::Unstructured<'a>,
-    ownership: OwnershipData<N>,
-) -> MockAgentPersistence {
+    ownership: OwnershipData,
+) -> (MockAgentPersistence, Vec<KitsuneOpHash>) {
     let mut arcs: HashMap<Arc<KitsuneAgent>, ((u32, u32), Vec<KitsuneOpHash>)> = HashMap::new();
     // create one op per "ownership" item
-    let mut ops: Vec<KitsuneOpHash> = ownership
-        .iter()
+    let mut hashes: Vec<KitsuneOpHash> = (0..ownership.total_ops)
         .map(|_| KitsuneOpHash::arbitrary(entropy).unwrap())
         .collect();
 
-    // sort ops by location
-    ops.sort_by_key(|op| op.get_loc());
+    // sort hashes by location
+    hashes.sort_by_key(|h| h.get_loc());
 
-    // associate ops with relevant agents, growing arcs at the same time
-    for (owners, op) in itertools::zip(ownership.iter(), ops.into_iter()) {
-        for owner in owners.clone() {
-            arcs.entry(owner)
-                .and_modify(|((_, hi), ops)| {
-                    *hi = op.get_loc();
-                    ops.push(op.clone())
-                })
-                .or_insert(((op.get_loc(), op.get_loc()), vec![op.clone()]));
-        }
-    }
-
-    // Construct the ArcIntervals, and for now, associate an arbitrary timestamp
-    // with each op
-    let arcs = arcs
-        .into_iter()
-        .map(|(agent, ((lo, hi), ops))| {
-            let ops = ops.into_iter().map(|op| (op, 1111)).collect();
-            (agent, ArcInterval::Bounded(lo, hi), ops)
+    // expand the indices provided in the input to actual op hashes and locations,
+    // per the gerated ops
+    let persistence = ownership
+        .agents
+        .iter()
+        .map(|data| {
+            let OwnershipDataAgent {
+                agent,
+                arc_indices: (arc_idx_lo, arc_idx_hi),
+                hash_indices,
+            } = data;
+            let arc =
+                ArcInterval::new(hashes[*arc_idx_lo].get_loc(), hashes[*arc_idx_hi].get_loc());
+            let hashes = hash_indices
+                .into_iter()
+                // TODO: `1111` is an arbitrary timestamp placeholder
+                .map(|i| (hashes[*i].clone(), 1111))
+                .collect();
+            (agent.to_owned(), arc, hashes)
         })
         .collect();
-    arcs
+    (persistence, hashes)
 }
 
 /// Given some mock persistence data, calculate the diff for each agent, i.e.
@@ -244,11 +276,21 @@ async fn test_three_way_sharded_ownership() {
     let mut u = arbitrary::Unstructured::new(&NOISE);
     let space = Arc::new(KitsuneSpace::arbitrary(&mut u).unwrap());
     let (agents, ownership) = three_way_sharded_ownership();
-    let persistence = generate_ops_for_overlapping_arcs(&mut u, ownership);
+    let (persistence, hashes) = mock_agent_persistence(&mut u, ownership);
     let agent_arcs: Vec<_> = persistence
         .iter()
         .map(|(agent, arc, _)| (agent.clone(), arc.clone()))
         .collect();
+
+    // - Check that the agents are missing certain hashes (by design)
+    assert_eq!(
+        calculate_missing_ops(&persistence),
+        vec![
+            (agents[0].clone(), vec![hashes[1].clone()]),
+            (agents[1].clone(), vec![hashes[3].clone()]),
+            (agents[2].clone(), vec![hashes[5].clone()]),
+        ]
+    );
 
     let evt_handler = HandlerBuilder::new()
         .with_agent_persistence(persistence)

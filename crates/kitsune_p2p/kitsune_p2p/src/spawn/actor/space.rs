@@ -279,7 +279,7 @@ impl SpaceInternalHandler for Space {
                 module_type
             ),
         }
-        Ok(async move { Ok(()) }.boxed().into())
+        unit_ok_fut()
     }
 }
 
