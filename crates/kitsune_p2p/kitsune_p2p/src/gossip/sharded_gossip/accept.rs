@@ -31,14 +31,14 @@ impl ShardedGossipLocal {
         }
 
         // Get the local intervals.
-        let local_intervals =
+        let local_agent_arcs =
             store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents).await?;
 
         let mut gossip = Vec::with_capacity(2);
 
         // Generate the bloom filters and new state.
         let state = self
-            .generate_blooms(&local_agents, local_intervals, remote_arc_set, &mut gossip)
+            .generate_blooms(local_agent_arcs, remote_arc_set, &mut gossip)
             .await?;
 
         self.inner.share_mut(|inner, _| {

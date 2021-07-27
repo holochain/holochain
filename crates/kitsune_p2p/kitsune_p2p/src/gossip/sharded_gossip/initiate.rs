@@ -27,8 +27,7 @@ impl ShardedGossipLocal {
         }
 
         // Get the local agents intervals.
-        let intervals =
-            store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents).await?;
+        let intervals = store::local_arcs(&self.evt_sender, &self.space, &local_agents).await?;
 
         // Choose a remote agent to gossip with.
         let remote_agent = self
@@ -103,17 +102,21 @@ impl ShardedGossipLocal {
         }
 
         // Get the local intervals.
-        let local_intervals =
+        let local_agent_arcs =
             store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents).await?;
+        let local_arcs = local_agent_arcs
+            .iter()
+            .map(|(_, arc)| arc.clone())
+            .collect();
 
         let mut gossip = Vec::with_capacity(3);
 
         // Send the intervals back as the accept message.
-        gossip.push(ShardedGossipWire::accept(local_intervals.clone()));
+        gossip.push(ShardedGossipWire::accept(local_arcs));
 
         // Generate the bloom filters and new state.
         let state = self
-            .generate_blooms(&local_agents, local_intervals, remote_arc_set, &mut gossip)
+            .generate_blooms(local_agent_arcs, remote_arc_set, &mut gossip)
             .await?;
 
         self.inner.share_mut(|inner, _| {
@@ -129,13 +132,13 @@ impl ShardedGossipLocal {
     /// - A new state is created for this round.
     pub(super) async fn generate_blooms(
         &self,
-        local_agents: &HashSet<Arc<KitsuneAgent>>,
-        local_intervals: Vec<ArcInterval>,
+        local_agent_arcs: Vec<(Arc<KitsuneAgent>, ArcInterval)>,
         remote_arc_set: Vec<ArcInterval>,
         gossip: &mut Vec<ShardedGossipWire>,
     ) -> KitsuneResult<RoundState> {
         // Create the common arc set from the remote and local arcs.
-        let arc_set: DhtArcSet = local_intervals.into();
+        let (local_agents, local_arcs): (HashSet<_>, Vec<_>) = local_agent_arcs.into_iter().unzip();
+        let arc_set: DhtArcSet = local_arcs.into();
         let remote_arc_set: DhtArcSet = remote_arc_set.into();
         let common_arc_set = Arc::new(arc_set.intersection(&remote_arc_set));
 

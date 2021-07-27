@@ -52,12 +52,11 @@ impl ShardedGossipLocal {
             .share_mut(|inner, _| Ok(inner.local_agents.clone()))?;
 
         // Get the local agents that are relevant to this common arc set.
-        let agents_within_common_arc: HashSet<_> =
+        let agents_within_common_arc: Vec<_> =
             store::agents_within_arcset(&self.evt_sender, &self.space, common_arc_set)
                 .await?
                 .into_iter()
-                .map(|(a, _)| a)
-                .filter(|a| local_agents.contains(a))
+                .filter(|(agent, _)| local_agents.contains(agent))
                 .collect();
 
         // Put the ops in the agents that contain the ops within their arcs.

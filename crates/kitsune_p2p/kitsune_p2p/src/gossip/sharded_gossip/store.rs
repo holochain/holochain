@@ -63,17 +63,30 @@ pub(super) async fn query_agent_info(
         .map_err(KitsuneError::other)?)
 }
 
-/// Get the arc intervals for all local agents.
+/// Get the arc intervals for specified agent, paired with their respective agent.
 pub(super) async fn local_agent_arcs(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
     local_agents: &HashSet<Arc<KitsuneAgent>>,
-) -> KitsuneResult<Vec<ArcInterval>> {
+) -> KitsuneResult<Vec<(Arc<KitsuneAgent>, ArcInterval)>> {
     Ok(query_agent_info(evt_sender, space, local_agents)
         .await?
         .into_iter()
-        .map(|info| info.storage_arc.interval())
+        .map(|info| (info.agent.clone(), info.storage_arc.interval()))
         .collect::<Vec<_>>())
+}
+
+/// Get just the arc intervals for specified agents.
+pub(super) async fn local_arcs(
+    evt_sender: &EventSender,
+    space: &Arc<KitsuneSpace>,
+    local_agents: &HashSet<Arc<KitsuneAgent>>,
+) -> KitsuneResult<Vec<ArcInterval>> {
+    Ok(local_agent_arcs(evt_sender, space, local_agents)
+        .await?
+        .into_iter()
+        .map(|(_, arc)| arc)
+        .collect())
 }
 
 /// Get `AgentInfoSigned` for all agents within a `DhtArcSet`.
@@ -197,29 +210,31 @@ pub(super) async fn fetch_ops(
 pub(super) async fn put_ops(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
-    agents_within_common_arc: HashSet<Arc<KitsuneAgent>>,
+    agent_arcs: Vec<(Arc<KitsuneAgent>, ArcInterval)>,
     // maackle: this seems silly, like we should just not have the op hashes in an arc
     ops: Vec<Arc<(Arc<KitsuneOpHash>, Vec<u8>)>>,
 ) -> KitsuneResult<()> {
-    for this_agent_info in all_agent_info(evt_sender, space)
-        .await?
-        .into_iter()
-        .filter(|a| agents_within_common_arc.contains(a.agent.as_ref()))
-    {
+    for (agent, arc) in agent_arcs {
         for data in &ops {
             let hash = &data.0;
             let op = &data.1;
 
-            tracing::debug!("Gossiping {} to {}", hash, this_agent_info.agent);
+            tracing::debug!(
+                "Gossiping: {} / {:?} gets {} if {}",
+                agent,
+                arc,
+                hash,
+                arc.contains(hash.get_loc())
+            );
 
-            if this_agent_info.storage_arc.contains(hash.get_loc()) {
+            if arc.contains(hash.get_loc()) {
                 // FIXME: This absolutely should be batched. Sending one op
                 // at a time to the conductor is very slow.
                 // This requires changing the event type to take multiple ops.
                 evt_sender
                     .gossip(
                         space.clone(),
-                        this_agent_info.agent.clone(),
+                        agent.clone(),
                         // FIXME: I don't know which agent this is coming from.
                         // It's wrong to say it's from self.
                         // This is hard to fix. We could just choose any agent
@@ -227,7 +242,7 @@ pub(super) async fn put_ops(
                         // ops into which agent they came from and send across
                         // a hashmap. But this would require iterating through
                         // all the ops multiple times.
-                        this_agent_info.agent.clone(),
+                        agent.clone(),
                         hash.clone(),
                         op.clone(),
                     )

@@ -52,6 +52,7 @@ async fn local_sync_scenario() {
     let mut evt_handler = HandlerBuilder::new().with_agent_persistence(data).build();
 
     let agent_arc_map: HashMap<_, _> = agent_arcs.clone().into_iter().collect();
+    println!("test agent_arc_map: {:#?}", agent_arc_map);
 
     // Set up expectations to ensure that the proper data is gossiped to each agent,
     // while still also allowing flexibility for some extraneous gossip
@@ -60,11 +61,11 @@ async fn local_sync_scenario() {
         for h in hashes {
             // - Ensure that the agents with missing ops get gossiped those ops
             let agent = agent.clone();
-            println!("{} must get hash {}", agent, h);
+            println!("{} MUST get hash {}", agent, h);
             evt_handler
                 .expect_handle_gossip()
                 .times(1)
-                .withf(move |_, to_agent, _, hash, op| *to_agent == agent && **hash == h)
+                .withf(move |_, to_agent, _, hash, _| *to_agent == agent && **hash == h)
                 .returning(move |_, _, _, _, _| unit_ok_fut());
         }
     }
@@ -77,7 +78,12 @@ async fn local_sync_scenario() {
         .times(0..6)
         .withf(move |_, to_agent, _, hash, _| {
             let arc = agent_arc_map.get(to_agent).unwrap();
-            arc.contains(hash.get_loc())
+            let contains = arc.contains(hash.get_loc());
+            println!(
+                "{} / {:?} MAY get hash {} if {}",
+                to_agent, arc, hash, contains
+            );
+            contains
         })
         .returning(move |_, _, _, _, _| unit_ok_fut());
 

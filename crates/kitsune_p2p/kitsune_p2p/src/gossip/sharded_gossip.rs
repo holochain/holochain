@@ -504,10 +504,11 @@ impl ShardedGossipLocal {
 
     async fn local_sync(&self) -> KitsuneResult<()> {
         let local_agents = self.inner.share_mut(|i, _| Ok(i.local_agents.clone()))?;
-        let local_arcs =
+        let agent_arcs =
             store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents).await?;
-        let arcset = local_sync_arcset(local_arcs.as_slice());
-        let agent_arcs: Vec<_> = itertools::zip(local_agents.clone(), local_arcs).collect();
+        println!("local_sync agent_arcs: {:#?}", agent_arcs);
+            let arcs: Vec<_> = agent_arcs.iter().map(|(_, arc)| arc.clone()).collect();
+        let arcset = local_sync_arcset(arcs.as_slice());
         let op_hashes = store::all_op_hashes_within_arcset(
             &self.evt_sender,
             &self.space,
@@ -533,7 +534,7 @@ impl ShardedGossipLocal {
         .map(Arc::new)
         .collect();
 
-        store::put_ops(&self.evt_sender, &self.space, local_agents, ops).await?;
+        store::put_ops(&self.evt_sender, &self.space, agent_arcs, ops).await?;
         Ok(())
     }
 
