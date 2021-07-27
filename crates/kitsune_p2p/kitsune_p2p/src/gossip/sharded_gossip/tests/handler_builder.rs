@@ -90,6 +90,7 @@ impl HandlerBuilder {
                     agents,
                     window_ms,
                     max_ops,
+                    include_limbo: _,
                 } = arg;
 
                 let agent_arcsets: HashMap<_, _> = agents.into_iter().collect();
@@ -310,6 +311,7 @@ async fn test_three_way_sharded_ownership() {
                 &DhtArcSet::Full,
                 full_time_window(),
                 usize::MAX,
+                false,
             )
             .await
             .unwrap()

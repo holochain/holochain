@@ -515,6 +515,7 @@ impl ShardedGossipLocal {
             &arcset,
             full_time_window(),
             usize::MAX,
+            true,
         )
         .await?
         .map(|(ops, _window)| ops)

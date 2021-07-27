@@ -17,6 +17,8 @@ pub struct FetchOpHashesForConstraintsEvt {
     pub window_ms: TimeWindowMs,
     /// Maximum number of ops to return.
     pub max_ops: usize,
+    /// Include ops that are still in limbo (not yet validated or integrated).
+    pub include_limbo: bool,
 }
 
 /// Gather all op-hash data for a list of op-hashes from our implementor.

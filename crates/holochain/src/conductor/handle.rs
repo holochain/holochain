@@ -627,6 +627,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 to_agents,
                 window_ms,
                 max_ops,
+                include_limbo,
                 respond,
                 ..
             } => {
@@ -638,7 +639,11 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                     let cell_id = CellId::new(dna_hash.clone(), agent);
                     let cell = self.cell_by_id(&cell_id).await?;
                     match cell
-                        .handle_fetch_op_hashes_for_constraints(arc_set, window_ms.clone())
+                        .handle_fetch_op_hashes_for_constraints(
+                            arc_set,
+                            window_ms.clone(),
+                            include_limbo,
+                        )
                         .await
                     {
                         Ok(t) => hashes_and_times.extend(t),

@@ -602,12 +602,31 @@ impl Cell {
         &self,
         dht_arc_set: DhtArcSet,
         window_ms: TimeWindowMs,
+        include_limbo: bool,
     ) -> CellResult<Vec<(DhtOpHash, u64)>> {
         let mut results = Vec::new();
 
         // The exclusive window bounds.
         let start = window_ms.start;
         let end = window_ms.end;
+
+        let full = if include_limbo {
+            holochain_sqlite::sql::sql_cell::any::FETCH_OP_HASHES_FULL
+        } else {
+            holochain_sqlite::sql::sql_cell::integrated::FETCH_OP_HASHES_FULL
+        };
+
+        let continuous = if include_limbo {
+            holochain_sqlite::sql::sql_cell::any::FETCH_OP_HASHES_CONTINUOUS
+        } else {
+            holochain_sqlite::sql::sql_cell::integrated::FETCH_OP_HASHES_CONTINUOUS
+        };
+
+        let wrapped = if include_limbo {
+            holochain_sqlite::sql::sql_cell::any::FETCH_OP_HASHES_WRAPPED
+        } else {
+            holochain_sqlite::sql::sql_cell::integrated::FETCH_OP_HASHES_WRAPPED
+        };
 
         // For each interval in the set, fetch the hashes and timestamps.
         for interval in dht_arc_set.intervals() {
@@ -616,7 +635,7 @@ impl Cell {
                 .async_reader(move |txn| {
                     DatabaseResult::Ok(match interval {
                         ArcInterval::Full => txn
-                            .prepare_cached(holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_FULL)?
+                            .prepare_cached(full)?
                             .query_map(
                                 named_params! {
                                     ":from": start,
@@ -627,9 +646,9 @@ impl Cell {
                             .collect::<rusqlite::Result<Vec<_>>>()?,
                         ArcInterval::Bounded(start_loc, end_loc) => {
                             let sql = if start_loc <= end_loc {
-                                holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_CONTINUOUS
+                                continuous
                             } else {
-                                holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_WRAPPED
+                                wrapped
                             };
                             txn.prepare_cached(sql)?
                                 .query_map(

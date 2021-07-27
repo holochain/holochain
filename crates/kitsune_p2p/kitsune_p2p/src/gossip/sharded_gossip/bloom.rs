@@ -73,6 +73,7 @@ impl ShardedGossipLocal {
                 common_arc_set,
                 search_time_window.clone(),
                 Self::UPPER_HASHES_BOUND,
+                true,
             )
             .await?;
 
@@ -143,6 +144,7 @@ impl ShardedGossipLocal {
             &common_arc_set,
             time,
             max_ops,
+            false,
         )
         .await?
         {

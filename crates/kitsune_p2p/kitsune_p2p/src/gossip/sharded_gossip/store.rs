@@ -119,6 +119,7 @@ pub(super) async fn all_op_hashes_within_arcset(
     common_arc_set: &DhtArcSet,
     window_ms: TimeWindowMs,
     max_ops: usize,
+    include_limbo: bool,
 ) -> KitsuneResult<Option<(Vec<Arc<KitsuneOpHash>>, Range<u64>)>> {
     let agents: Vec<_> = agents
         .into_iter()
@@ -135,6 +136,7 @@ pub(super) async fn all_op_hashes_within_arcset(
             agents,
             window_ms,
             max_ops,
+            include_limbo,
         })
         .await
         .map_err(KitsuneError::other)?)

@@ -3490,7 +3490,7 @@ dependencies = [
 [[package]]
 name = "lair_keystore_api"
 version = "0.0.1-alpha.13"
-source = "git+https://github.com/holochain/lair.git?branch=arbitrary#aa7a2931df9b2f9362cc4b2ebcd6b07bc10d6865"
+source = "git+https://github.com/holochain/lair.git#221c080e87a51f3a63e5ce91593565f27aa91fff"
 dependencies = [
  "arbitrary",
  "blake2b_simd",

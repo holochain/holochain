@@ -51,6 +51,7 @@ impl Inner {
                     agents: vec![(agent.clone(), ArcInterval::Full.into())],
                     window_ms: u64::MIN..u64::MAX,
                     max_ops: usize::MAX,
+                    include_limbo: false,
                 })
                 .await
             {

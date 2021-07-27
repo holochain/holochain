@@ -101,6 +101,7 @@ async fn local_sync_scenario() {
             &DhtArcSet::Full,
             full_time_window(),
             usize::MAX,
+            false,
         )
         .await
         .unwrap()
