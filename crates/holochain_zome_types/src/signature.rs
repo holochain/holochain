@@ -57,6 +57,15 @@ impl Sign {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Signature(pub [u8; SIGNATURE_BYTES]);
 
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for Signature {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let mut buf = [0; SIGNATURE_BYTES];
+        u.fill_buffer(&mut buf)?;
+        Ok(Signature(buf))
+    }
+}
+
 // This is more for convenience/convention that being worried
 // about things like constant time equality.
 // Signature verification should always defer to the host.

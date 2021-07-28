@@ -56,7 +56,7 @@ pub struct PreflightBytes(#[serde(with = "serde_bytes")] Vec<u8>);
 
 /// Agents can have a role specific to each countersigning session.
 /// The role is app defined and opaque to the subconscious.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Role(u8);
 
@@ -291,6 +291,14 @@ pub struct UpdateBase {
     original_entry_address: EntryHash,
     entry_type: EntryType,
     entry_hash: EntryHash,
+}
+
+/// All the data required for a countersigning session.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+pub struct CounterSigningSessionData {
+    preflight_request: PreflightRequest,
+    responses: Vec<CounterSigningAgentState>,
 }
 
 impl Create {

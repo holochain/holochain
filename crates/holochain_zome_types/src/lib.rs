@@ -192,18 +192,29 @@ macro_rules! secure_primitive {
 
         impl Eq for $t {}
 
+        #[cfg(not(feature = "subtle-encoding"))]
         /// The only meaningful debug information for a cryptograhpic secret is the literal bytes.
         /// Also, encodings like base64 are not constant time so debugging could open some weird
         /// side channel issue trying to be 'human friendly'.
         /// It seems better to never try to encode secrets.
         ///
+        /// Note that when using this crate with feature "subtle-encoding", a hex
+        /// representation will be used.
+        ///
         /// @todo maybe we want something like **HIDDEN** by default and putting the actual bytes
         ///       behind a feature flag?
-        ///
-        /// See https://docs.rs/subtle-encoding/0.5.1/subtle_encoding/
         impl std::fmt::Debug for $t {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 std::fmt::Debug::fmt(&self.0.to_vec(), f)
+            }
+        }
+
+        #[cfg(feature = "subtle-encoding")]
+        impl std::fmt::Debug for $t {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let str = String::from_utf8(subtle_encoding::hex::encode(self.0.to_vec()))
+                    .unwrap_or_else(|_| "<unparseable signature>".into());
+                f.write_str(&str)
             }
         }
 
@@ -271,3 +282,14 @@ macro_rules! impl_to_sql_via_display {
         }
     };
 }
+
+/// 10MB of entropy free for the taking.
+/// Useful for initializing arbitrary::Unstructured data
+#[cfg(any(test, feature = "test_utils"))]
+pub static NOISE: once_cell::sync::Lazy<Vec<u8>> = once_cell::sync::Lazy::new(|| {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    std::iter::repeat_with(|| rng.gen())
+        .take(10_000_000)
+        .collect()
+});
