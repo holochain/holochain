@@ -20,7 +20,7 @@ impl ShardedGossipLocal {
                     // Check them against the bloom
                     !remote_bloom.check(&Arc::new(MetaOpKey::Agent(
                         info.agent.clone(),
-                        info.signed_at_ms.clone(),
+                        info.signed_at_ms,
                     )))
                 })
                 .map(Arc::new)

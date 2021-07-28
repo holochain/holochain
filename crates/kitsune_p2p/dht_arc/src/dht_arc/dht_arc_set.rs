@@ -123,7 +123,7 @@ impl DhtArcSet {
     }
 
     pub fn contains(&self, t: T) -> bool {
-        self.overlap(&DhtArcSet::from(vec![(t.clone(), t)]))
+        self.overlap(&DhtArcSet::from(vec![(t, t)]))
     }
 
     /// Cheap check if the two sets have a non-null intersection
@@ -170,7 +170,7 @@ impl From<ArcInterval> for DhtArcSet {
 
 impl From<&[ArcInterval]> for DhtArcSet {
     fn from(arcs: &[ArcInterval]) -> Self {
-        arcs.into_iter()
+        arcs.iter()
             .map(Self::from)
             .fold(Self::new_empty(), |a, b| a.union(&b))
     }

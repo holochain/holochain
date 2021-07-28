@@ -529,11 +529,19 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             }
             QueryAgentInfoSigned {
                 kitsune_space,
+                agents,
                 respond,
                 ..
             } => {
                 let env = { self.p2p_env(space) };
                 let res = list_all_agent_info(env, kitsune_space)
+                    .map(|infos| match agents {
+                        Some(agents) => infos
+                            .into_iter()
+                            .filter(|info| agents.contains(&info.agent))
+                            .collect(),
+                        None => infos,
+                    })
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }

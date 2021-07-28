@@ -57,7 +57,7 @@ pub(super) async fn query_agent_info(
     Ok(evt_sender
         .query_agent_info_signed(QueryAgentInfoSignedEvt {
             space: space.clone(),
-            agents: Some(agents.into_iter().cloned().collect()),
+            agents: Some(agents.clone()),
         })
         .await
         .map_err(KitsuneError::other)?)
@@ -135,7 +135,7 @@ pub(super) async fn all_op_hashes_within_arcset(
     include_limbo: bool,
 ) -> KitsuneResult<Option<(Vec<Arc<KitsuneOpHash>>, Range<u64>)>> {
     let agents: Vec<_> = agents
-        .into_iter()
+        .iter()
         .map(|(a, i)| {
             // Intersect this agent's arc with the arcset to find the minimal
             // arcset relevant to this agent

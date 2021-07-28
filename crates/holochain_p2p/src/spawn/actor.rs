@@ -18,6 +18,7 @@ use ghost_actor::dependencies::tracing_futures::Instrument;
 use holochain_zome_types::zome::FunctionName;
 use kitsune_p2p::actor::KitsuneP2pSender;
 use kitsune_p2p::agent_store::AgentInfoSigned;
+use std::collections::HashSet;
 use std::future::Future;
 use std::time::SystemTime;
 
@@ -109,7 +110,7 @@ impl WrapEvtSender {
     fn query_agent_info_signed(
         &self,
         dna_hash: DnaHash,
-        agents: Option<Vec<AgentPubKey>>,
+        agents: Option<HashSet<Arc<kitsune_p2p::KitsuneAgent>>>,
         kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     ) -> impl Future<Output = HolochainP2pResult<Vec<AgentInfoSigned>>> + 'static + Send {
         timing_trace!(
@@ -622,11 +623,10 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<Vec<AgentInfoSigned>> {
         let kitsune_p2p::event::QueryAgentInfoSignedEvt { space, agents } = input;
         let h_space = DnaHash::from_kitsune(&space);
-        let h_agents = agents.map(|agents| agents.iter().map(AgentPubKey::from_kitsune).collect());
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
             Ok(evt_sender
-                .query_agent_info_signed(h_space, h_agents, space)
+                .query_agent_info_signed(h_space, agents, space)
                 .await?)
         }
         .boxed()

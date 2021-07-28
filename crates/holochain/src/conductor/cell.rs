@@ -607,8 +607,8 @@ impl Cell {
         let mut results = Vec::new();
 
         // The exclusive window bounds.
-        let start = window_ms.start;
-        let end = window_ms.end;
+        let start = clamp64(window_ms.start);
+        let end = clamp64(window_ms.end);
 
         let full = if include_limbo {
             holochain_sqlite::sql::sql_cell::any::FETCH_OP_HASHES_FULL

@@ -270,7 +270,8 @@ struct P2pRecord {
     storage_end_loc: Option<u32>,
 }
 
-fn clamp64(u: u64) -> i64 {
+/// Clamp a u64 to the range of a i64.
+pub fn clamp64(u: u64) -> i64 {
     if u > i64::MAX as u64 {
         i64::MAX
     } else {

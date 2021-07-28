@@ -2,7 +2,7 @@
 
 use crate::types::agent_store::AgentInfoSigned;
 use kitsune_p2p_types::dht_arc::DhtArcSet;
-use std::{sync::Arc, time::SystemTime};
+use std::{collections::HashSet, sync::Arc, time::SystemTime};
 
 /// Gather a list of op-hashes from our implementor that meet criteria.
 /// Also get the start and end times for ops within a time window
@@ -70,7 +70,7 @@ pub struct QueryAgentInfoSignedEvt {
     /// The "space" context.
     pub space: Arc<super::KitsuneSpace>,
     /// The optional list of agents to filter by.
-    pub agents: Option<Vec<Arc<super::KitsuneAgent>>>,
+    pub agents: Option<HashSet<Arc<super::KitsuneAgent>>>,
 }
 
 /// Get agent info which satisfies a query.

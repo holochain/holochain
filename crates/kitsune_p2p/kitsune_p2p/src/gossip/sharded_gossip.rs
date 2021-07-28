@@ -404,13 +404,14 @@ impl ShardedGossipLocal {
 
     async fn decrement_ops_blooms(&self, state_id: &StateKey) -> KitsuneResult<Option<RoundState>> {
         self.inner.share_mut(|i, _| {
+            let update_state = |state: &mut RoundState| {
+                let num_ops_blooms = state.num_sent_ops_blooms.saturating_sub(1);
+                state.num_sent_ops_blooms = num_ops_blooms;
+                state.num_sent_ops_blooms == 0 && state.received_all_incoming_ops_blooms
+            };
             if i.round_map
                 .get_mut(state_id)
-                .map(|state| {
-                    let num_ops_blooms = state.num_sent_ops_blooms.saturating_sub(1);
-                    state.num_sent_ops_blooms = num_ops_blooms;
-                    state.num_sent_ops_blooms == 0 && state.received_all_incoming_ops_blooms
-                })
+                .map(update_state)
                 .unwrap_or(true)
             {
                 Ok(i.remove_state(state_id))
@@ -508,7 +509,6 @@ impl ShardedGossipLocal {
         let local_agents = self.inner.share_mut(|i, _| Ok(i.local_agents.clone()))?;
         let agent_arcs =
             store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents).await?;
-        println!("local_sync agent_arcs: {:#?}", agent_arcs);
         let arcs: Vec<_> = agent_arcs.iter().map(|(_, arc)| arc.clone()).collect();
         let arcset = local_sync_arcset(arcs.as_slice());
         let op_hashes = store::all_op_hashes_within_arcset(
