@@ -847,7 +847,7 @@ pub mod test {
     #[tokio::test(flavor = "multi_thread")]
     pub async fn test_check_countersigning_preflight_response_signature() {
         let keystore = test_keystore();
-        let mut u = arbitrary::Unstructured::new(&[0]);
+        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
         let mut preflight_response = PreflightResponse::arbitrary(&mut u).unwrap();
         assert_matches!(
             check_countersigning_preflight_response_signature(&preflight_response).await,
@@ -880,7 +880,7 @@ pub mod test {
 
     #[test]
     pub fn test_check_countersigning_session_times() {
-        let mut u = arbitrary::Unstructured::new(&[0]);
+        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
         let mut session_times = CounterSigningSessionTimes::arbitrary(&mut u).unwrap();
 
         // Zero start and end won't pass.
@@ -933,7 +933,7 @@ pub mod test {
 
     #[test]
     pub fn test_check_countersigning_preflight_request_enzyme_index() {
-        let mut u = arbitrary::Unstructured::new(&[0]);
+        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
         let mut preflight_request = PreflightRequest::arbitrary(&mut u).unwrap();
 
         // None is always a pass.
@@ -966,7 +966,7 @@ pub mod test {
 
     #[test]
     pub fn test_check_countersigning_preflight_request_agents_len() {
-        let mut u = arbitrary::Unstructured::new(&[0]);
+        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
         let mut preflight_request = PreflightRequest::arbitrary(&mut u).unwrap();
 
         // Empty is a fail.
@@ -1000,7 +1000,7 @@ pub mod test {
 
     #[test]
     pub fn test_check_countersigning_preflight_request_agents_dupes() {
-        let mut u = arbitrary::Unstructured::new(&[0]);
+        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
         let mut preflight_request = PreflightRequest::arbitrary(&mut u).unwrap();
 
         let alice = fixt!(AgentPubKey, Predictable);
@@ -1035,7 +1035,7 @@ pub mod test {
 
     #[test]
     pub fn test_check_countersigning_session_data_responses_indexes() {
-        let mut u = arbitrary::Unstructured::new(&[0]);
+        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
         let mut session_data = CounterSigningSessionData::arbitrary(&mut u).unwrap();
 
         let alice = fixt!(AgentPubKey, Predictable);
