@@ -157,7 +157,7 @@ pub trait CellConductorReadHandleT: Send + Sync {
     async fn call_zome(
         &self,
         call: ZomeCall,
-        workspace_lock: &HostFnWorkspace,
+        workspace_lock: HostFnWorkspace,
     ) -> ConductorApiResult<ZomeCallResult>;
 
     /// Get a zome from this cell's Dna
@@ -173,11 +173,11 @@ impl CellConductorReadHandleT for CellConductorApi {
     async fn call_zome(
         &self,
         call: ZomeCall,
-        workspace_lock: &HostFnWorkspace,
+        workspace_lock: HostFnWorkspace,
     ) -> ConductorApiResult<ZomeCallResult> {
         if self.cell_id == call.cell_id {
             self.conductor_handle
-                .call_zome_with_workspace(call, workspace_lock.clone())
+                .call_zome_with_workspace(call, workspace_lock)
                 .await
         } else {
             self.conductor_handle.call_zome(call).await

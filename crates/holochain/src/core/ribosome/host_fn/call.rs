@@ -5,45 +5,50 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
+use futures::future::join_all;
 
 pub fn call(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    call: Call,
-) -> Result<ZomeCallResponse, WasmError> {
+    inputs: Vec<Call>,
+) -> Result<Vec<ZomeCallResponse>, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ write_workspace: Permission::Allow, .. } => {
-    let host_context = call_context.host_context();
-    let conductor_handle = host_context.call_zome_handle();
-    let workspace = host_context.workspace();
-    // Get the conductor handle
-
-            // Get the cell id if it's not passed in
-            let cell_id = call
-                .to_cell
-                .unwrap_or_else(|| conductor_handle.cell_id().clone());
-
-            let zome_name = call.zome_name.clone();
-
-            // Create the invocation for this call
-            let invocation = ZomeCall {
-                cell_id,
-                zome_name,
-                cap: call.cap,
-                fn_name: call.fn_name,
-                payload: call.payload,
-                provenance: call.provenance,
-            };
-
-            // Make the call using this workspace
-            tokio_helper::block_forever_on(async move {
-                conductor_handle
-                    .call_zome(invocation, workspace)
-                    .await
-                    .map_err(Box::new)
-            })
-            .map_err(|conductor_api_error| WasmError::Host(conductor_api_error.to_string()))?
-            .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))
+            let results: Vec<Result<Result<ZomeCallResponse, _>, _>> = tokio_helper::block_forever_on(async move {
+                join_all(inputs.into_iter().map(|input| {
+                    async {
+                        let Call {
+                            to_cell,
+                            zome_name,
+                            fn_name,
+                            cap,
+                            payload,
+                            provenance,
+                        } = input;
+                        let cell_id = to_cell.unwrap_or_else(|| call_context.host_context().call_zome_handle().cell_id().clone());
+                        let invocation = ZomeCall {
+                            cell_id,
+                            zome_name,
+                            fn_name,
+                            payload,
+                            cap,
+                            provenance,
+                        };
+                        call_context.host_context().call_zome_handle().call_zome(
+                            invocation,
+                            call_context.host_context().workspace().clone()
+                        ).await
+                    }
+                })).await
+            });
+            let results: Result<Vec<_>, _> = results.into_iter().map(|result| match result {
+                Ok(v) => match v {
+                    Ok(v) => Ok(v),
+                    Err(ribosome_error) => Err(WasmError::Host(ribosome_error.to_string())),
+                },
+                Err(conductor_api_error) => Err(WasmError::Host(conductor_api_error.to_string())),
+            }).collect();
+            Ok(results?)
         },
         _ => unreachable!(),
     }

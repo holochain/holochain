@@ -55,6 +55,15 @@ fn get_entry(_: ()) -> ExternResult<Option<Element>> {
 }
 
 #[hdk_extern]
+fn get_entry_twice(_: ()) -> ExternResult<Vec<Option<Element>>> {
+    HDK.with(|h| {
+        h.borrow().get(vec![
+            GetInput::new(hash_entry(&post())?.into(), GetOptions::content()); 2
+        ])
+    })
+}
+
+#[hdk_extern]
 fn get_post(hash: HeaderHash) -> ExternResult<Option<Element>> {
     get(
         hash,
