@@ -13,6 +13,7 @@ pub async fn spawn_handler<H: KitsuneP2pEventHandler + GhostControlHandler>(
     (tx, tokio::task::spawn(driver))
 }
 
+// TODO: integrate with `HandlerBuilder`
 async fn standard_responses(
     agents_with_arcs: Vec<(Arc<KitsuneAgent>, ArcInterval)>,
     with_data: bool,

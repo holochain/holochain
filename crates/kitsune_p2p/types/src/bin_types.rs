@@ -61,9 +61,10 @@ macro_rules! make_kitsune_bin_type {
                         debug_assert_eq!(bytes.len(), 32);
                         // FIXME: no way to compute location bytes at this time,
                         // so simply pad with 0's for now
-                        todo!("calculate location bytes");
-                        // bytes.append(&mut kitsune_location_bytes(&bytes));
                         bytes.append(&mut [0; 4].to_vec());
+
+                        todo!("actually calculate location bytes");
+                        // bytes.append(&mut kitsune_location_bytes(&bytes));
                     }
                     debug_assert_eq!(bytes.len(), 36);
                     Self(bytes)

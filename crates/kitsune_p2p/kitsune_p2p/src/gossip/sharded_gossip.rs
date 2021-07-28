@@ -200,7 +200,9 @@ impl ShardedGossip {
                 );
             }
         }
-        // TODO: Locally sync agents.
+
+        self.gossip.local_sync().await?;
+
         Ok(())
     }
 
@@ -507,7 +509,7 @@ impl ShardedGossipLocal {
         let agent_arcs =
             store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents).await?;
         println!("local_sync agent_arcs: {:#?}", agent_arcs);
-            let arcs: Vec<_> = agent_arcs.iter().map(|(_, arc)| arc.clone()).collect();
+        let arcs: Vec<_> = agent_arcs.iter().map(|(_, arc)| arc.clone()).collect();
         let arcset = local_sync_arcset(arcs.as_slice());
         let op_hashes = store::all_op_hashes_within_arcset(
             &self.evt_sender,

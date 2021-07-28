@@ -1,6 +1,3 @@
-use futures::future;
-use maplit::hashset;
-
 use super::common::*;
 use super::handler_builder::{
     calculate_missing_ops, mock_agent_persistence, HandlerBuilder, OwnershipData,
@@ -44,7 +41,9 @@ async fn local_sync_scenario() {
     let delta_counts = delta.iter().map(|(_, hs)| hs.len()).collect::<Vec<_>>();
 
     let agent_arc_map: HashMap<_, _> = agent_arcs.clone().into_iter().collect();
-    println!("test agent_arc_map: {:#?}", agent_arc_map);
+    for (_, arc) in agent_arcs.iter() {
+        println!("arc: |{}|", arc.to_ascii(64));
+    }
 
     // - The test is set up so each agent is missing 1 op
     assert_eq!(delta_counts, vec![1, 1, 1]);
@@ -58,7 +57,6 @@ async fn local_sync_scenario() {
         for h in hashes {
             // - Ensure that the agents with missing ops get gossiped those ops
             let agent = agent.clone();
-            println!("{} MUST get hash {}", agent, h);
             evt_handler
                 .expect_handle_gossip()
                 .times(1)
@@ -75,12 +73,7 @@ async fn local_sync_scenario() {
         .times(0..6)
         .withf(move |_, to_agent, _, hash, _| {
             let arc = agent_arc_map.get(to_agent).unwrap();
-            let contains = arc.contains(hash.get_loc());
-            println!(
-                "{} / {:?} MAY get hash {} if {}",
-                to_agent, arc, hash, contains
-            );
-            contains
+            arc.contains(hash.get_loc())
         })
         .returning(move |_, _, _, _, _| unit_ok_fut());
 

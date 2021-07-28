@@ -27,6 +27,7 @@ impl HandlerBuilder {
     }
 
     /// Mocks gossip to do nothing
+    #[allow(dead_code, unused_variables)]
     pub fn with_noop_gossip(mut self, agent_data: MockAgentPersistence) -> Self {
         self.0
             .expect_handle_gossip()
@@ -212,10 +213,6 @@ pub fn mock_agent_persistence<'a>(
 
     // sort hashes by location
     hashes.sort_by_key(|h| h.get_loc());
-    println!(
-        "hash locs: {:?}",
-        hashes.iter().map(|h| h.get_loc()).collect::<Vec<_>>()
-    );
 
     // expand the indices provided in the input to actual op hashes and locations,
     // per the gerated ops
@@ -263,11 +260,6 @@ pub fn calculate_missing_ops(
         .map(|(info, hs)| {
             let owned: HashSet<&KitsuneOpHash> = hs.iter().map(|(h, _)| h).collect();
             let (agent, arc) = info.to_agent_arc();
-            println!(
-                "arc: |{}|, total in arc: {}",
-                arc.to_ascii(64),
-                owned.iter().map(|h| arc.contains(h.get_loc())).count()
-            );
             (
                 agent.clone(),
                 all_hashes
@@ -292,8 +284,6 @@ async fn test_three_way_sharded_ownership() {
         .iter()
         .map(|(info, _)| (info.agent.clone(), info.storage_arc.interval()))
         .collect();
-
-    println!("agent arcs: {:?}", agent_arcs);
 
     let hold_counts: Vec<_> = agent_arcs
         .iter()
