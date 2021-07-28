@@ -112,6 +112,7 @@ pub struct KnownCreateLink {
 
 pub struct KnownDeleteLink {
     pub link_add_address: holo_hash::HeaderHash,
+    pub base_address: holo_hash::EntryHash,
 }
 
 impl Iterator for CreateLinkFixturator<KnownCreateLink> {
@@ -131,6 +132,7 @@ impl Iterator for DeleteLinkFixturator<KnownDeleteLink> {
     fn next(&mut self) -> Option<Self::Item> {
         let mut f = fixt!(DeleteLink);
         f.link_add_address = self.0.curve.link_add_address.clone();
+        f.base_address = self.0.curve.base_address.clone();
         Some(f)
     }
 }
@@ -558,7 +560,7 @@ fixturator!(
     };
     curve Entry {
         let et = match get_fixt_curve!() {
-            Entry::App(_) => EntryType::App(AppEntryTypeFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()),
+            Entry::App(_) | Entry::CounterSign(_, _) => EntryType::App(AppEntryTypeFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()),
             Entry::Agent(_) => EntryType::AgentPubKey,
             Entry::CapClaim(_) => EntryType::CapClaim,
             Entry::CapGrant(_) => EntryType::CapGrant,
@@ -594,7 +596,7 @@ fixturator!(
 
     curve Entry {
         let et = match get_fixt_curve!() {
-            Entry::App(_) => EntryType::App(AppEntryTypeFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()),
+            Entry::App(_) | Entry::CounterSign(_, _) => EntryType::App(AppEntryTypeFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()),
             Entry::Agent(_) => EntryType::AgentPubKey,
             Entry::CapClaim(_) => EntryType::CapClaim,
             Entry::CapGrant(_) => EntryType::CapGrant,
@@ -630,5 +632,86 @@ fixturator!(
             Header::Update(_) => Header::Update(fixt!(Update, PublicCurve)),
             other_type => other_type,
         }
+    };
+);
+
+fixturator!(
+    HeaderHashed;
+    constructor fn from_content_sync(Header);
+);
+
+fixturator!(
+    SignedHeaderHashed;
+    constructor fn with_presigned(HeaderHashed, Signature);
+);
+
+fixturator!(
+    Zome;
+    constructor fn new(ZomeName, ZomeDef);
+);
+
+fixturator!(
+    Zomes;
+    curve Empty Vec::new();
+    curve Unpredictable {
+        // @todo implement unpredictable zomes
+        ZomesFixturator::new(Empty).next().unwrap()
+    };
+    curve Predictable {
+        // @todo implement predictable zomes
+        ZomesFixturator::new(Empty).next().unwrap()
+    };
+);
+
+fixturator!(
+    ZomeDef;
+    constructor fn from_hash(WasmHash);
+);
+
+fixturator!(
+    DnaDef;
+    curve Empty DnaDef {
+        name: StringFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap(),
+        uid: StringFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap(),
+        properties: SerializedBytesFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap(),
+        zomes: ZomesFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap(),
+    };
+
+    curve Unpredictable DnaDef {
+        name: StringFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        uid: StringFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        properties: SerializedBytesFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        zomes: ZomesFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+    };
+
+    curve Predictable DnaDef {
+        name: StringFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        uid: StringFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        properties: SerializedBytesFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        zomes: ZomesFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
     };
 );

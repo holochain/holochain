@@ -1,6 +1,7 @@
 //! Module containing the HolochainP2p actor definition.
 #![allow(clippy::too_many_arguments)]
 
+use crate::event::GetRequest;
 use crate::*;
 use holochain_types::activity::AgentActivityResponse;
 
@@ -56,6 +57,10 @@ pub struct GetOptions {
     /// Return all live headers even if there is deletes.
     /// Useful for metadata calls.
     pub all_live_headers_with_metadata: bool,
+
+    /// [Remote]
+    /// The type of data this get request requires.
+    pub request_type: GetRequest,
 }
 
 impl Default for GetOptions {
@@ -67,6 +72,7 @@ impl Default for GetOptions {
             race_timeout_ms: None,
             follow_redirects: true,
             all_live_headers_with_metadata: false,
+            request_type: Default::default(),
         }
     }
 }
@@ -194,7 +200,7 @@ ghost_actor::ghost_chan! {
         /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
         fn join(dna_hash: DnaHash, agent_pub_key: AgentPubKey) -> ();
 
-        /// If a cell is deactivated, we'll need to \"leave\" the network module as well.
+        /// If a cell is disabled, we'll need to \"leave\" the network module as well.
         fn leave(dna_hash: DnaHash, agent_pub_key: AgentPubKey) -> ();
 
         /// Invoke a zome function on a remote node (if you have been granted the capability).
@@ -227,7 +233,7 @@ ghost_actor::ghost_chan! {
             from_agent: AgentPubKey,
             dht_hash: holo_hash::AnyDhtHash,
             options: GetOptions,
-        ) -> Vec<GetElementResponse>;
+        ) -> Vec<WireOps>;
 
         /// Get metadata from the DHT.
         fn get_meta(
@@ -241,9 +247,9 @@ ghost_actor::ghost_chan! {
         fn get_links(
             dna_hash: DnaHash,
             from_agent: AgentPubKey,
-            link_key: WireLinkMetaKey,
+            link_key: WireLinkKey,
             options: GetLinksOptions,
-        ) -> Vec<GetLinksResponse>;
+        ) -> Vec<WireLinkOps>;
 
         /// Get agent activity from the DHT.
         fn get_agent_activity(
@@ -252,7 +258,7 @@ ghost_actor::ghost_chan! {
             agent: AgentPubKey,
             query: ChainQueryFilter,
             options: GetActivityOptions,
-        ) -> Vec<AgentActivityResponse>;
+        ) -> Vec<AgentActivityResponse<HeaderHash>>;
 
         /// Send a validation receipt to a remote node.
         fn send_validation_receipt(dna_hash: DnaHash, to_agent: AgentPubKey, from_agent: AgentPubKey, receipt: SerializedBytes) -> ();

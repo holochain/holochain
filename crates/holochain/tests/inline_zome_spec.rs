@@ -16,7 +16,7 @@ use holochain::{
     core::ribosome::guest_callback::validate::ValidateResult, test_utils::wait_for_integration_1m,
 };
 use holochain::{core::SourceChainError, test_utils::display_agent_infos};
-use holochain_types::{dna::zome::inline_zome::InlineZome, prelude::ZomeDef, signal::Signal};
+use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::element::ElementEntry;
 use tokio_stream::StreamExt;
@@ -92,7 +92,7 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
     // Get two agents
     let (alice, bobbo) = SweetAgents::two(conductor.keystore()).await;
 
-    // Install DNA and install and activate apps in conductor
+    // Install DNA and install and enable apps in conductor
     let apps = conductor
         .setup_app_for_agents("app", &[alice.clone(), bobbo.clone()], &[dna_file])
         .await
@@ -220,8 +220,8 @@ async fn invalid_cell() -> anyhow::Result<()> {
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
     tracing::debug!(dnas = ?conductor.list_dnas().await.unwrap());
-    tracing::debug!(cell_ids = ?conductor.list_cell_ids().await.unwrap());
-    tracing::debug!(apps = ?conductor.list_active_apps().await.unwrap());
+    tracing::debug!(cell_ids = ?conductor.list_cell_ids(None).await.unwrap());
+    tracing::debug!(apps = ?conductor.list_running_apps().await.unwrap());
 
     display_agent_infos(&conductor).await;
 
@@ -241,7 +241,7 @@ async fn get_deleted() -> anyhow::Result<()> {
     // Create a Conductor
     let mut conductor = SweetConductor::from_config(Default::default()).await;
 
-    // Install DNA and install and activate apps in conductor
+    // Install DNA and install and enable apps in conductor
     let alice = conductor
         .setup_app("app", &[dna_file])
         .await

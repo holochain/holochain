@@ -7,8 +7,6 @@ use holochain::test_utils::show_authored;
 use holochain::test_utils::wait_for_integration_1m;
 use holochain::test_utils::wait_for_integration_with_others_10s;
 use holochain::test_utils::WaitOps;
-use holochain_types::dna::zome::inline_zome::InlineZome;
-use holochain_zome_types::element::ElementEntry;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]
 #[serde(transparent)]

@@ -1,12 +1,31 @@
 #![allow(clippy::too_many_arguments)]
 //! Module containing incoming events from the HolochainP2p actor.
 
+use std::time::SystemTime;
+
 use crate::*;
 use holochain_zome_types::signature::Signature;
-use kitsune_p2p::agent_store::AgentInfoSigned;
+use kitsune_p2p::{
+    agent_store::AgentInfoSigned,
+    event::{MetricKind, MetricQuery, MetricQueryAnswer},
+};
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+/// The data required for a get request.
+pub enum GetRequest {
+    /// Get all the integrated data.
+    All,
+    /// Get only the integrated content.
+    Content,
+    /// Get only the metadata.
+    /// If you already have the content this is all you need.
+    Metadata,
+    /// Get the content even if it's still pending.
+    Pending,
+}
 
 /// Get options help control how the get is processed at various levels.
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct GetOptions {
     /// Whether the remote-end should follow redirects or just return the
     /// requested entry.
@@ -14,6 +33,8 @@ pub struct GetOptions {
     /// Return all live headers even if there is deletes.
     /// Useful for metadata calls.
     pub all_live_headers_with_metadata: bool,
+    /// The type of data this get request requires.
+    pub request_type: GetRequest,
 }
 
 impl From<&actor::GetOptions> for GetOptions {
@@ -21,7 +42,14 @@ impl From<&actor::GetOptions> for GetOptions {
         Self {
             follow_redirects: a.follow_redirects,
             all_live_headers_with_metadata: a.all_live_headers_with_metadata,
+            request_type: a.request_type.clone(),
         }
+    }
+}
+
+impl Default for GetRequest {
+    fn default() -> Self {
+        GetRequest::All
     }
 }
 
@@ -57,6 +85,16 @@ pub struct GetActivityOptions {
     pub include_full_headers: bool,
 }
 
+impl Default for GetActivityOptions {
+    fn default() -> Self {
+        Self {
+            include_valid_activity: true,
+            include_rejected_activity: false,
+            include_full_headers: false,
+        }
+    }
+}
+
 impl From<&actor::GetActivityOptions> for GetActivityOptions {
     fn from(a: &actor::GetActivityOptions) -> Self {
         Self {
@@ -79,6 +117,15 @@ ghost_actor::ghost_chan! {
 
         /// We need to get previously stored agent info.
         fn query_agent_info_signed(dna_hash: DnaHash, to_agent: AgentPubKey, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>) -> Vec<AgentInfoSigned>;
+
+        /// query agent info in order of closeness to a basis location.
+        fn query_agent_info_signed_near_basis(dna_hash: DnaHash, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, basis_loc: u32, limit: u32) -> Vec<AgentInfoSigned>;
+
+        /// We need to store some metric data on behalf of kitsune.
+        fn put_metric_datum(dna_hash: DnaHash, to_agent: AgentPubKey, agent: AgentPubKey, metric: MetricKind, timestamp: SystemTime) -> ();
+
+        /// We need to provide some metric data to kitsune.
+        fn query_metrics(dna_hash: DnaHash, to_agent: AgentPubKey, query: MetricQuery) -> MetricQueryAnswer;
 
         /// A remote node is attempting to make a remote call on us.
         fn call_remote(
@@ -116,7 +163,7 @@ ghost_actor::ghost_chan! {
             to_agent: AgentPubKey,
             dht_hash: holo_hash::AnyDhtHash,
             options: GetOptions,
-        ) -> GetElementResponse;
+        ) -> WireOps;
 
         /// A remote node is requesting metadata from us.
         fn get_meta(
@@ -130,9 +177,9 @@ ghost_actor::ghost_chan! {
         fn get_links(
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
-            link_key: WireLinkMetaKey,
+            link_key: WireLinkKey,
             options: GetLinksOptions,
-        ) -> GetLinksResponse;
+        ) -> WireLinkOps;
 
         /// A remote node is requesting agent activity from us.
         fn get_agent_activity(
@@ -141,7 +188,7 @@ ghost_actor::ghost_chan! {
             agent: AgentPubKey,
             query: ChainQueryFilter,
             options: GetActivityOptions,
-        ) -> AgentActivityResponse;
+        ) -> AgentActivityResponse<HeaderHash>;
 
         /// A remote node has sent us a validation receipt.
         fn validation_receipt_received(
@@ -180,7 +227,7 @@ ghost_actor::ghost_chan! {
 
 /// utility macro to make it more ergonomic to access the enum variants
 macro_rules! match_p2p_evt {
-    ($h:ident => |$i:ident| { $($t:tt)* }) => {
+    ($h:ident => |$i:ident| { $($t:tt)* }, { $($t2:tt)* }) => {
         match $h {
             HolochainP2pEvent::CallRemote { $i, .. } => { $($t)* }
             HolochainP2pEvent::Publish { $i, .. } => { $($t)* }
@@ -196,6 +243,9 @@ macro_rules! match_p2p_evt {
             HolochainP2pEvent::PutAgentInfoSigned { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetAgentInfoSigned { $i, .. } => { $($t)* }
             HolochainP2pEvent::QueryAgentInfoSigned { $i, .. } => { $($t)* }
+            HolochainP2pEvent::PutMetricDatum { $i, .. } => { $($t)* }
+            HolochainP2pEvent::QueryMetrics { $i, .. } => { $($t)* }
+            $($t2)*
         }
     };
 }
@@ -203,12 +253,16 @@ macro_rules! match_p2p_evt {
 impl HolochainP2pEvent {
     /// The dna_hash associated with this network p2p event.
     pub fn dna_hash(&self) -> &DnaHash {
-        match_p2p_evt!(self => |dna_hash| { dna_hash })
+        match_p2p_evt!(self => |dna_hash| { dna_hash }, {
+            HolochainP2pEvent::QueryAgentInfoSignedNearBasis { dna_hash, .. } => { dna_hash }
+        })
     }
 
     /// The agent_pub_key associated with this network p2p event.
     pub fn target_agent_as_ref(&self) -> &AgentPubKey {
-        match_p2p_evt!(self => |to_agent| { to_agent })
+        match_p2p_evt!(self => |to_agent| { to_agent }, {
+            HolochainP2pEvent::QueryAgentInfoSignedNearBasis { .. } => { unimplemented!() }
+        })
     }
 }
 

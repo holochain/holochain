@@ -3,14 +3,14 @@
 
 use super::{SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetConductorHandle};
 use crate::conductor::{
-    config::ConductorConfig, error::ConductorResult, handle::ConductorHandle, Conductor,
-    ConductorBuilder,
+    api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult,
+    handle::ConductorHandle, CellError, Conductor, ConductorBuilder,
 };
 use hdk::prelude::*;
 use holo_hash::DnaHash;
 use holochain_conductor_api::{AdminInterfaceConfig, InterfaceDriver};
 use holochain_keystore::KeystoreSender;
-use holochain_lmdb::test_utils::{test_environments, TestEnvironments};
+use holochain_state::test_utils::{test_environments, TestEnvs};
 use holochain_types::prelude::*;
 use holochain_websocket::*;
 use kitsune_p2p::KitsuneP2pConfig;
@@ -28,7 +28,7 @@ pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Syn
 #[derive(derive_more::From)]
 pub struct SweetConductor {
     handle: Option<SweetConductorHandle>,
-    envs: TestEnvironments,
+    envs: TestEnvs,
     config: ConductorConfig,
     dnas: Vec<DnaFile>,
     signal_stream: Option<SignalStream>,
@@ -59,7 +59,7 @@ impl SweetConductor {
     /// "sweet-interface" so that signals may be emitted
     pub async fn new(
         handle: ConductorHandle,
-        envs: TestEnvironments,
+        envs: TestEnvs,
         config: ConductorConfig,
     ) -> SweetConductor {
         // Automatically add a test app interface
@@ -80,10 +80,10 @@ impl SweetConductor {
         }
     }
 
-    /// Create a SweetConductor with a new set of TestEnvironments from the given config
+    /// Create a SweetConductor with a new set of TestEnvs from the given config
     pub async fn from_config(config: ConductorConfig) -> SweetConductor {
         let envs = test_environments();
-        let handle = Self::handle_from_existing(&envs, &config).await;
+        let handle = Self::handle_from_existing(&envs, &config, &[]).await;
         Self::new(handle, envs, config).await
     }
 
@@ -93,29 +93,30 @@ impl SweetConductor {
     ) -> SweetConductor {
         let envs = test_environments();
         let config = builder.config.clone();
-        let handle = builder.test(&envs).await.unwrap();
+        let handle = builder.test(&envs, &[]).await.unwrap();
         Self::new(handle, envs, config).await
     }
 
     /// Create a handle from an existing environment and config
     pub async fn handle_from_existing(
-        envs: &TestEnvironments,
+        envs: &TestEnvs,
         config: &ConductorConfig,
+        extra_dnas: &[DnaFile],
     ) -> ConductorHandle {
         Conductor::builder()
             .config(config.clone())
-            .test(envs)
+            .test(envs, extra_dnas)
             .await
             .unwrap()
     }
 
-    /// Create a SweetConductor with a new set of TestEnvironments from the given config
+    /// Create a SweetConductor with a new set of TestEnvs from the given config
     pub async fn from_standard_config() -> SweetConductor {
         Self::from_config(standard_config()).await
     }
 
-    /// Access the TestEnvironments for this conductor
-    pub fn envs(&self) -> &TestEnvironments {
+    /// Access the TestEnvs for this conductor
+    pub fn envs(&self) -> &TestEnvs {
         &self.envs
     }
 
@@ -124,10 +125,41 @@ impl SweetConductor {
         self.envs.keystore()
     }
 
+    /// Convenience function that uses the internal handle to enable an app
+    pub async fn enable_app(
+        &self,
+        id: &InstalledAppId,
+    ) -> ConductorResult<(InstalledApp, Vec<(CellId, CellError)>)> {
+        self.handle().0.enable_app(id).await
+    }
+
+    /// Convenience function that uses the internal handle to disable an app
+    pub async fn disable_app(
+        &self,
+        id: &InstalledAppId,
+        reason: DisabledAppReason,
+    ) -> ConductorResult<InstalledApp> {
+        self.handle().0.disable_app(id, reason).await
+    }
+
+    /// Convenience function that uses the internal handle to start an app
+    pub async fn start_app(&self, id: &InstalledAppId) -> ConductorResult<InstalledApp> {
+        self.handle().0.start_app(id).await
+    }
+
+    /// Convenience function that uses the internal handle to pause an app
+    pub async fn pause_app(
+        &self,
+        id: &InstalledAppId,
+        reason: PausedAppReason,
+    ) -> ConductorResult<InstalledApp> {
+        self.handle().0.pause_app(id, reason).await
+    }
+
     /// Install the dna first.
     /// This allows a big speed up when
     /// installing many apps with the same dna
-    async fn setup_app_1_register_dna(&mut self, dna_files: &[DnaFile]) -> ConductorResult<()> {
+    async fn setup_app_1_register_dna(&mut self, dna_files: &[DnaFile]) -> ConductorApiResult<()> {
         for dna_file in dna_files {
             self.register_dna(dna_file.clone()).await?;
             self.dnas.push(dna_file.clone());
@@ -135,15 +167,15 @@ impl SweetConductor {
         Ok(())
     }
 
-    /// Install the app and activate it
+    /// Install the app and enable it
     // TODO: make this take a more flexible config for specifying things like
     // membrane proofs
-    async fn setup_app_2_install_and_activate(
+    async fn setup_app_2_install_and_enable(
         &mut self,
         installed_app_id: &str,
         agent: AgentPubKey,
         dna_files: &[DnaFile],
-    ) -> ConductorResult<()> {
+    ) -> ConductorApiResult<()> {
         let installed_app_id = installed_app_id.to_string();
 
         let installed_cells = dna_files
@@ -160,7 +192,11 @@ impl SweetConductor {
             .install_app(installed_app_id.clone(), installed_cells)
             .await?;
 
-        self.activate_app(installed_app_id).await?;
+        self.handle()
+            .0
+            .clone()
+            .enable_app(&installed_app_id)
+            .await?;
         Ok(())
     }
 
@@ -174,11 +210,11 @@ impl SweetConductor {
         installed_app_id: &str,
         agent: AgentPubKey,
         dna_hashes: impl Iterator<Item = DnaHash>,
-    ) -> ConductorResult<SweetApp> {
+    ) -> ConductorApiResult<SweetApp> {
         let mut sweet_cells = Vec::new();
         for dna_hash in dna_hashes {
             let cell_id = CellId::new(dna_hash, agent.clone());
-            let cell_env = self.handle().0.get_cell_env(&cell_id).await.unwrap();
+            let cell_env = self.handle().0.get_cell_env(&cell_id).await?;
             let cell = SweetCell { cell_id, cell_env };
             sweet_cells.push(cell);
         }
@@ -193,12 +229,16 @@ impl SweetConductor {
         installed_app_id: &str,
         agent: AgentPubKey,
         dna_files: &[DnaFile],
-    ) -> ConductorResult<SweetApp> {
+    ) -> ConductorApiResult<SweetApp> {
         self.setup_app_1_register_dna(dna_files).await?;
-        self.setup_app_2_install_and_activate(installed_app_id, agent.clone(), dna_files)
+        self.setup_app_2_install_and_enable(installed_app_id, agent.clone(), dna_files)
             .await?;
 
-        self.handle().0.clone().setup_cells().await?;
+        self.handle()
+            .0
+            .clone()
+            .reconcile_cell_status_with_app_status()
+            .await?;
 
         let dna_files = dna_files.iter().map(|d| d.dna_hash().clone());
         self.setup_app_3_create_sweet_app(installed_app_id, agent, dna_files)
@@ -212,7 +252,7 @@ impl SweetConductor {
         &mut self,
         installed_app_id: &str,
         dna_files: &[DnaFile],
-    ) -> ConductorResult<SweetApp> {
+    ) -> ConductorApiResult<SweetApp> {
         let agent = SweetAgents::one(self.keystore()).await;
         self.setup_app_for_agent(installed_app_id, agent, dna_files)
             .await
@@ -232,15 +272,19 @@ impl SweetConductor {
         app_id_prefix: &str,
         agents: &[AgentPubKey],
         dna_files: &[DnaFile],
-    ) -> ConductorResult<SweetAppBatch> {
+    ) -> ConductorApiResult<SweetAppBatch> {
         self.setup_app_1_register_dna(dna_files).await?;
         for agent in agents.iter() {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
-            self.setup_app_2_install_and_activate(&installed_app_id, agent.clone(), dna_files)
+            self.setup_app_2_install_and_enable(&installed_app_id, agent.clone(), dna_files)
                 .await?;
         }
 
-        self.handle().0.clone().setup_cells().await?;
+        self.handle()
+            .0
+            .clone()
+            .reconcile_cell_status_with_app_status()
+            .await?;
 
         let mut apps = Vec::new();
         for agent in agents {
@@ -297,16 +341,8 @@ impl SweetConductor {
     pub async fn startup(&mut self) {
         if self.handle.is_none() {
             self.handle = Some(SweetConductorHandle(
-                Self::handle_from_existing(&self.envs, &self.config).await,
+                Self::handle_from_existing(&self.envs, &self.config, self.dnas.as_slice()).await,
             ));
-
-            // MD: this feels wrong, why should we have to reinstall DNAs on restart?
-
-            for dna_file in self.dnas.iter() {
-                self.register_dna(dna_file.clone())
-                    .await
-                    .expect("Could not install DNA");
-            }
         } else {
             panic!("Attempted to start conductor which was already started");
         }

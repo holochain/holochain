@@ -125,14 +125,14 @@ pub struct InstalledAppInfo {
     pub installed_app_id: InstalledAppId,
     /// Info about the Cells installed in this app
     pub cell_data: Vec<InstalledCell>,
-    /// Is this app currently active?
-    pub status: InstalledAppStatus,
+    /// The app's current status, in an API-friendly format
+    pub status: InstalledAppInfoStatus,
 }
 
 impl InstalledAppInfo {
     pub fn from_installed_app(app: &InstalledApp) -> Self {
-        let installed_app_id = app.installed_app_id().clone();
-        let status = app.status();
+        let installed_app_id = app.id().clone();
+        let status = app.status().clone().into();
         let cell_data = app
             .provisioned_cells()
             .map(|(nick, id)| InstalledCell::new(id.clone(), nick.clone()))
@@ -149,4 +149,61 @@ impl From<&InstalledApp> for InstalledAppInfo {
     fn from(app: &InstalledApp) -> Self {
         Self::from_installed_app(app)
     }
+}
+
+/// A flat, slightly more API-friendly representation of [`InstalledAppStatus`]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[serde(rename_all = "snake_case")]
+pub enum InstalledAppInfoStatus {
+    Paused { reason: PausedAppReason },
+    Disabled { reason: DisabledAppReason },
+    Running,
+}
+
+impl From<AppStatus> for InstalledAppInfoStatus {
+    fn from(i: AppStatus) -> Self {
+        match i {
+            AppStatus::Running => InstalledAppInfoStatus::Running,
+            AppStatus::Disabled(reason) => InstalledAppInfoStatus::Disabled { reason },
+            AppStatus::Paused(reason) => InstalledAppInfoStatus::Paused { reason },
+        }
+    }
+}
+
+impl From<InstalledAppInfoStatus> for AppStatus {
+    fn from(i: InstalledAppInfoStatus) -> Self {
+        match i {
+            InstalledAppInfoStatus::Running => AppStatus::Running,
+            InstalledAppInfoStatus::Disabled { reason } => AppStatus::Disabled(reason),
+            InstalledAppInfoStatus::Paused { reason } => AppStatus::Paused(reason),
+        }
+    }
+}
+
+#[test]
+fn status_serialization() {
+    use kitsune_p2p::dependencies::kitsune_p2p_types::dependencies::serde_json;
+
+    let status: InstalledAppInfoStatus =
+        AppStatus::Disabled(DisabledAppReason::Error("because".into())).into();
+
+    assert_eq!(
+        serde_json::to_string(&status).unwrap(),
+        "{\"disabled\":{\"reason\":{\"error\":\"because\"}}}"
+    );
+
+    let status: InstalledAppInfoStatus =
+        AppStatus::Paused(PausedAppReason::Error("because".into())).into();
+
+    assert_eq!(
+        serde_json::to_string(&status).unwrap(),
+        "{\"paused\":{\"reason\":{\"error\":\"because\"}}}"
+    );
+
+    let status: InstalledAppInfoStatus = AppStatus::Disabled(DisabledAppReason::User).into();
+
+    assert_eq!(
+        serde_json::to_string(&status).unwrap(),
+        "{\"disabled\":{\"reason\":\"user\"}}"
+    );
 }

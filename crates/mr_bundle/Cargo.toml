@@ -1,15 +1,19 @@
 [package]
 name = "mr_bundle"
-version = "0.0.1"
+version = "0.0.2-dev.0"
 authors = ["Michael Dougherty <maackle.d@gmail.com>"]
 edition = "2018"
+description = "Implements the un-/packing of bundles that either embed or reference a set of resources"
+license = "Apache-2.0"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://github.com/holochain/holochain"
 
 [dependencies]
 bytes = "1.0"
 derive_more = "0.99"
 either = "1.5"
 flate2 = "1.0"
-ffs = { path = "../ffs", features = ["tokio"] }
+holochain_util = { path = "../holochain_util", version = "0.0.2-dev.0"}
 futures = "0.3"
 reqwest = "0.11"
 rmp-serde = "0.15"
@@ -33,5 +37,5 @@ tempdir = "0.3"
 
 packing = [
   "serde_yaml",
-  "ffs/tokio",
+  "holochain_util/tokio",
 ]

@@ -28,7 +28,7 @@ use std::path::PathBuf;
 /// All the config information for the conductor
 #[derive(Clone, Deserialize, Serialize, Default, Debug, PartialEq)]
 pub struct ConductorConfig {
-    /// The path to the LMDB environment for this conductor.
+    /// The path to the database for this conductor.
     /// If omitted, chooses a default path.
     pub environment_path: EnvironmentRootPath,
 
@@ -168,8 +168,6 @@ pub mod tests {
             proxy_accept_config: reject_all
       tuning_params:
         gossip_loop_iteration_delay_ms: 42
-        default_notify_remote_agent_count: 42
-        default_notify_timeout_ms: 42
         default_rpc_single_timeout_ms: 42
         default_rpc_multi_remote_agent_count: 42
         default_rpc_multi_timeout_ms: 42
@@ -196,8 +194,6 @@ pub mod tests {
         let mut tuning_params =
             kitsune_p2p::dependencies::kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
         tuning_params.gossip_loop_iteration_delay_ms = 42;
-        tuning_params.default_notify_remote_agent_count = 42;
-        tuning_params.default_notify_timeout_ms = 42;
         tuning_params.default_rpc_single_timeout_ms = 42;
         tuning_params.default_rpc_multi_remote_agent_count = 42;
         tuning_params.default_rpc_multi_timeout_ms = 42;

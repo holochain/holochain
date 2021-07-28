@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use std::path::PathBuf;
 mod dna_manifest_v1;
 
@@ -6,8 +7,6 @@ mod dna_manifest_v1;
 pub use dna_manifest_v1::{
     DnaManifestV1 as DnaManifestCurrent, DnaManifestV1Builder as DnaManifestCurrentBuilder, *,
 };
-
-use super::YamlProperties;
 
 /// The enum which encompasses all versions of the DNA manifest, past and present.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::From)]

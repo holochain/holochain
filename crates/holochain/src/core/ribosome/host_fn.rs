@@ -127,6 +127,15 @@ host_fn_api_impls! {
     // Hash an entry on the host.
     fn hash_entry (zt::entry::Entry) -> holo_hash::EntryHash;
 
+    // Retreive an element from the DHT or short circuit.
+    fn must_get_valid_element (zt::entry::MustGetValidElementInput) -> Element;
+
+    // Retreive a entry from the DHT or short circuit.
+    fn must_get_entry (zt::entry::MustGetEntryInput) -> EntryHashed;
+
+    // Retrieve a header from the DHT or short circuit.
+    fn must_get_header (zt::entry::MustGetHeaderInput) -> SignedHeaderHashed;
+
     // Query the source chain for data.
     fn query (zt::query::ChainQueryFilter) -> Vec<Element>;
 
@@ -162,10 +171,6 @@ host_fn_api_impls! {
     fn update (zt::entry::UpdateInput) -> holo_hash::HeaderHash;
 
     fn verify_signature (zt::signature::VerifySignature) -> bool;
-
-    // There's nothing to go in or out of a noop.
-    // Used to "defuse" host functions when side effects are not allowed.
-    fn unreachable (()) -> ();
 
     // The zome and agent info are constants specific to the current zome and chain.
     // All the information is provided by core so there is no input value.

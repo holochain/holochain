@@ -16,6 +16,7 @@ use holochain_serialized_bytes::prelude::*;
     Eq,
     SerializedBytes,
 )]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct LinkTag(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 impl LinkTag {
@@ -155,5 +156,12 @@ impl From<LinkDetails> for CreateLinkWithDeleteLinks {
 impl LinkDetails {
     pub fn into_inner(self) -> CreateLinkWithDeleteLinks {
         self.into()
+    }
+}
+
+#[cfg(feature = "full")]
+impl rusqlite::ToSql for LinkTag {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
+        Ok(rusqlite::types::ToSqlOutput::Borrowed((&self.0[..]).into()))
     }
 }

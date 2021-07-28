@@ -46,7 +46,7 @@ impl ExternIO {
     where
         O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
-        Ok(holochain_serialized_bytes::decode(&self.0)?)
+        holochain_serialized_bytes::decode(&self.0)
     }
 
     pub fn into_vec(self) -> Vec<u8> {
@@ -107,13 +107,13 @@ wasm_io_types! {
     // @todo Get the capability for the current zome call.
     fn capability_info (()) -> ();
 
+    // Returns HeaderHash of the newly created element.
+    fn create (zt::entry::EntryWithDefId) -> holo_hash::HeaderHash;
+
     // Create a link between two entries.
     fn create_link (zt::link::CreateLinkInput) -> holo_hash::HeaderHash;
 
     fn create_x25519_keypair(()) -> zt::x_salsa20_poly1305::x25519::X25519PubKey;
-
-    // Returns HeaderHash of the newly created element.
-    fn create (zt::entry::EntryWithDefId) -> holo_hash::HeaderHash;
 
     // The debug host import takes a TraceMsg to output wherever the host wants to display it.
     // TraceMsg includes line numbers. so the wasm tells the host about it's own code structure.
@@ -144,6 +144,15 @@ wasm_io_types! {
     // Hash an entry on the host.
     fn hash_entry (zt::entry::Entry) -> holo_hash::EntryHash;
 
+    // Retreive an element from the DHT or short circuit.
+    fn must_get_valid_element (zt::entry::MustGetValidElementInput) -> zt::element::Element;
+
+    // Retreive a entry from the DHT or short circuit.
+    fn must_get_entry (zt::entry::MustGetEntryInput) -> zt::entry::EntryHashed;
+
+    // Retrieve a header from the DHT or short circuit.
+    fn must_get_header (zt::entry::MustGetHeaderInput) -> zt::SignedHeaderHashed;
+
     // Query the source chain for data.
     fn query (zt::query::ChainQueryFilter) -> Vec<crate::Element>;
 
@@ -173,10 +182,6 @@ wasm_io_types! {
 
     // Current system time, in the opinion of the host, as a `Duration`.
     fn sys_time (()) -> core::time::Duration;
-
-    // There's nothing to go in or out of a noop.
-    // Used to "defuse" host functions when side effects are not allowed.
-    fn unreachable (()) -> ();
 
     // Same as  but also takes the HeaderHash of the updated element.
     fn update (zt::entry::UpdateInput) -> holo_hash::HeaderHash;
