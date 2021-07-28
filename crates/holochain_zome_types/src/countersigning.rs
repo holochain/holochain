@@ -293,14 +293,6 @@ pub struct UpdateBase {
     entry_hash: EntryHash,
 }
 
-/// All the data required for a countersigning session.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct CounterSigningSessionData {
-    preflight_request: PreflightRequest,
-    responses: Vec<CounterSigningAgentState>,
-}
-
 impl Create {
     /// Build an unsigned Create header from session data, shared create data and an agent's state.
     fn from_countersigning_data(

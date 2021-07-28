@@ -54,7 +54,6 @@ impl Sign {
 /// For an actually secure thing we wouldn't want to just assume a safe default hashing
 /// But that is not what clippy is complaining about here.
 #[allow(clippy::derive_hash_xor_eq)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Signature(pub [u8; SIGNATURE_BYTES]);
 
 #[cfg(feature = "arbitrary")]
