@@ -253,6 +253,23 @@ impl ArcInterval {
         }
     }
 
+    /// Shift the bounds so that an integer half-length is achieved. Always
+    /// increase the half-length, so that the resulting quantized interval is
+    /// a superset of the original
+    pub fn quantized(&self) -> Self {
+        if let Self::Bounded(lo, hi) = self {
+            if lo < hi && (hi - lo) % 2 == 1 {
+                Self::Bounded(lo.wrapping_sub(1), *hi)
+            } else if lo > hi && (lo - hi) % 2 == 1 {
+                Self::Bounded(*lo, hi.wrapping_add(1))
+            } else {
+                self.clone()
+            }
+        } else {
+            self.clone()
+        }
+    }
+
     /// Represent an arc as an optional range of inclusive endpoints.
     /// If none, the arc length is 0
     pub fn to_bounds_grouped(&self) -> Option<(u32, u32)> {

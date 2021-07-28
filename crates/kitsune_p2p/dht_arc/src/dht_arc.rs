@@ -379,3 +379,58 @@ impl std::fmt::Display for DhtArc {
         writeln!(f, "[{}]", out)
     }
 }
+
+#[cfg(any(test, feature = "test_utils"))]
+impl DhtArc {
+    pub fn from_interval(interval: ArcInterval) -> Self {
+        match interval {
+            ArcInterval::Empty => todo!(),
+            ArcInterval::Full => todo!(),
+            ArcInterval::Bounded(start, end) => {
+                if start <= end {
+                    // this should be +2 instead of +3, but we want to round up
+                    // so that the arc covers the interval
+                    let half_length = ((end as f64  - start as f64  + 3f64) / 2f64) as u32;
+                    let center = ((start as f64 + end as f64) / 2f64) as u32;
+                    Self::new(center, half_length)
+                } else {
+                    let half_length = MAX_HALF_LENGTH - ((start - end) / 2);
+                    let center = Wrapping(start) + Wrapping(half_length) - Wrapping(1);
+                    Self::new(center.0, half_length)
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn dht_arc_interval_roundtrip() {
+    let intervals = vec![
+        ArcInterval::new(0, 0),
+        ArcInterval::new(2, 2),
+        ArcInterval::new(3, 3),
+        ArcInterval::new(3, 5),
+        ArcInterval::new(2, 6),
+        ArcInterval::new(3, 6),
+        ArcInterval::new(3, 7),
+        ArcInterval::new(3, 8),
+        // these wind up becoming FULL for some reason
+        // ArcInterval::new(1, u32::MAX),
+        // ArcInterval::new(2, u32::MAX),
+        // ArcInterval::new(3, u32::MAX),
+        // ArcInterval::new(3, u32::MAX - 1),
+        // ArcInterval::new(3, u32::MAX - 2),
+        ArcInterval::new(u32::MAX, u32::MAX),
+        ArcInterval::new(u32::MAX / 4 * 3, u32::MAX / 4),
+        ArcInterval::new(u32::MAX / 4 * 3 + 1, u32::MAX / 4),
+        ArcInterval::new(u32::MAX / 4 * 3 - 1, u32::MAX / 4),
+        ArcInterval::new(u32::MAX / 4 * 3 - 1, u32::MAX / 4 + 1),
+        ArcInterval::new(u32::MAX / 4 * 3 + 1, u32::MAX / 4 - 1),
+    ];
+    let quantized: Vec<_> = intervals.iter().map(|i| i.quantized()).collect();
+    let roundtrips: Vec<_> = intervals
+        .iter()
+        .map(|i| DhtArc::from_interval(i.to_owned()).interval())
+        .collect();
+    assert_eq!(quantized, roundtrips);
+}

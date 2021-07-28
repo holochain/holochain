@@ -39,20 +39,17 @@ async fn local_sync_scenario() {
     let space = Arc::new(KitsuneSpace::arbitrary(&mut u).unwrap());
     let (agents, ownership) = three_way_sharded_ownership();
     let (data, _) = mock_agent_persistence(&mut u, ownership);
-    let agent_arcs: Vec<_> = data
-        .iter()
-        .map(|(agent, arc, _)| (agent.clone(), arc.clone()))
-        .collect();
+    let agent_arcs: Vec<_> = data.iter().map(|(info, _)| info.to_agent_arc()).collect();
     let delta = calculate_missing_ops(&data);
     let delta_counts = delta.iter().map(|(_, hs)| hs.len()).collect::<Vec<_>>();
+
+    let agent_arc_map: HashMap<_, _> = agent_arcs.clone().into_iter().collect();
+    println!("test agent_arc_map: {:#?}", agent_arc_map);
 
     // - The test is set up so each agent is missing 1 op
     assert_eq!(delta_counts, vec![1, 1, 1]);
 
     let mut evt_handler = HandlerBuilder::new().with_agent_persistence(data).build();
-
-    let agent_arc_map: HashMap<_, _> = agent_arcs.clone().into_iter().collect();
-    println!("test agent_arc_map: {:#?}", agent_arc_map);
 
     // Set up expectations to ensure that the proper data is gossiped to each agent,
     // while still also allowing flexibility for some extraneous gossip
@@ -87,7 +84,7 @@ async fn local_sync_scenario() {
         })
         .returning(move |_, _, _, _, _| unit_ok_fut());
 
-    let (evt_sender, _) = spawn_handler(evt_handler).await;
+    let (evt_sender, task) = spawn_handler(evt_handler).await;
     let gossip = ShardedGossipLocal::test(
         GossipType::Recent,
         evt_sender.clone(),
@@ -127,4 +124,15 @@ async fn local_sync_scenario() {
     // We can't actually test that agents hold the extra ops after sync, because
     // we're using an immutable mock, but by testing that handle_gossip is called
     // the appropriate amount, we ensure that in a real situation, sync is achieved.
+    //
+    // maackle: this kind of sucks. We have to await the handler task in order
+    //          to join any panics from that task into the test to cause a failure.
+    //          However, if there were no panics, then the task will never end,
+    //          so we need to wait "long enough" for any panics to occur
+    match tokio::time::timeout(tokio::time::Duration::from_secs(3), task).await {
+        // Err means timeout, which means no panic, which means the test passed
+        Err(_) => (),
+        // Ok means the task ended, which means there was a panic, which means the test should fail
+        Ok(err) => panic!("handler task panicked: {:?}", err),
+    }
 }

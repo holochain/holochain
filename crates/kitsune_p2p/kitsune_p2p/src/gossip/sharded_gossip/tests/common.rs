@@ -1,3 +1,5 @@
+use kitsune_p2p_types::{agent_info::AgentInfoInner, dht_arc::DhtArc};
+
 use super::*;
 
 /// Create a handler task and produce a Sender for interacting with it
@@ -134,6 +136,27 @@ pub async fn agent_info(agent: Arc<KitsuneAgent>) -> AgentInfoSigned {
         )
         .await
         .unwrap()
+}
+
+/// Create an AgentInfoSigned with arbitrary agent and arc.
+/// DANGER: the DhtArc may *mismatch* with the agent! This is wrong in general,
+/// but OK for some test situations, and a necessary evil when carefully
+/// constructing a particular test case with particular DHT locations.
+pub fn dangerous_fake_agent_info_with_arc(
+    space: Arc<KitsuneSpace>,
+    agent: Arc<KitsuneAgent>,
+    storage_arc: DhtArc,
+) -> AgentInfoSigned {
+    AgentInfoSigned(Arc::new(AgentInfoInner {
+        space,
+        agent,
+        storage_arc,
+        url_list: vec![],
+        signed_at_ms: 0,
+        expires_at_ms: 0,
+        signature: Arc::new(fixt!(KitsuneSignature)),
+        encoded_bytes: Box::new([0]),
+    }))
 }
 
 pub fn empty_bloom() -> Option<PoolBuf> {

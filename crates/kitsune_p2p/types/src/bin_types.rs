@@ -149,6 +149,7 @@ These metadata "Operations" each also have unique OpHashes."#,
     serde::Deserialize,
     serde::Serialize,
 )]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[shrinkwrap(mutable)]
 pub struct KitsuneSignature(#[serde(with = "serde_bytes")] pub Vec<u8>);
 

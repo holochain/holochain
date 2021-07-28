@@ -2,12 +2,16 @@
 
 use crate::bin_types::*;
 use crate::dht_arc::DhtArc;
-use crate::*;
-
 use crate::tx2::tx2_utils::TxUrl;
+use crate::*;
+use agent_info_helper::*;
+use dht_arc::ArcInterval;
 
 /// A list of Urls.
 pub type UrlList = Vec<TxUrl>;
+
+/// An agent paired with its storage arc in interval form
+pub type AgentArc = (Arc<KitsuneAgent>, ArcInterval);
 
 /// agent_info helper types
 pub mod agent_info_helper {
@@ -52,8 +56,6 @@ pub mod agent_info_helper {
         pub agent_info: &'lt [u8],
     }
 }
-
-use agent_info_helper::*;
 
 /// The inner constructable AgentInfo struct
 pub struct AgentInfoInner {
@@ -251,6 +253,11 @@ impl AgentInfoSigned {
         let mut buf = Vec::new();
         crate::codec::rmp_encode(&mut buf, self).map_err(KitsuneError::other)?;
         Ok(buf.into_boxed_slice())
+    }
+
+    /// get just the agent and its storage arc
+    pub fn to_agent_arc(&self) -> AgentArc {
+        (self.agent.clone(), self.storage_arc.interval())
     }
 }
 

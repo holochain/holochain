@@ -1,3 +1,7 @@
+use kitsune_p2p_types::dht_arc::DhtArc;
+
+use crate::gossip::sharded_gossip::tests::common::dangerous_fake_agent_info_with_arc;
+
 use super::common::agent_info;
 use super::common::spawn_handler;
 use super::test_local_sync::three_way_sharded_ownership;
@@ -5,11 +9,7 @@ use super::*;
 
 /// Data which represents the agent store of a backend.
 /// Specifies a list of agents along with their arc and timestamped op hashes held.
-pub type MockAgentPersistence = Vec<(
-    Arc<KitsuneAgent>,
-    ArcInterval,
-    Vec<(KitsuneOpHash, TimestampMs)>,
-)>;
+pub type MockAgentPersistence = Vec<(AgentInfoSigned, Vec<(KitsuneOpHash, TimestampMs)>)>;
 
 /// Build up the functionality of a mock event handler a la carte with these
 /// provided methods
@@ -41,25 +41,18 @@ impl HandlerBuilder {
     /// Limitations:
     /// - Op data returned is completely arbitrary and does NOT hash to the hash it's "stored" under
     pub fn with_agent_persistence(mut self, agent_data: MockAgentPersistence) -> Self {
-        let agents_only: Vec<_> = agent_data.iter().map(|(a, _, _)| a.clone()).collect();
+        let info_only: Vec<_> = agent_data.iter().map(|(info, _)| info.clone()).collect();
+        let agents_only: Vec<_> = info_only.iter().map(|info| info.agent.clone()).collect();
         let agents_arcs: Vec<_> = agent_data
             .iter()
-            .map(|(agent, arc, _)| (agent.clone(), arc.clone()))
+            .map(|(info, _)| (info.agent.clone(), info.storage_arc.interval()))
             .collect();
 
         self.0.expect_handle_query_agent_info_signed().returning({
-            let agents = agents_only.clone();
+            let info_only = info_only.clone();
             move |_| {
-                let agents = agents.clone();
-                Ok(async move {
-                    let mut infos = Vec::new();
-                    for agent in agents {
-                        infos.push(agent_info(agent).await);
-                    }
-                    Ok(infos)
-                }
-                .boxed()
-                .into())
+                let info_only = info_only.clone();
+                Ok(async move { Ok(info_only) }.boxed().into())
             }
         });
 
@@ -97,8 +90,8 @@ impl HandlerBuilder {
 
                 let mut ops: Vec<&(KitsuneOpHash, TimestampMs)> = agent_data
                     .iter()
-                    .filter_map(|(agent, _, ops)| {
-                        if let Some(arcset) = agent_arcsets.get(agent) {
+                    .filter_map(|(info, ops)| {
+                        if let Some(arcset) = agent_arcsets.get(&info.agent) {
                             Some(
                                 ops.into_iter()
                                     .filter(|(op, time)| {
@@ -212,7 +205,6 @@ pub fn mock_agent_persistence<'a>(
     entropy: &mut arbitrary::Unstructured<'a>,
     ownership: OwnershipData,
 ) -> (MockAgentPersistence, Vec<KitsuneOpHash>) {
-    let mut arcs: HashMap<Arc<KitsuneAgent>, ((u32, u32), Vec<KitsuneOpHash>)> = HashMap::new();
     // create one op per "ownership" item
     let mut hashes: Vec<KitsuneOpHash> = (0..ownership.total_ops)
         .map(|_| KitsuneOpHash::arbitrary(entropy).unwrap())
@@ -220,6 +212,10 @@ pub fn mock_agent_persistence<'a>(
 
     // sort hashes by location
     hashes.sort_by_key(|h| h.get_loc());
+    println!(
+        "hash locs: {:?}",
+        hashes.iter().map(|h| h.get_loc()).collect::<Vec<_>>()
+    );
 
     // expand the indices provided in the input to actual op hashes and locations,
     // per the gerated ops
@@ -232,14 +228,23 @@ pub fn mock_agent_persistence<'a>(
                 arc_indices: (arc_idx_lo, arc_idx_hi),
                 hash_indices,
             } = data;
-            let arc =
-                ArcInterval::new(hashes[*arc_idx_lo].get_loc(), hashes[*arc_idx_hi].get_loc());
+            let arc = DhtArc::from_interval(
+                ArcInterval::new(hashes[*arc_idx_lo].get_loc(), hashes[*arc_idx_hi].get_loc())
+                    .quantized(),
+            );
             let hashes = hash_indices
                 .into_iter()
                 // TODO: `1111` is an arbitrary timestamp placeholder
                 .map(|i| (hashes[*i].clone(), 1111))
                 .collect();
-            (agent.to_owned(), arc, hashes)
+            (
+                dangerous_fake_agent_info_with_arc(
+                    Arc::new(fixt!(KitsuneSpace)),
+                    agent.to_owned(),
+                    arc,
+                ),
+                hashes,
+            )
         })
         .collect();
     (persistence, hashes)
@@ -252,12 +257,17 @@ pub fn calculate_missing_ops(
 ) -> Vec<(Arc<KitsuneAgent>, Vec<KitsuneOpHash>)> {
     let all_hashes: HashSet<_> = data
         .iter()
-        .flat_map(|(_, _, hs)| hs.iter().map(|(h, _)| h))
+        .flat_map(|(_, hs)| hs.iter().map(|(h, _)| h))
         .collect();
     data.iter()
-        .map(|(agent, arc, hs)| {
+        .map(|(info, hs)| {
             let owned: HashSet<&KitsuneOpHash> = hs.iter().map(|(h, _)| h).collect();
-            println!("arc: |{}|", arc.to_ascii(32));
+            let (agent, arc) = info.to_agent_arc();
+            println!(
+                "arc: |{}|, total in arc: {}",
+                arc.to_ascii(64),
+                owned.iter().map(|h| arc.contains(h.get_loc())).count()
+            );
             (
                 agent.clone(),
                 all_hashes
@@ -280,8 +290,17 @@ async fn test_three_way_sharded_ownership() {
     let (persistence, hashes) = mock_agent_persistence(&mut u, ownership);
     let agent_arcs: Vec<_> = persistence
         .iter()
-        .map(|(agent, arc, _)| (agent.clone(), arc.clone()))
+        .map(|(info, _)| (info.agent.clone(), info.storage_arc.interval()))
         .collect();
+
+    println!("agent arcs: {:?}", agent_arcs);
+
+    let hold_counts: Vec<_> = agent_arcs
+        .iter()
+        .map(|(_, arc)| hashes.iter().filter(|h| arc.contains(h.get_loc())).count())
+        .collect();
+
+    assert_eq!(hold_counts, vec![3, 3, 3]);
 
     // - Check that the agents are missing certain hashes (by design)
     assert_eq!(
@@ -320,13 +339,13 @@ async fn test_three_way_sharded_ownership() {
         }
     };
 
-    // - All arcs cover 3 hashes
+    // - All arcs cover 3 hashes, but each agent only holds 2 of those
     let op_hashes_0 = (get_op_hashes.clone())(0).await;
     let op_hashes_1 = (get_op_hashes.clone())(1).await;
     let op_hashes_2 = (get_op_hashes.clone())(2).await;
     assert_eq!(
         (op_hashes_0.len(), op_hashes_1.len(), op_hashes_2.len()),
-        (3, 3, 3)
+        (2, 2, 2)
     );
 
     // - All hashes point to an actual retrievable op
@@ -354,7 +373,7 @@ async fn test_three_way_sharded_ownership() {
     )
     .await
     .unwrap();
-    assert_eq!((ops_0.len(), ops_1.len(), ops_2.len()), (3, 3, 3));
+    assert_eq!((ops_0.len(), ops_1.len(), ops_2.len()), (2, 2, 2));
 
     // - There are only 6 distinct ops
     let mut all_ops = HashSet::new();
