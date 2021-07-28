@@ -70,5 +70,12 @@ ghost_actor::ghost_chan! {
             timeout: KitsuneTimeout,
             payload: Vec<u8>
         ) -> ();
+
+        /// Check if an agent is an authority for a hash.
+        fn authority_for_hash(
+            space: Arc<super::KitsuneSpace>,
+            agent: Arc<super::KitsuneAgent>,
+            basis: Arc<super::KitsuneBasis>,
+        ) -> bool;
     }
 }

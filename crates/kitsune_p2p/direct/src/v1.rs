@@ -629,6 +629,21 @@ async fn handle_events(
                     .boxed()
                     .into()));
                 }
+                event::KitsuneP2pEvent::QueryPeerDensity {
+                    respond,
+                    space,
+                    dht_arc,
+                    ..
+                } => {
+                    respond.r(Ok(handle_query_peer_density(
+                        kdirect.clone(),
+                        space,
+                        dht_arc,
+                    )
+                    .map_err(KitsuneP2pError::other)
+                    .boxed()
+                    .into()));
+                }
                 event::KitsuneP2pEvent::PutMetricDatum { respond, datum, .. } => {
                     respond.r(Ok(handle_put_metric_datum(kdirect.clone(), datum)
                         .map_err(KitsuneP2pError::other)
@@ -785,6 +800,16 @@ async fn handle_query_agent_info_signed_near_basis(
         .query_agent_info_near_basis(root, basis_loc, limit)
         .await?;
     Ok(map.into_iter().map(|a| a.to_kitsune()).collect())
+}
+
+async fn handle_query_peer_density(
+    kdirect: Arc<Kd1>,
+    space: Arc<KitsuneSpace>,
+    dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+) -> KdResult<kitsune_p2p_types::dht_arc::PeerDensity> {
+    let root = KdHash::from_kitsune_space(&space);
+    let density = kdirect.persist.query_peer_density(root, dht_arc).await?;
+    Ok(density)
 }
 
 async fn handle_put_metric_datum(kdirect: Arc<Kd1>, datum: MetricDatum) -> KdResult<()> {

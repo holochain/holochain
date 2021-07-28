@@ -10,6 +10,7 @@ let
   default = import (builtins.toString ./default.nix) (builtins.removeAttrs args [
     "flavor"
     "flavour"
+    "inNixShell"
   ]);
 in
 

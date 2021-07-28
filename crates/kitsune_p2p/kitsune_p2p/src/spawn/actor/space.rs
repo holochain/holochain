@@ -4,6 +4,7 @@ use ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::tracing_futures::Instrument;
 use kitsune_p2p_mdns::*;
 use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
+use kitsune_p2p_types::dht_arc::DhtArc;
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
@@ -26,6 +27,9 @@ ghost_actor::ghost_chan! {
 
         /// see if an agent is locally joined
         fn is_agent_local(agent: Arc<KitsuneAgent>) -> bool;
+
+        /// Update the arc of a local agent.
+        fn update_agent_arc(agent: Arc<KitsuneAgent>, arc: DhtArc) -> ();
 
         /// Incoming Delegate Broadcast
         /// We are being requested to delegate a broadcast to our neighborhood
@@ -115,20 +119,27 @@ impl SpaceInternalHandler for Space {
         let space = self.space.clone();
         let mut mdns_handles = self.mdns_handles.clone();
         let network_type = self.config.network_type.clone();
-        let agent_list: Vec<Arc<KitsuneAgent>> = self.local_joined_agents.iter().cloned().collect();
+        let mut agent_list = Vec::with_capacity(self.local_joined_agents.len());
+        for agent in self.local_joined_agents.iter().cloned() {
+            let arc = self.get_agent_arc(&agent);
+            agent_list.push((agent, arc));
+        }
         let bound_url = self.this_addr.clone();
         let evt_sender = self.evt_sender.clone();
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
+        let internal_sender = self.i_s.clone();
         Ok(async move {
             let urls = vec![bound_url.into()];
-            for agent in agent_list {
+            for (agent, arc) in agent_list {
                 let input = UpdateAgentInfoInput {
                     expires_after,
                     space: space.clone(),
                     agent,
+                    arc,
                     urls: &urls,
                     evt_sender: &evt_sender,
+                    internal_sender: &internal_sender,
                     network_type: network_type.clone(),
                     mdns_handles: &mut mdns_handles,
                     bootstrap_service: &bootstrap_service,
@@ -150,16 +161,21 @@ impl SpaceInternalHandler for Space {
         let network_type = self.config.network_type.clone();
         let bound_url = self.this_addr.clone();
         let evt_sender = self.evt_sender.clone();
+        let internal_sender = self.i_s.clone();
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
+        let arc = self.get_agent_arc(&agent);
+
         Ok(async move {
             let urls = vec![bound_url.into()];
             let input = UpdateAgentInfoInput {
                 expires_after,
                 space: space.clone(),
                 agent,
+                arc,
                 urls: &urls,
                 evt_sender: &evt_sender,
+                internal_sender: &internal_sender,
                 network_type: network_type.clone(),
                 mdns_handles: &mut mdns_handles,
                 bootstrap_service: &bootstrap_service,
@@ -177,6 +193,15 @@ impl SpaceInternalHandler for Space {
     ) -> SpaceInternalHandlerResult<bool> {
         let res = self.local_joined_agents.contains(&agent);
         Ok(async move { Ok(res) }.boxed().into())
+    }
+
+    fn handle_update_agent_arc(
+        &mut self,
+        agent: Arc<KitsuneAgent>,
+        arc: DhtArc,
+    ) -> SpaceInternalHandlerResult<()> {
+        self.agent_arcs.insert(agent, arc);
+        Ok(async move { Ok(()) }.boxed().into())
     }
 
     fn handle_incoming_delegate_broadcast(
@@ -275,11 +300,36 @@ struct UpdateAgentInfoInput<'borrow> {
     expires_after: u64,
     space: Arc<KitsuneSpace>,
     agent: Arc<KitsuneAgent>,
+    arc: DhtArc,
     urls: &'borrow Vec<TxUrl>,
     evt_sender: &'borrow futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    internal_sender: &'borrow ghost_actor::GhostSender<SpaceInternal>,
     network_type: NetworkType,
     mdns_handles: &'borrow mut HashMap<Vec<u8>, Arc<AtomicBool>>,
     bootstrap_service: &'borrow Option<Url2>,
+}
+
+#[cfg(feature = "sharded")]
+async fn update_arc_length(
+    evt_sender: &futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    space: Arc<KitsuneSpace>,
+    arc: &mut DhtArc,
+) -> KitsuneP2pResult<()> {
+    // TODO: Get the peer density and update the arc if feature flag is set.
+    let density = evt_sender
+        .query_peer_density(space.clone(), arc.clone())
+        .await?;
+    arc.update_length(density);
+    Ok(())
+}
+
+#[cfg(not(feature = "sharded"))]
+async fn update_arc_length(
+    _evt_sender: &futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    _space: Arc<KitsuneSpace>,
+    _arc: &mut DhtArc,
+) -> KitsuneP2pResult<()> {
+    Ok(())
 }
 
 async fn update_single_agent_info(input: UpdateAgentInfoInput<'_>) -> KitsuneP2pResult<()> {
@@ -287,20 +337,28 @@ async fn update_single_agent_info(input: UpdateAgentInfoInput<'_>) -> KitsuneP2p
         expires_after,
         space,
         agent,
+        mut arc,
         urls,
         evt_sender,
+        internal_sender,
         network_type,
         mdns_handles,
         bootstrap_service,
     } = input;
     use kitsune_p2p_types::agent_info::AgentInfoSigned;
+
+    update_arc_length(evt_sender, space.clone(), &mut arc).await?;
+
+    // Update the agents arc through the internal sender.
+    internal_sender.update_agent_arc(agent.clone(), arc).await?;
+
     let signed_at_ms = crate::spawn::actor::bootstrap::now_once(None).await?;
     let expires_at_ms = signed_at_ms + expires_after;
 
     let agent_info_signed = AgentInfoSigned::sign(
         space.clone(),
         agent.clone(),
-        u32::MAX,
+        arc.half_length(),
         urls.clone(),
         signed_at_ms,
         expires_at_ms,
@@ -458,6 +516,7 @@ impl KitsuneP2pHandler for Space {
         agent: Arc<KitsuneAgent>,
     ) -> KitsuneP2pHandlerResult<()> {
         self.local_joined_agents.remove(&agent);
+        self.agent_arcs.remove(&agent);
         self.gossip_mod.local_agent_leave(agent.clone());
         self.publish_leave_agent_info(agent)
     }
@@ -671,6 +730,19 @@ impl KitsuneP2pHandler for Space {
         .boxed()
         .into())
     }
+
+    fn handle_authority_for_hash(
+        &mut self,
+        _space: Arc<KitsuneSpace>,
+        agent: Arc<KitsuneAgent>,
+        basis: Arc<KitsuneBasis>,
+    ) -> KitsuneP2pHandlerResult<bool> {
+        let r = match self.agent_arcs.get(&agent) {
+            Some(agent_arc) => agent_arc.contains(basis.get_loc()),
+            None => false,
+        };
+        Ok(async move { Ok(r) }.boxed().into())
+    }
 }
 
 pub(crate) struct SpaceReadOnlyInner {
@@ -693,6 +765,7 @@ pub(crate) struct Space {
     pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
     pub(crate) evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     pub(crate) local_joined_agents: HashSet<Arc<KitsuneAgent>>,
+    pub(crate) agent_arcs: HashMap<Arc<KitsuneAgent>, DhtArc>,
     pub(crate) config: Arc<KitsuneP2pConfig>,
     mdns_handles: HashMap<Vec<u8>, Arc<AtomicBool>>,
     mdns_listened_spaces: HashSet<String>,
@@ -821,6 +894,7 @@ impl Space {
             i_s,
             evt_sender,
             local_joined_agents: HashSet::new(),
+            agent_arcs: HashMap::new(),
             config,
             mdns_handles: HashMap::new(),
             mdns_listened_spaces: HashSet::new(),
@@ -990,5 +1064,15 @@ impl Space {
         .instrument(tracing::debug_span!("multi_inner"))
         .boxed()
         .into())
+    }
+
+    /// Get the existing agent storage arc or create a new one.
+    fn get_agent_arc(&self, agent: &Arc<KitsuneAgent>) -> DhtArc {
+        // TODO: We are simply setting the initial arc to full.
+        // In the future we may want to do something more intelligent.
+        self.agent_arcs
+            .get(agent)
+            .cloned()
+            .unwrap_or_else(|| DhtArc::full(agent.get_loc()))
     }
 }
