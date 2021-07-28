@@ -2895,6 +2895,7 @@ dependencies = [
  "shrinkwraprs",
  "strum",
  "subtle",
+ "subtle-encoding",
  "thiserror",
  "tracing",
 ]
@@ -3440,9 +3441,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_api"
-version = "0.0.1-alpha.12"
+version = "0.0.1-alpha.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "378b0a3a794a22602bf689574d098d749763ac591ed819c3245e8e6c246dd432"
+checksum = "5aad2cc33bf4c4a78ea32ba527201ae02ed6ff276ff93470265663659e9f5684"
 dependencies = [
  "blake2b_simd",
  "block-padding 0.2.1",
@@ -3463,13 +3464,14 @@ dependencies = [
  "thiserror",
  "tokio",
  "toml",
+ "winapi",
 ]
 
 [[package]]
 name = "lair_keystore_client"
-version = "0.0.1-alpha.12"
+version = "0.0.1-alpha.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5474d1cee8bc9c09a78809debd815f05b7026042d2426ecaaf372062278f4b5"
+checksum = "dd37d72f7141c7dc105d486045a5d7167b0eed874b71cc964483cb2c47f834ff"
 dependencies = [
  "ghost_actor 0.3.0-alpha.1",
  "lair_keystore_api",
@@ -6198,6 +6200,15 @@ name = "subtle"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6bdef32e8150c2a081110b42772ffe7d7c9032b606bc226c8260fd97e0976601"
+
+[[package]]
+name = "subtle-encoding"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7dcb1ed7b8330c5eed5441052651dd7a12c75e2ed88f2ec024ae1fa3a5e59945"
+dependencies = [
+ "zeroize",
+]
 
 [[package]]
 name = "syn"

@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 pub mod error;
 
-type BoxApi = Box<dyn HostFnApiT>;
+pub type BoxApi = Box<dyn HostFnApiT>;
 
 /// An InlineZome, which consists
 pub struct InlineZome {
@@ -131,7 +131,7 @@ mod tests {
         let zome = InlineZome::new("", vec![]).callback("zome_fn_1", |api, a: ()| {
             let hash: AnyDhtHash = todo!();
             Ok(api
-                .get(GetInput::new(hash, GetOptions::default()))
+                .get(vec![GetInput::new(hash, GetOptions::default())])
                 .expect("TODO after crate re-org"))
         });
         // let dna = InlineDna::new(hashmap! {

@@ -190,7 +190,7 @@ pub mod wasm_test {
         let round: Option<Element> =
             crate::call_test_ribosome!(host_access, TestWasm::Create, "get_entry", ()).unwrap();
 
-        let bytes: Vec<u8> = match round.and_then(|el| el.into()) {
+        let bytes: Vec<u8> = match round.clone().and_then(|el| el.into()) {
             Some(holochain_zome_types::entry::Entry::App(entry_bytes)) => {
                 entry_bytes.bytes().to_vec()
             }
@@ -198,6 +198,12 @@ pub mod wasm_test {
         };
         // this should be the content "foo" of the committed post
         assert_eq!(vec![163, 102, 111, 111], bytes);
+
+        let round_twice: Vec<Option<Element>> = crate::call_test_ribosome!(host_access, TestWasm::Create, "get_entry_twice", ()).unwrap();
+        assert_eq!(
+            round_twice,
+            vec![round.clone(), round],
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]
