@@ -252,6 +252,8 @@
 /// @todo in the future grant secrets may be moved to lair somehow.
 pub mod capability;
 
+pub mod countersigning;
+
 /// Working with app and system entries.
 ///
 /// Most holochain applications will define their own app entry types.

@@ -59,10 +59,10 @@ host_fn_api_impls! {
     // @todo
     fn call_info (()) -> zt::info::CallInfo;
 
-    fn call (zt::call::Call) -> zt::ZomeCallResponse;
+    fn call (Vec<zt::call::Call>) -> Vec<zt::ZomeCallResponse>;
 
-    // Header hash of the DeleteLink element.
-    fn call_remote (zt::call_remote::CallRemote) -> zt::ZomeCallResponse;
+    // Call a zome on a remote agent.
+    fn call_remote (Vec<zt::call_remote::CallRemote>) -> Vec<zt::ZomeCallResponse>;
 
     // @todo List all the local capability claims.
     fn capability_claims (()) -> ();
@@ -113,16 +113,16 @@ host_fn_api_impls! {
     fn trace (zt::trace::TraceMsg) -> ();
 
     // Attempt to get a live entry from the cascade.
-    fn get (zt::entry::GetInput) -> Option<zt::element::Element>;
+    fn get (Vec<zt::entry::GetInput>) -> Vec<Option<zt::element::Element>>;
 
     fn get_agent_activity (zt::agent_activity::GetAgentActivityInput) -> zt::query::AgentActivity;
 
-    fn get_details (zt::entry::GetInput) -> Option<zt::metadata::Details>;
+    fn get_details (Vec<zt::entry::GetInput>) -> Vec<Option<zt::metadata::Details>>;
 
     // Get links by entry hash from the cascade.
-    fn get_links (zt::link::GetLinksInput) -> zt::link::Links;
+    fn get_links (Vec<zt::link::GetLinksInput>) -> Vec<zt::link::Links>;
 
-    fn get_link_details (zt::link::GetLinksInput) -> zt::link::LinkDetails;
+    fn get_link_details (Vec<zt::link::GetLinksInput>) -> Vec<zt::link::LinkDetails>;
 
     // Hash an entry on the host.
     fn hash_entry (zt::entry::Entry) -> holo_hash::EntryHash;
