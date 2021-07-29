@@ -1,6 +1,6 @@
 [package]
 name = "holochain_util"
-version = "0.0.2-dev.0"
+version = "0.0.2"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2018"
 description = "This crate is a collection of various utility functions that are used in the other crates in the holochain repository."
