@@ -58,10 +58,10 @@ pub mod test {
         let input_header_hash = fixt!(HeaderHash);
         mock_hdk.expect_get()
             .with(hdk::prelude::mockall::predicate::eq(
-                GetInput::new(input_header_hash.clone().into(), GetOptions::latest())
+                vec![GetInput::new(input_header_hash.clone().into(), GetOptions::latest())]
             ))
             .times(1)
-            .return_once(move |_| Ok(None));
+            .return_once(move |_| Ok(vec![None]));
 
         hdk::prelude::set_hdk(mock_hdk);
 

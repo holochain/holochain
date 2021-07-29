@@ -55,20 +55,16 @@ mod tests {
         // needed until we have some way of bootstrapping
         harness.magic_peer_info_exchange().await?;
 
-        let res = p2p1
-            .rpc_multi(actor::RpcMulti {
-                space: space,
-                from_agent: a1.clone(),
-                // this is just a dummy value right now
-                basis: TestVal::test_val(),
-                remote_agent_count: Some(5),
-                timeout_ms: Some(200),
-                as_race: true,
-                race_timeout_ms: Some(100),
-                payload: b"test-multi-request".to_vec(),
-            })
-            .await
-            .unwrap();
+        let mut input = actor::RpcMulti::new(
+            &Default::default(),
+            space,
+            a1.clone(),
+            TestVal::test_val(),
+            b"test-multi-request".to_vec(),
+        );
+        input.max_remote_agent_count = 5;
+        input.max_timeout = kitsune_p2p_types::KitsuneTimeout::from_millis(200);
+        let res = p2p1.rpc_multi(input).await.unwrap();
 
         assert_eq!(3, res.len());
         for r in res {
@@ -174,20 +170,16 @@ mod tests {
         let a3: Arc<KitsuneAgent> = TestVal::test_val();
         p2p.join(space.clone(), a3.clone()).await?;
 
-        let res = p2p
-            .rpc_multi(actor::RpcMulti {
-                space: space,
-                from_agent: a1.clone(),
-                // this is just a dummy value right now
-                basis: TestVal::test_val(),
-                remote_agent_count: Some(2),
-                timeout_ms: Some(20),
-                as_race: true,
-                race_timeout_ms: Some(20),
-                payload: b"test-multi-request".to_vec(),
-            })
-            .await
-            .unwrap();
+        let mut input = actor::RpcMulti::new(
+            &Default::default(),
+            space,
+            a1.clone(),
+            TestVal::test_val(),
+            b"test-multi-request".to_vec(),
+        );
+        input.max_remote_agent_count = 2;
+        input.max_timeout = kitsune_p2p_types::KitsuneTimeout::from_millis(20);
+        let res = p2p.rpc_multi(input).await.unwrap();
 
         harness.ghost_actor_shutdown().await?;
 
@@ -210,20 +202,16 @@ mod tests {
         let space = harness.add_space().await?;
         let (a1, p2p) = harness.add_direct_agent("DIRECT".into()).await?;
 
-        let res = p2p
-            .rpc_multi(actor::RpcMulti {
-                space: space,
-                from_agent: a1.clone(),
-                // this is just a dummy value right now
-                basis: TestVal::test_val(),
-                remote_agent_count: Some(1),
-                timeout_ms: Some(20),
-                as_race: true,
-                race_timeout_ms: Some(20),
-                payload: b"test-multi-request".to_vec(),
-            })
-            .await
-            .unwrap();
+        let mut input = actor::RpcMulti::new(
+            &Default::default(),
+            space,
+            a1.clone(),
+            TestVal::test_val(),
+            b"test-multi-request".to_vec(),
+        );
+        input.max_remote_agent_count = 1;
+        input.max_timeout = kitsune_p2p_types::KitsuneTimeout::from_millis(20);
+        let res = p2p.rpc_multi(input).await.unwrap();
 
         assert_eq!(1, res.len());
         for r in res {

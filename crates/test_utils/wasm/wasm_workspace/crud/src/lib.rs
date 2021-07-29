@@ -9,13 +9,13 @@ fn new(_: ()) -> ExternResult<HeaderHash> {
 }
 
 #[hdk_extern]
-fn header_details(header_hash: HeaderHash) -> ExternResult<Option<Details>> {
-    countree::CounTree::header_details(header_hash)
+fn header_details(header_hashes: Vec<HeaderHash>) -> ExternResult<Vec<Option<Details>>> {
+    countree::CounTree::header_details(header_hashes)
 }
 
 #[hdk_extern]
-fn entry_details(entry_hash: EntryHash) -> ExternResult<Option<Details>> {
-    countree::CounTree::entry_details(entry_hash)
+fn entry_details(entry_hashes: Vec<EntryHash>) -> ExternResult<Vec<Option<Details>>> {
+    countree::CounTree::entry_details(entry_hashes)
 }
 
 #[hdk_extern]

@@ -9,7 +9,7 @@ use hdk::prelude::*;
 use holochain_types::prelude::*;
 use unwrap_to::unwrap_to;
 
-/// A wrapper around ConductorHandle with more convenient methods for testing
+/// A wrapper around ConductorHandle with more convenient methods for testing.
 #[derive(Clone, shrinkwraprs::Shrinkwrap, derive_more::From)]
 pub struct TestConductorHandle(pub(crate) ConductorHandle);
 

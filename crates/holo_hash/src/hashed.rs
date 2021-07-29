@@ -3,6 +3,9 @@ use crate::HashableContent;
 use crate::HoloHashOf;
 use holochain_serialized_bytes::prelude::*;
 
+#[cfg(feature = "arbitrary")]
+use crate::PrimitiveHashType;
+
 /// Represents some piece of content along with its hash representation, so that
 /// hashes need not be calculated multiple times.
 /// Provides an easy constructor which consumes the content.
@@ -25,6 +28,18 @@ impl<C: HashableContent> HasHash<C::HashType> for HoloHashed<C> {
     }
 }
 
+#[cfg(feature = "arbitrary")]
+impl<'a, C> arbitrary::Arbitrary<'a> for HoloHashed<C>
+where
+    C: HashableContent + arbitrary::Arbitrary<'a>,
+    C::HashType: PrimitiveHashType,
+{
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let hash = HoloHashOf::<C>::arbitrary(u)?;
+        let content = C::arbitrary(u)?;
+        Ok(Self { content, hash })
+    }
+}
 impl<C> HoloHashed<C>
 where
     C: HashableContent,

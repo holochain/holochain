@@ -6,6 +6,92 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20210722.172107
+
+## [holochain-0.0.102](crates/holochain/CHANGELOG.md#0.0.102)
+
+### Known Issues :exclamation:
+
+- We’ve become aware of a bug that locks up the conductor when installing happ bundles or registering DNA via the admin API concurrently. Please perform these actions sequentially until we’ve resolved the bug.
+
+### Fixed
+
+- Concurrent zome calls could cause the `init()` zome callback to run multiple times concurrently, causing `HeadMoved` errors. This is fixed, so that `init()` can only ever run once.
+  - If a zome call has been waiting for another zome call to finish running `init()` for longer than 30 seconds, it will timeout.
+
+### Changed
+
+- Apps now have a more complex status. Apps now can be either enabled/disabled as well as running/stopped, the combination of which is captured by three distinctly named states:
+  - “Running” (enabled + running) -\> The app is running normally
+  - “Paused” (enabled + stopped) -\> The app is currently stopped due to some minor problem in one of its cells such as failed network access, but will start running again as soon as it’s able. Some Cells may still be running normally.
+  - “Disabled” (disabled + stopped) -\> The app is stopped and will remain so until explicitly enabled via `EnableApp` admin method. Apps can be disabled manually via `DisableApp`, or automatically due to an unrecoverable error in a Cell.
+- Some admin methods are deprecated due to the app status changes:
+  - `ActivateApp` is deprecated in favor of `EnableApp`
+  - `DeactivateApp` is deprecated in favor of `DisableApp`
+- Apps will be automatically Paused if not all of their cells are able to join the network during startup
+
+### Added
+
+- `InstallAppBundle` command added to admin conductor API. [\#665](https://github.com/holochain/holochain/pull/665)
+- `DnaSource` in conductor\_api `RegisterDna` call now can take a `DnaBundle` [\#665](https://github.com/holochain/holochain/pull/665)
+- New admin interface methods:
+  - `EnableApp` (replaces `ActivateApp`)
+  - `DisableApp` (replaces `DeactivateApp`)
+  - `StartApp` (used to attempt to manually restart a Paused app)
+- Using the 3 level PLRU instance cache from latest holochain wasmer `v0.0.72`
+
+## [holochain\_test\_wasm\_common-0.0.2](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.2)
+
+## [holochain\_cascade-0.0.2](crates/holochain_cascade/CHANGELOG.md#0.0.2)
+
+## [holochain\_cli-0.0.3](crates/holochain_cli/CHANGELOG.md#0.0.3)
+
+## [holochain\_cli\_sandbox-0.0.3](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.3)
+
+## [holochain\_websocket-0.0.2](crates/holochain_websocket/CHANGELOG.md#0.0.2)
+
+## [holochain\_conductor\_api-0.0.2](crates/holochain_conductor_api/CHANGELOG.md#0.0.2)
+
+## [holochain\_state-0.0.2](crates/holochain_state/CHANGELOG.md#0.0.2)
+
+## [holochain\_wasm\_test\_utils-0.0.2](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.2)
+
+## [holochain\_p2p-0.0.2](crates/holochain_p2p/CHANGELOG.md#0.0.2)
+
+## [holochain\_cli\_bundle-0.0.2](crates/holochain_cli_bundle/CHANGELOG.md#0.0.2)
+
+## [holochain\_types-0.0.2](crates/holochain_types/CHANGELOG.md#0.0.2)
+
+## [holochain\_keystore-0.0.2](crates/holochain_keystore/CHANGELOG.md#0.0.2)
+
+## [holochain\_sqlite-0.0.2](crates/holochain_sqlite/CHANGELOG.md#0.0.2)
+
+## [kitsune\_p2p-0.0.2](crates/kitsune_p2p/CHANGELOG.md#0.0.2)
+
+## [kitsune\_p2p\_proxy-0.0.2](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.2)
+
+## [kitsune\_p2p\_transport\_quic-0.0.2](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.2)
+
+## [kitsune\_p2p\_types-0.0.2](crates/kitsune_p2p_types/CHANGELOG.md#0.0.2)
+
+## [mr\_bundle-0.0.2](crates/mr_bundle/CHANGELOG.md#0.0.2)
+
+## [holochain\_util-0.0.2](crates/holochain_util/CHANGELOG.md#0.0.2)
+
+## [hdk-0.0.102](crates/hdk/CHANGELOG.md#0.0.102)
+
+### Changed
+
+- hdk: fixed wrong order of recipient and sender in `x_25519_x_salsa20_poly1305_decrypt`
+
+## [hdk\_derive-0.0.4](crates/hdk_derive/CHANGELOG.md#0.0.4)
+
+## [holochain\_zome\_types-0.0.4](crates/holochain_zome_types/CHANGELOG.md#0.0.4)
+
+## [holo\_hash-0.0.4](crates/holo_hash/CHANGELOG.md#0.0.4)
+
+## [fixt-0.0.4](crates/fixt/CHANGELOG.md#0.0.4)
+
 # 20210624.155736
 
 ***:exclamation: Performance impact***

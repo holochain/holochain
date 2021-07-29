@@ -1002,18 +1002,17 @@ impl HolochainP2pHandler for HolochainP2pActor {
         let payload = crate::wire::WireMessage::get(dht_hash, r_options).encode()?;
 
         let kitsune_p2p = self.kitsune_p2p.clone();
+        let tuning_params = self.tuning_params.clone();
         Ok(async move {
+            let input = kitsune_p2p::actor::RpcMulti::new(
+                &tuning_params,
+                space,
+                from_agent,
+                basis,
+                payload,
+            );
             let result = kitsune_p2p
-                .rpc_multi(kitsune_p2p::actor::RpcMulti {
-                    space,
-                    from_agent,
-                    basis,
-                    remote_agent_count: options.remote_agent_count,
-                    timeout_ms: options.timeout_ms,
-                    as_race: options.as_race,
-                    race_timeout_ms: options.race_timeout_ms,
-                    payload,
-                })
+                .rpc_multi(input)
                 .instrument(tracing::debug_span!("rpc_multi"))
                 .await?;
 
@@ -1045,19 +1044,16 @@ impl HolochainP2pHandler for HolochainP2pActor {
         let payload = crate::wire::WireMessage::get_meta(dht_hash, r_options).encode()?;
 
         let kitsune_p2p = self.kitsune_p2p.clone();
+        let tuning_params = self.tuning_params.clone();
         Ok(async move {
-            let result = kitsune_p2p
-                .rpc_multi(kitsune_p2p::actor::RpcMulti {
-                    space,
-                    from_agent,
-                    basis,
-                    remote_agent_count: options.remote_agent_count,
-                    timeout_ms: options.timeout_ms,
-                    as_race: options.as_race,
-                    race_timeout_ms: options.race_timeout_ms,
-                    payload,
-                })
-                .await?;
+            let input = kitsune_p2p::actor::RpcMulti::new(
+                &tuning_params,
+                space,
+                from_agent,
+                basis,
+                payload,
+            );
+            let result = kitsune_p2p.rpc_multi(input).await?;
 
             let mut out = Vec::new();
             for item in result {
@@ -1087,22 +1083,20 @@ impl HolochainP2pHandler for HolochainP2pActor {
         let payload = crate::wire::WireMessage::get_links(link_key, r_options).encode()?;
 
         let kitsune_p2p = self.kitsune_p2p.clone();
+        let tuning_params = self.tuning_params.clone();
         Ok(async move {
+            let mut input = kitsune_p2p::actor::RpcMulti::new(
+                &tuning_params,
+                space,
+                from_agent,
+                basis,
+                payload,
+            );
             // TODO - We're just targeting a single remote node for now
             //        without doing any pagination / etc...
             //        Setting up RpcMulti to act like RpcSingle
-            let result = kitsune_p2p
-                .rpc_multi(kitsune_p2p::actor::RpcMulti {
-                    space,
-                    from_agent,
-                    basis,
-                    remote_agent_count: Some(1),
-                    timeout_ms: options.timeout_ms,
-                    as_race: false,
-                    race_timeout_ms: options.timeout_ms,
-                    payload,
-                })
-                .await?;
+            input.max_remote_agent_count = 1;
+            let result = kitsune_p2p.rpc_multi(input).await?;
 
             let mut out = Vec::new();
             for item in result {
@@ -1137,22 +1131,20 @@ impl HolochainP2pHandler for HolochainP2pActor {
             crate::wire::WireMessage::get_agent_activity(agent, query, r_options).encode()?;
 
         let kitsune_p2p = self.kitsune_p2p.clone();
+        let tuning_params = self.tuning_params.clone();
         Ok(async move {
+            let mut input = kitsune_p2p::actor::RpcMulti::new(
+                &tuning_params,
+                space,
+                from_agent,
+                basis,
+                payload,
+            );
             // TODO - We're just targeting a single remote node for now
             //        without doing any pagination / etc...
             //        Setting up RpcMulti to act like RpcSingle
-            let result = kitsune_p2p
-                .rpc_multi(kitsune_p2p::actor::RpcMulti {
-                    space,
-                    from_agent,
-                    basis,
-                    remote_agent_count: Some(1),
-                    timeout_ms: options.timeout_ms,
-                    as_race: false,
-                    race_timeout_ms: options.timeout_ms,
-                    payload,
-                })
-                .await?;
+            input.max_remote_agent_count = 1;
+            let result = kitsune_p2p.rpc_multi(input).await?;
 
             let mut out = Vec::new();
             for item in result {

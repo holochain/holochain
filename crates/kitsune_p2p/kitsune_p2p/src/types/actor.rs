@@ -1,5 +1,6 @@
 //! Definitions related to the KitsuneP2p peer-to-peer / dht communications actor.
 
+use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::KitsuneTimeout;
 use std::sync::Arc;
 use url2::Url2;
@@ -10,24 +11,49 @@ use url2::Url2;
 pub struct RpcMulti {
     /// The "space" context.
     pub space: Arc<super::KitsuneSpace>,
+
     /// The agent making the request.
     pub from_agent: Arc<super::KitsuneAgent>,
+
     /// The "basis" hash/coordinate of destination neigborhood.
     pub basis: Arc<super::KitsuneBasis>,
-    /// See docs on Broadcast
-    pub remote_agent_count: Option<u8>,
-    /// See docs on Broadcast
-    pub timeout_ms: Option<u64>,
-    /// We are interested in speed. If `true` and we have any results
-    /// when `race_timeout_ms` is expired, those results will be returned.
-    /// After `race_timeout_ms` and before `timeout_ms` the first result
-    /// received will be returned.
-    pub as_race: bool,
-    /// See `as_race` for details.
-    /// Set to `None` for a default "best-effort" race.
-    pub race_timeout_ms: Option<u64>,
+
     /// Request data.
     pub payload: Vec<u8>,
+
+    /// Max number of remote requests to make
+    pub max_remote_agent_count: u8,
+
+    /// Max timeout for aggregating response data
+    pub max_timeout: KitsuneTimeout,
+
+    /// Remote request grace period.
+    /// If we already have results from other sources,
+    /// but made any additional outgoing remote requests,
+    /// we'll wait at least this long for additional responses.
+    pub remote_request_grace_ms: u64,
+}
+
+impl RpcMulti {
+    /// Construct a new RpcMulti input struct
+    /// with timing defaults specified by tuning_params.
+    pub fn new(
+        tuning_params: &KitsuneP2pTuningParams,
+        space: Arc<super::KitsuneSpace>,
+        from_agent: Arc<super::KitsuneAgent>,
+        basis: Arc<super::KitsuneBasis>,
+        payload: Vec<u8>,
+    ) -> Self {
+        Self {
+            space,
+            from_agent,
+            basis,
+            payload,
+            max_remote_agent_count: tuning_params.default_rpc_multi_remote_agent_count,
+            max_timeout: tuning_params.implicit_timeout(),
+            remote_request_grace_ms: tuning_params.default_rpc_multi_remote_request_grace_ms,
+        }
+    }
 }
 
 /// A response type helps indicate what agent gave what response.

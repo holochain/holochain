@@ -23,16 +23,20 @@ where
 {
     // @todo is this secure to set this in the wasm rather than have the host inject it?
     let provenance = agent_info()?.agent_latest_pubkey;
-    HDK.with(|h| {
-        h.borrow().call(Call::new(
-            to_cell,
-            zome_name,
-            fn_name,
-            cap_secret,
-            ExternIO::encode(payload)?,
-            provenance,
-        ))
-    })
+    Ok(HDK
+        .with(|h| {
+            h.borrow().call(vec![Call::new(
+                to_cell,
+                zome_name,
+                fn_name,
+                cap_secret,
+                ExternIO::encode(payload)?,
+                provenance,
+            )])
+        })?
+        .into_iter()
+        .next()
+        .unwrap())
 }
 
 /// Wrapper for __call_remote host function.
@@ -68,15 +72,19 @@ pub fn call_remote<I>(
 where
     I: serde::Serialize + std::fmt::Debug,
 {
-    HDK.with(|h| {
-        h.borrow().call_remote(CallRemote::new(
-            agent,
-            zome,
-            fn_name,
-            cap_secret,
-            ExternIO::encode(payload)?,
-        ))
-    })
+    Ok(HDK
+        .with(|h| {
+            h.borrow().call_remote(vec![CallRemote::new(
+                agent,
+                zome,
+                fn_name,
+                cap_secret,
+                ExternIO::encode(payload)?,
+            )])
+        })?
+        .into_iter()
+        .next()
+        .unwrap())
 }
 
 /// Emit an app-defined Signal.

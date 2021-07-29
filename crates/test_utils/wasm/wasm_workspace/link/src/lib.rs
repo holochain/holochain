@@ -22,6 +22,11 @@ fn create_link(_: ()) -> ExternResult<HeaderHash> {
 }
 
 #[hdk_extern]
+fn create_back_link(_: ()) -> ExternResult<HeaderHash> {
+    hdk::prelude::create_link(target()?, base()?, ())
+}
+
+#[hdk_extern]
 fn delete_link(input: HeaderHash) -> ExternResult<HeaderHash> {
     hdk::prelude::delete_link(input)
 }
@@ -29,6 +34,37 @@ fn delete_link(input: HeaderHash) -> ExternResult<HeaderHash> {
 #[hdk_extern]
 fn get_links(_: ()) -> ExternResult<Links> {
     hdk::prelude::get_links(base()?, None)
+}
+
+#[hdk_extern]
+fn get_link_details(_: ()) -> ExternResult<LinkDetails> {
+    hdk::prelude::get_link_details(base()?, None)
+}
+
+#[hdk_extern]
+fn get_back_links(_: ()) -> ExternResult<Links> {
+    hdk::prelude::get_links(target()?, None)
+}
+
+#[hdk_extern]
+fn get_back_link_details(_: ()) -> ExternResult<LinkDetails> {
+    hdk::prelude::get_link_details(target()?, None)
+}
+
+#[hdk_extern]
+fn get_links_bidi(_: ()) -> ExternResult<Vec<Links>> {
+    HDK.with(|h| h.borrow().get_links(vec![
+        GetLinksInput::new(base()?, None),
+        GetLinksInput::new(target()?, None),
+    ]))
+}
+
+#[hdk_extern]
+fn get_link_details_bidi(_: ()) -> ExternResult<Vec<LinkDetails>> {
+    HDK.with(|h| h.borrow().get_link_details(vec![
+        GetLinksInput::new(base()?, None),
+        GetLinksInput::new(target()?, None),
+    ]))
 }
 
 #[hdk_extern]
