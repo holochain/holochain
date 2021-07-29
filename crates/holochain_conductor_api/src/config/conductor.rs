@@ -170,7 +170,7 @@ pub mod tests {
         gossip_loop_iteration_delay_ms: 42
         default_rpc_single_timeout_ms: 42
         default_rpc_multi_remote_agent_count: 42
-        default_rpc_multi_timeout_ms: 42
+        default_rpc_multi_remote_request_grace_ms: 42
         agent_info_expires_after_ms: 42
         tls_in_mem_session_storage: 42
         proxy_keepalive_ms: 42
@@ -196,7 +196,7 @@ pub mod tests {
         tuning_params.gossip_loop_iteration_delay_ms = 42;
         tuning_params.default_rpc_single_timeout_ms = 42;
         tuning_params.default_rpc_multi_remote_agent_count = 42;
-        tuning_params.default_rpc_multi_timeout_ms = 42;
+        tuning_params.default_rpc_multi_remote_request_grace_ms = 42;
         tuning_params.agent_info_expires_after_ms = 42;
         tuning_params.tls_in_mem_session_storage = 42;
         tuning_params.proxy_keepalive_ms = 42;
