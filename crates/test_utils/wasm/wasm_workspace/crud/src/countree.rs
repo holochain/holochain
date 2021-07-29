@@ -29,19 +29,33 @@ impl CounTree {
         }
     }
 
-    pub fn header_details(header_hash: HeaderHash) -> ExternResult<Option<Details>> {
-        get_details(
-            header_hash,
-            GetOptions::latest(),
-        )
+    pub fn header_details(header_hashes: Vec<HeaderHash>) -> ExternResult<Vec<Option<Details>>> {
+        HDK.with(|h| {
+            h.borrow().get_details(
+                header_hashes
+                .into_iter()
+                .map(|header_hash|
+                    GetInput::new(
+                        header_hash.into(),
+                        GetOptions::latest()
+                    )).collect()
+            )
+        })
     }
 
     /// return the Option<Details> for the entry hash from the header
-    pub fn entry_details(entry_hash: EntryHash) -> ExternResult<Option<Details>> {
-        get_details(
-            entry_hash,
-            GetOptions::latest(),
-        )
+    pub fn entry_details(entry_hashes: Vec<EntryHash>) -> ExternResult<Vec<Option<Details>>> {
+        HDK.with(|h| {
+            h.borrow().get_details(
+                entry_hashes
+                .into_iter()
+                .map(|entry_hash|
+                    GetInput::new(
+                        entry_hash.into(),
+                        GetOptions::latest()
+                    )
+                ).collect())
+        })
     }
 
     /// increments the given header hash by 1 or creates it if not found
