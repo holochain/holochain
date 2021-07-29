@@ -87,11 +87,12 @@ impl ShardedGossipLocal {
             // then we exit and the remote will proceed.
             // If we tie then we both exit (This will be very rare).
             if our_id >= remote_id {
+                return Ok(Vec::with_capacity(0));
+            } else {
                 self.inner.share_mut(|i, _| {
                     i.initiate_tgt = None;
                     Ok(())
                 })?;
-                return Ok(Vec::with_capacity(0));
             }
         }
 

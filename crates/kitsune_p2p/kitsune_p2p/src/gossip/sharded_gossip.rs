@@ -96,10 +96,16 @@ impl ShardedGossip {
         gossip_type: GossipType,
     ) -> Arc<Self> {
         let mut inner = ShardedGossipLocalState::default();
-        let bandwidth = Bandwidth::new(
-            tuning_params.gossip_inbound_target_mbps,
-            tuning_params.gossip_output_target_mbps,
-        );
+        let bandwidth = match gossip_type {
+            GossipType::Recent => Bandwidth::new(
+                tuning_params.gossip_inbound_target_mbps,
+                tuning_params.gossip_outbound_target_mbps,
+            ),
+            GossipType::Historical => Bandwidth::new(
+                tuning_params.gossip_historic_inbound_target_mbps,
+                tuning_params.gossip_historic_outbound_target_mbps,
+            ),
+        };
         inner.tuning_params = tuning_params.clone();
         let this = Arc::new(Self {
             ep_hnd,
@@ -111,6 +117,7 @@ impl ShardedGossip {
                 inner: Share::new(inner),
                 gossip_type,
                 closing: AtomicBool::new(false),
+                new_data: AtomicBool::new(false),
             },
             bandwidth,
         });
@@ -126,7 +133,7 @@ impl ShardedGossip {
                     // TODO: This sleep isn't really needed except to stop a hot loop.
                     // It could be much lower but we need to first implement how quickly we
                     // call nodes to avoid hot looping.
-                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
                     this.run_one_iteration().await;
                 }
                 KitsuneResult::Ok(())
@@ -194,6 +201,7 @@ impl ShardedGossip {
             let cert = outgoing.0.cert().clone();
             if let Err(err) = self.process_outgoing(outgoing).await {
                 self.gossip.remove_state(&cert).await?;
+                self.gossip.record_metric_info(cert, true)?;
                 tracing::error!(
                     "Gossip failed to send outgoing message because of: {:?}",
                     err
@@ -201,7 +209,9 @@ impl ShardedGossip {
             }
         }
 
-        self.gossip.local_sync().await?;
+        if self.gossip.should_local_sync()? {
+            self.gossip.local_sync().await?;
+        }
 
         Ok(())
     }
@@ -222,9 +232,11 @@ impl ShardedGossip {
             Ok(None) => (),
             Err(err) => tracing::error!("Gossip failed when trying to initiate with {:?}", err),
         }
+        self.gossip.reset_new_data();
         if let Err(err) = self.process_incoming_outgoing().await {
             tracing::error!("Gossip failed to process a message because of: {:?}", err);
         }
+        self.gossip.record_timeouts();
     }
 
     fn pop_queues(&self) -> KitsuneResult<(Option<Incoming>, Option<Outgoing>)> {
@@ -248,6 +260,8 @@ pub struct ShardedGossipLocal {
     evt_sender: EventSender,
     inner: Share<ShardedGossipLocalState>,
     closing: AtomicBool,
+    /// Have received new data since last message.
+    new_data: AtomicBool,
 }
 
 /// Incoming gossip.
@@ -266,6 +280,18 @@ pub struct ShardedGossipLocalState {
     /// If Some, we are in the process of trying to initiate gossip with this target.
     initiate_tgt: Option<(GossipTgt, u8)>,
     round_map: RoundStateMap,
+    /// Metrics for a connection.
+    // FIXME: Currently the p2p metric store is setup to track
+    // metrics per agent but we need to track metrics per connection.
+    metrics: HashMap<Tx2Cert, MetricInfo>,
+    /// Last moment we locally synced.
+    last_local_sync: Option<std::time::Instant>,
+}
+
+#[derive(Debug, Copy, Clone)]
+struct MetricInfo {
+    error: bool,
+    last_sync: std::time::Instant,
 }
 
 impl ShardedGossipLocalState {
@@ -479,6 +505,9 @@ impl ShardedGossipLocal {
                 }
             }
             ShardedGossipWire::MissingOps(MissingOps { ops, finished }) => {
+                if !ops.is_empty() {
+                    self.set_new_data();
+                }
                 let state = if finished {
                     self.decrement_ops_blooms(&cert).await?
                 } else {
@@ -524,7 +553,7 @@ impl ShardedGossipLocal {
         .map(|(ops, _window)| ops)
         .unwrap_or_default();
 
-        let ops = store::fetch_ops(
+        let ops: Vec<_> = store::fetch_ops(
             &self.evt_sender,
             &self.space,
             local_agents.iter(),
@@ -535,6 +564,16 @@ impl ShardedGossipLocal {
         // maackle: this seems silly
         .map(Arc::new)
         .collect();
+
+        // If we are actually gossiping ops then it's worth
+        // running another local next iteration because ops
+        // take time to pass through the incoming workflow.
+        if !ops.is_empty() {
+            self.inner.share_mut(|i, _| {
+                i.last_local_sync = None;
+                Ok(())
+            })?;
+        }
 
         store::put_ops(&self.evt_sender, &self.space, agent_arcs, ops).await?;
         Ok(())
@@ -547,7 +586,6 @@ impl ShardedGossipLocal {
         local_agents: &HashSet<Arc<KitsuneAgent>>,
         current_rounds: HashSet<Tx2Cert>,
     ) -> KitsuneResult<Option<(GossipTgt, TxUrl)>> {
-        // Get the time range for this gossip.
         let mut remote_agents_within_arc_set: Vec<_> =
             store::agents_within_arcset(&self.evt_sender, &self.space, arc_set.clone())
                 .await?
@@ -563,36 +601,136 @@ impl ShardedGossipLocal {
             remote_agents_within_arc_set.shuffle(&mut rng);
         }
 
-        match remote_agents_within_arc_set.into_iter().next() {
-            Some((remote_agent, _)) => {
-                Ok(
-                    // Get the agent info for the chosen remote agent.
-                    store::get_agent_info(&self.evt_sender, &self.space, &remote_agent)
-                        .await?
-                        .and_then(|ra| {
-                            ra.url_list
-                                .iter()
-                                .filter_map(|url| {
-                                    kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str())
-                                        .map_err(|e| tracing::error!("Failed to parse url {:?}", e))
-                                        .ok()
-                                        .map(|purl| {
-                                            (
-                                                GossipTgt::new(
-                                                    vec![ra.agent.clone()],
-                                                    Tx2Cert::from(purl.digest()),
-                                                ),
-                                                TxUrl::from(url.as_str()),
-                                            )
-                                        })
-                                        .filter(|(tgt, _)| !current_rounds.contains(tgt.cert()))
+        let mut result = None;
+        let have_new_data = self.have_new_data();
+        for (remote_agent, _) in remote_agents_within_arc_set {
+            // Get the agent info for the chosen remote agent.
+            let agent = store::get_agent_info(&self.evt_sender, &self.space, &remote_agent)
+                .await?
+                .and_then(|ra| {
+                    ra.url_list
+                        .iter()
+                        .filter_map(|url| {
+                            kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str())
+                                .map_err(|e| tracing::error!("Failed to parse url {:?}", e))
+                                .ok()
+                                .map(|purl| {
+                                    (
+                                        GossipTgt::new(
+                                            vec![ra.agent.clone()],
+                                            Tx2Cert::from(purl.digest()),
+                                        ),
+                                        TxUrl::from(url.as_str()),
+                                    )
                                 })
-                                .next()
-                        }),
-                )
+                                .filter(|(tgt, _)| !current_rounds.contains(tgt.cert()))
+                        })
+                        .next()
+                });
+            if let Some(agent) = agent {
+                if self.saw_too_recently(agent.0.cert(), have_new_data)? {
+                    continue;
+                }
+                self.record_metric_info(agent.0.cert().clone(), false)?;
+                result = Some(agent);
+                break;
             }
-            None => Ok(None),
         }
+        Ok(result)
+    }
+
+    /// Check if we have sync'd with a remote endpoint too recently.
+    fn saw_too_recently(&self, cert: &Tx2Cert, have_new_data: bool) -> KitsuneResult<bool> {
+        if let Some(metric_info) = self.get_metric_info(cert)? {
+            if metric_info.error {
+                if metric_info.last_sync.elapsed().as_millis() as u32
+                    <= self.tuning_params.gossip_peer_on_error_next_gossip_delay_ms
+                {
+                    return Ok(true);
+                }
+            } else if metric_info.last_sync.elapsed().as_millis() as u32
+                <= self
+                    .tuning_params
+                    .gossip_peer_on_success_next_gossip_delay_ms
+                && !have_new_data
+            {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    /// Check if we have new data sync the last iteration.
+    fn have_new_data(&self) -> bool {
+        self.new_data.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Reset the iteration.
+    fn reset_new_data(&self) {
+        self.new_data
+            .store(false, std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Set that we have new data this iteration.
+    fn set_new_data(&self) {
+        self.new_data
+            .store(true, std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Get metric info for a connection.
+    fn get_metric_info(&self, cert: &Tx2Cert) -> KitsuneResult<Option<MetricInfo>> {
+        self.inner
+            .share_mut(|i, _| Ok(i.metrics.get(cert).copied()))
+    }
+
+    /// Record metric info for a connection.
+    fn record_metric_info(&self, cert: Tx2Cert, error: bool) -> KitsuneResult<()> {
+        let metric = MetricInfo {
+            error,
+            last_sync: std::time::Instant::now(),
+        };
+        self.inner.share_mut(|i, _| {
+            i.metrics.insert(cert, metric);
+            Ok(())
+        })
+    }
+
+    /// Check if we should locally sync
+    fn should_local_sync(&self) -> KitsuneResult<bool> {
+        let update_last_sync = |i: &mut ShardedGossipLocalState, _: &mut bool| {
+            if i.last_local_sync
+                .as_ref()
+                .map(|s| s.elapsed().as_millis() as u32)
+                .unwrap_or(u32::MAX)
+                >= self.tuning_params.gossip_local_sync_delay_ms
+            {
+                i.last_local_sync = Some(std::time::Instant::now());
+                Ok(true)
+            } else {
+                Ok(false)
+            }
+        };
+        if self.have_new_data() || self.inner.share_mut(update_last_sync)? {
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// Record all timed out rounds into metrics
+    fn record_timeouts(&self) {
+        self.inner
+            .share_mut(|i, _| {
+                for cert in i.round_map.take_timed_out_rounds() {
+                    let metric = MetricInfo {
+                        error: true,
+                        last_sync: std::time::Instant::now(),
+                    };
+                    i.metrics.insert(cert, metric);
+                }
+                Ok(())
+            })
+            .ok();
     }
 }
 
@@ -744,6 +882,8 @@ impl AsGossipModule for ShardedGossip {
 
     fn local_agent_join(&self, a: Arc<KitsuneAgent>) {
         let _ = self.gossip.inner.share_mut(move |i, _| {
+            // Force a new local sync as we have a new agent to sync with.
+            i.last_local_sync = None;
             i.local_agents.insert(a);
             Ok(())
         });

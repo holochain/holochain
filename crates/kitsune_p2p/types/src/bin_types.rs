@@ -63,7 +63,7 @@ macro_rules! make_kitsune_bin_type {
                         // so simply pad with 0's for now
                         bytes.append(&mut [0; 4].to_vec());
 
-                        todo!("actually calculate location bytes");
+                        // todo!("actually calculate location bytes");
                         // bytes.append(&mut kitsune_location_bytes(&bytes));
                     }
                     debug_assert_eq!(bytes.len(), 36);

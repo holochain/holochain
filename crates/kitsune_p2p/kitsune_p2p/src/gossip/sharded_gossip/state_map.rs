@@ -1,9 +1,10 @@
 use super::*;
 
 /// Map of gossip round state that checks for timed out rounds on gets.
-#[derive(Default, Debug, derive_more::From)]
+#[derive(Default, Debug)]
 pub(super) struct RoundStateMap {
     map: HashMap<StateKey, RoundState>,
+    timed_out: Vec<StateKey>,
 }
 
 impl RoundStateMap {
@@ -13,6 +14,7 @@ impl RoundStateMap {
         if let Some(state) = self.map.get(key) {
             if state.created_at.elapsed().as_millis() as u32 > state.round_timeout {
                 self.map.remove(key);
+                self.timed_out.push(key.clone());
                 timed_out = true;
             }
         }
@@ -43,8 +45,16 @@ impl RoundStateMap {
 
     /// Get the set of current rounds and remove any expired rounds.
     pub(super) fn current_rounds(&mut self) -> HashSet<Tx2Cert> {
-        self.map
-            .retain(|_, v| (v.created_at.elapsed().as_millis() as u32) < v.round_timeout);
+        let mut timed_out = Vec::new();
+        self.map.retain(|k, v| {
+            if (v.created_at.elapsed().as_millis() as u32) < v.round_timeout {
+                true
+            } else {
+                timed_out.push(k.clone());
+                false
+            }
+        });
+        self.timed_out.extend(timed_out);
         self.map.keys().cloned().collect::<HashSet<_>>()
     }
 
@@ -52,5 +62,19 @@ impl RoundStateMap {
     pub(super) fn round_exists(&mut self, key: &StateKey) -> bool {
         self.check_timeout(key);
         self.map.contains_key(key)
+    }
+
+    /// Get all timed out rounds.
+    pub(super) fn take_timed_out_rounds(&mut self) -> Vec<StateKey> {
+        std::mem::take(&mut self.timed_out)
+    }
+}
+
+impl From<HashMap<StateKey, RoundState>> for RoundStateMap {
+    fn from(map: HashMap<StateKey, RoundState>) -> Self {
+        Self {
+            map,
+            ..Default::default()
+        }
     }
 }

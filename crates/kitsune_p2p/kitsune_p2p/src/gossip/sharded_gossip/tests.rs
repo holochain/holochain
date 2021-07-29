@@ -31,6 +31,7 @@ impl ShardedGossipLocal {
             evt_sender,
             inner: Share::new(inner),
             closing: std::sync::atomic::AtomicBool::new(false),
+            new_data: std::sync::atomic::AtomicBool::new(false),
         }
     }
 }
