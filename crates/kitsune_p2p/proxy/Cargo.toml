@@ -31,7 +31,7 @@ tracing-subscriber = "0.2"
 webpki = "0.21.2"
 
 [dev-dependencies]
-criterion = "*"
+criterion = "0.3.4"
 crossterm = "0.19"
 
 [[bench]]
