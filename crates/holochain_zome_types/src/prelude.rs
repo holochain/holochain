@@ -6,6 +6,7 @@ pub use crate::call::*;
 pub use crate::call_remote::*;
 pub use crate::capability::*;
 pub use crate::cell::*;
+pub use crate::countersigning::*;
 pub use crate::crdt::*;
 pub use crate::dna_def::*;
 pub use crate::element::*;
