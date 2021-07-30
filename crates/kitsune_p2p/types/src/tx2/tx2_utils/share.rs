@@ -45,7 +45,7 @@ impl<T: 'static + Send> Share<T> {
         }
         f(t.as_ref().unwrap())
     }
-    
+
     /// Attempt to unwrap the inner value, assuming this is the only instance.
     pub fn try_unwrap(self) -> Result<Option<T>, Self> {
         match Arc::try_unwrap(self.0) {
