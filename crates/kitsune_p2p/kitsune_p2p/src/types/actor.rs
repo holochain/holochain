@@ -1,5 +1,6 @@
 //! Definitions related to the KitsuneP2p peer-to-peer / dht communications actor.
 
+use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::KitsuneTimeout;
 use std::sync::Arc;
 use url2::Url2;
@@ -10,24 +11,49 @@ use url2::Url2;
 pub struct RpcMulti {
     /// The "space" context.
     pub space: Arc<super::KitsuneSpace>,
+
     /// The agent making the request.
     pub from_agent: Arc<super::KitsuneAgent>,
+
     /// The "basis" hash/coordinate of destination neigborhood.
     pub basis: Arc<super::KitsuneBasis>,
-    /// See docs on Broadcast
-    pub remote_agent_count: Option<u8>,
-    /// See docs on Broadcast
-    pub timeout_ms: Option<u64>,
-    /// We are interested in speed. If `true` and we have any results
-    /// when `race_timeout_ms` is expired, those results will be returned.
-    /// After `race_timeout_ms` and before `timeout_ms` the first result
-    /// received will be returned.
-    pub as_race: bool,
-    /// See `as_race` for details.
-    /// Set to `None` for a default "best-effort" race.
-    pub race_timeout_ms: Option<u64>,
+
     /// Request data.
     pub payload: Vec<u8>,
+
+    /// Max number of remote requests to make
+    pub max_remote_agent_count: u8,
+
+    /// Max timeout for aggregating response data
+    pub max_timeout: KitsuneTimeout,
+
+    /// Remote request grace period.
+    /// If we already have results from other sources,
+    /// but made any additional outgoing remote requests,
+    /// we'll wait at least this long for additional responses.
+    pub remote_request_grace_ms: u64,
+}
+
+impl RpcMulti {
+    /// Construct a new RpcMulti input struct
+    /// with timing defaults specified by tuning_params.
+    pub fn new(
+        tuning_params: &KitsuneP2pTuningParams,
+        space: Arc<super::KitsuneSpace>,
+        from_agent: Arc<super::KitsuneAgent>,
+        basis: Arc<super::KitsuneBasis>,
+        payload: Vec<u8>,
+    ) -> Self {
+        Self {
+            space,
+            from_agent,
+            basis,
+            payload,
+            max_remote_agent_count: tuning_params.default_rpc_multi_remote_agent_count,
+            max_timeout: tuning_params.implicit_timeout(),
+            remote_request_grace_ms: tuning_params.default_rpc_multi_remote_request_grace_ms,
+        }
+    }
 }
 
 /// A response type helps indicate what agent gave what response.
@@ -39,6 +65,12 @@ pub struct RpcMultiResponse {
     pub response: Vec<u8>,
 }
 
+type KSpace = Arc<super::KitsuneSpace>;
+type KAgent = Arc<super::KitsuneAgent>;
+type KBasis = Arc<super::KitsuneBasis>;
+type Payload = Vec<u8>;
+type OptU64 = Option<u64>;
+
 ghost_actor::ghost_chan! {
     /// The KitsuneP2pSender allows async remote-control of the KitsuneP2p actor.
     pub chan KitsuneP2p<super::KitsuneP2pError> {
@@ -46,14 +78,14 @@ ghost_actor::ghost_chan! {
         fn list_transport_bindings() -> Vec<Url2>;
 
         /// Announce a space/agent pair on this network.
-        fn join(space: Arc<super::KitsuneSpace>, agent: Arc<super::KitsuneAgent>) -> ();
+        fn join(space: KSpace, agent: KAgent) -> ();
 
         /// Withdraw this space/agent pair from this network.
-        fn leave(space: Arc<super::KitsuneSpace>, agent: Arc<super::KitsuneAgent>) -> ();
+        fn leave(space: KSpace, agent: KAgent) -> ();
 
         /// Make a request of a single remote agent, expecting a response.
         /// The remote side will receive a "Call" event.
-        fn rpc_single(space: Arc<super::KitsuneSpace>, to_agent: Arc<super::KitsuneAgent>, from_agent: Arc<super::KitsuneAgent>, payload: Vec<u8>, timeout_ms: Option<u64>) -> Vec<u8>;
+        fn rpc_single(space: KSpace, to_agent: KAgent, from_agent: KAgent, payload: Payload, timeout_ms: OptU64) -> Vec<u8>;
 
         /// Make a request to multiple destination agents - awaiting/aggregating the responses.
         /// The remote sides will see these messages as "Call" events.
@@ -65,10 +97,10 @@ ghost_actor::ghost_chan! {
         /// least one connection with a node in the target neighborhood.
         /// The remote sides will see these messages as "Notify" events.
         fn broadcast(
-            space: Arc<super::KitsuneSpace>,
-            basis: Arc<super::KitsuneBasis>,
+            space: KSpace,
+            basis: KBasis,
             timeout: KitsuneTimeout,
-            payload: Vec<u8>
+            payload: Payload
         ) -> ();
     }
 }

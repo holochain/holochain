@@ -331,7 +331,7 @@ impl ConItem {
 
     // register this connection
     pub async fn reg_con_inner(
-        con_init: std::time::Instant,
+        con_init: tokio::time::Instant,
         local_cert: Tx2Cert,
         tuning_params: KitsuneP2pTuningParams,
         inner: Share<PromoteEpInner>,
@@ -433,7 +433,7 @@ impl ConItem {
     // The raw fallible inner future
     // `inner_connect` must catch errors to delete the entry from pend_cons
     pub fn inner_con_inner(
-        con_init: std::time::Instant,
+        con_init: tokio::time::Instant,
         local_cert: Tx2Cert,
         tuning_params: KitsuneP2pTuningParams,
         inner: Share<PromoteEpInner>,
@@ -475,7 +475,7 @@ impl ConItem {
         remote: TxUrl,
         timeout: KitsuneTimeout,
     ) -> Shared<BoxFuture<'static, KitsuneResult<Self>>> {
-        let con_init = std::time::Instant::now();
+        let con_init = tokio::time::Instant::now();
         async move {
             match Self::inner_con_inner(
                 con_init,
@@ -712,7 +712,7 @@ async fn con_recv_logic(
     // This *is* actually bound, by the max connections semaphore.
     pend_stream
         .for_each_concurrent(None, move |r| async move {
-            let con_init = std::time::Instant::now();
+            let con_init = tokio::time::Instant::now();
             let (permit, r) = r;
             let (con, in_chan_recv) = match r.await {
                 Err(e) => {

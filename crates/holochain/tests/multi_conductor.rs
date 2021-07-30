@@ -59,13 +59,8 @@ async fn multi_conductor() -> anyhow::Result<()> {
     .await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Header
-    let elements: Vec<Option<Element>> =
-        conductors[1].call(&bobbo.zome("zome1"), "read", hash).await;
-    let element = elements
-        .into_iter()
-        .next()
-        .unwrap()
-        .expect("Element was None: bobbo couldn't `get` it");
+    let element: Option<Element> = conductors[1].call(&bobbo.zome("zome1"), "read", hash).await;
+    let element = element.expect("Element was None: bobbo couldn't `get` it");
 
     // Assert that the Element bobbo sees matches what alice committed
     assert_eq!(element.header().author(), alice.agent_pubkey());

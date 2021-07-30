@@ -147,6 +147,9 @@ pub(crate) fn search_remotes_covering_basis(
     async move {
         let backoff = timeout.backoff(INITIAL_DELAY, MAX_DELAY);
         loop {
+            //let s_remain = timeout.time_remaining().as_secs_f64();
+            //tracing::trace!(%s_remain, "search_remotes_covering_basis iteration");
+
             let mut cover_nodes = Vec::new();
             let mut near_nodes = Vec::new();
 

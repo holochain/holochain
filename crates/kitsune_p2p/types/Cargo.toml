@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_types"
-version = "0.0.2-dev.0"
+version = "0.0.2"
 description = "types subcrate for kitsune-p2p"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -14,10 +14,11 @@ edition = "2018"
 base64 = "0.13"
 derive_more = "0.99.7"
 futures = "0.3"
-ghost_actor = "0.3.0-alpha.1"
+ghost_actor = "=0.3.0-alpha.2"
 kitsune_p2p_dht_arc = { version = "0.0.1", path = "../dht_arc" }
 lair_keystore_api = "=0.0.2"
 lru = "0.6.5"
+mockall = { version = "0.10.2", optional = true }
 nanoid = "0.3"
 observability = "0.1.3"
 once_cell = "1.4"
@@ -52,5 +53,7 @@ harness = false
 test_utils = [
   "arbitrary",
   "lair_keystore_api/arbitrary",
-  "kitsune_p2p_dht_arc/test_utils"
+  "kitsune_p2p_dht_arc/test_utils",
+  "ghost_actor/test_utils",
+  "mockall",
 ]

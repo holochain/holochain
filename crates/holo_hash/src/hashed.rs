@@ -1,7 +1,10 @@
+use crate::HasHash;
 use crate::HashableContent;
 use crate::HoloHashOf;
-use crate::{HasHash, PrimitiveHashType};
 use holochain_serialized_bytes::prelude::*;
+
+#[cfg(feature = "arbitrary")]
+use crate::PrimitiveHashType;
 
 /// Represents some piece of content along with its hash representation, so that
 /// hashes need not be calculated multiple times.

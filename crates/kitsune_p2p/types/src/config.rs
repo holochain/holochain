@@ -119,11 +119,14 @@ pub mod tuning_params_struct {
         /// Default timeout for rpc single. [Default: 30s]
         default_rpc_single_timeout_ms: u32 = 1000 * 30,
 
-        /// Default agent count for rpc multi. [Default: 2]
-        default_rpc_multi_remote_agent_count: u32 = 2,
+        /// Default agent count for rpc multi. [Default: 3]
+        default_rpc_multi_remote_agent_count: u8 = 3,
 
-        /// Default timeout for rpc multi. [Default: 30s]
-        default_rpc_multi_timeout_ms: u32 = 1000 * 30,
+        /// Default remote request grace ms. [Default: 3s]
+        /// If we already have results from other sources,
+        /// but made any additional outgoing remote requests,
+        /// we'll wait at least this long for additional responses.
+        default_rpc_multi_remote_request_grace_ms: u64 = 1000 * 3,
 
         /// Default agent expires after milliseconds. [Default: 20 minutes]
         agent_info_expires_after_ms: u32 = 1000 * 60 * 20,
