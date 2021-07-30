@@ -169,6 +169,7 @@ type KSpace = Arc<super::KitsuneSpace>;
 type KAgent = Arc<super::KitsuneAgent>;
 type KOpHash = Arc<super::KitsuneOpHash>;
 type Payload = Vec<u8>;
+type Ops = Vec<(KOpHash, Payload)>;
 
 ghost_actor::ghost_chan! {
     /// The KitsuneP2pEvent stream allows handling events generated from the
@@ -202,11 +203,7 @@ ghost_actor::ghost_chan! {
         fn notify(space: KSpace, to_agent: KAgent, from_agent: KAgent, payload: Payload) -> ();
 
         /// We are receiving a dht op we may need to hold distributed via gossip.
-        fn gossip(
-            space: KSpace,
-            to_agent: KAgent,
-            ops: Vec<(KOpHash, Payload)>
-        ) -> ();
+        fn gossip(space: KSpace, to_agent: KAgent, ops: Ops) -> ();
 
         /// Gather a list of op-hashes from our implementor that meet criteria.
         /// Get the oldest and newest times for ops within a time window and max number of ops.

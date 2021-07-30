@@ -679,7 +679,7 @@ mockall::mock! {
 
     pub KitsuneP2pEventHandler {}
 
-    trait KitsuneP2pEventHandler {
+    impl KitsuneP2pEventHandler for KitsuneP2pEventHandler {
         fn handle_put_agent_info_signed(
             &mut self,
             input: crate::event::PutAgentInfoSignedEvt,
