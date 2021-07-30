@@ -160,6 +160,9 @@ ghost_actor::ghost_chan! {
         /// query agent info in order of closeness to a basis location.
         fn query_agent_info_signed_near_basis(space: KSpace, basis_loc: u32, limit: u32) -> Vec<crate::types::agent_store::AgentInfoSigned>;
 
+        /// Query the peer density of a space for a given [`DhtArc`].
+        fn query_peer_density(space: Arc<super::KitsuneSpace>, dht_arc: kitsune_p2p_types::dht_arc::DhtArc) -> kitsune_p2p_types::dht_arc::PeerDensity;
+
         /// Record a metric datum about an agent.
         fn put_metric_datum(datum: MetricDatum) -> ();
 
