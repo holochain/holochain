@@ -23,7 +23,7 @@ type ShareRMap<C> = Arc<Share<RMap<C>>>;
 
 struct RMapItem<C: Codec + 'static + Send + Unpin> {
     sender: RSend<C>,
-    start: std::time::Instant,
+    start: tokio::time::Instant,
     timeout: std::time::Duration,
     dbg_name: &'static str,
     req_byte_count: usize,
@@ -55,7 +55,7 @@ impl<C: Codec + 'static + Send + Unpin> RMap<C> {
             (uniq, msg_id),
             RMapItem {
                 sender: s_res,
-                start: std::time::Instant::now(),
+                start: tokio::time::Instant::now(),
                 timeout,
                 dbg_name,
                 req_byte_count,
@@ -511,7 +511,7 @@ impl<C: Codec + 'static + Send + Unpin> Tx2EpHnd<C> {
 pub struct Tx2Respond<C: Codec + 'static + Send + Unpin> {
     local_cert: Tx2Cert,
     peer_cert: Tx2Cert,
-    time: std::time::Instant,
+    time: tokio::time::Instant,
     dbg_name: &'static str,
     req_byte_count: usize,
     con: ConHnd,
@@ -534,7 +534,7 @@ impl<C: Codec + 'static + Send + Unpin> Tx2Respond<C> {
         con: ConHnd,
         msg_id: u64,
     ) -> Self {
-        let time = std::time::Instant::now();
+        let time = tokio::time::Instant::now();
         Self {
             local_cert,
             peer_cert,

@@ -1,31 +1,38 @@
 use super::*;
 use crate::types::gossip::GossipModule;
 use ghost_actor::dependencies::tracing;
-use ghost_actor::dependencies::tracing_futures::Instrument;
 use kitsune_p2p_mdns::*;
 use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
+use kitsune_p2p_types::dht_arc::DhtArc;
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
 use url2::Url2;
 
-/// if the user specifies None or zero (0) for race_timeout_ms
-/// (david.b) this is not currently used
-const DEFAULT_RPC_MULTI_RACE_TIMEOUT_MS: u64 = 200;
+mod rpc_multi_logic;
+
+type KSpace = Arc<KitsuneSpace>;
+type KAgent = Arc<KitsuneAgent>;
+type KBasis = Arc<KitsuneBasis>;
+type WireConHnd = Tx2ConHnd<wire::Wire>;
+type Payload = Box<[u8]>;
 
 ghost_actor::ghost_chan! {
     pub(crate) chan SpaceInternal<crate::KitsuneP2pError> {
         /// List online agents that claim to be covering a basis hash
-        fn list_online_agents_for_basis_hash(space: Arc<KitsuneSpace>, from_agent: Arc<KitsuneAgent>, basis: Arc<KitsuneBasis>) -> HashSet<Arc<KitsuneAgent>>;
+        fn list_online_agents_for_basis_hash(space: KSpace, from_agent: KAgent, basis: KBasis) -> HashSet<KAgent>;
 
         /// Update / publish our agent info
         fn update_agent_info() -> ();
 
         /// Update / publish a single agent info
-        fn update_single_agent_info(agent: Arc<KitsuneAgent>) -> ();
+        fn update_single_agent_info(agent: KAgent) -> ();
 
         /// see if an agent is locally joined
-        fn is_agent_local(agent: Arc<KitsuneAgent>) -> bool;
+        fn is_agent_local(agent: KAgent) -> bool;
+
+        /// Update the arc of a local agent.
+        fn update_agent_arc(agent: Arc<KitsuneAgent>, arc: DhtArc) -> ();
 
         /// Incoming Delegate Broadcast
         /// We are being requested to delegate a broadcast to our neighborhood
@@ -33,16 +40,16 @@ ghost_actor::ghost_chan! {
         /// neighbors we are responsible for.
         /// (See comments in actual method impl for more detail.)
         fn incoming_delegate_broadcast(
-            space: Arc<KitsuneSpace>,
-            basis: Arc<KitsuneBasis>,
-            to_agent: Arc<KitsuneAgent>,
+            space: KSpace,
+            basis: KBasis,
+            to_agent: KAgent,
             mod_idx: u32,
             mod_cnt: u32,
             data: crate::wire::WireData,
         ) -> ();
 
         /// Incoming Gossip
-        fn incoming_gossip(space: Arc<KitsuneSpace>, con: Tx2ConHnd<wire::Wire>, data: Box<[u8]>) -> ();
+        fn incoming_gossip(space: KSpace, con: WireConHnd, data: Payload) -> ();
     }
 }
 
@@ -115,20 +122,27 @@ impl SpaceInternalHandler for Space {
         let space = self.space.clone();
         let mut mdns_handles = self.mdns_handles.clone();
         let network_type = self.config.network_type.clone();
-        let agent_list: Vec<Arc<KitsuneAgent>> = self.local_joined_agents.iter().cloned().collect();
+        let mut agent_list = Vec::with_capacity(self.local_joined_agents.len());
+        for agent in self.local_joined_agents.iter().cloned() {
+            let arc = self.get_agent_arc(&agent);
+            agent_list.push((agent, arc));
+        }
         let bound_url = self.this_addr.clone();
         let evt_sender = self.evt_sender.clone();
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
+        let internal_sender = self.i_s.clone();
         Ok(async move {
             let urls = vec![bound_url.into()];
-            for agent in agent_list {
+            for (agent, arc) in agent_list {
                 let input = UpdateAgentInfoInput {
                     expires_after,
                     space: space.clone(),
                     agent,
+                    arc,
                     urls: &urls,
                     evt_sender: &evt_sender,
+                    internal_sender: &internal_sender,
                     network_type: network_type.clone(),
                     mdns_handles: &mut mdns_handles,
                     bootstrap_service: &bootstrap_service,
@@ -150,16 +164,21 @@ impl SpaceInternalHandler for Space {
         let network_type = self.config.network_type.clone();
         let bound_url = self.this_addr.clone();
         let evt_sender = self.evt_sender.clone();
+        let internal_sender = self.i_s.clone();
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
+        let arc = self.get_agent_arc(&agent);
+
         Ok(async move {
             let urls = vec![bound_url.into()];
             let input = UpdateAgentInfoInput {
                 expires_after,
                 space: space.clone(),
                 agent,
+                arc,
                 urls: &urls,
                 evt_sender: &evt_sender,
+                internal_sender: &internal_sender,
                 network_type: network_type.clone(),
                 mdns_handles: &mut mdns_handles,
                 bootstrap_service: &bootstrap_service,
@@ -177,6 +196,15 @@ impl SpaceInternalHandler for Space {
     ) -> SpaceInternalHandlerResult<bool> {
         let res = self.local_joined_agents.contains(&agent);
         Ok(async move { Ok(res) }.boxed().into())
+    }
+
+    fn handle_update_agent_arc(
+        &mut self,
+        agent: Arc<KitsuneAgent>,
+        arc: DhtArc,
+    ) -> SpaceInternalHandlerResult<()> {
+        self.agent_arcs.insert(agent, arc);
+        Ok(async move { Ok(()) }.boxed().into())
     }
 
     fn handle_incoming_delegate_broadcast(
@@ -275,11 +303,35 @@ struct UpdateAgentInfoInput<'borrow> {
     expires_after: u64,
     space: Arc<KitsuneSpace>,
     agent: Arc<KitsuneAgent>,
+    arc: DhtArc,
     urls: &'borrow Vec<TxUrl>,
     evt_sender: &'borrow futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    internal_sender: &'borrow ghost_actor::GhostSender<SpaceInternal>,
     network_type: NetworkType,
     mdns_handles: &'borrow mut HashMap<Vec<u8>, Arc<AtomicBool>>,
     bootstrap_service: &'borrow Option<Url2>,
+}
+
+#[cfg(feature = "sharded")]
+async fn update_arc_length(
+    evt_sender: &futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    space: Arc<KitsuneSpace>,
+    arc: &mut DhtArc,
+) -> KitsuneP2pResult<()> {
+    let density = evt_sender
+        .query_peer_density(space.clone(), arc.clone())
+        .await?;
+    arc.update_length(density);
+    Ok(())
+}
+
+#[cfg(not(feature = "sharded"))]
+async fn update_arc_length(
+    _evt_sender: &futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    _space: Arc<KitsuneSpace>,
+    _arc: &mut DhtArc,
+) -> KitsuneP2pResult<()> {
+    Ok(())
 }
 
 async fn update_single_agent_info(input: UpdateAgentInfoInput<'_>) -> KitsuneP2pResult<()> {
@@ -287,20 +339,28 @@ async fn update_single_agent_info(input: UpdateAgentInfoInput<'_>) -> KitsuneP2p
         expires_after,
         space,
         agent,
+        mut arc,
         urls,
         evt_sender,
+        internal_sender,
         network_type,
         mdns_handles,
         bootstrap_service,
     } = input;
     use kitsune_p2p_types::agent_info::AgentInfoSigned;
+
+    update_arc_length(evt_sender, space.clone(), &mut arc).await?;
+
+    // Update the agents arc through the internal sender.
+    internal_sender.update_agent_arc(agent.clone(), arc).await?;
+
     let signed_at_ms = crate::spawn::actor::bootstrap::now_once(None).await?;
     let expires_at_ms = signed_at_ms + expires_after;
 
     let agent_info_signed = AgentInfoSigned::sign(
         space.clone(),
         agent.clone(),
-        u32::MAX,
+        arc.half_length(),
         urls.clone(),
         signed_at_ms,
         expires_at_ms,
@@ -458,6 +518,7 @@ impl KitsuneP2pHandler for Space {
         agent: Arc<KitsuneAgent>,
     ) -> KitsuneP2pHandlerResult<()> {
         self.local_joined_agents.remove(&agent);
+        self.agent_arcs.remove(&agent);
         self.gossip_mod.local_agent_leave(agent.clone());
         self.publish_leave_agent_info(agent)
     }
@@ -513,43 +574,14 @@ impl KitsuneP2pHandler for Space {
 
     fn handle_rpc_multi(
         &mut self,
-        mut input: actor::RpcMulti,
+        input: actor::RpcMulti,
     ) -> KitsuneP2pHandlerResult<Vec<actor::RpcMultiResponse>> {
-        // if the user doesn't care about remote_agent_count, apply default
-        match input.remote_agent_count {
-            None | Some(0) => {
-                input.remote_agent_count = Some(
-                    self.config
-                        .tuning_params
-                        .default_rpc_multi_remote_agent_count as u8,
-                );
-            }
-            _ => {}
-        }
-
-        // if the user doesn't care about timeout_ms, apply default
-        match input.timeout_ms {
-            None | Some(0) => {
-                input.timeout_ms =
-                    Some(self.config.tuning_params.default_rpc_multi_timeout_ms as u64);
-            }
-            _ => {}
-        }
-
-        // if the user doesn't care about race_timeout_ms, apply default
-        match input.race_timeout_ms {
-            None | Some(0) => {
-                input.race_timeout_ms = Some(DEFAULT_RPC_MULTI_RACE_TIMEOUT_MS);
-            }
-            _ => {}
-        }
-
-        // race timeout > timeout is nonesense
-        if input.as_race && input.race_timeout_ms.unwrap() > input.timeout_ms.unwrap() {
-            input.race_timeout_ms = Some(input.timeout_ms.unwrap());
-        }
-
-        self.handle_rpc_multi_inner(input)
+        let fut = rpc_multi_logic::handle_rpc_multi(
+            input,
+            self.ro_inner.clone(),
+            self.local_joined_agents.clone(),
+        );
+        Ok(async move { fut.await }.boxed().into())
     }
 
     fn handle_broadcast(
@@ -671,6 +703,19 @@ impl KitsuneP2pHandler for Space {
         .boxed()
         .into())
     }
+
+    fn handle_authority_for_hash(
+        &mut self,
+        _space: Arc<KitsuneSpace>,
+        agent: Arc<KitsuneAgent>,
+        basis: Arc<KitsuneBasis>,
+    ) -> KitsuneP2pHandlerResult<bool> {
+        let r = match self.agent_arcs.get(&agent) {
+            Some(agent_arc) => agent_arc.contains(basis.get_loc()),
+            None => false,
+        };
+        Ok(async move { Ok(r) }.boxed().into())
+    }
 }
 
 pub(crate) struct SpaceReadOnlyInner {
@@ -693,6 +738,7 @@ pub(crate) struct Space {
     pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
     pub(crate) evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     pub(crate) local_joined_agents: HashSet<Arc<KitsuneAgent>>,
+    pub(crate) agent_arcs: HashMap<Arc<KitsuneAgent>, DhtArc>,
     pub(crate) config: Arc<KitsuneP2pConfig>,
     mdns_handles: HashMap<Vec<u8>, Arc<AtomicBool>>,
     mdns_listened_spaces: HashSet<String>,
@@ -821,6 +867,7 @@ impl Space {
             i_s,
             evt_sender,
             local_joined_agents: HashSet::new(),
+            agent_arcs: HashMap::new(),
             config,
             mdns_handles: HashMap::new(),
             mdns_listened_spaces: HashSet::new(),
@@ -894,101 +941,13 @@ impl Space {
         .into())
     }
 
-    /// actual logic for handle_rpc_multi ...
-    /// the top-level handler may or may not spawn a task for this
-    #[tracing::instrument(skip(self, input))]
-    fn handle_rpc_multi_inner(
-        &mut self,
-        input: actor::RpcMulti,
-    ) -> KitsuneP2pHandlerResult<Vec<actor::RpcMultiResponse>> {
-        let actor::RpcMulti {
-            space,
-            from_agent,
-            //basis,
-            //remote_agent_count,
-            //timeout_ms,
-            //as_race,
-            //race_timeout_ms,
-            payload,
-            ..
-        } = input;
-
-        // TODO - FIXME - david.b - removing the parts of this that
-        // actually make remote requests. We can get this data locally
-        // while we are still full sync after gossip, and the timeouts
-        // are not structured correctly.
-        //
-        // Better to re-write as part of sharding.
-
-        //let remote_agent_count = remote_agent_count.unwrap();
-        //let timeout_ms = timeout_ms.unwrap();
-        //let stage_1_timeout_ms = timeout_ms / 2;
-
-        // as an optimization - request to all local joins
-        // but don't count that toward our request total
-        let local_all = self
-            .local_joined_agents
-            .iter()
-            .map(|agent| {
-                let agent = agent.clone();
-                self.evt_sender
-                    .call(
-                        space.clone(),
-                        agent.clone(),
-                        from_agent.clone(),
-                        payload.clone(),
-                    )
-                    .then(|r| async move { (r, agent) })
-            })
-            .collect::<Vec<_>>();
-
-        /*
-        let remote_fut = discover::message_neighborhood(
-            self,
-            from_agent.clone(),
-            remote_agent_count,
-            stage_1_timeout_ms,
-            timeout_ms,
-            basis,
-            wire::Wire::call(
-                space.clone(),
-                from_agent.clone(),
-                from_agent,
-                payload.clone().into(),
-            ),
-            |a, w| match w {
-                wire::Wire::CallResp(c) => Ok(actor::RpcMultiResponse {
-                    agent: a,
-                    response: c.data.into(),
-                }),
-                _ => Err(()),
-            },
-        )
-        .instrument(tracing::debug_span!("message_neighborhood", payload = ?payload.iter().take(5).collect::<Vec<_>>()));
-        */
-
-        Ok(async move {
-            let out: Vec<actor::RpcMultiResponse> = futures::future::join_all(local_all)
-                .await
-                .into_iter()
-                .filter_map(|(r, a)| {
-                    if let Ok(r) = r {
-                        Some(actor::RpcMultiResponse {
-                            agent: a,
-                            response: r,
-                        })
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-
-            //out.append(&mut remote_fut.await);
-
-            Ok(out)
-        }
-        .instrument(tracing::debug_span!("multi_inner"))
-        .boxed()
-        .into())
+    /// Get the existing agent storage arc or create a new one.
+    fn get_agent_arc(&self, agent: &Arc<KitsuneAgent>) -> DhtArc {
+        // TODO: We are simply setting the initial arc to full.
+        // In the future we may want to do something more intelligent.
+        self.agent_arcs
+            .get(agent)
+            .cloned()
+            .unwrap_or_else(|| DhtArc::full(agent.get_loc()))
     }
 }
