@@ -7,9 +7,9 @@ use std::{sync::Arc, time::SystemTime};
 #[derive(Debug)]
 pub struct FetchOpHashesForConstraintsEvt {
     /// The "space" context.
-    pub space: Arc<super::KitsuneSpace>,
+    pub space: KSpace,
     /// The "agent" context.
-    pub agent: Arc<super::KitsuneAgent>,
+    pub agent: KAgent,
     /// The dht arc to query.
     pub dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
     /// Only retreive items received since this time (INCLUSIVE).
@@ -22,9 +22,9 @@ pub struct FetchOpHashesForConstraintsEvt {
 #[derive(Debug)]
 pub struct FetchOpHashDataEvt {
     /// The "space" context.
-    pub space: Arc<super::KitsuneSpace>,
+    pub space: KSpace,
     /// The "agent" context.
-    pub agent: Arc<super::KitsuneAgent>,
+    pub agent: KAgent,
     /// The op-hashes to fetch
     pub op_hashes: Vec<Arc<super::KitsuneOpHash>>,
 }
@@ -33,9 +33,9 @@ pub struct FetchOpHashDataEvt {
 #[derive(Debug)]
 pub struct SignNetworkDataEvt {
     /// The "space" context.
-    pub space: Arc<super::KitsuneSpace>,
+    pub space: KSpace,
     /// The "agent" context.
-    pub agent: Arc<super::KitsuneAgent>,
+    pub agent: KAgent,
     /// The data to sign.
     #[allow(clippy::rc_buffer)]
     pub data: Arc<Vec<u8>>,
@@ -45,9 +45,9 @@ pub struct SignNetworkDataEvt {
 #[derive(Debug)]
 pub struct PutAgentInfoSignedEvt {
     /// The "space" context.
-    pub space: Arc<super::KitsuneSpace>,
+    pub space: KSpace,
     /// The "agent" context.
-    pub agent: Arc<super::KitsuneAgent>,
+    pub agent: KAgent,
     /// The signed agent info.
     pub agent_info_signed: AgentInfoSigned,
 }
@@ -56,18 +56,18 @@ pub struct PutAgentInfoSignedEvt {
 #[derive(Debug)]
 pub struct GetAgentInfoSignedEvt {
     /// The "space" context.
-    pub space: Arc<super::KitsuneSpace>,
+    pub space: KSpace,
     /// The "agent" context.
-    pub agent: Arc<super::KitsuneAgent>,
+    pub agent: KAgent,
 }
 
 /// Get agent info which satisfies a query.
 #[derive(Debug)]
 pub struct QueryAgentInfoSignedEvt {
     /// The "space" context.
-    pub space: Arc<super::KitsuneSpace>,
+    pub space: KSpace,
     /// The "agent" context.
-    pub agent: Arc<super::KitsuneAgent>,
+    pub agent: KAgent,
 }
 
 /// A single datum of metric info about an Agent, to be recorded by the client.
@@ -91,7 +91,7 @@ pub enum MetricKind {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MetricDatum {
     /// The agent this event is about
-    pub agent: Arc<super::KitsuneAgent>,
+    pub agent: KAgent,
     /// The kind of event
     pub kind: MetricKind,
     /// The time at which this occurred
@@ -121,7 +121,7 @@ pub enum MetricQuery {
     /// Filters for the "last sync" query.
     LastSync {
         /// The agent to query by
-        agent: Arc<super::KitsuneAgent>,
+        agent: KAgent,
     },
     /// Filters for the "oldest agent" query.
     Oldest {
@@ -136,8 +136,13 @@ pub enum MetricQueryAnswer {
     /// The last sync time for all agents.
     LastSync(Option<std::time::SystemTime>),
     /// The agent with the oldest last-connection time which satisfies the query.
-    Oldest(Option<Arc<super::KitsuneAgent>>),
+    Oldest(Option<KAgent>),
 }
+
+type KSpace = Arc<super::KitsuneSpace>;
+type KAgent = Arc<super::KitsuneAgent>;
+type KOpHash = Arc<super::KitsuneOpHash>;
+type Payload = Vec<u8>;
 
 ghost_actor::ghost_chan! {
     /// The KitsuneP2pEvent stream allows handling events generated from the
@@ -153,7 +158,7 @@ ghost_actor::ghost_chan! {
         fn query_agent_info_signed(input: QueryAgentInfoSignedEvt) -> Vec<crate::types::agent_store::AgentInfoSigned>;
 
         /// query agent info in order of closeness to a basis location.
-        fn query_agent_info_signed_near_basis(space: Arc<super::KitsuneSpace>, basis_loc: u32, limit: u32) -> Vec<crate::types::agent_store::AgentInfoSigned>;
+        fn query_agent_info_signed_near_basis(space: KSpace, basis_loc: u32, limit: u32) -> Vec<crate::types::agent_store::AgentInfoSigned>;
 
         /// Record a metric datum about an agent.
         fn put_metric_datum(datum: MetricDatum) -> ();
@@ -162,18 +167,18 @@ ghost_actor::ghost_chan! {
         fn query_metrics(query: MetricQuery) -> MetricQueryAnswer;
 
         /// We are receiving a request from a remote node.
-        fn call(space: Arc<super::KitsuneSpace>, to_agent: Arc<super::KitsuneAgent>, from_agent: Arc<super::KitsuneAgent>, payload: Vec<u8>) -> Vec<u8>;
+        fn call(space: KSpace, to_agent: KAgent, from_agent: KAgent, payload: Payload) -> Vec<u8>;
 
         /// We are receiving a notification from a remote node.
-        fn notify(space: Arc<super::KitsuneSpace>, to_agent: Arc<super::KitsuneAgent>, from_agent: Arc<super::KitsuneAgent>, payload: Vec<u8>) -> ();
+        fn notify(space: KSpace, to_agent: KAgent, from_agent: KAgent, payload: Payload) -> ();
 
         /// We are receiving a dht op we may need to hold distributed via gossip.
         fn gossip(
-            space: Arc<super::KitsuneSpace>,
-            to_agent: Arc<super::KitsuneAgent>,
-            from_agent: Arc<super::KitsuneAgent>,
-            op_hash: Arc<super::KitsuneOpHash>,
-            op_data: Vec<u8>,
+            space: KSpace,
+            to_agent: KAgent,
+            from_agent: KAgent,
+            op_hash: KOpHash,
+            op_data: Payload,
         ) -> ();
 
         /// Gather a list of op-hashes from our implementor that meet criteria.

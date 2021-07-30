@@ -65,11 +65,11 @@ fn simple_crud_zome() -> InlineZome {
             Ok(hash)
         })
         .callback("read", |api, hash: HeaderHash| {
-            api.get(GetInput::new(hash.into(), GetOptions::default()))
+            api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
                 .map_err(Into::into)
         })
         .callback("read_entry", |api, hash: EntryHash| {
-            api.get(GetInput::new(hash.into(), GetOptions::default()))
+            api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
                 .map_err(Into::into)
         })
         // TODO: let this accept a usize, once the hdk refactor is merged
@@ -92,7 +92,7 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
     // Get two agents
     let (alice, bobbo) = SweetAgents::two(conductor.keystore()).await;
 
-    // Install DNA and install and activate apps in conductor
+    // Install DNA and install and enable apps in conductor
     let apps = conductor
         .setup_app_for_agents("app", &[alice.clone(), bobbo.clone()], &[dna_file])
         .await
@@ -113,8 +113,12 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
     .await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Header
-    let element: Option<Element> = conductor.call(&bobbo.zome("zome1"), "read", hash).await;
-    let element = element.expect("Element was None: bobbo couldn't `get` it");
+    let elements: Vec<Option<Element>> = conductor.call(&bobbo.zome("zome1"), "read", hash).await;
+    let element = elements
+        .into_iter()
+        .next()
+        .unwrap()
+        .expect("Element was None: bobbo couldn't `get` it");
 
     // Assert that the Element bobbo sees matches what alice committed
     assert_eq!(element.header().author(), alice.agent_pubkey());
@@ -174,10 +178,14 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
 
     // Verify that bobbo can run "read" on his cell and get alice's Header
     // on the "foo" DNA
-    let element: Option<Element> = conductor
+    let elements: Vec<Option<Element>> = conductor
         .call(&bobbo_foo.zome("foozome"), "read", hash_foo)
         .await;
-    let element = element.expect("Element was None: bobbo couldn't `get` it");
+    let element = elements
+        .into_iter()
+        .next()
+        .unwrap()
+        .expect("Element was None: bobbo couldn't `get` it");
     assert_eq!(element.header().author(), alice_foo.agent_pubkey());
     assert_eq!(
         *element.entry(),
@@ -187,10 +195,14 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     // Verify that carol can run "read" on her cell and get alice's Header
     // on the "bar" DNA
     // Let's do it with the SweetZome instead of the SweetCell too, for fun
-    let element: Option<Element> = conductor
+    let elements: Vec<Option<Element>> = conductor
         .call(&carol_bar.zome("barzome"), "read", hash_bar)
         .await;
-    let element = element.expect("Element was None: carol couldn't `get` it");
+    let element = elements
+        .into_iter()
+        .next()
+        .unwrap()
+        .expect("Element was None: carol couldn't `get` it");
     assert_eq!(element.header().author(), alice_bar.agent_pubkey());
     assert_eq!(
         *element.entry(),
@@ -220,8 +232,8 @@ async fn invalid_cell() -> anyhow::Result<()> {
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
     tracing::debug!(dnas = ?conductor.list_dnas().await.unwrap());
-    tracing::debug!(cell_ids = ?conductor.list_cell_ids().await.unwrap());
-    tracing::debug!(apps = ?conductor.list_active_apps().await.unwrap());
+    tracing::debug!(cell_ids = ?conductor.list_cell_ids(None).await.unwrap());
+    tracing::debug!(apps = ?conductor.list_running_apps().await.unwrap());
 
     display_agent_infos(&conductor).await;
 
@@ -241,7 +253,7 @@ async fn get_deleted() -> anyhow::Result<()> {
     // Create a Conductor
     let mut conductor = SweetConductor::from_config(Default::default()).await;
 
-    // Install DNA and install and activate apps in conductor
+    // Install DNA and install and enable apps in conductor
     let alice = conductor
         .setup_app("app", &[dna_file])
         .await
@@ -260,10 +272,14 @@ async fn get_deleted() -> anyhow::Result<()> {
 
     wait_for_integration_1m(alice.env(), expected_count).await;
 
-    let element: Option<Element> = conductor
+    let elements: Vec<Option<Element>> = conductor
         .call(&alice.zome("zome1"), "read", hash.clone())
         .await;
-    let element = element.expect("Element was None: bobbo couldn't `get` it");
+    let element = elements
+        .into_iter()
+        .next()
+        .unwrap()
+        .expect("Element was None: bobbo couldn't `get` it");
 
     assert_eq!(element.header().author(), alice.agent_pubkey());
     assert_eq!(
@@ -279,10 +295,10 @@ async fn get_deleted() -> anyhow::Result<()> {
     expected_count += WaitOps::DELETE;
     wait_for_integration_1m(alice.env(), expected_count).await;
 
-    let element: Option<Element> = conductor
+    let elements: Vec<Option<Element>> = conductor
         .call(&alice.zome("zome1"), "read_entry", entry_hash)
         .await;
-    assert!(element.is_none());
+    assert!(elements.into_iter().next().unwrap().is_none());
 
     Ok(())
 }
@@ -324,7 +340,7 @@ fn simple_validation_zome() -> InlineZome {
             Ok(hash)
         })
         .callback("read", |api, hash: HeaderHash| {
-            api.get(GetInput::new(hash.into(), GetOptions::default()))
+            api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
                 .map_err(Into::into)
         })
         .callback("validate_create_entry", |_api, data: ValidateData| {
@@ -354,7 +370,8 @@ async fn simple_validation() -> anyhow::Result<()> {
 
     // This call passes validation
     let h1: HeaderHash = conductor.call(&alice, "create", AppString::new("A")).await;
-    let e1: Option<Element> = conductor.call(&alice, "read", &h1).await;
+    let e1s: Vec<Option<Element>> = conductor.call(&alice, "read", &h1).await;
+    let e1 = e1s.into_iter().next().unwrap();
     let s1: AppString = e1.unwrap().entry().to_app_option().unwrap().unwrap();
     assert_eq!(s1, AppString::new("A"));
 

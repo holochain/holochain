@@ -13,6 +13,11 @@ CREATE TABLE IF NOT EXISTS p2p_agent_store (
   expires_at_ms           INTEGER   NOT NULL,
   storage_center_loc      INTEGER   NOT NULL,
 
+  -- if this record has no urls, it is inactive
+  -- if it *has* urls, it is active, mark it such
+  -- 1 = active, 0 = inactive
+  is_active               INTEGER   NOT NULL,
+
   -- Additional queryable fields derived from encoding:
   -- For zero length arcs, these will both be NULL.
   -- Otherwise, both will be set, i.e. XOR of these two fields is always false.

@@ -94,9 +94,9 @@ wasm_io_types! {
     fn call_info (()) -> zt::info::CallInfo;
 
     // Header hash of the DeleteLink element.
-    fn call_remote (zt::call_remote::CallRemote) -> zt::ZomeCallResponse;
+    fn call_remote (Vec<zt::call_remote::CallRemote>) -> Vec<zt::ZomeCallResponse>;
 
-    fn call (zt::call::Call) -> zt::ZomeCallResponse;
+    fn call (Vec<zt::call::Call>) -> Vec<zt::ZomeCallResponse>;
 
     // @todo List all the local capability claims.
     fn capability_claims (()) -> ();
@@ -131,18 +131,27 @@ wasm_io_types! {
 
     fn get_agent_activity (zt::agent_activity::GetAgentActivityInput) -> zt::query::AgentActivity;
 
-    fn get_details (zt::entry::GetInput) -> Option<zt::metadata::Details>;
+    fn get_details (Vec<zt::entry::GetInput>) -> Vec<Option<zt::metadata::Details>>;
 
-    fn get_link_details (zt::link::GetLinksInput) -> zt::link::LinkDetails;
+    fn get_link_details (Vec<zt::link::GetLinksInput>) -> Vec<zt::link::LinkDetails>;
 
     // Get links by entry hash from the cascade.
-    fn get_links (zt::link::GetLinksInput) -> zt::link::Links;
+    fn get_links (Vec<zt::link::GetLinksInput>) -> Vec<zt::link::Links>;
 
     // Attempt to get a live entry from the cascade.
-    fn get (zt::entry::GetInput) -> Option<zt::element::Element>;
+    fn get (Vec<zt::entry::GetInput>) -> Vec<Option<zt::element::Element>>;
 
     // Hash an entry on the host.
     fn hash_entry (zt::entry::Entry) -> holo_hash::EntryHash;
+
+    // Retreive an element from the DHT or short circuit.
+    fn must_get_valid_element (zt::entry::MustGetValidElementInput) -> zt::element::Element;
+
+    // Retreive a entry from the DHT or short circuit.
+    fn must_get_entry (zt::entry::MustGetEntryInput) -> zt::entry::EntryHashed;
+
+    // Retrieve a header from the DHT or short circuit.
+    fn must_get_header (zt::entry::MustGetHeaderInput) -> zt::SignedHeaderHashed;
 
     // Query the source chain for data.
     fn query (zt::query::ChainQueryFilter) -> Vec<crate::Element>;

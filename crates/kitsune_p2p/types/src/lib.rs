@@ -20,13 +20,13 @@ pub mod dependencies {
 /// This value is on the scale of microseconds.
 pub type ProcCountMicros = i64;
 
-/// Monotonically nondecreasing process tick count, backed by std::time::Instant
+/// Monotonically nondecreasing process tick count, backed by tokio::time::Instant
 /// as an i64 to facilitate reference times that may be less than the first
 /// call to this function.
 /// The returned value is on the scale of microseconds.
 pub fn proc_count_now_us() -> ProcCountMicros {
     use once_cell::sync::Lazy;
-    use std::time::Instant;
+    use tokio::time::Instant;
     static PROC_COUNT: Lazy<Instant> = Lazy::new(Instant::now);
     let r = *PROC_COUNT;
     Instant::now().saturating_duration_since(r).as_micros() as i64
@@ -187,11 +187,11 @@ pub enum KitsuneErrorKind {
     Unit,
 
     /// The operation timed out.
-    #[error("TimedOut")]
+    #[error("Operation timed out")]
     TimedOut,
 
     /// This object is closed, calls on it are invalid.
-    #[error("Closed")]
+    #[error("This object is closed, calls on it are invalid.")]
     Closed,
 
     /// Unspecified error.
@@ -293,6 +293,8 @@ pub mod bootstrap;
 pub mod codec;
 pub mod config;
 pub mod metrics;
+pub mod reverse_semaphore;
+pub mod task_agg;
 pub mod tls;
 pub mod transport;
 pub mod transport_mem;

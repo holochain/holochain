@@ -37,6 +37,7 @@ pub use error::{TimestampError, TimestampResult};
 #[derive(
     Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize, SerializedBytes,
 )]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Timestamp(
     pub i64, // seconds from UNIX Epoch, positive or negative
     pub u32, // nanoseconds, always a positive offset
@@ -334,8 +335,8 @@ impl Timestamp {
     pub fn to_sql_ms_lossy(self) -> i64 {
         use std::time::Duration;
         let s = Duration::from_secs(self.0.max(0) as u64);
-        let ms = Duration::from_millis(self.1 as u64);
-        let ts = s.checked_add(ms).unwrap_or(s);
+        let ns = Duration::from_nanos(self.1 as u64);
+        let ts = s.checked_add(ns).unwrap_or(s);
         ts.as_millis().clamp(0, i64::MAX as u128) as i64
     }
 }

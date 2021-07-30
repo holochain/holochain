@@ -1,9 +1,9 @@
 use crate::core::ribosome::FnComponents;
-use crate::core::ribosome::HostAccess;
+use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
-use holo_hash::EntryHash;
+use holo_hash::AnyDhtHash;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
@@ -28,7 +28,7 @@ pub struct InitHostAccess {
     pub network: HolochainP2pCell,
 }
 
-impl From<InitHostAccess> for HostAccess {
+impl From<InitHostAccess> for HostContext {
     fn from(init_host_access: InitHostAccess) -> Self {
         Self::Init(init_host_access)
     }
@@ -72,7 +72,7 @@ pub enum InitResult {
     /// ZomeName is the first zome that has unresolved dependencies
     /// Vec<EntryHash> is the list of all missing dependency addresses
     // TODO: MD: this is probably unnecessary
-    UnresolvedDependencies(ZomeName, Vec<EntryHash>),
+    UnresolvedDependencies(ZomeName, Vec<AnyDhtHash>),
 }
 
 impl From<Vec<(ZomeName, InitCallbackResult)>> for InitResult {

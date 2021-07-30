@@ -168,11 +168,9 @@ pub mod tests {
             proxy_accept_config: reject_all
       tuning_params:
         gossip_loop_iteration_delay_ms: 42
-        default_notify_remote_agent_count: 42
-        default_notify_timeout_ms: 42
         default_rpc_single_timeout_ms: 42
         default_rpc_multi_remote_agent_count: 42
-        default_rpc_multi_timeout_ms: 42
+        default_rpc_multi_remote_request_grace_ms: 42
         agent_info_expires_after_ms: 42
         tls_in_mem_session_storage: 42
         proxy_keepalive_ms: 42
@@ -196,11 +194,9 @@ pub mod tests {
         let mut tuning_params =
             kitsune_p2p::dependencies::kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
         tuning_params.gossip_loop_iteration_delay_ms = 42;
-        tuning_params.default_notify_remote_agent_count = 42;
-        tuning_params.default_notify_timeout_ms = 42;
         tuning_params.default_rpc_single_timeout_ms = 42;
         tuning_params.default_rpc_multi_remote_agent_count = 42;
-        tuning_params.default_rpc_multi_timeout_ms = 42;
+        tuning_params.default_rpc_multi_remote_request_grace_ms = 42;
         tuning_params.agent_info_expires_after_ms = 42;
         tuning_params.tls_in_mem_session_storage = 42;
         tuning_params.proxy_keepalive_ms = 42;

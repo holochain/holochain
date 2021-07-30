@@ -215,66 +215,69 @@ impl InstalledCell {
 
 /// An app which has been installed.
 /// An installed app is merely its collection of "slots", associated with an ID.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::From)]
-pub enum InstalledApp {
-    /// An active app
-    Active(ActiveApp),
-    /// An inactive app
-    Inactive(InactiveApp),
+#[derive(
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    derive_more::Constructor,
+    shrinkwraprs::Shrinkwrap,
+)]
+#[shrinkwrap(mutable, unsafe_ignore_visibility)]
+pub struct InstalledApp {
+    #[shrinkwrap(main_field)]
+    app: InstalledAppCommon,
+    /// The status of the installed app
+    pub status: AppStatus,
 }
 
 impl InstalledApp {
     /// Constructor for freshly installed app
-    pub fn new_inactive(app: InstalledAppCommon) -> Self {
-        Self::Inactive(InactiveApp {
+    pub fn new_fresh(app: InstalledAppCommon) -> Self {
+        Self {
             app,
-            reason: DeactivationReason::NeverActivated,
-        })
+            status: AppStatus::Disabled(DisabledAppReason::NeverStarted),
+        }
     }
 
     /// Constructor for freshly installed app
-    pub fn new_active(app: InstalledAppCommon) -> Self {
-        Self::Active(ActiveApp(app))
+    #[cfg(feature = "test_utils")]
+    pub fn new_running(app: InstalledAppCommon) -> Self {
+        Self {
+            app,
+            status: AppStatus::Running,
+        }
     }
 
     /// Return the common app info, as well as a status which encodes the remaining
     /// information
-    pub fn into_app_and_status(self) -> (InstalledAppCommon, InstalledAppStatus) {
-        match self {
-            Self::Active(app) => (app.into_common(), InstalledAppStatus::Active),
-            Self::Inactive(InactiveApp { app, reason, .. }) => {
-                (app, InstalledAppStatus::Inactive { reason })
-            }
-        }
+    pub fn into_app_and_status(self) -> (InstalledAppCommon, AppStatus) {
+        (self.app, self.status)
     }
 
-    /// Return the status
-    pub fn status(&self) -> InstalledAppStatus {
-        match self {
-            Self::Active(_) => InstalledAppStatus::Active,
-            Self::Inactive(InactiveApp { reason, .. }) => InstalledAppStatus::Inactive {
-                reason: reason.clone(),
-            },
-        }
+    /// Accessor
+    pub fn status(&self) -> &AppStatus {
+        &self.status
+    }
+
+    /// Accessor
+    pub fn id(&self) -> &InstalledAppId {
+        &self.app.installed_app_id
     }
 }
 
-impl AsRef<InstalledAppCommon> for InstalledApp {
-    fn as_ref(&self) -> &InstalledAppCommon {
-        match self {
-            Self::Active(app) => &app.0,
-            Self::Inactive(app) => &app.app,
-        }
+impl automap::AutoMapped for InstalledApp {
+    type Key = InstalledAppId;
+
+    fn key(&self) -> &Self::Key {
+        &self.app.installed_app_id
     }
 }
 
-impl std::ops::Deref for InstalledApp {
-    type Target = InstalledAppCommon;
-
-    fn deref(&self) -> &Self::Target {
-        self.as_ref()
-    }
-}
+/// A map from InstalledAppId -> InstalledApp
+pub type InstalledAppMap = automap::AutoHashMap<InstalledApp>;
 
 /// An active app
 #[derive(
@@ -287,33 +290,16 @@ impl std::ops::Deref for InstalledApp {
     derive_more::From,
     shrinkwraprs::Shrinkwrap,
 )]
-pub struct ActiveApp(InstalledAppCommon);
+#[shrinkwrap(mutable, unsafe_ignore_visibility)]
+pub struct RunningApp(InstalledAppCommon);
 
-impl ActiveApp {
-    /// Convert to a InactiveApp with the given reason
-    pub fn into_inactive(self, reason: DeactivationReason) -> InactiveApp {
-        InactiveApp::new(self.0, reason)
-    }
-
-    /// Add a cloned cell
-    pub fn add_clone(&mut self, slot_id: &SlotId, cell_id: CellId) -> AppResult<()> {
-        let slot = self.0.slot_mut(slot_id)?;
-        assert_eq!(
-            cell_id.agent_pubkey(),
-            slot.agent_key(),
-            "A clone cell must use the same agent key as the slot it is added to"
-        );
-        if slot.clones.len() as u32 >= slot.clone_limit {
-            return Err(AppError::CloneLimitExceeded(slot.clone_limit, slot.clone()));
+impl RunningApp {
+    /// Convert to a StoppedApp with the given reason
+    pub fn into_stopped(self, reason: StoppedAppReason) -> StoppedApp {
+        StoppedApp {
+            app: self.0,
+            reason,
         }
-        let _ = slot.clones.insert(cell_id);
-        Ok(())
-    }
-
-    /// Remove a cloned cell
-    pub fn remove_clone(&mut self, slot_id: &SlotId, cell_id: &CellId) -> AppResult<bool> {
-        let slot = self.0.slot_mut(slot_id)?;
-        Ok(slot.clones.remove(cell_id))
     }
 
     /// Move inner type out
@@ -322,27 +308,30 @@ impl ActiveApp {
     }
 }
 
-impl automap::AutoMapped for ActiveApp {
-    type Key = InstalledAppId;
-
-    fn key(&self) -> &Self::Key {
-        &self.0.installed_app_id
+impl From<RunningApp> for InstalledApp {
+    fn from(app: RunningApp) -> Self {
+        Self {
+            app: app.into_common(),
+            status: AppStatus::Running,
+        }
     }
 }
 
-/// An app which has either never been activated, or has been deactivated.
+/// An app which is either Paused or Disabled, i.e. not Running
 #[derive(
     Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, shrinkwraprs::Shrinkwrap,
 )]
-pub struct InactiveApp {
+#[shrinkwrap(mutable, unsafe_ignore_visibility)]
+pub struct StoppedApp {
     #[shrinkwrap(main_field)]
     app: InstalledAppCommon,
-    reason: DeactivationReason,
+    reason: StoppedAppReason,
 }
 
-impl InactiveApp {
+impl StoppedApp {
     /// Constructor
-    pub fn new(app: InstalledAppCommon, reason: DeactivationReason) -> Self {
+    #[deprecated = "should only be constructable through conversions from other types"]
+    pub fn new(app: InstalledAppCommon, reason: StoppedAppReason) -> Self {
         Self { app, reason }
     }
 
@@ -350,13 +339,22 @@ impl InactiveApp {
     pub fn new_fresh(app: InstalledAppCommon) -> Self {
         Self {
             app,
-            reason: DeactivationReason::NeverActivated,
+            reason: StoppedAppReason::Disabled(DisabledAppReason::NeverStarted),
         }
     }
 
-    /// Convert to a ActiveApp
-    pub fn into_active(self) -> ActiveApp {
-        ActiveApp(self.app)
+    /// If the app is Stopped, convert into a StoppedApp.
+    /// Returns None if app is Running.
+    pub fn from_app(app: &InstalledApp) -> Option<Self> {
+        StoppedAppReason::from_status(app.status()).map(|reason| Self {
+            app: app.as_ref().clone(),
+            reason,
+        })
+    }
+
+    /// Convert to a RunningApp
+    pub fn into_active(self) -> RunningApp {
+        RunningApp(self.app)
     }
 
     /// Move inner type out
@@ -365,34 +363,19 @@ impl InactiveApp {
     }
 }
 
-impl automap::AutoMapped for InactiveApp {
-    type Key = InstalledAppId;
-
-    fn key(&self) -> &Self::Key {
-        &self.app.installed_app_id
-    }
-}
-
-impl From<InactiveApp> for InstalledAppCommon {
-    fn from(d: InactiveApp) -> Self {
+impl From<StoppedApp> for InstalledAppCommon {
+    fn from(d: StoppedApp) -> Self {
         d.app
     }
 }
 
-/// The possible reasons for an app being deactivated
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum DeactivationReason {
-    /// The app has never been fully activated, and is just awaiting genesis
-    NeverActivated,
-    /// The app was deactivated by the user normally
-    Normal,
-    /// The app was automatically deactivated due to an unrecoverable error by
-    /// one of its Cells
-    Quarantined {
-        /// The error which necessitated the quarantine
-        error: String,
-    },
+impl From<StoppedApp> for InstalledApp {
+    fn from(d: StoppedApp) -> Self {
+        Self {
+            app: d.app,
+            status: d.reason.into(),
+        }
+    }
 }
 
 /// The common data between apps of any status
@@ -423,7 +406,7 @@ impl InstalledAppCommon {
     }
 
     /// Accessor
-    pub fn installed_app_id(&self) -> &InstalledAppId {
+    pub fn id(&self) -> &InstalledAppId {
         &self.installed_app_id
     }
 
@@ -453,6 +436,13 @@ impl InstalledAppCommon {
             .chain(self.cloned_cells())
     }
 
+    /// Iterator of all "required" cells, meaning Cells which must be running
+    /// for this App to be able to run. The notion of "required cells" is not
+    /// yet solidified, so for now this placeholder equates to "all cells".
+    pub fn required_cells(&self) -> impl Iterator<Item = &CellId> {
+        self.all_cells()
+    }
+
     /// Accessor for particular slot
     pub fn slot(&self, slot_id: &SlotId) -> AppResult<&AppSlot> {
         self.slots
@@ -469,6 +459,27 @@ impl InstalledAppCommon {
     /// Accessor
     pub fn slots(&self) -> &HashMap<SlotId, AppSlot> {
         &self.slots
+    }
+
+    /// Add a cloned cell
+    pub fn add_clone(&mut self, slot_id: &SlotId, cell_id: CellId) -> AppResult<()> {
+        let slot = self.slot_mut(slot_id)?;
+        assert_eq!(
+            cell_id.agent_pubkey(),
+            slot.agent_key(),
+            "A clone cell must use the same agent key as the slot it is added to"
+        );
+        if slot.clones.len() as u32 >= slot.clone_limit {
+            return Err(AppError::CloneLimitExceeded(slot.clone_limit, slot.clone()));
+        }
+        let _ = slot.clones.insert(cell_id);
+        Ok(())
+    }
+
+    /// Remove a cloned cell
+    pub fn remove_clone(&mut self, slot_id: &SlotId, cell_id: &CellId) -> AppResult<bool> {
+        let slot = self.slot_mut(slot_id)?;
+        Ok(slot.clones.remove(cell_id))
     }
 
     /// Accessor
@@ -500,9 +511,9 @@ impl InstalledAppCommon {
             .any(|c| *c.cell_id.agent_pubkey() != _agent_key)
         {
             tracing::warn!(
-                        "It's kind of an informal convention that all cells in a legacy installation should use the same agent key. But, no big deal... Cell data: {:#?}",
-                        installed_cells
-                    );
+                "It's kind of an informal convention that all cells in a legacy installation should use the same agent key. But, no big deal... Cell data: {:#?}",
+                installed_cells
+            );
         }
 
         // ensure all cells use the same agent key
@@ -537,23 +548,205 @@ impl InstalledAppCommon {
     }
 }
 
-/// The information in an InstalledApp which is not captured by InstalledAppCommon
+/// The status of an installed app.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename_all = "snake_case")]
-pub enum InstalledAppStatus {
-    /// Indicates the app is active
-    Active,
-    /// Indicates the app is inactive, and why
-    Inactive {
-        /// The reason for deactivation
-        reason: DeactivationReason,
-    },
+pub enum AppStatus {
+    /// The app is enabled and running normally.
+    Running,
+
+    /// Enabled, but stopped due to some recoverable problem.
+    /// The app "hopes" to be Running again as soon as possible.
+    /// Holochain may restart the app automatically if it can. It may also be
+    /// restarted manually via the `StartApp` admin method.
+    /// Paused apps will be automatically set to Running when the conductor restarts.
+    Paused(PausedAppReason),
+
+    /// Disabled and stopped, either manually by the user, or automatically due
+    /// to an unrecoverable error. App must be Enabled before running again,
+    /// and will not restart automaticaly on conductor reboot.
+    Disabled(DisabledAppReason),
 }
 
-/// A map from InstalledAppId -> ActiveApp
-pub type InstalledAppMap = automap::AutoHashMap<ActiveApp>;
-/// A map from InstalledAppId -> InactiveApp
-pub type DeactivatedAppMap = automap::AutoHashMap<InactiveApp>;
+/// The AppStatus without the reasons.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[allow(missing_docs)]
+pub enum AppStatusKind {
+    Running,
+    Paused,
+    Disabled,
+}
+
+impl From<AppStatus> for AppStatusKind {
+    fn from(status: AppStatus) -> Self {
+        match status {
+            AppStatus::Running => Self::Running,
+            AppStatus::Paused(_) => Self::Paused,
+            AppStatus::Disabled(_) => Self::Disabled,
+        }
+    }
+}
+
+/// Represents a state transition operation from one state to another
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum AppStatusTransition {
+    /// Attempt to unpause a Paused app
+    Start,
+    /// Attempt to pause a Running app
+    Pause(PausedAppReason),
+    /// Gets an app running no matter what
+    Enable,
+    /// Disables an app, no matter what
+    Disable(DisabledAppReason),
+}
+
+impl AppStatus {
+    /// Does this status correspond to an Enabled state?
+    /// If false, this indicates a Disabled state.
+    pub fn is_enabled(&self) -> bool {
+        matches!(self, Self::Running | Self::Paused(_))
+    }
+
+    /// Does this status correspond to a Running state?
+    /// If false, this indicates a Stopped state.
+    pub fn is_running(&self) -> bool {
+        matches!(self, Self::Running)
+    }
+
+    /// Does this status correspond to a Paused state?
+    pub fn is_paused(&self) -> bool {
+        matches!(self, Self::Paused(_))
+    }
+
+    /// Transition a status from one state to another.
+    /// If None, the transition was not valid, and the status did not change.
+    pub fn transition(&mut self, transition: AppStatusTransition) -> AppStatusFx {
+        use AppStatus::*;
+        use AppStatusFx::*;
+        use AppStatusTransition::*;
+        match (&self, transition) {
+            (Running, Pause(reason)) => Some((Paused(reason), SpinDown)),
+            (Running, Disable(reason)) => Some((Disabled(reason), SpinDown)),
+            (Running, Start) | (Running, Enable) => None,
+
+            (Paused(_), Start) => Some((Running, SpinUp)),
+            (Paused(_), Enable) => Some((Running, SpinUp)),
+            (Paused(_), Disable(reason)) => Some((Disabled(reason), SpinDown)),
+            (Paused(_), Pause(_)) => None,
+
+            (Disabled(_), Enable) => Some((Running, SpinUp)),
+            (Disabled(_), Pause(_)) | (Disabled(_), Disable(_)) | (Disabled(_), Start) => None,
+        }
+        .map(|(new_status, delta)| {
+            *self = new_status;
+            delta
+        })
+        .unwrap_or(NoChange)
+    }
+}
+
+/// A declaration of the side effects of a particular AppStatusTransition.
+///
+/// Two values of this type may also be combined into one,
+/// to capture the overall effect of a series of transitions.
+///
+/// The intent of this type is to make sure that any operation which causes an
+/// app state transition is followed up with a call to process_app_status_fx
+/// in order to reconcile the cell state with the new app state.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[must_use = "be sure to run this value through `process_app_status_fx` to handle any transition effects"]
+pub enum AppStatusFx {
+    /// The transition did not result in any change to CellState.
+    NoChange,
+    /// The transition may cause some Cells to be removed.
+    SpinDown,
+    /// The transition may cause some Cells to be added (fallibly).
+    SpinUp,
+    /// The transition may cause some Cells to be removed and some to be (fallibly) added.
+    Both,
+}
+
+impl Default for AppStatusFx {
+    fn default() -> Self {
+        Self::NoChange
+    }
+}
+
+impl AppStatusFx {
+    /// Combine two effects into one. Think "monoidal append", if that helps.
+    pub fn combine(self, other: Self) -> Self {
+        use AppStatusFx::*;
+        match (self, other) {
+            (NoChange, a) | (a, NoChange) => a,
+            (SpinDown, SpinDown) => SpinDown,
+            (SpinUp, SpinUp) => SpinUp,
+            (Both, _) | (_, Both) => Both,
+            (SpinDown, SpinUp) | (SpinUp, SpinDown) => Both,
+        }
+    }
+}
+
+/// The various reasons for why an App is not in the Running state.
+#[derive(
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    SerializedBytes,
+    derive_more::From,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum StoppedAppReason {
+    /// Same meaning as [`InstalledAppStatus::Paused`].
+    Paused(PausedAppReason),
+
+    /// Same meaning as [`InstalledAppStatus::Disabled`].
+    Disabled(DisabledAppReason),
+}
+
+impl StoppedAppReason {
+    /// Convert a status into a StoppedAppReason.
+    /// If the status is Running, returns None.
+    pub fn from_status(status: &AppStatus) -> Option<Self> {
+        match status {
+            AppStatus::Paused(reason) => Some(Self::Paused(reason.clone())),
+            AppStatus::Disabled(reason) => Some(Self::Disabled(reason.clone())),
+            AppStatus::Running => None,
+        }
+    }
+}
+
+impl From<StoppedAppReason> for AppStatus {
+    fn from(reason: StoppedAppReason) -> Self {
+        match reason {
+            StoppedAppReason::Paused(reason) => Self::Paused(reason),
+            StoppedAppReason::Disabled(reason) => Self::Disabled(reason),
+        }
+    }
+}
+
+/// The reason for an app being in a Paused state.
+/// NB: there is no way to manually pause an app.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[serde(rename_all = "snake_case")]
+pub enum PausedAppReason {
+    /// The pause was due to a RECOVERABLE error
+    Error(String),
+}
+
+/// The reason for an app being in a Disabled state.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[serde(rename_all = "snake_case")]
+pub enum DisabledAppReason {
+    /// The app is freshly installed, and never started
+    NeverStarted,
+    /// The disabling was done manually by the user (via admin interface)
+    User,
+    /// The disabling was due to an UNRECOVERABLE error
+    Error(String),
+}
 
 /// Cell "slots" correspond to cell entries in the AppManifest.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -621,7 +814,7 @@ impl AppSlot {
 
 #[cfg(test)]
 mod tests {
-    use super::{ActiveApp, AppSlot};
+    use super::{AppSlot, RunningApp};
     use crate::prelude::*;
     use ::fixt::prelude::*;
     use std::collections::HashSet;
@@ -634,7 +827,7 @@ mod tests {
         let slot1 = AppSlot::new(base_cell_id, false, 3);
         let agent = fixt!(AgentPubKey);
         let slot_id: SlotId = "slot_id".into();
-        let mut app: ActiveApp =
+        let mut app: RunningApp =
             InstalledAppCommon::new("app", agent.clone(), vec![(slot_id.clone(), slot1)]).into();
 
         // Can add clones up to the limit
@@ -671,21 +864,6 @@ mod tests {
         assert_eq!(
             app.cloned_cells().collect::<HashSet<_>>(),
             app.all_cells().collect::<HashSet<_>>()
-        );
-    }
-
-    #[test]
-    fn status_serialization() {
-        let status = InstalledAppStatus::Inactive {
-            reason: DeactivationReason::Quarantined {
-                error: "because".into(),
-            },
-        };
-
-        let json = serde_json::to_string(&status).unwrap();
-        assert_eq!(
-            json,
-            "{\"inactive\":{\"reason\":{\"quarantined\":{\"error\":\"because\"}}}}"
         );
     }
 }

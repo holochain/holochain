@@ -6,7 +6,7 @@ use super::guest_callback::validate::ValidateHostAccess;
 use super::guest_callback::validation_package::ValidationPackageHostAccess;
 use super::host_fn::get_agent_activity::get_agent_activity;
 use super::host_fn::HostFnApi;
-use super::HostAccess;
+use super::HostContext;
 use super::ZomeCallHostAccess;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
@@ -49,6 +49,9 @@ use crate::core::ribosome::host_fn::get_details::get_details;
 use crate::core::ribosome::host_fn::get_link_details::get_link_details;
 use crate::core::ribosome::host_fn::get_links::get_links;
 use crate::core::ribosome::host_fn::hash_entry::hash_entry;
+use crate::core::ribosome::host_fn::must_get_entry::must_get_entry;
+use crate::core::ribosome::host_fn::must_get_header::must_get_header;
+use crate::core::ribosome::host_fn::must_get_valid_element::must_get_valid_element;
 use crate::core::ribosome::host_fn::query::query;
 use crate::core::ribosome::host_fn::random_bytes::random_bytes;
 use crate::core::ribosome::host_fn::remote_signal::remote_signal;
@@ -192,8 +195,8 @@ fn instance_cache_key(wasm_hash: &WasmHash, dna_hash: &DnaHash, context_key: u64
     {
         bits[i] = byte;
     }
-    for (i, byte) in (24..32).zip(context_key.to_le_bytes()) {
-        bits[i] = byte;
+    for (i, byte) in (24..32).zip(&context_key.to_le_bytes()) {
+        bits[i] = *byte;
     }
     bits
 }
@@ -413,6 +416,9 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__get_links", get_links)
             .with_host_function(&mut ns, "__get_link_details", get_link_details)
             .with_host_function(&mut ns, "__get_agent_activity", get_agent_activity)
+            .with_host_function(&mut ns, "__must_get_entry", must_get_entry)
+            .with_host_function(&mut ns, "__must_get_header", must_get_header)
+            .with_host_function(&mut ns, "__must_get_valid_element", must_get_valid_element)
             .with_host_function(&mut ns, "__query", query)
             .with_host_function(&mut ns, "__call_remote", call_remote)
             .with_host_function(&mut ns, "__remote_signal", remote_signal)
@@ -438,10 +444,17 @@ macro_rules! do_callback {
         let mut results: Vec<(ZomeName, $callback_result)> = Vec::new();
         // fallible iterator syntax instead of for loop
         let mut call_iterator = $self.call_iterator($access.into(), $invocation);
-        while let Some(output) = call_iterator.next()? {
-            let (zome, callback_result) = output;
-            let zome_name: ZomeName = zome.into();
-            let callback_result: $callback_result = callback_result.into();
+        loop {
+            let (zome_name, callback_result): (ZomeName, $callback_result) =
+                match call_iterator.next() {
+                    Ok(Some((zome, extern_io))) => (zome.into(), extern_io.decode()?),
+                    Err((zome, RibosomeError::WasmError(wasm_error))) => (
+                        zome.into(),
+                        <$callback_result>::try_from_wasm_error(wasm_error)?,
+                    ),
+                    Err((_zome, other_error)) => return Err(other_error),
+                    Ok(None) => break,
+                };
             // return early if we have a definitive answer, no need to keep invoking callbacks
             // if we know we are done
             if callback_result.is_definitive() {
@@ -463,14 +476,14 @@ impl RibosomeT for RealRibosome {
     /// if it does not exist then return Ok(None)
     fn maybe_call<I: Invocation>(
         &self,
-        host_access: HostAccess,
+        host_context: HostContext,
         invocation: &I,
         zome: &Zome,
         to_call: &FunctionName,
     ) -> Result<Option<ExternIO>, RibosomeError> {
         let call_context = CallContext {
             zome: zome.clone(),
-            host_access,
+            host_context,
         };
 
         match zome.zome_def() {
@@ -513,10 +526,10 @@ impl RibosomeT for RealRibosome {
 
     fn call_iterator<I: crate::core::ribosome::Invocation>(
         &self,
-        access: HostAccess,
+        host_context: HostContext,
         invocation: I,
     ) -> CallIterator<Self, I> {
-        CallIterator::new(access, self.clone(), invocation)
+        CallIterator::new(host_context, self.clone(), invocation)
     }
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
@@ -532,9 +545,10 @@ impl RibosomeT for RealRibosome {
             let fn_name = invocation.fn_name.clone();
 
             let guest_output: ExternIO =
-                match self.call_iterator(host_access.into(), invocation).next()? {
-                    Some(result) => result.1,
-                    None => return Err(RibosomeError::ZomeFnNotExists(zome_name, fn_name)),
+                match self.call_iterator(host_access.into(), invocation).next() {
+                    Ok(Some((_zome, extern_io))) => extern_io,
+                    Ok(None) => return Err(RibosomeError::ZomeFnNotExists(zome_name, fn_name)),
+                    Err((_zome, ribosome_error)) => return Err(ribosome_error),
                 };
 
             ZomeCallResponse::Ok(guest_output)
@@ -553,7 +567,7 @@ impl RibosomeT for RealRibosome {
         access: GenesisSelfCheckHostAccess,
         invocation: GenesisSelfCheckInvocation,
     ) -> RibosomeResult<GenesisSelfCheckResult> {
-        do_callback!(self, access, invocation, GenesisSelfCheckResult)
+        do_callback!(self, access, invocation, ValidateCallbackResult)
     }
 
     fn run_validate(
@@ -639,12 +653,12 @@ pub mod wasm_test {
         host_access.workspace = workspace;
 
         let foo_result: String =
-            crate::call_test_ribosome!(host_access, TestWasm::HdkExtern, "foo", ());
+            crate::call_test_ribosome!(host_access, TestWasm::HdkExtern, "foo", ()).unwrap();
 
         assert_eq!("foo", foo_result.as_str());
 
         let bar_result: String =
-            crate::call_test_ribosome!(host_access, TestWasm::HdkExtern, "bar", ());
+            crate::call_test_ribosome!(host_access, TestWasm::HdkExtern, "bar", ()).unwrap();
 
         assert_eq!("foobar", bar_result.as_str());
     }

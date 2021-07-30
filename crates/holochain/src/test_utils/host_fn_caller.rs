@@ -8,7 +8,7 @@ use crate::conductor::ConductorHandle;
 use crate::core::ribosome::host_fn;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::CallContext;
-use crate::core::ribosome::HostAccess;
+use crate::core::ribosome::HostContext;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
@@ -235,20 +235,20 @@ impl HostFnCaller {
         output
     }
 
-    pub async fn get(&self, entry_hash: AnyDhtHash, options: GetOptions) -> Option<Element> {
+    pub async fn get(&self, entry_hash: AnyDhtHash, options: GetOptions) -> Vec<Option<Element>> {
         let (_, ribosome, call_context, _) = self.unpack().await;
         let input = GetInput::new(entry_hash, options);
-        host_fn::get::get(ribosome, call_context, input).unwrap()
+        host_fn::get::get(ribosome, call_context, vec![input]).unwrap()
     }
 
     pub async fn get_details<'env>(
         &self,
         entry_hash: AnyDhtHash,
         options: GetOptions,
-    ) -> Option<Details> {
+    ) -> Vec<Option<Details>> {
         let (_, ribosome, call_context, _) = self.unpack().await;
         let input = GetInput::new(entry_hash, options);
-        host_fn::get_details::get_details(ribosome, call_context, input).unwrap()
+        host_fn::get_details::get_details(ribosome, call_context, vec![input]).unwrap()
     }
 
     pub async fn create_link<'env>(
@@ -286,7 +286,13 @@ impl HostFnCaller {
     ) -> Vec<Link> {
         let (_, ribosome, call_context, workspace_lock) = self.unpack().await;
         let input = GetLinksInput::new(base, link_tag);
-        let output = { host_fn::get_links::get_links(ribosome, call_context, input).unwrap() };
+        let output = {
+            host_fn::get_links::get_links(ribosome, call_context, vec![input])
+                .unwrap()
+                .into_iter()
+                .next()
+                .unwrap()
+        };
 
         // Write
         workspace_lock.flush().await.unwrap();
@@ -302,8 +308,13 @@ impl HostFnCaller {
     ) -> Vec<(SignedHeaderHashed, Vec<SignedHeaderHashed>)> {
         let (_, ribosome, call_context, workspace_lock) = self.unpack().await;
         let input = GetLinksInput::new(base, Some(tag));
-        let output =
-            { host_fn::get_link_details::get_link_details(ribosome, call_context, input).unwrap() };
+        let output = {
+            host_fn::get_link_details::get_link_details(ribosome, call_context, vec![input])
+                .unwrap()
+                .into_iter()
+                .next()
+                .unwrap()
+        };
 
         // Write
         workspace_lock.flush().await.unwrap();
@@ -326,8 +337,8 @@ impl HostFnCaller {
         let (_, ribosome, call_context, workspace_lock) = self.unpack().await;
 
         let output = {
-            let host_access = call_context.host_access();
-            let zcha = unwrap_to!(host_access => HostAccess::ZomeCall).clone();
+            let host_access = call_context.host_context();
+            let zcha = unwrap_to!(host_access => HostContext::ZomeCall).clone();
             ribosome.call_zome_function(zcha, invocation).unwrap()
         };
 

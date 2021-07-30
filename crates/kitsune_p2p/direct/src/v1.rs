@@ -229,10 +229,11 @@ impl AsKitsuneDirect for Kd1 {
         // TODO - pass along code/reason to transport shutdowns
         let r = self.inner.share_mut(|i, c| {
             *c = true;
-            Ok(i.p2p.clone())
+            Ok((i.srv.clone(), i.p2p.clone()))
         });
         async move {
-            if let Ok(p2p) = r {
+            if let Ok((srv, p2p)) = r {
+                srv.close().await;
                 let _ = p2p.ghost_actor_shutdown_immediate().await;
             }
         }
@@ -277,8 +278,9 @@ async fn handle_srv_events(
     srv: KdSrv,
     srv_evt: KdSrvEvtStream,
 ) {
-    let srv = &srv;
+    let tuning_params = &tuning_params;
     let kdirect = &kdirect;
+    let srv = &srv;
 
     srv_evt
         .for_each_concurrent(
@@ -392,6 +394,21 @@ async fn handle_srv_events(
                                     })
                                 }.boxed()).await;
                             }
+                            KdApi::AppLeaveReq {
+                                msg_id,
+                                root,
+                                agent,
+                                ..
+                            } => {
+                                exec(msg_id.clone(), async {
+                                    kdirect.inner.share_mut(|i, _| {
+                                        Ok(i.p2p.leave(root.to_kitsune_space(), agent.to_kitsune_agent()))
+                                    }).map_err(KdError::other)?.await.map_err(KdError::other)?;
+                                    Ok(KdApi::AppLeaveRes {
+                                        msg_id,
+                                    })
+                                }.boxed()).await;
+                            }
                             KdApi::AgentInfoStoreReq {
                                 msg_id,
                                 agent_info,
@@ -474,10 +491,37 @@ async fn handle_srv_events(
                                         return Err("author mismatch".into());
                                     }
                                     let entry_signed = KdEntrySigned::from_content_with_binary(&kdirect.persist, content, &binary).await?;
-                                    // TODO - someday this should actually
-                                    //        publish... for now, we are just
-                                    //        relying on gossip
-                                    kdirect.persist.store_entry(root, author, entry_signed.clone()).await.map_err(KdError::other)?;
+
+                                    // first, put this in our store
+                                    // so it can begin gossiping
+                                    kdirect.persist.store_entry(root.clone(), author, entry_signed.clone()).await.map_err(KdError::other)?;
+
+                                    // next, let's try to publish it
+                                    //
+                                    // TODO - make a publish queue
+                                    //        so we don't blow out memory
+                                    //        spawning all these tasks!
+                                    //
+                                    //        we don't want to do this inline
+                                    //        because in the not connected
+                                    //        case, it'll take 30 seconds...
+                                    let basis = entry_signed.hash().to_kitsune_basis();
+                                    let timeout = tuning_params.implicit_timeout();
+                                    let payload = entry_signed.as_wire_data_ref().to_vec();
+                                    let fut = kdirect.inner.share_mut(|i, _| {
+                                        Ok(i.p2p.broadcast(
+                                            root.to_kitsune_space(),
+                                            basis,
+                                            timeout,
+                                            payload,
+                                        ))
+                                    }).map_err(KdError::other)?;
+                                    tokio::task::spawn(async move {
+                                        if let Err(err) = fut.await.map_err(KdError::other) {
+                                            tracing::warn!(?err, "publish error");
+                                        }
+                                    });
+
                                     Ok(KdApi::EntryAuthorRes {
                                         msg_id,
                                         entry_signed,
@@ -509,7 +553,19 @@ async fn handle_srv_events(
                                 // TODO -- FIXME
                                 unimplemented!("TODO")
                             }
-                            oth => {
+                            oth @ KdApi::ErrorRes { .. } |
+                            oth @ KdApi::HelloReq { .. } |
+                            oth @ KdApi::KeypairGetOrCreateTaggedRes { .. } |
+                            oth @ KdApi::AppJoinRes { .. } |
+                            oth @ KdApi::AppLeaveRes { .. } |
+                            oth @ KdApi::AgentInfoStoreRes { .. } |
+                            oth @ KdApi::AgentInfoGetRes { .. } |
+                            oth @ KdApi::AgentInfoQueryRes { .. } |
+                            oth @ KdApi::MessageSendRes { .. } |
+                            oth @ KdApi::MessageRecvEvt { .. } |
+                            oth @ KdApi::EntryAuthorRes { .. } |
+                            oth @ KdApi::EntryGetRes { .. } |
+                            oth @ KdApi::EntryGetChildrenRes { .. } => {
                                 let reason = format!("unexpected {}", oth);
                                 if let Err(err) = srv.websocket_send(con, KdApi::ErrorRes {
                                     msg_id,
@@ -604,8 +660,28 @@ async fn handle_events(
                     .boxed()
                     .into()));
                 }
-                event::KitsuneP2pEvent::Notify { .. } => {
-                    unimplemented!()
+                event::KitsuneP2pEvent::Notify {
+                    respond,
+                    space,
+                    to_agent,
+                    payload,
+                    ..
+                } => {
+                    let kdirect = kdirect.clone();
+                    respond.r(Ok(async move {
+                        let entry = KdEntrySigned::from_wire(payload.into())
+                            .await
+                            .map_err(KitsuneP2pError::other)?;
+                        let root = KdHash::from_kitsune_space(&space);
+                        let to_agent = KdHash::from_kitsune_agent(&to_agent);
+                        kdirect
+                            .persist
+                            .store_entry(root, to_agent, entry)
+                            .await
+                            .map_err(KitsuneP2pError::other)
+                    }
+                    .boxed()
+                    .into()));
                 }
                 event::KitsuneP2pEvent::Gossip {
                     respond,

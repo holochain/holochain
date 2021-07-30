@@ -166,8 +166,8 @@ impl Db {
                             .query_row(
                                 "
                                 SELECT EXISTS(
-                                    SELECT 1 FROM DhtOP 
-                                    WHERE when_integrated IS NOT NULL 
+                                    SELECT 1 FROM DhtOP
+                                    WHERE when_integrated IS NOT NULL
                                     AND hash = :hash
                                     AND validation_status = :status
                                 )
@@ -188,8 +188,8 @@ impl Db {
                             .query_row(
                                 "
                                 SELECT EXISTS(
-                                    SELECT 1 FROM DhtOP 
-                                    WHERE when_integrated IS NULL 
+                                    SELECT 1 FROM DhtOP
+                                    WHERE when_integrated IS NULL
                                     AND validation_stage = 3
                                     AND hash = :hash
                                     AND validation_status = :status
@@ -210,8 +210,8 @@ impl Db {
                             .query_row(
                                 "
                                 SELECT EXISTS(
-                                    SELECT 1 FROM DhtOP 
-                                    WHERE when_integrated IS NOT NULL 
+                                    SELECT 1 FROM DhtOP
+                                    WHERE when_integrated IS NOT NULL
                                     AND header_hash = :hash
                                     AND validation_status = :status
                                     AND (type = :store_entry OR type = :store_element)
@@ -237,7 +237,7 @@ impl Db {
                                 SELECT EXISTS(
                                     SELECT 1 FROM DhtOp
                                     JOIN Header ON DhtOp.header_hash = Header.hash
-                                    WHERE DhtOp.when_integrated IS NOT NULL 
+                                    WHERE DhtOp.when_integrated IS NOT NULL
                                     AND DhtOp.validation_status = :status
                                     AND (
                                         (Header.entry_hash = :hash AND DhtOp.type = :store_element)
@@ -265,8 +265,8 @@ impl Db {
                             .query_row(
                                 "
                                 SELECT EXISTS(
-                                    SELECT 1 FROM DhtOP 
-                                    WHERE when_integrated IS NOT NULL 
+                                    SELECT 1 FROM DhtOP
+                                    WHERE when_integrated IS NOT NULL
                                     AND basis_hash = :basis
                                     AND header_hash = :hash
                                     AND validation_status = :status
@@ -291,8 +291,8 @@ impl Db {
                             .query_row(
                                 "
                                 SELECT EXISTS(
-                                    SELECT 1 FROM DhtOP 
-                                    WHERE when_integrated IS NOT NULL 
+                                    SELECT 1 FROM DhtOP
+                                    WHERE when_integrated IS NOT NULL
                                     AND basis_hash = :basis
                                     AND header_hash = :hash
                                     AND validation_status = :status
@@ -316,8 +316,8 @@ impl Db {
                             .query_row(
                                 "
                                 SELECT EXISTS(
-                                    SELECT 1 FROM DhtOP 
-                                    WHERE when_integrated IS NOT NULL 
+                                    SELECT 1 FROM DhtOP
+                                    WHERE when_integrated IS NOT NULL
                                     AND basis_hash = :basis
                                     AND header_hash = :hash
                                     AND validation_status = :status
@@ -344,11 +344,11 @@ impl Db {
                                 SELECT EXISTS(
                                     SELECT 1 FROM DhtOP
                                     JOIN Header on DhtOp.header_hash = Header.hash
-                                    WHERE when_integrated IS NOT NULL 
+                                    WHERE when_integrated IS NOT NULL
                                     AND validation_status = :status
                                     AND (
                                         (DhtOp.type = :deleted_entry_header AND Header.deletes_header_hash = :deleted_header_hash)
-                                        OR 
+                                        OR
                                         (DhtOp.type = :deleted_by AND header_hash = :hash)
                                     )
                                 )
@@ -761,7 +761,7 @@ async fn commit_entry<'env>(
     let output = {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock.clone();
-        call_context.host_access = host_access.into();
+        call_context.host_context = host_access.into();
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
         host_fn::create::create(ribosome.clone(), call_context.clone(), input).unwrap()
@@ -797,10 +797,10 @@ async fn get_entry(env: EnvWrite, entry_hash: EntryHash) -> Option<Entry> {
     let output = {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
-        call_context.host_access = host_access.into();
+        call_context.host_context = host_access.into();
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
-        host_fn::get::get(ribosome.clone(), call_context.clone(), input).unwrap()
+        host_fn::get::get(ribosome.clone(), call_context.clone(), vec![input]).unwrap()
     };
     output.and_then(|el| el.into())
 }
@@ -841,7 +841,7 @@ async fn create_link(
     let output = {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock.clone();
-        call_context.host_access = host_access.into();
+        call_context.host_context = host_access.into();
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
         // Call the real create_link host fn
@@ -898,7 +898,7 @@ async fn get_links(
     let mut host_access = fixt!(ZomeCallHostAccess);
     host_access.workspace = workspace_lock;
     host_access.network = test_network.cell_network();
-    call_context.host_access = host_access.into();
+    call_context.host_context = host_access.into();
     let ribosome = Arc::new(ribosome);
     let call_context = Arc::new(call_context);
     host_fn::get_links::get_links(ribosome.clone(), call_context.clone(), input).unwrap()

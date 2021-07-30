@@ -6,7 +6,6 @@ use crate::core::ribosome::RibosomeT;
 use holochain_wasmer_host::prelude::WasmError;
 use crate::core::ribosome::HostFnAccess;
 
-use holo_hash::HasHash;
 use holochain_types::prelude::*;
 use std::sync::Arc;
 
@@ -17,12 +16,11 @@ pub fn create<'a>(
     call_context: Arc<CallContext>,
     input: EntryWithDefId,
 ) -> Result<HeaderHash, WasmError> {
-    match HostFnAccess::from(&call_context.host_access()) {
+    match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ write_workspace: Permission::Allow, .. } => {
-            // build the entry hash
-            let async_entry = AsRef::<Entry>::as_ref(&input).to_owned();
-            let entry_hash =
-                holochain_types::entry::EntryHashed::from_content_sync(async_entry).into_hash();
+    // build the entry hash
+    let entry_hash =
+    EntryHash::with_data_sync(AsRef::<Entry>::as_ref(&input));
 
             // extract the zome position
             let header_zome_id = ribosome
@@ -51,22 +49,22 @@ pub fn create<'a>(
                 entry_hash,
             };
 
-            // return the hash of the committed entry
-            // note that validation is handled by the workflow
-            // if the validation fails this commit will be rolled back by virtue of the DB transaction
-            // being atomic
-            let entry = AsRef::<Entry>::as_ref(&input).to_owned();
-            tokio_helper::block_forever_on(async move {
-                // push the header and the entry into the source chain
-                let header_hash = call_context
-                    .host_access
-                    .workspace()
-                    .source_chain()
-                    .put(header_builder, Some(entry))
-                    .await
-                    .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
-                Ok(header_hash)
-            })
+    // return the hash of the committed entry
+    // note that validation is handled by the workflow
+    // if the validation fails this commit will be rolled back by virtue of the DB transaction
+    // being atomic
+    let entry = AsRef::<Entry>::as_ref(&input).to_owned();
+    tokio_helper::block_forever_on(async move {
+        // push the header and the entry into the source chain
+        let header_hash = call_context
+            .host_context
+            .workspace()
+            .source_chain()
+            .put(header_builder, Some(entry))
+            .await
+            .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
+        Ok(header_hash)
+    })
         },
         _ => unreachable!(),
     }
@@ -78,7 +76,7 @@ pub fn extract_entry_def(
     entry_def_id: EntryDefId,
 ) -> Result<(holochain_zome_types::header::EntryDefIndex, EntryVisibility), WasmError> {
     let app_entry_type = match ribosome
-        .run_entry_defs((&call_context.host_access).into(), EntryDefsInvocation)
+        .run_entry_defs((&call_context.host_context).into(), EntryDefsInvocation)
         .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?
     {
         // the ribosome returned some defs
@@ -148,7 +146,7 @@ pub mod wasm_test {
         call_context.zome = TestWasm::Create.into();
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace.clone();
-        call_context.host_access = host_access.into();
+        call_context.host_context = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::App("post".into());
         let input = EntryWithDefId::new(entry_def_id, app_entry.clone());
@@ -179,7 +177,7 @@ pub mod wasm_test {
 
         // get the result of a commit entry
         let output: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Create, "create_entry", ());
+            crate::call_test_ribosome!(host_access, TestWasm::Create, "create_entry", ()).unwrap();
 
         // the chain head should be the committed entry header
         let chain_head = tokio_helper::block_forever_on(async move {
@@ -190,9 +188,9 @@ pub mod wasm_test {
         assert_eq!(&chain_head, &output);
 
         let round: Option<Element> =
-            crate::call_test_ribosome!(host_access, TestWasm::Create, "get_entry", ());
+            crate::call_test_ribosome!(host_access, TestWasm::Create, "get_entry", ()).unwrap();
 
-        let bytes: Vec<u8> = match round.and_then(|el| el.into()) {
+        let bytes: Vec<u8> = match round.clone().and_then(|el| el.into()) {
             Some(holochain_zome_types::entry::Entry::App(entry_bytes)) => {
                 entry_bytes.bytes().to_vec()
             }
@@ -200,6 +198,12 @@ pub mod wasm_test {
         };
         // this should be the content "foo" of the committed post
         assert_eq!(vec![163, 102, 111, 111], bytes);
+
+        let round_twice: Vec<Option<Element>> = crate::call_test_ribosome!(host_access, TestWasm::Create, "get_entry_twice", ()).unwrap();
+        assert_eq!(
+            round_twice,
+            vec![round.clone(), round],
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]

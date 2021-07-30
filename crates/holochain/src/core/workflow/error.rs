@@ -86,6 +86,9 @@ pub enum WorkflowError {
 
     #[error(transparent)]
     SystemTimeError(#[from] std::time::SystemTimeError),
+
+    #[error("RecvError")]
+    RecvError,
 }
 
 /// Internal type to handle running workflows
