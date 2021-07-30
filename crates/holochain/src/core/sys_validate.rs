@@ -280,10 +280,11 @@ pub async fn check_countersigning_session_data(
         .collect();
 
     let results: Vec<SysValidationResult<()>> = futures::future::join_all(tasks).await;
-    results.into_iter().fold(Ok(()), |acc, result| match acc {
-        Ok(()) => result,
-        Err(_) => acc,
-    })
+    let results: SysValidationResult<()> = results.into_iter().collect();
+    match results {
+        Ok(_) => Ok(()),
+        Err(e) => Err(e),
+    }
 }
 
 /// Check that previous header makes sense
