@@ -1,3 +1,4 @@
+#[cfg(feature = "packing")]
 use std::path::{Path, PathBuf};
 
 #[cfg(feature = "packing")]

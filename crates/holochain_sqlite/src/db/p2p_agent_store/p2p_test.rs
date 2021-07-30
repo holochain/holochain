@@ -87,7 +87,10 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
 
     // agents with zero arc lengths will never be returned, so count only the
     // nonzero ones
-    let num_nonzero = all.iter().filter(|a| a.storage_arc.half_length > 0).count();
+    let num_nonzero = all
+        .iter()
+        .filter(|a| a.storage_arc.half_length() > 0)
+        .count();
 
     // make sure we can get our example result
     println!("after insert select all count: {}", all.len());
