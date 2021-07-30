@@ -1,5 +1,8 @@
 use super::*;
 
+type KAgent = Arc<KitsuneAgent>;
+type KAgentMap = HashMap<KAgent, Arc<AgentInfoSigned>>;
+
 ghost_actor::ghost_chan! {
     /// controller for test harness agent actor
     pub(crate) chan HarnessAgentControl<KitsuneP2pError> {
@@ -7,7 +10,7 @@ ghost_actor::ghost_chan! {
         fn dump_agent_info() -> Vec<Arc<AgentInfoSigned>>;
 
         /// inject a bunch of agent info
-        fn inject_agent_info(info: HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>) -> ();
+        fn inject_agent_info(info: KAgentMap) -> ();
 
         /// inject data to be gradually gossiped
         fn inject_gossip_data(data: String) -> Arc<KitsuneOpHash>;

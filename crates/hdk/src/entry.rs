@@ -209,10 +209,14 @@ pub fn get<H>(hash: H, options: GetOptions) -> ExternResult<Option<Element>>
 where
     AnyDhtHash: From<H>,
 {
-    HDK.with(|h| {
-        h.borrow()
-            .get(GetInput::new(AnyDhtHash::from(hash), options))
-    })
+    Ok(HDK
+        .with(|h| {
+            h.borrow()
+                .get(vec![GetInput::new(AnyDhtHash::from(hash), options)])
+        })?
+        .into_iter()
+        .next()
+        .unwrap())
 }
 
 /// MUST get an EntryHashed at a given EntryHash.
@@ -366,7 +370,14 @@ pub fn get_details<H: Into<AnyDhtHash>>(
     hash: H,
     options: GetOptions,
 ) -> ExternResult<Option<Details>> {
-    HDK.with(|h| h.borrow().get_details(GetInput::new(hash.into(), options)))
+    Ok(HDK
+        .with(|h| {
+            h.borrow()
+                .get_details(vec![GetInput::new(hash.into(), options)])
+        })?
+        .into_iter()
+        .next()
+        .unwrap())
 }
 
 /// Trait for binding static [ `EntryDef` ] property access for a type.

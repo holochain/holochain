@@ -27,10 +27,17 @@ mod space;
 use ghost_actor::dependencies::tracing;
 use space::*;
 
+type EvtRcv = futures::channel::mpsc::Receiver<KitsuneP2pEvent>;
+type KSpace = Arc<KitsuneSpace>;
+type KAgent = Arc<KitsuneAgent>;
+type KBasis = Arc<KitsuneBasis>;
+type WireConHnd = Tx2ConHnd<wire::Wire>;
+type Payload = Box<[u8]>;
+
 ghost_actor::ghost_chan! {
     pub(crate) chan Internal<crate::KitsuneP2pError> {
         /// Register space event handler
-        fn register_space_event_handler(recv: futures::channel::mpsc::Receiver<KitsuneP2pEvent>) -> ();
+        fn register_space_event_handler(recv: EvtRcv) -> ();
 
         /// Incoming Delegate Broadcast
         /// We are being requested to delegate a broadcast to our neighborhood
@@ -38,16 +45,16 @@ ghost_actor::ghost_chan! {
         /// neighbors we are responsible for.
         /// (See comments in actual method impl for more detail.)
         fn incoming_delegate_broadcast(
-            space: Arc<KitsuneSpace>,
-            basis: Arc<KitsuneBasis>,
-            to_agent: Arc<KitsuneAgent>,
+            space: KSpace,
+            basis: KBasis,
+            to_agent: KAgent,
             mod_idx: u32,
             mod_cnt: u32,
             data: crate::wire::WireData,
         ) -> ();
 
         /// Incoming Gossip
-        fn incoming_gossip(space: Arc<KitsuneSpace>, con: Tx2ConHnd<wire::Wire>, data: Box<[u8]>) -> ();
+        fn incoming_gossip(space: KSpace, con: WireConHnd, data: Payload) -> ();
     }
 }
 

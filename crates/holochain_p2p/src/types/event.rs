@@ -263,7 +263,7 @@ impl HolochainP2pEvent {
     }
 
     /// The agent_pub_key associated with this network p2p event.
-    pub fn target_agent_as_ref(&self) -> &AgentPubKey {
+    pub fn target_agents(&self) -> &AgentPubKey {
         match_p2p_evt!(self => |to_agent| { to_agent }, {
             HolochainP2pEvent::QueryAgentInfoSignedNearBasis { .. } |
             HolochainP2pEvent::QueryPeerDensity { .. }

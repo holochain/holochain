@@ -116,7 +116,14 @@ pub fn delete_link(add_link_header: HeaderHash) -> ExternResult<HeaderHash> {
 ///
 /// See [ `get_link_details` ].
 pub fn get_links(base: EntryHash, link_tag: Option<LinkTag>) -> ExternResult<Links> {
-    HDK.with(|h| h.borrow().get_links(GetLinksInput::new(base, link_tag)))
+    Ok(HDK
+        .with(|h| {
+            h.borrow()
+                .get_links(vec![GetLinksInput::new(base, link_tag)])
+        })?
+        .into_iter()
+        .next()
+        .unwrap())
 }
 
 /// Get all link creates and deletes that reference a base entry hash, optionally filtered by tag
@@ -139,8 +146,12 @@ pub fn get_links(base: EntryHash, link_tag: Option<LinkTag>) -> ExternResult<Lin
 ///
 /// See [ `get_links` ].
 pub fn get_link_details(base: EntryHash, link_tag: Option<LinkTag>) -> ExternResult<LinkDetails> {
-    HDK.with(|h| {
-        h.borrow()
-            .get_link_details(GetLinksInput::new(base, link_tag))
-    })
+    Ok(HDK
+        .with(|h| {
+            h.borrow()
+                .get_link_details(vec![GetLinksInput::new(base, link_tag)])
+        })?
+        .into_iter()
+        .next()
+        .unwrap())
 }
