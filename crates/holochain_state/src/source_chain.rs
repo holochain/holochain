@@ -381,6 +381,63 @@ impl SourceChain {
         Ok(elements)
     }
 
+    pub async fn accept_countersigning_preflight_request(preflight_request: &PreflightRequest) -> SourceChainResult<PreflightRequestAcceptance> {
+        if let Err(e) = check_countersigning_preflight_request(preflight_request) {
+            return Ok(PreflightRequestAcceptance::Invalid(e.to_string()));
+        }
+
+        if std::time::SystemTime::now() + core::time::Duration::from_millis(SESSION_TIME_FUTURE_MAX_MILLIS as u64) < preflight_request.session_times().start() {
+            return Ok(PreflightRequestAcceptance::UnacceptableFutureStart);
+        }
+
+        let author = self.author.clone();
+
+        let agent_index = match preflight_request.signing_agents().iter().position(|&i| i == author) {
+            Some(agent_index) => agent_index as u8,
+            None => return Ok(PreflightRequestAcceptance::UnacceptableAgentNotFound),
+        };
+
+        let hashed_preflight_request = holo_hash::blake2b_256(
+            &holochain_serialized_bytes::encode(preflight_request)?
+        );
+
+        let countersigning_agent_state = self.vault
+        .async_commit(move |txn| {
+            if is_chain_locked(txn, hashed_preflight_request)? {
+                return Err(SouceChainError::ChainLocked);
+            }
+            let (persisted_head, persisted_seq) = chain_head_db(&txn, self.author.clone())?;
+            let countersigning_agent_state = CounterSigningAgentState::new(
+                agent_index,
+                persisted_head,
+                persisted_seq,
+            );
+            lock_chain(txn, hashed_preflight_request, preflight_request.session_times().end())?;
+            SourceChainResult::Ok(countersigning_agent_state)
+        }).await?;
+
+        let signature: Signature =
+            match call_context.host_context.keystore().sign_raw(
+                PreflightResponse::encode_fields_for_signature(&input, &countersigning_agent_state)?
+            ).await {
+                Ok(signature) => signature,
+                Err(e) => {
+                    // Attempt to unlock the chain again.
+                    // If this fails the chain will remain locked until the session end time.
+                    self.vault.async_commit(move |txn| {
+                        unlock_chain(txn, hashed_preflight_request)
+                    }).await?;
+                    return Err(e).into();
+                }
+            };
+
+        Ok(PreflightResponse::new(
+            input,
+            countersigning_agent_state,
+            signature,
+        ))
+    }
+
     pub async fn flush(&self) -> SourceChainResult<()> {
         // Nothing to write
         if self.scratch.apply(|s| s.is_empty())? {
@@ -458,6 +515,20 @@ impl SourceChain {
                 }
 
                 for entry in entries {
+                    let lock: Vec<u8> = match entry.as_content() {
+                        Entry::CounterSign(session_data, _) => {
+                            holo_hash::encode::blake2b_256(
+                                &holochain_serialized_bytes::encode(session_data.preflight_request())?
+                            )
+                        },
+                        _ => vec![],
+                    };
+                    // This also covers the case that a non-countersigning entry is committed in the same transaction.
+                    // If the lock exists only the countersigning entry with the correct lock id can be committed until the chain is unlocked.
+                    // Validation of the countersigning session will ensure the same countersigning entry cannot be committed more than once.
+                    if is_chain_locked(txn, &lock)? {
+                        return Err(SourceChainError::ChainLocked);
+                    }
                     insert_entry(txn, entry)?;
                 }
                 for header in headers {

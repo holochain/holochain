@@ -136,6 +136,9 @@ host_fn_api_impls! {
     // Retrieve a header from the DHT or short circuit.
     fn must_get_header (zt::entry::MustGetHeaderInput) -> SignedHeaderHashed;
 
+    // Attempt to accept a preflight request.
+    fn accept_countersigning_preflight_request(zt::countersigning::PreflightRequest) -> zt::countersigning::PreflightRequestAcceptance;
+
     // Query the source chain for data.
     fn query (zt::query::ChainQueryFilter) -> Vec<Element>;
 

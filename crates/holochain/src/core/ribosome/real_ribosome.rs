@@ -69,6 +69,7 @@ use crate::core::ribosome::host_fn::x_25519_x_salsa20_poly1305_encrypt::x_25519_
 use crate::core::ribosome::host_fn::x_salsa20_poly1305_decrypt::x_salsa20_poly1305_decrypt;
 use crate::core::ribosome::host_fn::x_salsa20_poly1305_encrypt::x_salsa20_poly1305_encrypt;
 use crate::core::ribosome::host_fn::zome_info::zome_info;
+use crate::core::ribosome::host_fn::accept_countersigning_preflight_request;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeT;
@@ -419,6 +420,7 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__must_get_entry", must_get_entry)
             .with_host_function(&mut ns, "__must_get_header", must_get_header)
             .with_host_function(&mut ns, "__must_get_valid_element", must_get_valid_element)
+            .with_host_function(&mut ns, "__accept_countersigning_preflight_request", accept_countersigning_preflight_request)
             .with_host_function(&mut ns, "__query", query)
             .with_host_function(&mut ns, "__call_remote", call_remote)
             .with_host_function(&mut ns, "__remote_signal", remote_signal)

@@ -49,6 +49,11 @@ pub trait HdkT: Send + Sync {
         &self,
         must_get_valid_element_input: MustGetValidElementInput,
     ) -> ExternResult<Element>;
+    // CounterSigning
+    fn accept_countersigning_preflight_request(
+        &self,
+        preflight_request: PreflightRequest,
+    ) -> ExternResult<PreflightRequestAcceptance>;
     // Info
     fn agent_info(&self, agent_info_input: ()) -> ExternResult<AgentInfo>;
     fn app_info(&self, app_info_input: ()) -> ExternResult<AppInfo>;
@@ -148,6 +153,13 @@ impl HdkT for ErrHdk {
         Self::err()
     }
     fn must_get_valid_element(&self, _: MustGetValidElementInput) -> ExternResult<Element> {
+        Self::err()
+    }
+    // CounterSigning
+    fn accept_countersigning_preflight_request(
+        &self,
+        _: PreflightRequest,
+    ) -> ExternResult<PreflightRequestAcceptance> {
         Self::err()
     }
     fn agent_info(&self, _: ()) -> ExternResult<AgentInfo> {
@@ -306,6 +318,16 @@ impl HdkT for HostHdk {
         host_call::<MustGetValidElementInput, Element>(
             __must_get_valid_element,
             must_get_valid_element_input,
+        )
+    }
+    // CounterSigning
+    fn accept_countersigning_preflight_request(
+        &self,
+        preflight_request: PreflightRequest,
+    ) -> ExternResult<PreflightRequestAcceptance> {
+        host_call::<PreflightRequest, PreflightRequestAcceptance>(
+            __accept_countersigning_preflight_request,
+            preflight_request,
         )
     }
     fn agent_info(&self, _: ()) -> ExternResult<AgentInfo> {

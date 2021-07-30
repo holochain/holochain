@@ -9,6 +9,10 @@ use holo_hash::HeaderHash;
 /// This makes it easier for agents to accept a preflight request with headers that are after their current chain top, after network latency.
 pub const SESSION_HEADER_TIME_OFFSET_MILLIS: i64 = 1000;
 
+/// Maximum time in the future the session start can be in the opinion of the participating agent.
+/// As the header will be SESSION_HEADER_TIME_OFFSET_MILLIS after the session start we include that here.
+pub const SESSION_TIME_FUTURE_MAX_MILLIS: i64 = 5000 + SESSION_HEADER_TIME_OFFSET_MILLIS;
+
 /// Errors related to the secure primitive macro.
 #[derive(Debug, thiserror::Error)]
 pub enum CounterSigningError {
@@ -150,7 +154,7 @@ impl PreflightRequest {
 
 /// Every agent must send back a preflight response.
 /// All the preflight response data is signed by each agent and included in the session data.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct PreflightResponse {
     /// The request this is a response to.
@@ -174,9 +178,14 @@ impl PreflightResponse {
         }
     }
 
+    /// Serialization for signing of the signable field data only.
+    pub fn encode_fields_for_signature(request: &PreflightRequest, agent_state: &CounterSigningAgentState) -> Result<Vec<u8>, SerializedBytesError> {
+        holochain_serialized_bytes::encode(&(request, agent_state))
+    }
+
     /// Consistent serialization for the preflight response so it can be signed and the signatures verified.
     pub fn encode_for_signature(&self) -> Result<Vec<u8>, SerializedBytesError> {
-        holochain_serialized_bytes::encode(&(&self.request, &self.agent_state))
+        Self::encode_fields_for_signature(&self.request, &self.agent_state)
     }
     /// Request accessor.
     pub fn request(&self) -> &PreflightRequest {
@@ -212,6 +221,17 @@ impl PreflightResponse {
     }
 }
 
+/// A preflight request can be accepted, or invalid, or valid but the local agent cannot accept it.
+#[derive(Debug, Serialize, Deserialize)]
+pub enum PreflightRequestAcceptance {
+    /// Preflight request accepted.
+    Accepted(PreflightResponse),
+    /// The preflight request is valid but cannot be accepted by the current agent.
+    Unacceptable(String),
+    /// The preflight request is invalid as it failed some integrity check.
+    Invalid(String),
+}
+
 /// Every countersigning agent must sign against their chain state.
 /// The chain must be frozen until each agent decides to sign or exit the session.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -226,6 +246,19 @@ pub struct CounterSigningAgentState {
 }
 
 impl CounterSigningAgentState {
+    /// Constructor.
+    pub fn new(
+        agent_index: u8,
+        chain_top: HeaderHash,
+        header_seq: u32,
+    ) -> Self {
+        Self {
+            agent_index,
+            chain_top,
+            header_seq,
+        }
+    }
+
     /// Agent index accessor.
     pub fn agent_index(&self) -> &u8 {
         &self.agent_index

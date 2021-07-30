@@ -20,7 +20,7 @@ use std::convert::TryInto;
 // hCsk 5508 <Buffer 84 2b 24>
 // hCwk 5636 <Buffer 84 2c 24>
 // hC0k 5764 <Buffer 84 2d 24> * DNA
-// hC4k 5892 <Buffer 84 2e 24>
+// hC4k 5892 <Buffer 84 2e 24> * COUNTERSIGNING PREFLIGHT REQUEST
 // hC8k 6020 <Buffer 84 2f 24>
 pub(crate) const AGENT_PREFIX: &[u8] = &[0x84, 0x20, 0x24]; // uhCAk [132, 32, 36]
 pub(crate) const ENTRY_PREFIX: &[u8] = &[0x84, 0x21, 0x24]; // uhCEk [132, 33, 36]
@@ -29,6 +29,7 @@ pub(crate) const DNA_PREFIX: &[u8] = &[0x84, 0x2d, 0x24]; // uhC0k [132, 45, 36]
 pub(crate) const NET_ID_PREFIX: &[u8] = &[0x84, 0x22, 0x24]; // uhCIk [132, 34, 36]
 pub(crate) const HEADER_PREFIX: &[u8] = &[0x84, 0x29, 0x24]; // uhCkk [132, 41, 36]
 pub(crate) const WASM_PREFIX: &[u8] = &[0x84, 0x2a, 0x24]; // uhCok [132, 42, 36]
+pub(crate) const COUNTERSIGNING_PREFLIGHT_REQUEST_PREFIX: &[u8] = &[0x84, 0x2e, 0x24]; // uhC4k [132, 46, 36]
 
 /// A PrimitiveHashType is one with a multihash prefix.
 /// In contrast, a non-primitive hash type could be one of several primitive
@@ -146,6 +147,7 @@ primitive_hash_type!(DhtOp, DhtOpHash, DhtOpVisitor, DHTOP_PREFIX);
 primitive_hash_type!(Header, HeaderHash, HeaderVisitor, HEADER_PREFIX);
 primitive_hash_type!(NetId, NetIdHash, NetIdVisitor, NET_ID_PREFIX);
 primitive_hash_type!(Wasm, WasmHash, WasmVisitor, WASM_PREFIX);
+primitive_hash_type!(CounterSigningPreflightRequest, CounterSigningPreflightRequestHash, CounterSigningPreflightRequestVisitor, COUNTERSIGNING_PREFLIGHT_REQUEST_PREFIX);
 
 // DhtOps are mostly hashes
 impl HashTypeSync for DhtOp {}

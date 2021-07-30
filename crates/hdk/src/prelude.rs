@@ -113,6 +113,7 @@ macro_rules! holochain_externs {
             __must_get_entry,
             __must_get_valid_element,
             __must_get_header,
+            __accept_countersigning_preflight_request,
             __query,
             __call_remote,
             __call,
