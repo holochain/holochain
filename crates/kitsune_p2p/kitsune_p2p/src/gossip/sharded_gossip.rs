@@ -39,7 +39,7 @@ mod store;
 
 mod bandwidth;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "test_utils"))]
 mod tests;
 
 /// max send buffer size (keep it under 16384 with a little room for overhead)
