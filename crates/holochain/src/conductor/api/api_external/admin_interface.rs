@@ -35,12 +35,14 @@ pub trait AdminInterfaceApi: 'static + Send + Sync + Clone {
 
     /// Deal with error cases produced by `handle_admin_request_inner`
     async fn handle_admin_request(&self, request: AdminRequest) -> AdminResponse {
-        let res = self.handle_admin_request_inner(request).await;
+        debug!("admin request: {:?}", request);
 
-        match res {
+        let res = match self.handle_admin_request_inner(request).await {
             Ok(response) => response,
             Err(e) => AdminResponse::Error(e.into()),
-        }
+        };
+        debug!("admin response: {:?}", res);
+        res
     }
 }
 
