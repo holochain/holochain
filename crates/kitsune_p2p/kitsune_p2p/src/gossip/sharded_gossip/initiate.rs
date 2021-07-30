@@ -1,5 +1,3 @@
-use std::convert::TryInto;
-
 use rand::Rng;
 
 use super::*;
@@ -181,48 +179,19 @@ impl ShardedGossipLocal {
 
             // Encode each bloom found for this time window.
             for (j, bloom) in blooms.into_iter().enumerate() {
-                let bloom = encode_timed_bloom_filter(&bloom);
+                let range = bloom.time;
+                let bloom = encode_bloom_filter(&bloom.bloom);
                 state.increment_sent_ops_blooms();
 
                 // Check if this is the final time window and the final bloom for this window.
                 if i == len - 1 && j == inner_len - 1 {
-                    gossip.push(ShardedGossipWire::ops(Some(bloom), true));
+                    gossip.push(ShardedGossipWire::ops(Some((bloom, range)), true));
                 } else {
-                    gossip.push(ShardedGossipWire::ops(Some(bloom), false));
+                    gossip.push(ShardedGossipWire::ops(Some((bloom, range)), false));
                 }
             }
         }
 
         Ok(state)
     }
-}
-
-pub(super) fn encode_timed_bloom_filter(bloom: &TimedBloomFilter) -> PoolBuf {
-    let mut buf = encode_bloom_filter(&bloom.bloom);
-    let start = bloom.time.start.to_le_bytes();
-    let end = bloom.time.end.to_le_bytes();
-
-    buf.extend_from_slice(&start);
-    buf.extend_from_slice(&end);
-
-    buf
-}
-
-pub(super) fn decode_timed_bloom_filter(bytes: &[u8]) -> Option<TimedBloomFilter> {
-    let filter = decode_bloom_filter(&bytes);
-    let len = bytes.len();
-    let start = u64::from_le_bytes(
-        bytes
-            .get(len - 16..len - 8)
-            .and_then(|arr| arr.try_into().ok())?,
-    );
-    let end = u64::from_le_bytes(
-        bytes
-            .get(len - 8..len)
-            .and_then(|arr| arr.try_into().ok())?,
-    );
-    Some(TimedBloomFilter {
-        bloom: filter,
-        time: start..end,
-    })
 }

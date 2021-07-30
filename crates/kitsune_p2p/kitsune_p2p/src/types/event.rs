@@ -49,10 +49,8 @@ pub struct SignNetworkDataEvt {
 pub struct PutAgentInfoSignedEvt {
     /// The "space" context.
     pub space: Arc<super::KitsuneSpace>,
-    /// The "agent" context.
-    pub agent: Arc<super::KitsuneAgent>,
-    /// The signed agent info.
-    pub agent_info_signed: AgentInfoSigned,
+    /// A batch of signed agent info for this space.
+    pub peer_data: Vec<AgentInfoSigned>,
 }
 
 /// Get agent info for a single agent, as previously signed and put.
@@ -203,9 +201,7 @@ ghost_actor::ghost_chan! {
         fn gossip(
             space: Arc<super::KitsuneSpace>,
             to_agent: Arc<super::KitsuneAgent>,
-            from_agent: Arc<super::KitsuneAgent>,
-            op_hash: Arc<super::KitsuneOpHash>,
-            op_data: Vec<u8>,
+            ops: Vec<(Arc<super::KitsuneOpHash>, Vec<u8>)>,
         ) -> ();
 
         /// Gather a list of op-hashes from our implementor that meet criteria.

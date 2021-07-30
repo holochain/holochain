@@ -266,16 +266,14 @@ impl Cell {
             Publish {
                 span_context,
                 respond,
-                from_agent,
                 request_validation_receipt,
-                dht_hash,
                 ops,
                 ..
             } => {
                 async {
                     tracing::Span::set_current_context(span_context);
                     let res = self
-                        .handle_publish(from_agent, request_validation_receipt, dht_hash, ops)
+                        .handle_publish(request_validation_receipt, ops)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
@@ -420,20 +418,17 @@ impl Cell {
         Ok(())
     }
 
-    #[instrument(skip(self, request_validation_receipt, _dht_hash, ops))]
+    #[instrument(skip(self, request_validation_receipt, ops))]
     /// we are receiving a "publish" event from the network
     async fn handle_publish(
         &self,
-        from_agent: AgentPubKey,
         request_validation_receipt: bool,
-        _dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> CellResult<()> {
         incoming_dht_ops_workflow(
             &self.env,
             self.queue_triggers.sys_validation.clone(),
             ops,
-            Some(from_agent),
             request_validation_receipt,
         )
         .await
@@ -676,13 +671,7 @@ impl Cell {
     async fn handle_fetch_op_hash_data(
         &self,
         op_hashes: Vec<holo_hash::DhtOpHash>,
-    ) -> CellResult<
-        Vec<(
-            holo_hash::AnyDhtHash,
-            holo_hash::DhtOpHash,
-            holochain_types::dht_op::DhtOp,
-        )>,
-    > {
+    ) -> CellResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
         // FIXME: Test this query.
         // TODO: SQL_PERF: Really on the fence about this query.
         // It has the potential to be slow if data density is very high
@@ -695,7 +684,7 @@ impl Cell {
                 positions.pop();
                 let sql = format!(
                     "
-                SELECT DhtOp.hash, DhtOp.basis_hash, DhtOp.type AS dht_type,
+                SELECT DhtOp.hash, DhtOp.type AS dht_type,
                 Header.blob AS header_blob, Entry.blob AS entry_blob
                 FROM DHtOp
                 JOIN Header ON DhtOp.header_hash = Header.hash
@@ -710,7 +699,6 @@ impl Cell {
                 let mut stmt = txn.prepare(&sql)?;
                 let r = stmt
                     .query_and_then(rusqlite::params_from_iter(op_hashes.into_iter()), |row| {
-                        let basis_hash: AnyDhtHash = row.get("basis_hash")?;
                         let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
                         let op_type: DhtOpType = row.get("dht_type")?;
                         let hash: DhtOpHash = row.get("hash")?;
@@ -729,7 +717,7 @@ impl Cell {
                             };
                         }
                         let op = DhtOp::from_type(op_type, header, entry)?;
-                        StateQueryResult::Ok((basis_hash, hash, op))
+                        StateQueryResult::Ok((hash, op))
                     })?
                     .collect::<StateQueryResult<Vec<_>>>()?;
                 StateQueryResult::Ok(r)

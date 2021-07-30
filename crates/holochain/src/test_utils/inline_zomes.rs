@@ -16,6 +16,7 @@ pub fn simple_create_read_zome() -> InlineZome {
         })
         .callback("read", |api, hash: HeaderHash| {
             api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
+                .map(|e| e.into_iter().next().unwrap())
                 .map_err(Into::into)
         })
 }

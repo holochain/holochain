@@ -127,6 +127,7 @@ test_utils = [
   "holochain_types/test_utils",
   "holochain_zome_types/test_utils",
   "kitsune_p2p_types/test_utils",
+  "kitsune_p2p/test_utils",
   "itertools",
   "matches",
   "holochain_test_wasm_common",

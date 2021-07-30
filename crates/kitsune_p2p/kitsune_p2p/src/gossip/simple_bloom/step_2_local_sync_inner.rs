@@ -113,6 +113,7 @@ impl Inner {
                 if old_agent == new_agent {
                     continue;
                 }
+                let mut to_send = Vec::new();
                 for old_key in old_set.iter() {
                     if !new_set.contains(old_key) {
                         local_synced_ops += 1;
@@ -121,16 +122,7 @@ impl Inner {
 
                         match &*op_data {
                             MetaOpData::Op(key, data) => {
-                                evt_sender
-                                    .gossip(
-                                        space.clone(),
-                                        new_agent.clone(),
-                                        old_agent.clone(),
-                                        key.clone(),
-                                        data.clone(),
-                                    )
-                                    .await
-                                    .map_err(KitsuneError::other)?;
+                                to_send.push((key.clone(), data.clone()));
                             }
                             // this should be impossible right now
                             // due to the shared agent store
@@ -140,6 +132,10 @@ impl Inner {
                         new_set.insert(old_key.clone());
                     }
                 }
+                evt_sender
+                    .gossip(space.clone(), new_agent.clone(), to_send)
+                    .await
+                    .map_err(KitsuneError::other)?;
             }
         }
 

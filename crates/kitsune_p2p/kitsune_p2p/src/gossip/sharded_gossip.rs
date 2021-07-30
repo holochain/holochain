@@ -25,7 +25,6 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use self::bandwidth::Bandwidth;
-use self::initiate::decode_timed_bloom_filter;
 use self::state_map::RoundStateMap;
 
 use super::simple_bloom::{HowToConnect, MetaOpKey};
@@ -496,7 +495,10 @@ impl ShardedGossipLocal {
                 };
                 match (
                     state,
-                    filter.and_then(|filter| decode_timed_bloom_filter(&filter)),
+                    filter.map(|(filter, range)| TimedBloomFilter {
+                        bloom: decode_bloom_filter(&filter),
+                        time: range,
+                    }),
                 ) {
                     (Some(state), Some(filter)) => {
                         self.incoming_ops(state.clone(), filter, usize::MAX).await?
@@ -561,8 +563,6 @@ impl ShardedGossipLocal {
         )
         .await?
         .into_iter()
-        // maackle: this seems silly
-        .map(Arc::new)
         .collect();
 
         // If we are actually gossiping ops then it's worth
@@ -806,7 +806,7 @@ kitsune_p2p_types::write_codec_enum! {
             intervals.0: Vec<ArcInterval>,
         },
 
-        /// Send Agent Info Boom
+        /// Send Agent Info Bloom
         Agents(0x30) {
             /// The bloom filter for agent data
             filter.0: PoolBuf,
@@ -818,13 +818,13 @@ kitsune_p2p_types::write_codec_enum! {
             agents.0: Vec<Arc<AgentInfoSigned>>,
         },
 
-        /// Send Agent Info Boom
+        /// Send Ops Bloom
         Ops(0x50) {
             /// The bloom filter for op data
             // maackle: what is the meaning and purpose of this ever being None?
             //          currently looks like it means the same thing as
             //          `finished == true`
-            filter.0: Option<PoolBuf>,
+            filter.0: Option<(PoolBuf, std::ops::Range<u64>)>,
             /// Is this the last bloom to be sent?
             finished.1: bool,
         },
@@ -832,7 +832,7 @@ kitsune_p2p_types::write_codec_enum! {
         /// Any ops that were missing from the remote bloom.
         MissingOps(0x60) {
             /// The missing ops
-            ops.0: Vec<Arc<(Arc<KitsuneOpHash>, Vec<u8>)>>,
+            ops.0: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
             /// Is this the last chunk of ops to be sent in response
             /// to the bloom filter that we're responding to?
             finished.1: bool,

@@ -43,7 +43,7 @@ impl ShardedGossipLocal {
     pub(super) async fn incoming_missing_ops(
         &self,
         state: RoundState,
-        ops: Vec<Arc<(Arc<KitsuneOpHash>, Vec<u8>)>>,
+        ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
     ) -> KitsuneResult<()> {
         // Unpack the state and get the local agents.
         let RoundState { common_arc_set, .. } = state;
@@ -84,17 +84,19 @@ fn into_chunks(gossip: &mut Vec<ShardedGossipWire>, ops: HashMap<Arc<KitsuneOpHa
         // Check if this op will fit without going over the max.
         if size + bytes <= MAX_SEND_BUF_BYTES {
             // Op will fit so add it to the chunk and update the size.
-            chunk.push(Arc::new(op));
+            chunk.push(op);
             size += bytes;
         } else {
             // Op won't fit so flush the chunk.
             // There will be at least one more chunk so this isn't the final.
-            gossip.push(ShardedGossipWire::missing_ops(chunk.clone(), false));
-            chunk.clear();
+            gossip.push(ShardedGossipWire::missing_ops(
+                std::mem::take(&mut chunk),
+                false,
+            ));
             // Reset the size to this ops size.
             size = bytes;
             // Push this op onto the next chunk.
-            chunk.push(Arc::new(op));
+            chunk.push(op);
         }
     }
     // If there is a final chunk to write then add it and set it to final.

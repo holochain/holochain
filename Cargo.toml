@@ -63,7 +63,7 @@ codegen-units = 16
 # observability = { git = "https://github.com/freesig/observability.git", branch = "main" }
 # ghost_actor = { path = "../ghost_actor/crates/ghost_actor" }
 # ghost_actor = { git = "https://github.com/holochain/ghost_actor.git", branch = "add_observability" }
-lair_keystore_api = { git = "https://github.com/holochain/lair.git" }
+# lair_keystore_api = { git = "https://github.com/holochain/lair.git" }
 # lair_keystore_client = { git = "https://github.com/holochain/lair.git", branch = "pr/tokio-1" }
 # lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }
 # lair_keystore_client = { path = "../lair/crates/lair_keystore_client" }

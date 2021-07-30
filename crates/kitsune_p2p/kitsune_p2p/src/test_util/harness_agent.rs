@@ -135,12 +135,14 @@ impl KitsuneP2pEventHandler for AgentHarness {
         &mut self,
         input: PutAgentInfoSignedEvt,
     ) -> KitsuneP2pEventHandlerResult<()> {
-        let info = Arc::new(input.agent_info_signed);
-        self.agent_store.insert(input.agent.clone(), info.clone());
-        self.harness_chan.publish(HarnessEventType::StoreAgentInfo {
-            agent: (&input.agent).into(),
-            agent_info: info,
-        });
+        for info in input.peer_data {
+            let info = Arc::new(info);
+            self.agent_store.insert(info.agent.clone(), info.clone());
+            self.harness_chan.publish(HarnessEventType::StoreAgentInfo {
+                agent: (&info.agent).into(),
+                agent_info: info,
+            });
+        }
         Ok(async move { Ok(()) }.boxed().into())
     }
 
@@ -241,16 +243,16 @@ impl KitsuneP2pEventHandler for AgentHarness {
         &mut self,
         _space: Arc<super::KitsuneSpace>,
         _to_agent: Arc<super::KitsuneAgent>,
-        _from_agent: Arc<super::KitsuneAgent>,
-        op_hash: Arc<super::KitsuneOpHash>,
-        op_data: Vec<u8>,
+        ops: Vec<(Arc<super::KitsuneOpHash>, Vec<u8>)>,
     ) -> KitsuneP2pEventHandlerResult<()> {
-        let op_data = String::from_utf8_lossy(&op_data).to_string();
-        self.harness_chan.publish(HarnessEventType::Gossip {
-            op_hash: (&op_hash).into(),
-            op_data: op_data.clone(),
-        });
-        self.gossip_store.insert(op_hash, op_data);
+        for (op_hash, op_data) in ops {
+            let op_data = String::from_utf8_lossy(&op_data).to_string();
+            self.harness_chan.publish(HarnessEventType::Gossip {
+                op_hash: (&op_hash).into(),
+                op_data: op_data.clone(),
+            });
+            self.gossip_store.insert(op_hash, op_data);
+        }
         Ok(async move { Ok(()) }.boxed().into())
     }
 

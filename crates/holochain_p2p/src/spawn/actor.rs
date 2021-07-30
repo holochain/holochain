@@ -46,14 +46,10 @@ impl WrapEvtSender {
     pub fn put_agent_info_signed(
         &self,
         dna_hash: DnaHash,
-        to_agent: AgentPubKey,
-        agent_info_signed: AgentInfoSigned,
+        peer_data: Vec<AgentInfoSigned>,
     ) -> impl Future<Output = HolochainP2pResult<()>> + 'static + Send {
         timing_trace!(
-            {
-                self.0
-                    .put_agent_info_signed(dna_hash, to_agent, agent_info_signed)
-            },
+            { self.0.put_agent_info_signed(dna_hash, peer_data) },
             "(hp2p:handle) put_agent_info_signed",
         )
     }
@@ -191,14 +187,12 @@ impl WrapEvtSender {
         &self,
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
-        from_agent: AgentPubKey,
         request_validation_receipt: bool,
-        dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> impl Future<Output = HolochainP2pResult<()>> + 'static + Send {
         let op_count = ops.len();
         timing_trace!({
-            self.0.publish(dna_hash, to_agent, from_agent, request_validation_receipt, dht_hash, ops)
+            self.0.publish(dna_hash, to_agent, request_validation_receipt, ops)
         }, %op_count, "(hp2p:handle) publish")
     }
 
@@ -319,13 +313,7 @@ impl WrapEvtSender {
         to_agent: AgentPubKey,
         op_hashes: Vec<holo_hash::DhtOpHash>,
     ) -> impl Future<
-        Output = HolochainP2pResult<
-            Vec<(
-                holo_hash::AnyDhtHash,
-                holo_hash::DhtOpHash,
-                holochain_types::dht_op::DhtOp,
-            )>,
-        >,
+        Output = HolochainP2pResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>>,
     >
            + 'static
            + Send {
@@ -503,22 +491,13 @@ impl HolochainP2pActor {
         &mut self,
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
-        from_agent: AgentPubKey,
         request_validation_receipt: bool,
-        dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> kitsune_p2p::actor::KitsuneP2pHandlerResult<()> {
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
             evt_sender
-                .publish(
-                    dna_hash,
-                    to_agent,
-                    from_agent,
-                    request_validation_receipt,
-                    dht_hash,
-                    ops,
-                )
+                .publish(dna_hash, to_agent, request_validation_receipt, ops)
                 .await?;
             Ok(())
         }
@@ -579,21 +558,14 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         &mut self,
         input: kitsune_p2p::event::PutAgentInfoSignedEvt,
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<()> {
-        let kitsune_p2p::event::PutAgentInfoSignedEvt {
-            space,
-            agent,
-            agent_info_signed,
-        } = input;
+        let kitsune_p2p::event::PutAgentInfoSignedEvt { space, peer_data } = input;
         let space = DnaHash::from_kitsune(&space);
-        let agent = AgentPubKey::from_kitsune(&agent);
         let evt_sender = self.evt_sender.clone();
-        Ok(async move {
-            Ok(evt_sender
-                .put_agent_info_signed(space, agent, agent_info_signed)
-                .await?)
-        }
-        .boxed()
-        .into())
+        Ok(
+            async move { Ok(evt_sender.put_agent_info_signed(space, peer_data).await?) }
+                .boxed()
+                .into(),
+        )
     }
 
     /// We need to get previously stored agent info.
@@ -779,12 +751,11 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         &mut self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
         to_agent: Arc<kitsune_p2p::KitsuneAgent>,
-        from_agent: Arc<kitsune_p2p::KitsuneAgent>,
+        _from_agent: Arc<kitsune_p2p::KitsuneAgent>,
         payload: Vec<u8>,
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<()> {
         let space = DnaHash::from_kitsune(&space);
         let to_agent = AgentPubKey::from_kitsune(&to_agent);
-        let from_agent = AgentPubKey::from_kitsune(&from_agent);
 
         let request =
             crate::wire::WireMessage::decode(payload.as_ref()).map_err(HolochainP2pError::from)?;
@@ -805,16 +776,9 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             }
             crate::wire::WireMessage::Publish {
                 request_validation_receipt,
-                dht_hash,
+                dht_hash: _,
                 ops,
-            } => self.handle_incoming_publish(
-                space,
-                to_agent,
-                from_agent,
-                request_validation_receipt,
-                dht_hash,
-                ops,
-            ),
+            } => self.handle_incoming_publish(space, to_agent, request_validation_receipt, ops),
         }
     }
 
@@ -823,24 +787,21 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         &mut self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
         to_agent: Arc<kitsune_p2p::KitsuneAgent>,
-        from_agent: Arc<kitsune_p2p::KitsuneAgent>,
-        op_hash: Arc<kitsune_p2p::KitsuneOpHash>,
-        op_data: Vec<u8>,
+        ops: Vec<(Arc<kitsune_p2p::KitsuneOpHash>, Vec<u8>)>,
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<()> {
         let space = DnaHash::from_kitsune(&space);
         let to_agent = AgentPubKey::from_kitsune(&to_agent);
-        let _from_agent = AgentPubKey::from_kitsune(&from_agent);
-        let op_hash = DhtOpHash::from_kitsune(&op_hash);
-        let op_data =
-            crate::wire::WireDhtOpData::decode(op_data).map_err(HolochainP2pError::from)?;
-        self.handle_incoming_publish(
-            space,
-            to_agent,
-            op_data.from_agent,
-            false,
-            op_data.dht_hash,
-            vec![(op_hash, op_data.op_data)],
-        )
+        let ops = ops
+            .into_iter()
+            .map(|(op_hash, op_data)| {
+                let op_hash = DhtOpHash::from_kitsune(&op_hash);
+                let op_data = crate::wire::WireDhtOpData::decode(op_data)
+                    .map_err(HolochainP2pError::from)?
+                    .op_data;
+                Ok((op_hash, op_data))
+            })
+            .collect::<Result<_, HolochainP2pError>>()?;
+        self.handle_incoming_publish(space, to_agent, false, ops)
     }
 
     #[tracing::instrument(skip(self), level = "trace")]
@@ -899,19 +860,15 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         Ok(async move {
             let mut out = vec![];
             for agent in agents {
-                for (dht_hash, op_hash, dht_op) in evt_sender
+                for (op_hash, dht_op) in evt_sender
                     .fetch_op_hash_data(space.clone(), agent.clone(), op_hashes.clone())
                     .await?
                 {
                     out.push((
                         op_hash.into_kitsune(),
-                        crate::wire::WireDhtOpData {
-                            from_agent: agent.clone(),
-                            dht_hash,
-                            op_data: dht_op,
-                        }
-                        .encode()
-                        .map_err(kitsune_p2p::KitsuneP2pError::other)?,
+                        crate::wire::WireDhtOpData { op_data: dht_op }
+                            .encode()
+                            .map_err(kitsune_p2p::KitsuneP2pError::other)?,
                     ));
                 }
             }

@@ -155,50 +155,54 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
             );
 
             // parse/integrate the chunks
-            let futs = bloom.inner.share_mut(move |i, _| {
-                if let Some(endpoint) = i.initiate_tgt.clone() {
-                    if finished && con.peer_cert() == *endpoint.cert() {
-                        i.initiate_tgt = None;
-                    }
-                }
-
-                let mut futs = Vec::new();
-
-                // Locally sync the newly received data
-                for chunk in chunks {
-                    for agent in i.local_agents.iter() {
-                        match &*chunk {
-                            MetaOpData::Op(key, data) => {
-                                futs.push(bloom.evt_sender.gossip(
-                                    bloom.space.clone(),
-                                    agent.clone(),
-                                    // FIXME: this should technically probably be `remote_agents.clone()`,
-                                    //        and should take a Vec, but perhaps this isn't be using right now? -MD
-                                    agent.clone(),
-                                    key.clone(),
-                                    data.clone(),
-                                ));
-                            }
-                            MetaOpData::Agent(agent_info_signed) => {
-                                // TODO - we actually only need to do this
-                                // once, since the agent store is shared...
-                                futs.push(bloom.evt_sender.put_agent_info_signed(
-                                    PutAgentInfoSignedEvt {
-                                        space: bloom.space.clone(),
-                                        agent: agent.clone(),
-                                        agent_info_signed: agent_info_signed.clone(),
-                                    },
-                                ));
-                            }
+            let futs =
+                bloom.inner.share_mut(move |i, _| {
+                    if let Some(endpoint) = i.initiate_tgt.clone() {
+                        if finished && con.peer_cert() == *endpoint.cert() {
+                            i.initiate_tgt = None;
                         }
                     }
-                    let key = chunk.key();
-                    i.local_bloom.set(&key);
-                    i.local_data_map.insert(key, chunk);
-                }
 
-                Ok(futs)
-            })?;
+                    let mut futs = Vec::new();
+
+                    // Locally sync the newly received data
+                    for agent in i.local_agents.iter() {
+                        let mut to_send_ops = Vec::new();
+                        let mut to_send_peer_data = Vec::new();
+                        for chunk in &chunks {
+                            match &**chunk {
+                                MetaOpData::Op(key, data) => {
+                                    to_send_ops.push((key.clone(), data.clone()));
+                                }
+                                MetaOpData::Agent(agent_info_signed) => {
+                                    // TODO - we actually only need to do this
+                                    // once, since the agent store is shared...
+                                    to_send_peer_data.push(agent_info_signed.clone());
+                                }
+                            }
+                            let key = chunk.key();
+                            i.local_bloom.set(&key);
+                            i.local_data_map.insert(key, chunk.clone());
+                        }
+                        if !to_send_ops.is_empty() {
+                            futs.push(bloom.evt_sender.gossip(
+                                bloom.space.clone(),
+                                agent.clone(),
+                                to_send_ops,
+                            ));
+                        }
+                        if !to_send_peer_data.is_empty() {
+                            futs.push(bloom.evt_sender.put_agent_info_signed(
+                                PutAgentInfoSignedEvt {
+                                    space: bloom.space.clone(),
+                                    peer_data: to_send_peer_data,
+                                },
+                            ));
+                        }
+                    }
+
+                    Ok(futs)
+                })?;
 
             if !futs.is_empty() {
                 futures::future::try_join_all(futs)

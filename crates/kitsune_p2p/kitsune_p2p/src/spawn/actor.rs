@@ -523,13 +523,9 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
         &mut self,
         space: Arc<KitsuneSpace>,
         to_agent: Arc<KitsuneAgent>,
-        from_agent: Arc<KitsuneAgent>,
-        op_hash: Arc<KitsuneOpHash>,
-        op_data: Vec<u8>,
+        ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
     ) -> KitsuneP2pEventHandlerResult<()> {
-        Ok(self
-            .evt_sender
-            .gossip(space, to_agent, from_agent, op_hash, op_data))
+        Ok(self.evt_sender.gossip(space, to_agent, ops))
     }
 
     fn handle_fetch_op_hash_data(
@@ -736,9 +732,7 @@ mockall::mock! {
             &mut self,
             space: Arc<KitsuneSpace>,
             to_agent: Arc<KitsuneAgent>,
-            from_agent: Arc<KitsuneAgent>,
-            op_hash: Arc<KitsuneOpHash>,
-            op_data: Vec<u8>,
+            ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
         ) -> KitsuneP2pEventHandlerResult<()>;
 
         fn handle_fetch_op_hashes_for_constraints(

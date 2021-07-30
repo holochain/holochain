@@ -2,10 +2,7 @@ use arbitrary::Arbitrary;
 use futures::FutureExt;
 use ghost_actor::{GhostControlHandler, GhostResult};
 
-use crate::{
-    gossip::sharded_gossip::initiate::encode_timed_bloom_filter, spawn::MockKitsuneP2pEventHandler,
-    NOISE,
-};
+use crate::{spawn::MockKitsuneP2pEventHandler, NOISE};
 
 use super::*;
 use crate::fixt::*;

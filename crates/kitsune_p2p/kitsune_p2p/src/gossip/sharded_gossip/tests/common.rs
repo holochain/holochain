@@ -87,7 +87,7 @@ async fn standard_responses(
     }
     evt_handler
         .expect_handle_gossip()
-        .returning(|_, _, _, _, _| Ok(async { Ok(()) }.boxed().into()));
+        .returning(|_, _, _| Ok(async { Ok(()) }.boxed().into()));
     evt_handler
 }
 
@@ -160,11 +160,7 @@ pub fn dangerous_fake_agent_info_with_arc(
     }))
 }
 
-pub fn empty_bloom() -> Option<PoolBuf> {
+pub fn empty_bloom() -> Option<(PoolBuf, std::ops::Range<u64>)> {
     let bloom = bloomfilter::Bloom::new_for_fp_rate(1, 0.1);
-    let bloom = TimedBloomFilter {
-        bloom,
-        time: 0..u64::MAX,
-    };
-    Some(encode_timed_bloom_filter(&bloom))
+    Some((encode_bloom_filter(&bloom), 0..u64::MAX))
 }

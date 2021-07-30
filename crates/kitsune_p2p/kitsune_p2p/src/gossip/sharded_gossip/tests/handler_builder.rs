@@ -31,7 +31,7 @@ impl HandlerBuilder {
     pub fn with_noop_gossip(mut self, agent_data: MockAgentPersistence) -> Self {
         self.0
             .expect_handle_gossip()
-            .returning(|_, _, _, _, _| Ok(async { Ok(()) }.boxed().into()));
+            .returning(|_, _, _| Ok(async { Ok(()) }.boxed().into()));
 
         self
     }

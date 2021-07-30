@@ -110,7 +110,7 @@ ghost_actor::ghost_chan! {
     /// the HolochainP2p actor.
     pub chan HolochainP2pEvent<super::HolochainP2pError> {
         /// We need to store signed agent info.
-        fn put_agent_info_signed(dna_hash: DnaHash, to_agent: AgentPubKey, agent_info_signed: AgentInfoSigned) -> ();
+        fn put_agent_info_signed(dna_hash: DnaHash, peer_data: Vec<AgentInfoSigned>) -> ();
 
         /// We need to get previously stored agent info.
         fn get_agent_info_signed(dna_hash: DnaHash, to_agent: AgentPubKey, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>) -> Option<AgentInfoSigned>;
@@ -152,9 +152,7 @@ ghost_actor::ghost_chan! {
         fn publish(
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
-            from_agent: AgentPubKey,
             request_validation_receipt: bool,
-            dht_hash: holo_hash::AnyDhtHash,
             ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
         ) -> ();
 
@@ -224,7 +222,7 @@ ghost_actor::ghost_chan! {
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
             op_hashes: Vec<holo_hash::DhtOpHash>,
-        ) -> Vec<(holo_hash::AnyDhtHash, holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>;
+        ) -> Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>;
 
         /// P2p operations require cryptographic signatures and validation.
         fn sign_network_data(
@@ -252,7 +250,6 @@ macro_rules! match_p2p_evt {
             HolochainP2pEvent::ValidationReceiptReceived { $i, .. } => { $($t)* }
             HolochainP2pEvent::FetchOpHashData { $i, .. } => { $($t)* }
             HolochainP2pEvent::SignNetworkData { $i, .. } => { $($t)* }
-            HolochainP2pEvent::PutAgentInfoSigned { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetAgentInfoSigned { $i, .. } => { $($t)* }
             HolochainP2pEvent::PutMetricDatum { $i, .. } => { $($t)* }
             HolochainP2pEvent::QueryMetrics { $i, .. } => { $($t)* }
@@ -269,6 +266,7 @@ impl HolochainP2pEvent {
             HolochainP2pEvent::QueryAgentInfoSigned { dna_hash, .. } => { dna_hash }
             HolochainP2pEvent::QueryAgentInfoSignedNearBasis { dna_hash, .. } => { dna_hash }
             HolochainP2pEvent::QueryGossipAgents { dna_hash, .. } => { dna_hash }
+            HolochainP2pEvent::PutAgentInfoSigned { dna_hash, .. } => { dna_hash }
         })
     }
 
@@ -279,6 +277,7 @@ impl HolochainP2pEvent {
             HolochainP2pEvent::QueryAgentInfoSigned { .. } => { unimplemented!("There is no single agent target for QueryAgentInfoSigned") },
             HolochainP2pEvent::QueryAgentInfoSignedNearBasis { .. } => { unimplemented!("There is no single agent target for QueryAgentInfoSignedNearBasis") },
             HolochainP2pEvent::QueryGossipAgents { .. } => { unimplemented!("There is no single agent target for QueryGossipAgents") },
+            HolochainP2pEvent::PutAgentInfoSigned { .. } => { unimplemented!("There is no single agent target for PutAgentInfoSigned") },
         })
     }
 }
