@@ -153,10 +153,10 @@ fn converge(current: f64, density: PeerDensity) -> f64 {
 /// ```
 pub struct DhtArc {
     /// The center location of this dht arc
-    pub center_loc: DhtLocation,
+    center_loc: DhtLocation,
 
     /// The "half-length" of this dht arc
-    pub half_length: u32,
+    half_length: u32,
 }
 
 impl DhtArc {
@@ -168,6 +168,16 @@ impl DhtArc {
             center_loc: center_loc.into(),
             half_length,
         }
+    }
+
+    /// Create a full arc from a center location
+    pub fn full<I: Into<DhtLocation>>(center_loc: I) -> Self {
+        Self::new(center_loc, MAX_HALF_LENGTH)
+    }
+
+    /// Create an empty arc from a center location
+    pub fn empty<I: Into<DhtLocation>>(center_loc: I) -> Self {
+        Self::new(center_loc, 0)
     }
 
     /// Update the half length based on a density reading.
@@ -262,6 +272,16 @@ impl DhtArc {
     /// by this arc.
     pub fn coverage(&self) -> f64 {
         self.absolute_length() as f64 / U32_LEN as f64
+    }
+
+    /// Get the half length of this arc.
+    pub fn half_length(&self) -> u32 {
+        self.half_length
+    }
+
+    /// Get the center location of this arc.
+    pub fn center_loc(&self) -> DhtLocation {
+        self.center_loc
     }
 }
 

@@ -292,10 +292,15 @@ impl HolochainP2pCellT for HolochainP2pCell {
     /// Check if an agent is an authority for a hash.
     async fn authority_for_hash(
         &self,
-        _dht_hash: holo_hash::AnyDhtHash,
+        dht_hash: holo_hash::AnyDhtHash,
     ) -> actor::HolochainP2pResult<bool> {
-        // Currently everyone is an authority
-        Ok(true)
+        self.sender
+            .authority_for_hash(
+                (*self.dna_hash).clone(),
+                (*self.from_agent).clone(),
+                dht_hash,
+            )
+            .await
     }
 }
 
