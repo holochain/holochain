@@ -315,7 +315,6 @@ async fn update_arc_length(
     space: Arc<KitsuneSpace>,
     arc: &mut DhtArc,
 ) -> KitsuneP2pResult<()> {
-    // TODO: Get the peer density and update the arc if feature flag is set.
     let density = evt_sender
         .query_peer_density(space.clone(), arc.clone())
         .await?;
