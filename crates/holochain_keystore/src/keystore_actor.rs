@@ -81,7 +81,9 @@ impl KeystoreSenderExt for KeystoreSender {
             <Vec<u8>>::from(UnsafeBytes::from(input.data.to_vec())).into(),
         );
         async move {
+            tracing::trace!("signing request start");
             let res = fut.await?;
+            tracing::trace!("signing request end");
             Ok(Signature::try_from(res.to_vec().as_ref())?)
         }
         .boxed()
