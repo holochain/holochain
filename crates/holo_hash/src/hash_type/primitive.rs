@@ -147,7 +147,12 @@ primitive_hash_type!(DhtOp, DhtOpHash, DhtOpVisitor, DHTOP_PREFIX);
 primitive_hash_type!(Header, HeaderHash, HeaderVisitor, HEADER_PREFIX);
 primitive_hash_type!(NetId, NetIdHash, NetIdVisitor, NET_ID_PREFIX);
 primitive_hash_type!(Wasm, WasmHash, WasmVisitor, WASM_PREFIX);
-primitive_hash_type!(CounterSigningPreflightRequest, CounterSigningPreflightRequestHash, CounterSigningPreflightRequestVisitor, COUNTERSIGNING_PREFLIGHT_REQUEST_PREFIX);
+primitive_hash_type!(
+    CounterSigningPreflightRequest,
+    CounterSigningPreflightRequestHash,
+    CounterSigningPreflightRequestVisitor,
+    COUNTERSIGNING_PREFLIGHT_REQUEST_PREFIX
+);
 
 // DhtOps are mostly hashes
 impl HashTypeSync for DhtOp {}

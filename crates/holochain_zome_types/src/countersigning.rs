@@ -179,7 +179,10 @@ impl PreflightResponse {
     }
 
     /// Serialization for signing of the signable field data only.
-    pub fn encode_fields_for_signature(request: &PreflightRequest, agent_state: &CounterSigningAgentState) -> Result<Vec<u8>, SerializedBytesError> {
+    pub fn encode_fields_for_signature(
+        request: &PreflightRequest,
+        agent_state: &CounterSigningAgentState,
+    ) -> Result<Vec<u8>, SerializedBytesError> {
         holochain_serialized_bytes::encode(&(request, agent_state))
     }
 
@@ -226,8 +229,10 @@ impl PreflightResponse {
 pub enum PreflightRequestAcceptance {
     /// Preflight request accepted.
     Accepted(PreflightResponse),
-    /// The preflight request is valid but cannot be accepted by the current agent.
-    Unacceptable(String),
+    /// The preflight request start time is too far in the future for the agent.
+    UnacceptableFutureStart,
+    /// The preflight request does not include the agent.
+    UnacceptableAgentNotFound,
     /// The preflight request is invalid as it failed some integrity check.
     Invalid(String),
 }
@@ -247,11 +252,7 @@ pub struct CounterSigningAgentState {
 
 impl CounterSigningAgentState {
     /// Constructor.
-    pub fn new(
-        agent_index: u8,
-        chain_top: HeaderHash,
-        header_seq: u32,
-    ) -> Self {
+    pub fn new(agent_index: u8, chain_top: HeaderHash, header_seq: u32) -> Self {
         Self {
             agent_index,
             chain_top,

@@ -553,28 +553,7 @@ pub fn insert_entry(txn: &mut Transaction, entry: EntryHashed) -> StateMutationR
     Ok(())
 }
 
-pub struct ChainLock {
-    lock: Vec<u8>,
-    end: u32,
-}
-
-pub fn is_chain_locked(txn: &mut Transaction, lock: &[u8]) -> StateMutationResult<bool> {
-    let statement = txn.prepare("SELECT lock, end FROM ChainLock")?;
-    for chain_lock in statement.query_map([], |row| {
-        Ok(ChainLock {
-            lock: row.get(0)?,
-            end: row.get(1)?,
-        })
-    }) {
-        if &chain_lock?.lock != lock && chain_lock?.end > SystemTime::now() {
-            return Ok(true);
-        }
-    }
-
-    Ok(false)
-}
-
-pub fn lock_chain(txn: &mut Transaction, lock: &[u8], end: u32) -> StateMutationResult<()> {
+pub fn lock_chain(txn: &mut Transaction, lock: &[u8], end: &Timestamp) -> StateMutationResult<()> {
     sql_insert!(txn, ChainLock, {
         "lock": lock,
         "end": end,

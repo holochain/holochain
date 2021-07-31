@@ -81,6 +81,9 @@ wasm_io_types! {
     // These definitions can be copy-pasted into the ribosome's HostFnApi
     // when updated
 
+    // Attempt to accept a preflight request.
+    fn accept_countersigning_preflight_request(zt::countersigning::PreflightRequest) -> zt::countersigning::PreflightRequestAcceptance;
+
     // Info about the calling agent.
     fn agent_info (()) -> zt::info::AgentInfo;
 
