@@ -891,34 +891,37 @@ async fn handle_fetch_op_hashes_for_constraints(
     let FetchOpHashesForConstraintsEvt {
         space,
         agents,
-        window_ms: window,
+        window_ms,
         max_ops,
-        ..
+        include_limbo: _,
     } = input;
 
-    todo!(
-        "reimplement for new api,
-        in particular making sure the time window lines up (s -> ms)"
-    );
+    let root = KdHash::from_kitsune_space(&space);
 
-    // let root = KdHash::from_kitsune_space(&space);
-    // let agent = KdHash::from_kitsune_agent(&agent);
-    // let c_start = since_utc_epoch_s as f32;
-    // let c_end = until_utc_epoch_s as f32;
+    // TODO - it's ok for now to just get the full entries
+    //        since they'll just get Arc::clone-d
+    //        but once this is a persisted database
+    //        we'll want an api to just get the hashes
+    let mut entries = vec![];
 
-    // // TODO - it's ok for now to just get the full entries
-    // //        since they'll just get Arc::clone-d
-    // //        but once this is a persisted database
-    // //        we'll want an api to just get the hashes
-    // let entries = kdirect
-    //     .persist
-    //     .query_entries(root, agent, c_start, c_end, dht_arc)
-    //     .await?;
+    for (agent, arcset) in agents {
+        let agent = KdHash::from_kitsune_agent(&agent);
+        let es = kdirect
+            .persist
+            .query_entries(root.clone(), agent, window_ms.clone(), arcset)
+            .await?;
+        entries.extend(es.into_iter());
+    }
 
-    // Ok(entries
-    //     .into_iter()
-    //     .map(|e| e.hash().clone().to_kitsune_op_hash())
-    //     .collect())
+    let mut entries: Vec<_> = entries
+        .into_iter()
+        .map(|e| e.hash().clone().to_kitsune_op_hash())
+        .collect();
+    entries.sort();
+    entries.dedup();
+
+    // TODO: produce proper time window of actual data returned
+    Ok(Some((entries, window_ms)))
 }
 
 async fn handle_fetch_op_hash_data(

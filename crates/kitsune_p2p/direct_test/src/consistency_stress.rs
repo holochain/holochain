@@ -1,5 +1,7 @@
 //! bunch of nodes gossip consistency test
 
+use kitsune_p2p_direct::dependencies::kitsune_p2p::event::full_time_window;
+use kitsune_p2p_direct::dependencies::kitsune_p2p_types::dht_arc::ArcInterval;
 use kitsune_p2p_direct::dependencies::*;
 use kitsune_p2p_direct::prelude::*;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
@@ -450,9 +452,8 @@ impl Test {
                     .query_entries(
                         self.root.clone(),
                         agent.clone(),
-                        f32::MIN,
-                        f32::MAX,
-                        DhtArc::new(0, u32::MAX).interval(),
+                        full_time_window(),
+                        ArcInterval::Full.into(),
                     )
                     .await
                     .unwrap()
