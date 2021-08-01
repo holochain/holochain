@@ -21,6 +21,7 @@ pub trait AsGossipModule: 'static + Send + Sync {
     ) -> KitsuneResult<()>;
     fn local_agent_join(&self, a: Arc<KitsuneAgent>);
     fn local_agent_leave(&self, a: Arc<KitsuneAgent>);
+    fn new_data(&self) {}
 }
 
 pub struct GossipModule(pub Arc<dyn AsGossipModule>);
@@ -44,6 +45,10 @@ impl GossipModule {
 
     pub fn local_agent_leave(&self, a: Arc<KitsuneAgent>) {
         self.0.local_agent_leave(a);
+    }
+
+    pub fn new_data(&self) {
+        self.0.new_data();
     }
 }
 

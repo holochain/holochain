@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use criterion::criterion_group;
 use criterion::criterion_main;
 use criterion::BenchmarkId;
@@ -125,6 +127,7 @@ impl Producer {
 
 impl Consumer {
     async fn run(&mut self) {
+        let start = std::time::Instant::now();
         let mut num = self.last;
         while num <= self.last {
             let hashes: EntryHashes = self
@@ -138,6 +141,7 @@ impl Consumer {
             num = hashes.0.len();
         }
         self.last = num;
+        dbg!(start.elapsed());
         self.tx.send(num).await.unwrap();
     }
 }
@@ -148,12 +152,17 @@ async fn setup() -> (Producer, Consumer, Others) {
         .await
         .unwrap();
     let config = || {
+        let mut tuning =
+            kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+        tuning.gossip_strategy = "sharded-gossip".to_string();
+
         let mut network = KitsuneP2pConfig::default();
         network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
             bind_to: None,
             override_host: None,
             override_port: None,
         }];
+        network.tuning_params = Arc::new(tuning);
         ConductorConfig {
             network: Some(network),
             admin_interfaces: Some(vec![AdminInterfaceConfig {
@@ -164,6 +173,9 @@ async fn setup() -> (Producer, Consumer, Others) {
     };
     let configs = vec![config(), config(), config(), config(), config()];
     let mut conductors = SweetConductorBatch::from_configs(configs.clone()).await;
+    for c in conductors.iter() {
+        c.set_skip_publish(true);
+    }
     let apps = conductors.setup_app("app", &[dna]).await.unwrap();
     let mut cells = apps
         .into_inner()

@@ -111,6 +111,9 @@ pub trait HolochainP2pCellT {
         &self,
         dht_hash: holo_hash::AnyDhtHash,
     ) -> actor::HolochainP2pResult<bool>;
+
+    /// There is new integrated data.
+    async fn new_data(&self) -> actor::HolochainP2pResult<()>;
 }
 
 /// A wrapper around HolochainP2pSender that partially applies the dna_hash / agent_pub_key.
@@ -296,6 +299,10 @@ impl HolochainP2pCellT for HolochainP2pCell {
     ) -> actor::HolochainP2pResult<bool> {
         // Currently everyone is an authority
         Ok(true)
+    }
+
+    async fn new_data(&self) -> actor::HolochainP2pResult<()> {
+        self.sender.new_data((*self.dna_hash).clone()).await
     }
 }
 

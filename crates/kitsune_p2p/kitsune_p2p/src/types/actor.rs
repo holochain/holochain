@@ -102,5 +102,8 @@ ghost_actor::ghost_chan! {
             timeout: KitsuneTimeout,
             payload: Payload
         ) -> ();
+
+        /// New integrated data.
+        fn new_data(space: KSpace) -> ();
     }
 }

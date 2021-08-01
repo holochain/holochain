@@ -116,7 +116,6 @@ impl ShardedGossip {
                 inner: Share::new(inner),
                 gossip_type,
                 closing: AtomicBool::new(false),
-                new_data: AtomicBool::new(false),
             },
             bandwidth,
         });
@@ -129,9 +128,6 @@ impl ShardedGossip {
                     .closing
                     .load(std::sync::atomic::Ordering::Relaxed)
                 {
-                    // TODO: This sleep isn't really needed except to stop a hot loop.
-                    // It could be much lower but we need to first implement how quickly we
-                    // call nodes to avoid hot looping.
                     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
                     this.run_one_iteration().await;
                 }
@@ -259,8 +255,6 @@ pub struct ShardedGossipLocal {
     evt_sender: EventSender,
     inner: Share<ShardedGossipLocalState>,
     closing: AtomicBool,
-    /// Have received new data since last message.
-    new_data: AtomicBool,
 }
 
 /// Incoming gossip.
@@ -285,6 +279,8 @@ pub struct ShardedGossipLocalState {
     metrics: HashMap<Tx2Cert, MetricInfo>,
     /// Last moment we locally synced.
     last_local_sync: Option<std::time::Instant>,
+    /// New integrated data
+    new_data: usize,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -662,19 +658,31 @@ impl ShardedGossipLocal {
 
     /// Check if we have new data sync the last iteration.
     fn have_new_data(&self) -> bool {
-        self.new_data.load(std::sync::atomic::Ordering::Relaxed)
+        self.inner
+            .share_mut(|i, _| Ok(i.new_data > 0))
+            .unwrap_or(false)
     }
 
     /// Reset the iteration.
     fn reset_new_data(&self) {
-        self.new_data
-            .store(false, std::sync::atomic::Ordering::Relaxed)
+        self.inner
+            .share_mut(|i, _| {
+                if let Some(v) = i.new_data.checked_sub(1) {
+                    i.new_data = v;
+                }
+                Ok(())
+            })
+            .ok();
     }
 
     /// Set that we have new data this iteration.
     fn set_new_data(&self) {
-        self.new_data
-            .store(true, std::sync::atomic::Ordering::Relaxed)
+        self.inner
+            .share_mut(|i, _| {
+                i.new_data += 1;
+                Ok(())
+            })
+            .ok();
     }
 
     /// Get metric info for a connection.
@@ -900,6 +908,10 @@ impl AsGossipModule for ShardedGossip {
         self.gossip
             .closing
             .store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    fn new_data(&self) {
+        self.gossip.set_new_data();
     }
 }
 

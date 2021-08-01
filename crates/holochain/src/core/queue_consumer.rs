@@ -108,6 +108,7 @@ pub async fn spawn_queue_consumer_tasks(
         stop.subscribe(),
         get_tx_sys,
         tx_receipt.clone(),
+        cell_network.clone(),
     );
     task_sender
         .send(ManagedTaskAdd::cell_critical(

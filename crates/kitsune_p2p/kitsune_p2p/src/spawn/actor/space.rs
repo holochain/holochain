@@ -47,6 +47,9 @@ ghost_actor::ghost_chan! {
 
         /// Incoming Gossip
         fn incoming_gossip(space: KSpace, con: WireConHnd, data: Payload, module_type: crate::types::gossip::GossipModuleType) -> ();
+
+        // /// New integrated data
+        // fn new_data() -> ();
     }
 }
 
@@ -293,6 +296,7 @@ impl SpaceInternalHandler for Space {
         }
         unit_ok_fut()
     }
+
 }
 
 struct UpdateAgentInfoInput<'borrow> {
@@ -661,6 +665,13 @@ impl KitsuneP2pHandler for Space {
         }
         .boxed()
         .into())
+    }
+    
+    fn handle_new_data(&mut self, _: KSpace) -> InternalHandlerResult<()> {
+        for module in self.gossip_mod.values() {
+            module.new_data();
+        }
+        unit_ok_fut()
     }
 }
 
