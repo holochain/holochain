@@ -148,7 +148,7 @@ impl HandlerBuilder {
 /// without having to refer to explicit op hashes or locations.
 ///
 /// This type is intended to be used to easily define arbitrary sharded network scenarios,
-/// to test various cases of local sync and gossip. It's expected that we'll eventually have a 
+/// to test various cases of local sync and gossip. It's expected that we'll eventually have a
 /// small library of such scenarios, defined in terms of this type.
 ///
 /// See [`generate_ops_for_overlapping_arcs`] for usage detail.
