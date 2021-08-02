@@ -482,6 +482,23 @@ impl SourceChain {
             SourceChainResult::Ok((headers, ops, entries))
         })?;
 
+        let maybe_countersigned_entry = entries
+            .iter()
+            .map(|entry| entry.as_content())
+            .find(|entry| matches!(entry, Entry::CounterSign(_, _)));
+
+        let lock = match maybe_countersigned_entry {
+            Some(Entry::CounterSign(session_data, _)) => {
+                if headers.len() != 1 {
+                    return Err(SourceChainError::DirtyCounterSigningWrite);
+                }
+                holo_hash::encode::blake2b_256(&holochain_serialized_bytes::encode(
+                    session_data.preflight_request(),
+                )?)
+            }
+            _ => vec![],
+        };
+
         // Write the entries, headers and ops to the database in one transaction.
         let author = self.author.clone();
         let persisted_head = self.persisted_head.clone();
@@ -500,19 +517,11 @@ impl SourceChain {
                     ));
                 }
 
+                if is_chain_locked(txn, &lock)? {
+                    return Err(SourceChainError::ChainLocked);
+                }
+
                 for entry in entries {
-                    let lock: Vec<u8> = match entry.as_content() {
-                        Entry::CounterSign(session_data, _) => holo_hash::encode::blake2b_256(
-                            &holochain_serialized_bytes::encode(session_data.preflight_request())?,
-                        ),
-                        _ => vec![],
-                    };
-                    // This also covers the case that a non-countersigning entry is committed in the same transaction.
-                    // If the lock exists only the countersigning entry with the correct lock id can be committed until the chain is unlocked.
-                    // Validation of the countersigning session will ensure the same countersigning entry cannot be committed more than once.
-                    if is_chain_locked(txn, &lock)? {
-                        return Err(SourceChainError::ChainLocked);
-                    }
                     insert_entry(txn, entry)?;
                 }
                 for header in headers {

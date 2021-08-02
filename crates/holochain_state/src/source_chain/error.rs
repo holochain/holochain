@@ -20,8 +20,11 @@ pub enum SourceChainError {
     )]
     HeadMoved(Option<HeaderHash>, Option<HeaderHash>),
 
-    #[error("Attempted to write anything other than the countersigning session entry while the chain was locked for a countersigning session")]
+    #[error("Attempted to write anything other than the countersigning session entry while the chain was locked for a countersigning session.")]
     ChainLocked,
+
+    #[error("Attempted to write anything other than the countersigning session entry at the same time as the session entry.")]
+    DirtyCounterSigningWrite,
 
     #[error(
         "The source chain's structure is invalid. This error is not recoverable. Detail:\n{0}"
