@@ -839,9 +839,6 @@ kitsune_p2p_types::write_codec_enum! {
         },
 
         /// The node you are trying to gossip with has no agents anymore.
-        // maackle: perhaps this should be a flag on the Agents (bloom) message,
-        //          since it would still be useful to gossip peer data.
-        // FS: No this literally means there's no local agents to gossip with.
         NoAgents(0x80) {
         },
 

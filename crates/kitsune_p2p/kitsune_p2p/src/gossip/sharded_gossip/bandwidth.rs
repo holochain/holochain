@@ -34,7 +34,7 @@ impl Bandwidth {
         if let Some(bits) = NonZeroU32::new(bytes as u32 * 8) {
             if let Some(outbound) = &self.outbound {
                 if outbound.until_n_ready(bits).await.is_err() {
-                    tracing::error!("Tried to send a message larger then the max message size");
+                    tracing::error!("Tried to send a message larger than the max message size");
                 }
             }
         }
@@ -45,7 +45,7 @@ impl Bandwidth {
         if let Some(bits) = NonZeroU32::new(bytes as u32 * 8) {
             if let Some(inbound) = &self.inbound {
                 if inbound.until_n_ready(bits).await.is_err() {
-                    tracing::error!("Tried to receive a message larger then the max message size");
+                    tracing::error!("Tried to receive a message larger than the max message size");
                 }
             }
         }

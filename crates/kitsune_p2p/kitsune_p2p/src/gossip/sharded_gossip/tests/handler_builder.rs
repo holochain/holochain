@@ -39,8 +39,9 @@ impl HandlerBuilder {
     /// Implements the agent persistence methods (fetches and gets) to act as if
     /// it is backed by a data store with the provided agent data.
     ///
-    /// Limitations:
+    /// Limitations/Discrepancies:
     /// - Op data returned is completely arbitrary and does NOT hash to the hash it's "stored" under
+    /// - The agent location will NOT be centered on their DhtArc
     pub fn with_agent_persistence(mut self, agent_data: MockAgentPersistence) -> Self {
         let info_only: Vec<_> = agent_data.iter().map(|(info, _)| info.clone()).collect();
         let agents_only: Vec<_> = info_only.iter().map(|info| info.agent.clone()).collect();
@@ -145,6 +146,11 @@ impl HandlerBuilder {
 
 /// Concise representation of data held by various agents in a sharded scenario,
 /// without having to refer to explicit op hashes or locations.
+///
+/// This type is intended to be used to easily define arbitrary sharded network scenarios,
+/// to test various cases of local sync and gossip. It's expected that we'll eventually have a 
+/// small library of such scenarios, defined in terms of this type.
+///
 /// See [`generate_ops_for_overlapping_arcs`] for usage detail.
 pub struct OwnershipData {
     /// Total number of op hashes to be generated

@@ -325,7 +325,7 @@ pub trait ConductorHandleT: Send + Sync {
         -> ConductorResult<()>;
 
     #[cfg(any(test, feature = "test_utils"))]
-    /// Check whether this conductor should skip gossip.
+    /// Check whether this conductor should skip publish.
     fn should_skip_publish(&self) -> bool;
 
     #[cfg(any(test, feature = "test_utils"))]

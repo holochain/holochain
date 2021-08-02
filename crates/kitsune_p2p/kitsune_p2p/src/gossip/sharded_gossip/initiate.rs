@@ -81,7 +81,7 @@ impl ShardedGossipLocal {
         if let Some(our_id) = same_as_target {
             // If we have a lower id then we proceed
             // and the remote will exit.
-            // If we have a higher id then the remote
+            // If we have a higher id than the remote
             // then we exit and the remote will proceed.
             // If we tie then we both exit (This will be very rare).
             if our_id >= remote_id {
