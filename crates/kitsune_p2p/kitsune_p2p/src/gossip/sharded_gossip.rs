@@ -227,7 +227,6 @@ impl ShardedGossip {
             Ok(None) => (),
             Err(err) => tracing::error!("Gossip failed when trying to initiate with {:?}", err),
         }
-        self.gossip.reset_new_data();
         if let Err(err) = self.process_incoming_outgoing().await {
             tracing::error!("Gossip failed to process a message because of: {:?}", err);
         }
@@ -279,8 +278,10 @@ pub struct ShardedGossipLocalState {
     metrics: HashMap<Tx2Cert, MetricInfo>,
     /// Last moment we locally synced.
     last_local_sync: Option<std::time::Instant>,
-    /// New integrated data
-    new_data: usize,
+    /// Trigger local sync to run on the next iteration.
+    trigger_local_sync: bool,
+    /// Trigger initiate to run on the next iteration.
+    trigger_initiate: usize,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -297,6 +298,9 @@ impl ShardedGossipLocalState {
             .map(|tgt| tgt.0.cert() == state_key)
             .unwrap_or(false)
         {
+            if let Some(v) = self.trigger_initiate.checked_sub(1) {
+                self.trigger_initiate = v;
+            }
             self.initiate_tgt = None;
         }
         self.round_map.remove(state_key)
@@ -503,9 +507,6 @@ impl ShardedGossipLocal {
                 }
             }
             ShardedGossipWire::MissingOps(MissingOps { ops, finished }) => {
-                if !ops.is_empty() {
-                    self.set_new_data();
-                }
                 let state = if finished {
                     self.decrement_ops_blooms(&cert).await?
                 } else {
@@ -598,7 +599,13 @@ impl ShardedGossipLocal {
         }
 
         let mut result = None;
-        let have_new_data = self.have_new_data();
+        let should_run = self.inner.share_mut(|i, _| {
+            if i.trigger_initiate > 0 {
+                Ok(true)
+            } else {
+                Ok(false)
+            }
+        })?;
         for (remote_agent, _) in remote_agents_within_arc_set {
             // Get the agent info for the chosen remote agent.
             let agent = store::get_agent_info(&self.evt_sender, &self.space, &remote_agent)
@@ -624,7 +631,7 @@ impl ShardedGossipLocal {
                         .next()
                 });
             if let Some(agent) = agent {
-                if self.saw_too_recently(agent.0.cert(), have_new_data)? {
+                if self.saw_too_recently(agent.0.cert(), should_run)? {
                     continue;
                 }
                 self.record_metric_info(agent.0.cert().clone(), false)?;
@@ -656,35 +663,6 @@ impl ShardedGossipLocal {
         Ok(false)
     }
 
-    /// Check if we have new data sync the last iteration.
-    fn have_new_data(&self) -> bool {
-        self.inner
-            .share_mut(|i, _| Ok(i.new_data > 0))
-            .unwrap_or(false)
-    }
-
-    /// Reset the iteration.
-    fn reset_new_data(&self) {
-        self.inner
-            .share_mut(|i, _| {
-                if let Some(v) = i.new_data.checked_sub(1) {
-                    i.new_data = v;
-                }
-                Ok(())
-            })
-            .ok();
-    }
-
-    /// Set that we have new data this iteration.
-    fn set_new_data(&self) {
-        self.inner
-            .share_mut(|i, _| {
-                i.new_data += 1;
-                Ok(())
-            })
-            .ok();
-    }
-
     /// Get metric info for a connection.
     fn get_metric_info(&self, cert: &Tx2Cert) -> KitsuneResult<Option<MetricInfo>> {
         self.inner
@@ -706,7 +684,12 @@ impl ShardedGossipLocal {
     /// Check if we should locally sync
     fn should_local_sync(&self) -> KitsuneResult<bool> {
         let update_last_sync = |i: &mut ShardedGossipLocalState, _: &mut bool| {
-            if i.last_local_sync
+            if i.trigger_local_sync {
+                i.trigger_local_sync = false;
+                i.last_local_sync = Some(std::time::Instant::now());
+                Ok(true)
+            } else if i
+                .last_local_sync
                 .as_ref()
                 .map(|s| s.elapsed().as_millis() as u32)
                 .unwrap_or(u32::MAX)
@@ -718,7 +701,7 @@ impl ShardedGossipLocal {
                 Ok(false)
             }
         };
-        if self.have_new_data() || self.inner.share_mut(update_last_sync)? {
+        if self.inner.share_mut(update_last_sync)? {
             Ok(true)
         } else {
             Ok(false)
@@ -891,7 +874,7 @@ impl AsGossipModule for ShardedGossip {
     fn local_agent_join(&self, a: Arc<KitsuneAgent>) {
         let _ = self.gossip.inner.share_mut(move |i, _| {
             // Force a new local sync as we have a new agent to sync with.
-            i.last_local_sync = None;
+            i.trigger_local_sync = true;
             i.local_agents.insert(a);
             Ok(())
         });
@@ -911,7 +894,11 @@ impl AsGossipModule for ShardedGossip {
     }
 
     fn new_data(&self) {
-        self.gossip.set_new_data();
+        let _ = self.gossip.inner.share_mut(move |i, _| {
+            i.trigger_local_sync = true;
+            i.trigger_initiate += 1;
+            Ok(())
+        });
     }
 }
 
