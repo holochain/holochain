@@ -18,7 +18,7 @@ rec {
 
     # alas, we cannot specify --features in the virtual workspace
     # run the specific slow tests in the holochain crate
-    cargo test --no-run --all-targets --manifest-path=crates/holochain/Cargo.toml --features slow_tests,test_utils,build_wasms,db-encryption
+    cargo test --no-run --all-features --all-targets --manifest-path=crates/holochain/Cargo.toml
     cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,test_utils,build_wasms,db-encryption -- --nocapture --test-threads 1
     # run all the remaining cargo tests
     cargo test --no-run --all-features --all-targets --workspace --exclude holochain
