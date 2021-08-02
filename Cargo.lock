@@ -3427,9 +3427,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_api"
-version = "0.0.1-alpha.13"
+version = "0.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5aad2cc33bf4c4a78ea32ba527201ae02ed6ff276ff93470265663659e9f5684"
+checksum = "26bf69f6ad88274191ef2ad12850193d267c9b76d5cc33874afac9337604e25b"
 dependencies = [
  "blake2b_simd",
  "block-padding 0.2.1",
@@ -3455,9 +3455,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_client"
-version = "0.0.1-alpha.13"
+version = "0.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd37d72f7141c7dc105d486045a5d7167b0eed874b71cc964483cb2c47f834ff"
+checksum = "56ee4915c92df45a3fa55ae07631d925d66c99641f109378b147fc6aeed0e5f7"
 dependencies = [
  "ghost_actor 0.3.0-alpha.2",
  "lair_keystore_api",
