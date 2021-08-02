@@ -161,7 +161,7 @@ impl ShardedGossipLocal {
                 .collect();
             let missing_ops = self
                 .evt_sender
-                .fetch_op_hash_data(FetchOpHashDataEvt {
+                .fetch_op_data(FetchOpDataEvt {
                     space: self.space.clone(),
                     agents,
                     op_hashes: missing_hashes,

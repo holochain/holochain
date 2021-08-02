@@ -77,10 +77,10 @@ impl HandlerBuilder {
         });
 
         self.0
-            .expect_handle_fetch_op_hashes_for_constraints()
-            .returning(move |arg: FetchOpHashesForConstraintsEvt| {
+            .expect_handle_query_op_hashes()
+            .returning(move |arg: QueryOpHashesEvt| {
                 // Return ops for agent, correctly filtered by arc but not by time window
-                let FetchOpHashesForConstraintsEvt {
+                let QueryOpHashesEvt {
                     space: _,
                     agents,
                     window_ms,
@@ -125,10 +125,10 @@ impl HandlerBuilder {
             });
 
         self.0
-            .expect_handle_fetch_op_hash_data()
-            .returning(|arg: FetchOpHashDataEvt| {
+            .expect_handle_fetch_op_data()
+            .returning(|arg: FetchOpDataEvt| {
                 // Return dummy data for each op
-                let FetchOpHashDataEvt {
+                let FetchOpDataEvt {
                     space: _,
                     agents: _,
                     op_hashes,

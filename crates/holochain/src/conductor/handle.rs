@@ -614,7 +614,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             | GetLinks { .. }
             | GetAgentActivity { .. }
             | ValidationReceiptReceived { .. }
-            | FetchOpHashData { .. } => {
+            | FetchOpData { .. } => {
                 let cell_id = CellId::new(event.dna_hash().clone(), event.target_agents().clone());
                 let cell = self.cell_by_id(&cell_id).await?;
                 cell.handle_holochain_p2p_event(event).await?;
@@ -624,7 +624,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             // it at the conductor level.
             // TODO: perhaps we can do away with the assumption that each event
             //       is meant for a single Cell, i.e. allow batching in general
-            HolochainP2pEvent::FetchOpHashesForConstraints {
+            HolochainP2pEvent::QueryOpHashes {
                 dna_hash,
                 to_agents,
                 window_ms,
@@ -641,7 +641,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                     let cell_id = CellId::new(dna_hash.clone(), agent);
                     let cell = self.cell_by_id(&cell_id).await?;
                     match cell
-                        .handle_fetch_op_hashes_for_constraints(
+                        .handle_query_op_hashes(
                             arc_set,
                             window_ms.clone(),
                             include_limbo,

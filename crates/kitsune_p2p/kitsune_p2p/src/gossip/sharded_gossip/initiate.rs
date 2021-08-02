@@ -29,7 +29,7 @@ impl ShardedGossipLocal {
 
         // Choose a remote agent to gossip with.
         let remote_agent = self
-            .find_remote_agent_within_arc(
+            .find_remote_agent_within_arcset(
                 Arc::new(intervals.clone().into()),
                 &local_agents,
                 current_rounds,

@@ -701,17 +701,14 @@ async fn handle_events(
                         .boxed()
                         .into()));
                 }
-                event::KitsuneP2pEvent::FetchOpHashesForConstraints { respond, input, .. } => {
-                    respond.r(Ok(handle_fetch_op_hashes_for_constraints(
-                        kdirect.clone(),
-                        input,
-                    )
-                    .map_err(KitsuneP2pError::other)
-                    .boxed()
-                    .into()));
+                event::KitsuneP2pEvent::QueryOpHashes { respond, input, .. } => {
+                    respond.r(Ok(handle_query_op_hashes(kdirect.clone(), input)
+                        .map_err(KitsuneP2pError::other)
+                        .boxed()
+                        .into()));
                 }
-                event::KitsuneP2pEvent::FetchOpHashData { respond, input, .. } => {
-                    respond.r(Ok(handle_fetch_op_hash_data(kdirect.clone(), input)
+                event::KitsuneP2pEvent::FetchOpData { respond, input, .. } => {
+                    respond.r(Ok(handle_fetch_op_data(kdirect.clone(), input)
                         .map_err(KitsuneP2pError::other)
                         .boxed()
                         .into()));
@@ -884,11 +881,11 @@ async fn handle_gossip(
 }
 
 #[allow(warnings)]
-async fn handle_fetch_op_hashes_for_constraints(
+async fn handle_query_op_hashes(
     kdirect: Arc<Kd1>,
-    input: FetchOpHashesForConstraintsEvt,
+    input: QueryOpHashesEvt,
 ) -> KdResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowMs)>> {
-    let FetchOpHashesForConstraintsEvt {
+    let QueryOpHashesEvt {
         space,
         agents,
         window_ms,
@@ -924,11 +921,11 @@ async fn handle_fetch_op_hashes_for_constraints(
     Ok(Some((entries, window_ms)))
 }
 
-async fn handle_fetch_op_hash_data(
+async fn handle_fetch_op_data(
     kdirect: Arc<Kd1>,
-    input: FetchOpHashDataEvt,
+    input: FetchOpDataEvt,
 ) -> KdResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> {
-    let FetchOpHashDataEvt {
+    let FetchOpDataEvt {
         space,
         agents,
         op_hashes,

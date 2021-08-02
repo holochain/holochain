@@ -580,7 +580,7 @@ impl ShardedGossipLocal {
     }
 
     /// Find a remote endpoint from agents within arc set.
-    async fn find_remote_agent_within_arc(
+    async fn find_remote_agent_within_arcset(
         &self,
         arc_set: Arc<DhtArcSet>,
         local_agents: &HashSet<Arc<KitsuneAgent>>,

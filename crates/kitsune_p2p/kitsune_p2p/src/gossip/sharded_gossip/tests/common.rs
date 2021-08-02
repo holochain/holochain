@@ -56,33 +56,29 @@ async fn standard_responses(
         }
     });
     if with_data {
-        evt_handler
-            .expect_handle_fetch_op_hashes_for_constraints()
-            .returning(|_| {
-                Ok(async {
-                    Ok(Some((
-                        vec![Arc::new(KitsuneOpHash(vec![0; 36]))],
-                        u64::MIN..u64::MAX,
-                    )))
-                }
-                .boxed()
-                .into())
-            });
-        evt_handler
-            .expect_handle_fetch_op_hash_data()
-            .returning(|_| {
-                Ok(
-                    async { Ok(vec![(Arc::new(KitsuneOpHash(vec![0; 36])), vec![0])]) }
-                        .boxed()
-                        .into(),
-                )
-            });
+        evt_handler.expect_handle_query_op_hashes().returning(|_| {
+            Ok(async {
+                Ok(Some((
+                    vec![Arc::new(KitsuneOpHash(vec![0; 36]))],
+                    u64::MIN..u64::MAX,
+                )))
+            }
+            .boxed()
+            .into())
+        });
+        evt_handler.expect_handle_fetch_op_data().returning(|_| {
+            Ok(
+                async { Ok(vec![(Arc::new(KitsuneOpHash(vec![0; 36])), vec![0])]) }
+                    .boxed()
+                    .into(),
+            )
+        });
     } else {
         evt_handler
-            .expect_handle_fetch_op_hashes_for_constraints()
+            .expect_handle_query_op_hashes()
             .returning(|_| Ok(async { Ok(None) }.boxed().into()));
         evt_handler
-            .expect_handle_fetch_op_hash_data()
+            .expect_handle_fetch_op_data()
             .returning(|_| Ok(async { Ok(vec![]) }.boxed().into()));
     }
     evt_handler
