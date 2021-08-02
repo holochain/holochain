@@ -160,10 +160,9 @@ pub struct OwnershipData {
 }
 
 impl OwnershipData {
-    pub fn from_compact(
-        total_ops: usize,
-        v: Vec<(Arc<KitsuneAgent>, (usize, usize), Vec<usize>)>,
-    ) -> Self {
+    /// Construct `OwnershipData` from a more compact "untagged" format using
+    /// tuples instead of structs. This is intended to be the canonical constructor.
+    pub fn from_compact(total_ops: usize, v: Vec<OwnershipDataAgentCompact>) -> Self {
         Self {
             total_ops,
             agents: v
@@ -187,6 +186,10 @@ pub struct OwnershipDataAgent {
     /// The indices of ops to consider as owned
     hash_indices: Vec<usize>,
 }
+
+/// Same as [`OwnershipDataAgent`], but using a tuple instead of a struct.
+/// It's just more compact.
+pub type OwnershipDataAgentCompact = (Arc<KitsuneAgent>, (usize, usize), Vec<usize>);
 
 /// Given a list of ownership requirements, returns a list of triples, each
 /// item of which consists of:
