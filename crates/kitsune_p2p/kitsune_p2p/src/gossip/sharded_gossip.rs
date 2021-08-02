@@ -24,7 +24,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
-use self::bandwidth::Bandwidth;
+use self::bandwidth::BandwidthThrottle;
 use self::state_map::RoundStateMap;
 
 use super::simple_bloom::{HowToConnect, MetaOpKey};
@@ -82,7 +82,7 @@ pub struct ShardedGossip {
     /// The internal mutable state
     inner: Share<ShardedGossipState>,
     /// Bandwidth for incoming and outgoing gossip.
-    bandwidth: Bandwidth,
+    bandwidth: BandwidthThrottle,
 }
 
 impl ShardedGossip {
@@ -96,11 +96,11 @@ impl ShardedGossip {
     ) -> Arc<Self> {
         let mut inner = ShardedGossipLocalState::default();
         let bandwidth = match gossip_type {
-            GossipType::Recent => Bandwidth::new(
+            GossipType::Recent => BandwidthThrottle::new(
                 tuning_params.gossip_inbound_target_mbps,
                 tuning_params.gossip_outbound_target_mbps,
             ),
-            GossipType::Historical => Bandwidth::new(
+            GossipType::Historical => BandwidthThrottle::new(
                 tuning_params.gossip_historic_inbound_target_mbps,
                 tuning_params.gossip_historic_outbound_target_mbps,
             ),

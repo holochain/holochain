@@ -4,12 +4,15 @@ use governor::Quota;
 
 use super::*;
 
-pub(super) struct Bandwidth {
+/// Manages incoming and outgoing bandwidth by providing methods which
+/// asynchronously wait for enough bandwidth to become available before
+/// processing a chunk of bytes
+pub(super) struct BandwidthThrottle {
     inbound: Option<RateLimiter<NotKeyed, InMemoryState, DefaultClock>>,
     outbound: Option<RateLimiter<NotKeyed, InMemoryState, DefaultClock>>,
 }
 
-impl Bandwidth {
+impl BandwidthThrottle {
     /// Set the inbound and outbound bandwidth limits in megabits per second.
     pub(super) fn new(inbound_mbps: f64, outbound_mbps: f64) -> Self {
         // Convert to bits per second.
@@ -58,7 +61,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_limiter() {
-        let bandwidth = Bandwidth::new(0.1, 0.1);
+        let bandwidth = BandwidthThrottle::new(0.1, 0.1);
         let bytes = MAX_SEND_BUF_BYTES;
         // Hit the burst limit.
         bandwidth.outgoing_bytes(bytes).await;
