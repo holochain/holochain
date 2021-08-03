@@ -15,8 +15,8 @@ base64 = "0.13"
 blake2b_simd = "0.5.10"
 derive_more = "0.99.7"
 futures = "0.3"
-kitsune_p2p_types = { version = "0.0.2", path = "../types" }
-kitsune_p2p_transport_quic = { version = "0.0.2", path = "../transport_quic" }
+kitsune_p2p_types = { version = "0.0.3-dev.0", path = "../types" }
+kitsune_p2p_transport_quic = { version = "0.0.3-dev.0", path = "../transport_quic" }
 lair_keystore_api = "=0.0.2"
 nanoid = "0.3"
 observability = "0.1.3"
