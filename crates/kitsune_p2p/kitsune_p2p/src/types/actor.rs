@@ -105,9 +105,9 @@ ghost_actor::ghost_chan! {
 
         /// Check if an agent is an authority for a hash.
         fn authority_for_hash(
-            space: Arc<super::KitsuneSpace>,
-            agent: Arc<super::KitsuneAgent>,
-            basis: Arc<super::KitsuneBasis>,
+            space: KSpace,
+            agent: KAgent,
+            basis: KBasis,
         ) -> bool;
     }
 }
