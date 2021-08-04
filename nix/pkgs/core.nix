@@ -5,6 +5,8 @@
 
 , holonix
 , holonixPath
+, hcToplevelDir
+, releaseAutomation
 }:
 
 rec {
@@ -28,56 +30,47 @@ rec {
     cargo test --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features -- --nocapture --test-threads 1
   '';
 
-  hcReleaseAutomationTest = let
-    releaseAutomationCmd = logLevel: ''
-      cargo run --manifest-path=crates/release-automation/Cargo.toml -- \
-          --workspace-path=$PWD \
-          --log-level=${logLevel} \
-        check \
-          --disallowed-version-reqs=">=0.1" \
-          --allowed-matched-blockers=UnreleasableViaChangelogFrontmatter \
-          --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$"
-    '';
-        # --allowed-dev-dependency-blockers=UnreleasableViaChangelogFrontmatter,MissingReadme \
-        # todo: verify why this was needed and isn't any longer
-        #  --exclude-optional-deps
-    in writeShellScriptBin "hc-release-automation-test" ''
+  hcReleaseAutomationTest = writeShellScriptBin "hc-release-automation-test" ''
     set -euxo pipefail
 
     # make sure the binary is built
     cargo build --manifest-path=crates/release-automation/Cargo.toml
     # run the release-automation tests
     cargo test --manifest-path=crates/release-automation/Cargo.toml ''${@}
+  '';
+
+  hcReleaseAutomationTestRepo = let
+    crateCmd = logLevel: ''
+      ${releaseAutomation} \
+          --workspace-path=${hcToplevelDir} \
+          --log-level=${logLevel} \
+        crate \
+          apply-dev-versions \
+            --dry-run
+    '';
+    releaseCmd = logLevel: ''
+      ${releaseAutomation} \
+          --workspace-path=${hcToplevelDir} \
+          --log-level=${logLevel} \
+        release \
+          --dry-run \
+          --disallowed-version-reqs=">=0.1" \
+          --allowed-matched-blockers=UnreleasableViaChangelogFrontmatter \
+          --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
+          --steps=BumpReleaseVersions
+    '';
+    in writeShellScriptBin "hc-release-automation-test-repo" ''
+    set -euxo pipefail
 
     # check the state of the repository
     (
-      ${releaseAutomationCmd "info"}
+      ${crateCmd "debug"}
+      ${releaseCmd "debug"}
     ) || (
-      ${releaseAutomationCmd "trace"}
+      ${crateCmd "trace"}
+      ${releaseCmd "trace"}
     )
   '';
-
-  hcReleaseAutmoation = writeShellScriptBin "hc-release-automation" ''
-    set -euxo pipefail
-
-    cargo run --manifest-path=crates/release-automation/Cargo.toml -- \
-      ''${@}
-  '';
-
-  hcReleaseAutmoationRelease = writeShellScriptBin "hc-release-automation-release" ''
-    set -euxo pipefail
-
-    cargo run --manifest-path=crates/release-automation/Cargo.toml -- \
-        --workspace-path=$PWD \
-        --log-level=trace \
-      release \
-        ''${@} \
-        --disallowed-version-reqs=">=0.1" \
-        --allowed-dev-dependency-blockers=UnreleasableViaChangelogFrontmatter,MissingReadme \
-        --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
-  '';
-      # todo: verify why this was needed and isn't any longer
-      #  --exclude-optional-deps
 
   hcStaticChecks = let
       pathPrefix = lib.makeBinPath
@@ -100,7 +93,8 @@ rec {
   hcMergeTest = writeShellScriptBin "hc-merge-test" ''
     set -euxo pipefail
     export RUST_BACKTRACE=1
-    hc-release-automation-test
+    ${hcReleaseAutomationTest}/bin/hc-release-automation-test
+    ${hcReleaseAutomationTestRepo}/bin/hc-release-automation-test-repo
     hc-static-checks
     hc-test
   '';
