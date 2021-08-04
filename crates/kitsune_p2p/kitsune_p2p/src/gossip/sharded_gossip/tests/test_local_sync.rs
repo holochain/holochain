@@ -1,7 +1,6 @@
 use super::common::*;
-use super::handler_builder::{
-    calculate_missing_ops, mock_agent_persistence, HandlerBuilder, OwnershipData,
-};
+use super::handler_builder::{calculate_missing_ops, mock_agent_persistence, HandlerBuilder};
+use super::sharded_scenario::*;
 use super::*;
 
 /// Defines a sharded scenario where:

@@ -10,6 +10,7 @@ use fixt::prelude::*;
 
 mod common;
 mod handler_builder;
+mod sharded_scenario;
 mod test_local_sync;
 mod test_two_nodes;
 
