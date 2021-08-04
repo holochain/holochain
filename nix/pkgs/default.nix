@@ -13,7 +13,7 @@ let
 
     crate=''${1:?The first argument needs to define the crate name}
     shift
-    cargo run --target-dir=''${CARGO_TARGET_DIR:?} --manifest-path=${hcToplevelDir}/crates/$crate/Cargo.toml -- $@
+    cargo run --target-dir=''${NIX_ENV_PREFIX:-?}/target/hc-run-crate --manifest-path=${hcToplevelDir}/crates/$crate/Cargo.toml -- $@
   '';
 
   mkHolochainBinaryScript = crate: writeShellScriptBin (builtins.replaceStrings ["_"] ["-"] crate) ''
