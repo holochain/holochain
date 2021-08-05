@@ -32,7 +32,7 @@ ghost_actor::ghost_chan! {
         fn is_agent_local(agent: KAgent) -> bool;
 
         /// Update the arc of a local agent.
-        fn update_agent_arc(agent: Arc<KitsuneAgent>, arc: DhtArc) -> ();
+        fn update_agent_arc(agent: KAgent, arc: DhtArc) -> ();
 
         /// Incoming Delegate Broadcast
         /// We are being requested to delegate a broadcast to our neighborhood

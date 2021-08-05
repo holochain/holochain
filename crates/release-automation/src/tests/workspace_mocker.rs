@@ -33,6 +33,10 @@ pub(crate) struct MockProject {
             ))
     "##))]
     pub(crate) readme: Option<String>,
+    #[educe(Default(expression = r##"Some("some crate".to_string())"##))]
+    pub(crate) description: Option<String>,
+    #[educe(Default(expression = r##"Some("Apache-2.0".to_string())"##))]
+    pub(crate) license: Option<String>,
 }
 
 pub(crate) struct WorkspaceMocker {
@@ -130,21 +134,31 @@ impl WorkspaceMocker {
                                 name = "{}"
                                 version = "{}"
                                 authors = []
-                                description = "Holochain, a framework for distributed applications"
-                                license = "Apache-2.0"
+                                {description}
+                                {license}
                                 homepage = "https://github.com/holochain/holochain"
                                 documentation = "https://github.com/holochain/holochain"
 
                                 [dependencies]
-                                {}
+                                {dependencies}
 
                                 [dev-dependencies]
-                                {}
+                                {dev_dependencies}
                                 "#,
                                 &name,
                                 &project.version,
-                                dependencies,
-                                dev_dependencies
+                                description = &project
+                                    .description
+                                    .clone()
+                                    .map(|d| format!(r#"description = "{}""#, d))
+                                    .unwrap_or_default(),
+                                license = &project
+                                    .license
+                                    .clone()
+                                    .map(|d| format!(r#"license = "{}""#, d))
+                                    .unwrap_or_default(),
+                                dependencies = dependencies,
+                                dev_dependencies = dev_dependencies,
                             ),
                         )
                         .file(
@@ -613,6 +627,65 @@ pub(crate) fn example_workspace_3<'a>() -> Fallible<WorkspaceMocker> {
     ];
 
     let workspace_mocker = WorkspaceMocker::try_new(None, members)?;
+
+    Ok(workspace_mocker)
+}
+
+/// A workspace to test some release blockers
+pub(crate) fn example_workspace_4<'a>() -> Fallible<WorkspaceMocker> {
+    use crate::tests::workspace_mocker::{self, MockProject, WorkspaceMocker};
+
+    let members = vec![
+        MockProject {
+            name: "wildcard_dependency".to_string(),
+            version: "0.0.1".to_string(),
+            dependencies: vec![],
+            dev_dependencies: vec![r#"criterion = '*'"#.to_string()],
+            excluded: false,
+            ty: workspace_mocker::MockProjectType::Bin,
+            changelog: Some(indoc::formatdoc!(
+                r#"
+                # Changelog
+                "#
+            )),
+            ..Default::default()
+        },
+        MockProject {
+            name: "no_description".to_string(),
+            version: "0.0.1".to_string(),
+            dependencies: vec![],
+            excluded: false,
+            ty: workspace_mocker::MockProjectType::Bin,
+            changelog: Some(indoc::formatdoc!(
+                r#"
+                # Changelog
+                "#
+            )),
+            description: None,
+            ..Default::default()
+        },
+        MockProject {
+            name: "no_license".to_string(),
+            version: "0.0.1".to_string(),
+            dependencies: vec![],
+            excluded: false,
+            ty: workspace_mocker::MockProjectType::Bin,
+            changelog: Some(indoc::formatdoc!(
+                r#"
+                # Changelog
+                "#
+            )),
+            license: None,
+            ..Default::default()
+        },
+    ];
+
+    let workspace_mocker = WorkspaceMocker::try_new(
+        Some(indoc::indoc! {r#"
+        # Changelog
+        "#}),
+        members,
+    )?;
 
     Ok(workspace_mocker)
 }

@@ -48,9 +48,8 @@ pub(crate) enum ReleaseSteps {
     VerifyMainBranch,
     PublishToCratesIo,
     AddOwnersToCratesIo,
-    CreateCrateTags,
+    // CreateCrateTags,
     PushReleaseTag,
-    BumpPostReleaseVersions,
     PushForDevelopPr,
     CreatePrToDevelop,
 }
@@ -102,15 +101,11 @@ pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &crate::cli::ReleaseArgs) -
                 add_owners_to_crates_io(&ws, cmd_args, latest_release_crates(&ws)?)?
             }
 
-            ReleaseSteps::CreateCrateTags => create_crate_tags(&ws, cmd_args)?,
+            // ReleaseSteps::CreateCrateTags => create_crate_tags(&ws, cmd_args)?,
             ReleaseSteps::PushReleaseTag => {
                 // todo: push all the tags that originated in this workspace release to the upstream:
-                // - workspace release tag
                 // - every crate release tag
-                // - every crate post-release tag
             }
-            ReleaseSteps::BumpPostReleaseVersions => post_release_bump_versions(&ws, cmd_args)?,
-
             ReleaseSteps::PushForDevelopPr => {
                 // todo(backlog): push the release branch
             }
@@ -186,43 +181,6 @@ pub(crate) fn create_release_branch<'a>(
     Ok(())
 }
 
-fn set_version<'a>(
-    cmd_args: &'a ReleaseArgs,
-    crt: &'a crate_selection::Crate<'a>,
-    release_version: semver::Version,
-) -> Fallible<()> {
-    let cargo_toml_path = crt.root().join("Cargo.toml");
-    debug!(
-        "setting version to {} in manifest at {:?}",
-        release_version, cargo_toml_path
-    );
-    if !cmd_args.dry_run {
-        cargo_next::set_version(&cargo_toml_path, release_version.to_string())?;
-    }
-
-    for dependant in crt.dependants_in_workspace()? {
-        let target_manifest = dependant.root().join("Cargo.toml");
-
-        debug!(
-            "[{}] updating dependency version from dependant {} to version {} in manifest {:?}",
-            crt.name(),
-            dependant.name(),
-            release_version.to_string().as_str(),
-            &target_manifest,
-        );
-
-        if !cmd_args.dry_run {
-            set_dependency_version(
-                &target_manifest,
-                &crt.name(),
-                release_version.to_string().as_str(),
-            )?;
-        }
-    }
-
-    Ok(())
-}
-
 fn bump_release_versions<'a>(
     ws: &'a ReleaseWorkspace<'a>,
     cmd_args: &'a ReleaseArgs,
@@ -234,6 +192,7 @@ fn bump_release_versions<'a>(
     };
 
     // check the workspace and determine the release selection
+    // todo: double-check that we select matching cratese that had their dependencies change
     let selection = crate::common::selection_check(&cmd_args.check_args, ws)?;
 
     if selection.is_empty() {
@@ -287,7 +246,7 @@ fn bump_release_versions<'a>(
 
         let greater_release = release_version > current_version;
         if greater_release {
-            set_version(cmd_args, crt, release_version.clone())?;
+            common::set_version(cmd_args.dry_run, crt, &release_version.clone())?;
         }
 
         let crate_release_heading_name = format!("{}", release_version);
@@ -321,7 +280,6 @@ fn bump_release_versions<'a>(
     }
 
     // ## for the workspace release:
-    let workspace_tag_name = branch_name.clone();
     let workspace_release_name = branch_name
         .strip_prefix(RELEASE_BRANCH_PREFIX)
         .ok_or_else(|| {
@@ -363,12 +321,12 @@ fn bump_release_versions<'a>(
     // create a release commit with an overview of which crates are included
     let commit_msg = indoc::formatdoc!(
         r#"
-        {}
+        create a release from branch {}
 
         the following crates are part of this release:
         {}
         "#,
-        workspace_tag_name,
+        branch_name,
         changed_crate_changelogs
             .iter()
             .map(|wcrh| format!("\n- {}", wcrh.title()))
@@ -377,8 +335,18 @@ fn bump_release_versions<'a>(
 
     info!("creating the following commit: {}", commit_msg);
     if !cmd_args.dry_run {
+        // this checks consistency and also updates the Cargo.lock file(s)
+        ws.cargo_check()?;
+
         ws.git_add_all_and_commit(&commit_msg, None)?;
     };
+
+    // create tags for all released crates
+    let tags_to_create = changed_crate_changelogs
+        .iter()
+        .map(|wcrh| wcrh.title())
+        .collect::<Vec<String>>();
+    create_crate_tags(&ws, tags_to_create, cmd_args)?;
 
     Ok(())
 }
@@ -829,7 +797,7 @@ fn publish_paths_to_crates_io(
 
             let mut found = false;
 
-            for delay_secs in &[14, 28, 56] {
+            for delay_secs in &[56, 28, 14, 7, 14, 28, 56] {
                 let duration = std::time::Duration::from_secs(*delay_secs);
                 std::thread::sleep(duration);
 
@@ -869,32 +837,19 @@ fn publish_paths_to_crates_io(
     Ok(())
 }
 
-fn create_crate_tags<'a>(ws: &'a ReleaseWorkspace<'a>, cmd_args: &'a ReleaseArgs) -> Fallible<()> {
-    let crates = latest_release_crates(ws)?;
+/// create a tag for each crate which will be used to identify its latest release
+fn create_crate_tags<'a>(
+    ws: &'a ReleaseWorkspace<'a>,
+    tags_to_create: Vec<String>,
+    cmd_args: &'a ReleaseArgs,
+) -> Fallible<()> {
+    let existing_tags = tags_to_create
+        .iter()
+        .filter_map(|git_tag| crate::crate_selection::git_lookup_tag(ws.git_repo(), &git_tag))
+        .collect::<Vec<_>>();
 
-    // create a tag for each crate which will be used to identify its latest release
-    let mut existing_tags = vec![];
-
-    for crt in crates {
-        let git_tag = crt.name_version();
-        debug!("creating tag '{}'", git_tag);
-
-        if cmd_args.dry_run {
-            // if not forced ensure the git tag for this crate doesn't exist
-            // todo: write  a test case for this
-            if !cmd_args.force_tag_creation
-                && crate::crate_selection::git_lookup_tag(ws.git_repo(), &git_tag).is_some()
-            {
-                existing_tags.push(git_tag);
-            }
-        } else {
-            crt.workspace()
-                .git_tag(&git_tag, cmd_args.force_tag_creation)?;
-        }
-    }
-
-    if !existing_tags.is_empty() {
-        bail!(
+    if !cmd_args.force_tag_creation && !existing_tags.is_empty() {
+        error!(
             "the following tags already exist: {}",
             existing_tags
                 .iter()
@@ -903,107 +858,12 @@ fn create_crate_tags<'a>(ws: &'a ReleaseWorkspace<'a>, cmd_args: &'a ReleaseArgs
         )
     }
 
-    Ok(())
-}
-
-fn post_release_bump_versions<'a>(
-    ws: &'a ReleaseWorkspace<'a>,
-    cmd_args: &'a ReleaseArgs,
-) -> Fallible<()> {
-    let branch_name = match ensure_release_branch(ws) {
-        Ok(branch_name) => branch_name,
-        Err(_) if cmd_args.dry_run => generate_release_branch_name(),
-        Err(e) => bail!(e),
-    };
-
-    let (release_title, crate_release_titles) = match ws
-        .changelog()
-        .map(|cl| cl.topmost_release())
-        .transpose()?
-        .flatten()
-        .ok_or_else(|| {
-            anyhow::anyhow!(
-                "no topmost release found in changelog '{:?}'. nothing to publish",
-                ws.changelog()
-            )
-        })? {
-        changelog::ReleaseChange::WorkspaceReleaseChange(title, releases) => {
-            (title, releases.into_iter().collect::<HashSet<String>>())
+    for git_tag in tags_to_create {
+        debug!("creating tag '{}'", git_tag);
+        if !cmd_args.dry_run {
+            ws.git_tag(&git_tag, cmd_args.force_tag_creation)?;
         }
-        unexpected => bail!("unexpected topmost release: {:?}", unexpected),
-    };
-
-    if !branch_name.contains(&release_title) {
-        // todo: create error type for this instead
-        warn!(
-            "branch name '{}' doesn't contain topmost release title '{}'. skipping..",
-            branch_name, release_title
-        );
-        return Ok(());
     }
-
-    let released_crates = ws
-        .members()?
-        .iter()
-        .filter(|member| crate_release_titles.contains(&member.name_version()))
-        .collect::<Vec<_>>();
-
-    // bump versions for every released crate to the next develop version
-    let commit_details =
-        released_crates
-            .iter()
-            .try_fold(String::new(), |msg, crt| -> Fallible<_> {
-                let mut version = crt.version();
-
-                if version.is_prerelease() {
-                    warn!(
-                        "[{}] ignoring due to prerelease version '{}' after supposed release",
-                        crt.name(),
-                        version,
-                    );
-                    return Ok(msg);
-                }
-
-                version.increment_patch();
-                version = semver::Version::parse(&format!("{}-dev.0", version))?;
-
-                debug!(
-                    "[{}] rewriting version {} -> {}",
-                    crt.name(),
-                    crt.version(),
-                    version,
-                );
-
-                if !cmd_args.dry_run {
-                    set_version(cmd_args, crt, version.clone())?;
-                };
-
-                Ok(msg + format!("\n- {}-{}", crt.name(), version).as_str())
-            })?;
-
-    // create a commit that concludes the workspace release
-    let commit_msg = indoc::formatdoc!(
-        r#"
-        setting develop versions to conclude '{}'
-
-        {}
-        "#,
-        branch_name,
-        commit_details,
-    );
-
-    let git_tag = &branch_name;
-    info!(
-        "{}creating the following commit: \n'{}'\nat the tag {}",
-        if cmd_args.dry_run { "[dry-run] " } else { "" },
-        branch_name,
-        git_tag,
-    );
-
-    if !cmd_args.dry_run {
-        ws.git_add_all_and_commit(&commit_msg, None)?;
-        ws.git_tag(git_tag, false)?;
-    };
 
     Ok(())
 }
@@ -1020,67 +880,4 @@ pub(crate) fn ensure_release_branch<'a>(ws: &'a ReleaseWorkspace<'a>) -> Fallibl
     }
 
     Ok(branch_name)
-}
-
-// Adapted from https://github.com/sunng87/cargo-release/blob/f94938c3f20ef20bc8f971d59de75574a0b18931/src/cargo.rs#L122-L154
-fn set_dependency_version(manifest_path: &Path, name: &str, version: &str) -> Fallible<()> {
-    let temp_manifest_path = manifest_path
-        .parent()
-        .ok_or_else(|| anyhow::anyhow!("couldn't get parent of path {}", manifest_path.display()))?
-        .join("Cargo.toml.work");
-
-    {
-        let manifest = load_from_file(manifest_path)?;
-        let mut manifest: toml_edit::Document = manifest.parse()?;
-        for key in &["dependencies", "dev-dependencies", "build-dependencies"] {
-            if manifest.as_table().contains_key(key)
-                && manifest[key]
-                    .as_table()
-                    .expect("manifest is already verified")
-                    .contains_key(name)
-            {
-                manifest[key][name]["version"] = toml_edit::value(version);
-            }
-        }
-
-        let mut file_out = std::fs::File::create(&temp_manifest_path)?;
-        file_out.write_all(manifest.to_string_in_original_order().as_bytes())?;
-    }
-    std::fs::rename(temp_manifest_path, manifest_path)?;
-
-    Ok(())
-}
-
-#[cfg(test)]
-pub(crate) fn get_dependency_version(manifest_path: &Path, name: &str) -> Fallible<String> {
-    let manifest_path = manifest_path
-        .parent()
-        .ok_or_else(|| anyhow::anyhow!("couldn't get parent of path {}", manifest_path.display()))?
-        .join("Cargo.toml");
-
-    {
-        let manifest: toml_edit::Document = load_from_file(&manifest_path)?.parse()?;
-        for key in &["dependencies", "dev-dependencies", "build-dependencies"] {
-            if manifest.as_table().contains_key(key)
-                && manifest[key]
-                    .as_table()
-                    .expect("manifest is already verified")
-                    .contains_key(name)
-            {
-                return Ok(manifest[key][name]["version"]
-                    .as_value()
-                    .ok_or_else(|| anyhow::anyhow!("expected a value"))?
-                    .to_string());
-            }
-        }
-    }
-
-    bail!("version not found")
-}
-
-fn load_from_file(path: &Path) -> Fallible<String> {
-    let mut file = std::fs::File::open(path)?;
-    let mut s = String::new();
-    file.read_to_string(&mut s)?;
-    Ok(s)
 }

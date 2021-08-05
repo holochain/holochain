@@ -4,6 +4,7 @@ use crate::changelog::{
     self, ChangeT, ChangelogT, ChangelogType, CrateChangelog, WorkspaceChangelog,
 };
 use crate::Fallible;
+use cargo::core::Dependency;
 use log::{debug, info, trace, warn};
 
 use anyhow::Context;
@@ -74,6 +75,11 @@ impl<'a> Crate<'a> {
     /// Return the path of the package's manifest.
     pub(crate) fn manifest_path(&self) -> &Path {
         self.package.manifest_path()
+    }
+
+    /// Return a reference to the package.
+    pub(crate) fn package(&self) -> &CargoPackage {
+        &self.package
     }
 
     pub(crate) fn state(&self) -> CrateState {
@@ -164,40 +170,43 @@ impl<'a> Crate<'a> {
         })
     }
 
-    /// Returns a reference to all crates that depend on this crate.
+    /// Returns a reference to all workspace crates that depend on this crate.
     // todo: write a unit test for this
     pub(crate) fn dependants_in_workspace(&'a self) -> Fallible<&'a Vec<&'a Crate<'a>>> {
+        self.dependants_in_workspace_filtered(|_| true)
+    }
+
+    /// Returns a reference to all workspace crates that depend on this crate.
+    /// Features filtering by applying a filter function to the dependant's dependencies.
+    // todo: write a unit test for this
+    pub(crate) fn dependants_in_workspace_filtered<F>(
+        &'a self,
+        filter_fn: F,
+    ) -> Fallible<&'a Vec<&'a Crate<'a>>>
+    where
+        F: Fn(&&Dependency) -> bool,
+        F: Copy,
+    {
         self.dependants_in_workspace.get_or_try_init(|| {
-            let members_dependants = self.workspace.members()?.iter().enumerate().try_fold(
-                LinkedHashSet::<usize>::new(),
-                |mut acc, (i, member)| -> Fallible<_> {
+            let members_dependants = self.workspace.members()?.iter().try_fold(
+                LinkedHashMap::<String, &'a Crate<'a>>::new(),
+                |mut acc, member| -> Fallible<_> {
                     if member
                         .dependencies_in_workspace()?
                         .iter()
+                        .filter(filter_fn)
                         .map(|dep| dep.package_name().to_string())
                         .collect::<HashSet<_>>()
                         .contains(&self.name())
                     {
-                        acc.insert(i);
+                        acc.insert(member.name(), *member);
                     };
 
                     Ok(acc)
                 },
             )?;
 
-            Ok(self
-                .workspace
-                .members()?
-                .iter()
-                .enumerate()
-                .filter_map(|(i, member)| {
-                    if members_dependants.contains(&i) {
-                        Some(*member)
-                    } else {
-                        None
-                    }
-                })
-                .collect())
+            Ok(members_dependants.values().cloned().collect())
         })
     }
 
@@ -261,6 +270,8 @@ pub(crate) enum CrateStateFlags {
     MissingReleaseTag,
     /// has changed since previous release
     ChangedSincePreviousRelease,
+    /// At least one dependency is marked as changed.
+    DependencyChanged,
 
     /// has `unreleasable: true` set in changelog
     MissingChangelog,
@@ -268,6 +279,12 @@ pub(crate) enum CrateStateFlags {
     UnreleasableViaChangelogFrontmatter,
     EnforcedVersionReqViolated,
     DisallowedVersionReqViolated,
+    /// Has no description in the Cargo.toml
+    MissingDescription,
+    /// Has no license in the Cargo.toml
+    MissingLicense,
+    /// Has a dependency that contains '*'
+    HasWildcardDependency,
 }
 
 /// Defines the meta states that can be derived from the more detailed `CrateStateFlags`.
@@ -299,11 +316,14 @@ pub(crate) struct CrateState {
 
 impl CrateState {
     pub(crate) const BLOCKING_STATES: BitFlags<CrateStateFlags> = enumflags2::make_bitflags!(
-        CrateStateFlags::{MissingChangelog |
-            MissingReadme|
-            UnreleasableViaChangelogFrontmatter |
-            DisallowedVersionReqViolated|
-            EnforcedVersionReqViolated
+        CrateStateFlags::{MissingChangelog
+            | MissingReadme
+            | UnreleasableViaChangelogFrontmatter
+            | DisallowedVersionReqViolated
+            | EnforcedVersionReqViolated
+            | MissingDescription
+            | MissingLicense
+            | HasWildcardDependency
     });
 
     pub(crate) fn new(
@@ -407,6 +427,22 @@ impl CrateState {
                 .contains(CrateStateFlags::ChangedSincePreviousRelease)
     }
 
+    /// At least one dependency is marked as changed.
+    pub(crate) fn dependency_changed(&self) -> bool {
+        self.flags.contains(CrateStateFlags::DependencyChanged)
+    }
+
+    /// There are changes to be released since the previous release
+    pub(crate) fn changed_since_previous_release(&self) -> bool {
+        self.flags
+            .contains(CrateStateFlags::ChangedSincePreviousRelease)
+    }
+
+    /// Has a prevoius release.
+    pub(crate) fn has_previous_release(&self) -> bool {
+        self.flags.contains(CrateStateFlags::HasPreviousRelease)
+    }
+
     /// Has been matched explicitly or as a consequence of a dependency.
     pub(crate) fn selected(&self) -> bool {
         self.is_matched() || self.is_dependency() || self.is_dev_dependency()
@@ -414,7 +450,7 @@ impl CrateState {
 
     /// Will be included in the release
     pub(crate) fn release_selection(&self) -> bool {
-        !self.blocked() && self.changed() && self.selected()
+        !self.blocked() && (self.changed() || self.dependency_changed()) && self.selected()
     }
 
     /// Returns a formatted string with an overview of crates and their states.
@@ -543,28 +579,8 @@ impl<'a> ReleaseWorkspace<'a> {
                 ..Default::default()
             };
 
-            let previous_release_tags: HashMap<_,_> = if let Some(changelog) = self.changelog() {
-                changelog.changes()?.into_iter().filter_map(|change| match change {
-                    ChangeT::Release(changelog::ReleaseChange::WorkspaceReleaseChange(title, crates)) => Some((title, crates)),
-                    _ => None,
-                }).fold(Default::default(), |mut acc, (title, crates)|{
-                    for crt in crates {
-                        acc.insert(
-                            crt,
-                            // todo: derive this prefix from a const or function
-                            "release-".to_owned() + changelog::normalize_heading_name(&title).as_str()
-                        );
-                    }
-                    acc
-                })
-            } else {
-                Default::default()
-            };
-
-            trace!("[{:?}] previous releases {:#?}", self.root(), previous_release_tags);
-
-
             for member in self.members()? {
+
                 // helper macros to access the desired state
                 macro_rules! get_state {
                     ( $i:expr ) => {
@@ -578,6 +594,18 @@ impl<'a> ReleaseWorkspace<'a> {
                     ( $flag:expr, $i:expr ) => {
                         get_state!($i).insert($flag)
                     };
+                }
+
+                // manifest metadata validation
+                {
+                    let metadata = member.package().manifest().metadata();
+                    if !(metadata.license.is_some() || metadata.license_file.is_some()) {
+                        insert_state!(CrateStateFlags::MissingLicense);
+                    }
+
+                    if metadata.description.is_none() {
+                        insert_state!(CrateStateFlags::MissingDescription);
+                    }
                 }
 
                 // regex matching state
@@ -643,7 +671,7 @@ impl<'a> ReleaseWorkspace<'a> {
                                 }
                             }
 
-                            if let Some(changelog::ReleaseChange::CrateReleaseChange(previous_release)) =
+                            if let Some(changelog::ReleaseChange::CrateReleaseChange(previous_release_version)) =
                                 changelog
                                     .changes()
                                     .ok()
@@ -660,15 +688,12 @@ impl<'a> ReleaseWorkspace<'a> {
                                     .next()
                             {
 
-                                // todo: derive the tagname from a function
+                                // todo: derive the tagname from a function?
                                 // lookup the git tag for the previous release
                                 let maybe_git_tag =
-                                    previous_release_tags
-                                        .get(format!("{}-{}", &member.name(), previous_release).as_str())
-                                        .map(|tag| { git_lookup_tag(&self.git_repo, tag) })
-                                        .flatten();
+                                        git_lookup_tag(&self.git_repo, format!("{}-{}", &member.name(), previous_release_version).as_str());
 
-                                log::trace!("[{}] previous git tag {:?}", member.name(), maybe_git_tag);
+                                log::debug!("[{}] previous release: {}, previous git tag {:?}", member.name(), previous_release_version, maybe_git_tag);
 
                                 if let Some(git_tag) = maybe_git_tag {
 
@@ -711,8 +736,25 @@ impl<'a> ReleaseWorkspace<'a> {
                                 dep.package_name().to_string()
                             );
                         }
+
+                        for dep in member.package().dependencies() {
+                            if dep.version_req().to_string().contains('*') {
+                                insert_state!(CrateStateFlags::HasWildcardDependency);
+                            }
+                        }
+                    }
+
+                    // set DependencyChanged in dependants if this crate changed
+                    if get_state!(member.name()).changed() {
+                        for dependant in member.dependants_in_workspace()? {
+                            insert_state!(
+                                CrateStateFlags::DependencyChanged,
+                                dependant.name()
+                            );
+                        }
                     }
                 }
+
             }
 
             Ok(members_states)
@@ -962,6 +1004,26 @@ impl<'a> ReleaseWorkspace<'a> {
     pub(crate) fn changelog(&'a self) -> Option<&'a ChangelogT<'a, WorkspaceChangelog>> {
         self.changelog.as_ref()
     }
+
+    pub(crate) fn cargo_check(&'a self) -> Fallible<()> {
+        let mut cmd = std::process::Command::new("cargo")
+            .args(&[
+                "check",
+                "--manifest-path",
+                &self.cargo_workspace()?.root_manifest().to_string_lossy(),
+                "--all-targets",
+                "--all-features",
+            ])
+            .spawn()?;
+
+        let cmd_status = cmd.wait()?;
+
+        if !cmd_status.success() {
+            bail!("running {:?} failed: \n{:?}", cmd, cmd.stderr);
+        }
+
+        Ok(())
+    }
 }
 
 /// Use the `git` shell command to detect changed files in the given directory between the given revisions.
@@ -996,14 +1058,16 @@ fn changed_files(dir: &Path, from_rev: &str, to_rev: &str) -> Fallible<Vec<PathB
 /// Find a git tag in a repository
 // todo: refactor into common place module
 pub(crate) fn git_lookup_tag(git_repo: &git2::Repository, tag_name: &str) -> Option<String> {
-    git_repo
-        // todo: derive the tagname from a function
+    let tag = git_repo
         .revparse_single(tag_name)
         .ok()
-        .map(|obj| obj.id())
-        .map(|id| git_repo.find_tag(id).ok())
+        .map(|obj| obj.as_tag().cloned())
         .flatten()
-        .map(|tag| tag.name().unwrap_or_default().to_owned())
+        .map(|tag| tag.name().unwrap_or_default().to_owned());
+
+    trace!("looking up tag '{}' -> {:?}", tag_name, tag);
+
+    tag
 }
 
 #[cfg(test)]
