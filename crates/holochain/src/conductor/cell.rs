@@ -34,11 +34,14 @@ use hash_type::AnyDht;
 use holo_hash::*;
 use holochain_cascade::authority;
 use holochain_cascade::Cascade;
+use holochain_p2p::dht_arc::ArcInterval;
+use holochain_p2p::dht_arc::DhtArcSet;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
+use kitsune_p2p::event::TimeWindowMs;
 use observability::OpenSpanExt;
 use std::hash::Hash;
 use std::hash::Hasher;
@@ -232,14 +235,13 @@ impl Cell {
             PutAgentInfoSigned { .. }
             | GetAgentInfoSigned { .. }
             | QueryAgentInfoSigned { .. }
+            | QueryGossipAgents { .. }
+            | QueryOpHashes { .. }
+            | QueryAgentInfoSignedNearBasis { .. }
             | QueryPeerDensity { .. }
-            | QueryAgentInfoSignedNearBasis { .. } => {
-                // PutAgentInfoSigned needs to be handled at the conductor level where the p2p
-                // store lives.
-                unreachable!()
-            }
-            PutMetricDatum { .. } | QueryMetrics { .. } => {
-                // Same goes for metrics
+            | PutMetricDatum { .. }
+            | QueryMetrics { .. } => {
+                // These events are aggregated over a set of cells, so need to be handled at the conductor level.
                 unreachable!()
             }
             CallRemote {
@@ -265,16 +267,14 @@ impl Cell {
             Publish {
                 span_context,
                 respond,
-                from_agent,
                 request_validation_receipt,
-                dht_hash,
                 ops,
                 ..
             } => {
                 async {
                     tracing::Span::set_current_context(span_context);
                     let res = self
-                        .handle_publish(from_agent, request_validation_receipt, dht_hash, ops)
+                        .handle_publish(request_validation_receipt, ops)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
@@ -383,25 +383,8 @@ impl Cell {
                 .instrument(debug_span!("cell_handle_validation_receipt_received"))
                 .await;
             }
-            FetchOpHashesForConstraints {
-                span_context: _,
-                respond,
-                dht_arc,
-                since,
-                until,
-                ..
-            } => {
-                async {
-                    let res = self
-                        .handle_fetch_op_hashes_for_constraints(dht_arc, since, until)
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other);
-                    respond.respond(Ok(async move { res }.boxed().into()));
-                }
-                .instrument(debug_span!("cell_handle_fetch_op_hashes_for_constraints"))
-                .await;
-            }
-            FetchOpHashData {
+
+            FetchOpData {
                 span_context: _,
                 respond,
                 op_hashes,
@@ -409,12 +392,12 @@ impl Cell {
             } => {
                 async {
                     let res = self
-                        .handle_fetch_op_hash_data(op_hashes)
+                        .handle_fetch_op_data(op_hashes)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
-                .instrument(debug_span!("cell_handle_fetch_op_hash_data"))
+                .instrument(debug_span!("cell_handle_fetch_op_data"))
                 .await;
             }
             SignNetworkData {
@@ -436,20 +419,17 @@ impl Cell {
         Ok(())
     }
 
-    #[instrument(skip(self, request_validation_receipt, _dht_hash, ops))]
+    #[instrument(skip(self, request_validation_receipt, ops))]
     /// we are receiving a "publish" event from the network
     async fn handle_publish(
         &self,
-        from_agent: AgentPubKey,
         request_validation_receipt: bool,
-        _dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> CellResult<()> {
         incoming_dht_ops_workflow(
             &self.env,
             self.queue_triggers.sys_validation.clone(),
             ops,
-            Some(from_agent),
             request_validation_receipt,
         )
         .await
@@ -611,67 +591,88 @@ impl Cell {
         Ok(())
     }
 
-    #[instrument(skip(self, dht_arc, since, until))]
+    #[instrument(skip(self))]
     /// the network module is requesting a list of dht op hashes
-    async fn handle_fetch_op_hashes_for_constraints(
+    /// Get the [`DhtOpHash`]es and authored timestamps for a given time window.
+    pub(super) async fn handle_query_op_hashes(
         &self,
-        dht_arc: holochain_p2p::dht_arc::DhtArc,
-        since: Timestamp,
-        until: Timestamp,
-    ) -> CellResult<Vec<DhtOpHash>> {
-        // FIXME: Test this query.
-        let full = (dht_arc.coverage() - 1.0).abs() < f64::EPSILON;
-        let result = self
-            .env()
-            .async_reader(move |txn| {
-                let r = if full {
-                    txn.prepare_cached(holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_FULL)?
-                        .query_map(
-                            named_params! {
-                                ":from": since.to_sql_ms_lossy(),
-                                ":to": until.to_sql_ms_lossy(),
-                            },
-                            |row| row.get("hash"),
-                        )?
-                        .collect::<rusqlite::Result<Vec<_>>>()?
-                } else if let Some((start_loc, end_loc)) = dht_arc.primitive_range_grouped() {
-                    let sql = if start_loc <= end_loc {
-                        holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_CONTINUOUS
-                    } else {
-                        holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_WRAPPED
-                    };
-                    txn.prepare_cached(sql)?
-                        .query_map(
-                            named_params! {
-                                ":from": since.to_sql_ms_lossy(),
-                                ":to": until.to_sql_ms_lossy(),
-                                ":storage_start_loc": start_loc,
-                                ":storage_end_loc": end_loc,
-                            },
-                            |row| row.get("hash"),
-                        )?
-                        .collect::<rusqlite::Result<Vec<_>>>()?
-                } else {
-                    Vec::new()
-                };
-                DatabaseResult::Ok(r)
-            })
-            .await?;
-        Ok(result)
+        dht_arc_set: DhtArcSet,
+        window_ms: TimeWindowMs,
+        include_limbo: bool,
+    ) -> CellResult<Vec<(DhtOpHash, u64)>> {
+        let mut results = Vec::new();
+
+        // The exclusive window bounds.
+        let start = clamp64(window_ms.start);
+        let end = clamp64(window_ms.end);
+
+        let full = if include_limbo {
+            holochain_sqlite::sql::sql_cell::any::FETCH_OP_HASHES_FULL
+        } else {
+            holochain_sqlite::sql::sql_cell::integrated::FETCH_OP_HASHES_FULL
+        };
+
+        let continuous = if include_limbo {
+            holochain_sqlite::sql::sql_cell::any::FETCH_OP_HASHES_CONTINUOUS
+        } else {
+            holochain_sqlite::sql::sql_cell::integrated::FETCH_OP_HASHES_CONTINUOUS
+        };
+
+        let wrapped = if include_limbo {
+            holochain_sqlite::sql::sql_cell::any::FETCH_OP_HASHES_WRAPPED
+        } else {
+            holochain_sqlite::sql::sql_cell::integrated::FETCH_OP_HASHES_WRAPPED
+        };
+
+        // For each interval in the set, fetch the hashes and timestamps.
+        for interval in dht_arc_set.intervals() {
+            let result = self
+                .env()
+                .async_reader(move |txn| {
+                    DatabaseResult::Ok(match interval {
+                        ArcInterval::Full => txn
+                            .prepare_cached(full)?
+                            .query_map(
+                                named_params! {
+                                    ":from": start,
+                                    ":to": end,
+                                },
+                                |row| Ok((row.get("hash")?, row.get("authored_timestamp_ms")?)),
+                            )?
+                            .collect::<rusqlite::Result<Vec<_>>>()?,
+                        ArcInterval::Bounded(start_loc, end_loc) => {
+                            let sql = if start_loc <= end_loc {
+                                continuous
+                            } else {
+                                wrapped
+                            };
+                            txn.prepare_cached(sql)?
+                                .query_map(
+                                    named_params! {
+                                        ":from": start,
+                                        ":to": end,
+                                        ":storage_start_loc": start_loc,
+                                        ":storage_end_loc": end_loc,
+                                    },
+                                    |row| Ok((row.get("hash")?, row.get("authored_timestamp_ms")?)),
+                                )?
+                                .collect::<rusqlite::Result<Vec<_>>>()?
+                        }
+                        ArcInterval::Empty => Vec::new(),
+                    })
+                })
+                .await?;
+            results.extend(result);
+        }
+        Ok(results)
     }
 
     #[instrument(skip(self, op_hashes))]
     /// The network module is requesting the content for dht ops
-    async fn handle_fetch_op_hash_data(
+    async fn handle_fetch_op_data(
         &self,
         op_hashes: Vec<holo_hash::DhtOpHash>,
-    ) -> CellResult<
-        Vec<(
-            holo_hash::AnyDhtHash,
-            holo_hash::DhtOpHash,
-            holochain_types::dht_op::DhtOp,
-        )>,
-    > {
+    ) -> CellResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
         // FIXME: Test this query.
         // TODO: SQL_PERF: Really on the fence about this query.
         // It has the potential to be slow if data density is very high
@@ -684,7 +685,7 @@ impl Cell {
                 positions.pop();
                 let sql = format!(
                     "
-                SELECT DhtOp.hash, DhtOp.basis_hash, DhtOp.type AS dht_type,
+                SELECT DhtOp.hash, DhtOp.type AS dht_type,
                 Header.blob AS header_blob, Entry.blob AS entry_blob
                 FROM DHtOp
                 JOIN Header ON DhtOp.header_hash = Header.hash
@@ -699,7 +700,6 @@ impl Cell {
                 let mut stmt = txn.prepare(&sql)?;
                 let r = stmt
                     .query_and_then(rusqlite::params_from_iter(op_hashes.into_iter()), |row| {
-                        let basis_hash: AnyDhtHash = row.get("basis_hash")?;
                         let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
                         let op_type: DhtOpType = row.get("dht_type")?;
                         let hash: DhtOpHash = row.get("hash")?;
@@ -718,7 +718,7 @@ impl Cell {
                             };
                         }
                         let op = DhtOp::from_type(op_type, header, entry)?;
-                        StateQueryResult::Ok((basis_hash, hash, op))
+                        StateQueryResult::Ok((hash, op))
                     })?
                     .collect::<StateQueryResult<Vec<_>>>()?;
                 StateQueryResult::Ok(r)

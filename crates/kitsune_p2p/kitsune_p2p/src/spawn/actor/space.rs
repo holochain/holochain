@@ -2,6 +2,7 @@ use super::*;
 use crate::types::gossip::GossipModule;
 use ghost_actor::dependencies::tracing;
 use kitsune_p2p_mdns::*;
+use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
 use kitsune_p2p_types::dht_arc::DhtArc;
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
@@ -49,7 +50,7 @@ ghost_actor::ghost_chan! {
         ) -> ();
 
         /// Incoming Gossip
-        fn incoming_gossip(space: KSpace, con: WireConHnd, data: Payload) -> ();
+        fn incoming_gossip(space: KSpace, con: WireConHnd, data: Payload, module_type: crate::types::gossip::GossipModuleType) -> ();
     }
 }
 
@@ -95,7 +96,7 @@ impl SpaceInternalHandler for Space {
     fn handle_list_online_agents_for_basis_hash(
         &mut self,
         _space: Arc<KitsuneSpace>,
-        from_agent: Arc<KitsuneAgent>,
+        _from_agent: Arc<KitsuneAgent>,
         // during short-circuit / full-sync mode,
         // we're ignoring the basis_hash and just returning everyone.
         _basis: Arc<KitsuneBasis>,
@@ -106,7 +107,7 @@ impl SpaceInternalHandler for Space {
             .evt_sender
             .query_agent_info_signed(QueryAgentInfoSignedEvt {
                 space: self.space.clone(),
-                agent: from_agent,
+                agents: None,
             });
         Ok(async move {
             for peer in all_peers_fut.await? {
@@ -134,6 +135,7 @@ impl SpaceInternalHandler for Space {
         let internal_sender = self.i_s.clone();
         Ok(async move {
             let urls = vec![bound_url.into()];
+            let mut peer_data = Vec::with_capacity(agent_list.len());
             for (agent, arc) in agent_list {
                 let input = UpdateAgentInfoInput {
                     expires_after,
@@ -147,8 +149,14 @@ impl SpaceInternalHandler for Space {
                     mdns_handles: &mut mdns_handles,
                     bootstrap_service: &bootstrap_service,
                 };
-                update_single_agent_info(input).await?;
+                peer_data.push(update_single_agent_info(input).await?);
             }
+            evt_sender
+                .put_agent_info_signed(PutAgentInfoSignedEvt {
+                    space: space.clone(),
+                    peer_data,
+                })
+                .await?;
             Ok(())
         }
         .boxed()
@@ -183,7 +191,13 @@ impl SpaceInternalHandler for Space {
                 mdns_handles: &mut mdns_handles,
                 bootstrap_service: &bootstrap_service,
             };
-            update_single_agent_info(input).await?;
+            let peer_data = vec![update_single_agent_info(input).await?];
+            evt_sender
+                .put_agent_info_signed(PutAgentInfoSignedEvt {
+                    space: space.clone(),
+                    peer_data,
+                })
+                .await?;
             Ok(())
         }
         .boxed()
@@ -293,9 +307,16 @@ impl SpaceInternalHandler for Space {
         _space: Arc<KitsuneSpace>,
         con: Tx2ConHnd<wire::Wire>,
         data: Box<[u8]>,
+        module_type: GossipModuleType,
     ) -> InternalHandlerResult<()> {
-        self.gossip_mod.incoming_gossip(con, data)?;
-        Ok(async move { Ok(()) }.boxed().into())
+        match self.gossip_mod.get(&module_type) {
+            Some(module) => module.incoming_gossip(con, data)?,
+            None => tracing::warn!(
+                "Received gossip for {:?} but this gossip module isn't running",
+                module_type
+            ),
+        }
+        unit_ok_fut()
     }
 }
 
@@ -334,7 +355,9 @@ async fn update_arc_length(
     Ok(())
 }
 
-async fn update_single_agent_info(input: UpdateAgentInfoInput<'_>) -> KitsuneP2pResult<()> {
+async fn update_single_agent_info(
+    input: UpdateAgentInfoInput<'_>,
+) -> KitsuneP2pResult<AgentInfoSigned> {
     let UpdateAgentInfoInput {
         expires_after,
         space,
@@ -347,7 +370,6 @@ async fn update_single_agent_info(input: UpdateAgentInfoInput<'_>) -> KitsuneP2p
         mdns_handles,
         bootstrap_service,
     } = input;
-    use kitsune_p2p_types::agent_info::AgentInfoSigned;
 
     update_arc_length(evt_sender, space.clone(), &mut arc).await?;
 
@@ -384,14 +406,6 @@ async fn update_single_agent_info(input: UpdateAgentInfoInput<'_>) -> KitsuneP2p
 
     tracing::debug!(?agent_info_signed);
 
-    evt_sender
-        .put_agent_info_signed(PutAgentInfoSignedEvt {
-            space: space.clone(),
-            agent: agent.clone(),
-            agent_info_signed: agent_info_signed.clone(),
-        })
-        .await?;
-
     // Push to the network as well
     match network_type {
         NetworkType::QuicMdns => {
@@ -417,11 +431,14 @@ async fn update_single_agent_info(input: UpdateAgentInfoInput<'_>) -> KitsuneP2p
             }
         }
         NetworkType::QuicBootstrap => {
-            crate::spawn::actor::bootstrap::put(bootstrap_service.clone(), agent_info_signed)
-                .await?;
+            crate::spawn::actor::bootstrap::put(
+                bootstrap_service.clone(),
+                agent_info_signed.clone(),
+            )
+            .await?;
         }
     }
-    Ok(())
+    Ok(agent_info_signed)
 }
 
 use ghost_actor::dependencies::must_future::MustBoxFuture;
@@ -431,7 +448,9 @@ impl ghost_actor::GhostControlHandler for Space {
             use futures::sink::SinkExt;
             // this is a curtesy, ok if fails
             let _ = self.evt_sender.close().await;
-            self.gossip_mod.close();
+            for module in self.gossip_mod.values_mut() {
+                module.close();
+            }
         }
         .boxed()
         .into()
@@ -453,14 +472,15 @@ impl KitsuneP2pHandler for Space {
         agent: Arc<KitsuneAgent>,
     ) -> KitsuneP2pHandlerResult<()> {
         self.local_joined_agents.insert(agent.clone());
-        self.gossip_mod.local_agent_join(agent.clone());
+        for module in self.gossip_mod.values() {
+            module.local_agent_join(agent.clone());
+        }
         let fut = self.i_s.update_single_agent_info(agent);
         let evt_sender = self.evt_sender.clone();
         match self.config.network_type {
             NetworkType::QuicMdns => {
                 // Listen to MDNS service that has that space as service type
                 let space_b64 = base64::encode_config(&space[..], base64::URL_SAFE_NO_PAD);
-                //println!("(MDNS) - Agent {:?} ({}) joined space {:?} ({} ; {})", agent, agent.get_bytes().len(), space, space.get_bytes().len(), dna_str.len());
                 if !self.mdns_listened_spaces.contains(&space_b64) {
                     self.mdns_listened_spaces.insert(space_b64.clone());
                     tokio::task::spawn(async move {
@@ -471,29 +491,24 @@ impl KitsuneP2pHandler for Space {
                                 Ok(response) => {
                                     tracing::trace!(msg = "Peer found via MDNS", ?response);
                                     // Decode response
-                                    let remote_agent_vec = base64::decode_config(
-                                        &response.service_name[..],
-                                        base64::URL_SAFE_NO_PAD,
-                                    )
-                                    .expect("Agent base64 decode failed");
-                                    let remote_agent = Arc::new(KitsuneAgent(remote_agent_vec));
-                                    //println!("(MDNS) - Peer found via MDNS: {:?})", *remote_agent);
                                     let maybe_agent_info_signed =
                                         rmp_decode(&mut &*response.buffer);
                                     if let Err(e) = maybe_agent_info_signed {
                                         tracing::error!(msg = "Failed to decode MDNS peer", ?e);
                                         continue;
                                     }
-                                    let remote_agent_info_signed = maybe_agent_info_signed.unwrap();
-                                    //println!("(MDNS) - Found agent_info_signed: {:?})", remote_agent_info_signed);
-                                    // Add to local storage
-                                    let _result = evt_sender
-                                        .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                            space: space.clone(),
-                                            agent: remote_agent,
-                                            agent_info_signed: remote_agent_info_signed,
-                                        })
-                                        .await;
+                                    if let Ok(remote_agent_info_signed) = maybe_agent_info_signed {
+                                        // Add to local storage
+                                        if let Err(e) = evt_sender
+                                            .put_agent_info_signed(PutAgentInfoSignedEvt {
+                                                space: space.clone(),
+                                                peer_data: vec![remote_agent_info_signed],
+                                            })
+                                            .await
+                                        {
+                                            tracing::error!(msg = "Failed to store MDNS peer", ?e);
+                                        }
+                                    }
                                 }
                                 Err(e) => {
                                     tracing::error!(msg = "Failed to get peers from MDNS", ?e);
@@ -519,7 +534,9 @@ impl KitsuneP2pHandler for Space {
     ) -> KitsuneP2pHandlerResult<()> {
         self.local_joined_agents.remove(&agent);
         self.agent_arcs.remove(&agent);
-        self.gossip_mod.local_agent_leave(agent.clone());
+        for module in self.gossip_mod.values() {
+            module.local_agent_leave(agent.clone());
+        }
         self.publish_leave_agent_info(agent)
     }
 
@@ -742,7 +759,7 @@ pub(crate) struct Space {
     pub(crate) config: Arc<KitsuneP2pConfig>,
     mdns_handles: HashMap<Vec<u8>, Arc<AtomicBool>>,
     mdns_listened_spaces: HashSet<String>,
-    gossip_mod: GossipModule,
+    gossip_mod: HashMap<GossipModuleType, GossipModule>,
 }
 
 impl Space {
@@ -755,20 +772,41 @@ impl Space {
         ep_hnd: Tx2EpHnd<wire::Wire>,
         config: Arc<KitsuneP2pConfig>,
     ) -> Self {
-        let gossip_mod_fact = if &config.tuning_params.gossip_strategy == "simple-bloom" {
-            crate::gossip::simple_bloom::factory()
-        } else {
-            panic!(
-                "unknown gossip strategy: {}",
-                config.tuning_params.gossip_strategy
-            );
-        };
-        let gossip_mod = gossip_mod_fact.spawn_gossip_task(
-            config.tuning_params.clone(),
-            space.clone(),
-            ep_hnd.clone(),
-            evt_sender.clone(),
-        );
+        let gossip_mod = config
+            .tuning_params
+            .gossip_strategy
+            .split(',')
+            .flat_map(|module| match module {
+                "simple-bloom" => vec![(
+                    GossipModuleType::Simple,
+                    crate::gossip::simple_bloom::factory(),
+                )],
+                "sharded-gossip" => vec![
+                    (
+                        GossipModuleType::ShardedRecent,
+                        crate::gossip::sharded_gossip::recent_factory(),
+                    ),
+                    (
+                        GossipModuleType::ShardedHistorical,
+                        crate::gossip::sharded_gossip::historical_factory(),
+                    ),
+                ],
+                _ => {
+                    panic!("unknown gossip strategy: {}", module);
+                }
+            })
+            .map(|(module, factory)| {
+                (
+                    module,
+                    factory.spawn_gossip_task(
+                        config.tuning_params.clone(),
+                        space.clone(),
+                        ep_hnd.clone(),
+                        evt_sender.clone(),
+                    ),
+                )
+            })
+            .collect();
 
         let i_s_c = i_s.clone();
         tokio::task::spawn(async move {
@@ -819,30 +857,27 @@ impl Space {
                             if !i_s_c.ghost_actor_is_active() {
                                 break;
                             }
+                            let mut peer_data = Vec::with_capacity(list.len());
                             for item in list {
                                 // TODO - someday some validation here
-                                let agent = item.agent.clone();
-                                match i_s_c.is_agent_local(agent.clone()).await {
+                                match i_s_c.is_agent_local(item.agent.clone()).await {
                                     Err(err) => tracing::error!(?err),
                                     Ok(is_local) => {
                                         if !is_local {
                                             // we got a result - let's add it to our store for the future
-                                            if let Err(err) = evt_s_c
-                                                .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                                    space: space_c.clone(),
-                                                    agent,
-                                                    agent_info_signed: item.clone(),
-                                                })
-                                                .await
-                                            {
-                                                tracing::error!(
-                                                    ?err,
-                                                    "error storing bootstrap agent_info"
-                                                );
-                                            }
+                                            peer_data.push(item);
                                         }
                                     }
                                 }
+                            }
+                            if let Err(err) = evt_s_c
+                                .put_agent_info_signed(PutAgentInfoSignedEvt {
+                                    space: space_c.clone(),
+                                    peer_data,
+                                })
+                                .await
+                            {
+                                tracing::error!(?err, "error storing bootstrap agent_info");
                             }
                         }
                     }
@@ -887,7 +922,6 @@ impl Space {
         Ok(async move {
             let signed_at_ms = crate::spawn::actor::bootstrap::now_once(None).await?;
             let expires_at_ms = signed_at_ms + expires_after;
-            use kitsune_p2p_types::agent_info::AgentInfoSigned;
             let agent_info_signed = AgentInfoSigned::sign(
                 space.clone(),
                 agent.clone(),
@@ -918,8 +952,7 @@ impl Space {
             evt_sender
                 .put_agent_info_signed(PutAgentInfoSignedEvt {
                     space: space.clone(),
-                    agent: agent.clone(),
-                    agent_info_signed: agent_info_signed.clone(),
+                    peer_data: vec![agent_info_signed.clone()],
                 })
                 .await?;
 

@@ -45,13 +45,13 @@ impl Inner {
 
         // collect all local agents' ops
         for agent in local_agents.iter() {
-            if let Ok(ops) = evt_sender
-                .fetch_op_hashes_for_constraints(FetchOpHashesForConstraintsEvt {
+            if let Ok(Some((ops, _))) = evt_sender
+                .query_op_hashes(QueryOpHashesEvt {
                     space: space.clone(),
-                    agent: agent.clone(),
-                    dht_arc: DhtArc::new(0, u32::MAX),
-                    since_utc_epoch_s: i64::MIN,
-                    until_utc_epoch_s: i64::MAX,
+                    agents: vec![(agent.clone(), ArcInterval::Full.into())],
+                    window_ms: u64::MIN..u64::MAX,
+                    max_ops: usize::MAX,
+                    include_limbo: false,
                 })
                 .await
             {
@@ -78,21 +78,19 @@ impl Inner {
 
         // agent store is shared between agents in one space
         // we only have to query it once for all local_agents
-        if let Some(agent) = local_agents.iter().next() {
-            if let Ok(agent_infos) = evt_sender
-                .query_agent_info_signed(QueryAgentInfoSignedEvt {
-                    space: space.clone(),
-                    agent: agent.clone(),
-                })
-                .await
-            {
-                for agent_info in agent_infos {
-                    let data = Arc::new(MetaOpData::Agent(agent_info));
-                    let key = data.key();
-                    data_map.insert(key.clone(), data);
-                    for (_agent, has) in has_map.iter_mut() {
-                        has.insert(key.clone());
-                    }
+        if let Ok(agent_infos) = evt_sender
+            .query_agent_info_signed(QueryAgentInfoSignedEvt {
+                space: space.clone(),
+                agents: Some(local_agents.clone().into_iter().collect()),
+            })
+            .await
+        {
+            for agent_info in agent_infos {
+                let data = Arc::new(MetaOpData::Agent(agent_info));
+                let key = data.key();
+                data_map.insert(key.clone(), data);
+                for (_agent, has) in has_map.iter_mut() {
+                    has.insert(key.clone());
                 }
             }
         }
@@ -115,6 +113,7 @@ impl Inner {
                 if old_agent == new_agent {
                     continue;
                 }
+                let mut to_send = Vec::new();
                 for old_key in old_set.iter() {
                     if !new_set.contains(old_key) {
                         local_synced_ops += 1;
@@ -123,16 +122,7 @@ impl Inner {
 
                         match &*op_data {
                             MetaOpData::Op(key, data) => {
-                                evt_sender
-                                    .gossip(
-                                        space.clone(),
-                                        new_agent.clone(),
-                                        old_agent.clone(),
-                                        key.clone(),
-                                        data.clone(),
-                                    )
-                                    .await
-                                    .map_err(KitsuneError::other)?;
+                                to_send.push((key.clone(), data.clone()));
                             }
                             // this should be impossible right now
                             // due to the shared agent store
@@ -142,6 +132,10 @@ impl Inner {
                         new_set.insert(old_key.clone());
                     }
                 }
+                evt_sender
+                    .gossip(space.clone(), new_agent.clone(), to_send)
+                    .await
+                    .map_err(KitsuneError::other)?;
             }
         }
 
@@ -202,9 +196,9 @@ async fn data_map_get(
     match &**key {
         MetaOpKey::Op(key) => {
             let mut op = evt_sender
-                .fetch_op_hash_data(FetchOpHashDataEvt {
+                .fetch_op_data(FetchOpDataEvt {
                     space: space.clone(),
-                    agent: agent.clone(),
+                    agents: vec![agent.clone()],
                     op_hashes: vec![key.clone()],
                 })
                 .await

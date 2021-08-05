@@ -3,11 +3,13 @@
 --
 -- This is one version of this query. There is another version which may be faster.
 SELECT
-  hash
+  hash,
+  authored_timestamp_ms
 FROM
   DHtOp
 WHERE
-  DhtOp.authored_timestamp_ms >= :from
+  DhtOp.when_integrated IS NOT NULL
+  AND DhtOp.authored_timestamp_ms >= :from
   AND DhtOp.authored_timestamp_ms < :to
   AND (
     storage_center_loc < :storage_end_loc

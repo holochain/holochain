@@ -34,6 +34,18 @@ impl<T: 'static + Send> Share<T> {
         Self(Arc::new(parking_lot::Mutex::new(None)))
     }
 
+    /// Execute code with immutable access to the internal state.
+    pub fn share_ref<R, F>(&self, f: F) -> KitsuneResult<R>
+    where
+        F: FnOnce(&T) -> KitsuneResult<R>,
+    {
+        let t = self.0.lock();
+        if t.is_none() {
+            return Err(KitsuneErrorKind::Closed.into());
+        }
+        f(t.as_ref().unwrap())
+    }
+
     /// Attempt to unwrap the inner value, assuming this is the only instance.
     pub fn try_unwrap(self) -> Result<Option<T>, Self> {
         match Arc::try_unwrap(self.0) {

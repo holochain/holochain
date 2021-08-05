@@ -40,12 +40,20 @@ pub fn proc_count_us_elapsed(pc: ProcCountMicros) -> std::time::Duration {
     std::time::Duration::from_micros(dur)
 }
 
+/// Helper function for the common case of returning this nested Unit type.
+pub fn unit_ok_fut<E1, E2>() -> Result<MustBoxFuture<'static, Result<(), E2>>, E1> {
+    use futures::FutureExt;
+    Ok(async move { Ok(()) }.boxed().into())
+}
+
 use ::ghost_actor::dependencies::tracing;
+use ghost_actor::dependencies::must_future::MustBoxFuture;
 
 pub use ::lair_keystore_api::actor::CertDigest;
 
 /// Wrapper around CertDigest that provides some additional debugging helpers.
 #[derive(Clone)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Tx2Cert(pub Arc<(CertDigest, String, String)>);
 
 impl Tx2Cert {

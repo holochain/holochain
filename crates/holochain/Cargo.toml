@@ -38,7 +38,7 @@ human-panic = "1.0.3"
 kitsune_p2p = { version = "0.0.2", path = "../kitsune_p2p/kitsune_p2p" }
 kitsune_p2p_types = { version = "0.0.3-dev.0", path = "../kitsune_p2p/types" }
 lazy_static = "1.4.0"
-mockall = "0.8"
+mockall = "0.10.2"
 mr_bundle = { version = "0.0.2", path = "../mr_bundle" }
 must_future = "0.1.1"
 nanoid = "0.3"
@@ -127,6 +127,7 @@ test_utils = [
   "holochain_types/test_utils",
   "holochain_zome_types/test_utils",
   "kitsune_p2p_types/test_utils",
+  "kitsune_p2p/test_utils",
   "itertools",
   "matches",
   "holochain_test_wasm_common",

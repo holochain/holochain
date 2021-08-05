@@ -3,8 +3,6 @@ use holochain_zome_types::zome::FunctionName;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub(crate) struct WireDhtOpData {
-    pub from_agent: holo_hash::AgentPubKey,
-    pub dht_hash: holo_hash::AnyDhtHash,
     pub op_data: holochain_types::dht_op::DhtOp,
 }
 

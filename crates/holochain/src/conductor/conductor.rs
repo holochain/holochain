@@ -1324,6 +1324,9 @@ mod builder {
                 conductor: RwLock::new(conductor),
                 keystore,
                 holochain_p2p,
+
+                #[cfg(any(test, feature = "test_utils"))]
+                skip_publish: std::sync::atomic::AtomicBool::new(false),
                 p2p_env: Arc::new(parking_lot::Mutex::new(HashMap::new())),
                 p2p_metrics_env: Arc::new(parking_lot::Mutex::new(HashMap::new())),
             });
@@ -1426,6 +1429,8 @@ mod builder {
                 holochain_p2p,
                 p2p_env: envs.p2p(),
                 p2p_metrics_env: envs.p2p_metrics(),
+                #[cfg(any(test, feature = "test_utils"))]
+                skip_publish: std::sync::atomic::AtomicBool::new(false),
             });
 
             // Install extra DNAs, in particular:

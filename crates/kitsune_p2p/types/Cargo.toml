@@ -38,6 +38,9 @@ url = "2"
 url2 = "0.0.6"
 webpki = "0.21.2"
 
+# arbitrary
+arbitrary = { version = "1.0", features = ["derive"], optional = true}
+
 [dev-dependencies]
 criterion = "0.3.4"
 tracing-subscriber = "0.2"
@@ -48,6 +51,8 @@ harness = false
 
 [features]
 test_utils = [
+  "arbitrary",
+  "lair_keystore_api/arbitrary",
   "kitsune_p2p_dht_arc/test_utils",
   "ghost_actor/test_utils",
   "mockall",

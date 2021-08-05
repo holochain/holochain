@@ -524,13 +524,7 @@ mod tests {
                         while let Some(evt) = recv.recv().await {
                             use holochain_p2p::event::HolochainP2pEvent::*;
                             match evt {
-                                Publish {
-                                    respond,
-                                    dht_hash,
-                                    ops,
-                                    ..
-                                } => {
-                                    tracing::debug!(?dht_hash);
+                                Publish { respond, ops, .. } => {
                                     tracing::debug!(?ops);
 
                                     // Check the ops are correct
@@ -538,7 +532,6 @@ mod tests {
                                         match expected.get(&op_hash) {
                                             Some((expected_op, count)) => {
                                                 assert_eq!(&op, expected_op);
-                                                assert_eq!(dht_hash, expected_op.dht_basis());
                                                 count.fetch_add(1, Ordering::SeqCst);
                                             }
                                             None => {

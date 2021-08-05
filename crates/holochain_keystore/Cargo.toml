@@ -11,7 +11,7 @@ categories = [ "cryptography" ]
 edition = "2018"
 
 [dependencies]
-ghost_actor = "0.3.0-alpha.2"
+ghost_actor = "=0.3.0-alpha.2"
 holo_hash = { version = "0.0.4", path = "../holo_hash", features = ["full"] }
 holochain_serialized_bytes = "=0.0.51"
 holochain_zome_types = { path = "../holochain_zome_types", version = "0.0.4"}
