@@ -4,6 +4,7 @@ members = [
     "anchor",
     "bench",
     "capability",
+    "countersigning",
     "create_entry",
     "crd",
     "crud",

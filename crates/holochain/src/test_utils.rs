@@ -720,9 +720,13 @@ pub fn fake_valid_dna_file(uid: &str) -> DnaFile {
 
 /// Run genesis on the source chain for testing.
 pub async fn fake_genesis(vault: EnvWrite) -> SourceChainResult<()> {
+    fake_genesis_for_agent(vault, fake_agent_pubkey_1()).await
+}
+
+/// Run genesis on the source chain for a specific agent for testing.
+pub async fn fake_genesis_for_agent(vault: EnvWrite, agent: AgentPubKey) -> SourceChainResult<()> {
     let dna = fake_dna_file("cool dna");
     let dna_hash = dna.dna_hash().clone();
-    let agent_pubkey = fake_agent_pubkey_1();
 
-    source_chain::genesis(vault, dna_hash, agent_pubkey, None).await
+    source_chain::genesis(vault, dna_hash, agent, None).await
 }

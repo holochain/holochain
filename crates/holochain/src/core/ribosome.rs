@@ -546,9 +546,7 @@ pub mod wasm_test {
                     .next()
                     .unwrap();
 
-                let author = $crate::fixt::AgentPubKeyFixturator::new(::fixt::prelude::Predictable)
-                    .next()
-                    .unwrap();
+                let author = host_access.cell_id.agent_pubkey().clone();
 
                 // Required because otherwise the network will return routing errors
                 let test_network = crate::test_utils::test_network(

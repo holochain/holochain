@@ -214,6 +214,7 @@ pub fn check_countersigning_session_data_responses_indexes(
     } else {
         for (i, (response, _response_signature)) in session_data.responses().iter().enumerate() {
             if *response.agent_index() as usize != i {
+                dbg!(&session_data, &i, &response);
                 return Err(SysValidationError::ValidationOutcome(
                     ValidationOutcome::CounterSigningSessionResponsesOrder(
                         *response.agent_index(),
@@ -380,6 +381,7 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
     match (entry_type, entry) {
         (EntryType::AgentPubKey, Entry::Agent(_)) => Ok(()),
         (EntryType::App(_), Entry::App(_)) => Ok(()),
+        (EntryType::App(_), Entry::CounterSign(_, _)) => Ok(()),
         (EntryType::CapClaim, Entry::CapClaim(_)) => Ok(()),
         (EntryType::CapGrant, Entry::CapGrant(_)) => Ok(()),
         _ => Err(ValidationOutcome::EntryType.into()),

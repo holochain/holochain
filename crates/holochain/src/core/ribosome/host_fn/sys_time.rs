@@ -4,19 +4,16 @@ use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
 use holochain_types::access::Permission;
+use holochain_zome_types::Timestamp;
 
 pub fn sys_time(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     _input: (),
-) -> Result<core::time::Duration, WasmError> {
+) -> Result<Timestamp, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ non_determinism: Permission::Allow, .. } => {
-            let start = std::time::SystemTime::now();
-            let since_the_epoch = start
-                .duration_since(std::time::UNIX_EPOCH)
-                .expect("Time went backwards");
-            Ok(since_the_epoch)
+            Ok(holochain_types::timestamp::now())
         },
         _ => unreachable!(),
     }

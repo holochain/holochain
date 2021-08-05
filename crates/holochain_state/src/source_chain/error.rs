@@ -84,6 +84,9 @@ pub enum SourceChainError {
 
     #[error(transparent)]
     SyncScratchError(#[from] SyncScratchError),
+
+    #[error(transparent)]
+    CounterSigningError(#[from] CounterSigningError),
 }
 
 // serde_json::Error does not implement PartialEq - why is that a requirement??

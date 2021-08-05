@@ -6,6 +6,8 @@ pub use crate::capability::generate_cap_secret;
 pub use crate::capability::update_cap_grant;
 pub use crate::chain::get_agent_activity;
 pub use crate::chain::query;
+pub use crate::countersigning::accept_countersigning_preflight_request;
+pub use crate::countersigning::session_times_from_millis;
 pub use crate::ed25519::sign;
 pub use crate::ed25519::sign_ephemeral;
 pub use crate::ed25519::sign_ephemeral_raw;

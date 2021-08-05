@@ -168,7 +168,7 @@ host_fn_api_impls! {
     fn sign_ephemeral (zt::signature::SignEphemeral) -> zt::signature::EphemeralSignatures;
 
     // Current system time, in the opinion of the host, as a `Duration`.
-    fn sys_time (()) -> core::time::Duration;
+    fn sys_time (()) -> zt::timestamp::Timestamp;
 
     // Same as  but also takes the HeaderHash of the updated element.
     fn update (zt::entry::UpdateInput) -> holo_hash::HeaderHash;

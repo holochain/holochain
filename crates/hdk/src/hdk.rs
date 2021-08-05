@@ -76,7 +76,7 @@ pub trait HdkT: Send + Sync {
     // Random
     fn random_bytes(&self, number_of_bytes: u32) -> ExternResult<Bytes>;
     // Time
-    fn sys_time(&self, sys_time_input: ()) -> ExternResult<core::time::Duration>;
+    fn sys_time(&self, sys_time_input: ()) -> ExternResult<Timestamp>;
     fn schedule(&self, execute_after: std::time::Duration) -> ExternResult<()>;
     fn sleep(&self, wake_after: std::time::Duration) -> ExternResult<()>;
     // Trace
@@ -208,7 +208,7 @@ impl HdkT for ErrHdk {
         Self::err()
     }
     // Time
-    fn sys_time(&self, _: ()) -> ExternResult<core::time::Duration> {
+    fn sys_time(&self, _: ()) -> ExternResult<Timestamp> {
         Self::err()
     }
     fn schedule(&self, _: std::time::Duration) -> ExternResult<()> {
@@ -375,8 +375,8 @@ impl HdkT for HostHdk {
     fn random_bytes(&self, number_of_bytes: u32) -> ExternResult<Bytes> {
         host_call::<u32, Bytes>(__random_bytes, number_of_bytes)
     }
-    fn sys_time(&self, _: ()) -> ExternResult<core::time::Duration> {
-        host_call::<(), core::time::Duration>(__sys_time, ())
+    fn sys_time(&self, _: ()) -> ExternResult<Timestamp> {
+        host_call::<(), Timestamp>(__sys_time, ())
     }
     fn schedule(&self, execute_after: std::time::Duration) -> ExternResult<()> {
         host_call::<std::time::Duration, ()>(__schedule, execute_after)

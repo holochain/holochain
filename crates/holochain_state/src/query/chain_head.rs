@@ -18,12 +18,12 @@ impl ChainHeadQuery {
 impl Query for ChainHeadQuery {
     type Item = Judged<SignedHeaderHashed>;
     type State = Option<SignedHeaderHashed>;
-    type Output = Option<(HeaderHash, u32)>;
+    type Output = Option<(HeaderHash, u32, Timestamp)>;
 
     fn query(&self) -> String {
         "
         SELECT blob, hash FROM (
-            SELECT Header.blob, Header.hash, MAX(header.seq) 
+            SELECT Header.blob, Header.hash, MAX(header.seq)
             FROM Header
             JOIN DhtOp ON DhtOp.header_hash = Header.hash
             WHERE Header.author = :author AND DhtOp.is_authored = 1
@@ -74,8 +74,9 @@ impl Query for ChainHeadQuery {
     {
         Ok(state.map(|sh| {
             let seq = sh.header().header_seq();
+            let timestamp = sh.header().timestamp();
             let hash = sh.into_inner().1;
-            (hash, seq)
+            (hash, seq, timestamp)
         }))
     }
 
