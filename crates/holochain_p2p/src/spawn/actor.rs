@@ -134,6 +134,19 @@ impl WrapEvtSender {
         )
     }
 
+    fn query_peer_density(
+        &self,
+        dna_hash: DnaHash,
+        kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
+        dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+    ) -> impl Future<Output = HolochainP2pResult<kitsune_p2p_types::dht_arc::PeerDensity>> + 'static + Send
+    {
+        timing_trace!(
+            { self.0.query_peer_density(dna_hash, kitsune_space, dht_arc) },
+            "(hp2p:handle) query_peer_density",
+        )
+    }
+
     fn put_metric_datum(
         &self,
         dna_hash: DnaHash,
@@ -642,6 +655,24 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         Ok(async move {
             Ok(evt_sender
                 .query_agent_info_signed_near_basis(h_space, space, basis_loc, limit)
+                .await?)
+        }
+        .boxed()
+        .into())
+    }
+
+    #[tracing::instrument(skip(self), level = "trace")]
+    fn handle_query_peer_density(
+        &mut self,
+        space: Arc<kitsune_p2p::KitsuneSpace>,
+        dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht_arc::PeerDensity>
+    {
+        let h_space = DnaHash::from_kitsune(&space);
+        let evt_sender = self.evt_sender.clone();
+        Ok(async move {
+            Ok(evt_sender
+                .query_peer_density(h_space, space, dht_arc)
                 .await?)
         }
         .boxed()
@@ -1205,5 +1236,24 @@ impl HolochainP2pHandler for HolochainP2pActor {
         }
         .boxed()
         .into())
+    }
+
+    #[tracing::instrument(skip(self), level = "trace")]
+    fn handle_authority_for_hash(
+        &mut self,
+        dna_hash: DnaHash,
+        agent: AgentPubKey,
+        dht_hash: AnyDhtHash,
+    ) -> HolochainP2pHandlerResult<bool> {
+        let space = dna_hash.into_kitsune();
+        let agent = agent.into_kitsune();
+        let basis = dht_hash.to_kitsune();
+
+        let kitsune_p2p = self.kitsune_p2p.clone();
+        Ok(
+            async move { Ok(kitsune_p2p.authority_for_hash(space, agent, basis).await?) }
+                .boxed()
+                .into(),
+        )
     }
 }

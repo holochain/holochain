@@ -495,6 +495,14 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
             .query_agent_info_signed_near_basis(space, basis_loc, limit))
     }
 
+    fn handle_query_peer_density(
+        &mut self,
+        space: Arc<KitsuneSpace>,
+        dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+    ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht_arc::PeerDensity> {
+        Ok(self.evt_sender.query_peer_density(space, dht_arc))
+    }
+
     fn handle_put_metric_datum(&mut self, datum: MetricDatum) -> KitsuneP2pEventHandlerResult<()> {
         Ok(self.evt_sender.put_metric_datum(datum))
     }
@@ -672,6 +680,24 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         .boxed()
         .into())
     }
+
+    fn handle_authority_for_hash(
+        &mut self,
+        space: Arc<KitsuneSpace>,
+        agent: Arc<KitsuneAgent>,
+        basis: Arc<KitsuneBasis>,
+    ) -> KitsuneP2pHandlerResult<bool> {
+        let space_sender = match self.spaces.get_mut(&space) {
+            None => return Err(KitsuneP2pError::RoutingSpaceError(space)),
+            Some(space) => space.get(),
+        };
+        Ok(async move {
+            let (space_sender, _) = space_sender.await;
+            space_sender.authority_for_hash(space, agent, basis).await
+        }
+        .boxed()
+        .into())
+    }
 }
 
 #[cfg(test)]
@@ -718,6 +744,12 @@ mockall::mock! {
             &mut self,
             query: MetricQuery,
         ) -> KitsuneP2pEventHandlerResult<MetricQueryAnswer>;
+
+        fn handle_query_peer_density(
+            &mut self,
+            space: Arc<KitsuneSpace>,
+            dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+        ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht_arc::PeerDensity>;
 
         fn handle_call(
             &mut self,

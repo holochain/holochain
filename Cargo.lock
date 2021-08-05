@@ -3310,7 +3310,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht_arc"
-version = "0.0.1"
+version = "0.0.2-dev.0"
 dependencies = [
  "derive_more",
  "gcollections",
@@ -3412,7 +3412,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_transport_quic"
-version = "0.0.2"
+version = "0.0.3-dev.0"
 dependencies = [
  "blake2b_simd",
  "futures",
@@ -3431,7 +3431,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_types"
-version = "0.0.2"
+version = "0.0.3-dev.0"
 dependencies = [
  "arbitrary",
  "base64",

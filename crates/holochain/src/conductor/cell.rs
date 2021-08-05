@@ -238,6 +238,7 @@ impl Cell {
             | QueryGossipAgents { .. }
             | QueryOpHashes { .. }
             | QueryAgentInfoSignedNearBasis { .. }
+            | QueryPeerDensity { .. }
             | PutMetricDatum { .. }
             | QueryMetrics { .. } => {
                 // These events are aggregated over a set of cells, so need to be handled at the conductor level.

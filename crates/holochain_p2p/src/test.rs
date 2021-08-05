@@ -103,6 +103,14 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
+    fn handle_authority_for_hash(
+        &mut self,
+        dna_hash: DnaHash,
+        agent: AgentPubKey,
+        dht_hash: AnyDhtHash,
+    ) -> HolochainP2pHandlerResult<bool> {
+        Err("stub".into())
+    }
 }
 
 /// Spawn a stub network that doesn't respond to any messages.

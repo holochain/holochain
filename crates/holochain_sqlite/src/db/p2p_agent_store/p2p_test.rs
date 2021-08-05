@@ -89,7 +89,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
     // nonzero ones
     let num_nonzero = all
         .iter()
-        .filter(|a| a.storage_arc.absolute_length() > 0)
+        .filter(|a| a.storage_arc.half_length() > 0)
         .count();
 
     // make sure we can get our example result

@@ -36,7 +36,7 @@ holochain_websocket = { version = "0.0.2", path = "../holochain_websocket" }
 holochain_zome_types = { version = "0.0.4", path = "../holochain_zome_types" }
 human-panic = "1.0.3"
 kitsune_p2p = { version = "0.0.2", path = "../kitsune_p2p/kitsune_p2p" }
-kitsune_p2p_types = { version = "0.0.2", path = "../kitsune_p2p/types" }
+kitsune_p2p_types = { version = "0.0.3-dev.0", path = "../kitsune_p2p/types" }
 lazy_static = "1.4.0"
 mockall = "0.10.2"
 mr_bundle = { version = "0.0.2", path = "../mr_bundle" }

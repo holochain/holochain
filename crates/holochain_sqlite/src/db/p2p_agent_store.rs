@@ -289,7 +289,7 @@ impl P2pRecord {
         let expires_at_ms = signed.expires_at_ms;
         let arc = signed.storage_arc;
 
-        let storage_center_loc = arc.center_loc.into();
+        let storage_center_loc = arc.center_loc().into();
 
         let is_active = !signed.url_list.is_empty();
 

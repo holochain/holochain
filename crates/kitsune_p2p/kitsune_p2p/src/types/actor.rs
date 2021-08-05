@@ -102,5 +102,12 @@ ghost_actor::ghost_chan! {
             timeout: KitsuneTimeout,
             payload: Payload
         ) -> ();
+
+        /// Check if an agent is an authority for a hash.
+        fn authority_for_hash(
+            space: KSpace,
+            agent: KAgent,
+            basis: KBasis,
+        ) -> bool;
     }
 }

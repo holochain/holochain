@@ -131,6 +131,9 @@ ghost_actor::ghost_chan! {
         /// query agent info in order of closeness to a basis location.
         fn query_agent_info_signed_near_basis(dna_hash: DnaHash, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, basis_loc: u32, limit: u32) -> Vec<AgentInfoSigned>;
 
+        /// Query the peer density of a space for a given [`DhtArc`].
+        fn query_peer_density(dna_hash: DnaHash, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, dht_arc: kitsune_p2p_types::dht_arc::DhtArc) -> kitsune_p2p_types::dht_arc::PeerDensity;
+
         /// We need to store some metric data on behalf of kitsune.
         fn put_metric_datum(dna_hash: DnaHash, to_agent: AgentPubKey, agent: AgentPubKey, metric: MetricKind, timestamp: SystemTime) -> ();
 
@@ -267,6 +270,7 @@ impl HolochainP2pEvent {
             HolochainP2pEvent::QueryAgentInfoSignedNearBasis { dna_hash, .. } => { dna_hash }
             HolochainP2pEvent::QueryGossipAgents { dna_hash, .. } => { dna_hash }
             HolochainP2pEvent::PutAgentInfoSigned { dna_hash, .. } => { dna_hash }
+            HolochainP2pEvent::QueryPeerDensity { dna_hash, .. } => { dna_hash }
         })
     }
 
@@ -278,6 +282,7 @@ impl HolochainP2pEvent {
             HolochainP2pEvent::QueryAgentInfoSignedNearBasis { .. } => { unimplemented!("There is no single agent target for QueryAgentInfoSignedNearBasis") },
             HolochainP2pEvent::QueryGossipAgents { .. } => { unimplemented!("There is no single agent target for QueryGossipAgents") },
             HolochainP2pEvent::PutAgentInfoSigned { .. } => { unimplemented!("There is no single agent target for PutAgentInfoSigned") },
+            HolochainP2pEvent::QueryPeerDensity { .. } => { unimplemented!() },
         })
     }
 }
