@@ -104,6 +104,6 @@ ghost_actor::ghost_chan! {
         ) -> ();
 
         /// New integrated data.
-        fn new_data(space: KSpace) -> ();
+        fn new_integrated_data(space: KSpace) -> ();
     }
 }

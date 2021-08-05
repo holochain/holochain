@@ -49,7 +49,7 @@ pub async fn integrate_dht_ops_workflow(
     if changed > 0 {
         trigger_sys.trigger();
         trigger_receipt.trigger();
-        cell_network.new_data().await?;
+        cell_network.new_integrated_data().await?;
         Ok(WorkComplete::Incomplete)
     } else {
         Ok(WorkComplete::Complete)

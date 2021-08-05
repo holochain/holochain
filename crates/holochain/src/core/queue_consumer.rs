@@ -161,7 +161,7 @@ pub async fn spawn_queue_consumer_tasks(
     }
 
     (
-        QueueTriggers::new(tx_sys.clone(), tx_publish.clone()),
+        QueueTriggers::new(tx_sys.clone(), tx_publish.clone(), tx_integration.clone()),
         InitialQueueTriggers::new(tx_sys, tx_publish, tx_app, tx_integration, tx_receipt),
     )
 }
@@ -173,6 +173,8 @@ pub struct QueueTriggers {
     pub sys_validation: TriggerSender,
     /// Notify the ProduceDhtOps workflow to run, i.e. after InvokeCallZome
     pub publish_dht_ops: TriggerSender,
+    /// Notify the IntegrateDhtOps workflow to run, i.e. after InvokeCallZome
+    pub integrate_dht_ops: TriggerSender,
 }
 
 /// The triggers to run once at the start of a cell
@@ -189,10 +191,15 @@ pub struct InitialQueueTriggers {
 
 impl QueueTriggers {
     /// Create a new queue trigger
-    pub fn new(sys_validation: TriggerSender, publish_dht_ops: TriggerSender) -> Self {
+    pub fn new(
+        sys_validation: TriggerSender,
+        publish_dht_ops: TriggerSender,
+        integrate_dht_ops: TriggerSender,
+    ) -> Self {
         Self {
             sys_validation,
             publish_dht_ops,
+            integrate_dht_ops,
         }
     }
 }

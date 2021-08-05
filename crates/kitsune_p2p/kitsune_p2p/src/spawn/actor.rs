@@ -673,7 +673,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         .into())
     }
     
-    fn handle_new_data(
+    fn handle_new_integrated_data(
         &mut self,
         space: Arc<KitsuneSpace>,
     ) -> KitsuneP2pHandlerResult<()> {
@@ -683,7 +683,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         };
         Ok(async move {
             let (space_sender, _) = space_sender.await;
-            space_sender.new_data(space).await?;
+            space_sender.new_integrated_data(space).await?;
             Ok(())
         }
         .boxed()

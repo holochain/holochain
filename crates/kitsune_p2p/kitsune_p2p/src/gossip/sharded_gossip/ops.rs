@@ -8,7 +8,6 @@ impl ShardedGossipLocal {
         &self,
         state: RoundState,
         remote_bloom: TimedBloomFilter,
-        max_ops: usize,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         // Get the local agents to check against the remote bloom.
         let local_agents = self
@@ -30,7 +29,7 @@ impl ShardedGossipLocal {
 
         // Check which ops are missing.
         let ops = self
-            .check_ops_bloom(local_agents_within_common_arc, state, remote_bloom, max_ops)
+            .check_ops_bloom(local_agents_within_common_arc, state, remote_bloom)
             .await?;
 
         // Chunk the ops into multiple gossip messages if needed.

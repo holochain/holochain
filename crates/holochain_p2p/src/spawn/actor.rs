@@ -1212,11 +1212,11 @@ impl HolochainP2pHandler for HolochainP2pActor {
         .into())
     }
 
-    fn handle_new_data(&mut self, dna_hash: DnaHash) -> HolochainP2pHandlerResult<()> {
+    fn handle_new_integrated_data(&mut self, dna_hash: DnaHash) -> HolochainP2pHandlerResult<()> {
         let space = dna_hash.into_kitsune();
 
         let kitsune_p2p = self.kitsune_p2p.clone();
-        Ok(async move { Ok(kitsune_p2p.new_data(space).await?) }
+        Ok(async move { Ok(kitsune_p2p.new_integrated_data(space).await?) }
             .boxed()
             .into())
     }

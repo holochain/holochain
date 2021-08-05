@@ -673,16 +673,15 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
                 // The end time bound if there is one.
                 let end = hashes_and_times
-                    .iter()
-                    .take(max_ops)
-                    .last()
+                    .get(max_ops)
+                    .or_else(|| hashes_and_times.last())
                     .map(|(_, t)| *t);
 
                 // Extract the hashes.
-                let hashes = hashes_and_times
+                let hashes: Vec<_> = hashes_and_times
                     .into_iter()
-                    .map(|(h, _)| h)
                     .take(max_ops)
+                    .map(|(h, _)| h)
                     .collect();
 
                 // The range is exclusive so we add one to the end.

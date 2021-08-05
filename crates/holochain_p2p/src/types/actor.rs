@@ -264,7 +264,7 @@ ghost_actor::ghost_chan! {
         fn send_validation_receipt(dna_hash: DnaHash, to_agent: AgentPubKey, from_agent: AgentPubKey, receipt: SerializedBytes) -> ();
 
         /// New integrated data.
-        fn new_data(dna_hash: DnaHash) -> ();
+        fn new_integrated_data(dna_hash: DnaHash) -> ();
     }
 }
 

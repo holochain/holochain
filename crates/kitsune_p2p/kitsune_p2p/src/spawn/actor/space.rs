@@ -47,9 +47,6 @@ ghost_actor::ghost_chan! {
 
         /// Incoming Gossip
         fn incoming_gossip(space: KSpace, con: WireConHnd, data: Payload, module_type: crate::types::gossip::GossipModuleType) -> ();
-
-        // /// New integrated data
-        // fn new_data() -> ();
     }
 }
 
@@ -667,9 +664,9 @@ impl KitsuneP2pHandler for Space {
         .into())
     }
     
-    fn handle_new_data(&mut self, _: KSpace) -> InternalHandlerResult<()> {
+    fn handle_new_integrated_data(&mut self, _: KSpace) -> InternalHandlerResult<()> {
         for module in self.gossip_mod.values() {
-            module.new_data();
+            module.new_integrated_data();
         }
         unit_ok_fut()
     }
@@ -725,10 +722,10 @@ impl Space {
                         GossipModuleType::ShardedRecent,
                         crate::gossip::sharded_gossip::recent_factory(),
                     ),
-                    (
-                        GossipModuleType::ShardedHistorical,
-                        crate::gossip::sharded_gossip::historical_factory(),
-                    ),
+                    // (
+                    //     GossipModuleType::ShardedHistorical,
+                    //     crate::gossip::sharded_gossip::historical_factory(),
+                    // ),
                 ],
                 _ => {
                     panic!("unknown gossip strategy: {}", module);

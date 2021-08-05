@@ -160,7 +160,8 @@ pub fn dangerous_fake_agent_info_with_arc(
     }))
 }
 
-pub fn empty_bloom() -> Option<(PoolBuf, std::ops::Range<u64>)> {
-    let bloom = bloomfilter::Bloom::new_for_fp_rate(1, 0.1);
-    Some((encode_bloom_filter(&bloom), 0..u64::MAX))
+pub fn empty_bloom() -> EncodedTimedBloomFilter {
+    EncodedTimedBloomFilter::MissingAllHashes {
+        time_window: 0..u64::MAX,
+    }
 }
