@@ -98,15 +98,12 @@ pub async fn spawn_queue_consumer_tasks(
         .await
         .expect("Failed to manage workflow handle");
 
-    let (create_tx_sys, get_tx_sys) = tokio::sync::oneshot::channel();
-
     // Integration
     let (tx_integration, handle) = spawn_integrate_dht_ops_consumer(
         env.clone(),
         conductor_handle.clone(),
         cell_network.cell_id(),
         stop.subscribe(),
-        get_tx_sys,
         tx_receipt.clone(),
         cell_network.clone(),
     );
@@ -156,10 +153,6 @@ pub async fn spawn_queue_consumer_tasks(
         ))
         .await
         .expect("Failed to manage workflow handle");
-    if create_tx_sys.send(tx_sys.clone()).is_err() {
-        panic!("Failed to send tx_sys");
-    }
-
     (
         QueueTriggers::new(tx_sys.clone(), tx_publish.clone(), tx_integration.clone()),
         InitialQueueTriggers::new(tx_sys, tx_publish, tx_app, tx_integration, tx_receipt),

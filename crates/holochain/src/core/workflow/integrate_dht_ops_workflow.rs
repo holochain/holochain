@@ -16,10 +16,9 @@ mod query_tests;
 #[cfg(feature = "test_utils")]
 mod tests;
 
-#[instrument(skip(vault, trigger_sys, trigger_receipt, cell_network))]
+#[instrument(skip(vault, trigger_receipt, cell_network))]
 pub async fn integrate_dht_ops_workflow(
     vault: EnvWrite,
-    mut trigger_sys: TriggerSender,
     mut trigger_receipt: TriggerSender,
     cell_network: HolochainP2pCell,
 ) -> WorkflowResult<WorkComplete> {
@@ -47,8 +46,6 @@ pub async fn integrate_dht_ops_workflow(
         .await?;
     tracing::debug!(?changed);
     if changed > 0 {
-        // FIXME: Is this right?
-        trigger_sys.trigger();
         trigger_receipt.trigger();
         cell_network.new_integrated_data().await?;
         Ok(WorkComplete::Incomplete)

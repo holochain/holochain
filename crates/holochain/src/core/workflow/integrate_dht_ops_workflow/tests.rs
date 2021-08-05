@@ -467,10 +467,9 @@ impl Db {
 
 async fn call_workflow<'env>(env: EnvWrite) {
     let (qt, _rx) = TriggerSender::new();
-    let (qt2, _rx) = TriggerSender::new();
     let test_network = test_network(None, None).await;
     let holochain_p2p_cell = test_network.cell_network();
-    integrate_dht_ops_workflow(env.clone(), qt, qt2, holochain_p2p_cell)
+    integrate_dht_ops_workflow(env.clone(), qt, holochain_p2p_cell)
         .await
         .unwrap();
 }
