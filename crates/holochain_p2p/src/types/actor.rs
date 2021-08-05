@@ -265,6 +265,9 @@ ghost_actor::ghost_chan! {
 
         /// New integrated data.
         fn new_integrated_data(dna_hash: DnaHash) -> ();
+
+        /// Check if an agent is an authority for a hash.
+        fn authority_for_hash(dna_hash: DnaHash, from_agent: AgentPubKey, dht_hash: AnyDhtHash) -> bool;
     }
 }
 

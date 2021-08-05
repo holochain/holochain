@@ -39,8 +39,9 @@ impl HandlerBuilder {
     /// Implements the agent persistence methods (fetches and gets) to act as if
     /// it is backed by a data store with the provided agent data.
     ///
-    /// Limitations:
+    /// Limitations/Discrepancies:
     /// - Op data returned is completely arbitrary and does NOT hash to the hash it's "stored" under
+    /// - The agent location will NOT be centered on their DhtArc
     pub fn with_agent_persistence(mut self, agent_data: MockAgentPersistence) -> Self {
         let info_only: Vec<_> = agent_data.iter().map(|(info, _)| info.clone()).collect();
         let agents_only: Vec<_> = info_only.iter().map(|info| info.agent.clone()).collect();
@@ -76,10 +77,10 @@ impl HandlerBuilder {
         });
 
         self.0
-            .expect_handle_fetch_op_hashes_for_constraints()
-            .returning(move |arg: FetchOpHashesForConstraintsEvt| {
+            .expect_handle_query_op_hashes()
+            .returning(move |arg: QueryOpHashesEvt| {
                 // Return ops for agent, correctly filtered by arc but not by time window
-                let FetchOpHashesForConstraintsEvt {
+                let QueryOpHashesEvt {
                     space: _,
                     agents,
                     window_ms,
@@ -124,10 +125,10 @@ impl HandlerBuilder {
             });
 
         self.0
-            .expect_handle_fetch_op_hash_data()
-            .returning(|arg: FetchOpHashDataEvt| {
+            .expect_handle_fetch_op_data()
+            .returning(|arg: FetchOpDataEvt| {
                 // Return dummy data for each op
-                let FetchOpHashDataEvt {
+                let FetchOpDataEvt {
                     space: _,
                     agents: _,
                     op_hashes,
@@ -145,6 +146,11 @@ impl HandlerBuilder {
 
 /// Concise representation of data held by various agents in a sharded scenario,
 /// without having to refer to explicit op hashes or locations.
+///
+/// This type is intended to be used to easily define arbitrary sharded network scenarios,
+/// to test various cases of local sync and gossip. It's expected that we'll eventually have a
+/// small library of such scenarios, defined in terms of this type.
+///
 /// See [`generate_ops_for_overlapping_arcs`] for usage detail.
 pub struct OwnershipData {
     /// Total number of op hashes to be generated
@@ -154,10 +160,9 @@ pub struct OwnershipData {
 }
 
 impl OwnershipData {
-    pub fn from_compact(
-        total_ops: usize,
-        v: Vec<(Arc<KitsuneAgent>, (usize, usize), Vec<usize>)>,
-    ) -> Self {
+    /// Construct `OwnershipData` from a more compact "untagged" format using
+    /// tuples instead of structs. This is intended to be the canonical constructor.
+    pub fn from_compact(total_ops: usize, v: Vec<OwnershipDataAgentCompact>) -> Self {
         Self {
             total_ops,
             agents: v
@@ -181,6 +186,10 @@ pub struct OwnershipDataAgent {
     /// The indices of ops to consider as owned
     hash_indices: Vec<usize>,
 }
+
+/// Same as [`OwnershipDataAgent`], but using a tuple instead of a struct.
+/// It's just more compact.
+pub type OwnershipDataAgentCompact = (Arc<KitsuneAgent>, (usize, usize), Vec<usize>);
 
 /// Given a list of ownership requirements, returns a list of triples, each
 /// item of which consists of:

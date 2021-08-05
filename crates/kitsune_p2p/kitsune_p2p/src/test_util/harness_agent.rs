@@ -193,6 +193,14 @@ impl KitsuneP2pEventHandler for AgentHarness {
         Ok(async move { Ok(out) }.boxed().into())
     }
 
+    fn handle_query_peer_density(
+        &mut self,
+        _space: Arc<KitsuneSpace>,
+        _dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+    ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht_arc::PeerDensity> {
+        todo!()
+    }
+
     fn handle_put_metric_datum(&mut self, datum: MetricDatum) -> KitsuneP2pEventHandlerResult<()> {
         self.metric_store.put_metric_datum(datum);
         Ok(async move { Ok(()) }.boxed().into())
@@ -259,9 +267,9 @@ impl KitsuneP2pEventHandler for AgentHarness {
         Ok(async move { Ok(()) }.boxed().into())
     }
 
-    fn handle_fetch_op_hashes_for_constraints(
+    fn handle_query_op_hashes(
         &mut self,
-        _input: FetchOpHashesForConstraintsEvt,
+        _input: QueryOpHashesEvt,
     ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<super::KitsuneOpHash>>, TimeWindowMs)>> {
         let hashes: Vec<Arc<super::KitsuneOpHash>> = self.gossip_store.keys().cloned().collect();
         let slug_hashes: Vec<Slug> = hashes.iter().map(|h| h.into()).collect();
@@ -271,9 +279,9 @@ impl KitsuneP2pEventHandler for AgentHarness {
             .into())
     }
 
-    fn handle_fetch_op_hash_data(
+    fn handle_fetch_op_data(
         &mut self,
-        input: FetchOpHashDataEvt,
+        input: FetchOpDataEvt,
     ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<super::KitsuneOpHash>, Vec<u8>)>> {
         let mut out = Vec::new();
         for hash in input.op_hashes {

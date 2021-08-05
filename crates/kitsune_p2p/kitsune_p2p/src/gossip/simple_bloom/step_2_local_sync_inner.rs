@@ -46,7 +46,7 @@ impl Inner {
         // collect all local agents' ops
         for agent in local_agents.iter() {
             if let Ok(Some((ops, _))) = evt_sender
-                .fetch_op_hashes_for_constraints(FetchOpHashesForConstraintsEvt {
+                .query_op_hashes(QueryOpHashesEvt {
                     space: space.clone(),
                     agents: vec![(agent.clone(), ArcInterval::Full.into())],
                     window_ms: u64::MIN..u64::MAX,
@@ -196,7 +196,7 @@ async fn data_map_get(
     match &**key {
         MetaOpKey::Op(key) => {
             let mut op = evt_sender
-                .fetch_op_hash_data(FetchOpHashDataEvt {
+                .fetch_op_data(FetchOpDataEvt {
                     space: space.clone(),
                     agents: vec![agent.clone()],
                     op_hashes: vec![key.clone()],

@@ -59,6 +59,7 @@ use super::Cell;
 use super::CellError;
 use super::Conductor;
 use crate::conductor::p2p_agent_store::get_single_agent_info;
+use crate::conductor::p2p_agent_store::query_peer_density;
 use crate::conductor::p2p_metrics::put_metric_datum;
 use crate::conductor::p2p_metrics::query_metrics;
 use crate::core::ribosome::real_ribosome::RealRibosome;
@@ -325,7 +326,7 @@ pub trait ConductorHandleT: Send + Sync {
         -> ConductorResult<()>;
 
     #[cfg(any(test, feature = "test_utils"))]
-    /// Check whether this conductor should skip gossip.
+    /// Check whether this conductor should skip publish.
     fn should_skip_publish(&self) -> bool;
 
     #[cfg(any(test, feature = "test_utils"))]
@@ -577,6 +578,17 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                         .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
+            QueryPeerDensity {
+                kitsune_space,
+                dht_arc,
+                respond,
+                ..
+            } => {
+                let env = { self.p2p_env(space) };
+                let res = query_peer_density(env, kitsune_space, dht_arc)
+                    .map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
+            }
             PutMetricDatum {
                 respond,
                 agent,
@@ -614,7 +626,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             | GetLinks { .. }
             | GetAgentActivity { .. }
             | ValidationReceiptReceived { .. }
-            | FetchOpHashData { .. } => {
+            | FetchOpData { .. } => {
                 let cell_id = CellId::new(event.dna_hash().clone(), event.target_agents().clone());
                 let cell = self.cell_by_id(&cell_id).await?;
                 cell.handle_holochain_p2p_event(event).await?;
@@ -624,7 +636,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             // it at the conductor level.
             // TODO: perhaps we can do away with the assumption that each event
             //       is meant for a single Cell, i.e. allow batching in general
-            HolochainP2pEvent::FetchOpHashesForConstraints {
+            HolochainP2pEvent::QueryOpHashes {
                 dna_hash,
                 to_agents,
                 window_ms,
@@ -641,11 +653,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                     let cell_id = CellId::new(dna_hash.clone(), agent);
                     let cell = self.cell_by_id(&cell_id).await?;
                     match cell
-                        .handle_fetch_op_hashes_for_constraints(
-                            arc_set,
-                            window_ms.clone(),
-                            include_limbo,
-                        )
+                        .handle_query_op_hashes(arc_set, window_ms.clone(), include_limbo)
                         .await
                     {
                         Ok(t) => hashes_and_times.extend(t),

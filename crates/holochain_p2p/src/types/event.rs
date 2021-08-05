@@ -131,6 +131,9 @@ ghost_actor::ghost_chan! {
         /// query agent info in order of closeness to a basis location.
         fn query_agent_info_signed_near_basis(dna_hash: DnaHash, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, basis_loc: u32, limit: u32) -> Vec<AgentInfoSigned>;
 
+        /// Query the peer density of a space for a given [`DhtArc`].
+        fn query_peer_density(dna_hash: DnaHash, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, dht_arc: kitsune_p2p_types::dht_arc::DhtArc) -> kitsune_p2p_types::dht_arc::PeerDensity;
+
         /// We need to store some metric data on behalf of kitsune.
         fn put_metric_datum(dna_hash: DnaHash, to_agent: AgentPubKey, agent: AgentPubKey, metric: MetricKind, timestamp: SystemTime) -> ();
 
@@ -209,7 +212,7 @@ ghost_actor::ghost_chan! {
         /// Gets all ops from a set of agents within a time window
         /// and max number of ops.
         /// Returns the actual time window of returned ops as well.
-        fn fetch_op_hashes_for_constraints(
+        fn query_op_hashes(
             dna_hash: DnaHash,
             to_agents: Vec<(AgentPubKey, kitsune_p2p::dht_arc::DhtArcSet)>,
             window_ms: TimeWindowMs,
@@ -218,7 +221,7 @@ ghost_actor::ghost_chan! {
         ) -> Option<(Vec<holo_hash::DhtOpHash>, TimeWindowMs)>;
 
         /// The p2p module needs access to the content for a given set of DhtOpHashes.
-        fn fetch_op_hash_data(
+        fn fetch_op_data(
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
             op_hashes: Vec<holo_hash::DhtOpHash>,
@@ -248,7 +251,7 @@ macro_rules! match_p2p_evt {
             HolochainP2pEvent::GetLinks { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetAgentActivity { $i, .. } => { $($t)* }
             HolochainP2pEvent::ValidationReceiptReceived { $i, .. } => { $($t)* }
-            HolochainP2pEvent::FetchOpHashData { $i, .. } => { $($t)* }
+            HolochainP2pEvent::FetchOpData { $i, .. } => { $($t)* }
             HolochainP2pEvent::SignNetworkData { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetAgentInfoSigned { $i, .. } => { $($t)* }
             HolochainP2pEvent::PutMetricDatum { $i, .. } => { $($t)* }
@@ -262,22 +265,24 @@ impl HolochainP2pEvent {
     /// The dna_hash associated with this network p2p event.
     pub fn dna_hash(&self) -> &DnaHash {
         match_p2p_evt!(self => |dna_hash| { dna_hash }, {
-            HolochainP2pEvent::FetchOpHashesForConstraints { dna_hash, .. } => { dna_hash }
+            HolochainP2pEvent::QueryOpHashes { dna_hash, .. } => { dna_hash }
             HolochainP2pEvent::QueryAgentInfoSigned { dna_hash, .. } => { dna_hash }
             HolochainP2pEvent::QueryAgentInfoSignedNearBasis { dna_hash, .. } => { dna_hash }
             HolochainP2pEvent::QueryGossipAgents { dna_hash, .. } => { dna_hash }
             HolochainP2pEvent::PutAgentInfoSigned { dna_hash, .. } => { dna_hash }
+            HolochainP2pEvent::QueryPeerDensity { dna_hash, .. } => { dna_hash }
         })
     }
 
     /// The agent_pub_key associated with this network p2p event.
     pub fn target_agents(&self) -> &AgentPubKey {
         match_p2p_evt!(self => |to_agent| { to_agent }, {
-            HolochainP2pEvent::FetchOpHashesForConstraints { .. } => { unimplemented!("There is no single agent target for FetchOpHashesForConstraints") }
+            HolochainP2pEvent::QueryOpHashes { .. } => { unimplemented!("There is no single agent target for QueryOpHashes") }
             HolochainP2pEvent::QueryAgentInfoSigned { .. } => { unimplemented!("There is no single agent target for QueryAgentInfoSigned") },
             HolochainP2pEvent::QueryAgentInfoSignedNearBasis { .. } => { unimplemented!("There is no single agent target for QueryAgentInfoSignedNearBasis") },
             HolochainP2pEvent::QueryGossipAgents { .. } => { unimplemented!("There is no single agent target for QueryGossipAgents") },
             HolochainP2pEvent::PutAgentInfoSigned { .. } => { unimplemented!("There is no single agent target for PutAgentInfoSigned") },
+            HolochainP2pEvent::QueryPeerDensity { .. } => { unimplemented!() },
         })
     }
 }

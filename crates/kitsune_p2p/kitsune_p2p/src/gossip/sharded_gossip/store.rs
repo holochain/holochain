@@ -4,8 +4,8 @@
 use std::{collections::HashSet, ops::Range, sync::Arc};
 
 use crate::event::{
-    FetchOpHashDataEvt, FetchOpHashesForConstraintsEvt, GetAgentInfoSignedEvt,
-    PutAgentInfoSignedEvt, QueryAgentInfoSignedEvt, QueryGossipAgentsEvt, TimeWindowMs,
+    FetchOpDataEvt, GetAgentInfoSignedEvt, PutAgentInfoSignedEvt, QueryAgentInfoSignedEvt,
+    QueryGossipAgentsEvt, QueryOpHashesEvt, TimeWindowMs,
 };
 use crate::types::event::KitsuneP2pEventSender;
 use kitsune_p2p_types::{
@@ -142,7 +142,7 @@ pub(super) async fn all_op_hashes_within_arcset(
         })
         .collect();
     Ok(evt_sender
-        .fetch_op_hashes_for_constraints(FetchOpHashesForConstraintsEvt {
+        .query_op_hashes(QueryOpHashesEvt {
             space: space.clone(),
             agents,
             window_ms,
@@ -192,7 +192,7 @@ pub(super) async fn fetch_ops(
     op_hashes: Vec<Arc<KitsuneOpHash>>,
 ) -> KitsuneResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> {
     evt_sender
-        .fetch_op_hash_data(FetchOpHashDataEvt {
+        .fetch_op_data(FetchOpDataEvt {
             space: space.clone(),
             agents: agents.cloned().collect(),
             op_hashes,

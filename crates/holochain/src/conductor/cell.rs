@@ -236,8 +236,9 @@ impl Cell {
             | GetAgentInfoSigned { .. }
             | QueryAgentInfoSigned { .. }
             | QueryGossipAgents { .. }
-            | FetchOpHashesForConstraints { .. }
+            | QueryOpHashes { .. }
             | QueryAgentInfoSignedNearBasis { .. }
+            | QueryPeerDensity { .. }
             | PutMetricDatum { .. }
             | QueryMetrics { .. } => {
                 // These events are aggregated over a set of cells, so need to be handled at the conductor level.
@@ -383,7 +384,7 @@ impl Cell {
                 .await;
             }
 
-            FetchOpHashData {
+            FetchOpData {
                 span_context: _,
                 respond,
                 op_hashes,
@@ -391,12 +392,12 @@ impl Cell {
             } => {
                 async {
                     let res = self
-                        .handle_fetch_op_hash_data(op_hashes)
+                        .handle_fetch_op_data(op_hashes)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
-                .instrument(debug_span!("cell_handle_fetch_op_hash_data"))
+                .instrument(debug_span!("cell_handle_fetch_op_data"))
                 .await;
             }
             SignNetworkData {
@@ -593,7 +594,7 @@ impl Cell {
     #[instrument(skip(self))]
     /// the network module is requesting a list of dht op hashes
     /// Get the [`DhtOpHash`]es and authored timestamps for a given time window.
-    pub(super) async fn handle_fetch_op_hashes_for_constraints(
+    pub(super) async fn handle_query_op_hashes(
         &self,
         dht_arc_set: DhtArcSet,
         window_ms: TimeWindowMs,
@@ -668,7 +669,7 @@ impl Cell {
 
     #[instrument(skip(self, op_hashes))]
     /// The network module is requesting the content for dht ops
-    async fn handle_fetch_op_hash_data(
+    async fn handle_fetch_op_data(
         &self,
         op_hashes: Vec<holo_hash::DhtOpHash>,
     ) -> CellResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {

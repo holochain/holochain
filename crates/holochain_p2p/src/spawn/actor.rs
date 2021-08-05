@@ -134,6 +134,19 @@ impl WrapEvtSender {
         )
     }
 
+    fn query_peer_density(
+        &self,
+        dna_hash: DnaHash,
+        kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
+        dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+    ) -> impl Future<Output = HolochainP2pResult<kitsune_p2p_types::dht_arc::PeerDensity>> + 'static + Send
+    {
+        timing_trace!(
+            { self.0.query_peer_density(dna_hash, kitsune_space, dht_arc) },
+            "(hp2p:handle) query_peer_density",
+        )
+    }
+
     fn put_metric_datum(
         &self,
         dna_hash: DnaHash,
@@ -283,7 +296,7 @@ impl WrapEvtSender {
         )
     }
 
-    fn fetch_op_hashes_for_constraints(
+    fn query_op_hashes(
         &self,
         dna_hash: DnaHash,
         agents: Vec<(AgentPubKey, kitsune_p2p::dht_arc::DhtArcSet)>,
@@ -295,19 +308,14 @@ impl WrapEvtSender {
            + Send {
         timing_trace!(
             {
-                self.0.fetch_op_hashes_for_constraints(
-                    dna_hash,
-                    agents,
-                    window_ms,
-                    max_ops,
-                    include_limbo,
-                )
+                self.0
+                    .query_op_hashes(dna_hash, agents, window_ms, max_ops, include_limbo)
             },
-            "(hp2p:handle) fetch_op_hashes_for_constraints",
+            "(hp2p:handle) query_op_hashes",
         )
     }
 
-    fn fetch_op_hash_data(
+    fn fetch_op_data(
         &self,
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
@@ -319,9 +327,9 @@ impl WrapEvtSender {
            + Send {
         let op_count = op_hashes.len();
         timing_trace!(
-            { self.0.fetch_op_hash_data(dna_hash, to_agent, op_hashes) },
+            { self.0.fetch_op_data(dna_hash, to_agent, op_hashes) },
             %op_count,
-            "(hp2p:handle) fetch_op_hash_data",
+            "(hp2p:handle) fetch_op_data",
         )
     }
 
@@ -653,6 +661,24 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         .into())
     }
 
+    #[tracing::instrument(skip(self), level = "trace")]
+    fn handle_query_peer_density(
+        &mut self,
+        space: Arc<kitsune_p2p::KitsuneSpace>,
+        dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht_arc::PeerDensity>
+    {
+        let h_space = DnaHash::from_kitsune(&space);
+        let evt_sender = self.evt_sender.clone();
+        Ok(async move {
+            Ok(evt_sender
+                .query_peer_density(h_space, space, dht_arc)
+                .await?)
+        }
+        .boxed()
+        .into())
+    }
+
     fn handle_put_metric_datum(
         &mut self,
         datum: MetricDatum,
@@ -805,13 +831,13 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
     }
 
     #[tracing::instrument(skip(self), level = "trace")]
-    fn handle_fetch_op_hashes_for_constraints(
+    fn handle_query_op_hashes(
         &mut self,
-        input: kitsune_p2p::event::FetchOpHashesForConstraintsEvt,
+        input: kitsune_p2p::event::QueryOpHashesEvt,
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<
         Option<(Vec<Arc<kitsune_p2p::KitsuneOpHash>>, TimeWindowMs)>,
     > {
-        let kitsune_p2p::event::FetchOpHashesForConstraintsEvt {
+        let kitsune_p2p::event::QueryOpHashesEvt {
             space,
             agents,
             window_ms: window,
@@ -827,7 +853,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
             Ok(evt_sender
-                .fetch_op_hashes_for_constraints(space, agents, window, max_ops, include_limbo)
+                .query_op_hashes(space, agents, window, max_ops, include_limbo)
                 .await?
                 .map(|(h, time)| (h.into_iter().map(|h| h.into_kitsune()).collect(), time)))
         }
@@ -837,13 +863,13 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
 
     #[allow(clippy::needless_collect)]
     #[tracing::instrument(skip(self), level = "trace")]
-    fn handle_fetch_op_hash_data(
+    fn handle_fetch_op_data(
         &mut self,
-        input: kitsune_p2p::event::FetchOpHashDataEvt,
+        input: kitsune_p2p::event::FetchOpDataEvt,
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<
         Vec<(Arc<kitsune_p2p::KitsuneOpHash>, Vec<u8>)>,
     > {
-        let kitsune_p2p::event::FetchOpHashDataEvt {
+        let kitsune_p2p::event::FetchOpDataEvt {
             space,
             agents,
             op_hashes,
@@ -861,7 +887,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             let mut out = vec![];
             for agent in agents {
                 for (op_hash, dht_op) in evt_sender
-                    .fetch_op_hash_data(space.clone(), agent.clone(), op_hashes.clone())
+                    .fetch_op_data(space.clone(), agent.clone(), op_hashes.clone())
                     .await?
                 {
                     out.push((
@@ -1216,8 +1242,29 @@ impl HolochainP2pHandler for HolochainP2pActor {
         let space = dna_hash.into_kitsune();
 
         let kitsune_p2p = self.kitsune_p2p.clone();
-        Ok(async move { Ok(kitsune_p2p.new_integrated_data(space).await?) }
-            .boxed()
-            .into())
+        Ok(
+            async move { Ok(kitsune_p2p.new_integrated_data(space).await?) }
+                .boxed()
+                .into(),
+        )
+    }
+
+    #[tracing::instrument(skip(self), level = "trace")]
+    fn handle_authority_for_hash(
+        &mut self,
+        dna_hash: DnaHash,
+        agent: AgentPubKey,
+        dht_hash: AnyDhtHash,
+    ) -> HolochainP2pHandlerResult<bool> {
+        let space = dna_hash.into_kitsune();
+        let agent = agent.into_kitsune();
+        let basis = dht_hash.to_kitsune();
+
+        let kitsune_p2p = self.kitsune_p2p.clone();
+        Ok(
+            async move { Ok(kitsune_p2p.authority_for_hash(space, agent, basis).await?) }
+                .boxed()
+                .into(),
+        )
     }
 }

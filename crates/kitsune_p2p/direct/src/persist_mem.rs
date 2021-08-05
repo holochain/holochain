@@ -4,10 +4,11 @@ use crate::types::metric_store::KdMetricStore;
 use crate::types::persist::*;
 use crate::*;
 use futures::future::{BoxFuture, FutureExt};
-use kitsune_p2p::dht_arc::ArcInterval;
+use kitsune_p2p::dht_arc::DhtArcSet;
 use kitsune_p2p::event::MetricDatum;
 use kitsune_p2p::event::MetricQuery;
 use kitsune_p2p::event::MetricQueryAnswer;
+use kitsune_p2p::event::TimeWindowMs;
 use kitsune_p2p_types::tls::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use std::collections::hash_map::Entry;
@@ -387,6 +388,40 @@ impl AsKdPersist for PersistMem {
         .boxed()
     }
 
+    fn query_peer_density(
+        &self,
+        root: KdHash,
+        dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+    ) -> BoxFuture<'static, KdResult<kitsune_p2p_types::dht_arc::PeerDensity>> {
+        let store = self.0.share_mut(move |i, _| match i.agent_info.get(&root) {
+            Some(store) => Ok(store.clone()),
+            None => Err("root not found".into()),
+        });
+        async move {
+            let store = match store {
+                Err(_) => return Err("root not found".into()),
+                Ok(store) => store,
+            };
+            let arcs = store
+                .get_all()?
+                .into_iter()
+                .filter_map(|v| {
+                    if dht_arc.contains(v.agent().as_loc()) {
+                        Some(*v.storage_arc())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            // contains is already checked in the iterator
+            let bucket = kitsune_p2p::dht_arc::DhtArcBucket::new_unchecked(dht_arc, arcs);
+
+            Ok(bucket.density())
+        }
+        .boxed()
+    }
+
     fn put_metric_datum(&self, datum: MetricDatum) -> BoxFuture<'static, KdResult<()>> {
         let inner = self.0.clone();
         async move {
@@ -452,9 +487,8 @@ impl AsKdPersist for PersistMem {
         &self,
         root: KdHash,
         agent: KdHash,
-        _created_at_start_s: f32,
-        _created_at_end_s: f32,
-        _dht_arc: ArcInterval,
+        _window_ms: TimeWindowMs,
+        _dht_arc: DhtArcSet,
     ) -> BoxFuture<'static, KdResult<Vec<KdEntrySigned>>> {
         // TODO - actually filter
 

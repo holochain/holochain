@@ -495,6 +495,14 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
             .query_agent_info_signed_near_basis(space, basis_loc, limit))
     }
 
+    fn handle_query_peer_density(
+        &mut self,
+        space: Arc<KitsuneSpace>,
+        dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+    ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht_arc::PeerDensity> {
+        Ok(self.evt_sender.query_peer_density(space, dht_arc))
+    }
+
     fn handle_put_metric_datum(&mut self, datum: MetricDatum) -> KitsuneP2pEventHandlerResult<()> {
         Ok(self.evt_sender.put_metric_datum(datum))
     }
@@ -535,18 +543,18 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
         Ok(self.evt_sender.gossip(space, to_agent, ops))
     }
 
-    fn handle_fetch_op_hash_data(
+    fn handle_fetch_op_data(
         &mut self,
-        input: FetchOpHashDataEvt,
+        input: FetchOpDataEvt,
     ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> {
-        Ok(self.evt_sender.fetch_op_hash_data(input))
+        Ok(self.evt_sender.fetch_op_data(input))
     }
 
-    fn handle_fetch_op_hashes_for_constraints(
+    fn handle_query_op_hashes(
         &mut self,
-        input: FetchOpHashesForConstraintsEvt,
+        input: QueryOpHashesEvt,
     ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowMs)>> {
-        Ok(self.evt_sender.fetch_op_hashes_for_constraints(input))
+        Ok(self.evt_sender.query_op_hashes(input))
     }
 
     fn handle_sign_network_data(
@@ -672,7 +680,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         .boxed()
         .into())
     }
-    
+
     fn handle_new_integrated_data(
         &mut self,
         space: Arc<KitsuneSpace>,
@@ -685,6 +693,24 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
             let (space_sender, _) = space_sender.await;
             space_sender.new_integrated_data(space).await?;
             Ok(())
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_authority_for_hash(
+        &mut self,
+        space: Arc<KitsuneSpace>,
+        agent: Arc<KitsuneAgent>,
+        basis: Arc<KitsuneBasis>,
+    ) -> KitsuneP2pHandlerResult<bool> {
+        let space_sender = match self.spaces.get_mut(&space) {
+            None => return Err(KitsuneP2pError::RoutingSpaceError(space)),
+            Some(space) => space.get(),
+        };
+        Ok(async move {
+            let (space_sender, _) = space_sender.await;
+            space_sender.authority_for_hash(space, agent, basis).await
         }
         .boxed()
         .into())
@@ -736,6 +762,12 @@ mockall::mock! {
             query: MetricQuery,
         ) -> KitsuneP2pEventHandlerResult<MetricQueryAnswer>;
 
+        fn handle_query_peer_density(
+            &mut self,
+            space: Arc<KitsuneSpace>,
+            dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+        ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht_arc::PeerDensity>;
+
         fn handle_call(
             &mut self,
             space: Arc<KitsuneSpace>,
@@ -759,14 +791,14 @@ mockall::mock! {
             ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
         ) -> KitsuneP2pEventHandlerResult<()>;
 
-        fn handle_fetch_op_hashes_for_constraints(
+        fn handle_query_op_hashes(
             &mut self,
-            input: FetchOpHashesForConstraintsEvt,
+            input: QueryOpHashesEvt,
         ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowMs)>>;
 
-        fn handle_fetch_op_hash_data(
+        fn handle_fetch_op_data(
             &mut self,
-            input: FetchOpHashDataEvt,
+            input: FetchOpDataEvt,
         ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> ;
 
         fn handle_sign_network_data(

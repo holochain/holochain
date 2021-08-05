@@ -8,7 +8,7 @@ use std::{collections::HashSet, sync::Arc, time::SystemTime};
 /// Also get the start and end times for ops within a time window
 /// up to a maximum number.
 #[derive(Debug)]
-pub struct FetchOpHashesForConstraintsEvt {
+pub struct QueryOpHashesEvt {
     /// The "space" context.
     pub space: KSpace,
     /// The agents from which to fetch, along with a DhtArcSet to filter by.
@@ -23,7 +23,7 @@ pub struct FetchOpHashesForConstraintsEvt {
 
 /// Gather all op-hash data for a list of op-hashes from our implementor.
 #[derive(Debug)]
-pub struct FetchOpHashDataEvt {
+pub struct FetchOpDataEvt {
     /// The "space" context.
     pub space: KSpace,
     /// The "agent" context.
@@ -190,6 +190,9 @@ ghost_actor::ghost_chan! {
         /// query agent info in order of closeness to a basis location.
         fn query_agent_info_signed_near_basis(space: KSpace, basis_loc: u32, limit: u32) -> Vec<crate::types::agent_store::AgentInfoSigned>;
 
+        /// Query the peer density of a space for a given [`DhtArc`].
+        fn query_peer_density(space: KSpace, dht_arc: kitsune_p2p_types::dht_arc::DhtArc) -> kitsune_p2p_types::dht_arc::PeerDensity;
+
         /// Record a metric datum about an agent.
         fn put_metric_datum(datum: MetricDatum) -> ();
 
@@ -208,10 +211,10 @@ ghost_actor::ghost_chan! {
         /// Gather a list of op-hashes from our implementor that meet criteria.
         /// Get the oldest and newest times for ops within a time window and max number of ops.
         // maackle: do we really need to *individually* wrap all these op hashes in Arcs?
-        fn fetch_op_hashes_for_constraints(input: FetchOpHashesForConstraintsEvt) -> Option<(Vec<KOpHash>, TimeWindowMs)>;
+        fn query_op_hashes(input: QueryOpHashesEvt) -> Option<(Vec<KOpHash>, TimeWindowMs)>;
 
         /// Gather all op-hash data for a list of op-hashes from our implementor.
-        fn fetch_op_hash_data(input: FetchOpHashDataEvt) -> Vec<(KOpHash, Vec<u8>)>;
+        fn fetch_op_data(input: FetchOpDataEvt) -> Vec<(KOpHash, Vec<u8>)>;
 
         /// Request that our implementor sign some data on behalf of an agent.
         fn sign_network_data(input: SignNetworkDataEvt) -> super::KitsuneSignature;

@@ -57,7 +57,7 @@ impl ShardedGossipLocal {
     ) -> KitsuneResult<Vec<TimedBloomFilter>> {
         let mut results = Vec::new();
         loop {
-            // Get the agents withing the arc set and filter by local.
+            // Get the local agents within the arc set.
             let local_agents_within_arc_set: Vec<_> =
                 store::agents_within_arcset(&self.evt_sender, &self.space, common_arc_set.clone())
                     .await?
@@ -110,6 +110,8 @@ impl ShardedGossipLocal {
             {
                 let bloom = TimedBloomFilter {
                     bloom: Some(bloom),
+                    // the `time_window.end` is exclusive, but has already been incremented
+                    // to account for this
                     time: search_time_window.start..found_time_window.end,
                 };
                 // Adjust the search window to search the remaining time window.
@@ -130,12 +132,12 @@ impl ShardedGossipLocal {
     }
 
     /// Check a bloom filter for missing ops.
-    /// - For each local agent that is within the common arc set.
-    /// - Get all ops that are within the common arc set and missing from the filter.
+    /// - For each local agent that is within the common arc set,
+    ///   get all ops that are within the common arc set and missing from the filter.
     /// - There is a 1% chance of false positives.
-    /// - The performance of this function is dependent of the number of ops that fit the
-    /// above criteria and the number of local agents.
-    /// The worst case is maximum amount of ops that could be created for the time period.
+    /// - The performance of this function is dependent on the number of ops that fit the
+    ///   above criteria and the number of local agents.
+    /// - The worst case is maximum amount of ops that could be created for the time period.
     /// - The expected performance per op is average 10ms and worst 100 ms.
     pub(super) async fn check_ops_bloom(
         &self,
@@ -173,7 +175,7 @@ impl ShardedGossipLocal {
                 .collect();
             let missing_ops = self
                 .evt_sender
-                .fetch_op_hash_data(FetchOpHashDataEvt {
+                .fetch_op_data(FetchOpDataEvt {
                     space: self.space.clone(),
                     agents,
                     op_hashes: missing_hashes,

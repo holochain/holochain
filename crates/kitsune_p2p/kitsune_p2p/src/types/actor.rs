@@ -105,5 +105,12 @@ ghost_actor::ghost_chan! {
 
         /// New integrated data.
         fn new_integrated_data(space: KSpace) -> ();
+
+        /// Check if an agent is an authority for a hash.
+        fn authority_for_hash(
+            space: KSpace,
+            agent: KAgent,
+            basis: KBasis,
+        ) -> bool;
     }
 }

@@ -405,7 +405,7 @@ async fn data_map_get(
     // next, check locally
     let mut op = match bloom
         .evt_sender
-        .fetch_op_hash_data(FetchOpHashDataEvt {
+        .fetch_op_data(FetchOpDataEvt {
             space,
             agents: vec![agent],
             op_hashes: vec![op_key],

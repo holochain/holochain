@@ -24,7 +24,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
-use self::bandwidth::Bandwidth;
+use self::bandwidth::BandwidthThrottle;
 use self::state_map::RoundStateMap;
 
 use super::simple_bloom::{HowToConnect, MetaOpKey};
@@ -84,7 +84,7 @@ pub struct ShardedGossip {
     /// The internal mutable state
     inner: Share<ShardedGossipState>,
     /// Bandwidth for incoming and outgoing gossip.
-    bandwidth: Bandwidth,
+    bandwidth: BandwidthThrottle,
 }
 
 impl ShardedGossip {
@@ -98,11 +98,11 @@ impl ShardedGossip {
     ) -> Arc<Self> {
         let mut inner = ShardedGossipLocalState::default();
         let bandwidth = match gossip_type {
-            GossipType::Recent => Bandwidth::new(
+            GossipType::Recent => BandwidthThrottle::new(
                 tuning_params.gossip_inbound_target_mbps,
                 tuning_params.gossip_outbound_target_mbps,
             ),
-            GossipType::Historical => Bandwidth::new(
+            GossipType::Historical => BandwidthThrottle::new(
                 tuning_params.gossip_historic_inbound_target_mbps,
                 tuning_params.gossip_historic_outbound_target_mbps,
             ),
@@ -635,7 +635,7 @@ impl ShardedGossipLocal {
     }
 
     /// Find a remote endpoint from agents within arc set.
-    async fn find_remote_agent_within_arc(
+    async fn find_remote_agent_within_arcset(
         &self,
         arc_set: Arc<DhtArcSet>,
         local_agents: &HashSet<Arc<KitsuneAgent>>,
@@ -957,9 +957,6 @@ kitsune_p2p_types::write_codec_enum! {
         },
 
         /// The node you are trying to gossip with has no agents anymore.
-        // maackle: perhaps this should be a flag on the Agents (bloom) message,
-        //          since it would still be useful to gossip peer data.
-        // FS: No this literally means there's no local agents to gossip with.
         NoAgents(0x80) {
         },
 
