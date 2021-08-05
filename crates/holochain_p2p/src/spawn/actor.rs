@@ -1238,6 +1238,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         .into())
     }
 
+    #[tracing::instrument(skip(self), level = "trace")]
     fn handle_new_integrated_data(&mut self, dna_hash: DnaHash) -> HolochainP2pHandlerResult<()> {
         let space = dna_hash.into_kitsune();
 

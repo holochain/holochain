@@ -47,6 +47,7 @@ impl GossipModule {
         self.0.local_agent_leave(a);
     }
 
+    /// New data has been integrated and is ready for gossiping.
     pub fn new_integrated_data(&self) {
         self.0.new_integrated_data();
     }

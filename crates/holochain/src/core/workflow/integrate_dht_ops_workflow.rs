@@ -47,6 +47,7 @@ pub async fn integrate_dht_ops_workflow(
         .await?;
     tracing::debug!(?changed);
     if changed > 0 {
+        // FIXME: Is this right?
         trigger_sys.trigger();
         trigger_receipt.trigger();
         cell_network.new_integrated_data().await?;

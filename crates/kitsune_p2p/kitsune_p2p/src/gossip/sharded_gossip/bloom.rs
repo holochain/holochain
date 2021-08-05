@@ -82,6 +82,7 @@ impl ShardedGossipLocal {
                 Some(r) => r,
                 None => {
                     if !local_agents_within_arc_set.is_empty() {
+                        // We have local agents within the arc but no hashes.
                         let bloom = TimedBloomFilter {
                             bloom: None,
                             time: search_time_window,
@@ -156,6 +157,8 @@ impl ShardedGossipLocal {
             local_agents_within_arc_set.as_slice(),
             &common_arc_set,
             time,
+            // TOOD: This means we will pull all hashes we have for this
+            // time window into memory. Is that ok?
             usize::MAX,
             false,
         )
@@ -166,6 +169,7 @@ impl ShardedGossipLocal {
                     .into_iter()
                     .filter(|hash| !remote_bloom.check(&Arc::new(MetaOpKey::Op(hash.clone()))))
                     .collect(),
+                // No remote bloom so they are missing everything.
                 None => hashes,
             };
             let agents = local_agents_within_arc_set

@@ -103,7 +103,7 @@ ghost_actor::ghost_chan! {
             payload: Payload
         ) -> ();
 
-        /// New integrated data.
+        /// New data has been integrated and is ready for gossiping.
         fn new_integrated_data(space: KSpace) -> ();
 
         /// Check if an agent is an authority for a hash.

@@ -165,7 +165,7 @@ impl ShardedGossipLocal {
                 )
                 .await?;
 
-            // If no blooms were found for this time window then return an empty bloom.
+            // If no blooms were found for this time window then return a no overlap.
             if blooms.is_empty() {
                 // Check if this is the final time window.
                 if i == len - 1 {
@@ -187,6 +187,7 @@ impl ShardedGossipLocal {
             for (j, bloom) in blooms.into_iter().enumerate() {
                 let time_window = bloom.time;
                 let bloom = match bloom.bloom {
+                    // We have some hashes so request all missing from the bloom.
                     Some(bloom) => {
                         let bytes = encode_bloom_filter(&bloom);
                         EncodedTimedBloomFilter::HaveHashes {
@@ -194,6 +195,8 @@ impl ShardedGossipLocal {
                             time_window,
                         }
                     }
+                    // We have no hashes for this time window but we do have agents
+                    // that hold the arc so request all the ops the remote holds.
                     None => EncodedTimedBloomFilter::MissingAllHashes { time_window },
                 };
                 state.increment_sent_ops_blooms();

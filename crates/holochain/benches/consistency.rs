@@ -99,7 +99,6 @@ impl Producer {
     async fn run(&mut self) {
         while let Some(mut i) = self.rx.recv().await {
             i += 1;
-            eprintln!("committing {}", i);
             let _: EntryHash = self
                 .conductor
                 .call(
@@ -132,7 +131,6 @@ impl Consumer {
     async fn run(&mut self, cells: &[SweetCell]) {
         let start = std::time::Instant::now();
         let mut num = self.last;
-        eprintln!("listing {}/{}", num, self.last);
         while num <= self.last {
             let hashes: EntryHashes = self
                 .conductor
@@ -189,7 +187,6 @@ async fn setup() -> (Producer, Consumer, Others) {
         }
     };
     let configs = vec![config(), config(), config(), config(), config()];
-    // let configs = vec![config(), config()];
     let mut conductors = SweetConductorBatch::from_configs(configs.clone()).await;
     for c in conductors.iter() {
         c.set_skip_publish(true);

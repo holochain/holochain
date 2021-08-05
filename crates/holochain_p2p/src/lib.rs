@@ -112,7 +112,7 @@ pub trait HolochainP2pCellT {
         dht_hash: holo_hash::AnyDhtHash,
     ) -> actor::HolochainP2pResult<bool>;
 
-    /// There is new integrated data.
+    /// New data has been integrated and is ready for gossiping.
     async fn new_integrated_data(&self) -> actor::HolochainP2pResult<()>;
 }
 
