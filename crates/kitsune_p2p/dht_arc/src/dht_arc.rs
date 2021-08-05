@@ -53,12 +53,12 @@ impl DhtLocation {
     }
 }
 
-// #[cfg(any(test, feature = "test_utils"))]
-// impl From<i32> for DhtLocation {
-//     fn from(i: i32) -> Self {
-//         (i as u32).into()
-//     }
-// }
+#[cfg(any(test, feature = "test_utils"))]
+impl From<i32> for DhtLocation {
+    fn from(i: i32) -> Self {
+        (i as u32).into()
+    }
+}
 
 #[cfg(feature = "sqlite")]
 impl rusqlite::ToSql for DhtLocation {
