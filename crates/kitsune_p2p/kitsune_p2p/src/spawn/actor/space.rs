@@ -793,10 +793,10 @@ impl Space {
                         GossipModuleType::ShardedRecent,
                         crate::gossip::sharded_gossip::recent_factory(),
                     ),
-                    // (
-                    //     GossipModuleType::ShardedHistorical,
-                    //     crate::gossip::sharded_gossip::historical_factory(),
-                    // ),
+                    (
+                        GossipModuleType::ShardedHistorical,
+                        crate::gossip::sharded_gossip::historical_factory(),
+                    ),
                 ],
                 _ => {
                     panic!("unknown gossip strategy: {}", module);
