@@ -782,11 +782,7 @@ impl ShardedGossipLocal {
             }
         };
 
-        if self.inner.share_mut(update_last_sync)? {
-            Ok(true)
-        } else {
-            Ok(false)
-        }
+        self.inner.share_mut(update_last_sync)
     }
 
     /// Record all timed out rounds into metrics
