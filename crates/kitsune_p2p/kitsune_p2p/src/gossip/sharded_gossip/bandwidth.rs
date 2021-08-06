@@ -4,10 +4,45 @@ use governor::Quota;
 
 use super::*;
 
+#[derive(Clone)]
+/// Set of bandwidth throttles for all gossip loops.
+pub struct BandwidthThrottles {
+    recent: Arc<BandwidthThrottle>,
+    historic: Arc<BandwidthThrottle>,
+}
+
+impl BandwidthThrottles {
+    /// Create a new set of throttles from the configuration.
+    pub fn new(tuning_params: &KitsuneP2pTuningParams) -> Self {
+        let recent = BandwidthThrottle::new(
+            tuning_params.gossip_inbound_target_mbps,
+            tuning_params.gossip_outbound_target_mbps,
+        );
+        let historic = BandwidthThrottle::new(
+            tuning_params.gossip_historic_inbound_target_mbps,
+            tuning_params.gossip_historic_outbound_target_mbps,
+        );
+        Self {
+            recent: Arc::new(recent),
+            historic: Arc::new(historic),
+        }
+    }
+
+    /// Get the throttle for the recent loop.
+    pub fn recent(&self) -> Arc<BandwidthThrottle> {
+        self.recent.clone()
+    }
+
+    /// Get the throttle for the historical loop.
+    pub fn historical(&self) -> Arc<BandwidthThrottle> {
+        self.historic.clone()
+    }
+}
+
 /// Manages incoming and outgoing bandwidth by providing methods which
 /// asynchronously wait for enough bandwidth to become available before
 /// processing a chunk of bytes
-pub(super) struct BandwidthThrottle {
+pub struct BandwidthThrottle {
     inbound: Option<RateLimiter<NotKeyed, InMemoryState, DefaultClock>>,
     outbound: Option<RateLimiter<NotKeyed, InMemoryState, DefaultClock>>,
 }
