@@ -80,7 +80,17 @@ impl ShardedGossipLocal {
             // If there are none then don't create a bloom.
             let (ops_within_common_arc, found_time_window) = match result {
                 Some(r) => r,
-                None => break,
+                None => {
+                    if !local_agents_within_arc_set.is_empty() {
+                        // We have local agents within the arc but no hashes.
+                        let bloom = TimedBloomFilter {
+                            bloom: None,
+                            time: search_time_window,
+                        };
+                        results.push(bloom);
+                    }
+                    break;
+                }
             };
 
             let num_found = ops_within_common_arc.len();
@@ -95,21 +105,24 @@ impl ShardedGossipLocal {
 
             // If we found the maximum number of ops we can then
             // there might still be more ops in the search window.
+            // TODO: Not sure this is correct?
             if num_found >= Self::UPPER_HASHES_BOUND
-                && found_time_window.end < search_time_window.end
+                && found_time_window.end <= search_time_window.end
             {
                 let bloom = TimedBloomFilter {
-                    bloom,
+                    bloom: Some(bloom),
                     // the `time_window.end` is exclusive, but has already been incremented
                     // to account for this
                     time: search_time_window.start..found_time_window.end,
                 };
                 // Adjust the search window to search the remaining time window.
-                search_time_window = found_time_window.end..search_time_window.end;
+                // Include the end of the last time bound.
+                search_time_window =
+                    found_time_window.end.saturating_sub(1)..search_time_window.end;
                 results.push(bloom);
             } else {
                 let bloom = TimedBloomFilter {
-                    bloom,
+                    bloom: Some(bloom),
                     time: search_time_window,
                 };
                 results.push(bloom);
@@ -132,7 +145,6 @@ impl ShardedGossipLocal {
         local_agents_within_arc_set: Vec<(Arc<KitsuneAgent>, ArcInterval)>,
         state: RoundState,
         remote_bloom: TimedBloomFilter,
-        max_ops: usize,
     ) -> KitsuneResult<HashMap<Arc<KitsuneOpHash>, Vec<u8>>> {
         let RoundState { common_arc_set, .. } = state;
         let TimedBloomFilter {
@@ -145,15 +157,21 @@ impl ShardedGossipLocal {
             local_agents_within_arc_set.as_slice(),
             &common_arc_set,
             time,
-            max_ops,
+            // TOOD: This means we will pull all hashes we have for this
+            // time window into memory. Is that ok?
+            usize::MAX,
             false,
         )
         .await?
         {
-            let missing_hashes: Vec<_> = hashes
-                .into_iter()
-                .filter(|hash| !remote_bloom.check(&Arc::new(MetaOpKey::Op(hash.clone()))))
-                .collect();
+            let missing_hashes: Vec<_> = match remote_bloom {
+                Some(remote_bloom) => hashes
+                    .into_iter()
+                    .filter(|hash| !remote_bloom.check(&Arc::new(MetaOpKey::Op(hash.clone()))))
+                    .collect(),
+                // No remote bloom so they are missing everything.
+                None => hashes,
+            };
             let agents = local_agents_within_arc_set
                 .iter()
                 .map(|(a, _)| a)

@@ -56,7 +56,7 @@ impl ShardedGossipLocal {
         &self,
         peer_cert: Tx2Cert,
         remote_arc_set: Vec<ArcInterval>,
-        remote_id: u8,
+        remote_id: u32,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let (local_agents, same_as_target, already_in_progress) =
             self.inner.share_mut(|i, _| {
@@ -165,13 +165,19 @@ impl ShardedGossipLocal {
                 )
                 .await?;
 
-            // If no blooms were found for this time window then return an empty bloom.
+            // If no blooms were found for this time window then return a no overlap.
             if blooms.is_empty() {
                 // Check if this is the final time window.
                 if i == len - 1 {
-                    gossip.push(ShardedGossipWire::ops(None, true));
+                    gossip.push(ShardedGossipWire::ops(
+                        EncodedTimedBloomFilter::NoOverlap,
+                        true,
+                    ));
                 } else {
-                    gossip.push(ShardedGossipWire::ops(None, false));
+                    gossip.push(ShardedGossipWire::ops(
+                        EncodedTimedBloomFilter::NoOverlap,
+                        false,
+                    ));
                 }
             }
 
@@ -179,15 +185,27 @@ impl ShardedGossipLocal {
 
             // Encode each bloom found for this time window.
             for (j, bloom) in blooms.into_iter().enumerate() {
-                let range = bloom.time;
-                let bloom = encode_bloom_filter(&bloom.bloom);
+                let time_window = bloom.time;
+                let bloom = match bloom.bloom {
+                    // We have some hashes so request all missing from the bloom.
+                    Some(bloom) => {
+                        let bytes = encode_bloom_filter(&bloom);
+                        EncodedTimedBloomFilter::HaveHashes {
+                            filter: bytes,
+                            time_window,
+                        }
+                    }
+                    // We have no hashes for this time window but we do have agents
+                    // that hold the arc so request all the ops the remote holds.
+                    None => EncodedTimedBloomFilter::MissingAllHashes { time_window },
+                };
                 state.increment_sent_ops_blooms();
 
                 // Check if this is the final time window and the final bloom for this window.
                 if i == len - 1 && j == inner_len - 1 {
-                    gossip.push(ShardedGossipWire::ops(Some((bloom, range)), true));
+                    gossip.push(ShardedGossipWire::ops(bloom, true));
                 } else {
-                    gossip.push(ShardedGossipWire::ops(Some((bloom, range)), false));
+                    gossip.push(ShardedGossipWire::ops(bloom, false));
                 }
             }
         }

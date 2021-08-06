@@ -721,6 +721,13 @@ impl KitsuneP2pHandler for Space {
         .into())
     }
 
+    fn handle_new_integrated_data(&mut self, _: KSpace) -> InternalHandlerResult<()> {
+        for module in self.gossip_mod.values() {
+            module.new_integrated_data();
+        }
+        unit_ok_fut()
+    }
+
     fn handle_authority_for_hash(
         &mut self,
         _space: Arc<KitsuneSpace>,
