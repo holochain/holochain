@@ -135,7 +135,6 @@ pub mod wasm_test {
     use hdk::prelude::*;
     use holo_hash::AnyDhtHash;
     use holo_hash::EntryHash;
-    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_state::source_chain::SourceChainResult;
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
@@ -147,22 +146,14 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     /// we can get an entry hash out of the fn directly
     async fn create_entry_test<'a>() {
-        // test workspace boilerplate
-        let test_env = holochain_state::test_utils::test_cell_env();
-        let test_cache = holochain_state::test_utils::test_cache_env();
-        let env = test_env.env();
-        let author = fake_agent_pubkey_1();
-        crate::test_utils::fake_genesis(env.clone()).await.unwrap();
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
-
         let ribosome =
             RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Create]))
                 .next()
                 .unwrap();
         let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
         call_context.zome = TestWasm::Create.into();
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace.clone();
+        let host_access = fixt!(ZomeCallHostAccess, Predictable);
+        let host_access_2 = host_access.clone();
         call_context.host_context = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::App("post".into());
@@ -172,7 +163,7 @@ pub mod wasm_test {
 
         // the chain head should be the committed entry header
         let chain_head = tokio_helper::block_forever_on(async move {
-            SourceChainResult::Ok(workspace.source_chain().chain_head()?.0)
+            SourceChainResult::Ok(host_access_2.workspace.source_chain().chain_head()?.0)
         })
         .unwrap();
 
@@ -182,23 +173,16 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_create_entry_test<'a>() {
         observability::test_run().ok();
-        // test workspace boilerplate
-        let test_env = holochain_state::test_utils::test_cell_env();
-        let test_cache = holochain_state::test_utils::test_cache_env();
-        let env = test_env.env();
-        let author = fake_agent_pubkey_1();
-        crate::test_utils::fake_genesis(env.clone()).await.unwrap();
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace.clone();
+        let host_access = fixt!(ZomeCallHostAccess, Predictable);
 
         // get the result of a commit entry
         let output: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::Create, "create_entry", ()).unwrap();
 
         // the chain head should be the committed entry header
+        let host_access_2 = host_access.clone();
         let chain_head = tokio_helper::block_forever_on(async move {
-            SourceChainResult::Ok(workspace.source_chain().chain_head()?.0)
+            SourceChainResult::Ok(host_access_2.workspace.source_chain().chain_head()?.0)
         })
         .unwrap();
 

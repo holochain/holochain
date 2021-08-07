@@ -736,7 +736,7 @@ async fn _put_db<H: HeaderInner, B: HeaderBuilder<H>>(
     header_builder: B,
     maybe_entry: Option<Entry>,
 ) -> SourceChainResult<HeaderHash> {
-    let (prev_header, last_header_seq) =
+    let (prev_header, last_header_seq, _) =
         fresh_reader!(vault, |txn| { chain_head_db(&txn, author.clone()) })?;
     let header_seq = last_header_seq + 1;
 
@@ -755,7 +755,7 @@ async fn _put_db<H: HeaderInner, B: HeaderBuilder<H>>(
     let entry = entry.into_option();
     let hash = header.as_hash().clone();
     vault.conn()?.with_commit_sync(|txn| {
-        let (new_head, _) = chain_head_db(txn, author.clone())?;
+        let (new_head, _, _) = chain_head_db(txn, author.clone())?;
         if new_head != prev_header {
             return Err(SourceChainError::HeadMoved(
                 Some(prev_header),

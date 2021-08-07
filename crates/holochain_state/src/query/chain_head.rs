@@ -170,7 +170,8 @@ mod tests {
             head.unwrap(),
             (
                 expected_head.as_hash().clone(),
-                expected_head.header().header_seq()
+                expected_head.header().header_seq(),
+                expected_head.header().timestamp()
             )
         );
     }
