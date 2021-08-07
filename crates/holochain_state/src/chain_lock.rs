@@ -2,6 +2,9 @@ use crate::prelude::StateMutationResult;
 use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::{named_params, Transaction};
 
+/// True if the chain is currently locked for the given lock id.
+/// The chain is never locked for the id that created it.
+/// The chain is always locked for all other ids until the lock end time is in the past.
 pub fn is_chain_locked(txn: &mut Transaction, lock: &[u8]) -> StateMutationResult<bool> {
     match txn
         .query_row(

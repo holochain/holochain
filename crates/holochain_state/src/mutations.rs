@@ -553,6 +553,14 @@ pub fn insert_entry(txn: &mut Transaction, entry: EntryHashed) -> StateMutationR
     Ok(())
 }
 
+/// Lock the chain with the given lock id until the given end time.
+/// During this time only the lock id will be unlocked according to `is_chain_locked`.
+/// The chain can be unlocked for all lock ids at any time by calling `unlock_chain`.
+/// In theory there can be multiple locks active at once.
+/// If there are multiple locks active at once effectively all locks are locked
+/// because the chain is locked if there are ANY locks that don't match the
+/// current id being queried.
+/// In practise this is useless so don't do that. One lock at a time please.
 pub fn lock_chain(txn: &mut Transaction, lock: &[u8], end: &Timestamp) -> StateMutationResult<()> {
     sql_insert!(txn, ChainLock, {
         "lock": lock,
@@ -561,6 +569,9 @@ pub fn lock_chain(txn: &mut Transaction, lock: &[u8], end: &Timestamp) -> StateM
     Ok(())
 }
 
+/// Unlock the chain by dropping all records in the lock table.
+/// This should be done very carefully as it can e.g. invalidate a shared
+/// countersigning session that is inflight.
 pub fn unlock_chain(txn: &mut Transaction) -> StateMutationResult<()> {
     txn.execute("DELETE FROM ChainLock", [])?;
     Ok(())
