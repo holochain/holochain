@@ -15,7 +15,7 @@ pub mod test {
         mock_hdk.expect_sys_time()
             .with(hdk::prelude::mockall::predicate::eq(()))
             .times(1)
-            .return_once(|_| Ok(core::time::Duration::new(5, 0)));
+            .return_once(|_| Ok(Timestamp(5, 0)));
 
         hdk::prelude::set_hdk(mock_hdk);
 
@@ -24,7 +24,7 @@ pub mod test {
         assert_eq!(
             result,
             Ok(
-                core::time::Duration::new(5, 0)
+                Timestamp(5, 0)
             )
         )
     }
