@@ -3,7 +3,6 @@ use holo_hash::DnaHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
 use holochain_sqlite::rusqlite::Transaction;
-use holochain_types::Timestamp;
 use holochain_types::dht_op::produce_op_lights_from_elements;
 use holochain_types::dht_op::produce_op_lights_from_iter;
 use holochain_types::dht_op::DhtOpLight;
@@ -14,6 +13,7 @@ use holochain_types::element::SignedHeaderHashedExt;
 use holochain_types::env::EnvRead;
 use holochain_types::env::EnvWrite;
 use holochain_types::timestamp;
+use holochain_types::Timestamp;
 use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::header;
 use holochain_zome_types::CapAccess;
@@ -124,8 +124,13 @@ impl SourceChain {
         // Check scratch for newer head.
         Ok(self.scratch.apply(|scratch| {
             let chain_head = chain_head_scratch(&(*scratch), self.author.as_ref());
-            let (prev_header, header_seq, timestamp) =
-                chain_head.unwrap_or_else(|| (self.persisted_head.clone(), self.persisted_seq, self.persisted_timestamp));
+            let (prev_header, header_seq, timestamp) = chain_head.unwrap_or_else(|| {
+                (
+                    self.persisted_head.clone(),
+                    self.persisted_seq,
+                    self.persisted_timestamp,
+                )
+            });
             (prev_header, header_seq, timestamp)
         })?)
     }
@@ -187,7 +192,8 @@ impl SourceChain {
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> SourceChainResult<u32> {
         Ok(self.scratch.apply(|scratch| {
-            let scratch_max = chain_head_scratch(&(*scratch), self.author.as_ref()).map(|(_, s, _)| s);
+            let scratch_max =
+                chain_head_scratch(&(*scratch), self.author.as_ref()).map(|(_, s, _)| s);
             scratch_max
                 .map(|s| std::cmp::max(s, self.persisted_seq))
                 .unwrap_or(self.persisted_seq)
@@ -544,7 +550,7 @@ impl SourceChain {
                 // locked then either the session expired or the countersigning
                 // entry being committed now is the correct one for the lock,
                 // in either case we should unlock the chain.
-                else if lock.len() > 0 {
+                else if !lock.is_empty() {
                     unlock_chain(txn)?;
                 }
 
@@ -703,12 +709,19 @@ fn chain_head_db(
     Ok((prev_header, last_header_seq, last_header_timestamp))
 }
 
-fn chain_head_scratch(scratch: &Scratch, author: &AgentPubKey) -> Option<(HeaderHash, u32, Timestamp)> {
+fn chain_head_scratch(
+    scratch: &Scratch,
+    author: &AgentPubKey,
+) -> Option<(HeaderHash, u32, Timestamp)> {
     scratch
         .headers()
         .filter_map(|shh| {
             if shh.header().author() == author {
-                Some((shh.header_address().clone(), shh.header().header_seq(), shh.header().timestamp()))
+                Some((
+                    shh.header_address().clone(),
+                    shh.header().header_seq(),
+                    shh.header().timestamp(),
+                ))
             } else {
                 None
             }

@@ -80,12 +80,18 @@ pub mod wasm_test {
     use holochain_types::prelude::AgentPubKeyFixturator;
     use holochain_zome_types::prelude::*;
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_wasm_test_utils::TestWasm;
     use hdk::prelude::*;
-    use crate::core::ribosome::RibosomeError;
-    use crate::test_utils::conductor_setup::ConductorTestData;
     use crate::conductor::{api::ZomeCall};
+    use crate::sweettest::SweetDnaFile;
+    use crate::core::ribosome::MockDnaStore;
+    use crate::sweettest::SweetConductor;
+    use crate::conductor::ConductorBuilder;
+    use crate::conductor::api::error::ConductorApiError;
+    use crate::core::workflow::error::WorkflowError;
+    use holochain_state::source_chain::SourceChainError;
+    use crate::conductor::CellError;
+    use crate::core::ribosome::error::RibosomeError;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn new_preflight_request() {
@@ -125,215 +131,200 @@ pub mod wasm_test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn lock_chain_2() {
-        observability::test_run().ok();
-
-        let alice = fixt!(AgentPubKey, Predictable, 0);
-        let bob = fixt!(AgentPubKey, Predictable, 1);
-
-        dbg!("alice", &alice);
-        dbg!("bob", &bob);
-
-        let zomes = vec![TestWasm::CounterSigning];
-        let conductor = ConductorTestData::two_agents(zomes, true).await;
-        let alice_cell_id = conductor.alice_call_data().cell_id.clone();
-        let bob_cell_id = conductor.bob_call_data().unwrap().cell_id.clone();
-
-        let thing_create = conductor.handle().call_zome(ZomeCall {
-            cell_id: alice_cell_id.clone(),
-            zome_name: TestWasm::CounterSigning.into(),
-            cap: None,
-            fn_name: "create_a_thing".into(),
-            payload: ExternIO::encode(()).unwrap(),
-            provenance: alice_cell_id.agent_pubkey().clone(),
-        })
-        .await;
-        dbg!(&thing_create);
-
-        let preflight_request: PreflightRequest = if let ZomeCallResponse::Ok(response) = conductor.handle().call_zome(ZomeCall {
-            cell_id: alice_cell_id.clone(),
-            zome_name: TestWasm::CounterSigning.into(),
-            cap: None,
-            fn_name: "generate_countersigning_preflight_request".into(),
-            payload: ExternIO::encode(vec![(alice, vec![Role(0)]), (bob, vec![])]).unwrap(),
-            provenance: alice_cell_id.agent_pubkey().clone(),
-        })
-        .await.unwrap().unwrap() {
-            ExternIO::decode(&response).unwrap()
-        } else {
-            unreachable!();
-        };
-        dbg!(&preflight_request);
-
-        let thing_create_2 = conductor.handle().call_zome(ZomeCall {
-            cell_id: alice_cell_id.clone(),
-            zome_name: TestWasm::CounterSigning.into(),
-            cap: None,
-            fn_name: "create_a_thing".into(),
-            payload: ExternIO::encode(()).unwrap(),
-            provenance: alice_cell_id.agent_pubkey().clone(),
-        })
-        .await;
-        dbg!(&thing_create_2);
-
-        let alice_acceptance: PreflightRequestAcceptance = if let ZomeCallResponse::Ok(response) = conductor.handle().call_zome(ZomeCall {
-            cell_id: alice_cell_id.clone(),
-            zome_name: TestWasm::CounterSigning.into(),
-            cap: None,
-            fn_name: "accept_countersigning_preflight_request".into(),
-            payload: ExternIO::encode(preflight_request.clone()).unwrap(),
-            provenance: alice_cell_id.agent_pubkey().clone(),
-        }).await.unwrap().unwrap() {
-            ExternIO::decode(&response).unwrap()
-        } else {
-            unreachable!();
-        };
-        dbg!(&alice_acceptance);
-        let alice_response = match alice_acceptance {
-            PreflightRequestAcceptance::Accepted(response) => response,
-            _ => unreachable!(),
-        };
-
-        let bob_acceptance: PreflightRequestAcceptance = if let ZomeCallResponse::Ok(response) = conductor.handle().call_zome(ZomeCall {
-            cell_id: bob_cell_id.clone(),
-            zome_name: TestWasm::CounterSigning.into(),
-            cap: None,
-            fn_name: "accept_countersigning_preflight_request".into(),
-            payload: ExternIO::encode(preflight_request.clone()).unwrap(),
-            provenance: bob_cell_id.agent_pubkey().clone(),
-        }).await.unwrap().unwrap() {
-            ExternIO::decode(&response).unwrap()
-        } else {
-            unreachable!();
-        };
-        dbg!(&bob_acceptance);
-        let bob_response = match bob_acceptance {
-            PreflightRequestAcceptance::Accepted(response) => response,
-            _ => unreachable!(),
-        };
-
-        let thing_fail_create = conductor.handle().call_zome(ZomeCall {
-            cell_id: alice_cell_id.clone(),
-            zome_name: TestWasm::CounterSigning.into(),
-            cap: None,
-            fn_name: "create_a_thing".into(),
-            payload: ExternIO::encode(()).unwrap(),
-            provenance: alice_cell_id.agent_pubkey().clone()
-        }).await;
-        dbg!(&thing_fail_create);
-
-        let countersigned_thing: HeaderHash = if let ZomeCallResponse::Ok(response) = conductor.handle().call_zome(ZomeCall {
-            cell_id: alice_cell_id.clone(),
-            zome_name: TestWasm::CounterSigning.into(),
-            cap: None,
-            fn_name: "create_a_countersigned_thing".into(),
-            payload: ExternIO::encode(vec![alice_response, bob_response]).unwrap(),
-            provenance: alice_cell_id.agent_pubkey().clone()
-        }).await.unwrap().unwrap() {
-            ExternIO::decode(&response).unwrap()
-        } else {
-            unreachable!();
-        };
-        dbg!(&countersigned_thing);
-
-        let thing_create_3 = conductor.handle().call_zome(ZomeCall {
-            cell_id: alice_cell_id.clone(),
-            zome_name: TestWasm::CounterSigning.into(),
-            cap: None,
-            fn_name: "create_a_thing".into(),
-            payload: ExternIO::encode(()).unwrap(),
-            provenance: alice_cell_id.agent_pubkey().clone(),
-        })
-        .await.unwrap().unwrap();
-        dbg!(&thing_create_3);
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
     async fn lock_chain() {
-        let alice = fixt!(AgentPubKey, Predictable, 0);
-        let bob = fixt!(AgentPubKey, Predictable, 1);
+        observability::test_run().ok();
+        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning])
+            .await
+            .unwrap();
 
-        let alice_test_env = holochain_state::test_utils::test_cell_env();
-        let alice_test_cache = holochain_state::test_utils::test_cache_env();
-        let alice_env = alice_test_env.env();
+        let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
+        let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
 
-        // let bob_test_env = holochain_state::test_utils::test_cell_env_2();
-        // let bob_test_cache = holochain_state::test_utils::test_cache_env_2();
-        // let bob_env = bob_test_env.env();
+        let mut dna_store = MockDnaStore::new();
+        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
+        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
+        dna_store.expect_add_dna().return_const(());
+        dna_store.expect_get().return_const(Some(dna_file.clone().into()));
+        dna_store.expect_get_entry_def().return_const(EntryDef::default_with_id("thing"));
 
-        crate::test_utils::fake_genesis(alice_env.clone()).await.unwrap();
-        let alice_workspace = HostFnWorkspace::new(alice_env.clone(), alice_test_cache.env(), alice.clone()).await.unwrap();
-        let mut alice_host_access = fixt!(ZomeCallHostAccess, Predictable, 0);
-        alice_host_access.workspace = alice_workspace;
+        let mut conductor = SweetConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
 
-        // crate::test_utils::fake_genesis_for_agent(bob_env.clone(), bob.clone()).await.unwrap();
-        // let bob_workspace = HostFnWorkspace::new(bob_env.clone(), bob_test_cache.env(), bob.clone()).await.unwrap();
-        let bob_host_access = fixt!(ZomeCallHostAccess, Predictable, 1);
-        // bob_host_access.workspace = bob_workspace;
+        let apps = conductor
+            .setup_app_for_agents(
+                "app-",
+                &[alice_pubkey.clone(), bob_pubkey.clone()],
+                &[dna_file.into()],
+            )
+            .await
+            .unwrap();
 
-        let thing_create: HeaderHash = crate::call_test_ribosome!(
-            alice_host_access,
-            TestWasm::CounterSigning,
-            "create_a_thing",
-            ()
-        ).unwrap();
-        dbg!(&thing_create);
-        let preflight_request: PreflightRequest = crate::call_test_ribosome!(
-            alice_host_access,
-            TestWasm::CounterSigning,
-            "generate_countersigning_preflight_request",
-            vec![(alice, vec![Role(0)]), (bob, vec![])]
-        ).unwrap();
-        dbg!(&preflight_request);
+        let ((alice,), (bobbo,)) = apps.into_tuples();
+        let alice = alice.zome(TestWasm::CounterSigning);
+        let bobbo = bobbo.zome(TestWasm::CounterSigning);
 
-        let thing_create_2: HeaderHash = crate::call_test_ribosome!(
-            alice_host_access,
-            TestWasm::CounterSigning,
-            "create_a_thing",
-            ()
-        ).unwrap();
-        dbg!(&thing_create_2);
+        // Before the preflight creation of things should work.
+        let _: HeaderHash = conductor
+            .call(
+                &alice,
+                "create_a_thing",
+                (),
+            ).await;
 
-        let alice_acceptance: PreflightRequestAcceptance = crate::call_test_ribosome!(
-            alice_host_access,
-            TestWasm::CounterSigning,
-            "accept_countersigning_preflight_request",
-            preflight_request
-        ).unwrap();
-        dbg!(&alice_acceptance);
-        let alice_response = match alice_acceptance {
-            PreflightRequestAcceptance::Accepted(response) => response,
-            _ => unreachable!(),
+        // Alice can create multiple preflight requests.
+        let preflight_request: PreflightRequest = conductor
+            .call(
+                &alice,
+                "generate_countersigning_preflight_request",
+                vec![(alice_pubkey.clone(), vec![Role(0)]), (bob_pubkey.clone(), vec![])],
+            )
+            .await;
+        let preflight_request_2: PreflightRequest = conductor
+            .call(
+                &alice,
+                "generate_countersigning_preflight_request",
+                vec![(alice_pubkey.clone(), vec![Role(1)]), (bob_pubkey.clone(), vec![])],
+            )
+            .await;
+
+        // Alice can still create things before the preflight is accepted.
+        let _: HeaderHash = conductor
+            .call(
+                &alice,
+                "create_a_thing",
+                (),
+            ).await;
+
+        // Alice can accept the preflight request.
+        let alice_acceptance: PreflightRequestAcceptance = conductor
+            .call(
+                &alice,
+                "accept_countersigning_preflight_request",
+                preflight_request.clone(),
+            )
+            .await;
+        let alice_response = if let PreflightRequestAcceptance::Accepted(ref response) = alice_acceptance {
+            response
+        } else {
+            unreachable!();
         };
 
-        let bob_acceptance: PreflightRequestAcceptance = crate::call_test_ribosome!(
-            bob_host_access,
-            TestWasm::CounterSigning,
-            "accept_countersigning_preflight_request",
-            preflight_request
-        ).unwrap();
-        dbg!(&bob_acceptance);
-        let bob_response = match bob_acceptance {
-            PreflightRequestAcceptance::Accepted(response) => response,
-            _ => unreachable!(),
-        };
-
-        let thing_fail_create: Result<HeaderHash, RibosomeError> = crate::call_test_ribosome!(
-            alice_host_access,
-            TestWasm::CounterSigning,
-            "create_a_thing",
-            ()
+        // Can't accept a second preflight request while the first is active.
+        let preflight_acceptance_fail = conductor
+            .handle()
+            .call_zome(ZomeCall {
+                cell_id: alice.cell_id().clone(),
+                zome_name: alice.name().clone(),
+                fn_name: "accept_countersigning_preflight_request".into(),
+                cap: None,
+                provenance: alice_pubkey.clone(),
+                payload: ExternIO::encode(&preflight_request_2).unwrap(),
+            }).await;
+        assert!(
+            matches!(
+                preflight_acceptance_fail,
+                Ok(Err(RibosomeError::WasmError(WasmError::Host(_))))
+            )
         );
 
-        dbg!(&thing_fail_create);
+        // Bob can also accept the preflight request.
+        let bob_acceptance: PreflightRequestAcceptance = conductor
+            .call(
+                &bobbo,
+                "accept_countersigning_preflight_request",
+                preflight_request.clone(),
+            )
+            .await;
+        let bob_response = if let PreflightRequestAcceptance::Accepted(ref response) = bob_acceptance {
+            response
+        } else {
+            unreachable!();
+        };
 
-        let countersigned_thing: HeaderHash = crate::call_test_ribosome!(
-            alice_host_access,
-            TestWasm::CounterSigning,
-            "create_a_countersigned_thing",
-            vec![alice_response, bob_response]
-        ).unwrap();
-        dbg!(&countersigned_thing);
+        // With an accepted preflight creations must fail for alice.
+        let thing_fail_create_alice = conductor
+            .handle()
+            .call_zome(ZomeCall {
+                cell_id: alice.cell_id().clone(),
+                zome_name: alice.name().clone(),
+                fn_name: "create_a_thing".into(),
+                cap: None,
+                provenance: alice_pubkey.clone(),
+                payload: ExternIO::encode(()).unwrap(),
+            }).await;
+        match thing_fail_create_alice {
+            Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) => match *workflow_error {
+                WorkflowError::SourceChainError(SourceChainError::ChainLocked) => { },
+                _ => unreachable!(),
+            },
+            _ => unreachable!(),
+        };
 
+        let thing_fail_create_bob = conductor
+            .handle()
+            .call_zome(ZomeCall {
+                cell_id: bobbo.cell_id().clone(),
+                zome_name: bobbo.name().clone(),
+                fn_name: "create_a_thing".into(),
+                cap: None,
+                provenance: bob_pubkey.clone(),
+                payload: ExternIO::encode(()).unwrap(),
+            }).await;
+        match thing_fail_create_bob {
+            Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) => match *workflow_error {
+                WorkflowError::SourceChainError(SourceChainError::ChainLocked) => { },
+                _ => unreachable!(),
+            },
+            _ => unreachable!(),
+        };
+
+        // Creating the correct countersigned entry will unlock the chain.
+        let _: HeaderHash = conductor
+            .call(
+                &alice,
+                "create_a_countersigned_thing",
+                vec![alice_response.clone(), bob_response.clone()],
+            ).await;
+
+        let _: HeaderHash = conductor
+            .call(
+                &alice,
+                "create_a_thing",
+                (),
+            ).await;
+
+        // Creation will still fail for bob.
+        let thing_fail_create_bob = conductor
+            .handle()
+            .call_zome(ZomeCall {
+                cell_id: bobbo.cell_id().clone(),
+                zome_name: bobbo.name().clone(),
+                fn_name: "create_a_thing".into(),
+                cap: None,
+                provenance: bob_pubkey.clone(),
+                payload: ExternIO::encode(()).unwrap(),
+            }).await;
+        match thing_fail_create_bob {
+            Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) => match *workflow_error {
+                WorkflowError::SourceChainError(SourceChainError::ChainLocked) => { },
+                _ => unreachable!(),
+            },
+            _ => unreachable!(),
+        };
+
+        // After bob commits the same countersigned entry he can unlock his chain.
+        let _: HeaderHash = conductor
+            .call(
+                &bobbo,
+                "create_a_countersigned_thing",
+                vec![alice_response, bob_response],
+            ).await;
+
+        let _: HeaderHash = conductor
+            .call(
+                &bobbo,
+                "create_a_thing",
+                ()
+            ).await;
     }
+
 }
