@@ -214,7 +214,6 @@ pub fn check_countersigning_session_data_responses_indexes(
     } else {
         for (i, (response, _response_signature)) in session_data.responses().iter().enumerate() {
             if *response.agent_index() as usize != i {
-                dbg!(&session_data, &i, &response);
                 return Err(SysValidationError::ValidationOutcome(
                     ValidationOutcome::CounterSigningSessionResponsesOrder(
                         *response.agent_index(),

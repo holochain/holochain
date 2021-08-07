@@ -57,7 +57,6 @@ pub fn accept_countersigning_preflight_request<'a>(
                             .await {
                                 error!(?unlock_result);
                             }
-                        dbg!("foo", &e);
                         return Err(WasmError::Host(e.to_string()));
                     }
                 };
