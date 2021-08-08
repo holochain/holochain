@@ -7,6 +7,7 @@ fn sys_time(_: ()) -> ExternResult<Timestamp> {
 
 #[cfg(test)]
 pub mod test {
+    use hdk::prelude::*;
 
     #[test]
     fn sys_time_smoke() {
