@@ -24,7 +24,6 @@ async fn test_cell_handle_publish() {
     let cell_id = fake_cell_id(1);
     let dna = cell_id.dna_hash().clone();
     let agent = cell_id.agent_pubkey().clone();
-    dbg!(&agent);
 
     let test_network = test_network(Some(dna.clone()), Some(agent.clone())).await;
     let holochain_p2p_cell = test_network.cell_network();
