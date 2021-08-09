@@ -167,11 +167,30 @@ async fn invalid_cell() -> anyhow::Result<()> {
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
 async fn delete_link_multi() {
+    use std::sync::Arc;
+
     use holochain::test_utils::consistency_10s;
     use holochain_wasm_test_utils::TestWasm;
+    use kitsune_p2p::KitsuneP2pConfig;
 
     let _g = observability::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;
+    let mut tuning =
+        kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+    tuning.gossip_strategy = "sharded-gossip".to_string();
+    // tuning.gossip_strategy = "simple-bloom".to_string();
+
+    let mut network = KitsuneP2pConfig::default();
+    network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
+        bind_to: None,
+        override_host: None,
+        override_port: None,
+    }];
+    network.tuning_params = Arc::new(tuning);
+    let config = ConductorConfig {
+        network: Some(network),
+        ..Default::default()
+    };
 
     let app = InlineZome::new_unique(vec![])
         .callback(
@@ -199,7 +218,7 @@ async fn delete_link_multi() {
             api.delete_link(hash).unwrap();
             Ok(())
         });
-    let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
+    let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
 
     let (dna_file1, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Link])
         .await
@@ -285,51 +304,51 @@ async fn delete_link_multi() {
 
     consistency_10s(&[&alice, &bobbo, &carol]).await;
 
-    let links: Links = conductors[0]
+    let links: Vec<Links> = conductors[0]
         .call(&alice.zome("zome1"), "get_links", bobbo.agent_pubkey())
         .await;
-    let links = links.into_inner();
+    let links = links[0].clone().into_inner();
 
     assert_eq!(links.len(), 1);
 
-    let links: Links = conductors[1]
+    let links: Vec<Links> = conductors[1]
         .call(&bobbo.zome("zome1"), "get_links", bobbo.agent_pubkey())
         .await;
-    let links = links.into_inner();
+    let links = links[0].clone().into_inner();
 
     assert_eq!(links.len(), 1);
 
-    let links: Links = conductors[2]
+    let links: Vec<Links> = conductors[2]
         .call(&carol.zome("zome1"), "get_links", bobbo.agent_pubkey())
         .await;
-    let links = links.into_inner();
+    let links = links[0].clone().into_inner();
 
     assert_eq!(links.len(), 1);
 
-    let _: HeaderHash = conductors[2]
-        .call(&carol.zome(TestWasm::Link), "delete_link", hash)
+    let _: () = conductors[2]
+        .call(&carol.zome("zome1"), "delete_link", hash)
         .await;
 
     consistency_10s(&[&alice, &bobbo, &carol]).await;
 
-    let links: Links = conductors[0]
+    let links: Vec<Links> = conductors[0]
         .call(&alice.zome("zome1"), "get_links", bobbo.agent_pubkey())
         .await;
-    let links = links.into_inner();
+    let links = links[0].clone().into_inner();
 
     assert_eq!(links.len(), 0);
 
-    let links: Links = conductors[1]
+    let links: Vec<Links> = conductors[1]
         .call(&bobbo.zome("zome1"), "get_links", bobbo.agent_pubkey())
         .await;
-    let links = links.into_inner();
+    let links = links[0].clone().into_inner();
 
     assert_eq!(links.len(), 0);
 
-    let links: Links = conductors[2]
+    let links: Vec<Links> = conductors[2]
         .call(&carol.zome("zome1"), "get_links", bobbo.agent_pubkey())
         .await;
-    let links = links.into_inner();
+    let links = links[0].clone().into_inner();
 
     assert_eq!(links.len(), 0);
 }
