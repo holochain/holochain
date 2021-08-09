@@ -5,7 +5,7 @@ use crate::gossip::sharded_gossip::tests::common::dangerous_fake_agent_info_with
 
 use super::common::agent_info;
 use super::common::spawn_handler;
-use super::sharded_scenario::*;
+use super::sharded_scenario_local::*;
 use super::test_local_sync::three_way_sharded_ownership;
 use super::*;
 
@@ -157,7 +157,7 @@ impl HandlerBuilder {
 /// See the test below for a thorough example.
 pub fn mock_agent_persistence<'a>(
     entropy: &mut arbitrary::Unstructured<'a>,
-    ownership: OwnershipData,
+    ownership: LocalScenarioDef,
 ) -> (MockAgentPersistence, Vec<KitsuneOpHash>) {
     // create one op per "ownership" item
     let mut hashes: Vec<KitsuneOpHash> = (0..ownership.total_ops)
@@ -173,7 +173,7 @@ pub fn mock_agent_persistence<'a>(
         .agents
         .iter()
         .map(|data| {
-            let OwnershipDataAgent {
+            let LocalScenarioDefAgent {
                 agent,
                 arc_indices: (arc_idx_lo, arc_idx_hi),
                 hash_indices,
