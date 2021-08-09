@@ -60,6 +60,7 @@ use super::workflow::error::WorkflowError;
 ///
 /// Waits for the initial loop to complete before returning, to prevent causing
 /// a race condition by trying to run a workflow too soon after cell creation.
+#[allow(clippy::too_many_arguments)]
 pub async fn spawn_queue_consumer_tasks(
     env: EnvWrite,
     cache: EnvWrite,

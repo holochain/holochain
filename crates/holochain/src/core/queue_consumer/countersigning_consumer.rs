@@ -16,7 +16,7 @@ pub(crate) fn spawn_countersigning_consumer(
     conductor_handle: ConductorHandle,
     workspace: CountersigningWorkspace,
     cell_network: HolochainP2pCell,
-    mut trigger_sys: TriggerSender,
+    trigger_sys: TriggerSender,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
     let (tx, mut rx) = TriggerSender::new();
     let mut trigger_self = tx.clone();
@@ -31,7 +31,7 @@ pub(crate) fn spawn_countersigning_consumer(
             }
 
             // Run the workflow
-            match countersigning_workflow(&env, &workspace, &cell_network, &mut trigger_sys).await {
+            match countersigning_workflow(&env, &workspace, &cell_network, &trigger_sys).await {
                 Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
                 Err(err) => {
                     handle_workflow_error(

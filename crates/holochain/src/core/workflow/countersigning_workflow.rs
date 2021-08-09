@@ -58,11 +58,10 @@ pub(crate) fn incoming_countersigning(
                 let header_set = session_data.build_header_set()?;
 
                 // Get the expires time for this session.
-                let expires = session_data
+                let expires = *session_data
                     .preflight_request()
                     .session_times_ref()
-                    .as_end_ref()
-                    .clone();
+                    .as_end_ref();
 
                 // Get the entry hash from a header.
                 // If the headers have different entry hashes they will fail validation.
@@ -125,6 +124,9 @@ pub(crate) async fn countersigning_workflow(
     }
     Ok(WorkComplete::Complete)
 }
+type AgentsToNotify = Vec<AgentPubKey>;
+type Ops = Vec<(DhtOpHash, DhtOp)>;
+type SignedHeaders = Vec<SignedHeader>;
 
 impl CountersigningWorkspace {
     /// Create a new empty countersigning workspace.
@@ -163,9 +165,7 @@ impl CountersigningWorkspace {
             .ok();
     }
 
-    fn get_complete_sessions(
-        &self,
-    ) -> Vec<(Vec<AgentPubKey>, Vec<(DhtOpHash, DhtOp)>, Vec<SignedHeader>)> {
+    fn get_complete_sessions(&self) -> Vec<(AgentsToNotify, Ops, SignedHeaders)> {
         let now = holochain_types::timestamp::now();
         self.inner
             .share_mut(|i, _| {
@@ -221,6 +221,12 @@ impl CountersigningWorkspace {
                 Ok(ret)
             })
             .unwrap_or_default()
+    }
+}
+
+impl Default for CountersigningWorkspace {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
