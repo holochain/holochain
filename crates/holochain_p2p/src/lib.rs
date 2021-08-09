@@ -58,6 +58,7 @@ pub trait HolochainP2pCellT {
     async fn publish(
         &self,
         request_validation_receipt: bool,
+        countersigning_session: bool,
         dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
         timeout_ms: Option<u64>,
@@ -111,6 +112,14 @@ pub trait HolochainP2pCellT {
         &self,
         dht_hash: holo_hash::AnyDhtHash,
     ) -> actor::HolochainP2pResult<bool>;
+
+    /// Response from an authority to agents that are
+    /// part of a session.
+    async fn countersigning_authority_response(
+        &self,
+        agents: Vec<AgentPubKey>,
+        response: Vec<SignedHeader>,
+    ) -> actor::HolochainP2pResult<()>;
 }
 
 /// A wrapper around HolochainP2pSender that partially applies the dna_hash / agent_pub_key.
@@ -174,6 +183,7 @@ impl HolochainP2pCellT for HolochainP2pCell {
     async fn publish(
         &self,
         request_validation_receipt: bool,
+        countersigning_session: bool,
         dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
         timeout_ms: Option<u64>,
@@ -183,6 +193,7 @@ impl HolochainP2pCellT for HolochainP2pCell {
                 (*self.dna_hash).clone(),
                 (*self.from_agent).clone(),
                 request_validation_receipt,
+                countersigning_session,
                 dht_hash,
                 ops,
                 timeout_ms,
@@ -301,6 +312,16 @@ impl HolochainP2pCellT for HolochainP2pCell {
                 dht_hash,
             )
             .await
+    }
+
+    async fn countersigning_authority_response(
+        &self,
+        _agents: Vec<AgentPubKey>,
+        _response: Vec<SignedHeader>,
+    ) -> actor::HolochainP2pResult<()> {
+        // TODO: Figure out how this message is received (by the cell?)
+        // and then plumb it through.
+        todo!()
     }
 }
 

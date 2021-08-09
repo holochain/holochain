@@ -49,6 +49,10 @@ use holochain_p2p::HolochainP2pCell;
 use holochain_p2p::*;
 use publish_dht_ops_consumer::*;
 
+mod countersigning_consumer;
+use countersigning_consumer::*;
+
+use super::workflow::countersigning_workflow::CountersigningWorkspace;
 use super::workflow::error::WorkflowError;
 
 /// Spawns several long-running tasks which are responsible for processing work
@@ -64,6 +68,7 @@ pub async fn spawn_queue_consumer_tasks(
     conductor_api: impl CellConductorApiT + 'static,
     task_sender: sync::mpsc::Sender<ManagedTaskAdd>,
     stop: sync::broadcast::Sender<()>,
+    countersigning_workspace: CountersigningWorkspace,
 ) -> (QueueTriggers, InitialQueueTriggers) {
     let cell_id = cell_network.cell_id();
     // Publish
@@ -155,12 +160,33 @@ pub async fn spawn_queue_consumer_tasks(
         ))
         .await
         .expect("Failed to manage workflow handle");
+    let (tx_cs, handle) = spawn_countersigning_consumer(
+        env.clone(),
+        stop.subscribe(),
+        conductor_handle.clone(),
+        countersigning_workspace,
+        cell_network.clone(),
+        tx_sys.clone(),
+    );
+    task_sender
+        .send(ManagedTaskAdd::cell_critical(
+            handle,
+            cell_id.clone(),
+            "countersigning_consumer",
+        ))
+        .await
+        .expect("Failed to manage workflow handle");
+
     if create_tx_sys.send(tx_sys.clone()).is_err() {
         panic!("Failed to send tx_sys");
     }
 
     (
-        QueueTriggers::new(tx_sys.clone(), tx_publish.clone()),
+        QueueTriggers {
+            sys_validation: tx_sys.clone(),
+            publish_dht_ops: tx_publish.clone(),
+            countersigning: tx_cs,
+        },
         InitialQueueTriggers::new(tx_sys, tx_publish, tx_app, tx_integration, tx_receipt),
     )
 }
@@ -172,6 +198,9 @@ pub struct QueueTriggers {
     pub sys_validation: TriggerSender,
     /// Notify the ProduceDhtOps workflow to run, i.e. after InvokeCallZome
     pub publish_dht_ops: TriggerSender,
+    /// Notify the countersigning workflow to run, i.e. after receiving
+    /// new countersigning data.
+    pub countersigning: TriggerSender,
 }
 
 /// The triggers to run once at the start of a cell
@@ -184,16 +213,6 @@ pub struct InitialQueueTriggers {
     app_validation: TriggerSender,
     integrate_dht_ops: TriggerSender,
     validation_receipt: TriggerSender,
-}
-
-impl QueueTriggers {
-    /// Create a new queue trigger
-    pub fn new(sys_validation: TriggerSender, publish_dht_ops: TriggerSender) -> Self {
-        Self {
-            sys_validation,
-            publish_dht_ops,
-        }
-    }
 }
 
 impl InitialQueueTriggers {

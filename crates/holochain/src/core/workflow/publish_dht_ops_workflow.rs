@@ -45,7 +45,7 @@ pub async fn publish_dht_ops_workflow(
     // Commit to the network
     tracing::info!("sending {} ops", to_publish.len());
     for (basis, ops) in to_publish {
-        if let Err(e) = network.publish(true, basis, ops, None).await {
+        if let Err(e) = network.publish(true, false, basis, ops, None).await {
             tracing::info!(failed_to_send_publish = ?e);
         }
     }

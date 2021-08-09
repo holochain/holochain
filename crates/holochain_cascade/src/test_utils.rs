@@ -191,6 +191,7 @@ impl HolochainP2pCellT for PassThroughNetwork {
     async fn publish(
         &self,
         _request_validation_receipt: bool,
+        _countersigning_session: bool,
         _dht_hash: holo_hash::AnyDhtHash,
         _ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
         _timeout_ms: Option<u64>,
@@ -202,6 +203,14 @@ impl HolochainP2pCellT for PassThroughNetwork {
         &self,
         _to_agent: AgentPubKey,
         _receipt: holochain_serialized_bytes::SerializedBytes,
+    ) -> actor::HolochainP2pResult<()> {
+        todo!()
+    }
+
+    async fn countersigning_authority_response(
+        &self,
+        _agents: Vec<AgentPubKey>,
+        _response: Vec<holochain_zome_types::SignedHeader>,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
@@ -343,6 +352,7 @@ impl HolochainP2pCellT for MockNetwork {
     async fn publish(
         &self,
         _request_validation_receipt: bool,
+        _countersigning_session: bool,
         _dht_hash: holo_hash::AnyDhtHash,
         _ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
         _timeout_ms: Option<u64>,
@@ -354,6 +364,14 @@ impl HolochainP2pCellT for MockNetwork {
         &self,
         _to_agent: AgentPubKey,
         _receipt: holochain_serialized_bytes::SerializedBytes,
+    ) -> actor::HolochainP2pResult<()> {
+        todo!()
+    }
+
+    async fn countersigning_authority_response(
+        &self,
+        _agents: Vec<AgentPubKey>,
+        _response: Vec<holochain_zome_types::SignedHeader>,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
