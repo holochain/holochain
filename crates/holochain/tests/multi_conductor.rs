@@ -166,20 +166,49 @@ async fn invalid_cell() -> anyhow::Result<()> {
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
-async fn delete_link_multi() -> anyhow::Result<()> {
-    use holochain::test_utils::{consistency_10s, inline_zomes::simple_create_read_zome};
+async fn delete_link_multi() {
+    use holochain::test_utils::consistency_10s;
     use holochain_wasm_test_utils::TestWasm;
 
     let _g = observability::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;
 
+    let app = InlineZome::new_unique(vec![])
+        .callback(
+            "create_link",
+            |api, base_target: (AgentPubKey, AgentPubKey)| {
+                let hash = api
+                    .create_link(CreateLinkInput {
+                        base_address: base_target.0.into(),
+                        target_address: base_target.1.into(),
+                        tag: LinkTag::new(vec![]),
+                    })
+                    .unwrap();
+                Ok(hash)
+            },
+        )
+        .callback("get_links", |api, base: AgentPubKey| {
+            Ok(api
+                .get_links(vec![GetLinksInput {
+                    base_address: base.into(),
+                    tag_prefix: None,
+                }])
+                .unwrap())
+        })
+        .callback("delete_link", |api, hash: HeaderHash| {
+            api.delete_link(hash).unwrap();
+            Ok(())
+        });
     let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
 
-    let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Link])
+    let (dna_file1, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Link])
+        .await
+        .unwrap();
+    let (dna_file2, _) = SweetDnaFile::unique_from_inline_zome("zome1", app)
         .await
         .unwrap();
 
-    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+    let apps = conductors.setup_app("app1", &[dna_file1]).await.unwrap();
     conductors.exchange_peer_info().await;
 
     let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
@@ -238,5 +267,69 @@ async fn delete_link_multi() -> anyhow::Result<()> {
 
     let links = links.into_inner();
     assert_eq!(links.len(), 0);
-    Ok(())
+
+    let apps = conductors.setup_app("app", &[dna_file2]).await.unwrap();
+    conductors.exchange_peer_info().await;
+
+    let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
+
+    consistency_10s(&[&alice, &bobbo, &carol]).await;
+
+    let hash: HeaderHash = conductors[0]
+        .call(
+            &alice.zome("zome1"),
+            "create_link",
+            (bobbo.agent_pubkey(), alice.agent_pubkey()),
+        )
+        .await;
+
+    consistency_10s(&[&alice, &bobbo, &carol]).await;
+
+    let links: Links = conductors[0]
+        .call(&alice.zome("zome1"), "get_links", bobbo.agent_pubkey())
+        .await;
+    let links = links.into_inner();
+
+    assert_eq!(links.len(), 1);
+
+    let links: Links = conductors[1]
+        .call(&bobbo.zome("zome1"), "get_links", bobbo.agent_pubkey())
+        .await;
+    let links = links.into_inner();
+
+    assert_eq!(links.len(), 1);
+
+    let links: Links = conductors[2]
+        .call(&carol.zome("zome1"), "get_links", bobbo.agent_pubkey())
+        .await;
+    let links = links.into_inner();
+
+    assert_eq!(links.len(), 1);
+
+    let _: HeaderHash = conductors[2]
+        .call(&carol.zome(TestWasm::Link), "delete_link", hash)
+        .await;
+
+    consistency_10s(&[&alice, &bobbo, &carol]).await;
+
+    let links: Links = conductors[0]
+        .call(&alice.zome("zome1"), "get_links", bobbo.agent_pubkey())
+        .await;
+    let links = links.into_inner();
+
+    assert_eq!(links.len(), 0);
+
+    let links: Links = conductors[1]
+        .call(&bobbo.zome("zome1"), "get_links", bobbo.agent_pubkey())
+        .await;
+    let links = links.into_inner();
+
+    assert_eq!(links.len(), 0);
+
+    let links: Links = conductors[2]
+        .call(&carol.zome("zome1"), "get_links", bobbo.agent_pubkey())
+        .await;
+    let links = links.into_inner();
+
+    assert_eq!(links.len(), 0);
 }
