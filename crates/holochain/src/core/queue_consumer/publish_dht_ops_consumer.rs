@@ -34,7 +34,7 @@ pub fn spawn_publish_dht_ops_consumer(
 
             #[cfg(any(test, feature = "test_utils"))]
             {
-                if conductor_handle.should_skip_publish() {
+                if conductor_handle.dev_settings().publish {
                     continue;
                 }
             }

@@ -7,6 +7,7 @@ use criterion::Criterion;
 
 use holo_hash::EntryHash;
 use holo_hash::EntryHashes;
+use holochain::conductor::handle::DevSettingsDelta;
 use holochain::sweettest::*;
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_conductor_api::AdminInterfaceConfig;
@@ -189,7 +190,10 @@ async fn setup() -> (Producer, Consumer, Others) {
     let configs = vec![config(), config(), config(), config(), config()];
     let mut conductors = SweetConductorBatch::from_configs(configs.clone()).await;
     for c in conductors.iter() {
-        c.set_skip_publish(true);
+        c.update_dev_settings(DevSettingsDelta {
+            publish: Some(false),
+            ..Default::default()
+        });
     }
     let apps = conductors.setup_app("app", &[dna]).await.unwrap();
     let mut cells = apps

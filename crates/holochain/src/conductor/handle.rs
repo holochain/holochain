@@ -328,13 +328,13 @@ pub trait ConductorHandleT: Send + Sync {
     async fn add_test_app_interface(&self, id: super::state::AppInterfaceId)
         -> ConductorResult<()>;
 
+    /// Get the current dev settings
     #[cfg(any(test, feature = "test_utils"))]
-    /// Check whether this conductor should skip publish.
-    fn should_skip_publish(&self) -> bool;
+    fn dev_settings(&self) -> DevSettings;
 
+    /// Update the current dev settings
     #[cfg(any(test, feature = "test_utils"))]
-    /// For testing we can choose to skip publish.
-    fn set_skip_publish(&self, skip_publish: bool);
+    fn update_dev_settings(&self, delta: DevSettingsDelta);
 
     /// Manually coerce cells to a given CellStatus. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
@@ -374,6 +374,53 @@ pub trait ConductorHandleT: Send + Sync {
     // }
 }
 
+/// Special switches for features to be used during development and testing
+#[derive(Clone)]
+pub struct DevSettings {
+    /// Determines whether publishing should be enabled
+    pub publish: bool,
+    /// Determines whether gossiping should be enabled
+    pub gossip: bool,
+    /// Determines whether storage arc resizing should be enabled
+    pub arc_resizing: bool,
+}
+
+/// Specify changes to be made to the Devsettings.
+/// None means no change, Some means make the specified change.
+#[derive(Default)]
+pub struct DevSettingsDelta {
+    /// Determines whether publishing should be enabled
+    pub publish: Option<bool>,
+    /// Determines whether gossiping should be enabled
+    pub gossip: Option<bool>,
+    /// Determines whether storage arc resizing should be enabled
+    pub arc_resizing: Option<bool>,
+}
+
+impl Default for DevSettings {
+    fn default() -> Self {
+        Self {
+            publish: true,
+            gossip: true,
+            arc_resizing: true,
+        }
+    }
+}
+
+impl DevSettings {
+    fn apply(&mut self, delta: DevSettingsDelta) {
+        if let Some(v) = delta.publish {
+            self.publish = v;
+        }
+        if let Some(v) = delta.gossip {
+            self.gossip = v;
+        }
+        if let Some(v) = delta.arc_resizing {
+            self.arc_resizing = v;
+        }
+    }
+}
+
 /// The current "production" implementation of a ConductorHandle.
 /// The implementation specifies how read/write access to the Conductor
 /// should be synchronized across multiple concurrent Handles.
@@ -403,11 +450,11 @@ pub struct ConductorHandleImpl<DS: DnaStore + 'static> {
     pub(super) p2p_batch_senders:
         Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, tokio::sync::mpsc::Sender<P2pBatch>>>>,
 
-    // Testing:
+    // This is only available in tests currently, but could be extended to
+    // normal usage.
     #[cfg(any(test, feature = "test_utils"))]
-    /// All conductors should skip publishing.
-    /// This is useful for testing gossip.
-    pub skip_publish: std::sync::atomic::AtomicBool,
+    /// Selectively enable/disable certain functionalities
+    pub dev_settings: parking_lot::RwLock<DevSettings>,
 }
 
 #[async_trait::async_trait]
@@ -1177,14 +1224,13 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     #[cfg(any(test, feature = "test_utils"))]
-    fn should_skip_publish(&self) -> bool {
-        self.skip_publish.load(std::sync::atomic::Ordering::Relaxed)
+    fn dev_settings(&self) -> DevSettings {
+        self.dev_settings.read().clone()
     }
 
     #[cfg(any(test, feature = "test_utils"))]
-    fn set_skip_publish(&self, skip_publish: bool) {
-        self.skip_publish
-            .store(skip_publish, std::sync::atomic::Ordering::Relaxed);
+    fn update_dev_settings(&self, delta: DevSettingsDelta) {
+        self.dev_settings.write().apply(delta);
     }
 
     #[cfg(any(test, feature = "test_utils"))]
