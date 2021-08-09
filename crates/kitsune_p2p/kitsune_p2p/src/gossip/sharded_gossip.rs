@@ -47,11 +47,19 @@ mod tests;
 /// with the constant in PoolBuf which cannot be set at runtime)
 const MAX_SEND_BUF_BYTES: usize = 16000;
 
+/// The maximum number of different nodes that will be
+/// gossiped with if gossip is triggered.
+const MAX_TRIGGERS: usize = 2;
+
 type BloomFilter = bloomfilter::Bloom<Arc<MetaOpKey>>;
 type EventSender = futures::channel::mpsc::Sender<event::KitsuneP2pEvent>;
 
 struct TimedBloomFilter {
-    bloom: BloomFilter,
+    /// The bloom filter for the time window.
+    /// If this is none then we have no hashes
+    /// for this time window.
+    bloom: Option<BloomFilter>,
+    /// The time window for this bloom filter.
     time: TimeWindowMs,
 }
 
@@ -116,7 +124,6 @@ impl ShardedGossip {
                 inner: Share::new(inner),
                 gossip_type,
                 closing: AtomicBool::new(false),
-                new_data: AtomicBool::new(false),
             },
             bandwidth,
         });
@@ -129,9 +136,6 @@ impl ShardedGossip {
                     .closing
                     .load(std::sync::atomic::Ordering::Relaxed)
                 {
-                    // TODO: This sleep isn't really needed except to stop a hot loop.
-                    // It could be much lower but we need to first implement how quickly we
-                    // call nodes to avoid hot looping.
                     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
                     this.run_one_iteration().await;
                 }
@@ -143,8 +147,8 @@ impl ShardedGossip {
 
     async fn process_outgoing(&self, outgoing: Outgoing) -> KitsuneResult<()> {
         let (_endpoint, how, gossip) = outgoing;
-        let s = tracing::trace_span!("process_outgoing", cert = ?_endpoint.cert());
-        s.in_scope(|| tracing::trace!("{:?}: {:?}", _endpoint.cert(), gossip));
+        let s = tracing::trace_span!("process_outgoing", cert = ?_endpoint.cert(), agents = ?self.gossip.show_local_agents());
+        s.in_scope(|| tracing::trace!(?gossip));
         let gossip = gossip.encode_vec().map_err(KitsuneError::other)?;
         let bytes = gossip.len();
         let gossip = wire::Wire::gossip(
@@ -231,7 +235,6 @@ impl ShardedGossip {
             Ok(None) => (),
             Err(err) => tracing::error!("Gossip failed when trying to initiate with {:?}", err),
         }
-        self.gossip.reset_new_data();
         if let Err(err) = self.process_incoming_outgoing().await {
             tracing::error!("Gossip failed to process a message because of: {:?}", err);
         }
@@ -259,8 +262,6 @@ pub struct ShardedGossipLocal {
     evt_sender: EventSender,
     inner: Share<ShardedGossipLocalState>,
     closing: AtomicBool,
-    /// Have received new data since last message.
-    new_data: AtomicBool,
 }
 
 /// Incoming gossip.
@@ -277,7 +278,7 @@ pub struct ShardedGossipLocalState {
     local_agents: HashSet<Arc<KitsuneAgent>>,
     tuning_params: KitsuneP2pTuningParams,
     /// If Some, we are in the process of trying to initiate gossip with this target.
-    initiate_tgt: Option<(GossipTgt, u8)>,
+    initiate_tgt: Option<(GossipTgt, u32)>,
     round_map: RoundStateMap,
     /// Metrics for a connection.
     // FIXME: Currently the p2p metric store is setup to track
@@ -285,6 +286,12 @@ pub struct ShardedGossipLocalState {
     metrics: HashMap<Tx2Cert, MetricInfo>,
     /// Last moment we locally synced.
     last_local_sync: Option<std::time::Instant>,
+    /// Trigger local sync to run on the next iteration.
+    trigger_local_sync: bool,
+    /// Trigger initiate to run on the next iteration.
+    trigger_initiate: bool,
+    /// Nodes that have been chosen to force initiate with.
+    forced_initiates: Vec<(GossipTgt, TxUrl)>,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -312,6 +319,30 @@ impl ShardedGossipLocalState {
                 self.initiate_tgt = None;
             }
         }
+    }
+
+    fn new_integrated_data(&mut self) -> KitsuneResult<()> {
+        let s = tracing::trace_span!("gossip_trigger", agents = ?self.show_local_agents());
+        s.in_scope(|| self.log_state());
+        self.trigger_initiate = true;
+        self.trigger_local_sync = true;
+        Ok(())
+    }
+
+    fn show_local_agents(&self) -> &HashSet<Arc<KitsuneAgent>> {
+        &self.local_agents
+    }
+
+    fn log_state(&self) {
+        tracing::trace!(
+            ?self.round_map,
+            ?self.initiate_tgt,
+            ?self.forced_initiates,
+            last_sync_times = ?self.metrics
+                .values()
+                .map(|v| v.last_sync.elapsed())
+                .collect::<Vec<_>>(),
+        )
     }
 }
 
@@ -451,19 +482,8 @@ impl ShardedGossipLocal {
         cert: Tx2Cert,
         msg: ShardedGossipWire,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
-        let s = tracing::trace_span!("process_incoming", ?cert, ?msg);
-        self.inner
-            .share_mut(|i, _| {
-                s.in_scope(|| {
-                    tracing::trace!(
-                        "Tgt: {:?}, State: {:?}",
-                        i.initiate_tgt.as_ref().map(|t| t.0.cert()),
-                        i.round_map
-                    )
-                });
-                Ok(())
-            })
-            .ok();
+        let s = tracing::trace_span!("process_incoming", ?cert, agents = ?self.show_local_agents(), ?msg);
+        s.in_scope(|| self.log_state());
         // If we don't have the state for a message then the other node will need to timeout.
         Ok(match msg {
             ShardedGossipWire::Initiate(Initiate { intervals, id }) => {
@@ -487,29 +507,40 @@ impl ShardedGossipLocal {
                 }
                 Vec::with_capacity(0)
             }
-            ShardedGossipWire::Ops(Ops { filter, finished }) => {
+            ShardedGossipWire::Ops(Ops {
+                missing_hashes,
+                finished,
+            }) => {
                 let state = if finished {
                     self.incoming_ops_finished(&cert).await?
                 } else {
                     self.get_state(&cert).await?
                 };
-                match (
-                    state,
-                    filter.map(|(filter, range)| TimedBloomFilter {
-                        bloom: decode_bloom_filter(&filter),
-                        time: range,
-                    }),
-                ) {
-                    (Some(state), Some(filter)) => {
-                        self.incoming_ops(state.clone(), filter, usize::MAX).await?
-                    }
-                    _ => Vec::with_capacity(0),
+                match state {
+                    Some(state) => match missing_hashes {
+                        EncodedTimedBloomFilter::NoOverlap => Vec::with_capacity(0),
+                        EncodedTimedBloomFilter::MissingAllHashes { time_window } => {
+                            let filter = TimedBloomFilter {
+                                bloom: None,
+                                time: time_window,
+                            };
+                            self.incoming_ops(state, filter).await?
+                        }
+                        EncodedTimedBloomFilter::HaveHashes {
+                            filter,
+                            time_window,
+                        } => {
+                            let filter = TimedBloomFilter {
+                                bloom: Some(decode_bloom_filter(&filter)),
+                                time: time_window,
+                            };
+                            self.incoming_ops(state, filter).await?
+                        }
+                    },
+                    None => Vec::with_capacity(0),
                 }
             }
             ShardedGossipWire::MissingOps(MissingOps { ops, finished }) => {
-                if !ops.is_empty() {
-                    self.set_new_data();
-                }
                 let state = if finished {
                     self.decrement_ops_blooms(&cert).await?
                 } else {
@@ -565,16 +596,6 @@ impl ShardedGossipLocal {
         .into_iter()
         .collect();
 
-        // If we are actually gossiping ops then it's worth
-        // running another local next iteration because ops
-        // take time to pass through the incoming workflow.
-        if !ops.is_empty() {
-            self.inner.share_mut(|i, _| {
-                i.last_local_sync = None;
-                Ok(())
-            })?;
-        }
-
         store::put_ops(&self.evt_sender, &self.space, agent_arcs, ops).await?;
         Ok(())
     }
@@ -586,6 +607,12 @@ impl ShardedGossipLocal {
         local_agents: &HashSet<Arc<KitsuneAgent>>,
         current_rounds: HashSet<Tx2Cert>,
     ) -> KitsuneResult<Option<(GossipTgt, TxUrl)>> {
+        enum ForceTriggerInitiate {
+            New,
+            Current((GossipTgt, TxUrl)),
+            None,
+        }
+
         let mut remote_agents_within_arc_set: Vec<_> =
             store::agents_within_arcset(&self.evt_sender, &self.space, arc_set.clone())
                 .await?
@@ -602,7 +629,39 @@ impl ShardedGossipLocal {
         }
 
         let mut result = None;
-        let have_new_data = self.have_new_data();
+
+        // Check if we have a new or current trigger.
+        let force_trigger = self.inner.share_mut(|i, _| {
+            // If there is a new trigger then take it.
+            let new_trigger = i.trigger_initiate;
+            i.trigger_initiate = false;
+            if new_trigger {
+                i.forced_initiates.clear();
+                Ok(ForceTriggerInitiate::New)
+            } else {
+                // If we have current trigger and it's not already in progress
+                // then take it.
+                if let Some(forced) = i.forced_initiates.pop() {
+                    if !current_rounds.contains(forced.0.cert()) {
+                        return Ok(ForceTriggerInitiate::Current(forced));
+                    } else {
+                        i.forced_initiates.push(forced);
+                    }
+                }
+                // Otherwise there's no trigger for this iteration.
+                Ok(ForceTriggerInitiate::None)
+            }
+        })?;
+
+        // Use the current trigger if we have one.
+        let new_trigger = match force_trigger {
+            ForceTriggerInitiate::New => true,
+            ForceTriggerInitiate::Current(forced) => return Ok(Some(forced)),
+            ForceTriggerInitiate::None => false,
+        };
+
+        let mut forced_initiates = Vec::with_capacity(MAX_TRIGGERS);
+
         for (remote_agent, _) in remote_agents_within_arc_set {
             // Get the agent info for the chosen remote agent.
             let agent = store::get_agent_info(&self.evt_sender, &self.space, &remote_agent)
@@ -623,24 +682,50 @@ impl ShardedGossipLocal {
                                         TxUrl::from(url.as_str()),
                                     )
                                 })
-                                .filter(|(tgt, _)| !current_rounds.contains(tgt.cert()))
                         })
                         .next()
                 });
             if let Some(agent) = agent {
-                if self.saw_too_recently(agent.0.cert(), have_new_data)? {
-                    continue;
+                if new_trigger {
+                    // We are force triggering an initiate then choose a remote
+                    // agent that is not already in progress or add them to be
+                    // forced later up to the MAX_TRIGGERS.
+                    if forced_initiates.len() < MAX_TRIGGERS {
+                        if result.is_none() && !current_rounds.contains(agent.0.cert()) {
+                            result = Some(agent);
+                        } else {
+                            forced_initiates.push(agent);
+                        }
+                    }
+                } else {
+                    // We are not force triggering an initiate so check if this
+                    // remote agent is already in progress or has been seen too
+                    // recently.
+                    if self.saw_too_recently(agent.0.cert())?
+                        || current_rounds.contains(agent.0.cert())
+                    {
+                        continue;
+                    }
+                    self.record_metric_info(agent.0.cert().clone(), false)?;
+                    result = Some(agent);
+                    break;
                 }
-                self.record_metric_info(agent.0.cert().clone(), false)?;
-                result = Some(agent);
-                break;
             }
         }
+
+        // If there is forced triggers then save them.
+        if !forced_initiates.is_empty() {
+            self.inner.share_mut(|i, _| {
+                i.forced_initiates = forced_initiates;
+                Ok(())
+            })?;
+        }
+
         Ok(result)
     }
 
     /// Check if we have sync'd with a remote endpoint too recently.
-    fn saw_too_recently(&self, cert: &Tx2Cert, have_new_data: bool) -> KitsuneResult<bool> {
+    fn saw_too_recently(&self, cert: &Tx2Cert) -> KitsuneResult<bool> {
         if let Some(metric_info) = self.get_metric_info(cert)? {
             if metric_info.error {
                 if metric_info.last_sync.elapsed().as_millis() as u32
@@ -652,29 +737,11 @@ impl ShardedGossipLocal {
                 <= self
                     .tuning_params
                     .gossip_peer_on_success_next_gossip_delay_ms
-                && !have_new_data
             {
                 return Ok(true);
             }
         }
         Ok(false)
-    }
-
-    /// Check if we have new data sync the last iteration.
-    fn have_new_data(&self) -> bool {
-        self.new_data.load(std::sync::atomic::Ordering::Relaxed)
-    }
-
-    /// Reset the iteration.
-    fn reset_new_data(&self) {
-        self.new_data
-            .store(false, std::sync::atomic::Ordering::Relaxed)
-    }
-
-    /// Set that we have new data this iteration.
-    fn set_new_data(&self) {
-        self.new_data
-            .store(true, std::sync::atomic::Ordering::Relaxed)
     }
 
     /// Get metric info for a connection.
@@ -697,24 +764,35 @@ impl ShardedGossipLocal {
 
     /// Check if we should locally sync
     fn should_local_sync(&self) -> KitsuneResult<bool> {
+        // Historical gossip should not locally sync.
+        if let GossipType::Historical = self.gossip_type {
+            return Ok(false);
+        }
         let update_last_sync = |i: &mut ShardedGossipLocalState, _: &mut bool| {
-            if i.last_local_sync
+            if i.trigger_local_sync {
+                // We are force triggering a local sync.
+                i.trigger_local_sync = false;
+                i.last_local_sync = Some(std::time::Instant::now());
+                let s = tracing::trace_span!("trigger",agents = ?i.show_local_agents(), i.trigger_local_sync);
+                s.in_scope(|| tracing::trace!("Force local sync"));
+                Ok(true)
+            } else if i
+                .last_local_sync
                 .as_ref()
                 .map(|s| s.elapsed().as_millis() as u32)
                 .unwrap_or(u32::MAX)
                 >= self.tuning_params.gossip_local_sync_delay_ms
             {
+                // It's been long enough since the last local sync.
                 i.last_local_sync = Some(std::time::Instant::now());
                 Ok(true)
             } else {
+                // Otherwise it's not time to sync.
                 Ok(false)
             }
         };
-        if self.have_new_data() || self.inner.share_mut(update_last_sync)? {
-            Ok(true)
-        } else {
-            Ok(false)
-        }
+
+        self.inner.share_mut(update_last_sync)
     }
 
     /// Record all timed out rounds into metrics
@@ -728,6 +806,21 @@ impl ShardedGossipLocal {
                     };
                     i.metrics.insert(cert, metric);
                 }
+                Ok(())
+            })
+            .ok();
+    }
+
+    fn show_local_agents(&self) -> HashSet<Arc<KitsuneAgent>> {
+        self.inner
+            .share_mut(|i, _| Ok(i.local_agents.clone()))
+            .unwrap_or_default()
+    }
+
+    fn log_state(&self) {
+        self.inner
+            .share_mut(|i, _| {
+                i.log_state();
                 Ok(())
             })
             .ok();
@@ -787,6 +880,28 @@ fn time_range(start: Duration, end: Duration) -> Range<u64> {
     start..end
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
+/// An encoded timed bloom filter of missing op hashes.
+pub enum EncodedTimedBloomFilter {
+    /// I have no overlap with your agents
+    /// Pleas don't send any ops.
+    NoOverlap,
+    /// I have overlap and I have no hashes.
+    /// Please send all your ops.
+    MissingAllHashes {
+        /// The time window that we are missing hashes for.
+        time_window: std::ops::Range<u64>,
+    },
+    /// I have overlap and I have some hashes.
+    /// Please send any missing ops.
+    HaveHashes {
+        /// The encoded bloom filter.
+        filter: PoolBuf,
+        /// The time window these hashes are for.
+        time_window: std::ops::Range<u64>,
+    },
+}
+
 kitsune_p2p_types::write_codec_enum! {
     /// SimpleBloom Gossip Wire Protocol Codec
     codec ShardedGossipWire {
@@ -796,7 +911,7 @@ kitsune_p2p_types::write_codec_enum! {
             /// for all local agents
             intervals.0: Vec<ArcInterval>,
             /// A random number to resolve concurrent initiates.
-            id.1: u8,
+            id.1: u32,
         },
 
         /// Accept an incoming round of gossip from a remote node
@@ -821,10 +936,7 @@ kitsune_p2p_types::write_codec_enum! {
         /// Send Ops Bloom
         Ops(0x50) {
             /// The bloom filter for op data
-            // maackle: what is the meaning and purpose of this ever being None?
-            //          currently looks like it means the same thing as
-            //          `finished == true`
-            filter.0: Option<(PoolBuf, std::ops::Range<u64>)>,
+            missing_hashes.0: EncodedTimedBloomFilter,
             /// Is this the last bloom to be sent?
             finished.1: bool,
         },
@@ -879,9 +991,10 @@ impl AsGossipModule for ShardedGossip {
 
     fn local_agent_join(&self, a: Arc<KitsuneAgent>) {
         let _ = self.gossip.inner.share_mut(move |i, _| {
-            // Force a new local sync as we have a new agent to sync with.
-            i.last_local_sync = None;
+            i.new_integrated_data()?;
             i.local_agents.insert(a);
+            let s = tracing::trace_span!("gossip_trigger", agents = ?i.show_local_agents(), msg = "New agent joining");
+            s.in_scope(|| i.log_state());
             Ok(())
         });
     }
@@ -897,6 +1010,15 @@ impl AsGossipModule for ShardedGossip {
         self.gossip
             .closing
             .store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    fn new_integrated_data(&self) {
+        let _ = self.gossip.inner.share_mut(move |i, _| {
+            i.new_integrated_data()?;
+            let s = tracing::trace_span!("gossip_trigger", agents = ?i.show_local_agents(), msg = "New integrated data");
+            s.in_scope(|| i.log_state());
+            Ok(())
+        });
     }
 }
 

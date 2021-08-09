@@ -214,6 +214,10 @@ impl HolochainP2pCellT for PassThroughNetwork {
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
+
+    async fn new_integrated_data(&self) -> actor::HolochainP2pResult<()> {
+        todo!()
+    }
 }
 
 pub fn fill_db(env: &EnvWrite, op: DhtOpHashed) {
@@ -373,6 +377,10 @@ impl HolochainP2pCellT for MockNetwork {
         _agents: Vec<AgentPubKey>,
         _response: Vec<holochain_zome_types::SignedHeader>,
     ) -> actor::HolochainP2pResult<()> {
+        todo!()
+    }
+
+    async fn new_integrated_data(&self) -> actor::HolochainP2pResult<()> {
         todo!()
     }
 }

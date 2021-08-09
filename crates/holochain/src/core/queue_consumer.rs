@@ -104,16 +104,14 @@ pub async fn spawn_queue_consumer_tasks(
         .await
         .expect("Failed to manage workflow handle");
 
-    let (create_tx_sys, get_tx_sys) = tokio::sync::oneshot::channel();
-
     // Integration
     let (tx_integration, handle) = spawn_integrate_dht_ops_consumer(
         env.clone(),
         conductor_handle.clone(),
         cell_network.cell_id(),
         stop.subscribe(),
-        get_tx_sys,
         tx_receipt.clone(),
+        cell_network.clone(),
     );
     task_sender
         .send(ManagedTaskAdd::cell_critical(
@@ -178,15 +176,12 @@ pub async fn spawn_queue_consumer_tasks(
         .await
         .expect("Failed to manage workflow handle");
 
-    if create_tx_sys.send(tx_sys.clone()).is_err() {
-        panic!("Failed to send tx_sys");
-    }
-
     (
         QueueTriggers {
             sys_validation: tx_sys.clone(),
             publish_dht_ops: tx_publish.clone(),
             countersigning: tx_cs,
+            integrate_dht_ops: tx_integration.clone(),
         },
         InitialQueueTriggers::new(tx_sys, tx_publish, tx_app, tx_integration, tx_receipt),
     )
@@ -202,6 +197,8 @@ pub struct QueueTriggers {
     /// Notify the countersigning workflow to run, i.e. after receiving
     /// new countersigning data.
     pub countersigning: TriggerSender,
+    /// Notify the IntegrateDhtOps workflow to run, i.e. after InvokeCallZome
+    pub integrate_dht_ops: TriggerSender,
 }
 
 /// The triggers to run once at the start of a cell

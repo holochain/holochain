@@ -120,6 +120,9 @@ pub trait HolochainP2pCellT {
         agents: Vec<AgentPubKey>,
         response: Vec<SignedHeader>,
     ) -> actor::HolochainP2pResult<()>;
+
+    /// New data has been integrated and is ready for gossiping.
+    async fn new_integrated_data(&self) -> actor::HolochainP2pResult<()>;
 }
 
 /// A wrapper around HolochainP2pSender that partially applies the dna_hash / agent_pub_key.
@@ -322,6 +325,12 @@ impl HolochainP2pCellT for HolochainP2pCell {
         // TODO: Figure out how this message is received (by the cell?)
         // and then plumb it through.
         todo!()
+    }
+
+    async fn new_integrated_data(&self) -> actor::HolochainP2pResult<()> {
+        self.sender
+            .new_integrated_data((*self.dna_hash).clone())
+            .await
     }
 }
 
