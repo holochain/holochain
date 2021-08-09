@@ -66,7 +66,7 @@ impl RealAdminInterfaceApi {
 // multiple apps are installed concurrently. a proper solution might involve
 // reworking the conductor R/W lock handling
 static INSTALL_APP_MUTEX: once_cell::sync::Lazy<std::sync::Arc<tokio::sync::Mutex<()>>> =
-    once_cell::sync::Lazy::new(|| Default::default());
+    once_cell::sync::Lazy::new(Default::default);
 
 #[async_trait::async_trait]
 impl AdminInterfaceApi for RealAdminInterfaceApi {

@@ -4,12 +4,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+### Fixed
+
+- This release solves the issues with installing happ bundles or registering DNA via the admin API concurrently. #[#881](https://github.com/holochain/holochain/pull/881).
+
+
 ### Changed
 
 - Header builder now uses chain top timestamp for new headers if in the future
 - Timestamps in headers require strict inequality in sys validation
 
 ## 0.0.102
+
 
 ### Known Issues :exclamation:
 
