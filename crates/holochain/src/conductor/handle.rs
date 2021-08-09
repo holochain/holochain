@@ -499,8 +499,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn get_dna(&self, hash: &DnaHash) -> Option<DnaFile> {
-        tracing::trace!("ConductorHandle::get_dna");
-        self.conductor.read().await.dna_store().get(hash)
+        tracing::trace!("ConductorHandle::get_dna starting");
+        let result = self.conductor.read().await.dna_store().get(hash);
+        tracing::trace!("ConductorHandle::get_dna finished");
+        result
     }
 
     async fn get_ribosome(&self, dna_hash: &DnaHash) -> ConductorResult<RealRibosome> {

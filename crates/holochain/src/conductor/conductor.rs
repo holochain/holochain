@@ -500,6 +500,9 @@ where
                 .and_then(|result| async move { result.map(|_| cell_id) })
                 .await
             });
+
+        tracing::trace!("assembled {} cell tasks", cells_tasks.len());
+
         let (success, errors): (Vec<_>, Vec<_>) = futures::future::join_all(cells_tasks)
             .await
             .into_iter()
@@ -507,6 +510,12 @@ where
 
         // unwrap safe because of the partition
         let success = success.into_iter().map(Result::unwrap);
+
+        tracing::trace!(
+            "completed {} cell tasks successfully, {} with error",
+            success.len(),
+            errors.len()
+        );
 
         // If there were errors, cleanup and return the errors
         if !errors.is_empty() {
