@@ -163,3 +163,80 @@ async fn invalid_cell() -> anyhow::Result<()> {
     assert!(r.is_some());
     Ok(())
 }
+
+#[cfg(feature = "test_utils")]
+#[tokio::test(flavor = "multi_thread")]
+async fn delete_link_multi() -> anyhow::Result<()> {
+    use holochain::test_utils::{consistency_10s, inline_zomes::simple_create_read_zome};
+    use holochain_wasm_test_utils::TestWasm;
+
+    let _g = observability::test_run().ok();
+    const NUM_CONDUCTORS: usize = 3;
+
+    let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
+
+    let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Link])
+        .await
+        .unwrap();
+
+    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+    conductors.exchange_peer_info().await;
+
+    let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
+
+    // Call the "create" zome fn on Alice's app
+    let hash: HeaderHash = conductors[0]
+        .call(&alice.zome(TestWasm::Link), "create_link", ())
+        .await;
+
+    consistency_10s(&[&alice, &bobbo, &carol]).await;
+
+    let links: Links = conductors[0]
+        .call(&alice.zome(TestWasm::Link), "get_links", ())
+        .await;
+    let links = links.into_inner();
+
+    assert_eq!(links.len(), 1);
+
+    let links: Links = conductors[1]
+        .call(&bobbo.zome(TestWasm::Link), "get_links", ())
+        .await;
+    let links = links.into_inner();
+
+    assert_eq!(links.len(), 1);
+
+    let links: Links = conductors[2]
+        .call(&carol.zome(TestWasm::Link), "get_links", ())
+        .await;
+
+    let links = links.into_inner();
+    assert_eq!(links.len(), 1);
+
+    let _: HeaderHash = conductors[1]
+        .call(&bobbo.zome(TestWasm::Link), "delete_link", hash)
+        .await;
+
+    consistency_10s(&[&alice, &bobbo, &carol]).await;
+
+    let links: Links = conductors[0]
+        .call(&alice.zome(TestWasm::Link), "get_links", ())
+        .await;
+    let links = links.into_inner();
+
+    assert_eq!(links.len(), 0);
+
+    let links: Links = conductors[1]
+        .call(&bobbo.zome(TestWasm::Link), "get_links", ())
+        .await;
+    let links = links.into_inner();
+
+    assert_eq!(links.len(), 0);
+
+    let links: Links = conductors[2]
+        .call(&carol.zome(TestWasm::Link), "get_links", ())
+        .await;
+
+    let links = links.into_inner();
+    assert_eq!(links.len(), 0);
+    Ok(())
+}
