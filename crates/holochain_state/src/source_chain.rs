@@ -158,7 +158,7 @@ impl SourceChain {
             .await
         } else {
             // The caller MUST guard against this case.
-            unreachable!();
+            unreachable!("Put countersigned called with the wrong entry type");
         }
     }
 
