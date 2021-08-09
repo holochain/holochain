@@ -19,9 +19,6 @@ use std::collections::{BTreeSet, HashSet};
 /// at the same location, which is possible in reality, but rare, and should
 /// have no bearing on test results. (TODO: test this case separately)
 pub struct ScenarioDef<const N: usize> {
-    /// The locations of all ops held by all agents
-    ops: BTreeSet<DhtLocation>,
-
     /// The "nodes" (in Holochain, "conductors") participating in this scenario
     nodes: [ScenarioDefNode; N],
 
@@ -31,21 +28,23 @@ pub struct ScenarioDef<const N: usize> {
 
     /// Represents latencies between nodes, to be simulated.
     /// If None, all latencies are zero.
-    latency_matrix: LatencyMatrix<N>,
+    _latency_matrix: LatencyMatrix<N>,
 }
 
 impl<const N: usize> ScenarioDef<N> {
-    pub fn new<O: Copy + Into<DhtLocation>>(
-        ops: &[O],
+    pub fn new(nodes: [ScenarioDefNode; N], peer_matrix: PeerMatrix<N>) -> Self {
+        Self::new_with_latency(nodes, peer_matrix, None)
+    }
+
+    pub fn new_with_latency(
         nodes: [ScenarioDefNode; N],
         peer_matrix: PeerMatrix<N>,
-        latency_matrix: LatencyMatrix<N>,
+        _latency_matrix: LatencyMatrix<N>,
     ) -> Self {
         Self {
-            ops: ops.into_iter().copied().map(Into::into).collect(),
             nodes,
             peer_matrix,
-            latency_matrix,
+            _latency_matrix,
         }
     }
 }
@@ -66,14 +65,14 @@ pub struct ScenarioDefAgent {
     /// The storage arc for this agent
     arc: ArcInterval,
     /// The ops stored by this agent
-    ops_held: BTreeSet<DhtLocation>,
+    ops: BTreeSet<DhtLocation>,
 }
 
 impl ScenarioDefAgent {
-    pub fn new<O: Copy + Into<DhtLocation>>(arc: ArcInterval, ops_held: &[O]) -> Self {
+    pub fn new<O: Copy + Into<DhtLocation>>(arc: ArcInterval, ops: &[O]) -> Self {
         Self {
             arc,
-            ops_held: ops_held.into_iter().copied().map(Into::into).collect(),
+            ops: ops.into_iter().copied().map(Into::into).collect(),
         }
     }
 }
@@ -120,10 +119,5 @@ fn constructors() {
             ),
         ]),
     ];
-    let _scenario = ScenarioDef::new(
-        ops.as_slice(),
-        nodes,
-        PeerMatrix::Sparse([hashset![1], hashset![]]),
-        Some([[0, 250], [250, 0]]),
-    );
+    let _scenario = ScenarioDef::new(nodes, PeerMatrix::Sparse([hashset![1], hashset![]]));
 }
