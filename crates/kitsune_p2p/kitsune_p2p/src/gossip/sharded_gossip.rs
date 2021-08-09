@@ -29,6 +29,8 @@ use self::state_map::RoundStateMap;
 
 use super::simple_bloom::{HowToConnect, MetaOpKey};
 
+pub use bandwidth::BandwidthThrottles;
+
 mod accept;
 mod agents;
 mod bloom;
@@ -90,7 +92,7 @@ pub struct ShardedGossip {
     /// The internal mutable state
     inner: Share<ShardedGossipState>,
     /// Bandwidth for incoming and outgoing gossip.
-    bandwidth: BandwidthThrottle,
+    bandwidth: Arc<BandwidthThrottle>,
 }
 
 impl ShardedGossip {
@@ -101,19 +103,8 @@ impl ShardedGossip {
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: EventSender,
         gossip_type: GossipType,
+        bandwidth: Arc<BandwidthThrottle>,
     ) -> Arc<Self> {
-        let mut inner = ShardedGossipLocalState::default();
-        let bandwidth = match gossip_type {
-            GossipType::Recent => BandwidthThrottle::new(
-                tuning_params.gossip_inbound_target_mbps,
-                tuning_params.gossip_outbound_target_mbps,
-            ),
-            GossipType::Historical => BandwidthThrottle::new(
-                tuning_params.gossip_historic_inbound_target_mbps,
-                tuning_params.gossip_historic_outbound_target_mbps,
-            ),
-        };
-        inner.tuning_params = tuning_params.clone();
         let this = Arc::new(Self {
             ep_hnd,
             inner: Share::new(Default::default()),
@@ -121,7 +112,7 @@ impl ShardedGossip {
                 tuning_params,
                 space,
                 evt_sender,
-                inner: Share::new(inner),
+                inner: Share::new(ShardedGossipLocalState::default()),
                 gossip_type,
                 closing: AtomicBool::new(false),
             },
@@ -276,7 +267,6 @@ type StateKey = Tx2Cert;
 pub struct ShardedGossipLocalState {
     /// The list of agents on this node
     local_agents: HashSet<Arc<KitsuneAgent>>,
-    tuning_params: KitsuneP2pTuningParams,
     /// If Some, we are in the process of trying to initiate gossip with this target.
     initiate_tgt: Option<(GossipTgt, u32)>,
     round_map: RoundStateMap,
@@ -1022,7 +1012,15 @@ impl AsGossipModule for ShardedGossip {
     }
 }
 
-struct ShardedRecentGossipFactory;
+struct ShardedRecentGossipFactory {
+    bandwidth: Arc<BandwidthThrottle>,
+}
+
+impl ShardedRecentGossipFactory {
+    fn new(bandwidth: Arc<BandwidthThrottle>) -> Self {
+        Self { bandwidth }
+    }
+}
 
 impl AsGossipModuleFactory for ShardedRecentGossipFactory {
     fn spawn_gossip_task(
@@ -1038,11 +1036,20 @@ impl AsGossipModuleFactory for ShardedRecentGossipFactory {
             ep_hnd,
             evt_sender,
             GossipType::Recent,
+            self.bandwidth.clone(),
         ))
     }
 }
 
-struct ShardedHistoricalGossipFactory;
+struct ShardedHistoricalGossipFactory {
+    bandwidth: Arc<BandwidthThrottle>,
+}
+
+impl ShardedHistoricalGossipFactory {
+    fn new(bandwidth: Arc<BandwidthThrottle>) -> Self {
+        Self { bandwidth }
+    }
+}
 
 impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
     fn spawn_gossip_task(
@@ -1058,18 +1065,19 @@ impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
             ep_hnd,
             evt_sender,
             GossipType::Historical,
+            self.bandwidth.clone(),
         ))
     }
 }
 
 /// Create a recent [`GossipModuleFactory`]
-pub fn recent_factory() -> GossipModuleFactory {
-    GossipModuleFactory(Arc::new(ShardedRecentGossipFactory))
+pub fn recent_factory(bandwidth: Arc<BandwidthThrottle>) -> GossipModuleFactory {
+    GossipModuleFactory(Arc::new(ShardedRecentGossipFactory::new(bandwidth)))
 }
 
 /// Create a [`GossipModuleFactory`]
-pub fn historical_factory() -> GossipModuleFactory {
-    GossipModuleFactory(Arc::new(ShardedHistoricalGossipFactory))
+pub fn historical_factory(bandwidth: Arc<BandwidthThrottle>) -> GossipModuleFactory {
+    GossipModuleFactory(Arc::new(ShardedHistoricalGossipFactory::new(bandwidth)))
 }
 
 #[allow(dead_code)]
