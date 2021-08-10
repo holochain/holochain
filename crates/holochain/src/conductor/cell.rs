@@ -423,6 +423,21 @@ impl Cell {
                 .instrument(debug_span!("cell_handle_sign_network_data"))
                 .await;
             }
+            CountersigningAuthorityResponse {
+                respond,
+                signed_headers,
+                ..
+            } => {
+                async {
+                    let res = self
+                        .handle_countersigning_authority_response(signed_headers)
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::other);
+                    respond.respond(Ok(async move { res }.boxed().into()));
+                }
+                .instrument(debug_span!("cell_handle_countersigning_response"))
+                .await;
+            }
         }
         Ok(())
     }
@@ -460,6 +475,14 @@ impl Cell {
             .map_err(Box::new)?;
         }
         Ok(())
+    }
+    #[instrument(skip(self, _signed_headers))]
+    /// we are receiving a response from a countersigning authority
+    async fn handle_countersigning_authority_response(
+        &self,
+        _signed_headers: Vec<SignedHeader>,
+    ) -> CellResult<()> {
+        todo!()
     }
 
     #[instrument(skip(self))]

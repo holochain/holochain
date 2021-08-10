@@ -271,7 +271,6 @@ impl SpaceInternalHandler for Space {
             {
                 let ro_inner = ro_inner.clone();
                 let space = space.clone();
-                let basis = basis.clone();
                 let data = data.clone();
                 all.push(async move {
                     use discover::PeerDiscoverResult;
@@ -287,7 +286,7 @@ impl SpaceInternalHandler for Space {
                     };
 
                     // generate our broadcast payload
-                    let payload = wire::Wire::broadcast(space, basis, info.agent.clone(), data);
+                    let payload = wire::Wire::broadcast(space, info.agent.clone(), data);
 
                     // forward the data
                     if let Err(err) = con_hnd.notify(&payload, timeout).await {
@@ -721,6 +720,81 @@ impl KitsuneP2pHandler for Space {
         }
         .boxed()
         .into())
+    }
+
+    fn handle_targeted_broadcast(
+        &mut self,
+        space: Arc<KitsuneSpace>,
+        from_agent: Arc<KitsuneAgent>,
+        agents: Vec<Arc<KitsuneAgent>>,
+        timeout: KitsuneTimeout,
+        payload: Vec<u8>,
+    ) -> KitsuneP2pHandlerResult<()> {
+        let evt_sender = self.evt_sender.clone();
+        let ro_inner = self.ro_inner.clone();
+        let concurrent_limit_per_thread = self.config.tuning_params.concurrent_limit_per_thread;
+        // TODO: limit spawns with semaphore.
+        tokio::task::spawn(async move {
+            let mut futures = Vec::with_capacity(agents.len());
+            for agent in agents {
+                let discover_fut = async {
+                    let result = discover::search_and_discover_peer_connect(
+                        ro_inner.clone(),
+                        agent.clone(),
+                        timeout,
+                    )
+                    .await;
+                    (result, agent)
+                };
+                futures.push(discover_fut);
+            }
+            let futures = futures::stream::iter(futures);
+            let futures = futures.buffer_unordered(concurrent_limit_per_thread);
+            futures
+                .for_each_concurrent(concurrent_limit_per_thread, |(discover_result, agent)| {
+                    match discover_result {
+                        discover::PeerDiscoverResult::OkShortcut => {
+                            // reflect this request locally
+                            evt_sender
+                                .notify(space.clone(), agent, from_agent.clone(), payload.clone())
+                                .map(|r| {
+                                    if let Err(e) = r {
+                                        tracing::error!(
+                                            "Failed to broadcast to local agent because: {:?}",
+                                            e
+                                        )
+                                    }
+                                })
+                                .boxed()
+                        }
+                        discover::PeerDiscoverResult::OkRemote { con_hnd, .. } => {
+                            let payload =
+                                wire::Wire::broadcast(space.clone(), agent, payload.clone().into());
+                            con_hnd
+                                .notify(&payload, timeout)
+                                .map(|r| {
+                                    if let Err(e) = r {
+                                        tracing::info!(
+                                            "Failed to broadcast to remote agent because: {:?}",
+                                            e
+                                        )
+                                    }
+                                })
+                                .boxed()
+                        }
+                        discover::PeerDiscoverResult::Err(e) => async move {
+                            tracing::info!(
+                                "Failed to discover connection for {:?} because: {:?}",
+                                agent,
+                                e
+                            );
+                        }
+                        .boxed(),
+                    }
+                })
+                .await;
+        });
+        Ok(async move { Ok(()) }.boxed().into())
     }
 
     fn handle_new_integrated_data(&mut self, _: KSpace) -> InternalHandlerResult<()> {
