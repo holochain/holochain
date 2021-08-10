@@ -7,14 +7,19 @@
 //! for tests.
 
 use holochain_serialized_bytes::prelude::*;
-use std::sync::Arc;
-
-use self::inline_zome::InlineZome;
-use error::{ZomeError, ZomeResult};
 
 pub mod error;
 #[cfg(feature = "full-dna-def")]
 pub mod inline_zome;
+
+use error::ZomeResult;
+
+#[cfg(feature = "full-dna-def")]
+use self::inline_zome::InlineZome;
+#[cfg(feature = "full-dna-def")]
+use error::ZomeError;
+#[cfg(feature = "full-dna-def")]
+use std::sync::Arc;
 
 /// A Holochain Zome. Includes the ZomeDef as well as the name of the Zome.
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -91,6 +96,7 @@ pub enum ZomeDef {
 
     /// A zome defined by Rust closures. Cannot be deserialized.
     #[serde(skip_deserializing)]
+    #[cfg(feature = "full-dna-def")]
     Inline(Arc<InlineZome>),
 }
 
@@ -107,11 +113,14 @@ impl From<ZomeDef> for ZomeDefSerialized {
     fn from(d: ZomeDef) -> Self {
         match d {
             ZomeDef::Wasm(zome) => Self::Wasm(zome),
+
+            #[cfg(feature = "full-dna-def")]
             ZomeDef::Inline(zome) => Self::InlineUid(zome.uuid.clone()),
         }
     }
 }
 
+#[cfg(feature = "full-dna-def")]
 impl From<InlineZome> for ZomeDef {
     fn from(iz: InlineZome) -> Self {
         Self::Inline(Arc::new(iz))
@@ -124,7 +133,8 @@ impl ZomeDef {
     pub fn wasm_hash(&self, zome_name: &ZomeName) -> ZomeResult<holo_hash::WasmHash> {
         match self {
             ZomeDef::Wasm(WasmZome { wasm_hash }) => Ok(wasm_hash.clone()),
-            _ => Err(ZomeError::NonWasmZome(zome_name.clone())),
+            #[cfg(feature = "full-dna-def")]
+            ZomeDef::Inline(_) => Err(ZomeError::NonWasmZome(zome_name.clone())),
         }
     }
 }
