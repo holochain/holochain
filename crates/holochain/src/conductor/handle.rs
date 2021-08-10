@@ -349,7 +349,7 @@ pub trait ConductorHandleT: Send + Sync {
     ) -> ConductorResult<(InstalledApp, AppStatusFx)>;
 
     // TODO: would be nice to have methods for accessing the underlying Conductor,
-    // but this trait doesn't know the concrete type of Conductor underlying,
+    // but this trait doesn't know the concrete type of underlying Conductor,
     // and using generics seems problematic with mockall::automock.
     // Something like this would be desirable, but ultimately doesn't work.
     //
@@ -379,10 +379,8 @@ pub trait ConductorHandleT: Send + Sync {
 pub struct DevSettings {
     /// Determines whether publishing should be enabled
     pub publish: bool,
-    /// Determines whether gossiping should be enabled
-    pub gossip: bool,
     /// Determines whether storage arc resizing should be enabled
-    pub arc_resizing: bool,
+    pub _arc_resizing: bool,
 }
 
 /// Specify changes to be made to the Devsettings.
@@ -391,8 +389,6 @@ pub struct DevSettings {
 pub struct DevSettingsDelta {
     /// Determines whether publishing should be enabled
     pub publish: Option<bool>,
-    /// Determines whether gossiping should be enabled
-    pub gossip: Option<bool>,
     /// Determines whether storage arc resizing should be enabled
     pub arc_resizing: Option<bool>,
 }
@@ -401,8 +397,7 @@ impl Default for DevSettings {
     fn default() -> Self {
         Self {
             publish: true,
-            gossip: true,
-            arc_resizing: true,
+            _arc_resizing: true,
         }
     }
 }
@@ -412,11 +407,9 @@ impl DevSettings {
         if let Some(v) = delta.publish {
             self.publish = v;
         }
-        if let Some(v) = delta.gossip {
-            self.gossip = v;
-        }
         if let Some(v) = delta.arc_resizing {
-            self.arc_resizing = v;
+            self._arc_resizing = v;
+            tracing::warn!("Arc resizing is not yet implemented, and can't be enabled/disabled.");
         }
     }
 }
