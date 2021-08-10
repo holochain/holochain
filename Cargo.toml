@@ -65,6 +65,6 @@ codegen-units = 16
 # ghost_actor = { git = "https://github.com/holochain/ghost_actor.git", branch = "add_observability" }
 # lair_keystore_api = { git = "https://github.com/holochain/lair.git" }
 # lair_keystore_client = { git = "https://github.com/holochain/lair.git", branch = "pr/tokio-1" }
-#lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }
-#lair_keystore_client = { path = "../lair/crates/lair_keystore_client" }
+# lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }
+# lair_keystore_client = { path = "../lair/crates/lair_keystore_client" }
 # observability = { path = "../../rust/observability" }
