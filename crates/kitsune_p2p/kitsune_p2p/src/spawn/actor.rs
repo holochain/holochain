@@ -3,6 +3,7 @@
 use crate::actor;
 use crate::actor::*;
 use crate::event::*;
+use crate::gossip::sharded_gossip::BandwidthThrottles;
 use crate::metrics::KitsuneMetrics;
 use crate::types::gossip::GossipModuleType;
 use crate::*;
@@ -74,6 +75,7 @@ pub(crate) struct KitsuneP2pActor {
         )>,
     >,
     config: Arc<KitsuneP2pConfig>,
+    bandwidth_throttles: BandwidthThrottles,
 }
 
 impl KitsuneP2pActor {
@@ -347,6 +349,8 @@ impl KitsuneP2pActor {
             }
         });
 
+        let bandwidth_throttles = BandwidthThrottles::new(&config.tuning_params);
+
         Ok(Self {
             this_addr: this_addr.into(),
             channel_factory,
@@ -355,6 +359,7 @@ impl KitsuneP2pActor {
             ep_hnd,
             spaces: HashMap::new(),
             config: Arc::new(config),
+            bandwidth_throttles,
         })
     }
 }
@@ -583,12 +588,14 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         let this_addr = self.this_addr.clone();
         let ep_hnd = self.ep_hnd.clone();
         let config = Arc::clone(&self.config);
+        let bandwidth_throttles = self.bandwidth_throttles.clone();
         let space_sender = match self.spaces.entry(space.clone()) {
             Entry::Occupied(entry) => entry.into_mut(),
             Entry::Vacant(entry) => entry.insert(AsyncLazy::new(async move {
-                let (send, send_inner, evt_recv) = spawn_space(space2, this_addr, ep_hnd, config)
-                    .await
-                    .expect("cannot fail to create space");
+                let (send, send_inner, evt_recv) =
+                    spawn_space(space2, this_addr, ep_hnd, config, bandwidth_throttles)
+                        .await
+                        .expect("cannot fail to create space");
                 internal_sender
                     .register_space_event_handler(evt_recv)
                     .await
