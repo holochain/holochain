@@ -43,6 +43,7 @@ pub mod gaps;
 /// a u32 dht arc
 pub struct DhtLocation(pub Wrapping<u32>);
 
+<<<<<<< HEAD
 impl DhtLocation {
     pub fn new(loc: u32) -> Self {
         Self(Wrapping(loc))
@@ -53,6 +54,8 @@ impl DhtLocation {
     }
 }
 
+=======
+>>>>>>> i32 DhtLocation only in tests
 #[cfg(any(test, feature = "test_utils"))]
 impl From<i32> for DhtLocation {
     fn from(i: i32) -> Self {
