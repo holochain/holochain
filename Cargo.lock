@@ -2457,6 +2457,7 @@ dependencies = [
  "serde_yaml",
  "serial_test",
  "shrinkwraprs",
+ "sodoken",
  "structopt 0.3.22",
  "strum",
  "tempdir",
@@ -2607,6 +2608,7 @@ dependencies = [
  "lair_keystore_client",
  "serde",
  "serde_bytes",
+ "sodoken",
  "thiserror",
  "tokio",
  "tracing",
@@ -3475,9 +3477,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_api"
-version = "0.0.2"
+version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26bf69f6ad88274191ef2ad12850193d267c9b76d5cc33874afac9337604e25b"
+checksum = "455fc371e6587b0222089b34e228eddb9d22d5e20e96f512e7e1b8e1f3511ed1"
 dependencies = [
  "arbitrary",
  "blake2b_simd",
@@ -3491,10 +3493,12 @@ dependencies = [
  "nanoid",
  "num_cpus",
  "once_cell",
+ "parking_lot 0.11.1",
  "rand 0.7.3",
  "rayon",
  "rcgen",
  "ring",
+ "sodoken",
  "subtle",
  "thiserror",
  "tokio",
@@ -3504,12 +3508,14 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_client"
-version = "0.0.2"
+version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56ee4915c92df45a3fa55ae07631d925d66c99641f109378b147fc6aeed0e5f7"
+checksum = "b06c2b566782922f4c8c52e7f06a9ffb60f7bb0bfe362f56542bfa838fe19742"
 dependencies = [
+ "futures",
  "ghost_actor 0.3.0-alpha.2",
  "lair_keystore_api",
+ "sodoken",
  "tempfile",
  "tokio",
  "tracing",
@@ -6086,16 +6092,15 @@ dependencies = [
 
 [[package]]
 name = "sodoken"
-version = "0.0.1-alpha.3"
+version = "0.0.1-alpha.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e228d84d2c62a7cfebd521c724c7a9470596dc32674cd45a99953cb43d7436d"
+checksum = "4f39afbc2d374fad30911f189625218312f8c93d6cd07f4f96181823a4316561"
 dependencies = [
  "libc",
  "libsodium-sys",
  "num_cpus",
  "once_cell",
  "parking_lot 0.11.1",
- "rayon",
  "thiserror",
  "tokio",
 ]

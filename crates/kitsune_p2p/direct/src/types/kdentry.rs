@@ -28,8 +28,7 @@ pub trait KdEntrySignedExt: Sized {
 }
 
 async fn check_sig_and_hash(e: &KdEntrySigned) -> KdResult<()> {
-    let data = e.as_data_to_sign_ref();
-    let data = Buffer::from_ref(data);
+    let data = sodoken::BufRead::new_no_lock(e.as_data_to_sign_ref());
 
     let sig = e.as_signature_ref();
     let sig = Arc::new(*sig);
