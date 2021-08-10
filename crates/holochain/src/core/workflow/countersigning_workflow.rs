@@ -124,6 +124,14 @@ pub(crate) async fn countersigning_workflow(
     }
     Ok(WorkComplete::Complete)
 }
+
+pub(crate) async fn countersigning_success(
+    env: &EnvWrite,
+    signed_headers: Vec<SignedHeader>,
+) -> WorkflowResult<()> {
+    todo!()
+}
+
 type AgentsToNotify = Vec<AgentPubKey>;
 type Ops = Vec<(DhtOpHash, DhtOp)>;
 type SignedHeaders = Vec<SignedHeader>;
