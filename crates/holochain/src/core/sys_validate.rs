@@ -422,7 +422,7 @@ impl IncomingDhtOpSender {
     ) -> SysValidationResult<()> {
         if let Some(op) = make_op(element) {
             let ops = vec![op];
-            incoming_dht_ops_workflow(&self.env, self.sys_validation_trigger, ops, None, false)
+            incoming_dht_ops_workflow(&self.env, self.sys_validation_trigger, ops, false)
                 .await
                 .map_err(Box::new)?;
         }

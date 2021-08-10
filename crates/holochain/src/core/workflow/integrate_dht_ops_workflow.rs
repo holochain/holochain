@@ -4,6 +4,8 @@ use super::*;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use error::WorkflowResult;
+use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pCellT;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 
@@ -14,11 +16,11 @@ mod query_tests;
 #[cfg(feature = "test_utils")]
 mod tests;
 
-#[instrument(skip(vault, trigger_sys, trigger_receipt))]
+#[instrument(skip(vault, trigger_receipt, cell_network))]
 pub async fn integrate_dht_ops_workflow(
     vault: EnvWrite,
-    mut trigger_sys: TriggerSender,
     mut trigger_receipt: TriggerSender,
+    cell_network: HolochainP2pCell,
 ) -> WorkflowResult<WorkComplete> {
     let time = holochain_types::timestamp::now();
     let changed = vault
@@ -44,8 +46,8 @@ pub async fn integrate_dht_ops_workflow(
         .await?;
     tracing::debug!(?changed);
     if changed > 0 {
-        trigger_sys.trigger();
         trigger_receipt.trigger();
+        cell_network.new_integrated_data().await?;
         Ok(WorkComplete::Incomplete)
     } else {
         Ok(WorkComplete::Complete)

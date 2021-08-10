@@ -2,7 +2,7 @@ use once_cell::sync::Lazy;
 
 /// this is a reference instance in time
 /// all latency info is encoded relative to this
-static LOC_EPOCH: Lazy<std::time::Instant> = Lazy::new(std::time::Instant::now);
+static LOC_EPOCH: Lazy<tokio::time::Instant> = Lazy::new(tokio::time::Instant::now);
 
 /// this tag identifies that a latency marker will follow
 /// as a little endian ieee f64, this will decode to NaN.
@@ -18,7 +18,7 @@ pub fn fill_with_latency_info(buf: &mut [u8]) {
     // make sure we call this first, so we don't go back in time
     let epoch = *LOC_EPOCH;
 
-    let now = std::time::Instant::now();
+    let now = tokio::time::Instant::now();
     let now = now.duration_since(epoch).as_secs_f64();
 
     // create a pattern of tag/marker
@@ -50,7 +50,7 @@ pub fn parse_latency_info(buf: &[u8]) -> Result<std::time::Duration, ()> {
             let mut time = [0; 8];
             time.copy_from_slice(&buf[i + 8..i + 16]);
             let time = f64::from_le_bytes(time);
-            let now = std::time::Instant::now();
+            let now = tokio::time::Instant::now();
             let now = now.duration_since(*LOC_EPOCH).as_secs_f64();
             let time = std::time::Duration::from_secs_f64(now - time);
             return Ok(time);

@@ -42,13 +42,21 @@ where
     pub is_root_zome_call: bool,
 }
 
-#[instrument(skip(workspace, network, keystore, args, trigger_publish_dht_ops))]
+#[instrument(skip(
+    workspace,
+    network,
+    keystore,
+    args,
+    trigger_publish_dht_ops,
+    trigger_integrate_dht_ops
+))]
 pub async fn call_zome_workflow<Ribosome, C>(
     workspace: HostFnWorkspace,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
     args: CallZomeWorkflowArgs<Ribosome, C>,
     mut trigger_publish_dht_ops: TriggerSender,
+    mut trigger_integrate_dht_ops: TriggerSender,
 ) -> WorkflowResult<ZomeCallResult>
 where
     Ribosome: RibosomeT + Send + 'static,
@@ -61,10 +69,13 @@ where
 
     // commit the workspace
     if should_write {
+        let is_empty = workspace.source_chain().is_empty()?;
         workspace.flush().await?;
+        if !is_empty {
+            trigger_publish_dht_ops.trigger();
+            trigger_integrate_dht_ops.trigger();
+        }
     }
-
-    trigger_publish_dht_ops.trigger();
 
     Ok(result)
 }

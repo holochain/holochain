@@ -53,13 +53,13 @@ use super::p2p_agent_store;
 use super::p2p_agent_store::all_agent_infos;
 use super::p2p_agent_store::get_agent_info_signed;
 use super::p2p_agent_store::inject_agent_infos;
-use super::p2p_agent_store::put_agent_info_signed;
-use super::p2p_agent_store::query_agent_info_signed;
-use super::p2p_agent_store::query_agent_info_signed_near_basis;
+use super::p2p_agent_store::list_all_agent_info;
+use super::p2p_agent_store::list_all_agent_info_signed_near_basis;
 use super::Cell;
 use super::CellError;
 use super::Conductor;
 use crate::conductor::p2p_agent_store::get_single_agent_info;
+use crate::conductor::p2p_agent_store::query_peer_density;
 use crate::conductor::p2p_metrics::put_metric_datum;
 use crate::conductor::p2p_metrics::query_metrics;
 use crate::core::ribosome::real_ribosome::RealRibosome;
@@ -325,6 +325,14 @@ pub trait ConductorHandleT: Send + Sync {
     async fn add_test_app_interface(&self, id: super::state::AppInterfaceId)
         -> ConductorResult<()>;
 
+    #[cfg(any(test, feature = "test_utils"))]
+    /// Check whether this conductor should skip publish.
+    fn should_skip_publish(&self) -> bool;
+
+    #[cfg(any(test, feature = "test_utils"))]
+    /// For testing we can choose to skip publish.
+    fn set_skip_publish(&self, skip_publish: bool);
+
     /// Manually coerce cells to a given CellStatus. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
     async fn update_cell_status(&self, cell_ids: &[CellId], status: CellStatus);
@@ -384,6 +392,12 @@ pub struct ConductorHandleImpl<DS: DnaStore + 'static> {
 
     /// The database for storing p2p MetricDatum(s)
     pub(super) p2p_metrics_env: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
+
+    // Testing:
+    #[cfg(any(test, feature = "test_utils"))]
+    /// All conductors should skip publishing.
+    /// This is useful for testing gossip.
+    pub skip_publish: std::sync::atomic::AtomicBool,
 }
 
 #[async_trait::async_trait]
@@ -492,12 +506,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         trace!(dispatch_event = ?event);
         match event {
             PutAgentInfoSigned {
-                agent_info_signed,
-                respond,
-                ..
+                peer_data, respond, ..
             } => {
                 let env = { self.p2p_env(space) };
-                let res = put_agent_info_signed(env, agent_info_signed)
+                let res = inject_agent_infos(env, peer_data.iter())
                     .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
@@ -515,11 +527,41 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             }
             QueryAgentInfoSigned {
                 kitsune_space,
+                agents,
                 respond,
                 ..
             } => {
                 let env = { self.p2p_env(space) };
-                let res = query_agent_info_signed(env, kitsune_space)
+                let res = list_all_agent_info(env, kitsune_space)
+                    .map(|infos| match agents {
+                        Some(agents) => infos
+                            .into_iter()
+                            .filter(|info| agents.contains(&info.agent))
+                            .collect(),
+                        None => infos,
+                    })
+                    .map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
+            }
+            QueryGossipAgents {
+                since_ms,
+                until_ms,
+                arc_set,
+                respond,
+                ..
+            } => {
+                use holochain_sqlite::db::AsP2pAgentStoreConExt;
+                let env = { self.p2p_env(space) };
+                let res = env
+                    .conn()?
+                    .p2p_gossip_query_agents(since_ms, until_ms, (*arc_set).clone())
+                    // FIXME: This sucks we have to iterate through the whole vec just to add Arcs.
+                    // Are arcs really saving us that much?
+                    .map(|r| {
+                        r.into_iter()
+                            .map(|(agent, arc)| (Arc::new(agent), arc))
+                            .collect()
+                    })
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
@@ -531,7 +573,19 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 ..
             } => {
                 let env = { self.p2p_env(space) };
-                let res = query_agent_info_signed_near_basis(env, kitsune_space, basis_loc, limit)
+                let res =
+                    list_all_agent_info_signed_near_basis(env, kitsune_space, basis_loc, limit)
+                        .map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
+            }
+            QueryPeerDensity {
+                kitsune_space,
+                dht_arc,
+                respond,
+                ..
+            } => {
+                let env = { self.p2p_env(space) };
+                let res = query_peer_density(env, kitsune_space, dht_arc)
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
@@ -572,14 +626,77 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             | GetLinks { .. }
             | GetAgentActivity { .. }
             | ValidationReceiptReceived { .. }
-            | FetchOpHashesForConstraints { .. }
-            | FetchOpHashData { .. } => {
-                let cell_id = CellId::new(
-                    event.dna_hash().clone(),
-                    event.target_agent_as_ref().clone(),
-                );
+            | FetchOpData { .. } => {
+                let cell_id = CellId::new(event.dna_hash().clone(), event.target_agents().clone());
                 let cell = self.cell_by_id(&cell_id).await?;
                 cell.handle_holochain_p2p_event(event).await?;
+            }
+
+            // This event does not have a single Cell as a target, so we handle
+            // it at the conductor level.
+            // TODO: perhaps we can do away with the assumption that each event
+            //       is meant for a single Cell, i.e. allow batching in general
+            HolochainP2pEvent::QueryOpHashes {
+                dna_hash,
+                to_agents,
+                window_ms,
+                max_ops,
+                include_limbo,
+                respond,
+                ..
+            } => {
+                let mut hashes_and_times = Vec::with_capacity(to_agents.len());
+
+                // For each cell collect the hashes and times that fit within the
+                // agents interval and time window.
+                for (agent, arc_set) in to_agents {
+                    let cell_id = CellId::new(dna_hash.clone(), agent);
+                    let cell = self.cell_by_id(&cell_id).await?;
+                    match cell
+                        .handle_query_op_hashes(arc_set, window_ms.clone(), include_limbo)
+                        .await
+                    {
+                        Ok(t) => hashes_and_times.extend(t),
+                        Err(e) => {
+                            // If there's an error for any cell we want to fail the whole call.
+                            respond.respond(Ok(async move {
+                                Err(holochain_p2p::HolochainP2pError::other(e))
+                            }
+                            .boxed()
+                            .into()));
+                            return Ok(());
+                        }
+                    }
+                }
+                // Remove any duplicate hashes.
+                // Note vec must be sorted to remove duplicates.
+                hashes_and_times.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+                hashes_and_times.dedup_by(|a, b| a.0 == b.0);
+
+                // Now sort by time so we can take up to max_ops.
+                hashes_and_times.sort_unstable_by_key(|(_, t)| *t);
+
+                // The start time bound if there is one.
+                let start = hashes_and_times.first().map(|(_, t)| *t);
+
+                // The end time bound if there is one.
+                let end = hashes_and_times
+                    .get(max_ops)
+                    .or_else(|| hashes_and_times.last())
+                    .map(|(_, t)| *t);
+
+                // Extract the hashes.
+                let hashes: Vec<_> = hashes_and_times
+                    .into_iter()
+                    .take(max_ops)
+                    .map(|(h, _)| h)
+                    .collect();
+
+                // The range is exclusive so we add one to the end.
+                let range =
+                    start.and_then(|s| end.map(|e| (hashes, s..(e.checked_add(1).unwrap_or(0)))));
+
+                respond.respond(Ok(async move { Ok(range) }.boxed().into()));
             }
         }
         Ok(())
@@ -1013,6 +1130,17 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     ) -> ConductorResult<()> {
         let mut lock = self.conductor.write().await;
         lock.add_test_app_interface(id).await
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    fn should_skip_publish(&self) -> bool {
+        self.skip_publish.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    fn set_skip_publish(&self, skip_publish: bool) {
+        self.skip_publish
+            .store(skip_publish, std::sync::atomic::Ordering::Relaxed);
     }
 
     #[cfg(any(test, feature = "test_utils"))]

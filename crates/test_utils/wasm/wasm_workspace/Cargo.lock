@@ -140,7 +140,7 @@ checksum = "4bb454f0228b18c7f4c3b0ebbee346ed9c52e7443b0999cd543ff3571205701d"
 
 [[package]]
 name = "fixt"
-version = "0.0.4-dev.0"
+version = "0.0.4"
 dependencies = [
  "holochain_serialized_bytes",
  "lazy_static",
@@ -187,7 +187,7 @@ checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
 
 [[package]]
 name = "hdk"
-version = "0.0.102-dev.0"
+version = "0.0.102"
 dependencies = [
  "hdk_derive",
  "holo_hash",
@@ -205,7 +205,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.0.4-dev.0"
+version = "0.0.4"
 dependencies = [
  "holochain_zome_types",
  "paste",
@@ -225,7 +225,7 @@ dependencies = [
 
 [[package]]
 name = "holo_hash"
-version = "0.0.4-dev.0"
+version = "0.0.4"
 dependencies = [
  "base64",
  "blake2b_simd",
@@ -265,7 +265,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.0.2-dev.0"
+version = "0.0.2"
 dependencies = [
  "hdk",
  "serde",
@@ -298,7 +298,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.0.4-dev.0"
+version = "0.0.4"
 dependencies = [
  "chrono",
  "fixt",
@@ -396,11 +396,11 @@ checksum = "b16bd47d9e329435e309c58469fe0791c2d0d1ba96ec0954152a5ae2b04387dc"
 
 [[package]]
 name = "mockall"
-version = "0.8.3"
+version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41cabea45a7fc0e37093f4f30a5e2b62602253f91791c057d5f0470c63260c3d"
+checksum = "6ab571328afa78ae322493cacca3efac6a0f2e0a67305b4df31fd439ef129ac0"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "downcast",
  "fragile",
  "lazy_static",
@@ -411,11 +411,11 @@ dependencies = [
 
 [[package]]
 name = "mockall_derive"
-version = "0.8.3"
+version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c461918bf7f59eefb1459252756bf2351a995d6bd510d0b2061bd86bcdabfa6"
+checksum = "e7e25b214433f669161f414959594216d8e6ba83b6679d3db96899c0b4639033"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "proc-macro2",
  "quote",
  "syn",

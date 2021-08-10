@@ -85,7 +85,21 @@ pub mod tuning_params_struct {
 
         /// The gossip loop will attempt to rate-limit output
         /// to this count mega bits per second. [Default: 0.5]
-        gossip_output_target_mbps: f64 = 0.5,
+        gossip_outbound_target_mbps: f64 = 0.5,
+
+        /// The gossip loop will attempt to rate-limit input
+        /// to this count mega bits per second. [Default: 0.5]
+        gossip_inbound_target_mbps: f64 = 0.5,
+
+        /// The gossip loop will attempt to rate-limit outbound
+        /// traffic for the historic loop (if there is one)
+        /// to this count mega bits per second. [Default: 0.1]
+        gossip_historic_outbound_target_mbps: f64 = 0.1,
+
+        /// The gossip loop will attempt to rate-limit inbound
+        /// traffic for the historic loop (if there is one)
+        /// to this count mega bits per second. [Default: 0.1]
+        gossip_historic_inbound_target_mbps: f64 = 0.1,
 
         /// How long should we hold off talking to a peer
         /// we've previously spoken successfully to.
@@ -97,14 +111,22 @@ pub mod tuning_params_struct {
         /// [Default: 5 minute]
         gossip_peer_on_error_next_gossip_delay_ms: u32 = 1000 * 60 * 5,
 
+        /// How frequently we should locally sync when there is
+        /// no new data. Agents arc can change so this shouldn't
+        /// be too long. [Default: 1 minutes]
+        gossip_local_sync_delay_ms: u32 = 1000 * 60,
+
         /// Default timeout for rpc single. [Default: 30s]
         default_rpc_single_timeout_ms: u32 = 1000 * 30,
 
-        /// Default agent count for rpc multi. [Default: 2]
-        default_rpc_multi_remote_agent_count: u32 = 2,
+        /// Default agent count for rpc multi. [Default: 3]
+        default_rpc_multi_remote_agent_count: u8 = 3,
 
-        /// Default timeout for rpc multi. [Default: 30s]
-        default_rpc_multi_timeout_ms: u32 = 1000 * 30,
+        /// Default remote request grace ms. [Default: 3s]
+        /// If we already have results from other sources,
+        /// but made any additional outgoing remote requests,
+        /// we'll wait at least this long for additional responses.
+        default_rpc_multi_remote_request_grace_ms: u64 = 1000 * 3,
 
         /// Default agent expires after milliseconds. [Default: 20 minutes]
         agent_info_expires_after_ms: u32 = 1000 * 60 * 20,

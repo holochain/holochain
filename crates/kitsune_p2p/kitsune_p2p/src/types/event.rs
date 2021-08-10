@@ -1,41 +1,44 @@
 //! Definitions for events emited from the KitsuneP2p actor.
 
 use crate::types::agent_store::AgentInfoSigned;
-use std::{sync::Arc, time::SystemTime};
+use kitsune_p2p_types::dht_arc::DhtArcSet;
+use std::{collections::HashSet, sync::Arc, time::SystemTime};
 
 /// Gather a list of op-hashes from our implementor that meet criteria.
+/// Also get the start and end times for ops within a time window
+/// up to a maximum number.
 #[derive(Debug)]
-pub struct FetchOpHashesForConstraintsEvt {
+pub struct QueryOpHashesEvt {
     /// The "space" context.
-    pub space: Arc<super::KitsuneSpace>,
-    /// The "agent" context.
-    pub agent: Arc<super::KitsuneAgent>,
-    /// The dht arc to query.
-    pub dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
-    /// Only retreive items received since this time (INCLUSIVE).
-    pub since_utc_epoch_s: i64,
-    /// Only retreive items received until this time (EXCLUSIVE).
-    pub until_utc_epoch_s: i64,
+    pub space: KSpace,
+    /// The agents from which to fetch, along with a DhtArcSet to filter by.
+    pub agents: Vec<(KAgent, DhtArcSet)>,
+    /// The time window to search within.
+    pub window_ms: TimeWindowMs,
+    /// Maximum number of ops to return.
+    pub max_ops: usize,
+    /// Include ops that are still in limbo (not yet validated or integrated).
+    pub include_limbo: bool,
 }
 
 /// Gather all op-hash data for a list of op-hashes from our implementor.
 #[derive(Debug)]
-pub struct FetchOpHashDataEvt {
+pub struct FetchOpDataEvt {
     /// The "space" context.
-    pub space: Arc<super::KitsuneSpace>,
+    pub space: KSpace,
     /// The "agent" context.
-    pub agent: Arc<super::KitsuneAgent>,
+    pub agents: Vec<KAgent>,
     /// The op-hashes to fetch
-    pub op_hashes: Vec<Arc<super::KitsuneOpHash>>,
+    pub op_hashes: Vec<KOpHash>,
 }
 
 /// Request that our implementor sign some data on behalf of an agent.
 #[derive(Debug)]
 pub struct SignNetworkDataEvt {
     /// The "space" context.
-    pub space: Arc<super::KitsuneSpace>,
+    pub space: KSpace,
     /// The "agent" context.
-    pub agent: Arc<super::KitsuneAgent>,
+    pub agent: KAgent,
     /// The data to sign.
     #[allow(clippy::rc_buffer)]
     pub data: Arc<Vec<u8>>,
@@ -45,29 +48,42 @@ pub struct SignNetworkDataEvt {
 #[derive(Debug)]
 pub struct PutAgentInfoSignedEvt {
     /// The "space" context.
-    pub space: Arc<super::KitsuneSpace>,
-    /// The "agent" context.
-    pub agent: Arc<super::KitsuneAgent>,
-    /// The signed agent info.
-    pub agent_info_signed: AgentInfoSigned,
+    pub space: KSpace,
+    /// A batch of signed agent info for this space.
+    pub peer_data: Vec<AgentInfoSigned>,
 }
 
 /// Get agent info for a single agent, as previously signed and put.
 #[derive(Debug)]
 pub struct GetAgentInfoSignedEvt {
     /// The "space" context.
-    pub space: Arc<super::KitsuneSpace>,
+    pub space: KSpace,
     /// The "agent" context.
-    pub agent: Arc<super::KitsuneAgent>,
+    pub agent: KAgent,
 }
 
 /// Get agent info which satisfies a query.
 #[derive(Debug)]
 pub struct QueryAgentInfoSignedEvt {
     /// The "space" context.
-    pub space: Arc<super::KitsuneSpace>,
-    /// The "agent" context.
-    pub agent: Arc<super::KitsuneAgent>,
+    pub space: KSpace,
+    /// The optional list of agents to filter by.
+    pub agents: Option<HashSet<KAgent>>,
+}
+
+/// Get agent info which satisfies a query.
+#[derive(Debug)]
+pub struct QueryGossipAgentsEvt {
+    /// The "space" context.
+    pub space: KSpace,
+    /// The optional list of agents to filter by.
+    pub agents: Option<Vec<KAgent>>,
+    /// Start of the time window.
+    pub since_ms: u64,
+    /// End of the time window.
+    pub until_ms: u64,
+    /// The set that we need agents to fit into.
+    pub arc_set: Arc<kitsune_p2p_types::dht_arc::DhtArcSet>,
 }
 
 /// A single datum of metric info about an Agent, to be recorded by the client.
@@ -91,7 +107,7 @@ pub enum MetricKind {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MetricDatum {
     /// The agent this event is about
-    pub agent: Arc<super::KitsuneAgent>,
+    pub agent: KAgent,
     /// The kind of event
     pub kind: MetricKind,
     /// The time at which this occurred
@@ -121,7 +137,7 @@ pub enum MetricQuery {
     /// Filters for the "last sync" query.
     LastSync {
         /// The agent to query by
-        agent: Arc<super::KitsuneAgent>,
+        agent: KAgent,
     },
     /// Filters for the "oldest agent" query.
     Oldest {
@@ -136,8 +152,24 @@ pub enum MetricQueryAnswer {
     /// The last sync time for all agents.
     LastSync(Option<std::time::SystemTime>),
     /// The agent with the oldest last-connection time which satisfies the query.
-    Oldest(Option<Arc<super::KitsuneAgent>>),
+    Oldest(Option<KAgent>),
 }
+
+/// A UNIX timestamp, measured in milliseconds
+pub type TimestampMs = u64;
+
+/// A range of timestamps, measured in milliseconds
+pub type TimeWindowMs = std::ops::Range<TimestampMs>;
+
+/// A time window which covers all of recordable time
+pub fn full_time_window() -> TimeWindowMs {
+    TimestampMs::MIN..TimestampMs::MAX
+}
+type KSpace = Arc<super::KitsuneSpace>;
+type KAgent = Arc<super::KitsuneAgent>;
+type KOpHash = Arc<super::KitsuneOpHash>;
+type Payload = Vec<u8>;
+type Ops = Vec<(KOpHash, Payload)>;
 
 ghost_actor::ghost_chan! {
     /// The KitsuneP2pEvent stream allows handling events generated from the
@@ -152,8 +184,14 @@ ghost_actor::ghost_chan! {
         /// We need to get previously stored agent info.
         fn query_agent_info_signed(input: QueryAgentInfoSignedEvt) -> Vec<crate::types::agent_store::AgentInfoSigned>;
 
+        /// We need to get agents that fit into an arc set for gossip.
+        fn query_gossip_agents(input: QueryGossipAgentsEvt) -> Vec<(KAgent, kitsune_p2p_types::dht_arc::ArcInterval)>;
+
         /// query agent info in order of closeness to a basis location.
-        fn query_agent_info_signed_near_basis(space: Arc<super::KitsuneSpace>, basis_loc: u32, limit: u32) -> Vec<crate::types::agent_store::AgentInfoSigned>;
+        fn query_agent_info_signed_near_basis(space: KSpace, basis_loc: u32, limit: u32) -> Vec<crate::types::agent_store::AgentInfoSigned>;
+
+        /// Query the peer density of a space for a given [`DhtArc`].
+        fn query_peer_density(space: KSpace, dht_arc: kitsune_p2p_types::dht_arc::DhtArc) -> kitsune_p2p_types::dht_arc::PeerDensity;
 
         /// Record a metric datum about an agent.
         fn put_metric_datum(datum: MetricDatum) -> ();
@@ -162,25 +200,21 @@ ghost_actor::ghost_chan! {
         fn query_metrics(query: MetricQuery) -> MetricQueryAnswer;
 
         /// We are receiving a request from a remote node.
-        fn call(space: Arc<super::KitsuneSpace>, to_agent: Arc<super::KitsuneAgent>, from_agent: Arc<super::KitsuneAgent>, payload: Vec<u8>) -> Vec<u8>;
+        fn call(space: KSpace, to_agent: KAgent, from_agent: KAgent, payload: Payload) -> Vec<u8>;
 
         /// We are receiving a notification from a remote node.
-        fn notify(space: Arc<super::KitsuneSpace>, to_agent: Arc<super::KitsuneAgent>, from_agent: Arc<super::KitsuneAgent>, payload: Vec<u8>) -> ();
+        fn notify(space: KSpace, to_agent: KAgent, from_agent: KAgent, payload: Payload) -> ();
 
         /// We are receiving a dht op we may need to hold distributed via gossip.
-        fn gossip(
-            space: Arc<super::KitsuneSpace>,
-            to_agent: Arc<super::KitsuneAgent>,
-            from_agent: Arc<super::KitsuneAgent>,
-            op_hash: Arc<super::KitsuneOpHash>,
-            op_data: Vec<u8>,
-        ) -> ();
+        fn gossip(space: KSpace, to_agent: KAgent, ops: Ops) -> ();
 
         /// Gather a list of op-hashes from our implementor that meet criteria.
-        fn fetch_op_hashes_for_constraints(input: FetchOpHashesForConstraintsEvt) -> Vec<Arc<super::KitsuneOpHash>>;
+        /// Get the oldest and newest times for ops within a time window and max number of ops.
+        // maackle: do we really need to *individually* wrap all these op hashes in Arcs?
+        fn query_op_hashes(input: QueryOpHashesEvt) -> Option<(Vec<KOpHash>, TimeWindowMs)>;
 
         /// Gather all op-hash data for a list of op-hashes from our implementor.
-        fn fetch_op_hash_data(input: FetchOpHashDataEvt) -> Vec<(Arc<super::KitsuneOpHash>, Vec<u8>)>;
+        fn fetch_op_data(input: FetchOpDataEvt) -> Vec<(KOpHash, Vec<u8>)>;
 
         /// Request that our implementor sign some data on behalf of an agent.
         fn sign_network_data(input: SignNetworkDataEvt) -> super::KitsuneSignature;

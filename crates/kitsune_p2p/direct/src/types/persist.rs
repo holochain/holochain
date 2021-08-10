@@ -2,10 +2,11 @@
 
 use crate::*;
 use futures::future::BoxFuture;
+use kitsune_p2p::dht_arc::DhtArcSet;
 use kitsune_p2p::event::MetricDatum;
 use kitsune_p2p::event::MetricQuery;
 use kitsune_p2p::event::MetricQueryAnswer;
-use kitsune_p2p_types::dht_arc::DhtArc;
+use kitsune_p2p::event::TimeWindowMs;
 use kitsune_p2p_types::tls::TlsConfig;
 use std::future::Future;
 
@@ -50,6 +51,13 @@ pub trait AsKdPersist: 'static + Send + Sync {
         limit: u32,
     ) -> BoxFuture<'static, KdResult<Vec<KdAgentInfo>>>;
 
+    /// Query the peer density of a space for a given [`DhtArc`].
+    fn query_peer_density(
+        &self,
+        root: KdHash,
+        dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+    ) -> BoxFuture<'static, KdResult<kitsune_p2p_types::dht_arc::PeerDensity>>;
+
     /// Store agent info
     fn put_metric_datum(&self, datum: MetricDatum) -> BoxFuture<'static, KdResult<()>>;
 
@@ -77,9 +85,8 @@ pub trait AsKdPersist: 'static + Send + Sync {
         &self,
         root: KdHash,
         agent: KdHash,
-        created_at_start_s: f32,
-        created_at_end_s: f32,
-        dht_arc: DhtArc,
+        window_ms: TimeWindowMs,
+        dht_arc: DhtArcSet,
     ) -> BoxFuture<'static, KdResult<Vec<KdEntrySigned>>>;
 
     /// Get ui file
@@ -173,6 +180,16 @@ impl KdPersist {
         AsKdPersist::query_agent_info_near_basis(&*self.0, root, basis_loc, limit)
     }
 
+    /// Query the peer density of a space for a given [`DhtArc`].
+    pub fn query_peer_density(
+        &self,
+        root: KdHash,
+        dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+    ) -> impl Future<Output = KdResult<kitsune_p2p_types::dht_arc::PeerDensity>> + 'static + Send
+    {
+        AsKdPersist::query_peer_density(&*self.0, root, dht_arc)
+    }
+
     /// Store agent info
     pub fn store_metric_datum(
         &self,
@@ -214,18 +231,10 @@ impl KdPersist {
         &self,
         root: KdHash,
         agent: KdHash,
-        created_at_start_s: f32,
-        created_at_end_s: f32,
-        dht_arc: DhtArc,
+        window: TimeWindowMs,
+        dht_arc: DhtArcSet,
     ) -> impl Future<Output = KdResult<Vec<KdEntrySigned>>> + 'static + Send {
-        AsKdPersist::query_entries(
-            &*self.0,
-            root,
-            agent,
-            created_at_start_s,
-            created_at_end_s,
-            dht_arc,
-        )
+        AsKdPersist::query_entries(&*self.0, root, agent, window, dht_arc)
     }
 
     /// Get ui file

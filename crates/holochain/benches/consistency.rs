@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use criterion::criterion_group;
 use criterion::criterion_main;
 use criterion::BenchmarkId;
@@ -50,16 +52,18 @@ fn consistency(bench: &mut Criterion) {
                 std::time::Duration::from_millis(500),
             )
             .await;
-            holochain_state::prelude::dump_tmp(consumer.cell.env());
+            // holochain_state::prelude::dump_tmp(consumer.cell.env());
         });
     }
+    let mut cells = vec![consumer.cell.clone(), producer.cell.clone()];
+    cells.extend(others.cells.clone());
     runtime.spawn(async move {
         producer.run().await;
         producer.conductor.shutdown_and_wait().await;
     });
     group.bench_function(BenchmarkId::new("test", format!("test")), |b| {
         b.iter(|| {
-            runtime.block_on(async { consumer.run().await });
+            runtime.block_on(async { consumer.run(&cells[..]).await });
         });
     });
     runtime.block_on(async move {
@@ -124,7 +128,8 @@ impl Producer {
 }
 
 impl Consumer {
-    async fn run(&mut self) {
+    async fn run(&mut self, cells: &[SweetCell]) {
+        let start = std::time::Instant::now();
         let mut num = self.last;
         while num <= self.last {
             let hashes: EntryHashes = self
@@ -136,8 +141,21 @@ impl Consumer {
                 )
                 .await;
             num = hashes.0.len();
+            if start.elapsed().as_secs() > 1 {
+                for cell in cells {
+                    holochain::test_utils::consistency(
+                        &[cell],
+                        1,
+                        std::time::Duration::from_millis(10),
+                    )
+                    .await;
+                }
+            }
+            // dump_tmp(self.cell.env());
+            // dump_tmp(prod.env());
         }
         self.last = num;
+        dbg!(start.elapsed());
         self.tx.send(num).await.unwrap();
     }
 }
@@ -148,12 +166,18 @@ async fn setup() -> (Producer, Consumer, Others) {
         .await
         .unwrap();
     let config = || {
+        let mut tuning =
+            kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+        tuning.gossip_strategy = "sharded-gossip".to_string();
+        // tuning.gossip_strategy = "simple-bloom".to_string();
+
         let mut network = KitsuneP2pConfig::default();
         network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
             bind_to: None,
             override_host: None,
             override_port: None,
         }];
+        network.tuning_params = Arc::new(tuning);
         ConductorConfig {
             network: Some(network),
             admin_interfaces: Some(vec![AdminInterfaceConfig {
@@ -164,6 +188,9 @@ async fn setup() -> (Producer, Consumer, Others) {
     };
     let configs = vec![config(), config(), config(), config(), config()];
     let mut conductors = SweetConductorBatch::from_configs(configs.clone()).await;
+    for c in conductors.iter() {
+        c.set_skip_publish(true);
+    }
     let apps = conductors.setup_app("app", &[dna]).await.unwrap();
     let mut cells = apps
         .into_inner()
