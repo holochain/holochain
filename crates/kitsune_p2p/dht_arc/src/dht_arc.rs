@@ -39,6 +39,7 @@ pub mod gaps;
 /// a u32 dht arc
 pub struct DhtLocation(pub Wrapping<u32>);
 
+#[cfg(any(test, feature = "test_utils"))]
 impl From<i32> for DhtLocation {
     fn from(i: i32) -> Self {
         (i as u32).into()
