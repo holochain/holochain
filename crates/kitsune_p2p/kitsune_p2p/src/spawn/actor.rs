@@ -76,6 +76,7 @@ pub(crate) struct KitsuneP2pActor {
     >,
     config: Arc<KitsuneP2pConfig>,
     bandwidth_throttles: BandwidthThrottles,
+    parallel_notify_permit: Arc<tokio::sync::Semaphore>,
 }
 
 impl KitsuneP2pActor {
@@ -350,6 +351,9 @@ impl KitsuneP2pActor {
         });
 
         let bandwidth_throttles = BandwidthThrottles::new(&config.tuning_params);
+        let parallel_notify_permit = Arc::new(tokio::sync::Semaphore::new(
+            config.tuning_params.concurrent_limit_per_thread,
+        ));
 
         Ok(Self {
             this_addr: this_addr.into(),
@@ -360,6 +364,7 @@ impl KitsuneP2pActor {
             spaces: HashMap::new(),
             config: Arc::new(config),
             bandwidth_throttles,
+            parallel_notify_permit,
         })
     }
 }
@@ -589,13 +594,20 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         let ep_hnd = self.ep_hnd.clone();
         let config = Arc::clone(&self.config);
         let bandwidth_throttles = self.bandwidth_throttles.clone();
+        let parallel_notify_permit = self.parallel_notify_permit.clone();
         let space_sender = match self.spaces.entry(space.clone()) {
             Entry::Occupied(entry) => entry.into_mut(),
             Entry::Vacant(entry) => entry.insert(AsyncLazy::new(async move {
-                let (send, send_inner, evt_recv) =
-                    spawn_space(space2, this_addr, ep_hnd, config, bandwidth_throttles)
-                        .await
-                        .expect("cannot fail to create space");
+                let (send, send_inner, evt_recv) = spawn_space(
+                    space2,
+                    this_addr,
+                    ep_hnd,
+                    config,
+                    bandwidth_throttles,
+                    parallel_notify_permit,
+                )
+                .await
+                .expect("cannot fail to create space");
                 internal_sender
                     .register_space_event_handler(evt_recv)
                     .await
