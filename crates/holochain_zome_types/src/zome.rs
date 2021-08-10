@@ -106,6 +106,8 @@ pub enum ZomeDef {
 #[serde(untagged)]
 enum ZomeDefSerialized {
     Wasm(WasmZome),
+
+    #[cfg(feature = "full-dna-def")]
     InlineUid(String),
 }
 
@@ -130,11 +132,14 @@ impl From<InlineZome> for ZomeDef {
 impl ZomeDef {
     /// If this is a Wasm zome, return the WasmHash.
     /// If not, return an error with the provided zome name
-    pub fn wasm_hash(&self, zome_name: &ZomeName) -> ZomeResult<holo_hash::WasmHash> {
+    //
+    // NB: argument uses underscore here because without full-dna-def feature,
+    //     the arg is unused.
+    pub fn wasm_hash(&self, _zome_name: &ZomeName) -> ZomeResult<holo_hash::WasmHash> {
         match self {
             ZomeDef::Wasm(WasmZome { wasm_hash }) => Ok(wasm_hash.clone()),
             #[cfg(feature = "full-dna-def")]
-            ZomeDef::Inline(_) => Err(ZomeError::NonWasmZome(zome_name.clone())),
+            ZomeDef::Inline(_) => Err(ZomeError::NonWasmZome(_zome_name.clone())),
         }
     }
 }
