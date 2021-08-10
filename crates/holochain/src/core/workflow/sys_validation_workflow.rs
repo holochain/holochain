@@ -231,6 +231,7 @@ async fn validate_op_inner(
 ) -> SysValidationResult<()> {
     match op {
         DhtOp::StoreElement(_, header, entry) => {
+            // @todo retrieve for all other headers on countersigned entry.
             store_element(header, workspace, network.clone()).await?;
             if let Some(entry) = entry {
                 store_entry(
@@ -247,6 +248,7 @@ async fn validate_op_inner(
             Ok(())
         }
         DhtOp::StoreEntry(_, header, entry) => {
+            // @todo check and hold for all other headers on countersigned entry.
             store_entry(
                 (header).into(),
                 entry.as_ref(),
@@ -367,6 +369,9 @@ async fn sys_validate_element_inner(
     let entry = element.entry().as_option();
     let incoming_dht_ops_sender = None;
     counterfeit_check(signature, header).await?;
+
+    // @todo loop here over headers for countersigned entries...
+
     store_element(header, workspace, network.clone()).await?;
     if let Some((entry, EntryVisibility::Public)) =
         &entry.and_then(|e| header.entry_type().map(|et| (e, et.visibility())))
