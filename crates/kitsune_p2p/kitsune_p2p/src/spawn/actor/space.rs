@@ -59,6 +59,7 @@ pub(crate) async fn spawn_space(
     this_addr: url2::Url2,
     ep_hnd: Tx2EpHnd<wire::Wire>,
     config: Arc<KitsuneP2pConfig>,
+    bandwidth_throttles: BandwidthThrottles,
 ) -> KitsuneP2pResult<(
     ghost_actor::GhostSender<KitsuneP2p>,
     ghost_actor::GhostSender<SpaceInternal>,
@@ -85,6 +86,7 @@ pub(crate) async fn spawn_space(
         evt_send,
         ep_hnd,
         config,
+        bandwidth_throttles,
     )));
 
     Ok((sender, i_s, evt_recv))
@@ -778,6 +780,7 @@ impl Space {
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
         ep_hnd: Tx2EpHnd<wire::Wire>,
         config: Arc<KitsuneP2pConfig>,
+        bandwidth_throttles: BandwidthThrottles,
     ) -> Self {
         let gossip_mod = config
             .tuning_params
@@ -791,11 +794,13 @@ impl Space {
                 "sharded-gossip" => vec![
                     (
                         GossipModuleType::ShardedRecent,
-                        crate::gossip::sharded_gossip::recent_factory(),
+                        crate::gossip::sharded_gossip::recent_factory(bandwidth_throttles.recent()),
                     ),
                     (
                         GossipModuleType::ShardedHistorical,
-                        crate::gossip::sharded_gossip::historical_factory(),
+                        crate::gossip::sharded_gossip::historical_factory(
+                            bandwidth_throttles.historical(),
+                        ),
                     ),
                 ],
                 _ => {
