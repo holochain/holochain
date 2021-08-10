@@ -32,7 +32,7 @@ pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u32 = 5;
 /// Don't publish a DhtOp more than once during this interval.
 /// This allows us to trigger the publish workflow as often as we like, without
 /// flooding the network with spurious publishes.
-pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(5);
+pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(60);
 
 #[instrument(skip(env, network))]
 pub async fn publish_dht_ops_workflow(
@@ -513,8 +513,8 @@ mod tests {
                 .await;
                 let cell_network = test_network.cell_network();
                 let (tx_complete, rx_complete) = tokio::sync::oneshot::channel();
-                // We are expecting six ops per agent plus one for self plus 7 for genesis.
-                let total_expected = (num_agents + 1) * (6 + 7);
+                // We are expecting six ops per agent plus one for self.
+                let total_expected = (num_agents + 1) * 6;
                 let mut recv_count: u32 = 0;
 
                 // Receive events and increment count
