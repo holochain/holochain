@@ -61,8 +61,10 @@ macro_rules! make_kitsune_bin_type {
                         debug_assert_eq!(bytes.len(), 32);
                         // FIXME: no way to compute location bytes at this time,
                         // so simply pad with 0's for now
-                        // bytes.append(&mut kitsune_location_bytes(&bytes));
                         bytes.append(&mut [0; 4].to_vec());
+
+                        // todo!("actually calculate location bytes");
+                        // bytes.append(&mut kitsune_location_bytes(&bytes));
                     }
                     debug_assert_eq!(bytes.len(), 36);
                     Self(bytes)
@@ -99,6 +101,22 @@ macro_rules! make_kitsune_bin_type {
                     self.0.as_slice()
                 }
             }
+
+            #[cfg(feature = "arbitrary")]
+            impl<'a> arbitrary::Arbitrary<'a> for $name {
+                fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+                    // FIXME: there is no way to calculate location bytes right now,
+                    //        so we're producing arbitrary bytes in a way that the location
+                    //        DOES NOT match the hash. This needs to change, but we can go
+                    //        forward with this for now.
+                    let mut buf = [0; 36];
+                    buf[..]
+                        .copy_from_slice(u.bytes(36)?);
+
+                    Ok(Self::new(buf.to_vec()))
+                }
+            }
+
         )*
     };
 }
@@ -132,6 +150,7 @@ These metadata "Operations" each also have unique OpHashes."#,
     serde::Deserialize,
     serde::Serialize,
 )]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[shrinkwrap(mutable)]
 pub struct KitsuneSignature(#[serde(with = "serde_bytes")] pub Vec<u8>);
 

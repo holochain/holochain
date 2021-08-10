@@ -23,9 +23,9 @@ enum TT {
 }
 
 struct Test {
-    pub proxy_ep_hnd: EpHnd,
-    pub tgt_nodes: Vec<(EpHnd, ConHnd)>,
-    pub tgt_addrs: Vec<TxUrl>,
+    pub _proxy_ep_hnd: EpHnd,
+    pub _tgt_nodes: Vec<(EpHnd, ConHnd)>,
+    pub _tgt_addrs: Vec<TxUrl>,
     pub nodes: Vec<(EpHnd, ConHnd)>,
 
     pub d_send: Arc<Share<Option<tokio::sync::mpsc::Sender<()>>>>,
@@ -80,9 +80,9 @@ impl Test {
         }
 
         Self {
-            proxy_ep_hnd,
-            tgt_nodes,
-            tgt_addrs,
+            _proxy_ep_hnd: proxy_ep_hnd,
+            _tgt_nodes: tgt_nodes,
+            _tgt_addrs: tgt_addrs,
             nodes,
             d_send,
         }

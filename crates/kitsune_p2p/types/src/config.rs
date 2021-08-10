@@ -85,7 +85,21 @@ pub mod tuning_params_struct {
 
         /// The gossip loop will attempt to rate-limit output
         /// to this count mega bits per second. [Default: 0.5]
-        gossip_output_target_mbps: f64 = 0.5,
+        gossip_outbound_target_mbps: f64 = 0.5,
+
+        /// The gossip loop will attempt to rate-limit input
+        /// to this count mega bits per second. [Default: 0.5]
+        gossip_inbound_target_mbps: f64 = 0.5,
+
+        /// The gossip loop will attempt to rate-limit outbound
+        /// traffic for the historic loop (if there is one)
+        /// to this count mega bits per second. [Default: 0.1]
+        gossip_historic_outbound_target_mbps: f64 = 0.1,
+
+        /// The gossip loop will attempt to rate-limit inbound
+        /// traffic for the historic loop (if there is one)
+        /// to this count mega bits per second. [Default: 0.1]
+        gossip_historic_inbound_target_mbps: f64 = 0.1,
 
         /// How long should we hold off talking to a peer
         /// we've previously spoken successfully to.
@@ -96,6 +110,11 @@ pub mod tuning_params_struct {
         /// we've previously gotten errors speaking to.
         /// [Default: 5 minute]
         gossip_peer_on_error_next_gossip_delay_ms: u32 = 1000 * 60 * 5,
+
+        /// How frequently we should locally sync when there is
+        /// no new data. Agents arc can change so this shouldn't
+        /// be too long. [Default: 1 minutes]
+        gossip_local_sync_delay_ms: u32 = 1000 * 60,
 
         /// Default timeout for rpc single. [Default: 30s]
         default_rpc_single_timeout_ms: u32 = 1000 * 30,
