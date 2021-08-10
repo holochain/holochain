@@ -116,7 +116,8 @@ pub mod tests {
     environment_path: /path/to/env
 
     passphrase_service:
-      type: cmd
+      type: fromconfig
+      passphrase: test-passphrase
     "#;
         let result: ConductorConfig = config_from_yaml(yaml).unwrap();
         assert_eq!(
@@ -125,7 +126,9 @@ pub mod tests {
                 environment_path: PathBuf::from("/path/to/env").into(),
                 network: None,
                 dpki: None,
-                passphrase_service: Some(PassphraseServiceConfig::Cmd),
+                passphrase_service: Some(PassphraseServiceConfig::FromConfig {
+                    passphrase: "test-passphrase".to_string(),
+                }),
                 keystore_path: None,
                 admin_interfaces: None,
                 use_dangerous_test_keystore: false,
@@ -145,7 +148,8 @@ pub mod tests {
     decryption_service_uri: ws://localhost:9003
 
     passphrase_service:
-      type: cmd
+      type: fromconfig
+      passphrase: test-passphrase
 
     dpki:
       instance_id: some_id
@@ -211,7 +215,9 @@ pub mod tests {
                     instance_id: "some_id".into(),
                     init_params: "some_params".into()
                 }),
-                passphrase_service: Some(PassphraseServiceConfig::Cmd),
+                passphrase_service: Some(PassphraseServiceConfig::FromConfig {
+                    passphrase: "test-passphrase".to_string(),
+                }),
                 keystore_path: None,
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
                     driver: InterfaceDriver::Websocket { port: 1234 }
