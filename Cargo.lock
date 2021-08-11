@@ -2920,6 +2920,7 @@ dependencies = [
  "holo_hash",
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
+ "matches",
  "nanoid",
  "num_enum",
  "once_cell",
