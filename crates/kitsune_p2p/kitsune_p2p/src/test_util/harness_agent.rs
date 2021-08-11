@@ -138,12 +138,14 @@ impl KitsuneP2pEventHandler for AgentHarness {
         &mut self,
         input: PutAgentInfoSignedEvt,
     ) -> KitsuneP2pEventHandlerResult<()> {
-        let info = Arc::new(input.agent_info_signed);
-        self.agent_store.insert(input.agent.clone(), info.clone());
-        self.harness_chan.publish(HarnessEventType::StoreAgentInfo {
-            agent: (&input.agent).into(),
-            agent_info: info,
-        });
+        for info in input.peer_data {
+            let info = Arc::new(info);
+            self.agent_store.insert(info.agent.clone(), info.clone());
+            self.harness_chan.publish(HarnessEventType::StoreAgentInfo {
+                agent: (&info.agent).into(),
+                agent_info: info,
+            });
+        }
         Ok(async move { Ok(()) }.boxed().into())
     }
 
@@ -153,6 +155,18 @@ impl KitsuneP2pEventHandler for AgentHarness {
     ) -> KitsuneP2pEventHandlerResult<Option<crate::types::agent_store::AgentInfoSigned>> {
         let res = self.agent_store.get(&input.agent).map(|i| (**i).clone());
         Ok(async move { Ok(res) }.boxed().into())
+    }
+
+    fn handle_query_gossip_agents(
+        &mut self,
+        _input: crate::event::QueryGossipAgentsEvt,
+    ) -> KitsuneP2pEventHandlerResult<
+        Vec<(
+            Arc<crate::KitsuneAgent>,
+            kitsune_p2p_types::dht_arc::ArcInterval,
+        )>,
+    > {
+        todo!()
     }
 
     fn handle_query_agent_info_signed(
@@ -240,32 +254,34 @@ impl KitsuneP2pEventHandler for AgentHarness {
         &mut self,
         _space: Arc<super::KitsuneSpace>,
         _to_agent: Arc<super::KitsuneAgent>,
-        _from_agent: Arc<super::KitsuneAgent>,
-        op_hash: Arc<super::KitsuneOpHash>,
-        op_data: Vec<u8>,
+        ops: Vec<(Arc<super::KitsuneOpHash>, Vec<u8>)>,
     ) -> KitsuneP2pEventHandlerResult<()> {
-        let op_data = String::from_utf8_lossy(&op_data).to_string();
-        self.harness_chan.publish(HarnessEventType::Gossip {
-            op_hash: (&op_hash).into(),
-            op_data: op_data.clone(),
-        });
-        self.gossip_store.insert(op_hash, op_data);
+        for (op_hash, op_data) in ops {
+            let op_data = String::from_utf8_lossy(&op_data).to_string();
+            self.harness_chan.publish(HarnessEventType::Gossip {
+                op_hash: (&op_hash).into(),
+                op_data: op_data.clone(),
+            });
+            self.gossip_store.insert(op_hash, op_data);
+        }
         Ok(async move { Ok(()) }.boxed().into())
     }
 
-    fn handle_fetch_op_hashes_for_constraints(
+    fn handle_query_op_hashes(
         &mut self,
-        _input: FetchOpHashesForConstraintsEvt,
-    ) -> KitsuneP2pEventHandlerResult<Vec<Arc<super::KitsuneOpHash>>> {
+        _input: QueryOpHashesEvt,
+    ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<super::KitsuneOpHash>>, TimeWindowMs)>> {
         let hashes: Vec<Arc<super::KitsuneOpHash>> = self.gossip_store.keys().cloned().collect();
         let slug_hashes: Vec<Slug> = hashes.iter().map(|h| h.into()).collect();
         tracing::trace!(?slug_hashes, "FETCH_OP_HASHES");
-        Ok(async move { Ok(hashes) }.boxed().into())
+        Ok(async move { Ok(Some((hashes, u64::MIN..u64::MAX))) }
+            .boxed()
+            .into())
     }
 
-    fn handle_fetch_op_hash_data(
+    fn handle_fetch_op_data(
         &mut self,
-        input: FetchOpHashDataEvt,
+        input: FetchOpDataEvt,
     ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<super::KitsuneOpHash>, Vec<u8>)>> {
         let mut out = Vec::new();
         for hash in input.op_hashes {

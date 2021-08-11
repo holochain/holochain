@@ -31,7 +31,7 @@ holochain_sqlite = { path = "../holochain_sqlite", version = "0.0.2"}
 holochain_zome_types = { path = "../holochain_zome_types", version = "0.0.4"}
 itertools = { version = "0.10" }
 lazy_static = "1.4.0"
-mockall = "0.8"
+mockall = "0.10.2"
 mr_bundle = { path = "../mr_bundle", features = ["packing"], version = "0.0.2"}
 must_future = "0.1.1"
 nanoid = "0.3"

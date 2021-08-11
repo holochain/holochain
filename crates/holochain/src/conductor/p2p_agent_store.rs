@@ -70,16 +70,16 @@ pub fn get_agent_info_signed(
     Ok(environ.conn()?.p2p_get_agent(&kitsune_agent)?)
 }
 
-/// Get agent info for a single space
-pub fn query_agent_info_signed(
+/// Get all agent info for a single space
+pub fn list_all_agent_info(
     environ: EnvWrite,
     _kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
 ) -> ConductorResult<Vec<AgentInfoSigned>> {
     Ok(environ.conn()?.p2p_list_agents()?)
 }
 
-/// Get agent info for a single space near a basis loc
-pub fn query_agent_info_signed_near_basis(
+/// Get all agent info for a single space near a basis loc
+pub fn list_all_agent_info_signed_near_basis(
     environ: EnvWrite,
     _kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     basis_loc: u32,

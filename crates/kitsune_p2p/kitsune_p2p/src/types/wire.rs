@@ -66,6 +66,7 @@ kitsune_p2p_types::write_codec_enum! {
         Gossip(0x42) {
             space.0: Arc<KitsuneSpace>,
             data.1: WireData,
+            module.2: gossip::GossipModuleType,
         },
 
         /// Ask a remote node if they know about a specific agent

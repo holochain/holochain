@@ -1,5 +1,7 @@
 //! Countersigned entries involve preflights between many agents to build a session that is part of the entry.
 
+use std::iter::FromIterator;
+
 use crate::prelude::*;
 use holo_hash::AgentPubKey;
 use holo_hash::EntryHash;
@@ -13,6 +15,11 @@ pub const SESSION_HEADER_TIME_OFFSET_MILLIS: i64 = 1000;
 /// As the header will be SESSION_HEADER_TIME_OFFSET_MILLIS after the session start we include that here.
 pub const SESSION_TIME_FUTURE_MAX_MILLIS: i64 = 5000 + SESSION_HEADER_TIME_OFFSET_MILLIS;
 
+/// Need at least two to countersign.
+pub const MIN_COUNTERSIGNING_AGENTS: usize = 2;
+/// 8 seems like a reasonable limit of agents to countersign.
+pub const MAX_COUNTERSIGNING_AGENTS: usize = 8;
+
 /// Errors related to the secure primitive macro.
 #[derive(Debug, thiserror::Error)]
 pub enum CounterSigningError {
@@ -22,6 +29,26 @@ pub enum CounterSigningError {
     /// An empty vector was used to build session data.
     #[error("Attempted to build CounterSigningSessionData with an empty response vector.")]
     MissingResponse,
+    /// Session responses needs to be same length as the signing agents.
+    #[error("The countersigning session responses ({0}) did not match the number of signing agents ({1})")]
+    CounterSigningSessionResponsesLength(usize, usize),
+    /// Session response agents all need to be in the correct positions.
+    #[error(
+        "The countersigning session response with agent index {0} was found in index position {1}"
+    )]
+    CounterSigningSessionResponsesOrder(u8, usize),
+    /// Enzyme index must be one of the signers if set.
+    #[error("The enzyme index {1:?} is out of bounds for signing agents list of length {0:?}")]
+    EnzymeIndex(usize, usize),
+    /// Agents length cannot be longer than max or less than min.
+    #[error("The signing agents list is too long or short {0:?}")]
+    AgentsLength(usize),
+    /// There cannot be duplicates in the agents list.
+    #[error("The signing agents list contains duplicates {0:?}")]
+    AgentsDupes(Vec<AgentPubKey>),
+    /// The session times must validate.
+    #[error("The countersigning session times were not valid {0:?}")]
+    CounterSigningSessionTimes(CounterSigningSessionTimes),
 }
 
 /// Every countersigning session must complete a full set of headers between the start and end times to be valid.
@@ -33,9 +60,20 @@ pub struct CounterSigningSessionTimes {
 }
 
 impl CounterSigningSessionTimes {
-    /// Constructor.
-    pub fn new(start: Timestamp, end: Timestamp) -> Self {
-        Self { start, end }
+    /// Verify the difference between the end and start time is larger than the session header time offset.
+    pub fn check_integrity(&self) -> Result<(), CounterSigningError> {
+        let times_are_valid = &Timestamp(0, 0) < self.start()
+            && self.start()
+                <= &(self.end()
+                    - core::time::Duration::from_millis(SESSION_HEADER_TIME_OFFSET_MILLIS as u64))
+                .map_err(|_| CounterSigningError::CounterSigningSessionTimes((*self).clone()))?;
+        if times_are_valid {
+            Ok(())
+        } else {
+            Err(CounterSigningError::CounterSigningSessionTimes(
+                (*self).clone(),
+            ))
+        }
     }
 
     /// Start time accessor.
@@ -104,20 +142,64 @@ pub struct PreflightRequest {
 }
 
 impl PreflightRequest {
-    /// Constructor.
-    pub fn new(
-        signing_agents: CounterSigningAgents,
-        enzyme_index: Option<u8>,
-        session_times: CounterSigningSessionTimes,
-        header_base: HeaderBase,
-        preflight_bytes: PreflightBytes,
-    ) -> Self {
-        Self {
-            signing_agents,
-            enzyme_index,
-            session_times,
-            header_base,
-            preflight_bytes,
+    /// Combined integrity checks.
+    pub fn check_integrity(&self) -> Result<(), CounterSigningError> {
+        self.check_enzyme_index()?;
+        self.session_times().check_integrity()?;
+        self.check_agents()?;
+        Ok(())
+    }
+
+    /// Verify there are no duplicate agents to sign.
+    pub fn check_agents_dupes(&self) -> Result<(), CounterSigningError> {
+        let v: Vec<AgentPubKey> = self
+            .signing_agents()
+            .iter()
+            .map(|(agent, _roles)| agent.clone())
+            .collect();
+        if std::collections::HashSet::<AgentPubKey>::from_iter(v.clone()).len()
+            == self.signing_agents().len()
+        {
+            Ok(())
+        } else {
+            Err(CounterSigningError::AgentsDupes(v))
+        }
+    }
+
+    /// Verify the number of signing agents is within the correct range.
+    pub fn check_agents_len(&self) -> Result<(), CounterSigningError> {
+        if MIN_COUNTERSIGNING_AGENTS <= self.signing_agents().len()
+            && self.signing_agents().len() <= MAX_COUNTERSIGNING_AGENTS
+        {
+            Ok(())
+        } else {
+            Err(CounterSigningError::AgentsLength(
+                self.signing_agents().len(),
+            ))
+        }
+    }
+
+    /// Verify the preflight request agents.
+    pub fn check_agents(&self) -> Result<(), CounterSigningError> {
+        self.check_agents_dupes()?;
+        self.check_agents_len()?;
+        Ok(())
+    }
+
+    /// Verify the enzyme index is in bounds of the signing agent if set.
+    pub fn check_enzyme_index(&self) -> Result<(), CounterSigningError> {
+        match self.enzyme_index() {
+            Some(index) => {
+                if (*index as usize) < self.signing_agents().len() {
+                    Ok(())
+                } else {
+                    Err(CounterSigningError::EnzymeIndex(
+                        self.signing_agents().len(),
+                        *index as usize,
+                    ))
+                }
+            }
+            None => Ok(()),
         }
     }
 
@@ -190,17 +272,24 @@ pub struct PreflightResponse {
 }
 
 impl PreflightResponse {
-    /// Constructor.
-    pub fn new(
+    /// Fallible constructor.
+    pub fn try_new(
         request: PreflightRequest,
         agent_state: CounterSigningAgentState,
         signature: Signature,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, CounterSigningError> {
+        let preflight_response = Self {
             request,
             agent_state,
             signature,
-        }
+        };
+        preflight_response.check_integrity()?;
+        Ok(preflight_response)
+    }
+
+    /// Combined preflight response validation call.
+    pub fn check_integrity(&self) -> Result<(), CounterSigningError> {
+        self.request().check_integrity()
     }
 
     /// Serialization for signing of the signable field data only.
@@ -449,6 +538,45 @@ impl CounterSigningSessionData {
         Ok(headers)
     }
 
+    /// Fallible constructor.
+    pub fn try_new(
+        preflight_request: PreflightRequest,
+        responses: Vec<(CounterSigningAgentState, Signature)>,
+    ) -> Result<Self, CounterSigningError> {
+        let session_data = Self {
+            preflight_request,
+            responses,
+        };
+        session_data.check_integrity()?;
+        Ok(session_data)
+    }
+
+    /// Combines all integrity checks.
+    pub fn check_integrity(&self) -> Result<(), CounterSigningError> {
+        self.check_responses_indexes()
+    }
+
+    /// Check that the countersigning session data responses all have the
+    /// correct indexes.
+    pub fn check_responses_indexes(&self) -> Result<(), CounterSigningError> {
+        if self.preflight_request().signing_agents().len() != self.responses().len() {
+            Err(CounterSigningError::CounterSigningSessionResponsesLength(
+                self.responses().len(),
+                self.preflight_request().signing_agents().len(),
+            ))
+        } else {
+            for (i, (response, _response_signature)) in self.responses().iter().enumerate() {
+                if *response.agent_index() as usize != i {
+                    return Err(CounterSigningError::CounterSigningSessionResponsesOrder(
+                        *response.agent_index(),
+                        i,
+                    ));
+                }
+            }
+            Ok(())
+        }
+    }
+
     /// Accessor to the preflight request.
     pub fn preflight_request(&self) -> &PreflightRequest {
         &self.preflight_request
@@ -469,5 +597,187 @@ impl CounterSigningSessionData {
     #[cfg(feature = "test_utils")]
     pub fn responses_mut(&mut self) -> &mut Vec<(CounterSigningAgentState, Signature)> {
         &mut self.responses
+    }
+}
+
+#[cfg(test)]
+pub mod test {
+    use crate::CounterSigningAgentState;
+    use crate::CounterSigningSessionData;
+    use crate::Signature;
+    use matches::assert_matches;
+
+    use super::CounterSigningError;
+    use super::CounterSigningSessionTimes;
+    use super::PreflightRequest;
+    use super::SESSION_HEADER_TIME_OFFSET_MILLIS;
+    use crate::AgentPubKeyFixturator;
+    use crate::Role;
+    use arbitrary::Arbitrary;
+    use fixt::fixt;
+    use fixt::Predictable;
+
+    #[test]
+    pub fn test_check_countersigning_session_times() {
+        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
+        let mut session_times = CounterSigningSessionTimes::arbitrary(&mut u).unwrap();
+
+        // Zero start and end won't pass.
+        assert_matches!(
+            session_times.check_integrity(),
+            Err(CounterSigningError::CounterSigningSessionTimes(_))
+        );
+
+        // Shifting the end forward 1 milli won't help.
+        *session_times.end_mut() =
+            (session_times.end() + core::time::Duration::from_millis(1)).unwrap();
+        assert_matches!(
+            session_times.check_integrity(),
+            Err(CounterSigningError::CounterSigningSessionTimes(_))
+        );
+
+        // Shifting the end forward by the session offset will _almost_ fix it.
+        *session_times.end_mut() = (session_times.end()
+            + core::time::Duration::from_millis(SESSION_HEADER_TIME_OFFSET_MILLIS as u64))
+        .unwrap();
+        assert_matches!(
+            session_times.check_integrity(),
+            Err(CounterSigningError::CounterSigningSessionTimes(_))
+        );
+
+        // making the the start non-zero should fix it.
+        *session_times.start_mut() =
+            (session_times.start() + core::time::Duration::from_millis(1)).unwrap();
+        assert_eq!(session_times.check_integrity().unwrap(), (),);
+
+        // making the diff between start and end less than the header offset will break it again.
+        *session_times.start_mut() =
+            (session_times.start() + core::time::Duration::from_millis(1)).unwrap();
+        assert_matches!(
+            session_times.check_integrity(),
+            Err(CounterSigningError::CounterSigningSessionTimes(_))
+        );
+    }
+
+    #[test]
+    pub fn test_check_countersigning_preflight_request_enzyme_index() {
+        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
+        let mut preflight_request = PreflightRequest::arbitrary(&mut u).unwrap();
+
+        // None is always a pass.
+        assert_eq!(preflight_request.check_enzyme_index().unwrap(), ());
+
+        let alice = fixt!(AgentPubKey, Predictable);
+        (*preflight_request.signing_agents_mut()).push((alice.clone(), vec![]));
+
+        // 0 is the first signing agent so is a valid enzyme.
+        *preflight_request.enzyme_index_mut() = Some(0);
+
+        assert_eq!(preflight_request.check_enzyme_index().unwrap(), (),);
+
+        // 1 is out of bounds for zero signing agents.
+        *preflight_request.enzyme_index_mut() = Some(1);
+
+        assert_matches!(
+            preflight_request.check_enzyme_index(),
+            Err(CounterSigningError::EnzymeIndex(_, _))
+        );
+    }
+
+    #[test]
+    pub fn test_check_countersigning_preflight_request_agents_len() {
+        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
+        let mut preflight_request = PreflightRequest::arbitrary(&mut u).unwrap();
+
+        // Empty is a fail.
+        assert_matches!(
+            preflight_request.check_agents_len(),
+            Err(CounterSigningError::AgentsLength(_))
+        );
+
+        // One signer is a fail.
+        let alice = fixt!(AgentPubKey, Predictable);
+        (*preflight_request.signing_agents_mut()).push((alice.clone(), vec![]));
+
+        assert_matches!(
+            preflight_request.check_agents_len(),
+            Err(CounterSigningError::AgentsLength(_))
+        );
+
+        // Two signers is a pass.
+        let bob = fixt!(AgentPubKey, Predictable, 1);
+        (*preflight_request.signing_agents_mut()).push((bob.clone(), vec![]));
+
+        assert_eq!(preflight_request.check_agents_len().unwrap(), (),);
+    }
+
+    #[test]
+    pub fn test_check_countersigning_preflight_request_agents_dupes() {
+        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
+        let mut preflight_request = PreflightRequest::arbitrary(&mut u).unwrap();
+
+        let alice = fixt!(AgentPubKey, Predictable);
+        let bob = fixt!(AgentPubKey, Predictable, 1);
+
+        assert_eq!(preflight_request.check_agents_dupes().unwrap(), (),);
+
+        (*preflight_request.signing_agents_mut()).push((alice.clone(), vec![]));
+        assert_eq!(preflight_request.check_agents_dupes().unwrap(), (),);
+
+        (*preflight_request.signing_agents_mut()).push((bob.clone(), vec![]));
+        assert_eq!(preflight_request.check_agents_dupes().unwrap(), (),);
+
+        // Another alice is a dupe, even if roles are different.
+        (*preflight_request.signing_agents_mut()).push((alice.clone(), vec![Role::new(0_u8)]));
+        assert_matches!(
+            preflight_request.check_agents_dupes(),
+            Err(CounterSigningError::AgentsDupes(_))
+        );
+    }
+
+    #[test]
+    pub fn test_check_countersigning_session_data_responses_indexes() {
+        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
+        let mut session_data = CounterSigningSessionData::arbitrary(&mut u).unwrap();
+
+        let alice = fixt!(AgentPubKey, Predictable);
+        let bob = fixt!(AgentPubKey, Predictable, 1);
+
+        // When everything is empty the indexes line up by default.
+        assert_eq!(session_data.check_responses_indexes().unwrap(), ());
+
+        // When the signing agents and responses are out of sync it must error.
+        (*session_data.preflight_request_mut().signing_agents_mut()).push((alice.clone(), vec![]));
+        assert_matches!(
+            session_data.check_responses_indexes(),
+            Err(CounterSigningError::CounterSigningSessionResponsesLength(
+                _,
+                _
+            ))
+        );
+
+        // When signing agents indexes are not in the correct order it must error.
+        (*session_data.preflight_request_mut().signing_agents_mut()).push((bob.clone(), vec![]));
+
+        let alice_state = CounterSigningAgentState::arbitrary(&mut u).unwrap();
+        let alice_signature = Signature::arbitrary(&mut u).unwrap();
+        let mut bob_state = CounterSigningAgentState::arbitrary(&mut u).unwrap();
+        let bob_signature = Signature::arbitrary(&mut u).unwrap();
+
+        (*session_data.responses_mut()).push((alice_state, alice_signature));
+        (*session_data.responses_mut()).push((bob_state.clone(), bob_signature.clone()));
+
+        assert_matches!(
+            session_data.check_responses_indexes(),
+            Err(CounterSigningError::CounterSigningSessionResponsesOrder(
+                _,
+                _
+            ))
+        );
+
+        *bob_state.agent_index_mut() = 1;
+        (*session_data.responses_mut()).pop();
+        (*session_data.responses_mut()).push((bob_state, bob_signature));
+        assert_eq!(session_data.check_responses_indexes().unwrap(), (),);
     }
 }

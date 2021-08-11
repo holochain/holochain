@@ -14,8 +14,6 @@ use holochain_state::workspace::WorkspaceError;
 use holochain_types::prelude::*;
 use holochain_zome_types::countersigning::CounterSigningError;
 use holochain_zome_types::countersigning::CounterSigningSessionData;
-use holochain_zome_types::countersigning::CounterSigningSessionTimes;
-use holochain_zome_types::countersigning::PreflightResponse;
 use thiserror::Error;
 
 /// Validation can result in either
@@ -49,6 +47,14 @@ pub enum SysValidationError {
     WorkspaceError(#[from] WorkspaceError),
     #[error(transparent)]
     ConductorApiError(#[from] Box<ConductorApiError>),
+}
+
+impl From<CounterSigningError> for SysValidationError {
+    fn from(counter_signing_error: CounterSigningError) -> Self {
+        SysValidationError::ValidationOutcome(ValidationOutcome::CounterSigningError(
+            counter_signing_error,
+        ))
+    }
 }
 
 #[deprecated = "This will be replaced with SysValidationOutcome as we shouldn't treat outcomes as errors"]
@@ -89,26 +95,12 @@ impl<E> TryFrom<OutcomeOrError<ValidationOutcome, E>> for ValidationOutcome {
 /// failed validation.
 #[derive(Error, Debug)]
 pub enum ValidationOutcome {
-    #[error("The signing agents list contains duplicates {0:?}")]
-    AgentsDupes(Vec<AgentPubKey>),
-    #[error("The signing agents list is too long or short {0:?}")]
-    AgentsLength(usize),
     #[error("The element with signature {0:?} and header {1:?} was found to be counterfeit")]
     Counterfeit(Signature, Header),
-    #[error("The countersigning session times were not valid {0:?}")]
-    CounterSigningSessionTimes(CounterSigningSessionTimes),
-    #[error("The enzyme index {1:?} is out of bounds for signing agents list of length {0:?}")]
-    EnzymeIndex(usize, usize),
     #[error("The header {1:?} is not found in the countersigning session data {0:?}")]
     HeaderNotInCounterSigningSession(CounterSigningSessionData, NewEntryHeader),
-    #[error("The header set could not be built for the counter signing session data: {0}")]
-    FailedToBuildHeaderSet(CounterSigningError),
-    #[error("The countersigning session responses ({0}) did not match the number of signing agents ({1})")]
-    CounterSigningSessionResponsesLength(usize, usize),
-    #[error(
-        "The countersigning session response with agent index {0} was found in index position {1}"
-    )]
-    CounterSigningSessionResponsesOrder(u8, usize),
+    #[error(transparent)]
+    CounterSigningError(#[from] CounterSigningError),
     #[error("The dependency {0:?} was not found on the DHT")]
     DepMissingFromDht(AnyDhtHash),
     #[error("The app entry type {0:?} entry def id was out of range")]
@@ -129,7 +121,7 @@ pub enum ValidationOutcome {
     NotNewEntry(Header),
     #[error("The dependency {0:?} is not held")]
     NotHoldingDep(AnyDhtHash),
-    #[error("The preflight response had an invalid signature {0:?}")]
+    #[error("The PreflightResponse signature was not valid {0:?}")]
     PreflightResponseSignature(PreflightResponse),
     #[error(transparent)]
     PrevHeaderError(#[from] PrevHeaderError),

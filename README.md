@@ -17,7 +17,7 @@ This code is in alpha. It is not for production use. The code is guaranteed NOT 
 
 We will be frequently and heavily restructuring code APIs and data chains until Beta.
 
-**We are currently only supporting Linux at this time**. You may or may not be able to successfully build and run Holochain on macOS. You definitely won't be able to on Windows (unless you are using WSL, but even that is untested). We will definitely be rolling out support for these OSes in the future, but in the meantime please use Linux for development!
+**We are currently only supporting Linux at this time**. You may or may not be able to successfully build and run Holochain on macOS or Windows. We will definitely be rolling out support for these OSes in the future, but in the meantime please use Linux for development!
 
 ## Making the Holochain binaries available in your shell
 There are a number of contexts and purposes you might be running in which yield different ways to access binaries.

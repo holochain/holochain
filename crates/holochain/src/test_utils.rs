@@ -47,6 +47,7 @@ use crate::sweettest::SweetCell;
 
 pub mod conductor_setup;
 pub mod host_fn_caller;
+pub mod inline_zomes;
 
 mod wait_for_any;
 pub use wait_for_any::*;
