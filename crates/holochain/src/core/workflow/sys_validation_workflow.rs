@@ -361,43 +361,60 @@ async fn sys_validate_element_inner(
     let signature = element.signature();
     let header = element.header();
     let entry = element.entry().as_option();
-    let incoming_dht_ops_sender = None;
     counterfeit_check(signature, header).await?;
 
-    // @todo loop here over headers for countersigned entries...
+    async fn validate(
+        header: &Header,
+        entry: Option<&Entry>,
+        workspace: &mut SysValidationWorkspace,
+        network: HolochainP2pCell,
+        conductor_api: &impl CellConductorApiT,
+    ) -> SysValidationResult<()> {
+        let incoming_dht_ops_sender = None;
+        store_element(header, workspace, network.clone()).await?;
+        if let Some((entry, EntryVisibility::Public)) =
+            &entry.and_then(|e| header.entry_type().map(|et| (e, et.visibility())))
+        {
+            store_entry(
+                (header)
+                    .try_into()
+                    .map_err(|_| ValidationOutcome::NotNewEntry(header.clone()))?,
+                entry,
+                conductor_api,
+                workspace,
+                network.clone(),
+            )
+            .await?;
+        }
+        match header {
+            Header::Update(header) => {
+                register_updated_content(header, workspace, network, incoming_dht_ops_sender)
+                    .await?;
+            }
+            Header::Delete(header) => {
+                register_deleted_entry_header(header, workspace, network, incoming_dht_ops_sender)
+                    .await?;
+            }
+            Header::CreateLink(header) => {
+                register_add_link(header, workspace, network, incoming_dht_ops_sender).await?;
+            }
+            Header::DeleteLink(header) => {
+                register_delete_link(header, workspace, network, incoming_dht_ops_sender).await?;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
 
-    store_element(header, workspace, network.clone()).await?;
-    if let Some((entry, EntryVisibility::Public)) =
-        &entry.and_then(|e| header.entry_type().map(|et| (e, et.visibility())))
-    {
-        store_entry(
-            (header)
-                .try_into()
-                .map_err(|_| ValidationOutcome::NotNewEntry(header.clone()))?,
-            entry,
-            conductor_api,
-            workspace,
-            network.clone(),
-        )
-        .await?;
+    match entry {
+        Some(Entry::CounterSign(session, _)) => {
+            for header in session.build_header_set()? {
+                validate(&header, entry, workspace, network.clone(), conductor_api).await?;
+            }
+            Ok(())
+        }
+        _ => validate(header, entry, workspace, network, conductor_api).await,
     }
-    match header {
-        Header::Update(header) => {
-            register_updated_content(header, workspace, network, incoming_dht_ops_sender).await?;
-        }
-        Header::Delete(header) => {
-            register_deleted_entry_header(header, workspace, network, incoming_dht_ops_sender)
-                .await?;
-        }
-        Header::CreateLink(header) => {
-            register_add_link(header, workspace, network, incoming_dht_ops_sender).await?;
-        }
-        Header::DeleteLink(header) => {
-            register_delete_link(header, workspace, network, incoming_dht_ops_sender).await?;
-        }
-        _ => {}
-    }
-    Ok(())
 }
 
 /// Check if the op has valid signature and author.
