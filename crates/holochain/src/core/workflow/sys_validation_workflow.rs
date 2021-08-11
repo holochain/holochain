@@ -5,6 +5,7 @@ use super::*;
 use crate::conductor::api::CellConductorApiT;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
+use crate::core::sys_validate::check_and_hold_store_element;
 use crate::core::sys_validate::*;
 use crate::core::validation::*;
 use error::WorkflowResult;
@@ -12,9 +13,8 @@ use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_p2p::HolochainP2pCell;
 use holochain_p2p::HolochainP2pCellT;
-use holochain_sqlite::prelude::*;
-
 use holochain_sqlite::db::ReadManager;
+use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::HostFnStores;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::prelude::*;
@@ -24,7 +24,6 @@ use holochain_zome_types::Entry;
 use holochain_zome_types::ValidationStatus;
 use std::convert::TryInto;
 use tracing::*;
-
 use types::Outcome;
 
 pub mod types;
@@ -225,9 +224,23 @@ async fn validate_op_inner(
 ) -> SysValidationResult<()> {
     match op {
         DhtOp::StoreElement(_, header, entry) => {
-            // @todo retrieve for all other headers on countersigned entry.
             store_element(header, workspace, network.clone()).await?;
             if let Some(entry) = entry {
+                // Retrieve for all other headers on countersigned entry.
+                if let Entry::CounterSign(session_data, _) = &**entry {
+                    for header in session_data.build_header_set()? {
+                        workspace
+                            .local_cascade()
+                            .retrieve(
+                                HeaderHashed::from_content_sync(header.clone())
+                                    .as_hash()
+                                    .to_owned()
+                                    .into(),
+                                Default::default(),
+                            )
+                            .await?;
+                    }
+                }
                 store_entry(
                     (header)
                         .try_into()
@@ -242,7 +255,21 @@ async fn validate_op_inner(
             Ok(())
         }
         DhtOp::StoreEntry(_, header, entry) => {
-            // @todo check and hold for all other headers on countersigned entry.
+            // Check and hold for all other headers on countersigned entry.
+            if let Entry::CounterSign(session_data, _) = &**entry {
+                let dependency_check = |_original_element: &Element| Ok(());
+                for header in session_data.build_header_set()? {
+                    check_and_hold_store_element(
+                        HeaderHashed::from_content_sync(header.clone()).as_hash(),
+                        workspace,
+                        network.clone(),
+                        incoming_dht_ops_sender.clone(),
+                        dependency_check,
+                    )
+                    .await?;
+                }
+            }
+
             store_entry(
                 (header).into(),
                 entry.as_ref(),
