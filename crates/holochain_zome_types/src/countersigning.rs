@@ -580,6 +580,8 @@ pub mod test {
     use super::CounterSigningSessionTimes;
     use super::PreflightRequest;
     use super::SESSION_HEADER_TIME_OFFSET_MILLIS;
+    use crate::AgentPubKeyFixturator;
+    use crate::Role;
     use arbitrary::Arbitrary;
     use fixt::fixt;
     use fixt::Predictable;
