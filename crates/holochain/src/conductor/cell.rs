@@ -576,9 +576,10 @@ impl Cell {
     }
 
     /// a remote agent is sending us a validation receipt.
-    #[tracing::instrument(skip(self))]
+    #[tracing::instrument(skip(self, receipt))]
     async fn handle_validation_receipt(&self, receipt: SerializedBytes) -> CellResult<()> {
         let receipt: SignedValidationReceipt = receipt.try_into()?;
+        tracing::debug!(from = ?receipt.receipt.validator, to = ?self.id.agent_pubkey(), hash = ?receipt.receipt.dht_op_hash);
 
         // Get the header for this op so we can check the entry type.
         let header: Option<SignedHeader> = fresh_reader!(self.env, |txn| {
@@ -591,7 +592,7 @@ impl Cell {
                     named_params! {
                         ":hash": receipt.receipt.dht_op_hash,
                     },
-                    |row| row.get("blob"),
+                    |row| row.get("header_blob"),
                 )
                 .optional()?;
             match h {

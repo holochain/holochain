@@ -75,7 +75,7 @@ async fn test_validation_receipt() {
         {
             fresh_reader_test!(vault, |txn: Transaction| {
                 let mut stmt = txn
-                    .prepare("SELECT COUNT(hash) FROM ValidationReceipts GROUP BY op_hash")
+                    .prepare("SELECT COUNT(hash) FROM ValidationReceipt GROUP BY op_hash")
                     .unwrap();
                 stmt.query_map([], |row| row.get::<_, Option<u32>>(0))
                     .unwrap()
