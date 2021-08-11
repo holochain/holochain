@@ -35,9 +35,7 @@ pub mod wasm_test {
     use crate::fixt::RealRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
-    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::fake_agent_pubkey_1;
     use std::sync::Arc;
     use crate::core::ribosome::HostContext;
 
@@ -64,18 +62,8 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     /// we can get some random data out of the fn via. a wasm call
     async fn ribosome_random_bytes_test() {
-        let test_env = holochain_state::test_utils::test_cell_env();
-        let test_cache = holochain_state::test_utils::test_cache_env();
-        let env = test_env.env();
-        let author = fake_agent_pubkey_1();
-        crate::test_utils::fake_genesis(env.clone())
-            .await
-            .unwrap();
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
-
         const LEN: u32 = 5;
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace;
+        let host_access = fixt!(ZomeCallHostAccess, Predictable);
         let output: hdk::prelude::Bytes =
             crate::call_test_ribosome!(host_access, TestWasm::RandomBytes, "random_bytes", LEN).unwrap();
 

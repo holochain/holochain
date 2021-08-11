@@ -205,9 +205,9 @@ impl<'stmt> Store for Txn<'stmt, '_> {
     fn contains_entry(&self, hash: &EntryHash) -> StateQueryResult<bool> {
         let exists = self.txn.query_row_named(
             "
-            SELECT 
+            SELECT
             EXISTS(
-                SELECT 1 FROM Entry 
+                SELECT 1 FROM Entry
                 WHERE hash = :hash
             )
             ",
@@ -233,9 +233,9 @@ impl<'stmt> Store for Txn<'stmt, '_> {
     fn contains_header(&self, hash: &HeaderHash) -> StateQueryResult<bool> {
         let exists = self.txn.query_row_named(
             "
-            SELECT 
+            SELECT
             EXISTS(
-                SELECT 1 FROM Header 
+                SELECT 1 FROM Header
                 WHERE hash = :hash
             )
             ",
@@ -261,7 +261,7 @@ impl<'stmt> Store for Txn<'stmt, '_> {
     fn get_header(&self, hash: &HeaderHash) -> StateQueryResult<Option<SignedHeaderHashed>> {
         let shh = self.txn.query_row_named(
             "
-            SELECT 
+            SELECT
             Header.blob, Header.hash
             FROM Header
             WHERE hash = :hash
@@ -299,11 +299,11 @@ impl<'stmt> Txn<'stmt, '_> {
     fn get_exact_element(&self, hash: &HeaderHash) -> StateQueryResult<Option<Element>> {
         let element = self.txn.query_row_named(
             "
-            SELECT 
+            SELECT
             Header.blob AS header_blob, Header.hash, Entry.blob as entry_blob
             FROM Header
             LEFT JOIN Entry ON Header.entry_hash = Entry.hash
-            WHERE 
+            WHERE
             Header.hash = :hash
             ",
             named_params! {
@@ -334,11 +334,11 @@ impl<'stmt> Txn<'stmt, '_> {
     fn get_any_element(&self, hash: &EntryHash) -> StateQueryResult<Option<Element>> {
         let element = self.txn.query_row_named(
             "
-            SELECT 
+            SELECT
             Header.blob AS header_blob, Header.hash, Entry.blob as entry_blob
             FROM Header
             JOIN Entry ON Header.entry_hash = Entry.hash
-            WHERE 
+            WHERE
             Entry.hash = :hash
             ",
             named_params! {

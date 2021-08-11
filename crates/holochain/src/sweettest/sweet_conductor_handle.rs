@@ -10,6 +10,11 @@ use unwrap_to::unwrap_to;
 pub struct SweetConductorHandle(pub(crate) ConductorHandle);
 
 impl SweetConductorHandle {
+    /// Handle accessor.
+    pub fn handle(&self) -> ConductorHandle {
+        std::sync::Arc::clone(&self.0)
+    }
+
     /// Make a zome call to a Cell, as if that Cell were the caller. Most common case.
     /// No capability is necessary, since the authorship capability is automatically granted.
     pub async fn call<I, O, F>(&self, zome: &SweetZome, fn_name: F, payload: I) -> O
@@ -79,7 +84,7 @@ impl SweetConductorHandle {
             provenance: provenance.clone(),
             payload,
         };
-        self.0.call_zome(call).await.map(|r| {
+        self.handle().call_zome(call).await.map(|r| {
             unwrap_to!(r.unwrap() => ZomeCallResponse::Ok)
                 .decode()
                 .expect("Couldn't deserialize zome call output")
