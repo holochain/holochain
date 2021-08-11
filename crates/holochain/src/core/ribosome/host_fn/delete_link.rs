@@ -82,23 +82,12 @@ pub mod slow_tests {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use holo_hash::HeaderHash;
-    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::fake_agent_pubkey_1;
     use holochain_zome_types::link::Links;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_delete_link_add_remove() {
-        let test_env = holochain_state::test_utils::test_cell_env();
-        let test_cache = holochain_state::test_utils::test_cache_env();
-        let env = test_env.env();
-        let author = fake_agent_pubkey_1();
-        crate::test_utils::fake_genesis(env.clone())
-            .await
-            .unwrap();
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace;
+        let host_access = fixt!(ZomeCallHostAccess, Predictable);
 
         // links should start empty
         let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();

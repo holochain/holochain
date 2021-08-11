@@ -235,6 +235,7 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
     match (entry_type, entry) {
         (EntryType::AgentPubKey, Entry::Agent(_)) => Ok(()),
         (EntryType::App(_), Entry::App(_)) => Ok(()),
+        (EntryType::App(_), Entry::CounterSign(_, _)) => Ok(()),
         (EntryType::CapClaim, Entry::CapClaim(_)) => Ok(()),
         (EntryType::CapGrant, Entry::CapGrant(_)) => Ok(()),
         _ => Err(ValidationOutcome::EntryType.into()),
