@@ -158,7 +158,7 @@ impl SourceChain {
             .await
         } else {
             // The caller MUST guard against this case.
-            unreachable!();
+            unreachable!("Put countersigned called with the wrong entry type");
         }
     }
 
@@ -428,7 +428,10 @@ impl SourceChain {
 
         // This all needs to be ensured in a non-panicky way BEFORE calling into the source chain here.
         let author = self.author.clone();
-        assert!(*author == preflight_request.signing_agents()[agent_index as usize].0);
+        assert_eq!(
+            *author,
+            preflight_request.signing_agents()[agent_index as usize].0
+        );
 
         let countersigning_agent_state = self
             .vault

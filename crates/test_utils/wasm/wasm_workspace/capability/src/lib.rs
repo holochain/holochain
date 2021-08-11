@@ -8,7 +8,7 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
     // grant unrestricted access to accept_cap_claim so other agents can send us claims
     let mut functions: GrantedFunctions = BTreeSet::new();
     functions.insert((zome_info()?.zome_name, "accept_cap_claim".into()));
-    // functions.insert((zome_info()?.zome_name, "needs_cap_claim".into()));
+    functions.insert((zome_info()?.zome_name, "another_cap_claim".into()));
     create_cap_grant(CapGrantEntry {
         tag: "".into(),
         // empty access converts to unrestricted
@@ -54,6 +54,11 @@ pub fn delete_cap_grant(header_hash: HeaderHash) -> ExternResult<HeaderHash> {
 #[hdk_extern]
 fn get_entry(header_hash: HeaderHash) -> ExternResult<Option<Element>> {
     get(header_hash, GetOptions::latest())
+}
+
+#[hdk_extern]
+fn another_cap_grant(_: ()) -> ExternResult<()> {
+    Ok(())
 }
 
 /// accepts a cap claim and commits it to the local chain

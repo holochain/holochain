@@ -220,7 +220,6 @@ impl ConductorTestData {
 
     #[allow(clippy::iter_nth_zero)]
     pub fn alice_call_data(&self) -> &CellHostFnCaller {
-        dbg!("alice call data", &self.cell_apis.values().len());
         match self.cell_apis.values().len() {
             0 => unreachable!(),
             1 => &self.cell_apis.values().next().unwrap(),

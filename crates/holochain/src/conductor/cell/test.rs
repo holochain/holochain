@@ -10,7 +10,6 @@ use holochain_state::prelude::*;
 use holochain_state::test_utils::test_keystore;
 use holochain_types::prelude::*;
 use holochain_zome_types::header;
-use holochain_zome_types::HeaderHashed;
 use std::sync::Arc;
 use tokio::sync;
 
@@ -24,7 +23,6 @@ async fn test_cell_handle_publish() {
     let cell_id = fake_cell_id(1);
     let dna = cell_id.dna_hash().clone();
     let agent = cell_id.agent_pubkey().clone();
-    dbg!(&agent);
 
     let test_network = test_network(Some(dna.clone()), Some(agent.clone())).await;
     let holochain_p2p_cell = test_network.cell_network();
@@ -75,16 +73,10 @@ async fn test_cell_handle_publish() {
     let shh = SignedHeaderHashed::new(&keystore, hh).await.unwrap();
     let op = DhtOp::StoreElement(shh.signature().clone(), header.clone(), None);
     let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
-    let header_hash = HeaderHashed::from_content_sync(header.clone()).into_hash();
 
-    cell.handle_publish(
-        fake_agent_pubkey_2(),
-        true,
-        header_hash.clone().into(),
-        vec![(op_hash.clone(), op.clone())],
-    )
-    .await
-    .unwrap();
+    cell.handle_publish(true, vec![(op_hash.clone(), op.clone())])
+        .await
+        .unwrap();
 
     op_exists(&cell.env, &op_hash).unwrap();
 

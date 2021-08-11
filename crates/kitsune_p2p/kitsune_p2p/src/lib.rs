@@ -11,7 +11,7 @@ pub mod dependencies {
 mod types;
 pub use types::*;
 
-mod gossip;
+pub mod gossip;
 
 mod config;
 pub use config::*;
@@ -26,3 +26,14 @@ pub mod test_util;
 mod test;
 
 pub mod fixt;
+
+/// 10MB of entropy free for the taking.
+/// Useful for initializing arbitrary::Unstructured data
+#[cfg(test)]
+pub static NOISE: once_cell::sync::Lazy<Vec<u8>> = once_cell::sync::Lazy::new(|| {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    std::iter::repeat_with(|| rng.gen())
+        .take(10_000_000)
+        .collect()
+});

@@ -103,11 +103,14 @@ ghost_actor::ghost_chan! {
             payload: Payload
         ) -> ();
 
+        /// New data has been integrated and is ready for gossiping.
+        fn new_integrated_data(space: KSpace) -> ();
+
         /// Check if an agent is an authority for a hash.
         fn authority_for_hash(
-            space: Arc<super::KitsuneSpace>,
-            agent: Arc<super::KitsuneAgent>,
-            basis: Arc<super::KitsuneBasis>,
+            space: KSpace,
+            agent: KAgent,
+            basis: KBasis,
         ) -> bool;
     }
 }

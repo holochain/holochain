@@ -4,7 +4,6 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
-use crate::core::sys_validate::check_countersigning_preflight_request;
 use holochain_keystore::KeystoreSenderExt;
 use tracing::error;
 
@@ -16,7 +15,7 @@ pub fn accept_countersigning_preflight_request<'a>(
 ) -> Result<PreflightRequestAcceptance, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ agent_info: Permission::Allow, keystore: Permission::Allow, non_determinism: Permission::Allow, .. } => {
-            if let Err(e) = check_countersigning_preflight_request(&input) {
+            if let Err(e) = input.check_integrity() {
                 return Ok(PreflightRequestAcceptance::Invalid(e.to_string()));
             }
             tokio_helper::block_forever_on(async move {
@@ -61,11 +60,11 @@ pub fn accept_countersigning_preflight_request<'a>(
                     }
                 };
 
-                Ok(PreflightRequestAcceptance::Accepted(PreflightResponse::new(
+                Ok(PreflightRequestAcceptance::Accepted(PreflightResponse::try_new(
                     input,
                     countersigning_agent_state,
                     signature,
-                )))
+                ).map_err(|e| WasmError::Host(e.to_string()))?))
             })
         },
         _ => unreachable!(),
@@ -78,7 +77,6 @@ pub mod wasm_test {
     use ::fixt::prelude::*;
     use holochain_types::prelude::AgentPubKeyFixturator;
     use holochain_zome_types::prelude::*;
-    use crate::fixt::ZomeCallHostAccessFixturator;
     use holochain_wasm_test_utils::TestWasm;
     use hdk::prelude::*;
     use crate::conductor::{api::ZomeCall};
@@ -91,43 +89,6 @@ pub mod wasm_test {
     use holochain_state::source_chain::SourceChainError;
     use crate::conductor::CellError;
     use crate::core::ribosome::error::RibosomeError;
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn new_preflight_request() {
-        let host_access = fixt!(ZomeCallHostAccess, Predictable);
-        let alice = fixt!(AgentPubKey, Predictable, 0);
-        let bob = fixt!(AgentPubKey, Predictable, 1);
-        let output: PreflightRequest = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::CounterSigning,
-            "generate_countersigning_preflight_request",
-            vec![(alice, vec![Role(0)]), (bob, vec![])]
-        ).unwrap();
-
-        dbg!(&output);
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn accept_preflight() {
-        let host_access = fixt!(ZomeCallHostAccess, Predictable);
-        let alice = fixt!(AgentPubKey, Predictable, 0);
-        let bob = fixt!(AgentPubKey, Predictable, 1);
-        let preflight_request: PreflightRequest = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::CounterSigning,
-            "generate_countersigning_preflight_request",
-            vec![(alice, vec![Role(0)]), (bob, vec![])]
-        ).unwrap();
-
-        let acceptance: PreflightRequestAcceptance = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::CounterSigning,
-            "accept_countersigning_preflight_request",
-            preflight_request
-        ).unwrap();
-
-        dbg!(&acceptance);
-    }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn lock_chain() {

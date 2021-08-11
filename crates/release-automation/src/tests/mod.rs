@@ -9,7 +9,7 @@ use crate::release::ReleaseSteps;
 
 #[test]
 fn release_steps_are_ordered() {
-    let input = "BumpReleaseVersions,VerifyMainBranch,PushForPrToMain,CreatePrToMain,PublishToCratesIo,PushReleaseTag,BumpPostReleaseVersions,PushForDevelopPr,CreatePrToDevelop,CreateReleaseBranch";
+    let input = "BumpReleaseVersions,VerifyMainBranch,PushForPrToMain,CreatePrToMain,PublishToCratesIo,PushReleaseTag,PushForDevelopPr,CreatePrToDevelop,CreateReleaseBranch";
 
     let parsed = super::cli::parse_releasesteps(input)
         .unwrap()

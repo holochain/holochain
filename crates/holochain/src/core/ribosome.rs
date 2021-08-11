@@ -511,12 +511,6 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
     ) -> RibosomeResult<ZomeCallResponse>;
 }
 
-impl std::fmt::Debug for MockRibosomeT {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("MockRibosomeT()"))
-    }
-}
-
 #[cfg(test)]
 pub mod wasm_test {
     use crate::core::ribosome::FnComponents;

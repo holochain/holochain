@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use crate::agent_store::AgentInfoSigned;
 use crate::event::MetricQuery;
 use crate::event::MetricQueryAnswer;
@@ -235,7 +237,7 @@ impl SimpleBloomMod {
             * 1000.0   // milliseconds
             / 1024.0   // kbps
             / 1024.0   // mbps
-            / tuning_params.gossip_output_target_mbps
+            / tuning_params.gossip_outbound_target_mbps
         ) as u64;
 
         let cont = Arc::new(atomic::AtomicBool::new(true));

@@ -263,6 +263,9 @@ ghost_actor::ghost_chan! {
         /// Send a validation receipt to a remote node.
         fn send_validation_receipt(dna_hash: DnaHash, to_agent: AgentPubKey, from_agent: AgentPubKey, receipt: SerializedBytes) -> ();
 
+        /// New data has been integrated and is ready for gossiping.
+        fn new_integrated_data(dna_hash: DnaHash) -> ();
+
         /// Check if an agent is an authority for a hash.
         fn authority_for_hash(dna_hash: DnaHash, from_agent: AgentPubKey, dht_hash: AnyDhtHash) -> bool;
     }

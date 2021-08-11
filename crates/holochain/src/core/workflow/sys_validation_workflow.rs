@@ -192,14 +192,7 @@ fn handle_failed(error: ValidationOutcome) -> Outcome {
         ValidationOutcome::Counterfeit(_, _) => {
             unreachable!("Counterfeit ops are dropped before sys validation")
         }
-        ValidationOutcome::AgentsDupes(_) => Rejected,
-        ValidationOutcome::AgentsLength(_) => Rejected,
-        ValidationOutcome::EnzymeIndex(_, _) => Rejected,
         ValidationOutcome::HeaderNotInCounterSigningSession(_, _) => Rejected,
-        ValidationOutcome::FailedToBuildHeaderSet(_) => Rejected,
-        ValidationOutcome::CounterSigningSessionTimes(_) => Rejected,
-        ValidationOutcome::CounterSigningSessionResponsesLength(_, _) => Rejected,
-        ValidationOutcome::CounterSigningSessionResponsesOrder(_, _) => Rejected,
         ValidationOutcome::DepMissingFromDht(_) => MissingDhtDep,
         ValidationOutcome::EntryDefId(_) => Rejected,
         ValidationOutcome::EntryHash => Rejected,
@@ -219,6 +212,7 @@ fn handle_failed(error: ValidationOutcome) -> Outcome {
         ValidationOutcome::UpdateTypeMismatch(_, _) => Rejected,
         ValidationOutcome::VerifySignature(_, _) => Rejected,
         ValidationOutcome::ZomeId(_) => Rejected,
+        ValidationOutcome::CounterSigningError(_) => Rejected,
     }
 }
 

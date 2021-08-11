@@ -17,20 +17,23 @@ path = "src/lib.rs"
 [features]
 default = []
 mock = ["hdk_derive/mock", "mockall"]
-test_utils = [ "holochain_zome_types/test_utils" ]
+fixturators = [ "holochain_zome_types/fixturators", "holo_hash/fixturators" ]
+test_utils = [ "fixturators", "holochain_zome_types/test_utils", "holo_hash/test_utils" ]
 
 [dependencies]
 hdk_derive = { version = "0.0.4", path = "../hdk_derive" }
-holo_hash = { version = "0.0.4", path = "../holo_hash" }
+holo_hash = { version = "0.0.4", path = "../holo_hash", default-features = false }
 holochain_wasmer_guest = "=0.0.73"
-holochain_zome_types = { version = "0.0.4", path = "../holochain_zome_types" }
+# it's important that we depend on holochain_zome_types with no default
+# features, both here AND in hdk_derive, to reduce code bloat
+holochain_zome_types = { version = "0.0.4", path = "../holochain_zome_types", default-features = false }
 paste = "=1.0.5"
 serde = "1.0"
 serde_bytes = "0.11"
 thiserror = "1.0.22"
 tracing = "0.1"
 tracing-core = "0.1"
-mockall = { version = "0.8", optional = true }
+mockall = { version = "0.10.2", optional = true }
 
 [dependencies.tracing-subscriber]
 version = "0.2"

@@ -9,6 +9,8 @@ use holochain_state::prelude::*;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_zome_types::fixt::*;
 
+use crate::test_utils::test_network;
+
 use super::*;
 
 struct Expected {
@@ -39,9 +41,10 @@ async fn integrate_query() {
     let env = test_cell_env();
     let expected = test_data(&env.env().into());
     let (qt, _rx) = TriggerSender::new();
-    let (qt2, _rx) = TriggerSender::new();
     // dump_tmp(&env.env());
-    integrate_dht_ops_workflow(env.env().into(), qt, qt2)
+    let test_network = test_network(None, None).await;
+    let holochain_p2p_cell = test_network.cell_network();
+    integrate_dht_ops_workflow(env.env().into(), qt, holochain_p2p_cell)
         .await
         .unwrap();
     let hashes = env
