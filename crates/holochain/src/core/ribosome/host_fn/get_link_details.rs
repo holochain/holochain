@@ -55,24 +55,13 @@ pub fn get_link_details<'a>(
 pub mod slow_tests {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
-    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::element::SignedHeaderHashed;
     use holochain_zome_types::Header;
-    use holochain_zome_types::fake_agent_pubkey_1;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_entry_hash_path_children_details() {
-        let test_env = holochain_state::test_utils::test_cell_env();
-        let test_cache = holochain_state::test_utils::test_cache_env();
-        let env = test_env.env();
-        let author = fake_agent_pubkey_1();
-        crate::test_utils::fake_genesis(env.clone())
-            .await
-            .unwrap();
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace;
+        let host_access = fixt!(ZomeCallHostAccess, Predictable);
 
         // ensure foo.bar twice to ensure idempotency
         let _: () = crate::call_test_ribosome!(

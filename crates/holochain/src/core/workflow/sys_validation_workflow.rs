@@ -192,6 +192,7 @@ fn handle_failed(error: ValidationOutcome) -> Outcome {
         ValidationOutcome::Counterfeit(_, _) => {
             unreachable!("Counterfeit ops are dropped before sys validation")
         }
+        ValidationOutcome::HeaderNotInCounterSigningSession(_, _) => Rejected,
         ValidationOutcome::DepMissingFromDht(_) => MissingDhtDep,
         ValidationOutcome::EntryDefId(_) => Rejected,
         ValidationOutcome::EntryHash => Rejected,
@@ -207,9 +208,11 @@ fn handle_failed(error: ValidationOutcome) -> Outcome {
         }
         ValidationOutcome::PrevHeaderError(_) => Rejected,
         ValidationOutcome::PrivateEntry => Rejected,
+        ValidationOutcome::PreflightResponseSignature(_) => Rejected,
         ValidationOutcome::UpdateTypeMismatch(_, _) => Rejected,
         ValidationOutcome::VerifySignature(_, _) => Rejected,
         ValidationOutcome::ZomeId(_) => Rejected,
+        ValidationOutcome::CounterSigningError(_) => Rejected,
     }
 }
 
@@ -357,9 +360,7 @@ async fn sys_validate_element_inner(
     let header = element.header();
     let entry = element.entry().as_option();
     let incoming_dht_ops_sender = None;
-    if !counterfeit_check(signature, header).await? {
-        return Err(ValidationOutcome::Counterfeit(signature.clone(), header.clone()).into());
-    }
+    counterfeit_check(signature, header).await?;
     store_element(header, workspace, network.clone()).await?;
     if let Some((entry, EntryVisibility::Public)) =
         &entry.and_then(|e| header.entry_type().map(|et| (e, et.visibility())))
@@ -396,12 +397,10 @@ async fn sys_validate_element_inner(
 
 /// Check if the op has valid signature and author.
 /// Ops that fail this check should be dropped.
-pub async fn counterfeit_check(
-    signature: &Signature,
-    header: &Header,
-) -> SysValidationResult<bool> {
-    Ok(verify_header_signature(&signature, &header).await?
-        && author_key_is_valid(header.author()).await?)
+pub async fn counterfeit_check(signature: &Signature, header: &Header) -> SysValidationResult<()> {
+    verify_header_signature(&signature, &header).await?;
+    author_key_is_valid(header.author()).await?;
+    Ok(())
 }
 
 async fn register_agent_activity(
@@ -469,6 +468,7 @@ async fn store_entry(
         let entry_def = check_app_entry_type(app_entry_type, conductor_api).await?;
         check_not_private(&entry_def)?;
     }
+
     check_entry_hash(entry_hash, entry).await?;
     check_entry_size(entry)?;
 
@@ -483,6 +483,11 @@ async fn store_entry(
                 ValidationOutcome::DepMissingFromDht(original_header_address.clone().into())
             })?;
         update_check(entry_update, original_header.header())?;
+    }
+
+    // Additional checks if this is a countersigned entry.
+    if let Entry::CounterSign(session_data, _) = entry {
+        check_countersigning_session_data(session_data, header).await?;
     }
     Ok(())
 }

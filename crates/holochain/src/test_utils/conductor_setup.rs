@@ -19,6 +19,7 @@ use holochain_state::{prelude::test_environments, test_utils::TestEnvs};
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 
@@ -84,7 +85,7 @@ impl CellHostFnCaller {
 pub struct ConductorTestData {
     _envs: TestEnvs,
     handle: ConductorHandle,
-    cell_apis: HashMap<CellId, CellHostFnCaller>,
+    cell_apis: BTreeMap<CellId, CellHostFnCaller>,
 }
 
 impl ConductorTestData {
@@ -119,7 +120,7 @@ impl ConductorTestData {
         )
         .await;
 
-        let mut cell_apis = HashMap::new();
+        let mut cell_apis = BTreeMap::new();
 
         for (dna_file, cell_ids) in cell_id_by_dna_file.iter() {
             for cell_id in cell_ids {
@@ -219,11 +220,21 @@ impl ConductorTestData {
 
     #[allow(clippy::iter_nth_zero)]
     pub fn alice_call_data(&self) -> &CellHostFnCaller {
-        &self.cell_apis.values().nth(0).unwrap()
+        match self.cell_apis.values().len() {
+            0 => unreachable!(),
+            1 => &self.cell_apis.values().next().unwrap(),
+            2 => &self.cell_apis.values().nth(1).unwrap(),
+            _ => unimplemented!(),
+        }
     }
 
     pub fn bob_call_data(&self) -> Option<&CellHostFnCaller> {
-        self.cell_apis.values().nth(1)
+        match self.cell_apis.values().len() {
+            0 => unreachable!(),
+            1 => None,
+            2 => self.cell_apis.values().next(),
+            _ => unimplemented!(),
+        }
     }
 
     #[allow(clippy::iter_nth_zero)]

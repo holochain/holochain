@@ -9,7 +9,7 @@ name = "test_wasm_random_bytes"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
-hdk = { path = "../../../../hdk" }
+hdk = { path = "../../../../hdk", features = ["fixturators"] }
 serde = "1.0"
 
 [dev-dependencies]

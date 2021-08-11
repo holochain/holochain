@@ -49,6 +49,11 @@ pub trait HdkT: Send + Sync {
         &self,
         must_get_valid_element_input: MustGetValidElementInput,
     ) -> ExternResult<Element>;
+    // CounterSigning
+    fn accept_countersigning_preflight_request(
+        &self,
+        preflight_request: PreflightRequest,
+    ) -> ExternResult<PreflightRequestAcceptance>;
     // Info
     fn agent_info(&self, agent_info_input: ()) -> ExternResult<AgentInfo>;
     fn app_info(&self, app_info_input: ()) -> ExternResult<AppInfo>;
@@ -71,7 +76,7 @@ pub trait HdkT: Send + Sync {
     // Random
     fn random_bytes(&self, number_of_bytes: u32) -> ExternResult<Bytes>;
     // Time
-    fn sys_time(&self, sys_time_input: ()) -> ExternResult<core::time::Duration>;
+    fn sys_time(&self, sys_time_input: ()) -> ExternResult<Timestamp>;
     fn schedule(&self, execute_after: std::time::Duration) -> ExternResult<()>;
     fn sleep(&self, wake_after: std::time::Duration) -> ExternResult<()>;
     // Trace
@@ -150,6 +155,13 @@ impl HdkT for ErrHdk {
     fn must_get_valid_element(&self, _: MustGetValidElementInput) -> ExternResult<Element> {
         Self::err()
     }
+    // CounterSigning
+    fn accept_countersigning_preflight_request(
+        &self,
+        _: PreflightRequest,
+    ) -> ExternResult<PreflightRequestAcceptance> {
+        Self::err()
+    }
     fn agent_info(&self, _: ()) -> ExternResult<AgentInfo> {
         Self::err()
     }
@@ -196,7 +208,7 @@ impl HdkT for ErrHdk {
         Self::err()
     }
     // Time
-    fn sys_time(&self, _: ()) -> ExternResult<core::time::Duration> {
+    fn sys_time(&self, _: ()) -> ExternResult<Timestamp> {
         Self::err()
     }
     fn schedule(&self, _: std::time::Duration) -> ExternResult<()> {
@@ -308,6 +320,16 @@ impl HdkT for HostHdk {
             must_get_valid_element_input,
         )
     }
+    // CounterSigning
+    fn accept_countersigning_preflight_request(
+        &self,
+        preflight_request: PreflightRequest,
+    ) -> ExternResult<PreflightRequestAcceptance> {
+        host_call::<PreflightRequest, PreflightRequestAcceptance>(
+            __accept_countersigning_preflight_request,
+            preflight_request,
+        )
+    }
     fn agent_info(&self, _: ()) -> ExternResult<AgentInfo> {
         host_call::<(), AgentInfo>(__agent_info, ())
     }
@@ -353,8 +375,8 @@ impl HdkT for HostHdk {
     fn random_bytes(&self, number_of_bytes: u32) -> ExternResult<Bytes> {
         host_call::<u32, Bytes>(__random_bytes, number_of_bytes)
     }
-    fn sys_time(&self, _: ()) -> ExternResult<core::time::Duration> {
-        host_call::<(), core::time::Duration>(__sys_time, ())
+    fn sys_time(&self, _: ()) -> ExternResult<Timestamp> {
+        host_call::<(), Timestamp>(__sys_time, ())
     }
     fn schedule(&self, execute_after: std::time::Duration) -> ExternResult<()> {
         host_call::<std::time::Duration, ()>(__schedule, execute_after)
