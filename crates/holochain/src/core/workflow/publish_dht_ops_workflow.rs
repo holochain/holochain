@@ -24,15 +24,16 @@ use tracing::*;
 mod publish_query;
 
 /// Default redundancy factor for validation receipts
-// TODO: Pull this from the wasm entry def and only use this if it's missing
-// TODO: Put a default in the DnaBundle
-// TODO: build zome_types/entry_def map to get the (AppEntryType map to entry def)
 pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u8 = 5;
 
 /// Don't publish a DhtOp more than once during this interval.
 /// This allows us to trigger the publish workflow as often as we like, without
 /// flooding the network with spurious publishes.
-pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(60);
+/// Republish an op at most once per day.
+/// Publish is only triggered by new commits so at worst we'll publish never
+/// republish.
+// TODO: We need a republish workflow to make sure the data is actually saturated.
+pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(60 * 60 * 24);
 
 #[instrument(skip(env, network))]
 pub async fn publish_dht_ops_workflow(

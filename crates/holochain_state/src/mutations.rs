@@ -353,9 +353,15 @@ pub fn set_receipts_complete(
     hash: &DhtOpHash,
     complete: bool,
 ) -> StateMutationResult<()> {
-    dht_op_update!(txn, hash, {
-        "receipts_complete": complete,
-    })?;
+    if complete {
+        dht_op_update!(txn, hash, {
+            "receipts_complete": true,
+        })?;
+    } else {
+        dht_op_update!(txn, hash, {
+            "receipts_complete": holochain_sqlite::rusqlite::types::Null,
+        })?;
+    }
     Ok(())
 }
 

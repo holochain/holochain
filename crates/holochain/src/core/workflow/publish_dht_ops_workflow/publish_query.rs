@@ -55,7 +55,7 @@ pub async fn get_ops_to_publish(
             AND
             (DhtOp.last_publish_time IS NULL OR DhtOp.last_publish_time <= :recency_threshold)
             AND
-            DhtOp.receipts_complete = 1
+            DhtOp.receipts_complete IS NULL 
             ",
             )?;
             let r = stmt.query_and_then(
