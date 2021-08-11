@@ -9,6 +9,7 @@ use crate::conductor::entry_def_store::get_entry_def;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::HolochainP2pCell;
 use holochain_types::prelude::*;
+use holochain_zome_types::countersigning::CounterSigningSessionData;
 use std::convert::TryInto;
 
 pub(super) use error::*;
@@ -33,22 +34,112 @@ pub const MAX_ENTRY_SIZE: usize = 16_000_000;
 pub const MAX_TAG_SIZE: usize = 1000;
 
 /// Verify the signature for this header
-pub async fn verify_header_signature(
-    sig: &Signature,
-    header: &Header,
-) -> SysValidationResult<bool> {
+pub async fn verify_header_signature(sig: &Signature, header: &Header) -> SysValidationResult<()> {
     if header.author().verify_signature(sig, header).await? {
-        Ok(true)
+        Ok(())
     } else {
-        Ok(false)
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::Counterfeit((*sig).clone(), (*header).clone()),
+        ))
     }
 }
 
 /// Verify the author key was valid at the time
 /// of signing with dpki
 /// TODO: This is just a stub until we have dpki.
-pub async fn author_key_is_valid(_author: &AgentPubKey) -> SysValidationResult<bool> {
-    Ok(true)
+pub async fn author_key_is_valid(_author: &AgentPubKey) -> SysValidationResult<()> {
+    Ok(())
+}
+
+/// Verify the countersigning session contains the specified header.
+pub fn check_countersigning_session_data_contains_header(
+    session_data: &CounterSigningSessionData,
+    header: NewEntryHeaderRef<'_>,
+) -> SysValidationResult<()> {
+    let header_is_in_session = session_data
+        .build_header_set()
+        .map_err(SysValidationError::from)?
+        .iter()
+        .any(|session_header| match (&header, session_header) {
+            (NewEntryHeaderRef::Create(create), Header::Create(session_create)) => {
+                create == &session_create
+            }
+            (NewEntryHeaderRef::Update(update), Header::Update(session_update)) => {
+                update == &session_update
+            }
+            _ => false,
+        });
+    if !header_is_in_session {
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::HeaderNotInCounterSigningSession(
+                session_data.to_owned(),
+                header.to_new_entry_header(),
+            ),
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+/// Verify that the signature on a preflight request is valid.
+pub async fn check_countersigning_preflight_response_signature(
+    preflight_response: &PreflightResponse,
+) -> SysValidationResult<()> {
+    let signature_is_valid = preflight_response
+        .request()
+        .signing_agents()
+        .get(*preflight_response.agent_state().agent_index() as usize)
+        .ok_or_else(|| {
+            SysValidationError::ValidationOutcome(ValidationOutcome::PreflightResponseSignature(
+                (*preflight_response).clone(),
+            ))
+        })?
+        .0
+        .verify_signature_raw(
+            preflight_response.signature(),
+            &preflight_response.encode_for_signature().map_err(|_| {
+                SysValidationError::ValidationOutcome(
+                    ValidationOutcome::PreflightResponseSignature((*preflight_response).clone()),
+                )
+            })?,
+        )
+        .await?;
+    if signature_is_valid {
+        Ok(())
+    } else {
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::PreflightResponseSignature((*preflight_response).clone()),
+        ))
+    }
+}
+
+/// Verify all the countersigning session data together.
+pub async fn check_countersigning_session_data(
+    session_data: &CounterSigningSessionData,
+    header: NewEntryHeaderRef<'_>,
+) -> SysValidationResult<()> {
+    session_data.check_integrity()?;
+    check_countersigning_session_data_contains_header(session_data, header)?;
+
+    let tasks: Vec<_> = session_data
+        .responses()
+        .iter()
+        .map(|(response, signature)| async move {
+            let preflight_response = PreflightResponse::try_new(
+                session_data.preflight_request().clone(),
+                response.clone(),
+                signature.clone(),
+            )?;
+            check_countersigning_preflight_response_signature(&preflight_response).await
+        })
+        .collect();
+
+    let results: Vec<SysValidationResult<()>> = futures::future::join_all(tasks).await;
+    let results: SysValidationResult<()> = results.into_iter().collect();
+    match results {
+        Ok(_) => Ok(()),
+        Err(e) => Err(e),
+    }
 }
 
 /// Check that previous header makes sense
@@ -581,4 +672,53 @@ fn make_register_agent_activity(element: Element) -> Option<(DhtOpHash, DhtOp)> 
     let op = DhtOp::RegisterAgentActivity(signature, header);
     let hash = DhtOpHash::with_data_sync(&op);
     Some((hash, op))
+}
+
+#[cfg(test)]
+pub mod test {
+    use super::check_countersigning_preflight_response_signature;
+    use crate::core::sys_validate::error::SysValidationError;
+    use crate::core::ValidationOutcome;
+    use arbitrary::Arbitrary;
+    use fixt::fixt;
+    use fixt::Predictable;
+    use hdk::prelude::AgentPubKeyFixturator;
+    use holochain_keystore::AgentPubKeyExt;
+    use holochain_state::test_utils::test_keystore;
+    use holochain_zome_types::countersigning::PreflightResponse;
+    use matches::assert_matches;
+
+    #[tokio::test(flavor = "multi_thread")]
+    pub async fn test_check_countersigning_preflight_response_signature() {
+        let keystore = test_keystore();
+        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
+        let mut preflight_response = PreflightResponse::arbitrary(&mut u).unwrap();
+        assert_matches!(
+            check_countersigning_preflight_response_signature(&preflight_response).await,
+            Err(SysValidationError::ValidationOutcome(
+                ValidationOutcome::PreflightResponseSignature(_)
+            ))
+        );
+
+        let alice = fixt!(AgentPubKey, Predictable);
+        let bob = fixt!(AgentPubKey, Predictable, 1);
+
+        (*preflight_response.request_mut().signing_agents_mut()).push((alice.clone(), vec![]));
+        (*preflight_response.request_mut().signing_agents_mut()).push((bob, vec![]));
+
+        *preflight_response.signature_mut() = alice
+            .sign_raw(
+                &keystore,
+                &preflight_response.encode_for_signature().unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            check_countersigning_preflight_response_signature(&preflight_response)
+                .await
+                .unwrap(),
+            (),
+        );
+    }
 }
