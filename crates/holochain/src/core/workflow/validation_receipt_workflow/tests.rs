@@ -10,7 +10,6 @@ use holochain_types::prelude::*;
 use rusqlite::Transaction;
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "This doesn't work without proper publishes"]
 async fn test_validation_receipt() {
     let _g = observability::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;
@@ -76,9 +75,9 @@ async fn test_validation_receipt() {
         {
             fresh_reader_test!(vault, |txn: Transaction| {
                 let mut stmt = txn
-                    .prepare("SELECT receipt_count FROM DhtOp WHERE is_authored = 1")
+                    .prepare("SELECT COUNT(hash) FROM ValidationReceipts GROUP BY op_hash")
                     .unwrap();
-                stmt.query_map([], |row| row.get::<_, Option<u32>>("receipt_count"))
+                stmt.query_map([], |row| row.get::<_, Option<u32>>(0))
                     .unwrap()
                     .map(Result::unwrap)
                     .filter_map(|i| i)

@@ -348,23 +348,14 @@ pub fn set_last_publish_time(
 }
 
 /// Set the receipt count for a [`DhtOp`].
-pub fn set_receipt_count(
+pub fn set_receipts_complete(
     txn: &mut Transaction,
-    hash: DhtOpHash,
-    count: u32,
+    hash: &DhtOpHash,
+    complete: bool,
 ) -> StateMutationResult<()> {
     dht_op_update!(txn, hash, {
-        "receipt_count": count,
+        "receipts_complete": complete,
     })?;
-    Ok(())
-}
-
-/// Add one to the receipt count for a [`DhtOp`].
-pub fn add_one_receipt_count(txn: &mut Transaction, hash: &DhtOpHash) -> StateMutationResult<()> {
-    txn.execute(
-        "UPDATE DhtOp SET receipt_count = IFNULL(receipt_count, 0) + 1 WHERE hash = :hash;",
-        named_params! { ":hash": hash },
-    )?;
     Ok(())
 }
 

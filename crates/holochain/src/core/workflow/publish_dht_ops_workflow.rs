@@ -27,7 +27,7 @@ mod publish_query;
 // TODO: Pull this from the wasm entry def and only use this if it's missing
 // TODO: Put a default in the DnaBundle
 // TODO: build zome_types/entry_def map to get the (AppEntryType map to entry def)
-pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u32 = 5;
+pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u8 = 5;
 
 /// Don't publish a DhtOp more than once during this interval.
 /// This allows us to trigger the publish workflow as often as we like, without
@@ -73,9 +73,7 @@ pub async fn publish_dht_ops_workflow_inner(
     let mut to_publish = HashMap::new();
     let mut hashes = Vec::new();
 
-    for op_hashed in
-        publish_query::get_ops_to_publish(agent.clone(), &env, DEFAULT_RECEIPT_BUNDLE_SIZE).await?
-    {
+    for op_hashed in publish_query::get_ops_to_publish(agent.clone(), &env).await? {
         let (op, op_hash) = op_hashed.into_inner();
         hashes.push(op_hash.clone());
 
@@ -269,23 +267,18 @@ mod tests {
         });
     }
 
-    /// There is a test that shows that if the validation_receipt_count > R
+    /// There is a test that shows that if the receipt is set to complete
     /// for a DHTOp we don't re-publish it
-    // #[test_case(1, 1)]
-    // #[test_case(1, 10)]
-    // #[test_case(1, 100)]
-    // #[test_case(10, 1)]
-    // #[test_case(10, 10)]
-    // #[test_case(10, 100)]
-    // #[test_case(100, 1)]
-    // #[test_case(100, 10)]
-    // #[test_case(100, 100)]
-    #[test]
-    #[ignore = "Publish currently doesn't respect receipt count so this test is of no use until we add that back"]
-    // fn test_no_republish(num_agents: u32, num_hash: u32) {
-    fn test_no_republish() {
-        let num_agents = 0;
-        let num_hash = 0;
+    #[test_case(1, 1)]
+    #[test_case(1, 10)]
+    #[test_case(1, 100)]
+    #[test_case(10, 1)]
+    #[test_case(10, 10)]
+    #[test_case(10, 100)]
+    #[test_case(100, 1)]
+    #[test_case(100, 10)]
+    #[test_case(100, 100)]
+    fn test_no_republish(num_agents: u32, num_hash: u32) {
         tokio_helper::block_forever_on(async {
             observability::test_run().ok();
 
@@ -297,15 +290,12 @@ mod tests {
             let (_network, cell_network, recv_task, _) =
                 setup(env.clone(), num_agents, num_hash, true).await;
 
-            // Update the authored to have > R counts
+            // Update the authored to have complete receipts
             env.conn()
                 .unwrap()
                 .with_commit_test(|txn| {
-                    txn.execute(
-                        "UPDATE DhtOp SET receipt_count = ?",
-                        [DEFAULT_RECEIPT_BUNDLE_SIZE],
-                    )
-                    .unwrap();
+                    txn.execute("UPDATE DhtOp SET receipts_complete = 1", [])
+                        .unwrap();
                 })
                 .unwrap();
 
@@ -370,10 +360,7 @@ mod tests {
                 fake_genesis(env.clone()).await.unwrap();
                 env.conn()
                     .unwrap()
-                    .execute(
-                        "UPDATE DhtOp SET receipt_count = ?",
-                        [DEFAULT_RECEIPT_BUNDLE_SIZE],
-                    )
+                    .execute("UPDATE DhtOp SET receipts_complete = 1", [])
                     .unwrap();
                 let author = fake_agent_pubkey_1();
 
@@ -514,6 +501,8 @@ mod tests {
                 let cell_network = test_network.cell_network();
                 let (tx_complete, rx_complete) = tokio::sync::oneshot::channel();
                 // We are expecting six ops per agent plus one for self.
+                // The 7 genesis ops were already recently published, so
+                // won't be published again this time.
                 let total_expected = (num_agents + 1) * 6;
                 let mut recv_count: u32 = 0;
 
