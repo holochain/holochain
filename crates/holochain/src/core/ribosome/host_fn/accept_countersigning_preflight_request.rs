@@ -4,7 +4,6 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
-use crate::core::sys_validate::check_countersigning_preflight_request;
 use holochain_keystore::KeystoreSenderExt;
 use tracing::error;
 
@@ -16,7 +15,7 @@ pub fn accept_countersigning_preflight_request<'a>(
 ) -> Result<PreflightRequestAcceptance, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ agent_info: Permission::Allow, keystore: Permission::Allow, non_determinism: Permission::Allow, .. } => {
-            if let Err(e) = check_countersigning_preflight_request(&input) {
+            if let Err(e) = input.check_integrity() {
                 return Ok(PreflightRequestAcceptance::Invalid(e.to_string()));
             }
             tokio_helper::block_forever_on(async move {
@@ -61,11 +60,11 @@ pub fn accept_countersigning_preflight_request<'a>(
                     }
                 };
 
-                Ok(PreflightRequestAcceptance::Accepted(PreflightResponse::new(
+                Ok(PreflightRequestAcceptance::Accepted(PreflightResponse::try_new(
                     input,
                     countersigning_agent_state,
                     signature,
-                )))
+                ).map_err(|e| WasmError::Host(e.to_string()))?))
             })
         },
         _ => unreachable!(),

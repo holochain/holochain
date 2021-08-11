@@ -23,13 +23,13 @@ fn create_a_countersigned_thing(responses: Vec<PreflightResponse>) -> ExternResu
 
 #[hdk_extern]
 fn generate_countersigning_preflight_request(agents: Vec<(AgentPubKey, Vec<Role>)>) -> ExternResult<PreflightRequest> {
-    Ok(PreflightRequest::new(
+    PreflightRequest::try_new(
         agents,
         None,
         session_times_from_millis(5000)?,
         HeaderBase::Create(CreateBase::new(entry_type!(Thing)?, hash_entry(Thing)?)),
         PreflightBytes(vec![]),
-    ))
+    ).map_err(|e| WasmError::Guest(e.to_string()))
 }
 
 #[hdk_extern]

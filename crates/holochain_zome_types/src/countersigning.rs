@@ -60,6 +60,13 @@ pub struct CounterSigningSessionTimes {
 }
 
 impl CounterSigningSessionTimes {
+    /// Fallible constructor.
+    pub fn try_new(start: Timestamp, end: Timestamp) -> Result<Self, CounterSigningError> {
+        let session_times = Self { start, end };
+        session_times.check_integrity()?;
+        Ok(session_times)
+    }
+
     /// Verify the difference between the end and start time is larger than the session header time offset.
     pub fn check_integrity(&self) -> Result<(), CounterSigningError> {
         let times_are_valid = &Timestamp(0, 0) < self.start()
@@ -142,6 +149,24 @@ pub struct PreflightRequest {
 }
 
 impl PreflightRequest {
+    /// Fallible constructor.
+    pub fn try_new(
+        signing_agents: CounterSigningAgents,
+        enzyme_index: Option<u8>,
+        session_times: CounterSigningSessionTimes,
+        header_base: HeaderBase,
+        preflight_bytes: PreflightBytes,
+    ) -> Result<Self, CounterSigningError> {
+        let preflight_request = Self {
+            signing_agents,
+            enzyme_index,
+            session_times,
+            header_base,
+            preflight_bytes,
+        };
+        preflight_request.check_integrity()?;
+        Ok(preflight_request)
+    }
     /// Combined integrity checks.
     pub fn check_integrity(&self) -> Result<(), CounterSigningError> {
         self.check_enzyme_index()?;
