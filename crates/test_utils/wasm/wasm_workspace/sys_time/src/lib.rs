@@ -1,12 +1,13 @@
 use hdk::prelude::*;
 
 #[hdk_extern]
-fn sys_time(_: ()) -> ExternResult<core::time::Duration> {
+fn sys_time(_: ()) -> ExternResult<Timestamp> {
     hdk::prelude::sys_time()
 }
 
 #[cfg(test)]
 pub mod test {
+    use hdk::prelude::*;
 
     #[test]
     fn sys_time_smoke() {
@@ -15,7 +16,7 @@ pub mod test {
         mock_hdk.expect_sys_time()
             .with(hdk::prelude::mockall::predicate::eq(()))
             .times(1)
-            .return_once(|_| Ok(core::time::Duration::new(5, 0)));
+            .return_once(|_| Ok(Timestamp(5, 0)));
 
         hdk::prelude::set_hdk(mock_hdk);
 
@@ -24,7 +25,7 @@ pub mod test {
         assert_eq!(
             result,
             Ok(
-                core::time::Duration::new(5, 0)
+                Timestamp(5, 0)
             )
         )
     }

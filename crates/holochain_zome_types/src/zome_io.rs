@@ -81,6 +81,9 @@ wasm_io_types! {
     // These definitions can be copy-pasted into the ribosome's HostFnApi
     // when updated
 
+    // Attempt to accept a preflight request.
+    fn accept_countersigning_preflight_request(zt::countersigning::PreflightRequest) -> zt::countersigning::PreflightRequestAcceptance;
+
     // Info about the calling agent.
     fn agent_info (()) -> zt::info::AgentInfo;
 
@@ -180,8 +183,8 @@ wasm_io_types! {
 
     fn sign_ephemeral (zt::signature::SignEphemeral) -> zt::signature::EphemeralSignatures;
 
-    // Current system time, in the opinion of the host, as a `Duration`.
-    fn sys_time (()) -> core::time::Duration;
+    // Current system time, in the opinion of the host, as a `Timestamp`.
+    fn sys_time (()) -> zt::timestamp::Timestamp;
 
     // Same as  but also takes the HeaderHash of the updated element.
     fn update (zt::entry::UpdateInput) -> holo_hash::HeaderHash;

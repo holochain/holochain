@@ -1,7 +1,11 @@
 //! Defines DnaDef struct
 
 use super::zome;
-use crate::{prelude::*, zome::error::ZomeError};
+use crate::prelude::*;
+
+#[cfg(feature = "full-dna-def")]
+use crate::zome::error::ZomeError;
+#[cfg(feature = "full-dna-def")]
 use holo_hash::*;
 
 /// Zomes need to be an ordered map from ZomeName to a Zome

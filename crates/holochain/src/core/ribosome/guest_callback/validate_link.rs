@@ -288,11 +288,9 @@ mod slow_tests {
     use crate::fixt::*;
     use ::fixt::prelude::*;
     use holo_hash::HeaderHash;
-    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_state::source_chain::SourceChainResult;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::fake_agent_pubkey_1;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_link_add_unimplemented() {
@@ -353,20 +351,7 @@ mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn pass_validate_link_add_test<'a>() {
-        // test workspace boilerplate
-        let test_env = holochain_state::test_utils::test_cell_env();
-        let test_cache = holochain_state::test_utils::test_cache_env();
-        let env = test_env.env();
-
-        let author = fake_agent_pubkey_1();
-        // commits fail validation if we don't do genesis
-        crate::test_utils::fake_genesis(env.clone()).await.unwrap();
-
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author)
-            .await
-            .unwrap();
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace.clone();
+        let host_access = fixt!(ZomeCallHostAccess, Predictable);
 
         let output: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::ValidateLink, "add_valid_link", ())
@@ -374,7 +359,7 @@ mod slow_tests {
 
         // the chain head should be the committed entry header
         let chain_head = tokio_helper::block_forever_on(async move {
-            SourceChainResult::Ok(workspace.source_chain().chain_head()?.0)
+            SourceChainResult::Ok(host_access.workspace.source_chain().chain_head()?.0)
         })
         .unwrap();
 
@@ -383,21 +368,7 @@ mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn fail_validate_link_add_test<'a>() {
-        // test workspace boilerplate
-        let test_env = holochain_state::test_utils::test_cell_env();
-        let test_cache = holochain_state::test_utils::test_cache_env();
-        let env = test_env.env();
-
-        let author = fake_agent_pubkey_1();
-        // commits fail validation if we don't do genesis
-        crate::test_utils::fake_genesis(env.clone()).await.unwrap();
-
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author)
-            .await
-            .unwrap();
-
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace.clone();
+        let host_access = fixt!(ZomeCallHostAccess, Predictable);
 
         let output: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::ValidateLink, "add_invalid_link", ())
@@ -405,7 +376,7 @@ mod slow_tests {
 
         // the chain head should be the committed entry header
         let chain_head = tokio_helper::block_forever_on(async move {
-            SourceChainResult::Ok(workspace.source_chain().chain_head()?.0)
+            SourceChainResult::Ok(host_access.workspace.source_chain().chain_head()?.0)
         })
         .unwrap();
 

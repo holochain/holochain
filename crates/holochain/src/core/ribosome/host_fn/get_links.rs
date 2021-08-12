@@ -61,7 +61,6 @@ pub mod slow_tests {
     use crate::test_utils::WaitOps;
     use ::fixt::prelude::*;
     use hdk::prelude::*;
-    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_test_wasm_common::*;
     use holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
@@ -69,14 +68,7 @@ pub mod slow_tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_entry_hash_path_children() {
         observability::test_run().ok();
-        let test_env = holochain_state::test_utils::test_cell_env();
-        let test_cache = holochain_state::test_utils::test_cache_env();
-        let env = test_env.env();
-        let author = fake_agent_pubkey_1();
-        crate::test_utils::fake_genesis(env.clone()).await.unwrap();
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace;
+        let host_access = fixt!(ZomeCallHostAccess, Predictable);
 
         // ensure foo.bar twice to ensure idempotency
         let _: () = crate::call_test_ribosome!(
@@ -138,14 +130,7 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn hash_path_anchor_get_anchor() {
-        let test_env = holochain_state::test_utils::test_cell_env();
-        let test_cache = holochain_state::test_utils::test_cache_env();
-        let env = test_env.env();
-        let author = fake_agent_pubkey_1();
-        crate::test_utils::fake_genesis(env.clone()).await.unwrap();
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace;
+        let host_access = fixt!(ZomeCallHostAccess, Predictable);
 
         // anchor foo bar
         let anchor_address_one: EntryHash = crate::call_test_ribosome!(
@@ -249,14 +234,7 @@ pub mod slow_tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn multi_get_links() {
         observability::test_run().ok();
-        let test_env = holochain_state::test_utils::test_cell_env();
-        let test_cache = holochain_state::test_utils::test_cache_env();
-        let env = test_env.env();
-        let author = fixt!(AgentPubKey, Predictable, 0);
-        crate::test_utils::fake_genesis(env.clone()).await.unwrap();
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace;
+        let host_access = fixt!(ZomeCallHostAccess, Predictable);
         let _: HeaderHash = crate::call_test_ribosome!(
             host_access,
             TestWasm::Link,

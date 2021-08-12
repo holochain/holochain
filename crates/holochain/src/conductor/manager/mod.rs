@@ -114,7 +114,7 @@ pub enum TaskOutcome {
     /// Log an info trace and take no other action.
     LogInfo(String),
     /// Log an error and take no other action.
-    MinorError(ManagedTaskError, String),
+    MinorError(Box<ManagedTaskError>, String),
     /// Close the conductor down because this is an unrecoverable error.
     ShutdownConductor(Box<ManagedTaskError>, String),
     /// Either pause or disable all apps which contain the problematic Cell,
@@ -242,7 +242,7 @@ fn handle_completed_task(kind: &TaskKind, result: ManagedTaskResult, name: Strin
     match kind {
         TaskKind::Ignore => match result {
             Ok(_) => LogInfo(name),
-            Err(err) => MinorError(err, name),
+            Err(err) => MinorError(Box::new(err), name),
         },
         TaskKind::Unrecoverable => match result {
             Ok(_) => LogInfo(name),
