@@ -18,7 +18,7 @@ pub fn create<'a>(
 ) -> Result<HeaderHash, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ write_workspace: Permission::Allow, .. } => {
-            let entry = AsRef::<Entry>::as_ref(&input).to_owned();
+            let entry = AsRef::<Entry>::as_ref(&input);
 
             // Countersigned entries have different header handling.
             match entry {
@@ -28,12 +28,12 @@ pub fn create<'a>(
                             .host_context
                             .workspace()
                             .source_chain()
-                            .put_countersigned(entry)
+                            .put_countersigned(input.into_entry())
                             .await
                             .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))
                     })
                 },
-                entry => {
+                _ => {
                     // build the entry hash
                     let entry_hash =
                     EntryHash::with_data_sync(AsRef::<Entry>::as_ref(&input));
@@ -75,7 +75,7 @@ pub fn create<'a>(
                             .host_context
                             .workspace()
                             .source_chain()
-                            .put(header_builder, Some(entry))
+                            .put(header_builder, Some(input.into_entry()))
                             .await
                             .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))
                     })

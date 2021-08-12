@@ -21,7 +21,7 @@ pub fn update<'a>(
                 original_header_address,
                 entry_with_def_id,
             } = input;
-            let entry = AsRef::<Entry>::as_ref(&entry_with_def_id).to_owned();
+            let entry = AsRef::<Entry>::as_ref(&entry_with_def_id);
 
             // Countersigned entries have different header handling.
             match entry {
@@ -31,12 +31,12 @@ pub fn update<'a>(
                             .host_context
                             .workspace()
                             .source_chain()
-                            .put_countersigned(entry)
+                            .put_countersigned(entry_with_def_id.into_entry())
                             .await
                             .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))
                     })
                 },
-                entry => {
+                _ => {
                     // build the entry hash
                     let entry_hash =
                     EntryHash::with_data_sync(AsRef::<Entry>::as_ref(&entry_with_def_id));
@@ -82,7 +82,7 @@ pub fn update<'a>(
                         let source_chain = workspace.source_chain();
                         // push the header and the entry into the source chain
                         let header_hash = source_chain
-                            .put(header_builder, Some(entry))
+                            .put(header_builder, Some(entry_with_def_id.into_entry()))
                             .await
                             .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
                         Ok(header_hash)
