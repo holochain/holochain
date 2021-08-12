@@ -58,10 +58,7 @@ pub(crate) fn incoming_countersigning(
                 let header_set = session_data.build_header_set()?;
 
                 // Get the expires time for this session.
-                let expires = *session_data
-                    .preflight_request()
-                    .session_times_ref()
-                    .as_end_ref();
+                let expires = *session_data.preflight_request().session_times().end();
 
                 // Get the entry hash from a header.
                 // If the headers have different entry hashes they will fail validation.

@@ -613,6 +613,11 @@ impl CounterSigningSessionData {
         &mut self.preflight_request
     }
 
+    /// Get all the agents signing for this session.
+    pub fn signing_agents(&self) -> impl Iterator<Item = &AgentPubKey> {
+        self.preflight_request.signing_agents.iter().map(|(a, _)| a)
+    }
+
     /// Accessor to responses.
     pub fn responses(&self) -> &Vec<(CounterSigningAgentState, Signature)> {
         &self.responses
@@ -804,15 +809,5 @@ pub mod test {
         (*session_data.responses_mut()).pop();
         (*session_data.responses_mut()).push((bob_state, bob_signature));
         assert_eq!(session_data.check_responses_indexes().unwrap(), (),);
-    }
-
-    /// Get all the agents signing for this session.
-    pub fn signing_agents(&self) -> impl Iterator<Item = &AgentPubKey> {
-        self.preflight_request.signing_agents.iter().map(|(a, _)| a)
-    }
-
-    /// Get the preflight request for this session.
-    pub fn preflight_request(&self) -> &PreflightRequest {
-        &self.preflight_request
     }
 }

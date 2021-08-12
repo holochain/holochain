@@ -5,6 +5,7 @@ use super::*;
 use crate::conductor::api::CellConductorApiT;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
+use crate::core::sys_validate::check_and_hold_store_element;
 use crate::core::sys_validate::*;
 use crate::core::validation::*;
 use error::WorkflowResult;
@@ -12,9 +13,8 @@ use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_p2p::HolochainP2pCell;
 use holochain_p2p::HolochainP2pCellT;
-use holochain_sqlite::prelude::*;
-
 use holochain_sqlite::db::ReadManager;
+use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::HostFnStores;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::prelude::*;
@@ -24,7 +24,6 @@ use holochain_zome_types::Entry;
 use holochain_zome_types::ValidationStatus;
 use std::convert::TryInto;
 use tracing::*;
-
 use types::Outcome;
 
 pub mod types;
@@ -227,6 +226,22 @@ async fn validate_op_inner(
         DhtOp::StoreElement(_, header, entry) => {
             store_element(header, workspace, network.clone()).await?;
             if let Some(entry) = entry {
+                // Retrieve for all other headers on countersigned entry.
+                if let Entry::CounterSign(session_data, _) = &**entry {
+                    for header in session_data.build_header_set()? {
+                        let hh = HeaderHash::with_data_sync(&header);
+                        if workspace
+                            .full_cascade(network.clone())
+                            .retrieve_header(hh.clone(), Default::default())
+                            .await?
+                            .is_none()
+                        {
+                            return Err(SysValidationError::ValidationOutcome(
+                                ValidationOutcome::DepMissingFromDht(hh.into()),
+                            ));
+                        }
+                    }
+                }
                 store_entry(
                     (header)
                         .try_into()
@@ -241,6 +256,21 @@ async fn validate_op_inner(
             Ok(())
         }
         DhtOp::StoreEntry(_, header, entry) => {
+            // Check and hold for all other headers on countersigned entry.
+            if let Entry::CounterSign(session_data, _) = &**entry {
+                let dependency_check = |_original_element: &Element| Ok(());
+                for header in session_data.build_header_set()? {
+                    check_and_hold_store_element(
+                        &HeaderHash::with_data_sync(&header),
+                        workspace,
+                        network.clone(),
+                        incoming_dht_ops_sender.clone(),
+                        dependency_check,
+                    )
+                    .await?;
+                }
+            }
+
             store_entry(
                 (header).into(),
                 entry.as_ref(),
@@ -359,40 +389,60 @@ async fn sys_validate_element_inner(
     let signature = element.signature();
     let header = element.header();
     let entry = element.entry().as_option();
-    let incoming_dht_ops_sender = None;
     counterfeit_check(signature, header).await?;
-    store_element(header, workspace, network.clone()).await?;
-    if let Some((entry, EntryVisibility::Public)) =
-        &entry.and_then(|e| header.entry_type().map(|et| (e, et.visibility())))
-    {
-        store_entry(
-            (header)
-                .try_into()
-                .map_err(|_| ValidationOutcome::NotNewEntry(header.clone()))?,
-            entry,
-            conductor_api,
-            workspace,
-            network.clone(),
-        )
-        .await?;
+
+    async fn validate(
+        header: &Header,
+        entry: Option<&Entry>,
+        workspace: &mut SysValidationWorkspace,
+        network: HolochainP2pCell,
+        conductor_api: &impl CellConductorApiT,
+    ) -> SysValidationResult<()> {
+        let incoming_dht_ops_sender = None;
+        store_element(header, workspace, network.clone()).await?;
+        if let Some((entry, EntryVisibility::Public)) =
+            &entry.and_then(|e| header.entry_type().map(|et| (e, et.visibility())))
+        {
+            store_entry(
+                (header)
+                    .try_into()
+                    .map_err(|_| ValidationOutcome::NotNewEntry(header.clone()))?,
+                entry,
+                conductor_api,
+                workspace,
+                network.clone(),
+            )
+            .await?;
+        }
+        match header {
+            Header::Update(header) => {
+                register_updated_content(header, workspace, network, incoming_dht_ops_sender)
+                    .await?;
+            }
+            Header::Delete(header) => {
+                register_deleted_entry_header(header, workspace, network, incoming_dht_ops_sender)
+                    .await?;
+            }
+            Header::CreateLink(header) => {
+                register_add_link(header, workspace, network, incoming_dht_ops_sender).await?;
+            }
+            Header::DeleteLink(header) => {
+                register_delete_link(header, workspace, network, incoming_dht_ops_sender).await?;
+            }
+            _ => {}
+        }
+        Ok(())
     }
-    match header {
-        Header::Update(header) => {
-            register_updated_content(header, workspace, network, incoming_dht_ops_sender).await?;
+
+    match entry {
+        Some(Entry::CounterSign(session, _)) => {
+            for header in session.build_header_set()? {
+                validate(&header, entry, workspace, network.clone(), conductor_api).await?;
+            }
+            Ok(())
         }
-        Header::Delete(header) => {
-            register_deleted_entry_header(header, workspace, network, incoming_dht_ops_sender)
-                .await?;
-        }
-        Header::CreateLink(header) => {
-            register_add_link(header, workspace, network, incoming_dht_ops_sender).await?;
-        }
-        Header::DeleteLink(header) => {
-            register_delete_link(header, workspace, network, incoming_dht_ops_sender).await?;
-        }
-        _ => {}
+        _ => validate(header, entry, workspace, network, conductor_api).await,
     }
-    Ok(())
 }
 
 /// Check if the op has valid signature and author.
