@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use holo_hash::EntryHash;
 use holo_hash::{AgentPubKey, DhtOpHash, HeaderHash};
 use holochain_p2p::HolochainP2pCellT;
+use holochain_state::prelude::SourceChain;
 use holochain_types::Timestamp;
 use holochain_types::{dht_op::DhtOp, env::EnvWrite};
 use holochain_zome_types::{Entry, SignedHeader};
@@ -126,9 +127,23 @@ pub(crate) async fn countersigning_workflow(
 }
 
 pub(crate) async fn countersigning_success(
-    env: &EnvWrite,
+    vault: EnvWrite,
+    author: AgentPubKey,
     signed_headers: Vec<SignedHeader>,
 ) -> WorkflowResult<()> {
+    // let (persisted_head, persisted_seq) = vault
+    //     .async_reader({
+    //         let author = author.clone();
+    //         move |txn| {
+    //             // TODO: Check if chain is locked
+    //             // is_chain_locked()
+    //             let chain_locked = false;
+    //             // chain_head_db(&txn, author)
+    //             todo!()
+    //         }
+    //     })
+    //     .await?;
+    let source_chain = SourceChain::new(vault, author).await?;
     todo!()
 }
 

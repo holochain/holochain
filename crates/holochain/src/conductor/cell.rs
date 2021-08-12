@@ -483,9 +483,13 @@ impl Cell {
         &self,
         signed_headers: Vec<SignedHeader>,
     ) -> CellResult<()> {
-        Ok(countersigning_success(&self.env, signed_headers)
-            .await
-            .map_err(Box::new)?)
+        Ok(countersigning_success(
+            self.env.clone(),
+            self.id.agent_pubkey().clone(),
+            signed_headers,
+        )
+        .await
+        .map_err(Box::new)?)
     }
 
     #[instrument(skip(self))]
