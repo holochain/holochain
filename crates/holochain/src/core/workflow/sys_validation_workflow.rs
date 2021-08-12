@@ -260,7 +260,7 @@ async fn validate_op_inner(
                 let dependency_check = |_original_element: &Element| Ok(());
                 for header in session_data.build_header_set()? {
                     check_and_hold_store_element(
-                        HeaderHashed::from_content_sync(header.clone()).as_hash(),
+                        &HeaderHash::with_data_sync(&header),
                         workspace,
                         network.clone(),
                         incoming_dht_ops_sender.clone(),
