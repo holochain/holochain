@@ -229,16 +229,16 @@ async fn validate_op_inner(
                 // Retrieve for all other headers on countersigned entry.
                 if let Entry::CounterSign(session_data, _) = &**entry {
                     for header in session_data.build_header_set()? {
-                        workspace
-                            .local_cascade()
-                            .retrieve(
-                                HeaderHashed::from_content_sync(header.clone())
-                                    .as_hash()
-                                    .to_owned()
-                                    .into(),
+                        let hh = HeaderHash::with_data_sync(&header);
+                        if workspace
+                            .cascade(network)
+                            .retrieve_header(
+                                hh.clone(),
                                 Default::default(),
                             )
-                            .await?;
+                            .await?.is_none() {
+                                return Err(SysValidationError::ValidationOutcome(ValidationOutcome::DepMissingFromDht(hh)))
+                            }
                     }
                 }
                 store_entry(
