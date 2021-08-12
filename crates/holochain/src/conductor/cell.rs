@@ -487,6 +487,7 @@ impl Cell {
             self.env.clone(),
             self.id.agent_pubkey().clone(),
             signed_headers,
+            self.queue_triggers.publish_dht_ops.clone(),
         )
         .await
         .map_err(Box::new)?)

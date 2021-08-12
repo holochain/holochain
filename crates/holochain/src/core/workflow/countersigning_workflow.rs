@@ -1,9 +1,12 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use holo_hash::EntryHash;
 use holo_hash::{AgentPubKey, DhtOpHash, HeaderHash};
+use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::HolochainP2pCellT;
-use holochain_state::prelude::SourceChain;
+use holochain_state::mutations;
+use holochain_state::prelude::{current_countersigning_session, SourceChainResult};
 use holochain_types::Timestamp;
 use holochain_types::{dht_op::DhtOp, env::EnvWrite};
 use holochain_zome_types::{Entry, SignedHeader};
@@ -59,10 +62,7 @@ pub(crate) fn incoming_countersigning(
                 let header_set = session_data.build_header_set()?;
 
                 // Get the expires time for this session.
-                let expires = *session_data
-                    .preflight_request()
-                    .session_times_ref()
-                    .as_end_ref();
+                let expires = *session_data.preflight_request().session_times().end();
 
                 // Get the entry hash from a header.
                 // If the headers have different entry hashes they will fail validation.
@@ -126,25 +126,62 @@ pub(crate) async fn countersigning_workflow(
     Ok(WorkComplete::Complete)
 }
 
+/// An incoming countersigning session success.
 pub(crate) async fn countersigning_success(
     vault: EnvWrite,
     author: AgentPubKey,
     signed_headers: Vec<SignedHeader>,
+    mut publish_trigger: TriggerSender,
 ) -> WorkflowResult<()> {
-    // let (persisted_head, persisted_seq) = vault
-    //     .async_reader({
-    //         let author = author.clone();
-    //         move |txn| {
-    //             // TODO: Check if chain is locked
-    //             // is_chain_locked()
-    //             let chain_locked = false;
-    //             // chain_head_db(&txn, author)
-    //             todo!()
-    //         }
-    //     })
-    //     .await?;
-    let source_chain = SourceChain::new(vault, author).await?;
-    todo!()
+    // Using iterators is fine in this function as there can only be a maximum of 8 headers.
+    let entry_hash = match signed_headers
+        .first()
+        .and_then(|sh| sh.0.entry_hash().cloned())
+    {
+        Some(h) => h,
+        None => return Ok(()),
+    };
+
+    // Verify signatures of headers.
+    for SignedHeader(header, signature) in &signed_headers {
+        if !header.author().verify_signature(signature, header).await? {
+            return Ok(());
+        }
+    }
+
+    // Hash headers.
+    let incoming_headers: Vec<_> = signed_headers
+        .iter()
+        .map(|SignedHeader(h, _)| HeaderHash::with_data_sync(h))
+        .collect();
+
+    let result = vault
+        .async_commit(move |txn| {
+            if let Some(cs) = current_countersigning_session(txn, Arc::new(author))? {
+                // Check we have the right session.
+                if *cs.entry_hash() == entry_hash {
+                    let stored_headers = cs.build_header_set()?;
+                    if stored_headers.len() == signed_headers.len() {
+                        // Check all stored header hashes match an incoming header hash.
+                        if stored_headers.iter().all(|h| {
+                            let h = HeaderHash::with_data_sync(h);
+                            incoming_headers.iter().any(|i| *i == h)
+                        }) {
+                            // All checks have passed so unlock the chain.
+                            mutations::unlock_chain(txn)?;
+                            // TODO: Update ops to publish.
+                            return Ok(true);
+                        }
+                    }
+                }
+            }
+            SourceChainResult::Ok(false)
+        })
+        .await?;
+    if result {
+        publish_trigger.trigger();
+    }
+    Ok(())
 }
 
 type AgentsToNotify = Vec<AgentPubKey>;

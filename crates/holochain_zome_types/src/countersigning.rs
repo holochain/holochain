@@ -448,6 +448,16 @@ pub enum HeaderBase {
     // CreateLink(CreateLinkBase),
 }
 
+impl HeaderBase {
+    /// Get the entry hash for this header.
+    pub fn entry_hash(&self) -> &EntryHash {
+        match self {
+            HeaderBase::Create(CreateBase { entry_hash, .. })
+            | HeaderBase::Update(UpdateBase { entry_hash, .. }) => entry_hash,
+        }
+    }
+}
+
 /// Base data for Create headers.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -616,6 +626,16 @@ impl CounterSigningSessionData {
     /// Accessor to responses.
     pub fn responses(&self) -> &Vec<(CounterSigningAgentState, Signature)> {
         &self.responses
+    }
+
+    /// Get all the agents signing for this session.
+    pub fn signing_agents(&self) -> impl Iterator<Item = &AgentPubKey> {
+        self.preflight_request.signing_agents.iter().map(|(a, _)| a)
+    }
+
+    /// Get the entry hash for this session.
+    pub fn entry_hash(&self) -> &EntryHash {
+        self.preflight_request.header_base.entry_hash()
     }
 
     /// Mutable responses accessor for testing.
@@ -804,15 +824,5 @@ pub mod test {
         (*session_data.responses_mut()).pop();
         (*session_data.responses_mut()).push((bob_state, bob_signature));
         assert_eq!(session_data.check_responses_indexes().unwrap(), (),);
-    }
-
-    /// Get all the agents signing for this session.
-    pub fn signing_agents(&self) -> impl Iterator<Item = &AgentPubKey> {
-        self.preflight_request.signing_agents.iter().map(|(a, _)| a)
-    }
-
-    /// Get the preflight request for this session.
-    pub fn preflight_request(&self) -> &PreflightRequest {
-        &self.preflight_request
     }
 }

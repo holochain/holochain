@@ -20,6 +20,7 @@ use holochain_zome_types::CapAccess;
 use holochain_zome_types::CapGrant;
 use holochain_zome_types::CapSecret;
 use holochain_zome_types::CounterSigningAgentState;
+use holochain_zome_types::CounterSigningSessionData;
 use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
 use holochain_zome_types::EntryVisibility;
@@ -532,7 +533,7 @@ impl SourceChain {
         let author = self.author.clone();
         let persisted_head = self.persisted_head.clone();
         self.vault
-            .async_commit(move |txn| {
+            .async_commit(move |txn: &mut Transaction| {
                 // As at check.
                 let (new_persisted_head, _, _) = chain_head_db(&txn, author)?;
                 if headers.last().is_none() {
@@ -730,6 +731,36 @@ fn chain_head_scratch(
             }
         })
         .max_by_key(|h| h.1)
+}
+
+/// Check if there is a current countersigning session and if so, return the
+/// session data.
+pub fn current_countersigning_session(
+    txn: &mut Transaction<'_>,
+    author: Arc<AgentPubKey>,
+) -> SourceChainResult<Option<CounterSigningSessionData>> {
+    // The chain must be locked for a session to be active.
+    if is_chain_locked(txn, &[])? {
+        match chain_head_db(txn, author) {
+            // We haven't done genesis so no session can be active.
+            Err(SourceChainError::ChainEmpty) => Ok(None),
+            Err(e) => Err(e),
+            Ok((hash, _, _)) => {
+                let txn: Txn = txn.into();
+                // Get the session data from the database.
+                let r = txn
+                    .get_element(&hash.into())?
+                    .and_then(|element| element.into_inner().1.into_option())
+                    .and_then(|entry| match entry {
+                        Entry::CounterSign(cs, _) => Some(*cs),
+                        _ => None,
+                    });
+                Ok(r)
+            }
+        }
+    } else {
+        Ok(None)
+    }
 }
 
 #[cfg(test)]
