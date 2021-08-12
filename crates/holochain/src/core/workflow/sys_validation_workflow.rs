@@ -231,14 +231,15 @@ async fn validate_op_inner(
                     for header in session_data.build_header_set()? {
                         let hh = HeaderHash::with_data_sync(&header);
                         if workspace
-                            .cascade(network)
-                            .retrieve_header(
-                                hh.clone(),
-                                Default::default(),
-                            )
-                            .await?.is_none() {
-                                return Err(SysValidationError::ValidationOutcome(ValidationOutcome::DepMissingFromDht(hh)))
-                            }
+                            .full_cascade(network.clone())
+                            .retrieve_header(hh.clone(), Default::default())
+                            .await?
+                            .is_none()
+                        {
+                            return Err(SysValidationError::ValidationOutcome(
+                                ValidationOutcome::DepMissingFromDht(hh.into()),
+                            ));
+                        }
                     }
                 }
                 store_entry(
