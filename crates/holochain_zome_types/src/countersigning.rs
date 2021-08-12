@@ -633,11 +633,6 @@ impl CounterSigningSessionData {
         &self.responses
     }
 
-    /// Get all the agents signing for this session.
-    pub fn signing_agents(&self) -> impl Iterator<Item = &AgentPubKey> {
-        self.preflight_request.signing_agents.iter().map(|(a, _)| a)
-    }
-
     /// Get the entry hash for this session.
     pub fn entry_hash(&self) -> &EntryHash {
         self.preflight_request.header_base.entry_hash()

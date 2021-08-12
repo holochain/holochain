@@ -39,20 +39,29 @@ pub async fn publish_dht_ops_workflow(
     env: EnvWrite,
     network: HolochainP2pCell,
 ) -> WorkflowResult<WorkComplete> {
-    let (to_publish, hashes) =
+    let mut complete = WorkComplete::Complete;
+    let to_publish =
         publish_dht_ops_workflow_inner(env.clone().into(), network.from_agent()).await?;
 
     // Commit to the network
     tracing::info!("sending {} ops", to_publish.len());
+    let mut success = Vec::new();
     for (basis, ops) in to_publish {
+        let hashes: Vec<_> = ops.iter().map(|(h, _)| h.clone()).collect();
         if let Err(e) = network.publish(true, false, basis, ops, None).await {
+            // If we get a routing error it means the space hasn't started yet and we should try publishing again.
+            if let holochain_p2p::HolochainP2pError::RoutingDnaError(_) = e {
+                complete = WorkComplete::Incomplete;
+            }
             tracing::info!(failed_to_send_publish = ?e);
+        } else {
+            success.extend(hashes);
         }
     }
-    tracing::info!("sent {} ops", hashes.len());
+    tracing::info!("sent {} ops", success.len());
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
     env.async_commit(move |writer| {
-        for hash in hashes {
+        for hash in success {
             mutations::set_last_publish_time(writer, hash, now)?;
         }
         WorkflowResult::Ok(())
@@ -61,24 +70,21 @@ pub async fn publish_dht_ops_workflow(
     tracing::info!("commited sent ops");
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
-    Ok(WorkComplete::Complete)
+    Ok(complete)
 }
 
 /// Read the authored for ops with receipt count < R
 pub async fn publish_dht_ops_workflow_inner(
     env: EnvRead,
     agent: AgentPubKey,
-) -> WorkflowResult<(HashMap<AnyDhtHash, Vec<(DhtOpHash, DhtOp)>>, Vec<DhtOpHash>)> {
+) -> WorkflowResult<HashMap<AnyDhtHash, Vec<(DhtOpHash, DhtOp)>>> {
     // Ops to publish by basis
     let mut to_publish = HashMap::new();
-    let mut hashes = Vec::new();
 
     for op_hashed in
         publish_query::get_ops_to_publish(agent.clone(), &env, DEFAULT_RECEIPT_BUNDLE_SIZE).await?
     {
         let (op, op_hash) = op_hashed.into_inner();
-        hashes.push(op_hash.clone());
-
         // For every op publish a request
         // Collect and sort ops by basis
         to_publish
@@ -87,7 +93,7 @@ pub async fn publish_dht_ops_workflow_inner(
             .push((op_hash, op));
     }
 
-    Ok((to_publish, hashes))
+    Ok(to_publish)
 }
 
 #[cfg(test)]

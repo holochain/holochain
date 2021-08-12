@@ -908,6 +908,7 @@ impl Space {
                         ),
                     ),
                 ],
+                "none" => vec![],
                 _ => {
                     panic!("unknown gossip strategy: {}", module);
                 }
