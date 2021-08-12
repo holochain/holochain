@@ -852,6 +852,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_wasm_countersigning"
+version = "0.0.1"
+dependencies = [
+ "fixt",
+ "hdk",
+ "holochain_test_wasm_common",
+ "serde",
+]
+
+[[package]]
 name = "test_wasm_crd"
 version = "0.0.1"
 dependencies = [

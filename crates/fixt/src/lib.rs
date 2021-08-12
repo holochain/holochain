@@ -562,7 +562,7 @@ macro_rules! fixt {
     ( $name:tt, $curve:expr ) => {
         $crate::fixt!($name, $curve, 0)
     };
-    ( $name:tt, $curve:expr, $index:literal ) => {
+    ( $name:tt, $curve:expr, $index:expr ) => {
         $crate::prelude::paste! { [< $name:camel Fixturator>]::new_indexed($curve, $index).next().unwrap() }
     }
 }
