@@ -2119,9 +2119,9 @@ dependencies = [
 
 [[package]]
 name = "ghost_actor"
-version = "0.3.0-alpha.2"
+version = "0.3.0-alpha.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22877bceb1241ee31bf21ebd4e622988d15370cfa36c0088a4b7309079e09918"
+checksum = "f381a129cc697f6accde7f129faade72ffce8f6fb6880e2be73c56eb5739e04f"
 dependencies = [
  "futures",
  "mockall",
@@ -2415,7 +2415,7 @@ dependencies = [
  "fallible-iterator",
  "fixt",
  "futures",
- "ghost_actor 0.3.0-alpha.2",
+ "ghost_actor 0.3.0-alpha.3",
  "hdk",
  "holo_hash",
  "holochain_cascade",
@@ -2487,7 +2487,7 @@ dependencies = [
  "fallible-iterator",
  "fixt",
  "futures",
- "ghost_actor 0.3.0-alpha.2",
+ "ghost_actor 0.3.0-alpha.3",
  "hdk",
  "hdk_derive",
  "holo_hash",
@@ -2599,7 +2599,7 @@ dependencies = [
 name = "holochain_keystore"
 version = "0.0.2"
 dependencies = [
- "ghost_actor 0.3.0-alpha.2",
+ "ghost_actor 0.3.0-alpha.3",
  "holo_hash",
  "holochain_serialized_bytes",
  "holochain_sqlite",
@@ -2620,7 +2620,7 @@ dependencies = [
  "async-trait",
  "fixt",
  "futures",
- "ghost_actor 0.3.0-alpha.2",
+ "ghost_actor 0.3.0-alpha.3",
  "holo_hash",
  "holochain_keystore",
  "holochain_serialized_bytes",
@@ -3263,7 +3263,7 @@ dependencies = [
  "derive_more",
  "fixt",
  "futures",
- "ghost_actor 0.3.0-alpha.2",
+ "ghost_actor 0.3.0-alpha.3",
  "governor",
  "itertools 0.10.1",
  "kitsune_p2p_mdns",
@@ -3440,7 +3440,7 @@ dependencies = [
  "criterion",
  "derive_more",
  "futures",
- "ghost_actor 0.3.0-alpha.2",
+ "ghost_actor 0.3.0-alpha.3",
  "kitsune_p2p_dht_arc",
  "lair_keystore_api",
  "lru",
@@ -3489,7 +3489,7 @@ dependencies = [
  "derive_more",
  "directories 3.0.2",
  "futures",
- "ghost_actor 0.3.0-alpha.2",
+ "ghost_actor 0.3.0-alpha.3",
  "nanoid",
  "num_cpus",
  "once_cell",
@@ -3510,7 +3510,7 @@ version = "0.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56ee4915c92df45a3fa55ae07631d925d66c99641f109378b147fc6aeed0e5f7"
 dependencies = [
- "ghost_actor 0.3.0-alpha.2",
+ "ghost_actor 0.3.0-alpha.3",
  "lair_keystore_api",
  "tempfile",
  "tokio",
