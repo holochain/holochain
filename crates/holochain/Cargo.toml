@@ -85,7 +85,6 @@ sd-notify = "0.3.0"
 
 [dev-dependencies]
 anyhow = "1.0.26"
-arbitrary = "1.0" 
 assert_cmd = "1.0.1"
 criterion = "0.3"
 maplit = "1"
