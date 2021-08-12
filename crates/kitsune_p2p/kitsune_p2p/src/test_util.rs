@@ -1,5 +1,7 @@
 //! Utilities to make kitsune testing a little more sane.
 
+#![allow(dead_code)]
+
 use crate::types::actor::*;
 use crate::types::agent_store::*;
 use crate::types::event::*;
@@ -11,6 +13,7 @@ use std::sync::Arc;
 
 /// Utility trait for test values
 pub trait TestVal: Sized {
+    /// Create the test val
     fn test_val() -> Self;
 }
 
@@ -39,13 +42,14 @@ test_val! {
 }
 
 mod harness_event;
-pub use harness_event::*;
+pub(crate) use harness_event::*;
 
 mod harness_agent;
 pub(crate) use harness_agent::*;
 
 mod harness_actor;
-pub use harness_actor::*;
+#[allow(unused_imports)]
+pub(crate) use harness_actor::*;
 
 // NB: this is a copy of `KdMetricStore` from `kitsune_p2p_direct`, which
 //   is downstream of this crate.
@@ -56,3 +60,5 @@ pub use metric_store::*;
 
 #[cfg(feature = "test_utils")]
 pub mod mock_network;
+pub mod scenario_def;
+pub(crate) mod scenario_def_local;

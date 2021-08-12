@@ -1,5 +1,6 @@
+//! Declarative definition of multi-conductor sharded scenarios.
+
 use kitsune_p2p_types::dht_arc::{ArcInterval, DhtLocation};
-use maplit::hashset;
 use std::collections::{BTreeSet, HashSet};
 
 /// Abstract representation of the instantaneous state of a sharded network
@@ -32,11 +33,12 @@ pub struct ScenarioDef<const N: usize> {
 }
 
 impl<const N: usize> ScenarioDef<N> {
+    /// Constructor
     pub fn new(nodes: [ScenarioDefNode; N], peer_matrix: PeerMatrix<N>) -> Self {
         Self::new_with_latency(nodes, peer_matrix, None)
     }
 
-    pub fn new_with_latency(
+    fn new_with_latency(
         nodes: [ScenarioDefNode; N],
         peer_matrix: PeerMatrix<N>,
         _latency_matrix: LatencyMatrix<N>,
@@ -54,6 +56,7 @@ impl<const N: usize> ScenarioDef<N> {
 pub struct ScenarioDefNode(HashSet<ScenarioDefAgent>);
 
 impl ScenarioDefNode {
+    /// Constructor
     pub fn new(agents: HashSet<ScenarioDefAgent>) -> Self {
         Self(agents)
     }
@@ -69,6 +72,7 @@ pub struct ScenarioDefAgent {
 }
 
 impl ScenarioDefAgent {
+    /// Constructor
     pub fn new<O: Copy + Into<DhtLocation>>(arc: ArcInterval, ops: &[O]) -> Self {
         Self {
             arc,
@@ -87,13 +91,17 @@ pub type LatencyMatrix<const N: usize> = Option<[[u32; N]; N]>;
 /// Specifies which other nodes are present in the peer store of each node.
 /// The array index matches the array defined in `ShardedScenario::nodes`.
 pub enum PeerMatrix<const N: usize> {
+    /// All nodes know about all other nodes
     Full,
+    /// Each index of the matrix is a hashset of other indices: The node at
+    /// this index knows about the other nodes at the indices in the hashset.
     Sparse([HashSet<usize>; N]),
 }
 
 /// Just construct a scenario to illustrate/experience how it's done
 #[test]
 fn constructors() {
+    use maplit::hashset;
     use ScenarioDefAgent as Agent;
     use ScenarioDefNode as Node;
     let ops: Vec<DhtLocation> = (-10..11).map(i32::into).collect();
