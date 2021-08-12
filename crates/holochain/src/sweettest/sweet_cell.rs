@@ -1,6 +1,7 @@
 use super::SweetZome;
 use hdk::prelude::*;
 use holo_hash::DnaHash;
+use holochain_p2p::dht_arc::ArcInterval;
 use holochain_types::env::EnvWrite;
 /// A reference to a Cell created by a SweetConductor installation function.
 /// It has very concise methods for calling a zome on this cell
@@ -8,6 +9,7 @@ use holochain_types::env::EnvWrite;
 pub struct SweetCell {
     pub(super) cell_id: CellId,
     pub(super) cell_env: EnvWrite,
+    pub(super) p2p_agents_env: EnvWrite,
 }
 
 impl SweetCell {
@@ -34,5 +36,9 @@ impl SweetCell {
     /// Get a SweetZome with the given name
     pub fn zome<Z: Into<ZomeName>>(&self, zome_name: Z) -> SweetZome {
         SweetZome::new(self.cell_id.clone(), zome_name.into())
+    }
+
+    pub fn set_storage_arc(&self, arc: ArcInterval) {
+        todo!()
     }
 }

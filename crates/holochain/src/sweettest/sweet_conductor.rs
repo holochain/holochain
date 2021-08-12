@@ -1,4 +1,4 @@
-//! A wrapper around ConductorHandle with more convenient methods for testing
+//! A wrapper around ConductorHandle with more convenient methods for testing.
 // TODO [ B-03669 ] move to own crate
 
 use super::{SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetConductorHandle};
@@ -10,10 +10,11 @@ use hdk::prelude::*;
 use holo_hash::DnaHash;
 use holochain_conductor_api::{AdminInterfaceConfig, InterfaceDriver};
 use holochain_keystore::KeystoreSender;
+use holochain_p2p::*;
 use holochain_state::test_utils::{test_environments, TestEnvs};
 use holochain_types::prelude::*;
 use holochain_websocket::*;
-use kitsune_p2p::KitsuneP2pConfig;
+use kitsune_p2p::{KitsuneP2pConfig, KitsuneSpace};
 use std::sync::Arc;
 
 /// A stream of signals.
@@ -21,6 +22,9 @@ pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Syn
 
 /// A useful Conductor abstraction for testing, allowing startup and shutdown as well
 /// as easy installation of apps across multiple Conductors and Agents.
+///
+/// SweetConductors are meant to run on a single machine. Peer discovery is
+/// explicit (TODO), and they are not expected to use a bootstrap server.
 ///
 /// This is intentionally NOT `Clone`, because the drop handle triggers a shutdown of
 /// the conductor handle, which would render all other cloned instances useless.
@@ -213,9 +217,15 @@ impl SweetConductor {
     ) -> ConductorApiResult<SweetApp> {
         let mut sweet_cells = Vec::new();
         for dna_hash in dna_hashes {
+            let kspace = dna_hash.clone().to_kitsune();
             let cell_id = CellId::new(dna_hash, agent.clone());
             let cell_env = self.handle().0.get_cell_env(&cell_id).await?;
-            let cell = SweetCell { cell_id, cell_env };
+            let p2p_agents_env = self.envs().p2p().lock().get(&kspace).unwrap().clone();
+            let cell = SweetCell {
+                cell_id,
+                cell_env,
+                p2p_agents_env,
+            };
             sweet_cells.push(cell);
         }
 
