@@ -499,7 +499,7 @@ where
 /// incoming_dht_ops_workflow if you
 /// found it on the network and were supposed
 /// to be holding it.
-#[derive(derive_more::Constructor)]
+#[derive(derive_more::Constructor, Clone)]
 pub struct IncomingDhtOpSender {
     env: EnvWrite,
     sys_validation_trigger: TriggerSender,
