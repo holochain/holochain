@@ -90,7 +90,7 @@ pub async fn get_ops_to_publish(
             WorkflowResult::Ok(r.collect())
         })
         .await?;
-    tracing::info!(?results);
+    tracing::debug!(?results);
     results
 }
 
