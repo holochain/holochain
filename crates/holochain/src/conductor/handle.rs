@@ -373,6 +373,7 @@ pub trait ConductorHandleT: Send + Sync {
 
 /// Special switches for features to be used during development and testing
 #[derive(Clone)]
+#[non_exhaustive]
 pub struct DevSettings {
     /// Determines whether publishing should be enabled
     pub publish: bool,
@@ -383,6 +384,7 @@ pub struct DevSettings {
 /// Specify changes to be made to the Devsettings.
 /// None means no change, Some means make the specified change.
 #[derive(Default)]
+#[non_exhaustive]
 pub struct DevSettingsDelta {
     /// Determines whether publishing should be enabled
     pub publish: Option<bool>,
