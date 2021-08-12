@@ -23,6 +23,8 @@ let
         if [[ -n "$NIX_ENV_PREFIX" ]]; then
           # don't touch it
           :
+        elif test -w "$PWD"; then
+          export NIX_ENV_PREFIX="$PWD"
         elif test -d "${builtins.toString self.hcToplevelDir}" &&
             test -w "${builtins.toString self.hcToplevelDir}"; then
           export NIX_ENV_PREFIX="${builtins.toString self.hcToplevelDir}"

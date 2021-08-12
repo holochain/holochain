@@ -511,12 +511,6 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
     ) -> RibosomeResult<ZomeCallResponse>;
 }
 
-impl std::fmt::Debug for MockRibosomeT {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("MockRibosomeT()"))
-    }
-}
-
 #[cfg(test)]
 pub mod wasm_test {
     use crate::core::ribosome::FnComponents;
@@ -546,9 +540,7 @@ pub mod wasm_test {
                     .next()
                     .unwrap();
 
-                let author = $crate::fixt::AgentPubKeyFixturator::new(::fixt::prelude::Predictable)
-                    .next()
-                    .unwrap();
+                let author = host_access.cell_id.agent_pubkey().clone();
 
                 // Required because otherwise the network will return routing errors
                 let test_network = crate::test_utils::test_network(

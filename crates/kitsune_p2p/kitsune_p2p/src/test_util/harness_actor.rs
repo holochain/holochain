@@ -1,5 +1,7 @@
 use super::*;
 
+type KAgent = Arc<KitsuneAgent>;
+
 ghost_actor::ghost_chan! {
     /// The api for the test harness controller
     pub chan HarnessControlApi<KitsuneP2pError> {
@@ -31,13 +33,13 @@ ghost_actor::ghost_chan! {
         fn magic_peer_info_exchange() -> ();
 
         /// Inject data for one specific agent to gossip to others
-        fn inject_gossip_data(agent: Arc<KitsuneAgent>, data: String) -> Arc<KitsuneOpHash>;
+        fn inject_gossip_data(agent: KAgent, data: String) -> Arc<KitsuneOpHash>;
 
         /// Dump all local gossip data from a specific agent
-        fn dump_local_gossip_data(agent: Arc<KitsuneAgent>) -> HashMap<Arc<KitsuneOpHash>, String>;
+        fn dump_local_gossip_data(agent: KAgent) -> HashMap<Arc<KitsuneOpHash>, String>;
 
         /// Dump all local peer data from a specific agent
-        fn dump_local_peer_data(agent: Arc<KitsuneAgent>) -> HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>;
+        fn dump_local_peer_data(agent: KAgent) -> HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>;
     }
 }
 
@@ -97,13 +99,16 @@ pub async fn spawn_test_harness(
     Ok((controller, harness_chan))
 }
 
+type KP2p = ghost_actor::GhostSender<KitsuneP2p>;
+type KCtl = ghost_actor::GhostSender<HarnessAgentControl>;
+
 ghost_actor::ghost_chan! {
     /// The api for the test harness controller
     chan HarnessInner<KitsuneP2pError> {
         fn finish_agent(
-            agent: Arc<KitsuneAgent>,
-            p2p: ghost_actor::GhostSender<KitsuneP2p>,
-            ctrl: ghost_actor::GhostSender<HarnessAgentControl>,
+            agent: KAgent,
+            p2p: KP2p,
+            ctrl: KCtl,
         ) -> ();
     }
 }

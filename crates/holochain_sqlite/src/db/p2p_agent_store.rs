@@ -270,7 +270,8 @@ struct P2pRecord {
     storage_end_loc: Option<u32>,
 }
 
-fn clamp64(u: u64) -> i64 {
+/// Clamp a u64 to the range of a i64.
+pub fn clamp64(u: u64) -> i64 {
     if u > i64::MAX as u64 {
         i64::MAX
     } else {
@@ -288,7 +289,7 @@ impl P2pRecord {
         let expires_at_ms = signed.expires_at_ms;
         let arc = signed.storage_arc;
 
-        let storage_center_loc = arc.center_loc.into();
+        let storage_center_loc = arc.center_loc().into();
 
         let is_active = !signed.url_list.is_empty();
 

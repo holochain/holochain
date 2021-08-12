@@ -6,48 +6,45 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
+use futures::future::join_all;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_link_details<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: GetLinksInput,
-) -> Result<LinkDetails, WasmError> {
+    inputs: Vec<GetLinksInput>,
+) -> Result<Vec<LinkDetails>, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ read_workspace: Permission::Allow, .. } => {
-            let GetLinksInput {
-                base_address,
-                tag_prefix,
-            } = input;
-
-            // Get zome id
-            let zome_id = ribosome
-                .zome_to_id(&call_context.zome)
-                .expect("Failed to get ID for current zome.");
-
-    // Get the network from the context
-    let network = call_context.host_context.network().clone();
-
-            tokio_helper::block_forever_on(async move {
-                // Create the key
-                let key = WireLinkKey {
-                    base: base_address,
-                    zome_id,
-                    tag: tag_prefix,
-                };
-
-        let workspace = call_context.host_context.workspace();
-        let mut cascade = Cascade::from_workspace_network(workspace, network);
-        // Get the links from the dht
-        let link_details = LinkDetails::from(
-            cascade
-                .get_link_details(key, GetLinksOptions::default())
-                .await
-                .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?,
-        );
-
-                Ok(link_details)
-            })
+            let results: Vec<Result<Vec<_>, _>> = tokio_helper::block_forever_on(async move {
+                join_all(inputs.into_iter().map(|input| {
+                    async {
+                        let GetLinksInput {
+                            base_address,
+                            tag_prefix,
+                        } = input;
+                        let zome_id = ribosome
+                            .zome_to_id(&call_context.zome)
+                            .expect("Failed to get ID for current zome.");
+                        let key = WireLinkKey {
+                            base: base_address,
+                            zome_id,
+                            tag: tag_prefix,
+                        };
+                        Cascade::from_workspace_network(
+                            call_context.host_context.workspace(),
+                            call_context.host_context.network().to_owned(),
+                        ).get_link_details(key, GetLinksOptions::default()).await
+                    }
+                })).await
+            });
+            let results: Result<Vec<_>, _> = results.into_iter().map(|result|
+                match result {
+                    Ok(v) => Ok(v.into()),
+                    Err(cascade_error) => Err(WasmError::Host(cascade_error.to_string())),
+                }
+            ).collect();
+            Ok(results?)
         },
         _ => unreachable!(),
     }
@@ -58,24 +55,13 @@ pub fn get_link_details<'a>(
 pub mod slow_tests {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
-    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::element::SignedHeaderHashed;
     use holochain_zome_types::Header;
-    use holochain_zome_types::fake_agent_pubkey_1;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_entry_hash_path_children_details() {
-        let test_env = holochain_state::test_utils::test_cell_env();
-        let test_cache = holochain_state::test_utils::test_cache_env();
-        let env = test_env.env();
-        let author = fake_agent_pubkey_1();
-        crate::test_utils::fake_genesis(env.clone())
-            .await
-            .unwrap();
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace;
+        let host_access = fixt!(ZomeCallHostAccess, Predictable);
 
         // ensure foo.bar twice to ensure idempotency
         let _: () = crate::call_test_ribosome!(

@@ -4,6 +4,13 @@ use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::*;
 use std::sync::Arc;
 
+#[derive(Clone, Debug, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+pub enum GossipModuleType {
+    Simple,
+    ShardedRecent,
+    ShardedHistorical,
+}
+
 /// Represents an interchangeable gossip strategy module
 pub trait AsGossipModule: 'static + Send + Sync {
     fn close(&self);
@@ -14,6 +21,7 @@ pub trait AsGossipModule: 'static + Send + Sync {
     ) -> KitsuneResult<()>;
     fn local_agent_join(&self, a: Arc<KitsuneAgent>);
     fn local_agent_leave(&self, a: Arc<KitsuneAgent>);
+    fn new_integrated_data(&self) {}
 }
 
 pub struct GossipModule(pub Arc<dyn AsGossipModule>);
@@ -37,6 +45,11 @@ impl GossipModule {
 
     pub fn local_agent_leave(&self, a: Arc<KitsuneAgent>) {
         self.0.local_agent_leave(a);
+    }
+
+    /// New data has been integrated and is ready for gossiping.
+    pub fn new_integrated_data(&self) {
+        self.0.new_integrated_data();
     }
 }
 
@@ -66,7 +79,7 @@ impl GossipModuleFactory {
     }
 }
 
-/// The specific provenance/destination of gossip is to a particular Agent on
+/// The specific provenance/destination of gossip is a particular Agent on
 /// a connection specified by a Tx2Cert
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, derive_more::Constructor)]
 pub struct GossipTgt {

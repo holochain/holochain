@@ -81,6 +81,9 @@ wasm_io_types! {
     // These definitions can be copy-pasted into the ribosome's HostFnApi
     // when updated
 
+    // Attempt to accept a preflight request.
+    fn accept_countersigning_preflight_request(zt::countersigning::PreflightRequest) -> zt::countersigning::PreflightRequestAcceptance;
+
     // Info about the calling agent.
     fn agent_info (()) -> zt::info::AgentInfo;
 
@@ -94,9 +97,9 @@ wasm_io_types! {
     fn call_info (()) -> zt::info::CallInfo;
 
     // Header hash of the DeleteLink element.
-    fn call_remote (zt::call_remote::CallRemote) -> zt::ZomeCallResponse;
+    fn call_remote (Vec<zt::call_remote::CallRemote>) -> Vec<zt::ZomeCallResponse>;
 
-    fn call (zt::call::Call) -> zt::ZomeCallResponse;
+    fn call (Vec<zt::call::Call>) -> Vec<zt::ZomeCallResponse>;
 
     // @todo List all the local capability claims.
     fn capability_claims (()) -> ();
@@ -131,15 +134,15 @@ wasm_io_types! {
 
     fn get_agent_activity (zt::agent_activity::GetAgentActivityInput) -> zt::query::AgentActivity;
 
-    fn get_details (zt::entry::GetInput) -> Option<zt::metadata::Details>;
+    fn get_details (Vec<zt::entry::GetInput>) -> Vec<Option<zt::metadata::Details>>;
 
-    fn get_link_details (zt::link::GetLinksInput) -> zt::link::LinkDetails;
+    fn get_link_details (Vec<zt::link::GetLinksInput>) -> Vec<zt::link::LinkDetails>;
 
     // Get links by entry hash from the cascade.
-    fn get_links (zt::link::GetLinksInput) -> zt::link::Links;
+    fn get_links (Vec<zt::link::GetLinksInput>) -> Vec<zt::link::Links>;
 
     // Attempt to get a live entry from the cascade.
-    fn get (zt::entry::GetInput) -> Option<zt::element::Element>;
+    fn get (Vec<zt::entry::GetInput>) -> Vec<Option<zt::element::Element>>;
 
     // Hash an entry on the host.
     fn hash_entry (zt::entry::Entry) -> holo_hash::EntryHash;
@@ -180,8 +183,8 @@ wasm_io_types! {
 
     fn sign_ephemeral (zt::signature::SignEphemeral) -> zt::signature::EphemeralSignatures;
 
-    // Current system time, in the opinion of the host, as a `Duration`.
-    fn sys_time (()) -> core::time::Duration;
+    // Current system time, in the opinion of the host, as a `Timestamp`.
+    fn sys_time (()) -> zt::timestamp::Timestamp;
 
     // Same as  but also takes the HeaderHash of the updated element.
     fn update (zt::entry::UpdateInput) -> holo_hash::HeaderHash;

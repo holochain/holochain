@@ -256,29 +256,36 @@ fixturator!(
     };
 );
 
+// XXX: This may not be great to just grab an environment for this purpose.
+//      It is assumed that this value is never really used in any "real"
+//      way, because previously, it was implemented as a null pointer
+//      wrapped in an UnsafeZomeCallWorkspace
 fixturator!(
     HostFnWorkspace;
     curve Empty {
-        // XXX: This may not be great to just grab an environment for this purpose.
-        //      It is assumed that this value is never really used in any "real"
-        //      way, because previously, it was implemented as a null pointer
-        //      wrapped in an UnsafeZomeCallWorkspace
-        let vault = holochain_state::test_utils::test_cell_env();
+        let vault = holochain_state::test_utils::test_cell_env_with_id(get_fixt_index!() as u8);
         let cache = holochain_state::test_utils::test_cell_env();
         tokio_helper::block_forever_on(async {
             fake_genesis(vault.env()).await.unwrap();
-            HostFnWorkspace::new(vault.env(), cache.env(), fake_agent_pubkey_1()).await.unwrap()
+            HostFnWorkspace::new(vault.env(), cache.env(), fixt!(AgentPubKey, Predictable, get_fixt_index!())).await.unwrap()
         })
     };
     curve Unpredictable {
-        HostFnWorkspaceFixturator::new(Empty)
-            .next()
-            .unwrap()
+        let vault = holochain_state::test_utils::test_cell_env_with_id(get_fixt_index!() as u8);
+        let cache = holochain_state::test_utils::test_cell_env();
+        tokio_helper::block_forever_on(async {
+            fake_genesis(vault.env()).await.unwrap();
+            HostFnWorkspace::new(vault.env(), cache.env(), fixt!(AgentPubKey, Predictable, get_fixt_index!())).await.unwrap()
+        })
     };
     curve Predictable {
-        HostFnWorkspaceFixturator::new(Empty)
-            .next()
-            .unwrap()
+        let vault = holochain_state::test_utils::test_cell_env_with_id(get_fixt_index!() as u8);
+        let cache = holochain_state::test_utils::test_cache_env_with_id(get_fixt_index!() as u8);
+        let agent = fixt!(AgentPubKey, Predictable, get_fixt_index!());
+        tokio_helper::block_forever_on(async {
+            crate::test_utils::fake_genesis_for_agent(vault.env(), agent.clone()).await.unwrap();
+            HostFnWorkspace::new(vault.env(), cache.env(), agent).await.unwrap()
+        })
     };
 );
 

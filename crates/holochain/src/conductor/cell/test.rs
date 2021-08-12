@@ -3,14 +3,13 @@ use crate::core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckR
 use crate::core::ribosome::MockRibosomeT;
 use crate::core::workflow::incoming_dht_ops_workflow::op_exists;
 use crate::fixt::DnaFileFixturator;
-use crate::fixt::SignatureFixturator;
 use crate::test_utils::test_network;
 use ::fixt::prelude::*;
 use holo_hash::HasHash;
 use holochain_state::prelude::*;
+use holochain_state::test_utils::test_keystore;
 use holochain_types::prelude::*;
 use holochain_zome_types::header;
-use holochain_zome_types::HeaderHashed;
 use std::sync::Arc;
 use tokio::sync;
 
@@ -64,24 +63,20 @@ async fn test_cell_handle_publish() {
     .await
     .unwrap();
 
-    let sig = fixt!(Signature);
+    let keystore = test_keystore();
     let header = header::Header::Dna(header::Dna {
         author: agent.clone(),
         timestamp: timestamp::now().into(),
         hash: dna.clone(),
     });
-    let op = DhtOp::StoreElement(sig, header.clone(), None);
+    let hh = HeaderHashed::from_content_sync(header.clone());
+    let shh = SignedHeaderHashed::new(&keystore, hh).await.unwrap();
+    let op = DhtOp::StoreElement(shh.signature().clone(), header.clone(), None);
     let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
-    let header_hash = HeaderHashed::from_content_sync(header.clone()).into_hash();
 
-    cell.handle_publish(
-        fake_agent_pubkey_2(),
-        true,
-        header_hash.clone().into(),
-        vec![(op_hash.clone(), op.clone())],
-    )
-    .await
-    .unwrap();
+    cell.handle_publish(true, vec![(op_hash.clone(), op.clone())])
+        .await
+        .unwrap();
 
     op_exists(&cell.env, &op_hash).unwrap();
 

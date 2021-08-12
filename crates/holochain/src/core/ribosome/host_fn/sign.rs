@@ -28,22 +28,11 @@ pub mod wasm_test {
     use hdk::prelude::test_utils::fake_agent_pubkey_1;
     use hdk::prelude::test_utils::fake_agent_pubkey_2;
     use hdk::prelude::*;
-    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_sign_test() {
-        let test_env = holochain_state::test_utils::test_cell_env();
-        let test_cache = holochain_state::test_utils::test_cache_env();
-        let env = test_env.env();
-        let author = fake_agent_pubkey_1();
-        crate::test_utils::fake_genesis(env.clone())
-            .await
-            .unwrap();
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
-
-        let mut host_access = fixt!(ZomeCallHostAccess, Predictable);
-        host_access.workspace = workspace;
+        let host_access = fixt!(ZomeCallHostAccess, Predictable);
 
         // signatures should not change for a given pubkey
         for (k, data, expect) in vec![

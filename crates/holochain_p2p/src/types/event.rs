@@ -7,7 +7,7 @@ use crate::*;
 use holochain_zome_types::signature::Signature;
 use kitsune_p2p::{
     agent_store::AgentInfoSigned,
-    event::{MetricKind, MetricQuery, MetricQueryAnswer},
+    event::{MetricKind, MetricQuery, MetricQueryAnswer, TimeWindowMs},
 };
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
@@ -110,16 +110,29 @@ ghost_actor::ghost_chan! {
     /// the HolochainP2p actor.
     pub chan HolochainP2pEvent<super::HolochainP2pError> {
         /// We need to store signed agent info.
-        fn put_agent_info_signed(dna_hash: DnaHash, to_agent: AgentPubKey, agent_info_signed: AgentInfoSigned) -> ();
+        fn put_agent_info_signed(dna_hash: DnaHash, peer_data: Vec<AgentInfoSigned>) -> ();
 
         /// We need to get previously stored agent info.
         fn get_agent_info_signed(dna_hash: DnaHash, to_agent: AgentPubKey, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>) -> Option<AgentInfoSigned>;
 
         /// We need to get previously stored agent info.
-        fn query_agent_info_signed(dna_hash: DnaHash, to_agent: AgentPubKey, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>) -> Vec<AgentInfoSigned>;
+        fn query_agent_info_signed(dna_hash: DnaHash, agents: Option<std::collections::HashSet<Arc<kitsune_p2p::KitsuneAgent>>>, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>) -> Vec<AgentInfoSigned>;
+
+        /// We need to get agents that fit into an arc set for gossip.
+        fn query_gossip_agents(
+            dna_hash: DnaHash,
+            agents: Option<Vec<AgentPubKey>>,
+            kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
+            since_ms: u64,
+            until_ms: u64,
+            arc_set: Arc<kitsune_p2p_types::dht_arc::DhtArcSet>,
+        ) -> Vec<(Arc<kitsune_p2p::KitsuneAgent>, kitsune_p2p_types::dht_arc::ArcInterval)>;
 
         /// query agent info in order of closeness to a basis location.
         fn query_agent_info_signed_near_basis(dna_hash: DnaHash, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, basis_loc: u32, limit: u32) -> Vec<AgentInfoSigned>;
+
+        /// Query the peer density of a space for a given [`DhtArc`].
+        fn query_peer_density(dna_hash: DnaHash, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, dht_arc: kitsune_p2p_types::dht_arc::DhtArc) -> kitsune_p2p_types::dht_arc::PeerDensity;
 
         /// We need to store some metric data on behalf of kitsune.
         fn put_metric_datum(dna_hash: DnaHash, to_agent: AgentPubKey, agent: AgentPubKey, metric: MetricKind, timestamp: SystemTime) -> ();
@@ -142,9 +155,7 @@ ghost_actor::ghost_chan! {
         fn publish(
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
-            from_agent: AgentPubKey,
             request_validation_receipt: bool,
-            dht_hash: holo_hash::AnyDhtHash,
             ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
         ) -> ();
 
@@ -198,20 +209,23 @@ ghost_actor::ghost_chan! {
         ) -> ();
 
         /// The p2p module wishes to query our DhtOpHash store.
-        fn fetch_op_hashes_for_constraints(
+        /// Gets all ops from a set of agents within a time window
+        /// and max number of ops.
+        /// Returns the actual time window of returned ops as well.
+        fn query_op_hashes(
             dna_hash: DnaHash,
-            to_agent: AgentPubKey,
-            dht_arc: kitsune_p2p::dht_arc::DhtArc,
-            since: holochain_types::Timestamp,
-            until: holochain_types::Timestamp,
-        ) -> Vec<holo_hash::DhtOpHash>;
+            to_agents: Vec<(AgentPubKey, kitsune_p2p::dht_arc::DhtArcSet)>,
+            window_ms: TimeWindowMs,
+            max_ops: usize,
+            include_limbo: bool,
+        ) -> Option<(Vec<holo_hash::DhtOpHash>, TimeWindowMs)>;
 
         /// The p2p module needs access to the content for a given set of DhtOpHashes.
-        fn fetch_op_hash_data(
+        fn fetch_op_data(
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
             op_hashes: Vec<holo_hash::DhtOpHash>,
-        ) -> Vec<(holo_hash::AnyDhtHash, holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>;
+        ) -> Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>;
 
         /// P2p operations require cryptographic signatures and validation.
         fn sign_network_data(
@@ -237,12 +251,9 @@ macro_rules! match_p2p_evt {
             HolochainP2pEvent::GetLinks { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetAgentActivity { $i, .. } => { $($t)* }
             HolochainP2pEvent::ValidationReceiptReceived { $i, .. } => { $($t)* }
-            HolochainP2pEvent::FetchOpHashesForConstraints { $i, .. } => { $($t)* }
-            HolochainP2pEvent::FetchOpHashData { $i, .. } => { $($t)* }
+            HolochainP2pEvent::FetchOpData { $i, .. } => { $($t)* }
             HolochainP2pEvent::SignNetworkData { $i, .. } => { $($t)* }
-            HolochainP2pEvent::PutAgentInfoSigned { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetAgentInfoSigned { $i, .. } => { $($t)* }
-            HolochainP2pEvent::QueryAgentInfoSigned { $i, .. } => { $($t)* }
             HolochainP2pEvent::PutMetricDatum { $i, .. } => { $($t)* }
             HolochainP2pEvent::QueryMetrics { $i, .. } => { $($t)* }
             $($t2)*
@@ -254,14 +265,24 @@ impl HolochainP2pEvent {
     /// The dna_hash associated with this network p2p event.
     pub fn dna_hash(&self) -> &DnaHash {
         match_p2p_evt!(self => |dna_hash| { dna_hash }, {
+            HolochainP2pEvent::QueryOpHashes { dna_hash, .. } => { dna_hash }
+            HolochainP2pEvent::QueryAgentInfoSigned { dna_hash, .. } => { dna_hash }
             HolochainP2pEvent::QueryAgentInfoSignedNearBasis { dna_hash, .. } => { dna_hash }
+            HolochainP2pEvent::QueryGossipAgents { dna_hash, .. } => { dna_hash }
+            HolochainP2pEvent::PutAgentInfoSigned { dna_hash, .. } => { dna_hash }
+            HolochainP2pEvent::QueryPeerDensity { dna_hash, .. } => { dna_hash }
         })
     }
 
     /// The agent_pub_key associated with this network p2p event.
-    pub fn target_agent_as_ref(&self) -> &AgentPubKey {
+    pub fn target_agents(&self) -> &AgentPubKey {
         match_p2p_evt!(self => |to_agent| { to_agent }, {
-            HolochainP2pEvent::QueryAgentInfoSignedNearBasis { .. } => { unimplemented!() }
+            HolochainP2pEvent::QueryOpHashes { .. } => { unimplemented!("There is no single agent target for QueryOpHashes") }
+            HolochainP2pEvent::QueryAgentInfoSigned { .. } => { unimplemented!("There is no single agent target for QueryAgentInfoSigned") },
+            HolochainP2pEvent::QueryAgentInfoSignedNearBasis { .. } => { unimplemented!("There is no single agent target for QueryAgentInfoSignedNearBasis") },
+            HolochainP2pEvent::QueryGossipAgents { .. } => { unimplemented!("There is no single agent target for QueryGossipAgents") },
+            HolochainP2pEvent::PutAgentInfoSigned { .. } => { unimplemented!("There is no single agent target for PutAgentInfoSigned") },
+            HolochainP2pEvent::QueryPeerDensity { .. } => { unimplemented!() },
         })
     }
 }

@@ -3,7 +3,6 @@
 use super::error::WorkflowResult;
 use super::sys_validation_workflow::counterfeit_check;
 use crate::core::queue_consumer::TriggerSender;
-use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::prelude::*;
@@ -22,7 +21,6 @@ type InOpBatchRcv = tokio::sync::oneshot::Receiver<WorkflowResult<()>>;
 
 struct InOpBatchEntry {
     snd: InOpBatchSnd,
-    from_agent: Option<AgentPubKey>,
     request_validation_receipt: bool,
     ops: Vec<(DhtOpHash, DhtOp)>,
 }
@@ -48,14 +46,12 @@ static IN_OP_BATCH: Lazy<parking_lot::Mutex<HashMap<DbKind, InOpBatch>>> =
 /// if result.0.is_some() -- the batch should be run now
 fn batch_check_insert(
     kind: DbKind,
-    from_agent: Option<AgentPubKey>,
     request_validation_receipt: bool,
     ops: Vec<(DhtOpHash, DhtOp)>,
 ) -> (Option<Vec<InOpBatchEntry>>, InOpBatchRcv) {
     let (snd, rcv) = tokio::sync::oneshot::channel();
     let entry = InOpBatchEntry {
         snd,
-        from_agent,
         request_validation_receipt,
         ops,
     };
@@ -92,7 +88,6 @@ fn batch_check_end(kind: DbKind) -> Option<Vec<InOpBatchEntry>> {
 
 fn batch_process_entry(
     txn: &mut rusqlite::Transaction<'_>,
-    from_agent: Option<AgentPubKey>,
     request_validation_receipt: bool,
     ops: Vec<(DhtOpHash, DhtOp)>,
 ) -> WorkflowResult<()> {
@@ -104,13 +99,13 @@ fn batch_process_entry(
             to_pending.push(op);
         } else {
             // Check if we should set receipt to send.
-            if needs_receipt(&op, &from_agent) && request_validation_receipt {
+            if request_validation_receipt {
                 set_send_receipt(txn, hash.clone())?;
             }
         }
     }
 
-    add_to_pending(txn, to_pending, from_agent, request_validation_receipt)?;
+    add_to_pending(txn, to_pending, request_validation_receipt)?;
 
     Ok(())
 }
@@ -120,29 +115,26 @@ pub async fn incoming_dht_ops_workflow(
     vault: &EnvWrite,
     mut sys_validation_trigger: TriggerSender,
     ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
-    from_agent: Option<AgentPubKey>,
     request_validation_receipt: bool,
 ) -> WorkflowResult<()> {
     let mut filter_ops = Vec::new();
 
     for (hash, op) in ops {
-        if should_keep(&op).await? {
-            filter_ops.push((hash, op));
-        } else {
-            tracing::warn!(
-                msg = "Dropping op because it failed counterfeit checks",
-                ?op
-            );
+        match should_keep(&op).await {
+            Ok(()) => filter_ops.push((hash, op)),
+            Err(e) => {
+                tracing::warn!(
+                    msg = "Dropping op because it failed counterfeit checks",
+                    ?op
+                );
+                return Err(e);
+            }
         }
     }
 
     let kind = vault.kind().clone();
-    let (mut maybe_batch, rcv) = batch_check_insert(
-        kind.clone(),
-        from_agent,
-        request_validation_receipt,
-        filter_ops,
-    );
+    let (mut maybe_batch, rcv) =
+        batch_check_insert(kind.clone(), request_validation_receipt, filter_ops);
 
     let vault = vault.clone();
     if maybe_batch.is_some() {
@@ -156,16 +148,10 @@ pub async fn incoming_dht_ops_workflow(
                         for entry in entries {
                             let InOpBatchEntry {
                                 snd,
-                                from_agent,
                                 request_validation_receipt,
                                 ops,
                             } = entry;
-                            let res = batch_process_entry(
-                                txn,
-                                from_agent,
-                                request_validation_receipt,
-                                ops,
-                            );
+                            let res = batch_process_entry(txn, request_validation_receipt, ops);
 
                             // we can't send the results here...
                             // we haven't comitted
@@ -195,16 +181,9 @@ pub async fn incoming_dht_ops_workflow(
         .map_err(|_| super::error::WorkflowError::RecvError)?
 }
 
-fn needs_receipt(op: &DhtOp, from_agent: &Option<AgentPubKey>) -> bool {
-    from_agent
-        .as_ref()
-        .map(|a| a == op.header().author())
-        .unwrap_or(false)
-}
-
 #[instrument(skip(op))]
 /// If this op fails the counterfeit check it should be dropped
-async fn should_keep(op: &DhtOp) -> WorkflowResult<bool> {
+async fn should_keep(op: &DhtOp) -> WorkflowResult<()> {
     let header = op.header();
     let signature = op.signature();
     Ok(counterfeit_check(signature, &header).await?)
@@ -213,14 +192,12 @@ async fn should_keep(op: &DhtOp) -> WorkflowResult<bool> {
 fn add_to_pending(
     txn: &mut rusqlite::Transaction<'_>,
     ops: Vec<DhtOpHashed>,
-    from_agent: Option<AgentPubKey>,
     request_validation_receipt: bool,
 ) -> StateMutationResult<()> {
     for op in ops {
-        let send_receipt = needs_receipt(&op, &from_agent) && request_validation_receipt;
         let op_hash = op.as_hash().clone();
         insert_op(txn, op, false)?;
-        set_require_receipt(txn, op_hash, send_receipt)?;
+        set_require_receipt(txn, op_hash, request_validation_receipt)?;
     }
     StateMutationResult::Ok(())
 }

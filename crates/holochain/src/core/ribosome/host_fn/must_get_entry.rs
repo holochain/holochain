@@ -74,7 +74,6 @@ pub mod test {
     use ::fixt::prelude::fixt;
     use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use crate::core::ribosome::HostFnWorkspace;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use crate::core::ribosome::RibosomeError;
     use std::sync::Arc;
@@ -94,15 +93,8 @@ pub mod test {
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_must_get_entry_test<'a>() {
         observability::test_run().ok();
-        // test workspace boilerplate
-        let test_env = holochain_state::test_utils::test_cell_env();
-        let test_cache = holochain_state::test_utils::test_cache_env();
-        let env = test_env.env();
-        let author = fake_agent_pubkey_1();
-        crate::test_utils::fake_genesis(env.clone()).await.unwrap();
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author.clone()).await.unwrap();
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace.clone();
+        let author = fixt!(AgentPubKey, Predictable, 0);
+        let mut host_access = fixt!(ZomeCallHostAccess, Predictable);
 
         // get the result of a commit entry
         let (header_hash, header_reference_hash, element_reference_hash, entry_reference_hash): (HeaderHash, HeaderHash, HeaderHash, HeaderHash) =

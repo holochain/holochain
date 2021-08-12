@@ -18,53 +18,70 @@ pub fn create<'a>(
 ) -> Result<HeaderHash, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ write_workspace: Permission::Allow, .. } => {
-    // build the entry hash
-    let entry_hash =
-    EntryHash::with_data_sync(AsRef::<Entry>::as_ref(&input));
+            let entry = AsRef::<Entry>::as_ref(&input).to_owned();
 
-            // extract the zome position
-            let header_zome_id = ribosome
-                .zome_to_id(&call_context.zome)
-                .expect("Failed to get ID for current zome");
+            // Countersigned entries have different header handling.
+            match entry {
+                Entry::CounterSign(_, _) => {
+                    tokio_helper::block_forever_on(async move {
+                        call_context
+                            .host_context
+                            .workspace()
+                            .source_chain()
+                            .put_countersigned(entry)
+                            .await
+                            .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))
+                    })
+                },
+                entry => {
+                    // build the entry hash
+                    let entry_hash =
+                    EntryHash::with_data_sync(AsRef::<Entry>::as_ref(&input));
 
-            // extract the entry defs for a zome
-            let entry_type = match AsRef::<EntryDefId>::as_ref(&input) {
-                EntryDefId::App(entry_def_id) => {
-                    let (header_entry_def_id, entry_visibility) = extract_entry_def(
-                        ribosome,
-                        call_context.clone(),
-                        entry_def_id.to_owned().into(),
-                    )?;
-                    let app_entry_type =
-                        AppEntryType::new(header_entry_def_id, header_zome_id, entry_visibility);
-                    EntryType::App(app_entry_type)
+                    // extract the zome position
+                    let header_zome_id = ribosome
+                        .zome_to_id(&call_context.zome)
+                        .expect("Failed to get ID for current zome");
+
+                    // extract the entry defs for a zome
+                    let entry_type = match AsRef::<EntryDefId>::as_ref(&input) {
+                        EntryDefId::App(entry_def_id) => {
+                            let (header_entry_def_id, entry_visibility) = extract_entry_def(
+                                ribosome,
+                                call_context.clone(),
+                                entry_def_id.to_owned().into(),
+                            )?;
+                            let app_entry_type =
+                                AppEntryType::new(header_entry_def_id, header_zome_id, entry_visibility);
+                            EntryType::App(app_entry_type)
+                        }
+                        EntryDefId::CapGrant => EntryType::CapGrant,
+                        EntryDefId::CapClaim => EntryType::CapClaim,
+                    };
+
+                    // build a header for the entry being committed
+                    let header_builder = builder::Create {
+                        entry_type,
+                        entry_hash,
+                    };
+
+                    // return the hash of the committed entry
+                    // note that validation is handled by the workflow
+                    // if the validation fails this commit will be rolled back by virtue of the DB transaction
+                    // being atomic
+                    tokio_helper::block_forever_on(async move {
+                        // push the header and the entry into the source chain
+                        call_context
+                            .host_context
+                            .workspace()
+                            .source_chain()
+                            .put(header_builder, Some(entry))
+                            .await
+                            .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))
+                    })
                 }
-                EntryDefId::CapGrant => EntryType::CapGrant,
-                EntryDefId::CapClaim => EntryType::CapClaim,
-            };
+            }
 
-            // build a header for the entry being committed
-            let header_builder = builder::Create {
-                entry_type,
-                entry_hash,
-            };
-
-    // return the hash of the committed entry
-    // note that validation is handled by the workflow
-    // if the validation fails this commit will be rolled back by virtue of the DB transaction
-    // being atomic
-    let entry = AsRef::<Entry>::as_ref(&input).to_owned();
-    tokio_helper::block_forever_on(async move {
-        // push the header and the entry into the source chain
-        let header_hash = call_context
-            .host_context
-            .workspace()
-            .source_chain()
-            .put(header_builder, Some(entry))
-            .await
-            .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
-        Ok(header_hash)
-    })
         },
         _ => unreachable!(),
     }
@@ -118,7 +135,6 @@ pub mod wasm_test {
     use hdk::prelude::*;
     use holo_hash::AnyDhtHash;
     use holo_hash::EntryHash;
-    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_state::source_chain::SourceChainResult;
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
@@ -130,22 +146,14 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     /// we can get an entry hash out of the fn directly
     async fn create_entry_test<'a>() {
-        // test workspace boilerplate
-        let test_env = holochain_state::test_utils::test_cell_env();
-        let test_cache = holochain_state::test_utils::test_cache_env();
-        let env = test_env.env();
-        let author = fake_agent_pubkey_1();
-        crate::test_utils::fake_genesis(env.clone()).await.unwrap();
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
-
         let ribosome =
             RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Create]))
                 .next()
                 .unwrap();
         let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
         call_context.zome = TestWasm::Create.into();
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace.clone();
+        let host_access = fixt!(ZomeCallHostAccess, Predictable);
+        let host_access_2 = host_access.clone();
         call_context.host_context = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::App("post".into());
@@ -155,7 +163,7 @@ pub mod wasm_test {
 
         // the chain head should be the committed entry header
         let chain_head = tokio_helper::block_forever_on(async move {
-            SourceChainResult::Ok(workspace.source_chain().chain_head()?.0)
+            SourceChainResult::Ok(host_access_2.workspace.source_chain().chain_head()?.0)
         })
         .unwrap();
 
@@ -165,23 +173,16 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_create_entry_test<'a>() {
         observability::test_run().ok();
-        // test workspace boilerplate
-        let test_env = holochain_state::test_utils::test_cell_env();
-        let test_cache = holochain_state::test_utils::test_cache_env();
-        let env = test_env.env();
-        let author = fake_agent_pubkey_1();
-        crate::test_utils::fake_genesis(env.clone()).await.unwrap();
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace.clone();
+        let host_access = fixt!(ZomeCallHostAccess, Predictable);
 
         // get the result of a commit entry
         let output: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::Create, "create_entry", ()).unwrap();
 
         // the chain head should be the committed entry header
+        let host_access_2 = host_access.clone();
         let chain_head = tokio_helper::block_forever_on(async move {
-            SourceChainResult::Ok(workspace.source_chain().chain_head()?.0)
+            SourceChainResult::Ok(host_access_2.workspace.source_chain().chain_head()?.0)
         })
         .unwrap();
 
@@ -190,7 +191,7 @@ pub mod wasm_test {
         let round: Option<Element> =
             crate::call_test_ribosome!(host_access, TestWasm::Create, "get_entry", ()).unwrap();
 
-        let bytes: Vec<u8> = match round.and_then(|el| el.into()) {
+        let bytes: Vec<u8> = match round.clone().and_then(|el| el.into()) {
             Some(holochain_zome_types::entry::Entry::App(entry_bytes)) => {
                 entry_bytes.bytes().to_vec()
             }
@@ -198,6 +199,12 @@ pub mod wasm_test {
         };
         // this should be the content "foo" of the committed post
         assert_eq!(vec![163, 102, 111, 111], bytes);
+
+        let round_twice: Vec<Option<Element>> = crate::call_test_ribosome!(host_access, TestWasm::Create, "get_entry_twice", ()).unwrap();
+        assert_eq!(
+            round_twice,
+            vec![round.clone(), round],
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]

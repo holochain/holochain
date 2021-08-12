@@ -10,6 +10,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- hdk: `sys_time` returns `Timestamp` instead of `Duration`
+
+### Added
+
+- hdk: Added `accept_countersigning_preflight_request`
+- hdk: Added `session_times_from_millis`
+- hdk: Now supports creating and updating countersigned entries
+
+## 0.0.102
+
+### Changed
+
 - hdk: fixed wrong order of recipient and sender in `x_25519_x_salsa20_poly1305_decrypt`
 
 ## 0.0.101

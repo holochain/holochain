@@ -209,10 +209,14 @@ pub fn get<H>(hash: H, options: GetOptions) -> ExternResult<Option<Element>>
 where
     AnyDhtHash: From<H>,
 {
-    HDK.with(|h| {
-        h.borrow()
-            .get(GetInput::new(AnyDhtHash::from(hash), options))
-    })
+    Ok(HDK
+        .with(|h| {
+            h.borrow()
+                .get(vec![GetInput::new(AnyDhtHash::from(hash), options)])
+        })?
+        .into_iter()
+        .next()
+        .unwrap())
 }
 
 /// MUST get an EntryHashed at a given EntryHash.
@@ -366,7 +370,14 @@ pub fn get_details<H: Into<AnyDhtHash>>(
     hash: H,
     options: GetOptions,
 ) -> ExternResult<Option<Details>> {
-    HDK.with(|h| h.borrow().get_details(GetInput::new(hash.into(), options)))
+    Ok(HDK
+        .with(|h| {
+            h.borrow()
+                .get_details(vec![GetInput::new(hash.into(), options)])
+        })?
+        .into_iter()
+        .next()
+        .unwrap())
 }
 
 /// Trait for binding static [ `EntryDef` ] property access for a type.
@@ -440,20 +451,31 @@ macro_rules! app_entry {
             }
         }
 
+        impl TryFrom<&$t> for $crate::prelude::AppEntryBytes {
+            type Error = $crate::prelude::WasmError;
+            fn try_from(t: &$t) -> Result<Self, Self::Error> {
+                AppEntryBytes::try_from(SerializedBytes::try_from(t)?).map_err(|entry_error| match entry_error {
+                    EntryError::SerializedBytes(serialized_bytes_error) => {
+                        WasmError::Serialize(serialized_bytes_error)
+                    }
+                    EntryError::EntryTooLarge(_) => {
+                        WasmError::Guest(entry_error.to_string())
+                    }
+                })
+            }
+        }
+
+        impl TryFrom<$t> for $crate::prelude::AppEntryBytes {
+            type Error = $crate::prelude::WasmError;
+            fn try_from(t: $t) -> Result<Self, Self::Error> {
+                Self::try_from(&t)
+            }
+        }
+
         impl TryFrom<&$t> for $crate::prelude::Entry {
             type Error = $crate::prelude::WasmError;
             fn try_from(t: &$t) -> Result<Self, Self::Error> {
-                match AppEntryBytes::try_from(SerializedBytes::try_from(t)?) {
-                    Ok(app_entry_bytes) => Ok(Self::App(app_entry_bytes)),
-                    Err(entry_error) => match entry_error {
-                        EntryError::SerializedBytes(serialized_bytes_error) => {
-                            Err(WasmError::Serialize(serialized_bytes_error))
-                        }
-                        EntryError::EntryTooLarge(_) => {
-                            Err(WasmError::Guest(entry_error.to_string()))
-                        }
-                    },
-                }
+                Ok(Self::App($crate::prelude::AppEntryBytes::try_from(t)?))
             }
         }
 

@@ -66,13 +66,11 @@ pub(crate) fn search_and_discover_peer_connect(
                             Ok(wire::Wire::PeerGetResp(wire::PeerGetResp {
                                 agent_info_signed,
                             })) => {
-                                let agent = agent_info_signed.agent.clone();
                                 if let Err(err) = inner
                                     .evt_sender
                                     .put_agent_info_signed(PutAgentInfoSignedEvt {
                                         space: inner.space.clone(),
-                                        agent,
-                                        agent_info_signed: agent_info_signed.clone(),
+                                        peer_data: vec![agent_info_signed.clone()],
                                     })
                                     .await
                                 {
@@ -149,6 +147,9 @@ pub(crate) fn search_remotes_covering_basis(
     async move {
         let backoff = timeout.backoff(INITIAL_DELAY, MAX_DELAY);
         loop {
+            //let s_remain = timeout.time_remaining().as_secs_f64();
+            //tracing::trace!(%s_remain, "search_remotes_covering_basis iteration");
+
             let mut cover_nodes = Vec::new();
             let mut near_nodes = Vec::new();
 
@@ -201,19 +202,15 @@ pub(crate) fn search_remotes_covering_basis(
                                 continue;
                             }
                             // if we got results, add them to our peer store
-                            for agent_info_signed in peer_list {
-                                let agent = agent_info_signed.agent.clone();
-                                if let Err(err) = inner
-                                    .evt_sender
-                                    .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                        space: inner.space.clone(),
-                                        agent,
-                                        agent_info_signed,
-                                    })
-                                    .await
-                                {
-                                    tracing::error!(?err, "error storing peer_queried agent_info");
-                                }
+                            if let Err(err) = inner
+                                .evt_sender
+                                .put_agent_info_signed(PutAgentInfoSignedEvt {
+                                    space: inner.space.clone(),
+                                    peer_data: peer_list,
+                                })
+                                .await
+                            {
+                                tracing::error!(?err, "error storing peer_queried agent_info");
                             }
                             // then break, to pull up the local query
                             // that should now include these new results

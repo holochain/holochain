@@ -4,7 +4,7 @@ use crate::changelog::sanitize;
 use crate::changelog::{ChangelogT, CrateChangelog, WorkspaceChangelog};
 use crate::crate_selection::ReleaseWorkspace;
 use crate::tests::workspace_mocker::{
-    example_workspace_1, example_workspace_1_aggregated_changelog,
+    example_workspace_1, example_workspace_1_aggregated_changelog, example_workspace_4,
 };
 use anyhow::Context;
 use predicates::prelude::*;
@@ -136,7 +136,7 @@ fn bump_versions_on_selection() {
     // todo: ensure *all* dependants were updated
     assert_eq!(
         "0.0.1",
-        crate::release::get_dependency_version(
+        crate::common::get_dependency_version(
             &workspace
                 .root()
                 .join("crates")
@@ -285,7 +285,7 @@ fn bump_versions_on_selection() {
     assert_eq!(
         indoc::formatdoc!(
             r#"
-        release-{}
+        create a release from branch release-{}
 
         the following crates are part of this release:
 
@@ -374,6 +374,9 @@ fn release_publish() {
     println!("stderr:\n'{}'\n---\nstdout:\n'{}'\n---", output.0, output.1,);
 }
 
+// the post release version bump functionliaty has been removed from the release
+// it now lives in a separate command and these tests can be moved there
+#[ignore]
 #[test]
 fn post_release_version_bumps() {
     let workspace_mocker = example_workspace_1().unwrap();
@@ -475,7 +478,8 @@ fn multiple_subsequent_releases() {
     ) in [
         (
             // bump the first time as they're initially released
-            vec!["0.0.2-dev.0", "0.0.3-dev.0", "0.0.2-dev.0"],
+            // vec!["0.0.2-dev.0", "0.0.3-dev.0", "0.0.2-dev.0"],
+            vec!["0.0.1", "0.0.2", "0.0.1"],
             vec!["crate_b", "crate_a", "crate_e"],
             // allowed missing dependencies
             Vec::<&str>::new(),
@@ -484,7 +488,8 @@ fn multiple_subsequent_releases() {
         ),
         (
             // should not bump the second time without making any changes
-            vec!["0.0.2-dev.0", "0.0.3-dev.0", "0.0.2-dev.0"],
+            // vec!["0.0.2-dev.0", "0.0.3-dev.0", "0.0.2-dev.0"],
+            vec!["0.0.1", "0.0.2", "0.0.1"],
             vec!["crate_b", "crate_a", "crate_e"],
             // allowed missing dependencies
             Vec::<&str>::new(),
@@ -493,7 +498,7 @@ fn multiple_subsequent_releases() {
         ),
         (
             // only crate_a and crate_e have changed, expect these to be bumped
-            vec!["0.0.2-dev.0", "0.0.4-dev.0", "0.0.3-dev.0"],
+            vec!["0.0.1", "0.0.3", "0.0.2"],
             vec!["crate_b", "crate_a", "crate_e"],
             // crate_b won't be part of the release so we allow it to be missing as we're not publishing
             vec!["crate_b"],
@@ -518,8 +523,8 @@ fn multiple_subsequent_releases() {
             }) as F,
         ),
         (
-            // change only crate_b
-            vec!["0.0.3-dev.0", "0.0.4-dev.0", "0.0.3-dev.0"],
+            // change crate_b, and as crate_a depends on crate_b it'll be bumped as well
+            vec!["0.0.2", "0.0.4", "0.0.2"],
             vec!["crate_b", "crate_a", "crate_e"],
             // allowed missing dependencies
             vec![],
@@ -581,11 +586,11 @@ fn multiple_subsequent_releases() {
             let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();
             let cmd = cmd.args(&[
                 &format!("--workspace-path={}", workspace.root().display()),
-                "--log-level=trace",
+                "--log-level=debug",
                 "release",
                 "--disallowed-version-reqs=>=0.1",
                 "--allowed-matched-blockers=UnreleasableViaChangelogFrontmatter,DisallowedVersionReqViolated",
-                "--steps=CreateReleaseBranch,BumpReleaseVersions,BumpPostReleaseVersions",
+                "--steps=CreateReleaseBranch,BumpReleaseVersions",
                 &format!(
                     "--allowed-missing-dependencies={}",
                     allowed_missing_dependencies.iter().fold("".to_string(), |acc, cur|{ acc + "," + *cur })
@@ -604,6 +609,8 @@ fn multiple_subsequent_releases() {
             assert_eq!(
                 expected_versions,
                 &get_crate_versions(expected_crates, &workspace),
+                "{}",
+                i
             );
 
             let topmost_release_title = match workspace
@@ -632,7 +639,7 @@ fn multiple_subsequent_releases() {
                 };
 
                 let expected_start = format!(
-                    "setting develop versions to conclude 'release-{}'",
+                    "create a release from branch release-{}",
                     topmost_release_title
                 );
 
@@ -664,5 +671,77 @@ fn multiple_subsequent_releases() {
         // sleep so the time based branch name is unique
         // todo: change to other branch name generator?
         std::thread::sleep(std::time::Duration::new(1, 0));
+    }
+}
+
+#[test]
+fn apply_dev_versions_works() {
+    let workspace_mocker = example_workspace_1().unwrap();
+
+    let get_crate_a_version = || -> String {
+        let workspace = ReleaseWorkspace::try_new(workspace_mocker.root()).unwrap();
+        let crate_a = workspace
+            .members()
+            .unwrap()
+            .iter()
+            .find(|m| m.name() == "crate_a")
+            .unwrap();
+
+        crate_a.version().to_string()
+    };
+
+    assert_eq!(get_crate_a_version(), "0.0.1");
+
+    let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();
+    let cmd = cmd.args(&[
+        &format!("--workspace-path={}", workspace_mocker.root().display()),
+        "--log-level=debug",
+        "crate",
+        "apply-dev-versions",
+    ]);
+    let output = assert_cmd_success!(cmd);
+    println!("stderr:\n'{}'\n---\nstdout:\n'{}'\n---", output.0, output.1);
+
+    assert_eq!(get_crate_a_version(), "0.0.2-dev.0");
+}
+
+#[test]
+fn release_dry_run_fails_on_unallowed_conditions() {
+    let workspace_mocker = example_workspace_4().unwrap();
+    let workspace = ReleaseWorkspace::try_new(workspace_mocker.root()).unwrap();
+    workspace.git_checkout_new_branch("develop").unwrap();
+
+    let members = workspace
+        .members()
+        .unwrap()
+        .iter()
+        .map(|m| m.name())
+        .collect::<Vec<_>>();
+
+    // every member corresponds to a blocker and must thus fail separately
+    for member in members {
+        workspace_mocker.add_or_replace_file(
+            &format!("crates/{}/README.md", member),
+            indoc::indoc! {r#"
+            # Example
+
+            Some changes
+            More changes
+            "#,
+            },
+        );
+        workspace.git_add_all_and_commit("msg", None).unwrap();
+
+        let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();
+        let cmd = cmd.args(&[
+            &format!("--workspace-path={}", workspace.root().display()),
+            "--log-level=debug",
+            "release",
+            &format!("--match-filter={}", member),
+            "--dry-run",
+            "--steps=BumpReleaseVersions",
+        ]);
+
+        cmd.assert().failure();
     }
 }
