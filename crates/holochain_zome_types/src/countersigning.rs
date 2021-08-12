@@ -623,6 +623,11 @@ impl CounterSigningSessionData {
         &mut self.preflight_request
     }
 
+    /// Get all the agents signing for this session.
+    pub fn signing_agents(&self) -> impl Iterator<Item = &AgentPubKey> {
+        self.preflight_request.signing_agents.iter().map(|(a, _)| a)
+    }
+
     /// Accessor to responses.
     pub fn responses(&self) -> &Vec<(CounterSigningAgentState, Signature)> {
         &self.responses
