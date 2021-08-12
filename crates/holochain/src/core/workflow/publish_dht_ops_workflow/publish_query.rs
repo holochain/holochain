@@ -55,6 +55,8 @@ pub async fn get_ops_to_publish(
             (DhtOp.type != :store_entry OR Header.private_entry = 0)
             AND
             DhtOp.last_publish_time IS NULL
+            AND 
+            DhtOp.withhold_publish IS NULL
             ",
                 // (DhtOp.last_publish_time IS NULL OR DhtOp.last_publish_time <= :earliest_allowed_time)
                 // AND

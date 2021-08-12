@@ -5,6 +5,7 @@ use holo_hash::HeaderHash;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::dht_op::produce_op_lights_from_elements;
 use holochain_types::dht_op::produce_op_lights_from_iter;
+use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpLight;
 use holochain_types::dht_op::DhtOpType;
 use holochain_types::dht_op::OpOrder;
@@ -37,6 +38,7 @@ use holochain_zome_types::SignedHeader;
 use holochain_zome_types::SignedHeaderHashed;
 
 use crate::chain_lock::is_chain_locked;
+use crate::chain_lock::is_lock_expired;
 use crate::prelude::*;
 use crate::query::chain_head::ChainHeadQuery;
 use crate::scratch::Scratch;
@@ -454,6 +456,34 @@ impl SourceChain {
         Ok(countersigning_agent_state)
     }
 
+    /// If there is a countersigning session get the
+    /// StoreEntry op to send to the entry authorities.
+    pub fn countersigning_op(&self) -> SourceChainResult<Option<DhtOp>> {
+        let r = self.scratch.apply(|scratch| {
+            scratch
+                .entries()
+                .find(|e| matches!(**e.1, Entry::CounterSign(_, _)))
+                .and_then(|(entry_hash, entry)| {
+                    scratch
+                        .headers()
+                        .find(|shh| {
+                            shh.header()
+                                .entry_hash()
+                                .map(|eh| eh == entry_hash)
+                                .unwrap_or(false)
+                        })
+                        .and_then(|shh| {
+                            Some(DhtOp::StoreEntry(
+                                shh.signature().clone(),
+                                shh.header().clone().try_into().ok()?,
+                                Box::new((**entry).clone()),
+                            ))
+                        })
+                })
+        })?;
+        Ok(r)
+    }
+
     pub async fn flush(&self) -> SourceChainResult<()> {
         // Nothing to write
         if self.scratch.apply(|s| s.is_empty())? {
@@ -526,7 +556,7 @@ impl SourceChain {
                     session_data.preflight_request(),
                 )?)
             }
-            _ => vec![],
+            _ => Vec::with_capacity(0),
         };
 
         // Write the entries, headers and ops to the database in one transaction.
@@ -547,15 +577,20 @@ impl SourceChain {
                     ));
                 }
 
+                // If the lock isn't empty this is a countersigning session.
+                let is_countersigning_session = !lock.is_empty();
+
                 if is_chain_locked(txn, &lock)? {
                     return Err(SourceChainError::ChainLocked);
                 }
-                // If the lock is not just the empty lock, and the chain is NOT
+                // If this is a countersigning session, and the chain is NOT
                 // locked then either the session expired or the countersigning
-                // entry being committed now is the correct one for the lock,
-                // in either case we should unlock the chain.
-                else if !lock.is_empty() {
-                    unlock_chain(txn)?;
+                // entry being committed now is the correct one for the lock.
+                else if is_countersigning_session {
+                    // If the lock is expired then we can't write this countersigning session.
+                    if is_lock_expired(txn, &lock)? {
+                        return Err(SourceChainError::LockExpired);
+                    }
                 }
 
                 for entry in entries {
@@ -579,12 +614,18 @@ impl SourceChain {
                     // TODO: Can anything every depend on a private store entry op? I don't think so.
                     if !(op_type == DhtOpType::StoreEntry
                         && visibility == Some(EntryVisibility::Private))
+                        && !is_countersigning_session
                     {
                         set_validation_stage(
                             txn,
-                            op_hash,
+                            op_hash.clone(),
                             ValidationLimboStatus::AwaitingIntegration,
                         )?;
+                    }
+                    // If this is a countersigning session we want to withhold
+                    // publishing the ops until the session is successful.
+                    if is_countersigning_session {
+                        set_withhold_publish(txn, op_hash)?;
                     }
                 }
                 SourceChainResult::Ok(())

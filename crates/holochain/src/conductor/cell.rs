@@ -485,6 +485,7 @@ impl Cell {
     ) -> CellResult<()> {
         Ok(countersigning_success(
             self.env.clone(),
+            &self.holochain_p2p_cell,
             self.id.agent_pubkey().clone(),
             signed_headers,
             self.queue_triggers.publish_dht_ops.clone(),

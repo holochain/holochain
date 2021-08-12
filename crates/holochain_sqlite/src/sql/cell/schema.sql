@@ -107,6 +107,9 @@ CREATE TABLE IF NOT EXISTS DhtOp (
     when_integrated_ns  BLOB NULL,          -- DATETIME
 
     receipt_count       INTEGER     NULL,
+    -- Used to withhold ops from publishing for things 
+    -- like countersigning.
+    withhold_publish    INTEGER     NULL, -- BOOLEAN
     last_publish_time   INTEGER     NULL,   -- UNIX TIMESTAMP SECONDS
 
     blob             BLOB           NOT NULL,
