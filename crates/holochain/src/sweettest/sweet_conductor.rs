@@ -14,7 +14,7 @@ use holochain_p2p::*;
 use holochain_state::test_utils::{test_environments, TestEnvs};
 use holochain_types::prelude::*;
 use holochain_websocket::*;
-use kitsune_p2p::{KitsuneP2pConfig, KitsuneSpace};
+use kitsune_p2p::KitsuneP2pConfig;
 use std::sync::Arc;
 
 /// A stream of signals.

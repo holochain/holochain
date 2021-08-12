@@ -1,8 +1,9 @@
 use super::SweetZome;
 use hdk::prelude::*;
 use holo_hash::DnaHash;
-use holochain_p2p::dht_arc::ArcInterval;
-use holochain_types::env::EnvWrite;
+use holochain_p2p::{dht_arc::ArcInterval, AgentPubKeyExt};
+use holochain_sqlite::db::*;
+use holochain_types::prelude::*;
 /// A reference to a Cell created by a SweetConductor installation function.
 /// It has very concise methods for calling a zome on this cell
 #[derive(Clone, derive_more::Constructor)]
@@ -38,7 +39,16 @@ impl SweetCell {
         SweetZome::new(self.cell_id.clone(), zome_name.into())
     }
 
+    /// Coerce the agent's storage arc to the specified value.
+    /// The arc need not be centered on the agent's DHT location, which is
+    /// typically a requirement "in the real world", but this can be useful
+    /// for integration tests of gossip.
     pub fn set_storage_arc(&self, arc: ArcInterval) {
-        todo!()
+        let agent = self.cell_id.agent_pubkey().to_kitsune();
+        self.p2p_agents_env
+            .conn()
+            .unwrap()
+            .with_commit_sync(|txn| txn.improperly_update_agent_arc(agent.as_ref(), arc))
+            .unwrap();
     }
 }

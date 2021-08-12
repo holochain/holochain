@@ -109,7 +109,7 @@ impl KdAgentInfo {
     /// Get the distance from a basis to this agent's storage arc.
     /// Will be zero if this agent covers this basis loc.
     pub fn basis_distance_to_storage(&self, basis: u32) -> u32 {
-        match self.storage_arc().primitive_range_grouped() {
+        match self.storage_arc().to_bounds_grouped() {
             None => u32::MAX,
             Some((s, e)) => {
                 if s <= e {
