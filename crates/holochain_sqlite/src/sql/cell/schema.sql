@@ -106,8 +106,10 @@ CREATE TABLE IF NOT EXISTS DhtOp (
     -- an INTEGER.
     when_integrated_ns  BLOB NULL,          -- DATETIME
 
-    -- BOOLEAN the op has received enough validation receipts.
-    receipts_complete   INTEGER     NULL,
+    -- The op has received enough validation receipts.
+    -- This is required as a field because different ops have different EntryTypes,
+    -- which have different numbers of required validation receipts.
+    receipts_complete   INTEGER     NULL,     -- BOOLEAN
     last_publish_time   INTEGER     NULL,   -- UNIX TIMESTAMP SECONDS
 
     blob             BLOB           NOT NULL,
