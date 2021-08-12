@@ -9,6 +9,7 @@ pub enum TestWasm {
     Anchor,
     Bench,
     Capability,
+    CounterSigning,
     Create,
     Crd,
     Crud,
@@ -56,6 +57,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::Anchor => "anchor",
             TestWasm::Bench => "bench",
             TestWasm::Capability => "capability",
+            TestWasm::CounterSigning => "countersigning",
             TestWasm::Create => "create_entry",
             TestWasm::Crd => "crd",
             TestWasm::Crud => "crud",
@@ -108,6 +110,9 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::Bench => get_code("wasm32-unknown-unknown/release/test_wasm_bench.wasm"),
             TestWasm::Capability => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_capability.wasm")
+            }
+            TestWasm::CounterSigning => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_countersigning.wasm")
             }
             TestWasm::Create => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_create_entry.wasm")

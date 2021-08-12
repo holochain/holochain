@@ -4,6 +4,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+### Changed
+
+- Header builder now uses chain top timestamp for new headers if in the future
+
 ## 0.0.102
 
 ### Known Issues :exclamation:

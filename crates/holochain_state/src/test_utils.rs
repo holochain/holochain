@@ -21,14 +21,20 @@ pub mod mutations_helpers;
 
 /// Create a [TestEnv] of [DbKind::Cell], backed by a temp directory.
 pub fn test_cell_env() -> TestEnv {
-    let cell_id = fake_cell_id(1);
-    test_env(DbKind::Cell(cell_id))
+    test_cell_env_with_id(1)
+}
+
+pub fn test_cell_env_with_id(id: u8) -> TestEnv {
+    test_env(DbKind::Cell(fake_cell_id(id)))
 }
 
 /// Create a [TestEnv] of [DbKind::Cache], backed by a temp directory.
 pub fn test_cache_env() -> TestEnv {
-    let dna = fake_cell_id(1).dna_hash().clone();
-    test_env(DbKind::Cache(dna))
+    test_cache_env_with_id(1)
+}
+
+pub fn test_cache_env_with_id(id: u8) -> TestEnv {
+    test_env(DbKind::Cache(fake_cell_id(id).dna_hash().clone()))
 }
 
 /// Create a [TestEnv] of [DbKind::Conductor], backed by a temp directory.

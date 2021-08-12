@@ -85,7 +85,6 @@ sd-notify = "0.3.0"
 
 [dev-dependencies]
 anyhow = "1.0.26"
-arbitrary = "1.0" 
 assert_cmd = "1.0.1"
 criterion = "0.3"
 maplit = "1"
@@ -98,7 +97,7 @@ hdk = { version = "0.0.102", path = "../hdk", optional = false }
 matches = {version = "0.1.8", optional = false }
 holochain_test_wasm_common = { version = "0.0.2", path = "../test_utils/wasm_common", optional = false  }
 unwrap_to = { version = "0.1.0", optional = false }
-
+arbitrary = { version = "1.0", features = ["derive"] }
 
 [[bench]]
 name = "bench"
