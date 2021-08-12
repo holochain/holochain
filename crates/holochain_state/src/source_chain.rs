@@ -736,7 +736,7 @@ fn chain_head_scratch(
 /// Check if there is a current countersigning session and if so, return the
 /// session data.
 pub fn current_countersigning_session(
-    txn: &mut Transaction<'_>,
+    txn: &Transaction<'_>,
     author: Arc<AgentPubKey>,
 ) -> SourceChainResult<Option<CounterSigningSessionData>> {
     // The chain must be locked for a session to be active.

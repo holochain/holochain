@@ -5,8 +5,9 @@ use holo_hash::EntryHash;
 use holo_hash::{AgentPubKey, DhtOpHash, HeaderHash};
 use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::HolochainP2pCellT;
+use holochain_sqlite::fresh_reader;
 use holochain_state::mutations;
-use holochain_state::prelude::{current_countersigning_session, SourceChainResult};
+use holochain_state::prelude::{current_countersigning_session, SourceChainResult, Store};
 use holochain_types::Timestamp;
 use holochain_types::{dht_op::DhtOp, env::EnvWrite};
 use holochain_zome_types::{Entry, SignedHeader};
@@ -142,7 +143,25 @@ pub(crate) async fn countersigning_success(
         None => return Ok(()),
     };
 
+    // Do a quick check to see if this entry hash matches
+    // the current locked session so we don't check signatures
+    // unless there is an active session.
+    let session_maybe_active = fresh_reader!(vault, |txn| {
+        if holochain_state::chain_lock::is_chain_locked(&txn, &[])? {
+            let txn: holochain_state::prelude::Txn = (&txn).into();
+            Ok(txn.contains_entry(&entry_hash)?)
+        } else {
+            SourceChainResult::Ok(false)
+        }
+    })?;
+
+    // If there is no active session then we can short circuit.
+    if !session_maybe_active {
+        return Ok(());
+    }
+
     // Verify signatures of headers.
+    // Note this step could be slow.
     for SignedHeader(header, signature) in &signed_headers {
         if !header.author().verify_signature(signature, header).await? {
             return Ok(());
