@@ -743,7 +743,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test_utils"))]
 mockall::mock! {
 
     pub KitsuneP2pEventHandler {}
@@ -818,7 +818,7 @@ mockall::mock! {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test_utils"))]
 impl ghost_actor::GhostHandler<KitsuneP2pEvent> for MockKitsuneP2pEventHandler {}
-#[cfg(test)]
+#[cfg(any(test, feature = "test_utils"))]
 impl ghost_actor::GhostControlHandler for MockKitsuneP2pEventHandler {}

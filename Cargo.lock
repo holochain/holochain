@@ -3201,8 +3201,8 @@ dependencies = [
  "kitsune_p2p_timestamp",
  "kitsune_p2p_transport_quic",
  "kitsune_p2p_types",
+ "lair_keystore_api 0.0.2",
  "maplit",
- "matches",
  "mockall",
  "observability",
  "once_cell",
@@ -3385,7 +3385,7 @@ dependencies = [
  "futures",
  "ghost_actor 0.3.0-alpha.4",
  "kitsune_p2p_dht_arc",
- "lair_keystore_api",
+ "lair_keystore_api 0.0.7",
  "lru",
  "mockall",
  "nanoid",
@@ -3416,6 +3416,34 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0de8b303297635ad57c9f5059fd9cee7a47f8e8daa09df0fcd07dd39fb22977f"
 dependencies = [
  "log",
+]
+
+[[package]]
+name = "lair_keystore_api"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "26bf69f6ad88274191ef2ad12850193d267c9b76d5cc33874afac9337604e25b"
+dependencies = [
+ "blake2b_simd",
+ "block-padding 0.2.1",
+ "byteorder",
+ "crypto_box",
+ "derive_more",
+ "directories 3.0.2",
+ "futures",
+ "ghost_actor 0.3.0-alpha.4",
+ "nanoid",
+ "num_cpus",
+ "once_cell",
+ "rand 0.7.3",
+ "rayon",
+ "rcgen",
+ "ring",
+ "subtle",
+ "thiserror",
+ "tokio",
+ "toml",
+ "winapi",
 ]
 
 [[package]]
@@ -3458,7 +3486,7 @@ checksum = "c2a7dd6f048af058c76bb15f7060aa997a34e15fd1fddc47fb96d57949a00ee4"
 dependencies = [
  "futures",
  "ghost_actor 0.3.0-alpha.4",
- "lair_keystore_api",
+ "lair_keystore_api 0.0.7",
  "sodoken",
  "tempfile",
  "tokio",
