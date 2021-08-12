@@ -29,6 +29,8 @@ fn invalid_cell_zome() -> InlineZome {
         })
 }
 
+/// Test that op publishing is sufficient for bobbo to get alice's op
+/// even with gossip disabled.
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_publish() -> anyhow::Result<()> {

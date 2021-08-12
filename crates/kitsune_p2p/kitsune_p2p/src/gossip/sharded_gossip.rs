@@ -441,6 +441,11 @@ impl ShardedGossipLocal {
                 })
                 .unwrap_or(true);
             if finished {
+                let metric = MetricInfo {
+                    error: false,
+                    last_sync: std::time::Instant::now(),
+                };
+                i.metrics.insert(state_id.clone(), metric);
                 Ok(i.remove_state(state_id))
             } else {
                 Ok(i.round_map.get(state_id).cloned())
@@ -460,6 +465,11 @@ impl ShardedGossipLocal {
                 .map(update_state)
                 .unwrap_or(true)
             {
+                let metric = MetricInfo {
+                    error: false,
+                    last_sync: std::time::Instant::now(),
+                };
+                i.metrics.insert(state_id.clone(), metric);
                 Ok(i.remove_state(state_id))
             } else {
                 Ok(i.round_map.get(state_id).cloned())
@@ -551,6 +561,7 @@ impl ShardedGossipLocal {
             }
             ShardedGossipWire::Error(Error { message }) => {
                 tracing::warn!("gossiping with: {:?} and got error: {}", cert, message);
+                self.record_metric_info(cert.clone(), true)?;
                 self.remove_state(&cert).await?;
                 Vec::with_capacity(0)
             }
@@ -696,7 +707,6 @@ impl ShardedGossipLocal {
                     {
                         continue;
                     }
-                    self.record_metric_info(agent.0.cert().clone(), false)?;
                     result = Some(agent);
                     break;
                 }

@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS Header (
     -- OpenChain / CloseChain
     prev_dna_hash    BLOB           NULL
 
-    -- We can't have any of these constraint because 
+    -- We can't have any of these constraint because
     -- the element authority doesn't get the create link for a remove link. @freesig
     -- FOREIGN KEY(entry_hash) REFERENCES Entry(hash)
     -- FOREIGN KEY(original_entry_hash) REFERENCES Entry(hash),
@@ -93,7 +93,7 @@ CREATE TABLE IF NOT EXISTS DhtOp (
     storage_center_loc          INTEGER   NOT NULL,
     authored_timestamp_ms       INTEGER   NOT NULL,
 
-    -- This is the order that process ops should result 
+    -- This is the order that process ops should result
     -- in dependencies before dependants.
     -- See OpOrder.
     op_order        TEXT           NOT NULL,
@@ -102,7 +102,7 @@ CREATE TABLE IF NOT EXISTS DhtOp (
     validation_status INTEGER       NULL,
 
     when_integrated  INTEGER NULL,          -- DATETIME
-    -- We need nanosecond accuracy which doesn't fit in 
+    -- We need nanosecond accuracy which doesn't fit in
     -- an INTEGER.
     when_integrated_ns  BLOB NULL,          -- DATETIME
 
@@ -120,7 +120,7 @@ CREATE TABLE IF NOT EXISTS DhtOp (
     -- 3: Awaiting integration.
     -- Don't need the other stages (pending, awaiting itntegration) because:
     -- - pending = validation_stage null && validation_status null.
-    -- We could make this an enum and use a Blob so we can capture which 
+    -- We could make this an enum and use a Blob so we can capture which
     -- deps are being awaited for debugging.
     validation_stage            INTEGER     NULL,
     num_validation_attempts     INTEGER     NULL,
@@ -152,4 +152,9 @@ CREATE TABLE IF NOT EXISTS ValidationReceipt (
     op_hash         BLOB           NOT NULL,
     blob            BLOB           NOT NULL,
     FOREIGN KEY(op_hash) REFERENCES DhtOp(hash)
+);
+
+CREATE TABLE IF NOT EXISTS ChainLock (
+    lock BLOB PRIMARY KEY ON CONFLICT ROLLBACK,
+    end INTEGER NOT NULL
 );

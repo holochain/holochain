@@ -13,11 +13,13 @@ use holochain_types::element::SignedHeaderHashedExt;
 use holochain_types::env::EnvRead;
 use holochain_types::env::EnvWrite;
 use holochain_types::timestamp;
+use holochain_types::Timestamp;
 use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::header;
 use holochain_zome_types::CapAccess;
 use holochain_zome_types::CapGrant;
 use holochain_zome_types::CapSecret;
+use holochain_zome_types::CounterSigningAgentState;
 use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
 use holochain_zome_types::EntryVisibility;
@@ -27,11 +29,13 @@ use holochain_zome_types::HeaderBuilder;
 use holochain_zome_types::HeaderBuilderCommon;
 use holochain_zome_types::HeaderHashed;
 use holochain_zome_types::HeaderInner;
+use holochain_zome_types::PreflightRequest;
 use holochain_zome_types::QueryFilter;
 use holochain_zome_types::Signature;
 use holochain_zome_types::SignedHeader;
 use holochain_zome_types::SignedHeaderHashed;
 
+use crate::chain_lock::is_chain_locked;
 use crate::prelude::*;
 use crate::query::chain_head::ChainHeadQuery;
 use crate::scratch::Scratch;
@@ -48,6 +52,7 @@ pub struct SourceChain {
     author: Arc<AgentPubKey>,
     persisted_seq: u32,
     persisted_head: HeaderHash,
+    persisted_timestamp: Timestamp,
     public_only: bool,
 }
 
@@ -73,7 +78,7 @@ impl SourceChain {
     pub async fn new(vault: EnvWrite, author: AgentPubKey) -> SourceChainResult<Self> {
         let scratch = Scratch::new().into_sync();
         let author = Arc::new(author);
-        let (persisted_head, persisted_seq) = vault
+        let (persisted_head, persisted_seq, persisted_timestamp) = vault
             .async_reader({
                 let author = author.clone();
                 move |txn| chain_head_db(&txn, author)
@@ -85,6 +90,7 @@ impl SourceChain {
             author,
             persisted_seq,
             persisted_head,
+            persisted_timestamp,
             public_only: false,
         })
     }
@@ -114,14 +120,46 @@ impl SourceChain {
         Ok(self.scratch.apply(|scratch| scratch.elements().collect())?)
     }
 
-    pub fn chain_head(&self) -> SourceChainResult<(HeaderHash, u32)> {
+    pub fn chain_head(&self) -> SourceChainResult<(HeaderHash, u32, Timestamp)> {
         // Check scratch for newer head.
         Ok(self.scratch.apply(|scratch| {
             let chain_head = chain_head_scratch(&(*scratch), self.author.as_ref());
-            let (prev_header, header_seq) =
-                chain_head.unwrap_or_else(|| (self.persisted_head.clone(), self.persisted_seq));
-            (prev_header, header_seq)
+            let (prev_header, header_seq, timestamp) = chain_head.unwrap_or_else(|| {
+                (
+                    self.persisted_head.clone(),
+                    self.persisted_seq,
+                    self.persisted_timestamp,
+                )
+            });
+            (prev_header, header_seq, timestamp)
         })?)
+    }
+
+    async fn put_with_header(
+        &self,
+        header: Header,
+        maybe_entry: Option<Entry>,
+    ) -> SourceChainResult<HeaderHash> {
+        let header = HeaderHashed::from_content_sync(header);
+        let hash = header.as_hash().clone();
+        let header = SignedHeaderHashed::new(&self.vault.keystore(), header).await?;
+        let element = Element::new(header, maybe_entry);
+        self.scratch
+            .apply(|scratch| insert_element_scratch(scratch, element))?;
+        Ok(hash)
+    }
+
+    pub async fn put_countersigned(&self, entry: Entry) -> SourceChainResult<HeaderHash> {
+        if let Entry::CounterSign(ref session_data, _) = entry {
+            self.put_with_header(
+                Header::from_countersigning_data(session_data, (*self.author).clone())?,
+                Some(entry),
+            )
+            .await
+        } else {
+            // The caller MUST guard against this case.
+            unreachable!("Put countersigned called with the wrong entry type");
+        }
     }
 
     pub async fn put<H: HeaderInner, B: HeaderBuilder<H>>(
@@ -129,28 +167,18 @@ impl SourceChain {
         header_builder: B,
         maybe_entry: Option<Entry>,
     ) -> SourceChainResult<HeaderHash> {
-        let (prev_header, chain_head_seq) = self.chain_head()?;
+        let (prev_header, chain_head_seq, chain_head_timestamp) = self.chain_head()?;
         let header_seq = chain_head_seq + 1;
 
         // Build the header.
         let common = HeaderBuilderCommon {
             author: (*self.author).clone(),
-            timestamp: timestamp::now(),
+            timestamp: std::cmp::max(timestamp::now(), chain_head_timestamp),
             header_seq,
             prev_header,
         };
-        let header = header_builder.build(common).into();
-        let header = HeaderHashed::from_content_sync(header);
-        let hash = header.as_hash().clone();
-
-        // Sign the header.
-        let header = SignedHeaderHashed::new(&self.vault.keystore(), header).await?;
-        let element = Element::new(header, maybe_entry);
-
-        // Put into scratch.
-        self.scratch
-            .apply(|scratch| insert_element_scratch(scratch, element))?;
-        Ok(hash)
+        self.put_with_header(header_builder.build(common).into(), maybe_entry)
+            .await
     }
 
     pub fn has_initialized(&self) -> SourceChainResult<bool> {
@@ -164,7 +192,8 @@ impl SourceChain {
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> SourceChainResult<u32> {
         Ok(self.scratch.apply(|scratch| {
-            let scratch_max = chain_head_scratch(&(*scratch), self.author.as_ref()).map(|(_, s)| s);
+            let scratch_max =
+                chain_head_scratch(&(*scratch), self.author.as_ref()).map(|(_, s, _)| s);
             scratch_max
                 .map(|s| std::cmp::max(s, self.persisted_seq))
                 .unwrap_or(self.persisted_seq)
@@ -381,6 +410,49 @@ impl SourceChain {
         Ok(elements)
     }
 
+    pub async fn unlock_chain(&self) -> SourceChainResult<()> {
+        self.vault
+            .async_commit(move |txn| unlock_chain(txn))
+            .await?;
+        Ok(())
+    }
+
+    pub async fn accept_countersigning_preflight_request(
+        &self,
+        preflight_request: PreflightRequest,
+        agent_index: u8,
+    ) -> SourceChainResult<CounterSigningAgentState> {
+        let hashed_preflight_request = holo_hash::encode::blake2b_256(
+            &holochain_serialized_bytes::encode(&preflight_request)?,
+        );
+
+        // This all needs to be ensured in a non-panicky way BEFORE calling into the source chain here.
+        let author = self.author.clone();
+        assert_eq!(
+            *author,
+            preflight_request.signing_agents()[agent_index as usize].0
+        );
+
+        let countersigning_agent_state = self
+            .vault
+            .async_commit(move |txn| {
+                if is_chain_locked(txn, &hashed_preflight_request)? {
+                    return Err(SourceChainError::ChainLocked);
+                }
+                let (persisted_head, persisted_seq, _) = chain_head_db(&txn, author)?;
+                let countersigning_agent_state =
+                    CounterSigningAgentState::new(agent_index, persisted_head, persisted_seq);
+                lock_chain(
+                    txn,
+                    &hashed_preflight_request,
+                    preflight_request.session_times().end(),
+                )?;
+                SourceChainResult::Ok(countersigning_agent_state)
+            })
+            .await?;
+        Ok(countersigning_agent_state)
+    }
+
     pub async fn flush(&self) -> SourceChainResult<()> {
         // Nothing to write
         if self.scratch.apply(|s| s.is_empty())? {
@@ -439,13 +511,30 @@ impl SourceChain {
             SourceChainResult::Ok((headers, ops, entries))
         })?;
 
+        let maybe_countersigned_entry = entries
+            .iter()
+            .map(|entry| entry.as_content())
+            .find(|entry| matches!(entry, Entry::CounterSign(_, _)));
+
+        let lock = match maybe_countersigned_entry {
+            Some(Entry::CounterSign(session_data, _)) => {
+                if headers.len() != 1 {
+                    return Err(SourceChainError::DirtyCounterSigningWrite);
+                }
+                holo_hash::encode::blake2b_256(&holochain_serialized_bytes::encode(
+                    session_data.preflight_request(),
+                )?)
+            }
+            _ => vec![],
+        };
+
         // Write the entries, headers and ops to the database in one transaction.
         let author = self.author.clone();
         let persisted_head = self.persisted_head.clone();
         self.vault
             .async_commit(move |txn| {
                 // As at check.
-                let (new_persisted_head, _) = chain_head_db(&txn, author)?;
+                let (new_persisted_head, _, _) = chain_head_db(&txn, author)?;
                 if headers.last().is_none() {
                     // Nothing to write
                     return Ok(());
@@ -455,6 +544,17 @@ impl SourceChain {
                         Some(persisted_head),
                         Some(new_persisted_head),
                     ));
+                }
+
+                if is_chain_locked(txn, &lock)? {
+                    return Err(SourceChainError::ChainLocked);
+                }
+                // If the lock is not just the empty lock, and the chain is NOT
+                // locked then either the session expired or the countersigning
+                // entry being committed now is the correct one for the lock,
+                // in either case we should unlock the chain.
+                else if !lock.is_empty() {
+                    unlock_chain(txn)?;
                 }
 
                 for entry in entries {
@@ -604,20 +704,27 @@ pub fn put_raw(
 fn chain_head_db(
     txn: &Transaction,
     author: Arc<AgentPubKey>,
-) -> SourceChainResult<(HeaderHash, u32)> {
+) -> SourceChainResult<(HeaderHash, u32, Timestamp)> {
     let chain_head = ChainHeadQuery::new(author);
-    let (prev_header, last_header_seq) = chain_head
+    let (prev_header, last_header_seq, last_header_timestamp) = chain_head
         .run(Txn::from(txn))?
         .ok_or(SourceChainError::ChainEmpty)?;
-    Ok((prev_header, last_header_seq))
+    Ok((prev_header, last_header_seq, last_header_timestamp))
 }
 
-fn chain_head_scratch(scratch: &Scratch, author: &AgentPubKey) -> Option<(HeaderHash, u32)> {
+fn chain_head_scratch(
+    scratch: &Scratch,
+    author: &AgentPubKey,
+) -> Option<(HeaderHash, u32, Timestamp)> {
     scratch
         .headers()
         .filter_map(|shh| {
             if shh.header().author() == author {
-                Some((shh.header_address().clone(), shh.header().header_seq()))
+                Some((
+                    shh.header_address().clone(),
+                    shh.header().header_seq(),
+                    shh.header().timestamp(),
+                ))
             } else {
                 None
             }
@@ -632,7 +739,7 @@ async fn _put_db<H: HeaderInner, B: HeaderBuilder<H>>(
     header_builder: B,
     maybe_entry: Option<Entry>,
 ) -> SourceChainResult<HeaderHash> {
-    let (prev_header, last_header_seq) =
+    let (prev_header, last_header_seq, _) =
         fresh_reader!(vault, |txn| { chain_head_db(&txn, author.clone()) })?;
     let header_seq = last_header_seq + 1;
 
@@ -651,7 +758,7 @@ async fn _put_db<H: HeaderInner, B: HeaderBuilder<H>>(
     let entry = entry.into_option();
     let hash = header.as_hash().clone();
     vault.conn()?.with_commit_sync(|txn| {
-        let (new_head, _) = chain_head_db(txn, author.clone())?;
+        let (new_head, _, _) = chain_head_db(txn, author.clone())?;
         if new_head != prev_header {
             return Err(SourceChainError::HeadMoved(
                 Some(prev_header),
