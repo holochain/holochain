@@ -21,15 +21,15 @@ use std::collections::{BTreeSet, HashSet};
 /// have no bearing on test results. (TODO: test this case separately)
 pub struct ScenarioDef<const N: usize> {
     /// The "nodes" (in Holochain, "conductors") participating in this scenario
-    nodes: [ScenarioDefNode; N],
+    pub nodes: [ScenarioDefNode; N],
 
     /// Specifies which other nodes are present in the peer store of each node.
     /// The array index matches the array defined in `ShardedScenario::nodes`.
-    peer_matrix: PeerMatrix<N>,
+    pub peer_matrix: PeerMatrix<N>,
 
     /// Represents latencies between nodes, to be simulated.
     /// If None, all latencies are zero.
-    _latency_matrix: LatencyMatrix<N>,
+    pub _latency_matrix: LatencyMatrix<N>,
 }
 
 impl<const N: usize> ScenarioDef<N> {
@@ -53,12 +53,15 @@ impl<const N: usize> ScenarioDef<N> {
 
 /// An individual node in a sharded scenario.
 /// The only data needed is the list of local agents.
-pub struct ScenarioDefNode(HashSet<ScenarioDefAgent>);
+pub struct ScenarioDefNode {
+    /// The agents local to this node
+    pub agents: HashSet<ScenarioDefAgent>,
+}
 
 impl ScenarioDefNode {
     /// Constructor
     pub fn new(agents: HashSet<ScenarioDefAgent>) -> Self {
-        Self(agents)
+        Self { agents }
     }
 }
 
@@ -66,9 +69,9 @@ impl ScenarioDefNode {
 #[derive(PartialEq, Eq, Hash)]
 pub struct ScenarioDefAgent {
     /// The storage arc for this agent
-    arc: ArcInterval,
+    pub arc: ArcInterval,
     /// The ops stored by this agent
-    ops: BTreeSet<DhtLocation>,
+    pub ops: BTreeSet<DhtLocation>,
 }
 
 impl ScenarioDefAgent {

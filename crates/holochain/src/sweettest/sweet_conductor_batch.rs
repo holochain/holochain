@@ -3,6 +3,7 @@ use crate::conductor::{api::error::ConductorApiResult, config::ConductorConfig};
 use futures::future;
 use hdk::prelude::*;
 use holochain_types::prelude::*;
+
 /// A collection of SweetConductors, with methods for operating on the entire collection
 #[derive(derive_more::From, derive_more::Into, derive_more::IntoIterator)]
 pub struct SweetConductorBatch(Vec<SweetConductor>);
@@ -103,6 +104,46 @@ impl SweetConductorBatch {
             .into_iter()
             .collect::<Result<Vec<_>, _>>()?
             .into())
+    }
+
+    /// Create a ConductorBatch from a kitsune `ScenarioDef`.
+    /// The resulting conductors will have the specified DNAs installed as an app,
+    /// and be pre-seeded with agents and op data as specified by the scenario.
+    /// The provided DnaFile must
+    #[cfg(feature = "unchecked-dht-location")]
+    pub async fn setup_from_scenario<const N: usize>(
+        scenario: kitsune_p2p::test_util::scenario_def::ScenarioDef<N>,
+    ) -> [(SweetConductor, SweetAppBatch); N] {
+        let (dna_file, _) =
+            super::SweetDnaFile::unique_from_inline_zome("zome", InlineZome::new_unique(vec![]))
+                .await
+                .unwrap();
+        let tasks = itertools::zip(scenario.nodes.into_iter(), std::iter::repeat(dna_file))
+            .enumerate()
+            .map(|(i, (node, dna_file))| async move {
+                let mut conductor = SweetConductor::from_standard_config().await;
+                let agent_defs: Vec<_> = node.agents.iter().collect();
+                let agents = SweetAgents::get(conductor.keystore(), agent_defs.len()).await;
+                let apps = conductor
+                    .setup_app_for_agents(
+                        &format!("node-{}", i),
+                        agents.as_slice(),
+                        &[dna_file.clone()],
+                    )
+                    .await
+                    .expect("Scenario setup is infallible");
+
+                for (agent_def, cell) in itertools::zip(agent_defs, apps.cells_flattened()) {
+                    cell.set_storage_arc(agent_def.arc.clone());
+                    cell.inject_fake_ops(agent_def.ops.clone().into_iter());
+                }
+
+                (conductor, apps)
+            });
+        future::join_all(tasks)
+            .await
+            .try_into()
+            .unwrap_or_else(|_| unreachable!("Array size must match"))
     }
 
     /// Let each conductor know about each others' agents so they can do networking

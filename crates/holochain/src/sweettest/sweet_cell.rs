@@ -1,9 +1,8 @@
 use super::SweetZome;
 use hdk::prelude::*;
 use holo_hash::DnaHash;
-use holochain_p2p::{dht_arc::ArcInterval, AgentPubKeyExt};
-use holochain_sqlite::db::*;
 use holochain_types::prelude::*;
+
 /// A reference to a Cell created by a SweetConductor installation function.
 /// It has very concise methods for calling a zome on this cell
 #[derive(Clone, derive_more::Constructor)]
@@ -38,7 +37,18 @@ impl SweetCell {
     pub fn zome<Z: Into<ZomeName>>(&self, zome_name: Z) -> SweetZome {
         SweetZome::new(self.cell_id.clone(), zome_name.into())
     }
+}
 
+#[cfg(feature = "unchecked-dht-location")]
+use holochain_p2p::{
+    dht_arc::{ArcInterval, DhtLocation},
+    AgentPubKeyExt,
+};
+#[cfg(feature = "unchecked-dht-location")]
+use holochain_sqlite::db::*;
+
+#[cfg(feature = "unchecked-dht-location")]
+impl SweetCell {
     /// Coerce the agent's storage arc to the specified value.
     /// The arc need not be centered on the agent's DHT location, which is
     /// typically a requirement "in the real world", but this can be useful
@@ -50,5 +60,24 @@ impl SweetCell {
             .unwrap()
             .with_commit_sync(|txn| txn.improperly_update_agent_arc(agent.as_ref(), arc))
             .unwrap();
+    }
+
+    pub fn inject_fake_ops<L>(&self, locations: L)
+    where
+        L: Iterator<Item = DhtLocation>,
+    {
+        use ::fixt::prelude::*;
+        self.cell_env.conn().unwrap().with_commit_sync(|txn| {
+            for loc in locations {
+                let header_hash = fixt!(HeaderHash);
+                let mut op_hash = fixt!(DhtOpHash);
+                let timestamp = fixt!(Timestamp);
+
+                op_hash.set_loc(loc);
+                let op_lite = DhtOpLight::StoreElement(header_hash.clone(), None, header_hash);
+                holochain_state::mutations::insert_op_lite(txn, op_lite, op_hash, true, timestamp)
+                    .unwrap();
+            }
+        })
     }
 }

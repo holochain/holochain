@@ -5,5 +5,4 @@ SET
   storage_start_loc = :storage_start_loc,
   storage_end_loc = :storage_end_loc
 WHERE
-  agent = :agent
-;
+  agent = :agent;
