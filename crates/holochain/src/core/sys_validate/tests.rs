@@ -27,12 +27,14 @@ async fn verify_header_signature_test() {
 
     assert_matches!(
         verify_header_signature(&wrong_signature, &header).await,
-        Ok(false)
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::Counterfeit(_, _)
+        ))
     );
 
     assert_matches!(
         verify_header_signature(&real_signature, &header).await,
-        Ok(true)
+        Ok(())
     );
 }
 

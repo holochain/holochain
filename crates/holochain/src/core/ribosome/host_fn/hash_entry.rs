@@ -27,7 +27,6 @@ pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use holo_hash::EntryHash;
-    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_wasm_test_utils::TestWasm;
     use std::convert::TryInto;
     use std::sync::Arc;
@@ -52,18 +51,8 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     /// we can get an entry hash out of the fn via. a wasm call
     async fn ribosome_hash_entry_test() {
-        let test_env = holochain_state::test_utils::test_cell_env();
-        let test_cache = holochain_state::test_utils::test_cache_env();
-        let env = test_env.env();
-        let author = fake_agent_pubkey_1();
-        crate::test_utils::fake_genesis(env.clone())
-            .await
-            .unwrap();
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
-
         let input = EntryFixturator::new(::fixt::Predictable).next().unwrap();
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace;
+        let host_access = fixt!(ZomeCallHostAccess, Predictable);
         let output: EntryHash =
             crate::call_test_ribosome!(host_access, TestWasm::HashEntry, "hash_entry", input).unwrap();
         assert_eq!(*output.hash_type(), holo_hash::hash_type::Entry);
@@ -88,16 +77,7 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     /// the hash path underlying anchors wraps entry_hash
     async fn ribosome_hash_path_pwd_test() {
-        let test_env = holochain_state::test_utils::test_cell_env();
-        let test_cache = holochain_state::test_utils::test_cache_env();
-        let env = test_env.env();
-        let author = fake_agent_pubkey_1();
-        crate::test_utils::fake_genesis(env.clone())
-            .await
-            .unwrap();
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace;
+        let host_access = fixt!(ZomeCallHostAccess, Predictable);
         let input = "foo.bar".to_string();
         let output: EntryHash =
             crate::call_test_ribosome!(host_access, TestWasm::HashPath, "hash", input).unwrap();

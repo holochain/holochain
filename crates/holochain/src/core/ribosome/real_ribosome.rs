@@ -29,6 +29,7 @@ use crate::core::ribosome::guest_callback::validate_link::ValidateLinkResult;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
+use crate::core::ribosome::host_fn::accept_countersigning_preflight_request::accept_countersigning_preflight_request;
 use crate::core::ribosome::host_fn::agent_info::agent_info;
 use crate::core::ribosome::host_fn::app_info::app_info;
 use crate::core::ribosome::host_fn::call::call;
@@ -419,6 +420,11 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__must_get_entry", must_get_entry)
             .with_host_function(&mut ns, "__must_get_header", must_get_header)
             .with_host_function(&mut ns, "__must_get_valid_element", must_get_valid_element)
+            .with_host_function(
+                &mut ns,
+                "__accept_countersigning_preflight_request",
+                accept_countersigning_preflight_request,
+            )
             .with_host_function(&mut ns, "__query", query)
             .with_host_function(&mut ns, "__call_remote", call_remote)
             .with_host_function(&mut ns, "__remote_signal", remote_signal)
