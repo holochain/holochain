@@ -1,7 +1,6 @@
 use super::common::*;
-use super::handler_builder::{
-    calculate_missing_ops, mock_agent_persistence, HandlerBuilder, OwnershipData,
-};
+use super::handler_builder::{calculate_missing_ops, mock_agent_persistence, HandlerBuilder};
+use super::sharded_scenario_local::*;
 use super::*;
 
 /// Defines a sharded scenario where:
@@ -14,7 +13,7 @@ use super::*;
 ///
 /// When syncing, we expect the missing op at the end of each arc to be received
 /// from the agent whose arc start intersects our arc end.
-pub(super) fn three_way_sharded_ownership() -> (Vec<Arc<KitsuneAgent>>, OwnershipData) {
+pub(super) fn three_way_sharded_ownership() -> (Vec<Arc<KitsuneAgent>>, LocalScenarioDef) {
     let agents = agents(3);
     let alice = agents[0].clone();
     let bobbo = agents[1].clone();
@@ -26,7 +25,7 @@ pub(super) fn three_way_sharded_ownership() -> (Vec<Arc<KitsuneAgent>>, Ownershi
         (bobbo.clone(), (1, 3), vec![1, 2]),
         (carol.clone(), (3, 5), vec![3, 4]),
     ];
-    (agents, OwnershipData::from_compact(6, ownership))
+    (agents, LocalScenarioDef::from_compact(6, ownership))
 }
 
 #[tokio::test(flavor = "multi_thread")]
