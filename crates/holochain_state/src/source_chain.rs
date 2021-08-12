@@ -612,10 +612,11 @@ impl SourceChain {
                     // StoreEntry ops with private entries are never gossiped or published
                     // so we don't need to integrate them.
                     // TODO: Can anything every depend on a private store entry op? I don't think so.
-                    if !(op_type == DhtOpType::StoreEntry
-                        && visibility == Some(EntryVisibility::Private))
-                        && !is_countersigning_session
-                    {
+                    let is_private_entry = op_type == DhtOpType::StoreEntry
+                        && visibility == Some(EntryVisibility::Private);
+
+                    // Don't publish private entries or countersigning sessions.
+                    if !is_private_entry && !is_countersigning_session {
                         set_validation_stage(
                             txn,
                             op_hash.clone(),
