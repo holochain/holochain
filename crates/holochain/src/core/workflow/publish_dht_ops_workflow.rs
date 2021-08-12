@@ -353,6 +353,21 @@ mod tests {
                 let test_env = test_cell_env();
                 let env = test_env.env();
 
+                let dna = fixt!(DnaHash);
+                let filter_events = |evt: &_| match evt {
+                    holochain_p2p::event::HolochainP2pEvent::Publish { .. } => true,
+                    _ => false,
+                };
+                let (tx, mut recv) = tokio::sync::mpsc::channel(10);
+                let test_network = test_network_with_events(
+                    Some(dna.clone()),
+                    Some(fake_agent_pubkey_1()),
+                    filter_events,
+                    tx,
+                )
+                .await;
+                let cell_network = test_network.cell_network();
+
                 // Setup data
                 let original_entry = fixt!(Entry);
                 let new_entry = fixt!(Entry);
@@ -407,7 +422,7 @@ mod tests {
                     .await
                     .unwrap();
 
-                source_chain.flush().await.unwrap();
+                source_chain.flush(&cell_network).await.unwrap();
                 let (entry_create_header, entry_update_header) = env
                     .conn()
                     .unwrap()
@@ -492,26 +507,12 @@ mod tests {
                 };
 
                 // Create cell data
-                let dna = fixt!(DnaHash);
                 let agents = AgentPubKeyFixturator::new(Unpredictable)
                     .take(num_agents as usize)
                     .collect::<Vec<_>>();
 
                 // Create the network
 
-                let filter_events = |evt: &_| match evt {
-                    holochain_p2p::event::HolochainP2pEvent::Publish { .. } => true,
-                    _ => false,
-                };
-                let (tx, mut recv) = tokio::sync::mpsc::channel(10);
-                let test_network = test_network_with_events(
-                    Some(dna.clone()),
-                    Some(fake_agent_pubkey_1()),
-                    filter_events,
-                    tx,
-                )
-                .await;
-                let cell_network = test_network.cell_network();
                 let (tx_complete, rx_complete) = tokio::sync::oneshot::channel();
                 // We are expecting six ops per agent plus one for self plus 7 for genesis.
                 let total_expected = (num_agents + 1) * (6 + 7);
