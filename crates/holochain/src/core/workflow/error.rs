@@ -33,6 +33,9 @@ pub enum WorkflowError {
     #[error(transparent)]
     CascadeError(#[from] CascadeError),
 
+    #[error(transparent)]
+    CounterSigningError(#[from] CounterSigningError),
+
     #[error("Workspace error: {0}")]
     WorkspaceError(#[from] WorkspaceError),
 
