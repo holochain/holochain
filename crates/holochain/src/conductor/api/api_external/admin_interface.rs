@@ -67,7 +67,6 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
         &self,
         request: AdminRequest,
     ) -> ConductorApiResult<AdminResponse> {
-        tracing::trace!("Handling admin request: {:?}", request);
         use AdminRequest::*;
         match request {
             AddAdminInterfaces(configs) => {
