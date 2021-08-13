@@ -41,7 +41,7 @@ mod hashed;
 mod ser;
 
 #[cfg(feature = "hashing")]
-pub use hash_ext::MAX_HASHABLE_CONTENT_LEN;
+pub use hash_ext::*;
 #[cfg(feature = "serialized-bytes")]
 pub use hashable_content::*;
 #[cfg(feature = "serialized-bytes")]
