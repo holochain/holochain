@@ -19,6 +19,7 @@ use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::call_zome_workflow;
+use crate::core::workflow::countersigning_workflow::countersigning_success;
 use crate::core::workflow::countersigning_workflow::incoming_countersigning;
 use crate::core::workflow::countersigning_workflow::CountersigningWorkspace;
 use crate::core::workflow::genesis_workflow::genesis_workflow;
@@ -477,13 +478,21 @@ impl Cell {
         }
         Ok(())
     }
-    #[instrument(skip(self, _signed_headers))]
+    #[instrument(skip(self, signed_headers))]
     /// we are receiving a response from a countersigning authority
     async fn handle_countersigning_authority_response(
         &self,
-        _signed_headers: Vec<SignedHeader>,
+        signed_headers: Vec<SignedHeader>,
     ) -> CellResult<()> {
-        todo!()
+        Ok(countersigning_success(
+            self.env.clone(),
+            &self.holochain_p2p_cell,
+            self.id.agent_pubkey().clone(),
+            signed_headers,
+            self.queue_triggers.publish_dht_ops.clone(),
+        )
+        .await
+        .map_err(Box::new)?)
     }
 
     #[instrument(skip(self))]
