@@ -41,7 +41,7 @@ pub fn is_lock_expired(txn: &Transaction, lock: &[u8]) -> StateMutationResult<bo
             named_params! {
                 ":lock": lock,
             },
-            |row| Ok(row.get::<_, i64>("end")? >= holochain_types::timestamp::now().0),
+            |row| Ok(row.get::<_, i64>("end")? < holochain_types::timestamp::now().0),
         )
         .optional()?;
     // If there's no lock then it's expired.
