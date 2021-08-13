@@ -115,6 +115,15 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<bool> {
         Err("stub".into())
     }
+    fn handle_countersigning_authority_response(
+        &mut self,
+        dna_hash: DnaHash,
+        from_agent: AgentPubKey,
+        agents: Vec<AgentPubKey>,
+        response: Vec<SignedHeader>,
+    ) -> HolochainP2pHandlerResult<()> {
+        Err("stub".into())
+    }
 }
 
 /// Spawn a stub network that doesn't respond to any messages.

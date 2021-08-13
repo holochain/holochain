@@ -319,12 +319,17 @@ impl HolochainP2pCellT for HolochainP2pCell {
 
     async fn countersigning_authority_response(
         &self,
-        _agents: Vec<AgentPubKey>,
-        _response: Vec<SignedHeader>,
+        agents: Vec<AgentPubKey>,
+        response: Vec<SignedHeader>,
     ) -> actor::HolochainP2pResult<()> {
-        // TODO: Figure out how this message is received (by the cell?)
-        // and then plumb it through.
-        todo!()
+        self.sender
+            .countersigning_authority_response(
+                (*self.dna_hash).clone(),
+                (*self.from_agent).clone(),
+                agents,
+                response,
+            )
+            .await
     }
 
     async fn new_integrated_data(&self) -> actor::HolochainP2pResult<()> {

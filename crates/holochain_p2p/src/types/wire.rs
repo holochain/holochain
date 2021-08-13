@@ -57,6 +57,9 @@ pub(crate) enum WireMessage {
     GetValidationPackage {
         header_hash: HeaderHash,
     },
+    CountersigningAuthorityResponse {
+        signed_headers: Vec<SignedHeader>,
+    },
 }
 
 impl WireMessage {
@@ -130,5 +133,9 @@ impl WireMessage {
     }
     pub fn get_validation_package(header_hash: HeaderHash) -> WireMessage {
         Self::GetValidationPackage { header_hash }
+    }
+
+    pub fn countersigning_authority_response(signed_headers: Vec<SignedHeader>) -> WireMessage {
+        Self::CountersigningAuthorityResponse { signed_headers }
     }
 }

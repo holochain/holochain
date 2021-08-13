@@ -237,6 +237,14 @@ ghost_actor::ghost_chan! {
             // The data to sign.
             data: Vec<u8>,
         ) -> Signature;
+
+        /// Response from an authority to agents that are
+        /// part of a session.
+        fn countersigning_authority_response(
+            dna_hash: DnaHash,
+            to_agent: AgentPubKey,
+            signed_headers: Vec<SignedHeader>,
+        ) -> ();
     }
 }
 
@@ -257,6 +265,7 @@ macro_rules! match_p2p_evt {
             HolochainP2pEvent::GetAgentInfoSigned { $i, .. } => { $($t)* }
             HolochainP2pEvent::PutMetricDatum { $i, .. } => { $($t)* }
             HolochainP2pEvent::QueryMetrics { $i, .. } => { $($t)* }
+            HolochainP2pEvent::CountersigningAuthorityResponse { $i, .. } => { $($t)* }
             $($t2)*
         }
     };
