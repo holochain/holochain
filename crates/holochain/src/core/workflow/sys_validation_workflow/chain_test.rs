@@ -88,7 +88,7 @@ async fn run_test(alice_cell_id: CellId, handle: ConductorHandle) {
     h2.header_seq = 4;
 
     // Set valid prev header
-    h2.prev_header = HeaderHash::with_data_sync(&Header::Create(h1.clone()));
+    h2.prev_header = Header::Create(h1.clone()).to_hash();
 
     let mut ops = vec![];
 
@@ -101,7 +101,7 @@ async fn run_test(alice_cell_id: CellId, handle: ConductorHandle) {
 
     // Create the activity op
     let op = DhtOp::RegisterAgentActivity(signature, h1.clone().into());
-    ops.push((DhtOpHash::with_data_sync(&op), op));
+    ops.push((op.to_hash(), op));
 
     // Make valid signature
     let signature = alice_cell_id
@@ -112,7 +112,7 @@ async fn run_test(alice_cell_id: CellId, handle: ConductorHandle) {
 
     // Create the activity op
     let op = DhtOp::RegisterAgentActivity(signature, h2.clone().into());
-    ops.push((DhtOpHash::with_data_sync(&op), op));
+    ops.push((op.to_hash(), op));
 
     // Add the ops to incoming
     incoming_dht_ops_workflow::incoming_dht_ops_workflow(
@@ -131,7 +131,7 @@ async fn run_test(alice_cell_id: CellId, handle: ConductorHandle) {
     // TODO: When we add invalid chains put a real check here
 
     // set valid prev header chain
-    let last_hash = HeaderHash::with_data_sync(&Header::Create(h2.clone()));
+    let last_hash = Header::Create(h2.clone()).to_hash();
     h1.prev_header = last_hash.clone();
 
     // set valid timestamps
@@ -158,7 +158,7 @@ async fn run_test(alice_cell_id: CellId, handle: ConductorHandle) {
 
     // Create the activity op
     let op = DhtOp::RegisterAgentActivity(signature, h1.into());
-    ops.push((DhtOpHash::with_data_sync(&op), op));
+    ops.push((op.to_hash(), op));
 
     // Make valid signature
     let signature = alice_cell_id
@@ -169,7 +169,7 @@ async fn run_test(alice_cell_id: CellId, handle: ConductorHandle) {
 
     // Create the activity op
     let op = DhtOp::RegisterAgentActivity(signature, h2.into());
-    ops.push((DhtOpHash::with_data_sync(&op), op));
+    ops.push((op.to_hash(), op));
 
     // Add the ops to incoming
     incoming_dht_ops_workflow::incoming_dht_ops_workflow(
