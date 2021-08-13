@@ -112,6 +112,7 @@ pub mod wasm_test {
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(flavor = "multi_thread")]
+    #[cfg(feature = "slow_tests")]
     async fn lock_chain() {
         observability::test_run().ok();
         let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning])
@@ -266,7 +267,8 @@ pub mod wasm_test {
             _ => unreachable!(),
         };
 
-        // Creating the correct countersigned entry will unlock the chain.
+        // Creating the correct countersigned entry will NOT immediately unlock
+        // the chain (it needs Bob to countersign).
         let _: HeaderHash = conductor
             .call(
                 &alice,
@@ -274,7 +276,27 @@ pub mod wasm_test {
                 vec![alice_response.clone(), bob_response.clone()],
             )
             .await;
-
+        let thing_fail_create_alice = conductor
+            .handle()
+            .call_zome(ZomeCall {
+                cell_id: alice.cell_id().clone(),
+                zome_name: alice.name().clone(),
+                fn_name: "create_a_thing".into(),
+                cap: None,
+                provenance: alice_pubkey.clone(),
+                payload: ExternIO::encode(()).unwrap(),
+            })
+            .await;
+        tokio::time::sleep(std::time::Duration::from_millis(4000)).await;
+        match thing_fail_create_alice {
+            Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) => {
+                match *workflow_error {
+                    WorkflowError::SourceChainError(SourceChainError::ChainLocked) => {}
+                    _ => unreachable!(),
+                }
+            }
+            _ => unreachable!(),
+        };
 
         // Creation will still fail for bob.
         let thing_fail_create_bob = conductor
@@ -292,10 +314,10 @@ pub mod wasm_test {
             Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) => {
                 match *workflow_error {
                     WorkflowError::SourceChainError(SourceChainError::ChainLocked) => {}
-                    _ => unreachable!(),
+                    _ => panic!("{:?}", workflow_error),
                 }
             }
-            _ => unreachable!(),
+            something_else => panic!("{:?}", something_else),
         };
 
         // After bob commits the same countersigned entry he can unlock his chain.
@@ -306,8 +328,8 @@ pub mod wasm_test {
                 vec![alice_response, bob_response],
             )
             .await;
-        tokio::time::sleep(std::time::Duration::from_millis(10000)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(4000)).await;
         let _: HeaderHash = conductor.call(&alice, "create_a_thing", ()).await;
-
+        let _: HeaderHash = conductor.call(&bobbo, "create_a_thing", ()).await;
     }
 }
