@@ -25,6 +25,7 @@ pub mod error;
 
 pub mod app_validation_workflow;
 pub mod call_zome_workflow;
+pub mod countersigning_workflow;
 pub mod genesis_workflow;
 pub mod incoming_dht_ops_workflow;
 pub mod initialize_zomes_workflow;

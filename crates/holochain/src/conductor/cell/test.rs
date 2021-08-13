@@ -74,7 +74,7 @@ async fn test_cell_handle_publish() {
     let op = DhtOp::StoreElement(shh.signature().clone(), header.clone(), None);
     let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
 
-    cell.handle_publish(true, vec![(op_hash.clone(), op.clone())])
+    cell.handle_publish(true, false, vec![(op_hash.clone(), op.clone())])
         .await
         .unwrap();
 

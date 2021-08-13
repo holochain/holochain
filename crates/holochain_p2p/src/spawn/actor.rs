@@ -201,11 +201,12 @@ impl WrapEvtSender {
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
         request_validation_receipt: bool,
+        countersigning_session: bool,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> impl Future<Output = HolochainP2pResult<()>> + 'static + Send {
         let op_count = ops.len();
         timing_trace!({
-            self.0.publish(dna_hash, to_agent, request_validation_receipt, ops)
+            self.0.publish(dna_hash, to_agent, request_validation_receipt, countersigning_session, ops)
         }, %op_count, "(hp2p:handle) publish")
     }
 
@@ -500,12 +501,19 @@ impl HolochainP2pActor {
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
         request_validation_receipt: bool,
+        countersigning_session: bool,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> kitsune_p2p::actor::KitsuneP2pHandlerResult<()> {
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
             evt_sender
-                .publish(dna_hash, to_agent, request_validation_receipt, ops)
+                .publish(
+                    dna_hash,
+                    to_agent,
+                    request_validation_receipt,
+                    countersigning_session,
+                    ops,
+                )
                 .await?;
             Ok(())
         }
@@ -802,9 +810,16 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             }
             crate::wire::WireMessage::Publish {
                 request_validation_receipt,
+                countersigning_session,
                 dht_hash: _,
                 ops,
-            } => self.handle_incoming_publish(space, to_agent, request_validation_receipt, ops),
+            } => self.handle_incoming_publish(
+                space,
+                to_agent,
+                request_validation_receipt,
+                countersigning_session,
+                ops,
+            ),
         }
     }
 
@@ -827,7 +842,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                 Ok((op_hash, op_data))
             })
             .collect::<Result<_, HolochainP2pError>>()?;
-        self.handle_incoming_publish(space, to_agent, false, ops)
+        self.handle_incoming_publish(space, to_agent, false, false, ops)
     }
 
     #[tracing::instrument(skip(self), level = "trace")]
@@ -991,6 +1006,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         dna_hash: DnaHash,
         _from_agent: AgentPubKey,
         request_validation_receipt: bool,
+        countersigning_session: bool,
         dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
         timeout_ms: Option<u64>,
@@ -1004,8 +1020,13 @@ impl HolochainP2pHandler for HolochainP2pActor {
             None => self.tuning_params.implicit_timeout(),
         };
 
-        let payload = crate::wire::WireMessage::publish(request_validation_receipt, dht_hash, ops)
-            .encode()?;
+        let payload = crate::wire::WireMessage::publish(
+            request_validation_receipt,
+            countersigning_session,
+            dht_hash,
+            ops,
+        )
+        .encode()?;
 
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {

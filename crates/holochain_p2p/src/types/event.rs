@@ -156,6 +156,7 @@ ghost_actor::ghost_chan! {
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
             request_validation_receipt: bool,
+            countersigning_session: bool,
             ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
         ) -> ();
 

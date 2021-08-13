@@ -49,7 +49,7 @@ pub async fn publish_dht_ops_workflow(
     let mut success = Vec::new();
     for (basis, ops) in to_publish {
         let hashes: Vec<_> = ops.iter().map(|(h, _)| h.clone()).collect();
-        if let Err(e) = network.publish(true, basis, ops, None).await {
+        if let Err(e) = network.publish(true, false, basis, ops, None).await {
             // If we get a routing error it means the space hasn't started yet and we should try publishing again.
             if let holochain_p2p::HolochainP2pError::RoutingDnaError(_) = e {
                 complete = WorkComplete::Incomplete;
