@@ -61,13 +61,6 @@ impl RealAdminInterfaceApi {
     }
 }
 
-// this mutex is used to implement a resource group with these request variants: InstallApp, InstallAppBundle, RegisterDna
-// FIXME: this is a workaround to a bug that causes the conductor to hang when
-// multiple apps are installed concurrently. a proper solution might involve
-// reworking the conductor R/W lock handling
-static INSTALL_APP_MUTEX: once_cell::sync::Lazy<std::sync::Arc<tokio::sync::Mutex<()>>> =
-    once_cell::sync::Lazy::new(Default::default);
-
 #[async_trait::async_trait]
 impl AdminInterfaceApi for RealAdminInterfaceApi {
     async fn handle_admin_request_inner(
@@ -86,17 +79,11 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             }
             RegisterDna(payload) => {
                 trace!(register_dna_payload = ?payload);
-
                 let RegisterDnaPayload {
                     uid,
                     properties,
                     source,
                 } = *payload;
-
-                // FIXME: this is a workaround to a bug that causes the conductor to hang when multiple apps are installed concurrently.
-                let _lock = INSTALL_APP_MUTEX.lock().await;
-                trace!("got the lock, registering dna {:?}", uid);
-
                 // uid and properties from the register call will override any in the bundle
                 let dna = match source {
                     DnaSource::Hash(ref hash) => {
@@ -154,16 +141,11 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             }
             InstallApp(payload) => {
                 trace!(?payload.dnas);
-
                 let InstallAppPayload {
                     installed_app_id,
                     agent_key,
                     dnas,
                 } = *payload;
-
-                // FIXME: this is a workaround to a bug that causes the conductor to hang when multiple apps are installed concurrently.
-                let _lock = INSTALL_APP_MUTEX.lock().await;
-                trace!("got the lock, installing {}", installed_app_id);
 
                 // Install Dnas
                 let tasks = dnas.into_iter().map(|dna_payload| async {
@@ -209,10 +191,6 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 Ok(AdminResponse::AppInstalled(info))
             }
             InstallAppBundle(payload) => {
-                // FIXME: this is a workaround to a bug that causes the conductor to hang when multiple apps are installed concurrently.
-                let _lock = INSTALL_APP_MUTEX.lock().await;
-                trace!("got the lock, installing app bundle");
-
                 let app: InstalledApp = self
                     .conductor_handle
                     .clone()
