@@ -19,6 +19,8 @@ use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::call_zome_workflow;
+use crate::core::workflow::countersigning_workflow::incoming_countersigning;
+use crate::core::workflow::countersigning_workflow::CountersigningWorkspace;
 use crate::core::workflow::genesis_workflow::genesis_workflow;
 use crate::core::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
 use crate::core::workflow::initialize_zomes_workflow;
@@ -104,6 +106,8 @@ where
     holochain_p2p_cell: P2pCell,
     queue_triggers: QueueTriggers,
     init_mutex: tokio::sync::Mutex<()>,
+    /// Countersigning workspace that is shared across this cell.
+    countersigning_workspace: CountersigningWorkspace,
 }
 
 impl Cell {
@@ -133,6 +137,7 @@ impl Cell {
         };
 
         if has_genesis {
+            let countersigning_workspace = CountersigningWorkspace::new();
             let (queue_triggers, initial_queue_triggers) = spawn_queue_consumer_tasks(
                 env.clone(),
                 cache.clone(),
@@ -141,6 +146,7 @@ impl Cell {
                 conductor_api.clone(),
                 managed_task_add_sender,
                 managed_task_stop_broadcaster,
+                countersigning_workspace.clone(),
             )
             .await;
 
@@ -153,6 +159,7 @@ impl Cell {
                     holochain_p2p_cell,
                     queue_triggers,
                     init_mutex: Default::default(),
+                    countersigning_workspace,
                 },
                 initial_queue_triggers,
             ))
@@ -269,13 +276,14 @@ impl Cell {
                 span_context,
                 respond,
                 request_validation_receipt,
+                countersigning_session,
                 ops,
                 ..
             } => {
                 async {
                     tracing::Span::set_current_context(span_context);
                     let res = self
-                        .handle_publish(request_validation_receipt, ops)
+                        .handle_publish(request_validation_receipt, countersigning_session, ops)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
@@ -416,6 +424,21 @@ impl Cell {
                 .instrument(debug_span!("cell_handle_sign_network_data"))
                 .await;
             }
+            CountersigningAuthorityResponse {
+                respond,
+                signed_headers,
+                ..
+            } => {
+                async {
+                    let res = self
+                        .handle_countersigning_authority_response(signed_headers)
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::other);
+                    respond.respond(Ok(async move { res }.boxed().into()));
+                }
+                .instrument(debug_span!("cell_handle_countersigning_response"))
+                .await;
+            }
         }
         Ok(())
     }
@@ -425,19 +448,42 @@ impl Cell {
     async fn handle_publish(
         &self,
         request_validation_receipt: bool,
+        countersigning_session: bool,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> CellResult<()> {
-        incoming_dht_ops_workflow(
-            &self.env,
-            self.queue_triggers.sys_validation.clone(),
-            ops,
-            request_validation_receipt,
-        )
-        .await
-        .map_err(Box::new)
-        .map_err(ConductorApiError::from)
-        .map_err(Box::new)?;
+        // If this is a countersigning session then
+        // send it to the countersigning workflow otherwise
+        // send it to the incoming ops workflow.
+        if countersigning_session {
+            incoming_countersigning(
+                ops,
+                &self.countersigning_workspace,
+                self.queue_triggers.countersigning.clone(),
+            )
+            .map_err(Box::new)
+            .map_err(ConductorApiError::from)
+            .map_err(Box::new)?;
+        } else {
+            incoming_dht_ops_workflow(
+                &self.env,
+                self.queue_triggers.sys_validation.clone(),
+                ops,
+                request_validation_receipt,
+            )
+            .await
+            .map_err(Box::new)
+            .map_err(ConductorApiError::from)
+            .map_err(Box::new)?;
+        }
         Ok(())
+    }
+    #[instrument(skip(self, _signed_headers))]
+    /// we are receiving a response from a countersigning authority
+    async fn handle_countersigning_authority_response(
+        &self,
+        _signed_headers: Vec<SignedHeader>,
+    ) -> CellResult<()> {
+        todo!()
     }
 
     #[instrument(skip(self))]

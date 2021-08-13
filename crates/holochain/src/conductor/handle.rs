@@ -619,6 +619,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 respond.respond(Ok(async move { Ok(signature) }.boxed().into()));
             }
             HolochainP2pEvent::CallRemote { .. }
+            | CountersigningAuthorityResponse { .. }
             | Publish { .. }
             | GetValidationPackage { .. }
             | Get { .. }

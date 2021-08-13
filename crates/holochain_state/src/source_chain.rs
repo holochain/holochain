@@ -532,7 +532,7 @@ impl SourceChain {
         let author = self.author.clone();
         let persisted_head = self.persisted_head.clone();
         self.vault
-            .async_commit(move |txn| {
+            .async_commit(move |txn: &mut Transaction| {
                 // As at check.
                 let (new_persisted_head, _, _) = chain_head_db(&txn, author)?;
                 if headers.last().is_none() {

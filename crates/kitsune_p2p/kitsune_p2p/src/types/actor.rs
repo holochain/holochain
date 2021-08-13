@@ -67,6 +67,7 @@ pub struct RpcMultiResponse {
 
 type KSpace = Arc<super::KitsuneSpace>;
 type KAgent = Arc<super::KitsuneAgent>;
+type KAgents = Vec<Arc<super::KitsuneAgent>>;
 type KBasis = Arc<super::KitsuneBasis>;
 type Payload = Vec<u8>;
 type OptU64 = Option<u64>;
@@ -99,6 +100,18 @@ ghost_actor::ghost_chan! {
         fn broadcast(
             space: KSpace,
             basis: KBasis,
+            timeout: KitsuneTimeout,
+            payload: Payload
+        ) -> ();
+
+        /// Broadcast data to a specific set of agents without
+        /// expecting a response.
+        /// An Ok(()) result only means that we were able to establish at
+        /// least one connection with a node in the agent set.
+        fn targeted_broadcast(
+            space: KSpace,
+            from_agent: KAgent,
+            agents: KAgents,
             timeout: KitsuneTimeout,
             payload: Payload
         ) -> ();
