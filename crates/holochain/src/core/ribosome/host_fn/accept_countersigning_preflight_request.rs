@@ -275,7 +275,6 @@ pub mod wasm_test {
             )
             .await;
 
-        let _: HeaderHash = conductor.call(&alice, "create_a_thing", ()).await;
 
         // Creation will still fail for bob.
         let thing_fail_create_bob = conductor
@@ -307,5 +306,8 @@ pub mod wasm_test {
                 vec![alice_response, bob_response],
             )
             .await;
+        tokio::time::sleep(std::time::Duration::from_millis(10000)).await;
+        let _: HeaderHash = conductor.call(&alice, "create_a_thing", ()).await;
+
     }
 }
