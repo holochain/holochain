@@ -466,80 +466,6 @@ where
         }
     }
 
-    /// Perform Genesis on the source chains for each of the specified CellIds.
-    ///
-    /// If genesis fails for any cell, this entire function fails, and all other
-    /// partial or complete successes are rolled back.
-    pub(super) async fn genesis_cells(
-        &self,
-        cell_ids_with_proofs: Vec<(CellId, Option<MembraneProof>)>,
-        conductor_handle: ConductorHandle,
-    ) -> ConductorResult<()> {
-        let root_env_dir = std::path::PathBuf::from(self.root_env_dir.clone());
-
-        let cells_tasks = cell_ids_with_proofs
-            .into_iter()
-            .map(|(cell_id, proof)| async {
-                let root_env_dir = root_env_dir.clone();
-                let keystore = self.keystore.clone();
-                let conductor_handle = conductor_handle.clone();
-                let cell_id_inner = cell_id.clone();
-                let ribosome = conductor_handle
-                    .get_ribosome(cell_id.dna_hash())
-                    .await
-                    .map_err(Box::new)?;
-                tokio::spawn(async move {
-                    let env = EnvWrite::open(
-                        &root_env_dir,
-                        DbKind::Cell(cell_id_inner.clone()),
-                        keystore.clone(),
-                    )?;
-                    Cell::genesis(cell_id_inner, conductor_handle, env, ribosome, proof).await
-                })
-                .map_err(CellError::from)
-                .and_then(|result| async move { result.map(|_| cell_id) })
-                .await
-            });
-
-        tracing::trace!("assembled {} cell tasks", cells_tasks.len());
-
-        let (success, errors): (Vec<_>, Vec<_>) = futures::future::join_all(cells_tasks)
-            .await
-            .into_iter()
-            .partition(Result::is_ok);
-
-        // unwrap safe because of the partition
-        let success = success.into_iter().map(Result::unwrap);
-
-        tracing::trace!(
-            "completed {} cell tasks successfully, {} with error",
-            success.len(),
-            errors.len()
-        );
-
-        // If there were errors, cleanup and return the errors
-        if !errors.is_empty() {
-            for cell_id in success {
-                let db = DbWrite::open(&root_env_dir, DbKind::Cell(cell_id))?;
-                db.remove().await?;
-            }
-
-            // match needed to avoid Debug requirement on unwrap_err
-            let errors = errors
-                .into_iter()
-                .map(|e| match e {
-                    Err(e) => e,
-                    Ok(_) => unreachable!("Safe because of the partition"),
-                })
-                .collect();
-
-            Err(ConductorError::GenesisFailed { errors })
-        } else {
-            // No errors so return the cells
-            Ok(())
-        }
-    }
-
     fn get_or_create_cache(&self, dna_hash: &DnaHash) -> ConductorResult<EnvWrite> {
         let mut caches = self.caches.lock();
         match caches.get(dna_hash) {
@@ -856,24 +782,52 @@ where
         // Load out all dna defs
         let (wasm_tasks, defs) = env
             .async_reader(move |txn| {
-                let wasm_tasks = holochain_state::dna_def::get_all(&txn)?
+                // Get all the dna defs.
+                let dna_defs: Vec<_> = holochain_state::dna_def::get_all(&txn)?
                     .into_iter()
-                    .map(|dna_def| {
-                        // Load all wasms for each dna_def from the wasm db into memory
-                        let wasms = dna_def.zomes.clone().into_iter().map(|(zome_name, zome)| {
-                            let wasm_hash = zome.wasm_hash(&zome_name)?;
-                            holochain_state::wasm::get(&txn, &wasm_hash)?
-                                .map(|hashed| hashed.into_content())
-                                .ok_or(ConductorError::WasmMissing)
-                        });
-                        let wasms = wasms.collect::<ConductorResult<Vec<_>>>();
-                        async move {
-                            let dna_file = DnaFile::new(dna_def.into_content(), wasms?).await?;
-                            ConductorResult::Ok((dna_file.dna_hash().clone(), dna_file))
-                        }
+                    .collect();
+
+                // Gather all the unique wasms.
+                let unique_wasms = dna_defs
+                    .iter()
+                    .flat_map(|dna_def| {
+                        dna_def
+                            .zomes
+                            .iter()
+                            .map(|(zome_name, zome)| Ok(zome.wasm_hash(&zome_name)?))
                     })
-                    // This needs to happen due to the environment not being Send
-                    .collect::<Vec<_>>();
+                    .collect::<ConductorResult<HashSet<_>>>()?;
+
+                // Get the code for each unique wasm.
+                let wasms = unique_wasms
+                    .into_iter()
+                    .map(|wasm_hash| {
+                        holochain_state::wasm::get(&txn, &wasm_hash)?
+                            .map(|hashed| hashed.into_content())
+                            .ok_or(ConductorError::WasmMissing)
+                            .map(|wasm| (wasm_hash, wasm))
+                    })
+                    .collect::<ConductorResult<HashMap<_, _>>>()?;
+                let wasm_tasks =
+                    holochain_state::dna_def::get_all(&txn)?
+                        .into_iter()
+                        .map(|dna_def| {
+                            // Load all wasms for each dna_def from the wasm db into memory
+                            let wasms = dna_def.zomes.clone().into_iter().filter_map(
+                                |(zome_name, zome)| {
+                                    let wasm_hash = zome.wasm_hash(&zome_name).ok()?;
+                                    // Note this is a cheap arc clone.
+                                    wasms.get(&wasm_hash).cloned()
+                                },
+                            );
+                            let wasms = wasms.collect::<Vec<_>>();
+                            async move {
+                                let dna_file = DnaFile::new(dna_def.into_content(), wasms).await?;
+                                ConductorResult::Ok((dna_file.dna_hash().clone(), dna_file))
+                            }
+                        })
+                        // This needs to happen due to the environment not being Send
+                        .collect::<Vec<_>>();
                 let defs = holochain_state::entry_def::get_all(&txn)?;
                 ConductorResult::Ok((wasm_tasks, defs))
             })
@@ -881,6 +835,16 @@ where
         // try to join all the tasks and return the list of dna files
         let dnas = futures::future::try_join_all(wasm_tasks).await?;
         Ok((dnas, defs))
+    }
+
+    /// Get the root environment directory.
+    pub fn root_env_dir(&self) -> &EnvironmentRootPath {
+        &self.root_env_dir
+    }
+
+    /// Get the keystore.
+    pub fn keystore(&self) -> &KeystoreSender {
+        &self.keystore
     }
 
     /// Remove cells from the cell map in the Conductor
@@ -1055,6 +1019,71 @@ where
         let _ = self
             .app_interfaces
             .insert(id, AppInterfaceRuntime::Test { signal_tx });
+        Ok(())
+    }
+}
+
+/// Perform Genesis on the source chains for each of the specified CellIds.
+///
+/// If genesis fails for any cell, this entire function fails, and all other
+/// partial or complete successes are rolled back.
+/// Note this function takes read locks so should not be called from within a read lock.
+pub(super) async fn genesis_cells(
+    root_env_dir: PathBuf,
+    keystore: KeystoreSender,
+    cell_ids_with_proofs: Vec<(CellId, Option<MembraneProof>)>,
+    conductor_handle: ConductorHandle,
+) -> ConductorResult<()> {
+    let cells_tasks = cell_ids_with_proofs
+        .into_iter()
+        .map(|(cell_id, proof)| async {
+            let root_env_dir = root_env_dir.clone();
+            let keystore = keystore.clone();
+            let conductor_handle = conductor_handle.clone();
+            let cell_id_inner = cell_id.clone();
+            let ribosome = conductor_handle
+                .get_ribosome(cell_id.dna_hash())
+                .await
+                .map_err(Box::new)?;
+            tokio::spawn(async move {
+                let env = EnvWrite::open(
+                    &root_env_dir,
+                    DbKind::Cell(cell_id_inner.clone()),
+                    keystore.clone(),
+                )?;
+                Cell::genesis(cell_id_inner, conductor_handle, env, ribosome, proof).await
+            })
+            .map_err(CellError::from)
+            .and_then(|result| async move { result.map(|_| cell_id) })
+            .await
+        });
+    let (success, errors): (Vec<_>, Vec<_>) = futures::future::join_all(cells_tasks)
+        .await
+        .into_iter()
+        .partition(Result::is_ok);
+
+    // unwrap safe because of the partition
+    let success = success.into_iter().map(Result::unwrap);
+
+    // If there were errors, cleanup and return the errors
+    if !errors.is_empty() {
+        for cell_id in success {
+            let db = DbWrite::open(&root_env_dir, DbKind::Cell(cell_id))?;
+            db.remove().await?;
+        }
+
+        // match needed to avoid Debug requirement on unwrap_err
+        let errors = errors
+            .into_iter()
+            .map(|e| match e {
+                Err(e) => e,
+                Ok(_) => unreachable!("Safe because of the partition"),
+            })
+            .collect();
+
+        Err(ConductorError::GenesisFailed { errors })
+    } else {
+        // No errors so return the cells
         Ok(())
     }
 }
