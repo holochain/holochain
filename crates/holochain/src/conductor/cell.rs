@@ -46,6 +46,7 @@ use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 use kitsune_p2p::event::TimeWindowMs;
 use observability::OpenSpanExt;
+use rusqlite::OptionalExtension;
 use std::hash::Hash;
 use std::hash::Hasher;
 use tokio::sync;
@@ -630,14 +631,71 @@ impl Cell {
     }
 
     /// a remote agent is sending us a validation receipt.
-    #[tracing::instrument(skip(self))]
+    #[tracing::instrument(skip(self, receipt))]
     async fn handle_validation_receipt(&self, receipt: SerializedBytes) -> CellResult<()> {
         let receipt: SignedValidationReceipt = receipt.try_into()?;
+        tracing::debug!(from = ?receipt.receipt.validator, to = ?self.id.agent_pubkey(), hash = ?receipt.receipt.dht_op_hash);
+
+        // Get the header for this op so we can check the entry type.
+        let header: Option<SignedHeader> = fresh_reader!(self.env, |txn| {
+            let h: Option<Vec<u8>> = txn
+                .query_row(
+                    "SELECT Header.blob as header_blob
+                    FROM DhtOp 
+                    JOIN Header ON Header.hash = DhtOp.header_hash
+                    WHERE DhtOp.hash = :hash",
+                    named_params! {
+                        ":hash": receipt.receipt.dht_op_hash,
+                    },
+                    |row| row.get("header_blob"),
+                )
+                .optional()?;
+            match h {
+                Some(h) => from_blob(h),
+                None => Ok(None),
+            }
+        })?;
+
+        // If the header has an app entry type get the entry def
+        // from the conductor.
+        let required_receipt_count = match header.as_ref().and_then(|h| h.0.entry_type()) {
+            Some(EntryType::App(entry_type)) => {
+                let zome_index = u8::from(entry_type.zome_id()) as usize;
+                let dna_file = self.conductor_api.get_this_dna().await.map_err(Box::new)?;
+                let zome = dna_file.dna().zomes.get(zome_index).map(|(_, z)| z.clone());
+                match zome {
+                    Some(zome) => self
+                        .conductor_api
+                        .get_entry_def(&EntryDefBufferKey::new(zome, entry_type.id()))
+                        .await
+                        .map(|e| u8::from(e.required_validations)),
+                    None => None,
+                }
+            }
+            _ => None,
+        };
+
+        // If no required receipt count was found then fallback to the default.
+        let required_validation_count = required_receipt_count.unwrap_or(
+            crate::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE,
+        );
 
         self.env
             .async_commit(move |txn| {
-                // Update receipt count.
-                add_one_receipt_count(txn, &receipt.receipt.dht_op_hash)?;
+                // Get the current count for this dhtop.
+                let receipt_count: usize = txn.query_row(
+                    "SELECT COUNT(rowid) FROM ValidationReceipt WHERE op_hash = :op_hash",
+                    named_params! {
+                        ":op_hash": receipt.receipt.dht_op_hash,
+                    },
+                    |row| row.get(0),
+                )?;
+
+                // If we have enough receipts then set receipts to complete.
+                if receipt_count >= required_validation_count as usize {
+                    set_receipts_complete(txn, &receipt.receipt.dht_op_hash, true)?;
+                }
+
                 // Add to receipts db
                 validation_receipts::add_if_unique(txn, receipt)
             })
