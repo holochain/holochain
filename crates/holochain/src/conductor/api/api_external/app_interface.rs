@@ -96,6 +96,12 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                         "Interface zome calls should never be routed to the network. This is a bug. Got {}",
                         e
                     ),
+                    Ok(ZomeCallResponse::CountersigningSession(e)) => Ok(AppResponse::Error(
+                        ExternalApiWireError::CountersigningSessionError(format!(
+                            "A countersigning session has failed to start on this zome call because: {}",
+                            e
+                        )),
+                    )),
                     Err(e) => Ok(AppResponse::Error(e.into())),
                 }
             }

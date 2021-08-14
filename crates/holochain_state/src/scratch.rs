@@ -87,6 +87,11 @@ impl Scratch {
         })
     }
 
+    /// Get the entries on in the scratch.
+    pub fn entries(&self) -> impl Iterator<Item = (&EntryHash, &Arc<Entry>)> {
+        self.entries.iter()
+    }
+
     pub fn num_headers(&self) -> usize {
         self.headers.len()
     }

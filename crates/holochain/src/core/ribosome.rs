@@ -573,6 +573,9 @@ pub mod wasm_test {
                         unreachable!()
                     }
                     Ok(crate::core::ribosome::ZomeCallResponse::NetworkError(_)) => unreachable!(),
+                    Ok(crate::core::ribosome::ZomeCallResponse::CountersigningSession(e)) => {
+                        panic!("Failed a countersigning session {}", e)
+                    }
                     Err(e) => Err(e),
                 }
             })

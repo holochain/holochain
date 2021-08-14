@@ -63,17 +63,31 @@ where
     C: CellConductorApiT,
 {
     let should_write = args.is_root_zome_call;
-    let result = call_zome_workflow_inner(workspace.clone(), network, keystore, args).await?;
+    let result =
+        call_zome_workflow_inner(workspace.clone(), network.clone(), keystore, args).await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
     if should_write {
         let is_empty = workspace.source_chain().is_empty()?;
+        let countersigning_op = workspace.source_chain().countersigning_op()?;
         workspace.flush().await?;
         if !is_empty {
-            trigger_publish_dht_ops.trigger();
-            trigger_integrate_dht_ops.trigger();
+            match countersigning_op {
+                Some(op) => {
+                    if let Err(error_response) =
+                        super::countersigning_workflow::countersigning_publish(&network, op).await
+                    {
+                        // TODO: Back out of the session.
+                        return Ok(Ok(error_response));
+                    }
+                }
+                None => {
+                    trigger_publish_dht_ops.trigger();
+                    trigger_integrate_dht_ops.trigger();
+                }
+            }
         }
     }
 
