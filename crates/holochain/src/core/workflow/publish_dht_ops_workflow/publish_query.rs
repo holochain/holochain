@@ -53,6 +53,8 @@ pub async fn get_ops_to_publish(
             AND
             (DhtOp.type != :store_entry OR Header.private_entry = 0)
             AND
+            DhtOp.withhold_publish IS NULL
+            AND
             (DhtOp.last_publish_time IS NULL OR DhtOp.last_publish_time <= :recency_threshold)
             AND
             DhtOp.receipts_complete IS NULL 

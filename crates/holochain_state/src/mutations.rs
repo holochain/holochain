@@ -6,6 +6,7 @@ use crate::validation_db::ValidationLimboStatus;
 use holo_hash::encode::blake2b_256;
 use holo_hash::*;
 use holochain_sqlite::rusqlite::named_params;
+use holochain_sqlite::rusqlite::types::Null;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::dht_op::DhtOpLight;
 use holochain_types::dht_op::OpOrder;
@@ -343,6 +344,22 @@ pub fn set_last_publish_time(
 ) -> StateMutationResult<()> {
     dht_op_update!(txn, hash, {
         "last_publish_time": unix_epoch.as_secs(),
+    })?;
+    Ok(())
+}
+
+/// Set withhold publish for a [`DhtOp`].
+pub fn set_withhold_publish(txn: &mut Transaction, hash: DhtOpHash) -> StateMutationResult<()> {
+    dht_op_update!(txn, hash, {
+        "withhold_publish": true,
+    })?;
+    Ok(())
+}
+
+/// Unset withhold publish for a [`DhtOp`].
+pub fn unset_withhold_publish(txn: &mut Transaction, hash: DhtOpHash) -> StateMutationResult<()> {
+    dht_op_update!(txn, hash, {
+        "withhold_publish": Null,
     })?;
     Ok(())
 }

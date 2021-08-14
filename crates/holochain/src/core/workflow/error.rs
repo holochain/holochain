@@ -70,6 +70,9 @@ pub enum WorkflowError {
     HoloHashError(#[from] holo_hash::error::HoloHashError),
 
     #[error(transparent)]
+    InterfaceError(#[from] crate::conductor::interface::error::InterfaceError),
+
+    #[error(transparent)]
     DhtOpError(#[from] DhtOpError),
 
     #[error(transparent)]

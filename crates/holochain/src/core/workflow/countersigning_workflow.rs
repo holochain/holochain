@@ -1,13 +1,25 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
-use holo_hash::EntryHash;
 use holo_hash::{AgentPubKey, DhtOpHash, HeaderHash};
-use holochain_p2p::HolochainP2pCellT;
+use holo_hash::{AnyDhtHash, EntryHash};
+use holochain_keystore::AgentPubKeyExt;
+use holochain_p2p::{HolochainP2pCell, HolochainP2pCellT};
+use holochain_sqlite::fresh_reader;
+use holochain_state::mutations;
+use holochain_state::prelude::{
+    current_countersigning_session, set_validation_stage, SourceChainResult, StateMutationResult,
+    Store,
+};
+use holochain_state::validation_db::ValidationLimboStatus;
+use holochain_types::signal::{Signal, SystemSignal};
 use holochain_types::Timestamp;
 use holochain_types::{dht_op::DhtOp, env::EnvWrite};
-use holochain_zome_types::{Entry, SignedHeader};
+use holochain_zome_types::{Entry, SignedHeader, ZomeCallResponse};
 use kitsune_p2p_types::tx2::tx2_utils::Share;
+use rusqlite::named_params;
 
+use crate::conductor::interface::SignalBroadcaster;
 use crate::core::queue_consumer::{TriggerSender, WorkComplete};
 
 use super::{error::WorkflowResult, incoming_dht_ops_workflow::incoming_dht_ops_workflow};
@@ -121,6 +133,172 @@ pub(crate) async fn countersigning_workflow(
     }
     Ok(WorkComplete::Complete)
 }
+
+/// An incoming countersigning session success.
+pub(crate) async fn countersigning_success(
+    vault: EnvWrite,
+    network: &HolochainP2pCell,
+    author: AgentPubKey,
+    signed_headers: Vec<SignedHeader>,
+    mut publish_trigger: TriggerSender,
+    mut signal: SignalBroadcaster,
+) -> WorkflowResult<()> {
+    // Using iterators is fine in this function as there can only be a maximum of 8 headers.
+    let (this_cells_header_hash, entry_hash) = match signed_headers
+        .iter()
+        .find(|h| *h.0.author() == author)
+        .and_then(|sh| {
+            sh.0.entry_hash()
+                .cloned()
+                .map(|eh| (HeaderHash::with_data_sync(&sh.0), eh))
+        }) {
+        Some(h) => h,
+        None => return Ok(()),
+    };
+
+    // Do a quick check to see if this entry hash matches
+    // the current locked session so we don't check signatures
+    // unless there is an active session.
+    let this_cell_headers_op_basis_hashes: Vec<(DhtOpHash, AnyDhtHash)> = fresh_reader!(
+        vault,
+        |txn| {
+            if holochain_state::chain_lock::is_chain_locked(&txn, &[])? {
+                let transaction: holochain_state::prelude::Txn = (&txn).into();
+                if transaction.contains_entry(&entry_hash)? {
+                    // If this is a countersigning session we can grab all the ops
+                    // for this cells header so we can check if we need to self publish them.
+                    let r: Result<_, _> = txn
+                        .prepare(
+                            "SELECT basis_hash, hash FROM DhtOp WHERE header_hash = :header_hash AND is_authored = 1",
+                        )?
+                        .query_map(
+                            named_params! {
+                                ":header_hash": this_cells_header_hash
+                            },
+                            |row| {
+                                let hash: DhtOpHash = row.get("hash")?;
+                                let basis: AnyDhtHash = row.get("basis_hash")?;
+                                Ok((hash, basis))
+                            },
+                        )?
+                        .collect();
+                    return Ok(r?);
+                }
+            }
+            StateMutationResult::Ok(Vec::with_capacity(0))
+        }
+    )?;
+
+    // If there is no active session then we can short circuit.
+    if this_cell_headers_op_basis_hashes.is_empty() {
+        return Ok(());
+    }
+
+    // Verify signatures of headers.
+    for SignedHeader(header, signature) in &signed_headers {
+        if !header.author().verify_signature(signature, header).await? {
+            return Ok(());
+        }
+    }
+
+    // Hash headers.
+    let incoming_headers: Vec<_> = signed_headers
+        .iter()
+        .map(|SignedHeader(h, _)| HeaderHash::with_data_sync(h))
+        .collect();
+
+    let mut ops_to_self_publish = Vec::new();
+
+    // Check which ops we are the authority for and self publish if we are.
+    for (op_hash, basis) in this_cell_headers_op_basis_hashes {
+        if network.authority_for_hash(basis).await? {
+            ops_to_self_publish.push(op_hash);
+        }
+    }
+    let result = vault
+        .async_commit({
+            let author = author.clone();
+            let entry_hash = entry_hash.clone();
+            move |txn| {
+            if let Some(cs) = current_countersigning_session(txn, Arc::new(author))? {
+                // Check we have the right session.
+                if *cs.entry_hash() == entry_hash {
+                    let stored_headers = cs.build_header_set()?;
+                    if stored_headers.len() == incoming_headers.len() {
+                        // Check all stored header hashes match an incoming header hash.
+                        if stored_headers.iter().all(|h| {
+                            let h = HeaderHash::with_data_sync(h);
+                            incoming_headers.iter().any(|i| *i == h)
+                        }) {
+                            // All checks have passed so unlock the chain.
+                            mutations::unlock_chain(txn)?;
+                            // Update ops to publish.
+                            txn.execute("UPDATE DhtOp SET withhold_publish = NULL WHERE header_hash = :header_hash", 
+                            named_params! {
+                                ":header_hash": this_cells_header_hash,
+                                }
+                            ).map_err(holochain_state::prelude::StateMutationError::from)?;
+                            // Self publish if we are an authority.
+                            for hash in ops_to_self_publish {
+                                set_validation_stage(
+                                    txn,
+                                    hash,
+                                    ValidationLimboStatus::AwaitingIntegration,
+                                )?;
+                            }
+                            return Ok(true);
+                        }
+                    }
+                }
+            }
+            SourceChainResult::Ok(false)
+        }})
+        .await?;
+
+    if result {
+        // Publish other signers agent activity ops to their agent activity authorities.
+        for SignedHeader(header, signature) in signed_headers {
+            if *header.author() == author {
+                continue;
+            }
+            let op = DhtOp::RegisterAgentActivity(signature, header);
+            let basis = op.dht_basis();
+            let ops = vec![(DhtOpHash::with_data_sync(&op), op)];
+            if let Err(e) = network.publish(false, false, basis, ops, None).await {
+                tracing::error!(
+                    "Failed to publish to other countersigners agent authorities because of: {:?}",
+                    e
+                );
+            }
+        }
+        // Signal to the UI.
+        signal.send(Signal::System(SystemSignal::SuccessfulCountersigning(
+            entry_hash,
+        )))?;
+
+        publish_trigger.trigger();
+    }
+    Ok(())
+}
+
+/// Publish to entry authorities so they can gather all the signed
+/// headers for this session and respond with a session complete.
+pub async fn countersigning_publish(
+    network: &HolochainP2pCell,
+    op: DhtOp,
+) -> Result<(), ZomeCallResponse> {
+    let basis = op.dht_basis();
+    let ops = vec![(DhtOpHash::with_data_sync(&op), op)];
+    if let Err(e) = network.publish(false, true, basis, ops, None).await {
+        tracing::error!(
+            "Failed to publish to entry authorities for countersigning session because of: {:?}",
+            e
+        );
+        return Err(ZomeCallResponse::CountersigningSession(e.to_string()));
+    }
+    Ok(())
+}
+
 type AgentsToNotify = Vec<AgentPubKey>;
 type Ops = Vec<(DhtOpHash, DhtOp)>;
 type SignedHeaders = Vec<SignedHeader>;

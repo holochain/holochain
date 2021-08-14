@@ -460,6 +460,8 @@ pub enum ExternalApiWireError {
     ActivateApp(String),
     /// The zome call is unauthorized
     ZomeCallUnauthorized(String),
+    /// A countersigning session has failed.
+    CountersigningSessionError(String),
 }
 
 impl ExternalApiWireError {

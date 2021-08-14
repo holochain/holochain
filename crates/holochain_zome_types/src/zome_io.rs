@@ -230,4 +230,6 @@ pub enum ZomeCallResponse {
     /// This was a zome call made remotely but
     /// something has failed on the network
     NetworkError(String),
+    /// A countersigning session has failed to start.
+    CountersigningSession(String),
 }
