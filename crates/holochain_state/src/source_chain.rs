@@ -420,6 +420,13 @@ impl SourceChain {
         Ok(())
     }
 
+    pub async fn is_chain_locked(&self, lock: Vec<u8>) -> SourceChainResult<bool> {
+        Ok(self
+            .vault
+            .async_reader(move |txn| is_chain_locked(&txn, &lock))
+            .await?)
+    }
+
     pub async fn accept_countersigning_preflight_request(
         &self,
         preflight_request: PreflightRequest,
@@ -482,6 +489,15 @@ impl SourceChain {
                 })
         })?;
         Ok(r)
+    }
+
+    pub fn lock_for_entry(entry: Option<&Entry>) -> SourceChainResult<Vec<u8>> {
+        Ok(match entry {
+            Some(Entry::CounterSign(session_data, _)) => holo_hash::encode::blake2b_256(
+                &holochain_serialized_bytes::encode(session_data.preflight_request())?,
+            ),
+            _ => Vec::with_capacity(0),
+        })
     }
 
     pub async fn flush(&self) -> SourceChainResult<()> {
@@ -547,17 +563,11 @@ impl SourceChain {
             .map(|entry| entry.as_content())
             .find(|entry| matches!(entry, Entry::CounterSign(_, _)));
 
-        let lock = match maybe_countersigned_entry {
-            Some(Entry::CounterSign(session_data, _)) => {
-                if headers.len() != 1 {
-                    return Err(SourceChainError::DirtyCounterSigningWrite);
-                }
-                holo_hash::encode::blake2b_256(&holochain_serialized_bytes::encode(
-                    session_data.preflight_request(),
-                )?)
-            }
-            _ => Vec::with_capacity(0),
-        };
+        if matches!(maybe_countersigned_entry, Some(Entry::CounterSign(_, _))) && headers.len() != 1
+        {
+            return Err(SourceChainError::DirtyCounterSigningWrite);
+        }
+        let lock = Self::lock_for_entry(maybe_countersigned_entry)?;
 
         // Write the entries, headers and ops to the database in one transaction.
         let author = self.author.clone();

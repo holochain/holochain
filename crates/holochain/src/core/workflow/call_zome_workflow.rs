@@ -11,11 +11,13 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::ZomesToInvoke;
+use crate::core::workflow::error::WorkflowError;
 use either::Either;
 use holochain_cascade::Cascade;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
+use holochain_state::source_chain::SourceChain;
 use holochain_state::source_chain::SourceChainError;
 use holochain_zome_types::element::Element;
 
@@ -79,7 +81,6 @@ where
                     if let Err(error_response) =
                         super::countersigning_workflow::countersigning_publish(&network, op).await
                     {
-                        // TODO: Back out of the session.
                         return Ok(Ok(error_response));
                     }
                 }
@@ -136,9 +137,42 @@ where
     .await?;
     tracing::trace!("After zome call");
 
-    inline_validation(workspace, network, conductor_api, Some(zome), ribosome).await?;
+    let is_locked_for_countersigning_session = if workspace.source_chain().len()? == 1 {
+        let lock = SourceChain::lock_for_entry(
+            workspace.source_chain().elements()?[0].entry().as_option(),
+        )?;
+        !lock.is_empty()
+            && workspace
+                .source_chain()
+                .is_chain_locked(Vec::with_capacity(0))
+                .await?
+            && !workspace.source_chain().is_chain_locked(lock).await?
+    } else {
+        false
+    };
 
-    Ok(result)
+    let validation_result = inline_validation(
+        workspace.clone(),
+        network,
+        conductor_api,
+        Some(zome),
+        ribosome,
+    )
+    .await;
+    match validation_result {
+        Err(WorkflowError::AppValidationError(_))
+        | Err(WorkflowError::SysValidationError(_))
+        | Err(WorkflowError::SourceChainError(_)) => {
+            if is_locked_for_countersigning_session {
+                if let Err(error) = workspace.source_chain().unlock_chain().await {
+                    tracing::error!(?error);
+                }
+            }
+            validation_result?;
+            Ok(result)
+        }
+        _ => Ok(result),
+    }
 }
 
 /// Run validation inline and wait for the result.
