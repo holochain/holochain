@@ -12,12 +12,14 @@ use holochain_state::prelude::{
     Store,
 };
 use holochain_state::validation_db::ValidationLimboStatus;
+use holochain_types::signal::{Signal, SystemSignal};
 use holochain_types::Timestamp;
 use holochain_types::{dht_op::DhtOp, env::EnvWrite};
 use holochain_zome_types::{Entry, SignedHeader, ZomeCallResponse};
 use kitsune_p2p_types::tx2::tx2_utils::Share;
 use rusqlite::named_params;
 
+use crate::conductor::interface::SignalBroadcaster;
 use crate::core::queue_consumer::{TriggerSender, WorkComplete};
 
 use super::{error::WorkflowResult, incoming_dht_ops_workflow::incoming_dht_ops_workflow};
@@ -139,6 +141,7 @@ pub(crate) async fn countersigning_success(
     author: AgentPubKey,
     signed_headers: Vec<SignedHeader>,
     mut publish_trigger: TriggerSender,
+    mut signal: SignalBroadcaster,
 ) -> WorkflowResult<()> {
     // Using iterators is fine in this function as there can only be a maximum of 8 headers.
     let (this_cells_header_hash, entry_hash) = match signed_headers
@@ -215,6 +218,7 @@ pub(crate) async fn countersigning_success(
     let result = vault
         .async_commit({
             let author = author.clone();
+            let entry_hash = entry_hash.clone();
             move |txn| {
             if let Some(cs) = current_countersigning_session(txn, Arc::new(author))? {
                 // Check we have the right session.
@@ -267,6 +271,11 @@ pub(crate) async fn countersigning_success(
                 );
             }
         }
+        // Signal to the UI.
+        signal.send(Signal::System(SystemSignal::SuccessfulCountersigning(
+            entry_hash,
+        )))?;
+
         publish_trigger.trigger();
     }
     Ok(())
