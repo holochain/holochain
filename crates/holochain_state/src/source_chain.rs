@@ -44,6 +44,7 @@ use crate::query::chain_head::ChainHeadQuery;
 use crate::scratch::Scratch;
 use crate::scratch::SyncScratch;
 use holochain_serialized_bytes::prelude::*;
+use holo_hash::EntryHash;
 
 pub use error::*;
 
@@ -146,16 +147,20 @@ impl SourceChain {
         let header = HeaderHashed::from_content_sync(header);
         let hash = header.as_hash().clone();
         let header = SignedHeaderHashed::new(&self.vault.keystore(), header).await?;
+        dbg!(&maybe_entry);
         let element = Element::new(header, maybe_entry);
+        dbg!(&element);
         self.scratch
             .apply(|scratch| insert_element_scratch(scratch, element))?;
+        let _ = dbg!(self.elements());
         Ok(hash)
     }
 
     pub async fn put_countersigned(&self, entry: Entry) -> SourceChainResult<HeaderHash> {
+        let entry_hash = EntryHash::with_data_sync(&entry);
         if let Entry::CounterSign(ref session_data, _) = entry {
             self.put_with_header(
-                Header::from_countersigning_data(session_data, (*self.author).clone())?,
+                Header::from_countersigning_data(entry_hash, session_data, (*self.author).clone())?,
                 Some(entry),
             )
             .await
@@ -786,11 +791,11 @@ fn chain_head_scratch(
 }
 
 /// Check if there is a current countersigning session and if so, return the
-/// session data.
+/// session data and the entry hash.
 pub fn current_countersigning_session(
     txn: &Transaction<'_>,
     author: Arc<AgentPubKey>,
-) -> SourceChainResult<Option<CounterSigningSessionData>> {
+) -> SourceChainResult<Option<(EntryHash, CounterSigningSessionData)>> {
     // The chain must be locked for a session to be active.
     if is_chain_locked(txn, &[])? {
         match chain_head_db(txn, author) {
@@ -800,14 +805,16 @@ pub fn current_countersigning_session(
             Ok((hash, _, _)) => {
                 let txn: Txn = txn.into();
                 // Get the session data from the database.
-                let r = txn
-                    .get_element(&hash.into())?
-                    .and_then(|element| element.into_inner().1.into_option())
-                    .and_then(|entry| match entry {
-                        Entry::CounterSign(cs, _) => Some(*cs),
-                        _ => None,
-                    });
-                Ok(r)
+                let element = match txn
+                    .get_element(&hash.into())? {
+                        Some(element) => element,
+                        None => return Ok(None),
+                    };
+                let (shh, ee) = element.into_inner();
+                Ok(match (shh.header().entry_hash(), ee.into_option()) {
+                    (Some(entry_hash), Some(Entry::CounterSign(cs, _))) => Some((entry_hash.to_owned(), *cs)),
+                    _ => None,
+                })
             }
         }
     } else {

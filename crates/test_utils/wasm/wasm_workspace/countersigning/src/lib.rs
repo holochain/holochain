@@ -52,15 +52,25 @@ fn create_a_countersigned_thing(responses: Vec<PreflightResponse>) -> ExternResu
     create_countersigned(responses, Thing::Valid)
 }
 
-#[hdk_extern]
-fn generate_countersigning_preflight_request(agents: Vec<(AgentPubKey, Vec<Role>)>) -> ExternResult<PreflightRequest> {
+fn generate_preflight_request(agents: Vec<(AgentPubKey, Vec<Role>)>, thing: Thing) -> ExternResult<PreflightRequest> {
     PreflightRequest::try_new(
+        hash_entry(thing)?,
         agents,
         None,
         session_times_from_millis(5000)?,
-        HeaderBase::Create(CreateBase::new(entry_type!(Thing)?, hash_entry(Thing::Valid)?)),
+        HeaderBase::Create(CreateBase::new(entry_type!(Thing)?)),
         PreflightBytes(vec![]),
     ).map_err(|e| WasmError::Guest(e.to_string()))
+}
+
+#[hdk_extern]
+fn generate_countersigning_preflight_request(agents: Vec<(AgentPubKey, Vec<Role>)>) -> ExternResult<PreflightRequest> {
+    generate_preflight_request(agents, Thing::Valid)
+}
+
+#[hdk_extern]
+fn generate_invalid_countersigning_preflight_request(agents: Vec<(AgentPubKey, Vec<Role>)>) -> ExternResult<PreflightRequest> {
+    generate_preflight_request(agents, Thing::Invalid)
 }
 
 #[hdk_extern]

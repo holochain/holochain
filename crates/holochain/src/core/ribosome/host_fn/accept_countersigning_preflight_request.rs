@@ -113,6 +113,123 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
+    async fn unlock_invalid_session() {
+        observability::test_run().ok();
+        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning])
+        .await
+        .unwrap();
+
+        let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
+        let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
+
+        let mut dna_store = MockDnaStore::new();
+        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
+        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
+        dna_store.expect_add_dna().return_const(());
+        dna_store
+            .expect_get()
+            .return_const(Some(dna_file.clone().into()));
+        dna_store
+            .expect_get_entry_def()
+            .return_const(EntryDef::default_with_id("thing"));
+
+        let mut conductor = SweetConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
+
+        let apps = conductor
+            .setup_app_for_agents(
+                "app-",
+                &[alice_pubkey.clone(), bob_pubkey.clone()],
+                &[dna_file.into()],
+            )
+            .await
+            .unwrap();
+
+        let ((alice,), (bobbo,)) = apps.into_tuples();
+        let alice = alice.zome(TestWasm::CounterSigning);
+        let bobbo = bobbo.zome(TestWasm::CounterSigning);
+
+        // Before preflight Alice can commit
+        let _: HeaderHash = conductor.call(&alice, "create_a_thing", ()).await;
+
+        let preflight_request: PreflightRequest = conductor
+            .call(
+                &alice,
+                "generate_invalid_countersigning_preflight_request",
+                vec![
+                    (alice_pubkey.clone(), vec![Role(0)]),
+                    (bob_pubkey.clone(), vec![])
+                ]
+            )
+            .await;
+
+        // Before accepting preflight Alice can commit
+        let _: HeaderHash = conductor.call(&alice, "create_a_thing", ()).await;
+
+        // Alice can accept the preflight request.
+        let alice_acceptance: PreflightRequestAcceptance = conductor
+            .call(
+                &alice,
+                "accept_countersigning_preflight_request",
+                preflight_request.clone(),
+            )
+            .await;
+        let alice_response = if let PreflightRequestAcceptance::Accepted(ref response) = alice_acceptance {
+            response
+        } else {
+            unreachable!();
+        };
+
+        // Bob can also accept the preflight request.
+        let bob_acceptance: PreflightRequestAcceptance = conductor
+            .call(
+                &bobbo,
+                "accept_countersigning_preflight_request",
+                preflight_request.clone(),
+            )
+            .await;
+        let bob_response =
+            if let PreflightRequestAcceptance::Accepted(ref response) = bob_acceptance {
+                response
+            } else {
+                unreachable!();
+            };
+
+        // With an accepted preflight creations must fail for alice.
+        let thing_fail_create_alice = conductor
+            .handle()
+            .call_zome(ZomeCall {
+                cell_id: alice.cell_id().clone(),
+                zome_name: alice.name().clone(),
+                fn_name: "create_a_thing".into(),
+                cap: None,
+                provenance: alice_pubkey.clone(),
+                payload: ExternIO::encode(()).unwrap(),
+            })
+            .await;
+        match thing_fail_create_alice {
+            Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) => {
+                match *workflow_error {
+                    WorkflowError::SourceChainError(SourceChainError::ChainLocked) => {}
+                    _ => unreachable!(),
+                }
+            }
+            _ => unreachable!(),
+        };
+
+        // Creating the INCORRECT countersigned entry WILL immediately unlock
+        // the chain.
+        let _: HeaderHash = conductor
+            .call(
+                &alice,
+                "create_an_invalid_countersigned_thing",
+                vec![alice_response.clone(), bob_response.clone()],
+            )
+            .await;
+        // let _: HeaderHash = conductor.call(&alice, "create_a_thing", ()).await;
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[cfg(feature = "slow_tests")]
     async fn lock_chain() {
         observability::test_run().ok();
         let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning])

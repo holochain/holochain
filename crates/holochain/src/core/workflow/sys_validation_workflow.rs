@@ -228,7 +228,8 @@ async fn validate_op_inner(
             if let Some(entry) = entry {
                 // Retrieve for all other headers on countersigned entry.
                 if let Entry::CounterSign(session_data, _) = &**entry {
-                    for header in session_data.build_header_set()? {
+                    let entry_hash = EntryHash::with_data_sync(&**entry);
+                    for header in session_data.build_header_set(entry_hash)? {
                         let hh = HeaderHash::with_data_sync(&header);
                         if workspace
                             .full_cascade(network.clone())
@@ -259,7 +260,8 @@ async fn validate_op_inner(
             // Check and hold for all other headers on countersigned entry.
             if let Entry::CounterSign(session_data, _) = &**entry {
                 let dependency_check = |_original_element: &Element| Ok(());
-                for header in session_data.build_header_set()? {
+                let entry_hash = EntryHash::with_data_sync(&**entry);
+                for header in session_data.build_header_set(entry_hash)? {
                     check_and_hold_store_element(
                         &HeaderHash::with_data_sync(&header),
                         workspace,
@@ -388,26 +390,26 @@ async fn sys_validate_element_inner(
 ) -> SysValidationResult<()> {
     let signature = element.signature();
     let header = element.header();
-    let entry = element.entry().as_option();
+    let maybe_entry = element.entry().as_option();
     counterfeit_check(signature, header).await?;
 
     async fn validate(
         header: &Header,
-        entry: Option<&Entry>,
+        maybe_entry: Option<&Entry>,
         workspace: &mut SysValidationWorkspace,
         network: HolochainP2pCell,
         conductor_api: &impl CellConductorApiT,
     ) -> SysValidationResult<()> {
         let incoming_dht_ops_sender = None;
         store_element(header, workspace, network.clone()).await?;
-        if let Some((entry, EntryVisibility::Public)) =
-            &entry.and_then(|e| header.entry_type().map(|et| (e, et.visibility())))
+        if let Some((maybe_entry, EntryVisibility::Public)) =
+            &maybe_entry.and_then(|e| header.entry_type().map(|et| (e, et.visibility())))
         {
             store_entry(
                 (header)
                     .try_into()
                     .map_err(|_| ValidationOutcome::NotNewEntry(header.clone()))?,
-                entry,
+                maybe_entry,
                 conductor_api,
                 workspace,
                 network.clone(),
@@ -434,14 +436,15 @@ async fn sys_validate_element_inner(
         Ok(())
     }
 
-    match entry {
+    match maybe_entry {
         Some(Entry::CounterSign(session, _)) => {
-            for header in session.build_header_set()? {
-                validate(&header, entry, workspace, network.clone(), conductor_api).await?;
+            let entry_hash = EntryHash::with_data_sync(maybe_entry.unwrap());
+            for header in session.build_header_set(entry_hash)? {
+                validate(&header, maybe_entry, workspace, network.clone(), conductor_api).await?;
             }
             Ok(())
         }
-        _ => validate(header, entry, workspace, network, conductor_api).await,
+        _ => validate(header, maybe_entry, workspace, network, conductor_api).await,
     }
 }
 
@@ -537,7 +540,7 @@ async fn store_entry(
 
     // Additional checks if this is a countersigned entry.
     if let Entry::CounterSign(session_data, _) = entry {
-        check_countersigning_session_data(session_data, header).await?;
+        check_countersigning_session_data(EntryHash::with_data_sync(entry), session_data, header).await?;
     }
     Ok(())
 }

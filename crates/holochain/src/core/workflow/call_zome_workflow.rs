@@ -204,6 +204,7 @@ where
 
         to_app_validate
     };
+    dbg!(&to_app_validate);
 
     {
         for chain_element in to_app_validate {
