@@ -200,6 +200,11 @@ impl EntryWithDefId {
             entry,
         }
     }
+
+    /// Consume into an Entry.
+    pub fn into_entry(self) -> Entry {
+        self.entry
+    }
 }
 
 impl AsRef<crate::Entry> for EntryWithDefId {
