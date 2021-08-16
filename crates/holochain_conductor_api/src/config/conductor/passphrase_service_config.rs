@@ -10,7 +10,7 @@ use serde::Serialize;
 /// The according `PassphraseServiceUnixSocket` will send a request message over the socket
 /// then receives bytes as passphrase until a newline is sent.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
-#[serde(tag = "type", rename_all = "lowercase")]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum PassphraseServiceConfig {
     // TODO (david.b) - we don't support these yet, so don't make them
     //                  seem like they are available
