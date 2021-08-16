@@ -8,6 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased](https://github.com/holochain/holochain/compare/hdk-v0.0.100...HEAD)
 
+### Changed
+
+- hdk: `sys_time` returns `Timestamp` instead of `Duration`
+
+### Added
+
+- hdk: Added `accept_countersigning_preflight_request`
+- hdk: Added `session_times_from_millis`
+- hdk: Now supports creating and updating countersigned entries
+
 ## 0.0.102
 
 ### Changed

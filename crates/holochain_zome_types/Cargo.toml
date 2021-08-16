@@ -49,6 +49,7 @@ subtle-encoding = {version = "0.5", optional = true}
 
 [dev-dependencies]
 once_cell = { version = "1.4", optional = false }
+matches = "0.1"
 
 [features]
 default = ["full-dna-def", "fixturators", "test_utils", "subtle-encoding"]

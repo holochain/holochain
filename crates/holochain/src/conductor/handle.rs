@@ -619,6 +619,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 respond.respond(Ok(async move { Ok(signature) }.boxed().into()));
             }
             HolochainP2pEvent::CallRemote { .. }
+            | CountersigningAuthorityResponse { .. }
             | Publish { .. }
             | GetValidationPackage { .. }
             | Get { .. }
@@ -752,12 +753,20 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             slot_id,
             membrane_proof,
         } = payload;
-        {
-            let conductor = self.conductor.read().await;
-            let cell_id = CellId::new(dna_hash, agent_key);
-            let cells = vec![(cell_id.clone(), membrane_proof)];
-            conductor.genesis_cells(cells, self.clone()).await?;
-        }
+        let cell_id = CellId::new(dna_hash, agent_key);
+        let cells = vec![(cell_id.clone(), membrane_proof)];
+
+        // Gather the directory and keystore to avoid holding the conductor read lock.
+        let (root_env_dir, keystore) = {
+            let lock = self.conductor.read().await;
+            let root_env_dir = std::path::PathBuf::from(lock.root_env_dir().clone());
+            let keystore = lock.keystore().clone();
+            (root_env_dir, keystore)
+        };
+        // Run genesis on cells.
+        crate::conductor::conductor::genesis_cells(root_env_dir, keystore, cells, self.clone())
+            .await?;
+
         {
             let mut conductor = self.conductor.write().await;
             let properties = properties.unwrap_or_else(|| ().into());
@@ -777,17 +786,24 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         installed_app_id: InstalledAppId,
         cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
     ) -> ConductorResult<()> {
-        self.conductor
-            .read()
-            .await
-            .genesis_cells(
-                cell_data
-                    .iter()
-                    .map(|(c, p)| (c.as_id().clone(), p.clone()))
-                    .collect(),
-                self.clone(),
-            )
-            .await?;
+        // Gather the directory and keystore to avoid holding the conductor read lock.
+        let (root_env_dir, keystore) = {
+            let lock = self.conductor.read().await;
+            let root_env_dir = std::path::PathBuf::from(lock.root_env_dir().clone());
+            let keystore = lock.keystore().clone();
+            (root_env_dir, keystore)
+        };
+
+        crate::conductor::conductor::genesis_cells(
+            root_env_dir,
+            keystore,
+            cell_data
+                .iter()
+                .map(|(c, p)| (c.as_id().clone(), p.clone()))
+                .collect(),
+            self.clone(),
+        )
+        .await?;
 
         let cell_data = cell_data.into_iter().map(|(c, _)| c);
         let app = InstalledAppCommon::new_legacy(installed_app_id, cell_data)?;
@@ -838,11 +854,21 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             self.clone().register_dna(dna).await?;
         }
 
-        self.conductor
-            .read()
-            .await
-            .genesis_cells(cells_to_create, self.clone())
-            .await?;
+        // Gather the directory and keystore to avoid holding the conductor read lock.
+        let (root_env_dir, keystore) = {
+            let lock = self.conductor.read().await;
+            let root_env_dir = std::path::PathBuf::from(lock.root_env_dir().clone());
+            let keystore = lock.keystore().clone();
+            (root_env_dir, keystore)
+        };
+
+        crate::conductor::conductor::genesis_cells(
+            root_env_dir,
+            keystore,
+            cells_to_create,
+            self.clone(),
+        )
+        .await?;
 
         let slots = ops.slots;
         let app = InstalledAppCommon::new(installed_app_id, agent_key, slots);

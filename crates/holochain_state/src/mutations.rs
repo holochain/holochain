@@ -6,6 +6,7 @@ use crate::validation_db::ValidationLimboStatus;
 use holo_hash::encode::blake2b_256;
 use holo_hash::*;
 use holochain_sqlite::rusqlite::named_params;
+use holochain_sqlite::rusqlite::types::Null;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::dht_op::DhtOpLight;
 use holochain_types::dht_op::OpOrder;
@@ -75,7 +76,7 @@ macro_rules! dht_op_update {
         let fieldvars = &[ $( { format!("{} = :{}", $field, $field) } ,)+ ].join(",");
         let sql = format!(
             "
-            UPDATE DhtOp 
+            UPDATE DhtOp
             SET {}
             WHERE DhtOp.hash = :hash
             ", fieldvars);
@@ -347,24 +348,37 @@ pub fn set_last_publish_time(
     Ok(())
 }
 
-/// Set the receipt count for a [`DhtOp`].
-pub fn set_receipt_count(
-    txn: &mut Transaction,
-    hash: DhtOpHash,
-    count: u32,
-) -> StateMutationResult<()> {
+/// Set withhold publish for a [`DhtOp`].
+pub fn set_withhold_publish(txn: &mut Transaction, hash: DhtOpHash) -> StateMutationResult<()> {
     dht_op_update!(txn, hash, {
-        "receipt_count": count,
+        "withhold_publish": true,
     })?;
     Ok(())
 }
 
-/// Add one to the receipt count for a [`DhtOp`].
-pub fn add_one_receipt_count(txn: &mut Transaction, hash: &DhtOpHash) -> StateMutationResult<()> {
-    txn.execute(
-        "UPDATE DhtOp SET receipt_count = IFNULL(receipt_count, 0) + 1 WHERE hash = :hash;",
-        named_params! { ":hash": hash },
-    )?;
+/// Unset withhold publish for a [`DhtOp`].
+pub fn unset_withhold_publish(txn: &mut Transaction, hash: DhtOpHash) -> StateMutationResult<()> {
+    dht_op_update!(txn, hash, {
+        "withhold_publish": Null,
+    })?;
+    Ok(())
+}
+
+/// Set the receipt count for a [`DhtOp`].
+pub fn set_receipts_complete(
+    txn: &mut Transaction,
+    hash: &DhtOpHash,
+    complete: bool,
+) -> StateMutationResult<()> {
+    if complete {
+        dht_op_update!(txn, hash, {
+            "receipts_complete": true,
+        })?;
+    } else {
+        dht_op_update!(txn, hash, {
+            "receipts_complete": holochain_sqlite::rusqlite::types::Null,
+        })?;
+    }
     Ok(())
 }
 
@@ -550,5 +564,29 @@ pub fn insert_entry(txn: &mut Transaction, entry: EntryHashed) -> StateMutationR
         "cap_secret": cap_secret,
         // TODO: add cap functions and assignees
     })?;
+    Ok(())
+}
+
+/// Lock the chain with the given lock id until the given end time.
+/// During this time only the lock id will be unlocked according to `is_chain_locked`.
+/// The chain can be unlocked for all lock ids at any time by calling `unlock_chain`.
+/// In theory there can be multiple locks active at once.
+/// If there are multiple locks active at once effectively all locks are locked
+/// because the chain is locked if there are ANY locks that don't match the
+/// current id being queried.
+/// In practise this is useless so don't do that. One lock at a time please.
+pub fn lock_chain(txn: &mut Transaction, lock: &[u8], end: &Timestamp) -> StateMutationResult<()> {
+    sql_insert!(txn, ChainLock, {
+        "lock": lock,
+        "end": end,
+    })?;
+    Ok(())
+}
+
+/// Unlock the chain by dropping all records in the lock table.
+/// This should be done very carefully as it can e.g. invalidate a shared
+/// countersigning session that is inflight.
+pub fn unlock_chain(txn: &mut Transaction) -> StateMutationResult<()> {
+    txn.execute("DELETE FROM ChainLock", [])?;
     Ok(())
 }

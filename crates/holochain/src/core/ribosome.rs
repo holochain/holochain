@@ -540,9 +540,7 @@ pub mod wasm_test {
                     .next()
                     .unwrap();
 
-                let author = $crate::fixt::AgentPubKeyFixturator::new(::fixt::prelude::Predictable)
-                    .next()
-                    .unwrap();
+                let author = host_access.cell_id.agent_pubkey().clone();
 
                 // Required because otherwise the network will return routing errors
                 let test_network = crate::test_utils::test_network(
@@ -575,6 +573,9 @@ pub mod wasm_test {
                         unreachable!()
                     }
                     Ok(crate::core::ribosome::ZomeCallResponse::NetworkError(_)) => unreachable!(),
+                    Ok(crate::core::ribosome::ZomeCallResponse::CountersigningSession(e)) => {
+                        panic!("Failed a countersigning session {}", e)
+                    }
                     Err(e) => Err(e),
                 }
             })

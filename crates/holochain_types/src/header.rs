@@ -229,6 +229,12 @@ impl NewEntryHeaderRef<'_> {
             | NewEntryHeaderRef::Update(Update { entry_hash, .. }) => entry_hash,
         }
     }
+    pub fn to_new_entry_header(&self) -> NewEntryHeader {
+        match self {
+            NewEntryHeaderRef::Create(create) => NewEntryHeader::Create((*create).to_owned()),
+            NewEntryHeaderRef::Update(update) => NewEntryHeader::Update((*update).to_owned()),
+        }
+    }
 }
 
 impl TryFrom<SignedHeaderHashed> for WireDelete {

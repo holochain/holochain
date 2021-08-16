@@ -239,6 +239,9 @@ async fn test_rpc_multi_logic_mocked() {
         i_s,
         evt_sender,
         ep_hnd,
+        parallel_notify_permit: Arc::new(tokio::sync::Semaphore::new(
+            config.tuning_params.concurrent_limit_per_thread,
+        )),
         config,
     });
 

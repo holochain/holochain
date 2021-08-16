@@ -20,6 +20,18 @@ pub enum SourceChainError {
     )]
     HeadMoved(Option<HeaderHash>, Option<HeaderHash>),
 
+    #[error(transparent)]
+    TimestampError(#[from] holochain_zome_types::TimestampError),
+
+    #[error("Attempted to write anything other than the countersigning session entry while the chain was locked for a countersigning session.")]
+    ChainLocked,
+
+    #[error("Attempted to write a countersigning session that has already expired")]
+    LockExpired,
+
+    #[error("Attempted to write anything other than the countersigning session entry at the same time as the session entry.")]
+    DirtyCounterSigningWrite,
+
     #[error(
         "The source chain's structure is invalid. This error is not recoverable. Detail:\n{0}"
     )]
@@ -78,6 +90,9 @@ pub enum SourceChainError {
 
     #[error(transparent)]
     SyncScratchError(#[from] SyncScratchError),
+
+    #[error(transparent)]
+    CounterSigningError(#[from] CounterSigningError),
 }
 
 // serde_json::Error does not implement PartialEq - why is that a requirement??

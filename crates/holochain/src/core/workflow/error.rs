@@ -33,6 +33,9 @@ pub enum WorkflowError {
     #[error(transparent)]
     CascadeError(#[from] CascadeError),
 
+    #[error(transparent)]
+    CounterSigningError(#[from] CounterSigningError),
+
     #[error("Workspace error: {0}")]
     WorkspaceError(#[from] WorkspaceError),
 
@@ -65,6 +68,9 @@ pub enum WorkflowError {
 
     #[error(transparent)]
     HoloHashError(#[from] holo_hash::error::HoloHashError),
+
+    #[error(transparent)]
+    InterfaceError(#[from] crate::conductor::interface::error::InterfaceError),
 
     #[error(transparent)]
     DhtOpError(#[from] DhtOpError),

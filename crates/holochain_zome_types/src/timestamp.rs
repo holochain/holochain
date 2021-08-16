@@ -339,6 +339,21 @@ impl Timestamp {
         let ts = s.checked_add(ns).unwrap_or(s);
         ts.as_millis().clamp(0, i64::MAX as u128) as i64
     }
+
+    /// Construct a Timestsamp from countersigning session data.
+    /// Ostensibly used for the Header because the session itself covers a time range.
+    pub fn from_countersigning_data(session_data: &CounterSigningSessionData) -> Self {
+        Self(
+            session_data
+                .preflight_request()
+                .session_times()
+                .start()
+                .0
+                .checked_add(SESSION_HEADER_TIME_OFFSET_MILLIS)
+                .unwrap_or(i64::MAX),
+            session_data.preflight_request().session_times().start().1,
+        )
+    }
 }
 
 /// Distance between two Timestamps as a chrono::Duration (subject to overflow).  A Timestamp
