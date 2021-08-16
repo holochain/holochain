@@ -469,6 +469,10 @@ impl KitsuneP2pHandler for Space {
         )
     }
 
+    // add method to modify agent_arcs, then call `update_single_agent_info`,
+    // which will add arc to db. make sure to use fudged location bytes for the agent key
+    // consider making this a general purpose test method which takes an enum
+
     fn handle_join(
         &mut self,
         space: Arc<KitsuneSpace>,
