@@ -181,7 +181,10 @@ impl SourceChain {
         // Build the header.
         let common = HeaderBuilderCommon {
             author: (*self.author).clone(),
-            timestamp: std::cmp::max(timestamp::now(), chain_head_timestamp),
+            timestamp: std::cmp::max(
+                timestamp::now(),
+                (chain_head_timestamp + std::time::Duration::from_nanos(1))?,
+            ),
             header_seq,
             prev_header,
         };
