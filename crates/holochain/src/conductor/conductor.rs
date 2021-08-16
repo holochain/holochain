@@ -1309,7 +1309,7 @@ mod builder {
                 keystore
             } else {
                 let passphrase = match &self.config.passphrase_service {
-                    Some(PassphraseServiceConfig::FromConfig { passphrase }) => {
+                    PassphraseServiceConfig::DangerInsecureFromConfig { passphrase } => {
                         tracing::warn!("USING INSECURE PASSPHRASE FROM CONFIG--This defeats the whole purpose of having a passphrase. (unfortunately, there isn't another option at the moment).");
                         // TODO - use `new_mem_locked` when we have a secure source
                         sodoken::BufRead::new_no_lock(passphrase.as_bytes())

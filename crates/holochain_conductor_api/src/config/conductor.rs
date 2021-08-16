@@ -50,7 +50,7 @@ pub struct ConductorConfig {
     /// The conductor is independent of the specialized implementation of the trait
     /// PassphraseService. It just needs something to provide a passphrase when needed.
     /// This config setting selects one of the available services (i.e. CLI prompt, IPC, FromConfig)
-    pub passphrase_service: Option<PassphraseServiceConfig>,
+    pub passphrase_service: PassphraseServiceConfig,
 
     /// Setup admin interfaces to control this conductor through a websocket connection
     pub admin_interfaces: Option<Vec<AdminInterfaceConfig>>,
@@ -116,8 +116,8 @@ pub mod tests {
     environment_path: /path/to/env
 
     passphrase_service:
-      type: fromconfig
-      passphrase: test-passphrase
+      type: danger_insecure_from_config
+      passphrase: "test-passphrase"
     "#;
         let result: ConductorConfig = config_from_yaml(yaml).unwrap();
         assert_eq!(
@@ -126,9 +126,9 @@ pub mod tests {
                 environment_path: PathBuf::from("/path/to/env").into(),
                 network: None,
                 dpki: None,
-                passphrase_service: Some(PassphraseServiceConfig::FromConfig {
+                passphrase_service: PassphraseServiceConfig::DangerInsecureFromConfig {
                     passphrase: "test-passphrase".to_string(),
-                }),
+                },
                 keystore_path: None,
                 admin_interfaces: None,
                 use_dangerous_test_keystore: false,
@@ -148,8 +148,8 @@ pub mod tests {
     decryption_service_uri: ws://localhost:9003
 
     passphrase_service:
-      type: fromconfig
-      passphrase: test-passphrase
+      type: danger_insecure_from_config
+      passphrase: "test-passphrase"
 
     dpki:
       instance_id: some_id
@@ -215,9 +215,9 @@ pub mod tests {
                     instance_id: "some_id".into(),
                     init_params: "some_params".into()
                 }),
-                passphrase_service: Some(PassphraseServiceConfig::FromConfig {
+                passphrase_service: PassphraseServiceConfig::DangerInsecureFromConfig {
                     passphrase: "test-passphrase".to_string(),
-                }),
+                },
                 keystore_path: None,
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
                     driver: InterfaceDriver::Websocket { port: 1234 }
@@ -235,8 +235,8 @@ pub mod tests {
     keystore_path: /path/to/keystore
 
     passphrase_service:
-      type: fromconfig
-      passphrase: foobar
+      type: danger_insecure_from_config
+      passphrase: "foobar"
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
         assert_eq!(
@@ -245,9 +245,9 @@ pub mod tests {
                 environment_path: PathBuf::from("/path/to/env").into(),
                 network: None,
                 dpki: None,
-                passphrase_service: Some(PassphraseServiceConfig::FromConfig {
+                passphrase_service: PassphraseServiceConfig::DangerInsecureFromConfig {
                     passphrase: "foobar".into()
-                }),
+                },
                 keystore_path: Some(PathBuf::from("/path/to/keystore").into()),
                 admin_interfaces: None,
                 use_dangerous_test_keystore: true,

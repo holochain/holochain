@@ -11,6 +11,7 @@ use serde::Serialize;
 /// then receives bytes as passphrase until a newline is sent.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum PassphraseServiceConfig {
     // TODO (david.b) - we don't support these yet, so don't make them
     //                  seem like they are available
@@ -26,7 +27,7 @@ pub enum PassphraseServiceConfig {
     /// DANGER - THIS IS NOT SECURE--In fact, it defeats the
     /// whole purpose of having a passphrase in the first place!
     /// Passphrase is pulled directly from the config file.
-    FromConfig {
+    DangerInsecureFromConfig {
         /// The actual pasphrase
         passphrase: String,
     },
@@ -34,11 +35,10 @@ pub enum PassphraseServiceConfig {
 
 // TODO (david.b) - We don't want FromConfig to be the default
 //                  but it's the only one available at the moment
-//                  so just don't supply a default for now
-/*
 impl Default for PassphraseServiceConfig {
     fn default() -> PassphraseServiceConfig {
-        PassphraseServiceConfig::Cmd
+        PassphraseServiceConfig::DangerInsecureFromConfig {
+            passphrase: "default-insecure-passphrase".into(),
+        }
     }
 }
-*/
