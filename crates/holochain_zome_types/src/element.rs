@@ -56,7 +56,6 @@ impl Element {
             .header()
             .entry_data()
             .map(|(_, entry_type)| entry_type.visibility());
-        dbg!(&maybe_visibility, &signed_header, &maybe_entry);
         let entry = match (maybe_entry, maybe_visibility) {
             (Some(entry), Some(_)) => ElementEntry::Present(entry),
             (None, Some(EntryVisibility::Private)) => ElementEntry::Hidden,

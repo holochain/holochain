@@ -218,14 +218,21 @@ pub mod wasm_test {
 
         // Creating the INCORRECT countersigned entry WILL immediately unlock
         // the chain.
-        let _: HeaderHash = conductor
-            .call(
-                &alice,
-                "create_an_invalid_countersigned_thing",
-                vec![alice_response.clone(), bob_response.clone()],
-            )
+        let countersign_fail_create_alice = conductor
+            .handle()
+            .call_zome(ZomeCall {
+                cell_id: alice.cell_id().clone(),
+                zome_name: alice.name().clone(),
+                fn_name: "create_an_invalid_countersigned_thing".into(),
+                cap: None,
+                provenance: alice_pubkey.clone(),
+                payload: ExternIO::encode(vec![alice_response.clone(), bob_response.clone()]).unwrap(),
+            })
             .await;
-        // let _: HeaderHash = conductor.call(&alice, "create_a_thing", ()).await;
+        assert!(
+            matches!(countersign_fail_create_alice, Err(_))
+        );
+        let _: HeaderHash = conductor.call(&alice, "create_a_thing", ()).await;
     }
 
     #[tokio::test(flavor = "multi_thread")]

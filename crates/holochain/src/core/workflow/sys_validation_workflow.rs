@@ -440,7 +440,14 @@ async fn sys_validate_element_inner(
         Some(Entry::CounterSign(session, _)) => {
             let entry_hash = EntryHash::with_data_sync(maybe_entry.unwrap());
             for header in session.build_header_set(entry_hash)? {
-                validate(&header, maybe_entry, workspace, network.clone(), conductor_api).await?;
+                validate(
+                    &header,
+                    maybe_entry,
+                    workspace,
+                    network.clone(),
+                    conductor_api,
+                )
+                .await?;
             }
             Ok(())
         }
@@ -540,7 +547,8 @@ async fn store_entry(
 
     // Additional checks if this is a countersigned entry.
     if let Entry::CounterSign(session_data, _) = entry {
-        check_countersigning_session_data(EntryHash::with_data_sync(entry), session_data, header).await?;
+        check_countersigning_session_data(EntryHash::with_data_sync(entry), session_data, header)
+            .await?;
     }
     Ok(())
 }

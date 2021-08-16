@@ -137,8 +137,6 @@ async fn validate_op(
     // Create the element
     let element = get_element(op)?;
 
-    dbg!(&element);
-
     // Check for caps
     check_for_caps(&element)?;
 
@@ -731,7 +729,6 @@ pub async fn run_validation_callback_direct(
     let entry_def_id = entry_def.map(|ed| ed.id);
 
     let element = Arc::new(element);
-    dbg!(&element);
 
     run_validation_callback_inner(
         zome,
@@ -753,7 +750,6 @@ fn run_validation_callback_inner(
     workspace_lock: HostFnWorkspace,
     network: HolochainP2pCell,
 ) -> AppValidationResult<Outcome> {
-    dbg!(&element);
     let validate: ValidateResult = ribosome.run_validate(
         ValidateHostAccess::new(workspace_lock, network),
         ValidateInvocation {

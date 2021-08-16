@@ -137,20 +137,6 @@ where
     .await?;
     tracing::trace!("After zome call");
 
-    let is_locked_for_countersigning_session = if workspace.source_chain().len()? == 1 {
-        let lock = SourceChain::lock_for_entry(
-            workspace.source_chain().elements()?[0].entry().as_option(),
-        )?;
-        !lock.is_empty()
-            && workspace
-                .source_chain()
-                .is_chain_locked(Vec::with_capacity(0))
-                .await?
-            && !workspace.source_chain().is_chain_locked(lock).await?
-    } else {
-        false
-    };
-
     let validation_result = inline_validation(
         workspace.clone(),
         network,
@@ -160,9 +146,19 @@ where
     )
     .await;
     match validation_result {
-        Err(WorkflowError::AppValidationError(_))
-        | Err(WorkflowError::SysValidationError(_))
-        | Err(WorkflowError::SourceChainError(_)) => {
+        Err(WorkflowError::SourceChainError(SourceChainError::InvalidCommit(_))) => {
+            let scratch_elements = workspace.source_chain().scratch_elements()?;
+            let is_locked_for_countersigning_session = if scratch_elements.len() == 1 {
+                let lock = SourceChain::lock_for_entry(scratch_elements[0].entry().as_option())?;
+                !lock.is_empty()
+                    && workspace
+                        .source_chain()
+                        .is_chain_locked(Vec::with_capacity(0))
+                        .await?
+                    && !workspace.source_chain().is_chain_locked(lock).await?
+            } else {
+                false
+            };
             if is_locked_for_countersigning_session {
                 if let Err(error) = workspace.source_chain().unlock_chain().await {
                     tracing::error!(?error);
@@ -189,10 +185,10 @@ where
 {
     let to_app_validate = {
         // collect all the elements we need to validate in wasm
-        let mut to_app_validate: Vec<Element> =
-            Vec::with_capacity(workspace.source_chain().len()? as usize);
+        let scratch_elements = workspace.source_chain().scratch_elements()?;
+        let mut to_app_validate: Vec<Element> = Vec::with_capacity(scratch_elements.len());
         // Loop forwards through all the new elements
-        for element in workspace.source_chain().elements()? {
+        for element in scratch_elements {
             sys_validate_element(&element, &workspace, network.clone(), &conductor_api)
                 .await
                 // If the was en error exit
@@ -204,7 +200,6 @@ where
 
         to_app_validate
     };
-    dbg!(&to_app_validate);
 
     {
         for chain_element in to_app_validate {

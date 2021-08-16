@@ -114,7 +114,6 @@ pub fn insert_element_scratch(scratch: &mut Scratch, element: Element) {
     let (header, entry) = element.into_inner();
     scratch.add_header(header);
     if let Some(entry) = entry.into_option() {
-        dbg!(&entry);
         scratch.add_entry(EntryHashed::from_content_sync(entry))
     }
 }

@@ -123,7 +123,6 @@ impl From<Vec<ValidateCallbackResult>> for ValidateResult {
 
 impl From<ValidateInvocation> for ValidateData {
     fn from(vi: ValidateInvocation) -> Self {
-        dbg!(&vi);
         Self {
             element: Element::clone(&vi.element),
             validation_package: vi

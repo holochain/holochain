@@ -43,8 +43,8 @@ use crate::prelude::*;
 use crate::query::chain_head::ChainHeadQuery;
 use crate::scratch::Scratch;
 use crate::scratch::SyncScratch;
-use holochain_serialized_bytes::prelude::*;
 use holo_hash::EntryHash;
+use holochain_serialized_bytes::prelude::*;
 
 pub use error::*;
 
@@ -120,7 +120,7 @@ impl SourceChain {
     // TODO: Maybe we should store data as elements in the scratch?
     // TODO: document that this is only the elemnts in the SCRATCH, not the
     //       entire source chain!
-    pub fn elements(&self) -> SourceChainResult<Vec<Element>> {
+    pub fn scratch_elements(&self) -> SourceChainResult<Vec<Element>> {
         Ok(self.scratch.apply(|scratch| scratch.elements().collect())?)
     }
 
@@ -147,12 +147,9 @@ impl SourceChain {
         let header = HeaderHashed::from_content_sync(header);
         let hash = header.as_hash().clone();
         let header = SignedHeaderHashed::new(&self.vault.keystore(), header).await?;
-        dbg!(&maybe_entry);
         let element = Element::new(header, maybe_entry);
-        dbg!(&element);
         self.scratch
             .apply(|scratch| insert_element_scratch(scratch, element))?;
-        let _ = dbg!(self.elements());
         Ok(hash)
     }
 
@@ -805,14 +802,15 @@ pub fn current_countersigning_session(
             Ok((hash, _, _)) => {
                 let txn: Txn = txn.into();
                 // Get the session data from the database.
-                let element = match txn
-                    .get_element(&hash.into())? {
-                        Some(element) => element,
-                        None => return Ok(None),
-                    };
+                let element = match txn.get_element(&hash.into())? {
+                    Some(element) => element,
+                    None => return Ok(None),
+                };
                 let (shh, ee) = element.into_inner();
                 Ok(match (shh.header().entry_hash(), ee.into_option()) {
-                    (Some(entry_hash), Some(Entry::CounterSign(cs, _))) => Some((entry_hash.to_owned(), *cs)),
+                    (Some(entry_hash), Some(Entry::CounterSign(cs, _))) => {
+                        Some((entry_hash.to_owned(), *cs))
+                    }
                     _ => None,
                 })
             }

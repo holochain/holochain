@@ -571,10 +571,17 @@ impl CounterSigningSessionData {
     /// Attempt to map countersigning session data to a set of headers.
     /// A given countersigning session always maps to the same ordered set of headers or an error.
     /// Note the headers are not signed as the intent is to build headers for other agents without their private keys.
-    pub fn build_header_set(&self, entry_hash: EntryHash) -> Result<Vec<Header>, CounterSigningError> {
+    pub fn build_header_set(
+        &self,
+        entry_hash: EntryHash,
+    ) -> Result<Vec<Header>, CounterSigningError> {
         let mut headers = vec![];
         for (agent, _role) in self.preflight_request.signing_agents().iter() {
-            headers.push(Header::from_countersigning_data(entry_hash.clone(), self, agent.clone())?);
+            headers.push(Header::from_countersigning_data(
+                entry_hash.clone(),
+                self,
+                agent.clone(),
+            )?);
         }
         Ok(headers)
     }
