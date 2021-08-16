@@ -17,13 +17,23 @@ struct FakeProperties {
 
 /// A fixture example dna for unit testing.
 pub fn fake_dna_file(uid: &str) -> DnaFile {
-    fake_dna_zomes(uid, vec![("test".into(), vec![].into())])
+    fake_dna_file_named(uid, "test")
+}
+
+/// A named dna for unit testing.
+pub fn fake_dna_file_named(uid: &str, name: &str) -> DnaFile {
+    fake_dna_zomes_named(uid, name, vec![(name.into(), vec![].into())])
 }
 
 /// A fixture example dna for unit testing.
 pub fn fake_dna_zomes(uid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
+    fake_dna_zomes_named(uid, "test", zomes)
+}
+
+/// A named dna for unit testing.
+pub fn fake_dna_zomes_named(uid: &str, name: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
     let mut dna = DnaDef {
-        name: "test".to_string(),
+        name: name.to_string(),
         properties: YamlProperties::new(serde_yaml::from_str("p: hi").unwrap())
             .try_into()
             .unwrap(),

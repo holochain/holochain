@@ -1113,6 +1113,7 @@ dependencies = [
  "clap 2.33.3",
  "criterion-plot",
  "csv",
+ "futures",
  "itertools 0.10.1",
  "lazy_static",
  "num-traits",
@@ -1125,6 +1126,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "tinytemplate",
+ "tokio",
  "walkdir",
 ]
 
