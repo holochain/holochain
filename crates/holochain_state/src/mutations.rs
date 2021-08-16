@@ -6,6 +6,7 @@ use crate::validation_db::ValidationLimboStatus;
 use holo_hash::encode::blake2b_256;
 use holo_hash::*;
 use holochain_sqlite::rusqlite::named_params;
+use holochain_sqlite::rusqlite::types::Null;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::dht_op::DhtOpLight;
 use holochain_types::dht_op::OpOrder;
@@ -347,24 +348,37 @@ pub fn set_last_publish_time(
     Ok(())
 }
 
-/// Set the receipt count for a [`DhtOp`].
-pub fn set_receipt_count(
-    txn: &mut Transaction,
-    hash: DhtOpHash,
-    count: u32,
-) -> StateMutationResult<()> {
+/// Set withhold publish for a [`DhtOp`].
+pub fn set_withhold_publish(txn: &mut Transaction, hash: DhtOpHash) -> StateMutationResult<()> {
     dht_op_update!(txn, hash, {
-        "receipt_count": count,
+        "withhold_publish": true,
     })?;
     Ok(())
 }
 
-/// Add one to the receipt count for a [`DhtOp`].
-pub fn add_one_receipt_count(txn: &mut Transaction, hash: &DhtOpHash) -> StateMutationResult<()> {
-    txn.execute(
-        "UPDATE DhtOp SET receipt_count = IFNULL(receipt_count, 0) + 1 WHERE hash = :hash;",
-        named_params! { ":hash": hash },
-    )?;
+/// Unset withhold publish for a [`DhtOp`].
+pub fn unset_withhold_publish(txn: &mut Transaction, hash: DhtOpHash) -> StateMutationResult<()> {
+    dht_op_update!(txn, hash, {
+        "withhold_publish": Null,
+    })?;
+    Ok(())
+}
+
+/// Set the receipt count for a [`DhtOp`].
+pub fn set_receipts_complete(
+    txn: &mut Transaction,
+    hash: &DhtOpHash,
+    complete: bool,
+) -> StateMutationResult<()> {
+    if complete {
+        dht_op_update!(txn, hash, {
+            "receipts_complete": true,
+        })?;
+    } else {
+        dht_op_update!(txn, hash, {
+            "receipts_complete": holochain_sqlite::rusqlite::types::Null,
+        })?;
+    }
     Ok(())
 }
 

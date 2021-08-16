@@ -21,7 +21,7 @@ either = "1.5.0"
 fallible-iterator = "0.2.0"
 fixt = { version = "0.0.4", path = "../fixt" }
 futures = "0.3.1"
-ghost_actor = "0.3.0-alpha.2"
+ghost_actor = "0.3.0-alpha.3"
 holo_hash = { version = "0.0.4", path = "../holo_hash", features = ["full"] }
 holochain_cascade = { version = "0.0.2", path = "../holochain_cascade" }
 holochain_conductor_api = { version = "0.0.2", path = "../holochain_conductor_api" }
@@ -86,7 +86,7 @@ sd-notify = "0.3.0"
 [dev-dependencies]
 anyhow = "1.0.26"
 assert_cmd = "1.0.1"
-criterion = "0.3"
+criterion = { version = "0.3", features = [ "async_tokio" ] }
 maplit = "1"
 pretty_assertions = "0.6.1"
 serial_test = "0.4.0"

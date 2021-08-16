@@ -2,7 +2,6 @@
 
 use super::*;
 use ::contrafact::*;
-use holo_hash::*;
 
 /// Fact: The DhtOp is internally consistent in all of its references:
 /// - TODO: The DhtOp variant matches the Header variant

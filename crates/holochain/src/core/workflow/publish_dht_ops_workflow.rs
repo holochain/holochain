@@ -24,35 +24,45 @@ use tracing::*;
 mod publish_query;
 
 /// Default redundancy factor for validation receipts
-// TODO: Pull this from the wasm entry def and only use this if it's missing
-// TODO: Put a default in the DnaBundle
-// TODO: build zome_types/entry_def map to get the (AppEntryType map to entry def)
-pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u32 = 5;
+pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u8 = 5;
 
 /// Don't publish a DhtOp more than once during this interval.
 /// This allows us to trigger the publish workflow as often as we like, without
 /// flooding the network with spurious publishes.
-pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(5);
+/// Republish an op at most once per day.
+/// Publish is only triggered by new commits so at worst we'll publish never
+/// republish.
+// TODO: We need a republish workflow to make sure the data is actually saturated.
+pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(60 * 60 * 24);
 
 #[instrument(skip(env, network))]
 pub async fn publish_dht_ops_workflow(
     env: EnvWrite,
     network: HolochainP2pCell,
 ) -> WorkflowResult<WorkComplete> {
-    let (to_publish, hashes) =
+    let mut complete = WorkComplete::Complete;
+    let to_publish =
         publish_dht_ops_workflow_inner(env.clone().into(), network.from_agent()).await?;
 
     // Commit to the network
     tracing::info!("sending {} ops", to_publish.len());
+    let mut success = Vec::new();
     for (basis, ops) in to_publish {
-        if let Err(e) = network.publish(true, basis, ops, None).await {
+        let hashes: Vec<_> = ops.iter().map(|(h, _)| h.clone()).collect();
+        if let Err(e) = network.publish(true, false, basis, ops, None).await {
+            // If we get a routing error it means the space hasn't started yet and we should try publishing again.
+            if let holochain_p2p::HolochainP2pError::RoutingDnaError(_) = e {
+                complete = WorkComplete::Incomplete;
+            }
             tracing::info!(failed_to_send_publish = ?e);
+        } else {
+            success.extend(hashes);
         }
     }
-    tracing::info!("sent {} ops", hashes.len());
+    tracing::info!("sent {} ops", success.len());
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
     env.async_commit(move |writer| {
-        for hash in hashes {
+        for hash in success {
             mutations::set_last_publish_time(writer, hash, now)?;
         }
         WorkflowResult::Ok(())
@@ -61,24 +71,19 @@ pub async fn publish_dht_ops_workflow(
     tracing::info!("commited sent ops");
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
-    Ok(WorkComplete::Complete)
+    Ok(complete)
 }
 
 /// Read the authored for ops with receipt count < R
 pub async fn publish_dht_ops_workflow_inner(
     env: EnvRead,
     agent: AgentPubKey,
-) -> WorkflowResult<(HashMap<AnyDhtHash, Vec<(DhtOpHash, DhtOp)>>, Vec<DhtOpHash>)> {
+) -> WorkflowResult<HashMap<AnyDhtHash, Vec<(DhtOpHash, DhtOp)>>> {
     // Ops to publish by basis
     let mut to_publish = HashMap::new();
-    let mut hashes = Vec::new();
 
-    for op_hashed in
-        publish_query::get_ops_to_publish(agent.clone(), &env, DEFAULT_RECEIPT_BUNDLE_SIZE).await?
-    {
+    for op_hashed in publish_query::get_ops_to_publish(agent.clone(), &env).await? {
         let (op, op_hash) = op_hashed.into_inner();
-        hashes.push(op_hash.clone());
-
         // For every op publish a request
         // Collect and sort ops by basis
         to_publish
@@ -87,7 +92,7 @@ pub async fn publish_dht_ops_workflow_inner(
             .push((op_hash, op));
     }
 
-    Ok((to_publish, hashes))
+    Ok(to_publish)
 }
 
 #[cfg(test)]
@@ -269,23 +274,18 @@ mod tests {
         });
     }
 
-    /// There is a test that shows that if the validation_receipt_count > R
+    /// There is a test that shows that if the receipt is set to complete
     /// for a DHTOp we don't re-publish it
-    // #[test_case(1, 1)]
-    // #[test_case(1, 10)]
-    // #[test_case(1, 100)]
-    // #[test_case(10, 1)]
-    // #[test_case(10, 10)]
-    // #[test_case(10, 100)]
-    // #[test_case(100, 1)]
-    // #[test_case(100, 10)]
-    // #[test_case(100, 100)]
-    #[test]
-    #[ignore = "Publish currently doesn't respect receipt count so this test is of no use until we add that back"]
-    // fn test_no_republish(num_agents: u32, num_hash: u32) {
-    fn test_no_republish() {
-        let num_agents = 0;
-        let num_hash = 0;
+    #[test_case(1, 1)]
+    #[test_case(1, 10)]
+    #[test_case(1, 100)]
+    #[test_case(10, 1)]
+    #[test_case(10, 10)]
+    #[test_case(10, 100)]
+    #[test_case(100, 1)]
+    #[test_case(100, 10)]
+    #[test_case(100, 100)]
+    fn test_no_republish(num_agents: u32, num_hash: u32) {
         tokio_helper::block_forever_on(async {
             observability::test_run().ok();
 
@@ -297,15 +297,12 @@ mod tests {
             let (_network, cell_network, recv_task, _) =
                 setup(env.clone(), num_agents, num_hash, true).await;
 
-            // Update the authored to have > R counts
+            // Update the authored to have complete receipts
             env.conn()
                 .unwrap()
                 .with_commit_test(|txn| {
-                    txn.execute(
-                        "UPDATE DhtOp SET receipt_count = ?",
-                        [DEFAULT_RECEIPT_BUNDLE_SIZE],
-                    )
-                    .unwrap();
+                    txn.execute("UPDATE DhtOp SET receipts_complete = 1", [])
+                        .unwrap();
                 })
                 .unwrap();
 
@@ -370,10 +367,7 @@ mod tests {
                 fake_genesis(env.clone()).await.unwrap();
                 env.conn()
                     .unwrap()
-                    .execute(
-                        "UPDATE DhtOp SET receipt_count = ?",
-                        [DEFAULT_RECEIPT_BUNDLE_SIZE],
-                    )
+                    .execute("UPDATE DhtOp SET receipts_complete = 1", [])
                     .unwrap();
                 let author = fake_agent_pubkey_1();
 
@@ -435,7 +429,7 @@ mod tests {
                         sig.clone(),
                         entry_create_header.clone().into_content(),
                     );
-                    let op_hash = DhtOpHashed::from_content_sync(expected_op.clone()).into_hash();
+                    let op_hash = expected_op.to_hash();
                     map.insert(
                         op_hash,
                         (expected_op, register_agent_activity_count.clone()),
@@ -446,7 +440,7 @@ mod tests {
                         entry_create_header.into_content().try_into().unwrap(),
                         None,
                     );
-                    let op_hash = DhtOpHashed::from_content_sync(expected_op.clone()).into_hash();
+                    let op_hash = expected_op.to_hash();
 
                     map.insert(op_hash, (expected_op, store_element_count.clone()));
 
@@ -458,7 +452,7 @@ mod tests {
                         entry_update_header.into_content().try_into().unwrap();
                     let expected_op =
                         DhtOp::StoreElement(sig.clone(), entry_update_header.clone().into(), None);
-                    let op_hash = DhtOpHashed::from_content_sync(expected_op.clone()).into_hash();
+                    let op_hash = expected_op.to_hash();
 
                     map.insert(op_hash, (expected_op, store_element_count.clone()));
 
@@ -467,7 +461,7 @@ mod tests {
                         entry_update_header.clone(),
                         None,
                     );
-                    let op_hash = DhtOpHashed::from_content_sync(expected_op.clone()).into_hash();
+                    let op_hash = expected_op.to_hash();
 
                     map.insert(op_hash, (expected_op, register_replaced_by_count.clone()));
                     let expected_op = DhtOp::RegisterUpdatedElement(
@@ -475,14 +469,14 @@ mod tests {
                         entry_update_header.clone(),
                         None,
                     );
-                    let op_hash = DhtOpHashed::from_content_sync(expected_op.clone()).into_hash();
+                    let op_hash = expected_op.to_hash();
 
                     map.insert(
                         op_hash,
                         (expected_op, register_updated_element_count.clone()),
                     );
                     let expected_op = DhtOp::RegisterAgentActivity(sig, entry_update_header.into());
-                    let op_hash = DhtOpHashed::from_content_sync(expected_op.clone()).into_hash();
+                    let op_hash = expected_op.to_hash();
                     map.insert(
                         op_hash,
                         (expected_op, register_agent_activity_count.clone()),
@@ -513,8 +507,10 @@ mod tests {
                 .await;
                 let cell_network = test_network.cell_network();
                 let (tx_complete, rx_complete) = tokio::sync::oneshot::channel();
-                // We are expecting six ops per agent plus one for self plus 7 for genesis.
-                let total_expected = (num_agents + 1) * (6 + 7);
+                // We are expecting six ops per agent plus one for self.
+                // The 7 genesis ops were already recently published, so
+                // won't be published again this time.
+                let total_expected = (num_agents + 1) * 6;
                 let mut recv_count: u32 = 0;
 
                 // Receive events and increment count

@@ -55,9 +55,8 @@ kitsune_p2p_types::write_codec_enum! {
         /// uses low-level notify, not request
         Broadcast(0x23) {
             space.0: Arc<KitsuneSpace>,
-            basis.1: Arc<KitsuneBasis>,
-            to_agent.2: Arc<KitsuneAgent>,
-            data.3: WireData,
+            to_agent.1: Arc<KitsuneAgent>,
+            data.2: WireData,
         },
 
         /// Gossip op with opaque data section,

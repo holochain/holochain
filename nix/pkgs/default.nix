@@ -4,6 +4,8 @@
 
 , hcToplevelDir
 , nixEnvPrefixEval
+
+, jq
 }:
 
 let
@@ -13,7 +15,35 @@ let
 
     crate=''${1:?The first argument needs to define the crate name}
     shift
-    cargo run --target-dir=''${NIX_ENV_PREFIX:-?}/target/hc-run-crate --manifest-path=${hcToplevelDir}/crates/$crate/Cargo.toml -- $@
+
+    binary=$(cargo build \
+      --target-dir=''${NIX_ENV_PREFIX:-?}/target/hc-run-crate \
+      --manifest-path=${hcToplevelDir}/crates/$crate/Cargo.toml \
+      --bin=$crate --message-format=json | \
+        ${jq}/bin/jq \
+          --slurp \
+          --raw-output \
+          'map(select(.executable != null))[0].executable' \
+      )
+
+    $binary $@
+  '';
+
+  hcCrateBinaryPath = writeShellScriptBin "hc-crate-binary-path" ''
+    set -x
+    ${nixEnvPrefixEval}
+
+    crate=''${1:?The first argument needs to define the crate name}
+
+    echo $(cargo build \
+      --target-dir=''${NIX_ENV_PREFIX:-?}/target/hc-run-crate \
+      --manifest-path=${hcToplevelDir}/crates/$crate/Cargo.toml \
+      --bin=$crate --message-format=json | \
+        ${jq}/bin/jq \
+          --slurp \
+          --raw-output \
+          'map(select(.executable != null))[0].executable' \
+      )
   '';
 
   mkHolochainBinaryScript = crate: writeShellScriptBin (builtins.replaceStrings ["_"] ["-"] crate) ''

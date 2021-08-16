@@ -211,7 +211,7 @@ pub async fn check_spam(_header: &Header) -> SysValidationResult<()> {
 
 /// Check previous header timestamp is before this header
 pub fn check_prev_timestamp(header: &Header, prev_header: &Header) -> SysValidationResult<()> {
-    if header.timestamp() >= prev_header.timestamp() {
+    if header.timestamp() > prev_header.timestamp() {
         Ok(())
     } else {
         Err(PrevHeaderError::Timestamp).map_err(|e| ValidationOutcome::from(e).into())
@@ -499,7 +499,7 @@ where
 /// incoming_dht_ops_workflow if you
 /// found it on the network and were supposed
 /// to be holding it.
-#[derive(derive_more::Constructor)]
+#[derive(derive_more::Constructor, Clone)]
 pub struct IncomingDhtOpSender {
     env: EnvWrite,
     sys_validation_trigger: TriggerSender,
@@ -608,7 +608,7 @@ fn make_store_element(element: Element) -> Option<(DhtOpHash, DhtOp)> {
 
     // Create the hash and op
     let op = DhtOp::StoreElement(signature, header, maybe_entry_box);
-    let hash = DhtOpHash::with_data_sync(&op);
+    let hash = op.to_hash();
     Some((hash, op))
 }
 
@@ -631,7 +631,7 @@ fn make_store_entry(element: Element) -> Option<(DhtOpHash, DhtOp)> {
 
     // Create the hash and op
     let op = DhtOp::StoreEntry(signature, header, entry_box);
-    let hash = DhtOpHash::with_data_sync(&op);
+    let hash = op.to_hash();
     Some((hash, op))
 }
 
@@ -651,7 +651,7 @@ fn make_register_add_link(element: Element) -> Option<(DhtOpHash, DhtOp)> {
 
     // Create the hash and op
     let op = DhtOp::RegisterAddLink(signature, header);
-    let hash = DhtOpHash::with_data_sync(&op);
+    let hash = op.to_hash();
     Some((hash, op))
 }
 
@@ -671,7 +671,7 @@ fn make_register_agent_activity(element: Element) -> Option<(DhtOpHash, DhtOp)> 
 
     // Create the hash and op
     let op = DhtOp::RegisterAgentActivity(signature, header);
-    let hash = DhtOpHash::with_data_sync(&op);
+    let hash = op.to_hash();
     Some((hash, op))
 }
 
