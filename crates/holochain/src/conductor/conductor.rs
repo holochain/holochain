@@ -46,6 +46,7 @@ use futures::future;
 use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
 use holo_hash::DnaHash;
+use holochain_conductor_api::conductor::PassphraseServiceConfig;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::IntegrationStateDump;
@@ -1307,7 +1308,18 @@ mod builder {
                     .unwrap();
                 keystore
             } else {
-                spawn_lair_keystore(self.config.keystore_path.as_deref()).await?
+                let passphrase = match &self.config.passphrase_service {
+                    PassphraseServiceConfig::DangerInsecureFromConfig { passphrase } => {
+                        tracing::warn!("USING INSECURE PASSPHRASE FROM CONFIG--This defeats the whole purpose of having a passphrase. (unfortunately, there isn't another option at the moment).");
+                        // TODO - use `new_mem_locked` when we have a secure source
+                        sodoken::BufRead::new_no_lock(passphrase.as_bytes())
+                    }
+                    oth => {
+                        panic!("We don't support this passphrase_service yet: {:?}", oth);
+                    }
+                };
+
+                spawn_lair_keystore(self.config.keystore_path.as_deref(), passphrase).await?
             };
             let env_path = self.config.environment_path.clone();
 

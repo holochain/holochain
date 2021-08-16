@@ -265,10 +265,15 @@ impl AsKitsuneDirect for Kd1 {
         let ws_addr = self.get_ui_addr().unwrap();
 
         // TODO - this should also be configured in v1 conf
-        let pass = sodoken::Buffer::new_memlocked(4).unwrap();
+        let pass = sodoken::BufWrite::new_mem_locked(4).unwrap();
         pass.write_lock().copy_from_slice(&[1, 2, 3, 4]);
 
-        async move { new_handle_ws(ws_addr, pass).await.map_err(KdError::other) }.boxed()
+        async move {
+            new_handle_ws(ws_addr, pass.to_read())
+                .await
+                .map_err(KdError::other)
+        }
+        .boxed()
     }
 }
 

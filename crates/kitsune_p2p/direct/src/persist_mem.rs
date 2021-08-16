@@ -203,7 +203,7 @@ impl UiStore {
 
 struct PersistMemInner {
     tls: Option<TlsConfig>,
-    priv_keys: HashMap<KdHash, sodoken::Buffer>,
+    priv_keys: HashMap<KdHash, sodoken::BufReadSized<64>>,
     agent_info: HashMap<KdHash, Arc<AgentStore>>,
     entries: HashMap<KdHash, Arc<AgentEntryStore>>,
     ui_cache: Arc<UiStore>,
@@ -271,11 +271,10 @@ impl AsKdPersist for PersistMem {
     fn generate_signing_keypair(&self) -> BoxFuture<'static, KdResult<KdHash>> {
         let inner = self.0.clone();
         async move {
-            let mut pk = Buffer::new(sodoken::sign::SIGN_PUBLICKEYBYTES);
-            let mut sk = Buffer::new_memlocked(sodoken::sign::SIGN_SECRETKEYBYTES)
-                .map_err(KdError::other)?;
+            let pk = sodoken::BufWriteSized::new_no_lock();
+            let sk = sodoken::BufWriteSized::new_mem_locked().map_err(KdError::other)?;
 
-            sodoken::sign::sign_keypair(&mut pk, &mut sk)
+            sodoken::sign::sign_keypair(pk.clone(), sk.clone())
                 .await
                 .map_err(KdError::other)?;
 
@@ -288,7 +287,7 @@ impl AsKdPersist for PersistMem {
             let pk_hash_clone = pk_hash.clone();
             inner
                 .share_mut(move |i, _| {
-                    i.priv_keys.insert(pk_hash_clone, sk);
+                    i.priv_keys.insert(pk_hash_clone, sk.to_read_sized());
                     Ok(())
                 })
                 .map_err(KdError::other)?;
@@ -299,7 +298,7 @@ impl AsKdPersist for PersistMem {
     }
 
     fn sign(&self, pub_key: KdHash, data: &[u8]) -> BoxFuture<'static, KdResult<Arc<[u8; 64]>>> {
-        let data = Buffer::from_ref(data);
+        let data = sodoken::BufRead::new_no_lock(data);
         let sk = self
             .0
             .share_mut(|i, _| Ok(i.priv_keys.get(&pub_key).cloned()));
@@ -309,8 +308,8 @@ impl AsKdPersist for PersistMem {
                 None => return Err(format!("invalid agent: {:?}", pub_key).into()),
                 Some(sk) => sk,
             };
-            let mut sig = Buffer::new(64);
-            sodoken::sign::sign_detached(&mut sig, &data, &sk)
+            let sig = <sodoken::BufWriteSized<64>>::new_no_lock();
+            sodoken::sign::sign_detached(sig.clone(), data, sk)
                 .await
                 .map_err(KdError::other)?;
             let mut out = [0; 64];
