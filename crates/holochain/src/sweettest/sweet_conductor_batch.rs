@@ -134,16 +134,22 @@ impl SweetConductorBatch {
                     .expect("Scenario setup is infallible");
 
                 for (agent_def, cell) in itertools::zip(agent_defs, apps.cells_flattened()) {
+                    // Manually set the storage arc
                     cell.set_storage_arc(agent_def.arc.clone());
+                    // Manually inject DhtOps at the correct locations
                     cell.inject_fake_ops(agent_def.ops.clone().into_iter());
                 }
 
                 (conductor, apps)
             });
-        future::join_all(tasks)
+        let conductors = future::join_all(tasks)
             .await
             .try_into()
-            .unwrap_or_else(|_| unreachable!("Array size must match"))
+            .unwrap_or_else(|_| unreachable!("Array size must match"));
+
+        for (conductor, _) in conductors.iter() {
+            conductor.exchange_peer_info()
+        }
     }
 
     /// Let each conductor know about each others' agents so they can do networking
