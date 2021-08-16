@@ -453,31 +453,17 @@ pub enum HeaderBase {
     // CreateLink(CreateLinkBase),
 }
 
-// impl HeaderBase {
-//     /// Get the entry hash for this header.
-//     pub fn entry_hash(&self) -> &EntryHash {
-//         match self {
-//             HeaderBase::Create(CreateBase { entry_hash, .. })
-//             | HeaderBase::Update(UpdateBase { entry_hash, .. }) => entry_hash,
-//         }
-//     }
-// }
-
 /// Base data for Create headers.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct CreateBase {
     entry_type: EntryType,
-    // entry_hash: EntryHash,
 }
 
 impl CreateBase {
     /// Constructor.
     pub fn new(entry_type: EntryType) -> Self {
-        Self {
-            entry_type,
-            // entry_hash,
-        }
+        Self { entry_type }
     }
 }
 
@@ -488,7 +474,6 @@ pub struct UpdateBase {
     original_header_address: HeaderHash,
     original_entry_address: EntryHash,
     entry_type: EntryType,
-    // entry_hash: EntryHash,
 }
 
 impl Header {
@@ -645,11 +630,6 @@ impl CounterSigningSessionData {
     pub fn responses(&self) -> &Vec<(CounterSigningAgentState, Signature)> {
         &self.responses
     }
-
-    // /// Get the entry hash for this session.
-    // pub fn entry_hash(&self) -> &EntryHash {
-    //     self.preflight_request.header_base.entry_hash()
-    // }
 
     /// Mutable responses accessor for testing.
     #[cfg(feature = "test_utils")]
