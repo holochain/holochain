@@ -145,30 +145,30 @@ where
         ribosome,
     )
     .await;
-    match validation_result {
-        Err(WorkflowError::SourceChainError(SourceChainError::InvalidCommit(_))) => {
-            let scratch_elements = workspace.source_chain().scratch_elements()?;
-            let is_locked_for_countersigning_session = if scratch_elements.len() == 1 {
-                let lock = SourceChain::lock_for_entry(scratch_elements[0].entry().as_option())?;
-                !lock.is_empty()
-                    && workspace
-                        .source_chain()
-                        .is_chain_locked(Vec::with_capacity(0))
-                        .await?
-                    && !workspace.source_chain().is_chain_locked(lock).await?
-            } else {
-                false
-            };
-            if is_locked_for_countersigning_session {
+    if matches!(
+        validation_result,
+        Err(WorkflowError::SourceChainError(
+            SourceChainError::InvalidCommit(_)
+        ))
+    ) {
+        let scratch_elements = workspace.source_chain().scratch_elements()?;
+        if scratch_elements.len() == 1 {
+            let lock = SourceChain::lock_for_entry(scratch_elements[0].entry().as_option())?;
+            if !lock.is_empty()
+                && workspace
+                    .source_chain()
+                    .is_chain_locked(Vec::with_capacity(0))
+                    .await?
+                && !workspace.source_chain().is_chain_locked(lock).await?
+            {
                 if let Err(error) = workspace.source_chain().unlock_chain().await {
                     tracing::error!(?error);
                 }
             }
-            validation_result?;
-            Ok(result)
         }
-        _ => Ok(result),
     }
+    validation_result?;
+    Ok(result)
 }
 
 /// Run validation inline and wait for the result.
