@@ -1,16 +1,28 @@
 use once_cell::sync::Lazy;
 use tokio::runtime::Runtime;
 
-pub static TOKIO: Lazy<Runtime> = Lazy::new(new_runtime);
+pub static TOKIO: Lazy<Runtime> = Lazy::new(|| new_runtime(None, None));
 
 /// Instantiate a new runtime.
-fn new_runtime() -> Runtime {
+pub fn new_runtime(worker_threads: Option<usize>, max_blocking_threads: Option<usize>) -> Runtime {
     // we want to use multiple threads
-    tokio::runtime::Builder::new_multi_thread()
+    let mut builder = tokio::runtime::Builder::new_multi_thread();
+
+    builder
         // we use both IO and Time tokio utilities
         .enable_all()
         // give our threads a descriptive name (they'll be numbered too)
-        .thread_name("holochain-tokio-thread")
+        .thread_name("holochain-tokio-thread");
+
+    if let Some(worker_threads) = worker_threads {
+        builder.worker_threads(worker_threads);
+    };
+
+    if let Some(max_blocking_threads) = max_blocking_threads {
+        builder.max_blocking_threads(max_blocking_threads);
+    };
+
+    builder
         // build the runtime
         .build()
         // panic if we cannot (we cannot run without it)

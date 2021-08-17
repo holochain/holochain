@@ -40,7 +40,10 @@ rec {
   # * CI scripts
   coreDev = hcMkShell {
     nativeBuildInputs = builtins.attrValues (pkgs.core)
-      ++ [ holonix.pkgs.sqlcipher ];
+      ++ (with holonix.pkgs;[
+        sqlcipher
+        gdb
+      ]);
   };
 
   ci = hcMkShell {
@@ -59,6 +62,7 @@ rec {
         lair-keystore
         sqlcipher
         binaryen
+        gdb
       ])
       ;
   };

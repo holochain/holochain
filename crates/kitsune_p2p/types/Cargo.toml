@@ -16,7 +16,7 @@ derive_more = "0.99.7"
 futures = "0.3"
 ghost_actor = "=0.3.0-alpha.3"
 kitsune_p2p_dht_arc = { version = "0.0.2-dev.0", path = "../dht_arc" }
-lair_keystore_api = "=0.0.2"
+lair_keystore_api = "=0.0.3"
 lru = "0.6.5"
 mockall = { version = "0.10.2", optional = true }
 nanoid = "0.3"

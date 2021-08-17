@@ -54,6 +54,7 @@ serde = { version = "1.0", features = [ "derive" ] }
 serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 serde_yaml = "0.8"
 shrinkwraprs = "0.3.0"
+sodoken = "=0.0.1-alpha.10"
 structopt = "0.3.11"
 strum = "0.18.0"
 tempdir = "0.3.7"
@@ -86,7 +87,7 @@ sd-notify = "0.3.0"
 [dev-dependencies]
 anyhow = "1.0.26"
 assert_cmd = "1.0.1"
-criterion = "0.3"
+criterion = { version = "0.3", features = [ "async_tokio" ] }
 maplit = "1"
 pretty_assertions = "0.6.1"
 serial_test = "0.4.0"
