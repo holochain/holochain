@@ -1191,6 +1191,7 @@ where
 mod builder {
     use super::*;
     use crate::conductor::dna_store::RealDnaStore;
+    use crate::conductor::handle::DevSettings;
     use crate::conductor::ConductorHandle;
     use holochain_sqlite::db::DbKind;
     #[cfg(any(test, feature = "test_utils"))]
@@ -1324,11 +1325,11 @@ mod builder {
                 conductor: RwLock::new(conductor),
                 keystore,
                 holochain_p2p,
-
-                #[cfg(any(test, feature = "test_utils"))]
-                skip_publish: std::sync::atomic::AtomicBool::new(false),
                 p2p_env: Arc::new(parking_lot::Mutex::new(HashMap::new())),
                 p2p_metrics_env: Arc::new(parking_lot::Mutex::new(HashMap::new())),
+
+                #[cfg(any(test, feature = "test_utils"))]
+                dev_settings: parking_lot::RwLock::new(DevSettings::default()),
             });
 
             Self::finish(handle, config, p2p_evt).await
@@ -1429,8 +1430,9 @@ mod builder {
                 holochain_p2p,
                 p2p_env: envs.p2p(),
                 p2p_metrics_env: envs.p2p_metrics(),
+
                 #[cfg(any(test, feature = "test_utils"))]
-                skip_publish: std::sync::atomic::AtomicBool::new(false),
+                dev_settings: parking_lot::RwLock::new(DevSettings::default()),
             });
 
             // Install extra DNAs, in particular:
