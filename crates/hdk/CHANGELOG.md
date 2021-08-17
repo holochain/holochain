@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - hdk: Added `accept_countersigning_preflight_request`
 - hdk: Added `session_times_from_millis`
 - hdk: Now supports creating and updating countersigned entries
+- hdk: Now supports deserializing countersigned entries in app entry `try_from`
 
 ## 0.0.102
 

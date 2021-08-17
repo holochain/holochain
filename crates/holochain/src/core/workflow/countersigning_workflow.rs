@@ -66,8 +66,9 @@ pub(crate) fn incoming_countersigning(
         if let DhtOp::StoreEntry(_, _, entry) = &op {
             // Must have a counter sign entry type.
             if let Entry::CounterSign(session_data, _) = entry.as_ref() {
+                let entry_hash = EntryHash::with_data_sync(&**entry);
                 // Get the required headers for this session.
-                let header_set = session_data.build_header_set()?;
+                let header_set = session_data.build_header_set(entry_hash)?;
 
                 // Get the expires time for this session.
                 let expires = *session_data.preflight_request().session_times().end();
@@ -220,10 +221,10 @@ pub(crate) async fn countersigning_success(
             let author = author.clone();
             let entry_hash = entry_hash.clone();
             move |txn| {
-            if let Some(cs) = current_countersigning_session(txn, Arc::new(author))? {
+            if let Some((cs_entry_hash, cs)) = current_countersigning_session(txn, Arc::new(author))? {
                 // Check we have the right session.
-                if *cs.entry_hash() == entry_hash {
-                    let stored_headers = cs.build_header_set()?;
+                if cs_entry_hash == entry_hash {
+                    let stored_headers = cs.build_header_set(entry_hash)?;
                     if stored_headers.len() == incoming_headers.len() {
                         // Check all stored header hashes match an incoming header hash.
                         if stored_headers.iter().all(|h| {
@@ -233,7 +234,7 @@ pub(crate) async fn countersigning_success(
                             // All checks have passed so unlock the chain.
                             mutations::unlock_chain(txn)?;
                             // Update ops to publish.
-                            txn.execute("UPDATE DhtOp SET withhold_publish = NULL WHERE header_hash = :header_hash", 
+                            txn.execute("UPDATE DhtOp SET withhold_publish = NULL WHERE header_hash = :header_hash",
                             named_params! {
                                 ":header_hash": this_cells_header_hash,
                                 }

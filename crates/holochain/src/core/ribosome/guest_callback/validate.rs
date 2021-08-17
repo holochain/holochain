@@ -67,7 +67,7 @@ impl Invocation for ValidateInvocation {
         }
         match self.element.entry().as_option() {
             Some(Entry::Agent(_)) => fns.push("agent".into()),
-            Some(Entry::App(_)) => {
+            Some(Entry::App(_)) | Some(Entry::CounterSign(_, _)) => {
                 fns.push("entry".into());
                 if let Some(EntryDefId::App(entry_def_id)) = self.entry_def_id.clone() {
                     fns.push(entry_def_id);
