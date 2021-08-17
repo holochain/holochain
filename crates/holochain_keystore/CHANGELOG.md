@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## \[Unreleased\]
 
 - Updated to lair 0.0.3
-  - switch to sqlite/sqlcipher for kestore backing database
+  - switch to sqlite/sqlcipher for keystore backing database
   - enable encryption via passphrase (not on windows)
 
 ## 0.0.2
