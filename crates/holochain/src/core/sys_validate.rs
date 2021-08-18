@@ -53,11 +53,12 @@ pub async fn author_key_is_valid(_author: &AgentPubKey) -> SysValidationResult<(
 
 /// Verify the countersigning session contains the specified header.
 pub fn check_countersigning_session_data_contains_header(
+    entry_hash: EntryHash,
     session_data: &CounterSigningSessionData,
     header: NewEntryHeaderRef<'_>,
 ) -> SysValidationResult<()> {
     let header_is_in_session = session_data
-        .build_header_set()
+        .build_header_set(entry_hash)
         .map_err(SysValidationError::from)?
         .iter()
         .any(|session_header| match (&header, session_header) {
@@ -115,11 +116,12 @@ pub async fn check_countersigning_preflight_response_signature(
 
 /// Verify all the countersigning session data together.
 pub async fn check_countersigning_session_data(
+    entry_hash: EntryHash,
     session_data: &CounterSigningSessionData,
     header: NewEntryHeaderRef<'_>,
 ) -> SysValidationResult<()> {
     session_data.check_integrity()?;
-    check_countersigning_session_data_contains_header(session_data, header)?;
+    check_countersigning_session_data_contains_header(entry_hash, session_data, header)?;
 
     let tasks: Vec<_> = session_data
         .responses()

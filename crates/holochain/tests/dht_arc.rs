@@ -1,9 +1,11 @@
 use holochain::sweettest::SweetAgents;
 use holochain::sweettest::SweetConductor;
 use holochain_keystore::KeystoreSender;
+use holochain_p2p::dht_arc::ArcInterval;
 use holochain_p2p::dht_arc::MAX_HALF_LENGTH;
 use holochain_p2p::dht_arc::MIN_PEERS;
 use holochain_p2p::dht_arc::MIN_REDUNDANCY;
+use holochain_zome_types::InlineZome;
 use kitsune_p2p::dht_arc::DhtArc;
 use kitsune_p2p::dht_arc::DhtArcBucket;
 use kitsune_p2p::*;
@@ -23,13 +25,13 @@ async fn get_peers(num: usize, half_lens: &[u32], keystore: KeystoreSender) -> V
     out
 }
 
-#[tokio::test(flavor = "multi_thread")]
-#[ignore = "Too unstable"]
 // Unfortunately I can't get nodes to "settle".
 // As a node shrinks their arc they may drop below the redundancy
 // target. This is because all nodes are changing their arcs concurrently.
 // TODO: Figure out some way to stabilize convergence so a network can become
 // stable given no new nodes.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "Too unstable"]
 async fn test_arc_coverage() {
     let conductor = SweetConductor::from_config(Default::default()).await;
     let keystore = conductor.keystore();
@@ -74,11 +76,11 @@ async fn test_arc_coverage() {
     }
 }
 
-#[tokio::test(flavor = "multi_thread")]
 // This test shows that we can handle maintaining our [`MINIMUM_REDUNDANCY`]
 // through 1000 trials. If this test ever fails it's not flakey. Instead that means
 // we can't actually maintain the [`MIN_REDUNDANCY`] and will need raise the [`REDUNDANCY_TARGET`].
 // Please @freesig if you see this fail.
+#[tokio::test(flavor = "multi_thread")]
 async fn test_arc_redundancy() {
     let conductor = SweetConductor::from_config(Default::default()).await;
     let keystore = conductor.keystore();
@@ -189,9 +191,9 @@ async fn test_arc_redundancy_all() {
     }
 }
 
-#[tokio::test(flavor = "multi_thread")]
 // Can survive 50% of the nodes changing per update without
 // dropping below [`MIN_REDUNDANCY`]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_join_leave() {
     let conductor = SweetConductor::from_config(Default::default()).await;
     let keystore = conductor.keystore();
@@ -228,4 +230,18 @@ async fn test_join_leave() {
         }
     }
     assert!(mature);
+}
+
+// Test that arcs can be manually resized
+#[tokio::test(flavor = "multi_thread")]
+async fn arc_resizing_smoke_test() {
+    use holochain::sweettest::*;
+    let mut conductor = SweetConductor::from_config(Default::default()).await;
+    let zome = InlineZome::new_unique(Vec::new());
+    let (dna, _) = SweetDnaFile::unique_from_inline_zome("zome", zome)
+        .await
+        .unwrap();
+    let app = conductor.setup_app("app", &[dna]).await.unwrap();
+    let (cell,) = app.into_tuple();
+    cell.set_storage_arc(ArcInterval::new(0, 1)).await;
 }

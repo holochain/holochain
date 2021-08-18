@@ -316,6 +316,10 @@ pub trait ConductorHandleT: Send + Sync {
     #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_triggers(&self, cell_id: &CellId) -> ConductorApiResult<QueueTriggers>;
 
+    /// Retrieve HolochainP2pCell. FOR TESTING ONLY.
+    #[cfg(any(test, feature = "test_utils"))]
+    async fn get_cell_network(&self, cell_id: &CellId) -> ConductorApiResult<HolochainP2pCell>;
+
     /// Retrieve the ConductorState. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
     async fn get_state_from_handle(&self) -> ConductorApiResult<ConductorState>;
@@ -380,7 +384,7 @@ pub struct DevSettings {
     pub _arc_resizing: bool,
 }
 
-/// Specify changes to be made to the Devsettings.
+/// Specify changes to be made to the DevSettings.
 /// None means no change, Some means make the specified change.
 #[derive(Default)]
 pub struct DevSettingsDelta {
@@ -1181,6 +1185,12 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn get_cell_triggers(&self, cell_id: &CellId) -> ConductorApiResult<QueueTriggers> {
         let cell = self.cell_by_id(cell_id).await?;
         Ok(cell.triggers().clone())
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    async fn get_cell_network(&self, cell_id: &CellId) -> ConductorApiResult<HolochainP2pCell> {
+        let cell = self.cell_by_id(cell_id).await?;
+        Ok(cell.holochain_p2p_cell().clone())
     }
 
     #[cfg(any(test, feature = "test_utils"))]

@@ -35,7 +35,7 @@ pub fn is_lock_expired(txn: &Transaction, lock: &[u8]) -> StateMutationResult<bo
             "
             SELECT end
             FROM ChainLock
-            WHERE 
+            WHERE
             lock = :lock
             ",
             named_params! {

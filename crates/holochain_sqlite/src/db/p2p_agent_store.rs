@@ -53,16 +53,6 @@ pub trait AsP2pStateTxExt {
 
     /// Query agents sorted by nearness to basis loc
     fn p2p_query_near_basis(&self, basis: u32, limit: u32) -> DatabaseResult<Vec<AgentInfoSigned>>;
-
-    /// Just update an agent's arc in the database, for testing, with caveats:
-    /// - the arc centerpoint may differ from the agent's location
-    /// - any other state, including the bootstrap server, will not be updated
-    #[cfg(any(test, feature = "test_utils"))]
-    fn improperly_update_agent_arc(
-        &self,
-        agent: &KitsuneAgent,
-        arc: ArcInterval,
-    ) -> DatabaseResult<()>;
 }
 
 impl AsP2pAgentStoreConExt for crate::db::PConn {
@@ -256,23 +246,6 @@ impl AsP2pStateTxExt for Transaction<'_> {
             out.push(r?);
         }
         Ok(out)
-    }
-
-    #[cfg(any(test, feature = "test_utils"))]
-    fn improperly_update_agent_arc(
-        &self,
-        agent: &KitsuneAgent,
-        arc: ArcInterval,
-    ) -> DatabaseResult<()> {
-        let mut stmt = self
-            .prepare(sql_p2p_agent_store::UPDATE_ARC)
-            .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
-
-        let (start, end) = arc.to_bounds_detached();
-        stmt.execute(
-            named_params! { ":agent": agent.0, ":storage_start_loc": start, ":storage_end_loc": end },
-        )?;
-        Ok(())
     }
 }
 

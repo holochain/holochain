@@ -12,7 +12,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 /// Create a new KitsuneDirect controller handle over the websocket channel.
 pub async fn new_handle_ws(
     ws_addr: std::net::SocketAddr,
-    _connect_passphrase: sodoken::Buffer,
+    _connect_passphrase: sodoken::BufRead,
 ) -> KdResult<(KdHnd, KdHndEvtStream)> {
     let url = format!("ws://{}", ws_addr);
 

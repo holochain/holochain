@@ -42,6 +42,7 @@ use crate::prelude::*;
 use crate::query::chain_head::ChainHeadQuery;
 use crate::scratch::Scratch;
 use crate::scratch::SyncScratch;
+use holo_hash::EntryHash;
 use holochain_serialized_bytes::prelude::*;
 
 pub use error::*;
@@ -118,7 +119,7 @@ impl SourceChain {
     // TODO: Maybe we should store data as elements in the scratch?
     // TODO: document that this is only the elemnts in the SCRATCH, not the
     //       entire source chain!
-    pub fn elements(&self) -> SourceChainResult<Vec<Element>> {
+    pub fn scratch_elements(&self) -> SourceChainResult<Vec<Element>> {
         Ok(self.scratch.apply(|scratch| scratch.elements().collect())?)
     }
 
@@ -152,9 +153,10 @@ impl SourceChain {
     }
 
     pub async fn put_countersigned(&self, entry: Entry) -> SourceChainResult<HeaderHash> {
+        let entry_hash = EntryHash::with_data_sync(&entry);
         if let Entry::CounterSign(ref session_data, _) = entry {
             self.put_with_header(
-                Header::from_countersigning_data(session_data, (*self.author).clone())?,
+                Header::from_countersigning_data(entry_hash, session_data, (*self.author).clone())?,
                 Some(entry),
             )
             .await
@@ -422,6 +424,13 @@ impl SourceChain {
         Ok(())
     }
 
+    pub async fn is_chain_locked(&self, lock: Vec<u8>) -> SourceChainResult<bool> {
+        Ok(self
+            .vault
+            .async_reader(move |txn| is_chain_locked(&txn, &lock))
+            .await?)
+    }
+
     pub async fn accept_countersigning_preflight_request(
         &self,
         preflight_request: PreflightRequest,
@@ -486,6 +495,15 @@ impl SourceChain {
         Ok(r)
     }
 
+    pub fn lock_for_entry(entry: Option<&Entry>) -> SourceChainResult<Vec<u8>> {
+        Ok(match entry {
+            Some(Entry::CounterSign(session_data, _)) => holo_hash::encode::blake2b_256(
+                &holochain_serialized_bytes::encode(session_data.preflight_request())?,
+            ),
+            _ => Vec::with_capacity(0),
+        })
+    }
+
     pub async fn flush(&self) -> SourceChainResult<()> {
         // Nothing to write
         if self.scratch.apply(|s| s.is_empty())? {
@@ -548,17 +566,11 @@ impl SourceChain {
             .map(|entry| entry.as_content())
             .find(|entry| matches!(entry, Entry::CounterSign(_, _)));
 
-        let lock = match maybe_countersigned_entry {
-            Some(Entry::CounterSign(session_data, _)) => {
-                if headers.len() != 1 {
-                    return Err(SourceChainError::DirtyCounterSigningWrite);
-                }
-                holo_hash::encode::blake2b_256(&holochain_serialized_bytes::encode(
-                    session_data.preflight_request(),
-                )?)
-            }
-            _ => Vec::with_capacity(0),
-        };
+        if matches!(maybe_countersigned_entry, Some(Entry::CounterSign(_, _))) && headers.len() != 1
+        {
+            return Err(SourceChainError::DirtyCounterSigningWrite);
+        }
+        let lock = Self::lock_for_entry(maybe_countersigned_entry)?;
 
         // Write the entries, headers and ops to the database in one transaction.
         let author = self.author.clone();
@@ -772,11 +784,11 @@ fn chain_head_scratch(
 }
 
 /// Check if there is a current countersigning session and if so, return the
-/// session data.
+/// session data and the entry hash.
 pub fn current_countersigning_session(
     txn: &Transaction<'_>,
     author: Arc<AgentPubKey>,
-) -> SourceChainResult<Option<CounterSigningSessionData>> {
+) -> SourceChainResult<Option<(EntryHash, CounterSigningSessionData)>> {
     // The chain must be locked for a session to be active.
     if is_chain_locked(txn, &[])? {
         match chain_head_db(txn, author) {
@@ -786,14 +798,17 @@ pub fn current_countersigning_session(
             Ok((hash, _, _)) => {
                 let txn: Txn = txn.into();
                 // Get the session data from the database.
-                let r = txn
-                    .get_element(&hash.into())?
-                    .and_then(|element| element.into_inner().1.into_option())
-                    .and_then(|entry| match entry {
-                        Entry::CounterSign(cs, _) => Some(*cs),
-                        _ => None,
-                    });
-                Ok(r)
+                let element = match txn.get_element(&hash.into())? {
+                    Some(element) => element,
+                    None => return Ok(None),
+                };
+                let (shh, ee) = element.into_inner();
+                Ok(match (shh.header().entry_hash(), ee.into_option()) {
+                    (Some(entry_hash), Some(Entry::CounterSign(cs, _))) => {
+                        Some((entry_hash.to_owned(), *cs))
+                    }
+                    _ => None,
+                })
             }
         }
     } else {
