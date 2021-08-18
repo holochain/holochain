@@ -36,7 +36,7 @@ toml_edit = "0.2"
 thiserror = "1"
 regex = "1.5"
 crates_io_api = "0.7"
-holochain_util = { path = "../holochain_util" ,version = "0.0.2"}
+holochain_util = { path = "../holochain_util" ,version = "0.0.3"}
 crates-index = "0.16"
 
 [dev-dependencies]
