@@ -411,8 +411,11 @@ macro_rules! app_entry {
                     $crate::prelude::Entry::App(eb) => Ok(Self::try_from(
                         $crate::prelude::SerializedBytes::from(eb.to_owned()),
                     )?),
+                    $crate::prelude::Entry::CounterSign(_, eb) => Ok(Self::try_from(
+                        $crate::prelude::SerializedBytes::from(eb.to_owned()),
+                    )?),
                     _ => Err($crate::prelude::SerializedBytesError::Deserialize(format!(
-                        "{:?} is not an Entry::App so has no serialized bytes",
+                        "{:?} is not an Entry::App or Entry::CounterSign so has no serialized bytes",
                         entry
                     ))
                     .into()),
@@ -438,7 +441,7 @@ macro_rules! app_entry {
             type Error = $crate::prelude::WasmError;
             fn try_from(element: &$crate::prelude::Element) -> Result<Self, Self::Error> {
                 Ok(match element.entry() {
-                    ElementEntry::Present(serialized) => Self::try_from(serialized)?,
+                    ElementEntry::Present(entry) => Self::try_from(entry)?,
                     _ => return Err(Self::Error::Guest(format!("Tried to deserialize an element, expecting it to contain entry data, but there was none. Element HeaderHash: {}", element.header_hashed().as_hash()))),
                 })
             }

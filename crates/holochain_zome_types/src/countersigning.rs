@@ -133,6 +133,9 @@ pub type CounterSigningAgents = Vec<(AgentPubKey, Vec<Role>)>;
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct PreflightRequest {
+    /// The hash of the app entry, as if it were not countersigned.
+    /// The final entry hash will include the countersigning session.
+    app_entry_hash: EntryHash,
     /// The agents that are participating in this countersignature session.
     signing_agents: CounterSigningAgents,
     /// The agent that must receive and include all other headers in their own header.
@@ -151,6 +154,7 @@ pub struct PreflightRequest {
 impl PreflightRequest {
     /// Fallible constructor.
     pub fn try_new(
+        app_entry_hash: EntryHash,
         signing_agents: CounterSigningAgents,
         enzyme_index: Option<u8>,
         session_times: CounterSigningSessionTimes,
@@ -158,6 +162,7 @@ impl PreflightRequest {
         preflight_bytes: PreflightBytes,
     ) -> Result<Self, CounterSigningError> {
         let preflight_request = Self {
+            app_entry_hash,
             signing_agents,
             enzyme_index,
             session_times,
@@ -448,31 +453,17 @@ pub enum HeaderBase {
     // CreateLink(CreateLinkBase),
 }
 
-impl HeaderBase {
-    /// Get the entry hash for this header.
-    pub fn entry_hash(&self) -> &EntryHash {
-        match self {
-            HeaderBase::Create(CreateBase { entry_hash, .. })
-            | HeaderBase::Update(UpdateBase { entry_hash, .. }) => entry_hash,
-        }
-    }
-}
-
 /// Base data for Create headers.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct CreateBase {
     entry_type: EntryType,
-    entry_hash: EntryHash,
 }
 
 impl CreateBase {
     /// Constructor.
-    pub fn new(entry_type: EntryType, entry_hash: EntryHash) -> Self {
-        Self {
-            entry_type,
-            entry_hash,
-        }
+    pub fn new(entry_type: EntryType) -> Self {
+        Self { entry_type }
     }
 }
 
@@ -483,12 +474,12 @@ pub struct UpdateBase {
     original_header_address: HeaderHash,
     original_entry_address: EntryHash,
     entry_type: EntryType,
-    entry_hash: EntryHash,
 }
 
 impl Header {
     /// Construct a Header from the HeaderBase and associated session data.
     pub fn from_countersigning_data(
+        entry_hash: EntryHash,
         session_data: &CounterSigningSessionData,
         author: AgentPubKey,
     ) -> Result<Self, CounterSigningError> {
@@ -500,7 +491,7 @@ impl Header {
                 header_seq: agent_state.header_seq + 1,
                 prev_header: agent_state.chain_top.clone(),
                 entry_type: create_base.entry_type.clone(),
-                entry_hash: create_base.entry_hash.clone(),
+                entry_hash,
             }),
             HeaderBase::Update(update_base) => Header::Update(Update {
                 author,
@@ -510,7 +501,7 @@ impl Header {
                 original_header_address: update_base.original_header_address.clone(),
                 original_entry_address: update_base.original_entry_address.clone(),
                 entry_type: update_base.entry_type.clone(),
-                entry_hash: update_base.entry_hash.clone(),
+                entry_hash,
             }),
         })
     }
@@ -565,10 +556,17 @@ impl CounterSigningSessionData {
     /// Attempt to map countersigning session data to a set of headers.
     /// A given countersigning session always maps to the same ordered set of headers or an error.
     /// Note the headers are not signed as the intent is to build headers for other agents without their private keys.
-    pub fn build_header_set(&self) -> Result<Vec<Header>, CounterSigningError> {
+    pub fn build_header_set(
+        &self,
+        entry_hash: EntryHash,
+    ) -> Result<Vec<Header>, CounterSigningError> {
         let mut headers = vec![];
         for (agent, _role) in self.preflight_request.signing_agents().iter() {
-            headers.push(Header::from_countersigning_data(self, agent.clone())?);
+            headers.push(Header::from_countersigning_data(
+                entry_hash.clone(),
+                self,
+                agent.clone(),
+            )?);
         }
         Ok(headers)
     }
@@ -631,11 +629,6 @@ impl CounterSigningSessionData {
     /// Accessor to responses.
     pub fn responses(&self) -> &Vec<(CounterSigningAgentState, Signature)> {
         &self.responses
-    }
-
-    /// Get the entry hash for this session.
-    pub fn entry_hash(&self) -> &EntryHash {
-        self.preflight_request.header_base.entry_hash()
     }
 
     /// Mutable responses accessor for testing.

@@ -26,10 +26,10 @@ async fn test_direct_sanity() {
     let ws_addr = kd.get_ui_addr().unwrap();
     println!("ws_addr: {}", ws_addr);
 
-    let pass = sodoken::Buffer::new_memlocked(4).unwrap();
+    let pass = sodoken::BufWrite::new_mem_locked(4).unwrap();
     pass.write_lock().copy_from_slice(&[1, 2, 3, 4]);
 
-    let (hnd, mut hnd_evt) = new_handle_ws(ws_addr, pass).await.unwrap();
+    let (hnd, mut hnd_evt) = new_handle_ws(ws_addr, pass.to_read()).await.unwrap();
 
     let (m_s, mut m_r) = tokio::sync::mpsc::channel(32);
     tokio::task::spawn(async move {

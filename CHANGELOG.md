@@ -6,6 +6,115 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20210817.185301
+
+## [holochain-0.0.103](crates/holochain/CHANGELOG.md#0.0.103)
+
+### Fixed
+
+- This release solves the issues with installing happ bundles or registering DNA via the admin API concurrently. [\#881](https://github.com/holochain/holochain/pull/881).
+
+### Changed
+
+- Header builder now uses chain top timestamp for new headers if in the future
+- Timestamps in headers require strict inequality in sys validation
+
+## [holochain\_test\_wasm\_common-0.0.3](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.3)
+
+## [holochain\_cascade-0.0.3](crates/holochain_cascade/CHANGELOG.md#0.0.3)
+
+## [holochain\_cli-0.0.4](crates/holochain_cli/CHANGELOG.md#0.0.4)
+
+## [holochain\_cli\_sandbox-0.0.4](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.4)
+
+## [holochain\_websocket-0.0.3](crates/holochain_websocket/CHANGELOG.md#0.0.3)
+
+## [holochain\_conductor\_api-0.0.3](crates/holochain_conductor_api/CHANGELOG.md#0.0.3)
+
+- BREAKING: CONDUCTOR CONFIG CHANGE–related to update to lair 0.0.3
+  - `passphrase_service` is now required
+    - The only implemented option is `danger_insecure_from_config`
+
+#### Example
+
+``` yaml
+---
+passphrase_service:
+  type: danger_insecure_from_config
+  passphrase: "foobar"
+```
+
+## [holochain\_state-0.0.3](crates/holochain_state/CHANGELOG.md#0.0.3)
+
+## [holochain\_wasm\_test\_utils-0.0.3](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.3)
+
+## [holochain\_p2p-0.0.3](crates/holochain_p2p/CHANGELOG.md#0.0.3)
+
+## [holochain\_cli\_bundle-0.0.3](crates/holochain_cli_bundle/CHANGELOG.md#0.0.3)
+
+## [holochain\_types-0.0.3](crates/holochain_types/CHANGELOG.md#0.0.3)
+
+## [holochain\_keystore-0.0.3](crates/holochain_keystore/CHANGELOG.md#0.0.3)
+
+- Updated to lair 0.0.3
+  - switch to sqlite/sqlcipher for keystore backing database
+  - enable encryption via passphrase (not on windows)
+
+## [holochain\_sqlite-0.0.3](crates/holochain_sqlite/CHANGELOG.md#0.0.3)
+
+## [kitsune\_p2p-0.0.3](crates/kitsune_p2p/CHANGELOG.md#0.0.3)
+
+## [kitsune\_p2p\_proxy-0.0.3](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.3)
+
+## [kitsune\_p2p\_transport\_quic-0.0.3](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.3)
+
+## [kitsune\_p2p\_types-0.0.3](crates/kitsune_p2p_types/CHANGELOG.md#0.0.3)
+
+## [kitsune\_p2p\_dht\_arc-0.0.2](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.0.2)
+
+## [mr\_bundle-0.0.3](crates/mr_bundle/CHANGELOG.md#0.0.3)
+
+## [holochain\_util-0.0.3](crates/holochain_util/CHANGELOG.md#0.0.3)
+
+## [hdk-0.0.103](crates/hdk/CHANGELOG.md#0.0.103)
+
+### Changed
+
+- hdk: `sys_time` returns `Timestamp` instead of `Duration`
+
+### Added
+
+- hdk: Added `accept_countersigning_preflight_request`
+
+- hdk: Added `session_times_from_millis`
+
+- hdk: Now supports creating and updating countersigned entries
+
+- hdk: Now supports deserializing countersigned entries in app entry `try_from`
+
+- hdk: implements multi-call for:
+  
+  - `remote_call`
+  - `call`
+  - `get`
+  - `get_details`
+  - `get_links`
+  - `get_link_details`
+  
+  We strictly only needed `remote_call` for countersigning, but feedback from the community was that having to sequentially loop over these common HDK functions is a pain point, so we enabled all of them to be async over a vector of inputs.
+
+## [hdk\_derive-0.0.5](crates/hdk_derive/CHANGELOG.md#0.0.5)
+
+## [holochain\_zome\_types-0.0.5](crates/holochain_zome_types/CHANGELOG.md#0.0.5)
+
+### Added
+
+- Countersigning related functions and structs
+
+## [holo\_hash-0.0.5](crates/holo_hash/CHANGELOG.md#0.0.5)
+
+## [fixt-0.0.5](crates/fixt/CHANGELOG.md#0.0.5)
+
 # 20210722.172107
 
 ## [holochain-0.0.102](crates/holochain/CHANGELOG.md#0.0.102)
