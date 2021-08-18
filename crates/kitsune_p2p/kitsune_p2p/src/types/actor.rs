@@ -1,6 +1,6 @@
 //! Definitions related to the KitsuneP2p peer-to-peer / dht communications actor.
 
-use kitsune_p2p_types::bin_types::KitsuneAgent;
+use kitsune_p2p_types::bin_types::{KitsuneAgent, KitsuneSpace};
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::dht_arc::ArcInterval;
 use kitsune_p2p_types::KitsuneTimeout;
@@ -130,7 +130,7 @@ ghost_actor::ghost_chan! {
 
         /// Run "backdoor" methods, used only during testing
         #[cfg(feature = "test_utils")]
-        fn test_backdoor(action: TestBackdoor) -> ();
+        fn test_backdoor(space: KSpace, action: TestBackdoor) -> ();
     }
 }
 

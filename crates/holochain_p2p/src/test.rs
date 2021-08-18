@@ -127,6 +127,7 @@ impl HolochainP2pHandler for StubNetwork {
     #[cfg(feature = "test_utils")]
     fn handle_test_backdoor(
         &mut self,
+        dna_hash: DnaHash,
         action: kitsune_p2p::actor::TestBackdoor,
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())

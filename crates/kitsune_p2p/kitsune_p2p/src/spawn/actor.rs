@@ -758,7 +758,20 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
     }
 
     #[cfg(feature = "test_utils")]
-    fn handle_test_backdoor(&mut self, _action: TestBackdoor) -> KitsuneP2pHandlerResult<()> {
-        todo!("dispatch to space")
+    fn handle_test_backdoor(
+        &mut self,
+        space: Arc<KitsuneSpace>,
+        action: TestBackdoor,
+    ) -> KitsuneP2pHandlerResult<()> {
+        let space_sender = match self.spaces.get_mut(&space) {
+            None => return Err(KitsuneP2pError::RoutingSpaceError(space)),
+            Some(space) => space.get(),
+        };
+        Ok(async move {
+            let (space_sender, _) = space_sender.await;
+            space_sender.test_backdoor(space, action).await
+        }
+        .boxed()
+        .into())
     }
 }

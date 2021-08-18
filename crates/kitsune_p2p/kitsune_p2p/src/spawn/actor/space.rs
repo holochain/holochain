@@ -844,7 +844,11 @@ impl KitsuneP2pHandler for Space {
     }
 
     #[cfg(feature = "test_utils")]
-    fn handle_test_backdoor(&mut self, action: TestBackdoor) -> KitsuneP2pHandlerResult<()> {
+    fn handle_test_backdoor(
+        &mut self,
+        _space: Arc<KitsuneSpace>,
+        action: TestBackdoor,
+    ) -> KitsuneP2pHandlerResult<()> {
         let space = self.space.clone();
         let mut mdns_handles = self.mdns_handles.clone();
         let network_type = self.config.network_type.clone();

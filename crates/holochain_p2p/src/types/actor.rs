@@ -285,7 +285,7 @@ ghost_actor::ghost_chan! {
 
         /// Run "backdoor" methods, used only during testing
         #[cfg(any(test, feature = "test_utils"))]
-        fn test_backdoor(action: TestBackdoor) -> ();
+        fn test_backdoor(dna_hash: DnaHash, action: TestBackdoor) -> ();
     }
 }
 

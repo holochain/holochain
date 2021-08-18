@@ -350,7 +350,9 @@ impl HolochainP2pCellT for HolochainP2pCell {
         &self,
         action: kitsune_p2p::actor::TestBackdoor,
     ) -> actor::HolochainP2pResult<()> {
-        self.sender.test_backdoor(action).await
+        self.sender
+            .test_backdoor((*self.dna_hash).clone(), action)
+            .await
     }
 }
 

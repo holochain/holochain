@@ -384,7 +384,7 @@ pub struct DevSettings {
     pub _arc_resizing: bool,
 }
 
-/// Specify changes to be made to the Devsettings.
+/// Specify changes to be made to the DevSettings.
 /// None means no change, Some means make the specified change.
 #[derive(Default)]
 pub struct DevSettingsDelta {

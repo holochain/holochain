@@ -1363,8 +1363,15 @@ impl HolochainP2pHandler for HolochainP2pActor {
     #[cfg(feature = "test_utils")]
     fn handle_test_backdoor(
         &mut self,
-        _action: kitsune_p2p::actor::TestBackdoor,
+        dna_hash: DnaHash,
+        action: kitsune_p2p::actor::TestBackdoor,
     ) -> HolochainP2pHandlerResult<()> {
-        unimplemented!()
+        let space = dna_hash.into_kitsune();
+        let kitsune_p2p = self.kitsune_p2p.clone();
+        Ok(
+            async move { Ok(kitsune_p2p.test_backdoor(space, action).await?) }
+                .boxed()
+                .into(),
+        )
     }
 }
