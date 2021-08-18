@@ -4,9 +4,10 @@ use crate::gossip::sharded_gossip::tests::common::dangerous_fake_agent_info_with
 
 use super::common::agent_info;
 use super::common::spawn_handler;
-use super::sharded_scenario_local::*;
 use super::test_local_sync::three_way_sharded_ownership;
 use super::*;
+use crate::test_util::scenario_def_local::*;
+use crate::NOISE;
 
 /// Data which represents the agent store of a backend.
 /// Specifies a list of agents along with their arc and timestamped op hashes held.
