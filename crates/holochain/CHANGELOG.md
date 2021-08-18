@@ -4,9 +4,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.0.103
+
 ### Fixed
 
-- This release solves the issues with installing happ bundles or registering DNA via the admin API concurrently. [#881](https://github.com/holochain/holochain/pull/881).
+- This release solves the issues with installing happ bundles or registering DNA via the admin API concurrently. [\#881](https://github.com/holochain/holochain/pull/881).
 
 ### Changed
 
