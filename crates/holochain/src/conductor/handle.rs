@@ -387,7 +387,7 @@ pub struct DevSettings {
 /// Specify changes to be made to the Devsettings.
 /// None means no change, Some means make the specified change.
 #[derive(Default)]
-pub(crate) struct DevSettingsDelta {
+pub struct DevSettingsDelta {
     /// Determines whether publishing should be enabled
     pub publish: Option<bool>,
     /// Determines whether storage arc resizing should be enabled
