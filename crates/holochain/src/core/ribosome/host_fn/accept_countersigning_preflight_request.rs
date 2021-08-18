@@ -393,7 +393,7 @@ pub mod wasm_test {
 
         // Creating the correct countersigned entry will NOT immediately unlock
         // the chain (it needs Bob to countersign).
-        let _: HeaderHash = conductor
+        let countersigned_header_hash_alice: HeaderHash = conductor
             .call(
                 &alice,
                 "create_a_countersigned_thing",
@@ -422,6 +422,19 @@ pub mod wasm_test {
             _ => unreachable!(),
         };
 
+        // The countersigned entry does NOT appear in alice's activity yet.
+        let alice_activity_pre: AgentActivity = conductor
+            .call(
+                &alice,
+                "get_agent_activity",
+                GetAgentActivityInput {
+                    agent_pubkey: alice_pubkey.clone(),
+                    chain_query_filter: ChainQueryFilter::new(),
+                    activity_request: ActivityRequest::Full,
+                }
+            ).await;
+        assert_eq!(alice_activity_pre.valid_activity.len(), 6);
+
         // Creation will still fail for bob.
         let thing_fail_create_bob = conductor
             .handle()
@@ -445,7 +458,7 @@ pub mod wasm_test {
         };
 
         // After bob commits the same countersigned entry he can unlock his chain.
-        let _: HeaderHash = conductor
+        let countersigned_header_hash_bob: HeaderHash = conductor
             .call(
                 &bobbo,
                 "create_a_countersigned_thing",
@@ -455,5 +468,76 @@ pub mod wasm_test {
         tokio::time::sleep(std::time::Duration::from_millis(4000)).await;
         let _: HeaderHash = conductor.call(&alice, "create_a_thing", ()).await;
         let _: HeaderHash = conductor.call(&bobbo, "create_a_thing", ()).await;
+
+        // Header get must not error.
+        let countersigned_header_bob: SignedHeaderHashed = conductor
+            .call(
+                &bobbo,
+                "must_get_header",
+                countersigned_header_hash_bob.clone()
+            )
+            .await;
+        let countersigned_header_alice: SignedHeaderHashed = conductor
+            .call(
+                &alice,
+                "must_get_header",
+                countersigned_header_hash_alice.clone(),
+            ).await;
+
+        // Entry get must not error.
+        if let Some((countersigned_entry_hash_bob, _)) = countersigned_header_bob.header().entry_data() {
+            let _countersigned_entry_bob: EntryHashed = conductor
+                .call(
+                    &bobbo,
+                    "must_get_entry",
+                    countersigned_entry_hash_bob
+                )
+                .await;
+        } else {
+            unreachable!();
+        }
+
+        // Element get must not error.
+        let _countersigned_element_bob: Element = conductor
+            .call(
+                &bobbo,
+                "must_get_valid_element",
+                countersigned_header_hash_bob
+            )
+            .await;
+
+        let alice_activity: AgentActivity = conductor
+            .call(
+                &alice,
+                "get_agent_activity",
+                GetAgentActivityInput {
+                    agent_pubkey: alice_pubkey.clone(),
+                    chain_query_filter: ChainQueryFilter::new(),
+                    activity_request: ActivityRequest::Full,
+                }
+            ).await;
+        assert_eq!(alice_activity.valid_activity.len(), 8);
+        assert_eq!(
+            &alice_activity.valid_activity[6].1,
+            countersigned_header_alice.header_hashed().as_hash(),
+        );
+
+        let bob_activity: AgentActivity = conductor
+            .call(
+                &bobbo,
+                "get_agent_activity",
+                GetAgentActivityInput {
+
+                    agent_pubkey: bob_pubkey.clone(),
+                    chain_query_filter: ChainQueryFilter::new(),
+                    activity_request: ActivityRequest::Full,
+                }
+            )
+            .await;
+        assert_eq!(bob_activity.valid_activity.len(), 6);
+        assert_eq!(
+            &bob_activity.valid_activity[4].1,
+            countersigned_header_bob.header_hashed().as_hash(),
+        );
     }
 }
