@@ -254,9 +254,9 @@ pub fn create_config(port: u16, environment_path: PathBuf) -> ConductorConfig {
         environment_path: environment_path.into(),
         network: None,
         dpki: None,
-        passphrase_service: Some(PassphraseServiceConfig::FromConfig {
+        passphrase_service: PassphraseServiceConfig::DangerInsecureFromConfig {
             passphrase: "password".into(),
-        }),
+        },
         keystore_path: None,
         use_dangerous_test_keystore: true,
     }
