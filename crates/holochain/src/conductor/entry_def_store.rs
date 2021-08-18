@@ -140,6 +140,7 @@ mod tests {
             crdt_type: CrdtType,
             required_validations: 5.into(),
             required_validation_type: Default::default(),
+            chain_top_ordering: Default::default(),
         };
         let comment_def = EntryDef {
             id: "comment".into(),
@@ -147,6 +148,7 @@ mod tests {
             crdt_type: CrdtType,
             required_validations: 5.into(),
             required_validation_type: Default::default(),
+            chain_top_ordering: Default::default(),
         };
         let dna_wasm = DnaWasmHashed::from_content(TestWasm::EntryDefs.into())
             .await

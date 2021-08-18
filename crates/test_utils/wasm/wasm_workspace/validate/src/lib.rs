@@ -43,6 +43,7 @@ impl From<&ThisWasmEntry> for EntryDef {
             required_validations: entry.into(),
             visibility: entry.into(),
             required_validation_type: Default::default(),
+            chain_top_ordering: Default::default(),
         }
     }
 }

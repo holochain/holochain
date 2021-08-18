@@ -236,6 +236,7 @@ mod slow_tests {
                         crdt_type: CrdtType,
                         required_validations: 5.into(),
                         required_validation_type: Default::default(),
+                        chain_top_ordering: Default::default(),
                     },
                     EntryDef {
                         id: "comment".into(),
@@ -243,6 +244,7 @@ mod slow_tests {
                         crdt_type: CrdtType,
                         required_validations: 5.into(),
                         required_validation_type: Default::default(),
+                        chain_top_ordering: Default::default(),
                     },
                 ]
                 .into();

@@ -82,6 +82,7 @@ pub use std::convert::TryFrom;
 pub use tracing;
 pub use tracing::{debug, error, info, instrument, trace, warn};
 pub use tracing_subscriber;
+pub use validate::RequiredValidationType;
 
 #[cfg(feature = "mock")]
 pub use mockall;

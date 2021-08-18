@@ -13,6 +13,7 @@ struct EntryVisibility(holochain_zome_types::entry_def::EntryVisibility);
 struct CrdtType(holochain_zome_types::crdt::CrdtType);
 struct RequiredValidations(holochain_zome_types::entry_def::RequiredValidations);
 struct RequiredValidationType(holochain_zome_types::validate::RequiredValidationType);
+struct ChainTopOrdering(holochain_zome_types::entry_def::ChainTopOrdering);
 
 impl Parse for EntryDef {
     fn parse(input: ParseStream) -> Result<Self> {
@@ -23,6 +24,7 @@ impl Parse for EntryDef {
         let crdt_type = holochain_zome_types::crdt::CrdtType::default();
         let mut required_validation_type =
             holochain_zome_types::validate::RequiredValidationType::default();
+        let mut chain_top_ordering = holochain_zome_types::entry_def::ChainTopOrdering::default();
 
         let vars = Punctuated::<syn::MetaNameValue, syn::Token![,]>::parse_terminated(input)?;
         for var in vars {
@@ -88,6 +90,20 @@ impl Parse for EntryDef {
                     "crdt_type" => {
                         unimplemented!();
                     }
+                    "chain_top_ordering" => match var.lit {
+                        syn::Lit::Str(s) => {
+                            chain_top_ordering = match s.value().as_str() {
+                                "strict" => {
+                                    holochain_zome_types::entry_def::ChainTopOrdering::Strict
+                                }
+                                "relaxed" => {
+                                    holochain_zome_types::entry_def::ChainTopOrdering::Relaxed
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        _ => unreachable!(),
+                    },
                     _ => {}
                 }
             }
@@ -98,6 +114,7 @@ impl Parse for EntryDef {
             crdt_type,
             required_validations,
             required_validation_type,
+            chain_top_ordering,
         }))
     }
 }
@@ -147,6 +164,21 @@ impl quote::ToTokens for EntryVisibility {
     }
 }
 
+impl quote::ToTokens for ChainTopOrdering {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        let variant = syn::Ident::new(
+            match self.0 {
+                holochain_zome_types::entry_def::ChainTopOrdering::Strict => "Strict",
+                holochain_zome_types::entry_def::ChainTopOrdering::Relaxed => "Relaxed",
+            },
+            proc_macro2::Span::call_site(),
+        );
+        tokens.append_all(quote::quote! {
+            hdk::prelude::ChainTopOrdering::#variant
+        });
+    }
+}
+
 impl quote::ToTokens for RequiredValidationType {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let variant = syn::Ident::new(
@@ -171,6 +203,7 @@ impl quote::ToTokens for EntryDef {
         let crdt_type = CrdtType(self.0.crdt_type);
         let required_validations = RequiredValidations(self.0.required_validations);
         let required_validation_type = RequiredValidationType(self.0.required_validation_type);
+        let chain_top_ordering = ChainTopOrdering(self.0.chain_top_ordering);
 
         tokens.append_all(quote::quote! {
             hdk::prelude::EntryDef {
@@ -179,6 +212,7 @@ impl quote::ToTokens for EntryDef {
                 crdt_type: #crdt_type,
                 required_validations: #required_validations,
                 required_validation_type: #required_validation_type,
+                chain_top_ordering: #chain_top_ordering,
             }
         });
     }

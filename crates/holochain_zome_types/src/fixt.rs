@@ -455,8 +455,13 @@ fixturator!(
 );
 
 fixturator!(
+    ChainTopOrdering;
+    unit variants [ Strict Relaxed ] empty Strict;
+);
+
+fixturator!(
     EntryDef;
-    constructor fn new(EntryDefId, EntryVisibility, CrdtType, RequiredValidations, RequiredValidationType);
+    constructor fn new(EntryDefId, EntryVisibility, CrdtType, RequiredValidations, RequiredValidationType, ChainTopOrdering);
 );
 
 fixturator!(

@@ -67,6 +67,27 @@ impl EntryVisibility {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum ChainTopOrdering {
+    /// The chain top MUST NOT move relative to the zome call that writes a
+    /// strict entry. If ANY strict entry is written in a zome call and the
+    /// head moves, ALL entries in the zome call will be rolled back with an
+    /// error. Validation rules for strict entries MAY rely on chain ordering.
+    Strict,
+    /// The chain top CAN move relative to the zome call that writes a relaxed
+    /// entry. If ALL entries written in a zome call are relaxed and the chain
+    /// head moves they will ALL have their headers REWRITTEN relative to the
+    /// new chain head. Validation rules for relaxed entries MUST NOT rely on
+    /// chain ordering.
+    Relaxed,
+}
+
+impl Default for ChainTopOrdering {
+    fn default() -> Self {
+        Self::Strict
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct EntryDef {
     /// Zome-unique identifier for this entry type
@@ -79,6 +100,9 @@ pub struct EntryDef {
     pub required_validations: RequiredValidations,
     /// The required validation package for this entry
     pub required_validation_type: RequiredValidationType,
+    /// Does this entry allow the chain to move relative to the zome call that
+    /// wrote it?
+    pub chain_top_ordering: ChainTopOrdering,
 }
 
 impl EntryDef {
@@ -88,6 +112,7 @@ impl EntryDef {
         crdt_type: CrdtType,
         required_validations: RequiredValidations,
         required_validation_type: RequiredValidationType,
+        chain_top_ordering: ChainTopOrdering,
     ) -> Self {
         Self {
             id,
@@ -95,6 +120,7 @@ impl EntryDef {
             crdt_type,
             required_validations,
             required_validation_type,
+            chain_top_ordering,
         }
     }
 
@@ -102,6 +128,7 @@ impl EntryDef {
     pub fn default_with_id<I: Into<EntryDefId>>(id: I) -> Self {
         EntryDef::new(
             id.into(),
+            Default::default(),
             Default::default(),
             Default::default(),
             Default::default(),
