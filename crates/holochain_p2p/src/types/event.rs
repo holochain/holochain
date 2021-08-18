@@ -8,6 +8,7 @@ use holochain_zome_types::signature::Signature;
 use kitsune_p2p::{
     agent_store::AgentInfoSigned,
     event::{MetricKind, MetricQuery, MetricQueryAnswer, TimeWindowMs},
+    KitsuneAgent, KitsuneSpace,
 };
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
@@ -105,34 +106,50 @@ impl From<&actor::GetActivityOptions> for GetActivityOptions {
     }
 }
 
+// mockall::automock can't handle `< >` tokens :(
+pub(crate) type KAgent = Arc<KitsuneAgent>;
+pub(crate) type KSpace = Arc<KitsuneSpace>;
+pub(crate) type AgentInfoSignedVec = Vec<AgentInfoSigned>;
+pub(crate) type KAgentHashSetOption = Option<std::collections::HashSet<KAgent>>;
+pub(crate) type AgentPubKeyVec = Vec<AgentPubKey>;
+pub(crate) type AgentPubKeyVecOption = Option<Vec<AgentPubKey>>;
+pub(crate) type DhtArcSetArc = Arc<kitsune_p2p_types::dht_arc::DhtArcSet>;
+pub(crate) type CapSecretOption = Option<CapSecret>;
+pub(crate) type PublishOps = Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>;
+pub(crate) type ToAgents = Vec<(AgentPubKey, kitsune_p2p::dht_arc::DhtArcSet)>;
+pub(crate) type DhtOpHashVec = Vec<holo_hash::DhtOpHash>;
+pub(crate) type ByteVec = Vec<u8>;
+pub(crate) type SignedHeaderVec = Vec<SignedHeader>;
+pub(crate) type OptionU64 = Option<u64>;
+
 ghost_actor::ghost_chan! {
     /// The HolochainP2pEvent stream allows handling events generated from
     /// the HolochainP2p actor.
     pub chan HolochainP2pEvent<super::HolochainP2pError> {
         /// We need to store signed agent info.
-        fn put_agent_info_signed(dna_hash: DnaHash, peer_data: Vec<AgentInfoSigned>) -> ();
+        fn put_agent_info_signed(dna_hash: DnaHash, peer_data: AgentInfoSignedVec) -> ();
 
         /// We need to get previously stored agent info.
-        fn get_agent_info_signed(dna_hash: DnaHash, to_agent: AgentPubKey, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>) -> Option<AgentInfoSigned>;
+        fn get_agent_info_signed(dna_hash: DnaHash, to_agent: AgentPubKey, kitsune_space: KSpace, kitsune_agent: KAgent) -> Option<AgentInfoSigned>;
 
         /// We need to get previously stored agent info.
-        fn query_agent_info_signed(dna_hash: DnaHash, agents: Option<std::collections::HashSet<Arc<kitsune_p2p::KitsuneAgent>>>, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>) -> Vec<AgentInfoSigned>;
+        fn query_agent_info_signed(dna_hash: DnaHash, agents: KAgentHashSetOption, kitsune_space: KSpace) -> Vec<AgentInfoSigned>;
 
         /// We need to get agents that fit into an arc set for gossip.
         fn query_gossip_agents(
             dna_hash: DnaHash,
-            agents: Option<Vec<AgentPubKey>>,
-            kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
+            agents: AgentPubKeyVecOption,
+            kitsune_space: KSpace,
             since_ms: u64,
             until_ms: u64,
-            arc_set: Arc<kitsune_p2p_types::dht_arc::DhtArcSet>,
-        ) -> Vec<(Arc<kitsune_p2p::KitsuneAgent>, kitsune_p2p_types::dht_arc::ArcInterval)>;
+            arc_set: DhtArcSetArc,
+        ) -> Vec<(KAgent, kitsune_p2p_types::dht_arc::ArcInterval)>;
 
         /// query agent info in order of closeness to a basis location.
-        fn query_agent_info_signed_near_basis(dna_hash: DnaHash, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, basis_loc: u32, limit: u32) -> Vec<AgentInfoSigned>;
+        fn query_agent_info_signed_near_basis(dna_hash: DnaHash, kitsune_space: KSpace, basis_loc: u32, limit: u32) -> Vec<AgentInfoSigned>;
 
         /// Query the peer density of a space for a given [`DhtArc`].
-        fn query_peer_density(dna_hash: DnaHash, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, dht_arc: kitsune_p2p_types::dht_arc::DhtArc) -> kitsune_p2p_types::dht_arc::PeerDensity;
+        fn query_peer_density(dna_hash: DnaHash, kitsune_space: KSpace, dht_arc: kitsune_p2p_types::dht_arc::DhtArc) -> kitsune_p2p_types::dht_arc::PeerDensity;
 
         /// We need to store some metric data on behalf of kitsune.
         fn put_metric_datum(dna_hash: DnaHash, to_agent: AgentPubKey, agent: AgentPubKey, metric: MetricKind, timestamp: SystemTime) -> ();
@@ -147,7 +164,7 @@ ghost_actor::ghost_chan! {
             from_agent: AgentPubKey,
             zome_name: ZomeName,
             fn_name: FunctionName,
-            cap: Option<CapSecret>,
+            cap: CapSecretOption,
             payload: ExternIO,
         ) -> SerializedBytes;
 
@@ -157,7 +174,7 @@ ghost_actor::ghost_chan! {
             to_agent: AgentPubKey,
             request_validation_receipt: bool,
             countersigning_session: bool,
-            ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+            ops: PublishOps,
         ) -> ();
 
         /// A remote node is requesting a validation package.
@@ -215,7 +232,7 @@ ghost_actor::ghost_chan! {
         /// Returns the actual time window of returned ops as well.
         fn query_op_hashes(
             dna_hash: DnaHash,
-            to_agents: Vec<(AgentPubKey, kitsune_p2p::dht_arc::DhtArcSet)>,
+            to_agents: ToAgents,
             window_ms: TimeWindowMs,
             max_ops: usize,
             include_limbo: bool,
@@ -225,7 +242,7 @@ ghost_actor::ghost_chan! {
         fn fetch_op_data(
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
-            op_hashes: Vec<holo_hash::DhtOpHash>,
+            op_hashes: DhtOpHashVec,
         ) -> Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>;
 
         /// P2p operations require cryptographic signatures and validation.
@@ -235,7 +252,7 @@ ghost_actor::ghost_chan! {
             // The agent_id / agent_pub_key context.
             to_agent: AgentPubKey,
             // The data to sign.
-            data: Vec<u8>,
+            data: ByteVec,
         ) -> Signature;
 
         /// Response from an authority to agents that are
@@ -243,7 +260,7 @@ ghost_actor::ghost_chan! {
         fn countersigning_authority_response(
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
-            signed_headers: Vec<SignedHeader>,
+            signed_headers: SignedHeaderVec,
         ) -> ();
     }
 }

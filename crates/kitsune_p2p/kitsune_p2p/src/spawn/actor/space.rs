@@ -319,7 +319,7 @@ impl SpaceInternalHandler for Space {
                 module_type
             ),
         }
-        unit_ok_fut()
+        ok_fut(())
     }
 }
 
@@ -468,10 +468,6 @@ impl KitsuneP2pHandler for Space {
             "These requests are handled at the to actor level and are never propagated down to the space."
         )
     }
-
-    // add method to modify agent_arcs, then call `update_single_agent_info`,
-    // which will add arc to db. make sure to use fudged location bytes for the agent key
-    // consider making this a general purpose test method which takes an enum
 
     fn handle_join(
         &mut self,
@@ -833,7 +829,7 @@ impl KitsuneP2pHandler for Space {
         for module in self.gossip_mod.values() {
             module.new_integrated_data();
         }
-        unit_ok_fut()
+        ok_fut(())
     }
 
     fn handle_authority_for_hash(
@@ -846,7 +842,46 @@ impl KitsuneP2pHandler for Space {
             Some(agent_arc) => agent_arc.contains(basis.get_loc()),
             None => false,
         };
-        Ok(async move { Ok(r) }.boxed().into())
+        ok_fut(r)
+    }
+
+    #[cfg(feature = "test_utils")]
+    fn handle_test_backdoor(&mut self, action: TestBackdoor) -> KitsuneP2pHandlerResult<()> {
+        let space = self.space.clone();
+        let mut mdns_handles = self.mdns_handles.clone();
+        let network_type = self.config.network_type.clone();
+        let mut agent_list = Vec::with_capacity(self.local_joined_agents.len());
+        for agent in self.local_joined_agents.iter().cloned() {
+            let arc = self.get_agent_arc(&agent);
+            agent_list.push((agent, arc));
+        }
+        let bound_url = self.this_addr.clone();
+        let urls = vec![bound_url.into()];
+        let evt_sender = self.evt_sender.clone();
+        let bootstrap_service = self.config.bootstrap_service.clone();
+        let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
+        let internal_sender = self.i_s.clone();
+        Ok(async move {
+            Ok(match action {
+                TestBackdoor::SetArc(agent, arc) => {
+                    let input = UpdateAgentInfoInput {
+                        expires_after,
+                        space: space.clone(),
+                        agent,
+                        arc: DhtArc::from_interval(arc),
+                        urls: &urls,
+                        evt_sender: &evt_sender,
+                        internal_sender: &internal_sender,
+                        network_type: network_type.clone(),
+                        mdns_handles: &mut mdns_handles,
+                        bootstrap_service: &bootstrap_service,
+                    };
+                    update_single_agent_info(input).await?;
+                }
+            })
+        }
+        .boxed()
+        .into())
     }
 }
 

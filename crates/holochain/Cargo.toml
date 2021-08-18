@@ -122,6 +122,7 @@ default = ["slow_tests", "test_utils", "no-deps"]
 # This feature should be turned off for production builds.
 test_utils = [
   "hdk",
+  "holochain_p2p/test_utils",
   "holochain_sqlite/test_utils",
   "holochain_state/test_utils",
   "holochain_types/test_utils",

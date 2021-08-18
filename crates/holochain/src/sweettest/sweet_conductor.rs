@@ -217,14 +217,13 @@ impl SweetConductor {
     ) -> ConductorApiResult<SweetApp> {
         let mut sweet_cells = Vec::new();
         for dna_hash in dna_hashes {
-            let kspace = dna_hash.clone().to_kitsune();
             let cell_id = CellId::new(dna_hash, agent.clone());
             let cell_env = self.handle().0.get_cell_env(&cell_id).await?;
-            let p2p_agents_env = self.envs().p2p().lock().get(&kspace).unwrap().clone();
+            let network = self.handle().get_cell_network(&cell_id).await?;
             let cell = SweetCell {
                 cell_id,
                 cell_env,
-                p2p_agents_env,
+                network,
             };
             sweet_cells.push(cell);
         }

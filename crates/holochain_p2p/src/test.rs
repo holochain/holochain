@@ -124,6 +124,13 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
+    #[cfg(feature = "test_utils")]
+    fn handle_test_backdoor(
+        &mut self,
+        action: kitsune_p2p::actor::TestBackdoor,
+    ) -> HolochainP2pHandlerResult<()> {
+        Err("stub".into())
+    }
 }
 
 /// Spawn a stub network that doesn't respond to any messages.

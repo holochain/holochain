@@ -123,6 +123,13 @@ pub trait HolochainP2pCellT {
 
     /// New data has been integrated and is ready for gossiping.
     async fn new_integrated_data(&self) -> actor::HolochainP2pResult<()>;
+
+    /// Run "backdoor" methods, used only during testing
+    #[cfg(feature = "test_utils")]
+    async fn test_backdoor(
+        &self,
+        action: kitsune_p2p::actor::TestBackdoor,
+    ) -> actor::HolochainP2pResult<()>;
 }
 
 /// A wrapper around HolochainP2pSender that partially applies the dna_hash / agent_pub_key.
@@ -336,6 +343,14 @@ impl HolochainP2pCellT for HolochainP2pCell {
         self.sender
             .new_integrated_data((*self.dna_hash).clone())
             .await
+    }
+
+    #[cfg(feature = "test_utils")]
+    async fn test_backdoor(
+        &self,
+        action: kitsune_p2p::actor::TestBackdoor,
+    ) -> actor::HolochainP2pResult<()> {
+        self.sender.test_backdoor(action).await
     }
 }
 

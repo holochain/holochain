@@ -419,7 +419,7 @@ impl InternalHandler for KitsuneP2pActor {
                     "received delegate_broadcast for unhandled space: {:?}",
                     space
                 );
-                return unit_ok_fut();
+                return ok_fut(());
             }
             Some(space) => space.get(),
         };
@@ -443,7 +443,7 @@ impl InternalHandler for KitsuneP2pActor {
         let space_sender = match self.spaces.get_mut(&space) {
             None => {
                 tracing::warn!("received gossip for unhandled space: {:?}", space);
-                return unit_ok_fut();
+                return ok_fut(());
             }
             Some(space) => space.get(),
         };
@@ -630,7 +630,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         agent: Arc<KitsuneAgent>,
     ) -> KitsuneP2pHandlerResult<()> {
         let space_sender = match self.spaces.get_mut(&space) {
-            None => return unit_ok_fut(),
+            None => return ok_fut(()),
             Some(space) => space.get(),
         };
         Ok(async move {
@@ -727,7 +727,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         space: Arc<KitsuneSpace>,
     ) -> KitsuneP2pHandlerResult<()> {
         let space_sender = match self.spaces.get_mut(&space) {
-            None => return unit_ok_fut(),
+            None => return ok_fut(()),
             Some(space) => space.get(),
         };
         Ok(async move {
@@ -755,6 +755,11 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         }
         .boxed()
         .into())
+    }
+
+    #[cfg(feature = "test_utils")]
+    fn handle_test_backdoor(&mut self, _action: TestBackdoor) -> KitsuneP2pHandlerResult<()> {
+        todo!("dispatch to space")
     }
 }
 

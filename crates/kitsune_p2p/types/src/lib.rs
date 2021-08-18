@@ -41,9 +41,11 @@ pub fn proc_count_us_elapsed(pc: ProcCountMicros) -> std::time::Duration {
 }
 
 /// Helper function for the common case of returning this nested Unit type.
-pub fn unit_ok_fut<E1, E2>() -> Result<MustBoxFuture<'static, Result<(), E2>>, E1> {
+pub fn ok_fut<T: Send + 'static, E1, E2>(
+    t: T,
+) -> Result<MustBoxFuture<'static, Result<T, E2>>, E1> {
     use futures::FutureExt;
-    Ok(async move { Ok(()) }.boxed().into())
+    Ok(async move { Ok(t) }.boxed().into())
 }
 
 use ::ghost_actor::dependencies::tracing;

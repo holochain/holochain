@@ -36,9 +36,6 @@ pub(crate) mod sql_p2p_agent_store {
     pub(crate) const QUERY_NEAR_BASIS: &str =
         include_str!("sql/p2p_agent_store/query_near_basis.sql");
     pub(crate) const PRUNE: &str = include_str!("sql/p2p_agent_store/prune.sql");
-
-    #[cfg(any(test, feature = "test_utils"))]
-    pub(crate) const UPDATE_ARC: &str = include_str!("sql/p2p_agent_store/update_arc.sql");
 }
 
 pub(crate) mod sql_p2p_metrics {
