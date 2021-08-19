@@ -8,7 +8,7 @@ const MAX_HISTORY: usize = 10;
 
 #[derive(Debug, Clone, Default)]
 /// Information about a remote node.
-struct Info {
+struct NodeInfo {
     /// Times we recorded errors for this node.
     errors: VecDeque<Instant>,
     /// Times we recorded initiates to this node.
@@ -26,14 +26,14 @@ struct Info {
 /// choose which remote node to initiate the next round with.
 pub(super) struct Metrics {
     /// Map of remote nodes.
-    map: HashMap<StateKey, Info>,
+    map: HashMap<StateKey, NodeInfo>,
     // Number of times we need to force initiate
     // the next round.
     force_initiates: u8,
 }
 
 /// Outcome of a gossip round.
-pub(super) enum Outcome {
+pub(super) enum RoundOutcome {
     Success(Instant),
     Error(Instant),
 }
@@ -47,30 +47,21 @@ impl Metrics {
     /// Record a gossip round has been initiated by us.
     pub(super) fn record_initiate(&mut self, key: StateKey) {
         let info = self.map.entry(key).or_default();
-        info.initiates.push_back(Instant::now());
-        if info.initiates.len() > MAX_HISTORY {
-            info.initiates.pop_front();
-        }
+        record_instant(&mut info.initiates);
         info.current_round = true;
     }
 
     /// Record a remote gossip round has started.
     pub(super) fn record_remote_round(&mut self, key: StateKey) {
         let info = self.map.entry(key).or_default();
-        info.remote_rounds.push_back(Instant::now());
-        if info.remote_rounds.len() > MAX_HISTORY {
-            info.remote_rounds.pop_front();
-        }
+        record_instant(&mut info.remote_rounds);
         info.current_round = true;
     }
 
     /// Record a gossip round has completed successfully.
     pub(super) fn record_success(&mut self, key: StateKey) {
         let info = self.map.entry(key).or_default();
-        info.complete_rounds.push_back(Instant::now());
-        if info.complete_rounds.len() > MAX_HISTORY {
-            info.complete_rounds.pop_front();
-        }
+        record_instant(&mut info.complete_rounds);
         info.current_round = false;
         if info.is_initiate_round() {
             self.force_initiates = self.force_initiates.saturating_sub(1);
@@ -80,10 +71,7 @@ impl Metrics {
     /// Record a gossip round has finished with an error.
     pub(super) fn record_error(&mut self, key: StateKey) {
         let info = self.map.entry(key).or_default();
-        info.errors.push_back(Instant::now());
-        if info.errors.len() > MAX_HISTORY {
-            info.errors.pop_front();
-        }
+        record_instant(&mut info.errors);
         info.current_round = false;
     }
 
@@ -105,18 +93,18 @@ impl Metrics {
     }
 
     /// What was the last outcome for this nodes gossip round?
-    pub(super) fn last_outcome(&self, key: &StateKey) -> Option<Outcome> {
+    pub(super) fn last_outcome(&self, key: &StateKey) -> Option<RoundOutcome> {
         self.map.get(key).and_then(
             |info| match (info.errors.back(), info.complete_rounds.back()) {
                 (Some(error), Some(success)) => {
                     if dbg!(error) > dbg!(success) {
-                        Some(Outcome::Error(*error))
+                        Some(RoundOutcome::Error(*error))
                     } else {
-                        Some(Outcome::Success(*success))
+                        Some(RoundOutcome::Success(*success))
                     }
                 }
-                (Some(error), None) => Some(Outcome::Error(*error)),
-                (None, Some(success)) => Some(Outcome::Success(*success)),
+                (Some(error), None) => Some(RoundOutcome::Error(*error)),
+                (None, Some(success)) => Some(RoundOutcome::Success(*success)),
                 (None, None) => None,
             },
         )
@@ -128,7 +116,7 @@ impl Metrics {
     }
 }
 
-impl Info {
+impl NodeInfo {
     /// Was the last round for this node initiated by us?
     fn is_initiate_round(&self) -> bool {
         match (self.remote_rounds.back(), self.initiates.back()) {
@@ -137,4 +125,11 @@ impl Info {
             (Some(remote), Some(initiate)) => initiate > remote,
         }
     }
+}
+
+fn record_instant(buffer: &mut VecDeque<Instant>) {
+    if buffer.len() > MAX_HISTORY {
+        buffer.pop_front();
+    }
+    buffer.push_back(Instant::now());
 }

@@ -133,11 +133,11 @@ fn next_remote_node(
             } else {
                 // Otherwise only find with nodes that have not been gossiped with too recently.
                 match metrics.last_outcome(n.cert()) {
-                    Some(metrics::Outcome::Success(when)) => {
+                    Some(metrics::RoundOutcome::Success(when)) => {
                         when.elapsed().as_millis() as u32
                             >= tuning_params.gossip_peer_on_success_next_gossip_delay_ms
                     }
-                    Some(metrics::Outcome::Error(when)) => {
+                    Some(metrics::RoundOutcome::Error(when)) => {
                         when.elapsed().as_millis() as u32
                             >= tuning_params.gossip_peer_on_error_next_gossip_delay_ms
                     }
@@ -156,7 +156,7 @@ impl Node {
 
 #[cfg(test)]
 mod tests {
-    use crate::{fixt::*, gossip::sharded_gossip::metrics::Metrics};
+    use crate::gossip::sharded_gossip::metrics::Metrics;
     use fixt::prelude::*;
     use rand::distributions::Alphanumeric;
     use test_case::test_case;
@@ -195,29 +195,34 @@ mod tests {
         Arc::new(t)
     }
 
+    fn create_remote_nodes(n: usize) -> Vec<Node> {
+        let mut rng = thread_rng();
+        (0..n)
+            .map(|_| {
+                let url = random_url(&mut rng);
+                let url = TxUrl::from(url.as_str());
+                let purl = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()).unwrap();
+                let target = GossipTgt::new(vec![], Tx2Cert::from(purl.digest()));
+                Node { target, url }
+            })
+            .collect()
+    }
+
     #[test]
     /// Test that we can find a remote node to sync with
     /// when there is only one to choose from.
     fn next_remote_node_sanity() {
-        let agent = Arc::new(fixt!(KitsuneAgent));
-
-        let mut rng = thread_rng();
-
         // - Create one remote node.
-        let url = random_url(&mut rng);
-        let expected_url = TxUrl::from(url.as_str());
-        let purl = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()).unwrap();
-        let expected_tgt = GossipTgt::new(vec![agent], Tx2Cert::from(purl.digest()));
-        let expected_tgt = Node {
-            target: expected_tgt,
-            url: expected_url,
-        };
-        let remote_nodes = vec![expected_tgt.clone()];
+        let remote_nodes = create_remote_nodes(1);
 
-        let r = next_remote_node(remote_nodes, &Default::default(), tuning_params_no_delay());
+        let r = next_remote_node(
+            remote_nodes.clone(),
+            &Default::default(),
+            tuning_params_no_delay(),
+        );
 
         // - That node is chosen.
-        assert_eq!(r, Some(expected_tgt));
+        assert_eq!(r, remote_nodes.first().cloned());
     }
 
     /// Test that given N remote nodes we choose the one
@@ -227,18 +232,8 @@ mod tests {
     #[test_case(10)]
     #[test_case(100)]
     fn next_remote_node_least_recently(n: usize) {
-        let mut rng = thread_rng();
-
         // - Create N remote nodes.
-        let mut remote_nodes: Vec<_> = (0..n)
-            .map(|_| {
-                let url = random_url(&mut rng);
-                let url = TxUrl::from(url.as_str());
-                let purl = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()).unwrap();
-                let target = GossipTgt::new(vec![], Tx2Cert::from(purl.digest()));
-                Node { target, url }
-            })
-            .collect();
+        let mut remote_nodes = create_remote_nodes(n);
 
         let mut metrics = Metrics::new();
 
@@ -273,18 +268,8 @@ mod tests {
     #[test_case(10)]
     #[test_case(100)]
     fn next_remote_node_never_talked_to(n: usize) {
-        let mut rng = thread_rng();
-
         // - Create N remote nodes.
-        let mut remote_nodes: Vec<_> = (0..n)
-            .map(|_| {
-                let url = random_url(&mut rng);
-                let url = TxUrl::from(url.as_str());
-                let purl = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()).unwrap();
-                let target = GossipTgt::new(vec![], Tx2Cert::from(purl.digest()));
-                Node { target, url }
-            })
-            .collect();
+        let mut remote_nodes = create_remote_nodes(n);
 
         let mut metrics = Metrics::new();
 
@@ -311,18 +296,8 @@ mod tests {
     /// Test we break ties between never talked
     /// to nodes by randomly choosing one.
     fn randomly_break_ties() {
-        let mut rng = thread_rng();
-
         // - Create 100 remote nodes.
-        let mut remote_nodes: Vec<_> = (0..100)
-            .map(|_| {
-                let url = random_url(&mut rng);
-                let url = TxUrl::from(url.as_str());
-                let purl = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()).unwrap();
-                let target = GossipTgt::new(vec![], Tx2Cert::from(purl.digest()));
-                Node { target, url }
-            })
-            .collect();
+        let mut remote_nodes = create_remote_nodes(100);
 
         let mut metrics = Metrics::new();
 
@@ -339,19 +314,21 @@ mod tests {
 
         // - Push the last two nodes back into the remote nodes.
         remote_nodes.push(second_last.clone());
-        remote_nodes.push(last);
+        remote_nodes.push(last.clone());
 
-        // - Check we don't always get the second last node.
-        // The second last is returned always when not randomly breaking ties.
-        let mut always_the_last = true;
+        // - Check we don't always get the same node.
+        let mut chose_last = false;
+        let mut chose_second_last = false;
         for _ in 0..100 {
             let r =
                 next_remote_node(remote_nodes.clone(), &metrics, tuning_params_no_delay()).unwrap();
-            if r != second_last {
-                always_the_last = false;
+            if r == last {
+                chose_last = true;
+            } else if r == second_last {
+                chose_second_last = true;
             }
         }
-        assert!(!always_the_last);
+        assert!(chose_last && chose_second_last);
     }
 
     /// Test that given N remote nodes we never choose a current round.
@@ -360,18 +337,8 @@ mod tests {
     #[test_case(10)]
     #[test_case(100)]
     fn dont_choose_current_rounds(n: usize) {
-        let mut rng = thread_rng();
-
         // - Create N remote nodes.
-        let mut remote_nodes: Vec<_> = (0..n)
-            .map(|_| {
-                let url = random_url(&mut rng);
-                let url = TxUrl::from(url.as_str());
-                let purl = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()).unwrap();
-                let target = GossipTgt::new(vec![], Tx2Cert::from(purl.digest()));
-                Node { target, url }
-            })
-            .collect();
+        let mut remote_nodes = create_remote_nodes(n);
 
         let mut metrics = Metrics::new();
 
@@ -399,24 +366,15 @@ mod tests {
         let r = next_remote_node(remote_nodes.clone(), &metrics, tuning_params_no_delay());
 
         // - Now we expect the last node to be chosen.
+        // (because we're using "no delay" for the tuning params)
         assert_eq!(r, remote_nodes.last().cloned());
     }
 
     #[test]
     /// Test we don't choose nodes we've seen too recently.
     fn dont_choose_very_recent_rounds() {
-        let mut rng = thread_rng();
-
         // - Create 100 remote nodes.
-        let remote_nodes: Vec<_> = (0..100)
-            .map(|_| {
-                let url = random_url(&mut rng);
-                let url = TxUrl::from(url.as_str());
-                let purl = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()).unwrap();
-                let target = GossipTgt::new(vec![], Tx2Cert::from(purl.digest()));
-                Node { target, url }
-            })
-            .collect();
+        let remote_nodes = create_remote_nodes(100);
 
         let mut metrics = Metrics::new();
 
@@ -508,18 +466,8 @@ mod tests {
     #[test_case(10)]
     #[test_case(100)]
     fn force_initiate(n: usize) {
-        let mut rng = thread_rng();
-
         // - Create N remote nodes.
-        let mut remote_nodes: Vec<_> = (0..n)
-            .map(|_| {
-                let url = random_url(&mut rng);
-                let url = TxUrl::from(url.as_str());
-                let purl = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()).unwrap();
-                let target = GossipTgt::new(vec![], Tx2Cert::from(purl.digest()));
-                Node { target, url }
-            })
-            .collect();
+        let mut remote_nodes = create_remote_nodes(n);
 
         let mut metrics = Metrics::new();
 
