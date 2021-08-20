@@ -187,12 +187,12 @@ impl HashableContent for Entry {
 
 /// Data to create an entry.
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-pub struct EntryWithDefId {
+pub struct CreateInput {
     entry_def_id: crate::entry_def::EntryDefId,
     entry: crate::entry::Entry,
 }
 
-impl EntryWithDefId {
+impl CreateInput {
     /// Constructor.
     pub fn new(entry_def_id: crate::entry_def::EntryDefId, entry: crate::entry::Entry) -> Self {
         Self {
@@ -207,13 +207,13 @@ impl EntryWithDefId {
     }
 }
 
-impl AsRef<crate::Entry> for EntryWithDefId {
+impl AsRef<crate::Entry> for CreateInput {
     fn as_ref(&self) -> &crate::Entry {
         &self.entry
     }
 }
 
-impl AsRef<crate::EntryDefId> for EntryWithDefId {
+impl AsRef<crate::EntryDefId> for CreateInput {
     fn as_ref(&self) -> &crate::EntryDefId {
         &self.entry_def_id
     }
@@ -292,14 +292,14 @@ pub struct UpdateInput {
     /// Header of the element being updated.
     pub original_header_address: holo_hash::HeaderHash,
     /// Value of the update.
-    pub entry_with_def_id: EntryWithDefId,
+    pub entry_with_def_id: CreateInput,
 }
 
 impl UpdateInput {
     /// Constructor.
     pub fn new(
         original_header_address: holo_hash::HeaderHash,
-        entry_with_def_id: EntryWithDefId,
+        entry_with_def_id: CreateInput,
     ) -> Self {
         Self {
             original_header_address,

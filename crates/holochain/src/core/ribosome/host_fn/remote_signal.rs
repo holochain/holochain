@@ -102,7 +102,7 @@ mod tests {
                     access: ().into(),
                     functions,
                 };
-                api.create(EntryWithDefId::new(
+                api.create(CreateInput::new(
                     EntryDefId::CapGrant,
                     Entry::CapGrant(cap_grant_entry),
                 ))

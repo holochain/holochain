@@ -75,8 +75,8 @@ pub fn create<'a>(
                         call_context
                             .host_context
                             .workspace()
-                            .source_chain_mut()
-                            .put(header_builder, Some(input.into_entry(), chain_top_ordering))
+                            .source_chain()
+                            .put(header_builder, Some(input.into_entry()), chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))
                     })
@@ -158,7 +158,7 @@ pub mod wasm_test {
         call_context.host_context = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::App("post".into());
-        let input = EntryWithDefId::new(entry_def_id, app_entry.clone());
+        let input = CreateInput::new(entry_def_id, app_entry.clone());
 
         let output = create(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 

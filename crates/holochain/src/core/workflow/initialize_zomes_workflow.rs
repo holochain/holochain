@@ -70,7 +70,7 @@ where
 
     // Insert the init marker
     workspace
-        .source_chain_mut()
+        .source_chain()
         .put(
             builder::InitZomesComplete {},
             None,
@@ -224,7 +224,7 @@ pub mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn commit_during_init_one_zome_unimplemented_one_fails() {
         let zome_fail = InlineZome::new_unique(vec![]).callback("init", |api, _: ()| {
-            api.create(EntryWithDefId::new(
+            api.create(CreateInput::new(
                 EntryDefId::CapGrant,
                 Entry::CapGrant(CapGrantEntry {
                     tag: "".into(),

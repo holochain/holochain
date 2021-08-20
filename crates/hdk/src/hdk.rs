@@ -34,7 +34,7 @@ pub trait HdkT: Send + Sync {
     fn sign_ephemeral(&self, sign_ephemeral: SignEphemeral) -> ExternResult<EphemeralSignatures>;
     fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool>;
     // Entry
-    fn create(&self, entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash>;
+    fn create(&self, create_input: CreateInput) -> ExternResult<HeaderHash>;
     fn update(&self, update_input: UpdateInput) -> ExternResult<HeaderHash>;
     fn delete(&self, hash: HeaderHash) -> ExternResult<HeaderHash>;
     fn hash_entry(&self, entry: Entry) -> ExternResult<EntryHash>;
@@ -128,7 +128,7 @@ impl HdkT for ErrHdk {
     fn verify_signature(&self, _: VerifySignature) -> ExternResult<bool> {
         Self::err()
     }
-    fn create(&self, _: EntryWithDefId) -> ExternResult<HeaderHash> {
+    fn create(&self, _: CreateInput) -> ExternResult<HeaderHash> {
         Self::err()
     }
     fn update(&self, _: UpdateInput) -> ExternResult<HeaderHash> {
@@ -281,8 +281,8 @@ impl HdkT for HostHdk {
     fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool> {
         host_call::<VerifySignature, bool>(__verify_signature, verify_signature)
     }
-    fn create(&self, entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
-        host_call::<EntryWithDefId, HeaderHash>(__create, entry_with_def_id)
+    fn create(&self, entry_with_def_id: CreateInput) -> ExternResult<HeaderHash> {
+        host_call::<CreateInput, HeaderHash>(__create, entry_with_def_id)
     }
     fn update(&self, update_input: UpdateInput) -> ExternResult<HeaderHash> {
         host_call::<UpdateInput, HeaderHash>(__update, update_input)

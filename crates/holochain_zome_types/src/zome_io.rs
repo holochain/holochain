@@ -111,7 +111,7 @@ wasm_io_types! {
     fn capability_info (()) -> ();
 
     // Returns HeaderHash of the newly created element.
-    fn create (zt::entry::EntryWithDefId) -> holo_hash::HeaderHash;
+    fn create (zt::entry::CreateInput) -> holo_hash::HeaderHash;
 
     // Create a link between two entries.
     fn create_link (zt::link::CreateLinkInput) -> holo_hash::HeaderHash;

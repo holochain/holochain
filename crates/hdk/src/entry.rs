@@ -9,7 +9,7 @@ use crate::prelude::*;
 ///
 /// Usually you don't need to use this function directly; it is the most general way to create an
 /// entry and standardises the internals of higher level create functions.
-pub fn create(entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
+pub fn create(entry_with_def_id: CreateInput) -> ExternResult<HeaderHash> {
     HDK.with(|h| h.borrow().create(entry_with_def_id))
 }
 
@@ -23,7 +23,7 @@ pub fn create(entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
 ///
 /// Usually you don't need to use this function directly; it is the most general way to update an
 /// entry and standardises the internals of higher level create functions.
-pub fn update(hash: HeaderHash, entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
+pub fn update(hash: HeaderHash, entry_with_def_id: CreateInput) -> ExternResult<HeaderHash> {
     HDK.with(|h| h.borrow().update(UpdateInput::new(hash, entry_with_def_id)))
 }
 
@@ -60,10 +60,10 @@ pub fn delete(hash: HeaderHash) -> ExternResult<HeaderHash> {
 /// See [ `get` ] and [ `get_details` ] for more information on CRUD.
 pub fn create_entry<I, E>(input: I) -> ExternResult<HeaderHash>
 where
-    EntryWithDefId: TryFrom<I, Error = E>,
+    CreateInput: TryFrom<I, Error = E>,
     WasmError: From<E>,
 {
-    create(EntryWithDefId::try_from(input)?)
+    create(CreateInput::try_from(input)?)
 }
 
 /// Alias to delete
@@ -154,10 +154,10 @@ where
 /// See [ `delete_entry` ]
 pub fn update_entry<I, E>(hash: HeaderHash, input: I) -> ExternResult<HeaderHash>
 where
-    EntryWithDefId: TryFrom<I, Error = E>,
+    CreateInput: TryFrom<I, Error = E>,
     WasmError: From<E>,
 {
-    update(hash, EntryWithDefId::try_from(input)?)
+    update(hash, CreateInput::try_from(input)?)
 }
 
 /// Gets an element for a given entry or header hash.

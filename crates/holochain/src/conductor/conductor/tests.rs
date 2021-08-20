@@ -589,7 +589,7 @@ pub(crate) fn simple_create_entry_zome() -> InlineZome {
     InlineZome::new_unique(vec![unit_entry_def.clone()]).callback("create", move |api, ()| {
         let entry_def_id: EntryDefId = unit_entry_def.id.clone();
         let entry = Entry::app(().try_into().unwrap()).unwrap();
-        let hash = api.create(EntryWithDefId::new(entry_def_id, entry))?;
+        let hash = api.create(CreateInput::new(entry_def_id, entry))?;
         Ok(hash)
     })
 }
@@ -766,7 +766,7 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
         .callback("create", move |api, ()| {
             let entry_def_id: EntryDefId = unit_entry_def.id.clone();
             let entry = Entry::app(().try_into().unwrap()).unwrap();
-            let hash = api.create(EntryWithDefId::new(entry_def_id, entry))?;
+            let hash = api.create(CreateInput::new(entry_def_id, entry))?;
             Ok(hash)
         });
 
@@ -818,7 +818,7 @@ async fn test_apps_disable_on_panic_after_genesis() {
         .callback("create", move |api, ()| {
             let entry_def_id: EntryDefId = unit_entry_def.id.clone();
             let entry = Entry::app(().try_into().unwrap()).unwrap();
-            let hash = api.create(EntryWithDefId::new(entry_def_id, entry))?;
+            let hash = api.create(CreateInput::new(entry_def_id, entry))?;
             Ok(hash)
         });
 
