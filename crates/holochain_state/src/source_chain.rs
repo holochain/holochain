@@ -1,4 +1,5 @@
 use holo_hash::AgentPubKey;
+use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
@@ -20,6 +21,7 @@ use holochain_zome_types::header;
 use holochain_zome_types::CapAccess;
 use holochain_zome_types::CapGrant;
 use holochain_zome_types::CapSecret;
+use holochain_zome_types::ChainTopOrdering;
 use holochain_zome_types::CounterSigningAgentState;
 use holochain_zome_types::CounterSigningSessionData;
 use holochain_zome_types::Element;
@@ -58,6 +60,7 @@ pub struct SourceChain {
     persisted_head: HeaderHash,
     persisted_timestamp: Timestamp,
     public_only: bool,
+    relaxed_only: bool,
 }
 
 // TODO fix this.  We shouldn't really have nil values but this would
@@ -96,6 +99,7 @@ impl SourceChain {
             persisted_head,
             persisted_timestamp,
             public_only: false,
+            relaxed_only: true,
         })
     }
     pub fn public_only(&mut self) {
@@ -143,22 +147,28 @@ impl SourceChain {
         &self,
         header: Header,
         maybe_entry: Option<Entry>,
+        chain_top_ordering: ChainTopOrdering,
     ) -> SourceChainResult<HeaderHash> {
         let header = HeaderHashed::from_content_sync(header);
         let hash = header.as_hash().clone();
         let header = SignedHeaderHashed::new(&self.vault.keystore(), header).await?;
         let element = Element::new(header, maybe_entry);
         self.scratch
-            .apply(|scratch| insert_element_scratch(scratch, element))?;
+            .apply(|scratch| insert_element_scratch(scratch, element, chain_top_ordering))?;
         Ok(hash)
     }
 
-    pub async fn put_countersigned(&self, entry: Entry) -> SourceChainResult<HeaderHash> {
+    pub async fn put_countersigned(
+        &mut self,
+        entry: Entry,
+        chain_top_ordering: ChainTopOrdering,
+    ) -> SourceChainResult<HeaderHash> {
         let entry_hash = EntryHash::with_data_sync(&entry);
         if let Entry::CounterSign(ref session_data, _) = entry {
             self.put_with_header(
                 Header::from_countersigning_data(entry_hash, session_data, (*self.author).clone())?,
                 Some(entry),
+                chain_top_ordering,
             )
             .await
         } else {
@@ -168,9 +178,10 @@ impl SourceChain {
     }
 
     pub async fn put<H: HeaderInner, B: HeaderBuilder<H>>(
-        &self,
+        &mut self,
         header_builder: B,
         maybe_entry: Option<Entry>,
+        chain_top_ordering: ChainTopOrdering,
     ) -> SourceChainResult<HeaderHash> {
         let (prev_header, chain_head_seq, chain_head_timestamp) = self.chain_head()?;
         let header_seq = chain_head_seq + 1;
@@ -185,8 +196,12 @@ impl SourceChain {
             header_seq,
             prev_header,
         };
-        self.put_with_header(header_builder.build(common).into(), maybe_entry)
-            .await
+        self.put_with_header(
+            header_builder.build(common).into(),
+            maybe_entry,
+            chain_top_ordering,
+        )
+        .await
     }
 
     pub fn has_initialized(&self) -> SourceChainResult<bool> {
@@ -506,20 +521,23 @@ impl SourceChain {
     }
 
     pub async fn flush(&self) -> SourceChainResult<()> {
-        // Nothing to write
-        if self.scratch.apply(|s| s.is_empty())? {
-            return Ok(());
-        }
-        let (headers, ops, entries) = self.scratch.apply_and_then(|scratch| {
-            let length = scratch.num_headers();
-
-            // The op related data ends up here.
-            let mut ops = Vec::with_capacity(length);
-
-            // Drain out the headers.
-            let signed_headers = scratch.drain_headers().collect::<Vec<_>>();
+        fn build_ops_from_headers(
+            signed_headers: Vec<SignedHeaderHashed>,
+        ) -> SourceChainResult<(
+            Vec<SignedHeaderHashed>,
+            Vec<(
+                DhtOpLight,
+                DhtOpHash,
+                OpOrder,
+                Timestamp,
+                Option<EntryVisibility>,
+                Dependency,
+            )>,
+        )> {
             // Headers end up back in here.
             let mut headers = Vec::with_capacity(signed_headers.len());
+            // The op related data ends up here.
+            let mut ops = Vec::with_capacity(headers.len());
 
             // Loop through each header and produce op related data.
             for shh in signed_headers {
@@ -557,6 +575,16 @@ impl SourceChain {
                 // Put the header back in the list.
                 headers.push(shh);
             }
+            Ok((headers, ops))
+        }
+
+        // Nothing to write
+        if self.scratch.apply(|s| s.is_empty())? {
+            return Ok(());
+        }
+        let (headers, ops, entries) = self.scratch.apply_and_then(|scratch| {
+            let (headers, ops) =
+                build_ops_from_headers(scratch.drain_headers().collect::<Vec<_>>())?;
 
             // Drain out any entries.
             let entries = scratch.drain_entries().collect::<Vec<_>>();
@@ -577,6 +605,7 @@ impl SourceChain {
         // Write the entries, headers and ops to the database in one transaction.
         let author = self.author.clone();
         let persisted_head = self.persisted_head.clone();
+        let is_relaxed_only = self.relaxed_only;
         self.vault
             .async_commit(move |txn: &mut Transaction| {
                 // As at check.
@@ -586,10 +615,15 @@ impl SourceChain {
                     return Ok(());
                 }
                 if persisted_head != new_persisted_head {
-                    return Err(SourceChainError::HeadMoved(
-                        Some(persisted_head),
-                        Some(new_persisted_head),
-                    ));
+                    if is_relaxed_only {
+                        // @TODO: rebuild all the headers here.
+                        todo!();
+                    } else {
+                        return Err(SourceChainError::HeadMoved(
+                            Some(persisted_head),
+                            Some(new_persisted_head),
+                        ));
+                    }
                 }
 
                 // If the lock isn't empty this is a countersigning session.

@@ -14,11 +14,12 @@ use std::sync::Arc;
 pub fn create<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: EntryWithDefId,
+    input: CreateInput,
 ) -> Result<HeaderHash, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ write_workspace: Permission::Allow, .. } => {
             let entry = AsRef::<Entry>::as_ref(&input);
+            let chain_top_ordering = input.chain_top_ordering().clone();
 
             // Countersigned entries have different header handling.
             match entry {
@@ -28,7 +29,7 @@ pub fn create<'a>(
                             .host_context
                             .workspace()
                             .source_chain()
-                            .put_countersigned(input.into_entry())
+                            .put_countersigned(input.into_entry(), chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))
                     })
@@ -74,8 +75,8 @@ pub fn create<'a>(
                         call_context
                             .host_context
                             .workspace()
-                            .source_chain()
-                            .put(header_builder, Some(input.into_entry()))
+                            .source_chain_mut()
+                            .put(header_builder, Some(input.into_entry(), chain_top_ordering))
                             .await
                             .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))
                     })

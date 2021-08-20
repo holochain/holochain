@@ -110,12 +110,17 @@ pub fn insert_op_scratch(scratch: &mut Scratch, op: DhtOpHashed) -> StateMutatio
     Ok(())
 }
 
-pub fn insert_element_scratch(scratch: &mut Scratch, element: Element) {
+pub fn insert_element_scratch(
+    scratch: &mut Scratch,
+    element: Element,
+    chain_top_ordering: ChainTopOrdering,
+) {
     let (header, entry) = element.into_inner();
     scratch.add_header(header);
     if let Some(entry) = entry.into_option() {
-        scratch.add_entry(EntryHashed::from_content_sync(entry))
+        scratch.add_entry(EntryHashed::from_content_sync(entry));
     }
+    scratch.respect_chain_top_ordering(chain_top_ordering);
 }
 
 /// Insert a [`DhtOp`] into the database.

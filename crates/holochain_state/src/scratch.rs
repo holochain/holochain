@@ -8,6 +8,7 @@ use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_types::prelude::Judged;
 use holochain_zome_types::entry::EntryHashed;
+use holochain_zome_types::ChainTopOrdering;
 use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
 use holochain_zome_types::SignedHeaderHashed;
@@ -32,6 +33,7 @@ use crate::query::Store;
 pub struct Scratch {
     headers: Vec<SignedHeaderHashed>,
     entries: HashMap<EntryHash, Arc<Entry>>,
+    chain_top_ordering: ChainTopOrdering,
 }
 
 #[derive(Debug, Clone)]
@@ -45,6 +47,12 @@ pub struct FilteredScratch {
 impl Scratch {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn respect_chain_top_ordering(&mut self, chain_top_ordering: ChainTopOrdering) {
+        if chain_top_ordering == ChainTopOrdering::Strict {
+            self.chain_top_ordering = chain_top_ordering;
+        }
     }
 
     pub fn add_header(&mut self, item: SignedHeaderHashed) {
