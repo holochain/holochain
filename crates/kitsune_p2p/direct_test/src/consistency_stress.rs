@@ -255,10 +255,10 @@ struct TestNode {
 struct State {
     /// the total agent node count processed for averaging purposes
     agent_tot_cnt: usize,
-    
+
     /// the total calculated target number of agents that should be held across the system
     agent_tot_tgt: usize,
-    
+
     /// the total calculated number of agents currently held across the system
     agent_tot_cur: usize,
 
