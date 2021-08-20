@@ -247,12 +247,19 @@ struct TestNode {
     kdirect: KitsuneDirect,
     kdhnd: KdHnd,
     agents: Vec<KdHash>,
+    /// The pair of usizes here represents the number of agents
+    /// this agent *should* hold vs the number that they *do* hold
     agents_holding: HashMap<KdHash, (usize, usize)>,
 }
 
 struct State {
+    /// the total agent node count processed for averaging purposes
     agent_tot_cnt: usize,
+    
+    /// the total calculated target number of agents that should be held across the system
     agent_tot_tgt: usize,
+    
+    /// the total calculated number of agents currently held across the system
     agent_tot_cur: usize,
 
     avg_total_op_count: usize,
