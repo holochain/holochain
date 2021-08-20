@@ -160,77 +160,6 @@ impl SweetConductor {
         self.handle().0.pause_app(id, reason).await
     }
 
-    /// Install the dna first.
-    /// This allows a big speed up when
-    /// installing many apps with the same dna
-    async fn setup_app_1_register_dna(&mut self, dna_files: &[DnaFile]) -> ConductorApiResult<()> {
-        for dna_file in dna_files {
-            self.register_dna(dna_file.clone()).await?;
-            self.dnas.push(dna_file.clone());
-        }
-        Ok(())
-    }
-
-    /// Install the app and enable it
-    // TODO: make this take a more flexible config for specifying things like
-    // membrane proofs
-    async fn setup_app_2_install_and_enable(
-        &mut self,
-        installed_app_id: &str,
-        agent: AgentPubKey,
-        dna_files: &[DnaFile],
-    ) -> ConductorApiResult<()> {
-        let installed_app_id = installed_app_id.to_string();
-
-        let installed_cells = dna_files
-            .iter()
-            .map(|dna| {
-                let cell_handle = format!("{}", dna.dna_hash());
-                let cell_id = CellId::new(dna.dna_hash().clone(), agent.clone());
-                (InstalledCell::new(cell_id, cell_handle), None)
-            })
-            .collect();
-        self.handle()
-            .0
-            .clone()
-            .install_app(installed_app_id.clone(), installed_cells)
-            .await?;
-
-        self.handle()
-            .0
-            .clone()
-            .enable_app(&installed_app_id)
-            .await?;
-        Ok(())
-    }
-
-    /// Build the SweetCells after `setup_cells` has been run
-    /// The setup is split into two parts because the Cell environments
-    /// are not available until after `setup_cells` has run, and it is
-    /// better to do that once for all apps in the case of multiple apps being
-    /// set up at once.
-    async fn setup_app_3_create_sweet_app(
-        &self,
-        installed_app_id: &str,
-        agent: AgentPubKey,
-        dna_hashes: impl Iterator<Item = DnaHash>,
-    ) -> ConductorApiResult<SweetApp> {
-        let mut sweet_cells = Vec::new();
-        for dna_hash in dna_hashes {
-            let cell_id = CellId::new(dna_hash, agent.clone());
-            let cell_env = self.handle().0.get_cell_env(&cell_id).await?;
-            let network = self.handle().get_cell_network(&cell_id).await?;
-            let cell = SweetCell {
-                cell_id,
-                cell_env,
-                network,
-            };
-            sweet_cells.push(cell);
-        }
-
-        Ok(SweetApp::new(installed_app_id.into(), sweet_cells))
-    }
-
     /// Opinionated app setup.
     /// Creates an app for the given agent, using the given DnaFiles, with no extra configuration.
     pub async fn setup_app_for_agent(
@@ -360,6 +289,79 @@ impl SweetConductor {
     /// Check if this conductor is running
     pub fn is_running(&self) -> bool {
         self.handle.is_some()
+    }
+
+    // App setup methods
+
+    /// Install the dna first.
+    /// This allows a big speed up when
+    /// installing many apps with the same dna
+    async fn setup_app_1_register_dna(&mut self, dna_files: &[DnaFile]) -> ConductorApiResult<()> {
+        for dna_file in dna_files {
+            self.register_dna(dna_file.clone()).await?;
+            self.dnas.push(dna_file.clone());
+        }
+        Ok(())
+    }
+
+    /// Install the app and enable it
+    // TODO: make this take a more flexible config for specifying things like
+    // membrane proofs
+    async fn setup_app_2_install_and_enable(
+        &mut self,
+        installed_app_id: &str,
+        agent: AgentPubKey,
+        dna_files: &[DnaFile],
+    ) -> ConductorApiResult<()> {
+        let installed_app_id = installed_app_id.to_string();
+
+        let installed_cells = dna_files
+            .iter()
+            .map(|dna| {
+                let cell_handle = format!("{}", dna.dna_hash());
+                let cell_id = CellId::new(dna.dna_hash().clone(), agent.clone());
+                (InstalledCell::new(cell_id, cell_handle), None)
+            })
+            .collect();
+        self.handle()
+            .0
+            .clone()
+            .install_app(installed_app_id.clone(), installed_cells)
+            .await?;
+
+        self.handle()
+            .0
+            .clone()
+            .enable_app(&installed_app_id)
+            .await?;
+        Ok(())
+    }
+
+    /// Build the SweetCells after `setup_cells` has been run
+    /// The setup is split into two parts because the Cell environments
+    /// are not available until after `setup_cells` has run, and it is
+    /// better to do that once for all apps in the case of multiple apps being
+    /// set up at once.
+    async fn setup_app_3_create_sweet_app(
+        &self,
+        installed_app_id: &str,
+        agent: AgentPubKey,
+        dna_hashes: impl Iterator<Item = DnaHash>,
+    ) -> ConductorApiResult<SweetApp> {
+        let mut sweet_cells = Vec::new();
+        for dna_hash in dna_hashes {
+            let cell_id = CellId::new(dna_hash, agent.clone());
+            let cell_env = self.handle().0.get_cell_env(&cell_id).await?;
+            let network = self.handle().get_cell_network(&cell_id).await?;
+            let cell = SweetCell {
+                cell_id,
+                cell_env,
+                network,
+            };
+            sweet_cells.push(cell);
+        }
+
+        Ok(SweetApp::new(installed_app_id.into(), sweet_cells))
     }
 
     // NB: keep this private to prevent leaking out owned references
