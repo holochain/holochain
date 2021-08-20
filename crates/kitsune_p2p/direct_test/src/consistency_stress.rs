@@ -255,20 +255,20 @@ struct State {
     agent_tot_cnt: usize,
 
     /// total calculated target number of agents that should be
-    /// held accross the system
+    /// held across the system
     agent_tot_tgt: usize,
 
-    /// total calculated number of agents currently held accross the system
+    /// total calculated number of agents currently held across the system
     agent_tot_cur: usize,
 
     /// total op node count processed for averaging purposes
     op_tot_cnt: usize,
 
     /// total calculated target number of ops that should be
-    /// held accross the system
+    /// held across the system
     op_tot_tgt: usize,
 
-    /// total calculated number of ops currently held accross the system
+    /// total calculated number of ops currently held across the system
     op_tot_cur: usize,
 }
 
