@@ -163,7 +163,7 @@ pub fn insert_op_lite(
     sql_insert!(txn, DhtOp, {
         "hash": hash,
         "type": op_lite.get_type(),
-        "storage_center_loc": basis.get_loc(),
+        "storage_center_loc": u32::from(basis.get_loc()),
         "authored_timestamp_ms": timestamp.to_sql_ms_lossy(),
         "basis_hash": basis,
         "header_hash": header_hash,

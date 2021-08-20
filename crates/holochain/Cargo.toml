@@ -117,7 +117,10 @@ name = "holochain"
 path = "src/bin/holochain/main.rs"
 
 [features]
-default = ["slow_tests", "test_utils", "no-deps"]
+default = ["slow_tests", "test_utils", "no-deps",
+
+  # TODO: selectively enable
+  "unchecked-dht-location",]
 
 # Exposes additional functionality only needed for integration tests.
 # This feature should be turned off for production builds.
@@ -133,7 +136,8 @@ test_utils = [
   "itertools",
   "matches",
   "holochain_test_wasm_common",
-  "unwrap_to"
+  "unwrap_to",
+
 ]
 
 # Wasm ribosome tests take > 60 seconds - let's only run them in CI
@@ -150,3 +154,7 @@ db-encryption = ['holochain_sqlite/db-encryption']
 # Compile SQLite from source rather than depending on a library.
 # Incompatible with "db-encryption"
 no-deps = ['holochain_sqlite/no-deps']
+
+# Disable any integrity checks which ensure that the last 4 bytes of a hash
+# are properly computed, i.e. let the locations be set arbitrarily
+unchecked-dht-location = ["holo_hash/unchecked-dht-location"]

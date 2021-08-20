@@ -1,7 +1,8 @@
 use super::SweetZome;
 use hdk::prelude::*;
-use holo_hash::DnaHash;
-use holochain_p2p::{dht_arc::ArcInterval, AgentPubKeyExt, HolochainP2pCell};
+use holo_hash::*;
+use holochain_p2p::HolochainP2pCell;
+use holochain_sqlite::prelude::DatabaseResult;
 use holochain_types::prelude::*;
 use kitsune_p2p::actor::TestBackdoor;
 /// A reference to a Cell created by a SweetConductor installation function.
@@ -10,6 +11,7 @@ use kitsune_p2p::actor::TestBackdoor;
 pub struct SweetCell {
     pub(super) cell_id: CellId,
     pub(super) cell_env: EnvWrite,
+    pub(super) p2p_agents_env: EnvWrite,
     pub(super) network: HolochainP2pCell,
 }
 
@@ -68,7 +70,6 @@ impl SweetCell {
     /// The arc need not be centered on the agent's DHT location, which is
     /// typically a requirement "in the real world", but this can be useful
     /// for integration tests of gossip.
-    ///
     #[cfg(feature = "test_utils")]
     pub async fn set_storage_arc(&self, arc: ArcInterval) {
         use holochain_p2p::HolochainP2pCellT;
@@ -80,22 +81,40 @@ impl SweetCell {
             .unwrap();
     }
 
+    /// Inject fake ops into the cell's vault, such that each op is at the
+    /// specified location. The locations will not match the op hashes.
     pub fn inject_fake_ops<L>(&self, locations: L)
     where
         L: Iterator<Item = DhtLocation>,
     {
         use ::fixt::prelude::*;
-        self.cell_env.conn().unwrap().with_commit_sync(|txn| {
-            for loc in locations {
-                let header_hash = fixt!(HeaderHash);
-                let mut op_hash = fixt!(DhtOpHash);
-                let timestamp = fixt!(Timestamp);
+        self.cell_env
+            .conn()
+            .unwrap()
+            .with_commit_sync(|txn| {
+                for loc in locations {
+                    let header_hash = fixt!(HeaderHash);
+                    let basis = AnyDhtHash::from(header_hash.clone());
+                    let mut op_hash = fixt!(DhtOpHash);
+                    let timestamp = fixt!(Timestamp);
 
-                op_hash.set_loc(loc);
-                let op_lite = DhtOpLight::StoreElement(header_hash.clone(), None, header_hash);
-                holochain_state::mutations::insert_op_lite(txn, op_lite, op_hash, true, timestamp)
+                    op_hash.set_loc(loc);
+                    let op_lite = DhtOpLight::StoreElement(header_hash, None, basis);
+                    holochain_state::mutations::insert_op_lite(
+                        txn, op_lite, op_hash, true, timestamp,
+                    )
                     .unwrap();
-            }
-        })
+                }
+                DatabaseResult::Ok(())
+            })
+            .unwrap();
+    }
+}
+
+impl std::fmt::Debug for SweetCell {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SweetCell")
+            .field("cell_id", &self.cell_id())
+            .finish()
     }
 }

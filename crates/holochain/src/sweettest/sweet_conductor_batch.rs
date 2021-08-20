@@ -105,51 +105,77 @@ impl SweetConductorBatch {
             .collect::<Result<Vec<_>, _>>()?
             .into())
     }
+}
 
+#[cfg(feature = "unchecked-dht-location")]
+use holochain_p2p::*;
+#[cfg(feature = "unchecked-dht-location")]
+use kitsune_p2p::test_util::scenario_def::{PeerMatrix, ScenarioDef};
+
+#[cfg(feature = "unchecked-dht-location")]
+impl SweetConductorBatch {
     /// Create a ConductorBatch from a kitsune `ScenarioDef`.
     /// The resulting conductors will have the specified DNAs installed as an app,
     /// and be pre-seeded with agents and op data as specified by the scenario.
     /// The provided DnaFile must
-    #[cfg(feature = "unchecked-dht-location")]
     pub async fn setup_from_scenario<const N: usize>(
-        scenario: kitsune_p2p::test_util::scenario_def::ScenarioDef<N>,
+        scenario: ScenarioDef<N>,
     ) -> [(SweetConductor, SweetAppBatch); N] {
         let (dna_file, _) =
             super::SweetDnaFile::unique_from_inline_zome("zome", InlineZome::new_unique(vec![]))
                 .await
                 .unwrap();
-        let tasks = itertools::zip(scenario.nodes.into_iter(), std::iter::repeat(dna_file))
-            .enumerate()
-            .map(|(i, (node, dna_file))| async move {
-                let mut conductor = SweetConductor::from_standard_config().await;
-                let agent_defs: Vec<_> = node.agents.iter().collect();
-                let agents = SweetAgents::get(conductor.keystore(), agent_defs.len()).await;
-                let apps = conductor
-                    .setup_app_for_agents(
-                        &format!("node-{}", i),
-                        agents.as_slice(),
-                        &[dna_file.clone()],
-                    )
-                    .await
-                    .expect("Scenario setup is infallible");
+        let tasks = itertools::zip(
+            scenario.nodes.into_iter(),
+            std::iter::repeat(dna_file.clone()),
+        )
+        .enumerate()
+        .map(|(i, (node, dna_file))| async move {
+            let mut conductor = SweetConductor::from_standard_config().await;
+            let agent_defs: Vec<_> = node.agents.iter().collect();
+            let agents = SweetAgents::get(conductor.keystore(), agent_defs.len()).await;
+            let apps = conductor
+                .setup_app_for_agents(
+                    &format!("node-{}", i),
+                    agents.as_slice(),
+                    &[dna_file.clone()],
+                )
+                .await
+                .expect("Scenario setup is infallible");
 
-                for (agent_def, cell) in itertools::zip(agent_defs, apps.cells_flattened()) {
-                    // Manually set the storage arc
-                    cell.set_storage_arc(agent_def.arc.clone());
-                    // Manually inject DhtOps at the correct locations
-                    cell.inject_fake_ops(agent_def.ops.clone().into_iter());
-                }
+            for (agent_def, cell) in itertools::zip(agent_defs, apps.cells_flattened()) {
+                // Manually set the storage arc
+                cell.set_storage_arc(agent_def.arc.clone());
+                // Manually inject DhtOps at the correct locations
+                cell.inject_fake_ops(agent_def.ops.clone().into_iter());
+            }
 
-                (conductor, apps)
-            });
-        let conductors = future::join_all(tasks)
+            (conductor, apps)
+        });
+        let conductors_and_apps: Vec<_> = future::join_all(tasks)
             .await
             .try_into()
             .unwrap_or_else(|_| unreachable!("Array size must match"));
 
-        for (conductor, _) in conductors.iter() {
-            conductor.exchange_peer_info()
-        }
+        let conductors: Vec<&SweetConductor> = conductors_and_apps.iter().map(|(c, _)| c).collect();
+
+        // Inject agent infos according to the PeerMatrix
+        match scenario.peer_matrix {
+            PeerMatrix::Full => SweetConductor::exchange_peer_info(conductors.clone()).await,
+            PeerMatrix::Sparse(matrix) => {
+                let kspace = dna_file.dna_hash().clone().to_kitsune();
+                for (i, conductor) in conductors.iter().enumerate() {
+                    conductor.inject_peer_info(
+                        matrix[i].iter().map(|c| conductors[*c]),
+                        dna_file.dna_hash().to_owned(),
+                    ).await;
+                }
+            }
+        };
+
+        conductors_and_apps
+            .try_into()
+            .expect("Total conductors must match input")
     }
 
     /// Let each conductor know about each others' agents so they can do networking
@@ -175,5 +201,39 @@ impl std::ops::Index<usize> for SweetConductorBatch {
 impl std::ops::IndexMut<usize> for SweetConductorBatch {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         &mut self.0[index]
+    }
+}
+
+#[cfg(feature = "unchecked-dht-location")]
+mod tests {
+    use maplit::hashset;
+
+    use super::*;
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn scenario_smoke_test() {
+        use crate::sweettest::SweetDnaFile;
+        use kitsune_p2p::dht_arc::ArcInterval;
+        use kitsune_p2p::test_util::scenario_def::ScenarioDefAgent as Agent;
+        use kitsune_p2p::test_util::scenario_def::ScenarioDefNode as Node;
+
+        let zome = InlineZome::new_unique(Vec::new());
+        let (dna, _) = SweetDnaFile::unique_from_inline_zome("zome", zome)
+            .await
+            .unwrap();
+        let scenario = ScenarioDef::new(
+            [
+                Node::new(hashset![
+                    Agent::new(ArcInterval::new(0, 110), &[0, 10, 20, 30, 90]),
+                    Agent::new(ArcInterval::new(90, 200), &[90, 100, 150]),
+                ]),
+                Node::new(hashset![
+                    Agent::new(ArcInterval::new(0, 110), &[5, 15, 25, 35, 95]),
+                    Agent::new(ArcInterval::new(90, 200), &[95, 105, 155]),
+                ]),
+            ],
+            PeerMatrix::Sparse([hashset![1], hashset![0]]),
+        );
+        let conductors_and_apps = SweetConductorBatch::setup_from_scenario(scenario);
     }
 }

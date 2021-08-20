@@ -23,6 +23,8 @@
 //!
 //! The complete 39 bytes together are known as the "full" hash
 
+use kitsune_p2p_dht_arc::DhtLocation;
+
 use crate::encode;
 use crate::error::HoloHashResult;
 use crate::has_hash::HasHash;
@@ -142,7 +144,7 @@ impl<T: HashType> HoloHash<T> {
     }
 
     /// Fetch the holo dht location for this hash
-    pub fn get_loc(&self) -> u32 {
+    pub fn get_loc(&self) -> DhtLocation {
         use std::convert::TryInto;
         bytes_to_loc(
             (&self.hash[HOLO_HASH_FULL_LEN - HOLO_HASH_LOC_LEN..])
@@ -159,7 +161,7 @@ impl<T: HashType> HoloHash<T> {
 
     /// manually set the location bytes
     #[cfg(feature = "unchecked-dht-location")]
-    pub fn set_loc(&mut self, loc: u32) {
+    pub fn set_loc(&mut self, loc: DhtLocation) {
         self.hash[32..].copy_from_slice(&loc_to_bytes(loc));
     }
 }
@@ -245,13 +247,13 @@ impl<T: HashType> std::fmt::Debug for HoloHash<T> {
 }
 
 /// internal convert 4 location bytes into a u32 location
-fn bytes_to_loc(bytes: [u8; 4]) -> u32 {
-    u32::from_le_bytes(bytes)
+fn bytes_to_loc(bytes: [u8; 4]) -> DhtLocation {
+    u32::from_le_bytes(bytes).into()
 }
 
 /// internal convert u32 location into 4 location bytes
-fn loc_to_bytes(loc: u32) -> [u8; 4] {
-    loc.to_le_bytes()
+fn loc_to_bytes(loc: DhtLocation) -> [u8; 4] {
+    u32::from(loc).to_le_bytes()
 }
 
 #[cfg(test)]
