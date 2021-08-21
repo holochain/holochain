@@ -194,6 +194,38 @@ pub enum KdApi {
         agent_info_list: Vec<KdAgentInfo>,
     },
 
+    /// check if an agent is an authority for a given hash
+    #[serde(rename = "isAuthorityReq")]
+    IsAuthorityReq {
+        /// message id
+        #[serde(rename = "msgId")]
+        msg_id: String,
+
+        /// root app hash
+        #[serde(rename = "root")]
+        root: KdHash,
+
+        /// agent hash
+        #[serde(rename = "agent")]
+        agent: KdHash,
+
+        /// basis hash
+        #[serde(rename = "basis")]
+        basis: KdHash,
+    },
+
+    /// check if an agent is an authority for a given hash
+    #[serde(rename = "isAuthorityRes")]
+    IsAuthorityRes {
+        /// message id
+        #[serde(rename = "msgId")]
+        msg_id: String,
+
+        /// is authority
+        #[serde(rename = "isAuthority")]
+        is_authority: bool,
+    },
+
     /// Send a message to a remote app/agent
     #[serde(rename = "messageSendReq")]
     MessageSendReq {
@@ -399,6 +431,8 @@ impl KdApi {
             Self::AgentInfoGetRes { msg_id, .. } => msg_id,
             Self::AgentInfoQueryReq { msg_id, .. } => msg_id,
             Self::AgentInfoQueryRes { msg_id, .. } => msg_id,
+            Self::IsAuthorityReq { msg_id, .. } => msg_id,
+            Self::IsAuthorityRes { msg_id, .. } => msg_id,
             Self::MessageSendReq { msg_id, .. } => msg_id,
             Self::MessageSendRes { msg_id, .. } => msg_id,
             Self::MessageRecvEvt { .. } => "",
@@ -423,6 +457,7 @@ impl KdApi {
             Self::AgentInfoStoreRes { .. } => true,
             Self::AgentInfoGetRes { .. } => true,
             Self::AgentInfoQueryRes { .. } => true,
+            Self::IsAuthorityRes { .. } => true,
             Self::MessageSendRes { .. } => true,
             Self::EntryAuthorRes { .. } => true,
             Self::EntryGetRes { .. } => true,
