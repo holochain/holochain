@@ -67,6 +67,14 @@ pub trait AsKdHnd: 'static + Send + Sync {
     /// query a list of agent_info records from the store
     fn agent_info_query(&self, root: KdHash) -> BoxFuture<'static, KdResult<Vec<KdAgentInfo>>>;
 
+    /// check if an agent is an authority for a given hash
+    fn is_authority(
+        &self,
+        root: KdHash,
+        agent: KdHash,
+        basis: KdHash,
+    ) -> BoxFuture<'static, KdResult<bool>>;
+
     /// Send a message to a remote app/agent
     fn message_send(
         &self,
@@ -181,6 +189,16 @@ impl KdHnd {
         root: KdHash,
     ) -> impl Future<Output = KdResult<Vec<KdAgentInfo>>> + 'static + Send {
         AsKdHnd::agent_info_query(&*self.0, root)
+    }
+
+    /// check if an agent is an authority for a given hash
+    pub fn is_authority(
+        &self,
+        root: KdHash,
+        agent: KdHash,
+        basis: KdHash,
+    ) -> impl Future<Output = KdResult<bool>> {
+        AsKdHnd::is_authority(&*self.0, root, agent, basis)
     }
 
     /// Send a message to a remote app/agent
