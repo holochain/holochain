@@ -34,7 +34,7 @@ pub mod test {
         let closure_header_hash = header_hash.clone();
         mock_hdk.expect_create()
             .with(hdk::prelude::mockall::predicate::eq(
-                EntryWithDefId::try_from(&super::Thing).unwrap()
+                CreateInput::try_from(&super::Thing).unwrap()
             ))
             .times(1)
             .return_once(move |_| Ok(closure_header_hash));

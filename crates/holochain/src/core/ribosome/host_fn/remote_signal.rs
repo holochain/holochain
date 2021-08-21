@@ -105,6 +105,7 @@ mod tests {
                 api.create(CreateInput::new(
                     EntryDefId::CapGrant,
                     Entry::CapGrant(cap_grant_entry),
+                    ChainTopOrdering::default(),
                 ))
                 .unwrap();
 

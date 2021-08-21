@@ -45,10 +45,10 @@ pub fn delete(hash: HeaderHash) -> ExternResult<HeaderHash> {
 /// Apps define app entries by registering entry def ids with the `entry_defs` callback and serialize the
 /// entry content when committing to the source chain.
 ///
-/// This function accepts any input that implements [ `TryInto<EntryWithDefId>` ].
+/// This function accepts any input that implements [ `TryInto<CreateInput>` ].
 /// The default impls from the `#[hdk_entry( .. )]` and [ `entry_def!` ] macros include this.
 ///
-/// With generic type handling it may make sense to directly construct [ `EntryWithDefId` ] and [ `create` ].
+/// With generic type handling it may make sense to directly construct [ `CreateInput` ] and [ `create` ].
 ///
 /// e.g.
 /// ```ignore
@@ -125,7 +125,7 @@ where
 }
 
 /// Thin wrapper around update for app entries.
-/// The hash is the [ `HeaderHash` ] of the deleted element, the input is a [ `TryInto<EntryWithDefId>` ].
+/// The hash is the [ `HeaderHash` ] of the deleted element, the input is a [ `TryInto<CreateInput>` ].
 ///
 /// Updates can reference Elements which contain Entry data -- namely, Creates and other Updates -- but
 /// not Deletes or system Elements
@@ -559,17 +559,21 @@ macro_rules! register_entry {
             }
         }
 
-        impl TryFrom<&$t> for $crate::prelude::EntryWithDefId
+        impl TryFrom<&$t> for $crate::prelude::CreateInput
         where
             $t: $crate::prelude::EntryDefRegistration,
         {
             type Error = $crate::prelude::WasmError;
             fn try_from(t: &$t) -> Result<Self, Self::Error> {
-                Ok(Self::new($t::entry_def_id(), t.try_into()?))
+                Ok(Self::new(
+                    $t::entry_def_id(),
+                    t.try_into()?,
+                    ChainTopOrdering::default(),
+                ))
             }
         }
 
-        impl TryFrom<$t> for $crate::prelude::EntryWithDefId {
+        impl TryFrom<$t> for $crate::prelude::CreateInput {
             type Error = $crate::prelude::WasmError;
             fn try_from(t: $t) -> Result<Self, Self::Error> {
                 (&t).try_into()

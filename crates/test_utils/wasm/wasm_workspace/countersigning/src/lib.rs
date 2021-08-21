@@ -33,12 +33,14 @@ fn create_an_invalid_thing(_: ()) -> ExternResult<HeaderHash> {
 }
 
 fn create_countersigned(responses: Vec<PreflightResponse>, thing: Thing) -> ExternResult<HeaderHash> {
-    HDK.with(|h| h.borrow().create(EntryWithDefId::new(
+    HDK.with(|h| h.borrow().create(CreateInput::new(
         (&thing).into(),
         Entry::CounterSign(
             Box::new(CounterSigningSessionData::try_from_responses(responses).map_err(|countersigning_error| WasmError::Guest(countersigning_error.to_string()))?),
             thing.try_into()?,
-        )
+        ),
+        // Countersigned entries MUST have strict ordering.
+        ChainTopOrdering::Strict,
     )))
 }
 

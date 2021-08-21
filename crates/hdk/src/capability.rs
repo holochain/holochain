@@ -31,6 +31,7 @@ pub fn create_cap_claim(cap_claim_entry: CapClaimEntry) -> ExternResult<HeaderHa
     create(CreateInput::new(
         EntryDefId::CapClaim,
         Entry::CapClaim(cap_claim_entry),
+        ChainTopOrdering::default(),
     ))
 }
 
@@ -122,6 +123,7 @@ pub fn create_cap_grant(cap_grant_entry: CapGrantEntry) -> ExternResult<HeaderHa
     create(CreateInput::new(
         EntryDefId::CapGrant,
         Entry::CapGrant(cap_grant_entry),
+        ChainTopOrdering::default(),
     ))
 }
 
@@ -183,6 +185,10 @@ pub fn update_cap_grant(
 ) -> ExternResult<HeaderHash> {
     update(
         old_grant_header_hash,
-        CreateInput::new(EntryDefId::CapGrant, Entry::CapGrant(new_grant_value)),
+        CreateInput::new(
+            EntryDefId::CapGrant,
+            Entry::CapGrant(new_grant_value),
+            ChainTopOrdering::default(),
+        ),
     )
 }

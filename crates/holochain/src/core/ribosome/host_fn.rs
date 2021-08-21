@@ -99,10 +99,10 @@ host_fn_api_impls! {
     fn create_link (zt::link::CreateLinkInput) -> holo_hash::HeaderHash;
 
     // Delete an entry.
-    fn delete (holo_hash::HeaderHash) -> holo_hash::HeaderHash;
+    fn delete (zt::entry::DeleteInput) -> holo_hash::HeaderHash;
 
-    // Header hash of the CreateLink element.
-    fn delete_link (holo_hash::HeaderHash) -> holo_hash::HeaderHash;
+    // Delete a CreateLink element.
+    fn delete_link (zt::link::DeleteLinkInput) -> holo_hash::HeaderHash;
 
     // Header hash of the newly committed element.
     // Emit a Signal::App to subscribers on the interface

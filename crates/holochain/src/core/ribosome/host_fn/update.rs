@@ -19,9 +19,13 @@ pub fn update<'a>(
             // destructure the args out into an app type def id and entry
             let UpdateInput {
                 original_header_address,
-                entry_with_def_id,
+                create_input,
             } = input;
-            let entry = AsRef::<Entry>::as_ref(&entry_with_def_id);
+            let CreateInput {
+                entry_def_id,
+                entry,
+                chain_top_ordering,
+            } = create_input;
 
             // Countersigned entries have different header handling.
             match entry {
@@ -31,7 +35,7 @@ pub fn update<'a>(
                             .host_context
                             .workspace()
                             .source_chain()
-                            .put_countersigned(entry_with_def_id.into_entry())
+                            .put_countersigned(entry, chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))
                     })
@@ -39,7 +43,7 @@ pub fn update<'a>(
                 _ => {
                     // build the entry hash
                     let entry_hash =
-                    EntryHash::with_data_sync(AsRef::<Entry>::as_ref(&entry_with_def_id));
+                    EntryHash::with_data_sync(&entry);
 
                     // extract the zome position
                     let header_zome_id = ribosome
@@ -47,7 +51,7 @@ pub fn update<'a>(
                     .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
 
                     // extract the entry defs for a zome
-                    let entry_type = match AsRef::<EntryDefId>::as_ref(&entry_with_def_id) {
+                    let entry_type = match entry_def_id {
                         EntryDefId::App(entry_def_id) => {
                             let (header_entry_def_id, entry_visibility) = extract_entry_def(
                                 ribosome,
@@ -82,7 +86,7 @@ pub fn update<'a>(
                         let source_chain = workspace.source_chain();
                         // push the header and the entry into the source chain
                         let header_hash = source_chain
-                            .put(header_builder, Some(entry_with_def_id.into_entry()))
+                            .put(header_builder, Some(entry), chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
                         Ok(header_hash)

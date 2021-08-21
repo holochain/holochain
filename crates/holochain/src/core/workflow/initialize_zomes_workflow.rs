@@ -47,7 +47,7 @@ where
 }
 
 async fn initialize_zomes_workflow_inner<Ribosome, C>(
-    mut workspace: HostFnWorkspace,
+    workspace: HostFnWorkspace,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
     args: InitializeZomesWorkflowArgs<Ribosome, C>,
@@ -231,6 +231,7 @@ pub mod tests {
                     access: ().into(),
                     functions: vec![("no-init".into(), "xxx".into())].into_iter().collect(),
                 }),
+                ChainTopOrdering::default(),
             ))?;
             Ok(InitCallbackResult::Fail("reason".into()))
         });

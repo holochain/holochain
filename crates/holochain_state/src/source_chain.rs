@@ -159,7 +159,7 @@ impl SourceChain {
     }
 
     pub async fn put_countersigned(
-        &mut self,
+        &self,
         entry: Entry,
         chain_top_ordering: ChainTopOrdering,
     ) -> SourceChainResult<HeaderHash> {
@@ -178,7 +178,7 @@ impl SourceChain {
     }
 
     pub async fn put<H: HeaderInner, B: HeaderBuilder<H>>(
-        &mut self,
+        &self,
         header_builder: B,
         maybe_entry: Option<Entry>,
         chain_top_ordering: ChainTopOrdering,

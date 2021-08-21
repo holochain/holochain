@@ -65,6 +65,7 @@ pub fn create_link<T: Into<LinkTag>>(
             base_address,
             target_address,
             tag.into(),
+            ChainTopOrdering::default(),
         ))
     })
 }

@@ -51,17 +51,25 @@ fn simple_crud_zome() -> InlineZome {
         .callback("create_string", move |api, s: AppString| {
             let entry_def_id: EntryDefId = string_entry_def.id.clone();
             let entry = Entry::app(AppString::from(s).try_into().unwrap()).unwrap();
-            let hash = api.create(CreateInput::new(entry_def_id, entry))?;
+            let hash = api.create(CreateInput::new(
+                entry_def_id,
+                entry,
+                ChainTopOrdering::default(),
+            ))?;
             Ok(hash)
         })
         .callback("create_unit", move |api, ()| {
             let entry_def_id: EntryDefId = unit_entry_def.id.clone();
             let entry = Entry::app(().try_into().unwrap()).unwrap();
-            let hash = api.create(CreateInput::new(entry_def_id, entry))?;
+            let hash = api.create(CreateInput::new(
+                entry_def_id,
+                entry,
+                ChainTopOrdering::default(),
+            ))?;
             Ok(hash)
         })
         .callback("delete", move |api, header_hash: HeaderHash| {
-            let hash = api.delete(header_hash)?;
+            let hash = api.delete(DeleteInput::new(header_hash, ChainTopOrdering::default()))?;
             Ok(hash)
         })
         .callback("read", |api, hash: HeaderHash| {
@@ -336,7 +344,11 @@ fn simple_validation_zome() -> InlineZome {
         .callback("create", move |api, s: AppString| {
             let entry_def_id: EntryDefId = entry_def.id.clone();
             let entry = Entry::app(s.try_into().unwrap()).unwrap();
-            let hash = api.create(CreateInput::new(entry_def_id, entry))?;
+            let hash = api.create(CreateInput::new(
+                entry_def_id,
+                entry,
+                ChainTopOrdering::default(),
+            ))?;
             Ok(hash)
         })
         .callback("read", |api, hash: HeaderHash| {
