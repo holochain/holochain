@@ -521,6 +521,7 @@ impl SourceChain {
     }
 
     pub async fn flush(&self) -> SourceChainResult<()> {
+        #[allow(clippy::complexity)]
         fn build_ops_from_headers(
             signed_headers: Vec<SignedHeaderHashed>,
         ) -> SourceChainResult<(
@@ -1015,7 +1016,9 @@ pub mod tests {
                 entry_type: EntryType::CapGrant,
                 entry_hash: entry_hash.clone(),
             };
-            let header = chain.put(header_builder, Some(entry)).await?;
+            let header = chain
+                .put(header_builder, Some(entry), ChainTopOrdering::default())
+                .await?;
 
             chain.flush().await.unwrap();
 
@@ -1056,7 +1059,9 @@ pub mod tests {
                 original_header_address,
                 original_entry_address,
             };
-            let header = chain.put(header_builder, Some(entry)).await?;
+            let header = chain
+                .put(header_builder, Some(entry), ChainTopOrdering::default())
+                .await?;
 
             chain.flush().await.unwrap();
 
@@ -1093,7 +1098,9 @@ pub mod tests {
                 deletes_address: updated_header_hash,
                 deletes_entry_address: updated_entry_hash,
             };
-            chain.put(header_builder, None).await?;
+            chain
+                .put(header_builder, None, ChainTopOrdering::default())
+                .await?;
 
             chain.flush().await.unwrap();
         }
@@ -1199,13 +1206,19 @@ pub mod tests {
             entry_type: EntryType::App(fixt!(AppEntryType)),
             entry_hash: EntryHash::with_data_sync(&entry),
         };
-        let h1 = source_chain.put(create, Some(entry)).await.unwrap();
+        let h1 = source_chain
+            .put(create, Some(entry), ChainTopOrdering::default())
+            .await
+            .unwrap();
         let entry = Entry::App(fixt!(AppEntryBytes));
         let create = builder::Create {
             entry_type: EntryType::App(fixt!(AppEntryType)),
             entry_hash: EntryHash::with_data_sync(&entry),
         };
-        let h2 = source_chain.put(create, Some(entry)).await.unwrap();
+        let h2 = source_chain
+            .put(create, Some(entry), ChainTopOrdering::default())
+            .await
+            .unwrap();
         source_chain.flush().await.unwrap();
 
         fresh_reader_test!(vault, |txn| {

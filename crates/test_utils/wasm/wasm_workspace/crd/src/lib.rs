@@ -79,12 +79,12 @@ pub mod test {
     fn delete_smoke() {
         let mut mock_hdk = hdk::prelude::MockHdkT::new();
 
-        let input_header_hash = fixt!(HeaderHash);
+        let delete_input = fixt!(DeleteInput);
         let output_header_hash = fixt!(HeaderHash);
         let output_header_hash_closure = output_header_hash.clone();
         mock_hdk.expect_delete()
             .with(hdk::prelude::mockall::predicate::eq(
-                input_header_hash.clone()
+                DeleteInput::new(input_header_hash.clone(), ChainTopOrdering::default())
             ))
             .times(1)
             .return_once(move |_| Ok(output_header_hash_closure));

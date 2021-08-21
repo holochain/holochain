@@ -36,8 +36,13 @@ pub fn update(hash: HeaderHash, create_input: CreateInput) -> ExternResult<Heade
 ///
 /// Usually you don't need to use this function directly; it is the most general way to update an
 /// entry and standardises the internals of higher level create functions.
-pub fn delete(hash: HeaderHash) -> ExternResult<HeaderHash> {
-    HDK.with(|h| h.borrow().delete(hash))
+pub fn delete(deletes_header_address: HeaderHash) -> ExternResult<HeaderHash> {
+    HDK.with(|h| {
+        h.borrow().delete(DeleteInput::new(
+            deletes_header_address,
+            ChainTopOrdering::default(),
+        ))
+    })
 }
 
 /// Create an app entry.

@@ -103,7 +103,7 @@ let entry = Entry::App(bar.clone().try_into()?);
 // Call the update_entry host_fn directly
 let _bar_header_hash = host_call::<UpdateInput, HeaderHash>(
     __update,
-    UpdateInput::new(foo_header_hash, CreateInput::new(Bar::entry_def().id, entry)))
+    UpdateInput::new(foo_header_hash, CreateInput::new(Bar::entry_def().id, entry, ChainTopOrdering::Strict)))
 )?;
 ```
 

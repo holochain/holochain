@@ -19,7 +19,7 @@ pub fn create<'a>(
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ write_workspace: Permission::Allow, .. } => {
             let entry = AsRef::<Entry>::as_ref(&input);
-            let chain_top_ordering = input.chain_top_ordering().clone();
+            let chain_top_ordering = *input.chain_top_ordering();
 
             // Countersigned entries have different header handling.
             match entry {

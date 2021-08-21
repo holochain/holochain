@@ -56,7 +56,7 @@ pub fn update<'a>(
                             let (header_entry_def_id, entry_visibility) = extract_entry_def(
                                 ribosome,
                                 call_context.clone(),
-                                entry_def_id.to_owned().into(),
+                                entry_def_id.into(),
                             )?;
                             let app_entry_type =
                                 AppEntryType::new(header_entry_def_id, header_zome_id, entry_visibility);
