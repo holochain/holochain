@@ -125,33 +125,30 @@ impl SweetConductorBatch {
             super::SweetDnaFile::unique_from_inline_zome("zome", InlineZome::new_unique(vec![]))
                 .await
                 .unwrap();
-        let tasks = itertools::zip(
-            scenario.nodes.into_iter(),
-            std::iter::repeat(dna_file.clone()),
-        )
-        .enumerate()
-        .map(|(i, (node, dna_file))| async move {
-            let mut conductor = SweetConductor::from_standard_config().await;
-            let agent_defs: Vec<_> = node.agents.iter().collect();
-            let agents = SweetAgents::get(conductor.keystore(), agent_defs.len()).await;
-            let apps = conductor
-                .setup_app_for_agents(
-                    &format!("node-{}", i),
-                    agents.as_slice(),
-                    &[dna_file.clone()],
-                )
-                .await
-                .expect("Scenario setup is infallible");
+        let tasks = itertools::zip(scenario.nodes.iter(), std::iter::repeat(dna_file.clone()))
+            .enumerate()
+            .map(|(i, (node, dna_file))| async move {
+                let mut conductor = SweetConductor::from_standard_config().await;
+                let agent_defs: Vec<_> = node.agents.iter().collect();
+                let agents = SweetAgents::get(conductor.keystore(), agent_defs.len()).await;
+                let apps = conductor
+                    .setup_app_for_agents(
+                        &format!("node-{}", i),
+                        agents.as_slice(),
+                        &[dna_file.clone()],
+                    )
+                    .await
+                    .expect("Scenario setup is infallible");
 
-            for (agent_def, cell) in itertools::zip(agent_defs, apps.cells_flattened()) {
-                // Manually set the storage arc
-                cell.set_storage_arc(agent_def.arc.clone());
-                // Manually inject DhtOps at the correct locations
-                cell.inject_fake_ops(agent_def.ops.clone().into_iter());
-            }
+                for (agent_def, cell) in itertools::zip(agent_defs, apps.cells_flattened()) {
+                    // Manually set the storage arc
+                    cell.set_storage_arc(agent_def.arc.clone()).await;
+                    // Manually inject DhtOps at the correct locations
+                    cell.inject_fake_ops(agent_def.ops.clone().into_iter());
+                }
 
-            (conductor, apps)
-        });
+                (conductor, apps)
+            });
         let conductors_and_apps: Vec<_> = future::join_all(tasks)
             .await
             .try_into()
@@ -163,12 +160,13 @@ impl SweetConductorBatch {
         match scenario.peer_matrix {
             PeerMatrix::Full => SweetConductor::exchange_peer_info(conductors.clone()).await,
             PeerMatrix::Sparse(matrix) => {
-                let kspace = dna_file.dna_hash().clone().to_kitsune();
                 for (i, conductor) in conductors.iter().enumerate() {
-                    conductor.inject_peer_info(
-                        matrix[i].iter().map(|c| conductors[*c]),
-                        dna_file.dna_hash().to_owned(),
-                    ).await;
+                    conductor
+                        .inject_peer_info(
+                            matrix[i].iter().map(|c| conductors[*c]),
+                            dna_file.dna_hash().to_owned(),
+                        )
+                        .await;
                 }
             }
         };
@@ -204,6 +202,7 @@ impl std::ops::IndexMut<usize> for SweetConductorBatch {
     }
 }
 
+#[cfg(test)]
 #[cfg(feature = "unchecked-dht-location")]
 mod tests {
     use maplit::hashset;
@@ -217,10 +216,6 @@ mod tests {
         use kitsune_p2p::test_util::scenario_def::ScenarioDefAgent as Agent;
         use kitsune_p2p::test_util::scenario_def::ScenarioDefNode as Node;
 
-        let zome = InlineZome::new_unique(Vec::new());
-        let (dna, _) = SweetDnaFile::unique_from_inline_zome("zome", zome)
-            .await
-            .unwrap();
         let scenario = ScenarioDef::new(
             [
                 Node::new(hashset![
@@ -234,6 +229,6 @@ mod tests {
             ],
             PeerMatrix::Sparse([hashset![1], hashset![0]]),
         );
-        let conductors_and_apps = SweetConductorBatch::setup_from_scenario(scenario);
+        let _conductors_and_apps = SweetConductorBatch::setup_from_scenario(scenario);
     }
 }

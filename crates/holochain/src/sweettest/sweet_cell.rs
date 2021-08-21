@@ -40,20 +40,6 @@ impl SweetCell {
     pub fn zome<Z: Into<ZomeName>>(&self, zome_name: Z) -> SweetZome {
         SweetZome::new(self.cell_id.clone(), zome_name.into())
     }
-
-    /// Inject peer info for the given cells into this cell's peer store
-    pub async fn inject_peer_info<C>(&self, cells: C)
-    where
-        C: Iterator<Item = Self> + Send,
-    {
-        let agent_infos = cells.map(|c| todo!("make agent info"));
-        crate::conductor::p2p_agent_store::inject_agent_infos(
-            self.p2p_agents_env.clone(),
-            agent_infos,
-        )
-        .await
-        .unwrap();
-    }
 }
 
 #[cfg(feature = "unchecked-dht-location")]

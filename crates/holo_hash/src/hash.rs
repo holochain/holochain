@@ -162,7 +162,7 @@ impl<T: HashType> HoloHash<T> {
     /// manually set the location bytes
     #[cfg(feature = "unchecked-dht-location")]
     pub fn set_loc(&mut self, loc: DhtLocation) {
-        self.hash[32..].copy_from_slice(&loc_to_bytes(loc));
+        self.hash[32..].copy_from_slice(&_loc_to_bytes(loc));
     }
 }
 
@@ -252,7 +252,7 @@ fn bytes_to_loc(bytes: [u8; 4]) -> DhtLocation {
 }
 
 /// internal convert u32 location into 4 location bytes
-fn loc_to_bytes(loc: DhtLocation) -> [u8; 4] {
+fn _loc_to_bytes(loc: DhtLocation) -> [u8; 4] {
     u32::from(loc).to_le_bytes()
 }
 

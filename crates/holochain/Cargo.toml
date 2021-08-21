@@ -117,10 +117,7 @@ name = "holochain"
 path = "src/bin/holochain/main.rs"
 
 [features]
-default = ["slow_tests", "test_utils", "no-deps",
-
-  # TODO: selectively enable
-  "unchecked-dht-location",]
+default = ["slow_tests", "test_utils", "no-deps",]
 
 # Exposes additional functionality only needed for integration tests.
 # This feature should be turned off for production builds.
@@ -138,6 +135,8 @@ test_utils = [
   "holochain_test_wasm_common",
   "unwrap_to",
 
+  # TODO: selectively enable
+  "unchecked-dht-location",
 ]
 
 # Wasm ribosome tests take > 60 seconds - let's only run them in CI

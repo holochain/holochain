@@ -321,6 +321,8 @@ impl SweetConductor {
             .unwrap();
     }
 
+    /// Inject all peer info from all spaces of all conductors into each other conductor.
+    /// Maximum information sharing between conductors.
     pub async fn exchange_peer_info<'a, P: IntoIterator<Item = &'a Self>>(peers: P) {
         use crate::conductor::p2p_agent_store as p2p_store;
         let envs: Vec<_> = peers
