@@ -9,8 +9,8 @@ use crate::prelude::*;
 ///
 /// Usually you don't need to use this function directly; it is the most general way to create an
 /// entry and standardises the internals of higher level create functions.
-pub fn create(entry_with_def_id: CreateInput) -> ExternResult<HeaderHash> {
-    HDK.with(|h| h.borrow().create(entry_with_def_id))
+pub fn create(create_input: CreateInput) -> ExternResult<HeaderHash> {
+    HDK.with(|h| h.borrow().create(create_input))
 }
 
 /// Update any entry type.
@@ -23,8 +23,8 @@ pub fn create(entry_with_def_id: CreateInput) -> ExternResult<HeaderHash> {
 ///
 /// Usually you don't need to use this function directly; it is the most general way to update an
 /// entry and standardises the internals of higher level create functions.
-pub fn update(hash: HeaderHash, entry_with_def_id: CreateInput) -> ExternResult<HeaderHash> {
-    HDK.with(|h| h.borrow().update(UpdateInput::new(hash, entry_with_def_id)))
+pub fn update(hash: HeaderHash, create_input: CreateInput) -> ExternResult<HeaderHash> {
+    HDK.with(|h| h.borrow().update(UpdateInput::new(hash, create_input)))
 }
 
 /// General function that can delete any entry type.

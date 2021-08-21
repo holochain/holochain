@@ -281,8 +281,8 @@ impl HdkT for HostHdk {
     fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool> {
         host_call::<VerifySignature, bool>(__verify_signature, verify_signature)
     }
-    fn create(&self, entry_with_def_id: CreateInput) -> ExternResult<HeaderHash> {
-        host_call::<CreateInput, HeaderHash>(__create, entry_with_def_id)
+    fn create(&self, create_input: CreateInput) -> ExternResult<HeaderHash> {
+        host_call::<CreateInput, HeaderHash>(__create, create_input)
     }
     fn update(&self, update_input: UpdateInput) -> ExternResult<HeaderHash> {
         host_call::<UpdateInput, HeaderHash>(__update, update_input)
