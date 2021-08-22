@@ -468,6 +468,7 @@ pub mod wasm_test {
         tokio::time::sleep(std::time::Duration::from_millis(4000)).await;
         let _: HeaderHash = conductor.call(&alice, "create_a_thing", ()).await;
         let _: HeaderHash = conductor.call(&bobbo, "create_a_thing", ()).await;
+        tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
 
         // Header get must not error.
         let countersigned_header_bob: SignedHeaderHashed = conductor
