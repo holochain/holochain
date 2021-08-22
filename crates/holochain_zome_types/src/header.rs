@@ -11,6 +11,8 @@ use holo_hash::HashableContent;
 use holo_hash::HeaderHash;
 use holo_hash::HoloHashed;
 use holochain_serialized_bytes::prelude::*;
+use conversions::WrongHeaderError;
+use thiserror::Error;
 
 #[cfg(feature = "rusqlite")]
 use crate::impl_to_sql_via_display;
@@ -24,6 +26,17 @@ pub mod facts;
 /// created during genesis. Anything with this seq or higher was created
 /// after genesis.
 pub const POST_GENESIS_SEQ_THRESHOLD: u32 = 3;
+
+
+#[derive(Error, Debug)]
+pub enum HeaderError {
+    #[error("Tried to create a NewEntryHeader with a type that isn't a Create or Update")]
+    NotNewEntry,
+    #[error(transparent)]
+    WrongHeaderError(#[from] WrongHeaderError),
+    #[error("{0}")]
+    Rebase(String),
+}
 
 #[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum ChainTopOrdering {
@@ -210,6 +223,35 @@ impl Header {
     /// returns the timestamp of when the header was created
     pub fn timestamp(&self) -> Timestamp {
         match_header!(self => |i| { i.timestamp })
+    }
+
+    pub fn rebase_on(
+        &mut self,
+        new_prev_header: HeaderHash,
+        new_prev_seq: u32,
+        new_prev_timestamp: Timestamp,
+    ) -> Result<(), HeaderError> {
+        let new_seq = new_prev_seq + 1;
+        let new_timestamp = self.timestamp().max((
+            new_prev_timestamp
+                + std::time::Duration::from_nanos(1)).map_err(|e| HeaderError::Rebase(e.to_string()))?);
+        match self {
+            Self::Dna(_) => return Err(HeaderError::Rebase("Rebased a DNA Header".to_string())),
+            Self::AgentValidationPkg(AgentValidationPkg { timestamp, header_seq, prev_header, .. })
+            | Self::InitZomesComplete(InitZomesComplete { timestamp, header_seq, prev_header, .. })
+            | Self::CreateLink(CreateLink { timestamp, header_seq, prev_header, .. })
+            | Self::DeleteLink(DeleteLink { timestamp, header_seq, prev_header, .. })
+            | Self::Delete(Delete { timestamp, header_seq, prev_header, .. })
+            | Self::CloseChain(CloseChain { timestamp, header_seq, prev_header, .. })
+            | Self::OpenChain(OpenChain { timestamp, header_seq, prev_header, .. })
+            | Self::Create(Create { timestamp, header_seq, prev_header, .. })
+            | Self::Update(Update { timestamp, header_seq, prev_header, .. }) => {
+                *timestamp = new_timestamp;
+                *header_seq = new_seq;
+                *prev_header = new_prev_header;
+            },
+        };
+        Ok(())
     }
 
     /// returns the sequence ordinal of this header

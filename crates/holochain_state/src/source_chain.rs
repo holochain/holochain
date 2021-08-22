@@ -39,6 +39,7 @@ use holochain_zome_types::QueryFilter;
 use holochain_zome_types::Signature;
 use holochain_zome_types::SignedHeader;
 use holochain_zome_types::SignedHeaderHashed;
+use holochain_keystore::KeystoreSender;
 
 use crate::chain_lock::is_chain_locked;
 use crate::chain_lock::is_lock_expired;
@@ -522,7 +523,9 @@ impl SourceChain {
     pub async fn flush(&self) -> SourceChainResult<()> {
         #[allow(clippy::complexity)]
         fn build_ops_from_headers(
+            keystore: &KeystoreSender,
             signed_headers: Vec<SignedHeaderHashed>,
+            rebase_on: Option<(HeaderHash, u32, Timestamp)>,
         ) -> SourceChainResult<(
             Vec<SignedHeaderHashed>,
             Vec<(
@@ -535,12 +538,30 @@ impl SourceChain {
             )>,
         )> {
             // Headers end up back in here.
-            let mut headers = Vec::with_capacity(signed_headers.len());
+            let mut headers_input = Vec::with_capacity(signed_headers.len());
+            let mut headers_output = Vec::with_capacity(signed_headers.len());
             // The op related data ends up here.
-            let mut ops = Vec::with_capacity(headers.len());
+            let mut ops = Vec::with_capacity(signed_headers.len());
+
+            if let Some((mut rebase_header, rebase_seq, rebase_timestamp)) = rebase_on {
+                let mut rebased_headers = vec![];
+                rebased_headers = signed_headers;
+                rebased_headers
+                    .sort_by(|a, b| a.header().header_seq().cmp(&b.header().header_seq()));
+                for rebased_header in rebased_headers.iter_mut() {
+                    let header = rebased_header.header();
+                    header.rebase_on(rebase_header, rebase_seq, rebase_timestamp);
+                    let hh = HeaderHashed::with_data_sync(header);
+                    let shh = SignedHeaderHashed::new(keystore, hh)?;
+                    rebased_header = shh;
+                }
+                headers_input = rebased_headers;
+            } else {
+                headers_input = signed_headers;
+            }
 
             // Loop through each header and produce op related data.
-            for shh in signed_headers {
+            for shh in headers_input {
                 // &HeaderHash, &Header, EntryHash are needed to produce the ops.
                 let entry_hash = shh.header().entry_hash().cloned();
                 let item = (shh.as_hash(), shh.header(), entry_hash);
@@ -573,10 +594,12 @@ impl SourceChain {
                     sig,
                 );
                 // Put the header back in the list.
-                headers.push(shh);
+                headers_output.push(shh);
             }
-            Ok((headers, ops))
+            Ok((headers_output, ops))
         }
+
+        let keystore = self.vault.keystore();
 
         // Nothing to write
         if self.scratch.apply(|s| s.is_empty())? {
@@ -584,7 +607,7 @@ impl SourceChain {
         }
         let (headers, ops, entries) = self.scratch.apply_and_then(|scratch| {
             let (headers, ops) =
-                build_ops_from_headers(scratch.drain_headers().collect::<Vec<_>>())?;
+                build_ops_from_headers(&keystore, scratch.drain_headers().collect::<Vec<_>>(), None)?;
 
             // Drain out any entries.
             let entries = scratch.drain_entries().collect::<Vec<_>>();
@@ -614,22 +637,28 @@ impl SourceChain {
         self.vault
             .async_commit(move |txn: &mut Transaction| {
                 // As at check.
-                let (new_persisted_head, _, _) = chain_head_db(&txn, author)?;
+                let (new_persisted_head, new_head_seq, new_timestamp) =
+                    chain_head_db(&txn, author)?;
                 if headers.last().is_none() {
                     // Nothing to write
                     return Ok(());
                 }
-                if persisted_head != new_persisted_head {
+                let (headers, ops) = if persisted_head == new_persisted_head {
+                    (headers, ops)
+                } else {
                     if is_relaxed_ordering {
-                        // @TODO: rebuild all the headers here.
-                        todo!();
+                        build_ops_from_headers(
+                            &keystore,
+                            headers,
+                            Some((new_persisted_head, new_head_seq, new_timestamp)),
+                        )?
                     } else {
                         return Err(SourceChainError::HeadMoved(
                             Some(persisted_head),
                             Some(new_persisted_head),
                         ));
                     }
-                }
+                };
 
                 // If the lock isn't empty this is a countersigning session.
                 let is_countersigning_session = !lock.is_empty();
