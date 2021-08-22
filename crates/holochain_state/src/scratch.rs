@@ -49,17 +49,23 @@ impl Scratch {
         Self::default()
     }
 
+    pub fn chain_top_ordering(&self) -> ChainTopOrdering {
+        self.chain_top_ordering
+    }
+
     pub fn respect_chain_top_ordering(&mut self, chain_top_ordering: ChainTopOrdering) {
         if chain_top_ordering == ChainTopOrdering::Strict {
             self.chain_top_ordering = chain_top_ordering;
         }
     }
 
-    pub fn add_header(&mut self, item: SignedHeaderHashed) {
+    pub fn add_header(&mut self, item: SignedHeaderHashed, chain_top_ordering: ChainTopOrdering) {
+        self.respect_chain_top_ordering(chain_top_ordering);
         self.headers.push(item);
     }
 
-    pub fn add_entry(&mut self, entry_hashed: EntryHashed) {
+    pub fn add_entry(&mut self, entry_hashed: EntryHashed, chain_top_ordering: ChainTopOrdering) {
+        self.respect_chain_top_ordering(chain_top_ordering);
         let (entry, hash) = entry_hashed.into_inner();
         self.entries.insert(hash, Arc::new(entry));
     }

@@ -1,3 +1,4 @@
+use crate::scratch::SyncScratchError;
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
@@ -60,7 +61,6 @@ pub struct SourceChain {
     persisted_head: HeaderHash,
     persisted_timestamp: Timestamp,
     public_only: bool,
-    relaxed_only: bool,
 }
 
 // TODO fix this.  We shouldn't really have nil values but this would
@@ -99,7 +99,6 @@ impl SourceChain {
             persisted_head,
             persisted_timestamp,
             public_only: false,
-            relaxed_only: true,
         })
     }
     pub fn public_only(&mut self) {
@@ -603,10 +602,15 @@ impl SourceChain {
         }
         let lock = Self::lock_for_entry(maybe_countersigned_entry)?;
 
+        let is_relaxed_ordering =
+            self.scratch
+                .apply_and_then::<bool, SyncScratchError, _>(|scratch| {
+                    Ok(scratch.chain_top_ordering() == ChainTopOrdering::Relaxed)
+                })?;
+
         // Write the entries, headers and ops to the database in one transaction.
         let author = self.author.clone();
         let persisted_head = self.persisted_head.clone();
-        let is_relaxed_only = self.relaxed_only;
         self.vault
             .async_commit(move |txn: &mut Transaction| {
                 // As at check.
@@ -616,7 +620,7 @@ impl SourceChain {
                     return Ok(());
                 }
                 if persisted_head != new_persisted_head {
-                    if is_relaxed_only {
+                    if is_relaxed_ordering {
                         // @TODO: rebuild all the headers here.
                         todo!();
                     } else {
