@@ -114,8 +114,8 @@ async fn links_authoring() {
 
     // Data
     let td = EntryTestData::create();
-    insert_op_scratch(&mut scratch, td.store_entry_op.clone()).unwrap();
-    insert_op_scratch(&mut scratch, td.create_link_op.clone()).unwrap();
+    insert_op_scratch(&mut scratch, td.store_entry_op.clone(), ChainTopOrdering::default()).unwrap();
+    insert_op_scratch(&mut scratch, td.create_link_op.clone(), ChainTopOrdering::default()).unwrap();
 
     // Network
     // - Not expecting any calls to the network.
@@ -141,7 +141,7 @@ async fn links_authoring() {
 
     assert_eq!(r, td.links);
 
-    insert_op_scratch(&mut scratch, td.delete_link_op.clone()).unwrap();
+    insert_op_scratch(&mut scratch, td.delete_link_op.clone(), ChainTopOrdering::default()).unwrap();
 
     let mut cascade = Cascade::empty()
         .with_network(mock, cache.env())
