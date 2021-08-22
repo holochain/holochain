@@ -79,7 +79,7 @@ pub mod test {
     fn delete_smoke() {
         let mut mock_hdk = hdk::prelude::MockHdkT::new();
 
-        let delete_input = fixt!(DeleteInput);
+        let input_header_hash = fixt!(HeaderHash);
         let output_header_hash = fixt!(HeaderHash);
         let output_header_hash_closure = output_header_hash.clone();
         mock_hdk.expect_delete()
