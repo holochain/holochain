@@ -43,10 +43,6 @@ impl HostFnWorkspace {
         &self.source_chain
     }
 
-    pub fn source_chain_mut(&mut self) -> &mut SourceChain {
-        &mut self.source_chain
-    }
-
     pub fn stores(&self) -> HostFnStores {
         HostFnStores {
             vault: self.vault.clone().into(),
