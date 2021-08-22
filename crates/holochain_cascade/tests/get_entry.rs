@@ -7,6 +7,7 @@ use holochain_p2p::MockHolochainP2pCellT;
 use holochain_state::mutations::insert_op_scratch;
 use holochain_state::prelude::test_cell_env;
 use holochain_state::scratch::Scratch;
+use holochain_zome_types::ChainTopOrdering;
 use holochain_zome_types::Details;
 use holochain_zome_types::ElementDetails;
 use holochain_zome_types::EntryDetails;
