@@ -257,8 +257,18 @@ async fn entry_authoring() {
     // Data
     let td_entry = EntryTestData::create();
     let td_element = ElementTestData::create();
-    insert_op_scratch(&mut scratch, td_entry.store_entry_op.clone()).unwrap();
-    insert_op_scratch(&mut scratch, td_element.any_store_element_op.clone()).unwrap();
+    insert_op_scratch(
+        &mut scratch,
+        td_entry.store_entry_op.clone(),
+        ChainTopOrdering::default(),
+    )
+    .unwrap();
+    insert_op_scratch(
+        &mut scratch,
+        td_element.any_store_element_op.clone(),
+        ChainTopOrdering::default(),
+    )
+    .unwrap();
 
     // Network
     // - Not expecting any calls to the network.
@@ -341,8 +351,18 @@ async fn content_authoring() {
     // Data
     let td_entry = EntryTestData::create();
     let td_element = ElementTestData::create();
-    insert_op_scratch(&mut scratch, td_entry.store_entry_op.clone()).unwrap();
-    insert_op_scratch(&mut scratch, td_element.any_store_element_op.clone()).unwrap();
+    insert_op_scratch(
+        &mut scratch,
+        td_entry.store_entry_op.clone(),
+        ChainTopOrdering::default(),
+    )
+    .unwrap();
+    insert_op_scratch(
+        &mut scratch,
+        td_element.any_store_element_op.clone(),
+        ChainTopOrdering::default(),
+    )
+    .unwrap();
 
     // Network
     // - Not expecting any calls to the network.
