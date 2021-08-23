@@ -1,6 +1,6 @@
 [package]
 name = "holochain_keystore"
-version = "0.0.3"
+version = "0.0.4-dev.0"
 description = "keystore for libsodium keypairs"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -26,4 +26,4 @@ tracing = "0.1"
 
 # This is a redundant dependency.
 # It's included only to set the proper feature flag for database encryption.
-holochain_sqlite = { version = "0.0.3", path = "../holochain_sqlite" }
+holochain_sqlite = { version = "0.0.4-dev.0", path = "../holochain_sqlite" }
