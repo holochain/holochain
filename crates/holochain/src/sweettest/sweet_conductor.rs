@@ -1,7 +1,7 @@
 //! A wrapper around ConductorHandle with more convenient methods for testing.
 // TODO [ B-03669 ] move to own crate
 
-use super::{SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetConductorHandle};
+use super::*;
 use crate::conductor::{
     api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult,
     handle::ConductorHandle, CellError, Conductor, ConductorBuilder,
@@ -10,11 +10,12 @@ use hdk::prelude::*;
 use holo_hash::DnaHash;
 use holochain_conductor_api::{AdminInterfaceConfig, InterfaceDriver};
 use holochain_keystore::KeystoreSender;
+use holochain_p2p::dht_arc::ArcInterval;
 use holochain_p2p::*;
 use holochain_state::test_utils::{test_environments, TestEnvs};
 use holochain_types::prelude::*;
 use holochain_websocket::*;
-use kitsune_p2p::KitsuneP2pConfig;
+use kitsune_p2p::{event::full_time_window, KitsuneP2pConfig};
 use std::sync::Arc;
 
 /// A stream of signals.
@@ -338,6 +339,28 @@ impl SweetConductor {
             .map(|e| e.to_owned())
             .collect();
         p2p_store::exchange_peer_info(envs).await;
+    }
+
+    /// Get all op hashes for all Cells with the specified DnaHash and agent keys
+    pub async fn get_all_op_hashes<A: IntoIterator<Item = AgentPubKey>>(
+        &self,
+        dna_hash: &DnaHash,
+        agents: A,
+    ) -> HashSet<DhtOpHash> {
+        self.query_op_hashes(
+            dna_hash.clone(),
+            agents
+                .into_iter()
+                .map(|agent| (agent, ArcInterval::Full.into()))
+                .collect(),
+            full_time_window(),
+            true,
+        )
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|(h, _)| h)
+        .collect()
     }
 
     // App setup methods

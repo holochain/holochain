@@ -42,15 +42,15 @@ impl SweetCell {
     }
 }
 
-#[cfg(feature = "unchecked-dht-location")]
+#[cfg(feature = "no-hash-integrity")]
 use holochain_p2p::{
     dht_arc::{ArcInterval, DhtLocation},
     AgentPubKeyExt,
 };
-#[cfg(feature = "unchecked-dht-location")]
+#[cfg(feature = "no-hash-integrity")]
 use holochain_sqlite::db::*;
 
-#[cfg(feature = "unchecked-dht-location")]
+#[cfg(feature = "no-hash-integrity")]
 impl SweetCell {
     /// Coerce the agent's storage arc to the specified value.
     /// The arc need not be centered on the agent's DHT location, which is
@@ -74,22 +74,23 @@ impl SweetCell {
         L: Iterator<Item = DhtLocation>,
     {
         use ::fixt::prelude::*;
+
         self.cell_env
             .conn()
             .unwrap()
             .with_commit_sync(|txn| {
                 for loc in locations {
-                    let header_hash = fixt!(HeaderHash);
-                    let basis = AnyDhtHash::from(header_hash.clone());
-                    let mut op_hash = fixt!(DhtOpHash);
-                    let timestamp = fixt!(Timestamp);
-
-                    op_hash.set_loc(loc);
-                    let op_lite = DhtOpLight::StoreElement(header_hash, None, basis);
-                    holochain_state::mutations::insert_op_lite(
-                        txn, op_lite, op_hash, true, timestamp,
-                    )
-                    .unwrap();
+                    let signed_header = fixt!(SignedHeaderHashed);
+                    let op = DhtOp::StoreElement(
+                        signed_header.signature().clone(),
+                        signed_header.header().clone(),
+                        None,
+                    );
+                    let mut op = DhtOpHashed::from_content_sync(op);
+                    // Override the op hash to be at the
+                    // specified location
+                    op.override_hash(|hash| hash.set_loc(loc));
+                    holochain_state::mutations::insert_op(txn, op, true).unwrap();
                 }
                 DatabaseResult::Ok(())
             })

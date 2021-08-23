@@ -136,7 +136,7 @@ test_utils = [
   "unwrap_to",
 
   # TODO: selectively enable
-  "unchecked-dht-location",
+  "no-hash-integrity",
 ]
 
 # Wasm ribosome tests take > 60 seconds - let's only run them in CI
@@ -156,4 +156,4 @@ no-deps = ['holochain_sqlite/no-deps']
 
 # Disable any integrity checks which ensure that the last 4 bytes of a hash
 # are properly computed, i.e. let the locations be set arbitrarily
-unchecked-dht-location = ["holo_hash/unchecked-dht-location"]
+no-hash-integrity = ["holo_hash/no-hash-integrity"]

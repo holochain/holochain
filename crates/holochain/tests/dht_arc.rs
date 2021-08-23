@@ -234,7 +234,7 @@ async fn test_join_leave() {
 
 // Test that arcs can be manually resized
 #[tokio::test(flavor = "multi_thread")]
-#[cfg(feature = "unchecked-dht-location")]
+#[cfg(feature = "no-hash-integrity")]
 async fn arc_resizing_smoke_test() {
     use holochain::sweettest::*;
     let mut conductor = SweetConductor::from_config(Default::default()).await;

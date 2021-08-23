@@ -43,6 +43,10 @@ impl DhtLocation {
     pub fn new(loc: u32) -> Self {
         Self(Wrapping(loc))
     }
+
+    pub fn as_u32(&self) -> u32 {
+        self.0 .0
+    }
 }
 
 #[cfg(any(test, feature = "test_utils"))]

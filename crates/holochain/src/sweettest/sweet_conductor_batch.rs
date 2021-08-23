@@ -107,12 +107,12 @@ impl SweetConductorBatch {
     }
 }
 
-#[cfg(feature = "unchecked-dht-location")]
+#[cfg(feature = "no-hash-integrity")]
 use holochain_p2p::*;
-#[cfg(feature = "unchecked-dht-location")]
+#[cfg(feature = "no-hash-integrity")]
 use kitsune_p2p::test_util::scenario_def::{PeerMatrix, ScenarioDef};
 
-#[cfg(feature = "unchecked-dht-location")]
+#[cfg(feature = "no-hash-integrity")]
 impl SweetConductorBatch {
     /// Create a ConductorBatch from a kitsune `ScenarioDef`.
     /// The resulting conductors will have the specified DNAs installed as an app,
@@ -200,16 +200,16 @@ impl std::ops::IndexMut<usize> for SweetConductorBatch {
 }
 
 #[cfg(test)]
-#[cfg(feature = "unchecked-dht-location")]
+#[cfg(feature = "no-hash-integrity")]
 mod tests {
     use maplit::hashset;
 
-    use crate::sweettest::*;
-    use crate::test_utils::inline_zomes::{simple_create_read_zome, unit_dna};
+    use crate::test_utils::inline_zomes::unit_dna;
 
     use super::*;
 
-    /// Just test that a scenario can be instantiated
+    /// Just test that a scenario can be instantiated and results in the proper
+    /// conductor state being created
     #[tokio::test(flavor = "multi_thread")]
     async fn scenario_smoke_test() {
         use kitsune_p2p::dht_arc::ArcInterval;
@@ -227,37 +227,44 @@ mod tests {
                     Agent::new(ArcInterval::new(90, 200), [95, 105, 155]),
                 ]),
             ],
-            PeerMatrix::sparse([&[1], &[0]]),
+            PeerMatrix::sparse([&[1], &[]]),
         );
-        let [(conductor0, apps0), (conductor1, apps1)] =
-            SweetConductorBatch::setup_from_scenario(scenario, unit_dna().await).await;
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn scenario_simple_test() {
-        use kitsune_p2p::dht_arc::ArcInterval;
-        use kitsune_p2p::test_util::scenario_def::ScenarioDefAgent as Agent;
-        use kitsune_p2p::test_util::scenario_def::ScenarioDefNode as Node;
-
-        let (dna_file, _) =
-            SweetDnaFile::unique_from_inline_zome("zome", simple_create_read_zome())
-                .await
-                .unwrap();
-
-        let scenario = ScenarioDef::new(
-            [
-                Node::new(hashset![
-                    Agent::new(ArcInterval::new(0, 110), [0, 10, 20, 30, 90]),
-                    Agent::new(ArcInterval::new(90, 200), [90, 100, 150]),
-                ]),
-                Node::new(hashset![
-                    Agent::new(ArcInterval::new(0, 110), [5, 15, 25, 35, 95]),
-                    Agent::new(ArcInterval::new(90, 200), [95, 105, 155]),
-                ]),
-            ],
-            PeerMatrix::sparse([&[1], &[0]]),
-        );
+        let dna_file = unit_dna().await;
+        let dna_hash = dna_file.dna_hash().clone();
         let [(conductor0, apps0), (conductor1, apps1)] =
             SweetConductorBatch::setup_from_scenario(scenario, dna_file).await;
+
+        // - All local and remote agents are available on the first conductor
+        assert_eq!(conductor0.get_agent_infos(None).await.unwrap().len(), 4);
+        // - Only local agents are available on the second conductor
+        assert_eq!(conductor1.get_agent_infos(None).await.unwrap().len(), 2);
+
+        let to_agents_0: Vec<_> = apps0
+            .cells_flattened()
+            .into_iter()
+            .map(|cell| cell.agent_pubkey().clone())
+            .collect();
+        let to_agents_1: Vec<_> = apps1
+            .cells_flattened()
+            .into_iter()
+            .map(|cell| cell.agent_pubkey().clone())
+            .collect();
+        let ops0: HashSet<_> = conductor0
+            .get_all_op_hashes(&dna_hash, to_agents_0)
+            .await
+            .into_iter()
+            .map(|h| h.get_loc().as_u32())
+            .collect();
+        let ops1: HashSet<_> = conductor1
+            .get_all_op_hashes(&dna_hash, to_agents_1)
+            .await
+            .into_iter()
+            .map(|h| h.get_loc().as_u32())
+            .collect();
+
+        // - Check that the specially prepared ops are present
+        //   (must check for subset because the usual genesis ops are still created)
+        assert!(ops0.is_superset(&hashset![0, 10, 20, 30, 90, 100, 150]));
+        assert!(ops1.is_superset(&hashset![5, 15, 25, 35, 95, 105, 155]));
     }
 }

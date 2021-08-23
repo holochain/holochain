@@ -12,6 +12,7 @@ use holo_hash::HeaderHash;
 use holochain_serialized_bytes::SerializedBytes;
 
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct HeaderBuilderCommon {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,

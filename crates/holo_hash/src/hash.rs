@@ -160,9 +160,9 @@ impl<T: HashType> HoloHash<T> {
     }
 
     /// manually set the location bytes
-    #[cfg(feature = "unchecked-dht-location")]
+    #[cfg(feature = "no-hash-integrity")]
     pub fn set_loc(&mut self, loc: DhtLocation) {
-        self.hash[32..].copy_from_slice(&_loc_to_bytes(loc));
+        self.hash[HOLO_HASH_FULL_LEN - HOLO_HASH_LOC_LEN..].copy_from_slice(&_loc_to_bytes(loc));
     }
 }
 

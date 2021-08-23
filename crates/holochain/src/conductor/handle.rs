@@ -71,6 +71,7 @@ use holochain_conductor_api::conductor::EnvironmentRootPath;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::JsonDump;
+use holochain_p2p::dht_arc::DhtArcSet;
 use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_p2p::DnaHashExt;
@@ -81,6 +82,7 @@ use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::source_chain;
 use holochain_types::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
+use kitsune_p2p::event::TimeWindowMs;
 use kitsune_p2p::KitsuneSpace;
 use kitsune_p2p_types::config::JOIN_NETWORK_TIMEOUT;
 use std::collections::HashMap;
@@ -148,6 +150,15 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Add the [DnaFile]s from the wasm and dna_def databases into memory
     async fn load_dnas(&self) -> ConductorResult<()>;
+
+    /// Query for op hashes held across multiple Cells
+    async fn query_op_hashes(
+        &self,
+        dna_hash: DnaHash,
+        to_agents: Vec<(AgentPubKey, DhtArcSet)>,
+        window_ms: TimeWindowMs,
+        include_limbo: bool,
+    ) -> ConductorApiResult<Vec<(DhtOpHash, u64)>>;
 
     /// Dispatch a network event to the correct cell.
     /// Warning: returning an error from this function kills the network for the conductor.
@@ -284,7 +295,8 @@ pub trait ConductorHandleT: Send + Sync {
     /// Add signed agent info to the conductor
     async fn add_agent_infos(&self, agent_infos: Vec<AgentInfoSigned>) -> ConductorApiResult<()>;
 
-    /// Get signed agent info from the conductor
+    /// Get signed agent info from the conductor.
+    /// If no CellId is specified, get all agent infos across all cells.
     async fn get_agent_infos(
         &self,
         cell_id: Option<CellId>,
@@ -541,6 +553,32 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self.conductor.read().await.dna_store().get_entry_def(key)
     }
 
+    async fn query_op_hashes(
+        &self,
+        dna_hash: DnaHash,
+        to_agents: Vec<(AgentPubKey, DhtArcSet)>,
+        window_ms: TimeWindowMs,
+        include_limbo: bool,
+    ) -> ConductorApiResult<Vec<(DhtOpHash, u64)>> {
+        let mut hashes_and_times = Vec::with_capacity(to_agents.len());
+
+        // For each cell collect the hashes and times that fit within the
+        // agents interval and time window.
+        for (agent, arc_set) in to_agents {
+            let cell_id = CellId::new(dna_hash.clone(), agent);
+            let cell = self.cell_by_id(&cell_id).await?;
+            let hashes = cell
+                .handle_query_op_hashes(arc_set, window_ms.clone(), include_limbo)
+                .await?;
+            hashes_and_times.extend(hashes);
+        }
+        // Remove any duplicate hashes.
+        // Note vec must be sorted to remove duplicates.
+        hashes_and_times.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        hashes_and_times.dedup_by(|a, b| a.0 == b.0);
+        Ok(hashes_and_times)
+    }
+
     #[instrument(skip(self))]
     async fn dispatch_holochain_p2p_event(
         &self,
@@ -690,33 +728,21 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 respond,
                 ..
             } => {
-                let mut hashes_and_times = Vec::with_capacity(to_agents.len());
-
-                // For each cell collect the hashes and times that fit within the
-                // agents interval and time window.
-                for (agent, arc_set) in to_agents {
-                    let cell_id = CellId::new(dna_hash.clone(), agent);
-                    let cell = self.cell_by_id(&cell_id).await?;
-                    match cell
-                        .handle_query_op_hashes(arc_set, window_ms.clone(), include_limbo)
-                        .await
-                    {
-                        Ok(t) => hashes_and_times.extend(t),
-                        Err(e) => {
-                            // If there's an error for any cell we want to fail the whole call.
-                            respond.respond(Ok(async move {
-                                Err(holochain_p2p::HolochainP2pError::other(e))
-                            }
-                            .boxed()
-                            .into()));
-                            return Ok(());
+                let mut hashes_and_times = match self
+                    .query_op_hashes(dna_hash, to_agents, window_ms, include_limbo)
+                    .await
+                {
+                    Ok(v) => v,
+                    Err(e) => {
+                        // If there's an error for any cell we want to fail the whole call.
+                        respond.respond(Ok(async move {
+                            Err(holochain_p2p::HolochainP2pError::other(e))
                         }
+                        .boxed()
+                        .into()));
+                        return Ok(());
                     }
-                }
-                // Remove any duplicate hashes.
-                // Note vec must be sorted to remove duplicates.
-                hashes_and_times.sort_unstable_by(|a, b| a.0.cmp(&b.0));
-                hashes_and_times.dedup_by(|a, b| a.0 == b.0);
+                };
 
                 // Now sort by time so we can take up to max_ops.
                 hashes_and_times.sort_unstable_by_key(|(_, t)| *t);
