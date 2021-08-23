@@ -3,6 +3,7 @@ use crate::link::LinkTag;
 use crate::timestamp::Timestamp;
 pub use builder::HeaderBuilder;
 pub use builder::HeaderBuilderCommon;
+use conversions::WrongHeaderError;
 use holo_hash::impl_hashable_content;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
@@ -11,7 +12,6 @@ use holo_hash::HashableContent;
 use holo_hash::HeaderHash;
 use holo_hash::HoloHashed;
 use holochain_serialized_bytes::prelude::*;
-use conversions::WrongHeaderError;
 use thiserror::Error;
 
 #[cfg(feature = "rusqlite")]
@@ -26,7 +26,6 @@ pub mod facts;
 /// created during genesis. Anything with this seq or higher was created
 /// after genesis.
 pub const POST_GENESIS_SEQ_THRESHOLD: u32 = 3;
-
 
 #[derive(Error, Debug)]
 pub enum HeaderError {
@@ -232,24 +231,70 @@ impl Header {
         new_prev_timestamp: Timestamp,
     ) -> Result<(), HeaderError> {
         let new_seq = new_prev_seq + 1;
-        let new_timestamp = self.timestamp().max((
-            new_prev_timestamp
-                + std::time::Duration::from_nanos(1)).map_err(|e| HeaderError::Rebase(e.to_string()))?);
+        let new_timestamp = self.timestamp().max(
+            (new_prev_timestamp + std::time::Duration::from_nanos(1))
+                .map_err(|e| HeaderError::Rebase(e.to_string()))?,
+        );
         match self {
             Self::Dna(_) => return Err(HeaderError::Rebase("Rebased a DNA Header".to_string())),
-            Self::AgentValidationPkg(AgentValidationPkg { timestamp, header_seq, prev_header, .. })
-            | Self::InitZomesComplete(InitZomesComplete { timestamp, header_seq, prev_header, .. })
-            | Self::CreateLink(CreateLink { timestamp, header_seq, prev_header, .. })
-            | Self::DeleteLink(DeleteLink { timestamp, header_seq, prev_header, .. })
-            | Self::Delete(Delete { timestamp, header_seq, prev_header, .. })
-            | Self::CloseChain(CloseChain { timestamp, header_seq, prev_header, .. })
-            | Self::OpenChain(OpenChain { timestamp, header_seq, prev_header, .. })
-            | Self::Create(Create { timestamp, header_seq, prev_header, .. })
-            | Self::Update(Update { timestamp, header_seq, prev_header, .. }) => {
+            Self::AgentValidationPkg(AgentValidationPkg {
+                timestamp,
+                header_seq,
+                prev_header,
+                ..
+            })
+            | Self::InitZomesComplete(InitZomesComplete {
+                timestamp,
+                header_seq,
+                prev_header,
+                ..
+            })
+            | Self::CreateLink(CreateLink {
+                timestamp,
+                header_seq,
+                prev_header,
+                ..
+            })
+            | Self::DeleteLink(DeleteLink {
+                timestamp,
+                header_seq,
+                prev_header,
+                ..
+            })
+            | Self::Delete(Delete {
+                timestamp,
+                header_seq,
+                prev_header,
+                ..
+            })
+            | Self::CloseChain(CloseChain {
+                timestamp,
+                header_seq,
+                prev_header,
+                ..
+            })
+            | Self::OpenChain(OpenChain {
+                timestamp,
+                header_seq,
+                prev_header,
+                ..
+            })
+            | Self::Create(Create {
+                timestamp,
+                header_seq,
+                prev_header,
+                ..
+            })
+            | Self::Update(Update {
+                timestamp,
+                header_seq,
+                prev_header,
+                ..
+            }) => {
                 *timestamp = new_timestamp;
                 *header_seq = new_seq;
                 *prev_header = new_prev_header;
-            },
+            }
         };
         Ok(())
     }
