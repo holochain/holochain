@@ -15,6 +15,7 @@ use kitsune_p2p_transport_quic::tx2::*;
 use kitsune_p2p_types::async_lazy::AsyncLazy;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_pool_promote::*;
+use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use kitsune_p2p_types::tx2::*;
 use kitsune_p2p_types::*;
 use std::collections::hash_map::Entry;
@@ -56,7 +57,7 @@ ghost_actor::ghost_chan! {
         ) -> ();
 
         /// Incoming Gossip
-        fn incoming_gossip(space: KSpace, con: WireConHnd, data: Payload, module_type: crate::types::gossip::GossipModuleType) -> ();
+        fn incoming_gossip(space: KSpace, con: WireConHnd, remote_url: kitsune_p2p_types::tx2::tx2_utils::TxUrl, data: Payload, module_type: crate::types::gossip::GossipModuleType) -> ();
     }
 }
 
@@ -287,60 +288,68 @@ impl KitsuneP2pActor {
                                     data => unimplemented!("{:?}", data),
                                 }
                             }
-                            IncomingNotify(Tx2EpIncomingNotify { con, data, .. }) => match data {
-                                wire::Wire::DelegateBroadcast(wire::DelegateBroadcast {
-                                    space,
-                                    basis,
-                                    to_agent,
-                                    mod_idx,
-                                    mod_cnt,
-                                    data,
-                                }) => {
-                                    // one might be tempted to notify here
-                                    // as in Broadcast below... but we
-                                    // notify all relevent agents inside
-                                    // the space incoming_delegate_broadcast
-                                    // handler.
-                                    if let Err(err) = i_s
-                                        .incoming_delegate_broadcast(
-                                            space, basis, to_agent, mod_idx, mod_cnt, data,
-                                        )
-                                        .await
-                                    {
-                                        tracing::warn!(
-                                            ?err,
-                                            "failed to handle incoming delegate broadcast"
-                                        );
+                            IncomingNotify(Tx2EpIncomingNotify { con, data, url, .. }) => {
+                                match data {
+                                    wire::Wire::DelegateBroadcast(wire::DelegateBroadcast {
+                                        space,
+                                        basis,
+                                        to_agent,
+                                        mod_idx,
+                                        mod_cnt,
+                                        data,
+                                    }) => {
+                                        // one might be tempted to notify here
+                                        // as in Broadcast below... but we
+                                        // notify all relevent agents inside
+                                        // the space incoming_delegate_broadcast
+                                        // handler.
+                                        if let Err(err) = i_s
+                                            .incoming_delegate_broadcast(
+                                                space, basis, to_agent, mod_idx, mod_cnt, data,
+                                            )
+                                            .await
+                                        {
+                                            tracing::warn!(
+                                                ?err,
+                                                "failed to handle incoming delegate broadcast"
+                                            );
+                                        }
                                     }
-                                }
-                                wire::Wire::Broadcast(wire::Broadcast {
-                                    space,
-                                    to_agent,
-                                    data,
-                                    ..
-                                }) => {
-                                    if let Err(err) = evt_sender
-                                        .notify(space, to_agent.clone(), to_agent, data.into())
-                                        .await
-                                    {
-                                        tracing::warn!(?err, "error processing incoming broadcast");
+                                    wire::Wire::Broadcast(wire::Broadcast {
+                                        space,
+                                        to_agent,
+                                        data,
+                                        ..
+                                    }) => {
+                                        if let Err(err) = evt_sender
+                                            .notify(space, to_agent.clone(), to_agent, data.into())
+                                            .await
+                                        {
+                                            tracing::warn!(
+                                                ?err,
+                                                "error processing incoming broadcast"
+                                            );
+                                        }
                                     }
-                                }
-                                wire::Wire::Gossip(wire::Gossip {
-                                    space,
-                                    data,
-                                    module,
-                                }) => {
-                                    let data: Vec<u8> = data.into();
-                                    let data: Box<[u8]> = data.into_boxed_slice();
-                                    if let Err(e) =
-                                        i_s.incoming_gossip(space, con, data, module).await
-                                    {
-                                        tracing::warn!("failed to handle incoming gossip: {:?}", e);
+                                    wire::Wire::Gossip(wire::Gossip {
+                                        space,
+                                        data,
+                                        module,
+                                    }) => {
+                                        let data: Vec<u8> = data.into();
+                                        let data: Box<[u8]> = data.into_boxed_slice();
+                                        if let Err(e) =
+                                            i_s.incoming_gossip(space, con, url, data, module).await
+                                        {
+                                            tracing::warn!(
+                                                "failed to handle incoming gossip: {:?}",
+                                                e
+                                            );
+                                        }
                                     }
+                                    data => unimplemented!("{:?}", data),
                                 }
-                                data => unimplemented!("{:?}", data),
-                            },
+                            }
                             _ => (),
                         }
                     }
@@ -437,6 +446,7 @@ impl InternalHandler for KitsuneP2pActor {
         &mut self,
         space: Arc<KitsuneSpace>,
         con: Tx2ConHnd<wire::Wire>,
+        remote_url: TxUrl,
         data: Box<[u8]>,
         module_type: GossipModuleType,
     ) -> InternalHandlerResult<()> {
@@ -450,7 +460,7 @@ impl InternalHandler for KitsuneP2pActor {
         Ok(async move {
             let (_, space_inner) = space_sender.await;
             space_inner
-                .incoming_gossip(space, con, data, module_type)
+                .incoming_gossip(space, con, remote_url, data, module_type)
                 .await
         }
         .boxed()

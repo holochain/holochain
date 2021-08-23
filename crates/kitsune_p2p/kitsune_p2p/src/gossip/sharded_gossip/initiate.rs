@@ -38,7 +38,6 @@ impl ShardedGossipLocal {
             Ok(if let Some((endpoint, url)) = remote_agent {
                 let gossip = ShardedGossipWire::initiate(intervals, id);
                 inner.initiate_tgt = Some((endpoint.clone(), id));
-                inner.metrics.record_initiate(endpoint.cert.clone());
                 Some((endpoint, HowToConnect::Url(url), gossip))
             } else {
                 None
