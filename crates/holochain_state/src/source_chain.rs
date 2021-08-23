@@ -686,16 +686,13 @@ impl SourceChain {
                 old_head,
                 Some((new_persisted_head, new_head_seq, new_timestamp)),
             )) => {
-                if self
-                    .scratch
-                    .apply_and_then::<bool, SyncScratchError, _>(|scratch| {
-                        Ok(scratch.chain_top_ordering() == ChainTopOrdering::Relaxed)
-                    })?
-                {
+                let is_relaxed =
+                    self.scratch
+                        .apply_and_then::<bool, SyncScratchError, _>(|scratch| {
+                            Ok(scratch.chain_top_ordering() == ChainTopOrdering::Relaxed)
+                        })?;
+                if is_relaxed {
                     let keystore = self.vault.keystore();
-                    // async fn apply_rebase(scratch: &mut Scratch) -> Result<(), ScratchError> {
-                    //     scratch.rebase_headers_on(&keystore, )
-                    // }
 
                     async fn rebase_headers_on(
                         keystore: &KeystoreSender,
@@ -704,14 +701,13 @@ impl SourceChain {
                         mut rebase_seq: u32,
                         mut rebase_timestamp: Timestamp,
                     ) -> Result<Vec<SignedHeaderHashed>, ScratchError> {
-                        headers
-                            .sort_by(|a, b| a.header().header_seq().cmp(&b.header().header_seq()));
+                        headers.sort_by_key(|a| a.header().header_seq());
                         for shh in headers.iter_mut() {
                             let mut header = shh.header().clone();
                             header.rebase_on(
                                 rebase_header.clone(),
-                                rebase_seq.clone(),
-                                rebase_timestamp.clone(),
+                                rebase_seq,
+                                rebase_timestamp,
                             )?;
                             rebase_seq = header.header_seq();
                             rebase_timestamp = header.timestamp();
