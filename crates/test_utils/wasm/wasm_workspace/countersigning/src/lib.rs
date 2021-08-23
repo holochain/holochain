@@ -77,3 +77,26 @@ fn generate_invalid_countersigning_preflight_request(agents: Vec<(AgentPubKey, V
 fn accept_countersigning_preflight_request(preflight_request: PreflightRequest) -> ExternResult<PreflightRequestAcceptance> {
     hdk::prelude::accept_countersigning_preflight_request(preflight_request)
 }
+
+#[hdk_extern]
+fn must_get_header(header_hash: HeaderHash) -> ExternResult<SignedHeaderHashed> {
+    hdk::prelude::must_get_header(header_hash)
+}
+
+#[hdk_extern]
+fn must_get_entry(entry_hash: EntryHash) -> ExternResult<EntryHashed> {
+    hdk::prelude::must_get_entry(entry_hash)
+}
+
+#[hdk_extern]
+fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> {
+    hdk::prelude::must_get_valid_element(header_hash)
+}
+
+#[hdk_extern]
+fn get_agent_activity(input: GetAgentActivityInput) ->ExternResult<AgentActivity> {
+    HDK.with(|h| {
+        h.borrow()
+            .get_agent_activity(input)
+    })
+}

@@ -453,6 +453,26 @@ async fn handle_srv_events(
                                     })
                                 }.boxed()).await;
                             }
+                            KdApi::IsAuthorityReq {
+                                msg_id,
+                                root,
+                                agent,
+                                basis,
+                                ..
+                            } => {
+                                exec(msg_id.clone(), async {
+                                    let space = root.to_kitsune_space();
+                                    let agent = agent.to_kitsune_agent();
+                                    let basis = basis.to_kitsune_basis();
+                                    let is_authority = kdirect.inner.share_mut(move |i, _| {
+                                        Ok(i.p2p.authority_for_hash(space, agent, basis))
+                                    }).map_err(KdError::other)?.await.map_err(KdError::other)?;
+                                    Ok(KdApi::IsAuthorityRes {
+                                        msg_id,
+                                        is_authority,
+                                    })
+                                }.boxed()).await;
+                            }
                             KdApi::MessageSendReq {
                                 msg_id,
                                 root,
@@ -566,6 +586,7 @@ async fn handle_srv_events(
                             oth @ KdApi::AgentInfoStoreRes { .. } |
                             oth @ KdApi::AgentInfoGetRes { .. } |
                             oth @ KdApi::AgentInfoQueryRes { .. } |
+                            oth @ KdApi::IsAuthorityRes { .. } |
                             oth @ KdApi::MessageSendRes { .. } |
                             oth @ KdApi::MessageRecvEvt { .. } |
                             oth @ KdApi::EntryAuthorRes { .. } |
