@@ -1,23 +1,18 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use std::sync::Mutex;
 
 use holo_hash::hash_type::AnyDht;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
-use holo_hash::HasHash;
 use holo_hash::HeaderHash;
 use holochain_keystore::KeystoreError;
-use holochain_keystore::KeystoreSender;
-use holochain_types::element::SignedHeaderHashedExt;
 use holochain_types::prelude::*;
 use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::ChainTopOrdering;
 use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
-use holochain_zome_types::HeaderHashed;
 use holochain_zome_types::SignedHeaderHashed;
-use holochain_zome_types::Timestamp;
 use holochain_zome_types::TimestampError;
 use thiserror::Error;
 
@@ -64,33 +59,6 @@ impl Scratch {
         if chain_top_ordering == ChainTopOrdering::Strict {
             self.chain_top_ordering = chain_top_ordering;
         }
-    }
-
-    pub async fn rebase_headers_on(
-        &mut self,
-        keystore: &KeystoreSender,
-        mut rebase_header: HeaderHash,
-        mut rebase_seq: u32,
-        mut rebase_timestamp: Timestamp,
-    ) -> Result<(), ScratchError> {
-        let mut output_headers = self.headers.clone();
-        output_headers.sort_by(|a, b| a.header().header_seq().cmp(&b.header().header_seq()));
-        for shh in output_headers.iter_mut() {
-            let mut header = shh.header().clone();
-            header.rebase_on(
-                rebase_header.clone(),
-                rebase_seq.clone(),
-                rebase_timestamp.clone(),
-            );
-            rebase_seq = header.header_seq();
-            rebase_timestamp = header.timestamp();
-            let hh = HeaderHashed::from_content_sync(header);
-            rebase_header = hh.as_hash().clone();
-            let new_shh = SignedHeaderHashed::new(keystore, hh).await?;
-            *shh = new_shh;
-        }
-        self.headers = output_headers;
-        Ok(())
     }
 
     pub fn add_header(&mut self, item: SignedHeaderHashed, chain_top_ordering: ChainTopOrdering) {
@@ -195,29 +163,21 @@ impl Scratch {
 
 impl SyncScratch {
     pub fn apply<T, F: FnOnce(&mut Scratch) -> T>(&self, f: F) -> Result<T, SyncScratchError> {
-        let lock_promise = self.0.lock();
-        Ok(f(tokio_helper::block_forever_on(async move {
-            &mut *(lock_promise.await)
-        })))
+        Ok(f(&mut *self
+            .0
+            .lock()
+            .map_err(|_| SyncScratchError::ScratchLockPoison)?))
     }
-    pub async fn apply_async<
-        T,
-        TI: std::future::Future<Output = T>,
-        F: FnOnce(&mut Scratch) -> TI,
-    >(
-        &self,
-        f: F,
-    ) -> Result<T, SyncScratchError> {
-        Ok(f(&mut *self.0.lock().await).await)
-    }
+
     pub fn apply_and_then<T, E, F>(&self, f: F) -> Result<T, E>
     where
         E: From<SyncScratchError>,
         F: FnOnce(&mut Scratch) -> Result<T, E>,
     {
-        f(tokio_helper::block_forever_on(async move {
-            &mut *self.0.lock().await
-        }))
+        f(&mut *self
+            .0
+            .lock()
+            .map_err(|_| SyncScratchError::ScratchLockPoison)?)
     }
 }
 
@@ -285,6 +245,8 @@ pub enum ScratchError {
     Timestamp(#[from] TimestampError),
     #[error(transparent)]
     Keystore(#[from] KeystoreError),
+    #[error(transparent)]
+    Header(#[from] HeaderError),
 }
 
 #[derive(Error, Debug)]

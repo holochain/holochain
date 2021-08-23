@@ -1,3 +1,4 @@
+use crate::scratch::ScratchError;
 use crate::scratch::SyncScratchError;
 use async_recursion::async_recursion;
 use holo_hash::AgentPubKey;
@@ -5,6 +6,7 @@ use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
+use holochain_keystore::KeystoreSender;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::dht_op::produce_op_lights_from_elements;
 use holochain_types::dht_op::produce_op_lights_from_iter;
@@ -694,18 +696,49 @@ impl SourceChain {
                     // async fn apply_rebase(scratch: &mut Scratch) -> Result<(), ScratchError> {
                     //     scratch.rebase_headers_on(&keystore, )
                     // }
-                    self.scratch
-                        .apply_async(|scratch| async {
-                            scratch
-                                .rebase_headers_on(
-                                    &keystore,
-                                    new_persisted_head,
-                                    new_head_seq,
-                                    new_timestamp,
-                                )
-                                .await
-                        })
-                        .await?;
+
+                    async fn rebase_headers_on(
+                        keystore: &KeystoreSender,
+                        mut headers: Vec<SignedHeaderHashed>,
+                        mut rebase_header: HeaderHash,
+                        mut rebase_seq: u32,
+                        mut rebase_timestamp: Timestamp,
+                    ) -> Result<Vec<SignedHeaderHashed>, ScratchError> {
+                        headers
+                            .sort_by(|a, b| a.header().header_seq().cmp(&b.header().header_seq()));
+                        for shh in headers.iter_mut() {
+                            let mut header = shh.header().clone();
+                            header.rebase_on(
+                                rebase_header.clone(),
+                                rebase_seq.clone(),
+                                rebase_timestamp.clone(),
+                            )?;
+                            rebase_seq = header.header_seq();
+                            rebase_timestamp = header.timestamp();
+                            let hh = HeaderHashed::from_content_sync(header);
+                            rebase_header = hh.as_hash().clone();
+                            let new_shh = SignedHeaderHashed::new(keystore, hh).await?;
+                            *shh = new_shh;
+                        }
+                        Ok(headers)
+                    }
+                    let headers = self.scratch.apply(|scratch| {
+                        let headers: Vec<SignedHeaderHashed> = scratch.drain_headers().collect();
+                        headers
+                    })?;
+                    let rebased_headers: Vec<SignedHeaderHashed> = rebase_headers_on(
+                        &keystore,
+                        headers,
+                        new_persisted_head,
+                        new_head_seq,
+                        new_timestamp,
+                    )
+                    .await?;
+                    self.scratch.apply(|scratch| {
+                        for header in rebased_headers {
+                            scratch.add_header(header, ChainTopOrdering::Relaxed)
+                        }
+                    })?;
                     self.flush().await
                 } else {
                     Err(SourceChainError::HeadMoved(
@@ -917,11 +950,11 @@ async fn _put_db<H: HeaderInner, B: HeaderBuilder<H>>(
     let entry = entry.into_option();
     let hash = header.as_hash().clone();
     vault.conn()?.with_commit_sync(|txn| {
-        let (new_head, _, _) = chain_head_db(txn, author.clone())?;
+        let (new_head, new_seq, new_timestamp) = chain_head_db(txn, author.clone())?;
         if new_head != prev_header {
             return Err(SourceChainError::HeadMoved(
                 Some(prev_header),
-                Some(new_head),
+                Some((new_head, new_seq, new_timestamp)),
             ));
         }
         SourceChainResult::Ok(put_raw(txn, header, ops, entry)?)
