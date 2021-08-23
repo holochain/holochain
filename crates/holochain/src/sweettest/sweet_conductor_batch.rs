@@ -211,7 +211,6 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn scenario_smoke_test() {
-        use crate::sweettest::SweetDnaFile;
         use kitsune_p2p::dht_arc::ArcInterval;
         use kitsune_p2p::test_util::scenario_def::ScenarioDefAgent as Agent;
         use kitsune_p2p::test_util::scenario_def::ScenarioDefNode as Node;
@@ -219,15 +218,15 @@ mod tests {
         let scenario = ScenarioDef::new(
             [
                 Node::new(hashset![
-                    Agent::new(ArcInterval::new(0, 110), &[0, 10, 20, 30, 90]),
-                    Agent::new(ArcInterval::new(90, 200), &[90, 100, 150]),
+                    Agent::new(ArcInterval::new(0, 110), [0, 10, 20, 30, 90]),
+                    Agent::new(ArcInterval::new(90, 200), [90, 100, 150]),
                 ]),
                 Node::new(hashset![
-                    Agent::new(ArcInterval::new(0, 110), &[5, 15, 25, 35, 95]),
-                    Agent::new(ArcInterval::new(90, 200), &[95, 105, 155]),
+                    Agent::new(ArcInterval::new(0, 110), [5, 15, 25, 35, 95]),
+                    Agent::new(ArcInterval::new(90, 200), [95, 105, 155]),
                 ]),
             ],
-            PeerMatrix::Sparse([hashset![1], hashset![0]]),
+            PeerMatrix::Sparse([[1], [0]]),
         );
         let _conductors_and_apps = SweetConductorBatch::setup_from_scenario(scenario);
     }

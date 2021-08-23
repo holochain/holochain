@@ -60,8 +60,10 @@ pub struct ScenarioDefNode {
 
 impl ScenarioDefNode {
     /// Constructor
-    pub fn new(agents: HashSet<ScenarioDefAgent>) -> Self {
-        Self { agents }
+    pub fn new<A: IntoIterator<Item = ScenarioDefAgent>>(agents: A) -> Self {
+        Self {
+            agents: agents.into_iter().collect(),
+        }
     }
 }
 
@@ -76,10 +78,13 @@ pub struct ScenarioDefAgent {
 
 impl ScenarioDefAgent {
     /// Constructor
-    pub fn new<O: Copy + Into<DhtLocation>>(arc: ArcInterval, ops: &[O]) -> Self {
+    pub fn new<O: Copy + Into<DhtLocation>, OO: IntoIterator<Item = O>>(
+        arc: ArcInterval,
+        ops: OO,
+    ) -> Self {
         Self {
             arc,
-            ops: ops.into_iter().copied().map(Into::into).collect(),
+            ops: ops.into_iter().map(Into::into).collect(),
         }
     }
 }
@@ -101,34 +106,62 @@ pub enum PeerMatrix<const N: usize> {
     Sparse([HashSet<usize>; N]),
 }
 
+impl<const N: usize> PeerMatrix<N> {
+    /// Construct a full matrix (full peer connectivity)
+    pub fn full() -> Self {
+        Self::Full
+    }
+
+    /// Construct a sparse matrix by the given nodes.
+    /// More convenient than constructing the enum variant directly, since the
+    /// inner collection type is a slice rather than a HashSet.
+    pub fn sparse<'a>(matrix: [&'a [usize]; N]) -> Self {
+        use std::convert::TryInto;
+        Self::Sparse(
+            matrix
+                // TODO: when array map stabilizes, the node.clone() below
+                // can be removed
+                .iter()
+                .map(|node| {
+                    node.clone()
+                        .into_iter()
+                        .map(|u| u.clone())
+                        .collect::<HashSet<_>>()
+                })
+                .collect::<Vec<_>>()
+                .try_into()
+                .unwrap(),
+        )
+    }
+}
+
 /// Just construct a scenario to illustrate/experience how it's done
 #[test]
 fn constructors() {
-    use maplit::hashset;
     use ScenarioDefAgent as Agent;
     use ScenarioDefNode as Node;
     let ops: Vec<DhtLocation> = (-10..11).map(i32::into).collect();
     let nodes = [
-        Node::new(hashset![
+        Node::new([
             Agent::new(
                 ArcInterval::Bounded(ops[0].into(), ops[2].into()),
-                &[ops[0], ops[1]],
+                [ops[0], ops[1]],
             ),
             Agent::new(
                 ArcInterval::Bounded(ops[3].into(), ops[4].into()),
-                &[ops[3], ops[4]],
+                [ops[3], ops[4]],
             ),
         ]),
-        Node::new(hashset![
+        Node::new([
             Agent::new(
                 ArcInterval::Bounded(ops[0].into(), ops[2].into()),
-                &[ops[5], ops[7]],
+                [ops[5], ops[7]],
             ),
             Agent::new(
                 ArcInterval::Bounded(ops[3].into(), ops[4].into()),
-                &[ops[6], ops[9]],
+                [ops[6], ops[9]],
             ),
         ]),
     ];
-    let _scenario = ScenarioDef::new(nodes, PeerMatrix::Sparse([hashset![1], hashset![]]));
+    let _scenario = ScenarioDef::new(nodes, PeerMatrix::sparse([&[1], &[]]));
 }
