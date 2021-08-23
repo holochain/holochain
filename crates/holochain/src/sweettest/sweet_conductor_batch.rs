@@ -120,11 +120,8 @@ impl SweetConductorBatch {
     /// The provided DnaFile must
     pub async fn setup_from_scenario<const N: usize>(
         scenario: ScenarioDef<N>,
+        dna_file: DnaFile,
     ) -> [(SweetConductor, SweetAppBatch); N] {
-        let (dna_file, _) =
-            super::SweetDnaFile::unique_from_inline_zome("zome", InlineZome::new_unique(vec![]))
-                .await
-                .unwrap();
         let tasks = itertools::zip(scenario.nodes.iter(), std::iter::repeat(dna_file.clone()))
             .enumerate()
             .map(|(i, (node, dna_file))| async move {
@@ -207,8 +204,12 @@ impl std::ops::IndexMut<usize> for SweetConductorBatch {
 mod tests {
     use maplit::hashset;
 
+    use crate::sweettest::*;
+    use crate::test_utils::inline_zomes::{simple_create_read_zome, unit_dna};
+
     use super::*;
 
+    /// Just test that a scenario can be instantiated
     #[tokio::test(flavor = "multi_thread")]
     async fn scenario_smoke_test() {
         use kitsune_p2p::dht_arc::ArcInterval;
@@ -226,8 +227,37 @@ mod tests {
                     Agent::new(ArcInterval::new(90, 200), [95, 105, 155]),
                 ]),
             ],
-            PeerMatrix::Sparse([[1], [0]]),
+            PeerMatrix::sparse([&[1], &[0]]),
         );
-        let _conductors_and_apps = SweetConductorBatch::setup_from_scenario(scenario);
+        let [(conductor0, apps0), (conductor1, apps1)] =
+            SweetConductorBatch::setup_from_scenario(scenario, unit_dna().await).await;
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn scenario_simple_test() {
+        use kitsune_p2p::dht_arc::ArcInterval;
+        use kitsune_p2p::test_util::scenario_def::ScenarioDefAgent as Agent;
+        use kitsune_p2p::test_util::scenario_def::ScenarioDefNode as Node;
+
+        let (dna_file, _) =
+            SweetDnaFile::unique_from_inline_zome("zome", simple_create_read_zome())
+                .await
+                .unwrap();
+
+        let scenario = ScenarioDef::new(
+            [
+                Node::new(hashset![
+                    Agent::new(ArcInterval::new(0, 110), [0, 10, 20, 30, 90]),
+                    Agent::new(ArcInterval::new(90, 200), [90, 100, 150]),
+                ]),
+                Node::new(hashset![
+                    Agent::new(ArcInterval::new(0, 110), [5, 15, 25, 35, 95]),
+                    Agent::new(ArcInterval::new(90, 200), [95, 105, 155]),
+                ]),
+            ],
+            PeerMatrix::sparse([&[1], &[0]]),
+        );
+        let [(conductor0, apps0), (conductor1, apps1)] =
+            SweetConductorBatch::setup_from_scenario(scenario, dna_file).await;
     }
 }

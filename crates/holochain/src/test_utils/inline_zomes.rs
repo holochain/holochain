@@ -1,7 +1,20 @@
 //! Collection of commonly used InlineZomes
 
 use holo_hash::*;
-use holochain_zome_types::prelude::*;
+use holochain_types::prelude::*;
+
+/// A zome with no functions and no entry types
+pub fn unit_zome() -> InlineZome {
+    InlineZome::new_unique(vec![])
+}
+
+/// A DnaFile with just a unit Zome
+pub async fn unit_dna() -> DnaFile {
+    crate::sweettest::SweetDnaFile::unique_from_inline_zome("zome", unit_zome())
+        .await
+        .unwrap()
+        .0
+}
 
 /// An InlineZome with simple Create and Read operations
 pub fn simple_create_read_zome() -> InlineZome {
