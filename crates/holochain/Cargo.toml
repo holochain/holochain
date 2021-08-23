@@ -136,7 +136,7 @@ test_utils = [
   "unwrap_to",
 
   # TODO: selectively enable
-  "unchecked-dht-location",
+  # "unchecked-dht-location",
 ]
 
 # Wasm ribosome tests take > 60 seconds - let's only run them in CI
