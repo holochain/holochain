@@ -3451,9 +3451,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_api"
-version = "0.0.3"
+version = "0.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "455fc371e6587b0222089b34e228eddb9d22d5e20e96f512e7e1b8e1f3511ed1"
+checksum = "b31e2a5ccad740bc59428512de0645f051c293993ed79c26c21aaf6621a0ee95"
 dependencies = [
  "arbitrary",
  "blake2b_simd",
@@ -3482,9 +3482,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_client"
-version = "0.0.3"
+version = "0.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b06c2b566782922f4c8c52e7f06a9ffb60f7bb0bfe362f56542bfa838fe19742"
+checksum = "74e03b3cb5076be7db2a54c64a661172a12686487a20332a960613f52913ff17"
 dependencies = [
  "futures",
  "ghost_actor 0.3.0-alpha.3",
@@ -5252,9 +5252,9 @@ dependencies = [
 
 [[package]]
 name = "rcgen"
-version = "0.8.5"
+version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4974f7e96ee51fa3c90c3022e02c3a7117e71cb2a84518a55e44360135200c25"
+checksum = "48b4fc1b81d685fcd442a86da2e2c829d9e353142633a8159f42bf28e7e94428"
 dependencies = [
  "chrono",
  "pem",
@@ -7461,9 +7461,9 @@ dependencies = [
 
 [[package]]
 name = "yasna"
-version = "0.3.2"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0de7bff972b4f2a06c85f6d8454b09df153af7e3a4ec2aac81db1b105b684ddb"
+checksum = "e262a29d0e61ccf2b6190d7050d4b237535fc76ce4c1210d9caa316f71dffa75"
 dependencies = [
  "chrono",
 ]
