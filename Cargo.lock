@@ -3255,6 +3255,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "shrinkwraprs",
+ "test-case",
  "thiserror",
  "tokio",
  "tokio-stream",
