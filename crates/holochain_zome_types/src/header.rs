@@ -39,7 +39,32 @@ pub enum HeaderError {
 
 #[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum ChainTopOrdering {
+    /// Relaxed chain top ordering REWRITES HEADERS INLINE during a flush of
+    /// the source chain to sit on top of the current chain top. The "as at"
+    /// of the zome call initial state is completely ignored.
+    /// This may be significantly more efficient if you are CERTAIN that none
+    /// of your zome or validation logic is order dependent. Examples include
+    /// simple chat messages or tweets. Note however that even chat messages
+    /// and tweets may have subtle order dependencies, such as if a cap grant
+    /// was written or revoked that would have invalidated the zome call that
+    /// wrote data after the revocation, etc.
+    /// The efficiency of relaxed ordering comes from simply rehashing and
+    /// signing headers on the new chain top during flush, avoiding the
+    /// overhead of the client, websockets, zome call instance, wasm execution,
+    /// validation, etc. that would result from handling a `HeadMoved` error
+    /// via an external driver.
     Relaxed,
+    /// The default `Strict` ordering is the default for a very good reason.
+    /// Writes normally compare the chain head from the start of a zome call
+    /// against the time a write transaction is flushed from the source chain.
+    /// This is REQUIRED for data integrity if any zome or validation logic
+    /// depends on the ordering of data in a chain.
+    /// This order dependence could be obvious such as an explicit reference or
+    /// dependency. It could be very subtle such as checking for the existence
+    /// or absence of some data.
+    /// If you are unsure whether your data is order dependent you should err
+    /// on the side of caution and handle `HeadMoved` errors on the client of
+    /// the zome call and restart the zome call from the start.
     Strict,
 }
 

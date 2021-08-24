@@ -609,13 +609,14 @@ impl SourceChain {
         // Write the entries, headers and ops to the database in one transaction.
         let author = self.author.clone();
         let persisted_head = self.persisted_head.clone();
+        let headers_1 = headers.clone();
         match self
             .vault
             .async_commit(move |txn: &mut Transaction| {
                 // As at check.
                 let (new_persisted_head, new_head_seq, new_timestamp) =
                     chain_head_db(&txn, author)?;
-                if headers.last().is_none() {
+                if headers_1.last().is_none() {
                     // Nothing to write
                     return Ok(());
                 }
@@ -645,7 +646,7 @@ impl SourceChain {
                 for entry in entries {
                     insert_entry(txn, entry)?;
                 }
-                for header in headers {
+                for header in headers_1 {
                     insert_header(txn, header)?;
                 }
                 for (op, op_hash, op_order, timestamp, visibility, dependency) in ops {
@@ -693,7 +694,6 @@ impl SourceChain {
                         })?;
                 if is_relaxed {
                     let keystore = self.vault.keystore();
-
                     async fn rebase_headers_on(
                         keystore: &KeystoreSender,
                         mut headers: Vec<SignedHeaderHashed>,
@@ -718,10 +718,9 @@ impl SourceChain {
                         }
                         Ok(headers)
                     }
-                    let headers = self.scratch.apply(|scratch| {
-                        let headers: Vec<SignedHeaderHashed> = scratch.drain_headers().collect();
-                        headers
-                    })?;
+                    // A child chain is needed with a new as-at that matches
+                    // the rebase.
+                    let child_chain = Self::new(self.vault.clone(), (*self.author).clone()).await?;
                     let rebased_headers: Vec<SignedHeaderHashed> = rebase_headers_on(
                         &keystore,
                         headers,
@@ -730,12 +729,12 @@ impl SourceChain {
                         new_timestamp,
                     )
                     .await?;
-                    self.scratch.apply(|scratch| {
+                    child_chain.scratch.apply(|scratch| {
                         for header in rebased_headers {
                             scratch.add_header(header, ChainTopOrdering::Relaxed)
                         }
                     })?;
-                    self.flush().await
+                    child_chain.flush().await
                 } else {
                     Err(SourceChainError::HeadMoved(
                         old_head,
@@ -1036,6 +1035,50 @@ pub mod tests {
 
     use crate::source_chain::SourceChainResult;
     use holochain_zome_types::Entry;
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_relaxed_ordering() -> SourceChainResult<()> {
+        let test_env = test_cell_env();
+        let env = test_env.env();
+        let alice = fixt!(AgentPubKey, Predictable, 0);
+
+        source_chain::genesis(env.clone(), fake_dna_hash(1), alice.clone(), None).await.unwrap();
+        let chain_1 = SourceChain::new(env.clone().into(), alice.clone()).await?;
+        let chain_2 = SourceChain::new(env.clone().into(), alice.clone()).await?;
+        let chain_3 = SourceChain::new(env.clone().into(), alice.clone()).await?;
+
+        let header_builder = builder::CloseChain {
+            new_dna_hash: fixt!(DnaHash),
+        };
+        chain_1.put(header_builder.clone(), None, ChainTopOrdering::Strict).await?;
+        chain_2.put(header_builder.clone(), None, ChainTopOrdering::Strict).await?;
+        chain_3.put(header_builder, None, ChainTopOrdering::Relaxed).await?;
+
+        let author = Arc::new(alice);
+        chain_1.flush().await?;
+        let author_1 = Arc::clone(&author);
+        let (_, seq, _) = env.async_commit(move |txn: &mut Transaction| {
+            chain_head_db(&txn, author_1)
+        }).await?;
+        assert_eq!(seq, 3);
+
+        assert!(matches!(chain_2.flush().await, Err(SourceChainError::HeadMoved(_, _))));
+        let author_2 = Arc::clone(&author);
+        let (_, seq, _) = env.async_commit(move |txn: &mut Transaction| {
+            chain_head_db(&txn, author_2)
+        }).await?;
+        assert_eq!(seq, 3);
+
+        chain_3.flush().await?;
+        let author_3 = Arc::clone(&author);
+        let (_, seq, _) = env.async_commit(move |txn: &mut Transaction| {
+            chain_head_db(&txn, author_3)
+        }).await?;
+        assert_eq!(seq, 4);
+
+        Ok(())
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     async fn test_get_cap_grant() -> SourceChainResult<()> {
         let test_env = test_cell_env();
