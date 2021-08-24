@@ -46,7 +46,10 @@ pub struct FilteredScratch {
 
 impl Scratch {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            chain_top_ordering: ChainTopOrdering::Relaxed,
+            ..Default::default()
+        }
     }
 
     pub fn chain_top_ordering(&self) -> ChainTopOrdering {
