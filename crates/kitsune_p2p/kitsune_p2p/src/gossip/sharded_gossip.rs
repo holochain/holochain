@@ -25,6 +25,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use self::bandwidth::BandwidthThrottle;
+use self::metrics::Metrics;
 use self::state_map::RoundStateMap;
 
 use super::simple_bloom::{HowToConnect, MetaOpKey};
@@ -40,6 +41,8 @@ mod state_map;
 mod store;
 
 mod bandwidth;
+mod metrics;
+mod next_target;
 
 #[cfg(all(test, feature = "test_utils"))]
 mod tests;
@@ -51,7 +54,7 @@ const MAX_SEND_BUF_BYTES: usize = 16000;
 
 /// The maximum number of different nodes that will be
 /// gossiped with if gossip is triggered.
-const MAX_TRIGGERS: usize = 2;
+const MAX_TRIGGERS: u8 = 2;
 
 type BloomFilter = bloomfilter::Bloom<Arc<MetaOpKey>>;
 type EventSender = futures::channel::mpsc::Sender<event::KitsuneP2pEvent>;
@@ -176,7 +179,7 @@ impl ShardedGossip {
             let outgoing = match self.gossip.process_incoming(con.peer_cert(), msg).await {
                 Ok(r) => r,
                 Err(e) => {
-                    self.gossip.remove_state(&con.peer_cert()).await?;
+                    self.gossip.remove_state(&con.peer_cert(), true).await?;
                     vec![ShardedGossipWire::error(e.to_string())]
                 }
             };
@@ -194,8 +197,7 @@ impl ShardedGossip {
         if let Some(outgoing) = outgoing {
             let cert = outgoing.0.cert().clone();
             if let Err(err) = self.process_outgoing(outgoing).await {
-                self.gossip.remove_state(&cert).await?;
-                self.gossip.record_metric_info(cert, true)?;
+                self.gossip.remove_state(&cert, true).await?;
                 tracing::error!(
                     "Gossip failed to send outgoing message because of: {:?}",
                     err
@@ -270,28 +272,17 @@ pub struct ShardedGossipLocalState {
     /// If Some, we are in the process of trying to initiate gossip with this target.
     initiate_tgt: Option<(GossipTgt, u32)>,
     round_map: RoundStateMap,
-    /// Metrics for a connection.
-    // FIXME: Currently the p2p metric store is setup to track
-    // metrics per agent but we need to track metrics per connection.
-    metrics: HashMap<Tx2Cert, MetricInfo>,
+    /// Metrics that track remote node states and help guide
+    /// the next node to gossip with.
+    metrics: Metrics,
     /// Last moment we locally synced.
     last_local_sync: Option<std::time::Instant>,
     /// Trigger local sync to run on the next iteration.
     trigger_local_sync: bool,
-    /// Trigger initiate to run on the next iteration.
-    trigger_initiate: bool,
-    /// Nodes that have been chosen to force initiate with.
-    forced_initiates: Vec<(GossipTgt, TxUrl)>,
-}
-
-#[derive(Debug, Copy, Clone)]
-struct MetricInfo {
-    error: bool,
-    last_sync: std::time::Instant,
 }
 
 impl ShardedGossipLocalState {
-    fn remove_state(&mut self, state_key: &StateKey) -> Option<RoundState> {
+    fn remove_state(&mut self, state_key: &StateKey, error: bool) -> Option<RoundState> {
         if self
             .initiate_tgt
             .as_ref()
@@ -299,6 +290,11 @@ impl ShardedGossipLocalState {
             .unwrap_or(false)
         {
             self.initiate_tgt = None;
+        }
+        if error {
+            self.metrics.record_error(state_key.clone());
+        } else {
+            self.metrics.record_success(state_key.clone());
         }
         self.round_map.remove(state_key)
     }
@@ -314,7 +310,7 @@ impl ShardedGossipLocalState {
     fn new_integrated_data(&mut self) -> KitsuneResult<()> {
         let s = tracing::trace_span!("gossip_trigger", agents = ?self.show_local_agents());
         s.in_scope(|| self.log_state());
-        self.trigger_initiate = true;
+        self.metrics.record_force_initiate();
         self.trigger_local_sync = true;
         Ok(())
     }
@@ -327,11 +323,6 @@ impl ShardedGossipLocalState {
         tracing::trace!(
             ?self.round_map,
             ?self.initiate_tgt,
-            ?self.forced_initiates,
-            last_sync_times = ?self.metrics
-                .values()
-                .map(|v| v.last_sync.elapsed())
-                .collect::<Vec<_>>(),
         )
     }
 }
@@ -410,8 +401,8 @@ impl ShardedGossipLocal {
             .share_mut(|i, _| Ok(i.round_map.get(id).cloned()))
     }
 
-    async fn remove_state(&self, id: &StateKey) -> KitsuneResult<Option<RoundState>> {
-        self.inner.share_mut(|i, _| Ok(i.remove_state(id)))
+    async fn remove_state(&self, id: &StateKey, error: bool) -> KitsuneResult<Option<RoundState>> {
+        self.inner.share_mut(|i, _| Ok(i.remove_state(id, error)))
     }
 
     async fn remove_target(&self, id: &StateKey) -> KitsuneResult<()> {
@@ -441,12 +432,7 @@ impl ShardedGossipLocal {
                 })
                 .unwrap_or(true);
             if finished {
-                let metric = MetricInfo {
-                    error: false,
-                    last_sync: std::time::Instant::now(),
-                };
-                i.metrics.insert(state_id.clone(), metric);
-                Ok(i.remove_state(state_id))
+                Ok(i.remove_state(state_id, false))
             } else {
                 Ok(i.round_map.get(state_id).cloned())
             }
@@ -465,12 +451,7 @@ impl ShardedGossipLocal {
                 .map(update_state)
                 .unwrap_or(true)
             {
-                let metric = MetricInfo {
-                    error: false,
-                    last_sync: std::time::Instant::now(),
-                };
-                i.metrics.insert(state_id.clone(), metric);
-                Ok(i.remove_state(state_id))
+                Ok(i.remove_state(state_id, false))
             } else {
                 Ok(i.round_map.get(state_id).cloned())
             }
@@ -552,7 +533,7 @@ impl ShardedGossipLocal {
                 Vec::with_capacity(0)
             }
             ShardedGossipWire::NoAgents(_) => {
-                self.remove_state(&cert).await?;
+                self.remove_state(&cert, true).await?;
                 Vec::with_capacity(0)
             }
             ShardedGossipWire::AlreadyInProgress(_) => {
@@ -561,8 +542,7 @@ impl ShardedGossipLocal {
             }
             ShardedGossipWire::Error(Error { message }) => {
                 tracing::warn!("gossiping with: {:?} and got error: {}", cert, message);
-                self.record_metric_info(cert.clone(), true)?;
-                self.remove_state(&cert).await?;
+                self.remove_state(&cert, true).await?;
                 Vec::with_capacity(0)
             }
         })
@@ -599,167 +579,6 @@ impl ShardedGossipLocal {
 
         store::put_ops(&self.evt_sender, &self.space, agent_arcs, ops).await?;
         Ok(())
-    }
-
-    /// Find a remote endpoint from agents within arc set.
-    async fn find_remote_agent_within_arcset(
-        &self,
-        arc_set: Arc<DhtArcSet>,
-        local_agents: &HashSet<Arc<KitsuneAgent>>,
-        current_rounds: HashSet<Tx2Cert>,
-    ) -> KitsuneResult<Option<(GossipTgt, TxUrl)>> {
-        enum ForceTriggerInitiate {
-            New,
-            Current((GossipTgt, TxUrl)),
-            None,
-        }
-
-        let mut remote_agents_within_arc_set: Vec<_> =
-            store::agents_within_arcset(&self.evt_sender, &self.space, arc_set.clone())
-                .await?
-                .into_iter()
-                .filter(|(a, _)| !local_agents.contains(a))
-                .collect();
-
-        // Get a random remote endpoint.
-        {
-            use rand::prelude::*;
-            let mut rng = thread_rng();
-            // randomize the keys
-            remote_agents_within_arc_set.shuffle(&mut rng);
-        }
-
-        let mut result = None;
-
-        // Check if we have a new or current trigger.
-        let force_trigger = self.inner.share_mut(|i, _| {
-            // If there is a new trigger then take it.
-            let new_trigger = i.trigger_initiate;
-            i.trigger_initiate = false;
-            if new_trigger {
-                i.forced_initiates.clear();
-                Ok(ForceTriggerInitiate::New)
-            } else {
-                // If we have current trigger and it's not already in progress
-                // then take it.
-                if let Some(forced) = i.forced_initiates.pop() {
-                    if !current_rounds.contains(forced.0.cert()) {
-                        return Ok(ForceTriggerInitiate::Current(forced));
-                    } else {
-                        i.forced_initiates.push(forced);
-                    }
-                }
-                // Otherwise there's no trigger for this iteration.
-                Ok(ForceTriggerInitiate::None)
-            }
-        })?;
-
-        // Use the current trigger if we have one.
-        let new_trigger = match force_trigger {
-            ForceTriggerInitiate::New => true,
-            ForceTriggerInitiate::Current(forced) => return Ok(Some(forced)),
-            ForceTriggerInitiate::None => false,
-        };
-
-        let mut forced_initiates = Vec::with_capacity(MAX_TRIGGERS);
-
-        for (remote_agent, _) in remote_agents_within_arc_set {
-            // Get the agent info for the chosen remote agent.
-            let agent = store::get_agent_info(&self.evt_sender, &self.space, &remote_agent)
-                .await?
-                .and_then(|ra| {
-                    ra.url_list
-                        .iter()
-                        .filter_map(|url| {
-                            kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str())
-                                .map_err(|e| tracing::error!("Failed to parse url {:?}", e))
-                                .ok()
-                                .map(|purl| {
-                                    (
-                                        GossipTgt::new(
-                                            vec![ra.agent.clone()],
-                                            Tx2Cert::from(purl.digest()),
-                                        ),
-                                        TxUrl::from(url.as_str()),
-                                    )
-                                })
-                        })
-                        .next()
-                });
-            if let Some(agent) = agent {
-                if new_trigger {
-                    // We are force triggering an initiate then choose a remote
-                    // agent that is not already in progress or add them to be
-                    // forced later up to the MAX_TRIGGERS.
-                    if forced_initiates.len() < MAX_TRIGGERS {
-                        if result.is_none() && !current_rounds.contains(agent.0.cert()) {
-                            result = Some(agent);
-                        } else {
-                            forced_initiates.push(agent);
-                        }
-                    }
-                } else {
-                    // We are not force triggering an initiate so check if this
-                    // remote agent is already in progress or has been seen too
-                    // recently.
-                    if self.saw_too_recently(agent.0.cert())?
-                        || current_rounds.contains(agent.0.cert())
-                    {
-                        continue;
-                    }
-                    result = Some(agent);
-                    break;
-                }
-            }
-        }
-
-        // If there is forced triggers then save them.
-        if !forced_initiates.is_empty() {
-            self.inner.share_mut(|i, _| {
-                i.forced_initiates = forced_initiates;
-                Ok(())
-            })?;
-        }
-
-        Ok(result)
-    }
-
-    /// Check if we have sync'd with a remote endpoint too recently.
-    fn saw_too_recently(&self, cert: &Tx2Cert) -> KitsuneResult<bool> {
-        if let Some(metric_info) = self.get_metric_info(cert)? {
-            if metric_info.error {
-                if metric_info.last_sync.elapsed().as_millis() as u32
-                    <= self.tuning_params.gossip_peer_on_error_next_gossip_delay_ms
-                {
-                    return Ok(true);
-                }
-            } else if metric_info.last_sync.elapsed().as_millis() as u32
-                <= self
-                    .tuning_params
-                    .gossip_peer_on_success_next_gossip_delay_ms
-            {
-                return Ok(true);
-            }
-        }
-        Ok(false)
-    }
-
-    /// Get metric info for a connection.
-    fn get_metric_info(&self, cert: &Tx2Cert) -> KitsuneResult<Option<MetricInfo>> {
-        self.inner
-            .share_mut(|i, _| Ok(i.metrics.get(cert).copied()))
-    }
-
-    /// Record metric info for a connection.
-    fn record_metric_info(&self, cert: Tx2Cert, error: bool) -> KitsuneResult<()> {
-        let metric = MetricInfo {
-            error,
-            last_sync: std::time::Instant::now(),
-        };
-        self.inner.share_mut(|i, _| {
-            i.metrics.insert(cert, metric);
-            Ok(())
-        })
     }
 
     /// Check if we should locally sync
@@ -800,11 +619,7 @@ impl ShardedGossipLocal {
         self.inner
             .share_mut(|i, _| {
                 for cert in i.round_map.take_timed_out_rounds() {
-                    let metric = MetricInfo {
-                        error: true,
-                        last_sync: std::time::Instant::now(),
-                    };
-                    i.metrics.insert(cert, metric);
+                    i.metrics.record_error(cert);
                 }
                 Ok(())
             })

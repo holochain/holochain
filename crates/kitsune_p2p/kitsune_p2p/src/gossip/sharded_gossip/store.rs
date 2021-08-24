@@ -4,8 +4,8 @@
 use std::{collections::HashSet, ops::Range, sync::Arc};
 
 use crate::event::{
-    FetchOpDataEvt, GetAgentInfoSignedEvt, PutAgentInfoSignedEvt, QueryAgentInfoSignedEvt,
-    QueryGossipAgentsEvt, QueryOpHashesEvt, TimeWindowMs,
+    FetchOpDataEvt, PutAgentInfoSignedEvt, QueryAgentInfoSignedEvt, QueryGossipAgentsEvt,
+    QueryOpHashesEvt, TimeWindowMs,
 };
 use crate::types::event::KitsuneP2pEventSender;
 use kitsune_p2p_types::{
@@ -26,21 +26,6 @@ pub(super) async fn all_agent_info(
         .query_agent_info_signed(QueryAgentInfoSignedEvt {
             space: space.clone(),
             agents: None,
-        })
-        .await
-        .map_err(KitsuneError::other)?)
-}
-
-/// Get a single agent info.
-pub(super) async fn get_agent_info(
-    evt_sender: &EventSender,
-    space: &Arc<KitsuneSpace>,
-    agent: &Arc<KitsuneAgent>,
-) -> KitsuneResult<Option<AgentInfoSigned>> {
-    Ok(evt_sender
-        .get_agent_info_signed(GetAgentInfoSignedEvt {
-            space: space.clone(),
-            agent: agent.clone(),
         })
         .await
         .map_err(KitsuneError::other)?)
