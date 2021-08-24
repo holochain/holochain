@@ -50,7 +50,6 @@ test-case = "1.0.0"
 tracing-subscriber = "0.2"
 
 [features]
-sharded = []
 test_utils = [
   "tokio/test-util",
   "ghost_actor/test_utils",
