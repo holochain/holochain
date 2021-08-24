@@ -39,7 +39,12 @@ async fn can_handle_update_in_scratch() {
     assert_eq!(*r.header(), *td.update_header.header());
 
     // - Add to the scratch
-    insert_op_scratch(&mut scratch, td.update_store_element_op.clone()).unwrap();
+    insert_op_scratch(
+        &mut scratch,
+        td.update_store_element_op.clone(),
+        ChainTopOrdering::default(),
+    )
+    .unwrap();
     let r = query
         .run(scratch.clone())
         .unwrap()

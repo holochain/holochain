@@ -758,7 +758,7 @@ async fn commit_entry<'env>(
         .next()
         .unwrap();
 
-    let input = EntryWithDefId::new(entry_def_id.clone(), entry.clone());
+    let input = CreateInput::new(entry_def_id.clone(), entry.clone());
 
     let output = {
         let mut host_access = fixt!(ZomeCallHostAccess);

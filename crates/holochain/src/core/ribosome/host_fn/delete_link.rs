@@ -12,25 +12,26 @@ use crate::core::ribosome::HostFnAccess;
 pub fn delete_link<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: HeaderHash,
+    input: DeleteLinkInput,
 ) -> Result<HeaderHash, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ write_workspace: Permission::Allow, .. } => {
+            let DeleteLinkInput { address, chain_top_ordering } = input;
             // get the base address from the add link header
             // don't allow the wasm developer to get this wrong
             // it is never valid to have divergent base address for add/remove links
             // the subconscious will validate the base address match but we need to fetch it here to
             // include it in the remove link header
             let network = call_context.host_context.network().clone();
-            let address = input.clone();
             let call_context_2 = call_context.clone();
 
             // handle timeouts at the network layer
+            let address_2 = address.clone();
             let maybe_add_link: Option<SignedHeaderHashed> = tokio_helper::block_forever_on(async move {
                 let workspace = call_context_2.host_context.workspace();
                 CascadeResult::Ok(
                     Cascade::from_workspace_network(workspace, network)
-                        .dht_get(address.into(), GetOptions::content())
+                        .dht_get(address_2.into(), GetOptions::content())
                         .await?
                         .map(|el| el.into_inner().0),
                 )
@@ -43,7 +44,7 @@ pub fn delete_link<'a>(
                         Header::CreateLink(link_add_header) => Ok(link_add_header.base_address.clone()),
                         // the add link header hash provided was found but didn't point to an AddLink
                         // header (it is something else) so we cannot proceed
-                        _ => Err(RibosomeError::ElementDeps(input.clone().into())),
+                        _ => Err(RibosomeError::ElementDeps(address.clone().into())),
                     }
                 }
                 // the add link header hash could not be found
@@ -51,7 +52,7 @@ pub fn delete_link<'a>(
                 // that isn't also discoverable in either the cache or DHT, but it _is_ possible so we have
                 // to fail in that case (e.g. the local cache could have GC'd at the same moment the
                 // network connection dropped out)
-                None => Err(RibosomeError::ElementDeps(input.clone().into())),
+                None => Err(RibosomeError::ElementDeps(address.clone().into())),
             }
             .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?;
 
@@ -62,11 +63,11 @@ pub fn delete_link<'a>(
             // add a DeleteLink to the source chain
             tokio_helper::block_forever_on(async move {
                 let header_builder = builder::DeleteLink {
-                    link_add_address: input,
+                    link_add_address: address,
                     base_address,
                 };
                 let header_hash = source_chain
-                    .put(header_builder, None)
+                    .put(header_builder, None, chain_top_ordering)
                     .await
                     .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
                 Ok(header_hash)

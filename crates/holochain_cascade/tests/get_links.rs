@@ -6,6 +6,7 @@ use holochain_state::mutations::insert_op_scratch;
 use holochain_state::prelude::test_cell_env;
 use holochain_state::scratch::Scratch;
 use holochain_types::link::WireLinkOps;
+use holochain_zome_types::ChainTopOrdering;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn links_not_authority() {
@@ -114,8 +115,18 @@ async fn links_authoring() {
 
     // Data
     let td = EntryTestData::create();
-    insert_op_scratch(&mut scratch, td.store_entry_op.clone()).unwrap();
-    insert_op_scratch(&mut scratch, td.create_link_op.clone()).unwrap();
+    insert_op_scratch(
+        &mut scratch,
+        td.store_entry_op.clone(),
+        ChainTopOrdering::default(),
+    )
+    .unwrap();
+    insert_op_scratch(
+        &mut scratch,
+        td.create_link_op.clone(),
+        ChainTopOrdering::default(),
+    )
+    .unwrap();
 
     // Network
     // - Not expecting any calls to the network.
@@ -141,7 +152,12 @@ async fn links_authoring() {
 
     assert_eq!(r, td.links);
 
-    insert_op_scratch(&mut scratch, td.delete_link_op.clone()).unwrap();
+    insert_op_scratch(
+        &mut scratch,
+        td.delete_link_op.clone(),
+        ChainTopOrdering::default(),
+    )
+    .unwrap();
 
     let mut cascade = Cascade::empty()
         .with_network(mock, cache.env())

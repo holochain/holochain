@@ -20,6 +20,7 @@ fn links_zome() -> InlineZome {
                 base_target.0,
                 base_target.1,
                 ().into(),
+                ChainTopOrdering::default(),
             ))?;
             Ok(hash)
         })
