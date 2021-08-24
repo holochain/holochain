@@ -65,6 +65,7 @@ pub fn create_link<T: Into<LinkTag>>(
             base_address,
             target_address,
             tag.into(),
+            ChainTopOrdering::default(),
         ))
     })
 }
@@ -92,8 +93,11 @@ pub fn create_link<T: Into<LinkTag>>(
 ///   link after any previous delete of any link.
 /// All of this is bad so link creates point to entries (See [ `create_link` ]) and deletes point to
 /// creates.
-pub fn delete_link(add_link_header: HeaderHash) -> ExternResult<HeaderHash> {
-    HDK.with(|h| h.borrow().delete_link(add_link_header))
+pub fn delete_link(address: HeaderHash) -> ExternResult<HeaderHash> {
+    HDK.with(|h| {
+        h.borrow()
+            .delete_link(DeleteLinkInput::new(address, ChainTopOrdering::default()))
+    })
 }
 
 /// Returns all links that reference a base entry hash, optionally filtered by tag.

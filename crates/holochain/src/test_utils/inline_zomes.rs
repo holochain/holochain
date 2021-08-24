@@ -24,7 +24,11 @@ pub fn simple_create_read_zome() -> InlineZome {
         .callback("create", move |api, ()| {
             let entry_def_id: EntryDefId = entry_def.id.clone();
             let entry = Entry::app(().try_into().unwrap()).unwrap();
-            let hash = api.create(EntryWithDefId::new(entry_def_id, entry))?;
+            let hash = api.create(CreateInput::new(
+                entry_def_id,
+                entry,
+                ChainTopOrdering::default(),
+            ))?;
             Ok(hash)
         })
         .callback("read", |api, hash: HeaderHash| {

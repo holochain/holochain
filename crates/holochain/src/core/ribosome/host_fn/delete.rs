@@ -15,23 +15,24 @@ use crate::core::ribosome::HostFnAccess;
 pub fn delete<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: HeaderHash,
+    input: DeleteInput,
 ) -> Result<HeaderHash, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ write_workspace: Permission::Allow, .. } => {
-            let deletes_entry_address = get_original_address(call_context.clone(), input.clone())?;
+            let DeleteInput { deletes_header_address, chain_top_ordering } = input;
+            let deletes_entry_address = get_original_address(call_context.clone(), deletes_header_address.clone())?;
 
-    let host_access = call_context.host_context();
+            let host_access = call_context.host_context();
 
             // handle timeouts at the source chain layer
             tokio_helper::block_forever_on(async move {
                 let source_chain = host_access.workspace().source_chain();
                 let header_builder = builder::Delete {
-                    deletes_address: input,
+                    deletes_address: deletes_header_address,
                     deletes_entry_address,
                 };
                 let header_hash = source_chain
-                    .put(header_builder, None)
+                    .put(header_builder, None, chain_top_ordering)
                     .await
                     .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
                 Ok(header_hash)

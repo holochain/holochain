@@ -65,9 +65,24 @@ async fn get_links() {
     insert_valid_authored_op(&mut cache_txn, td.create_link_op.clone()).unwrap();
 
     // - Add to the scratch
-    insert_op_scratch(&mut scratch, td.base_op.clone()).unwrap();
-    insert_op_scratch(&mut scratch, td.target_op.clone()).unwrap();
-    insert_op_scratch(&mut scratch, td.create_link_op.clone()).unwrap();
+    insert_op_scratch(
+        &mut scratch,
+        td.base_op.clone(),
+        ChainTopOrdering::default(),
+    )
+    .unwrap();
+    insert_op_scratch(
+        &mut scratch,
+        td.target_op.clone(),
+        ChainTopOrdering::default(),
+    )
+    .unwrap();
+    insert_op_scratch(
+        &mut scratch,
+        td.create_link_op.clone(),
+        ChainTopOrdering::default(),
+    )
+    .unwrap();
 
     // - Check we can resolve this to a single link.
     let r = get_link_query(&mut [&mut cache_txn], Some(&scratch), td.base_query.clone());
@@ -126,7 +141,12 @@ async fn get_entry() {
     insert_valid_authored_op(&mut cache_txn, td.store_entry_op.clone()).unwrap();
 
     // - Add to the scratch
-    insert_op_scratch(&mut scratch, td.store_entry_op.clone()).unwrap();
+    insert_op_scratch(
+        &mut scratch,
+        td.store_entry_op.clone(),
+        ChainTopOrdering::default(),
+    )
+    .unwrap();
 
     // - Get the entry from both stores and union the query results.
     let r = get_entry_query(

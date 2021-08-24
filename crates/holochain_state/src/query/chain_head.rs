@@ -156,7 +156,7 @@ mod tests {
         // It's also totally invalid for a call_zome scratch to contain headers
         // from other authors, but it doesn't matter here
         for shh in &shhs[6..] {
-            scratch.add_header(shh.clone());
+            scratch.add_header(shh.clone(), ChainTopOrdering::default());
         }
 
         let query = ChainHeadQuery::new(Arc::new(author));
