@@ -8,6 +8,7 @@ use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_types::prelude::Judged;
 use holochain_zome_types::entry::EntryHashed;
+use holochain_zome_types::ChainTopOrdering;
 use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
 use holochain_zome_types::SignedHeaderHashed;
@@ -32,6 +33,7 @@ use crate::query::Store;
 pub struct Scratch {
     headers: Vec<SignedHeaderHashed>,
     entries: HashMap<EntryHash, Arc<Entry>>,
+    chain_top_ordering: ChainTopOrdering,
 }
 
 #[derive(Debug, Clone)]
@@ -44,14 +46,29 @@ pub struct FilteredScratch {
 
 impl Scratch {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            chain_top_ordering: ChainTopOrdering::Relaxed,
+            ..Default::default()
+        }
     }
 
-    pub fn add_header(&mut self, item: SignedHeaderHashed) {
+    pub fn chain_top_ordering(&self) -> ChainTopOrdering {
+        self.chain_top_ordering
+    }
+
+    pub fn respect_chain_top_ordering(&mut self, chain_top_ordering: ChainTopOrdering) {
+        if chain_top_ordering == ChainTopOrdering::Strict {
+            self.chain_top_ordering = chain_top_ordering;
+        }
+    }
+
+    pub fn add_header(&mut self, item: SignedHeaderHashed, chain_top_ordering: ChainTopOrdering) {
+        self.respect_chain_top_ordering(chain_top_ordering);
         self.headers.push(item);
     }
 
-    pub fn add_entry(&mut self, entry_hashed: EntryHashed) {
+    pub fn add_entry(&mut self, entry_hashed: EntryHashed, chain_top_ordering: ChainTopOrdering) {
+        self.respect_chain_top_ordering(chain_top_ordering);
         let (entry, hash) = entry_hashed.into_inner();
         self.entries.insert(hash, Arc::new(entry));
     }

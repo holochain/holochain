@@ -11,6 +11,8 @@ use futures::future::{BoxFuture, FutureExt};
 use futures::sink::SinkExt;
 use futures::stream::StreamExt;
 
+use std::collections::HashSet;
+
 /// configuration for consistency_stress test
 pub struct Config {
     /// tuning_params
@@ -247,6 +249,29 @@ struct TestNode {
     agents: Vec<KdHash>,
 }
 
+#[derive(Clone)]
+struct State {
+    /// total agent node count processed for averaging purposes
+    agent_tot_cnt: usize,
+
+    /// total calculated target number of agents that should be
+    /// held across the system
+    agent_tot_tgt: usize,
+
+    /// total calculated number of agents currently held across the system
+    agent_tot_cur: usize,
+
+    /// total op node count processed for averaging purposes
+    op_tot_cnt: usize,
+
+    /// total calculated target number of ops that should be
+    /// held across the system
+    op_tot_tgt: usize,
+
+    /// total calculated number of ops currently held across the system
+    op_tot_cur: usize,
+}
+
 struct Test {
     node_count: usize,
     agents_per_node: usize,
@@ -264,9 +289,6 @@ struct Test {
     time_test_start: std::time::Instant,
     #[allow(dead_code)]
     time_round_start: std::time::Instant,
-
-    target_agent_count: usize,
-    target_total_op_count: usize,
 }
 
 impl Test {
@@ -322,9 +344,6 @@ impl Test {
 
             time_test_start,
             time_round_start: std::time::Instant::now(),
-
-            target_agent_count: node_count * agents_per_node,
-            target_total_op_count: 1, // 1 for app_entry
         }
     }
 
@@ -388,8 +407,6 @@ impl Test {
 
     async fn inject_bad_agent_info(&mut self) {
         for _ in 0..self.bad_agent_count {
-            self.target_agent_count += 1;
-
             let info = gen_bad_agent_info(
                 self.tuning_params.clone(),
                 self.root.clone(),
@@ -421,32 +438,70 @@ impl Test {
                 .await
                 .unwrap();
             self.add_agent_to_node(node_idx).await;
-            // we don't remove the old one, because the agent info is
-            // still going to be in the db / gossiped
-            self.target_agent_count += 1;
             println!("Turned Over Agent in NODE {}", node_idx);
         }
     }
 
-    async fn calc_avgs(&mut self) -> (usize, usize) {
-        let mut avg_agent_count = 0;
+    async fn calc_avgs(&mut self) -> State {
+        let mut out = State {
+            agent_tot_cnt: 0,
+            agent_tot_tgt: 0,
+            agent_tot_cur: 0,
 
-        for node in self.nodes.iter() {
-            avg_agent_count += node
-                .kdirect
-                .get_persist()
-                .query_agent_info(self.root.clone())
-                .await
-                .unwrap()
-                .len();
-        }
-        avg_agent_count /= self.nodes.len();
+            op_tot_cnt: 0,
+            op_tot_tgt: 0,
+            op_tot_cur: 0,
+        };
 
-        let mut avg_total_op_count = 0;
-
+        // gather the list of all agents we care about
+        let mut all_agents = Vec::new();
         for node in self.nodes.iter() {
             for agent in node.agents.iter() {
-                avg_total_op_count += node
+                all_agents.push(agent.clone());
+            }
+        }
+
+        // check each agent for which agents they *should* be holding
+        // then also count the agents that they *are* holding
+        for node in self.nodes.iter() {
+            for agent in node.agents.iter() {
+                out.agent_tot_cnt += 1;
+
+                // which agents does this node hold?
+                let mut has_agents = HashSet::new();
+                for hold_info in node
+                    .kdirect
+                    .get_persist()
+                    .query_agent_info(self.root.clone())
+                    .await
+                    .unwrap()
+                {
+                    has_agents.insert(hold_info.agent().clone());
+                }
+
+                // of the agents this node *should* hold,
+                // which *are* they holding?
+                for all_agent in all_agents.iter() {
+                    let should_hold = node
+                        .kdhnd
+                        .is_authority(self.root.clone(), agent.clone(), all_agent.clone())
+                        .await
+                        .unwrap();
+                    if should_hold {
+                        out.agent_tot_tgt += 1;
+                        if has_agents.contains(all_agent) {
+                            out.agent_tot_cur += 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        // gather the list of all ops we care about
+        let mut all_ops = HashSet::new();
+        for node in self.nodes.iter() {
+            for agent in node.agents.iter() {
+                for op in node
                     .kdirect
                     .get_persist()
                     .query_entries(
@@ -457,12 +512,53 @@ impl Test {
                     )
                     .await
                     .unwrap()
-                    .len();
+                {
+                    all_ops.insert(op.hash().clone());
+                }
             }
         }
-        avg_total_op_count /= self.node_count * self.agents_per_node;
 
-        (avg_agent_count, avg_total_op_count)
+        // check each target is holding the ops they should be
+        for node in self.nodes.iter() {
+            for agent in node.agents.iter() {
+                out.op_tot_cnt += 1;
+
+                // which ops does this node hold?
+                let mut has_ops = HashSet::new();
+                for op in node
+                    .kdirect
+                    .get_persist()
+                    .query_entries(
+                        self.root.clone(),
+                        agent.clone(),
+                        full_time_window(),
+                        ArcInterval::Full.into(),
+                    )
+                    .await
+                    .unwrap()
+                {
+                    has_ops.insert(op.hash().clone());
+                }
+
+                // of the ops this node *should* hold,
+                // which *are* they holding?
+                for all_op in all_ops.iter() {
+                    let should_hold = node
+                        .kdhnd
+                        .is_authority(self.root.clone(), agent.clone(), all_op.clone())
+                        .await
+                        .unwrap();
+                    if should_hold {
+                        out.op_tot_tgt += 1;
+                        if has_ops.contains(all_op) {
+                            out.op_tot_cur += 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        out
     }
 
     fn new_round(&mut self) {
@@ -484,37 +580,43 @@ impl Test {
             .unwrap();
     }
 
-    async fn emit_interim(&mut self, avg_agent_count: usize, avg_total_op_count: usize) {
+    async fn emit_interim(&mut self, state: State) {
+        let agent_avg_cur = state.agent_tot_cur / state.agent_tot_cnt;
+        let agent_avg_tgt = state.agent_tot_tgt / state.agent_tot_cnt;
+        let op_avg_cur = state.op_tot_cur / state.op_tot_cnt;
+        let op_avg_tgt = state.op_tot_tgt / state.op_tot_cnt;
         self.p_send
             .send(Progress::InterimState {
                 run_time_s: self.time_test_start.elapsed().as_secs_f64(),
                 round_elapsed_s: self.time_round_start.elapsed().as_secs_f64(),
-                target_agent_count: self.target_agent_count,
-                avg_agent_count,
-                target_total_op_count: self.target_total_op_count,
-                avg_total_op_count,
+                target_agent_count: agent_avg_tgt,
+                avg_agent_count: agent_avg_cur,
+                target_total_op_count: op_avg_tgt,
+                avg_total_op_count: op_avg_cur,
             })
             .await
             .unwrap();
     }
 
-    async fn emit_agent_consistent(&mut self, agent_count: usize) {
+    async fn emit_agent_consistent(&mut self, state: State) {
+        let agent_avg_cur = state.agent_tot_cur / state.agent_tot_cnt;
         self.p_send
             .send(Progress::AgentConsistent {
                 run_time_s: self.time_test_start.elapsed().as_secs_f64(),
-                agent_count,
+                agent_count: agent_avg_cur,
             })
             .await
             .unwrap();
     }
 
-    async fn emit_op_consistent(&mut self, total_op_count: usize) {
+    async fn emit_op_consistent(&mut self, state: State) {
+        let op_avg_tgt = state.op_tot_tgt / state.op_tot_cnt;
         self.p_send
             .send(Progress::OpConsistent {
                 run_time_s: self.time_test_start.elapsed().as_secs_f64(),
                 round_elapsed_s: self.time_round_start.elapsed().as_secs_f64(),
                 new_ops_added_count: self.node_count * self.agents_per_node,
-                total_op_count,
+                total_op_count: op_avg_tgt,
             })
             .await
             .unwrap();
@@ -575,14 +677,15 @@ async fn test(
     loop {
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
-        let (avg_agent_count, avg_total_op_count) = test.calc_avgs().await;
+        let state = test.calc_avgs().await;
 
-        if avg_agent_count >= test.target_agent_count {
-            test.emit_agent_consistent(avg_agent_count).await;
+        if state.agent_tot_cur >= state.agent_tot_tgt {
+            test.emit_interim(state.clone()).await;
+            test.emit_agent_consistent(state).await;
             break;
         }
 
-        test.emit_interim(avg_agent_count, avg_total_op_count).await;
+        test.emit_interim(state).await;
     }
 
     // this loop publishes ops, and waits for them to be synced
@@ -614,7 +717,6 @@ async fn test(
                     )
                     .await
                     .unwrap();
-                test.target_total_op_count += 1;
             }
         }
 
@@ -622,14 +724,15 @@ async fn test(
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
-            let (avg_agent_count, avg_total_op_count) = test.calc_avgs().await;
+            let state = test.calc_avgs().await;
 
-            if avg_total_op_count >= test.target_total_op_count {
-                test.emit_op_consistent(avg_total_op_count).await;
+            if state.op_tot_cur >= state.op_tot_tgt {
+                test.emit_interim(state.clone()).await;
+                test.emit_op_consistent(state).await;
                 break;
             }
 
-            test.emit_interim(avg_agent_count, avg_total_op_count).await;
+            test.emit_interim(state).await;
         }
     }
 }

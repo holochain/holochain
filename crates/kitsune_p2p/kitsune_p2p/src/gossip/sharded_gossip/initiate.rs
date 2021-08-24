@@ -7,11 +7,12 @@ impl ShardedGossipLocal {
     /// have an outgoing gossip.
     pub(super) async fn try_initiate(&self) -> KitsuneResult<Option<Outgoing>> {
         // Get local agents
-        let (has_target, local_agents, current_rounds) = self.inner.share_mut(|i, _| {
+        let (has_target, local_agents) = self.inner.share_mut(|i, _| {
             i.check_tgt_expired();
             let has_target = i.initiate_tgt.is_some();
-            let current_rounds = i.round_map.current_rounds();
-            Ok((has_target, i.local_agents.clone(), current_rounds))
+            // Clear any expired rounds.
+            i.round_map.current_rounds();
+            Ok((has_target, i.local_agents.clone()))
         })?;
         // There's already a target so there's nothing to do.
         if has_target {
@@ -29,11 +30,7 @@ impl ShardedGossipLocal {
 
         // Choose a remote agent to gossip with.
         let remote_agent = self
-            .find_remote_agent_within_arcset(
-                Arc::new(intervals.clone().into()),
-                &local_agents,
-                current_rounds,
-            )
+            .find_remote_agent_within_arcset(Arc::new(intervals.clone().into()), &local_agents)
             .await?;
         let id = rand::thread_rng().gen();
 
@@ -41,6 +38,7 @@ impl ShardedGossipLocal {
             Ok(if let Some((endpoint, url)) = remote_agent {
                 let gossip = ShardedGossipWire::initiate(intervals, id);
                 inner.initiate_tgt = Some((endpoint.clone(), id));
+                inner.metrics.record_initiate(endpoint.cert.clone());
                 Some((endpoint, HowToConnect::Url(url), gossip))
             } else {
                 None
@@ -120,6 +118,15 @@ impl ShardedGossipLocal {
 
         self.inner.share_mut(|inner, _| {
             inner.round_map.insert(peer_cert.clone(), state);
+            // If this is not the target we are accepting
+            // then record it as a remote round.
+            if inner
+                .initiate_tgt
+                .as_ref()
+                .map_or(true, |tgt| *tgt.0.cert() != peer_cert)
+            {
+                inner.metrics.record_remote_round(peer_cert);
+            }
             Ok(())
         })?;
         Ok(gossip)

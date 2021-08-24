@@ -34,7 +34,7 @@ pub mod test {
         let closure_header_hash = header_hash.clone();
         mock_hdk.expect_create()
             .with(hdk::prelude::mockall::predicate::eq(
-                EntryWithDefId::try_from(&super::Thing).unwrap()
+                CreateInput::try_from(&super::Thing).unwrap()
             ))
             .times(1)
             .return_once(move |_| Ok(closure_header_hash));
@@ -84,7 +84,7 @@ pub mod test {
         let output_header_hash_closure = output_header_hash.clone();
         mock_hdk.expect_delete()
             .with(hdk::prelude::mockall::predicate::eq(
-                input_header_hash.clone()
+                DeleteInput::new(input_header_hash.clone(), ChainTopOrdering::default())
             ))
             .times(1)
             .return_once(move |_| Ok(output_header_hash_closure));

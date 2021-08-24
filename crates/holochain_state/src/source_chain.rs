@@ -1,4 +1,6 @@
+use crate::scratch::SyncScratchError;
 use holo_hash::AgentPubKey;
+use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
@@ -20,6 +22,7 @@ use holochain_zome_types::header;
 use holochain_zome_types::CapAccess;
 use holochain_zome_types::CapGrant;
 use holochain_zome_types::CapSecret;
+use holochain_zome_types::ChainTopOrdering;
 use holochain_zome_types::CounterSigningAgentState;
 use holochain_zome_types::CounterSigningSessionData;
 use holochain_zome_types::Element;
@@ -143,22 +146,28 @@ impl SourceChain {
         &self,
         header: Header,
         maybe_entry: Option<Entry>,
+        chain_top_ordering: ChainTopOrdering,
     ) -> SourceChainResult<HeaderHash> {
         let header = HeaderHashed::from_content_sync(header);
         let hash = header.as_hash().clone();
         let header = SignedHeaderHashed::new(&self.vault.keystore(), header).await?;
         let element = Element::new(header, maybe_entry);
         self.scratch
-            .apply(|scratch| insert_element_scratch(scratch, element))?;
+            .apply(|scratch| insert_element_scratch(scratch, element, chain_top_ordering))?;
         Ok(hash)
     }
 
-    pub async fn put_countersigned(&self, entry: Entry) -> SourceChainResult<HeaderHash> {
+    pub async fn put_countersigned(
+        &self,
+        entry: Entry,
+        chain_top_ordering: ChainTopOrdering,
+    ) -> SourceChainResult<HeaderHash> {
         let entry_hash = EntryHash::with_data_sync(&entry);
         if let Entry::CounterSign(ref session_data, _) = entry {
             self.put_with_header(
                 Header::from_countersigning_data(entry_hash, session_data, (*self.author).clone())?,
                 Some(entry),
+                chain_top_ordering,
             )
             .await
         } else {
@@ -171,6 +180,7 @@ impl SourceChain {
         &self,
         header_builder: B,
         maybe_entry: Option<Entry>,
+        chain_top_ordering: ChainTopOrdering,
     ) -> SourceChainResult<HeaderHash> {
         let (prev_header, chain_head_seq, chain_head_timestamp) = self.chain_head()?;
         let header_seq = chain_head_seq + 1;
@@ -185,8 +195,12 @@ impl SourceChain {
             header_seq,
             prev_header,
         };
-        self.put_with_header(header_builder.build(common).into(), maybe_entry)
-            .await
+        self.put_with_header(
+            header_builder.build(common).into(),
+            maybe_entry,
+            chain_top_ordering,
+        )
+        .await
     }
 
     pub fn has_initialized(&self) -> SourceChainResult<bool> {
@@ -506,20 +520,24 @@ impl SourceChain {
     }
 
     pub async fn flush(&self) -> SourceChainResult<()> {
-        // Nothing to write
-        if self.scratch.apply(|s| s.is_empty())? {
-            return Ok(());
-        }
-        let (headers, ops, entries) = self.scratch.apply_and_then(|scratch| {
-            let length = scratch.num_headers();
-
-            // The op related data ends up here.
-            let mut ops = Vec::with_capacity(length);
-
-            // Drain out the headers.
-            let signed_headers = scratch.drain_headers().collect::<Vec<_>>();
+        #[allow(clippy::complexity)]
+        fn build_ops_from_headers(
+            signed_headers: Vec<SignedHeaderHashed>,
+        ) -> SourceChainResult<(
+            Vec<SignedHeaderHashed>,
+            Vec<(
+                DhtOpLight,
+                DhtOpHash,
+                OpOrder,
+                Timestamp,
+                Option<EntryVisibility>,
+                Dependency,
+            )>,
+        )> {
             // Headers end up back in here.
             let mut headers = Vec::with_capacity(signed_headers.len());
+            // The op related data ends up here.
+            let mut ops = Vec::with_capacity(headers.len());
 
             // Loop through each header and produce op related data.
             for shh in signed_headers {
@@ -557,6 +575,16 @@ impl SourceChain {
                 // Put the header back in the list.
                 headers.push(shh);
             }
+            Ok((headers, ops))
+        }
+
+        // Nothing to write
+        if self.scratch.apply(|s| s.is_empty())? {
+            return Ok(());
+        }
+        let (headers, ops, entries) = self.scratch.apply_and_then(|scratch| {
+            let (headers, ops) =
+                build_ops_from_headers(scratch.drain_headers().collect::<Vec<_>>())?;
 
             // Drain out any entries.
             let entries = scratch.drain_entries().collect::<Vec<_>>();
@@ -574,6 +602,12 @@ impl SourceChain {
         }
         let lock = Self::lock_for_entry(maybe_countersigned_entry)?;
 
+        let is_relaxed_ordering =
+            self.scratch
+                .apply_and_then::<bool, SyncScratchError, _>(|scratch| {
+                    Ok(scratch.chain_top_ordering() == ChainTopOrdering::Relaxed)
+                })?;
+
         // Write the entries, headers and ops to the database in one transaction.
         let author = self.author.clone();
         let persisted_head = self.persisted_head.clone();
@@ -586,10 +620,15 @@ impl SourceChain {
                     return Ok(());
                 }
                 if persisted_head != new_persisted_head {
-                    return Err(SourceChainError::HeadMoved(
-                        Some(persisted_head),
-                        Some(new_persisted_head),
-                    ));
+                    if is_relaxed_ordering {
+                        // @TODO: rebuild all the headers here.
+                        todo!();
+                    } else {
+                        return Err(SourceChainError::HeadMoved(
+                            Some(persisted_head),
+                            Some(new_persisted_head),
+                        ));
+                    }
                 }
 
                 // If the lock isn't empty this is a countersigning session.
@@ -981,7 +1020,9 @@ pub mod tests {
                 entry_type: EntryType::CapGrant,
                 entry_hash: entry_hash.clone(),
             };
-            let header = chain.put(header_builder, Some(entry)).await?;
+            let header = chain
+                .put(header_builder, Some(entry), ChainTopOrdering::default())
+                .await?;
 
             chain.flush().await.unwrap();
 
@@ -1022,7 +1063,9 @@ pub mod tests {
                 original_header_address,
                 original_entry_address,
             };
-            let header = chain.put(header_builder, Some(entry)).await?;
+            let header = chain
+                .put(header_builder, Some(entry), ChainTopOrdering::default())
+                .await?;
 
             chain.flush().await.unwrap();
 
@@ -1059,7 +1102,9 @@ pub mod tests {
                 deletes_address: updated_header_hash,
                 deletes_entry_address: updated_entry_hash,
             };
-            chain.put(header_builder, None).await?;
+            chain
+                .put(header_builder, None, ChainTopOrdering::default())
+                .await?;
 
             chain.flush().await.unwrap();
         }
@@ -1165,13 +1210,19 @@ pub mod tests {
             entry_type: EntryType::App(fixt!(AppEntryType)),
             entry_hash: EntryHash::with_data_sync(&entry),
         };
-        let h1 = source_chain.put(create, Some(entry)).await.unwrap();
+        let h1 = source_chain
+            .put(create, Some(entry), ChainTopOrdering::default())
+            .await
+            .unwrap();
         let entry = Entry::App(fixt!(AppEntryBytes));
         let create = builder::Create {
             entry_type: EntryType::App(fixt!(AppEntryType)),
             entry_hash: EntryHash::with_data_sync(&entry),
         };
-        let h2 = source_chain.put(create, Some(entry)).await.unwrap();
+        let h2 = source_chain
+            .put(create, Some(entry), ChainTopOrdering::default())
+            .await
+            .unwrap();
         source_chain.flush().await.unwrap();
 
         fresh_reader_test!(vault, |txn| {

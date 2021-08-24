@@ -25,6 +25,18 @@ pub mod facts;
 /// after genesis.
 pub const POST_GENESIS_SEQ_THRESHOLD: u32 = 3;
 
+#[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum ChainTopOrdering {
+    Relaxed,
+    Strict,
+}
+
+impl Default for ChainTopOrdering {
+    fn default() -> Self {
+        Self::Strict
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub struct HeaderHashes(pub Vec<HeaderHash>);
 

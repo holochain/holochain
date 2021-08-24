@@ -37,8 +37,6 @@ pub struct KitsuneP2pConfig {
     pub tuning_params: KitsuneP2pTuningParams,
     /// The network used for connecting to other peers
     pub network_type: NetworkType,
-    /// Resize agents' storage arcs as appropriate
-    pub resize_arcs: bool,
 }
 
 impl Default for KitsuneP2pConfig {
@@ -48,10 +46,6 @@ impl Default for KitsuneP2pConfig {
             bootstrap_service: None,
             tuning_params: KitsuneP2pTuningParams::default(),
             network_type: NetworkType::QuicBootstrap,
-            #[cfg(feature = "sharded")]
-            resize_arcs: true,
-            #[cfg(not(feature = "sharded"))]
-            resize_arcs: false,
         }
     }
 }
