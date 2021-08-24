@@ -1042,7 +1042,9 @@ pub mod tests {
         let env = test_env.env();
         let alice = fixt!(AgentPubKey, Predictable, 0);
 
-        source_chain::genesis(env.clone(), fake_dna_hash(1), alice.clone(), None).await.unwrap();
+        source_chain::genesis(env.clone(), fake_dna_hash(1), alice.clone(), None)
+            .await
+            .unwrap();
         let chain_1 = SourceChain::new(env.clone().into(), alice.clone()).await?;
         let chain_2 = SourceChain::new(env.clone().into(), alice.clone()).await?;
         let chain_3 = SourceChain::new(env.clone().into(), alice.clone()).await?;
@@ -1050,30 +1052,39 @@ pub mod tests {
         let header_builder = builder::CloseChain {
             new_dna_hash: fixt!(DnaHash),
         };
-        chain_1.put(header_builder.clone(), None, ChainTopOrdering::Strict).await?;
-        chain_2.put(header_builder.clone(), None, ChainTopOrdering::Strict).await?;
-        chain_3.put(header_builder, None, ChainTopOrdering::Relaxed).await?;
+        chain_1
+            .put(header_builder.clone(), None, ChainTopOrdering::Strict)
+            .await?;
+        chain_2
+            .put(header_builder.clone(), None, ChainTopOrdering::Strict)
+            .await?;
+        chain_3
+            .put(header_builder, None, ChainTopOrdering::Relaxed)
+            .await?;
 
         let author = Arc::new(alice);
         chain_1.flush().await?;
         let author_1 = Arc::clone(&author);
-        let (_, seq, _) = env.async_commit(move |txn: &mut Transaction| {
-            chain_head_db(&txn, author_1)
-        }).await?;
+        let (_, seq, _) = env
+            .async_commit(move |txn: &mut Transaction| chain_head_db(&txn, author_1))
+            .await?;
         assert_eq!(seq, 3);
 
-        assert!(matches!(chain_2.flush().await, Err(SourceChainError::HeadMoved(_, _))));
+        assert!(matches!(
+            chain_2.flush().await,
+            Err(SourceChainError::HeadMoved(_, _))
+        ));
         let author_2 = Arc::clone(&author);
-        let (_, seq, _) = env.async_commit(move |txn: &mut Transaction| {
-            chain_head_db(&txn, author_2)
-        }).await?;
+        let (_, seq, _) = env
+            .async_commit(move |txn: &mut Transaction| chain_head_db(&txn, author_2))
+            .await?;
         assert_eq!(seq, 3);
 
         chain_3.flush().await?;
         let author_3 = Arc::clone(&author);
-        let (_, seq, _) = env.async_commit(move |txn: &mut Transaction| {
-            chain_head_db(&txn, author_3)
-        }).await?;
+        let (_, seq, _) = env
+            .async_commit(move |txn: &mut Transaction| chain_head_db(&txn, author_3))
+            .await?;
         assert_eq!(seq, 4);
 
         Ok(())
