@@ -1,4 +1,4 @@
-//! A wrapper around ConductorHandle with more convenient methods for testing
+//! A wrapper around ConductorHandle with more convenient methods for testing.
 // TODO [ B-03669 ] move to own crate
 
 use super::{SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetConductorHandle};
@@ -10,6 +10,7 @@ use hdk::prelude::*;
 use holo_hash::DnaHash;
 use holochain_conductor_api::{AdminInterfaceConfig, InterfaceDriver};
 use holochain_keystore::KeystoreSender;
+use holochain_p2p::*;
 use holochain_state::test_utils::{test_environments, TestEnvs};
 use holochain_types::prelude::*;
 use holochain_websocket::*;
@@ -21,6 +22,9 @@ pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Syn
 
 /// A useful Conductor abstraction for testing, allowing startup and shutdown as well
 /// as easy installation of apps across multiple Conductors and Agents.
+///
+/// SweetConductors are meant to run on a single machine. Peer discovery is
+/// explicit (TODO), and they are not expected to use a bootstrap server.
 ///
 /// This is intentionally NOT `Clone`, because the drop handle triggers a shutdown of
 /// the conductor handle, which would render all other cloned instances useless.
@@ -215,7 +219,12 @@ impl SweetConductor {
         for dna_hash in dna_hashes {
             let cell_id = CellId::new(dna_hash, agent.clone());
             let cell_env = self.handle().0.get_cell_env(&cell_id).await?;
-            let cell = SweetCell { cell_id, cell_env };
+            let network = self.handle().get_cell_network(&cell_id).await?;
+            let cell = SweetCell {
+                cell_id,
+                cell_env,
+                network,
+            };
             sweet_cells.push(cell);
         }
 

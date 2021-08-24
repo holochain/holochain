@@ -4,6 +4,7 @@
 use crate::event::GetRequest;
 use crate::*;
 use holochain_types::activity::AgentActivityResponse;
+use kitsune_p2p::actor::TestBackdoor;
 
 /// Request a validation package.
 #[derive(Clone, Debug)]
@@ -193,6 +194,9 @@ impl Default for GetActivityOptions {
     }
 }
 
+// Import type aliases to get around mockall::automock shortcomings
+use crate::types::event::*;
+
 ghost_actor::ghost_chan! {
     /// The HolochainP2pSender struct allows controlling the HolochainP2p
     /// actor instance.
@@ -210,7 +214,7 @@ ghost_actor::ghost_chan! {
             to_agent: AgentPubKey,
             zome_name: ZomeName,
             fn_name: FunctionName,
-            cap: Option<CapSecret>,
+            cap: CapSecretOption,
             payload: ExternIO,
         ) -> SerializedBytes;
 
@@ -221,8 +225,8 @@ ghost_actor::ghost_chan! {
             request_validation_receipt: bool,
             countersigning_session: bool,
             dht_hash: holo_hash::AnyDhtHash,
-            ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
-            timeout_ms: Option<u64>,
+            ops: PublishOps,
+            timeout_ms: OptionU64,
         ) -> ();
 
         /// Request a validation package.
@@ -275,9 +279,13 @@ ghost_actor::ghost_chan! {
         fn countersigning_authority_response(
             dna_hash: DnaHash,
             from_agent: AgentPubKey,
-            agents: Vec<AgentPubKey>,
-            signed_headers: Vec<SignedHeader>,
+            agents: AgentPubKeyVec,
+            signed_headers: SignedHeaderVec,
         ) -> ();
+
+        /// Run "backdoor" methods, used only during testing
+        #[cfg(any(test, feature = "test_utils"))]
+        fn test_backdoor(dna_hash: DnaHash, action: TestBackdoor) -> ();
     }
 }
 

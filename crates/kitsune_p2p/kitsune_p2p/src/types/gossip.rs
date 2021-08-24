@@ -87,9 +87,9 @@ pub struct GossipTgt {
     /// In the current full-sync case, it makes sense to address gossip to all
     /// known agents on a node, but after sharding, we may make this a single
     /// agent target.
-    agents: Vec<Arc<KitsuneAgent>>,
+    pub agents: Vec<Arc<KitsuneAgent>>,
     /// The cert which represents the remote node to talk to.
-    cert: Tx2Cert,
+    pub cert: Tx2Cert,
 }
 
 impl GossipTgt {

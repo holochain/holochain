@@ -136,6 +136,7 @@ impl SpaceInternalHandler for Space {
         let evt_sender = self.evt_sender.clone();
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
+        let dynamic_arcs = self.config.tuning_params.gossip_dynamic_arcs;
         let internal_sender = self.i_s.clone();
         Ok(async move {
             let urls = vec![bound_url.into()];
@@ -152,6 +153,7 @@ impl SpaceInternalHandler for Space {
                     network_type: network_type.clone(),
                     mdns_handles: &mut mdns_handles,
                     bootstrap_service: &bootstrap_service,
+                    dynamic_arcs,
                 };
                 peer_data.push(update_single_agent_info(input).await?);
             }
@@ -179,6 +181,7 @@ impl SpaceInternalHandler for Space {
         let internal_sender = self.i_s.clone();
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
+        let dynamic_arcs = self.config.tuning_params.gossip_dynamic_arcs;
         let arc = self.get_agent_arc(&agent);
 
         Ok(async move {
@@ -194,6 +197,7 @@ impl SpaceInternalHandler for Space {
                 network_type: network_type.clone(),
                 mdns_handles: &mut mdns_handles,
                 bootstrap_service: &bootstrap_service,
+                dynamic_arcs,
             };
             let peer_data = vec![update_single_agent_info(input).await?];
             evt_sender
@@ -319,7 +323,7 @@ impl SpaceInternalHandler for Space {
                 module_type
             ),
         }
-        unit_ok_fut()
+        ok_fut(())
     }
 }
 
@@ -334,27 +338,16 @@ struct UpdateAgentInfoInput<'borrow> {
     network_type: NetworkType,
     mdns_handles: &'borrow mut HashMap<Vec<u8>, Arc<AtomicBool>>,
     bootstrap_service: &'borrow Option<Url2>,
+    dynamic_arcs: bool,
 }
 
-#[cfg(feature = "sharded")]
 async fn update_arc_length(
     evt_sender: &futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     space: Arc<KitsuneSpace>,
     arc: &mut DhtArc,
 ) -> KitsuneP2pResult<()> {
-    let density = evt_sender
-        .query_peer_density(space.clone(), arc.clone())
-        .await?;
+    let density = evt_sender.query_peer_density(space.clone(), *arc).await?;
     arc.update_length(density);
-    Ok(())
-}
-
-#[cfg(not(feature = "sharded"))]
-async fn update_arc_length(
-    _evt_sender: &futures::channel::mpsc::Sender<KitsuneP2pEvent>,
-    _space: Arc<KitsuneSpace>,
-    _arc: &mut DhtArc,
-) -> KitsuneP2pResult<()> {
     Ok(())
 }
 
@@ -372,9 +365,12 @@ async fn update_single_agent_info(
         network_type,
         mdns_handles,
         bootstrap_service,
+        dynamic_arcs,
     } = input;
 
-    update_arc_length(evt_sender, space.clone(), &mut arc).await?;
+    if dynamic_arcs {
+        update_arc_length(evt_sender, space.clone(), &mut arc).await?;
+    }
 
     // Update the agents arc through the internal sender.
     internal_sender.update_agent_arc(agent.clone(), arc).await?;
@@ -829,7 +825,7 @@ impl KitsuneP2pHandler for Space {
         for module in self.gossip_mod.values() {
             module.new_integrated_data();
         }
-        unit_ok_fut()
+        ok_fut(())
     }
 
     fn handle_authority_for_hash(
@@ -842,7 +838,47 @@ impl KitsuneP2pHandler for Space {
             Some(agent_arc) => agent_arc.contains(basis.get_loc()),
             None => false,
         };
-        Ok(async move { Ok(r) }.boxed().into())
+        ok_fut(r)
+    }
+
+    #[cfg(feature = "test_utils")]
+    fn handle_test_backdoor(
+        &mut self,
+        _space: Arc<KitsuneSpace>,
+        action: TestBackdoor,
+    ) -> KitsuneP2pHandlerResult<()> {
+        let space = self.space.clone();
+        let mut mdns_handles = self.mdns_handles.clone();
+        let network_type = self.config.network_type.clone();
+        let dynamic_arcs = self.config.tuning_params.gossip_dynamic_arcs.clone();
+        let bound_url = self.this_addr.clone();
+        let urls = vec![bound_url.into()];
+        let evt_sender = self.evt_sender.clone();
+        let bootstrap_service = self.config.bootstrap_service.clone();
+        let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
+        let internal_sender = self.i_s.clone();
+        Ok(async move {
+            Ok(match action {
+                TestBackdoor::SetArc(agent, arc) => {
+                    let input = UpdateAgentInfoInput {
+                        expires_after,
+                        space: space.clone(),
+                        agent,
+                        arc: DhtArc::from_interval(arc),
+                        urls: &urls,
+                        evt_sender: &evt_sender,
+                        internal_sender: &internal_sender,
+                        network_type: network_type.clone(),
+                        dynamic_arcs,
+                        mdns_handles: &mut mdns_handles,
+                        bootstrap_service: &bootstrap_service,
+                    };
+                    update_single_agent_info(input).await?;
+                }
+            })
+        }
+        .boxed()
+        .into())
     }
 }
 

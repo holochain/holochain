@@ -63,7 +63,7 @@ async fn local_sync_scenario() {
             .withf(move |_, to_agent, ops| {
                 *to_agent == agent && ops.iter().all(|op| hashes.contains(&*op.0))
             })
-            .returning(move |_, _, _| unit_ok_fut());
+            .returning(move |_, _, _| ok_fut(()));
     }
 
     // - It's OK if other agents who already hold this hash get it gossiped again,
@@ -76,7 +76,7 @@ async fn local_sync_scenario() {
             let arc = agent_arc_map.get(to_agent).unwrap();
             ops.iter().all(|op| arc.contains(op.0.get_loc()))
         })
-        .returning(move |_, _, _| unit_ok_fut());
+        .returning(move |_, _, _| ok_fut(()));
 
     let (evt_sender, task) = spawn_handler(evt_handler).await;
     let gossip = ShardedGossipLocal::test(

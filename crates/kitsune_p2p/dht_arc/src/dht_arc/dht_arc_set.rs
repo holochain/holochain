@@ -280,8 +280,8 @@ impl ArcInterval {
         }
     }
 
-    /// Same as primitive_range, but with the return type "inside-out"
-    pub fn primitive_range_detached(&self) -> (Option<u32>, Option<u32>) {
+    /// Same as `to_bounds_grouped`, but with the return type "inside-out"
+    pub fn to_bounds_detached(&self) -> (Option<u32>, Option<u32>) {
         self.to_bounds_grouped()
             .map(|(a, b)| (Some(a), Some(b)))
             .unwrap_or_default()

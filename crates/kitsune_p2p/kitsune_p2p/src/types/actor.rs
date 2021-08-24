@@ -1,6 +1,8 @@
 //! Definitions related to the KitsuneP2p peer-to-peer / dht communications actor.
 
+use kitsune_p2p_types::bin_types::KitsuneAgent;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
+use kitsune_p2p_types::dht_arc::ArcInterval;
 use kitsune_p2p_types::KitsuneTimeout;
 use std::sync::Arc;
 use url2::Url2;
@@ -125,5 +127,17 @@ ghost_actor::ghost_chan! {
             agent: KAgent,
             basis: KBasis,
         ) -> bool;
+
+        /// Run "backdoor" methods, used only during testing
+        #[cfg(feature = "test_utils")]
+        fn test_backdoor(space: KSpace, action: TestBackdoor) -> ();
     }
+}
+
+/// A "backdoor" command to run during testing
+#[cfg(feature = "test_utils")]
+pub enum TestBackdoor {
+    /// Manually set the arc for an agent.
+    /// The arc does not need to match the agent's location.
+    SetArc(Arc<KitsuneAgent>, ArcInterval),
 }

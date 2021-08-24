@@ -1331,6 +1331,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
                 .into(),
         )
     }
+
     #[tracing::instrument(skip(self), level = "trace")]
     fn handle_countersigning_authority_response(
         &mut self,
@@ -1357,5 +1358,20 @@ impl HolochainP2pHandler for HolochainP2pActor {
         }
         .boxed()
         .into())
+    }
+
+    #[cfg(feature = "test_utils")]
+    fn handle_test_backdoor(
+        &mut self,
+        dna_hash: DnaHash,
+        action: kitsune_p2p::actor::TestBackdoor,
+    ) -> HolochainP2pHandlerResult<()> {
+        let space = dna_hash.into_kitsune();
+        let kitsune_p2p = self.kitsune_p2p.clone();
+        Ok(
+            async move { Ok(kitsune_p2p.test_backdoor(space, action).await?) }
+                .boxed()
+                .into(),
+        )
     }
 }

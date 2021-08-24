@@ -293,7 +293,7 @@ impl P2pRecord {
 
         let is_active = !signed.url_list.is_empty();
 
-        let (storage_start_loc, storage_end_loc) = arc.primitive_range_detached();
+        let (storage_start_loc, storage_end_loc) = arc.to_bounds_detached();
 
         Ok(Self {
             agent,

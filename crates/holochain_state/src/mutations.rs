@@ -89,7 +89,11 @@ macro_rules! dht_op_update {
 }
 
 /// Insert a [`DhtOp`] into the [`Scratch`].
-pub fn insert_op_scratch(scratch: &mut Scratch, op: DhtOpHashed) -> StateMutationResult<()> {
+pub fn insert_op_scratch(
+    scratch: &mut Scratch,
+    op: DhtOpHashed,
+    chain_top_ordering: ChainTopOrdering,
+) -> StateMutationResult<()> {
     let (op, _) = op.into_inner();
     let op_light = op.to_light();
     let header = op.header();
@@ -102,19 +106,23 @@ pub fn insert_op_scratch(scratch: &mut Scratch, op: DhtOpHashed) -> StateMutatio
                 .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone()))?
                 .clone(),
         );
-        scratch.add_entry(entry_hashed);
+        scratch.add_entry(entry_hashed, chain_top_ordering);
     }
     let header_hashed = HeaderHashed::with_pre_hashed(header, op_light.header_hash().to_owned());
     let header_hashed = SignedHeaderHashed::with_presigned(header_hashed, signature);
-    scratch.add_header(header_hashed);
+    scratch.add_header(header_hashed, chain_top_ordering);
     Ok(())
 }
 
-pub fn insert_element_scratch(scratch: &mut Scratch, element: Element) {
+pub fn insert_element_scratch(
+    scratch: &mut Scratch,
+    element: Element,
+    chain_top_ordering: ChainTopOrdering,
+) {
     let (header, entry) = element.into_inner();
-    scratch.add_header(header);
+    scratch.add_header(header, chain_top_ordering);
     if let Some(entry) = entry.into_option() {
-        scratch.add_entry(EntryHashed::from_content_sync(entry))
+        scratch.add_entry(EntryHashed::from_content_sync(entry), chain_top_ordering);
     }
 }
 

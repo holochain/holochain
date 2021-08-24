@@ -218,6 +218,13 @@ impl HolochainP2pCellT for PassThroughNetwork {
     async fn new_integrated_data(&self) -> actor::HolochainP2pResult<()> {
         todo!()
     }
+
+    async fn test_backdoor(
+        &self,
+        _action: kitsune_p2p::actor::TestBackdoor,
+    ) -> actor::HolochainP2pResult<()> {
+        todo!()
+    }
 }
 
 pub fn fill_db(env: &EnvWrite, op: DhtOpHashed) {
@@ -381,6 +388,13 @@ impl HolochainP2pCellT for MockNetwork {
     }
 
     async fn new_integrated_data(&self) -> actor::HolochainP2pResult<()> {
+        todo!()
+    }
+
+    async fn test_backdoor(
+        &self,
+        _action: kitsune_p2p::actor::TestBackdoor,
+    ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
 }
