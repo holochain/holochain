@@ -111,7 +111,7 @@ wasm_io_types! {
     fn capability_info (()) -> ();
 
     // Returns HeaderHash of the newly created element.
-    fn create (zt::entry::EntryWithDefId) -> holo_hash::HeaderHash;
+    fn create (zt::entry::CreateInput) -> holo_hash::HeaderHash;
 
     // Create a link between two entries.
     fn create_link (zt::link::CreateLinkInput) -> holo_hash::HeaderHash;
@@ -123,10 +123,10 @@ wasm_io_types! {
     fn trace (zt::trace::TraceMsg) -> ();
 
     // Header hash of the CreateLink element.
-    fn delete_link (holo_hash::HeaderHash) -> holo_hash::HeaderHash;
+    fn delete_link (zt::link::DeleteLinkInput) -> holo_hash::HeaderHash;
 
     // Delete an element.
-    fn delete (holo_hash::HeaderHash) -> holo_hash::HeaderHash;
+    fn delete (zt::entry::DeleteInput) -> holo_hash::HeaderHash;
 
     // Header hash of the newly committed element.
     // Emit a Signal::App to subscribers on the interface

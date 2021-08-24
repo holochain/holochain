@@ -7,6 +7,7 @@ use holochain_p2p::MockHolochainP2pCellT;
 use holochain_state::mutations::insert_op_scratch;
 use holochain_state::prelude::test_cell_env;
 use holochain_state::scratch::Scratch;
+use holochain_zome_types::ChainTopOrdering;
 use holochain_zome_types::Details;
 use holochain_zome_types::ElementDetails;
 use holochain_zome_types::EntryDetails;
@@ -257,8 +258,18 @@ async fn entry_authoring() {
     // Data
     let td_entry = EntryTestData::create();
     let td_element = ElementTestData::create();
-    insert_op_scratch(&mut scratch, td_entry.store_entry_op.clone()).unwrap();
-    insert_op_scratch(&mut scratch, td_element.any_store_element_op.clone()).unwrap();
+    insert_op_scratch(
+        &mut scratch,
+        td_entry.store_entry_op.clone(),
+        ChainTopOrdering::default(),
+    )
+    .unwrap();
+    insert_op_scratch(
+        &mut scratch,
+        td_element.any_store_element_op.clone(),
+        ChainTopOrdering::default(),
+    )
+    .unwrap();
 
     // Network
     // - Not expecting any calls to the network.
@@ -341,8 +352,18 @@ async fn content_authoring() {
     // Data
     let td_entry = EntryTestData::create();
     let td_element = ElementTestData::create();
-    insert_op_scratch(&mut scratch, td_entry.store_entry_op.clone()).unwrap();
-    insert_op_scratch(&mut scratch, td_element.any_store_element_op.clone()).unwrap();
+    insert_op_scratch(
+        &mut scratch,
+        td_entry.store_entry_op.clone(),
+        ChainTopOrdering::default(),
+    )
+    .unwrap();
+    insert_op_scratch(
+        &mut scratch,
+        td_element.any_store_element_op.clone(),
+        ChainTopOrdering::default(),
+    )
+    .unwrap();
 
     // Network
     // - Not expecting any calls to the network.

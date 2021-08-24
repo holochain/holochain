@@ -17,7 +17,12 @@ async fn entry_scratch_same_as_sql() {
 
     let td = EntryTestData::new();
     let query = GetEntryDetailsQuery::new(td.hash.clone());
-    insert_op_scratch(&mut scratch, td.store_entry_op.clone()).unwrap();
+    insert_op_scratch(
+        &mut scratch,
+        td.store_entry_op.clone(),
+        ChainTopOrdering::default(),
+    )
+    .unwrap();
     insert_op(&mut txn, td.store_entry_op.clone(), true).unwrap();
     set_validation_status(
         &mut txn,
@@ -49,7 +54,12 @@ async fn element_scratch_same_as_sql() {
 
     let td = ElementTestData::new();
     let query = GetElementDetailsQuery::new(td.header.as_hash().clone());
-    insert_op_scratch(&mut scratch, td.store_element_op.clone()).unwrap();
+    insert_op_scratch(
+        &mut scratch,
+        td.store_element_op.clone(),
+        ChainTopOrdering::default(),
+    )
+    .unwrap();
     insert_op(&mut txn, td.store_element_op.clone(), true).unwrap();
     set_validation_status(
         &mut txn,

@@ -1,4 +1,5 @@
 use crate::element::SignedHeaderHashed;
+use crate::ChainTopOrdering;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 
@@ -80,6 +81,7 @@ pub struct CreateLinkInput {
     pub base_address: holo_hash::EntryHash,
     pub target_address: holo_hash::EntryHash,
     pub tag: LinkTag,
+    pub chain_top_ordering: ChainTopOrdering,
 }
 
 impl CreateLinkInput {
@@ -87,11 +89,30 @@ impl CreateLinkInput {
         base_address: holo_hash::EntryHash,
         target_address: holo_hash::EntryHash,
         tag: LinkTag,
+        chain_top_ordering: ChainTopOrdering,
     ) -> Self {
         Self {
             base_address,
             target_address,
             tag,
+            chain_top_ordering,
+        }
+    }
+}
+
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub struct DeleteLinkInput {
+    /// Address of the link being deleted.
+    pub address: holo_hash::HeaderHash,
+    /// Chain top ordering rules for writes.
+    pub chain_top_ordering: ChainTopOrdering,
+}
+
+impl DeleteLinkInput {
+    pub fn new(address: holo_hash::HeaderHash, chain_top_ordering: ChainTopOrdering) -> Self {
+        Self {
+            address,
+            chain_top_ordering,
         }
     }
 }

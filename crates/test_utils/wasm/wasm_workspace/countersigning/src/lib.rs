@@ -33,12 +33,14 @@ fn create_an_invalid_thing(_: ()) -> ExternResult<HeaderHash> {
 }
 
 fn create_countersigned(responses: Vec<PreflightResponse>, thing: Thing) -> ExternResult<HeaderHash> {
-    HDK.with(|h| h.borrow().create(EntryWithDefId::new(
+    HDK.with(|h| h.borrow().create(CreateInput::new(
         (&thing).into(),
         Entry::CounterSign(
             Box::new(CounterSigningSessionData::try_from_responses(responses).map_err(|countersigning_error| WasmError::Guest(countersigning_error.to_string()))?),
             thing.try_into()?,
-        )
+        ),
+        // Countersigned entries MUST have strict ordering.
+        ChainTopOrdering::Strict,
     )))
 }
 
@@ -76,4 +78,27 @@ fn generate_invalid_countersigning_preflight_request(agents: Vec<(AgentPubKey, V
 #[hdk_extern]
 fn accept_countersigning_preflight_request(preflight_request: PreflightRequest) -> ExternResult<PreflightRequestAcceptance> {
     hdk::prelude::accept_countersigning_preflight_request(preflight_request)
+}
+
+#[hdk_extern]
+fn must_get_header(header_hash: HeaderHash) -> ExternResult<SignedHeaderHashed> {
+    hdk::prelude::must_get_header(header_hash)
+}
+
+#[hdk_extern]
+fn must_get_entry(entry_hash: EntryHash) -> ExternResult<EntryHashed> {
+    hdk::prelude::must_get_entry(entry_hash)
+}
+
+#[hdk_extern]
+fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> {
+    hdk::prelude::must_get_valid_element(header_hash)
+}
+
+#[hdk_extern]
+fn get_agent_activity(input: GetAgentActivityInput) ->ExternResult<AgentActivity> {
+    HDK.with(|h| {
+        h.borrow()
+            .get_agent_activity(input)
+    })
 }
