@@ -64,12 +64,12 @@ pub enum SessionReport {
     KeepAlive {
         /// The number of missing agents.
         missing_agents: u32,
-        /// The expected number of hashes.
-        out_of_agents: u32,
+        /// The expected number of agents.
+        expected_agents: u32,
         /// The number of missing ops.
         missing_hashes: u32,
         /// The expected number of hashes.
-        out_of_hashes: u32,
+        expected_hashes: u32,
     },
     /// The session is complete and the agent has all the data.
     Complete {

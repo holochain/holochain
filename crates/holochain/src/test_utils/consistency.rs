@@ -210,16 +210,16 @@ async fn wait_for_consistency(
             SessionReport::KeepAlive {
                 missing_agents,
                 missing_hashes,
-                out_of_agents,
-                out_of_hashes,
+                expected_agents,
+                expected_hashes,
             } => {
                 tracing::debug!(
                     "{:?} is still missing {} of {} agents and {} of {} hashes",
                     from,
                     missing_agents,
-                    out_of_agents,
+                    expected_agents,
                     missing_hashes,
-                    out_of_hashes,
+                    expected_hashes,
                 );
             }
             SessionReport::Complete { elapsed_ms } => {
@@ -493,9 +493,9 @@ async fn check_expected_data_inner(
             reporter
                 .send_report(SessionReport::KeepAlive {
                     missing_agents: missing_agents.len() as u32,
-                    out_of_agents: expected_agents.len() as u32,
+                    expected_agents: expected_agents.len() as u32,
                     missing_hashes: missing_hashes.len() as u32,
-                    out_of_hashes: expected_hashes.len() as u32,
+                    expected_hashes: expected_hashes.len() as u32,
                 })
                 .await;
 
