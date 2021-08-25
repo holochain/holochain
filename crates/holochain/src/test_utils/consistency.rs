@@ -198,12 +198,12 @@ async fn wait_for_consistency(
     let mut success = 0;
     let mut average_time = Duration::default();
     let mut amount_held = HashMap::new();
-    let avg_held = || {
+    let avg_held = |amount_held: &HashMap<_, _>| {
         let (p_agent_held, p_hash_held) = amount_held.values().fold(
             (0.0, 0.0),
-            |(p_hash_held, p_agent_held), (ma, ea, mh, eh)| {
-                p_agent_held += ma as f32 / ea as f32;
-                p_hash_held += mh as f32 / eh as f32;
+            |(mut p_hash_held, mut p_agent_held), (ma, ea, mh, eh)| {
+                p_agent_held += *ma as f32 / *ea as f32;
+                p_hash_held += *mh as f32 / *eh as f32;
                 (p_agent_held, p_hash_held)
             },
         );
@@ -281,7 +281,7 @@ async fn wait_for_consistency(
                 }
             }
         }
-        let (avg_agent_held, avg_hash_held) = avg_held();
+        let (avg_agent_held, avg_hash_held) = avg_held(&amount_held);
         tracing::debug!(
             "{} of {} agents have still not reached consistency in {:?}. The average consistency is currently reached in {:?}. {}% agents held, {}% hashes held.",
             agents.len(),
@@ -301,7 +301,7 @@ async fn wait_for_consistency(
             total_agents
         );
     }
-    let (avg_agent_held, avg_hash_held) = avg_held();
+    let (avg_agent_held, avg_hash_held) = avg_held(&amount_held);
     tracing::debug!(
         "
 REPORT:
