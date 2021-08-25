@@ -1,4 +1,15 @@
 //! Types used for consistency checking during tests or dht health checks.
+//! These types describe a protocol that can be implemented to gather statistics
+//! on data consistency.
+//! This is a first prototype so expect this to change.
+//!
+//! The idea is that a central node can request all the published hashes from a set
+//! of nodes on the DHT and then create a consistency session for each node.
+//! The sessions can then be sent to each node so they can self-check what they
+//! should be holding and then send back small session reports at a set frequency.
+//!
+//! This allows consistency and health checks to be run at scale with minimal network traffic.
+//! It does require honest network nodes. (Although this could be strengthened).
 use std::time::Duration;
 
 use crate::bin_types::*;

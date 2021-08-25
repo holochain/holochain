@@ -265,6 +265,7 @@ async fn sharded_consistency() {
         conductors.setup_app(&i.to_string(), &dnas).await.unwrap();
     }
     conductors.exchange_peer_info().await;
+    conductors.force_all_publish_dht_ops().await;
     // Call the "create" zome fn on Alice's app
     let hash: HeaderHash = conductors[0].call(&alice.zome("zome1"), "create", ()).await;
 
