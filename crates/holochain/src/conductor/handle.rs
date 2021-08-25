@@ -63,6 +63,8 @@ use crate::conductor::p2p_agent_store::query_peer_density;
 use crate::conductor::p2p_metrics::put_metric_datum;
 use crate::conductor::p2p_metrics::query_metrics;
 use crate::core::ribosome::real_ribosome::RealRibosome;
+use crate::core::workflow::publish_dht_ops_workflow::ForcePublishHandler;
+use crate::core::workflow::publish_dht_ops_workflow::ForcePublishSender;
 use crate::core::workflow::ZomeCallResult;
 use derive_more::From;
 use futures::future::FutureExt;
@@ -300,6 +302,14 @@ pub trait ConductorHandleT: Send + Sync {
     /// allowing individual Cells to be shut down.
     async fn remove_cells(&self, cell_ids: &[CellId]);
 
+    /// Get the force publish handler.
+    fn force_publish_handler(&self) -> ForcePublishHandler;
+
+    #[cfg(any(test, feature = "test_utils"))]
+    /// Force all publish dht op workflows to publish DhtOps without enough
+    /// validation receipts immediately.
+    async fn force_all_publish_dht_ops(&self);
+
     /// Retrieve the environment for this cell. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvWrite>;
@@ -392,6 +402,10 @@ pub struct ConductorHandleImpl<DS: DnaStore + 'static> {
 
     /// The database for storing p2p MetricDatum(s)
     pub(super) p2p_metrics_env: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
+
+    /// The force publish sender to force all publish dht op workflows to
+    /// publish any DhtOps without enough validation receipts.
+    pub(super) force_publish_sender: ForcePublishSender,
 
     // Testing:
     #[cfg(any(test, feature = "test_utils"))]
@@ -1118,6 +1132,19 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn remove_cells(&self, cell_ids: &[CellId]) {
         let mut lock = self.conductor.write().await;
         lock.remove_cells(cell_ids.to_vec()).await
+    }
+
+    fn force_publish_handler(&self) -> ForcePublishHandler {
+        self.force_publish_sender.handler()
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    async fn force_all_publish_dht_ops(&self) {
+        self.force_publish_sender.force();
+        self.conductor
+            .read()
+            .await
+            .trigger_all_publish_dht_ops_workflows()
     }
 
     #[cfg(any(test, feature = "test_utils"))]

@@ -24,6 +24,7 @@ use super::MIN_PUBLISH_INTERVAL;
 pub async fn get_ops_to_publish(
     agent: AgentPubKey,
     env: &EnvRead,
+    force_publish: bool,
 ) -> WorkflowResult<Vec<DhtOpHashed>> {
     let recency_threshold = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -55,7 +56,7 @@ pub async fn get_ops_to_publish(
             AND
             DhtOp.withhold_publish IS NULL
             AND
-            (DhtOp.last_publish_time IS NULL OR DhtOp.last_publish_time <= :recency_threshold)
+            (DhtOp.last_publish_time IS NULL OR DhtOp.last_publish_time <= :recency_threshold OR :force_publish = 1)
             AND
             DhtOp.receipts_complete IS NULL 
             ",
@@ -65,6 +66,7 @@ pub async fn get_ops_to_publish(
                     ":author": agent,
                     ":recency_threshold": recency_threshold,
                     ":store_entry": DhtOpType::StoreEntry,
+                    ":force_publish": force_publish,
                 },
                 |row| {
                     let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
@@ -137,7 +139,7 @@ mod tests {
         observability::test_run().ok();
         let env = test_cell_env();
         let expected = test_data(&env.env().into());
-        let r = get_ops_to_publish(expected.agent, &env.env().into())
+        let r = get_ops_to_publish(expected.agent, &env.env().into(), false)
             .await
             .unwrap();
         assert_eq!(r, expected.results);

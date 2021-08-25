@@ -115,6 +115,15 @@ impl SweetConductorBatch {
         }
         crate::conductor::p2p_agent_store::exchange_peer_info(all).await;
     }
+
+    /// Force all publish dht op workflows to publish ops
+    /// without enough dht ops.
+    /// This is useful for making sure genesis is published.
+    pub async fn force_all_publish_dht_ops(&self) {
+        for c in self.0.iter() {
+            c.force_all_publish_dht_ops().await;
+        }
+    }
 }
 
 impl std::ops::Index<usize> for SweetConductorBatch {
