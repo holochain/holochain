@@ -253,13 +253,13 @@ mod tests {
             .get_all_op_hashes(&dna_hash, to_agents_0)
             .await
             .into_iter()
-            .map(|h| h.get_loc().as_u32())
+            .map(|h| h.get_loc().to_u32())
             .collect();
         let ops1: HashSet<_> = conductor1
             .get_all_op_hashes(&dna_hash, to_agents_1)
             .await
             .into_iter()
-            .map(|h| h.get_loc().as_u32())
+            .map(|h| h.get_loc().to_u32())
             .collect();
 
         // - Check that the specially prepared ops are present
