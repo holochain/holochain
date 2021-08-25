@@ -10,7 +10,6 @@ use holochain_types::dht_op::produce_op_lights_from_iter;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpLight;
 use holochain_types::dht_op::DhtOpType;
-use holochain_types::dht_op::OpOrder;
 use holochain_types::dht_op::UniqueForm;
 use holochain_types::element::SignedHeaderHashedExt;
 use holochain_types::env::EnvRead;
@@ -528,7 +527,6 @@ impl SourceChain {
             Vec<(
                 DhtOpLight,
                 DhtOpHash,
-                OpOrder,
                 Timestamp,
                 Option<EntryVisibility>,
                 Dependency,
