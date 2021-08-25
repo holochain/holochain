@@ -1003,6 +1003,13 @@ where
     }
 
     #[cfg(any(test, feature = "test_utils"))]
+    pub(super) fn trigger_all_publish_dht_ops_workflows(&self) {
+        for cell in self.cells.values() {
+            cell.cell.triggers().publish_dht_ops.clone().trigger();
+        }
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
     pub(super) async fn get_state_from_handle(&self) -> ConductorResult<ConductorState> {
         self.get_state().await
     }
@@ -1231,6 +1238,7 @@ mod builder {
     use super::*;
     use crate::conductor::dna_store::RealDnaStore;
     use crate::conductor::ConductorHandle;
+    use crate::core::workflow::publish_dht_ops_workflow::ForcePublishSender;
     use holochain_sqlite::db::DbKind;
     #[cfg(any(test, feature = "test_utils"))]
     use holochain_state::test_utils::TestEnvs;
@@ -1374,6 +1382,7 @@ mod builder {
                 conductor: RwLock::new(conductor),
                 keystore,
                 holochain_p2p,
+                force_publish_sender: ForcePublishSender::new(),
 
                 #[cfg(any(test, feature = "test_utils"))]
                 skip_publish: std::sync::atomic::AtomicBool::new(false),
@@ -1479,6 +1488,7 @@ mod builder {
                 holochain_p2p,
                 p2p_env: envs.p2p(),
                 p2p_metrics_env: envs.p2p_metrics(),
+                force_publish_sender: ForcePublishSender::new(),
                 #[cfg(any(test, feature = "test_utils"))]
                 skip_publish: std::sync::atomic::AtomicBool::new(false),
             });

@@ -21,7 +21,9 @@ use std::collections::HashMap;
 use std::time;
 use tracing::*;
 
+mod force_publish;
 mod publish_query;
+pub use force_publish::*;
 
 /// Default redundancy factor for validation receipts
 pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u8 = 5;
@@ -35,14 +37,16 @@ pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u8 = 5;
 // TODO: We need a republish workflow to make sure the data is actually saturated.
 pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(60 * 60 * 24);
 
-#[instrument(skip(env, network))]
+#[instrument(skip(env, network, force_publish))]
 pub async fn publish_dht_ops_workflow(
     env: EnvWrite,
     network: HolochainP2pCell,
+    force_publish: &mut ForcePublishHandler,
 ) -> WorkflowResult<WorkComplete> {
     let mut complete = WorkComplete::Complete;
     let to_publish =
-        publish_dht_ops_workflow_inner(env.clone().into(), network.from_agent()).await?;
+        publish_dht_ops_workflow_inner(env.clone().into(), network.from_agent(), force_publish)
+            .await?;
 
     // Commit to the network
     tracing::info!("sending {} ops", to_publish.len());
@@ -78,11 +82,14 @@ pub async fn publish_dht_ops_workflow(
 pub async fn publish_dht_ops_workflow_inner(
     env: EnvRead,
     agent: AgentPubKey,
+    force_publish: &mut ForcePublishHandler,
 ) -> WorkflowResult<HashMap<AnyDhtHash, Vec<(DhtOpHash, DhtOp)>>> {
     // Ops to publish by basis
     let mut to_publish = HashMap::new();
 
-    for op_hashed in publish_query::get_ops_to_publish(agent.clone(), &env).await? {
+    for op_hashed in
+        publish_query::get_ops_to_publish(agent.clone(), &env, force_publish.forced()).await?
+    {
         let (op, op_hash) = op_hashed.into_inner();
         // For every op publish a request
         // Collect and sort ops by basis
@@ -216,7 +223,7 @@ mod tests {
 
     /// Call the workflow
     async fn call_workflow(env: EnvWrite, cell_network: HolochainP2pCell) {
-        publish_dht_ops_workflow(env.clone().into(), cell_network)
+        publish_dht_ops_workflow(env.clone().into(), cell_network, &mut Default::default())
             .await
             .unwrap();
     }
