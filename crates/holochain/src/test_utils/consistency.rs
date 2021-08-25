@@ -197,6 +197,20 @@ async fn wait_for_consistency(
     let mut errors = 0;
     let mut success = 0;
     let mut average_time = Duration::default();
+    let mut amount_held = HashMap::new();
+    let avg_held = || {
+        let (p_agent_held, p_hash_held) = amount_held.values().fold(
+            (0.0, 0.0),
+            |(p_hash_held, p_agent_held), (ma, ea, mh, eh)| {
+                p_agent_held += ma as f32 / ea as f32;
+                p_hash_held += mh as f32 / eh as f32;
+                (p_agent_held, p_hash_held)
+            },
+        );
+        let avg_agent_held = p_agent_held / amount_held.len() as f32;
+        let avg_hash_held = p_hash_held / amount_held.len() as f32;
+        (avg_agent_held.round(), avg_hash_held.round())
+    };
 
     // While we haven't timed out collect messages from all agents, print traces and update stats.
     while let Ok(Some(SessionMessage { from, report })) =
@@ -213,6 +227,13 @@ async fn wait_for_consistency(
                 expected_agents,
                 expected_hashes,
             } => {
+                let e = amount_held
+                    .entry(from.clone())
+                    .or_insert_with(|| (0, 0, 0, 0));
+                e.0 = missing_agents;
+                e.1 = expected_agents;
+                e.2 = missing_hashes;
+                e.3 = expected_hashes;
                 tracing::debug!(
                     "{:?} is still missing {} of {} agents and {} of {} hashes",
                     from,
@@ -260,12 +281,15 @@ async fn wait_for_consistency(
                 }
             }
         }
+        let (avg_agent_held, avg_hash_held) = avg_held();
         tracing::debug!(
-            "{} of {} agents have still not reached consistency in {:?}. The average consistency is currently reached in {:?}",
+            "{} of {} agents have still not reached consistency in {:?}. The average consistency is currently reached in {:?}. {}% agents held, {}% hashes held.",
             agents.len(),
             total_agents,
             start.elapsed(),
-            average_time.checked_div(success as u32).unwrap_or_default()
+            average_time.checked_div(success as u32).unwrap_or_default(),
+            avg_agent_held,
+            avg_hash_held,
         );
     }
     if tokio::time::Instant::now() > deadline {
@@ -277,6 +301,7 @@ async fn wait_for_consistency(
             total_agents
         );
     }
+    let (avg_agent_held, avg_hash_held) = avg_held();
     tracing::debug!(
         "
 REPORT:
@@ -285,6 +310,8 @@ Successful agents: {} in an average of {:?}
 Timed out agents: {}
 Failed out agents: {}
 Total agents: {}
+Average agents held: {}%.
+Average hashes held: {}%.
         ",
         start.elapsed(),
         success,
@@ -292,6 +319,8 @@ Total agents: {}
         timeouts,
         errors,
         total_agents,
+        avg_agent_held,
+        avg_hash_held,
     );
 }
 
