@@ -269,14 +269,13 @@ async fn wait_for_consistency(
         );
     }
     if tokio::time::Instant::now() > deadline {
+        timeouts += agents.len();
+        agents.clear();
         tracing::debug!(
             "Timed out with {} of {} agents have still not reaching consistency",
             agents.len(),
             total_agents
         );
-        for _ in agents.iter() {
-            timeouts += 1;
-        }
     }
     tracing::debug!(
         "
