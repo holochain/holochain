@@ -52,13 +52,29 @@ pub async fn local_machine_session(conductors: &[ConductorHandle], timeout: Dura
     }
     for (_, conductors) in spaces {
         let mut wait_for_agents = HashSet::new();
+        let mut agent_env_map = HashMap::new();
+        let mut agent_p2p_map = HashMap::new();
+        let mut all_agents = Vec::new();
+        let mut all_hashes = Vec::new();
         let (tx, rx) = tokio::sync::mpsc::channel(1000);
         for c in conductors {
             if let Some((p2p_env, agents)) = c {
                 wait_for_agents.extend(agents.iter().map(|(_, agent)| agent.clone()));
-                tokio::spawn(expect_all(tx.clone(), p2p_env, agents, timeout.clone()));
+                agent_env_map.extend(agents.iter().cloned().map(|(e, a)| (a, e)));
+                agent_p2p_map.extend(agents.iter().cloned().map(|(_, a)| (a, p2p_env.clone())));
+                let (a, h) = gather_conductor_data(p2p_env, agents).await;
+                all_agents.extend(a);
+                all_hashes.extend(h);
             }
         }
+        tokio::spawn(expect_all(
+            tx.clone(),
+            timeout,
+            all_agents,
+            all_hashes,
+            agent_env_map,
+            agent_p2p_map,
+        ));
         wait_for_consistency(rx, wait_for_agents, timeout.clone()).await;
     }
 }
@@ -66,13 +82,12 @@ pub async fn local_machine_session(conductors: &[ConductorHandle], timeout: Dura
 /// Get consistency for a particular hash.
 pub async fn local_machine_session_with_hashes(
     conductors: Vec<&ConductorHandle>,
-    hashes: impl Iterator<Item = &DhtOpHash>,
+    hashes: impl Iterator<Item = DhtOpHash>,
     space: &DnaHash,
     timeout: Duration,
 ) {
     let mut spaces = HashMap::new();
     for (i, c) in conductors.iter().enumerate() {
-        // TODO: Handle error.
         for cell_id in c.list_cell_ids(None).await.unwrap() {
             if cell_id.dna_hash() != space {
                 continue;
@@ -85,7 +100,6 @@ pub async fn local_machine_session_with_hashes(
                 space[i] = Some((p2p_env, Vec::new()));
             }
             space[i].as_mut().unwrap().1.push((
-                // TODO: Handle error.
                 c.get_cell_env_readonly(&cell_id).await.unwrap(),
                 cell_id.agent_pubkey().to_kitsune(),
             ));
@@ -93,37 +107,31 @@ pub async fn local_machine_session_with_hashes(
     }
     let all_hashes = hashes
         .into_iter()
-        .map(|h| h.to_kitsune())
+        .map(|h| h.into_kitsune_raw())
         .collect::<Vec<_>>();
-    for (_, conductors) in spaces {
-        let mut wait_for_agents = HashSet::new();
-        let (tx, rx) = tokio::sync::mpsc::channel(1000);
-        for c in conductors {
-            if let Some((p2p_env, agents)) = c {
-                wait_for_agents.extend(agents.iter().map(|(_, agent)| agent.clone()));
-                tokio::spawn({
-                    let all_hashes = all_hashes.clone();
-                    let tx = tx.clone();
-                    let agent_env_map: HashMap<_, _> =
-                        agents.iter().cloned().map(|(e, a)| (a, e)).collect();
-                    async move {
-                        let mut all_agents = Vec::with_capacity(agents.len());
-                        for (_, agent) in &agents {
-                            // TODO: Handle error.
-                            if let Some(storage_arc) = request_arc(&p2p_env, &agent).await.unwrap()
-                            {
-                                all_agents.push((agent.clone(), storage_arc));
-                            }
-                        }
-                        let iter =
-                            generate_session(&all_agents, &all_hashes, timeout, agent_env_map);
-                        check_all(iter, tx, p2p_env).await;
-                    }
-                });
+    let (_, conductors) = spaces.into_iter().next().unwrap();
+    let mut wait_for_agents = HashSet::new();
+    let mut agent_env_map = HashMap::new();
+    let mut agent_p2p_map = HashMap::new();
+    let mut all_agents = Vec::new();
+    let (tx, rx) = tokio::sync::mpsc::channel(1000);
+    for c in conductors {
+        if let Some((p2p_env, agents)) = c {
+            wait_for_agents.extend(agents.iter().map(|(_, agent)| agent.clone()));
+            agent_env_map.extend(agents.iter().cloned().map(|(e, a)| (a, e)));
+            agent_p2p_map.extend(agents.iter().cloned().map(|(_, a)| (a, p2p_env.clone())));
+            for (_, agent) in &agents {
+                if let Some(storage_arc) = request_arc(&p2p_env, &agent).await.unwrap() {
+                    all_agents.push((agent.clone(), storage_arc));
+                }
             }
         }
-        wait_for_consistency(rx, wait_for_agents, timeout.clone()).await;
     }
+    tokio::spawn(async move {
+        let iter = generate_session(&all_agents, &all_hashes, timeout, agent_env_map);
+        check_all(iter, tx, agent_p2p_map).await;
+    });
+    wait_for_consistency(rx, wait_for_agents, timeout.clone()).await;
 }
 
 impl Reporter {
@@ -142,32 +150,48 @@ impl Reporter {
     }
 }
 
+#[tracing::instrument(skip(rx, agents))]
 async fn wait_for_consistency(
     mut rx: tokio::sync::mpsc::Receiver<SessionMessage>,
     mut agents: HashSet<Arc<KitsuneAgent>>,
     timeout: Duration,
 ) {
-    let deadline = tokio::time::Instant::now() + timeout + Duration::from_millis(100);
+    let start = tokio::time::Instant::now();
+    let deadline = tokio::time::Instant::now() + timeout + Duration::from_secs(1);
+    let total_agents = agents.len();
+    let mut timeouts = 0;
+    let mut errors = 0;
+    let mut success = 0;
+    let mut average_time = Duration::default();
     while let Ok(Some(SessionMessage { from, report })) =
         tokio::time::timeout_at(deadline, rx.recv()).await
     {
+        if tokio::time::Instant::now() > deadline {
+            break;
+        }
         match report {
             SessionReport::KeepAlive {
                 missing_agents,
                 missing_hashes,
+                out_of_agents,
+                out_of_hashes,
             } => {
                 tracing::debug!(
-                    "{:?} is still missing {} agents and {} hashes",
+                    "{:?} is still missing {} of {} agents and {} of {} hashes",
                     from,
                     missing_agents,
-                    missing_hashes
+                    out_of_agents,
+                    missing_hashes,
+                    out_of_hashes,
                 );
             }
             SessionReport::Complete { elapsed_ms } => {
                 agents.remove(&from);
                 tracing::debug!("{:?} has reached consistency in {}ms", from, elapsed_ms);
+                average_time += Duration::from_millis(elapsed_ms as u64);
+                success += 1;
                 if agents.is_empty() {
-                    return;
+                    break;
                 }
             }
             SessionReport::Timeout {
@@ -181,8 +205,9 @@ async fn wait_for_consistency(
                     missing_agents,
                     missing_hashes
                 );
+                timeouts += 1;
                 if agents.is_empty() {
-                    return;
+                    break;
                 }
             }
             SessionReport::Error { error } => {
@@ -192,26 +217,57 @@ async fn wait_for_consistency(
                     from,
                     error
                 );
+                errors += 1;
                 if agents.is_empty() {
-                    return;
+                    break;
                 }
             }
         }
+        tracing::debug!(
+            "{} of {} agents have still not reached consistency in {:?}. The average consistency is currently reached in {:?}",
+            agents.len(),
+            total_agents,
+            start.elapsed(),
+            average_time.checked_div(success as u32).unwrap_or_default()
+        );
     }
+    if tokio::time::Instant::now() > deadline {
+        tracing::debug!(
+            "Timed out with {} of {} agents have still not reaching consistency",
+            agents.len(),
+            total_agents
+        );
+        for _ in agents.iter() {
+            timeouts += 1;
+        }
+    }
+    tracing::debug!(
+        "
+REPORT:
+Total elapsed: {:?}
+Successful agents: {} in an average of {:?}
+Timed out agents: {}
+Failed out agents: {}
+Total agents: {}
+        ",
+        start.elapsed(),
+        success,
+        average_time.checked_div(success as u32).unwrap_or_default(),
+        timeouts,
+        errors,
+        total_agents,
+    );
 }
 
-async fn expect_all(
-    tx: tokio::sync::mpsc::Sender<SessionMessage>,
+async fn gather_conductor_data(
     p2p_env: EnvRead,
     agents: Vec<(EnvRead, Arc<KitsuneAgent>)>,
-    timeout: Duration,
-) {
+) -> (Vec<(Arc<KitsuneAgent>, DhtArc)>, Vec<KitsuneOpHash>) {
     let stores = agents.iter().cloned().map(|(cell_env, agent)| Stores {
         agent,
         cell_env,
         p2p_env: p2p_env.clone(),
     });
-    let agent_env_map: HashMap<_, _> = agents.iter().cloned().map(|(e, a)| (a, e)).collect();
     // TODO: Handle error.
     let all_published_data = gather_published_data(stores, CONCURRENCY).await.unwrap();
     let mut all_hashes = Vec::new();
@@ -225,20 +281,33 @@ async fn expect_all(
         all_hashes.extend(published_hashes);
         all_agents.push((agent, storage_arc));
     }
+    (all_agents, all_hashes)
+}
 
+async fn expect_all(
+    tx: tokio::sync::mpsc::Sender<SessionMessage>,
+    timeout: Duration,
+    all_agents: Vec<(Arc<KitsuneAgent>, DhtArc)>,
+    all_hashes: Vec<KitsuneOpHash>,
+    agent_env_map: HashMap<Arc<KitsuneAgent>, EnvRead>,
+    agent_p2p_map: HashMap<Arc<KitsuneAgent>, EnvRead>,
+) {
     let iter = generate_session(&all_agents, &all_hashes, timeout, agent_env_map);
-    check_all(iter, tx, p2p_env).await;
+    check_all(iter, tx, agent_p2p_map).await;
 }
 
 async fn check_all(
     iter: impl Iterator<Item = (Arc<KitsuneAgent>, ConsistencySession, EnvRead)>,
     tx: tokio::sync::mpsc::Sender<SessionMessage>,
-    p2p_env: EnvRead,
+    agent_p2p_map: HashMap<Arc<KitsuneAgent>, EnvRead>,
 ) {
     futures::stream::iter(iter)
         .for_each_concurrent(CONCURRENCY, |(agent, expected_session, cell_env)| {
             let tx = tx.clone();
-            let p2p_env = p2p_env.clone();
+            let p2p_env = agent_p2p_map
+                .get(&agent)
+                .cloned()
+                .expect("Must contain all p2p envs, this is a bug.");
             let reporter = Reporter(tx.clone(), agent);
             check_expected_data(reporter, expected_session, cell_env, p2p_env)
         })
@@ -261,7 +330,7 @@ async fn check_expected_data(
 
 fn generate_session<'iter>(
     all_agents: &'iter Vec<(Arc<KitsuneAgent>, DhtArc)>,
-    all_hashes: &'iter Vec<Arc<KitsuneOpHash>>,
+    all_hashes: &'iter Vec<KitsuneOpHash>,
     timeout: Duration,
     agent_env_map: HashMap<Arc<KitsuneAgent>, EnvRead>,
 ) -> impl Iterator<Item = (Arc<KitsuneAgent>, ConsistencySession, EnvRead)> + 'iter {
@@ -306,6 +375,7 @@ fn generate_session<'iter>(
                 .map(|env| (agent, expected_session, env))
         })
 }
+
 async fn check_expected_data_inner(
     reporter: Reporter,
     session: ConsistencySession,
@@ -327,9 +397,15 @@ async fn check_expected_data_inner(
     let mut last_keep_alive = start;
     let deadline = tokio::time::Instant::now() + timeout;
     let mut frequency = tokio::time::interval(frequency);
+    frequency.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     let mut missing_agents = Vec::with_capacity(expected_agents.len());
     let mut missing_hashes = Vec::with_capacity(expected_hashes.len());
     while let Ok(_) = tokio::time::timeout_at(deadline, frequency.tick()).await {
+        // If the frequency interval is always ready the timeout
+        // won't check so we also need to check for timeout here.
+        if tokio::time::Instant::now() > deadline {
+            break;
+        }
         missing_agents = check_agents(&p2p_env, &expected_agents).await?.collect();
 
         check_hashes(&vault, &mut expected_hashes, &mut missing_hashes).await?;
@@ -345,7 +421,9 @@ async fn check_expected_data_inner(
             reporter
                 .send_report(SessionReport::KeepAlive {
                     missing_agents: missing_agents.len() as u32,
+                    out_of_agents: expected_agents.len() as u32,
                     missing_hashes: missing_hashes.len() as u32,
+                    out_of_hashes: expected_hashes.len() as u32,
                 })
                 .await;
             last_keep_alive = tokio::time::Instant::now();
@@ -381,8 +459,8 @@ async fn check_agents<'iter>(
 
 async fn check_hashes(
     vault: &EnvRead,
-    expected_hashes: &mut Vec<Arc<KitsuneOpHash>>,
-    missing_hashes: &mut Vec<Arc<KitsuneOpHash>>,
+    expected_hashes: &mut Vec<KitsuneOpHash>,
+    missing_hashes: &mut Vec<KitsuneOpHash>,
 ) -> DatabaseResult<()> {
     missing_hashes.clear();
     // We need to swap these hashes so we can move them into the async_reader
@@ -393,7 +471,7 @@ async fn check_hashes(
                 .async_reader(move |txn| {
                     for hash in &expected {
                         // TODO: This might be too slow, could instead save the holochain hash versions.
-                        let h_hash: DhtOpHash = DhtOpHashExt::from_kitsune(&hash);
+                        let h_hash: DhtOpHash = DhtOpHashExt::from_kitsune_raw(hash.clone());
                         let integrated: bool = txn.query_row(
                             "
                             SELECT EXISTS(
@@ -439,7 +517,8 @@ async fn gather_published_data(
         .await
 }
 
-async fn request_published_ops(env: &EnvRead) -> StateQueryResult<Vec<Arc<KitsuneOpHash>>> {
+/// Request the published hashes for the given agent.
+async fn request_published_ops(env: &EnvRead) -> StateQueryResult<Vec<KitsuneOpHash>> {
     Ok(env
         .async_reader(|txn| {
             // Collect all ops except StoreEntry's that are private.
@@ -463,7 +542,7 @@ async fn request_published_ops(env: &EnvRead) -> StateQueryResult<Vec<Arc<Kitsun
                     },
                     |row| {
                         let h: DhtOpHash = row.get("dht_op_hash")?;
-                        Ok(h.to_kitsune())
+                        Ok(Arc::try_unwrap(h.to_kitsune()).unwrap())
                     },
                 )?
                 .collect::<Result<_, _>>()?;
@@ -472,6 +551,7 @@ async fn request_published_ops(env: &EnvRead) -> StateQueryResult<Vec<Arc<Kitsun
         .await?)
 }
 
+/// Request the storage arc for the given agent.
 async fn request_arc(env: &EnvRead, agent: &KitsuneAgent) -> StateQueryResult<Option<DhtArc>> {
     use holochain_sqlite::db::ReadManager;
     env.conn()?

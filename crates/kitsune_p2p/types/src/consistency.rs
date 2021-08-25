@@ -13,7 +13,7 @@ pub struct PublishedData {
     /// The storage arc of the agent.
     pub storage_arc: DhtArc,
     /// The op hashes published by the agent.
-    pub published_hashes: Vec<Arc<KitsuneOpHash>>,
+    pub published_hashes: Vec<KitsuneOpHash>,
 }
 
 /// A consistency session for an individual agent
@@ -36,7 +36,7 @@ pub struct ExpectedData {
     /// The agents this agent is expected to have in their peer store.
     pub expected_agents: Vec<Arc<KitsuneAgent>>,
     /// The ops this agent is expected to have integrated.
-    pub expected_hashes: Vec<Arc<KitsuneOpHash>>,
+    pub expected_hashes: Vec<KitsuneOpHash>,
 }
 
 /// A message from an agent with a report on their status for this session.
@@ -53,8 +53,12 @@ pub enum SessionReport {
     KeepAlive {
         /// The number of missing agents.
         missing_agents: u32,
+        /// The expected number of hashes.
+        out_of_agents: u32,
         /// The number of missing ops.
         missing_hashes: u32,
+        /// The expected number of hashes.
+        out_of_hashes: u32,
     },
     /// The session is complete and the agent has all the data.
     Complete {
@@ -66,7 +70,7 @@ pub enum SessionReport {
         /// The agents that are missing.
         missing_agents: Vec<Arc<KitsuneAgent>>,
         /// The ops that ars missing.
-        missing_hashes: Vec<Arc<KitsuneOpHash>>,
+        missing_hashes: Vec<KitsuneOpHash>,
     },
     /// An error has occurred and the session has failed for this agent.
     Error {
