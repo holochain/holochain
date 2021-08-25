@@ -524,64 +524,6 @@ impl SourceChain {
 
     #[async_recursion]
     pub async fn flush(&self) -> SourceChainResult<()> {
-        #[allow(clippy::complexity)]
-        fn build_ops_from_headers(
-            signed_headers: Vec<SignedHeaderHashed>,
-        ) -> SourceChainResult<(
-            Vec<SignedHeaderHashed>,
-            Vec<(
-                DhtOpLight,
-                DhtOpHash,
-                OpOrder,
-                Timestamp,
-                Option<EntryVisibility>,
-                Dependency,
-            )>,
-        )> {
-            // Headers end up back in here.
-            let mut headers_output = Vec::with_capacity(signed_headers.len());
-            // The op related data ends up here.
-            let mut ops = Vec::with_capacity(signed_headers.len());
-
-            // Loop through each header and produce op related data.
-            for shh in signed_headers {
-                // &HeaderHash, &Header, EntryHash are needed to produce the ops.
-                let entry_hash = shh.header().entry_hash().cloned();
-                let item = (shh.as_hash(), shh.header(), entry_hash);
-                let ops_inner = produce_op_lights_from_iter(vec![item].into_iter(), 1)?;
-
-                // Break apart the SignedHeaderHashed.
-                let (header, sig) = shh.into_header_and_signature();
-                let (header, hash) = header.into_inner();
-
-                // We need to take the header by value and put it back each loop.
-                let mut h = Some(header);
-                for op in ops_inner {
-                    let op_type = op.get_type();
-                    // Header is required by value to produce the DhtOpHash.
-                    let (header, op_hash) =
-                        UniqueForm::op_hash(op_type, h.expect("This can't be empty"))?;
-                    let op_order = OpOrder::new(op_type, header.timestamp());
-                    let timestamp = header.timestamp();
-                    let visibility = header.entry_type().map(|et| *et.visibility());
-                    // Put the header back by value.
-                    let dependency = get_dependency(op_type, &header);
-                    h = Some(header);
-                    // Collect the DhtOpLight, DhtOpHash and OpOrder.
-                    ops.push((op, op_hash, op_order, timestamp, visibility, dependency));
-                }
-
-                // Put the SignedHeaderHashed back together.
-                let shh = SignedHeaderHashed::with_presigned(
-                    HeaderHashed::with_pre_hashed(h.expect("This can't be empty"), hash),
-                    sig,
-                );
-                // Put the header back in the list.
-                headers_output.push(shh);
-            }
-            Ok((headers_output, ops))
-        }
-
         // Nothing to write
         if self.scratch.apply(|s| s.is_empty())? {
             return Ok(());
@@ -694,30 +636,6 @@ impl SourceChain {
                         })?;
                 if is_relaxed {
                     let keystore = self.vault.keystore();
-                    async fn rebase_headers_on(
-                        keystore: &KeystoreSender,
-                        mut headers: Vec<SignedHeaderHashed>,
-                        mut rebase_header: HeaderHash,
-                        mut rebase_seq: u32,
-                        mut rebase_timestamp: Timestamp,
-                    ) -> Result<Vec<SignedHeaderHashed>, ScratchError> {
-                        headers.sort_by_key(|a| a.header().header_seq());
-                        for shh in headers.iter_mut() {
-                            let mut header = shh.header().clone();
-                            header.rebase_on(
-                                rebase_header.clone(),
-                                rebase_seq,
-                                rebase_timestamp,
-                            )?;
-                            rebase_seq = header.header_seq();
-                            rebase_timestamp = header.timestamp();
-                            let hh = HeaderHashed::from_content_sync(header);
-                            rebase_header = hh.as_hash().clone();
-                            let new_shh = SignedHeaderHashed::new(keystore, hh).await?;
-                            *shh = new_shh;
-                        }
-                        Ok(headers)
-                    }
                     // A child chain is needed with a new as-at that matches
                     // the rebase.
                     let child_chain = Self::new(self.vault.clone(), (*self.author).clone()).await?;
@@ -745,6 +663,84 @@ impl SourceChain {
             result => result,
         }
     }
+}
+
+#[allow(clippy::complexity)]
+fn build_ops_from_headers(
+    signed_headers: Vec<SignedHeaderHashed>,
+) -> SourceChainResult<(
+    Vec<SignedHeaderHashed>,
+    Vec<(
+        DhtOpLight,
+        DhtOpHash,
+        OpOrder,
+        Timestamp,
+        Option<EntryVisibility>,
+        Dependency,
+    )>,
+)> {
+    // Headers end up back in here.
+    let mut headers_output = Vec::with_capacity(signed_headers.len());
+    // The op related data ends up here.
+    let mut ops = Vec::with_capacity(signed_headers.len());
+
+    // Loop through each header and produce op related data.
+    for shh in signed_headers {
+        // &HeaderHash, &Header, EntryHash are needed to produce the ops.
+        let entry_hash = shh.header().entry_hash().cloned();
+        let item = (shh.as_hash(), shh.header(), entry_hash);
+        let ops_inner = produce_op_lights_from_iter(vec![item].into_iter(), 1)?;
+
+        // Break apart the SignedHeaderHashed.
+        let (header, sig) = shh.into_header_and_signature();
+        let (header, hash) = header.into_inner();
+
+        // We need to take the header by value and put it back each loop.
+        let mut h = Some(header);
+        for op in ops_inner {
+            let op_type = op.get_type();
+            // Header is required by value to produce the DhtOpHash.
+            let (header, op_hash) = UniqueForm::op_hash(op_type, h.expect("This can't be empty"))?;
+            let op_order = OpOrder::new(op_type, header.timestamp());
+            let timestamp = header.timestamp();
+            let visibility = header.entry_type().map(|et| *et.visibility());
+            // Put the header back by value.
+            let dependency = get_dependency(op_type, &header);
+            h = Some(header);
+            // Collect the DhtOpLight, DhtOpHash and OpOrder.
+            ops.push((op, op_hash, op_order, timestamp, visibility, dependency));
+        }
+
+        // Put the SignedHeaderHashed back together.
+        let shh = SignedHeaderHashed::with_presigned(
+            HeaderHashed::with_pre_hashed(h.expect("This can't be empty"), hash),
+            sig,
+        );
+        // Put the header back in the list.
+        headers_output.push(shh);
+    }
+    Ok((headers_output, ops))
+}
+
+async fn rebase_headers_on(
+    keystore: &KeystoreSender,
+    mut headers: Vec<SignedHeaderHashed>,
+    mut rebase_header: HeaderHash,
+    mut rebase_seq: u32,
+    mut rebase_timestamp: Timestamp,
+) -> Result<Vec<SignedHeaderHashed>, ScratchError> {
+    headers.sort_by_key(|a| a.header().header_seq());
+    for shh in headers.iter_mut() {
+        let mut header = shh.header().clone();
+        header.rebase_on(rebase_header.clone(), rebase_seq, rebase_timestamp)?;
+        rebase_seq = header.header_seq();
+        rebase_timestamp = header.timestamp();
+        let hh = HeaderHashed::from_content_sync(header);
+        rebase_header = hh.as_hash().clone();
+        let new_shh = SignedHeaderHashed::new(keystore, hh).await?;
+        *shh = new_shh;
+    }
+    Ok(headers)
 }
 
 pub async fn genesis(
