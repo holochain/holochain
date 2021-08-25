@@ -31,3 +31,12 @@ pub use sweet_conductor_handle::*;
 pub use sweet_dna_file::*;
 pub use sweet_network::*;
 pub use sweet_zome::*;
+
+/// Re-exports of ScenarioDef-related types form kitsune_p2p
+pub mod scenario {
+    pub use kitsune_p2p::test_util::scenario_def::{
+        PeerMatrix, ScenarioDef, ScenarioDefAgent as Agent, ScenarioDefNode as Node,
+    };
+}
+
+pub use crate::test_utils::inline_zomes::unit_dna;

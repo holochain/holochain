@@ -2,6 +2,8 @@ use gcollections::ops::*;
 use interval::{interval_set::*, IntervalSet};
 use std::{borrow::Borrow, collections::VecDeque, fmt::Debug};
 
+use crate::DhtLocation;
+
 type T = u32;
 
 // For u32, IntervalSet excludes MAX from its set of valid values due to its
@@ -221,7 +223,12 @@ pub enum ArcInterval {
 }
 
 impl ArcInterval {
-    pub fn new(start: T, end: T) -> Self {
+    pub fn new<V>(start: V, end: V) -> Self
+    where
+        DhtLocation: From<V>,
+    {
+        let start = DhtLocation::from(start).to_u32();
+        let end = DhtLocation::from(end).to_u32();
         if is_full(start, end) {
             Self::Full
         } else {
