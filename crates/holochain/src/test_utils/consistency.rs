@@ -201,14 +201,14 @@ async fn wait_for_consistency(
     let avg_held = |amount_held: &HashMap<_, _>| {
         let (p_agent_held, p_hash_held) = amount_held.values().fold(
             (0.0, 0.0),
-            |(mut p_hash_held, mut p_agent_held), (ma, ea, mh, eh)| {
-                p_agent_held += *ma as f32 / *ea as f32;
-                p_hash_held += *mh as f32 / *eh as f32;
+            |(mut p_agent_held, mut p_hash_held), (ma, ea, mh, eh)| {
+                p_agent_held += (*ea - *ma) as f32 / *ea as f32;
+                p_hash_held += (*eh - *mh) as f32 / *eh as f32;
                 (p_agent_held, p_hash_held)
             },
         );
-        let avg_agent_held = p_agent_held / amount_held.len() as f32;
-        let avg_hash_held = p_hash_held / amount_held.len() as f32;
+        let avg_agent_held = p_agent_held / amount_held.len() as f32 * 100.0;
+        let avg_hash_held = p_hash_held / amount_held.len() as f32 * 100.0;
         (avg_agent_held.round(), avg_hash_held.round())
     };
 
