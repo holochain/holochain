@@ -125,7 +125,7 @@ impl SweetConductorBatch {
         let tasks = itertools::zip(scenario.nodes.iter(), std::iter::repeat(dna_file.clone()))
             .enumerate()
             .map(|(i, (node, dna_file))| async move {
-                let mut conductor = SweetConductor::from_standard_config().await;
+                let mut conductor = SweetConductor::from_config(sharded_config()).await;
                 let agent_defs: Vec<_> = node.agents.iter().collect();
                 let agents = SweetAgents::get(conductor.keystore(), agent_defs.len()).await;
                 let apps = conductor
@@ -199,6 +199,28 @@ impl std::ops::IndexMut<usize> for SweetConductorBatch {
     }
 }
 
+fn sharded_config() -> ConductorConfig {
+    use holochain_conductor_api::*;
+    use kitsune_p2p::*;
+    let mut tuning =
+        kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+    tuning.gossip_strategy = "sharded-gossip".to_string();
+    let mut network = KitsuneP2pConfig::default();
+    network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
+        bind_to: None,
+        override_host: None,
+        override_port: None,
+    }];
+    network.tuning_params = std::sync::Arc::new(tuning);
+    ConductorConfig {
+        network: Some(network),
+        admin_interfaces: Some(vec![AdminInterfaceConfig {
+            driver: InterfaceDriver::Websocket { port: 0 },
+        }]),
+        ..Default::default()
+    }
+}
+
 #[cfg(test)]
 #[cfg(feature = "no-hash-integrity")]
 mod tests {
@@ -230,7 +252,6 @@ mod tests {
             PeerMatrix::sparse([&[1], &[]]),
         );
         let dna_file = unit_dna().await;
-        let dna_hash = dna_file.dna_hash().clone();
         let [(conductor0, apps0), (conductor1, apps1)] =
             SweetConductorBatch::setup_from_scenario(scenario, dna_file).await;
 
@@ -239,26 +260,15 @@ mod tests {
         // - Only local agents are available on the second conductor
         assert_eq!(conductor1.get_agent_infos(None).await.unwrap().len(), 2);
 
-        let to_agents_0: Vec<_> = apps0
-            .cells_flattened()
-            .into_iter()
-            .map(|cell| cell.agent_pubkey().clone())
-            .collect();
-        let to_agents_1: Vec<_> = apps1
-            .cells_flattened()
-            .into_iter()
-            .map(|cell| cell.agent_pubkey().clone())
-            .collect();
+        // TODO: write conductor.get_all_op_locations in terms of IntoIterator<Item = SweetCell>
         let ops0: HashSet<_> = conductor0
-            .get_all_op_hashes(&dna_hash, to_agents_0)
+            .get_all_op_hashes(apps0.cells_flattened())
             .await
-            .into_iter()
             .map(|h| h.get_loc().to_u32())
             .collect();
         let ops1: HashSet<_> = conductor1
-            .get_all_op_hashes(&dna_hash, to_agents_1)
+            .get_all_op_hashes(apps1.cells_flattened())
             .await
-            .into_iter()
             .map(|h| h.get_loc().to_u32())
             .collect();
 

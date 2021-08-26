@@ -10,11 +10,12 @@ use hdk::prelude::*;
 use holo_hash::DnaHash;
 use holochain_conductor_api::{AdminInterfaceConfig, InterfaceDriver};
 use holochain_keystore::KeystoreSender;
-use holochain_p2p::dht_arc::ArcInterval;
+use holochain_p2p::dht_arc::{DhtArcSet};
 use holochain_p2p::*;
 use holochain_state::test_utils::{test_environments, TestEnvs};
 use holochain_types::prelude::*;
 use holochain_websocket::*;
+use itertools::Itertools;
 use kitsune_p2p::{event::full_time_window, KitsuneP2pConfig};
 use std::sync::Arc;
 
@@ -342,25 +343,24 @@ impl SweetConductor {
     }
 
     /// Get all op hashes for all Cells with the specified DnaHash and agent keys
-    pub async fn get_all_op_hashes<A: IntoIterator<Item = AgentPubKey>>(
+    pub async fn get_all_op_hashes<'c, C: IntoIterator<Item = &'c SweetCell>>(
         &self,
-        dna_hash: &DnaHash,
-        agents: A,
-    ) -> HashSet<DhtOpHash> {
-        self.query_op_hashes(
-            dna_hash.clone(),
-            agents
+        cells: C,
+    ) -> impl Iterator<Item = DhtOpHash> {
+        let groups = cells.into_iter().group_by(|c| c.dna_hash());
+        let tasks = groups.into_iter().map(|(dna_hash, cells)| async move {
+            let agents = cells
                 .into_iter()
-                .map(|agent| (agent, ArcInterval::Full.into()))
-                .collect(),
-            full_time_window(),
-            true,
-        )
-        .await
-        .unwrap()
-        .into_iter()
-        .map(|(h, _)| h)
-        .collect()
+                .map(|cell| (cell.agent_pubkey().clone(), DhtArcSet::Full))
+                .collect();
+            self.query_op_hashes(dna_hash.clone(), agents, full_time_window(), true)
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|(h, _)| h)
+                .collect::<Vec<_>>()
+        });
+        futures::future::join_all(tasks).await.into_iter().flatten()
     }
 
     // App setup methods
