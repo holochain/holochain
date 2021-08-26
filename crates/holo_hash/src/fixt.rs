@@ -68,8 +68,8 @@ fixturator!(
 );
 
 fn append_location(mut base: Vec<u8>) -> Vec<u8> {
-    let mut loc_bytes = holo_dht_location_bytes(&base);
-    base.append(&mut loc_bytes);
+    let loc_bytes = holo_dht_location_bytes(&base);
+    base.append(&mut loc_bytes.to_vec());
     base
 }
 

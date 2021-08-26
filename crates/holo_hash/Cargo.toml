@@ -13,6 +13,11 @@ documentation = "https://github.com/holochain/holochain"
 [package.metadata.cargo-udeps.ignore]
 normal = ["tracing"]
 
+[[bin]]
+name = "gen-fixtures"
+path = "src/bin/gen_fixtures.rs"
+required_features = ["string-encoding"]
+
 [dependencies]
 serde = "1"
 serde_bytes = "0.11"
@@ -35,7 +40,6 @@ thiserror = "1.0.22"
 serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 
 [features]
-
 default = ["serialized-bytes", "fixturators"]
 full = ["fixturators", "hashing", "string-encoding", "sqlite"]
 

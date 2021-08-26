@@ -162,7 +162,7 @@ impl<T: HashType> HoloHash<T> {
     /// manually set the location bytes
     #[cfg(feature = "no-hash-integrity")]
     pub fn set_loc(&mut self, loc: DhtLocation) {
-        self.hash[HOLO_HASH_FULL_LEN - HOLO_HASH_LOC_LEN..].copy_from_slice(&_loc_to_bytes(loc));
+        self.hash[HOLO_HASH_FULL_LEN - HOLO_HASH_LOC_LEN..].copy_from_slice(&loc_to_bytes(loc));
     }
 }
 
@@ -175,7 +175,7 @@ impl<T: HashType> HoloHash<T> {
     /// the location bytes will used as provided, not computed.
     pub fn from_raw_32_and_type(mut hash: Vec<u8>, hash_type: T) -> Self {
         if hash.len() == HOLO_HASH_CORE_LEN {
-            hash.append(&mut encode::holo_dht_location_bytes(&hash));
+            hash.append(&mut encode::holo_dht_location_bytes(&hash).to_vec());
         }
 
         assert_length!(HOLO_HASH_UNTYPED_LEN, &hash);
@@ -247,12 +247,12 @@ impl<T: HashType> std::fmt::Debug for HoloHash<T> {
 }
 
 /// internal convert 4 location bytes into a u32 location
-fn bytes_to_loc(bytes: [u8; 4]) -> DhtLocation {
+pub fn bytes_to_loc(bytes: [u8; 4]) -> DhtLocation {
     u32::from_le_bytes(bytes).into()
 }
 
 /// internal convert u32 location into 4 location bytes
-fn _loc_to_bytes(loc: DhtLocation) -> [u8; 4] {
+pub fn loc_to_bytes(loc: DhtLocation) -> [u8; 4] {
     u32::from(loc).to_le_bytes()
 }
 
