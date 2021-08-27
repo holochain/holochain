@@ -1,3 +1,5 @@
+use crate::hash_type;
+use crate::AgentPubKey;
 use crate::HasHash;
 use crate::HashableContent;
 use crate::HoloHashOf;
@@ -149,5 +151,17 @@ where
 {
     fn hash<StdH: std::hash::Hasher>(&self, state: &mut StdH) {
         std::hash::Hash::hash(&self.hash, state)
+    }
+}
+
+impl HashableContent for AgentPubKey {
+    type HashType = hash_type::Agent;
+
+    fn hash_type(&self) -> Self::HashType {
+        hash_type::Agent::new()
+    }
+
+    fn hashable_content(&self) -> crate::HashableContentBytes {
+        crate::HashableContentBytes::Prehashed39(self.get_raw_39().to_vec())
     }
 }

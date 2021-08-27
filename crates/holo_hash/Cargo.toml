@@ -13,11 +13,6 @@ documentation = "https://github.com/holochain/holochain"
 [package.metadata.cargo-udeps.ignore]
 normal = ["tracing"]
 
-[[bin]]
-name = "gen-fixtures"
-path = "src/bin/gen_fixtures.rs"
-required_features = ["string-encoding"]
-
 [dependencies]
 serde = "1"
 serde_bytes = "0.11"
