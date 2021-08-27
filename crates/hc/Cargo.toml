@@ -10,11 +10,6 @@ edition = "2018"
 license = "Apache-2.0"
 description = "Provides the `hc` binary, a helpful CLI tool for working with Holochain."
 
-[[bin]]
-name = "gen-fixtures"
-path = "src/bin/gen_fixtures.rs"
-required_features = ["string-encoding"]
-
 [lib]
 name = "holochain_cli"
 path = "src/lib.rs"
