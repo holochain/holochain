@@ -52,32 +52,37 @@ where
     /// Get the item at the specified "bucket".
     /// There are `self.num` buckets, and the index can be a negative number,
     /// which will be counted backwards from `num`.
-    pub fn get(&self, i: isize) -> &HoloHashed<C> {
-        &self.items[self.rectify(i)]
+    pub fn get(&self, i: i32) -> &HoloHashed<C> {
+        &self.items[self.rectify_index(i)]
     }
 
     /// Get the endpoints for the bucket at the specified index
-    pub fn bucket(&self, i: isize) -> (DhtLocation, DhtLocation) {
+    pub fn bucket(&self, i: i32) -> (DhtLocation, DhtLocation) {
         let bucket_size = u32::MAX / self.num as u32;
-        let start = self.rectify(i) as u32 * bucket_size;
+        let start = self.rectify_index(i) as u32 * bucket_size;
         (
             DhtLocation::new(start),
             DhtLocation::new(start + bucket_size),
         )
     }
 
-    fn rectify(&self, i: isize) -> usize {
-        let num = self.num as isize;
-        if i >= num || i <= -num {
-            panic!(
-                "attempted to rectify an out-of-bounds index: |{}| >= {}",
-                i, num
-            );
-        }
-        if i < 0 {
-            (num + i) as usize
-        } else {
-            i as usize
-        }
+    fn rectify_index(&self, i: i32) -> usize {
+        rectify_index(self.num, i)
+    }
+}
+
+/// Map a signed index into an unsigned index
+pub fn rectify_index(num: usize, i: i32) -> usize {
+    let num = num as i32;
+    if i >= num || i <= -num {
+        panic!(
+            "attempted to rectify an out-of-bounds index: |{}| >= {}",
+            i, num
+        );
+    }
+    if i < 0 {
+        (num + i) as usize
+    } else {
+        i as usize
     }
 }
