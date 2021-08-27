@@ -107,12 +107,9 @@ impl SweetConductorBatch {
     }
 }
 
-#[cfg(feature = "no-hash-integrity")]
 use holochain_p2p::*;
-#[cfg(feature = "no-hash-integrity")]
 use kitsune_p2p::test_util::scenario_def::{PeerMatrix, ScenarioDef};
 
-#[cfg(feature = "no-hash-integrity")]
 impl SweetConductorBatch {
     /// Create a ConductorBatch from a kitsune `ScenarioDef`.
     /// The resulting conductors will have the specified DNAs installed as an app,
@@ -122,6 +119,7 @@ impl SweetConductorBatch {
         scenario: ScenarioDef<N>,
         dna_file: DnaFile,
     ) -> [(SweetConductor, SweetAppBatch); N] {
+        let resolution = *&scenario.resolution;
         let tasks = itertools::zip(scenario.nodes.iter(), std::iter::repeat(dna_file.clone()))
             .enumerate()
             .map(|(i, (node, dna_file))| async move {
@@ -139,9 +137,9 @@ impl SweetConductorBatch {
 
                 for (agent_def, cell) in itertools::zip(agent_defs, apps.cells_flattened()) {
                     // Manually set the storage arc
-                    cell.set_storage_arc(agent_def.arc.clone()).await;
+                    cell.set_storage_arc(agent_def.arc(resolution)).await;
                     // Manually inject DhtOps at the correct locations
-                    cell.inject_fake_ops(agent_def.ops.clone().into_iter());
+                    cell.inject_fixture_ops(agent_def.ops.clone().into_iter());
                 }
 
                 (conductor, apps)
@@ -222,7 +220,6 @@ fn sharded_config() -> ConductorConfig {
 }
 
 #[cfg(test)]
-#[cfg(feature = "no-hash-integrity")]
 mod tests {
     use maplit::hashset;
 
@@ -234,19 +231,18 @@ mod tests {
     /// conductor state being created
     #[tokio::test(flavor = "multi_thread")]
     async fn scenario_smoke_test() {
-        use kitsune_p2p::dht_arc::ArcInterval;
         use kitsune_p2p::test_util::scenario_def::ScenarioDefAgent as Agent;
         use kitsune_p2p::test_util::scenario_def::ScenarioDefNode as Node;
 
         let scenario = ScenarioDef::new(
             [
                 Node::new(hashset![
-                    Agent::new(ArcInterval::new(0, 110), [0, 10, 20, 30, 90]),
-                    Agent::new(ArcInterval::new(90, 200), [90, 100, 150]),
+                    Agent::new((0, 110), [0, 10, 20, 30, 90]),
+                    Agent::new((90, 200), [90, 100, 150]),
                 ]),
                 Node::new(hashset![
-                    Agent::new(ArcInterval::new(0, 110), [5, 15, 25, 35, 95]),
-                    Agent::new(ArcInterval::new(90, 200), [95, 105, 155]),
+                    Agent::new((0, 110), [5, 15, 25, 35, 95]),
+                    Agent::new((90, 200), [95, 105, 155]),
                 ]),
             ],
             PeerMatrix::sparse([&[1], &[]]),
@@ -274,7 +270,7 @@ mod tests {
 
         // - Check that the specially prepared ops are present
         //   (must check for subset because the usual genesis ops are still created)
-        assert!(ops0.is_superset(&hashset![0, 10, 20, 30, 90, 100, 150]));
-        assert!(ops1.is_superset(&hashset![5, 15, 25, 35, 95, 105, 155]));
+        assert!(dbg!(ops0).is_superset(&hashset![0, 10, 20, 30, 90, 100, 150]));
+        assert!(dbg!(ops1).is_superset(&hashset![5, 15, 25, 35, 95, 105, 155]));
     }
 }

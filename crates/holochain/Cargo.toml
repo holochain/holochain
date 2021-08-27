@@ -74,6 +74,7 @@ xsalsa20poly1305 = "0.6.0"
 holochain_wasm_test_utils = { version = "0.0.4-dev.0", path = "../test_utils/wasm" }
 
 # Dependencies for test_utils: keep in sync with below
+arbitrary = { version = "1.0", features = ["derive"], optional = true }
 hdk = { version = "0.0.103", path = "../hdk", optional = true }
 matches = {version = "0.1.8", optional = true }
 holochain_test_wasm_common = { version = "0.0.3", path = "../test_utils/wasm_common", optional = true  }
@@ -94,11 +95,11 @@ serial_test = "0.4.0"
 test-case = "1.0.0"
 
 # Dependencies for test_utils: keep in sync with above
+arbitrary = { version = "1.0", features = ["derive"] }
 hdk = { version = "0.0.103", path = "../hdk", optional = false }
 matches = {version = "0.1.8", optional = false }
 holochain_test_wasm_common = { version = "0.0.3", path = "../test_utils/wasm_common", optional = false  }
 unwrap_to = { version = "0.1.0", optional = false }
-arbitrary = { version = "1.0", features = ["derive"] }
 
 [[bench]]
 name = "bench"
@@ -122,7 +123,9 @@ default = ["slow_tests", "test_utils", "no-deps",]
 # Exposes additional functionality only needed for integration tests.
 # This feature should be turned off for production builds.
 test_utils = [
+  "arbitrary",
   "hdk",
+  "holo_hash/test_utils",
   "holochain_p2p/test_utils",
   "holochain_sqlite/test_utils",
   "holochain_state/test_utils",
@@ -134,9 +137,6 @@ test_utils = [
   "matches",
   "holochain_test_wasm_common",
   "unwrap_to",
-
-  # TODO: selectively enable
-  "no-hash-integrity",
 ]
 
 # Wasm ribosome tests take > 60 seconds - let's only run them in CI
@@ -153,7 +153,3 @@ db-encryption = ['holochain_sqlite/db-encryption']
 # Compile SQLite from source rather than depending on a library.
 # Incompatible with "db-encryption"
 no-deps = ['holochain_sqlite/no-deps']
-
-# Disable any integrity checks which ensure that the last 4 bytes of a hash
-# are properly computed, i.e. let the locations be set arbitrarily
-no-hash-integrity = ["holo_hash/no-hash-integrity"]

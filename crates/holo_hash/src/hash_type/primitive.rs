@@ -147,6 +147,8 @@ primitive_hash_type!(Header, HeaderHash, HeaderVisitor, HEADER_PREFIX);
 primitive_hash_type!(NetId, NetIdHash, NetIdVisitor, NET_ID_PREFIX);
 primitive_hash_type!(Wasm, WasmHash, WasmVisitor, WASM_PREFIX);
 
+// AgentPubKey is already an "identity hash"
+impl HashTypeSync for Agent {}
 // DhtOps are mostly hashes
 impl HashTypeSync for DhtOp {}
 // Entries are capped at 16MB, which is small enough to hash synchronously
