@@ -12,6 +12,8 @@ Common types used by other Holochain crates.
 
 This crate is a complement to the [holochain_zome_types crate](https://crates.io/crates/holochain_zome_types), which contains only the essential types which are used in Holochain DNA code. This crate expands on those types to include all types which Holochain itself depends on.
 
+**It is not recommended to depend on this crate from your zomes*, as it will pull in many needless dependencies, bloating your Wasm. If there is a type from `holochain_types` that you absolute need in your DNA, please [open an issue in the holochain repo](https://github.com/holochain/holochain/issues) explaining why, and we can consider pulling that type into `holochain_zome_types`.
+
 ## Contribute
 Holochain is an open source project.  We welcome all sorts of participation and are actively working on increasing surface area to accept it.  Please see our [contributing guidelines](/CONTRIBUTING.md) for our general practices and protocols on participating in the community, as well as specific expectations around things like code formatting, testing practices, continuous integration, etc.
 
