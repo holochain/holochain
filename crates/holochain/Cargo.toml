@@ -117,12 +117,6 @@ path = "src/lib.rs"
 name = "holochain"
 path = "src/bin/holochain/main.rs"
 
-[[bin]]
-name = "gen-hashed-fixtures"
-path = "src/bin/gen_hashed_fixtures.rs"
-required-features = ["test_utils"]
-
-
 [features]
 default = ["slow_tests", "test_utils", "no-deps",]
 

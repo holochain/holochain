@@ -283,13 +283,15 @@ macro_rules! impl_to_sql_via_display {
     };
 }
 
+/// Generate a vec of random bytes of a given size
+pub fn generate_noise(size: usize) -> Vec<u8> {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    std::iter::repeat_with(|| rng.gen()).take(size).collect()
+}
+
 /// 10MB of entropy free for the taking.
 /// Useful for initializing arbitrary::Unstructured data
 #[cfg(any(test, feature = "test_utils"))]
-pub static NOISE: once_cell::sync::Lazy<Vec<u8>> = once_cell::sync::Lazy::new(|| {
-    use rand::Rng;
-    let mut rng = rand::thread_rng();
-    std::iter::repeat_with(|| rng.gen())
-        .take(10_000_000)
-        .collect()
-});
+pub static NOISE: once_cell::sync::Lazy<Vec<u8>> =
+    once_cell::sync::Lazy::new(|| generate_noise(10_000_000));

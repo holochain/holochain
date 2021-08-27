@@ -46,6 +46,7 @@ pub use itertools;
 use crate::sweettest::SweetCell;
 
 pub mod conductor_setup;
+pub mod gossip_fixtures;
 pub mod host_fn_caller;
 pub mod inline_zomes;
 
