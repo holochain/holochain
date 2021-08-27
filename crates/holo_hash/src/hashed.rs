@@ -154,6 +154,7 @@ where
     }
 }
 
+// AgentPubKey is "content" which hashes to itself
 impl HashableContent for AgentPubKey {
     type HashType = hash_type::Agent;
 

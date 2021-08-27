@@ -15,7 +15,40 @@ pub struct HashedFixtures<C: HashableContent> {
     pub items: Vec<HoloHashed<C>>,
 }
 
-impl<C: HashableContent> HashedFixtures<C> {
+impl<'a, T, C> HashedFixtures<C>
+where
+    C: Clone + HashableContent<HashType = T> + Arbitrary<'a>,
+    T: HashTypeSync,
+{
+    /// Quickly generate a collection of `num` hashed values whose computed
+    /// DHT locations are evenly distributed across the space of u32 values.
+    /// Specifically, there is only one hash per interval of size `2^32 / num`
+    pub fn generate<F: Fn(&HoloHashed<C>) -> DhtLocation>(
+        num: usize,
+        u: &mut Unstructured<'a>,
+        relevant_location: F,
+    ) -> Self {
+        let mut tot = 0;
+        let mut items = vec![None; num];
+        while tot < num {
+            let content = C::arbitrary(u).unwrap();
+            let item = HoloHashed::from_content_sync(content);
+            let loc = relevant_location(&item).to_u32();
+            let idx = loc / (u32::MAX / num as u32);
+
+            match &mut items[idx as usize] {
+                Some(_) => (),
+                h @ None => {
+                    *h = Some(item);
+                    tot += 1;
+                }
+            }
+        }
+        assert!(items.iter().all(|h| h.is_some()));
+        let items = items.into_iter().flatten().collect(); //into_iter().map(|i| i.unwrap()).collect();
+        Self { num, items }
+    }
+
     /// Get the item at the specified "bucket".
     /// There are `self.num` buckets, and the index can be a negative number,
     /// which will be counted backwards from `num`.
@@ -47,38 +80,4 @@ impl<C: HashableContent> HashedFixtures<C> {
             i as usize
         }
     }
-}
-
-/// Quickly generate a collection of N hashed values whose computed DHT locations
-/// are evenly distributed across the space of u32 values.
-/// Specifically, there is only one hash per interval of size `(2 ^ 32) / N`
-pub fn gen_hashed_fixtures<
-    'a,
-    T: HashTypeSync,
-    C: Clone + HashableContent<HashType = T> + Arbitrary<'a>,
-    F: Fn(&HoloHashed<C>) -> DhtLocation,
->(
-    num: usize,
-    u: &mut Unstructured<'a>,
-    relevant_location: F,
-) -> HashedFixtures<C> {
-    let mut tot = 0;
-    let mut items = vec![None; num];
-    while tot < num {
-        let content = C::arbitrary(u).unwrap();
-        let item = HoloHashed::from_content_sync(content);
-        let loc = relevant_location(&item).to_u32();
-        let idx = loc / (u32::MAX / num as u32);
-
-        match &mut items[idx as usize] {
-            Some(_) => (),
-            h @ None => {
-                *h = Some(item);
-                tot += 1;
-            }
-        }
-    }
-    assert!(items.iter().all(|h| h.is_some()));
-    let items = items.into_iter().map(|i| i.unwrap()).collect();
-    HashedFixtures { num, items }
 }
