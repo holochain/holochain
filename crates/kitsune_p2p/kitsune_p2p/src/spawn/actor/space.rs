@@ -136,6 +136,7 @@ impl SpaceInternalHandler for Space {
         let evt_sender = self.evt_sender.clone();
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
+        let dynamic_arcs = self.config.tuning_params.gossip_dynamic_arcs;
         let internal_sender = self.i_s.clone();
         Ok(async move {
             let urls = vec![bound_url.into()];
@@ -152,6 +153,7 @@ impl SpaceInternalHandler for Space {
                     network_type: network_type.clone(),
                     mdns_handles: &mut mdns_handles,
                     bootstrap_service: &bootstrap_service,
+                    dynamic_arcs,
                 };
                 peer_data.push(update_single_agent_info(input).await?);
             }
@@ -179,6 +181,7 @@ impl SpaceInternalHandler for Space {
         let internal_sender = self.i_s.clone();
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
+        let dynamic_arcs = self.config.tuning_params.gossip_dynamic_arcs;
         let arc = self.get_agent_arc(&agent);
 
         Ok(async move {
@@ -194,6 +197,7 @@ impl SpaceInternalHandler for Space {
                 network_type: network_type.clone(),
                 mdns_handles: &mut mdns_handles,
                 bootstrap_service: &bootstrap_service,
+                dynamic_arcs,
             };
             let peer_data = vec![update_single_agent_info(input).await?];
             evt_sender
@@ -335,27 +339,16 @@ struct UpdateAgentInfoInput<'borrow> {
     network_type: NetworkType,
     mdns_handles: &'borrow mut HashMap<Vec<u8>, Arc<AtomicBool>>,
     bootstrap_service: &'borrow Option<Url2>,
+    dynamic_arcs: bool,
 }
 
-#[cfg(feature = "sharded")]
 async fn update_arc_length(
     evt_sender: &futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     space: Arc<KitsuneSpace>,
     arc: &mut DhtArc,
 ) -> KitsuneP2pResult<()> {
-    let density = evt_sender
-        .query_peer_density(space.clone(), arc.clone())
-        .await?;
+    let density = evt_sender.query_peer_density(space.clone(), *arc).await?;
     arc.update_length(density);
-    Ok(())
-}
-
-#[cfg(not(feature = "sharded"))]
-async fn update_arc_length(
-    _evt_sender: &futures::channel::mpsc::Sender<KitsuneP2pEvent>,
-    _space: Arc<KitsuneSpace>,
-    _arc: &mut DhtArc,
-) -> KitsuneP2pResult<()> {
     Ok(())
 }
 
@@ -373,9 +366,12 @@ async fn update_single_agent_info(
         network_type,
         mdns_handles,
         bootstrap_service,
+        dynamic_arcs,
     } = input;
 
-    update_arc_length(evt_sender, space.clone(), &mut arc).await?;
+    if dynamic_arcs {
+        update_arc_length(evt_sender, space.clone(), &mut arc).await?;
+    }
 
     // Update the agents arc through the internal sender.
     internal_sender.update_agent_arc(agent.clone(), arc).await?;

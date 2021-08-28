@@ -1,5 +1,8 @@
 # Holochain Development Kit (HDK)
 
+[![Crate](https://img.shields.io/crates/v/hdk.svg)](https://crates.io/crates/hdk)
+[![API Docs](https://docs.rs/hdk/badge.svg)](https://docs.rs/hdk)
+
 This kit:
 
 1. The DSL is ergonomic and composable, so optional if you want more control
@@ -103,7 +106,7 @@ let entry = Entry::App(bar.clone().try_into()?);
 // Call the update_entry host_fn directly
 let _bar_header_hash = host_call::<UpdateInput, HeaderHash>(
     __update,
-    UpdateInput::new(foo_header_hash, EntryWithDefId::new(Bar::entry_def().id, entry)))
+    UpdateInput::new(foo_header_hash, CreateInput::new(Bar::entry_def().id, entry, ChainTopOrdering::Strict)))
 )?;
 ```
 

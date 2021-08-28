@@ -9,8 +9,8 @@ use crate::prelude::*;
 ///
 /// Usually you don't need to use this function directly; it is the most general way to create an
 /// entry and standardises the internals of higher level create functions.
-pub fn create(entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
-    HDK.with(|h| h.borrow().create(entry_with_def_id))
+pub fn create(create_input: CreateInput) -> ExternResult<HeaderHash> {
+    HDK.with(|h| h.borrow().create(create_input))
 }
 
 /// Update any entry type.
@@ -23,8 +23,8 @@ pub fn create(entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
 ///
 /// Usually you don't need to use this function directly; it is the most general way to update an
 /// entry and standardises the internals of higher level create functions.
-pub fn update(hash: HeaderHash, entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
-    HDK.with(|h| h.borrow().update(UpdateInput::new(hash, entry_with_def_id)))
+pub fn update(hash: HeaderHash, create_input: CreateInput) -> ExternResult<HeaderHash> {
+    HDK.with(|h| h.borrow().update(UpdateInput::new(hash, create_input)))
 }
 
 /// General function that can delete any entry type.
@@ -36,8 +36,13 @@ pub fn update(hash: HeaderHash, entry_with_def_id: EntryWithDefId) -> ExternResu
 ///
 /// Usually you don't need to use this function directly; it is the most general way to update an
 /// entry and standardises the internals of higher level create functions.
-pub fn delete(hash: HeaderHash) -> ExternResult<HeaderHash> {
-    HDK.with(|h| h.borrow().delete(hash))
+pub fn delete(deletes_header_address: HeaderHash) -> ExternResult<HeaderHash> {
+    HDK.with(|h| {
+        h.borrow().delete(DeleteInput::new(
+            deletes_header_address,
+            ChainTopOrdering::default(),
+        ))
+    })
 }
 
 /// Create an app entry.
@@ -45,10 +50,10 @@ pub fn delete(hash: HeaderHash) -> ExternResult<HeaderHash> {
 /// Apps define app entries by registering entry def ids with the `entry_defs` callback and serialize the
 /// entry content when committing to the source chain.
 ///
-/// This function accepts any input that implements [ `TryInto<EntryWithDefId>` ].
+/// This function accepts any input that implements [ `TryInto<CreateInput>` ].
 /// The default impls from the `#[hdk_entry( .. )]` and [ `entry_def!` ] macros include this.
 ///
-/// With generic type handling it may make sense to directly construct [ `EntryWithDefId` ] and [ `create` ].
+/// With generic type handling it may make sense to directly construct [ `CreateInput` ] and [ `create` ].
 ///
 /// e.g.
 /// ```ignore
@@ -60,10 +65,10 @@ pub fn delete(hash: HeaderHash) -> ExternResult<HeaderHash> {
 /// See [ `get` ] and [ `get_details` ] for more information on CRUD.
 pub fn create_entry<I, E>(input: I) -> ExternResult<HeaderHash>
 where
-    EntryWithDefId: TryFrom<I, Error = E>,
+    CreateInput: TryFrom<I, Error = E>,
     WasmError: From<E>,
 {
-    create(EntryWithDefId::try_from(input)?)
+    create(CreateInput::try_from(input)?)
 }
 
 /// Alias to delete
@@ -125,7 +130,7 @@ where
 }
 
 /// Thin wrapper around update for app entries.
-/// The hash is the [ `HeaderHash` ] of the deleted element, the input is a [ `TryInto<EntryWithDefId>` ].
+/// The hash is the [ `HeaderHash` ] of the deleted element, the input is a [ `TryInto<CreateInput>` ].
 ///
 /// Updates can reference Elements which contain Entry data -- namely, Creates and other Updates -- but
 /// not Deletes or system Elements
@@ -154,10 +159,10 @@ where
 /// See [ `delete_entry` ]
 pub fn update_entry<I, E>(hash: HeaderHash, input: I) -> ExternResult<HeaderHash>
 where
-    EntryWithDefId: TryFrom<I, Error = E>,
+    CreateInput: TryFrom<I, Error = E>,
     WasmError: From<E>,
 {
-    update(hash, EntryWithDefId::try_from(input)?)
+    update(hash, CreateInput::try_from(input)?)
 }
 
 /// Gets an element for a given entry or header hash.
@@ -559,17 +564,21 @@ macro_rules! register_entry {
             }
         }
 
-        impl TryFrom<&$t> for $crate::prelude::EntryWithDefId
+        impl TryFrom<&$t> for $crate::prelude::CreateInput
         where
             $t: $crate::prelude::EntryDefRegistration,
         {
             type Error = $crate::prelude::WasmError;
             fn try_from(t: &$t) -> Result<Self, Self::Error> {
-                Ok(Self::new($t::entry_def_id(), t.try_into()?))
+                Ok(Self::new(
+                    $t::entry_def_id(),
+                    t.try_into()?,
+                    ChainTopOrdering::default(),
+                ))
             }
         }
 
-        impl TryFrom<$t> for $crate::prelude::EntryWithDefId {
+        impl TryFrom<$t> for $crate::prelude::CreateInput {
             type Error = $crate::prelude::WasmError;
             fn try_from(t: $t) -> Result<Self, Self::Error> {
                 (&t).try_into()

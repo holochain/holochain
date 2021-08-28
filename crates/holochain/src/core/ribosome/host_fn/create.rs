@@ -14,11 +14,12 @@ use std::sync::Arc;
 pub fn create<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: EntryWithDefId,
+    input: CreateInput,
 ) -> Result<HeaderHash, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ write_workspace: Permission::Allow, .. } => {
             let entry = AsRef::<Entry>::as_ref(&input);
+            let chain_top_ordering = *input.chain_top_ordering();
 
             // Countersigned entries have different header handling.
             match entry {
@@ -28,7 +29,7 @@ pub fn create<'a>(
                             .host_context
                             .workspace()
                             .source_chain()
-                            .put_countersigned(input.into_entry())
+                            .put_countersigned(input.into_entry(), chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))
                     })
@@ -75,7 +76,7 @@ pub fn create<'a>(
                             .host_context
                             .workspace()
                             .source_chain()
-                            .put(header_builder, Some(input.into_entry()))
+                            .put(header_builder, Some(input.into_entry()), chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))
                     })
@@ -157,7 +158,7 @@ pub mod wasm_test {
         call_context.host_context = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::App("post".into());
-        let input = EntryWithDefId::new(entry_def_id, app_entry.clone());
+        let input = CreateInput::new(entry_def_id, app_entry.clone(), ChainTopOrdering::default());
 
         let output = create(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 

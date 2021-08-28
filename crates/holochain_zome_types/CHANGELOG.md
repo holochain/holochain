@@ -4,6 +4,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased](https://github.com/holochain/holochain/holochain_zome_types-v0.0.2-alpha.1...HEAD)
 
+## 0.0.6
+
+### Changed
+
+- `CreateInput`, `DeleteInput`, `DeleteLinkInput` structs invented for zome io
+- `EntryDefId` merged into `CreateInput`
+
+### Added
+
+- `ChainTopOrdering` enum added to define chain top ordering behaviour on write
+
 ## 0.0.5
 
 ### Added
