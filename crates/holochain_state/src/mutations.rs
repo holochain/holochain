@@ -150,16 +150,9 @@ pub fn insert_op(
     let dependency = get_dependency(op_light.get_type(), &header);
     let header_hashed = HeaderHashed::with_pre_hashed(header, op_light.header_hash().to_owned());
     let header_hashed = SignedHeaderHashed::with_presigned(header_hashed, signature);
-    let op_order = OpOrder::new(op_light.get_type(), header_hashed.header().timestamp());
+
     insert_header(txn, header_hashed)?;
-    insert_op_lite(
-        txn,
-        op_light,
-        hash.clone(),
-        is_authored,
-        op_order,
-        timestamp,
-    )?;
+    insert_op_lite(txn, op_light, hash.clone(), is_authored, timestamp)?;
     set_dependency(txn, hash, dependency)?;
     Ok(())
 }
@@ -170,15 +163,15 @@ pub fn insert_op_lite(
     op_lite: DhtOpLight,
     hash: DhtOpHash,
     is_authored: bool,
-    order: OpOrder,
     timestamp: Timestamp,
 ) -> StateMutationResult<()> {
     let header_hash = op_lite.header_hash().clone();
     let basis = op_lite.dht_basis().to_owned();
+    let order = OpOrder::new(op_lite.get_type(), timestamp);
     sql_insert!(txn, DhtOp, {
         "hash": hash,
         "type": op_lite.get_type(),
-        "storage_center_loc": basis.get_loc(),
+        "storage_center_loc": u32::from(basis.get_loc()),
         "authored_timestamp_ms": timestamp.to_sql_ms_lossy(),
         "basis_hash": basis,
         "header_hash": header_hash,

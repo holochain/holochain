@@ -3,6 +3,7 @@ use crate::conductor::{api::error::ConductorApiResult, config::ConductorConfig};
 use futures::future;
 use hdk::prelude::*;
 use holochain_types::prelude::*;
+
 /// A collection of SweetConductors, with methods for operating on the entire collection
 #[derive(derive_more::From, derive_more::Into, derive_more::IntoIterator)]
 pub struct SweetConductorBatch(Vec<SweetConductor>);
@@ -104,6 +105,73 @@ impl SweetConductorBatch {
             .collect::<Result<Vec<_>, _>>()?
             .into())
     }
+}
+
+#[cfg(feature = "no-hash-integrity")]
+use holochain_p2p::*;
+#[cfg(feature = "no-hash-integrity")]
+use kitsune_p2p::test_util::scenario_def::{PeerMatrix, ScenarioDef};
+
+#[cfg(feature = "no-hash-integrity")]
+impl SweetConductorBatch {
+    /// Create a ConductorBatch from a kitsune `ScenarioDef`.
+    /// The resulting conductors will have the specified DNAs installed as an app,
+    /// and be pre-seeded with agents and op data as specified by the scenario.
+    /// The provided DnaFile must
+    pub async fn setup_from_scenario<const N: usize>(
+        scenario: ScenarioDef<N>,
+        dna_file: DnaFile,
+    ) -> [(SweetConductor, SweetAppBatch); N] {
+        let tasks = itertools::zip(scenario.nodes.iter(), std::iter::repeat(dna_file.clone()))
+            .enumerate()
+            .map(|(i, (node, dna_file))| async move {
+                let mut conductor = SweetConductor::from_standard_config().await;
+                let agent_defs: Vec<_> = node.agents.iter().collect();
+                let agents = SweetAgents::get(conductor.keystore(), agent_defs.len()).await;
+                let apps = conductor
+                    .setup_app_for_agents(
+                        &format!("node-{}", i),
+                        agents.as_slice(),
+                        &[dna_file.clone()],
+                    )
+                    .await
+                    .expect("Scenario setup is infallible");
+
+                for (agent_def, cell) in itertools::zip(agent_defs, apps.cells_flattened()) {
+                    // Manually set the storage arc
+                    cell.set_storage_arc(agent_def.arc.clone()).await;
+                    // Manually inject DhtOps at the correct locations
+                    cell.inject_fake_ops(agent_def.ops.clone().into_iter());
+                }
+
+                (conductor, apps)
+            });
+        let conductors_and_apps: Vec<_> = future::join_all(tasks)
+            .await
+            .try_into()
+            .unwrap_or_else(|_| unreachable!("Array size must match"));
+
+        let conductors: Vec<&SweetConductor> = conductors_and_apps.iter().map(|(c, _)| c).collect();
+
+        // Inject agent infos according to the PeerMatrix
+        match scenario.peer_matrix {
+            PeerMatrix::Full => SweetConductor::exchange_peer_info(conductors.clone()).await,
+            PeerMatrix::Sparse(matrix) => {
+                for (i, conductor) in conductors.iter().enumerate() {
+                    conductor
+                        .inject_peer_info(
+                            matrix[i].iter().map(|c| conductors[*c]),
+                            dna_file.dna_hash().to_owned(),
+                        )
+                        .await;
+                }
+            }
+        };
+
+        conductors_and_apps
+            .try_into()
+            .expect("Total conductors must match input")
+    }
 
     /// Let each conductor know about each others' agents so they can do networking
     pub async fn exchange_peer_info(&self) {
@@ -128,5 +196,75 @@ impl std::ops::Index<usize> for SweetConductorBatch {
 impl std::ops::IndexMut<usize> for SweetConductorBatch {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         &mut self.0[index]
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "no-hash-integrity")]
+mod tests {
+    use maplit::hashset;
+
+    use crate::test_utils::inline_zomes::unit_dna;
+
+    use super::*;
+
+    /// Just test that a scenario can be instantiated and results in the proper
+    /// conductor state being created
+    #[tokio::test(flavor = "multi_thread")]
+    async fn scenario_smoke_test() {
+        use kitsune_p2p::dht_arc::ArcInterval;
+        use kitsune_p2p::test_util::scenario_def::ScenarioDefAgent as Agent;
+        use kitsune_p2p::test_util::scenario_def::ScenarioDefNode as Node;
+
+        let scenario = ScenarioDef::new(
+            [
+                Node::new(hashset![
+                    Agent::new(ArcInterval::new(0, 110), [0, 10, 20, 30, 90]),
+                    Agent::new(ArcInterval::new(90, 200), [90, 100, 150]),
+                ]),
+                Node::new(hashset![
+                    Agent::new(ArcInterval::new(0, 110), [5, 15, 25, 35, 95]),
+                    Agent::new(ArcInterval::new(90, 200), [95, 105, 155]),
+                ]),
+            ],
+            PeerMatrix::sparse([&[1], &[]]),
+        );
+        let dna_file = unit_dna().await;
+        let dna_hash = dna_file.dna_hash().clone();
+        let [(conductor0, apps0), (conductor1, apps1)] =
+            SweetConductorBatch::setup_from_scenario(scenario, dna_file).await;
+
+        // - All local and remote agents are available on the first conductor
+        assert_eq!(conductor0.get_agent_infos(None).await.unwrap().len(), 4);
+        // - Only local agents are available on the second conductor
+        assert_eq!(conductor1.get_agent_infos(None).await.unwrap().len(), 2);
+
+        let to_agents_0: Vec<_> = apps0
+            .cells_flattened()
+            .into_iter()
+            .map(|cell| cell.agent_pubkey().clone())
+            .collect();
+        let to_agents_1: Vec<_> = apps1
+            .cells_flattened()
+            .into_iter()
+            .map(|cell| cell.agent_pubkey().clone())
+            .collect();
+        let ops0: HashSet<_> = conductor0
+            .get_all_op_hashes(&dna_hash, to_agents_0)
+            .await
+            .into_iter()
+            .map(|h| h.get_loc().to_u32())
+            .collect();
+        let ops1: HashSet<_> = conductor1
+            .get_all_op_hashes(&dna_hash, to_agents_1)
+            .await
+            .into_iter()
+            .map(|h| h.get_loc().to_u32())
+            .collect();
+
+        // - Check that the specially prepared ops are present
+        //   (must check for subset because the usual genesis ops are still created)
+        assert!(ops0.is_superset(&hashset![0, 10, 20, 30, 90, 100, 150]));
+        assert!(ops1.is_superset(&hashset![5, 15, 25, 35, 95, 105, 155]));
     }
 }

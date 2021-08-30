@@ -39,10 +39,27 @@ pub mod gaps;
 /// a u32 dht arc
 pub struct DhtLocation(pub Wrapping<u32>);
 
+impl DhtLocation {
+    pub fn new(loc: u32) -> Self {
+        Self(Wrapping(loc))
+    }
+
+    pub fn to_u32(&self) -> u32 {
+        self.0 .0
+    }
+}
+
 #[cfg(any(test, feature = "test_utils"))]
 impl From<i32> for DhtLocation {
     fn from(i: i32) -> Self {
         (i as u32).into()
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl rusqlite::ToSql for DhtLocation {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
+        Ok(self.0 .0.into())
     }
 }
 

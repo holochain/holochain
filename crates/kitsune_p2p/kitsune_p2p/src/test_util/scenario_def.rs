@@ -21,15 +21,15 @@ use std::collections::{BTreeSet, HashSet};
 /// have no bearing on test results. (TODO: test this case separately)
 pub struct ScenarioDef<const N: usize> {
     /// The "nodes" (in Holochain, "conductors") participating in this scenario
-    nodes: [ScenarioDefNode; N],
+    pub nodes: [ScenarioDefNode; N],
 
     /// Specifies which other nodes are present in the peer store of each node.
     /// The array index matches the array defined in `ShardedScenario::nodes`.
-    peer_matrix: PeerMatrix<N>,
+    pub peer_matrix: PeerMatrix<N>,
 
     /// Represents latencies between nodes, to be simulated.
     /// If None, all latencies are zero.
-    _latency_matrix: LatencyMatrix<N>,
+    pub _latency_matrix: LatencyMatrix<N>,
 }
 
 impl<const N: usize> ScenarioDef<N> {
@@ -53,12 +53,17 @@ impl<const N: usize> ScenarioDef<N> {
 
 /// An individual node in a sharded scenario.
 /// The only data needed is the list of local agents.
-pub struct ScenarioDefNode(HashSet<ScenarioDefAgent>);
+pub struct ScenarioDefNode {
+    /// The agents local to this node
+    pub agents: HashSet<ScenarioDefAgent>,
+}
 
 impl ScenarioDefNode {
     /// Constructor
-    pub fn new(agents: HashSet<ScenarioDefAgent>) -> Self {
-        Self(agents)
+    pub fn new<A: IntoIterator<Item = ScenarioDefAgent>>(agents: A) -> Self {
+        Self {
+            agents: agents.into_iter().collect(),
+        }
     }
 }
 
@@ -66,17 +71,20 @@ impl ScenarioDefNode {
 #[derive(PartialEq, Eq, Hash)]
 pub struct ScenarioDefAgent {
     /// The storage arc for this agent
-    arc: ArcInterval,
+    pub arc: ArcInterval,
     /// The ops stored by this agent
-    ops: BTreeSet<DhtLocation>,
+    pub ops: BTreeSet<DhtLocation>,
 }
 
 impl ScenarioDefAgent {
     /// Constructor
-    pub fn new<O: Copy + Into<DhtLocation>>(arc: ArcInterval, ops: &[O]) -> Self {
+    pub fn new<O: Copy + Into<DhtLocation>, OO: IntoIterator<Item = O>>(
+        arc: ArcInterval,
+        ops: OO,
+    ) -> Self {
         Self {
             arc,
-            ops: ops.into_iter().copied().map(Into::into).collect(),
+            ops: ops.into_iter().map(Into::into).collect(),
         }
     }
 }
@@ -98,34 +106,62 @@ pub enum PeerMatrix<const N: usize> {
     Sparse([HashSet<usize>; N]),
 }
 
+impl<const N: usize> PeerMatrix<N> {
+    /// Construct a full matrix (full peer connectivity)
+    pub fn full() -> Self {
+        Self::Full
+    }
+
+    /// Construct a sparse matrix by the given nodes.
+    /// More convenient than constructing the enum variant directly, since the
+    /// inner collection type is a slice rather than a HashSet.
+    pub fn sparse<'a>(matrix: [&'a [usize]; N]) -> Self {
+        use std::convert::TryInto;
+        Self::Sparse(
+            matrix
+                // TODO: when array map stabilizes, the node.clone() below
+                // can be removed
+                .iter()
+                .map(|node| {
+                    node.clone()
+                        .into_iter()
+                        .map(|u| u.clone())
+                        .collect::<HashSet<_>>()
+                })
+                .collect::<Vec<_>>()
+                .try_into()
+                .unwrap(),
+        )
+    }
+}
+
 /// Just construct a scenario to illustrate/experience how it's done
 #[test]
 fn constructors() {
-    use maplit::hashset;
     use ScenarioDefAgent as Agent;
     use ScenarioDefNode as Node;
     let ops: Vec<DhtLocation> = (-10..11).map(i32::into).collect();
     let nodes = [
-        Node::new(hashset![
+        Node::new([
             Agent::new(
                 ArcInterval::Bounded(ops[0].into(), ops[2].into()),
-                &[ops[0], ops[1]],
+                [ops[0], ops[1]],
             ),
             Agent::new(
                 ArcInterval::Bounded(ops[3].into(), ops[4].into()),
-                &[ops[3], ops[4]],
+                [ops[3], ops[4]],
             ),
         ]),
-        Node::new(hashset![
+        Node::new([
             Agent::new(
                 ArcInterval::Bounded(ops[0].into(), ops[2].into()),
-                &[ops[5], ops[7]],
+                [ops[5], ops[7]],
             ),
             Agent::new(
                 ArcInterval::Bounded(ops[3].into(), ops[4].into()),
-                &[ops[6], ops[9]],
+                [ops[6], ops[9]],
             ),
         ]),
     ];
-    let _scenario = ScenarioDef::new(nodes, PeerMatrix::Sparse([hashset![1], hashset![]]));
+    let _scenario = ScenarioDef::new(nodes, PeerMatrix::sparse([&[1], &[]]));
 }

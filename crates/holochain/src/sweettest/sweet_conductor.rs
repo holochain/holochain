@@ -1,7 +1,7 @@
 //! A wrapper around ConductorHandle with more convenient methods for testing.
 // TODO [ B-03669 ] move to own crate
 
-use super::{SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetConductorHandle};
+use super::*;
 use crate::conductor::{
     api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult,
     handle::ConductorHandle, CellError, Conductor, ConductorBuilder,
@@ -10,11 +10,12 @@ use hdk::prelude::*;
 use holo_hash::DnaHash;
 use holochain_conductor_api::{AdminInterfaceConfig, InterfaceDriver};
 use holochain_keystore::KeystoreSender;
+use holochain_p2p::dht_arc::ArcInterval;
 use holochain_p2p::*;
 use holochain_state::test_utils::{test_environments, TestEnvs};
 use holochain_types::prelude::*;
 use holochain_websocket::*;
-use kitsune_p2p::KitsuneP2pConfig;
+use kitsune_p2p::{event::full_time_window, KitsuneP2pConfig};
 use std::sync::Arc;
 
 /// A stream of signals.
@@ -291,6 +292,77 @@ impl SweetConductor {
         self.handle.is_some()
     }
 
+    /// Inject all agents from the specified Conductors into this Conductor's
+    /// peer store, for the given DnaHash.
+    pub async fn inject_peer_info<'a, P: Iterator<Item = &'a Self> + Send>(
+        &'a self,
+        peers: P,
+        dna_hash: DnaHash,
+    ) {
+        use crate::conductor::p2p_agent_store as p2p_store;
+        let kspace = dna_hash.to_kitsune();
+        let store = self.envs().p2p().lock().get(&kspace).unwrap().clone();
+        let agent_infos: Vec<_> = peers
+            .into_iter()
+            .flat_map(|peer| {
+                p2p_store::all_agent_infos(
+                    peer.envs()
+                        .p2p()
+                        .lock()
+                        .get(&kspace)
+                        .unwrap()
+                        .clone()
+                        .into(),
+                )
+                .unwrap()
+            })
+            .collect();
+        p2p_store::inject_agent_infos(store, agent_infos.iter())
+            .await
+            .unwrap();
+    }
+
+    /// Inject all peer info from all spaces of all conductors into each other conductor.
+    /// Maximum information sharing between conductors.
+    pub async fn exchange_peer_info<'a, P: IntoIterator<Item = &'a Self>>(peers: P) {
+        use crate::conductor::p2p_agent_store as p2p_store;
+        let envs: Vec<_> = peers
+            .into_iter()
+            .flat_map(|peer| {
+                peer.envs()
+                    .p2p()
+                    .lock()
+                    .values()
+                    .cloned()
+                    .collect::<Vec<_>>()
+            })
+            .map(|e| e.to_owned())
+            .collect();
+        p2p_store::exchange_peer_info(envs).await;
+    }
+
+    /// Get all op hashes for all Cells with the specified DnaHash and agent keys
+    pub async fn get_all_op_hashes<A: IntoIterator<Item = AgentPubKey>>(
+        &self,
+        dna_hash: &DnaHash,
+        agents: A,
+    ) -> HashSet<DhtOpHash> {
+        self.query_op_hashes(
+            dna_hash.clone(),
+            agents
+                .into_iter()
+                .map(|agent| (agent, ArcInterval::Full.into()))
+                .collect(),
+            full_time_window(),
+            true,
+        )
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|(h, _)| h)
+        .collect()
+    }
+
     // App setup methods
 
     /// Install the dna first.
@@ -350,12 +422,15 @@ impl SweetConductor {
     ) -> ConductorApiResult<SweetApp> {
         let mut sweet_cells = Vec::new();
         for dna_hash in dna_hashes {
+            let kspace = dna_hash.clone().to_kitsune();
             let cell_id = CellId::new(dna_hash, agent.clone());
             let cell_env = self.handle().0.get_cell_env(&cell_id).await?;
+            let p2p_agents_env = self.envs().p2p().lock().get(&kspace).unwrap().clone();
             let network = self.handle().get_cell_network(&cell_id).await?;
             let cell = SweetCell {
                 cell_id,
                 cell_env,
+                p2p_agents_env,
                 network,
             };
             sweet_cells.push(cell);
@@ -380,6 +455,12 @@ impl SweetConductor {
             .as_ref()
             .map(|h| h.0.clone())
             .expect("Tried to use a conductor that is offline")
+    }
+}
+
+impl std::fmt::Debug for SweetConductor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SweetConductor").finish()
     }
 }
 

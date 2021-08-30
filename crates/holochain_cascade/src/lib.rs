@@ -170,10 +170,9 @@ where
             header,
             validation_status,
         } = op;
-        let op_order = OpOrder::new(op_light.get_type(), header.header().timestamp());
         let timestamp = header.header().timestamp();
         insert_header(txn, header)?;
-        insert_op_lite(txn, op_light, op_hash.clone(), false, op_order, timestamp)?;
+        insert_op_lite(txn, op_light, op_hash.clone(), false, timestamp)?;
         if let Some(status) = validation_status {
             set_validation_status(txn, op_hash.clone(), status)?;
         }

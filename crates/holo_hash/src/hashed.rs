@@ -40,6 +40,7 @@ where
         Ok(Self { content, hash })
     }
 }
+
 impl<C> HoloHashed<C>
 where
     C: HashableContent,
@@ -72,6 +73,12 @@ where
     /// Deconstruct as a tuple
     pub fn into_inner(self) -> (C, HoloHashOf<C>) {
         (self.content, self.hash)
+    }
+
+    /// Manually override the hash, only used for testing invalid hashes
+    #[cfg(feature = "test_utils")]
+    pub fn override_hash<F: FnOnce(&mut HoloHashOf<C>)>(&mut self, update: F) {
+        update(&mut self.hash);
     }
 }
 

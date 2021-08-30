@@ -18,7 +18,7 @@ mod sweet_cell;
 mod sweet_conductor;
 mod sweet_conductor_batch;
 mod sweet_conductor_handle;
-mod sweet_dna;
+mod sweet_dna_file;
 mod sweet_network;
 mod sweet_zome;
 
@@ -28,6 +28,6 @@ pub use sweet_cell::*;
 pub use sweet_conductor::*;
 pub use sweet_conductor_batch::*;
 pub use sweet_conductor_handle::*;
-pub use sweet_dna::*;
+pub use sweet_dna_file::*;
 pub use sweet_network::*;
 pub use sweet_zome::*;
