@@ -97,7 +97,7 @@ impl Metrics {
         self.map.get(key).and_then(
             |info| match (info.errors.back(), info.complete_rounds.back()) {
                 (Some(error), Some(success)) => {
-                    if dbg!(error) > dbg!(success) {
+                    if error > success {
                         Some(RoundOutcome::Error(*error))
                     } else {
                         Some(RoundOutcome::Success(*success))
