@@ -142,7 +142,9 @@ struct NodeInfo {
 }
 
 pub(crate) enum HowToConnect {
-    Con(Tx2ConHnd<wire::Wire>),
+    /// The connection handle and the url that this handle has been connected to.
+    /// If the connection handle closes the url can change so we need to track it.
+    Con(Tx2ConHnd<wire::Wire>, TxUrl),
     Url(TxUrl),
 }
 
@@ -158,7 +160,7 @@ pub(crate) struct SimpleBloomModInner {
     last_initiate_check_us: ProcCountMicros,
     initiate_tgt: Option<GossipTgt>,
 
-    incoming: Vec<(Tx2ConHnd<wire::Wire>, GossipWire)>,
+    incoming: Vec<(Tx2ConHnd<wire::Wire>, TxUrl, GossipWire)>,
 
     last_outgoing_us: ProcCountMicros,
     outgoing: Vec<(GossipTgt, HowToConnect, GossipWire)>,
@@ -451,12 +453,13 @@ impl AsGossipModule for SimpleBloomMod {
     fn incoming_gossip(
         &self,
         con: Tx2ConHnd<wire::Wire>,
+        remote_url: TxUrl,
         gossip_data: Box<[u8]>,
     ) -> KitsuneResult<()> {
         use kitsune_p2p_types::codec::*;
         let (_, gossip) = GossipWire::decode_ref(&gossip_data).map_err(KitsuneError::other)?;
         self.inner.share_mut(move |i, _| {
-            i.incoming.push((con, gossip));
+            i.incoming.push((con, remote_url, gossip));
             if i.incoming.len() > 20 {
                 tracing::warn!(
                     "Overloaded with incoming gossip.. {} messages",
