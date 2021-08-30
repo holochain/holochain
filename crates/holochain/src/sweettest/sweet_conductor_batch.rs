@@ -4,6 +4,9 @@ use futures::future;
 use hdk::prelude::*;
 use holochain_types::prelude::*;
 
+#[cfg(any(test, feature = "test_utils"))]
+use holochain_conductor_api::conductor::TestConfig;
+
 /// A collection of SweetConductors, with methods for operating on the entire collection
 #[derive(derive_more::From, derive_more::Into, derive_more::IntoIterator)]
 pub struct SweetConductorBatch(Vec<SweetConductor>);
@@ -139,7 +142,7 @@ impl SweetConductorBatch {
                     // Manually set the storage arc
                     cell.set_storage_arc(agent_def.arc(resolution)).await;
                     // Manually inject DhtOps at the correct locations
-                    cell.inject_fixture_ops(agent_def.ops.clone().into_iter());
+                    cell.populate_fixture_ops(agent_def.ops.clone().into_iter());
                 }
 
                 (conductor, apps)
@@ -215,6 +218,7 @@ fn sharded_config() -> ConductorConfig {
         admin_interfaces: Some(vec![AdminInterfaceConfig {
             driver: InterfaceDriver::Websocket { port: 0 },
         }]),
+        test: TestConfig {},
         ..Default::default()
     }
 }

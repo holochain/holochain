@@ -21,6 +21,9 @@ pub use error::*;
 
 mod error;
 
+#[cfg(any(test, feature = "test_utils"))]
+use holochain_types::env::EnvWrite;
+
 #[derive(Debug)]
 pub enum Dependency {
     Header(HeaderHash),
@@ -590,4 +593,22 @@ pub fn lock_chain(txn: &mut Transaction, lock: &[u8], end: &Timestamp) -> StateM
 pub fn unlock_chain(txn: &mut Transaction) -> StateMutationResult<()> {
     txn.execute("DELETE FROM ChainLock", [])?;
     Ok(())
+}
+
+// Completely remove all ops, entries, and headers
+#[cfg(any(test, feature = "test_utils"))]
+pub fn clear_vault(env: EnvWrite) {
+    use holochain_sqlite::db::WriteManager;
+    env.conn()
+        .unwrap()
+        .with_commit_test(clear_vault_with_txn)
+        .unwrap();
+}
+
+// Completely remove all ops, entries, and headers
+#[cfg(any(test, feature = "test_utils"))]
+pub fn clear_vault_with_txn(txn: &mut Transaction) {
+    txn.execute("DELETE FROM DhtOp", []).unwrap();
+    txn.execute("DELETE FROM Header", []).unwrap();
+    txn.execute("DELETE FROM Entry", []).unwrap();
 }

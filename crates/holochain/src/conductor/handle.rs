@@ -67,6 +67,7 @@ use crate::core::workflow::ZomeCallResult;
 use derive_more::From;
 use futures::future::FutureExt;
 use futures::StreamExt;
+use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_conductor_api::conductor::EnvironmentRootPath;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InstalledAppInfo;
@@ -312,6 +313,9 @@ pub trait ConductorHandleT: Send + Sync {
     /// allowing individual Cells to be shut down.
     async fn remove_cells(&self, cell_ids: &[CellId]);
 
+    /// Get the ConductorConfig
+    fn get_config(&self) -> &ConductorConfig;
+
     /// Retrieve the environment for this cell. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvWrite>;
@@ -437,6 +441,7 @@ impl DevSettings {
 #[derive(From)]
 pub struct ConductorHandleImpl<DS: DnaStore + 'static> {
     pub(super) conductor: RwLock<Conductor<DS>>,
+    pub(super) config: Arc<ConductorConfig>,
     pub(super) keystore: KeystoreSender,
     pub(super) holochain_p2p: holochain_p2p::HolochainP2pRef,
 
@@ -551,6 +556,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
         self.conductor.read().await.dna_store().get_entry_def(key)
+    }
+
+    fn get_config(&self) -> &ConductorConfig {
+        &self.config
     }
 
     async fn query_op_hashes(

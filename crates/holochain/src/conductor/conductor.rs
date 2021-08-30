@@ -573,7 +573,12 @@ where
             .collect::<CellResult<Vec<()>>>()?;
 
         // drop all but the keepers
+        let before = self.cells.len();
         self.cells.retain(|id, _| keepers.contains(id));
+        let after = self.cells.len();
+        if after > before {
+            tracing::debug!("Removed {} cells", after - before);
+        }
         Ok(())
     }
 
@@ -1373,6 +1378,7 @@ mod builder {
             let handle: ConductorHandle = Arc::new(ConductorHandleImpl {
                 root_env_dir: config.environment_path.clone(),
                 conductor: RwLock::new(conductor),
+                config: Arc::new(config.clone()),
                 keystore,
                 holochain_p2p,
                 p2p_env: Arc::new(parking_lot::Mutex::new(HashMap::new())),
@@ -1476,6 +1482,7 @@ mod builder {
             let handle: ConductorHandle = Arc::new(ConductorHandleImpl {
                 root_env_dir: self.config.environment_path.clone(),
                 conductor: RwLock::new(conductor),
+                config: Arc::new(self.config.clone()),
                 keystore,
                 holochain_p2p,
                 p2p_env: envs.p2p(),

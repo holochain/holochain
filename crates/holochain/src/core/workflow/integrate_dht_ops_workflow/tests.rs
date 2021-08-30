@@ -474,19 +474,6 @@ async fn call_workflow<'env>(env: EnvWrite) {
         .unwrap();
 }
 
-// Need to clear the data from the previous test
-fn clear_dbs(env: EnvWrite) {
-    env.conn()
-        .unwrap()
-        .with_commit_sync(|txn| {
-            txn.execute("DELETE FROM DhtOP", []).unwrap();
-            txn.execute("DELETE FROM Header", []).unwrap();
-            txn.execute("DELETE FROM Entry", []).unwrap();
-            StateMutationResult::Ok(())
-        })
-        .unwrap();
-}
-
 // TESTS BEGIN HERE
 // The following show an op or ops that you want to test
 // with a desired pre-state that you want the database in
@@ -690,7 +677,7 @@ async fn test_ops_state() {
     ];
 
     for t in tests.iter() {
-        clear_dbs(env.clone());
+        holochain_state::mutations::clear_vault(env.clone());
         println!("test_ops_state on function {:?}", t);
         let td = TestData::new().await;
         let (pre_state, expect, name) = t(td);
@@ -916,7 +903,7 @@ async fn test_metadata_from_wasm_api() {
     observability::test_run().ok();
     let test_env = holochain_state::test_utils::test_cell_env();
     let env = test_env.env();
-    clear_dbs(env.clone());
+    holochain_state::mutations::clear_vault(env.clone());
 
     // Generate fixture data
     let mut td = TestData::with_app_entry_type().await;
@@ -983,7 +970,7 @@ async fn test_wasm_api_without_integration_links() {
     observability::test_run().ok();
     let test_env = holochain_state::test_utils::test_cell_env();
     let env = test_env.env();
-    clear_dbs(env.clone());
+    holochain_state::mutations::clear_vault(env.clone());
 
     // Generate fixture data
     let mut td = TestData::with_app_entry_type().await;
@@ -1036,7 +1023,7 @@ async fn test_wasm_api_without_integration_delete() {
     observability::test_run().ok();
     let test_env = holochain_state::test_utils::test_cell_env();
     let env = test_env.env();
-    clear_dbs(env.clone());
+    holochain_state::mutations::clear_vault(env.clone());
 
     // Generate fixture data
     let mut td = TestData::with_app_entry_type().await;

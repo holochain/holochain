@@ -65,8 +65,12 @@ impl SweetCell {
             .unwrap();
     }
 
-    /// Inject ops from the GOSSIP_FIXTURES, indexed by signed (+/-) location
-    pub fn inject_fixture_ops<L>(&self, locations: L)
+    /// Inject ops from the GOSSIP_FIXTURES, indexed by signed (+/-) location.
+    /// - This sets the author to the current agent. NB this can lead to
+    ///   multiple agents claiming authorship over the same op! For gossip
+    ///   purposes, this isn't a problem.
+    /// - NB this **removes all other existing ops and related data**!
+    pub fn populate_fixture_ops<L>(&self, locations: L)
     where
         L: Iterator<Item = i32>,
     {
@@ -74,10 +78,24 @@ impl SweetCell {
             .conn()
             .unwrap()
             .with_commit_sync(|txn| {
+                // Completely clear all existing cell data, including genesis data
+                holochain_state::mutations::clear_vault_with_txn(txn);
+                // Add in fixture data
                 for loc in locations {
                     let op = GOSSIP_FIXTURES.ops.get(loc).clone();
                     holochain_state::mutations::insert_op(txn, op, true).unwrap();
                 }
+                // Set author to this agent
+                txn.execute(
+                    "
+                    UPDATE Header
+                    SET author = :author
+                    ",
+                    rusqlite::named_params! {
+                        ":author": self.agent_pubkey()
+                    },
+                )
+                .unwrap();
                 DatabaseResult::Ok(())
             })
             .unwrap();

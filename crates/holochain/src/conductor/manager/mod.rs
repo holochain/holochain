@@ -164,10 +164,10 @@ async fn run(
         tokio::select! {
             Some(new_task) = new_task_channel.recv() => {
                 task_manager.stream.push(new_task);
-                tracing::info!("Task added. Total tasks: {}", task_manager.stream.len());
+                tracing::debug!("Task added. Total tasks: {}", task_manager.stream.len());
             }
             result = task_manager.stream.next() => {
-                tracing::info!("Task completed. Total tasks: {}", task_manager.stream.len());
+                tracing::debug!("Task completed. Total tasks: {}", task_manager.stream.len());
                 match result {
                 Some(TaskOutcome::NewTask(new_task)) => task_manager.stream.push(new_task),
                 Some(TaskOutcome::LogInfo(context)) => {

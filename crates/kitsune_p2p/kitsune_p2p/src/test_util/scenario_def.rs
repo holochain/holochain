@@ -13,8 +13,10 @@ type CoarseLoc = i32;
 /// with multiple conductors. Useful for setting up multi-node test scenarios,
 /// and for deriving the expected final state after reaching consistency.
 ///
-/// NB: The concrete scenarios derived from this definition will in general break a rule:
-///     The agent arcs will not be centered on the agent's DHT location.
+/// NB: The concrete scenarios derived from this definition will in general break some rules:
+///   - The agent arcs will not be centered on the agent's DHT location.
+///   - The authors in the database will not match the Headers created.
+///     - this means that two agents could claim authorship over the same ops!
 ///
 /// Thus, rather than dealing with hash types directly, this representation
 /// deals only with locations.
@@ -99,10 +101,12 @@ pub struct ScenarioDefAgent {
 impl ScenarioDefAgent {
     /// Constructor
     pub fn new<O: IntoIterator<Item = CoarseLoc>>(arc: (CoarseLoc, CoarseLoc), ops: O) -> Self {
-        Self {
-            arc,
-            ops: ops.into_iter().collect(),
-        }
+        let ops: BTreeSet<CoarseLoc> = ops.into_iter().collect();
+        assert!(
+            ops.len() > 0,
+            "Must provide at least one op per Agent, so that a chain head can be determined"
+        );
+        Self { arc, ops }
     }
 
     /// Produce an ArcInterval in the u32 space from the lower-resolution

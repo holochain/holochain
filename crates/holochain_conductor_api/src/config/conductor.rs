@@ -17,12 +17,16 @@ pub use paths::EnvironmentRootPath;
 
 pub use super::*;
 pub use dpki_config::DpkiConfig;
-//pub use logger_config::LoggerConfig;
 pub use error::*;
 pub use passphrase_service_config::PassphraseServiceConfig;
 //pub use signal_config::SignalConfig;
 use std::path::Path;
 use std::path::PathBuf;
+
+// #[cfg(any(test, feature = "test_utils"))]
+mod test_config;
+// #[cfg(any(test, feature = "test_utils"))]
+pub use test_config::TestConfig;
 
 // TODO change types from "stringly typed" to Url2
 /// All the config information for the conductor
@@ -57,6 +61,10 @@ pub struct ConductorConfig {
 
     /// Config options for the network module. Optional.
     pub network: Option<holochain_p2p::kitsune_p2p::KitsuneP2pConfig>,
+
+    /// Test-only config
+    #[cfg(any(test, feature = "test_utils"))]
+    pub test: TestConfig,
     //
     //
     // /// Which signals to emit
@@ -223,6 +231,7 @@ pub mod tests {
                     driver: InterfaceDriver::Websocket { port: 1234 }
                 }]),
                 network: Some(network_config),
+                test: TestConfig::default(),
             }
         );
     }
