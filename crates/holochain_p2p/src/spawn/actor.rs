@@ -321,6 +321,7 @@ impl WrapEvtSender {
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
         op_hashes: Vec<holo_hash::DhtOpHash>,
+        include_limbo: bool,
     ) -> impl Future<
         Output = HolochainP2pResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>>,
     >
@@ -328,7 +329,7 @@ impl WrapEvtSender {
            + Send {
         let op_count = op_hashes.len();
         timing_trace!(
-            { self.0.fetch_op_data(dna_hash, to_agent, op_hashes) },
+            { self.0.fetch_op_data(dna_hash, to_agent, op_hashes, include_limbo) },
             %op_count,
             "(hp2p:handle) fetch_op_data",
         )
@@ -930,6 +931,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             space,
             agents,
             op_hashes,
+            include_limbo,
         } = input;
         let space = DnaHash::from_kitsune(&space);
         let agents: Vec<_> = agents.iter().map(AgentPubKey::from_kitsune).collect();
@@ -944,7 +946,12 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             let mut out = vec![];
             for agent in agents {
                 for (op_hash, dht_op) in evt_sender
-                    .fetch_op_data(space.clone(), agent.clone(), op_hashes.clone())
+                    .fetch_op_data(
+                        space.clone(),
+                        agent.clone(),
+                        op_hashes.clone(),
+                        include_limbo,
+                    )
                     .await?
                 {
                     out.push((

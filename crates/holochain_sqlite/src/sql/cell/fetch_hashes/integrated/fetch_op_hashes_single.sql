@@ -8,3 +8,4 @@ WHERE
   AND storage_center_loc >= :storage_start_1
   AND storage_center_loc <= :storage_end_1
   AND DhtOp.when_integrated IS NOT NULL
+  AND private_entry IS NULL

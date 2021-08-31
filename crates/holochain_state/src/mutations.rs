@@ -372,6 +372,17 @@ pub fn unset_withhold_publish(txn: &mut Transaction, hash: DhtOpHash) -> StateMu
     Ok(())
 }
 
+/// Set withhold publish for a [`DhtOp`].
+pub fn set_private_entry_store_entry(
+    txn: &mut Transaction,
+    hash: DhtOpHash,
+) -> StateMutationResult<()> {
+    dht_op_update!(txn, hash, {
+        "private_entry": true,
+    })?;
+    Ok(())
+}
+
 /// Set the receipt count for a [`DhtOp`].
 pub fn set_receipts_complete(
     txn: &mut Transaction,

@@ -680,7 +680,11 @@ impl SourceChain {
                     // If this is a countersigning session we want to withhold
                     // publishing the ops until the session is successful.
                     if is_countersigning_session {
-                        set_withhold_publish(txn, op_hash)?;
+                        set_withhold_publish(txn, op_hash.clone())?;
+                    }
+
+                    if is_private_entry {
+                        set_private_entry_store_entry(txn, op_hash)?;
                     }
                 }
                 SourceChainResult::Ok(())

@@ -183,6 +183,7 @@ impl ShardedGossipLocal {
                     space: self.space.clone(),
                     agents,
                     op_hashes: missing_hashes,
+                    include_limbo: false,
                 })
                 .await
                 .map_err(KitsuneError::other)?;

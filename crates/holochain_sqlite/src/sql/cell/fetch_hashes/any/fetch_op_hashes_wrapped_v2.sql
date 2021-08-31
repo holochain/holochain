@@ -10,6 +10,7 @@ WHERE
   DhtOp.authored_timestamp_ms >= :from
   AND DhtOp.authored_timestamp_ms < :to
   AND storage_center_loc < :storage_end_loc
+  AND private_entry IS NULL
 UNION
 ALL
 SELECT
@@ -20,3 +21,4 @@ WHERE
   authored_timestamp_ms >= :from
   AND DhtOp.authored_timestamp_ms < :to
   AND storage_center_loc > :storage_start_loc
+  AND private_entry IS NULL

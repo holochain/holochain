@@ -132,6 +132,7 @@ impl HandlerBuilder {
                     space: _,
                     agents: _,
                     op_hashes,
+                    include_limbo: _,
                 } = arg;
                 Ok(async {
                     Ok(itertools::zip(op_hashes.into_iter(), std::iter::repeat(vec![0])).collect())
@@ -353,6 +354,7 @@ async fn test_three_way_sharded_ownership() {
         &space,
         agents.iter().skip(0).take(1),
         op_hashes_0,
+        false,
     )
     .await
     .unwrap();
@@ -361,6 +363,7 @@ async fn test_three_way_sharded_ownership() {
         &space,
         agents.iter().skip(1).take(1),
         op_hashes_1,
+        false,
     )
     .await
     .unwrap();
@@ -369,6 +372,7 @@ async fn test_three_way_sharded_ownership() {
         &space,
         agents.iter().skip(2).take(1),
         op_hashes_2,
+        false,
     )
     .await
     .unwrap();

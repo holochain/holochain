@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS DhtOp (
 
     storage_center_loc          INTEGER   NOT NULL,
     authored_timestamp_ms       INTEGER   NOT NULL,
+    private_entry               INTEGER   NULL,  -- BOOLEAN
 
     -- This is the order that process ops should result
     -- in dependencies before dependants.

@@ -560,30 +560,54 @@ impl ShardedGossipLocal {
             store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents).await?;
         let arcs: Vec<_> = agent_arcs.iter().map(|(_, arc)| arc.clone()).collect();
         let arcset = local_sync_arcset(arcs.as_slice());
-        let op_hashes = store::all_op_hashes_within_arcset(
-            &self.evt_sender,
-            &self.space,
-            agent_arcs.as_slice(),
-            &arcset,
-            full_time_window(),
-            usize::MAX,
-            true,
-        )
-        .await?
-        .map(|(ops, _window)| ops)
-        .unwrap_or_default();
+        let mut op_hashes = HashMap::new();
+        for (agent, arc) in agent_arcs.clone() {
+            let oh = store::all_op_hashes_within_arcset(
+                &self.evt_sender,
+                &self.space,
+                &[(agent.clone(), arc.clone())],
+                &arcset,
+                full_time_window(),
+                usize::MAX,
+                true,
+            )
+            .await?
+            .map(|(ops, _window)| ops)
+            .unwrap_or_default();
+            op_hashes.insert(agent, (arc, oh));
+        }
 
-        let ops: Vec<_> = store::fetch_ops(
+        let mut needed_op_hashes = HashMap::new();
+        for (agent, (arc, _)) in &op_hashes {
+            for (a, (_, hashes)) in &op_hashes {
+                if a == agent {
+                    continue;
+                }
+                let r: HashSet<_> = hashes
+                    .iter()
+                    .filter(|h| arc.contains(h.get_loc()))
+                    .cloned()
+                    .collect();
+                needed_op_hashes
+                    .entry(agent.clone())
+                    .or_insert_with(HashSet::new)
+                    .extend(r);
+            }
+        }
+
+        let ops_needed: HashSet<_> = needed_op_hashes.values().flatten().cloned().collect();
+        let ops: HashMap<_, _> = store::fetch_ops(
             &self.evt_sender,
             &self.space,
             local_agents.iter(),
-            op_hashes,
+            ops_needed.into_iter().collect(),
+            true,
         )
         .await?
         .into_iter()
         .collect();
+        store::put_ops_direct(&self.evt_sender, &self.space, needed_op_hashes, ops).await?;
 
-        store::put_ops(&self.evt_sender, &self.space, agent_arcs, ops).await?;
         Ok(())
     }
 

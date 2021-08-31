@@ -104,9 +104,15 @@ async fn local_sync_scenario() {
         .unwrap()
         .unwrap();
 
-        let ops = store::fetch_ops(&evt_sender, &space, agents.iter().take(1), hashes_before)
-            .await
-            .unwrap();
+        let ops = store::fetch_ops(
+            &evt_sender,
+            &space,
+            agents.iter().take(1),
+            hashes_before,
+            true,
+        )
+        .await
+        .unwrap();
 
         assert_eq!(ops.len(), 2);
     }

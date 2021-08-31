@@ -398,11 +398,12 @@ impl Cell {
                 span_context: _,
                 respond,
                 op_hashes,
+                include_limbo,
                 ..
             } => {
                 async {
                     let res = self
-                        .handle_fetch_op_data(op_hashes)
+                        .handle_fetch_op_data(op_hashes, include_limbo)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
@@ -786,6 +787,7 @@ impl Cell {
     async fn handle_fetch_op_data(
         &self,
         op_hashes: Vec<holo_hash::DhtOpHash>,
+        include_limbo: bool,
     ) -> CellResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
         // FIXME: Test this query.
         // TODO: SQL_PERF: Really on the fence about this query.
@@ -805,10 +807,14 @@ impl Cell {
                 JOIN Header ON DhtOp.header_hash = Header.hash
                 LEFT JOIN Entry ON Header.entry_hash = Entry.hash
                 WHERE
-                DhtOp.when_integrated IS NOT NULL
-                AND
+                {}
                 DhtOp.hash in ({})
                 ",
+                    if include_limbo {
+                        ""
+                    } else {
+                        "DhtOp.when_integrated IS NOT NULL AND"
+                    },
                     positions
                 );
                 let mut stmt = txn.prepare(&sql)?;
@@ -818,6 +824,14 @@ impl Cell {
                         let op_type: DhtOpType = row.get("dht_type")?;
                         let hash: DhtOpHash = row.get("hash")?;
                         // Check the entry isn't private before gossiping it.
+                        if header
+                            .0
+                            .entry_type()
+                            .map_or(false, |et| *et.visibility() == EntryVisibility::Private)
+                            && op_type == DhtOpType::StoreEntry
+                        {
+                            return Ok(None);
+                        }
                         let mut entry: Option<Entry> = None;
                         if header
                             .0
@@ -832,13 +846,13 @@ impl Cell {
                             };
                         }
                         let op = DhtOp::from_type(op_type, header, entry)?;
-                        StateQueryResult::Ok((hash, op))
+                        StateQueryResult::Ok(Some((hash, op)))
                     })?
                     .collect::<StateQueryResult<Vec<_>>>()?;
                 StateQueryResult::Ok(r)
             })
             .await?;
-        Ok(results)
+        Ok(results.into_iter().flatten().collect())
     }
 
     /// the network module would like this cell/agent to sign some data

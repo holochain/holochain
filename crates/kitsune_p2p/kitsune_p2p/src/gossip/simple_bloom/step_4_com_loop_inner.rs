@@ -420,6 +420,7 @@ async fn data_map_get(
             space,
             agents: vec![agent],
             op_hashes: vec![op_key],
+            include_limbo: false,
         })
         .await
     {

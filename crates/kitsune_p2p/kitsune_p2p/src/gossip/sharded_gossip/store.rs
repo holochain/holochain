@@ -1,6 +1,7 @@
 //! This module is the ideal interface we would have for the conductor (or other store that kitsune uses).
 //! We should update the conductor to match this interface.
 
+use std::collections::HashMap;
 use std::{collections::HashSet, ops::Range, sync::Arc};
 
 use crate::event::{
@@ -175,12 +176,14 @@ pub(super) async fn fetch_ops(
     space: &Arc<KitsuneSpace>,
     agents: impl Iterator<Item = &Arc<KitsuneAgent>>,
     op_hashes: Vec<Arc<KitsuneOpHash>>,
+    include_limbo: bool,
 ) -> KitsuneResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> {
     evt_sender
         .fetch_op_data(FetchOpDataEvt {
             space: space.clone(),
             agents: agents.cloned().collect(),
             op_hashes,
+            include_limbo,
         })
         .await
         .map_err(KitsuneError::other)
@@ -198,6 +201,28 @@ pub(super) async fn put_ops(
             .iter()
             .filter(|(op_hash, _)| arc.contains(op_hash.get_loc()))
             .cloned()
+            .collect();
+        if !ops.is_empty() {
+            evt_sender
+                .gossip(space.clone(), agent.clone(), ops)
+                .await
+                .map_err(KitsuneError::other)?;
+        }
+    }
+
+    Ok(())
+}
+
+pub(super) async fn put_ops_direct(
+    evt_sender: &EventSender,
+    space: &Arc<KitsuneSpace>,
+    needed_op_hashes: HashMap<Arc<KitsuneAgent>, HashSet<Arc<KitsuneOpHash>>>,
+    ops: HashMap<Arc<KitsuneOpHash>, Vec<u8>>,
+) -> KitsuneResult<()> {
+    for (agent, op_hashes) in needed_op_hashes {
+        let ops: Vec<_> = op_hashes
+            .iter()
+            .filter_map(|op_hash| ops.get(op_hash).map(|v| (op_hash.clone(), v.clone())))
             .collect();
         if !ops.is_empty() {
             evt_sender

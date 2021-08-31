@@ -200,6 +200,7 @@ async fn data_map_get(
                     space: space.clone(),
                     agents: vec![agent.clone()],
                     op_hashes: vec![key.clone()],
+                    include_limbo: false,
                 })
                 .await
                 .map_err(KitsuneError::other)?;

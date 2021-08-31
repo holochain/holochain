@@ -30,6 +30,8 @@ pub struct FetchOpDataEvt {
     pub agents: Vec<KAgent>,
     /// The op-hashes to fetch
     pub op_hashes: Vec<KOpHash>,
+    /// Include ops that are still in limbo (not yet validated or integrated).
+    pub include_limbo: bool,
 }
 
 /// Request that our implementor sign some data on behalf of an agent.

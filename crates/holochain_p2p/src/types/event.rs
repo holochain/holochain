@@ -226,6 +226,7 @@ ghost_actor::ghost_chan! {
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
             op_hashes: Vec<holo_hash::DhtOpHash>,
+            include_limbo: bool,
         ) -> Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>;
 
         /// P2p operations require cryptographic signatures and validation.
