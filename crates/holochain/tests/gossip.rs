@@ -1,13 +1,14 @@
-
-
 use holochain::sweettest::*;
 use maplit::hashset;
-use pretty_assertions::{assert_eq};
+use pretty_assertions::assert_eq;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_1() {
     use scenario::*;
     // observability::test_run().ok();
+
+    // TODO: seems that the first node only displays having [-10, 20].
+    // See what ops these are and what's special about them.
 
     let nodes = [
         Node::new([
