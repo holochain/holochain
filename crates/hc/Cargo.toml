@@ -1,6 +1,6 @@
 [package]
 name = "holochain_cli"
-version = "0.0.5"
+version = "0.0.6"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://github.com/holochain/holochain"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]

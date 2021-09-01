@@ -21,10 +21,10 @@ chrono = "0.4.6"
 futures = "0.3"
 lazy_static = "1.4.0"
 holochain_cli_bundle = { path = "../hc_bundle", version = "0.0.4"}
-holochain_conductor_api = { path = "../holochain_conductor_api", version = "0.0.4"}
-holochain_types = { path = "../holochain_types", version = "0.0.4"}
-holochain_websocket = { path = "../holochain_websocket", version = "0.0.4"}
-holochain_p2p = { path = "../holochain_p2p", version = "0.0.4"}
+holochain_conductor_api = { path = "../holochain_conductor_api", version = "0.0.5"}
+holochain_types = { path = "../holochain_types", version = "0.0.5"}
+holochain_websocket = { path = "../holochain_websocket", version = "0.0.5"}
+holochain_p2p = { path = "../holochain_p2p", version = "0.0.5"}
 nanoid = "0.3"
 observability = "0.1.3"
 serde_yaml = "0.8"
