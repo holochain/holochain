@@ -6,7 +6,7 @@ use holo_hash::*;
 use holochain_p2p::HolochainP2pCell;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_types::prelude::*;
-use kitsune_p2p::{actor::TestBackdoor, test_util::scenario_def::CoarseLoc};
+use kitsune_p2p::{actor::TestBackdoor, test_util::scenario_def::LocBucket};
 /// A reference to a Cell created by a SweetConductor installation function.
 /// It has very concise methods for calling a zome on this cell
 #[derive(Clone, derive_more::Constructor)]
@@ -67,23 +67,17 @@ impl SweetCell {
 
     /// Inject ops from the GOSSIP_FIXTURES, indexed by signed (+/-) location.
     /// - This sets the author to the current agent. NB this can lead to
-    ///   multiple agents claiming authorship over the same op! For gossip
-    ///   purposes, this isn't a problem.
-    /// - NB this **removes all other existing ops and related data**!
+    ///   multiple agents claiming authorship over the same op! However,
+    ///   for gossip testing purposes, this isn't a problem.
     pub fn populate_fixture_ops<L>(&self, locations: L)
     where
-        L: Iterator<Item = CoarseLoc>,
+        L: Iterator<Item = LocBucket>,
     {
         let locations: Vec<_> = locations.collect();
         self.cell_env
             .conn()
             .unwrap()
             .with_commit_sync(|txn| {
-                // Completely clear all existing cell data, including genesis data
-                let (ops_deleted, _, _) = holochain_state::mutations::clear_vault_with_txn(txn);
-                // The purpose of this is to clear out genesis ops, so make sure we did that
-                assert!(dbg!(ops_deleted) >= 7);
-
                 // Add in fixture data
                 for loc in locations.iter() {
                     let op = GOSSIP_FIXTURES.ops.get(*loc).clone();
@@ -99,6 +93,9 @@ impl SweetCell {
                         ":author": self.agent_pubkey()
                     },
                 )?;
+                // Set timestamp to something recognizable. Also important because
+                // u64::MAX cannot be matched on due to the timestamp range query
+                // being exclusive on the endpoint.
                 txn.execute(
                     "
                     UPDATE DhtOp
@@ -106,16 +103,6 @@ impl SweetCell {
                     ",
                     [],
                 )?;
-                DatabaseResult::Ok(())
-            })
-            .unwrap();
-        self.cell_env
-            .conn()
-            .unwrap()
-            .with_reader(|txn| {
-                let count: usize =
-                    txn.query_row("SELECT COUNT(rowid) FROM DhtOp", [], |row| row.get(0))?;
-                assert_eq!(count, locations.len());
                 DatabaseResult::Ok(())
             })
             .unwrap();

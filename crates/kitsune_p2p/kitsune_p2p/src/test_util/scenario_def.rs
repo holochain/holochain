@@ -12,8 +12,8 @@ const BUCKET_SIZE: usize = ((u32::MAX as u64 + 1) / (TOTAL as u64)) as usize;
 
 /// A "coarse" DHT location specification, defined at a lower resolution
 /// than the full u32 space, for convenience in more easily covering the entire
-/// space in tests.
-pub type CoarseLoc = i8;
+/// space in tests. Splits the u32 space into 256 evenly spaced buckets.
+pub type LocBucket = i8;
 
 /// Abstract representation of the instantaneous state of a sharded network
 /// with multiple conductors. Useful for setting up multi-node test scenarios,
@@ -84,15 +84,15 @@ impl ScenarioDefNode {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ScenarioDefAgent {
     /// The storage arc for this agent
-    arc: (CoarseLoc, CoarseLoc),
+    arc: (LocBucket, LocBucket),
     /// The ops stored by this agent
-    pub ops: BTreeSet<CoarseLoc>,
+    pub ops: BTreeSet<LocBucket>,
 }
 
 impl ScenarioDefAgent {
     /// Constructor
-    pub fn new<O: IntoIterator<Item = CoarseLoc>>(arc: (CoarseLoc, CoarseLoc), ops: O) -> Self {
-        let ops: BTreeSet<CoarseLoc> = ops.into_iter().collect();
+    pub fn new<O: IntoIterator<Item = LocBucket>>(arc: (LocBucket, LocBucket), ops: O) -> Self {
+        let ops: BTreeSet<LocBucket> = ops.into_iter().collect();
         assert!(
             ops.len() > 0,
             "Must provide at least one op per Agent, so that a chain head can be determined"
@@ -171,7 +171,7 @@ pub fn rectify_index(num: usize, i: i8) -> u32 {
 fn constructors() {
     use ScenarioDefAgent as Agent;
     use ScenarioDefNode as Node;
-    let ops: Vec<CoarseLoc> = (-10..11).map(i8::into).collect();
+    let ops: Vec<LocBucket> = (-10..11).map(i8::into).collect();
     let nodes = [
         Node::new([
             Agent::new((ops[0], ops[2]), [ops[0], ops[1]]),

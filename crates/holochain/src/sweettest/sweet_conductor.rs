@@ -19,7 +19,7 @@ use holochain_state::test_utils::{test_environments, TestEnvs};
 use holochain_types::prelude::*;
 use holochain_websocket::*;
 use itertools::Itertools;
-use kitsune_p2p::{event::full_time_window, test_util::scenario_def::CoarseLoc, KitsuneP2pConfig};
+use kitsune_p2p::{event::full_time_window, test_util::scenario_def::LocBucket, KitsuneP2pConfig};
 use std::sync::Arc;
 
 /// A stream of signals.
@@ -364,28 +364,6 @@ impl SweetConductor {
                 .collect::<Vec<_>>()
         });
         futures::future::join_all(tasks).await.into_iter().flatten()
-    }
-
-    pub async fn get_op_basis_buckets<'c>(
-        &self,
-        apps: &'c SweetAppBatch,
-    ) -> HashSet<CoarseLoc> {
-        dbg!("----");
-        self.get_all_op_hashes(apps.cells_flattened())
-            .await
-            .map(|h| dbg!(h))
-            .map(|h| {
-                let loc = *GOSSIP_FIXTURE_OP_LOOKUP.get(&h).unwrap_or_else(|| {
-                    // dbg!(&GOSSIP_FIXTURE_OP_LOOKUP);
-                    // dbg!(h);
-                    panic!("must use a fixture op hash for lookup")
-                });
-                // let loc = dbg!(h.get_loc().to_u32()) as u64;
-                // let loc = (loc * (u8::MAX as u64 + 1) / (u32::MAX as u64 + 1)) as u32;
-                // assert!(loc <= u8::MAX as u32);
-                loc
-            })
-            .collect()
     }
 
     /// "Solidify" the temp test directory so that it won't be cleaned up

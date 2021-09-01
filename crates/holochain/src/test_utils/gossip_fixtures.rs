@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use holo_hash::hashed_fixtures::*;
 use holo_hash::*;
 use holochain_types::prelude::*;
-use kitsune_p2p::test_util::scenario_def::CoarseLoc;
+use kitsune_p2p::test_util::scenario_def::LocBucket;
 
 const FIXTURE_PATH: &'static str = "fixtures/gossip-fixtures.msgpack";
 
@@ -37,7 +37,7 @@ pub static GOSSIP_FIXTURES: once_cell::sync::Lazy<GossipFixtures> =
     });
 
 /// Map from DhtOpHash to the CoarseLoc for the **basis hash** (not the op hash!)
-pub static GOSSIP_FIXTURE_OP_LOOKUP: once_cell::sync::Lazy<HashMap<DhtOpHash, CoarseLoc>> =
+pub static GOSSIP_FIXTURE_OP_LOOKUP: once_cell::sync::Lazy<HashMap<DhtOpHash, LocBucket>> =
     once_cell::sync::Lazy::new(|| {
         GOSSIP_FIXTURES
             .ops
