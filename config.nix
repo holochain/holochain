@@ -20,9 +20,9 @@
      then (import ./nix/sources.nix).holonix
      else local.path;
 
-  importFn = _: import (pathFn {}) {
+  importFn = args: import (pathFn {}) ({
       inherit includeHolochainBinaries;
-    }
+    } // args)
     ;
  };
 
