@@ -6,7 +6,7 @@ use holo_hash::*;
 use holochain_p2p::HolochainP2pCell;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_types::prelude::*;
-use kitsune_p2p::actor::TestBackdoor;
+use kitsune_p2p::{actor::TestBackdoor, test_util::scenario_def::CoarseLoc};
 /// A reference to a Cell created by a SweetConductor installation function.
 /// It has very concise methods for calling a zome on this cell
 #[derive(Clone, derive_more::Constructor)]
@@ -72,30 +72,50 @@ impl SweetCell {
     /// - NB this **removes all other existing ops and related data**!
     pub fn populate_fixture_ops<L>(&self, locations: L)
     where
-        L: Iterator<Item = i32>,
+        L: Iterator<Item = CoarseLoc>,
     {
+        let locations: Vec<_> = locations.collect();
         self.cell_env
             .conn()
             .unwrap()
             .with_commit_sync(|txn| {
                 // Completely clear all existing cell data, including genesis data
-                holochain_state::mutations::clear_vault_with_txn(txn);
+                let (ops_deleted, _, _) = holochain_state::mutations::clear_vault_with_txn(txn);
+                // The purpose of this is to clear out genesis ops, so make sure we did that
+                assert!(dbg!(ops_deleted) >= 7);
+
                 // Add in fixture data
-                for loc in locations {
-                    let op = GOSSIP_FIXTURES.ops.get(loc).clone();
+                for loc in locations.iter() {
+                    let op = GOSSIP_FIXTURES.ops.get(*loc).clone();
                     holochain_state::mutations::insert_op(txn, op, true).unwrap();
                 }
                 // Set author to this agent
                 txn.execute(
                     "
                     UPDATE Header
-                    SET author = :author
+                    SET author = :author, private_entry = 0
                     ",
                     rusqlite::named_params! {
                         ":author": self.agent_pubkey()
                     },
-                )
-                .unwrap();
+                )?;
+                txn.execute(
+                    "
+                    UPDATE DhtOp
+                    SET authored_timestamp_ms = 1111
+                    ",
+                    [],
+                )?;
+                DatabaseResult::Ok(())
+            })
+            .unwrap();
+        self.cell_env
+            .conn()
+            .unwrap()
+            .with_reader(|txn| {
+                let count: usize =
+                    txn.query_row("SELECT COUNT(rowid) FROM DhtOp", [], |row| row.get(0))?;
+                assert_eq!(count, locations.len());
                 DatabaseResult::Ok(())
             })
             .unwrap();

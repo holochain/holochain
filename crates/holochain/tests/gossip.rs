@@ -28,7 +28,7 @@ async fn test_1() {
 
     let nodes = [
         Node::new([
-            Agent::new((-30, 30), [-10, 10]),
+            Agent::new((-30, 30), [-10, 10, 1, 2, 3, -1, -2, -3]),
             Agent::new((0, 60), [10, 20]),
         ]),
         Node::new([

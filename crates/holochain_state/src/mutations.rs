@@ -607,8 +607,10 @@ pub fn clear_vault(env: EnvWrite) {
 
 // Completely remove all ops, entries, and headers
 #[cfg(any(test, feature = "test_utils"))]
-pub fn clear_vault_with_txn(txn: &mut Transaction) {
-    txn.execute("DELETE FROM DhtOp", []).unwrap();
-    txn.execute("DELETE FROM Header", []).unwrap();
-    txn.execute("DELETE FROM Entry", []).unwrap();
+pub fn clear_vault_with_txn(txn: &mut Transaction) -> (usize, usize, usize) {
+    txn.execute("DELETE FROM ValidationReceipt", []).unwrap();
+    let ops = txn.execute("DELETE FROM DhtOp", []).unwrap();
+    let headers = txn.execute("DELETE FROM Header", []).unwrap();
+    let entries = txn.execute("DELETE FROM Entry", []).unwrap();
+    (ops, headers, entries)
 }

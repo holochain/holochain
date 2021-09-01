@@ -75,6 +75,7 @@ holochain_wasm_test_utils = { version = "0.0.4-dev.0", path = "../test_utils/was
 
 # Dependencies for test_utils: keep in sync with below
 arbitrary = { version = "1.0", features = ["derive"], optional = true }
+contrafact = { version = "0.1.0-dev.1", optional = true }
 hdk = { version = "0.0.103", path = "../hdk", optional = true }
 matches = {version = "0.1.8", optional = true }
 holochain_test_wasm_common = { version = "0.0.3", path = "../test_utils/wasm_common", optional = true  }
@@ -93,13 +94,6 @@ maplit = "1"
 pretty_assertions = "0.6.1"
 serial_test = "0.4.0"
 test-case = "1.0.0"
-
-# Dependencies for test_utils: keep in sync with above
-arbitrary = { version = "1.0", features = ["derive"] }
-hdk = { version = "0.0.103", path = "../hdk", optional = false }
-matches = {version = "0.1.8", optional = false }
-holochain_test_wasm_common = { version = "0.0.3", path = "../test_utils/wasm_common", optional = false  }
-unwrap_to = { version = "0.1.0", optional = false }
 
 [[bench]]
 name = "bench"
@@ -124,6 +118,7 @@ default = ["slow_tests", "test_utils", "no-deps",]
 # This feature should be turned off for production builds.
 test_utils = [
   "arbitrary",
+  "contrafact",
   "hdk",
   "holo_hash/test_utils",
   "holochain_conductor_api/test_utils",

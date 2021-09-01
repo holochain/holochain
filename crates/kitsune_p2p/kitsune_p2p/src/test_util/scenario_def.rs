@@ -4,10 +4,16 @@ use std::collections::{BTreeSet, HashSet};
 
 use kitsune_p2p_types::dht_arc::ArcInterval;
 
+/// The total number of items in a collection. This is set to 256 for convenience,
+/// but could be changed, or could make this a parameter on a per-collection basis
+const TOTAL: usize = u8::MAX as usize + 1;
+/// The size of each "bucket" represented by each item.
+const BUCKET_SIZE: usize = ((u32::MAX as u64 + 1) / (TOTAL as u64)) as usize;
+
 /// A "coarse" DHT location specification, defined at a lower resolution
 /// than the full u32 space, for convenience in more easily covering the entire
 /// space in tests.
-type CoarseLoc = i32;
+pub type CoarseLoc = i8;
 
 /// Abstract representation of the instantaneous state of a sharded network
 /// with multiple conductors. Useful for setting up multi-node test scenarios,
@@ -24,6 +30,7 @@ type CoarseLoc = i32;
 /// Thus, note that for simplicity's sake, it's impossible to specify two ops
 /// at the same location, which is possible in reality, but rare, and should
 /// have no bearing on test results. (TODO: test this case separately)
+#[derive(Debug, PartialEq, Eq)]
 pub struct ScenarioDef<const N: usize> {
     /// The "nodes" (in Holochain, "conductors") participating in this scenario
     pub nodes: [ScenarioDefNode; N],
@@ -35,20 +42,6 @@ pub struct ScenarioDef<const N: usize> {
     /// Represents latencies between nodes, to be simulated.
     /// If None, all latencies are zero.
     pub _latency_matrix: LatencyMatrix<N>,
-
-    /// DhtLocations may be specified in a smaller set of integers than the full
-    /// u32 space, for convenience. This number specifies the size of the space
-    /// to work with.
-    ///
-    /// The `HashedFixtures` construct works with a u8 space, and in such cases
-    /// this `resolution` should be set to `u8::MAX`
-    ///
-    /// Any reference to a DHT arc endpoint defined in a scenario will be
-    /// multiplied by a factor to properly map the lower-resolution location
-    /// into the full u32 location space.
-    ///
-    /// e.g. for a u8 resolution, the multiplicative factor is `u32::MAX / u8::MAX`
-    pub resolution: u32,
 }
 
 impl<const N: usize> ScenarioDef<N> {
@@ -63,9 +56,6 @@ impl<const N: usize> ScenarioDef<N> {
         _latency_matrix: LatencyMatrix<N>,
     ) -> Self {
         Self {
-            // Resolution is hard-coded for now, but can be modified if ever
-            // needed
-            resolution: u8::MAX as u32,
             nodes,
             peer_matrix,
             _latency_matrix,
@@ -75,6 +65,7 @@ impl<const N: usize> ScenarioDef<N> {
 
 /// An individual node in a sharded scenario.
 /// The only data needed is the list of local agents.
+#[derive(Debug, PartialEq, Eq)]
 pub struct ScenarioDefNode {
     /// The agents local to this node
     pub agents: HashSet<ScenarioDefAgent>,
@@ -90,7 +81,7 @@ impl ScenarioDefNode {
 }
 
 /// An individual agent on a node in a sharded scenario
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ScenarioDefAgent {
     /// The storage arc for this agent
     arc: (CoarseLoc, CoarseLoc),
@@ -112,9 +103,9 @@ impl ScenarioDefAgent {
     /// Produce an ArcInterval in the u32 space from the lower-resolution
     /// definition, based on the resolution defined in the ScenarioDef which
     /// is passed in
-    pub fn arc(&self, resolution: u32) -> ArcInterval {
-        let start = rectify_index(resolution, self.arc.0);
-        let end = rectify_index(resolution, self.arc.1 + 1) - 1;
+    pub fn arc(&self) -> ArcInterval {
+        let start = rectify_index(TOTAL, self.arc.0);
+        let end = rectify_index(TOTAL, self.arc.1 + 1) - 1;
         ArcInterval::new(start, end)
     }
 }
@@ -128,6 +119,7 @@ pub type LatencyMatrix<const N: usize> = Option<[[u32; N]; N]>;
 
 /// Specifies which other nodes are present in the peer store of each node.
 /// The array index matches the array defined in `ShardedScenario::nodes`.
+#[derive(Debug, PartialEq, Eq)]
 pub enum PeerMatrix<const N: usize> {
     /// All nodes know about all other nodes
     Full,
@@ -166,16 +158,9 @@ impl<const N: usize> PeerMatrix<N> {
 }
 
 /// Map a signed index into an unsigned index
-pub fn rectify_index(num: u32, i: i32) -> u32 {
-    let num = num as i32;
-    if i >= num || i <= -num {
-        panic!(
-            "attempted to rectify an out-of-bounds index: |{}| >= {}",
-            i, num
-        );
-    }
+pub fn rectify_index(num: usize, i: i8) -> u32 {
     if i < 0 {
-        (num + i) as u32
+        (num as isize + i as isize) as u32
     } else {
         i as u32
     }
@@ -186,7 +171,7 @@ pub fn rectify_index(num: u32, i: i32) -> u32 {
 fn constructors() {
     use ScenarioDefAgent as Agent;
     use ScenarioDefNode as Node;
-    let ops: Vec<CoarseLoc> = (-10..11).map(i32::into).collect();
+    let ops: Vec<CoarseLoc> = (-10..11).map(i8::into).collect();
     let nodes = [
         Node::new([
             Agent::new((ops[0], ops[2]), [ops[0], ops[1]]),

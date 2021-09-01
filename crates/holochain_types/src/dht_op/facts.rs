@@ -10,37 +10,60 @@ use ::contrafact::*;
 /// - If the header does not reference an Entry, the entry will be None
 pub fn valid_dht_op(keystore: KeystoreSender) -> Facts<'static, DhtOp> {
     facts![
-        brute("Header type matches Entry existence", |op: &DhtOp| {
+        header_type_matches_entry_existence(),
+        header_references_entry(),
+        signature_matches_header(keystore),
+    ]
+}
+
+/// Ensures that the header type is congruent to the entry existence, i.e.
+/// if the Header expects an Entry, there must be an Entry, and
+/// if the Header expects no Entry, there must be no Entry
+pub fn header_type_matches_entry_existence() -> Facts<'static, DhtOp> {
+    facts![brute(
+        "Header type matches Entry existence",
+        |op: &DhtOp| {
             let has_header = op.header().entry_data().is_some();
             let has_entry = op.entry().is_some();
             has_header == has_entry
-        }),
-        mapped(
-            "If there is entry data, the header must point to it",
-            |op: &DhtOp| {
-                if let Some(entry) = op.entry() {
-                    // NOTE: this could be a `lens` if the previous check were short-circuiting,
-                    // but it is possible that this check will run even if the previous check fails,
-                    // so use a prism instead.
-                    facts![prism(
-                        "header's entry hash",
-                        |op: &mut DhtOp| op.header_entry_data_mut().map(|(hash, _)| hash),
-                        eq("hash of matching entry", EntryHash::with_data_sync(entry)),
-                    )]
-                } else {
-                    facts![always()]
-                }
+        }
+    )]
+}
+
+/// Ensures that the Entry hash matches the hash referred to by the Header
+pub fn header_references_entry() -> Facts<'static, DhtOp> {
+    facts![mapped(
+        "If there is entry data, the header must point to it",
+        |op: &DhtOp| {
+            if let Some(entry) = op.entry() {
+                // NOTE: this could be a `lens` if the previous check were short-circuiting,
+                // but it is possible that this check will run even if the previous check fails,
+                // so use a prism instead.
+                facts![prism(
+                    "header's entry hash",
+                    |op: &mut DhtOp| op.header_entry_data_mut().map(|(hash, _)| hash),
+                    eq("hash of matching entry", EntryHash::with_data_sync(entry)),
+                )]
+            } else {
+                facts![always()]
             }
-        ),
-        mapped("The Signature matches the Header", move |op: &DhtOp| {
+        },
+    )]
+}
+
+/// Ensure that the signature of the header is correct
+pub fn signature_matches_header(keystore: KeystoreSender) -> Facts<'static, DhtOp> {
+    facts![mapped(
+        "The Signature matches the Header",
+        move |op: &DhtOp| {
             use holochain_keystore::AgentPubKeyExt;
             let header = op.header();
             let agent = header.author();
             let actual = tokio_helper::block_forever_on(agent.sign(&keystore, &header))
                 .expect("Can sign the header");
             facts![lens("signature", DhtOp::signature_mut, eq_(actual))]
-        })
-    ]
+        }
+    )]
 }
 
 #[cfg(test)]

@@ -237,27 +237,15 @@ impl TestEnvs {
     }
 
     /// Consume the TempDir so that it will not be cleaned up after the test is over.
-    #[deprecated = "solidified() should only be used during debugging"]
-    pub fn solidified(self) -> Self {
-        let Self {
-            conductor,
-            wasm,
-            p2p,
-            p2p_metrics,
-            dir,
-        } = self;
-        let dir = dir.left_and_then(|tempdir| {
-            let pathbuf = tempdir.into_path();
-            println!("Solidified TestEnvs at {:?}", pathbuf);
-            Either::Right(pathbuf)
+    #[deprecated = "solidify() should only be used during debugging"]
+    pub fn solidify(&mut self) {
+        replace_with::replace_with_or_abort(&mut self.dir, |dir| {
+            dir.left_and_then(|tempdir| {
+                let pathbuf = tempdir.into_path();
+                println!("Solidified TestEnvs at {:?}", pathbuf);
+                Either::Right(pathbuf)
+            })
         });
-        Self {
-            conductor,
-            wasm,
-            p2p,
-            p2p_metrics,
-            dir,
-        }
     }
 
     pub fn into_tempdir(self) -> TempDir {

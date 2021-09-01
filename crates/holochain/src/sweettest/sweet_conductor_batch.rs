@@ -1,5 +1,7 @@
 use super::{standard_config, SweetAgents, SweetAppBatch, SweetConductor};
-use crate::conductor::{api::error::ConductorApiResult, config::ConductorConfig};
+use crate::conductor::{
+    api::error::ConductorApiResult, config::ConductorConfig, handle::DevSettingsDelta,
+};
 use futures::future;
 use hdk::prelude::*;
 use holochain_types::prelude::*;
@@ -122,35 +124,43 @@ impl SweetConductorBatch {
         scenario: ScenarioDef<N>,
         dna_file: DnaFile,
     ) -> [(SweetConductor, SweetAppBatch); N] {
-        let resolution = *&scenario.resolution;
-        let tasks = itertools::zip(scenario.nodes.iter(), std::iter::repeat(dna_file.clone()))
-            .enumerate()
-            .map(|(i, (node, dna_file))| async move {
-                let mut conductor = SweetConductor::from_config(sharded_config()).await;
-                let agent_defs: Vec<_> = node.agents.iter().collect();
-                let agents = SweetAgents::get(conductor.keystore(), agent_defs.len()).await;
-                let apps = conductor
-                    .setup_app_for_agents(
-                        &format!("node-{}", i),
-                        agents.as_slice(),
-                        &[dna_file.clone()],
-                    )
-                    .await
-                    .expect("Scenario setup is infallible");
-
-                for (agent_def, cell) in itertools::zip(agent_defs, apps.cells_flattened()) {
-                    // Manually set the storage arc
-                    cell.set_storage_arc(agent_def.arc(resolution)).await;
-                    // Manually inject DhtOps at the correct locations
-                    cell.populate_fixture_ops(agent_def.ops.clone().into_iter());
-                }
-
-                (conductor, apps)
+        let mut conductors_and_apps = Vec::with_capacity(N);
+        let mut genesis_op_hashes = HashSet::new();
+        let node_iter = itertools::zip(scenario.nodes.iter(), std::iter::repeat(dna_file.clone()));
+        for (i, (node, dna_file)) in node_iter.enumerate() {
+            let mut conductor = SweetConductor::from_config(sharded_config()).await;
+            conductor.update_dev_settings(DevSettingsDelta {
+                publish: Some(false),
+                ..Default::default()
             });
-        let conductors_and_apps: Vec<_> = future::join_all(tasks)
-            .await
-            .try_into()
-            .unwrap_or_else(|_| unreachable!("Array size must match"));
+            let agent_defs: Vec<_> = node.agents.iter().collect();
+            let agents = SweetAgents::get(conductor.keystore(), agent_defs.len()).await;
+            let apps = conductor
+                .setup_app_for_agents(
+                    &format!("node-{}", i),
+                    agents.as_slice(),
+                    &[dna_file.clone()],
+                )
+                .await
+                .expect("Scenario setup is infallible");
+
+            // TODO: remove!
+            conductor.solidify_environment();
+
+            // Record existing op hashes which were created during genesis,
+            // so that these can later be filtered out.
+            let cells = apps.cells_flattened();
+            genesis_op_hashes.extend(conductor.get_all_op_hashes(cells.clone()).await);
+
+            for (agent_def, cell) in itertools::zip(agent_defs, cells) {
+                // Manually set the storage arc
+                cell.set_storage_arc(agent_def.arc()).await;
+                // Manually inject DhtOps at the correct locations
+                cell.populate_fixture_ops(agent_def.ops.clone().into_iter());
+            }
+
+            conductors_and_apps.push((conductor, apps));
+        }
 
         let conductors: Vec<&SweetConductor> = conductors_and_apps.iter().map(|(c, _)| c).collect();
 
@@ -231,22 +241,43 @@ mod tests {
 
     use super::*;
 
+    use kitsune_p2p::test_util::scenario_def::ScenarioDefAgent as Agent;
+    use kitsune_p2p::test_util::scenario_def::ScenarioDefNode as Node;
+
     /// Just test that a scenario can be instantiated and results in the proper
     /// conductor state being created
     #[tokio::test(flavor = "multi_thread")]
-    async fn scenario_smoke_test() {
-        use kitsune_p2p::test_util::scenario_def::ScenarioDefAgent as Agent;
-        use kitsune_p2p::test_util::scenario_def::ScenarioDefNode as Node;
+    async fn scenario_smoke_test_single_node() {
+        let scenario = ScenarioDef::new(
+            [Node::new([
+                Agent::new((0, 110), [1, 2, 3]),
+                Agent::new((-30, 90), [4, 5, 6]),
+            ])],
+            PeerMatrix::Full,
+        );
+        let dna_file = unit_dna().await;
+        let [(conductor0, apps0)] =
+            SweetConductorBatch::setup_from_scenario(scenario, dna_file).await;
 
+        let ops0 = conductor0.get_op_basis_buckets(&apps0).await;
+
+        // - Check that the specially prepared ops are present
+        assert_eq!(ops0, hashset![1, 2, 3, 4, 5, 6]);
+    }
+
+    /// Just test that a scenario can be instantiated and results in the proper
+    /// conductor state being created
+    #[tokio::test(flavor = "multi_thread")]
+    async fn scenario_smoke_test_two_nodes() {
         let scenario = ScenarioDef::new(
             [
-                Node::new(hashset![
+                Node::new([
                     Agent::new((0, 110), [0, 10, 20, 30, 90]),
-                    Agent::new((90, 200), [90, 100, 150]),
+                    Agent::new((-30, 90), [90, 80, -10]),
                 ]),
-                Node::new(hashset![
+                Node::new([
                     Agent::new((0, 110), [5, 15, 25, 35, 95]),
-                    Agent::new((90, 200), [95, 105, 155]),
+                    Agent::new((-30, 90), [75, 85, -25]),
                 ]),
             ],
             PeerMatrix::sparse([&[1], &[]]),
@@ -260,21 +291,12 @@ mod tests {
         // - Only local agents are available on the second conductor
         assert_eq!(conductor1.get_agent_infos(None).await.unwrap().len(), 2);
 
-        // TODO: write conductor.get_all_op_locations in terms of IntoIterator<Item = SweetCell>
-        let ops0: HashSet<_> = conductor0
-            .get_all_op_hashes(apps0.cells_flattened())
-            .await
-            .map(|h| h.get_loc().to_u32())
-            .collect();
-        let ops1: HashSet<_> = conductor1
-            .get_all_op_hashes(apps1.cells_flattened())
-            .await
-            .map(|h| h.get_loc().to_u32())
-            .collect();
+        let ops0 = conductor0.get_op_basis_buckets(&apps0).await;
+        let ops1 = conductor1.get_op_basis_buckets(&apps1).await;
+        dbg!(&ops0, &ops1);
 
         // - Check that the specially prepared ops are present
-        //   (must check for subset because the usual genesis ops are still created)
-        assert!(dbg!(ops0).is_superset(&hashset![0, 10, 20, 30, 90, 100, 150]));
-        assert!(dbg!(ops1).is_superset(&hashset![5, 15, 25, 35, 95, 105, 155]));
+        assert_eq!(ops0, hashset![0, 10, 20, 30, 90, 80, -10]);
+        assert_eq!(ops1, hashset![5, 15, 25, 35, 75, 85, -25]);
     }
 }

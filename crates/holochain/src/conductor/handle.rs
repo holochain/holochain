@@ -574,11 +574,13 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         // For each cell collect the hashes and times that fit within the
         // agents interval and time window.
         for (agent, arc_set) in to_agents {
+            // dbg!(&agent, &arc_set);
             let cell_id = CellId::new(dna_hash.clone(), agent);
             let cell = self.cell_by_id(&cell_id).await?;
             let hashes = cell
                 .handle_query_op_hashes(arc_set, window_ms.clone(), include_limbo)
                 .await?;
+            // dbg!(&hashes);
             hashes_and_times.extend(hashes);
         }
         // Remove any duplicate hashes.
