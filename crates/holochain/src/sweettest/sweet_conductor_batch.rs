@@ -1,12 +1,8 @@
-use super::{standard_config, SweetAgents, SweetAppBatch, SweetConductor, SweetGossipScenario};
-use crate::conductor::{
-    api::error::ConductorApiResult, config::ConductorConfig, handle::DevSettingsDelta,
-};
+use super::{standard_config, SweetAgents, SweetAppBatch, SweetConductor};
+use crate::conductor::{api::error::ConductorApiResult, config::ConductorConfig};
 use futures::future;
 use hdk::prelude::*;
 use holochain_types::prelude::*;
-
-use holochain_conductor_api::conductor::TestConfig;
 
 /// A collection of SweetConductors, with methods for operating on the entire collection
 #[derive(derive_more::From, derive_more::Into, derive_more::IntoIterator)]

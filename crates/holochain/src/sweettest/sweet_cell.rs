@@ -69,7 +69,7 @@ impl SweetCell {
     /// - This sets the author to the current agent. NB this can lead to
     ///   multiple agents claiming authorship over the same op! However,
     ///   for gossip testing purposes, this isn't a problem.
-    pub fn populate_fixture_ops<L>(&self, locations: L)
+    pub fn inject_gossip_fixture_ops<L>(&self, locations: L)
     where
         L: Iterator<Item = LocBucket>,
     {

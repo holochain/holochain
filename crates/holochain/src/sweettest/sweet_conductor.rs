@@ -2,12 +2,9 @@
 // TODO [ B-03669 ] move to own crate
 
 use super::*;
-use crate::{
-    conductor::{
-        api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult,
-        handle::ConductorHandle, CellError, Conductor, ConductorBuilder,
-    },
-    test_utils::gossip_fixtures::GOSSIP_FIXTURE_OP_LOOKUP,
+use crate::conductor::{
+    api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult,
+    handle::ConductorHandle, CellError, Conductor, ConductorBuilder,
 };
 use hdk::prelude::*;
 use holo_hash::DnaHash;
@@ -19,7 +16,7 @@ use holochain_state::test_utils::{test_environments, TestEnvs};
 use holochain_types::prelude::*;
 use holochain_websocket::*;
 use itertools::Itertools;
-use kitsune_p2p::{event::full_time_window, test_util::scenario_def::LocBucket, KitsuneP2pConfig};
+use kitsune_p2p::{event::full_time_window, KitsuneP2pConfig};
 use std::sync::Arc;
 
 /// A stream of signals.

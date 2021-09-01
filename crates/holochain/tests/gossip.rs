@@ -1,25 +1,8 @@
-use std::collections::HashSet;
 
-use holochain::sweettest::{scenario::ScenarioDef, *};
-use holochain_p2p::dht_arc::ArcInterval;
+
+use holochain::sweettest::*;
 use maplit::hashset;
-
-async fn get_locations(
-    conductor: &SweetConductor,
-    apps: &SweetAppBatch,
-    resolution: u32,
-) -> HashSet<i32> {
-    conductor
-        .get_all_op_hashes(apps.cells_flattened())
-        .await
-        .map(|h| {
-            let loc = h.get_loc().to_u32() as u64;
-            let loc = (loc * resolution as u64 / u32::MAX as u64) as u32;
-            assert!(loc <= u8::MAX as u32);
-            loc as i8 as i32
-        })
-        .collect()
-}
+use pretty_assertions::{assert_eq};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_1() {
@@ -28,8 +11,8 @@ async fn test_1() {
 
     let nodes = [
         Node::new([
-            Agent::new((-30, 30), [-10, 10, 1, 2, 3, -1, -2, -3]),
             Agent::new((0, 60), [10, 20]),
+            Agent::new((-30, 30), [-10, 10, 1, 2, 3, -1, -2, -3]),
         ]),
         Node::new([
             Agent::new((-40, 40), [-40, -20, 20, 40]),
@@ -37,15 +20,15 @@ async fn test_1() {
         ]),
         Node::new([Agent::new((-120, -60), [-90, -60])]),
     ];
-    // let scenario = ScenarioDef::new(nodes, PeerMatrix::sparse([&[], &[], &[]]));
-    let scenario = ScenarioDef::new(nodes, PeerMatrix::sparse([&[1, 2], &[0, 2], &[]]));
-    let res = scenario.resolution;
-    let [(c0, a0), (c1, a1), (c2, a2)] =
-        SweetConductorBatch::setup_from_scenario(scenario, unit_dna().await).await;
+    // let peers = PeerMatrix::sparse([&[1, 2], &[0, 2], &[]]);
+    let peers = PeerMatrix::Full;
+    let def = ScenarioDef::new(nodes, peers);
+    let scenario = SweetGossipScenario::setup(def, unit_dna().await).await;
+    let [c0, c1, c2] = scenario.nodes();
 
-    let locs0 = get_locations(&c0, &a0, res).await;
-    let locs1 = get_locations(&c1, &a1, res).await;
-    let locs2 = get_locations(&c2, &a2, res).await;
+    let locs0 = c0.get_op_basis_buckets().await;
+    let locs1 = c1.get_op_basis_buckets().await;
+    let locs2 = c2.get_op_basis_buckets().await;
 
     dbg!((locs0.len(), locs1.len(), locs2.len()));
     dbg!(&locs0);
@@ -55,11 +38,11 @@ async fn test_1() {
     // TODO: properly await consistency
     tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
 
-    dbg!((locs0.len(), locs1.len(), locs2.len()));
-    let locs0 = get_locations(&c0, &a0, res).await;
-    let locs1 = get_locations(&c1, &a1, res).await;
-    let locs2 = get_locations(&c2, &a2, res).await;
+    let locs0 = c0.get_op_basis_buckets().await;
+    let locs1 = c1.get_op_basis_buckets().await;
+    let locs2 = c2.get_op_basis_buckets().await;
 
+    dbg!((locs0.len(), locs1.len(), locs2.len()));
     dbg!(&locs0);
     dbg!(&locs1);
     dbg!(&locs2);

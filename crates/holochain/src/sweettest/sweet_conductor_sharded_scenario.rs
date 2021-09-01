@@ -2,12 +2,9 @@ use std::sync::Arc;
 
 use super::{SweetAgents, SweetAppBatch, SweetConductor};
 use crate::{
-    conductor::{
-        api::error::ConductorApiResult, config::ConductorConfig, handle::DevSettingsDelta,
-    },
+    conductor::{config::ConductorConfig, handle::DevSettingsDelta},
     test_utils::gossip_fixtures::GOSSIP_FIXTURE_OP_LOOKUP,
 };
-use futures::future;
 use hdk::prelude::*;
 use holochain_p2p::*;
 use holochain_types::prelude::*;
@@ -15,6 +12,7 @@ use kitsune_p2p::test_util::scenario_def::{LocBucket, PeerMatrix, ScenarioDef};
 
 use holochain_conductor_api::conductor::TestConfig;
 
+/// Represents a single node in a sharded gossip scenario.
 #[derive(Debug, shrinkwraprs::Shrinkwrap)]
 pub struct SweetGossipScenarioNode {
     #[shrinkwrap(main_field)]
@@ -24,6 +22,8 @@ pub struct SweetGossipScenarioNode {
 }
 
 impl SweetGossipScenarioNode {
+    /// Get the LocBuckets for every op hash held by this node.
+    /// Ops which were not manually injected are excluded.
     pub async fn get_op_basis_buckets(&self) -> HashSet<LocBucket> {
         let hashes: HashSet<DhtOpHash> = self
             .conductor
@@ -47,6 +47,7 @@ impl SweetGossipScenarioNode {
     }
 }
 
+/// Represents a multi-node sharded gossip scenario, as specified by `ScenarioDef`.
 #[derive(Debug)]
 pub struct SweetGossipScenario<const N: usize> {
     nodes: [SweetGossipScenarioNode; N],
@@ -58,7 +59,7 @@ impl<const N: usize> SweetGossipScenario<N> {
     /// The resulting conductors will have the specified DNAs installed as an app,
     /// and be pre-seeded with agents and op data as specified by the scenario.
     /// The provided DnaFile must
-    pub async fn setup_from_scenario(scenario: ScenarioDef<N>, dna_file: DnaFile) -> Self {
+    pub async fn setup(scenario: ScenarioDef<N>, dna_file: DnaFile) -> Self {
         let mut conductors_with_apps = Vec::with_capacity(N);
         let mut excluded_ops = HashSet::new();
         let node_iter = itertools::zip(scenario.nodes.iter(), std::iter::repeat(dna_file.clone()));
@@ -89,9 +90,9 @@ impl<const N: usize> SweetGossipScenario<N> {
 
             for (agent_def, cell) in itertools::zip(agent_defs, cells) {
                 // Manually set the storage arc
-                cell.set_storage_arc(agent_def.arc()).await;
+                // cell.set_storage_arc(agent_def.arc()).await;
                 // Manually inject DhtOps at the correct locations
-                cell.populate_fixture_ops(agent_def.ops.clone().into_iter());
+                cell.inject_gossip_fixture_ops(agent_def.ops.clone().into_iter());
             }
 
             conductors_with_apps.push((conductor, apps));
@@ -130,6 +131,7 @@ impl<const N: usize> SweetGossipScenario<N> {
         }
     }
 
+    /// Get references to the nodes. Can be destructured with array syntax.
     pub fn nodes(&self) -> [&SweetGossipScenarioNode; N] {
         self.nodes.iter().collect::<Vec<_>>().try_into().unwrap()
     }
