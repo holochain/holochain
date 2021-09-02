@@ -19,6 +19,8 @@ pub struct QueryOpHashesEvt {
     pub max_ops: usize,
     /// Include ops that are still in limbo (not yet validated or integrated).
     pub include_limbo: bool,
+    /// Only return ops authored by the given agents.
+    pub only_authored: bool,
 }
 
 /// Gather all op-hash data for a list of op-hashes from our implementor.

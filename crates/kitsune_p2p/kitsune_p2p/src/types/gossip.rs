@@ -23,7 +23,7 @@ pub trait AsGossipModule: 'static + Send + Sync {
     ) -> KitsuneResult<()>;
     fn local_agent_join(&self, a: Arc<KitsuneAgent>);
     fn local_agent_leave(&self, a: Arc<KitsuneAgent>);
-    fn new_integrated_data(&self) {}
+    fn new_integrated_data(&self, _authored: bool) {}
 }
 
 pub struct GossipModule(pub Arc<dyn AsGossipModule>);
@@ -51,8 +51,8 @@ impl GossipModule {
     }
 
     /// New data has been integrated and is ready for gossiping.
-    pub fn new_integrated_data(&self) {
-        self.0.new_integrated_data();
+    pub fn new_integrated_data(&self, authored: bool) {
+        self.0.new_integrated_data(authored);
     }
 }
 

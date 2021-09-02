@@ -154,6 +154,17 @@ impl DhtArcSet {
             }
         }
     }
+
+    pub fn difference(&self, other: &Self) -> Self {
+        match (self, other) {
+            (&Self::Full, Self::Full) => Self::new_empty(),
+            (Self::Partial(_), Self::Full) => Self::new_empty(),
+            (Self::Full, Self::Partial(that)) => Self::Partial(that.complement()).normalized(),
+            (Self::Partial(this), Self::Partial(that)) => {
+                Self::Partial(this.difference(that)).normalized()
+            }
+        }
+    }
 }
 
 impl From<&ArcInterval> for DhtArcSet {

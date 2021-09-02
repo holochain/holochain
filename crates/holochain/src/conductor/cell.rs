@@ -714,6 +714,7 @@ impl Cell {
         dht_arc_set: DhtArcSet,
         window_ms: TimeWindowMs,
         include_limbo: bool,
+        only_authored: bool,
     ) -> CellResult<Vec<(DhtOpHash, u64)>> {
         let mut results = Vec::new();
 
@@ -721,19 +722,25 @@ impl Cell {
         let start = clamp64(window_ms.start);
         let end = clamp64(window_ms.end);
 
-        let full = if include_limbo {
+        let full = if only_authored {
+            holochain_sqlite::sql::sql_cell::authored::FETCH_OP_HASHES_FULL
+        } else if include_limbo {
             holochain_sqlite::sql::sql_cell::any::FETCH_OP_HASHES_FULL
         } else {
             holochain_sqlite::sql::sql_cell::integrated::FETCH_OP_HASHES_FULL
         };
 
-        let continuous = if include_limbo {
+        let continuous = if only_authored {
+            holochain_sqlite::sql::sql_cell::authored::FETCH_OP_HASHES_CONTINUOUS
+        } else if include_limbo {
             holochain_sqlite::sql::sql_cell::any::FETCH_OP_HASHES_CONTINUOUS
         } else {
             holochain_sqlite::sql::sql_cell::integrated::FETCH_OP_HASHES_CONTINUOUS
         };
 
-        let wrapped = if include_limbo {
+        let wrapped = if only_authored {
+            holochain_sqlite::sql::sql_cell::authored::FETCH_OP_HASHES_WRAPPED
+        } else if include_limbo {
             holochain_sqlite::sql::sql_cell::any::FETCH_OP_HASHES_WRAPPED
         } else {
             holochain_sqlite::sql::sql_cell::integrated::FETCH_OP_HASHES_WRAPPED

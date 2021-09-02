@@ -942,6 +942,7 @@ async fn handle_query_op_hashes(
         window_ms,
         max_ops,
         include_limbo: _,
+        only_authored: _,
     } = input;
 
     let root = KdHash::from_kitsune_space(&space);

@@ -117,7 +117,7 @@ ghost_actor::ghost_chan! {
         ) -> ();
 
         /// New data has been integrated and is ready for gossiping.
-        fn new_integrated_data(space: KSpace) -> ();
+        fn new_integrated_data(space: KSpace, authored: bool) -> ();
 
         /// Check if an agent is an authority for a hash.
         fn authority_for_hash(

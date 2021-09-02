@@ -215,7 +215,7 @@ impl HolochainP2pCellT for PassThroughNetwork {
         todo!()
     }
 
-    async fn new_integrated_data(&self) -> actor::HolochainP2pResult<()> {
+    async fn new_integrated_data(&self, _: bool) -> actor::HolochainP2pResult<()> {
         todo!()
     }
 }
@@ -380,7 +380,7 @@ impl HolochainP2pCellT for MockNetwork {
         todo!()
     }
 
-    async fn new_integrated_data(&self) -> actor::HolochainP2pResult<()> {
+    async fn new_integrated_data(&self, _: bool) -> actor::HolochainP2pResult<()> {
         todo!()
     }
 }

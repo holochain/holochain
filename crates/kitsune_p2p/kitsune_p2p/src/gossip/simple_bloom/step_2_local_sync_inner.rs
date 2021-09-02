@@ -52,6 +52,7 @@ impl Inner {
                     window_ms: u64::MIN..u64::MAX,
                     max_ops: usize::MAX,
                     include_limbo: false,
+                    only_authored: false,
                 })
                 .await
             {

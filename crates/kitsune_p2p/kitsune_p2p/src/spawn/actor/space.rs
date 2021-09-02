@@ -822,9 +822,13 @@ impl KitsuneP2pHandler for Space {
         .into())
     }
 
-    fn handle_new_integrated_data(&mut self, _: KSpace) -> InternalHandlerResult<()> {
+    fn handle_new_integrated_data(
+        &mut self,
+        _: KSpace,
+        authored: bool,
+    ) -> InternalHandlerResult<()> {
         for module in self.gossip_mod.values() {
-            module.new_integrated_data();
+            module.new_integrated_data(authored);
         }
         unit_ok_fut()
     }

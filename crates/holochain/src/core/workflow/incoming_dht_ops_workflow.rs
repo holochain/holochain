@@ -120,14 +120,18 @@ pub async fn incoming_dht_ops_workflow(
     let mut filter_ops = Vec::new();
 
     for (hash, op) in ops {
-        match should_keep(&op).await {
-            Ok(()) => filter_ops.push((hash, op)),
-            Err(e) => {
-                tracing::warn!(
-                    msg = "Dropping op because it failed counterfeit checks",
-                    ?op
-                );
-                return Err(e);
+        // It's cheaper to check if the op exists before trying
+        // to check the signature or open a write transaction.
+        if !op_exists(vault, &hash)? {
+            match should_keep(&op).await {
+                Ok(()) => filter_ops.push((hash, op)),
+                Err(e) => {
+                    tracing::warn!(
+                        msg = "Dropping op because it failed counterfeit checks",
+                        ?op
+                    );
+                    return Err(e);
+                }
             }
         }
     }

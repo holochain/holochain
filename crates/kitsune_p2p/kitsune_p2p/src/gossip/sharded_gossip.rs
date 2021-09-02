@@ -41,6 +41,7 @@ mod state_map;
 mod store;
 
 mod bandwidth;
+mod local_sync;
 mod metrics;
 mod next_target;
 
@@ -55,6 +56,12 @@ const MAX_SEND_BUF_BYTES: usize = 16000;
 /// The maximum number of different nodes that will be
 /// gossiped with if gossip is triggered.
 const MAX_TRIGGERS: u8 = 2;
+
+/// The minimum time a local sync can occur within.
+const MIN_LOCAL_SYNC_INTERVAL_MS: u128 = 1000;
+
+/// The timeout for a gossip round if there is no contact. Five minutes.
+const ROUND_TIMEOUT_MS: u32 = 1000 * 60 * 5;
 
 type BloomFilter = bloomfilter::Bloom<Arc<MetaOpKey>>;
 type EventSender = futures::channel::mpsc::Sender<event::KitsuneP2pEvent>;
@@ -98,6 +105,26 @@ pub struct ShardedGossip {
     bandwidth: Arc<BandwidthThrottle>,
 }
 
+/// Basic statistic for gossip loop processing performance.
+struct Stats {
+    start: std::time::Instant,
+    avg_processing_time: std::time::Duration,
+    max_processing_time: std::time::Duration,
+    count: u32,
+}
+
+impl Stats {
+    /// Reset the stats.
+    fn reset() -> Self {
+        Stats {
+            start: std::time::Instant::now(),
+            avg_processing_time: std::time::Duration::default(),
+            max_processing_time: std::time::Duration::default(),
+            count: 0,
+        }
+    }
+}
+
 impl ShardedGossip {
     /// Constructor
     pub fn new(
@@ -125,6 +152,7 @@ impl ShardedGossip {
             let this = this.clone();
 
             async move {
+                let mut stats = Stats::reset();
                 while !this
                     .gossip
                     .closing
@@ -132,6 +160,7 @@ impl ShardedGossip {
                 {
                     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
                     this.run_one_iteration().await;
+                    this.stats(&mut stats);
                 }
                 KitsuneResult::Ok(())
             }
@@ -239,6 +268,28 @@ impl ShardedGossip {
             Ok((incoming, outgoing))
         })
     }
+
+    /// Log the statistics for the gossip loop.
+    fn stats(&self, stats: &mut Stats) {
+        if let GossipType::Recent = self.gossip.gossip_type {
+            let elapsed = stats.start.elapsed();
+            stats.avg_processing_time += elapsed;
+            stats.max_processing_time = std::cmp::max(stats.max_processing_time, elapsed);
+            stats.count += 1;
+            if elapsed.as_secs() > 5 {
+                stats.avg_processing_time = stats
+                    .avg_processing_time
+                    .checked_div(stats.count)
+                    .unwrap_or_default();
+                let _ = self.gossip.inner.share_mut(|i, _| {
+                    let s = tracing::trace_span!("gossip_metrics");
+                    s.in_scope(|| tracing::trace!("{}\nStats over last 5s:\n\tAverage processing time {:?}\n\tIteration count: {}\n\tMax gossip processing time: {:?}", i.metrics, stats.avg_processing_time, stats.count, stats.max_processing_time));
+                    Ok(())
+                });
+                *stats = Stats::reset();
+            }
+        }
+    }
 }
 
 /// The parts of sharded gossip which are concerned only with the gossiping node:
@@ -275,8 +326,12 @@ pub struct ShardedGossipLocalState {
     metrics: Metrics,
     /// Last moment we locally synced.
     last_local_sync: Option<std::time::Instant>,
-    /// Trigger local sync to run on the next iteration.
-    trigger_local_sync: bool,
+    /// Trigger local sync of authored ops only to run on the next iteration.
+    trigger_authored_local_sync: bool,
+    /// Trigger a full local sync to run on the next iteration.
+    trigger_full_local_sync: bool,
+    /// The last local agents common arc set. Used for local syncing.
+    last_local_sync_arc_set: Option<DhtArcSet>,
 }
 
 impl ShardedGossipLocalState {
@@ -308,11 +363,18 @@ impl ShardedGossipLocalState {
         }
     }
 
-    fn new_integrated_data(&mut self) -> KitsuneResult<()> {
-        let s = tracing::trace_span!("gossip_trigger", agents = ?self.show_local_agents());
-        s.in_scope(|| self.log_state());
+    fn new_integrated_data(&mut self, authored: bool, full_sync: bool) -> KitsuneResult<()> {
         self.metrics.record_force_initiate();
-        self.trigger_local_sync = true;
+        // If the integrated data is authored we can trigger a
+        // authored local sync next iteration.
+        if authored {
+            self.trigger_authored_local_sync = true;
+        }
+
+        // If a full sync has been requested trigger that next iteration.
+        if full_sync {
+            self.trigger_full_local_sync = true;
+        }
         Ok(())
     }
 
@@ -349,6 +411,8 @@ pub struct RoundState {
     received_all_incoming_ops_blooms: bool,
     /// Round start time
     created_at: std::time::Instant,
+    /// Last moment we had any contact for this round.
+    last_touch: std::time::Instant,
     /// Amount of time before a round is considered expired.
     round_timeout: u32,
 }
@@ -388,12 +452,8 @@ impl ShardedGossipLocal {
             num_sent_ops_blooms: 0,
             received_all_incoming_ops_blooms: false,
             created_at: std::time::Instant::now(),
-            // TODO: Check if the node is a successful peer or not and set the timeout accordingly.
-            // TODO: Actually I think this is the wrong time out? This is
-            // how long we wait to timeout a round.
-            round_timeout: self
-                .tuning_params
-                .gossip_peer_on_success_next_gossip_delay_ms,
+            last_touch: std::time::Instant::now(),
+            round_timeout: ROUND_TIMEOUT_MS,
         })
     }
 
@@ -552,96 +612,6 @@ impl ShardedGossipLocal {
                 Vec::with_capacity(0)
             }
         })
-    }
-
-    async fn local_sync(&self) -> KitsuneResult<()> {
-        let local_agents = self.inner.share_mut(|i, _| Ok(i.local_agents.clone()))?;
-        let agent_arcs =
-            store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents).await?;
-        let arcs: Vec<_> = agent_arcs.iter().map(|(_, arc)| arc.clone()).collect();
-        let arcset = local_sync_arcset(arcs.as_slice());
-        let mut op_hashes = HashMap::new();
-        for (agent, arc) in agent_arcs.clone() {
-            let oh = store::all_op_hashes_within_arcset(
-                &self.evt_sender,
-                &self.space,
-                &[(agent.clone(), arc.clone())],
-                &arcset,
-                full_time_window(),
-                usize::MAX,
-                true,
-            )
-            .await?
-            .map(|(ops, _window)| ops)
-            .unwrap_or_default();
-            op_hashes.insert(agent, (arc, oh));
-        }
-
-        let mut needed_op_hashes = HashMap::new();
-        for (agent, (arc, _)) in &op_hashes {
-            for (a, (_, hashes)) in &op_hashes {
-                if a == agent {
-                    continue;
-                }
-                let r: HashSet<_> = hashes
-                    .iter()
-                    .filter(|h| arc.contains(h.get_loc()))
-                    .cloned()
-                    .collect();
-                needed_op_hashes
-                    .entry(agent.clone())
-                    .or_insert_with(HashSet::new)
-                    .extend(r);
-            }
-        }
-
-        let ops_needed: HashSet<_> = needed_op_hashes.values().flatten().cloned().collect();
-        let ops: HashMap<_, _> = store::fetch_ops(
-            &self.evt_sender,
-            &self.space,
-            local_agents.iter(),
-            ops_needed.into_iter().collect(),
-            true,
-        )
-        .await?
-        .into_iter()
-        .collect();
-        store::put_ops_direct(&self.evt_sender, &self.space, needed_op_hashes, ops).await?;
-
-        Ok(())
-    }
-
-    /// Check if we should locally sync
-    fn should_local_sync(&self) -> KitsuneResult<bool> {
-        // Historical gossip should not locally sync.
-        if let GossipType::Historical = self.gossip_type {
-            return Ok(false);
-        }
-        let update_last_sync = |i: &mut ShardedGossipLocalState, _: &mut bool| {
-            if i.trigger_local_sync {
-                // We are force triggering a local sync.
-                i.trigger_local_sync = false;
-                i.last_local_sync = Some(std::time::Instant::now());
-                let s = tracing::trace_span!("trigger",agents = ?i.show_local_agents(), i.trigger_local_sync);
-                s.in_scope(|| tracing::trace!("Force local sync"));
-                Ok(true)
-            } else if i
-                .last_local_sync
-                .as_ref()
-                .map(|s| s.elapsed().as_millis() as u32)
-                .unwrap_or(u32::MAX)
-                >= self.tuning_params.gossip_local_sync_delay_ms
-            {
-                // It's been long enough since the last local sync.
-                i.last_local_sync = Some(std::time::Instant::now());
-                Ok(true)
-            } else {
-                // Otherwise it's not time to sync.
-                Ok(false)
-            }
-        };
-
-        self.inner.share_mut(update_last_sync)
     }
 
     /// Record all timed out rounds into metrics
@@ -838,7 +808,9 @@ impl AsGossipModule for ShardedGossip {
 
     fn local_agent_join(&self, a: Arc<KitsuneAgent>) {
         let _ = self.gossip.inner.share_mut(move |i, _| {
-            i.new_integrated_data()?;
+            // Trigger a full local sync because a new agent has
+            // to catch up with all other agents.
+            i.new_integrated_data(true, true)?;
             i.local_agents.insert(a);
             let s = tracing::trace_span!("gossip_trigger", agents = ?i.show_local_agents(), msg = "New agent joining");
             s.in_scope(|| i.log_state());
@@ -859,9 +831,9 @@ impl AsGossipModule for ShardedGossip {
             .store(true, std::sync::atomic::Ordering::Relaxed);
     }
 
-    fn new_integrated_data(&self) {
+    fn new_integrated_data(&self, authored: bool) {
         let _ = self.gossip.inner.share_mut(move |i, _| {
-            i.new_integrated_data()?;
+            i.new_integrated_data(authored, false)?;
             let s = tracing::trace_span!("gossip_trigger", agents = ?i.show_local_agents(), msg = "New integrated data");
             s.in_scope(|| i.log_state());
             Ok(())

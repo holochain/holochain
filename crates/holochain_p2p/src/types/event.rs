@@ -219,6 +219,7 @@ ghost_actor::ghost_chan! {
             window_ms: TimeWindowMs,
             max_ops: usize,
             include_limbo: bool,
+            only_authored: bool,
         ) -> Option<(Vec<holo_hash::DhtOpHash>, TimeWindowMs)>;
 
         /// The p2p module needs access to the content for a given set of DhtOpHashes.

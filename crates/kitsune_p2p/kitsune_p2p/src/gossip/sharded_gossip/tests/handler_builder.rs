@@ -1,5 +1,6 @@
 use kitsune_p2p_types::dht_arc::DhtArc;
 
+use crate::gossip::sharded_gossip::store::OpHashQuery;
 use crate::gossip::sharded_gossip::tests::common::dangerous_fake_agent_info_with_arc;
 
 use super::common::agent_info;
@@ -86,6 +87,7 @@ impl HandlerBuilder {
                     window_ms,
                     max_ops,
                     include_limbo: _,
+                    only_authored: _,
                 } = arg;
 
                 let agent_arcsets: HashMap<_, _> = agents.into_iter().collect();
@@ -328,9 +330,7 @@ async fn test_three_way_sharded_ownership() {
                 // Only look at one agent at a time
                 &agent_arcs[a..a + 1],
                 &DhtArcSet::Full,
-                full_time_window(),
-                usize::MAX,
-                false,
+                OpHashQuery::default(),
             )
             .await
             .unwrap()

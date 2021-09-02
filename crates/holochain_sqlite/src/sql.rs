@@ -9,6 +9,14 @@ pub mod sql_cell {
         pub const FETCH_OP_HASHES_WRAPPED: &str =
             include_str!("sql/cell/fetch_hashes/any/fetch_op_hashes_wrapped_v1.sql");
     }
+    pub mod authored {
+        pub const FETCH_OP_HASHES_FULL: &str =
+            include_str!("sql/cell/fetch_hashes/authored/fetch_op_hashes_full.sql");
+        pub const FETCH_OP_HASHES_CONTINUOUS: &str =
+            include_str!("sql/cell/fetch_hashes/authored/fetch_op_hashes_continuous.sql");
+        pub const FETCH_OP_HASHES_WRAPPED: &str =
+            include_str!("sql/cell/fetch_hashes/authored/fetch_op_hashes_wrapped_v1.sql");
+    }
     pub mod integrated {
         pub const FETCH_OP_HASHES_FULL: &str =
             include_str!("sql/cell/fetch_hashes/integrated/fetch_op_hashes_full.sql");

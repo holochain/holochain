@@ -304,13 +304,20 @@ impl WrapEvtSender {
         window_ms: TimeWindowMs,
         max_ops: usize,
         include_limbo: bool,
+        only_authored: bool,
     ) -> impl Future<Output = HolochainP2pResult<Option<(Vec<holo_hash::DhtOpHash>, TimeWindowMs)>>>
            + 'static
            + Send {
         timing_trace!(
             {
-                self.0
-                    .query_op_hashes(dna_hash, agents, window_ms, max_ops, include_limbo)
+                self.0.query_op_hashes(
+                    dna_hash,
+                    agents,
+                    window_ms,
+                    max_ops,
+                    include_limbo,
+                    only_authored,
+                )
             },
             "(hp2p:handle) query_op_hashes",
         )
@@ -901,6 +908,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             window_ms: window,
             max_ops,
             include_limbo,
+            only_authored,
         } = input;
         let space = DnaHash::from_kitsune(&space);
         let agents = agents
@@ -911,7 +919,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
             Ok(evt_sender
-                .query_op_hashes(space, agents, window, max_ops, include_limbo)
+                .query_op_hashes(space, agents, window, max_ops, include_limbo, only_authored)
                 .await?
                 .map(|(h, time)| (h.into_iter().map(|h| h.into_kitsune()).collect(), time)))
         }
@@ -1309,12 +1317,16 @@ impl HolochainP2pHandler for HolochainP2pActor {
     }
 
     #[tracing::instrument(skip(self), level = "trace")]
-    fn handle_new_integrated_data(&mut self, dna_hash: DnaHash) -> HolochainP2pHandlerResult<()> {
+    fn handle_new_integrated_data(
+        &mut self,
+        dna_hash: DnaHash,
+        authored: bool,
+    ) -> HolochainP2pHandlerResult<()> {
         let space = dna_hash.into_kitsune();
 
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(
-            async move { Ok(kitsune_p2p.new_integrated_data(space).await?) }
+            async move { Ok(kitsune_p2p.new_integrated_data(space, authored).await?) }
                 .boxed()
                 .into(),
         )

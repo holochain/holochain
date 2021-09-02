@@ -47,7 +47,19 @@ pub async fn integrate_dht_ops_workflow(
     tracing::debug!(?changed);
     if changed > 0 {
         trigger_receipt.trigger();
-        cell_network.new_integrated_data().await?;
+        // Check if the ops we just integrated were authored by this cell.
+        let authored: bool = fresh_reader!(vault, |txn| {
+            DatabaseResult::Ok(txn.query_row(
+                "
+                SELECT EXISTS(
+                    SELECT 1 FROM DhtOp WHERE when_integrated = ? AND is_authored = 1
+                )
+                ",
+                [time],
+                |row| row.get(0),
+            )?)
+        })?;
+        cell_network.new_integrated_data(authored).await?;
         Ok(WorkComplete::Incomplete)
     } else {
         Ok(WorkComplete::Complete)

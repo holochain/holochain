@@ -1,5 +1,6 @@
 use std::ops::Range;
 
+use super::store::OpHashQuery;
 use super::*;
 
 impl ShardedGossipLocal {
@@ -71,9 +72,12 @@ impl ShardedGossipLocal {
                 &self.space,
                 local_agents_within_arc_set.as_slice(),
                 common_arc_set,
-                search_time_window.clone(),
-                Self::UPPER_HASHES_BOUND,
-                true,
+                OpHashQuery {
+                    window_ms: search_time_window.clone(),
+                    max_ops: Self::UPPER_HASHES_BOUND,
+                    include_limbo: true,
+                    only_authored: false,
+                },
             )
             .await?;
 
@@ -151,16 +155,16 @@ impl ShardedGossipLocal {
             bloom: remote_bloom,
             time,
         } = remote_bloom;
+        let query = OpHashQuery {
+            window_ms: time,
+            ..Default::default()
+        };
         if let Some((hashes, _)) = store::all_op_hashes_within_arcset(
             &self.evt_sender,
             &self.space,
             local_agents_within_arc_set.as_slice(),
             &common_arc_set,
-            time,
-            // TOOD: This means we will pull all hashes we have for this
-            // time window into memory. Is that ok?
-            usize::MAX,
-            false,
+            query,
         )
         .await?
         {

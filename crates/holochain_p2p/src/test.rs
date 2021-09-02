@@ -104,7 +104,11 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
-    fn handle_new_integrated_data(&mut self, dna_hash: DnaHash) -> HolochainP2pHandlerResult<()> {
+    fn handle_new_integrated_data(
+        &mut self,
+        dna_hash: DnaHash,
+        authored: bool,
+    ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
     fn handle_authority_for_hash(

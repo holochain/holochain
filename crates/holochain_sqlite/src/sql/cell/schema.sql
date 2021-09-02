@@ -147,6 +147,7 @@ CREATE INDEX IF NOT EXISTS DhtOp_type_idx ON DhtOp ( type );
 CREATE INDEX IF NOT EXISTS DhtOp_validation_stage_idx ON DhtOp ( validation_stage );
 CREATE INDEX IF NOT EXISTS DhtOp_validation_status_idx ON DhtOp ( validation_status );
 CREATE INDEX IF NOT EXISTS DhtOp_authored_timestamp_ms_idx ON DhtOp ( authored_timestamp_ms );
+CREATE INDEX IF NOT EXISTS DhtOp_when_integrated_idx ON DhtOp ( when_integrated );
 CREATE INDEX IF NOT EXISTS DhtOp_storage_center_loc_idx ON DhtOp ( storage_center_loc );
 CREATE INDEX IF NOT EXISTS DhtOp_header_hash_idx ON DhtOp ( header_hash );
 -- CREATE INDEX DhtOp_basis_hash_idx ON DhtOp ( basis_hash );

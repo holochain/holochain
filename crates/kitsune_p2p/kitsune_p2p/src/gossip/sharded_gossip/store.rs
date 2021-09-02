@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use std::{collections::HashSet, ops::Range, sync::Arc};
 
 use crate::event::{
-    FetchOpDataEvt, PutAgentInfoSignedEvt, QueryAgentInfoSignedEvt, QueryGossipAgentsEvt,
-    QueryOpHashesEvt, TimeWindowMs,
+    full_time_window, FetchOpDataEvt, PutAgentInfoSignedEvt, QueryAgentInfoSignedEvt,
+    QueryGossipAgentsEvt, QueryOpHashesEvt, TimeWindowMs,
 };
 use crate::types::event::KitsuneP2pEventSender;
 use kitsune_p2p_types::{
@@ -108,15 +108,32 @@ pub(super) async fn agents_within_arcset(
         .map_err(KitsuneError::other)?)
 }
 
+#[derive(Clone)]
+pub(super) struct OpHashQuery {
+    pub window_ms: TimeWindowMs,
+    pub max_ops: usize,
+    pub include_limbo: bool,
+    pub only_authored: bool,
+}
+
+impl Default for OpHashQuery {
+    fn default() -> Self {
+        Self {
+            window_ms: full_time_window(),
+            max_ops: usize::MAX,
+            include_limbo: false,
+            only_authored: false,
+        }
+    }
+}
+
 /// Get all ops for all agents that fall within the specified arcset.
 pub(super) async fn all_op_hashes_within_arcset(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
     agents: &[(Arc<KitsuneAgent>, ArcInterval)],
     common_arc_set: &DhtArcSet,
-    window_ms: TimeWindowMs,
-    max_ops: usize,
-    include_limbo: bool,
+    query: OpHashQuery,
 ) -> KitsuneResult<Option<(Vec<Arc<KitsuneOpHash>>, Range<u64>)>> {
     let agents: Vec<_> = agents
         .iter()
@@ -131,9 +148,10 @@ pub(super) async fn all_op_hashes_within_arcset(
         .query_op_hashes(QueryOpHashesEvt {
             space: space.clone(),
             agents,
-            window_ms,
-            max_ops,
-            include_limbo,
+            window_ms: query.window_ms,
+            max_ops: query.max_ops,
+            include_limbo: query.include_limbo,
+            only_authored: query.only_authored,
         })
         .await
         .map_err(KitsuneError::other)?)

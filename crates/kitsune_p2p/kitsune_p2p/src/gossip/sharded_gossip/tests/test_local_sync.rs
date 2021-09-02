@@ -1,3 +1,5 @@
+use crate::gossip::sharded_gossip::store::OpHashQuery;
+
 use super::common::*;
 use super::handler_builder::{
     calculate_missing_ops, mock_agent_persistence, HandlerBuilder, OwnershipData,
@@ -96,9 +98,7 @@ async fn local_sync_scenario() {
             // Only look at the first agent
             &agent_arcs[0..1],
             &DhtArcSet::Full,
-            full_time_window(),
-            usize::MAX,
-            false,
+            OpHashQuery::default(),
         )
         .await
         .unwrap()

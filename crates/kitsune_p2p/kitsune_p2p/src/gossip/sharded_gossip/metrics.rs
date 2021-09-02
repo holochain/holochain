@@ -133,3 +133,48 @@ fn record_instant(buffer: &mut VecDeque<Instant>) {
     }
     buffer.push_back(Instant::now());
 }
+
+impl std::fmt::Display for Metrics {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Metrics:")?;
+        for (key, info) in &self.map {
+            write!(f, "\n\t{:?}:", key)?;
+            write!(
+                f,
+                "\n\t\tErrors: {}, Last: {:?}",
+                info.errors.len(),
+                info.errors.back().map(|i| i.elapsed()).unwrap_or_default()
+            )?;
+            write!(
+                f,
+                "\n\t\tInitiates: {}, Last: {:?}",
+                info.initiates.len(),
+                info.initiates
+                    .back()
+                    .map(|i| i.elapsed())
+                    .unwrap_or_default()
+            )?;
+            write!(
+                f,
+                "\n\t\tRemote Rounds: {}, Last: {:?}",
+                info.remote_rounds.len(),
+                info.remote_rounds
+                    .back()
+                    .map(|i| i.elapsed())
+                    .unwrap_or_default()
+            )?;
+            write!(
+                f,
+                "\n\t\tComplete Rounds: {}, Last: {:?}",
+                info.complete_rounds.len(),
+                info.complete_rounds
+                    .back()
+                    .map(|i| i.elapsed())
+                    .unwrap_or_default()
+            )?;
+            write!(f, "\n\t\tCurrent Round: {}", info.current_round)?;
+        }
+        write!(f, "\n\tForce Initiate: {}", self.force_initiates)?;
+        Ok(())
+    }
+}
