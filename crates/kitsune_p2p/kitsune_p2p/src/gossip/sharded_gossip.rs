@@ -213,6 +213,7 @@ impl ShardedGossip {
     }
 
     async fn run_one_iteration(&self) {
+        tracing::debug!("gossip iteration");
         match self.gossip.try_initiate().await {
             Ok(Some(outgoing)) => {
                 if let Err(err) = self.inner.share_mut(|i, _| {

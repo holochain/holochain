@@ -104,8 +104,8 @@ impl ScenarioDefAgent {
     /// definition, based on the resolution defined in the ScenarioDef which
     /// is passed in
     pub fn arc(&self) -> ArcInterval {
-        let start = rectify_index(TOTAL, self.arc.0);
-        let end = rectify_index(TOTAL, self.arc.1 + 1) - 1;
+        let start = rectify_index(TOTAL, self.arc.0, false);
+        let end = rectify_index(TOTAL, self.arc.1, true);
         ArcInterval::new(start, end)
     }
 }
@@ -158,7 +158,7 @@ impl<const N: usize> PeerMatrix<N> {
 }
 
 /// Map a signed index into an unsigned index
-pub fn rectify_index(num: usize, i: i8) -> u32 {
+pub fn rectify_index(num: usize, i: i8, end: bool) -> u32 {
     if i < 0 {
         (num as isize + i as isize) as u32
     } else {

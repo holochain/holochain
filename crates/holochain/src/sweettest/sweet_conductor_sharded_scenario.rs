@@ -24,23 +24,22 @@ pub struct SweetGossipScenarioNode {
 impl SweetGossipScenarioNode {
     /// Get the LocBuckets for every op hash held by this node.
     /// Ops which were not manually injected are excluded.
-    pub async fn get_op_basis_buckets(&self) -> HashSet<LocBucket> {
+    pub async fn get_op_basis_loc_buckets(&self) -> HashSet<LocBucket> {
         let hashes: HashSet<DhtOpHash> = self
             .conductor
             .get_all_op_hashes(self.apps.cells_flattened())
             .await
             .collect();
+        // Exclude the ops which were present at the moment of op injection
         hashes
             .difference(&*self.excluded_ops)
             .map(|h| {
                 let loc = *GOSSIP_FIXTURE_OP_LOOKUP.get(&h).unwrap_or_else(|| {
-                    // dbg!(&GOSSIP_FIXTURE_OP_LOOKUP);
-                    // dbg!(h);
-                    panic!("must use a fixture op hash for lookup")
+                    panic!(
+                        "Must only fixture op hashes for LocBucket lookup. Hash: {}",
+                        h
+                    )
                 });
-                // let loc = dbg!(h.get_loc().to_u32()) as u64;
-                // let loc = (loc * (u8::MAX as u64 + 1) / (u32::MAX as u64 + 1)) as u32;
-                // assert!(loc <= u8::MAX as u32);
                 loc
             })
             .collect()
@@ -90,7 +89,7 @@ impl<const N: usize> SweetGossipScenario<N> {
 
             for (agent_def, cell) in itertools::zip(agent_defs, cells) {
                 // Manually set the storage arc
-                // cell.set_storage_arc(agent_def.arc()).await;
+                cell.set_storage_arc(agent_def.arc()).await;
                 // Manually inject DhtOps at the correct locations
                 cell.inject_gossip_fixture_ops(agent_def.ops.clone().into_iter());
             }
