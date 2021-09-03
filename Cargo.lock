@@ -621,7 +621,7 @@ dependencies = [
  "percent-encoding 2.1.0",
  "rand 0.8.4",
  "rustc-workspace-hack",
- "rustfix",
+ "rustfix 0.5.1",
  "same-file",
  "semver 0.10.0",
  "serde",
@@ -2260,7 +2260,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.0.103"
+version = "0.0.104"
 dependencies = [
  "fixt",
  "hdk_derive",
@@ -2279,7 +2279,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "holochain_zome_types",
  "paste",
@@ -2370,7 +2370,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.0.104-dev.0"
+version = "0.0.104"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2452,7 +2452,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.0.4-dev.0"
+version = "0.0.4"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2485,7 +2485,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.0.5-dev.0"
+version = "0.0.5"
 dependencies = [
  "anyhow",
  "futures",
@@ -2498,7 +2498,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.0.4-dev.0"
+version = "0.0.4"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -2519,7 +2519,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.0.5-dev.0"
+version = "0.0.5"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -2546,7 +2546,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.0.4-dev.0"
+version = "0.0.4"
 dependencies = [
  "derive_more",
  "directories 2.0.2",
@@ -2570,7 +2570,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_keystore"
-version = "0.0.4-dev.0"
+version = "0.0.4"
 dependencies = [
  "ghost_actor 0.3.0-alpha.3",
  "holo_hash",
@@ -2589,7 +2589,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.0.4-dev.0"
+version = "0.0.4"
 dependencies = [
  "async-trait",
  "fixt",
@@ -2640,7 +2640,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_sqlite"
-version = "0.0.4-dev.0"
+version = "0.0.4"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -2686,7 +2686,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.0.4-dev.0"
+version = "0.0.4"
 dependencies = [
  "anyhow",
  "base64",
@@ -2725,7 +2725,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "hdk",
  "serde",
@@ -2733,7 +2733,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.0.4-dev.0"
+version = "0.0.4"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2798,7 +2798,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.0.4-dev.0"
+version = "0.0.4"
 dependencies = [
  "fixt",
  "holo_hash",
@@ -2856,7 +2856,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_websocket"
-version = "0.0.4-dev.0"
+version = "0.0.4"
 dependencies = [
  "criterion",
  "futures",
@@ -2884,7 +2884,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "arbitrary",
  "chrono",
@@ -3228,7 +3228,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p"
-version = "0.0.4-dev.0"
+version = "0.0.4"
 dependencies = [
  "arbitrary",
  "arrayref",
@@ -3363,7 +3363,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_proxy"
-version = "0.0.4-dev.0"
+version = "0.0.4"
 dependencies = [
  "base64",
  "blake2b_simd",
@@ -3389,7 +3389,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_transport_quic"
-version = "0.0.4-dev.0"
+version = "0.0.4"
 dependencies = [
  "blake2b_simd",
  "futures",
@@ -3408,7 +3408,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_types"
-version = "0.0.4-dev.0"
+version = "0.0.4"
 dependencies = [
  "arbitrary",
  "base64",
@@ -5389,8 +5389,11 @@ dependencies = [
  "prettydiff",
  "pulldown-cmark",
  "regex",
+ "rustfix 0.6.0",
  "semver 0.10.0",
  "serde",
+ "serde_json",
+ "serde_with",
  "serde_yaml",
  "structopt 0.3.22",
  "tempfile",
@@ -5585,6 +5588,18 @@ name = "rustfix"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2c50b74badcddeb8f7652fa8323ce440b95286f8e4b64ebfd871c609672704e"
+dependencies = [
+ "anyhow",
+ "log",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "rustfix"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f0be05fc0675ef4f47119dc39cfc46636bb77d4fc4ef1bd851b9c3f7697f32a"
 dependencies = [
  "anyhow",
  "log",
@@ -5860,6 +5875,29 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
+]
+
+[[package]]
+name = "serde_with"
+version = "1.9.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1ad9fdbb69badc8916db738c25efd04f0a65297d26c2f8de4b62e57b8c12bc72"
+dependencies = [
+ "rustversion",
+ "serde",
+ "serde_with_macros",
+]
+
+[[package]]
+name = "serde_with_macros"
+version = "1.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1569374bd54623ec8bd592cf22ba6e03c0f177ff55fbc8c29a49e296e7adecf"
+dependencies = [
+ "darling 0.13.0",
+ "proc-macro2 1.0.28",
+ "quote 1.0.9",
+ "syn 1.0.74",
 ]
 
 [[package]]
