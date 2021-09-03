@@ -27,7 +27,10 @@ fn get_clippy_output() -> Result<PathBuf, Error> {
     cmd.args(&[
         "clippy",
         "--target-dir",
-        &format!("{}/clippy", env!("CARGO_TARGET_DIR")),
+        &format!(
+            "{}/clippy",
+            option_env!("CARGO_TARGET_DIR").unwrap_or("target")
+        ),
         "--message-format=json",
         "--",
         "-A",
