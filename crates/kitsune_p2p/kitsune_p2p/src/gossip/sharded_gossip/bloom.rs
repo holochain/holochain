@@ -56,6 +56,7 @@ impl ShardedGossipLocal {
         mut search_time_window: Range<u64>,
     ) -> KitsuneResult<Vec<TimedBloomFilter>> {
         let mut results = Vec::new();
+        dbg!(&common_arc_set);
         loop {
             // Get the local agents within the arc set.
             let local_agents_within_arc_set: Vec<_> =

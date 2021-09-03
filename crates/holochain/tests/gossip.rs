@@ -49,8 +49,5 @@ async fn test_1() {
     dbg!(&locs1);
     dbg!(&locs2);
 
-    assert_eq!(
-        locs0,
-        hashset![-4, -3, -2, -1, 0, 1, 2, 3, 4]
-    );
+    assert_eq!(locs0, hashset![-4, -3, -2, -1, 0, 1, 2, 3, 4]);
 }

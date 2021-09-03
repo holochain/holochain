@@ -126,6 +126,8 @@ pub mod tests {
     passphrase_service:
       type: danger_insecure_from_config
       passphrase: "test-passphrase"
+    
+    test:
     "#;
         let result: ConductorConfig = config_from_yaml(yaml).unwrap();
         assert_eq!(
@@ -140,6 +142,7 @@ pub mod tests {
                 keystore_path: None,
                 admin_interfaces: None,
                 use_dangerous_test_keystore: false,
+                test: Default::default(),
             }
         );
     }
@@ -246,6 +249,7 @@ pub mod tests {
     passphrase_service:
       type: danger_insecure_from_config
       passphrase: "foobar"
+    test:
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
         assert_eq!(
@@ -260,6 +264,7 @@ pub mod tests {
                 keystore_path: Some(PathBuf::from("/path/to/keystore").into()),
                 admin_interfaces: None,
                 use_dangerous_test_keystore: true,
+                test: Default::default(),
             }
         );
     }

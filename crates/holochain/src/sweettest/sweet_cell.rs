@@ -93,15 +93,17 @@ impl SweetCell {
                         ":author": self.agent_pubkey()
                     },
                 )?;
-                // Set timestamp to something recognizable. Also important because
-                // u64::MAX cannot be matched on due to the timestamp range query
-                // being exclusive on the endpoint.
+                // Set timestamp to something reasonable.
+                // TODO: allow variability of timestamps.
+                let timestamp = holochain_types::timestamp::now();
                 txn.execute(
                     "
                     UPDATE DhtOp
-                    SET authored_timestamp_ms = 1111
+                    SET authored_timestamp_ms = :timestamp
                     ",
-                    [],
+                    rusqlite::named_params! {
+                        ":timestamp": timestamp
+                    },
                 )?;
                 DatabaseResult::Ok(())
             })
