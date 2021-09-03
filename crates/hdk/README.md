@@ -1,5 +1,8 @@
 # Holochain Development Kit (HDK)
 
+[![Crate](https://img.shields.io/crates/v/hdk.svg)](https://crates.io/crates/hdk)
+[![API Docs](https://docs.rs/hdk/badge.svg)](https://docs.rs/hdk)
+
 This kit:
 
 1. The DSL is ergonomic and composable, so optional if you want more control

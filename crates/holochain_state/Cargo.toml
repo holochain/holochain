@@ -1,6 +1,6 @@
 [package]
 name = "holochain_state"
-version = "0.0.4-dev.0"
+version = "0.0.4"
 description = "TODO minimize deps"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -13,17 +13,17 @@ byteorder = "1.3.4"
 chrono = "0.4.6"
 derive_more = "0.99.3"
 either = "1.5"
-holochain_sqlite = { version = "0.0.4-dev.0", path = "../holochain_sqlite" }
+holochain_sqlite = { version = "0.0.4", path = "../holochain_sqlite" }
 holo_hash = { version = "0.0.5", path = "../holo_hash", features = ["full"] }
 fallible-iterator = "0.2.0"
-holochain_keystore = { version = "0.0.4-dev.0", path = "../holochain_keystore" }
+holochain_keystore = { version = "0.0.4", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.51"
-holochain_p2p = { version = "0.0.4-dev.0", path = "../holochain_p2p" }
-holochain_types = { version = "0.0.4-dev.0", path = "../holochain_types" }
+holochain_p2p = { version = "0.0.4", path = "../holochain_p2p" }
+holochain_types = { version = "0.0.4", path = "../holochain_types" }
 holochain_util = { version = "0.0.3", path = "../holochain_util" }
-holochain_wasm_test_utils = { path = "../test_utils/wasm", optional = true, version = "0.0.4-dev.0"}
-holochain_zome_types = { version = "0.0.5", path = "../holochain_zome_types", features = [ "full" ] }
-kitsune_p2p = { version = "0.0.4-dev.0", path = "../kitsune_p2p/kitsune_p2p" }
+holochain_wasm_test_utils = { path = "../test_utils/wasm", optional = true, version = "0.0.4"}
+holochain_zome_types = { version = "0.0.6", path = "../holochain_zome_types", features = [ "full" ] }
+kitsune_p2p = { version = "0.0.4", path = "../kitsune_p2p/kitsune_p2p" }
 mockall = "0.10.2"
 parking_lot = "0.10"
 replace_with = { version = "0.1.7" }
@@ -44,8 +44,8 @@ contrafact = { version = "0.1.0-dev.1", optional = true }
 [dev-dependencies]
 anyhow = "1.0.26"
 fixt = { version = "0.0.5", path = "../fixt" }
-hdk = { version = "0.0.103", path = "../hdk" }
-holochain_wasm_test_utils = { path = "../test_utils/wasm", version = "0.0.4-dev.0"}
+hdk = { version = "0.0.104", path = "../hdk" }
+holochain_wasm_test_utils = { path = "../test_utils/wasm", version = "0.0.4"}
 matches = "0.1.8"
 observability = "0.1.3"
 pretty_assertions = "0.6.1"

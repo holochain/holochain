@@ -154,11 +154,9 @@ impl ShardedGossip {
         let timeout = self.gossip.tuning_params.implicit_timeout();
 
         let con = match how {
-            HowToConnect::Con(con) => {
+            HowToConnect::Con(con, remote_url) => {
                 if con.is_closed() {
-                    self.ep_hnd
-                        .get_connection(con.peer_addr()?, timeout)
-                        .await?
+                    self.ep_hnd.get_connection(remote_url, timeout).await?
                 } else {
                     con
                 }
@@ -174,7 +172,7 @@ impl ShardedGossip {
 
     async fn process_incoming_outgoing(&self) -> KitsuneResult<()> {
         let (incoming, outgoing) = self.pop_queues()?;
-        if let Some((con, msg, bytes)) = incoming {
+        if let Some((con, remote_url, msg, bytes)) = incoming {
             self.bandwidth.incoming_bytes(bytes).await;
             let outgoing = match self.gossip.process_incoming(con.peer_cert(), msg).await {
                 Ok(r) => r,
@@ -187,7 +185,7 @@ impl ShardedGossip {
                 i.outgoing.extend(outgoing.into_iter().map(|msg| {
                     (
                         GossipTgt::new(Vec::with_capacity(0), con.peer_cert()),
-                        HowToConnect::Con(con.clone()),
+                        HowToConnect::Con(con.clone(), remote_url.clone()),
                         msg,
                     )
                 }));
@@ -259,7 +257,7 @@ pub struct ShardedGossipLocal {
 }
 
 /// Incoming gossip.
-type Incoming = (Tx2ConHnd<wire::Wire>, ShardedGossipWire, usize);
+type Incoming = (Tx2ConHnd<wire::Wire>, TxUrl, ShardedGossipWire, usize);
 /// Outgoing gossip.
 type Outgoing = (GossipTgt, HowToConnect, ShardedGossipWire);
 
@@ -292,12 +290,15 @@ impl ShardedGossipLocalState {
         {
             self.initiate_tgt = None;
         }
-        if error {
-            self.metrics.record_error(state_key.clone());
-        } else {
-            self.metrics.record_success(state_key.clone());
+        let r = self.round_map.remove(state_key);
+        if r.is_some() {
+            if error {
+                self.metrics.record_error(state_key.clone());
+            } else {
+                self.metrics.record_success(state_key.clone());
+            }
         }
-        self.round_map.remove(state_key)
+        r
     }
 
     fn check_tgt_expired(&mut self) {
@@ -406,7 +407,7 @@ impl ShardedGossipLocal {
         self.inner.share_mut(|i, _| Ok(i.remove_state(id, error)))
     }
 
-    async fn remove_target(&self, id: &StateKey) -> KitsuneResult<()> {
+    async fn remove_target(&self, id: &StateKey, error: bool) -> KitsuneResult<()> {
         self.inner.share_mut(|i, _| {
             if i.initiate_tgt
                 .as_ref()
@@ -414,6 +415,11 @@ impl ShardedGossipLocal {
                 .unwrap_or(false)
             {
                 i.initiate_tgt = None;
+                if error {
+                    i.metrics.record_error(id.clone());
+                } else {
+                    i.metrics.record_success(id.clone());
+                }
             }
             Ok(())
         })
@@ -538,7 +544,7 @@ impl ShardedGossipLocal {
                 Vec::with_capacity(0)
             }
             ShardedGossipWire::AlreadyInProgress(_) => {
-                self.remove_target(&cert).await?;
+                self.remove_target(&cert, false).await?;
                 Vec::with_capacity(0)
             }
             ShardedGossipWire::Error(Error { message }) => {
@@ -788,13 +794,15 @@ impl AsGossipModule for ShardedGossip {
     fn incoming_gossip(
         &self,
         con: Tx2ConHnd<wire::Wire>,
+        remote_url: TxUrl,
         gossip_data: Box<[u8]>,
     ) -> KitsuneResult<()> {
         use kitsune_p2p_types::codec::*;
         let (bytes, gossip) =
             ShardedGossipWire::decode_ref(&gossip_data).map_err(KitsuneError::other)?;
         self.inner.share_mut(move |i, _| {
-            i.incoming.push_back((con, gossip, bytes as usize));
+            i.incoming
+                .push_back((con, remote_url, gossip, bytes as usize));
             if i.incoming.len() > 20 {
                 tracing::warn!(
                     "Overloaded with incoming gossip.. {} messages",
