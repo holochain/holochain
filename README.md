@@ -36,7 +36,7 @@ This nix-shell flavor installs wrapper binaries for `holochain` and `hc` that wi
 
 Another way to install the `holochain` and `hc` binaries (if the previous didn't work) is by using rust
 
-[Install Rust](https://www.rust-lang.org/tools/install) 
+[Install Rust](https://www.rust-lang.org/tools/install)
 
 Install holochain binaries:
 ```
@@ -133,6 +133,18 @@ rough advice, because anything we say today could be out of date tomorrow:
 - Install any relevant shared libs like libsodium
 - Write your own scaffolding, build and development tools
 - Plan for dependency management as we ship new binaries
+
+### Advanced nix-shell usage
+
+#### Custom rust version
+
+The shell function in this repository takes a `rustVersion` argument that works in the following way:
+
+```shell
+$ nix-shell --arg rustVersion '{ track = "nightly"; version = "2021-07-01"; }' --run "rustc --version"
+Using /home/steveej/src/holo/holochain as target prefix...
+rustc 1.55.0-nightly (868c702d0 2021-06-30)
+```
 
 ### Additional Documentation
 
