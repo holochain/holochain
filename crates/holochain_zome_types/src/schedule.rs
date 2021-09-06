@@ -3,6 +3,7 @@ use std::time::Duration;
 /// Defines either a persisted or ephemeral schedule for a schedule function.
 /// Persisted schedules survive a conductor reboot, ephemeral will not.
 /// Persisted schedules continue beyond irrecoverable errors, ephemeral do not.
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub enum Schedule {
     /// Persisted schedules are defined by a crontab syntax string.
     Persisted(String),

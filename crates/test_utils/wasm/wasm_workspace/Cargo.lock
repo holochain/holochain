@@ -1194,6 +1194,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_wasm_schedule"
+version = "0.0.1"
+dependencies = [
+ "fixt",
+ "hdk",
+ "serde",
+]
+
+[[package]]
 name = "test_wasm_ser_regression"
 version = "0.0.1"
 dependencies = [

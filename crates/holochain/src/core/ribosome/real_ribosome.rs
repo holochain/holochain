@@ -636,15 +636,15 @@ impl RibosomeT for RealRibosome {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use hdk::prelude::*;
-    use holochain_wasm_test_utils::TestWasm;
-    use ::fixt::prelude::*;
-    use crate::sweettest::SweetDnaFile;
-    use holochain_types::prelude::AgentPubKeyFixturator;
-    use crate::core::ribosome::MockDnaStore;
-    use crate::sweettest::SweetConductor;
     use crate::conductor::ConductorBuilder;
+    use crate::core::ribosome::MockDnaStore;
     use crate::core::ribosome::ZomeCall;
+    use crate::sweettest::SweetConductor;
+    use crate::sweettest::SweetDnaFile;
+    use ::fixt::prelude::*;
+    use hdk::prelude::*;
+    use holochain_types::prelude::AgentPubKeyFixturator;
+    use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(flavor = "multi_thread")]
     /// Basic checks that we can call externs internally and externally the way we want using the
@@ -652,7 +652,9 @@ pub mod wasm_test {
     async fn ribosome_extern_test() {
         observability::test_run().ok();
 
-        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::HdkExtern]).await.unwrap();
+        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::HdkExtern])
+            .await
+            .unwrap();
         let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
         let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
 
@@ -660,9 +662,12 @@ pub mod wasm_test {
         dna_store.expect_add_dnas::<Vec<_>>().return_const(());
         dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
         dna_store.expect_add_dna().return_const(());
-        dna_store.expect_get().return_const(Some(dna_file.clone().into()));
+        dna_store
+            .expect_get()
+            .return_const(Some(dna_file.clone().into()));
 
-        let mut conductor = SweetConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
+        let mut conductor =
+            SweetConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
 
         let apps = conductor
             .setup_app_for_agents(
@@ -676,23 +681,16 @@ pub mod wasm_test {
         let ((alice,), (_bob,)) = apps.into_tuples();
         let alice = alice.zome(TestWasm::HdkExtern);
 
-        let foo_result: String = conductor.call(
-            &alice,
-            "foo",
-            ()
-        ).await;
+        let foo_result: String = conductor.call(&alice, "foo", ()).await;
 
         assert_eq!("foo", &foo_result);
 
-        let bar_result: String = conductor.call(
-            &alice,
-            "bar",
-            ()
-        ).await;
+        let bar_result: String = conductor.call(&alice, "bar", ()).await;
 
         assert_eq!("foobar", &bar_result);
 
-        let infallible_result = conductor.handle()
+        let infallible_result = conductor
+            .handle()
             .call_zome(ZomeCall {
                 cell_id: alice.cell_id().clone(),
                 zome_name: alice.name().clone(),
@@ -701,15 +699,13 @@ pub mod wasm_test {
                 provenance: alice_pubkey.clone(),
                 payload: ExternIO::encode(()).unwrap(),
             })
-            .await.unwrap().unwrap();
+            .await
+            .unwrap()
+            .unwrap();
 
         if let ZomeCallResponse::Ok(response) = infallible_result {
-            assert_eq!(
-                "infallible",
-                &response.decode::<String>().unwrap(),
-            );
-        }
-        else {
+            assert_eq!("infallible", &response.decode::<String>().unwrap(),);
+        } else {
             unreachable!();
         }
     }
