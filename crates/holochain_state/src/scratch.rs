@@ -34,6 +34,7 @@ pub struct Scratch {
     headers: Vec<SignedHeaderHashed>,
     entries: HashMap<EntryHash, Arc<Entry>>,
     chain_top_ordering: ChainTopOrdering,
+    scheduled_fns: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -50,6 +51,14 @@ impl Scratch {
             chain_top_ordering: ChainTopOrdering::Relaxed,
             ..Default::default()
         }
+    }
+
+    pub fn scheduled_fns(&self) -> &[String] {
+        &self.scheduled_fns
+    }
+
+    pub fn add_scheduled_fn(&mut self, scheduled_fn: String) {
+        self.scheduled_fns.push(scheduled_fn)
     }
 
     pub fn chain_top_ordering(&self) -> ChainTopOrdering {
@@ -87,7 +96,7 @@ impl Scratch {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.headers.is_empty()
+        self.headers.is_empty() && self.scheduled_fns.is_empty()
     }
 
     pub fn headers(&self) -> impl Iterator<Item = &SignedHeaderHashed> {
@@ -144,6 +153,10 @@ impl Scratch {
             Some(Element::new(shh, Some(entry)))
         });
         Ok(r)
+    }
+
+    pub fn drain_scheduled_fns(&mut self) -> impl Iterator<Item = String> + '_ {
+        self.scheduled_fns.drain(..)
     }
 
     /// Drain out all the headers.

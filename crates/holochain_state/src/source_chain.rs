@@ -582,13 +582,14 @@ impl SourceChain {
         if self.scratch.apply(|s| s.is_empty())? {
             return Ok(());
         }
-        let (headers, ops, entries) = self.scratch.apply_and_then(|scratch| {
+        let (scheduled_fns, headers, ops, entries) = self.scratch.apply_and_then(|scratch| {
             let (headers, ops) =
                 build_ops_from_headers(scratch.drain_headers().collect::<Vec<_>>())?;
 
             // Drain out any entries.
             let entries = scratch.drain_entries().collect::<Vec<_>>();
-            SourceChainResult::Ok((headers, ops, entries))
+            let scheduled_fns = scratch.drain_scheduled_fns().collect::<Vec<_>>();
+            SourceChainResult::Ok((scheduled_fns, headers, ops, entries))
         })?;
 
         let maybe_countersigned_entry = entries
@@ -613,6 +614,9 @@ impl SourceChain {
         let persisted_head = self.persisted_head.clone();
         self.vault
             .async_commit(move |txn: &mut Transaction| {
+                for scheduled_fn in scheduled_fns {
+                    schedule_fn(&txn, scheduled_fn, None)?;
+                }
                 // As at check.
                 let (new_persisted_head, _, _) = chain_head_db(&txn, author)?;
                 if headers.last().is_none() {

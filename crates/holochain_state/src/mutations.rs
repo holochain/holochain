@@ -598,3 +598,32 @@ pub fn unlock_chain(txn: &mut Transaction) -> StateMutationResult<()> {
     txn.execute("DELETE FROM ChainLock", [])?;
     Ok(())
 }
+
+pub fn schedule_fn(txn: &mut Transaction, scheduled_fn: String, schedule: Option<Schedule>) -> StateMutationResult<()> {
+    match (fn_is_scheduled(scheduled_fn)?, schedule) {
+        (_, Some(schedule)) => {
+            txn.execute(
+                "
+                UPDATE ScheduledFunctions
+                SET
+                schedule = :schedule,
+                tokio_scheduled = false
+                WHERE
+                ScheduledFunctions.scheduled_fn = :scheduled_fn
+                ",
+                named_params! {
+                    ":schedule": to_blob(schedule)?,
+                    ":scheduled_fn": scheduled_fn,
+                },
+            )?;
+            Ok(())
+        },
+        (false, None) => {
+            sql_insert!(txn, ScheduledFunctions, {
+                "scheduled_fn": scheduled_fn,
+                "tokio_scheduled": false,
+            })?;
+        },
+        _ => { }
+    }
+}
