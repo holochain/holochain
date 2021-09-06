@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - hdk: `scheduled` fn signature updated to a string
 
+### Added
+
+- hdk: `map_extern_infallible` added to map infallible externs
+
 ## 0.0.104
 
 ## 0.0.103
