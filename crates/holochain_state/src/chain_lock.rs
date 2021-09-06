@@ -17,7 +17,7 @@ pub fn is_chain_locked(txn: &Transaction, lock: &[u8]) -> StateMutationResult<bo
             ",
             named_params! {
                 ":lock": lock,
-                ":now": holochain_types::timestamp::now().0
+                ":now": holochain_types::timestamp::now().secs()
             },
             |row| row.get::<_, u32>(0),
         )
@@ -41,7 +41,7 @@ pub fn is_lock_expired(txn: &Transaction, lock: &[u8]) -> StateMutationResult<bo
             named_params! {
                 ":lock": lock,
             },
-            |row| Ok(row.get::<_, i64>("end")? < holochain_types::timestamp::now().0),
+            |row| Ok(row.get::<_, i64>("end")? < holochain_types::timestamp::now().secs()),
         )
         .optional()?;
     // If there's no lock then it's expired.

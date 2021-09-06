@@ -3,9 +3,6 @@
 //! Includes a struct that gives a uniform well-ordered byte representation
 //! of a timestamp, used for chronologically ordered database keys
 
-use std::convert::TryFrom;
-use std::convert::TryInto;
-
 /// A UTC timestamp for use in Holochain's headers.
 ///
 /// Timestamp implements `Serialize` and `Display` as rfc3339 time strings.
@@ -23,68 +20,6 @@ pub fn now() -> Timestamp {
     Timestamp::from(chrono::offset::Utc::now())
 }
 
-const SEC: usize = std::mem::size_of::<i64>();
-const NSEC: usize = std::mem::size_of::<u32>();
-
-/// Total size in bytes of a [TimestampKey]
-pub const TS_SIZE: usize = SEC + NSEC;
-
-/// A representation of a Timestamp which can go into and out of a byte slice
-/// in-place without allocation. Useful for ordered database keys.
-///
-/// The mapping to byte slice involves some bit shifting, and so the bytes
-/// should not be directly used. However, ordering is preserved when mapping
-/// to a TimestampKey, which is what allows us to use it as a key.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[repr(transparent)]
-pub struct TimestampKey([u8; TS_SIZE]);
-
-impl TimestampKey {
-    /// Constructor based on current time
-    pub fn now() -> Self {
-        crate::timestamp::now().into()
-    }
-}
-
-impl From<Timestamp> for TimestampKey {
-    fn from(t: Timestamp) -> TimestampKey {
-        let (sec, nsec) = (t.0, t.1);
-        // We have to add 2^64, so that negative numbers become positive,
-        // so that correct ordering relative to other byte arrays is maintained.
-        let sec: i128 = (sec as i128) - (i64::MIN as i128);
-        let sec: u64 = sec as u64;
-        let mut a = [0; TS_SIZE];
-        a[0..SEC].copy_from_slice(&sec.to_be_bytes());
-        a[SEC..].copy_from_slice(&nsec.to_be_bytes());
-        TimestampKey(a)
-    }
-}
-
-impl From<TimestampKey> for Timestamp {
-    fn from(k: TimestampKey) -> Timestamp {
-        let sec = u64::from_be_bytes(k.0[0..SEC].try_into().unwrap());
-        let nsec = u32::from_be_bytes(k.0[SEC..].try_into().unwrap());
-        // Since we added 2^64 during encoding, we must subtract it during
-        // decoding
-        let sec: i128 = (sec as i128) + (i64::MIN as i128);
-        Timestamp(sec as i64, nsec)
-    }
-}
-
-impl AsRef<[u8]> for TimestampKey {
-    fn as_ref(&self) -> &[u8] {
-        assert_eq!(self.0.len(), 12);
-        &self.0
-    }
-}
-
-impl From<&[u8]> for TimestampKey {
-    fn from(bytes: &[u8]) -> Self {
-        assert_eq!(bytes.len(), 12);
-        Self(<[u8; TS_SIZE]>::try_from(bytes).unwrap())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -97,8 +32,8 @@ mod tests {
     #[test]
     fn test_timestamp_serialization() {
         let t: Timestamp = TEST_TS.try_into().unwrap();
-        assert_eq!(t.0, 1588706164);
-        assert_eq!(t.1, 266431045);
+        assert_eq!(t.secs(), 1588706164);
+        assert_eq!(t.nsecs(), 266431045);
         assert_eq!(TEST_TS, &t.to_string());
 
         #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -110,52 +45,5 @@ mod tests {
         let s: S = sb.try_into().unwrap();
         let t = s.0;
         assert_eq!(TEST_TS, &t.to_string());
-    }
-
-    #[test]
-    fn test_timestamp_key_roundtrips() {
-        // create test timestamps
-        let t1 = Timestamp(i64::MIN, u32::MIN);
-        let t2 = Timestamp(i64::MIN / 4, u32::MAX);
-        let t3 = Timestamp::try_from("1930-01-01T00:00:00.999999999Z").unwrap();
-        let t4 = Timestamp::try_from("1970-11-11T14:34:00.000000000Z").unwrap();
-        let t5 = Timestamp::try_from("2020-05-05T19:16:04.266431045Z").unwrap();
-        let t6 = Timestamp(i64::MAX / 4, u32::MIN);
-        let t7 = Timestamp(i64::MAX, u32::MAX);
-
-        // build corresponding keys
-        let k1 = TimestampKey::from(t1.clone());
-        let k2 = TimestampKey::from(t2.clone());
-        let k3 = TimestampKey::from(t3.clone());
-        let k4 = TimestampKey::from(t4.clone());
-        let k5 = TimestampKey::from(t5.clone());
-        let k6 = TimestampKey::from(t6.clone());
-        let k7 = TimestampKey::from(t7.clone());
-
-        // test Timestamp <-> TimestampKey roundtrip
-        assert_eq!(t1, Timestamp::from(k1.clone()));
-        assert_eq!(t2, Timestamp::from(k2.clone()));
-        assert_eq!(t3, Timestamp::from(k3.clone()));
-        assert_eq!(t4, Timestamp::from(k4.clone()));
-        assert_eq!(t5, Timestamp::from(k5.clone()));
-        assert_eq!(t6, Timestamp::from(k6.clone()));
-        assert_eq!(t7, Timestamp::from(k7.clone()));
-
-        // test TimestampKey::as_ref() <-> TimestampKey roundtrip
-        assert_eq!(k1, k1.as_ref().into());
-        assert_eq!(k2, k2.as_ref().into());
-        assert_eq!(k3, k3.as_ref().into());
-        assert_eq!(k4, k4.as_ref().into());
-        assert_eq!(k5, k5.as_ref().into());
-        assert_eq!(k6, k6.as_ref().into());
-        assert_eq!(k7, k7.as_ref().into());
-
-        // test absolute ordering is preserved when mapping to TimestampKey
-        assert!(k1 < k2);
-        assert!(k2 < k3);
-        assert!(k3 < k4);
-        assert!(k4 < k5);
-        assert!(k5 < k6);
-        assert!(k6 < k7);
     }
 }

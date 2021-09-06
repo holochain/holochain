@@ -38,17 +38,17 @@ fixturator!(
 fixturator!(
     Timestamp;
     curve Empty {
-        Timestamp((I64Fixturator::new(Empty).next().unwrap().abs()
+        Timestamp::new((I64Fixturator::new(Empty).next().unwrap().abs()
            % ((i32::MAX as i64) * 86_400)).abs(),
           U32Fixturator::new(Empty).next().unwrap() % 1000000000)
     };
     curve Unpredictable {
-        Timestamp((I64Fixturator::new(Unpredictable).next().unwrap()
+        Timestamp::new((I64Fixturator::new(Unpredictable).next().unwrap()
            % ((i32::MAX as i64) * 86_400)).abs(),
           U32Fixturator::new(Unpredictable).next().unwrap() % 1000000000)
     };
     curve Predictable {
-        Timestamp((I64Fixturator::new(Predictable).next().unwrap()
+        Timestamp::new((I64Fixturator::new(Predictable).next().unwrap()
            % ((i32::MAX as i64) * 86_400)).abs(),
           U32Fixturator::new(Predictable).next().unwrap() % 1000000000)
     };

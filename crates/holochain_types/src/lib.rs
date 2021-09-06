@@ -38,4 +38,4 @@ pub mod validate;
 pub mod test_utils;
 
 pub use holochain_zome_types::entry::EntryHashed;
-pub use timestamp::{Timestamp, TimestampKey};
+pub use timestamp::Timestamp;

@@ -39,8 +39,8 @@ pub use error::{TimestampError, TimestampResult};
 )]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Timestamp(
-    pub i64, // seconds from UNIX Epoch, positive or negative
-    pub u32, // nanoseconds, always a positive offset
+    i64, // seconds from UNIX Epoch, positive or negative
+    u32, // nanoseconds, always a positive offset
 );
 
 /// Display as RFC3339 Date+Time for sane value ranges (0000-9999AD).  Beyond that, format
@@ -208,6 +208,22 @@ macro_rules! try_opt {
 }
 
 impl Timestamp {
+    /// Constructor
+    pub fn new(secs: i64, nsecs: u32) -> Self {
+        Self(secs, nsecs)
+    }
+
+    /// Access seconds since UNIX epoch
+    pub fn secs(&self) -> i64 {
+        self.0
+    }
+
+    /// Accessor for nanosecond adjustment. This is only the nanosecond component
+    /// of the timestamp, not the total nanoseconds since UNIX epoch.
+    pub fn nsecs(&self) -> u32 {
+        self.1
+    }
+
     /// Construct a normalized Timestamp from the given secs/nanos.  Allows a full, signed range of
     /// seconds and/or nanoseconds; produces a Timestamp with a properly signed i64 seconds, and an
     /// always positive-offset u32 nanoseconds.  Differs from typical `new` implementation in that
@@ -340,18 +356,23 @@ impl Timestamp {
         ts.as_millis().clamp(0, i64::MAX as u128) as i64
     }
 
-    /// Construct a Timestsamp from countersigning session data.
+    /// Construct from milliseconds
+    pub fn from_millis(millis: i64) -> Self {
+        let secs = millis / 1_000;
+        let nanos = (millis % 1_000) as u32 * 1_000_000;
+        Self(secs, nanos)
+    }
+
+    /// Construct a Timestamp from countersigning session data.
     /// Ostensibly used for the Header because the session itself covers a time range.
     pub fn from_countersigning_data(session_data: &CounterSigningSessionData) -> Self {
+        let start = session_data.preflight_request().session_times().start();
         Self(
-            session_data
-                .preflight_request()
-                .session_times()
-                .start()
+            start
                 .0
                 .checked_add(SESSION_HEADER_TIME_OFFSET_MILLIS)
                 .unwrap_or(i64::MAX),
-            session_data.preflight_request().session_times().start().1,
+            start.1,
         )
     }
 }
@@ -371,7 +392,16 @@ impl Sub<Timestamp> for Timestamp {
 #[cfg(feature = "full")]
 impl rusqlite::ToSql for Timestamp {
     fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
-        Ok(rusqlite::types::ToSqlOutput::Owned(self.0.into()))
+        Ok(rusqlite::types::ToSqlOutput::Owned(
+            self.to_sql_ms_lossy().into(),
+        ))
+    }
+}
+
+#[cfg(feature = "full")]
+impl rusqlite::types::FromSql for Timestamp {
+    fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
+        i64::column_result(value).and_then(|millis| Ok(Self::from_millis(millis)))
     }
 }
 
@@ -392,5 +422,16 @@ pub mod tests {
 
         let t2 = Timestamp(0, 0) + core::time::Duration::new(0, 1);
         assert_eq!(t2, Ok(Timestamp(0, 1)));
+    }
+
+    #[test]
+    fn millis_roundtrip() {
+        for t in [Timestamp(1234567, 123_000_000), Timestamp(99999, 999_000_000)] {
+            let millis = t.to_sql_ms_lossy();
+            dbg!(&millis);
+            let r = Timestamp::from_millis(millis);
+            assert_eq!(t.0, r.0);
+            assert_eq!(t.1, r.1);
+        }
     }
 }

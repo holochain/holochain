@@ -932,7 +932,9 @@ impl std::fmt::Display for OpOrder {
         write!(
             f,
             "{}{:019}{:010}",
-            self.order as u8, self.timestamp.0, self.timestamp.1
+            self.order as u8,
+            self.timestamp.secs(),
+            self.timestamp.nsecs()
         )
     }
 }
