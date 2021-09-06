@@ -407,7 +407,7 @@ impl rusqlite::ToSql for Timestamp {
 #[cfg(feature = "full")]
 impl rusqlite::types::FromSql for Timestamp {
     fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
-        i64::column_result(value).and_then(|millis| Ok(Self::from_millis(millis)))
+        i64::column_result(value).map(Self::from_millis)
     }
 }
 
