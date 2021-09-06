@@ -218,6 +218,12 @@ impl Timestamp {
         self.0
     }
 
+    /// Access seconds since UNIX epoch, mutably
+    /// TODO: replace with `add(&mut self, d: Duration)` and `sub(..)`
+    pub fn secs_mut(&mut self) -> &mut i64 {
+        &mut self.0
+    }
+
     /// Accessor for nanosecond adjustment. This is only the nanosecond component
     /// of the timestamp, not the total nanoseconds since UNIX epoch.
     pub fn nsecs(&self) -> u32 {
@@ -426,9 +432,11 @@ pub mod tests {
 
     #[test]
     fn millis_roundtrip() {
-        for t in [Timestamp(1234567, 123_000_000), Timestamp(99999, 999_000_000)] {
+        for t in [
+            Timestamp(1234567, 123_000_000),
+            Timestamp(99999, 999_000_000),
+        ] {
             let millis = t.to_sql_ms_lossy();
-            dbg!(&millis);
             let r = Timestamp::from_millis(millis);
             assert_eq!(t.0, r.0);
             assert_eq!(t.1, r.1);

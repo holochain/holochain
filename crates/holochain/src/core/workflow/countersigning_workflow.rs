@@ -443,7 +443,7 @@ mod tests {
         // - Put the ops in the workspace with expiry set to one hour from now.
         for (op_h, op) in op_hashes.into_iter().zip(ops.into_iter()) {
             let mut expires = timestamp::now();
-            expires.0 += 60 * 60 * 1000;
+            *expires.secs_mut() += 60 * 60 * 1000;
             workspace.put(
                 entry_hash.clone(),
                 op_h,
@@ -481,7 +481,7 @@ mod tests {
         let entry_hash = EntryHash::arbitrary(&mut u).unwrap();
         let header_hash = HeaderHash::with_data_sync(&header);
         let mut expires = timestamp::now();
-        expires.0 -= 60 * 60;
+        *expires.secs_mut() -= 60 * 60;
 
         // - Add it to the workspace.
         workspace.put(entry_hash, op_hash, op, vec![header_hash], expires);

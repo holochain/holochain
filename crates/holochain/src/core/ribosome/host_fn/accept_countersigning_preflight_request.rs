@@ -24,8 +24,8 @@ pub fn accept_countersigning_preflight_request<'a>(
                 return Ok(PreflightRequestAcceptance::Invalid(e.to_string()));
             }
             tokio_helper::block_forever_on(async move {
-                if holochain_types::timestamp::now().0 + SESSION_TIME_FUTURE_MAX_MILLIS
-                    < input.session_times().start().0
+                if holochain_types::timestamp::now().secs() + SESSION_TIME_FUTURE_MAX_MILLIS
+                    < input.session_times().start().secs()
                 {
                     return Ok(PreflightRequestAcceptance::UnacceptableFutureStart);
                 }
