@@ -121,8 +121,11 @@ pub enum ElementEntry {
     /// The Header does not contain an entry_address reference.
     NotApplicable,
     /// The Header has an entry but was stored without it.
+    ///
     /// This can happen when you receive gossip of just a header
-    /// when the header type is a [NewEntryHeader]
+    /// when the header type is a [NewEntryHeader] or
+    /// when a [chain query](https://docs.rs/hdk/0.0.104/hdk/chain/fn.query.html) is performed without
+    /// setting `include_entries` to `true`.
     NotStored,
 }
 
