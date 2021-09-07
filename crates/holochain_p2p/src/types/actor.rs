@@ -4,6 +4,8 @@
 use crate::event::GetRequest;
 use crate::*;
 use holochain_types::activity::AgentActivityResponse;
+
+#[cfg(feature = "test_utils")]
 use kitsune_p2p::actor::TestBackdoor;
 
 /// Request a validation package.
@@ -284,7 +286,7 @@ ghost_actor::ghost_chan! {
         ) -> ();
 
         /// Run "backdoor" methods, used only during testing
-        #[cfg(any(test, feature = "test_utils"))]
+        #[cfg(feature = "test_utils")]
         fn test_backdoor(dna_hash: DnaHash, action: TestBackdoor) -> ();
     }
 }

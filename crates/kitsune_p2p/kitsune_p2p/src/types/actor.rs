@@ -1,11 +1,14 @@
 //! Definitions related to the KitsuneP2p peer-to-peer / dht communications actor.
 
-use kitsune_p2p_types::bin_types::KitsuneAgent;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
-use kitsune_p2p_types::dht_arc::ArcInterval;
 use kitsune_p2p_types::KitsuneTimeout;
 use std::sync::Arc;
 use url2::Url2;
+
+#[cfg(feature = "test_utils")]
+use kitsune_p2p_types::bin_types::KitsuneAgent;
+#[cfg(feature = "test_utils")]
+use kitsune_p2p_types::dht_arc::ArcInterval;
 
 /// Make a request to multiple destination agents - awaiting/aggregating the responses.
 /// The remote sides will see these messages as "RequestEvt" events.
