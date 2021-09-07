@@ -3,6 +3,7 @@
 
 use super::*;
 use crate::conductor::api::CellConductorApiT;
+use crate::conductor::handle::DevSettings;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use crate::core::sys_validate::check_and_hold_store_element;
@@ -51,12 +52,14 @@ pub async fn sys_validation_workflow(
     // TODO: Update HolochainP2p to reflect changes to pass through network.
     network: HolochainP2pCell,
     conductor_api: impl CellConductorApiT,
+    dev_settings: DevSettings,
 ) -> WorkflowResult<WorkComplete> {
     let complete = sys_validation_workflow_inner(
         &mut workspace,
         network,
         conductor_api,
         sys_validation_trigger,
+        dev_settings,
     )
     .await?;
 
@@ -73,6 +76,7 @@ async fn sys_validation_workflow_inner(
     network: HolochainP2pCell,
     conductor_api: impl CellConductorApiT,
     sys_validation_trigger: TriggerSender,
+    dev_settings: DevSettings,
 ) -> WorkflowResult<WorkComplete> {
     let env = workspace.vault.clone().into();
     let sorted_ops = validation_query::get_ops_to_sys_validate(&env).await?;
@@ -87,14 +91,18 @@ async fn sys_validation_workflow_inner(
         let incoming_dht_ops_sender =
             IncomingDhtOpSender::new(workspace.vault.clone(), sys_validation_trigger.clone());
 
-        let outcome = validate_op(
-            &op,
-            workspace,
-            network.clone(),
-            &conductor_api,
-            Some(incoming_dht_ops_sender),
-        )
-        .await?;
+        let outcome = if dev_settings.validation {
+            validate_op(
+                &op,
+                workspace,
+                network.clone(),
+                &conductor_api,
+                Some(incoming_dht_ops_sender),
+            )
+            .await?
+        } else {
+            Outcome::Accepted
+        };
 
         match outcome {
             Outcome::Accepted => {

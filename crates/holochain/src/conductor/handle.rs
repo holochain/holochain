@@ -341,8 +341,8 @@ pub trait ConductorHandleT: Send + Sync {
     async fn add_test_app_interface(&self, id: super::state::AppInterfaceId)
         -> ConductorResult<()>;
 
-    /// Get the current dev settings
-    #[cfg(any(test, feature = "test_utils"))]
+    /// Get the current dev settings. If not running tests, this can only ever
+    /// return the Default DevSettings.
     fn dev_settings(&self) -> DevSettings;
 
     /// Update the current dev settings
@@ -388,20 +388,24 @@ pub trait ConductorHandleT: Send + Sync {
 }
 
 /// Special switches for features to be used during development and testing
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DevSettings {
     /// Determines whether publishing should be enabled
     pub publish: bool,
+    /// Determines whether validation should be enabled
+    pub validation: bool,
     /// Determines whether storage arc resizing should be enabled
     pub _arc_resizing: bool,
 }
 
 /// Specify changes to be made to the DevSettings.
 /// None means no change, Some means make the specified change.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct DevSettingsDelta {
     /// Determines whether publishing should be enabled
     pub publish: Option<bool>,
+    /// Determines whether validation should be enabled
+    pub validation: Option<bool>,
     /// Determines whether storage arc resizing should be enabled
     pub arc_resizing: Option<bool>,
 }
@@ -410,6 +414,7 @@ impl Default for DevSettings {
     fn default() -> Self {
         Self {
             publish: true,
+            validation: true,
             _arc_resizing: true,
         }
     }
@@ -419,6 +424,9 @@ impl DevSettings {
     fn apply(&mut self, delta: DevSettingsDelta) {
         if let Some(v) = delta.publish {
             self.publish = v;
+        }
+        if let Some(v) = delta.validation {
+            self.validation = v;
         }
         if let Some(v) = delta.arc_resizing {
             self._arc_resizing = v;
@@ -1234,9 +1242,14 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         lock.add_test_app_interface(id).await
     }
 
-    #[cfg(any(test, feature = "test_utils"))]
     fn dev_settings(&self) -> DevSettings {
-        self.dev_settings.read().clone()
+        cfg_if::cfg_if! {
+            if #[cfg(any(test, feature = "test_utils"))] {
+                self.dev_settings.read().clone()
+            } else {
+                DevSettings::default()
+            }
+        }
     }
 
     #[cfg(any(test, feature = "test_utils"))]

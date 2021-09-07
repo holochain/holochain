@@ -11,6 +11,7 @@ use super::error::WorkflowResult;
 use super::sys_validation_workflow::validation_query;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::entry_def_store::get_entry_def;
+use crate::conductor::handle::DevSettings;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use crate::core::ribosome::guest_callback::validate::ValidateHostAccess;
@@ -56,8 +57,11 @@ pub async fn app_validation_workflow(
     mut trigger_integration: TriggerSender,
     conductor_api: impl CellConductorApiT,
     network: HolochainP2pCell,
+    dev_settings: DevSettings,
 ) -> WorkflowResult<WorkComplete> {
-    let complete = app_validation_workflow_inner(&mut workspace, conductor_api, &network).await?;
+    let complete =
+        app_validation_workflow_inner(&mut workspace, conductor_api, &network, dev_settings)
+            .await?;
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // trigger other workflows
@@ -70,6 +74,7 @@ async fn app_validation_workflow_inner(
     workspace: &mut AppValidationWorkspace,
     conductor_api: impl CellConductorApiT,
     network: &HolochainP2pCell,
+    dev_settings: DevSettings,
 ) -> WorkflowResult<WorkComplete> {
     let env = workspace.vault.clone().into();
     let sorted_ops = validation_query::get_ops_to_app_validate(&env).await?;
@@ -79,10 +84,15 @@ async fn app_validation_workflow_inner(
         let (op, op_hash) = so.into_inner();
 
         // Validate this op
-        let outcome = validate_op(op.clone(), &conductor_api, workspace, &network)
-            .await
-            // Get the outcome or return the error
-            .or_else(|outcome_or_err| outcome_or_err.try_into())?;
+        let outcome = if dev_settings.validation {
+            validate_op(op.clone(), &conductor_api, workspace, &network)
+                .await
+                // Get the outcome or return the error
+                .or_else(|outcome_or_err| outcome_or_err.try_into())?
+        } else {
+            // If validation dev setting is disabled, accept everything.
+            Outcome::Accepted
+        };
 
         if let Outcome::AwaitingDeps(_) | Outcome::Rejected(_) = &outcome {
             warn!(

@@ -46,6 +46,7 @@ pub fn spawn_app_validation_consumer(
                 trigger_integration.clone(),
                 conductor_api.clone(),
                 network.clone(),
+                conductor_handle.dev_settings(),
             )
             .await;
             match result {

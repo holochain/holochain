@@ -46,6 +46,7 @@ pub fn spawn_sys_validation_consumer(
                 trigger_self.clone(),
                 network.clone(),
                 conductor_api.clone(),
+                conductor_handle.dev_settings(),
             )
             .await
             {
