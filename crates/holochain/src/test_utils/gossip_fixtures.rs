@@ -1,3 +1,5 @@
+//! Defines fixture data used for gossip tests.
+
 use holo_hash::hashed_fixtures::*;
 use holo_hash::*;
 use holochain_types::prelude::*;
@@ -10,10 +12,13 @@ const FIXTURE_PATH: &'static str = "fixtures/gossip-fixtures.msgpack";
 /// See `holo_hash::hashed_fixtures` for more info.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GossipFixtures {
+    /// DhtOp fixtures
     pub ops: HashedFixtures<DhtOp>,
+    /// AgentPubKey fixtures
     pub agents: HashedFixtures<AgentPubKey>,
 }
 
+/// Lazy static GossipFixtures, cached on disk
 pub static GOSSIP_FIXTURES: once_cell::sync::Lazy<GossipFixtures> =
     once_cell::sync::Lazy::new(|| match std::fs::read(&FIXTURE_PATH) {
         Ok(bytes) => holochain_serialized_bytes::decode(&bytes).unwrap(),
