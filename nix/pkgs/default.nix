@@ -1,5 +1,4 @@
 { callPackage
-, hcRustPlatform
 , writeShellScriptBin
 
 , hcToplevelDir

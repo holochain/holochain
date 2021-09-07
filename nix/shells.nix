@@ -5,7 +5,6 @@
 , coreutils
 
 , holonix
-, hcRustPlatform
 , hcToplevelDir
 , nixEnvPrefixEval
 , pkgs
