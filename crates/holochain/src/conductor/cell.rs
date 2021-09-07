@@ -642,7 +642,7 @@ impl Cell {
             let h: Option<Vec<u8>> = txn
                 .query_row(
                     "SELECT Header.blob as header_blob
-                    FROM DhtOp 
+                    FROM DhtOp
                     JOIN Header ON Header.hash = DhtOp.header_hash
                     WHERE DhtOp.hash = :hash",
                     named_params! {

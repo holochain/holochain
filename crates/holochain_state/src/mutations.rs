@@ -1,6 +1,7 @@
 use crate::entry_def::EntryDefStoreKey;
 use crate::prelude::SignedValidationReceipt;
 use crate::query::to_blob;
+use crate::schedule::fn_is_scheduled;
 use crate::scratch::Scratch;
 use crate::validation_db::ValidationLimboStatus;
 use holo_hash::encode::blake2b_256;
@@ -599,8 +600,12 @@ pub fn unlock_chain(txn: &mut Transaction) -> StateMutationResult<()> {
     Ok(())
 }
 
-pub fn schedule_fn(txn: &mut Transaction, scheduled_fn: String, schedule: Option<Schedule>) -> StateMutationResult<()> {
-    match (fn_is_scheduled(scheduled_fn)?, schedule) {
+pub fn schedule_fn(
+    txn: &mut Transaction,
+    scheduled_fn: String,
+    schedule: Option<Schedule>,
+) -> StateMutationResult<()> {
+    match (fn_is_scheduled(txn, scheduled_fn.clone())?, schedule) {
         (_, Some(schedule)) => {
             txn.execute(
                 "
@@ -616,14 +621,14 @@ pub fn schedule_fn(txn: &mut Transaction, scheduled_fn: String, schedule: Option
                     ":scheduled_fn": scheduled_fn,
                 },
             )?;
-            Ok(())
-        },
+        }
         (false, None) => {
             sql_insert!(txn, ScheduledFunctions, {
                 "scheduled_fn": scheduled_fn,
                 "tokio_scheduled": false,
             })?;
-        },
-        _ => { }
-    }
+        }
+        _ => {}
+    };
+    Ok(())
 }

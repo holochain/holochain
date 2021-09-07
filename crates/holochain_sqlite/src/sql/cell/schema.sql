@@ -162,8 +162,8 @@ CREATE TABLE IF NOT EXISTS ChainLock (
     end INTEGER NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS ScheduledFunctions {
+CREATE TABLE IF NOT EXISTS ScheduledFunctions (
     scheduled_fn TEXT PRIMARY KEY ON CONFLICT ROLLBACK,
-    schedule BLOB NULL
+    schedule BLOB NULL,
     tokio_scheduled BOOLEAN NOT NULL
-}
+);

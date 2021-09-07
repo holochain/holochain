@@ -242,6 +242,12 @@ pub trait ConductorHandleT: Send + Sync {
     /// Start an enabled but stopped (paused) app
     async fn start_app(self: Arc<Self>, app_id: &InstalledAppId) -> ConductorResult<InstalledApp>;
 
+    /// Set the scheduler. None is not an option.
+    async fn set_scheduler(self: Arc<Self>, scheduler: tokio::task::JoinHandle<()>);
+
+    /// Dispatch all due scheduled functions.
+    async fn dispatch_scheduled_fns(self: Arc<Self>);
+
     /// Stop a running app while leaving it enabled. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
     async fn pause_app(
@@ -882,6 +888,16 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await?;
 
         Ok(stopped_app)
+    }
+
+    /// Set the scheduler. None is not an option.
+    async fn set_scheduler(self: Arc<Self>, scheduler: tokio::task::JoinHandle<()>) {
+        self.conductor.write().await.set_scheduler(scheduler);
+    }
+
+    /// The scheduler wants to dispatch any functions that are due.
+    async fn dispatch_scheduled_fns(self: Arc<Self>) {
+        self.conductor.write().await.dispatch_scheduled_fns().await;
     }
 
     #[tracing::instrument(skip(self))]

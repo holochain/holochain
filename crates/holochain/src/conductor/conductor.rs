@@ -67,6 +67,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::*;
 
+const SCHEDULER_INTERVAL_MILLIS: u64 = 10000;
+
 #[cfg(any(test, feature = "test_utils"))]
 use super::handle::MockConductorHandleT;
 
@@ -157,6 +159,8 @@ where
 
     /// Handle to the network actor.
     holochain_p2p: holochain_p2p::HolochainP2pRef,
+
+    scheduler: Option<tokio::task::JoinHandle<()>>,
 }
 
 impl Conductor {
@@ -1155,7 +1159,19 @@ where
             keystore,
             root_env_dir,
             holochain_p2p,
+            scheduler: None,
         })
+    }
+
+    pub(super) fn set_scheduler(&mut self, scheduler: tokio::task::JoinHandle<()>) {
+        self.scheduler = Some(scheduler);
+    }
+
+    pub(super) async fn dispatch_scheduled_fns(&self) {
+        dbg!("dispatching scheduled fns");
+        for (cell_id, _cell) in self.running_cells() {
+            dbg!(cell_id);
+        }
     }
 
     pub(super) async fn get_state(&self) -> ConductorResult<ConductorState> {
@@ -1390,6 +1406,17 @@ mod builder {
             p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
         ) -> ConductorResult<ConductorHandle> {
             tokio::task::spawn(p2p_event_task(p2p_evt, handle.clone()));
+
+            let scheduler_handle = handle.clone();
+            let _ = handle.clone().set_scheduler(tokio::task::spawn(async move {
+                let mut interval = tokio::time::interval(std::time::Duration::from_millis(
+                    SCHEDULER_INTERVAL_MILLIS,
+                ));
+                loop {
+                    interval.tick().await;
+                    scheduler_handle.clone().dispatch_scheduled_fns().await;
+                }
+            }));
 
             let configs = conductor_config.admin_interfaces.unwrap_or_default();
             let cell_startup_errors = handle.clone().initialize_conductor(configs).await?;
