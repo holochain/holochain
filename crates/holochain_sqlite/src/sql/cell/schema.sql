@@ -106,7 +106,7 @@ CREATE TABLE IF NOT EXISTS DhtOp (
     -- an INTEGER.
     when_integrated_ns  BLOB NULL,          -- DATETIME
 
-    -- Used to withhold ops from publishing for things 
+    -- Used to withhold ops from publishing for things
     -- like countersigning.
     withhold_publish    INTEGER     NULL, -- BOOLEAN
     -- The op has received enough validation receipts.
@@ -159,5 +159,6 @@ CREATE TABLE IF NOT EXISTS ValidationReceipt (
 
 CREATE TABLE IF NOT EXISTS ChainLock (
     lock BLOB PRIMARY KEY ON CONFLICT ROLLBACK,
-    end INTEGER NOT NULL
+    -- The expiration time of the lock as a millisecond timestamp
+    expires_at_ms INTEGER NOT NULL
 );

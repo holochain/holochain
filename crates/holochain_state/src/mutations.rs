@@ -311,7 +311,7 @@ pub fn set_validation_stage(
         ValidationLimboStatus::AwaitingAppDeps(_) => Some(2),
         ValidationLimboStatus::AwaitingIntegration => Some(3),
     };
-    let now = holochain_types::timestamp::now().secs();
+    let now = holochain_types::timestamp::now();
     txn.execute(
         "
         UPDATE DhtOp
@@ -583,10 +583,14 @@ pub fn insert_entry(txn: &mut Transaction, entry: EntryHashed) -> StateMutationR
 /// because the chain is locked if there are ANY locks that don't match the
 /// current id being queried.
 /// In practise this is useless so don't do that. One lock at a time please.
-pub fn lock_chain(txn: &mut Transaction, lock: &[u8], end: &Timestamp) -> StateMutationResult<()> {
+pub fn lock_chain(
+    txn: &mut Transaction,
+    lock: &[u8],
+    expires_at_ms: &Timestamp,
+) -> StateMutationResult<()> {
     sql_insert!(txn, ChainLock, {
         "lock": lock,
-        "end": end,
+        "expires_at_ms": expires_at_ms,
     })?;
     Ok(())
 }

@@ -14,6 +14,11 @@ use crate::prelude::*;
 
 pub use error::{TimestampError, TimestampResult};
 
+/// The smallest possible Timestamp
+pub const MIN: Timestamp = Timestamp(i64::MIN, u32::MIN);
+/// The largest possible Timestamp
+pub const MAX: Timestamp = Timestamp(i64::MAX, u32::MAX);
+
 /// A UTC timestamp for use in Holochain's headers.  It is assumed to be untrustworthy: it may
 /// contain times offset from the UNIX epoch with the full +/- i64 range.  Most of these times are
 /// *not* representable by a chrono::DateTime<Utc> (which limits itself to a +/- i32 offset in days
@@ -374,10 +379,9 @@ impl Timestamp {
     pub fn from_countersigning_data(session_data: &CounterSigningSessionData) -> Self {
         let start = session_data.preflight_request().session_times().start();
         Self(
-            start
-                .0
-                .checked_add(SESSION_HEADER_TIME_OFFSET_MILLIS)
-                .unwrap_or(i64::MAX),
+            (start + SESSION_HEADER_TIME_OFFSET)
+                .unwrap_or(timestamp::MAX)
+                .0,
             start.1,
         )
     }

@@ -1,6 +1,7 @@
 use crate::prelude::StateMutationResult;
 use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::{named_params, Transaction};
+use holochain_types::Timestamp;
 
 /// True if the chain is currently locked for the given lock id.
 /// The chain is never locked for the id that created it.
@@ -11,13 +12,13 @@ pub fn is_chain_locked(txn: &Transaction, lock: &[u8]) -> StateMutationResult<bo
             "
             SELECT 1
             FROM ChainLock
-            WHERE end >= :now
+            WHERE expires_at_ms >= :now
             AND lock != :lock
             LIMIT 1
             ",
             named_params! {
                 ":lock": lock,
-                ":now": holochain_types::timestamp::now().secs()
+                ":now": holochain_types::timestamp::now()
             },
             |row| row.get::<_, u32>(0),
         )
@@ -33,7 +34,7 @@ pub fn is_lock_expired(txn: &Transaction, lock: &[u8]) -> StateMutationResult<bo
     let r = txn
         .query_row(
             "
-            SELECT end
+            SELECT expires_at_ms
             FROM ChainLock
             WHERE
             lock = :lock
@@ -41,7 +42,7 @@ pub fn is_lock_expired(txn: &Transaction, lock: &[u8]) -> StateMutationResult<bo
             named_params! {
                 ":lock": lock,
             },
-            |row| Ok(row.get::<_, i64>("end")? < holochain_types::timestamp::now().secs()),
+            |row| Ok(row.get::<_, Timestamp>("expires_at_ms")? < holochain_types::timestamp::now()),
         )
         .optional()?;
     // If there's no lock then it's expired.
