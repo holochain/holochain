@@ -13,8 +13,8 @@ pub use encode::{holo_hash_decode, holo_hash_decode_unchecked, holo_hash_encode}
 pub use has_hash::HasHash;
 pub use hash::*;
 pub use hash_b64::*;
-pub use hash_type::HashType;
 pub use hash_type::PrimitiveHashType;
+pub use hash_type::{HashType, HashTypeAsync, HashTypeSync};
 
 /// By default, disable string encoding and just display raw bytes
 #[cfg(not(feature = "string-encoding"))]
@@ -29,6 +29,9 @@ pub mod hash_b64;
 
 #[cfg(feature = "fixturators")]
 pub mod fixt;
+
+#[cfg(feature = "test_utils")]
+pub mod hashed_fixtures;
 
 #[cfg(feature = "hashing")]
 mod hash_ext;

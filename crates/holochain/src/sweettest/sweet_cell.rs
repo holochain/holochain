@@ -1,3 +1,5 @@
+use crate::test_utils::gossip_fixtures::GOSSIP_FIXTURES;
+
 use super::SweetZome;
 use hdk::prelude::*;
 use holo_hash::*;
@@ -42,21 +44,17 @@ impl SweetCell {
     }
 }
 
-#[cfg(feature = "no-hash-integrity")]
-use holochain_p2p::{
-    dht_arc::{ArcInterval, DhtLocation},
-    AgentPubKeyExt,
-};
-#[cfg(feature = "no-hash-integrity")]
+#[cfg(feature = "test_utils")]
+use holochain_p2p::{dht_arc::ArcInterval, AgentPubKeyExt};
+#[cfg(feature = "test_utils")]
 use holochain_sqlite::db::*;
 
-#[cfg(feature = "no-hash-integrity")]
+#[cfg(feature = "test_utils")]
 impl SweetCell {
     /// Coerce the agent's storage arc to the specified value.
     /// The arc need not be centered on the agent's DHT location, which is
     /// typically a requirement "in the real world", but this can be useful
     /// for integration tests of gossip.
-    #[cfg(feature = "test_utils")]
     pub async fn set_storage_arc(&self, arc: ArcInterval) {
         use holochain_p2p::HolochainP2pCellT;
 
@@ -67,29 +65,17 @@ impl SweetCell {
             .unwrap();
     }
 
-    /// Inject fake ops into the cell's vault, such that each op is at the
-    /// specified location. The locations will not match the op hashes.
-    pub fn inject_fake_ops<L>(&self, locations: L)
+    /// Inject ops from the GOSSIP_FIXTURES, indexed by signed (+/-) location
+    pub fn inject_fixture_ops<L>(&self, locations: L)
     where
-        L: Iterator<Item = DhtLocation>,
+        L: Iterator<Item = i32>,
     {
-        use ::fixt::prelude::*;
-
         self.cell_env
             .conn()
             .unwrap()
             .with_commit_sync(|txn| {
                 for loc in locations {
-                    let signed_header = fixt!(SignedHeaderHashed);
-                    let op = DhtOp::StoreElement(
-                        signed_header.signature().clone(),
-                        signed_header.header().clone(),
-                        None,
-                    );
-                    let mut op = DhtOpHashed::from_content_sync(op);
-                    // Override the op hash to be at the
-                    // specified location
-                    op.override_hash(|hash| hash.set_loc(loc));
+                    let op = GOSSIP_FIXTURES.ops.get(loc).clone();
                     holochain_state::mutations::insert_op(txn, op, true).unwrap();
                 }
                 DatabaseResult::Ok(())

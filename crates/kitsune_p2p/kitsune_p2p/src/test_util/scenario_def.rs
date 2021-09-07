@@ -1,17 +1,20 @@
 //! Declarative definition of multi-conductor sharded scenarios.
 
-use kitsune_p2p_types::dht_arc::{ArcInterval, DhtLocation};
 use std::collections::{BTreeSet, HashSet};
+
+use kitsune_p2p_types::dht_arc::ArcInterval;
+
+/// A "coarse" DHT location specification, defined at a lower resolution
+/// than the full u32 space, for convenience in more easily covering the entire
+/// space in tests.
+type CoarseLoc = i32;
 
 /// Abstract representation of the instantaneous state of a sharded network
 /// with multiple conductors. Useful for setting up multi-node test scenarios,
 /// and for deriving the expected final state after reaching consistency.
 ///
-/// NB: The "reification" of this representation will break a rule:
-/// Agent and Op hashes will have manually defined locations which do NOT
-/// match the actual hash content, since it is computationally infeasible to
-/// search for hashes which match a given location.
-/// (By "reification" I mean the actual concrete Nodes which are set up.)
+/// NB: The concrete scenarios derived from this definition will in general break a rule:
+///     The agent arcs will not be centered on the agent's DHT location.
 ///
 /// Thus, rather than dealing with hash types directly, this representation
 /// deals only with locations.
@@ -30,6 +33,20 @@ pub struct ScenarioDef<const N: usize> {
     /// Represents latencies between nodes, to be simulated.
     /// If None, all latencies are zero.
     pub _latency_matrix: LatencyMatrix<N>,
+
+    /// DhtLocations may be specified in a smaller set of integers than the full
+    /// u32 space, for convenience. This number specifies the size of the space
+    /// to work with.
+    ///
+    /// The `HashedFixtures` construct works with a u8 space, and in such cases
+    /// this `resolution` should be set to `u8::MAX`
+    ///
+    /// Any reference to a DHT arc endpoint defined in a scenario will be
+    /// multiplied by a factor to properly map the lower-resolution location
+    /// into the full u32 location space.
+    ///
+    /// e.g. for a u8 resolution, the multiplicative factor is `u32::MAX / u8::MAX`
+    pub resolution: u32,
 }
 
 impl<const N: usize> ScenarioDef<N> {
@@ -44,6 +61,9 @@ impl<const N: usize> ScenarioDef<N> {
         _latency_matrix: LatencyMatrix<N>,
     ) -> Self {
         Self {
+            // Resolution is hard-coded for now, but can be modified if ever
+            // needed
+            resolution: u8::MAX as u32,
             nodes,
             peer_matrix,
             _latency_matrix,
@@ -71,21 +91,27 @@ impl ScenarioDefNode {
 #[derive(PartialEq, Eq, Hash)]
 pub struct ScenarioDefAgent {
     /// The storage arc for this agent
-    pub arc: ArcInterval,
+    arc: (CoarseLoc, CoarseLoc),
     /// The ops stored by this agent
-    pub ops: BTreeSet<DhtLocation>,
+    pub ops: BTreeSet<CoarseLoc>,
 }
 
 impl ScenarioDefAgent {
     /// Constructor
-    pub fn new<O: Copy + Into<DhtLocation>, OO: IntoIterator<Item = O>>(
-        arc: ArcInterval,
-        ops: OO,
-    ) -> Self {
+    pub fn new<O: IntoIterator<Item = CoarseLoc>>(arc: (CoarseLoc, CoarseLoc), ops: O) -> Self {
         Self {
             arc,
-            ops: ops.into_iter().map(Into::into).collect(),
+            ops: ops.into_iter().collect(),
         }
+    }
+
+    /// Produce an ArcInterval in the u32 space from the lower-resolution
+    /// definition, based on the resolution defined in the ScenarioDef which
+    /// is passed in
+    pub fn arc(&self, resolution: u32) -> ArcInterval {
+        let start = rectify_index(resolution, self.arc.0);
+        let end = rectify_index(resolution, self.arc.1 + 1) - 1;
+        ArcInterval::new(start, end)
     }
 }
 
@@ -135,32 +161,36 @@ impl<const N: usize> PeerMatrix<N> {
     }
 }
 
+/// Map a signed index into an unsigned index
+pub fn rectify_index(num: u32, i: i32) -> u32 {
+    let num = num as i32;
+    if i >= num || i <= -num {
+        panic!(
+            "attempted to rectify an out-of-bounds index: |{}| >= {}",
+            i, num
+        );
+    }
+    if i < 0 {
+        (num + i) as u32
+    } else {
+        i as u32
+    }
+}
+
 /// Just construct a scenario to illustrate/experience how it's done
 #[test]
 fn constructors() {
     use ScenarioDefAgent as Agent;
     use ScenarioDefNode as Node;
-    let ops: Vec<DhtLocation> = (-10..11).map(i32::into).collect();
+    let ops: Vec<CoarseLoc> = (-10..11).map(i32::into).collect();
     let nodes = [
         Node::new([
-            Agent::new(
-                ArcInterval::Bounded(ops[0].into(), ops[2].into()),
-                [ops[0], ops[1]],
-            ),
-            Agent::new(
-                ArcInterval::Bounded(ops[3].into(), ops[4].into()),
-                [ops[3], ops[4]],
-            ),
+            Agent::new((ops[0], ops[2]), [ops[0], ops[1]]),
+            Agent::new((ops[3], ops[4]), [ops[3], ops[4]]),
         ]),
         Node::new([
-            Agent::new(
-                ArcInterval::Bounded(ops[0].into(), ops[2].into()),
-                [ops[5], ops[7]],
-            ),
-            Agent::new(
-                ArcInterval::Bounded(ops[3].into(), ops[4].into()),
-                [ops[6], ops[9]],
-            ),
+            Agent::new((ops[0], ops[2]), [ops[5], ops[7]]),
+            Agent::new((ops[3], ops[4]), [ops[6], ops[9]]),
         ]),
     ];
     let _scenario = ScenarioDef::new(nodes, PeerMatrix::sparse([&[1], &[]]));
