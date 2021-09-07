@@ -35,7 +35,6 @@ thiserror = "1.0.22"
 serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 
 [features]
-
 default = ["serialized-bytes", "fixturators"]
 full = ["fixturators", "hashing", "string-encoding", "sqlite"]
 
@@ -44,5 +43,4 @@ fixturators = ["fixt", "rand", "hashing", "string-encoding"]
 hashing = ["futures", "must_future", "blake2b_simd", "serialized-bytes"]
 serialized-bytes = ["holochain_serialized_bytes"]
 string-encoding = ["base64", "blake2b_simd", "derive_more"]
-no-hash-integrity = []
 test_utils = ["fixturators"]
