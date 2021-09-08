@@ -233,6 +233,10 @@ impl Cell {
         self.conductor_api.signal_broadcaster().await
     }
 
+    pub(super) async fn dispatch_scheduled_fns(self: Arc<Self>) {
+        todo!();
+    }
+
     #[instrument(skip(self, evt))]
     /// Entry point for incoming messages from the network that need to be handled
     pub async fn handle_holochain_p2p_event(

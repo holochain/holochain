@@ -1167,13 +1167,6 @@ where
         self.scheduler = Some(scheduler);
     }
 
-    pub(super) async fn dispatch_scheduled_fns(&self) {
-        dbg!("dispatching scheduled fns");
-        for (cell_id, _cell) in self.running_cells() {
-            dbg!(cell_id);
-        }
-    }
-
     pub(super) async fn get_state(&self) -> ConductorResult<ConductorState> {
         self.conductor_env.conn()?.with_reader(|txn| {
             let state = txn

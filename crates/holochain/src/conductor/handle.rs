@@ -897,7 +897,26 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     /// The scheduler wants to dispatch any functions that are due.
     async fn dispatch_scheduled_fns(self: Arc<Self>) {
-        self.conductor.write().await.dispatch_scheduled_fns().await;
+        let cell_arcs = {
+            let lock = self.conductor.read().await;
+            let cell_ids = lock
+                .running_cells()
+                .map(|(cell_id, _)| cell_id)
+                .cloned()
+                .collect::<Vec<CellId>>();
+            let mut cell_arcs = vec![];
+            for cell_id in cell_ids {
+                // unwrap here because the only error case is if the cell is
+                // missing and we just read it from the conductor with a lock.
+                cell_arcs.push(self.cell_by_id(&cell_id).await.unwrap());
+            }
+            cell_arcs
+        };
+
+        let tasks = cell_arcs
+            .into_iter()
+            .map(|cell_arc| cell_arc.dispatch_scheduled_fns());
+        futures::future::join_all(tasks).await;
     }
 
     #[tracing::instrument(skip(self))]
