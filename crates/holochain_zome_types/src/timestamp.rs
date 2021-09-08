@@ -74,27 +74,6 @@ impl fmt::Debug for Timestamp {
     }
 }
 
-/// Infallible conversions into a Timestamp.  The only infallible ways to create a Timestamp are
-/// `from` a Unix timestamp, or `normalize` with a timestamp and nanoseconds, or converting from
-/// a DateTime<Utc>.
-impl From<i64> for Timestamp {
-    fn from(secs: i64) -> Self {
-        Self(secs, 0)
-    }
-}
-
-impl From<i32> for Timestamp {
-    fn from(secs: i32) -> Self {
-        Self(secs.into(), 0)
-    }
-}
-
-impl From<u32> for Timestamp {
-    fn from(secs: u32) -> Self {
-        Self(secs.into(), 0)
-    }
-}
-
 impl From<chrono::DateTime<chrono::Utc>> for Timestamp {
     fn from(t: chrono::DateTime<chrono::Utc>) -> Self {
         std::convert::From::from(&t)
@@ -218,21 +197,9 @@ impl Timestamp {
         Self(secs, nsecs)
     }
 
-    /// Access seconds since UNIX epoch
-    pub fn secs(&self) -> i64 {
-        self.0
-    }
-
-    /// Access seconds since UNIX epoch, mutably
-    /// TODO: replace with `add(&mut self, d: Duration)` and `sub(..)`
-    pub fn secs_mut(&mut self) -> &mut i64 {
-        &mut self.0
-    }
-
-    /// Accessor for nanosecond adjustment. This is only the nanosecond component
-    /// of the timestamp, not the total nanoseconds since UNIX epoch.
-    pub fn nsecs(&self) -> u32 {
-        self.1
+    /// Access seconds since UNIX epoch plus nanosecond offset
+    pub fn as_seconds_and_nanos(&self) -> (i64, u32) {
+        (self.0, self.1)
     }
 
     /// Construct a normalized Timestamp from the given secs/nanos.  Allows a full, signed range of

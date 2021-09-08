@@ -442,8 +442,7 @@ mod tests {
 
         // - Put the ops in the workspace with expiry set to one hour from now.
         for (op_h, op) in op_hashes.into_iter().zip(ops.into_iter()) {
-            let mut expires = timestamp::now();
-            *expires.secs_mut() += 60 * 60;
+            let expires = (timestamp::now() + std::time::Duration::from_secs(60 * 60)).unwrap();
             workspace.put(
                 entry_hash.clone(),
                 op_h,
@@ -480,8 +479,7 @@ mod tests {
         let header = op.header();
         let entry_hash = EntryHash::arbitrary(&mut u).unwrap();
         let header_hash = HeaderHash::with_data_sync(&header);
-        let mut expires = timestamp::now();
-        *expires.secs_mut() -= 60 * 60;
+        let expires = (timestamp::now() - std::time::Duration::from_secs(60 * 60)).unwrap();
 
         // - Add it to the workspace.
         workspace.put(entry_hash, op_hash, op, vec![header_hash], expires);

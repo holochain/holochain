@@ -32,8 +32,9 @@ mod tests {
     #[test]
     fn test_timestamp_serialization() {
         let t: Timestamp = TEST_TS.try_into().unwrap();
-        assert_eq!(t.secs(), 1588706164);
-        assert_eq!(t.nsecs(), 266431045);
+        let (secs, nsecs) = t.as_seconds_and_nanos();
+        assert_eq!(secs, 1588706164);
+        assert_eq!(nsecs, 266431045);
         assert_eq!(TEST_TS, &t.to_string());
 
         #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
