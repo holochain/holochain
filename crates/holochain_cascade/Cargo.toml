@@ -14,7 +14,7 @@ either = "1.5"
 fallible-iterator = "0.2"
 fixt = { version = "0.0.5", path = "../fixt" }
 futures = "0.3"
-ghost_actor = "=0.3.0-alpha.3"
+ghost_actor = "=0.3.0-alpha.4"
 hdk = { version = "0.0.104", path = "../hdk" }
 hdk_derive = { version = "0.0.6", path = "../hdk_derive" }
 holo_hash = { version = "0.0.5", path = "../holo_hash", features = ["full"] }
