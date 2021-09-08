@@ -586,11 +586,11 @@ pub fn insert_entry(txn: &mut Transaction, entry: EntryHashed) -> StateMutationR
 pub fn lock_chain(
     txn: &mut Transaction,
     lock: &[u8],
-    expires_at_ms: &Timestamp,
+    expires_at: &Timestamp,
 ) -> StateMutationResult<()> {
     sql_insert!(txn, ChainLock, {
         "lock": lock,
-        "expires_at_ms": expires_at_ms,
+        "expires_at_timestamp": expires_at,
     })?;
     Ok(())
 }

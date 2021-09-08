@@ -12,7 +12,7 @@ pub fn is_chain_locked(txn: &Transaction, lock: &[u8]) -> StateMutationResult<bo
             "
             SELECT 1
             FROM ChainLock
-            WHERE expires_at_ms >= :now
+            WHERE expires_at_timestamp >= :now
             AND lock != :lock
             LIMIT 1
             ",
@@ -34,7 +34,7 @@ pub fn is_lock_expired(txn: &Transaction, lock: &[u8]) -> StateMutationResult<bo
     let r = txn
         .query_row(
             "
-            SELECT expires_at_ms
+            SELECT expires_at_timestamp
             FROM ChainLock
             WHERE
             lock = :lock
@@ -42,7 +42,10 @@ pub fn is_lock_expired(txn: &Transaction, lock: &[u8]) -> StateMutationResult<bo
             named_params! {
                 ":lock": lock,
             },
-            |row| Ok(row.get::<_, Timestamp>("expires_at_ms")? < holochain_types::timestamp::now()),
+            |row| {
+                Ok(row.get::<_, Timestamp>("expires_at_timestamp")?
+                    < holochain_types::timestamp::now())
+            },
         )
         .optional()?;
     // If there's no lock then it's expired.
