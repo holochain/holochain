@@ -2089,8 +2089,7 @@ dependencies = [
 [[package]]
 name = "ghost_actor"
 version = "0.3.0-alpha.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f381a129cc697f6accde7f129faade72ffce8f6fb6880e2be73c56eb5739e04f"
+source = "git+https://github.com/holochain/ghost_actor.git?branch=v0.3-macro-fix#e7597e8cc020302404c101d18180a44206aaf957"
 dependencies = [
  "futures",
  "mockall",
