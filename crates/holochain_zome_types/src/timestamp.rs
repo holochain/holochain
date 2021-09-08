@@ -23,7 +23,7 @@ pub const MAX: Timestamp = Timestamp(i64::MAX, u32::MAX);
 /// contain times offset from the UNIX epoch with the full +/- i64 range.  Most of these times are
 /// *not* representable by a chrono::DateTime<Utc> (which limits itself to a +/- i32 offset in days
 /// from Jan 1, 0AD and from 1970AD).  Also, most differences between two Timestamps are *not*
-/// representable by either a chrono::Duration (which limits itself to +/- i64 milliseconds), *nor*
+/// representable by either a chrono::Duration (which limits itself to +/- i64 microseconds), *nor*
 /// by core::time::Duration (which limits itself to +'ve u64 seconds).  Many constructions of these
 /// chrono and core::time types will panic!, so painful measures must be taken to avoid this outcome
 /// -- it is not acceptable for our core Holochain algorithms to panic when accessing DHT Header
@@ -64,7 +64,7 @@ impl fmt::Display for Timestamp {
         }
         // Outside 0000-01-01 to 9999-12-31; Display raw value tuple, or not a valid DateTime<Utc>;
         // Display raw value tuple
-        write!(f, "({},{})", self.0, self.1)
+        write!(f, "({}s, {}ns)", self.0, self.1)
     }
 }
 
@@ -359,18 +359,18 @@ impl Timestamp {
 
     /// Convert this timestamp to fit into a sqlite integer which is
     /// an i64. The value will be clamped between 0 and i64::MAX.
-    pub fn to_sql_ms_lossy(self) -> i64 {
+    pub fn to_sql_micros_lossy(self) -> i64 {
         use std::time::Duration;
         let s = Duration::from_secs(self.0.max(0) as u64);
         let ns = Duration::from_nanos(self.1 as u64);
         let ts = s.checked_add(ns).unwrap_or(s);
-        ts.as_millis().clamp(0, i64::MAX as u128) as i64
+        ts.as_micros().clamp(0, i64::MAX as u128) as i64
     }
 
-    /// Construct from milliseconds
-    pub fn from_millis(millis: i64) -> Self {
-        let secs = millis / 1_000;
-        let nanos = (millis % 1_000) as u32 * 1_000_000;
+    /// Construct from microseconds
+    pub fn from_micros(micros: i64) -> Self {
+        let secs = micros / 1_000_000;
+        let nanos = (micros % 1_000_000) as u32 * 1_000;
         Self(secs, nanos)
     }
 
@@ -389,7 +389,7 @@ impl Timestamp {
 
 /// Distance between two Timestamps as a chrono::Duration (subject to overflow).  A Timestamp
 /// represents a *signed* distance from the UNIX Epoch (1970-01-01T00:00:00Z).  A chrono::Duration
-/// is limited to +/- i64::MIN/MAX milliseconds.
+/// is limited to +/- i64::MIN/MAX microseconds.
 impl Sub<Timestamp> for Timestamp {
     type Output = TimestampResult<chrono::Duration>;
 
@@ -403,7 +403,7 @@ impl Sub<Timestamp> for Timestamp {
 impl rusqlite::ToSql for Timestamp {
     fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
         Ok(rusqlite::types::ToSqlOutput::Owned(
-            self.to_sql_ms_lossy().into(),
+            self.to_sql_micros_lossy().into(),
         ))
     }
 }
@@ -411,7 +411,7 @@ impl rusqlite::ToSql for Timestamp {
 #[cfg(feature = "full")]
 impl rusqlite::types::FromSql for Timestamp {
     fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
-        i64::column_result(value).map(Self::from_millis)
+        i64::column_result(value).map(Self::from_micros)
     }
 }
 
@@ -435,13 +435,13 @@ pub mod tests {
     }
 
     #[test]
-    fn millis_roundtrip() {
+    fn micros_roundtrip() {
         for t in [
             Timestamp(1234567, 123_000_000),
             Timestamp(99999, 999_000_000),
         ] {
-            let millis = t.to_sql_ms_lossy();
-            let r = Timestamp::from_millis(millis);
+            let micros = t.to_sql_micros_lossy();
+            let r = Timestamp::from_micros(micros);
             assert_eq!(t.0, r.0);
             assert_eq!(t.1, r.1);
         }

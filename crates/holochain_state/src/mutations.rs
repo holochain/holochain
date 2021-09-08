@@ -179,7 +179,7 @@ pub fn insert_op_lite(
         "hash": hash,
         "type": op_lite.get_type(),
         "storage_center_loc": basis.get_loc(),
-        "authored_timestamp_ms": timestamp.to_sql_ms_lossy(),
+        "authored_timestamp_ms": timestamp.to_sql_micros_lossy(),
         "basis_hash": basis,
         "header_hash": header_hash,
         "is_authored": is_authored,
