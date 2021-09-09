@@ -71,7 +71,7 @@ impl CounterSigningSessionTimes {
 
     /// Verify the difference between the end and start time is larger than the session header time offset.
     pub fn check_integrity(&self) -> Result<(), CounterSigningError> {
-        let times_are_valid = &Timestamp::new(0, 0) < self.start()
+        let times_are_valid = &Timestamp::from_micros(0) < self.start()
             && self.start()
                 <= &(self.end() - SESSION_HEADER_TIME_OFFSET).map_err(|_| {
                     CounterSigningError::CounterSigningSessionTimes((*self).clone())
