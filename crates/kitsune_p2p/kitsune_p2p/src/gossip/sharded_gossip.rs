@@ -633,41 +633,41 @@ impl ShardedGossipLocal {
         Ok(())
     }
 
-    #[cfg(not(feature = "space_gossip"))]
-    /// Check if we should locally sync
-    fn should_local_sync(&self) -> KitsuneResult<bool> {
-        // Historical gossip should not locally sync.
-        if let GossipType::Historical = self.gossip_type {
-            return Ok(false);
-        }
-        let update_last_sync = |i: &mut ShardedGossipLocalState, _: &mut bool| {
-            if i.trigger_local_sync {
-                // We are force triggering a local sync.
-                i.trigger_local_sync = false;
-                i.last_local_sync = Some(std::time::Instant::now());
-                let s = tracing::trace_span!("trigger",agents = ?i.show_local_agents(), i.trigger_local_sync);
-                s.in_scope(|| tracing::trace!("Force local sync"));
-                Ok(true)
-            } else if i
-                .last_local_sync
-                .as_ref()
-                .map(|s| s.elapsed().as_millis() as u32)
-                .unwrap_or(u32::MAX)
-                >= self.tuning_params.gossip_local_sync_delay_ms
-            {
-                // It's been long enough since the last local sync.
-                i.last_local_sync = Some(std::time::Instant::now());
-                Ok(true)
-            } else {
-                // Otherwise it's not time to sync.
-                Ok(false)
-            }
-        };
+    // #[cfg(not(feature = "space_gossip"))]
+    // /// Check if we should locally sync
+    // fn should_local_sync(&self) -> KitsuneResult<bool> {
+    //     // Historical gossip should not locally sync.
+    //     if let GossipType::Historical = self.gossip_type {
+    //         return Ok(false);
+    //     }
+    //     let update_last_sync = |i: &mut ShardedGossipLocalState, _: &mut bool| {
+    //         if i.trigger_local_sync {
+    //             // We are force triggering a local sync.
+    //             i.trigger_local_sync = false;
+    //             i.last_local_sync = Some(std::time::Instant::now());
+    //             let s = tracing::trace_span!("trigger",agents = ?i.show_local_agents(), i.trigger_local_sync);
+    //             s.in_scope(|| tracing::trace!("Force local sync"));
+    //             Ok(true)
+    //         } else if i
+    //             .last_local_sync
+    //             .as_ref()
+    //             .map(|s| s.elapsed().as_millis() as u32)
+    //             .unwrap_or(u32::MAX)
+    //             >= self.tuning_params.gossip_local_sync_delay_ms
+    //         {
+    //             // It's been long enough since the last local sync.
+    //             i.last_local_sync = Some(std::time::Instant::now());
+    //             Ok(true)
+    //         } else {
+    //             // Otherwise it's not time to sync.
+    //             Ok(false)
+    //         }
+    //     };
 
-        self.inner.share_mut(update_last_sync)
-    }
+    //     self.inner.share_mut(update_last_sync)
+    // }
 
-    #[cfg(feature = "space_gossip")]
+    // #[cfg(feature = "space_gossip")]
     fn should_local_sync(&self) -> KitsuneResult<bool> {
         Ok(false)
     }

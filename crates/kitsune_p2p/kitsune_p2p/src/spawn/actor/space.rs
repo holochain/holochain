@@ -1098,18 +1098,18 @@ impl Space {
         .into())
     }
 
-    #[cfg(not(feature = "space_gossip"))]
-    /// Get the existing agent storage arc or create a new one.
-    fn get_agent_arc(&self, agent: &Arc<KitsuneAgent>) -> DhtArc {
-        // TODO: We are simply setting the initial arc to full.
-        // In the future we may want to do something more intelligent.
-        self.agent_arcs
-            .get(agent)
-            .cloned()
-            .unwrap_or_else(|| DhtArc::full(agent.get_loc()))
-    }
+    // #[cfg(not(feature = "space_gossip"))]
+    // /// Get the existing agent storage arc or create a new one.
+    // fn get_agent_arc(&self, agent: &Arc<KitsuneAgent>) -> DhtArc {
+    //     // TODO: We are simply setting the initial arc to full.
+    //     // In the future we may want to do something more intelligent.
+    //     self.agent_arcs
+    //         .get(agent)
+    //         .cloned()
+    //         .unwrap_or_else(|| DhtArc::full(agent.get_loc()))
+    // }
 
-    #[cfg(feature = "space_gossip")]
+    // #[cfg(feature = "space_gossip")]
     /// Get the existing agent storage arc or create a new one.
     fn get_agent_arc(&self, agent: &Arc<KitsuneAgent>) -> DhtArc {
         // TODO: This is an experimental feature that sets the first
