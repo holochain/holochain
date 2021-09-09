@@ -32,7 +32,7 @@ macro_rules! timing_trace {
             if __elapsed_s >= 5.0 {
                 tracing::warn!( elapsed_s = %__elapsed_s $($rest)* );
             } else {
-                tracing::debug!( elapsed_s = %__elapsed_s $($rest)* );
+                tracing::trace!( elapsed_s = %__elapsed_s $($rest)* );
             }
             __out
         }
