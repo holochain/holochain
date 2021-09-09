@@ -78,7 +78,7 @@ impl Query for GetAgentActivityQuery {
             let validation_status: Option<ValidationStatus> = row.get("validation_status")?;
             let hash: HeaderHash = row.get("hash")?;
             from_blob::<SignedHeader>(row.get("header_blob")?).and_then(|header| {
-                let integrated: Option<i32> = row.get("when_integrated")?;
+                let integrated: Option<i64> = row.get("when_integrated")?;
                 let header = HeaderHashed::with_pre_hashed(header.0, hash);
                 let item = if integrated.is_some() {
                     Item::Integrated(header)
