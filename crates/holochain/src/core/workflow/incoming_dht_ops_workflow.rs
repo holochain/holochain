@@ -113,7 +113,7 @@ fn batch_process_entry(
 #[derive(Default, Clone)]
 pub struct IncomingOpHashes(Arc<parking_lot::Mutex<HashSet<DhtOpHash>>>);
 
-#[instrument(skip(vault, sys_validation_trigger, ops, incoming_op_hashes, cell_network))]
+#[instrument(skip(vault, sys_validation_trigger, ops, incoming_op_hashes))]
 pub async fn incoming_dht_ops_workflow(
     vault: &EnvWrite,
     incoming_op_hashes: Option<&IncomingOpHashes>,
@@ -131,7 +131,7 @@ pub async fn incoming_dht_ops_workflow(
     if let Some(incoming_op_hashes) = &incoming_op_hashes {
         let mut set = incoming_op_hashes.0.lock();
         let mut o = Vec::with_capacity(ops.len());
-    for (hash, op) in ops {
+        for (hash, op) in ops {
             if !set.contains(&hash) {
                 set.insert(hash.clone());
                 hashes_to_remove.push(hash.clone());
@@ -149,14 +149,14 @@ pub async fn incoming_dht_ops_workflow(
         // It's cheaper to check if the op exists before trying
         // to check the signature or open a write transaction.
         if !op_exists(vault, &hash)? {
-        match should_keep(&op).await {
-            Ok(()) => filter_ops.push((hash, op)),
-            Err(e) => {
-                tracing::warn!(
-                    msg = "Dropping op because it failed counterfeit checks",
-                    ?op
-                );
-                return Err(e);
+            match should_keep(&op).await {
+                Ok(()) => filter_ops.push((hash, op)),
+                Err(e) => {
+                    tracing::warn!(
+                        msg = "Dropping op because it failed counterfeit checks",
+                        ?op
+                    );
+                    return Err(e);
                 }
             }
         }

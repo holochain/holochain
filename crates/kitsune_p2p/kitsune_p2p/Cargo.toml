@@ -56,3 +56,7 @@ test_utils = [
   "kitsune_p2p_types/test_utils",
   "mockall",
 ]
+# An experimental feature that enables only one cell to gossip 
+# per dna space. This should not be used in production unless 
+# you know what you're doing.
+space_gossip = []

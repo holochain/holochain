@@ -320,6 +320,7 @@ pub struct ShardedGossipLocalState {
     /// Metrics that track remote node states and help guide
     /// the next node to gossip with.
     metrics: Metrics,
+    #[allow(dead_code)]
     /// Last moment we locally synced.
     last_local_sync: Option<std::time::Instant>,
     /// Trigger local sync to run on the next iteration.
@@ -632,6 +633,7 @@ impl ShardedGossipLocal {
         Ok(())
     }
 
+    #[cfg(not(feature = "space_gossip"))]
     /// Check if we should locally sync
     fn should_local_sync(&self) -> KitsuneResult<bool> {
         // Historical gossip should not locally sync.
@@ -663,6 +665,11 @@ impl ShardedGossipLocal {
         };
 
         self.inner.share_mut(update_last_sync)
+    }
+
+    #[cfg(feature = "space_gossip")]
+    fn should_local_sync(&self) -> KitsuneResult<bool> {
+        Ok(false)
     }
 
     /// Record all timed out rounds into metrics

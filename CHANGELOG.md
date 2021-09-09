@@ -5,7 +5,7 @@ This file conveniently consolidates all of the crates individual CHANGELOG.md fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 # \[Unreleased\]
-
+- Adds experimental feature for one storage agent per space.
 # 20210825.101130
 
 ## [holochain-0.0.104](crates/holochain/CHANGELOG.md#0.0.104)

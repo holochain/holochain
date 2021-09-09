@@ -30,3 +30,9 @@ thiserror = "1.0.22"
 tokio = { version = "1.3", features = [ "full" ] }
 tokio-stream = "0.1"
 holochain_util = { version = "0.0.3", path = "../holochain_util" }
+
+[features]
+# An experimental feature that enables only one cell to gossip 
+# per dna space. This should not be used in production unless 
+# you know what you're doing.
+space_gossip = ["kitsune_p2p/space_gossip"]

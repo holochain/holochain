@@ -203,8 +203,7 @@ impl AsP2pStateTxExt for Transaction<'_> {
                     let end: Option<u32> = r.get(2)?;
                     let interval = match (start, end) {
                         (Some(start), Some(end)) => Some(ArcInterval::new(start, end)),
-                        // (None, None) => None,
-                        (None, None) => Some(ArcInterval::new_empty()),
+                        (None, None) => None,
                         _ => {
                             tracing::warn!(
                             "Mismatch in arc bounds for an agent, treating as zero arc ({:?}, {:?})",
@@ -219,12 +218,12 @@ impl AsP2pStateTxExt for Transaction<'_> {
             )?;
         query.fold(Ok(vec![]), |out, maybe_pair| {
             if let Some((agent, interval)) = maybe_pair? {
-                // if arcset.overlap(&interval.clone().into()) {
+                if arcset.overlap(&interval.clone().into()) {
                     return out.map(|mut out| {
                         out.push((agent, interval));
                         out
                     });
-                // }
+                }
             }
             out
         })
