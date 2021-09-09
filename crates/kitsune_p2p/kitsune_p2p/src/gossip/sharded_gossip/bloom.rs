@@ -63,6 +63,7 @@ impl ShardedGossipLocal {
                     .await?
                     .into_iter()
                     .filter(|(a, _)| local_agents.contains(a))
+                    .filter(|(_, i)| !i.is_empty())
                     .collect();
 
             // Get the op hashes which fit within the common arc set from these local agents.

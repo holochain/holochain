@@ -10,7 +10,7 @@ use holochain_state::prelude::*;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::prelude::*;
 use once_cell::sync::Lazy;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use tracing::instrument;
 
 #[cfg(test)]
@@ -110,16 +110,45 @@ fn batch_process_entry(
     Ok(())
 }
 
-#[instrument(skip(vault, sys_validation_trigger, ops))]
+#[derive(Default, Clone)]
+pub struct IncomingOpHashes(Arc<parking_lot::Mutex<HashSet<DhtOpHash>>>);
+
+#[instrument(skip(vault, sys_validation_trigger, ops, incoming_op_hashes, cell_network))]
 pub async fn incoming_dht_ops_workflow(
     vault: &EnvWrite,
+    incoming_op_hashes: Option<&IncomingOpHashes>,
     mut sys_validation_trigger: TriggerSender,
-    ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+    mut ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     request_validation_receipt: bool,
 ) -> WorkflowResult<()> {
     let mut filter_ops = Vec::new();
+    let mut hashes_to_remove = if incoming_op_hashes.is_some() {
+        Vec::with_capacity(ops.len())
+    } else {
+        Vec::with_capacity(0)
+    };
+
+    if let Some(incoming_op_hashes) = &incoming_op_hashes {
+        let mut set = incoming_op_hashes.0.lock();
+        let mut o = Vec::with_capacity(ops.len());
+    for (hash, op) in ops {
+            if !set.contains(&hash) {
+                set.insert(hash.clone());
+                hashes_to_remove.push(hash.clone());
+                o.push((hash, op));
+            }
+        }
+        ops = o;
+    }
+
+    if ops.is_empty() {
+        return Ok(());
+    }
 
     for (hash, op) in ops {
+        // It's cheaper to check if the op exists before trying
+        // to check the signature or open a write transaction.
+        if !op_exists(vault, &hash)? {
         match should_keep(&op).await {
             Ok(()) => filter_ops.push((hash, op)),
             Err(e) => {
@@ -128,6 +157,7 @@ pub async fn incoming_dht_ops_workflow(
                     ?op
                 );
                 return Err(e);
+                }
             }
         }
     }
@@ -177,8 +207,17 @@ pub async fn incoming_dht_ops_workflow(
         });
     }
 
-    rcv.await
-        .map_err(|_| super::error::WorkflowError::RecvError)?
+    let r = rcv
+        .await
+        .map_err(|_| super::error::WorkflowError::RecvError)?;
+
+    if let Some(incoming_op_hashes) = &incoming_op_hashes {
+        let mut set = incoming_op_hashes.0.lock();
+        for hash in hashes_to_remove {
+            set.remove(&hash);
+        }
+    }
+    r
 }
 
 #[instrument(skip(op))]

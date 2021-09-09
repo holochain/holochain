@@ -218,7 +218,6 @@ pub trait WriteManager<'e> {
     /// transaction, and commit the transaction after the closure has run.
     /// If there is a SQLite error, recover from it and re-run the closure.
     // FIXME: B-01566: implement write failure detection
-    #[cfg(feature = "test_utils")]
     fn with_commit_sync<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,

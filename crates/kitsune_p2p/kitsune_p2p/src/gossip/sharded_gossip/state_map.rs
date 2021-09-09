@@ -12,7 +12,7 @@ impl RoundStateMap {
     pub(super) fn check_timeout(&mut self, key: &StateKey) -> bool {
         let mut timed_out = false;
         if let Some(state) = self.map.get(key) {
-            if state.created_at.elapsed().as_millis() as u32 > state.round_timeout {
+            if state.last_touch.elapsed().as_millis() as u32 > state.round_timeout {
                 self.map.remove(key);
                 self.timed_out.push(key.clone());
                 timed_out = true;
@@ -23,7 +23,7 @@ impl RoundStateMap {
 
     /// Get the state if it hasn't timed out.
     pub(super) fn get(&mut self, key: &StateKey) -> Option<&RoundState> {
-        self.check_timeout(key);
+        self.touch(key);
         self.map.get(key)
     }
 
@@ -47,7 +47,7 @@ impl RoundStateMap {
     pub(super) fn current_rounds(&mut self) -> HashSet<Tx2Cert> {
         let mut timed_out = Vec::new();
         self.map.retain(|k, v| {
-            if (v.created_at.elapsed().as_millis() as u32) < v.round_timeout {
+            if (v.last_touch.elapsed().as_millis() as u32) < v.round_timeout {
                 true
             } else {
                 timed_out.push(k.clone());
@@ -67,6 +67,13 @@ impl RoundStateMap {
     /// Get all timed out rounds.
     pub(super) fn take_timed_out_rounds(&mut self) -> Vec<StateKey> {
         std::mem::take(&mut self.timed_out)
+    }
+
+    /// Touch a round to reset its timeout.
+    fn touch(&mut self, key: &StateKey) {
+        if let Some(state) = self.map.get_mut(key) {
+            state.last_touch = std::time::Instant::now();
+        }
     }
 }
 

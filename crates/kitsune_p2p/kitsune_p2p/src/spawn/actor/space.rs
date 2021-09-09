@@ -242,6 +242,8 @@ impl SpaceInternalHandler for Space {
         // local agents.
         let mut local_events = Vec::new();
         for agent in self.local_joined_agents.iter().cloned() {
+            if let Some(arc) = self.agent_arcs.get(&agent) {
+                if arc.contains(basis.get_loc()) {
             let fut = self.evt_sender.notify(
                 space.clone(),
                 agent.clone(),
@@ -253,6 +255,8 @@ impl SpaceInternalHandler for Space {
                     tracing::warn!(?err, "failed local broadcast");
                 }
             });
+        }
+            }
         }
 
         // next, gather a list of agents covering this data to be
@@ -611,6 +615,8 @@ impl KitsuneP2pHandler for Space {
         // first, forward this data to all connected local agents.
         let mut local_events = Vec::new();
         for agent in self.local_joined_agents.iter().cloned() {
+            if let Some(arc) = self.agent_arcs.get(&agent) {
+                if arc.contains(basis.get_loc()) {
             let fut = self.evt_sender.notify(
                 space.clone(),
                 agent.clone(),
@@ -622,6 +628,8 @@ impl KitsuneP2pHandler for Space {
                     tracing::warn!(?err, "failed local broadcast");
                 }
             });
+        }
+            }
         }
 
         // then, find a list of agents in a potentially remote neighborhood
@@ -1090,13 +1098,30 @@ impl Space {
         .into())
     }
 
+    // /// Get the existing agent storage arc or create a new one.
+    // fn get_agent_arc(&self, agent: &Arc<KitsuneAgent>) -> DhtArc {
+    //     // TODO: We are simply setting the initial arc to full.
+    //     // In the future we may want to do something more intelligent.
+    //     self.agent_arcs
+    //         .get(agent)
+    //         .cloned()
+    //         .unwrap_or_else(|| DhtArc::full(agent.get_loc()))
+    // }
+
     /// Get the existing agent storage arc or create a new one.
     fn get_agent_arc(&self, agent: &Arc<KitsuneAgent>) -> DhtArc {
         // TODO: We are simply setting the initial arc to full.
         // In the future we may want to do something more intelligent.
-        self.agent_arcs
-            .get(agent)
-            .cloned()
-            .unwrap_or_else(|| DhtArc::full(agent.get_loc()))
+        let arc = self.agent_arcs.get(agent).cloned();
+        match arc {
+            Some(arc) => arc,
+            None => {
+                if self.agent_arcs.is_empty() {
+                    DhtArc::full(agent.get_loc())
+                } else {
+                    DhtArc::empty(agent.get_loc())
+                }
+            }
+        }
     }
 }
