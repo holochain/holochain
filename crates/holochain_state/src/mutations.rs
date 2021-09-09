@@ -600,32 +600,85 @@ pub fn unlock_chain(txn: &mut Transaction) -> StateMutationResult<()> {
     Ok(())
 }
 
+pub fn delete_ephemeral_scheduled_fns(
+    txn: &mut Transaction
+) -> StateMutationResult<()> {
+    txn.execute("DELETE FROM ScheduledFunctions WHERE ephemeral", [])?;
+    Ok(())
+}
+
+pub fn reschedule_expired(txn: &mut Transaction, now: Timestamp) -> StateMutationResult<()> {
+    for (zome_name, scheduled_fn, schedule_string) in txn.execute(
+        "
+        SELECT
+        zome_name,
+        scheduled_fn,
+        schedule
+        FROM ScheduledFunctions
+        WHERE
+        end < :now",
+        named_params! {
+            ":now": now
+        },
+    )?.query_map(|row| {
+        Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+    }) {
+        schedule_fn(txn, zome_name, scheduled_fn, Schedule::Persisted(schedule_string), now)?;
+    }
+    Ok(())
+}
+
 pub fn schedule_fn(
     txn: &mut Transaction,
+    zome_name: ZomeName,
     scheduled_fn: String,
     schedule: Option<Schedule>,
+    now: Timestamp
 ) -> StateMutationResult<()> {
-    match (fn_is_scheduled(txn, scheduled_fn.clone())?, schedule) {
+    match (fn_is_scheduled(txn, zome_name, scheduled_fn.clone())?, schedule) {
         (_, Some(schedule)) => {
+            let (schedule_string, start, end) = match schedule {
+                Schedule::Persisted(schedule_string) => {
+                    // If this cron doesn't parse cleanly we don't even want to
+                    // write it to the db.
+                    let start = cron::Schedule::from_str(schedule_string)?.after(chrono::DateTime::from_utc(now, Utc)).next()?;
+                    let end = start + holochain_zome_types::schedule::PERSISTED_TIMEOUT;
+                    (schedule_string, start, end)
+                },
+                Schedule::Ephemeral(duration) => {
+                    (String::new(), timestamp::now() + duration, i64::MAX)
+                },
+            };
             txn.execute(
                 "
                 UPDATE ScheduledFunctions
                 SET
                 schedule = :schedule,
-                tokio_scheduled = false
+                start = :start,
+                end = :end,
+                ephemeral = :ephemeral
                 WHERE
-                ScheduledFunctions.scheduled_fn = :scheduled_fn
+                zome_name = :zome_name
+                AND scheduled_fn = :scheduled_fn
                 ",
                 named_params! {
-                    ":schedule": to_blob(schedule)?,
+                    ":zome_name": zome_name,
+                    ":schedule": schedule_string,
                     ":scheduled_fn": scheduled_fn,
+                    ":start": start,
+                    ":end": end,
+                    ":ephemeral": maybe_schedule.is_none(),
                 },
             )?;
         }
         (false, None) => {
             sql_insert!(txn, ScheduledFunctions, {
+                "zome_name": zome_name,
+                "schedule": "",
                 "scheduled_fn": scheduled_fn,
-                "tokio_scheduled": false,
+                "start": 0,
+                "end": i64::MAX,
+                "ephemeral": true,
             })?;
         }
         _ => {}

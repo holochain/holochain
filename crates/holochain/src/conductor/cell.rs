@@ -233,8 +233,46 @@ impl Cell {
         self.conductor_api.signal_broadcaster().await
     }
 
+    pub(super) async fn delete_ephemeral_scheduled_fns(self: Arc<Self>) {
+        self.env.async_commit(move |txn: &mut Transaction| {
+            delete_ephemeral_scheduled_fns(txn);
+        })
+    }
+
     pub(super) async fn dispatch_scheduled_fns(self: Arc<Self>) {
-        todo!();
+        self.env.async_commit(move |txn: &mut Transaction| {
+            let now = timestamp::now();
+            reschedule_expired(txn, now);
+
+            let tasks = vec![];
+            for (zome_name, scheduled_fn, schedule) in live_scheduled_fns(txn, now) {
+                let invocation = ZomeCall {
+                    cell_id: self.id.clone(),
+                    zome_name,
+                    None,
+                    payload: schedule,
+                    provenance: self.id.agent_pubkey(),
+                    scheduled_fn,
+                };
+                tasks.push(self.call_zome(invocation, None));
+            }
+            delete_ephemeral_scheduled_fns(txn);
+            results: Vec<CellResult<ZomeCallResult>> = futures::future::join_all(tasks).await;
+
+            for result in results {
+                match result {
+                    Ok(Ok(ZomeCallResponse::Ok(extern_io))) => {
+                        let next_schedule: Schedule = match extern_io.decode() {
+                            Ok(Some(v)) => v,
+                            Ok(None) => { },
+                            Err(e) => error!(e),
+                        };
+                        schedule_fn(txn, zome_name, scheduled_fn, next_schedule);
+                    },
+                    errorish => error!(errorish),
+                }
+            }
+        })
     }
 
     #[instrument(skip(self, evt))]

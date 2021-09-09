@@ -163,7 +163,10 @@ CREATE TABLE IF NOT EXISTS ChainLock (
 );
 
 CREATE TABLE IF NOT EXISTS ScheduledFunctions (
+    zome_name TEXT PRIMARY KEY ON CONFLICT ROLLBACK,
     scheduled_fn TEXT PRIMARY KEY ON CONFLICT ROLLBACK,
-    schedule BLOB NULL,
-    tokio_scheduled BOOLEAN NOT NULL
+    schedule TEXT NOT NULL,
+    start INTEGER NOT NULL,
+    end INTEGER NOT NULL,
+    ephemeral BOOLEAN NOT NULL
 );

@@ -1400,16 +1400,7 @@ mod builder {
         ) -> ConductorResult<ConductorHandle> {
             tokio::task::spawn(p2p_event_task(p2p_evt, handle.clone()));
 
-            let scheduler_handle = handle.clone();
-            let _ = handle.clone().set_scheduler(tokio::task::spawn(async move {
-                let mut interval = tokio::time::interval(std::time::Duration::from_millis(
-                    SCHEDULER_INTERVAL_MILLIS,
-                ));
-                loop {
-                    interval.tick().await;
-                    scheduler_handle.clone().dispatch_scheduled_fns().await;
-                }
-            }));
+            let _ = handle.start_scheduler();
 
             let configs = conductor_config.admin_interfaces.unwrap_or_default();
             let cell_startup_errors = handle.clone().initialize_conductor(configs).await?;
