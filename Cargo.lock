@@ -2893,6 +2893,7 @@ dependencies = [
  "holo_hash",
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
+ "kitsune_p2p_timestamp",
  "matches",
  "nanoid",
  "num_enum",
@@ -3384,6 +3385,17 @@ dependencies = [
  "tokio",
  "tracing-subscriber",
  "webpki",
+]
+
+[[package]]
+name = "kitsune_p2p_timestamp"
+version = "0.0.1-dev.0"
+dependencies = [
+ "arbitrary",
+ "chrono",
+ "rusqlite",
+ "serde",
+ "thiserror",
 ]
 
 [[package]]

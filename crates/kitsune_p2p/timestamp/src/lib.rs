@@ -10,9 +10,9 @@ use std::{
     str::FromStr,
 };
 
-use crate::prelude::*;
+use serde::{Deserialize, Serialize};
 
-pub use error::{TimestampError, TimestampResult};
+pub use crate::error::{TimestampError, TimestampResult};
 
 /// The smallest possible Timestamp
 pub const MIN: Timestamp = Timestamp(i64::MIN, u32::MIN);
@@ -39,9 +39,7 @@ pub const MAX: Timestamp = Timestamp(i64::MAX, u32::MAX);
 /// Create a new Timestamp instance from the supplied secs/nsecs.  Note that we can easily create a
 /// Timestamp that cannot be converted to a valid DateTime<Utc> (ie. by supplying 86,400-second days
 /// beyond range of +/- i32 offset from 0AD or 1970AD, nsecs beyond 1e9, etc.; see its code.)
-#[derive(
-    Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize, SerializedBytes,
-)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Timestamp(
     i64, // seconds from UNIX Epoch, positive or negative
@@ -340,18 +338,6 @@ impl Timestamp {
         let nanos = (micros % 1_000_000) as u32 * 1_000;
         Self(secs, nanos)
     }
-
-    /// Construct a Timestamp from countersigning session data.
-    /// Ostensibly used for the Header because the session itself covers a time range.
-    pub fn from_countersigning_data(session_data: &CounterSigningSessionData) -> Self {
-        let start = session_data.preflight_request().session_times().start();
-        Self(
-            (start + SESSION_HEADER_TIME_OFFSET)
-                .unwrap_or(timestamp::MAX)
-                .0,
-            start.1,
-        )
-    }
 }
 
 /// Distance between two Timestamps as a chrono::Duration (subject to overflow).  A Timestamp
@@ -366,7 +352,7 @@ impl Sub<Timestamp> for Timestamp {
     }
 }
 
-#[cfg(feature = "full")]
+#[cfg(feature = "rusqlite")]
 impl rusqlite::ToSql for Timestamp {
     fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
         Ok(rusqlite::types::ToSqlOutput::Owned(
@@ -375,7 +361,7 @@ impl rusqlite::ToSql for Timestamp {
     }
 }
 
-#[cfg(feature = "full")]
+#[cfg(feature = "rusqlite")]
 impl rusqlite::types::FromSql for Timestamp {
     fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
         i64::column_result(value).map(Self::from_micros)
@@ -384,6 +370,7 @@ impl rusqlite::types::FromSql for Timestamp {
 
 #[cfg(test)]
 pub mod tests {
+    use std::convert::TryInto;
 
     use super::*;
 
