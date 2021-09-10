@@ -21,7 +21,7 @@ either = "1.5.0"
 fallible-iterator = "0.2.0"
 fixt = { version = "0.0.5", path = "../fixt" }
 futures = "0.3.1"
-ghost_actor = "0.3.0-alpha.3"
+ghost_actor = "0.3.0-alpha.4"
 holo_hash = { version = "0.0.5", path = "../holo_hash", features = ["full"] }
 holochain_cascade = { version = "0.0.5", path = "../holochain_cascade" }
 holochain_conductor_api = { version = "0.0.5", path = "../holochain_conductor_api" }
@@ -36,7 +36,7 @@ holochain_websocket = { version = "0.0.5", path = "../holochain_websocket" }
 holochain_zome_types = { version = "0.0.7", path = "../holochain_zome_types" }
 human-panic = "1.0.3"
 kitsune_p2p = { version = "0.0.5", path = "../kitsune_p2p/kitsune_p2p" }
-kitsune_p2p_types = { version = "0.0.4", path = "../kitsune_p2p/types" }
+kitsune_p2p_types = { version = "0.0.5-dev.0", path = "../kitsune_p2p/types" }
 lazy_static = "1.4.0"
 mockall = "0.10.2"
 mr_bundle = { version = "0.0.3", path = "../mr_bundle" }
