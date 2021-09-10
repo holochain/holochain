@@ -1,11 +1,11 @@
 //! This module is the ideal interface we would have for the conductor (or other store that kitsune uses).
 //! We should update the conductor to match this interface.
 
-use std::{collections::HashSet, ops::Range, sync::Arc};
+use std::{collections::HashSet, sync::Arc};
 
 use crate::event::{
     FetchOpDataEvt, PutAgentInfoSignedEvt, QueryAgentInfoSignedEvt, QueryGossipAgentsEvt,
-    QueryOpHashesEvt, TimeWindowMs,
+    QueryOpHashesEvt, TimeRange,
 };
 use crate::types::event::KitsuneP2pEventSender;
 use kitsune_p2p_types::{
@@ -113,10 +113,10 @@ pub(super) async fn all_op_hashes_within_arcset(
     space: &Arc<KitsuneSpace>,
     agents: &[(Arc<KitsuneAgent>, ArcInterval)],
     common_arc_set: &DhtArcSet,
-    window_ms: TimeWindowMs,
+    window_ms: TimeRange,
     max_ops: usize,
     include_limbo: bool,
-) -> KitsuneResult<Option<(Vec<Arc<KitsuneOpHash>>, Range<u64>)>> {
+) -> KitsuneResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeRange)>> {
     let agents: Vec<_> = agents
         .iter()
         .map(|(a, i)| {

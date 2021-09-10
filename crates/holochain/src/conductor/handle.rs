@@ -694,8 +694,14 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                     .collect();
 
                 // The range is exclusive so we add one to the end.
-                let range =
-                    start.and_then(|s| end.map(|e| (hashes, s..(e.checked_add(1).unwrap_or(0)))));
+                let range = start.and_then(|s| {
+                    end.map(|e| {
+                        (
+                            hashes,
+                            s..(e.saturating_add(&std::time::Duration::from_millis(1))),
+                        )
+                    })
+                });
 
                 respond.respond(Ok(async move { Ok(range) }.boxed().into()));
             }

@@ -8,7 +8,7 @@ use kitsune_p2p::dht_arc::DhtArcSet;
 use kitsune_p2p::event::MetricDatum;
 use kitsune_p2p::event::MetricQuery;
 use kitsune_p2p::event::MetricQueryAnswer;
-use kitsune_p2p::event::TimeWindowMs;
+use kitsune_p2p::event::TimeRange;
 use kitsune_p2p_types::tls::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use std::collections::hash_map::Entry;
@@ -486,7 +486,7 @@ impl AsKdPersist for PersistMem {
         &self,
         root: KdHash,
         agent: KdHash,
-        _window_ms: TimeWindowMs,
+        _window_ms: TimeRange,
         _dht_arc: DhtArcSet,
     ) -> BoxFuture<'static, KdResult<Vec<KdEntrySigned>>> {
         // TODO - actually filter

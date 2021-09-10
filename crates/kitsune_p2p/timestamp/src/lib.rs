@@ -14,11 +14,6 @@ use serde::{Deserialize, Serialize};
 
 pub use crate::error::{TimestampError, TimestampResult};
 
-/// The smallest possible Timestamp
-pub const MIN: Timestamp = Timestamp(i64::MIN);
-/// The largest possible Timestamp
-pub const MAX: Timestamp = Timestamp(i64::MAX);
-
 pub const MM: i64 = 1_000_000;
 
 /// A UTC timestamp for use in Holochain's headers.  It is assumed to be untrustworthy: it may
@@ -182,6 +177,11 @@ impl<D: Into<core::time::Duration>> Sub<D> for &Timestamp {
 }
 
 impl Timestamp {
+    /// The smallest possible Timestamp
+    pub const MIN: Timestamp = Timestamp(i64::MIN);
+    /// The largest possible Timestamp
+    pub const MAX: Timestamp = Timestamp(i64::MAX);
+
     /// Construct from microseconds
     pub fn from_micros(micros: i64) -> Self {
         Self(micros)
@@ -270,6 +270,16 @@ impl Timestamp {
         } else {
             None
         }
+    }
+
+    /// Add a duration, clamping to MAX if overflow
+    pub fn saturating_add(&self, rhs: &core::time::Duration) -> Timestamp {
+        self.checked_add(rhs).unwrap_or(Self::MAX)
+    }
+
+    /// Subtract a duration, clamping to MIN if overflow
+    pub fn saturating_sub(&self, rhs: &core::time::Duration) -> Timestamp {
+        self.checked_sub(rhs).unwrap_or(Self::MIN)
     }
 
     /// Convert this timestamp to fit into a sqlite integer which is

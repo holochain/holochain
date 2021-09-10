@@ -616,7 +616,7 @@ impl CounterSigningSessionData {
     /// Ostensibly used for the Header because the session itself covers a time range.
     pub fn to_timestamp(&self) -> Timestamp {
         (self.preflight_request().session_times().start() + SESSION_HEADER_TIME_OFFSET)
-            .unwrap_or(timestamp::MAX)
+            .unwrap_or(Timestamp::MAX)
     }
 
     /// Accessor to the preflight request.

@@ -3242,6 +3242,7 @@ dependencies = [
  "itertools 0.10.1",
  "kitsune_p2p_mdns",
  "kitsune_p2p_proxy",
+ "kitsune_p2p_timestamp",
  "kitsune_p2p_transport_quic",
  "kitsune_p2p_types",
  "lair_keystore_api",

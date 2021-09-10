@@ -8,7 +8,7 @@ use kitsune_p2p::event::MetricDatum;
 use kitsune_p2p::event::MetricKind;
 use kitsune_p2p::event::MetricQuery;
 use kitsune_p2p::event::MetricQueryAnswer;
-use kitsune_p2p::event::TimeWindowMs;
+use kitsune_p2p::event::TimeRange;
 
 use crate::types::AgentPubKeyExt;
 
@@ -301,10 +301,10 @@ impl WrapEvtSender {
         &self,
         dna_hash: DnaHash,
         agents: Vec<(AgentPubKey, kitsune_p2p::dht_arc::DhtArcSet)>,
-        window_ms: TimeWindowMs,
+        window_ms: TimeRange,
         max_ops: usize,
         include_limbo: bool,
-    ) -> impl Future<Output = HolochainP2pResult<Option<(Vec<holo_hash::DhtOpHash>, TimeWindowMs)>>>
+    ) -> impl Future<Output = HolochainP2pResult<Option<(Vec<holo_hash::DhtOpHash>, TimeRange)>>>
            + 'static
            + Send {
         timing_trace!(
@@ -892,7 +892,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         &mut self,
         input: kitsune_p2p::event::QueryOpHashesEvt,
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<
-        Option<(Vec<Arc<kitsune_p2p::KitsuneOpHash>>, TimeWindowMs)>,
+        Option<(Vec<Arc<kitsune_p2p::KitsuneOpHash>>, TimeRange)>,
     > {
         let kitsune_p2p::event::QueryOpHashesEvt {
             space,

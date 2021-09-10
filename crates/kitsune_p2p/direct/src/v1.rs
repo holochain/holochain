@@ -935,7 +935,7 @@ async fn handle_gossip(
 async fn handle_query_op_hashes(
     kdirect: Arc<Kd1>,
     input: QueryOpHashesEvt,
-) -> KdResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowMs)>> {
+) -> KdResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeRange)>> {
     let QueryOpHashesEvt {
         space,
         agents,
