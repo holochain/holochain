@@ -751,7 +751,7 @@ impl Cell {
                                     ":from": start,
                                     ":to": end,
                                 },
-                                |row| Ok((row.get("hash")?, row.get("authored_timestamp_ms")?)),
+                                |row| Ok((row.get("hash")?, row.get("authored_timestamp")?)),
                             )?
                             .collect::<rusqlite::Result<Vec<_>>>()?,
                         ArcInterval::Bounded(start_loc, end_loc) => {
@@ -768,7 +768,7 @@ impl Cell {
                                         ":storage_start_loc": start_loc,
                                         ":storage_end_loc": end_loc,
                                     },
-                                    |row| Ok((row.get("hash")?, row.get("authored_timestamp_ms")?)),
+                                    |row| Ok((row.get("hash")?, row.get("authored_timestamp")?)),
                                 )?
                                 .collect::<rusqlite::Result<Vec<_>>>()?
                         }

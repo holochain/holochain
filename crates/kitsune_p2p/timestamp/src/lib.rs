@@ -282,10 +282,10 @@ impl Timestamp {
         self.checked_sub(rhs).unwrap_or(Self::MIN)
     }
 
-    /// Convert this timestamp to fit into a sqlite integer which is
-    /// an i64. The value will be clamped between 0 and i64::MAX.
-    pub fn to_sql_micros_lossy(self) -> i64 {
-        self.0.clamp(0, i64::MAX)
+    /// Convert this timestamp to fit into a SQLite integer which is an i64.
+    /// The value will be clamped to the valid range supported by SQLite
+    fn to_sql_micros_lossy(self) -> i64 {
+        i64::clamp(self.0, -62167219200_000_000, 106751991167_000_000)
     }
 }
 
