@@ -8,6 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # 20210901.105419
 
+***Note***: The following crates could not be published to crates.io due to build errors:
+
+- hdk_derive-0.0.7
+- hdk-0.0.105
+- holochain_state-0.0.5
+- holochain_conductor_api-0.0.5
+- holochain_cascade-0.0.5",
+- holochain_test_wasm_common-0.0.5
+- holochain-0.0.105
+
 ## [holochain-0.0.105](crates/holochain/CHANGELOG.md#0.0.105)
 
 ## [holochain\_test\_wasm\_common-0.0.5](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.5)
