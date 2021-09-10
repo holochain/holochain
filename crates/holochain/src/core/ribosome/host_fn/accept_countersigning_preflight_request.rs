@@ -112,6 +112,19 @@ pub mod wasm_test {
     use holochain_types::prelude::AgentPubKeyFixturator;
     use holochain_wasm_test_utils::TestWasm;
 
+    /// Allow ChainLocked error, panic on anything else
+    fn expect_chain_locked(result: Result<Result<ZomeCallResponse, RibosomeError>, ConductorApiError>) {
+        match result {
+            Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) => {
+                match *workflow_error {
+                    WorkflowError::SourceChainError(SourceChainError::ChainLocked) => {}
+                    _ => panic!("{:?}", workflow_error),
+                }
+            }
+            something_else => panic!("{:?}", something_else),
+        };
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
     async fn unlock_invalid_session() {
@@ -209,15 +222,8 @@ pub mod wasm_test {
                 payload: ExternIO::encode(()).unwrap(),
             })
             .await;
-        match thing_fail_create_alice {
-            Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) => {
-                match *workflow_error {
-                    WorkflowError::SourceChainError(SourceChainError::ChainLocked) => {}
-                    _ => unreachable!(),
-                }
-            }
-            _ => unreachable!(),
-        };
+
+        expect_chain_locked(thing_fail_create_alice);
 
         // Creating the INCORRECT countersigned entry WILL immediately unlock
         // the chain.
@@ -362,15 +368,7 @@ pub mod wasm_test {
                 payload: ExternIO::encode(()).unwrap(),
             })
             .await;
-        match thing_fail_create_alice {
-            Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) => {
-                match *workflow_error {
-                    WorkflowError::SourceChainError(SourceChainError::ChainLocked) => {}
-                    _ => unreachable!(),
-                }
-            }
-            _ => unreachable!(),
-        };
+        expect_chain_locked(thing_fail_create_alice);
 
         let thing_fail_create_bob = conductor
             .handle()
@@ -383,15 +381,7 @@ pub mod wasm_test {
                 payload: ExternIO::encode(()).unwrap(),
             })
             .await;
-        match thing_fail_create_bob {
-            Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) => {
-                match *workflow_error {
-                    WorkflowError::SourceChainError(SourceChainError::ChainLocked) => {}
-                    _ => unreachable!(),
-                }
-            }
-            _ => unreachable!(),
-        };
+        expect_chain_locked( thing_fail_create_bob);
 
         // Creating the correct countersigned entry will NOT immediately unlock
         // the chain (it needs Bob to countersign).
@@ -414,17 +404,8 @@ pub mod wasm_test {
             })
             .await;
         tokio::time::sleep(std::time::Duration::from_millis(4000)).await;
-        match thing_fail_create_alice {
-            Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) => {
-                match *workflow_error {
-                    WorkflowError::SourceChainError(SourceChainError::ChainLocked) => {}
-                    _ => unreachable!(),
-                }
-            }
-            _ => unreachable!(),
-        };
 
-        // TEMP: this is where the test is currently failing
+        expect_chain_locked(thing_fail_create_alice);
 
         // The countersigned entry does NOT appear in alice's activity yet.
         let alice_activity_pre: AgentActivity = conductor
@@ -452,15 +433,7 @@ pub mod wasm_test {
                 payload: ExternIO::encode(()).unwrap(),
             })
             .await;
-        match thing_fail_create_bob {
-            Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) => {
-                match *workflow_error {
-                    WorkflowError::SourceChainError(SourceChainError::ChainLocked) => {}
-                    _ => panic!("{:?}", workflow_error),
-                }
-            }
-            something_else => panic!("{:?}", something_else),
-        };
+        expect_chain_locked(thing_fail_create_bob);
 
         // After bob commits the same countersigned entry he can unlock his chain.
         let countersigned_header_hash_bob: HeaderHash = conductor
