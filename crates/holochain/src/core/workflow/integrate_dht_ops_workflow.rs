@@ -29,7 +29,6 @@ pub async fn integrate_dht_ops_workflow(
                 .prepare_cached(holochain_sqlite::sql::sql_cell::UPDATE_INTEGRATE_OPS)?
                 .execute(named_params! {
                     ":when_integrated": time,
-                    ":when_integrated_ns": to_blob(time)?,
                     ":store_entry": DhtOpType::StoreEntry,
                     ":store_element": DhtOpType::StoreElement,
                     ":register_activity": DhtOpType::RegisterAgentActivity,

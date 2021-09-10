@@ -102,9 +102,6 @@ CREATE TABLE IF NOT EXISTS DhtOp (
     validation_status INTEGER       NULL,
 
     when_integrated  INTEGER NULL,          -- DATETIME
-    -- We need nanosecond accuracy which doesn't fit in
-    -- an INTEGER.
-    when_integrated_ns  BLOB NULL,          -- DATETIME
 
     -- Used to withhold ops from publishing for things
     -- like countersigning.

@@ -338,7 +338,6 @@ pub fn set_when_integrated(
     time: Timestamp,
 ) -> StateMutationResult<()> {
     dht_op_update!(txn, hash, {
-        "when_integrated_ns": to_blob(time)?,
         "when_integrated": time,
     })?;
     Ok(())
