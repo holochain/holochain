@@ -302,7 +302,7 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
         }
         AdminRequestCli::UninstallApp(args) => {
             let app_id = args.app_id.clone();
-            let app = uninstall_app(cmd, args).await?;
+            uninstall_app(cmd, args).await?;
             msg!("Uninstalled App: {}", app_id,);
         }
         AdminRequestCli::ListDnas => {
@@ -535,7 +535,12 @@ pub async fn uninstall_app(cmd: &mut CmdRunner, args: UninstallApp) -> anyhow::R
             installed_app_id: args.app_id,
         })
         .await?;
-    Ok(expect_match!(resp => AdminResponse::AppUninstalled, "Failed to uninstall app"))
+
+    assert!(
+        matches!(resp, AdminResponse::AppUninstalled),
+        "Failed to uninstall app"
+    );
+    Ok(())
 }
 
 /// Calls [`AdminRequest::ListAppInterfaces`].
