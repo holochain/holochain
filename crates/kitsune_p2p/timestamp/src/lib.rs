@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 
 pub use crate::error::{TimestampError, TimestampResult};
 
+/// One million
 pub const MM: i64 = 1_000_000;
 
 /// A microsecond-precision UTC timestamp for use in Holochain's headers.
@@ -44,7 +45,7 @@ pub struct Timestamp(
 /// as (seconds, nanoseconds) tuple (output and parsing of large +/- years is unreliable).
 impl fmt::Display for Timestamp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let ce = -62167219200_000_000i64..=253402214400_000_000i64;
+        let ce = -(62167219200 * MM)..=(253402214400 * MM);
         if ce.contains(&self.0) {
             if let Ok(ts) = chrono::DateTime::<chrono::Utc>::try_from(self) {
                 return write!(
@@ -288,11 +289,7 @@ impl Timestamp {
     /// Convert this timestamp to fit into a SQLite integer which is an i64.
     /// The value will be clamped to the valid range supported by SQLite
     pub fn into_sql_lossy(self) -> Self {
-        Self(i64::clamp(
-            self.0,
-            -62167219200_000_000,
-            106751991167_000_000,
-        ))
+        Self(i64::clamp(self.0, -62167219200 * MM, 106751991167 * MM))
     }
 }
 
