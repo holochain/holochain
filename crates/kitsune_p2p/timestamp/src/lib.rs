@@ -187,6 +187,11 @@ impl Timestamp {
         Self(micros)
     }
 
+    /// Access time as microseconds since UNIX epoch
+    pub fn as_micros(&self) -> i64 {
+        self.0
+    }
+
     /// Access seconds since UNIX epoch plus nanosecond offset
     pub fn as_seconds_and_nanos(&self) -> (i64, u32) {
         let secs = self.0 / MM;
@@ -284,8 +289,12 @@ impl Timestamp {
 
     /// Convert this timestamp to fit into a SQLite integer which is an i64.
     /// The value will be clamped to the valid range supported by SQLite
-    fn to_sql_micros_lossy(self) -> i64 {
-        i64::clamp(self.0, -62167219200_000_000, 106751991167_000_000)
+    pub fn into_sql_lossy(self) -> Self {
+        Self(i64::clamp(
+            self.0,
+            -62167219200_000_000,
+            106751991167_000_000,
+        ))
     }
 }
 
@@ -305,7 +314,7 @@ impl Sub<Timestamp> for Timestamp {
 impl rusqlite::ToSql for Timestamp {
     fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
         Ok(rusqlite::types::ToSqlOutput::Owned(
-            self.to_sql_micros_lossy().into(),
+            self.into_sql_lossy().0.into(),
         ))
     }
 }
@@ -340,7 +349,7 @@ pub mod tests {
     #[test]
     fn micros_roundtrip() {
         for t in [Timestamp(1234567890), Timestamp(987654321)] {
-            let micros = t.to_sql_micros_lossy();
+            let micros = t.clone().into_sql_lossy().as_micros();
             let r = Timestamp::from_micros(micros);
             assert_eq!(t.0, r.0);
             assert_eq!(t, r);
