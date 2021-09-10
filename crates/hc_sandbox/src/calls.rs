@@ -58,6 +58,8 @@ pub enum AdminRequestCli {
     RegisterDna(RegisterDna),
     InstallApp(InstallApp),
     InstallAppBundle(InstallAppBundle),
+    /// Calls AdminRequest::UninstallApp.
+    UninstallApp(UninstallApp),
     /// Calls AdminRequest::ListAppInterfaces.
     ListAppWs,
     /// Calls AdminRequest::ListDnas.
@@ -159,6 +161,14 @@ pub struct InstallAppBundle {
 
     /// Optional UID override for every DNA in this app
     pub uid: Option<Uid>,
+}
+
+#[derive(Debug, StructOpt, Clone)]
+/// Calls AdminRequest::UninstallApp
+/// and uninstalls the specified app.
+pub struct UninstallApp {
+    /// The InstalledAppId to uninstall.
+    pub app_id: String,
 }
 
 #[derive(Debug, StructOpt, Clone)]
@@ -289,6 +299,11 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
         AdminRequestCli::InstallAppBundle(args) => {
             let app = install_app_bundle(cmd, args).await?;
             msg!("Installed App: {}", app.installed_app_id,);
+        }
+        AdminRequestCli::UninstallApp(args) => {
+            let app_id = args.app_id.clone();
+            let app = uninstall_app(cmd, args).await?;
+            msg!("Uninstalled App: {}", app_id,);
         }
         AdminRequestCli::ListDnas => {
             let dnas = list_dnas(cmd).await?;
@@ -511,6 +526,16 @@ pub async fn install_app_bundle(
     )
     .await?;
     Ok(installed_app)
+}
+
+/// Calls [`AdminRequest::UninstallApp`] and uninstalls the installed app.
+pub async fn uninstall_app(cmd: &mut CmdRunner, args: UninstallApp) -> anyhow::Result<()> {
+    let resp = cmd
+        .command(AdminRequest::UninstallApp {
+            installed_app_id: args.app_id,
+        })
+        .await?;
+    Ok(expect_match!(resp => AdminResponse::AppUninstalled, "Failed to uninstall app"))
 }
 
 /// Calls [`AdminRequest::ListAppInterfaces`].

@@ -92,6 +92,19 @@ pub enum AdminRequest {
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
     InstallAppBundle(Box<InstallAppBundlePayload>),
 
+    /// Uninstalls the `App` specified by argument `installed_app_id` from the conductor,
+    /// meaning that all its cells will be disabled and removed, and all persistent state removed.
+    ///
+    /// Will be responded to with an [`AdminResponse::AppUninstalled`]
+    /// or an [`AdminResponse::Error`]
+    ///
+    /// [`AdminResponse::AppUninstalled`]: enum.AdminResponse.html#variant.AppUninstalled
+    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
+    UninstallApp {
+        /// The InstalledAppId to uninstall
+        installed_app_id: InstalledAppId,
+    },
+
     /// List the hashes of all installed `Dna`s.
     /// Takes no arguments.
     ///
@@ -309,6 +322,13 @@ pub enum AdminResponse {
     /// [`CellNick`]: ../../../holochain_types/app/type.CellNick.html
     /// [`CellId`]: ../../../holochain_types/cell/struct.CellId.html
     AppBundleInstalled(InstalledAppInfo),
+
+    /// The succesful response to an [`AdminRequest::UninstallApp`].
+    ///
+    /// It means the `App` was uninstalled successfully.
+    ///
+    /// [`AdminRequest::UninstallApp`]: enum.AdminRequest.html#variant.UninstallApp
+    AppUninstalled,
 
     /// The successful response to an [`AdminRequest::CreateCloneCell`].
     ///
