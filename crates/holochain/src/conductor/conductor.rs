@@ -67,8 +67,6 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::*;
 
-const SCHEDULER_INTERVAL_MILLIS: u64 = 10000;
-
 #[cfg(any(test, feature = "test_utils"))]
 use super::handle::MockConductorHandleT;
 

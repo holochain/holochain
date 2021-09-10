@@ -43,10 +43,12 @@ use holochain_serialized_bytes::SerializedBytes;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::prelude::*;
+use holochain_state::schedule::live_scheduled_fns;
 use holochain_types::prelude::*;
 use kitsune_p2p::event::TimeWindowMs;
 use observability::OpenSpanExt;
 use rusqlite::OptionalExtension;
+use rusqlite::Transaction;
 use std::hash::Hash;
 use std::hash::Hasher;
 use tokio::sync;
@@ -233,46 +235,66 @@ impl Cell {
         self.conductor_api.signal_broadcaster().await
     }
 
-    pub(super) async fn delete_ephemeral_scheduled_fns(self: Arc<Self>) {
-        self.env.async_commit(move |txn: &mut Transaction| {
-            delete_ephemeral_scheduled_fns(txn);
-        })
+    pub(super) async fn delete_all_ephemeral_scheduled_fns(self: Arc<Self>) -> CellResult<()> {
+        Ok(self
+            .env
+            .async_commit(move |txn: &mut Transaction| delete_all_ephemeral_scheduled_fns(txn))
+            .await?)
     }
 
     pub(super) async fn dispatch_scheduled_fns(self: Arc<Self>) {
-        self.env.async_commit(move |txn: &mut Transaction| {
-            let now = timestamp::now();
-            reschedule_expired(txn, now);
-
-            let tasks = vec![];
-            for (zome_name, scheduled_fn, schedule) in live_scheduled_fns(txn, now) {
-                let invocation = ZomeCall {
-                    cell_id: self.id.clone(),
-                    zome_name,
-                    None,
-                    payload: schedule,
-                    provenance: self.id.agent_pubkey(),
-                    scheduled_fn,
-                };
-                tasks.push(self.call_zome(invocation, None));
-            }
-            delete_ephemeral_scheduled_fns(txn);
-            results: Vec<CellResult<ZomeCallResult>> = futures::future::join_all(tasks).await;
-
-            for result in results {
-                match result {
-                    Ok(Ok(ZomeCallResponse::Ok(extern_io))) => {
-                        let next_schedule: Schedule = match extern_io.decode() {
-                            Ok(Some(v)) => v,
-                            Ok(None) => { },
-                            Err(e) => error!(e),
-                        };
-                        schedule_fn(txn, zome_name, scheduled_fn, next_schedule);
-                    },
-                    errorish => error!(errorish),
+        let now = timestamp::now();
+        let lives = self
+            .env
+            .async_commit(move |txn: &mut Transaction| {
+                reschedule_expired(txn, now);
+                let lives = live_scheduled_fns(txn, now);
+                // We know what to run so we can delete the ephemerals.
+                if lives.is_ok() {
+                    delete_live_ephemeral_scheduled_fns(txn, now);
                 }
+                lives
+            })
+            .await;
+
+        match lives {
+            // Cannot proceed if we don't know what to run.
+            Err(e) => {
+                error!("{}", e.to_string());
             }
-        })
+            Ok(lives) => {
+                let tasks = vec![];
+                for (scheduled_fn, schedule) in lives {
+                    let invocation = ZomeCall {
+                        cell_id: self.id.clone(),
+                        zome_name: scheduled_fn.zome_name().clone(),
+                        cap: None,
+                        payload: ExternIO::encode(schedule),
+                        provenance: self.id.agent_pubkey(),
+                        fn_name: scheduled_fn.fn_name(),
+                    };
+                    tasks.push(self.call_zome(invocation, None));
+                }
+                let results: Vec<CellResult<ZomeCallResult>> =
+                    futures::future::join_all(tasks).await;
+
+                self.env.async_commit(move |txn: &mut Transaction| {
+                    for ((scheduled_fn, _), result) in lives.iter().zip(results.iter()) {
+                        match result {
+                            Ok(Ok(ZomeCallResponse::Ok(extern_io))) => {
+                                let next_schedule: Schedule = match extern_io.decode() {
+                                    Ok(Some(v)) => v,
+                                    Ok(None) => {}
+                                    Err(e) => error!(e),
+                                };
+                                schedule_fn(txn, scheduled_fn, next_schedule);
+                            }
+                            errorish => error!(errorish),
+                        }
+                    }
+                });
+            }
+        }
     }
 
     #[instrument(skip(self, evt))]

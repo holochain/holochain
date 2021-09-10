@@ -1,8 +1,11 @@
 use crate::prelude::StateMutationResult;
 use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::{named_params, Transaction};
+use holochain_zome_types::ScheduledFn;
+use holochain_zome_types::Timestamp;
+use holochain_zome_types::ZomeName;
 
-pub fn fn_is_scheduled(txn: &Transaction, zome_name: String, scheduled_fn: String) -> StateMutationResult<bool> {
+pub fn fn_is_scheduled(txn: &Transaction, scheduled_fn: ScheduledFn) -> StateMutationResult<bool> {
     match txn
         .query_row(
             "
@@ -14,8 +17,8 @@ pub fn fn_is_scheduled(txn: &Transaction, zome_name: String, scheduled_fn: Strin
             LIMIT 1
             ",
             named_params! {
-                ":zome_name": zome_name,
-                ":scheduled_fn": scheduled_fn,
+                ":zome_name": scheduled_fn.zome_name().to_string(),
+                ":scheduled_fn": scheduled_fn.fn_name(),
             },
             |row| row.get::<_, u32>(0),
         )
@@ -26,21 +29,34 @@ pub fn fn_is_scheduled(txn: &Transaction, zome_name: String, scheduled_fn: Strin
     }
 }
 
-pub fn live_scheduled_fns(txn: &Transaction, now: Timestamp) -> StateMutationResult<Vec<(zome_name, scheduled_fn, schedule)>> {
-    txn.execute(
+pub fn live_scheduled_fns(
+    txn: &Transaction,
+    now: Timestamp,
+) -> StateMutationResult<Vec<(ScheduledFn, Schedule)>> {
+    let mut stmt = txn.prepare(
         "
         SELECT
         zome_name,
         scheduled_fn,
-        schedule
+        schedule,
+        ephemeral
         FROM ScheduledFunctions
         WHERE
-        start <= :now
-        AND :now <= end",
-        named_params! {
-            ":now": now
-        },
-    )?.query_map(|row| {
-        Ok((row.get(0)?, row.get(1)?, row.get(2)?))
-    })
+        start <= ?
+        AND ? <= end",
+    )?;
+    let rows = stmt.query_map([now], |row| {
+        Ok((
+            ScheduledFn::new(ZomeName(row.get(0)?), row.get(1)?),
+            if row.get(3)? {
+                Schedule::Ephemeral
+            }
+            row.get(2)?,
+        ))
+    })?;
+    let mut ret = vec![];
+    for row in rows {
+        ret.push(row?)
+    }
+    Ok(ret)
 }

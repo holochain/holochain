@@ -17,6 +17,7 @@ use holochain_types::prelude::DnaDefHashed;
 use holochain_types::prelude::DnaWasmHashed;
 use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::*;
+use std::str::FromStr;
 
 pub use error::*;
 
@@ -600,54 +601,99 @@ pub fn unlock_chain(txn: &mut Transaction) -> StateMutationResult<()> {
     Ok(())
 }
 
-pub fn delete_ephemeral_scheduled_fns(
-    txn: &mut Transaction
-) -> StateMutationResult<()> {
+pub fn delete_all_ephemeral_scheduled_fns(txn: &mut Transaction) -> StateMutationResult<()> {
     txn.execute("DELETE FROM ScheduledFunctions WHERE ephemeral", [])?;
     Ok(())
 }
 
+pub fn delete_live_ephemeral_scheduled_fns(
+    txn: &mut Transaction,
+    now: Timestamp,
+) -> StateMutationResult<()> {
+    txn.execute(
+        "DELETE FROM ScheduledFunctions WHERE ephemeral AND start <= ?",
+        [now],
+    )?;
+    Ok(())
+}
+
 pub fn reschedule_expired(txn: &mut Transaction, now: Timestamp) -> StateMutationResult<()> {
-    for (zome_name, scheduled_fn, schedule_string) in txn.execute(
-        "
-        SELECT
-        zome_name,
-        scheduled_fn,
-        schedule
-        FROM ScheduledFunctions
-        WHERE
-        end < :now",
-        named_params! {
-            ":now": now
-        },
-    )?.query_map(|row| {
-        Ok((row.get(0)?, row.get(1)?, row.get(2)?))
-    }) {
-        schedule_fn(txn, zome_name, scheduled_fn, Schedule::Persisted(schedule_string), now)?;
+    let rows = {
+        let mut stmt = txn.prepare(
+            "
+            SELECT
+            zome_name,
+            scheduled_fn,
+            schedule
+            FROM ScheduledFunctions
+            WHERE
+            end < ?",
+        )?;
+        let rows = stmt.query_map([now], |row| {
+            Ok((ZomeName(row.get(0)?), row.get(1)?, row.get(2)?))
+        })?;
+        let mut ret = vec![];
+        for row in rows {
+            ret.push(row?);
+        }
+        ret
+    };
+    for (zome_name, scheduled_fn, schedule_string) in rows {
+        schedule_fn(
+            txn,
+            ScheduledFn::new(zome_name, scheduled_fn),
+            Some(Schedule::Persisted(schedule_string)),
+            now,
+        )?;
     }
     Ok(())
 }
 
 pub fn schedule_fn(
     txn: &mut Transaction,
-    zome_name: ZomeName,
-    scheduled_fn: String,
+    scheduled_fn: ScheduledFn,
     schedule: Option<Schedule>,
-    now: Timestamp
+    now: Timestamp,
 ) -> StateMutationResult<()> {
-    match (fn_is_scheduled(txn, zome_name, scheduled_fn.clone())?, schedule) {
+    match (fn_is_scheduled(txn, scheduled_fn.clone())?, schedule) {
         (_, Some(schedule)) => {
-            let (schedule_string, start, end) = match schedule {
+            let (schedule_string, start, end, ephemeral) = match schedule {
                 Schedule::Persisted(schedule_string) => {
                     // If this cron doesn't parse cleanly we don't even want to
                     // write it to the db.
-                    let start = cron::Schedule::from_str(schedule_string)?.after(chrono::DateTime::from_utc(now, Utc)).next()?;
-                    let end = start + holochain_zome_types::schedule::PERSISTED_TIMEOUT;
-                    (schedule_string, start, end)
-                },
-                Schedule::Ephemeral(duration) => {
-                    (String::new(), timestamp::now() + duration, i64::MAX)
-                },
+                    let start = if let Some(start) = cron::Schedule::from_str(&schedule_string)
+                        .map_err(|e| ScheduleError::Cron(e.to_string()))?
+                        .after(
+                            &chrono::DateTime::<chrono::Utc>::try_from(now)
+                                .map_err(|e| ScheduleError::Timestamp(e))?,
+                        )
+                        .next()
+                    {
+                        start
+                    } else {
+                        // If there are no further executions then
+                        // scheduling is a no-op.
+                        return Ok(());
+                    };
+                    let end = start
+                        + chrono::Duration::milliseconds(
+                            holochain_zome_types::schedule::PERSISTED_TIMEOUT_MILLIS,
+                        );
+                    (
+                        schedule_string,
+                        Timestamp::from(start).to_sql_ms_lossy(),
+                        Timestamp::from(end).to_sql_ms_lossy(),
+                        false,
+                    )
+                }
+                Schedule::Ephemeral(duration) => (
+                    String::new(),
+                    (holochain_types::timestamp::now() + duration)
+                        .map_err(|e| ScheduleError::Timestamp(e))?
+                        .to_sql_ms_lossy(),
+                    i64::MAX,
+                    true,
+                ),
             };
             txn.execute(
                 "
@@ -662,20 +708,20 @@ pub fn schedule_fn(
                 AND scheduled_fn = :scheduled_fn
                 ",
                 named_params! {
-                    ":zome_name": zome_name,
+                    ":zome_name": scheduled_fn.zome_name().to_string(),
                     ":schedule": schedule_string,
-                    ":scheduled_fn": scheduled_fn,
+                    ":scheduled_fn": scheduled_fn.fn_name(),
                     ":start": start,
                     ":end": end,
-                    ":ephemeral": maybe_schedule.is_none(),
+                    ":ephemeral": ephemeral,
                 },
             )?;
         }
         (false, None) => {
             sql_insert!(txn, ScheduledFunctions, {
-                "zome_name": zome_name,
+                "zome_name": scheduled_fn.zome_name().to_string(),
                 "schedule": "",
-                "scheduled_fn": scheduled_fn,
+                "scheduled_fn": scheduled_fn.fn_name(),
                 "start": 0,
                 "end": i64::MAX,
                 "ephemeral": true,

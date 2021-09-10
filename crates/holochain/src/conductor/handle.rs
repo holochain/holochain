@@ -242,8 +242,8 @@ pub trait ConductorHandleT: Send + Sync {
     /// Start an enabled but stopped (paused) app
     async fn start_app(self: Arc<Self>, app_id: &InstalledAppId) -> ConductorResult<InstalledApp>;
 
-    /// Set the scheduler. None is not an option.
-    async fn set_scheduler(self: Arc<Self>, scheduler: tokio::task::JoinHandle<()>);
+    /// Start the scheduler. All ephemeral tasks are deleted.
+    async fn start_scheduler(self: Arc<Self>);
 
     /// Dispatch all due scheduled functions.
     async fn dispatch_scheduled_fns(self: Arc<Self>);
@@ -902,25 +902,28 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 .collect::<Vec<CellId>>();
             let mut cell_arcs = vec![];
             for cell_id in cell_ids {
-                if let Some(cell_arc) = self.cell_by_id(&cell_id).await {
+                if let Ok(cell_arc) = self.cell_by_id(&cell_id).await {
                     cell_arcs.push(cell_arc);
                 }
             }
             cell_arcs
         };
-        let tasks = cell_arcs.into_iter().map(|cell_arc| cell_arc.delete_ephemeral_scheduled_fns());
+        let tasks = cell_arcs
+            .into_iter()
+            .map(|cell_arc| cell_arc.delete_ephemeral_scheduled_fns());
         futures::future::join_all(tasks).await;
 
+        let scheduler_handle = self.clone();
         let scheduler = tokio::task::spawn(async move {
             let mut interval = tokio::time::interval(std::time::Duration::from_millis(
-                SCHEDULER_INTERVAL_MILLIS,
+                holochain_zome_types::schedule::SCHEDULER_INTERVAL_MILLIS,
             ));
             loop {
                 interval.tick().await;
                 scheduler_handle.clone().dispatch_scheduled_fns().await;
             }
-        };
-        self.conductor.write().await.set_scheduler(self.clone());
+        });
+        self.conductor.write().await.set_scheduler(scheduler);
     }
 
     /// The scheduler wants to dispatch any functions that are due.
@@ -934,7 +937,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 .collect::<Vec<CellId>>();
             let mut cell_arcs = vec![];
             for cell_id in cell_ids {
-                if let Some(cell_arc) = self.cell_by_id(&cell_id).await {
+                if let Ok(cell_arc) = self.cell_by_id(&cell_id).await {
                     cell_arcs.push(cell_arc);
                 }
             }
