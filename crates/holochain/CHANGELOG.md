@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 
 - Timestamps in headers no longer require strict inequality in sys validation, i.e. consecutive headers may have equal timestamps. This will be reverted once we implement rate-limiting.
+- HDK `sys_time` now returns a `holochain_zome_types::Timestamp` instead of a `core::time::Duration`.
 
 ## 0.0.104
 
