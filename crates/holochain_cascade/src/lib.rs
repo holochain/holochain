@@ -179,7 +179,7 @@ where
         }
         // We set the integrated to for the cache so it can match the
         // same query as the vault. This can also be used for garbage collection.
-        set_when_integrated(txn, op_hash, timestamp::now())?;
+        set_when_integrated(txn, op_hash, Timestamp::now())?;
         Ok(())
     }
 

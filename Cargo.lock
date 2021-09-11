@@ -3394,6 +3394,7 @@ version = "0.0.1-dev.0"
 dependencies = [
  "arbitrary",
  "chrono",
+ "holochain_serialized_bytes",
  "rusqlite",
  "serde",
  "thiserror",

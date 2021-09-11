@@ -15,8 +15,6 @@ use holochain_types::dht_op::UniqueForm;
 use holochain_types::element::SignedHeaderHashedExt;
 use holochain_types::env::EnvRead;
 use holochain_types::env::EnvWrite;
-use holochain_types::timestamp;
-use holochain_types::Timestamp;
 use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::header;
 use holochain_zome_types::CapAccess;
@@ -39,6 +37,7 @@ use holochain_zome_types::QueryFilter;
 use holochain_zome_types::Signature;
 use holochain_zome_types::SignedHeader;
 use holochain_zome_types::SignedHeaderHashed;
+use holochain_zome_types::Timestamp;
 
 use crate::chain_lock::is_chain_locked;
 use crate::chain_lock::is_lock_expired;
@@ -189,7 +188,7 @@ impl SourceChain {
         let common = HeaderBuilderCommon {
             author: (*self.author).clone(),
             timestamp: std::cmp::max(
-                timestamp::now(),
+                Timestamp::now(),
                 (chain_head_timestamp + std::time::Duration::from_nanos(1))?,
             ),
             header_seq,
@@ -699,7 +698,7 @@ pub async fn genesis(
     let keystore = vault.keystore().clone();
     let dna_header = Header::Dna(header::Dna {
         author: agent_pubkey.clone(),
-        timestamp: timestamp::now(),
+        timestamp: Timestamp::now(),
         hash: dna_hash,
     });
     let dna_header = HeaderHashed::from_content_sync(dna_header);
@@ -712,7 +711,7 @@ pub async fn genesis(
     // create the agent validation entry and add it directly to the store
     let agent_validation_header = Header::AgentValidationPkg(header::AgentValidationPkg {
         author: agent_pubkey.clone(),
-        timestamp: timestamp::now(),
+        timestamp: Timestamp::now(),
         header_seq: 1,
         prev_header: dna_header_address,
         membrane_proof,
@@ -728,7 +727,7 @@ pub async fn genesis(
     // create a agent chain element and add it directly to the store
     let agent_header = Header::Create(header::Create {
         author: agent_pubkey.clone(),
-        timestamp: timestamp::now(),
+        timestamp: Timestamp::now(),
         header_seq: 2,
         prev_header: avh_addr,
         entry_type: header::EntryType::AgentPubKey,
@@ -875,7 +874,7 @@ async fn _put_db<H: HeaderInner, B: HeaderBuilder<H>>(
 
     let common = HeaderBuilderCommon {
         author: (*author).clone(),
-        timestamp: timestamp::now(),
+        timestamp: Timestamp::now(),
         header_seq,
         prev_header: prev_header.clone(),
     };

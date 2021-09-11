@@ -15,7 +15,7 @@ pub fn sys_time(
         HostFnAccess {
             non_determinism: Permission::Allow,
             ..
-        } => Ok(holochain_types::timestamp::now()),
+        } => Ok(holochain_zome_types::Timestamp::now()),
         _ => unreachable!(),
     }
 }

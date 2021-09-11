@@ -34,7 +34,7 @@ pub const MM: i64 = 1_000_000;
 /// Timestamp implements `Serialize` and `Display` as rfc3339 time strings (if possible).
 ///
 /// Supports +/- chrono::Duration directly.  There is no Timestamp::now() method, since this is not
-/// supported by WASM; however, holochain_types provides a timestamp::now() method.
+/// supported by WASM; however, holochain_types provides a Timestamp::now() method.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Timestamp(
@@ -181,6 +181,15 @@ impl Timestamp {
     /// The largest possible Timestamp
     pub const MAX: Timestamp = Timestamp(i64::MAX);
 
+    /// Returns the current system time as a Timestamp.
+    ///
+    /// This is behind a feature because we need Timestamp to be WASM compatible, and
+    /// chrono doesn't have a now() implementation for WASM.
+    #[cfg(feature = "now")]
+    pub fn now() -> Timestamp {
+        Timestamp::from(chrono::offset::Utc::now())
+    }
+
     /// Construct from microseconds
     pub fn from_micros(micros: i64) -> Self {
         Self(micros)
@@ -322,10 +331,13 @@ impl rusqlite::types::FromSql for Timestamp {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use std::convert::TryInto;
 
     use super::*;
+
+    const TEST_TS: &'static str = "2020-05-05T19:16:04.266431045Z";
+    const TEST_EN: &'static [u8] = b"\x92\xce\x5e\xb1\xbb\x74\xce\x0f\xe1\x6a\x45";
 
     #[test]
     fn timestamp_distance() {
@@ -349,5 +361,25 @@ pub mod tests {
             assert_eq!(t.0, r.0);
             assert_eq!(t, r);
         }
+    }
+
+    #[test]
+    fn test_timestamp_serialization() {
+        use holochain_serialized_bytes::prelude::*;
+        let t: Timestamp = TEST_TS.try_into().unwrap();
+        let (secs, nsecs) = t.as_seconds_and_nanos();
+        assert_eq!(secs, 1588706164);
+        assert_eq!(nsecs, 266431045);
+        assert_eq!(TEST_TS, &t.to_string());
+
+        #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+        struct S(Timestamp);
+        let s = S(t);
+        let sb = SerializedBytes::try_from(s).unwrap();
+        assert_eq!(&TEST_EN[..], sb.bytes().as_slice());
+
+        let s: S = sb.try_into().unwrap();
+        let t = s.0;
+        assert_eq!(TEST_TS, &t.to_string());
     }
 }

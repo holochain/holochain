@@ -311,7 +311,7 @@ pub fn set_validation_stage(
         ValidationLimboStatus::AwaitingAppDeps(_) => Some(2),
         ValidationLimboStatus::AwaitingIntegration => Some(3),
     };
-    let now = holochain_types::timestamp::now();
+    let now = holochain_zome_types::Timestamp::now();
     txn.execute(
         "
         UPDATE DhtOp

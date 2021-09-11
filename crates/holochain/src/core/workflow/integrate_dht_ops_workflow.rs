@@ -22,7 +22,7 @@ pub async fn integrate_dht_ops_workflow(
     mut trigger_receipt: TriggerSender,
     cell_network: HolochainP2pCell,
 ) -> WorkflowResult<WorkComplete> {
-    let time = holochain_types::timestamp::now();
+    let time = holochain_zome_types::Timestamp::now();
     let changed = vault
         .async_commit(move |txn| {
             let changed = txn

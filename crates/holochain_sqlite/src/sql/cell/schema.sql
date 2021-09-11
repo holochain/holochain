@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS DhtOp (
     -- If this is null then validation is still in progress.
     validation_status INTEGER       NULL,
 
-    when_integrated  INTEGER NULL,          -- DATETIME
+    when_integrated   INTEGER       NULL,          -- DATETIME
 
     -- Used to withhold ops from publishing for things
     -- like countersigning.

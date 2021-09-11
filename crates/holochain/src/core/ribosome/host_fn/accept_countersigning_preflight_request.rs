@@ -24,7 +24,7 @@ pub fn accept_countersigning_preflight_request<'a>(
                 return Ok(PreflightRequestAcceptance::Invalid(e.to_string()));
             }
             tokio_helper::block_forever_on(async move {
-                if (holochain_types::timestamp::now() + SESSION_TIME_FUTURE_MAX)
+                if (holochain_zome_types::Timestamp::now() + SESSION_TIME_FUTURE_MAX)
                     .unwrap_or(Timestamp::MAX)
                     < *input.session_times().start()
                 {
@@ -113,7 +113,9 @@ pub mod wasm_test {
     use holochain_wasm_test_utils::TestWasm;
 
     /// Allow ChainLocked error, panic on anything else
-    fn expect_chain_locked(result: Result<Result<ZomeCallResponse, RibosomeError>, ConductorApiError>) {
+    fn expect_chain_locked(
+        result: Result<Result<ZomeCallResponse, RibosomeError>, ConductorApiError>,
+    ) {
         match result {
             Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) => {
                 match *workflow_error {
@@ -381,7 +383,7 @@ pub mod wasm_test {
                 payload: ExternIO::encode(()).unwrap(),
             })
             .await;
-        expect_chain_locked( thing_fail_create_bob);
+        expect_chain_locked(thing_fail_create_bob);
 
         // Creating the correct countersigned entry will NOT immediately unlock
         // the chain (it needs Bob to countersign).

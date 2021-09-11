@@ -32,10 +32,8 @@ pub mod metadata;
 pub mod prelude;
 pub mod properties;
 pub mod signal;
-pub mod timestamp;
 pub mod validate;
 
 pub mod test_utils;
 
 pub use holochain_zome_types::entry::EntryHashed;
-pub use timestamp::Timestamp;

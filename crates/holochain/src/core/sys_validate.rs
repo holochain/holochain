@@ -16,7 +16,7 @@ pub(super) use error::*;
 pub use holo_hash::*;
 pub use holochain_state::source_chain::SourceChainError;
 pub use holochain_state::source_chain::SourceChainResult;
-pub use holochain_types::Timestamp;
+pub use holochain_zome_types::Timestamp;
 pub use holochain_zome_types::HeaderHashed;
 
 #[allow(missing_docs)]
