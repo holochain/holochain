@@ -93,7 +93,10 @@ pub enum AdminRequest {
     InstallAppBundle(Box<InstallAppBundlePayload>),
 
     /// Uninstalls the `App` specified by argument `installed_app_id` from the conductor,
-    /// meaning that all its cells will be disabled and removed, and all persistent state removed.
+    /// meaning that the app will be removed from the list of installed apps, and any Cells
+    /// which were referenced only by this app will be disabled and removed, clearing up
+    /// any persisted data. 
+    /// Cells which are still referenced by other installed apps will not be removed.
     ///
     /// Will be responded to with an [`AdminResponse::AppUninstalled`]
     /// or an [`AdminResponse::Error`]
