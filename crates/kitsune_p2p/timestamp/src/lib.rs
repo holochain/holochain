@@ -326,7 +326,11 @@ impl rusqlite::ToSql for Timestamp {
 #[cfg(feature = "rusqlite")]
 impl rusqlite::types::FromSql for Timestamp {
     fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
-        i64::column_result(value).map(Self::from_micros)
+        match value {
+            rusqlite::types::ValueRef::Null => Ok(Self::from_micros(0)),
+            rusqlite::types::ValueRef::Integer(i) => Ok(Self::from_micros(i)),
+            _ => Err(rusqlite::types::FromSqlError::InvalidType),
+        }
     }
 }
 
