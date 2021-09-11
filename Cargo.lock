@@ -2260,7 +2260,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.0.105"
+version = "0.0.106-dev.0"
 dependencies = [
  "fixt",
  "hdk_derive",
@@ -2279,7 +2279,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.0.7"
+version = "0.0.8-dev.0"
 dependencies = [
  "holochain_zome_types",
  "paste",
@@ -2724,7 +2724,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.0.5"
+version = "0.0.6-dev.0"
 dependencies = [
  "hdk",
  "serde",
