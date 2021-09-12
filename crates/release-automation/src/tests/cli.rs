@@ -19,6 +19,10 @@ fn release_createreleasebranch() {
     let cmd = cmd.args(&[
         &format!("--workspace-path={}", workspace.root().display()),
         "release",
+        &format!(
+            "--cargo-target-dir={}",
+            workspace.root().join("target").display()
+        ),
         "--steps=CreateReleaseBranch",
     ]);
     cmd.assert().success();
@@ -47,6 +51,10 @@ fn release_createreleasebranch_fails_on_dirty_repo() {
         &format!("--workspace-path={}", workspace.root().display()),
         "--log-level=debug",
         "release",
+        &format!(
+            "--cargo-target-dir={}",
+            workspace.root().join("target").display()
+        ),
         "--steps=CreateReleaseBranch",
     ]);
 
@@ -113,11 +121,16 @@ fn bump_versions_on_selection() {
         &format!("--workspace-path={}", workspace.root().display()),
         "--log-level=trace",
         "release",
+        &format!(
+            "--cargo-target-dir={}",
+            workspace.root().join("target").display()
+        ),
         "--disallowed-version-reqs=>=0.1",
         "--allowed-matched-blockers=UnreleasableViaChangelogFrontmatter,DisallowedVersionReqViolated",
         "--steps=CreateReleaseBranch,BumpReleaseVersions",
         "--allowed-missing-dependencies=crate_b",
-    ]);
+    ])
+    ;
 
     let output = assert_cmd_success!(cmd);
     println!("stderr:\n'{}'\n---\nstdout:\n'{}'\n---", output.0, output.1,);
@@ -353,6 +366,7 @@ fn release_publish() {
         &format!("--workspace-path={}", workspace.root().display()),
         "--log-level=trace",
         "release",
+        &format!("--cargo-target-dir={}", workspace.root().join("target").display()),
         "--disallowed-version-reqs=>=0.1",
         "--allowed-matched-blockers=UnreleasableViaChangelogFrontmatter,DisallowedVersionReqViolated",
         "--steps=CreateReleaseBranch,BumpReleaseVersions",
@@ -368,6 +382,10 @@ fn release_publish() {
         "release",
         // todo: set up a custom registry and actually publish the crates
         "--dry-run",
+        &format!(
+            "--cargo-target-dir={}",
+            workspace.root().join("target").display()
+        ),
         "--steps=PublishToCratesIo",
     ]);
     let output = assert_cmd_success!(cmd);
@@ -389,6 +407,10 @@ fn post_release_version_bumps() {
         &format!("--workspace-path={}", workspace.root().display()),
         "--log-level=trace",
         "release",
+        &format!(
+            "--cargo-target-dir={}",
+            workspace.root().join("target").display()
+        ),
         "--disallowed-version-reqs=>=0.1",
         "--allowed-matched-blockers=UnreleasableViaChangelogFrontmatter,DisallowedVersionReqViolated",
         "--steps=CreateReleaseBranch,BumpReleaseVersions",
@@ -402,6 +424,10 @@ fn post_release_version_bumps() {
         &format!("--workspace-path={}", workspace.root().display()),
         "--log-level=trace",
         "release",
+        &format!(
+            "--cargo-target-dir={}",
+            workspace.root().join("target").display()
+        ),
         "--steps=BumpPostReleaseVersions",
     ]);
     let output = assert_cmd_success!(cmd);
@@ -588,6 +614,7 @@ fn multiple_subsequent_releases() {
                 &format!("--workspace-path={}", workspace.root().display()),
                 "--log-level=debug",
                 "release",
+                &format!("--cargo-target-dir={}", workspace.root().join("target").display()),
                 "--disallowed-version-reqs=>=0.1",
                 "--allowed-matched-blockers=UnreleasableViaChangelogFrontmatter,DisallowedVersionReqViolated",
                 "--steps=CreateReleaseBranch,BumpReleaseVersions",
