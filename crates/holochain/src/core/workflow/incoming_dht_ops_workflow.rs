@@ -62,7 +62,7 @@ fn batch_check_insert(
         batch.pending.push(entry);
         (None, rcv)
     } else {
-        // no batch running, run this (and assert we never collect straglers
+        // no batch running, run this (and assert we never collect stragglers)
         assert!(batch.pending.is_empty());
         batch.is_running = true;
         (Some(vec![entry]), rcv)

@@ -391,7 +391,7 @@ pub trait ConductorHandleT: Send + Sync {
 #[derive(Clone, Debug)]
 pub struct DevSettings {
     /// Determines whether publishing should be enabled
-    pub publish: bool,
+    pub publishing: bool,
     /// Determines whether validation should be enabled
     pub validation: bool,
     /// Determines whether storage arc resizing should be enabled
@@ -402,9 +402,13 @@ pub struct DevSettings {
 /// None means no change, Some means make the specified change.
 #[derive(Default, Debug)]
 pub struct DevSettingsDelta {
-    /// Determines whether publishing should be enabled
+    /// Determines whether publishing should be enabled.
+    /// If false, no ops will be published.
     pub publish: Option<bool>,
-    /// Determines whether validation should be enabled
+    /// Determines whether validation should be enabled.
+    /// If false, all sys and app validation checks will be hard-wired to
+    /// green-light any op that comes through the queue, and dependency
+    /// existence checks will be disabled during op integration
     pub validation: Option<bool>,
     /// Determines whether storage arc resizing should be enabled
     pub arc_resizing: Option<bool>,
@@ -413,7 +417,7 @@ pub struct DevSettingsDelta {
 impl Default for DevSettings {
     fn default() -> Self {
         Self {
-            publish: true,
+            publishing: true,
             validation: true,
             _arc_resizing: true,
         }
@@ -423,7 +427,7 @@ impl Default for DevSettings {
 impl DevSettings {
     fn apply(&mut self, delta: DevSettingsDelta) {
         if let Some(v) = delta.publish {
-            self.publish = v;
+            self.publishing = v;
         }
         if let Some(v) = delta.validation {
             self.validation = v;
