@@ -1,3 +1,4 @@
+use crate::FunctionName;
 use crate::ZomeName;
 use std::time::Duration;
 
@@ -43,11 +44,11 @@ impl From<Duration> for Schedule {
 
 /// A fully qualified scheduled function.
 #[derive(Debug, Clone)]
-pub struct ScheduledFn(ZomeName, String);
+pub struct ScheduledFn(ZomeName, FunctionName);
 
 impl ScheduledFn {
     /// Constructor.
-    pub fn new(zome_name: ZomeName, fn_name: String) -> Self {
+    pub fn new(zome_name: ZomeName, fn_name: FunctionName) -> Self {
         Self(zome_name, fn_name)
     }
 
@@ -57,7 +58,7 @@ impl ScheduledFn {
     }
 
     /// Function name accessor.
-    pub fn fn_name(&self) -> &String {
+    pub fn fn_name(&self) -> &FunctionName {
         &self.1
     }
 }

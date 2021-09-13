@@ -12,7 +12,7 @@ pub fn schedule(
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ write_workspace: Permission::Allow, .. } => {
             call_context.host_context().workspace().source_chain().scratch().apply(|scratch| {
-                scratch.add_scheduled_fn(ScheduledFn::new(call_context.zome.zome_name().clone(), input));
+                scratch.add_scheduled_fn(ScheduledFn::new(call_context.zome.zome_name().clone(), input.into()));
             }).map_err(|e| WasmError::Host(e.to_string()))?;
             Ok(())
         },

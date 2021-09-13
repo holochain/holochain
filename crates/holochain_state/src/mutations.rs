@@ -1,5 +1,6 @@
 use crate::entry_def::EntryDefStoreKey;
 use crate::prelude::SignedValidationReceipt;
+use crate::query::from_blob;
 use crate::query::to_blob;
 use crate::schedule::fn_is_scheduled;
 use crate::scratch::Scratch;
@@ -624,13 +625,18 @@ pub fn reschedule_expired(txn: &mut Transaction, now: Timestamp) -> StateMutatio
             SELECT
             zome_name,
             scheduled_fn,
-            schedule
+            maybe_schedule
             FROM ScheduledFunctions
             WHERE
-            end < ?",
+            NOT ephemeral
+            AND end < ?",
         )?;
         let rows = stmt.query_map([now], |row| {
-            Ok((ZomeName(row.get(0)?), row.get(1)?, row.get(2)?))
+            Ok((
+                ZomeName(row.get(0)?),
+                FunctionName(row.get(1)?),
+                row.get(2)?,
+            ))
         })?;
         let mut ret = vec![];
         for row in rows {
@@ -638,11 +644,11 @@ pub fn reschedule_expired(txn: &mut Transaction, now: Timestamp) -> StateMutatio
         }
         ret
     };
-    for (zome_name, scheduled_fn, schedule_string) in rows {
+    for (zome_name, scheduled_fn, maybe_schedule) in rows {
         schedule_fn(
             txn,
             ScheduledFn::new(zome_name, scheduled_fn),
-            Some(Schedule::Persisted(schedule_string)),
+            from_blob(maybe_schedule)?,
             now,
         )?;
     }
@@ -652,13 +658,13 @@ pub fn reschedule_expired(txn: &mut Transaction, now: Timestamp) -> StateMutatio
 pub fn schedule_fn(
     txn: &mut Transaction,
     scheduled_fn: ScheduledFn,
-    schedule: Option<Schedule>,
+    maybe_schedule: Option<Schedule>,
     now: Timestamp,
 ) -> StateMutationResult<()> {
-    match (fn_is_scheduled(txn, scheduled_fn.clone())?, schedule) {
+    match (fn_is_scheduled(txn, scheduled_fn.clone())?, maybe_schedule) {
         (_, Some(schedule)) => {
-            let (schedule_string, start, end, ephemeral) = match schedule {
-                Schedule::Persisted(schedule_string) => {
+            let (start, end, ephemeral) = match schedule {
+                Schedule::Persisted(ref schedule_string) => {
                     // If this cron doesn't parse cleanly we don't even want to
                     // write it to the db.
                     let start = if let Some(start) = cron::Schedule::from_str(&schedule_string)
@@ -680,14 +686,12 @@ pub fn schedule_fn(
                             holochain_zome_types::schedule::PERSISTED_TIMEOUT_MILLIS,
                         );
                     (
-                        schedule_string,
                         Timestamp::from(start).to_sql_ms_lossy(),
                         Timestamp::from(end).to_sql_ms_lossy(),
                         false,
                     )
                 }
                 Schedule::Ephemeral(duration) => (
-                    String::new(),
                     (holochain_types::timestamp::now() + duration)
                         .map_err(|e| ScheduleError::Timestamp(e))?
                         .to_sql_ms_lossy(),
@@ -699,7 +703,7 @@ pub fn schedule_fn(
                 "
                 UPDATE ScheduledFunctions
                 SET
-                schedule = :schedule,
+                maybe_schedule = :maybe_schedule,
                 start = :start,
                 end = :end,
                 ephemeral = :ephemeral
@@ -709,8 +713,8 @@ pub fn schedule_fn(
                 ",
                 named_params! {
                     ":zome_name": scheduled_fn.zome_name().to_string(),
-                    ":schedule": schedule_string,
-                    ":scheduled_fn": scheduled_fn.fn_name(),
+                    ":maybe_schedule": to_blob(Some(schedule))?,
+                    ":scheduled_fn": scheduled_fn.fn_name().to_string(),
                     ":start": start,
                     ":end": end,
                     ":ephemeral": ephemeral,
@@ -720,8 +724,8 @@ pub fn schedule_fn(
         (false, None) => {
             sql_insert!(txn, ScheduledFunctions, {
                 "zome_name": scheduled_fn.zome_name().to_string(),
-                "schedule": "",
-                "scheduled_fn": scheduled_fn.fn_name(),
+                "maybe_schedule": to_blob::<Option<Schedule>>(None)?,
+                "scheduled_fn": scheduled_fn.fn_name().to_string(),
                 "start": 0,
                 "end": i64::MAX,
                 "ephemeral": true,

@@ -910,7 +910,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         };
         let tasks = cell_arcs
             .into_iter()
-            .map(|cell_arc| cell_arc.delete_ephemeral_scheduled_fns());
+            .map(|cell_arc| cell_arc.delete_all_ephemeral_scheduled_fns());
         futures::future::join_all(tasks).await;
 
         let scheduler_handle = self.clone();

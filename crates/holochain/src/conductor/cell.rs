@@ -247,11 +247,14 @@ impl Cell {
         let lives = self
             .env
             .async_commit(move |txn: &mut Transaction| {
-                reschedule_expired(txn, now);
+                // Rescheduling should not fail as the data in the database
+                // should be valid schedules only.
+                reschedule_expired(txn, now)?;
                 let lives = live_scheduled_fns(txn, now);
                 // We know what to run so we can delete the ephemerals.
                 if lives.is_ok() {
-                    delete_live_ephemeral_scheduled_fns(txn, now);
+                    // Failing to delete should rollback this attempt.
+                    delete_live_ephemeral_scheduled_fns(txn, now)?;
                 }
                 lives
             })
@@ -263,36 +266,66 @@ impl Cell {
                 error!("{}", e.to_string());
             }
             Ok(lives) => {
-                let tasks = vec![];
-                for (scheduled_fn, schedule) in lives {
+                let mut tasks = vec![];
+                for (scheduled_fn, schedule) in &lives {
+                    // Failing to encode a schedule should never happen.
+                    // If it does log the error and bail.
+                    let payload = match ExternIO::encode(schedule) {
+                        Ok(payload) => payload,
+                        Err(e) => {
+                            error!("{}", e.to_string());
+                            return;
+                        }
+                    };
                     let invocation = ZomeCall {
                         cell_id: self.id.clone(),
                         zome_name: scheduled_fn.zome_name().clone(),
                         cap: None,
-                        payload: ExternIO::encode(schedule),
-                        provenance: self.id.agent_pubkey(),
-                        fn_name: scheduled_fn.fn_name(),
+                        payload,
+                        provenance: self.id.agent_pubkey().clone(),
+                        fn_name: scheduled_fn.fn_name().clone(),
                     };
                     tasks.push(self.call_zome(invocation, None));
                 }
                 let results: Vec<CellResult<ZomeCallResult>> =
                     futures::future::join_all(tasks).await;
 
-                self.env.async_commit(move |txn: &mut Transaction| {
-                    for ((scheduled_fn, _), result) in lives.iter().zip(results.iter()) {
-                        match result {
-                            Ok(Ok(ZomeCallResponse::Ok(extern_io))) => {
-                                let next_schedule: Schedule = match extern_io.decode() {
-                                    Ok(Some(v)) => v,
-                                    Ok(None) => {}
-                                    Err(e) => error!(e),
-                                };
-                                schedule_fn(txn, scheduled_fn, next_schedule);
+                // We don't do anything with errors in here.
+                let _ = self
+                    .env
+                    .async_commit(move |txn: &mut Transaction| {
+                        for ((scheduled_fn, _), result) in lives.iter().zip(results.iter()) {
+                            match result {
+                                Ok(Ok(ZomeCallResponse::Ok(extern_io))) => {
+                                    let next_schedule: Schedule = match extern_io.decode() {
+                                        Ok(Some(v)) => v,
+                                        Ok(None) => {
+                                            continue;
+                                        }
+                                        Err(e) => {
+                                            error!("{}", e.to_string());
+                                            continue;
+                                        }
+                                    };
+                                    // Ignore errors so that failing to schedule
+                                    // one function doesn't error others.
+                                    // For example if a zome returns a bad cron.
+                                    if let Err(e) = schedule_fn(
+                                        txn,
+                                        scheduled_fn.clone(),
+                                        Some(next_schedule),
+                                        now.clone(),
+                                    ) {
+                                        error!("{}", e.to_string());
+                                        continue;
+                                    }
+                                }
+                                errorish => error!("{:?}", errorish),
                             }
-                            errorish => error!(errorish),
                         }
-                    }
-                });
+                        Result::<(), DatabaseError>::Ok(())
+                    })
+                    .await;
             }
         }
     }
