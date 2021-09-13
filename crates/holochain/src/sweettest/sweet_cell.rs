@@ -7,6 +7,7 @@ use holochain_p2p::HolochainP2pCell;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_types::prelude::*;
 use kitsune_p2p::actor::TestBackdoor;
+
 /// A reference to a Cell created by a SweetConductor installation function.
 /// It has very concise methods for calling a zome on this cell
 #[derive(Clone, derive_more::Constructor)]
