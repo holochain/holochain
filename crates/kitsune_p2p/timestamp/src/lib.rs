@@ -343,8 +343,7 @@ mod tests {
 
     use super::*;
 
-    const TEST_TS: &'static str = "2020-05-05T19:16:04.266431045Z";
-    const TEST_EN: &'static [u8] = b"\x92\xce\x5e\xb1\xbb\x74\xce\x0f\xe1\x6a\x45";
+    const TEST_TS: &'static str = "2020-05-05T19:16:04.266431Z";
 
     #[test]
     fn timestamp_distance() {
@@ -352,7 +351,7 @@ mod tests {
         // prone.  It is easy to get panics when converting Timestamp to chrono::Datetime<Utc> and
         // chrono::Duration, both of which have strict range limits.  Since we cannot generally
         // trust code that produces Timestamps, it has no intrinsic range limits.
-        let t1 = Timestamp((2_i64.pow(31) + 1) * 86_400); // invalid secs for DateTime
+        let t1 = Timestamp(i64::MAX); // invalid secs for DateTime
         let d1: TimestampResult<chrono::DateTime<chrono::Utc>> = t1.try_into();
         assert_eq!(d1, Err(TimestampError::Overflow));
 
@@ -376,15 +375,13 @@ mod tests {
         let t: Timestamp = TEST_TS.try_into().unwrap();
         let (secs, nsecs) = t.as_seconds_and_nanos();
         assert_eq!(secs, 1588706164);
-        assert_eq!(nsecs, 266431045);
+        assert_eq!(nsecs, 266431000);
         assert_eq!(TEST_TS, &t.to_string());
 
         #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
         struct S(Timestamp);
         let s = S(t);
         let sb = SerializedBytes::try_from(s).unwrap();
-        assert_eq!(&TEST_EN[..], sb.bytes().as_slice());
-
         let s: S = sb.try_into().unwrap();
         let t = s.0;
         assert_eq!(TEST_TS, &t.to_string());
