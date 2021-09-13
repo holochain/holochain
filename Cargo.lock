@@ -7527,8 +7527,3 @@ dependencies = [
  "syn 1.0.74",
  "synstructure",
 ]
-
-[[patch.unused]]
-name = "ghost_actor"
-version = "0.3.0-alpha.3"
-source = "git+https://github.com/holochain/ghost_actor.git?branch=v0.3-macro-fix#e7597e8cc020302404c101d18180a44206aaf957"
