@@ -187,9 +187,16 @@ impl SourceChain {
         // Build the header.
         let common = HeaderBuilderCommon {
             author: (*self.author).clone(),
+            // If the current time is equal to the current chain head timestamp,
+            // or even has drifted to be before it, just set the next timestamp
+            // to be one unit ahead of the previous.
+            //
+            // TODO: put a limit on the size of the negative time interval
+            //       we are willing to accept, beyond which we emit an error
+            //       rather than bumping the timestamp
             timestamp: std::cmp::max(
                 Timestamp::now(),
-                (chain_head_timestamp + std::time::Duration::from_nanos(1))?,
+                (chain_head_timestamp + std::time::Duration::from_micros(1))?,
             ),
             header_seq,
             prev_header,

@@ -5,8 +5,8 @@ use holochain_sqlite::db::WriteManager;
 use holochain_state::mutations;
 use holochain_state::prelude::test_cell_env;
 use holochain_types::dht_op::DhtOpLight;
-use holochain_zome_types::Timestamp;
 use holochain_zome_types::fixt::*;
+use holochain_zome_types::Timestamp;
 use holochain_zome_types::ValidationStatus;
 
 #[tokio::test(flavor = "multi_thread")]
