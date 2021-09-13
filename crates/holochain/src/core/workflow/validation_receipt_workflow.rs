@@ -51,7 +51,8 @@ pub async fn validation_receipt_workflow(
                         let author: AgentPubKey = r.get("author")?;
                         let dht_op_hash = r.get("hash")?;
                         let validation_status = r.get("validation_status")?;
-                        let when_integrated = from_blob::<Timestamp>(r.get("when_integrated")?)?;
+                        // NB: timestamp will never be null, so this is OK
+                        let when_integrated = r.get("when_integrated")?;
                         StateQueryResult::Ok((
                             ValidationReceipt {
                                 dht_op_hash,

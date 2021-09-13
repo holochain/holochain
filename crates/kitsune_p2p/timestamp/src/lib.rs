@@ -327,7 +327,10 @@ impl rusqlite::ToSql for Timestamp {
 impl rusqlite::types::FromSql for Timestamp {
     fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
         match value {
-            rusqlite::types::ValueRef::Null => Ok(Self::from_micros(0)),
+            // NB: if you have a NULLable Timestamp field in a DB, use `Option<Timestamp>`.
+            //     otherwise, you'll get an InvalidType error, because we don't handle null
+            //     values here.
+            // rusqlite::types::ValueRef::Null => Ok(Self::from_micros(0)),
             rusqlite::types::ValueRef::Integer(i) => Ok(Self::from_micros(i)),
             _ => Err(rusqlite::types::FromSqlError::InvalidType),
         }
