@@ -211,9 +211,9 @@ pub async fn check_spam(_header: &Header) -> SysValidationResult<()> {
     Ok(())
 }
 
-/// Check that this header's timestamp is not before the previous header's timestamp
+/// Check previous header timestamp is before this header
 pub fn check_prev_timestamp(header: &Header, prev_header: &Header) -> SysValidationResult<()> {
-    if header.timestamp() >= prev_header.timestamp() {
+    if header.timestamp() > prev_header.timestamp() {
         Ok(())
     } else {
         Err(PrevHeaderError::Timestamp).map_err(|e| ValidationOutcome::from(e).into())
