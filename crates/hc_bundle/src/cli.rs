@@ -269,9 +269,13 @@ impl HcWebAppBundle {
                 output,
                 force,
             } => {
-                let dir_path =
-                    crate::packing::unpack::<WebAppManifest>(WEB_APP_BUNDLE_EXT, &path, output, force)
-                        .await?;
+                let dir_path = crate::packing::unpack::<WebAppManifest>(
+                    WEB_APP_BUNDLE_EXT,
+                    &path,
+                    output,
+                    force,
+                )
+                .await?;
                 println!("Unpacked to directory {}", dir_path.to_string_lossy());
             }
         }

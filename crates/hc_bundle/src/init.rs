@@ -60,13 +60,13 @@ fn prompt_app_init(root_dir: PathBuf) -> anyhow::Result<AppBundle> {
         .build()
         .unwrap()
         .into();
-        
+
     Ok(mr_bundle::Bundle::new(manifest, vec![], root_dir)?.into())
 }
 
 fn prompt_web_app_init(root_dir: PathBuf) -> anyhow::Result<WebAppBundle> {
     let name = prompt_required("name:")?;
-    
+
     let manifest = WebAppManifest::current(name);
 
     Ok(mr_bundle::Bundle::new(manifest, vec![], root_dir)?.into())
