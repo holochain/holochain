@@ -4,6 +4,7 @@ use std::{io, path::PathBuf};
 use holochain_types::prelude::{
     AppBundle, AppManifest, AppManifestCurrentBuilder, AppSlotManifest, DnaBundle, DnaManifest,
 };
+use holochain_types::web_app::{WebAppBundle, WebAppManifest};
 
 fn readline(prompt: Option<&str>) -> io::Result<Option<String>> {
     let mut input = String::new();
@@ -59,6 +60,15 @@ fn prompt_app_init(root_dir: PathBuf) -> anyhow::Result<AppBundle> {
         .build()
         .unwrap()
         .into();
+        
+    Ok(mr_bundle::Bundle::new(manifest, vec![], root_dir)?.into())
+}
+
+fn prompt_web_app_init(root_dir: PathBuf) -> anyhow::Result<WebAppBundle> {
+    let name = prompt_required("name:")?;
+    
+    let manifest = WebAppManifest::current(name);
+
     Ok(mr_bundle::Bundle::new(manifest, vec![], root_dir)?.into())
 }
 
@@ -70,6 +80,12 @@ pub async fn init_dna(target: PathBuf) -> anyhow::Result<()> {
 
 pub async fn init_app(target: PathBuf) -> anyhow::Result<()> {
     let bundle = prompt_app_init(target.to_owned())?;
+    bundle.unpack_yaml(&target, false).await?;
+    Ok(())
+}
+
+pub async fn init_web_app(target: PathBuf) -> anyhow::Result<()> {
+    let bundle = prompt_web_app_init(target.to_owned())?;
     bundle.unpack_yaml(&target, false).await?;
     Ok(())
 }
