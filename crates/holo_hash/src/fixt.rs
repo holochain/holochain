@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use crate::encode_common::holo_dht_location_bytes;
+use crate::encode::holo_dht_location_bytes;
 use crate::hash_type;
 use crate::AgentPubKey;
 use crate::AgentPubKeyB64;

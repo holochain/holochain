@@ -23,7 +23,7 @@
 //!
 //! The complete 39 bytes together are known as the "full" hash
 
-use crate::encode_common;
+use crate::encode;
 use crate::error::HoloHashResult;
 use crate::has_hash::HasHash;
 use crate::HashType;
@@ -162,7 +162,7 @@ impl<T: HashType> HoloHash<T> {
     /// the location bytes will used as provided, not computed.
     pub fn from_raw_32_and_type(mut hash: Vec<u8>, hash_type: T) -> Self {
         if hash.len() == HOLO_HASH_CORE_LEN {
-            hash.append(&mut encode_common::holo_dht_location_bytes(&hash));
+            hash.append(&mut encode::holo_dht_location_bytes(&hash));
         }
 
         assert_length!(HOLO_HASH_UNTYPED_LEN, &hash);
