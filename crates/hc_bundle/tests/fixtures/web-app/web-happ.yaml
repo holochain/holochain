@@ -1,0 +1,7 @@
+---
+manifest_version: "1"
+name: fixture-web-happ
+ui:
+  bundled: "./ui.zip"
+happ_manifest:
+  bundled: "../my-app/fixture-app.happ"
