@@ -10,6 +10,6 @@ pub struct WebAppBundle(mr_bundle::Bundle<WebAppManifest>);
 impl WebAppBundle {
     /// Construct from raw bytes
     pub fn decode(bytes: &[u8]) -> MrBundleResult<Self> {
-        mr_bundle::Bundle::decode(bytes).map(|b| Ok(WebAppBundle(b)))
+        mr_bundle::Bundle::decode(bytes).map(WebAppBundle)
     }
 }
