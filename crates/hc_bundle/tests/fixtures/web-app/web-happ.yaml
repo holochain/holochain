@@ -1,6 +1,6 @@
 ---
 manifest_version: "1"
-name: fixture-web-happ
+name: fixture-web-app
 ui:
   bundled: "./ui.zip"
 happ_manifest:
