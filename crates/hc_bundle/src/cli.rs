@@ -147,7 +147,7 @@ pub enum HcWebAppBundle {
         path: PathBuf,
     },
 
-    /// Pack into the `[name].web-happ` bundle according to the `web-happ.yaml` manifest,
+    /// Pack into the `[name].webhapp` bundle according to the `web-happ.yaml` manifest,
     /// found inside the working directory. The `[name]` is taken from the `name`
     /// property of the manifest file.
     ///
@@ -155,7 +155,7 @@ pub enum HcWebAppBundle {
     ///
     /// $ hc web-app pack ./some/directory/foo
     ///
-    /// creates a file `./some/directory/foo/[name].web-happ`, based on
+    /// creates a file `./some/directory/foo/[name].webhapp`, based on
     /// `./some/directory/foo/web-happ.yaml`
     Pack {
         /// The path to the working directory containing a `web-happ.yaml` manifest
@@ -163,17 +163,17 @@ pub enum HcWebAppBundle {
 
         /// Specify the output path for the packed bundle file
         ///
-        /// If not specified, the `[name].web-happ` bundle will be placed inside the
+        /// If not specified, the `[name].webhapp` bundle will be placed inside the
         /// provided working directory.
         #[structopt(short = "o", long)]
         output: Option<PathBuf>,
     },
 
-    /// Unpack parts of the `.web-happ` bundle file into a specific directory.
+    /// Unpack parts of the `.webhapp` bundle file into a specific directory.
     ///
     /// e.g.:
     ///
-    /// $ hc web-app unpack ./some/dir/my-app.web-happ
+    /// $ hc web-app unpack ./some/dir/my-app.webhapp
     ///
     /// creates a new directory `./some/dir/my-app`, containining a new `web-happ.yaml`
     /// manifest

@@ -41,7 +41,7 @@ async fn roundtrip() {
         cmd.assert().success();
     }
 
-    let web_app_path = PathBuf::from("tests/fixtures/web-app/fixture-web-app.web-happ");
+    let web_app_path = PathBuf::from("tests/fixtures/web-app/fixture-web-app.webhapp");
     let app_path = PathBuf::from("tests/fixtures/my-app/fixture-app.happ");
     let dna1_path = PathBuf::from("tests/fixtures/my-app/dnas/dna1/a dna.dna");
     let dna2_path = PathBuf::from("tests/fixtures/my-app/dnas/dna2/another dna.dna");

@@ -34,7 +34,7 @@ impl Manifest for WebAppManifest {
     }
 
     fn bundle_extension() -> &'static str {
-        "web-happ"
+        "webhapp"
     }
 }
 
