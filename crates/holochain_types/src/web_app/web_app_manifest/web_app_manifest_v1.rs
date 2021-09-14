@@ -1,7 +1,6 @@
 //! WebApp Manifest format, version 1.
 //!
 //! NB: After stabilization, *do not modify this file*! Create a new version of
-
 //! the spec and leave this one alone to maintain backwards compatibility.
 
 /// Version 1 of the App manifest schema
