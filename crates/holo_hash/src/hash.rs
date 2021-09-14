@@ -23,7 +23,6 @@
 //!
 //! The complete 39 bytes together are known as the "full" hash
 
-use crate::encode;
 use crate::error::HoloHashResult;
 use crate::has_hash::HasHash;
 use crate::HashType;
@@ -160,9 +159,13 @@ impl<T: HashType> HoloHash<T> {
     ///
     /// For convenience, 36 bytes can also be passed in, in which case
     /// the location bytes will used as provided, not computed.
-    pub fn from_raw_32_and_type(mut hash: Vec<u8>, hash_type: T) -> Self {
+    pub fn from_raw_32_and_type(hash: Vec<u8>, hash_type: T) -> Self {
+        #[cfg(feature = "serialized-bytes")]
+        let mut hash = hash;
+
+        #[cfg(feature = "serialized-bytes")]
         if hash.len() == HOLO_HASH_CORE_LEN {
-            hash.append(&mut encode::holo_dht_location_bytes(&hash));
+            hash.append(&mut crate::encode::holo_dht_location_bytes(&hash));
         }
 
         assert_length!(HOLO_HASH_UNTYPED_LEN, &hash);
