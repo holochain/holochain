@@ -18,7 +18,7 @@ pub const DNA_BUNDLE_EXT: &str = "dna";
 pub const APP_BUNDLE_EXT: &str = "happ";
 
 /// The file extension to use for Web-hApp bundles
-pub const WEB_APP_BUNDLE_EXT: &str = "web-happ";
+pub const WEB_APP_BUNDLE_EXT: &str = "webhapp";
 
 /// Work with Holochain DNA bundles
 #[derive(Debug, StructOpt)]
