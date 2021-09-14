@@ -102,6 +102,8 @@ impl DbWrite {
         }
         let pool = new_connection_pool(&path, kind.clone());
         let mut conn = pool.get()?;
+        // set to faster write-ahead-log mode
+        conn.pragma_update(None, "journal_mode", &"WAL".to_string())?;
         crate::table::initialize_database(&mut conn, &kind)?;
 
         Ok(DbWrite(DbRead {
@@ -134,9 +136,7 @@ impl DbWrite {
         match map.get(kind) {
             Some(s) => s.clone(),
             None => {
-                let num_cpus = num_cpus::get();
-                let num_read_threads = if num_cpus < 4 { 4 } else { num_cpus / 2 };
-                let s = Arc::new(Semaphore::new(num_read_threads));
+                let s = Arc::new(Semaphore::new(num_read_threads()));
                 map.insert(kind.clone(), s.clone());
                 s
             }
@@ -158,6 +158,12 @@ impl DbWrite {
         }
         Ok(())
     }
+}
+
+pub fn num_read_threads() -> usize {
+    let num_cpus = num_cpus::get();
+    let num_threads = num_cpus.checked_div(2).unwrap_or(0);
+    std::cmp::max(num_threads, 4)
 }
 
 /// The various types of database, used to specify the list of databases to initialize

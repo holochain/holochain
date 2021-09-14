@@ -50,9 +50,11 @@ pub(crate) fn new_connection_pool(path: &Path, kind: DbKind) -> ConnectionPool {
     use r2d2_sqlite::SqliteConnectionManager;
     let manager = SqliteConnectionManager::file(path);
     let customizer = Box::new(ConnCustomizer { kind });
+    // We need the same amount of connections as reader threads plus one for the writer thread.
+    let max_cons = num_read_threads() + 1;
     r2d2::Pool::builder()
         // Only up to 20 connections at a time
-        .max_size(20)
+        .max_size(max_cons as u32)
         // Never maintain idle connections
         .min_idle(Some(0))
         // Close connections after 30-60 seconds of idle time
@@ -104,11 +106,10 @@ fn initialize_connection(
     // https://sqlite.org/pragma.html#pragma_trusted_schema
     conn.pragma_update(None, "trusted_schema", &false)?;
 
-    // set to faster write-ahead-log mode
-    conn.pragma_update(None, "journal_mode", &"WAL".to_string())?;
-
     // enable foreign key support
     conn.pragma_update(None, "foreign_keys", &"ON".to_string())?;
+
+    conn.pragma_update(None, "synchronous", &0).unwrap();
 
     Ok(())
 }

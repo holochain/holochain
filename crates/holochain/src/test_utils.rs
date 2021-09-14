@@ -250,7 +250,7 @@ pub async fn install_app(
 
     conductor_handle
         .clone()
-        .enable_app(&name.to_string())
+        .enable_app(name.to_string())
         .await
         .unwrap();
 

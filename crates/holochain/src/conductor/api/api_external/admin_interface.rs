@@ -237,7 +237,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let (app, errors) = self
                     .conductor_handle
                     .clone()
-                    .enable_app(&installed_app_id)
+                    .enable_app(installed_app_id.clone())
                     .await?;
 
                 let app_cells: HashSet<_> = app.required_cells().collect();
@@ -263,7 +263,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 // Disable app
                 self.conductor_handle
                     .clone()
-                    .disable_app(&installed_app_id, DisabledAppReason::User)
+                    .disable_app(installed_app_id, DisabledAppReason::User)
                     .await?;
                 Ok(AdminResponse::AppDisabled)
             }
@@ -272,7 +272,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let app = self
                     .conductor_handle
                     .clone()
-                    .start_app(&installed_app_id)
+                    .start_app(installed_app_id)
                     .await?;
                 Ok(AdminResponse::AppStarted(app.status().is_running()))
             }

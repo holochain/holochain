@@ -107,13 +107,13 @@ async fn can_add_clone_cell_to_app() {
 
     matches::assert_matches!(
         conductor
-            .add_clone_cell_to_app(&"no clone".to_string(), &"nick".to_string(), ().into())
+            .add_clone_cell_to_app("no clone".to_string(), "nick".to_string(), ().into())
             .await,
         Err(ConductorError::AppError(AppError::CloneLimitExceeded(0, _)))
     );
 
     let cloned_cell_id = conductor
-        .add_clone_cell_to_app(&"yes clone".to_string(), &"nick".to_string(), ().into())
+        .add_clone_cell_to_app("yes clone".to_string(), "nick".to_string(), ().into())
         .await
         .unwrap();
 
@@ -166,7 +166,7 @@ async fn app_ids_are_unique() {
 
     //- it doesn't matter whether the app is active or inactive
     let (_, delta) = conductor
-        .transition_app_status(&"id".to_string(), AppStatusTransition::Enable)
+        .transition_app_status("id".to_string(), AppStatusTransition::Enable)
         .await
         .unwrap();
     assert_eq!(delta, AppStatusFx::SpinUp);
@@ -622,7 +622,7 @@ async fn test_reenable_app() {
     assert_matches!(active_apps[0].status, InstalledAppInfoStatus::Running);
 
     conductor
-        .disable_app(&"app".to_string(), DisabledAppReason::User)
+        .disable_app("app".to_string(), DisabledAppReason::User)
         .await
         .unwrap();
 
@@ -644,7 +644,7 @@ async fn test_reenable_app() {
         }
     );
 
-    conductor.enable_app(&"app".to_string()).await.unwrap();
+    conductor.enable_app("app".to_string()).await.unwrap();
     conductor
         .inner_handle()
         .reconcile_cell_status_with_app_status()
@@ -869,53 +869,53 @@ async fn test_app_status_states() {
     // RUNNING -pause-> PAUSED
 
     conductor
-        .pause_app(&"app".to_string(), PausedAppReason::Error("because".into()))
+        .pause_app("app".to_string(), PausedAppReason::Error("because".into()))
         .await
         .unwrap();
     assert_matches!(get_status().await, InstalledAppInfoStatus::Paused { .. });
 
     // PAUSED  --start->  RUNNING
 
-    conductor.start_app(&"app".to_string()).await.unwrap();
+    conductor.start_app("app".to_string()).await.unwrap();
     assert_matches!(get_status().await, InstalledAppInfoStatus::Running);
 
     // RUNNING  --disable->  DISABLED
 
     conductor
-        .disable_app(&"app".to_string(), DisabledAppReason::User)
+        .disable_app("app".to_string(), DisabledAppReason::User)
         .await
         .unwrap();
     assert_matches!(get_status().await, InstalledAppInfoStatus::Disabled { .. });
 
     // DISABLED  --start->  DISABLED
 
-    conductor.start_app(&"app".to_string()).await.unwrap();
+    conductor.start_app("app".to_string()).await.unwrap();
     assert_matches!(get_status().await, InstalledAppInfoStatus::Disabled { .. });
 
     // DISABLED  --pause->  DISABLED
 
     conductor
-        .pause_app(&"app".to_string(), PausedAppReason::Error("because".into()))
+        .pause_app("app".to_string(), PausedAppReason::Error("because".into()))
         .await
         .unwrap();
     assert_matches!(get_status().await, InstalledAppInfoStatus::Disabled { .. });
 
     // DISABLED  --enable->  ENABLED
 
-    conductor.enable_app(&"app".to_string()).await.unwrap();
+    conductor.enable_app("app".to_string()).await.unwrap();
     assert_matches!(get_status().await, InstalledAppInfoStatus::Running);
 
     // RUNNING  --pause->  PAUSED
 
     conductor
-        .pause_app(&"app".to_string(), PausedAppReason::Error("because".into()))
+        .pause_app("app".to_string(), PausedAppReason::Error("because".into()))
         .await
         .unwrap();
     assert_matches!(get_status().await, InstalledAppInfoStatus::Paused { .. });
 
     // PAUSED  --enable->  RUNNING
 
-    conductor.enable_app(&"app".to_string()).await.unwrap();
+    conductor.enable_app("app".to_string()).await.unwrap();
     assert_matches!(get_status().await, InstalledAppInfoStatus::Running);
 }
 
@@ -973,7 +973,7 @@ async fn test_cell_and_app_status_reconciliation() {
     assert_eq!(check().await, (Paused, 2, 1));
 
     // - Can start the app again and get all cells joined
-    conductor.start_app(&app_id).await.unwrap();
+    conductor.start_app(app_id.clone()).await.unwrap();
     assert_eq!(check().await, (Running, 3, 0));
 
     // - Simulate a cell being removed due to error
@@ -990,17 +990,17 @@ async fn test_cell_and_app_status_reconciliation() {
 
     // - Disabling the app causes all cells to be removed
     conductor
-        .disable_app(&app_id, DisabledAppReason::User)
+        .disable_app(app_id.clone(), DisabledAppReason::User)
         .await
         .unwrap();
     assert_eq!(check().await, (Disabled, 0, 0));
 
     // - Starting a disabled app does nothing
-    conductor.start_app(&app_id).await.unwrap();
+    conductor.start_app(app_id.clone()).await.unwrap();
     assert_eq!(check().await, (Disabled, 0, 0));
 
     // - ...but enabling one does
-    conductor.enable_app(&app_id).await.unwrap();
+    conductor.enable_app(app_id).await.unwrap();
     assert_eq!(check().await, (Running, 3, 0));
 }
 
@@ -1020,14 +1020,14 @@ async fn test_app_status_filters() {
 
     conductor
         .pause_app(
-            &"paused".to_string(),
+            "paused".to_string(),
             PausedAppReason::Error("because".into()),
         )
         .await
         .unwrap();
 
     conductor
-        .disable_app(&"disabled".to_string(), DisabledAppReason::User)
+        .disable_app("disabled".to_string(), DisabledAppReason::User)
         .await
         .unwrap();
 

@@ -128,7 +128,7 @@ impl SweetConductor {
     /// Convenience function that uses the internal handle to enable an app
     pub async fn enable_app(
         &self,
-        id: &InstalledAppId,
+        id: InstalledAppId,
     ) -> ConductorResult<(InstalledApp, Vec<(CellId, CellError)>)> {
         self.handle().0.enable_app(id).await
     }
@@ -136,21 +136,21 @@ impl SweetConductor {
     /// Convenience function that uses the internal handle to disable an app
     pub async fn disable_app(
         &self,
-        id: &InstalledAppId,
+        id: InstalledAppId,
         reason: DisabledAppReason,
     ) -> ConductorResult<InstalledApp> {
         self.handle().0.disable_app(id, reason).await
     }
 
     /// Convenience function that uses the internal handle to start an app
-    pub async fn start_app(&self, id: &InstalledAppId) -> ConductorResult<InstalledApp> {
+    pub async fn start_app(&self, id: InstalledAppId) -> ConductorResult<InstalledApp> {
         self.handle().0.start_app(id).await
     }
 
     /// Convenience function that uses the internal handle to pause an app
     pub async fn pause_app(
         &self,
-        id: &InstalledAppId,
+        id: InstalledAppId,
         reason: PausedAppReason,
     ) -> ConductorResult<InstalledApp> {
         self.handle().0.pause_app(id, reason).await
@@ -195,7 +195,7 @@ impl SweetConductor {
         self.handle()
             .0
             .clone()
-            .enable_app(&installed_app_id)
+            .enable_app(installed_app_id)
             .await?;
         Ok(())
     }

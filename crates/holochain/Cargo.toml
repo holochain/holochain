@@ -59,7 +59,7 @@ structopt = "0.3.11"
 strum = "0.18.0"
 tempdir = "0.3.7"
 thiserror = "1.0.22"
-tokio = { version = "1.3", features = [ "full" ] }
+tokio = { version = "1.11", features = [ "full"] }
 tokio-stream = "0.1"
 holochain_util = { version = "0.0.3", path = "../holochain_util" }
 toml = "0.5.6"

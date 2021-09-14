@@ -670,7 +670,7 @@ where
     #[tracing::instrument(skip(self))]
     pub(super) async fn transition_app_status(
         &mut self,
-        app_id: &InstalledAppId,
+        app_id: InstalledAppId,
         transition: AppStatusTransition,
     ) -> ConductorResult<(InstalledApp, AppStatusFx)> {
         Ok(self
@@ -732,37 +732,40 @@ where
     /// Associate a Cell with an existing App
     pub(super) async fn add_clone_cell_to_app(
         &mut self,
-        app_id: &InstalledAppId,
-        slot_id: &SlotId,
+        app_id: InstalledAppId,
+        slot_id: SlotId,
         properties: YamlProperties,
     ) -> ConductorResult<CellId> {
         let dna_store = &self.dna_store;
-        let (_, child_dna) = self
-            .update_state_prime(move |mut state| {
-                if let Some(app) = state.installed_apps_mut().get_mut(app_id) {
+        let (_, parent_dna_hash) = self
+            .update_state_prime({
+                let app_id = app_id.clone();
+                let slot_id = app_id.clone();
+                move |mut state| {
+                if let Some(app) = state.installed_apps_mut().get_mut(&app_id) {
                     let slot = app
                         .slots()
-                        .get(slot_id)
+                        .get(&slot_id)
                         .ok_or_else(|| AppError::SlotIdMissing(slot_id.to_owned()))?;
-                    let parent_dna_hash = slot.dna_hash();
-                    let dna = dna_store
-                        .get(parent_dna_hash)
-                        .ok_or_else(|| DnaError::DnaMissing(parent_dna_hash.to_owned()))?
-                        .modify_phenotype(random_uid(), properties)?;
-                    Ok((state, dna))
+                    let parent_dna_hash = slot.dna_hash().clone();
+                    Ok((state, parent_dna_hash))
                 } else {
                     Err(ConductorError::AppNotRunning(app_id.clone()))
                 }
-            })
+            }})
             .await?;
+        let child_dna = dna_store
+            .get(&parent_dna_hash)
+            .ok_or_else(|| DnaError::DnaMissing(parent_dna_hash.to_owned()))?
+            .modify_phenotype(random_uid(), properties)?;
         let child_dna_hash = child_dna.dna_hash().to_owned();
         self.register_phenotype(child_dna).await?;
         let (_, cell_id) = self
-            .update_state_prime(|mut state| {
-                if let Some(app) = state.installed_apps_mut().get_mut(app_id) {
-                    let agent_key = app.slot(slot_id)?.agent_key().to_owned();
+            .update_state_prime(move |mut state| {
+                if let Some(app) = state.installed_apps_mut().get_mut(&app_id) {
+                    let agent_key = app.slot(&slot_id)?.agent_key().to_owned();
                     let cell_id = CellId::new(child_dna_hash, agent_key);
-                    app.add_clone(slot_id, cell_id.clone())?;
+                    app.add_clone(&slot_id, cell_id.clone())?;
                     Ok((state, cell_id))
                 } else {
                     Err(ConductorError::AppNotRunning(app_id.clone()))
@@ -1187,13 +1190,13 @@ where
     /// this function
     async fn update_state_prime<F, O>(&self, f: F) -> ConductorResult<(ConductorState, O)>
     where
-        F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)>,
-        O: Send,
+        F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)> + Send + 'static,
+        O: Send + 'static,
     {
         self.check_running()?;
         let output = self
             .conductor_env
-            .async_commit_in_place(move |txn| {
+            .async_commit(move |txn| {
                 let state = txn
                     .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
                         row.get("blob")
