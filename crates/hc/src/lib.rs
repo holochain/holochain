@@ -114,7 +114,7 @@ use structopt::StructOpt;
 
 /// Holochain CLI
 ///
-/// Work with DNA and hApp bundle files, set up sandbox environments for testing
+/// Work with DNA, hApp and web-hApp bundle files, set up sandbox environments for testing
 /// and development purposes, make direct admin calls to running conductors,
 /// and more.
 #[allow(clippy::large_enum_variant)]
