@@ -565,7 +565,7 @@ impl ShardedGossipLocal {
             &self.space,
             agent_arcs.as_slice(),
             &arcset,
-            full_time_range(),
+            full_time_window(),
             usize::MAX,
             true,
         )

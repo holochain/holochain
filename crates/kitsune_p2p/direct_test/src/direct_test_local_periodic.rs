@@ -345,7 +345,7 @@ async fn periodic_agent_hook_task(
 #[cfg(test)]
 mod tests {
     use kitsune_p2p_direct::dependencies::{
-        kitsune_p2p::event::full_time_range, kitsune_p2p_types::dht_arc::ArcInterval,
+        kitsune_p2p::event::full_time_window, kitsune_p2p_types::dht_arc::ArcInterval,
     };
 
     use super::*;
@@ -438,7 +438,7 @@ mod tests {
                     .query_entries(
                         test.root.clone(),
                         agent.clone(),
-                        full_time_range(),
+                        full_time_window(),
                         ArcInterval::Full.into(),
                     )
                     .await
