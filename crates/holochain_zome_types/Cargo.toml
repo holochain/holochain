@@ -1,6 +1,6 @@
 [package]
 name = "holochain_zome_types"
-version = "0.0.7-dev.0"
+version = "0.0.7"
 description = "Holochain zome types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -59,7 +59,7 @@ default = ["full-dna-def", "fixturators", "test_utils", "subtle-encoding"]
 # but used in Holochain
 full-dna-def = ["derive_builder", "nanoid", "shrinkwraprs"]
 
-full = ["default", "rusqlite", "num_enum"]
+full = ["default", "rusqlite", "num_enum", "kitsune_p2p_timestamp/full"]
 
 fixturators = ["fixt", "rand", "strum", "holo_hash/fixturators", ]
 

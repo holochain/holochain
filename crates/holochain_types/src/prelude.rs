@@ -1,6 +1,5 @@
 //! reexport some common things
 
-pub use crate::Timestamp;
 pub use holochain_keystore::AgentPubKeyExt;
 pub use holochain_keystore::KeystoreSender;
 pub use holochain_serialized_bytes::prelude::*;
@@ -31,8 +30,6 @@ pub use crate::link::*;
 pub use crate::metadata::*;
 pub use crate::properties::*;
 pub use crate::signal::*;
-pub use crate::timestamp; // for timestamp::now()
-pub use crate::timestamp::*;
 pub use crate::validate::*;
 
 pub use crate::fixt::TimestampFixturator;
