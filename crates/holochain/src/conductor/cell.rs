@@ -44,7 +44,7 @@ use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
-use kitsune_p2p::event::TimeWindowMs;
+use kitsune_p2p::event::TimeWindow;
 use observability::OpenSpanExt;
 use rusqlite::OptionalExtension;
 use std::hash::Hash;
@@ -642,7 +642,7 @@ impl Cell {
             let h: Option<Vec<u8>> = txn
                 .query_row(
                     "SELECT Header.blob as header_blob
-                    FROM DhtOp 
+                    FROM DhtOp
                     JOIN Header ON Header.hash = DhtOp.header_hash
                     WHERE DhtOp.hash = :hash",
                     named_params! {
@@ -711,14 +711,14 @@ impl Cell {
     pub(super) async fn handle_query_op_hashes(
         &self,
         dht_arc_set: DhtArcSet,
-        window_ms: TimeWindowMs,
+        window: TimeWindow,
         include_limbo: bool,
-    ) -> CellResult<Vec<(DhtOpHash, u64)>> {
+    ) -> CellResult<Vec<(DhtOpHash, Timestamp)>> {
         let mut results = Vec::new();
 
         // The exclusive window bounds.
-        let start = clamp64(window_ms.start);
-        let end = clamp64(window_ms.end);
+        let start = window.start;
+        let end = window.end;
 
         let full = if include_limbo {
             holochain_sqlite::sql::sql_cell::any::FETCH_OP_HASHES_FULL
@@ -751,7 +751,7 @@ impl Cell {
                                     ":from": start,
                                     ":to": end,
                                 },
-                                |row| Ok((row.get("hash")?, row.get("authored_timestamp_ms")?)),
+                                |row| Ok((row.get("hash")?, row.get("authored_timestamp")?)),
                             )?
                             .collect::<rusqlite::Result<Vec<_>>>()?,
                         ArcInterval::Bounded(start_loc, end_loc) => {
@@ -768,7 +768,7 @@ impl Cell {
                                         ":storage_start_loc": start_loc,
                                         ":storage_end_loc": end_loc,
                                     },
-                                    |row| Ok((row.get("hash")?, row.get("authored_timestamp_ms")?)),
+                                    |row| Ok((row.get("hash")?, row.get("authored_timestamp")?)),
                                 )?
                                 .collect::<rusqlite::Result<Vec<_>>>()?
                         }

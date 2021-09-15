@@ -66,7 +66,7 @@ async fn test_cell_handle_publish() {
     let keystore = test_keystore();
     let header = header::Header::Dna(header::Dna {
         author: agent.clone(),
-        timestamp: timestamp::now().into(),
+        timestamp: Timestamp::now().into(),
         hash: dna.clone(),
     });
     let hh = HeaderHashed::from_content_sync(header.clone());

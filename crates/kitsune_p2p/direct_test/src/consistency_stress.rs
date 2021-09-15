@@ -1,6 +1,6 @@
 //! bunch of nodes gossip consistency test
 
-use kitsune_p2p_direct::dependencies::kitsune_p2p::event::full_time_window;
+use kitsune_p2p_direct::dependencies::kitsune_p2p::event::full_time_range;
 use kitsune_p2p_direct::dependencies::kitsune_p2p_types::dht_arc::ArcInterval;
 use kitsune_p2p_direct::dependencies::*;
 use kitsune_p2p_direct::prelude::*;
@@ -507,7 +507,7 @@ impl Test {
                     .query_entries(
                         self.root.clone(),
                         agent.clone(),
-                        full_time_window(),
+                        full_time_range(),
                         ArcInterval::Full.into(),
                     )
                     .await
@@ -531,7 +531,7 @@ impl Test {
                     .query_entries(
                         self.root.clone(),
                         agent.clone(),
-                        full_time_window(),
+                        full_time_range(),
                         ArcInterval::Full.into(),
                     )
                     .await

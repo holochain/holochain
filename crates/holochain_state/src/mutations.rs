@@ -179,7 +179,7 @@ pub fn insert_op_lite(
         "hash": hash,
         "type": op_lite.get_type(),
         "storage_center_loc": basis.get_loc(),
-        "authored_timestamp_ms": timestamp.to_sql_micros_lossy(),
+        "authored_timestamp": timestamp,
         "basis_hash": basis,
         "header_hash": header_hash,
         "is_authored": is_authored,
@@ -311,7 +311,7 @@ pub fn set_validation_stage(
         ValidationLimboStatus::AwaitingAppDeps(_) => Some(2),
         ValidationLimboStatus::AwaitingIntegration => Some(3),
     };
-    let now = holochain_types::timestamp::now();
+    let now = holochain_zome_types::Timestamp::now();
     txn.execute(
         "
         UPDATE DhtOp
@@ -338,7 +338,6 @@ pub fn set_when_integrated(
     time: Timestamp,
 ) -> StateMutationResult<()> {
     dht_op_update!(txn, hash, {
-        "when_integrated_ns": to_blob(time)?,
         "when_integrated": time,
     })?;
     Ok(())

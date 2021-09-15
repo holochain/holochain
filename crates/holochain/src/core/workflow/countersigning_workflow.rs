@@ -13,8 +13,8 @@ use holochain_state::prelude::{
 };
 use holochain_state::validation_db::ValidationLimboStatus;
 use holochain_types::signal::{Signal, SystemSignal};
-use holochain_types::Timestamp;
 use holochain_types::{dht_op::DhtOp, env::EnvWrite};
+use holochain_zome_types::Timestamp;
 use holochain_zome_types::{Entry, SignedHeader, ZomeCallResponse};
 use kitsune_p2p_types::tx2::tx2_utils::Share;
 use rusqlite::named_params;
@@ -83,7 +83,7 @@ pub(crate) fn incoming_countersigning(
                         .collect();
 
                     // Check if already timed out.
-                    if holochain_types::timestamp::now() < expires {
+                    if holochain_zome_types::Timestamp::now() < expires {
                         // Put this op in the pending map.
                         workspace.put(entry_hash, hash, op, required_headers, expires);
                         // We have new ops so we should trigger the workflow.
@@ -342,7 +342,7 @@ impl CountersigningWorkspace {
     }
 
     fn get_complete_sessions(&self) -> Vec<(AgentsToNotify, Ops, SignedHeaders)> {
-        let now = holochain_types::timestamp::now();
+        let now = holochain_zome_types::Timestamp::now();
         self.inner
             .share_mut(|i, _| {
                 // Remove any expired sessions.
@@ -409,7 +409,6 @@ impl Default for CountersigningWorkspace {
 #[cfg(test)]
 mod tests {
     use arbitrary::Arbitrary;
-    use holochain_types::timestamp;
 
     use super::*;
 
@@ -442,7 +441,7 @@ mod tests {
 
         // - Put the ops in the workspace with expiry set to one hour from now.
         for (op_h, op) in op_hashes.into_iter().zip(ops.into_iter()) {
-            let expires = (timestamp::now() + std::time::Duration::from_secs(60 * 60)).unwrap();
+            let expires = (Timestamp::now() + std::time::Duration::from_secs(60 * 60)).unwrap();
             workspace.put(
                 entry_hash.clone(),
                 op_h,
@@ -479,7 +478,7 @@ mod tests {
         let header = op.header();
         let entry_hash = EntryHash::arbitrary(&mut u).unwrap();
         let header_hash = HeaderHash::with_data_sync(&header);
-        let expires = (timestamp::now() - std::time::Duration::from_secs(60 * 60)).unwrap();
+        let expires = (Timestamp::now() - std::time::Duration::from_secs(60 * 60)).unwrap();
 
         // - Add it to the workspace.
         workspace.put(entry_hash, op_hash, op, vec![header_hash], expires);

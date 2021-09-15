@@ -4,8 +4,6 @@ use crate::dna::wasm::DnaWasm;
 use crate::element::SignedHeaderHashedExt;
 use crate::fixt::*;
 use crate::prelude::*;
-use crate::timestamp;
-use holochain_zome_types::prelude::EntryHashed;
 use std::path::PathBuf;
 
 pub use holochain_zome_types::test_utils::*;
@@ -97,7 +95,7 @@ pub async fn fake_unique_element(
     let app_entry_type = AppEntryTypeFixturator::new(visibility).next().unwrap();
     let header_1 = Header::Create(Create {
         author: agent_key,
-        timestamp: timestamp::now(),
+        timestamp: Timestamp::now(),
         header_seq: 0,
         prev_header: fake_header_hash(1),
 

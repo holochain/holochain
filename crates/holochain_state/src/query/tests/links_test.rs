@@ -85,7 +85,7 @@ fn fixtures(env: EnvWrite, n: usize) -> Vec<TestData> {
 impl TestData {
     /// Create the same test data with a new timestamp
     fn with_same_keys(mut td: Self) -> Self {
-        td.link_add.timestamp = holochain_types::timestamp::now().into();
+        td.link_add.timestamp = holochain_zome_types::Timestamp::now().into();
         let link_add_hash =
             HeaderHashed::from_content_sync(Header::CreateLink(td.link_add.clone())).into_hash();
         td.link_remove.link_add_address = link_add_hash.clone();

@@ -71,7 +71,7 @@ impl CounterSigningSessionTimes {
 
     /// Verify the difference between the end and start time is larger than the session header time offset.
     pub fn check_integrity(&self) -> Result<(), CounterSigningError> {
-        let times_are_valid = &Timestamp::new(0, 0) < self.start()
+        let times_are_valid = &Timestamp::from_micros(0) < self.start()
             && self.start()
                 <= &(self.end() - SESSION_HEADER_TIME_OFFSET).map_err(|_| {
                     CounterSigningError::CounterSigningSessionTimes((*self).clone())
@@ -489,7 +489,7 @@ impl Header {
         Ok(match session_data.preflight_request().header_base() {
             HeaderBase::Create(create_base) => Header::Create(Create {
                 author,
-                timestamp: Timestamp::from_countersigning_data(session_data),
+                timestamp: session_data.to_timestamp(),
                 header_seq: agent_state.header_seq + 1,
                 prev_header: agent_state.chain_top.clone(),
                 entry_type: create_base.entry_type.clone(),
@@ -497,7 +497,7 @@ impl Header {
             }),
             HeaderBase::Update(update_base) => Header::Update(Update {
                 author,
-                timestamp: Timestamp::from_countersigning_data(session_data),
+                timestamp: session_data.to_timestamp(),
                 header_seq: agent_state.header_seq + 1,
                 prev_header: agent_state.chain_top.clone(),
                 original_header_address: update_base.original_header_address.clone(),
@@ -610,6 +610,13 @@ impl CounterSigningSessionData {
             }
             Ok(())
         }
+    }
+
+    /// Construct a Timestamp from countersigning session data.
+    /// Ostensibly used for the Header because the session itself covers a time range.
+    pub fn to_timestamp(&self) -> Timestamp {
+        (self.preflight_request().session_times().start() + SESSION_HEADER_TIME_OFFSET)
+            .unwrap_or(Timestamp::MAX)
     }
 
     /// Accessor to the preflight request.

@@ -9,8 +9,8 @@ use holochain_sqlite::prelude::*;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::Transaction;
-use holochain_types::Timestamp;
 use holochain_zome_types::signature::Signature;
+use holochain_zome_types::Timestamp;
 use holochain_zome_types::ValidationStatus;
 use mutations::StateMutationResult;
 
@@ -128,7 +128,6 @@ mod tests {
     use holochain_sqlite::db::ReadManager;
     use holochain_types::dht_op::DhtOp;
     use holochain_types::dht_op::DhtOpHashed;
-    use holochain_types::timestamp;
     use holochain_zome_types::fixt::*;
 
     async fn fake_vr(
@@ -144,7 +143,7 @@ mod tests {
             dht_op_hash: dht_op_hash.clone(),
             validation_status: ValidationStatus::Valid,
             validator: agent,
-            when_integrated: timestamp::now(),
+            when_integrated: Timestamp::now(),
         };
         receipt.sign(keystore).await.unwrap()
     }

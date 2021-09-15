@@ -6,7 +6,7 @@ use kitsune_p2p::dht_arc::DhtArcSet;
 use kitsune_p2p::event::MetricDatum;
 use kitsune_p2p::event::MetricQuery;
 use kitsune_p2p::event::MetricQueryAnswer;
-use kitsune_p2p::event::TimeWindowMs;
+use kitsune_p2p::event::TimeWindow;
 use kitsune_p2p_types::tls::TlsConfig;
 use std::future::Future;
 
@@ -85,7 +85,7 @@ pub trait AsKdPersist: 'static + Send + Sync {
         &self,
         root: KdHash,
         agent: KdHash,
-        window_ms: TimeWindowMs,
+        window: TimeWindow,
         dht_arc: DhtArcSet,
     ) -> BoxFuture<'static, KdResult<Vec<KdEntrySigned>>>;
 
@@ -231,7 +231,7 @@ impl KdPersist {
         &self,
         root: KdHash,
         agent: KdHash,
-        window: TimeWindowMs,
+        window: TimeWindow,
         dht_arc: DhtArcSet,
     ) -> impl Future<Output = KdResult<Vec<KdEntrySigned>>> + 'static + Send {
         AsKdPersist::query_entries(&*self.0, root, agent, window, dht_arc)
