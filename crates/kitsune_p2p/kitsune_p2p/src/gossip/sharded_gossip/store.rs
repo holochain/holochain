@@ -72,7 +72,6 @@ pub(super) async fn local_arcs(
         .collect())
 }
 
-#[allow(dead_code)]
 /// Get `AgentInfoSigned` for all agents within a `DhtArcSet`.
 pub(super) async fn agent_info_within_arc_set(
     evt_sender: &EventSender,
