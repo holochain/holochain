@@ -23,11 +23,13 @@
 //!
 //! The complete 39 bytes together are known as the "full" hash
 
-use crate::encode;
 use crate::error::HoloHashResult;
 use crate::has_hash::HasHash;
 use crate::HashType;
 use crate::PrimitiveHashType;
+
+#[cfg(feature = "encoding")]
+use crate::encode;
 
 /// Length of the prefix bytes (3)
 pub const HOLO_HASH_PREFIX_LEN: usize = 3;
@@ -153,6 +155,7 @@ impl<T: HashType> HoloHash<T> {
     }
 }
 
+#[cfg(feature = "encoding")]
 impl<T: HashType> HoloHash<T> {
     /// Construct a HoloHash from a 32-byte hash.
     /// The 3 prefix bytes will be added based on the provided HashType,
@@ -177,6 +180,8 @@ impl<P: PrimitiveHashType> HoloHash<P> {
         assert_length!(HOLO_HASH_UNTYPED_LEN, &hash);
         Self::from_raw_36_and_type(hash, P::new())
     }
+
+    #[cfg(feature = "encoding")]
     /// Construct a HoloHash from a prehashed raw 32-byte slice.
     /// The location bytes will be calculated.
     pub fn from_raw_32(hash: Vec<u8>) -> Self {
@@ -245,7 +250,7 @@ fn bytes_to_loc(bytes: &[u8]) -> u32 {
 mod tests {
     use crate::*;
 
-    #[cfg(not(feature = "string-encoding"))]
+    #[cfg(not(feature = "encoding"))]
     fn assert_type<T: HashType>(t: &str, h: HoloHash<T>) {
         assert_eq!(3_688_618_971, h.get_loc());
         assert_eq!(
@@ -255,7 +260,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "string-encoding"))]
+    #[cfg(not(feature = "encoding"))]
     fn test_enum_types() {
         assert_type(
             "DnaHash",
