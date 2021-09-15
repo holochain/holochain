@@ -8,6 +8,51 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Adds experimental feature for one storage agent per space to kitsune tuning params. `gossip_single_storage_arc_per_space`.
 - Adds the ability to lower the synchronous level for the sqlite backend to the conductor config. `db_sync_level`. See [sqlite documentation](https://www.sqlite.org/pragma.html#pragma_synchronous). This allows running on slower HDD but can result in corrupted databases and is not recommended for production or SSDs.
 - Fixes bug where WAL mode was set on every opening connection.
+
+# 20210901.105419
+
+***Note***: The following crates could not be published to crates.io due to build errors:
+
+- hdk_derive-0.0.7
+- hdk-0.0.105
+- holochain_state-0.0.5
+- holochain_conductor_api-0.0.5
+- holochain_cascade-0.0.5",
+- holochain_test_wasm_common-0.0.5
+- holochain-0.0.105
+
+## [holochain-0.0.105](crates/holochain/CHANGELOG.md#0.0.105)
+
+## [holochain\_test\_wasm\_common-0.0.5](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.5)
+
+## [holochain\_cascade-0.0.5](crates/holochain_cascade/CHANGELOG.md#0.0.5)
+
+## [holochain\_cli-0.0.6](crates/holochain_cli/CHANGELOG.md#0.0.6)
+
+## [holochain\_websocket-0.0.5](crates/holochain_websocket/CHANGELOG.md#0.0.5)
+
+## [holochain\_conductor\_api-0.0.5](crates/holochain_conductor_api/CHANGELOG.md#0.0.5)
+
+## [holochain\_state-0.0.5](crates/holochain_state/CHANGELOG.md#0.0.5)
+
+## [holochain\_wasm\_test\_utils-0.0.5](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.5)
+
+## [holochain\_p2p-0.0.5](crates/holochain_p2p/CHANGELOG.md#0.0.5)
+
+## [holochain\_types-0.0.5](crates/holochain_types/CHANGELOG.md#0.0.5)
+
+## [holochain\_keystore-0.0.5](crates/holochain_keystore/CHANGELOG.md#0.0.5)
+
+## [holochain\_sqlite-0.0.5](crates/holochain_sqlite/CHANGELOG.md#0.0.5)
+
+## [kitsune\_p2p-0.0.5](crates/kitsune_p2p/CHANGELOG.md#0.0.5)
+
+## [hdk-0.0.105](crates/hdk/CHANGELOG.md#0.0.105)
+
+## [hdk\_derive-0.0.7](crates/hdk_derive/CHANGELOG.md#0.0.7)
+
+## [holochain\_zome\_types-0.0.7](crates/holochain_zome_types/CHANGELOG.md#0.0.7)
+
 # 20210825.101130
 
 ## [holochain-0.0.104](crates/holochain/CHANGELOG.md#0.0.104)

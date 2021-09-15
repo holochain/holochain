@@ -200,6 +200,13 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     InstalledAppInfo::from_installed_app(&app),
                 ))
             }
+            UninstallApp { installed_app_id } => {
+                self.conductor_handle
+                    .clone()
+                    .uninstall_app(&installed_app_id)
+                    .await?;
+                Ok(AdminResponse::AppUninstalled)
+            }
             ListDnas => {
                 let dna_list = self.conductor_handle.list_dnas().await?;
                 Ok(AdminResponse::DnasListed(dna_list))

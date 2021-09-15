@@ -34,6 +34,7 @@ pub mod properties;
 pub mod signal;
 pub mod timestamp;
 pub mod validate;
+pub mod web_app;
 
 pub mod test_utils;
 
