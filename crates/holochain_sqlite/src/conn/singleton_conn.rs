@@ -11,7 +11,7 @@ use std::{
     sync::Arc,
 };
 
-use super::initialize_connection;
+use super::{initialize_connection, DbSyncLevel};
 
 lazy_static! {
     pub(crate) static ref CONNECTIONS: RwLock<HashMap<PathBuf, SConn>> =
@@ -32,7 +32,7 @@ impl SConn {
     /// Create a new connection with decryption key set
     pub fn open(path: &Path, kind: &DbKind) -> DatabaseResult<Self> {
         let mut conn = Connection::open(path)?;
-        initialize_connection(&mut conn, kind, true)?;
+        initialize_connection(&mut conn, kind, DbSyncLevel::default(), true)?;
         Ok(Self::new(conn, kind.clone()))
     }
 

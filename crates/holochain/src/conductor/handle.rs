@@ -393,6 +393,9 @@ pub struct ConductorHandleImpl<DS: DnaStore + 'static> {
     /// The database for storing p2p MetricDatum(s)
     pub(super) p2p_metrics_env: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
 
+    /// Database sync level
+    pub(super) db_sync_level: DbSyncLevel,
+
     // Testing:
     #[cfg(any(test, feature = "test_utils"))]
     /// All conductors should skip publishing.
@@ -764,8 +767,14 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             (root_env_dir, keystore)
         };
         // Run genesis on cells.
-        crate::conductor::conductor::genesis_cells(root_env_dir, keystore, cells, self.clone())
-            .await?;
+        crate::conductor::conductor::genesis_cells(
+            root_env_dir,
+            keystore,
+            cells,
+            self.clone(),
+            self.db_sync_level,
+        )
+        .await?;
 
         {
             let mut conductor = self.conductor.write().await;
@@ -802,6 +811,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 .map(|(c, p)| (c.as_id().clone(), p.clone()))
                 .collect(),
             self.clone(),
+            self.db_sync_level,
         )
         .await?;
 
@@ -867,6 +877,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             keystore,
             cells_to_create,
             self.clone(),
+            self.db_sync_level,
         )
         .await?;
 
@@ -1343,26 +1354,38 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
 
     pub(super) fn p2p_env(&self, space: Arc<KitsuneSpace>) -> EnvWrite {
         let mut p2p_env = self.p2p_env.lock();
+        let db_sync_level = self.db_sync_level;
         p2p_env
             .entry(space.clone())
             .or_insert_with(move || {
                 let root_env_dir = self.root_env_dir.as_ref();
                 let keystore = self.keystore.clone();
-                EnvWrite::open(root_env_dir, DbKind::P2pAgentStore(space), keystore)
-                    .expect("failed to open p2p_agent_store database")
+                EnvWrite::open_with_sync_level(
+                    root_env_dir,
+                    DbKind::P2pAgentStore(space),
+                    keystore,
+                    db_sync_level,
+                )
+                .expect("failed to open p2p_agent_store database")
             })
             .clone()
     }
 
     pub(super) fn p2p_metrics_env(&self, space: Arc<KitsuneSpace>) -> EnvWrite {
         let mut p2p_metrics_env = self.p2p_metrics_env.lock();
+        let db_sync_level = self.db_sync_level;
         p2p_metrics_env
             .entry(space.clone())
             .or_insert_with(move || {
                 let root_env_dir = self.root_env_dir.as_ref();
                 let keystore = self.keystore.clone();
-                EnvWrite::open(root_env_dir, DbKind::P2pMetrics(space), keystore)
-                    .expect("failed to open p2p_metrics database")
+                EnvWrite::open_with_sync_level(
+                    root_env_dir,
+                    DbKind::P2pMetrics(space),
+                    keystore,
+                    db_sync_level,
+                )
+                .expect("failed to open p2p_metrics database")
             })
             .clone()
     }

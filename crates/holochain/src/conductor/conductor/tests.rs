@@ -36,6 +36,7 @@ async fn can_update_state() {
         keystore,
         envs.path().to_path_buf().into(),
         holochain_p2p,
+        DbSyncLevel::default(),
     )
     .await
     .unwrap();
@@ -82,6 +83,7 @@ async fn can_add_clone_cell_to_app() {
         keystore,
         envs.path().to_path_buf().into(),
         holochain_p2p,
+        DbSyncLevel::default(),
     )
     .await
     .unwrap();
@@ -145,6 +147,7 @@ async fn app_ids_are_unique() {
         environments.keystore().clone(),
         environments.path().to_path_buf().into(),
         holochain_p2p,
+        DbSyncLevel::default(),
     )
     .await
     .unwrap();

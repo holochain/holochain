@@ -1,6 +1,7 @@
 #![deny(missing_docs)]
 //! This module is used to configure the conductor
 
+use holochain_types::env::DbSyncLevel;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
@@ -57,6 +58,12 @@ pub struct ConductorConfig {
 
     /// Config options for the network module. Optional.
     pub network: Option<holochain_p2p::kitsune_p2p::KitsuneP2pConfig>,
+
+    #[serde(default)]
+    /// Override the default database synchronous level.
+    /// See [sqlite documentation](https://www.sqlite.org/pragma.html#pragma_synchronous).
+    /// Warning: Using `Off` level could result in database corruption that cannot be recovered from.
+    pub db_sync_level: DbSyncLevel,
     //
     //
     // /// Which signals to emit
@@ -132,6 +139,7 @@ pub mod tests {
                 keystore_path: None,
                 admin_interfaces: None,
                 use_dangerous_test_keystore: false,
+                db_sync_level: DbSyncLevel::default(),
             }
         );
     }
@@ -180,6 +188,9 @@ pub mod tests {
         proxy_keepalive_ms: 42
         proxy_to_expire_ms: 42
       network_type: quic_bootstrap
+    
+    db_sync_level: 
+        - type: off
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
         use holochain_p2p::kitsune_p2p::*;
@@ -223,6 +234,7 @@ pub mod tests {
                     driver: InterfaceDriver::Websocket { port: 1234 }
                 }]),
                 network: Some(network_config),
+                db_sync_level: DbSyncLevel::Off,
             }
         );
     }
@@ -251,6 +263,7 @@ pub mod tests {
                 keystore_path: Some(PathBuf::from("/path/to/keystore").into()),
                 admin_interfaces: None,
                 use_dangerous_test_keystore: true,
+                db_sync_level: DbSyncLevel::default(),
             }
         );
     }

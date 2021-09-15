@@ -5,7 +5,9 @@ This file conveniently consolidates all of the crates individual CHANGELOG.md fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 # \[Unreleased\]
-- Adds experimental feature for one storage agent per space.
+- Adds experimental feature for one storage agent per space to kitsune tuning params. `gossip_single_storage_arc_per_space`.
+- Adds the ability to lower the synchronous level for the sqlite backend to the conductor config. `db_sync_level`. See [sqlite documentation](https://www.sqlite.org/pragma.html#pragma_synchronous). This allows running on slower HDD but can result in corrupted databases and is not recommended for production or SSDs.
+- Fixes bug where WAL mode was set on every opening connection.
 # 20210825.101130
 
 ## [holochain-0.0.104](crates/holochain/CHANGELOG.md#0.0.104)

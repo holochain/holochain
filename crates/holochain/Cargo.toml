@@ -149,8 +149,3 @@ db-encryption = ['holochain_sqlite/db-encryption']
 # Compile SQLite from source rather than depending on a library.
 # Incompatible with "db-encryption"
 no-deps = ['holochain_sqlite/no-deps']
-
-# An experimental feature that enables only one cell to gossip 
-# per dna space. This should not be used in production unless 
-# you know what you're doing.
-space_gossip = ['holochain_p2p/space_gossip']

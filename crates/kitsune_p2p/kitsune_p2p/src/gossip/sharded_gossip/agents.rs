@@ -73,20 +73,10 @@ impl ShardedGossipLocal {
     }
 }
 
-// #[cfg(feature = "space_gossip")]
 async fn get_agent_info(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
-    _arc_set: Arc<DhtArcSet>,
+    arc_set: Arc<DhtArcSet>,
 ) -> KitsuneResult<impl Iterator<Item = AgentInfoSigned>> {
-    Ok(store::all_agent_info(evt_sender, space).await?.into_iter())
+    store::agent_info_within_arc_set(evt_sender, space, arc_set).await
 }
-
-// #[cfg(not(feature = "space_gossip"))]
-// async fn get_agent_info(
-//     evt_sender: &EventSender,
-//     space: &Arc<KitsuneSpace>,
-//     arc_set: Arc<DhtArcSet>,
-// ) -> KitsuneResult<impl Iterator<Item = AgentInfoSigned>> {
-//     store::agent_info_within_arc_set(evt_sender, space, arc_set).await
-// }

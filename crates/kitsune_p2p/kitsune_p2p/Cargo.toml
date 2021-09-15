@@ -5,15 +5,15 @@ description = "p2p / dht communication framework"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://github.com/holochain/holochain"
-authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
-keywords = [ "holochain", "holo", "p2p", "dht", "networking" ]
-categories = [ "network-programming" ]
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+keywords = ["holochain", "holo", "p2p", "dht", "networking"]
+categories = ["network-programming"]
 edition = "2018"
 
 [dependencies]
 arrayref = "0.3.6"
 base64 = "0.13"
-bloomfilter = { version = "1.0.5", features = [ "serde" ] }
+bloomfilter = { version = "1.0.5", features = ["serde"] }
 derive_more = "0.99.11"
 futures = "0.3"
 ghost_actor = "=0.3.0-alpha.4"
@@ -29,18 +29,18 @@ parking_lot = "0.11.1"
 rand = "0.7"
 shrinkwraprs = "0.3.0"
 thiserror = "1.0.22"
-tokio = { version = "1.11", features = [ "full" ] }
+tokio = { version = "1.11", features = ["full"] }
 tokio-stream = "0.1"
 url2 = "0.0.6"
-serde = { version = "1.0", features = [ "derive" ] }
+serde = { version = "1.0", features = ["derive"] }
 serde_bytes = "0.11"
 reqwest = "0.11.2"
 once_cell = "1.4.1"
-fixt = { path = "../../fixt", version = "0.0.5"}
+fixt = { path = "../../fixt", version = "0.0.5" }
 observability = "0.1.3"
 
 # arbitrary could be made optional
-arbitrary = { version = "1.0", features = ["derive"]}
+arbitrary = { version = "1.0", features = ["derive"] }
 
 [dev-dependencies]
 maplit = "1"
@@ -56,7 +56,3 @@ test_utils = [
   "kitsune_p2p_types/test_utils",
   "mockall",
 ]
-# An experimental feature that enables only one cell to gossip 
-# per dna space. This should not be used in production unless 
-# you know what you're doing.
-space_gossip = []

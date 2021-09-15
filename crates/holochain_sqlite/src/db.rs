@@ -1,7 +1,7 @@
 //! Functions dealing with obtaining and referencing singleton databases
 
 use crate::{
-    conn::{new_connection_pool, ConnectionPool, PConn, DATABASE_HANDLES},
+    conn::{new_connection_pool, ConnectionPool, DbSyncLevel, PConn, DATABASE_HANDLES},
     prelude::*,
 };
 use derive_more::Into;
@@ -81,17 +81,28 @@ pub struct DbWrite(DbRead);
 impl DbWrite {
     /// Create or open an existing database reference,
     pub fn open(path_prefix: &Path, kind: DbKind) -> DatabaseResult<DbWrite> {
+        Self::open_with_sync_level(path_prefix, kind, DbSyncLevel::default())
+    }
+    pub fn open_with_sync_level(
+        path_prefix: &Path,
+        kind: DbKind,
+        sync_level: DbSyncLevel,
+    ) -> DatabaseResult<DbWrite> {
         let path = path_prefix.join(kind.filename());
         if let Some(v) = DATABASE_HANDLES.get(&path) {
             Ok(v.clone())
         } else {
-            let db = Self::new(path_prefix, kind)?;
+            let db = Self::new(path_prefix, kind, sync_level)?;
             DATABASE_HANDLES.insert_new(path, db.clone());
             Ok(db)
         }
     }
 
-    pub(crate) fn new(path_prefix: &Path, kind: DbKind) -> DatabaseResult<Self> {
+    pub(crate) fn new(
+        path_prefix: &Path,
+        kind: DbKind,
+        sync_level: DbSyncLevel,
+    ) -> DatabaseResult<Self> {
         let path = path_prefix.join(kind.filename());
         let parent = path
             .parent()
@@ -100,7 +111,7 @@ impl DbWrite {
             std::fs::create_dir_all(parent)
                 .map_err(|_e| DatabaseError::DatabaseMissing(parent.to_owned()))?;
         }
-        let pool = new_connection_pool(&path, kind.clone());
+        let pool = new_connection_pool(&path, kind.clone(), sync_level);
         let mut conn = pool.get()?;
         // set to faster write-ahead-log mode
         conn.pragma_update(None, "journal_mode", &"WAL".to_string())?;
@@ -147,7 +158,7 @@ impl DbWrite {
     /// connection pool, useful for testing.
     #[cfg(any(test, feature = "test_utils"))]
     pub fn test(tmpdir: &tempdir::TempDir, kind: DbKind) -> DatabaseResult<Self> {
-        Self::new(tmpdir.path(), kind)
+        Self::new(tmpdir.path(), kind, DbSyncLevel::default())
     }
 
     /// Remove the db and directory
