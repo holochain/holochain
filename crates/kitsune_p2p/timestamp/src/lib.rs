@@ -214,18 +214,7 @@ impl Timestamp {
         Some(chrono::Duration::microseconds(self.0.checked_sub(rhs.0)?))
     }
 
-    /// Add a signed chrono::Duration{ secs: i64, nanos: i32 } (negative nanos are invalid) to a
-    /// Timestamp( i64, u32 ).  May overflow.  Unfortunately, there is *no way* in the provided API
-    /// to actually obtain the raw { secs, nanos }, nor their component parts without overflow!  The
-    /// closest is to obtain the millis, subtract them out and obtain the residual nanoseconds...
-    ///
-    /// ```
-    /// use holochain_zome_types::prelude::*;
-    ///
-    /// assert_eq!( Timestamp::normalize( 0, 1 ).unwrap()
-    ///                 .checked_sub_signed(&chrono::Duration::nanoseconds(2)),
-    ///             Some(Timestamp( -1, 999_999_999 )));
-    /// ```
+    /// Add a signed chrono::Duration{ secs: i64, nanos: i32 } to a Timestamp.
     pub fn checked_add_signed(&self, rhs: &chrono::Duration) -> Option<Timestamp> {
         Some(Self(self.0.checked_add(rhs.num_microseconds()?)?))
     }
@@ -237,22 +226,6 @@ impl Timestamp {
 
     /// Add unsigned core::time::Duration{ secs: u64, nanos: u32 } to a Timestamp.  See:
     /// https://doc.rust-lang.org/src/core/time.rs.html#53-56
-    /// ```
-    /// use holochain_zome_types::prelude::*;
-    ///
-    /// assert_eq!( Timestamp::normalize( 0, -3 ).unwrap()
-    ///                 .checked_add(&core::time::Duration::from_nanos(2)),
-    ///             Some(Timestamp( -1, 999_999_999 )));
-    /// assert_eq!( Timestamp::normalize( 0, 0 ).unwrap()
-    ///                 .checked_add(&core::time::Duration::from_secs(2_u64.pow(32)-1)),
-    ///             Some(Timestamp( 2_i64.pow(32)-1, 0 )));
-    /// assert_eq!( Timestamp::normalize( 0, 0 ).unwrap()
-    ///                 .checked_add(&core::time::Duration::from_secs(2_u64.pow(63)-1)),
-    ///             Some(Timestamp( (2_u64.pow(63)-1) as i64, 0 )));
-    /// assert_eq!( Timestamp::normalize( 0, 0 ).unwrap()
-    ///                 .checked_add(&core::time::Duration::from_secs(2_u64.pow(63))),
-    ///             None);
-    /// ```
     pub fn checked_add(&self, rhs: &core::time::Duration) -> Option<Timestamp> {
         let micros = rhs.as_micros();
         if micros <= i64::MAX as u128 {
@@ -263,19 +236,6 @@ impl Timestamp {
     }
 
     /// Sub unsigned core::time::Duration{ secs: u64, nanos: u32 } from a Timestamp.
-    /// ```
-    /// use holochain_zome_types::prelude::*;
-    ///
-    /// assert_eq!( Timestamp::normalize( 0, 1 ).unwrap()
-    ///                 .checked_sub(&core::time::Duration::from_nanos(2)),
-    ///             Some(Timestamp( -1, 999_999_999 )));
-    /// assert_eq!((Timestamp::normalize( 0, 1 ).unwrap()
-    ///             - core::time::Duration::from_nanos(2)),
-    ///             Ok(Timestamp( -1, 999_999_999 )));
-    /// assert_eq!( Timestamp::normalize( 550, 5_500_000_000 ).unwrap()
-    ///                 .checked_sub(&core::time::Duration::from_nanos(2)),
-    ///             Some(Timestamp( 555, 499_999_998 )));
-    /// ```
     pub fn checked_sub(&self, rhs: &core::time::Duration) -> Option<Timestamp> {
         let micros = rhs.as_micros();
         if micros <= i64::MAX as u128 {
@@ -330,7 +290,6 @@ impl rusqlite::types::FromSql for Timestamp {
             // NB: if you have a NULLable Timestamp field in a DB, use `Option<Timestamp>`.
             //     otherwise, you'll get an InvalidType error, because we don't handle null
             //     values here.
-            // rusqlite::types::ValueRef::Null => Ok(Self::from_micros(0)),
             rusqlite::types::ValueRef::Integer(i) => Ok(Self::from_micros(i)),
             _ => Err(rusqlite::types::FromSqlError::InvalidType),
         }

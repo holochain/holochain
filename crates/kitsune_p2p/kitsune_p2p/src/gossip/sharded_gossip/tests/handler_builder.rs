@@ -84,7 +84,7 @@ impl HandlerBuilder {
                 let QueryOpHashesEvt {
                     space: _,
                     agents,
-                    window_ms,
+                    window,
                     max_ops,
                     include_limbo: _,
                 } = arg;
@@ -98,7 +98,7 @@ impl HandlerBuilder {
                             Some(
                                 ops.into_iter()
                                     .filter(|(op, time)| {
-                                        window_ms.contains(time) && arcset.contains(op.get_loc())
+                                        window.contains(time) && arcset.contains(op.get_loc())
                                     })
                                     .collect::<Vec<_>>(),
                             )
@@ -111,7 +111,7 @@ impl HandlerBuilder {
 
                 ops.sort_by_key(|(_, time)| time);
                 ops.dedup();
-                let result: Option<(Vec<Arc<KitsuneOpHash>>, TimeRange)> =
+                let result: Option<(Vec<Arc<KitsuneOpHash>>, TimeWindow)> =
                     if let (Some((_, first)), Some((_, last))) = (ops.first(), ops.last()) {
                         let ops = ops
                             .into_iter()

@@ -44,7 +44,7 @@ use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
-use kitsune_p2p::event::TimeRange;
+use kitsune_p2p::event::TimeWindow;
 use observability::OpenSpanExt;
 use rusqlite::OptionalExtension;
 use std::hash::Hash;
@@ -711,14 +711,14 @@ impl Cell {
     pub(super) async fn handle_query_op_hashes(
         &self,
         dht_arc_set: DhtArcSet,
-        time_range: TimeRange,
+        window: TimeWindow,
         include_limbo: bool,
     ) -> CellResult<Vec<(DhtOpHash, Timestamp)>> {
         let mut results = Vec::new();
 
         // The exclusive window bounds.
-        let start = time_range.start;
-        let end = time_range.end;
+        let start = window.start;
+        let end = window.end;
 
         let full = if include_limbo {
             holochain_sqlite::sql::sql_cell::any::FETCH_OP_HASHES_FULL

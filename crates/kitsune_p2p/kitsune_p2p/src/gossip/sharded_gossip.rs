@@ -65,7 +65,7 @@ struct TimedBloomFilter {
     /// for this time window.
     bloom: Option<BloomFilter>,
     /// The time window for this bloom filter.
-    time: TimeRange,
+    time: TimeWindow,
 }
 
 /// Gossip has two distinct variants which share a lot of similarities but
@@ -360,7 +360,7 @@ impl ShardedGossipLocal {
     const UPPER_HASHES_BOUND: usize = 500;
 
     /// Calculate the time range for a gossip round.
-    fn calculate_time_ranges(&self) -> Vec<TimeRange> {
+    fn calculate_time_ranges(&self) -> Vec<TimeWindow> {
         const NOW: Duration = Duration::from_secs(0);
         const HOUR: Duration = Duration::from_secs(60 * 60);
         const DAY: Duration = Duration::from_secs(60 * 60 * 24);
@@ -684,7 +684,7 @@ impl RoundState {
 
 /// Time range from now into the past.
 /// Start must be < end.
-fn time_range(start: Duration, end: Duration) -> TimeRange {
+fn time_range(start: Duration, end: Duration) -> TimeWindow {
     // TODO: write in terms of chrono::now()
     let now = SystemTime::now();
     let start = now
@@ -712,7 +712,7 @@ pub enum EncodedTimedBloomFilter {
     /// Please send all your ops.
     MissingAllHashes {
         /// The time window that we are missing hashes for.
-        time_window: TimeRange,
+        time_window: TimeWindow,
     },
     /// I have overlap and I have some hashes.
     /// Please send any missing ops.
@@ -720,7 +720,7 @@ pub enum EncodedTimedBloomFilter {
         /// The encoded bloom filter.
         filter: PoolBuf,
         /// The time window these hashes are for.
-        time_window: TimeRange,
+        time_window: TimeWindow,
     },
 }
 

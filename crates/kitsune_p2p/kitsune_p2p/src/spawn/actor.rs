@@ -573,7 +573,7 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
     fn handle_query_op_hashes(
         &mut self,
         input: QueryOpHashesEvt,
-    ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeRange)>> {
+    ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindow)>> {
         Ok(self.evt_sender.query_op_hashes(input))
     }
 
@@ -845,7 +845,7 @@ mockall::mock! {
         fn handle_query_op_hashes(
             &mut self,
             input: QueryOpHashesEvt,
-        ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeRange)>>;
+        ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindow)>>;
 
         fn handle_fetch_op_data(
             &mut self,

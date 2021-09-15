@@ -15,7 +15,7 @@ pub struct QueryOpHashesEvt {
     /// The agents from which to fetch, along with a DhtArcSet to filter by.
     pub agents: Vec<(KAgent, DhtArcSet)>,
     /// The time window to search within.
-    pub window_ms: TimeRange,
+    pub window: TimeWindow,
     /// Maximum number of ops to return.
     pub max_ops: usize,
     /// Include ops that are still in limbo (not yet validated or integrated).
@@ -157,10 +157,10 @@ pub enum MetricQueryAnswer {
 }
 
 /// A range of timestamps, measured in milliseconds
-pub type TimeRange = std::ops::Range<Timestamp>;
+pub type TimeWindow = std::ops::Range<Timestamp>;
 
 /// A time window which covers all of recordable time
-pub fn full_time_range() -> TimeRange {
+pub fn full_time_range() -> TimeWindow {
     Timestamp::MIN..Timestamp::MAX
 }
 type KSpace = Arc<super::KitsuneSpace>;
@@ -209,7 +209,7 @@ ghost_actor::ghost_chan! {
         /// Gather a list of op-hashes from our implementor that meet criteria.
         /// Get the oldest and newest times for ops within a time window and max number of ops.
         // maackle: do we really need to *individually* wrap all these op hashes in Arcs?
-        fn query_op_hashes(input: QueryOpHashesEvt) -> Option<(Vec<KOpHash>, TimeRange)>;
+        fn query_op_hashes(input: QueryOpHashesEvt) -> Option<(Vec<KOpHash>, TimeWindow)>;
 
         /// Gather all op-hash data for a list of op-hashes from our implementor.
         fn fetch_op_data(input: FetchOpDataEvt) -> Vec<(KOpHash, Vec<u8>)>;

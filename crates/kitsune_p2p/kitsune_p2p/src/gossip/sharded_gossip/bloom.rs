@@ -51,7 +51,7 @@ impl ShardedGossipLocal {
         &self,
         local_agents: &HashSet<Arc<KitsuneAgent>>,
         common_arc_set: &Arc<DhtArcSet>,
-        mut search_time_window: TimeRange,
+        mut search_time_window: TimeWindow,
     ) -> KitsuneResult<Vec<TimedBloomFilter>> {
         let mut results = Vec::new();
         loop {
