@@ -44,12 +44,14 @@ impl<T> RwShare<T> {
                     .try_read_recursive_for(std::time::Duration::from_secs(60))
             })
             // Now we are probably at a deadlock or a really long held lock so print an error.
-            .unwrap_or_else(|| {
+            .or_else(|| {
                 tracing::error!(
                     "Failed to get a RwShare read lock for over 120s this could be a dead lock"
                 );
-                self.0.read_recursive()
-            });
+                self.0
+                    .try_read_recursive_for(std::time::Duration::from_secs(180))
+            })
+            .expect("Failed to take a read lock for over 5 minutes this must be a deadlock");
         f(&t)
     }
 
@@ -72,12 +74,13 @@ impl<T> RwShare<T> {
                 self.0.try_write_for(std::time::Duration::from_secs(120))
             })
             // Now we are probably at a deadlock or a really long held lock so print an error.
-            .unwrap_or_else(|| {
+            .or_else(|| {
                 tracing::error!(
                     "Failed to get a RwShare write lock for over 120s this could be a dead lock"
                 );
-                self.0.write()
-            });
+                self.0.try_write_for(std::time::Duration::from_secs(180))
+            })
+            .expect("Failed to take a write lock for over 5 minutes this must be a deadlock");
         f(&mut t)
     }
 }

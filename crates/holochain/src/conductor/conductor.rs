@@ -217,21 +217,17 @@ where
 
     /// Iterator over only the cells which are pending validation. Used to
     /// discover which cells need to be joined to the network.
-    pub(super) fn pending_cells<F, R>(&self, f: F) -> Vec<R>
-    where
-        F: Fn((&CellId, &Cell)) -> R,
-    {
+    pub(super) fn pending_cells(&self) -> Vec<(CellId, Arc<Cell>)> {
         self.cells.share_ref(|cells| {
             cells
                 .iter()
                 .filter_map(|(id, item)| {
                     if item.is_pending() {
-                        Some((id, item.cell.as_ref()))
+                        Some((id.clone(), item.cell.clone()))
                     } else {
                         None
                     }
                 })
-                .map(f)
                 .collect()
         })
     }
@@ -249,18 +245,8 @@ where
         }
     }
 
-    pub(super) fn dna_store<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&DS) -> R,
-    {
-        self.dna_store.share_ref(|dna_store| f(dna_store))
-    }
-
-    pub(super) fn dna_store_mut<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&mut DS) -> R,
-    {
-        self.dna_store.share_mut(|dna_store| f(dna_store))
+    pub(super) fn dna_store(&self) -> &RwShare<DS> {
+        &self.dna_store
     }
 
     /// Broadcasts the shutdown signal to all managed tasks.
@@ -893,9 +879,6 @@ where
                 .collect()
         });
         for (cell_id, item) in to_cleanup {
-            // TODO: make this function async, or ensure that cleanup is fast,
-            //       so we don't hold the conductor lock unduly long while doing cleanup
-            //       (currently cleanup is a noop, so it's not urgent)
             if let Err(err) = item.cell.cleanup().await {
                 tracing::error!("Error cleaning up Cell: {:?}\nCellId: {}", err, cell_id);
             }

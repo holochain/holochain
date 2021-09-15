@@ -468,7 +468,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn load_dnas(&self) -> ConductorResult<()> {
         let (dnas, entry_defs) = self.conductor.load_wasms_into_dna_files().await?;
-        self.conductor.dna_store_mut(|ds| {
+        self.conductor.dna_store().share_mut(|ds| {
             ds.add_dnas(dnas);
             ds.add_entry_defs(entry_defs);
         });
@@ -476,11 +476,11 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     fn list_dnas(&self) -> Vec<DnaHash> {
-        self.conductor.dna_store(|ds| ds.list())
+        self.conductor.dna_store().share_ref(|ds| ds.list())
     }
 
     fn get_dna(&self, hash: &DnaHash) -> Option<DnaFile> {
-        self.conductor.dna_store(|ds| ds.get(hash))
+        self.conductor.dna_store().share_ref(|ds| ds.get(hash))
     }
 
     fn get_ribosome(&self, dna_hash: &DnaHash) -> ConductorResult<RealRibosome> {
@@ -488,7 +488,9 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
-        self.conductor.dna_store(|ds| ds.get_entry_def(key))
+        self.conductor
+            .dna_store()
+            .share_ref(|ds| ds.get_entry_def(key))
     }
 
     #[instrument(skip(self))]
@@ -1234,7 +1236,10 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
 
         let pending_cells: Vec<(CellId, HolochainP2pCell)> = self
             .conductor
-            .pending_cells(|(id, cell)| (id.clone(), cell.holochain_p2p_cell().clone()));
+            .pending_cells()
+            .into_iter()
+            .map(|(id, cell)| (id.clone(), cell.holochain_p2p_cell().clone()))
+            .collect();
 
         let tasks = pending_cells.into_iter()
             .map(|(cell_id, network)| async move {

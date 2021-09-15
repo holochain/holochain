@@ -375,17 +375,12 @@ impl SweetConductor {
     pub async fn force_all_publish_dht_ops(&self) {
         use futures::stream::StreamExt;
         if let Some(handle) = self.handle.as_ref() {
-            let iter = handle
-                .list_cell_ids(None)
-                .await
-                .expect("Failed to list cell ids")
-                .into_iter()
-                .map(|id| async {
-                    let id = id;
-                    let env = self.get_cell_env(&id).await.unwrap();
-                    let trigger = self.get_cell_triggers(&id).await.unwrap();
-                    (env, trigger)
-                });
+            let iter = handle.list_cell_ids(None).into_iter().map(|id| async {
+                let id = id;
+                let env = self.get_cell_env(&id).unwrap();
+                let trigger = self.get_cell_triggers(&id).unwrap();
+                (env, trigger)
+            });
             futures::stream::iter(iter)
                 .then(|f| f)
                 .for_each(|(env, mut triggers)| async move {
