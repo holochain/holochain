@@ -1,3 +1,4 @@
+use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::dht_arc::DhtArc;
 
 use crate::gossip::sharded_gossip::tests::common::dangerous_fake_agent_info_with_arc;
@@ -9,7 +10,7 @@ use super::*;
 
 /// Data which represents the agent store of a backend.
 /// Specifies a list of agents along with their arc and timestamped op hashes held.
-pub type MockAgentPersistence = Vec<(AgentInfoSigned, Vec<(KitsuneOpHash, TimestampMs)>)>;
+pub type MockAgentPersistence = Vec<(AgentInfoSigned, Vec<(KitsuneOpHash, Timestamp)>)>;
 
 /// Build up the functionality of a mock event handler a la carte with these
 /// provided methods
@@ -83,21 +84,21 @@ impl HandlerBuilder {
                 let QueryOpHashesEvt {
                     space: _,
                     agents,
-                    window_ms,
+                    window,
                     max_ops,
                     include_limbo: _,
                 } = arg;
 
                 let agent_arcsets: HashMap<_, _> = agents.into_iter().collect();
 
-                let mut ops: Vec<&(KitsuneOpHash, TimestampMs)> = agent_data
+                let mut ops: Vec<&(KitsuneOpHash, Timestamp)> = agent_data
                     .iter()
                     .filter_map(|(info, ops)| {
                         if let Some(arcset) = agent_arcsets.get(&info.agent) {
                             Some(
                                 ops.into_iter()
                                     .filter(|(op, time)| {
-                                        window_ms.contains(time) && arcset.contains(op.get_loc())
+                                        window.contains(time) && arcset.contains(op.get_loc())
                                     })
                                     .collect::<Vec<_>>(),
                             )
@@ -110,7 +111,7 @@ impl HandlerBuilder {
 
                 ops.sort_by_key(|(_, time)| time);
                 ops.dedup();
-                let result: Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowMs)> =
+                let result: Option<(Vec<Arc<KitsuneOpHash>>, TimeWindow)> =
                     if let (Some((_, first)), Some((_, last))) = (ops.first(), ops.last()) {
                         let ops = ops
                             .into_iter()
@@ -241,7 +242,7 @@ pub fn mock_agent_persistence<'a>(
             let hashes = hash_indices
                 .into_iter()
                 // TODO: `1111` is an arbitrary timestamp placeholder
-                .map(|i| (hashes[*i].clone(), 1111))
+                .map(|i| (hashes[*i].clone(), Timestamp::from_micros(1111)))
                 .collect();
             (
                 dangerous_fake_agent_info_with_arc(
@@ -327,7 +328,7 @@ async fn test_three_way_sharded_ownership() {
                 // Only look at one agent at a time
                 &agent_arcs[a..a + 1],
                 &DhtArcSet::Full,
-                full_time_window(),
+                full_time_range(),
                 usize::MAX,
                 false,
             )

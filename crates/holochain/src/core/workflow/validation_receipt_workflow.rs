@@ -35,13 +35,13 @@ pub async fn validation_receipt_workflow(
                 let mut stmt = txn.prepare(
                     "
             SELECT Header.author, DhtOp.hash, DhtOp.validation_status,
-            DhtOp.when_integrated_ns
+            DhtOp.when_integrated
             From DhtOp
             JOIN Header ON DhtOp.header_hash = Header.hash
             WHERE
             DhtOp.require_receipt = 1
             AND
-            DhtOp.when_integrated_ns IS NOT NULL
+            DhtOp.when_integrated IS NOT NULL
             AND
             DhtOp.validation_status IS NOT NULL
             ",
@@ -51,7 +51,8 @@ pub async fn validation_receipt_workflow(
                         let author: AgentPubKey = r.get("author")?;
                         let dht_op_hash = r.get("hash")?;
                         let validation_status = r.get("validation_status")?;
-                        let when_integrated = from_blob::<Timestamp>(r.get("when_integrated_ns")?)?;
+                        // NB: timestamp will never be null, so this is OK
+                        let when_integrated = r.get("when_integrated")?;
                         StateQueryResult::Ok((
                             ValidationReceipt {
                                 dht_op_hash,

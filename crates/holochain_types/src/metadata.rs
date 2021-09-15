@@ -1,11 +1,9 @@
 //! Types for getting and storing metadata
 
-use crate::timestamp;
-use crate::Timestamp;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 pub use holochain_zome_types::metadata::EntryDhtStatus;
-use holochain_zome_types::HeaderHashed;
+use holochain_zome_types::{HeaderHashed, Timestamp};
 use std::collections::BTreeSet;
 
 /// Timestamp of when the header was created with the headers hash.
@@ -50,7 +48,7 @@ impl From<HeaderHashed> for TimedHeaderHash {
 impl From<HeaderHash> for TimedHeaderHash {
     fn from(h: HeaderHash) -> Self {
         TimedHeaderHash {
-            timestamp: timestamp::now(),
+            timestamp: Timestamp::now(),
             header_hash: h,
         }
     }

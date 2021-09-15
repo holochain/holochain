@@ -22,14 +22,13 @@ pub async fn integrate_dht_ops_workflow(
     mut trigger_receipt: TriggerSender,
     cell_network: HolochainP2pCell,
 ) -> WorkflowResult<WorkComplete> {
-    let time = holochain_types::timestamp::now();
+    let time = holochain_zome_types::Timestamp::now();
     let changed = vault
         .async_commit(move |txn| {
             let changed = txn
                 .prepare_cached(holochain_sqlite::sql::sql_cell::UPDATE_INTEGRATE_OPS)?
                 .execute(named_params! {
                     ":when_integrated": time,
-                    ":when_integrated_ns": to_blob(time)?,
                     ":store_entry": DhtOpType::StoreEntry,
                     ":store_element": DhtOpType::StoreElement,
                     ":register_activity": DhtOpType::RegisterAgentActivity,

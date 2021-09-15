@@ -935,11 +935,11 @@ async fn handle_gossip(
 async fn handle_query_op_hashes(
     kdirect: Arc<Kd1>,
     input: QueryOpHashesEvt,
-) -> KdResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowMs)>> {
+) -> KdResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindow)>> {
     let QueryOpHashesEvt {
         space,
         agents,
-        window_ms,
+        window,
         max_ops,
         include_limbo: _,
     } = input;
@@ -956,7 +956,7 @@ async fn handle_query_op_hashes(
         let agent = KdHash::from_kitsune_agent(&agent);
         let es = kdirect
             .persist
-            .query_entries(root.clone(), agent, window_ms.clone(), arcset)
+            .query_entries(root.clone(), agent, window.clone(), arcset)
             .await?;
         entries.extend(es.into_iter());
     }
@@ -969,7 +969,7 @@ async fn handle_query_op_hashes(
     entries.dedup();
 
     // TODO: produce proper time window of actual data returned
-    Ok(Some((entries, window_ms)))
+    Ok(Some((entries, window)))
 }
 
 async fn handle_fetch_op_data(

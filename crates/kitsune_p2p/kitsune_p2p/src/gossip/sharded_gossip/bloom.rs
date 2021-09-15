@@ -1,5 +1,3 @@
-use std::ops::Range;
-
 use super::*;
 
 impl ShardedGossipLocal {
@@ -50,7 +48,7 @@ impl ShardedGossipLocal {
         &self,
         local_agents: &HashSet<Arc<KitsuneAgent>>,
         common_arc_set: &Arc<DhtArcSet>,
-        mut search_time_window: Range<u64>,
+        mut search_time_window: TimeWindow,
     ) -> KitsuneResult<Vec<TimedBloomFilter>> {
         let mut results = Vec::new();
         loop {
@@ -115,8 +113,10 @@ impl ShardedGossipLocal {
                 };
                 // Adjust the search window to search the remaining time window.
                 // Include the end of the last time bound.
-                search_time_window =
-                    found_time_window.end.saturating_sub(1)..search_time_window.end;
+                search_time_window = found_time_window
+                    .end
+                    .saturating_sub(&Duration::from_micros(1))
+                    ..search_time_window.end;
                 results.push(bloom);
             } else {
                 let bloom = TimedBloomFilter {

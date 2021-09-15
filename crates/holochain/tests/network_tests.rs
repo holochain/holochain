@@ -576,7 +576,7 @@ async fn generate_fixt_store() -> (
     meta_store.insert(
         entry_hash.into(),
         TimedHeaderHash {
-            timestamp: timestamp::now(),
+            timestamp: Timestamp::now(),
             header_hash: hash.clone(),
         },
     );
