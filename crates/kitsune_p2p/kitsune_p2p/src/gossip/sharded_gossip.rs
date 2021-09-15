@@ -594,7 +594,9 @@ impl ShardedGossipLocal {
             return Ok(false);
         }
         let update_last_sync = |i: &mut ShardedGossipLocalState, _: &mut bool| {
-            if i.trigger_local_sync {
+            if i.local_agents.len() < 2 {
+                Ok(false)
+            } else if i.trigger_local_sync {
                 // We are force triggering a local sync.
                 i.trigger_local_sync = false;
                 i.last_local_sync = Some(std::time::Instant::now());
