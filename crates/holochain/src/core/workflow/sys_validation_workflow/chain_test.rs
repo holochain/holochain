@@ -60,7 +60,7 @@ async fn run_test(alice_cell_id: CellId, handle: ConductorHandle) {
     wait_for_integration(&alice_env, 7, 100, Duration::from_millis(100)).await;
 
     let source_chain = SourceChain::new(alice_env.clone().into()).unwrap();
-    let mut timestamp = timestamp::now();
+    let mut timestamp = Timestamp::now();
 
     // Create the headers
     let mut h1 = fixt!(Create);

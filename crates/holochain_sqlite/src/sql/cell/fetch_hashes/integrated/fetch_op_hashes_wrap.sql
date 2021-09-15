@@ -3,8 +3,8 @@ SELECT
 FROM
   DHtOp
 WHERE
-  DhtOp.authored_timestamp_ms >= :from
-  AND DhtOp.authored_timestamp_ms < :to
+  DhtOp.authored_timestamp >= :from
+  AND DhtOp.authored_timestamp < :to
   AND storage_center_loc >= :storage_start_1
   AND storage_center_loc <= :storage_end_1
   AND DhtOp.when_integrated IS NOT NULL
@@ -15,8 +15,8 @@ SELECT
 FROM
   DHtOp
 WHERE
-  DhtOp.authored_timestamp_ms >= :from
-  AND DhtOp.authored_timestamp_ms < :to
+  DhtOp.authored_timestamp >= :from
+  AND DhtOp.authored_timestamp < :to
   AND storage_center_loc >= :storage_start_2
   AND storage_center_loc <= :storage_end_2
   AND DhtOp.when_integrated IS NOT NULL
