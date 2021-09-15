@@ -155,7 +155,7 @@ impl<T: HashType> HoloHash<T> {
     }
 }
 
-#[cfg(feature = "encoding")]
+#[cfg(feature = "hashing")]
 impl<T: HashType> HoloHash<T> {
     /// Construct a HoloHash from a 32-byte hash.
     /// The 3 prefix bytes will be added based on the provided HashType,
@@ -181,7 +181,7 @@ impl<P: PrimitiveHashType> HoloHash<P> {
         Self::from_raw_36_and_type(hash, P::new())
     }
 
-    #[cfg(feature = "encoding")]
+    #[cfg(feature = "hashing")]
     /// Construct a HoloHash from a prehashed raw 32-byte slice.
     /// The location bytes will be calculated.
     pub fn from_raw_32(hash: Vec<u8>) -> Self {
