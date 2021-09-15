@@ -14,6 +14,30 @@ pub use hash::*;
 pub use hash_type::HashType;
 pub use hash_type::PrimitiveHashType;
 
+// feature: serialization (enabled by default)
+// (serde, SerializedBytes)
+
+#[cfg(feature = "serialization")]
+mod hashed;
+#[cfg(feature = "serialization")]
+pub use hashed::*;
+
+#[cfg(feature = "serialization")]
+mod hashable_content;
+#[cfg(feature = "serialization")]
+pub use hashable_content::*;
+
+#[cfg(feature = "serialization")]
+mod ser;
+
+#[cfg(feature = "serialization")]
+/// A convenience type, for specifying a hash by HashableContent rather than
+/// by its HashType
+pub type HoloHashOf<C> = HoloHash<<C as HashableContent>::HashType>;
+
+// feature: encoding
+// (string encoding)
+
 #[cfg(feature = "encoding")]
 pub use encode::{holo_hash_decode, holo_hash_decode_unchecked, holo_hash_encode};
 
@@ -30,27 +54,16 @@ mod hash_b64;
 #[cfg(feature = "encoding")]
 pub use hash_b64::*;
 
-#[cfg(feature = "fixturators")]
-pub mod fixt;
+// feature: hashing
+// (blake2b hashing for hash generation and DHT location calculation)
 
 #[cfg(feature = "hashing")]
 mod hash_ext;
 
 #[cfg(feature = "hashing")]
-mod hashable_content;
-#[cfg(feature = "hashing")]
-mod hashed;
-#[cfg(feature = "serialization")]
-mod ser;
-
-#[cfg(feature = "hashing")]
 pub use hash_ext::*;
-#[cfg(feature = "hashing")]
-pub use hashable_content::*;
-#[cfg(feature = "hashing")]
-pub use hashed::*;
 
-/// A convenience type, for specifying a hash by HashableContent rather than
-/// by its HashType
-#[cfg(feature = "hashing")]
-pub type HoloHashOf<C> = HoloHash<<C as HashableContent>::HashType>;
+// feature: fixturators
+// provides fixturators for all hash types
+#[cfg(feature = "fixturators")]
+pub mod fixt;
