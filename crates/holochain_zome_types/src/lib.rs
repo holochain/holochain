@@ -80,6 +80,14 @@ pub mod dependencies {
 }
 use holochain_wasmer_common::WasmError;
 
+#[cfg(feature = "hashing")]
+pub(crate) mod hashing {
+    pub(crate) use holo_hash::impl_hashable_content;
+    pub(crate) use holo_hash::HashableContent;
+    pub(crate) use holo_hash::HashableContentBytes;
+    pub(crate) use holo_hash::HoloHashed;
+}
+
 #[allow(missing_docs)]
 pub trait CallbackResult: Sized {
     /// if a callback result is definitive we should halt any further iterations over remaining

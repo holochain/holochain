@@ -13,8 +13,6 @@ use crate::header::ChainTopOrdering;
 use holo_hash::hash_type;
 use holo_hash::AgentPubKey;
 use holo_hash::EntryHash;
-use holo_hash::HashableContent;
-use holo_hash::HashableContentBytes;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 
@@ -37,8 +35,13 @@ pub type CapGrantEntry = ZomeCallCapGrant;
 pub type CapClaimEntry = CapClaim;
 
 /// An Entry paired with its EntryHash
+#[cfg(feature = "hashing")]
 pub type EntryHashed = holo_hash::HoloHashed<Entry>;
 
+#[cfg(feature = "hashing")]
+use crate::hashing::*;
+
+#[cfg(feature = "hashing")]
 impl From<EntryHashed> for Entry {
     fn from(entry_hashed: EntryHashed) -> Self {
         entry_hashed.into_content()

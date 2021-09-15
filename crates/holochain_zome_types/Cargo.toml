@@ -58,9 +58,11 @@ default = ["full-dna-def", "fixturators", "test_utils", "subtle-encoding"]
 # but used in Holochain
 full-dna-def = ["derive_builder", "nanoid", "shrinkwraprs"]
 
-full = ["default", "rusqlite", "num_enum"]
+full = ["default", "rusqlite", "num_enum", "hashing"]
 
 fixturators = ["fixt", "rand", "strum", "holo_hash/fixturators", ]
+
+hashing = ["holo_hash/hashing"]
 
 test_utils = [
   "arbitrary",

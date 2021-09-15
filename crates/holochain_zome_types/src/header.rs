@@ -3,13 +3,14 @@ use crate::link::LinkTag;
 use crate::timestamp::Timestamp;
 pub use builder::HeaderBuilder;
 pub use builder::HeaderBuilderCommon;
-use holo_hash::impl_hashable_content;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holo_hash::EntryHash;
-use holo_hash::HashableContent;
 use holo_hash::HeaderHash;
+
+#[cfg(feature = "hashing")]
 use holo_hash::HoloHashed;
+
 use holochain_serialized_bytes::prelude::*;
 
 #[cfg(feature = "rusqlite")]
@@ -46,9 +47,11 @@ impl From<Vec<HeaderHash>> for HeaderHashes {
     }
 }
 
+#[cfg(feature = "hashing")]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub struct HeaderHashedVec(pub Vec<HeaderHashed>);
 
+#[cfg(feature = "hashing")]
 impl From<Vec<HeaderHashed>> for HeaderHashedVec {
     fn from(vs: Vec<HeaderHashed>) -> Self {
         Self(vs)
@@ -250,7 +253,8 @@ impl Header {
     }
 }
 
-impl_hashable_content!(Header, Header);
+#[cfg(feature = "hashing")]
+impl_holo_hash::hashable_content!(Header, Header);
 
 /// this id is an internal reference, which also serves as a canonical ordering
 /// for zome initialization.  The value should be auto-generated from the Zome Bundle def

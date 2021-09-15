@@ -55,3 +55,7 @@ pub use hashed::*;
 /// by its HashType
 #[cfg(feature = "serialized-bytes")]
 pub type HoloHashOf<C> = HoloHash<<C as HashableContent>::HashType>;
+
+/// Common types used by other crytes.
+/// TODO:  consider moving this to holochain_zome_types
+pub mod types;

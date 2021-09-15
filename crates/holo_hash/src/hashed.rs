@@ -1,32 +1,9 @@
-use crate::HasHash;
+use crate::types::*;
 use crate::HashableContent;
 use crate::HoloHashOf;
-use holochain_serialized_bytes::prelude::*;
 
 #[cfg(feature = "arbitrary")]
 use crate::PrimitiveHashType;
-
-/// Represents some piece of content along with its hash representation, so that
-/// hashes need not be calculated multiple times.
-/// Provides an easy constructor which consumes the content.
-// TODO: consider making lazy with OnceCell
-#[derive(Debug, Serialize, Deserialize)]
-pub struct HoloHashed<C: HashableContent> {
-    /// Whatever type C is as data.
-    pub(crate) content: C,
-    /// The hash of the content C.
-    pub(crate) hash: HoloHashOf<C>,
-}
-
-impl<C: HashableContent> HasHash<C::HashType> for HoloHashed<C> {
-    fn as_hash(&self) -> &HoloHashOf<C> {
-        &self.hash
-    }
-
-    fn into_hash(self) -> HoloHashOf<C> {
-        self.hash
-    }
-}
 
 #[cfg(feature = "arbitrary")]
 impl<'a, C> arbitrary::Arbitrary<'a> for HoloHashed<C>

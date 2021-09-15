@@ -159,11 +159,8 @@ impl<T: HashType> HoloHash<T> {
     ///
     /// For convenience, 36 bytes can also be passed in, in which case
     /// the location bytes will used as provided, not computed.
-    pub fn from_raw_32_and_type(hash: Vec<u8>, hash_type: T) -> Self {
-        #[cfg(feature = "serialized-bytes")]
-        let mut hash = hash;
-
-        #[cfg(feature = "serialized-bytes")]
+    #[cfg(feature = "serialized-bytes")]
+    pub fn from_raw_32_and_type(mut hash: Vec<u8>, hash_type: T) -> Self {
         if hash.len() == HOLO_HASH_CORE_LEN {
             hash.append(&mut crate::encode::holo_dht_location_bytes(&hash));
         }
@@ -182,6 +179,7 @@ impl<P: PrimitiveHashType> HoloHash<P> {
     }
     /// Construct a HoloHash from a prehashed raw 32-byte slice.
     /// The location bytes will be calculated.
+    #[cfg(feature = "serialized-bytes")]
     pub fn from_raw_32(hash: Vec<u8>) -> Self {
         Self::from_raw_32_and_type(hash, P::new())
     }

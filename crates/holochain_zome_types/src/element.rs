@@ -4,16 +4,19 @@ use crate::entry_def::EntryVisibility;
 use crate::header::conversions::WrongHeaderError;
 use crate::header::CreateLink;
 use crate::header::DeleteLink;
-use crate::header::HeaderHashed;
 use crate::signature::Signature;
 use crate::Entry;
 use crate::Header;
 use holo_hash::hash_type;
 use holo_hash::HasHash;
-use holo_hash::HashableContent;
-use holo_hash::HashableContentBytes;
 use holo_hash::HeaderHash;
-use holo_hash::HoloHashed;
+
+#[cfg(feature = "hashing")]
+use crate::header::HeaderHashed;
+
+#[cfg(feature = "hashing")]
+use crate::hashing::*;
+
 use holochain_serialized_bytes::prelude::*;
 
 #[cfg(feature = "test_utils")]
@@ -97,6 +100,7 @@ impl Element {
     }
 
     /// Access the HeaderHashed from this element's signed header portion
+    #[cfg(feature = "hashing")]
     pub fn header_hashed(&self) -> &HeaderHashed {
         self.signed_header.header_hashed()
     }
@@ -203,6 +207,7 @@ impl HashableContent for SignedHeader {
         hash_type::Header
     }
 
+    #[cfg(feature = "hashing")]
     fn hashable_content(&self) -> HashableContentBytes {
         HashableContentBytes::Content(
             (&self.0)
@@ -308,6 +313,7 @@ impl From<SignedHeader> for (Header, Signature) {
     }
 }
 
+#[cfg(feature = "hashing")]
 impl From<HoloHashed<SignedHeader>> for SignedHeaderHashed {
     fn from(hashed: HoloHashed<SignedHeader>) -> SignedHeaderHashed {
         let (signed_header, hash) = hashed.into_inner();
