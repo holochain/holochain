@@ -845,7 +845,7 @@ fn create_crate_tags<'a>(
 ) -> Fallible<()> {
     let existing_tags = tags_to_create
         .iter()
-        .filter_map(|git_tag| crate::crate_selection::git_lookup_tag(ws.git_repo(), &git_tag))
+        .filter_map(|git_tag| crate::crate_selection::git_lookup_tag(ws.git_repo(), git_tag))
         .collect::<Vec<_>>();
 
     if !cmd_args.force_tag_creation && !existing_tags.is_empty() {

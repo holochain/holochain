@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Added the `hc web-app` subcommand, with the exact same behaviour and functionality as `hc dna` and `hc app`.
+
 ## 0.0.4
 
 ## 0.0.3
