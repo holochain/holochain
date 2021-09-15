@@ -33,6 +33,7 @@ pub mod prelude;
 pub mod properties;
 pub mod signal;
 pub mod validate;
+pub mod web_app;
 
 pub mod test_utils;
 
