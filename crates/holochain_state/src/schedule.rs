@@ -48,7 +48,7 @@ pub fn live_scheduled_fns(
         start <= ?
         AND ? <= end",
     )?;
-    let rows = stmt.query_map([now], |row| {
+    let rows = stmt.query_map([now, now], |row| {
         Ok((
             ScheduledFn::new(ZomeName(row.get(0)?), FunctionName(row.get(1)?)),
             row.get(2)?,

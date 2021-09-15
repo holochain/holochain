@@ -662,7 +662,7 @@ pub fn schedule_fn(
     now: Timestamp,
 ) -> StateMutationResult<()> {
     match (fn_is_scheduled(txn, scheduled_fn.clone())?, maybe_schedule) {
-        (_, Some(schedule)) => {
+        (true, Some(schedule)) => {
             let (start, end, ephemeral) = match schedule {
                 Schedule::Persisted(ref schedule_string) => {
                     // If this cron doesn't parse cleanly we don't even want to
@@ -692,7 +692,7 @@ pub fn schedule_fn(
                     )
                 }
                 Schedule::Ephemeral(duration) => (
-                    (holochain_types::timestamp::now() + duration)
+                    (now + duration)
                         .map_err(|e| ScheduleError::Timestamp(e))?
                         .to_sql_ms_lossy(),
                     i64::MAX,
@@ -721,17 +721,19 @@ pub fn schedule_fn(
                 },
             )?;
         }
-        (false, None) => {
+        (false, maybe_schedule) => {
             sql_insert!(txn, ScheduledFunctions, {
                 "zome_name": scheduled_fn.zome_name().to_string(),
-                "maybe_schedule": to_blob::<Option<Schedule>>(None)?,
+                "maybe_schedule": to_blob::<Option<Schedule>>(maybe_schedule)?,
                 "scheduled_fn": scheduled_fn.fn_name().to_string(),
                 "start": 0,
                 "end": i64::MAX,
                 "ephemeral": true,
             })?;
         }
-        _ => {}
+        (true, None) => {
+            // None schedule for an already-scheduled fn is a no-op.
+        }
     };
     Ok(())
 }

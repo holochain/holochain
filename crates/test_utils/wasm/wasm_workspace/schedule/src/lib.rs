@@ -12,7 +12,7 @@ fn scheduled_fn(_: Option<Schedule>) -> Option<Schedule> {
     if create_entry(&Tick).is_err() {
         return Some(Schedule::Ephemeral(std::time::Duration::from_millis(1)));
     }
-    if query(ChainQueryFilter::default().entry_type(entry_type!(Tick).unwrap())).unwrap().len() < TICKS {
+    if hdk::prelude::query(ChainQueryFilter::default().entry_type(entry_type!(Tick).unwrap())).unwrap().len() < TICKS {
         Some(Schedule::Ephemeral(std::time::Duration::from_millis(1)))
     }
     else {
@@ -23,4 +23,9 @@ fn scheduled_fn(_: Option<Schedule>) -> Option<Schedule> {
 #[hdk_extern]
 fn schedule(_: ()) -> ExternResult<()> {
     hdk::prelude::schedule("scheduled_fn")
+}
+
+#[hdk_extern]
+fn query(_: ()) -> ExternResult<Vec<Element>> {
+    hdk::prelude::query(ChainQueryFilter::default().entry_type(entry_type!(Tick).unwrap()))
 }
