@@ -214,7 +214,7 @@ impl SweetConductor {
         let mut sweet_cells = Vec::new();
         for dna_hash in dna_hashes {
             let cell_id = CellId::new(dna_hash, agent.clone());
-            let cell_env = self.handle().0.get_cell_env(&cell_id).await?;
+            let cell_env = self.handle().0.get_cell_env(&cell_id)?;
             let cell = SweetCell { cell_id, cell_env };
             sweet_cells.push(cell);
         }
@@ -319,7 +319,6 @@ impl SweetConductor {
     pub async fn admin_ws_client(&self) -> (WebsocketSender, WebsocketReceiver) {
         let port = self
             .get_arbitrary_admin_websocket_port()
-            .await
             .expect("No admin port open on conductor");
         websocket_client_by_port(port).await.unwrap()
     }
@@ -388,8 +387,8 @@ impl Drop for SweetConductor {
         if let Some(handle) = self.handle.take() {
             tokio::task::spawn(async move {
                 // Shutdown the conductor
-                if let Some(shutdown) = handle.take_shutdown_handle().await {
-                    handle.shutdown().await;
+                if let Some(shutdown) = handle.take_shutdown_handle() {
+                    handle.shutdown();
                     if let Err(e) = shutdown.await {
                         tracing::warn!("Failed to join conductor shutdown task: {:?}", e);
                     }

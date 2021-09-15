@@ -185,7 +185,6 @@ impl Cell {
         // get the dna
         let dna_file = conductor_handle
             .get_dna(id.dna_hash())
-            .await
             .ok_or_else(|| DnaError::DnaMissing(id.dna_hash().to_owned()))?;
 
         let conductor_api = CellConductorApi::new(conductor_handle, id.clone());
@@ -662,13 +661,12 @@ impl Cell {
         let required_receipt_count = match header.as_ref().and_then(|h| h.0.entry_type()) {
             Some(EntryType::App(entry_type)) => {
                 let zome_index = u8::from(entry_type.zome_id()) as usize;
-                let dna_file = self.conductor_api.get_this_dna().await.map_err(Box::new)?;
+                let dna_file = self.conductor_api.get_this_dna().map_err(Box::new)?;
                 let zome = dna_file.dna().zomes.get(zome_index).map(|(_, z)| z.clone());
                 match zome {
                     Some(zome) => self
                         .conductor_api
                         .get_entry_def(&EntryDefBufferKey::new(zome, entry_type.id()))
-                        .await
                         .map(|e| u8::from(e.required_validations)),
                     None => None,
                 }
@@ -955,7 +953,6 @@ impl Cell {
         // get the dna
         let dna_file = conductor_api
             .get_dna(id.dna_hash())
-            .await
             .ok_or_else(|| DnaError::DnaMissing(id.dna_hash().to_owned()))?;
         let dna_def = dna_file.dna_def().clone();
 
@@ -1017,7 +1014,7 @@ impl Cell {
     /// Instantiate a Ribosome for use by this Cell's workflows
     // TODO: reevaluate once Workflows are fully implemented (after B-01567)
     pub(crate) async fn get_ribosome(&self) -> CellResult<RealRibosome> {
-        match self.conductor_api.get_dna(self.dna_hash()).await {
+        match self.conductor_api.get_dna(self.dna_hash()) {
             Some(dna) => Ok(RealRibosome::new(dna)),
             None => Err(DnaError::DnaMissing(self.dna_hash().to_owned()).into()),
         }

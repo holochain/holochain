@@ -101,8 +101,8 @@ impl SweetConductorHandle {
     /// is useful if you need to know when it's finished cleaning up.
     pub async fn shutdown_and_wait(&self) {
         let c = &self.0;
-        if let Some(shutdown) = c.take_shutdown_handle().await {
-            c.shutdown().await;
+        if let Some(shutdown) = c.take_shutdown_handle() {
+            c.shutdown();
             shutdown
                 .await
                 .expect("Failed to await shutdown handle")
