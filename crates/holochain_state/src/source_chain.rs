@@ -620,7 +620,7 @@ impl SourceChain {
         let persisted_head = self.persisted_head.clone();
         self.vault
             .async_commit(move |txn: &mut Transaction| {
-                let now = timestamp::now();
+                let now = Timestamp::now();
                 for scheduled_fn in scheduled_fns {
                     schedule_fn(txn, scheduled_fn, None, now)?;
                 }

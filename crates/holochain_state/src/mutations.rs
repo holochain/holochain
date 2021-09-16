@@ -616,7 +616,7 @@ pub fn delete_live_ephemeral_scheduled_fns(
 ) -> StateMutationResult<()> {
     txn.execute(
         "DELETE FROM ScheduledFunctions WHERE ephemeral = true AND start <= ?",
-        [now.to_sql_ms_lossy()],
+        [now],
     )?;
     Ok(())
 }
@@ -634,7 +634,7 @@ pub fn reschedule_expired(txn: &mut Transaction, now: Timestamp) -> StateMutatio
             NOT ephemeral
             AND end < ?",
         )?;
-        let rows = stmt.query_map([now.to_sql_ms_lossy()], |row| {
+        let rows = stmt.query_map([now], |row| {
             Ok((
                 ZomeName(row.get(0)?),
                 FunctionName(row.get(1)?),
@@ -665,82 +665,73 @@ pub fn schedule_fn(
     maybe_schedule: Option<Schedule>,
     now: Timestamp,
 ) -> StateMutationResult<()> {
-    match (fn_is_scheduled(txn, scheduled_fn.clone())?, maybe_schedule) {
-        (true, Some(schedule)) => {
-            let (start, end, ephemeral) = match schedule {
-                Schedule::Persisted(ref schedule_string) => {
-                    // If this cron doesn't parse cleanly we don't even want to
-                    // write it to the db.
-                    let start = if let Some(start) = cron::Schedule::from_str(&schedule_string)
-                        .map_err(|e| ScheduleError::Cron(e.to_string()))?
-                        .after(
-                            &chrono::DateTime::<chrono::Utc>::try_from(now)
-                                .map_err(|e| ScheduleError::Timestamp(e))?,
-                        )
-                        .next()
-                    {
-                        start
-                    } else {
-                        // If there are no further executions then
-                        // scheduling is a no-op.
-                        return Ok(());
-                    };
-                    let end = start
-                        + chrono::Duration::milliseconds(
-                            holochain_zome_types::schedule::PERSISTED_TIMEOUT_MILLIS,
-                        );
-                    (
-                        Timestamp::from(start).to_sql_ms_lossy(),
-                        Timestamp::from(end).to_sql_ms_lossy(),
-                        false,
-                    )
-                }
-                Schedule::Ephemeral(duration) => (
-                    (now + duration)
-                        .map_err(|e| ScheduleError::Timestamp(e))?
-                        .to_sql_ms_lossy(),
-                    i64::MAX,
-                    true,
-                ),
+    let (start, end, ephemeral) = match maybe_schedule {
+        Some(Schedule::Persisted(ref schedule_string)) => {
+            // If this cron doesn't parse cleanly we don't even want to
+            // write it to the db.
+            let start = if let Some(start) = cron::Schedule::from_str(&schedule_string)
+                .map_err(|e| ScheduleError::Cron(e.to_string()))?
+                .after(
+                    &chrono::DateTime::<chrono::Utc>::try_from(now)
+                        .map_err(|e| ScheduleError::Timestamp(e))?,
+                )
+                .next()
+            {
+                start
+            } else {
+                // If there are no further executions then
+                // scheduling is a no-op.
+                return Ok(());
             };
-            txn.execute(
-                "
-                UPDATE ScheduledFunctions
-                SET
-                maybe_schedule = :maybe_schedule,
-                start = :start,
-                end = :end,
-                ephemeral = :ephemeral
-                WHERE
-                zome_name = :zome_name
-                AND scheduled_fn = :scheduled_fn
-                ",
-                named_params! {
-                    ":zome_name": scheduled_fn.zome_name().to_string(),
-                    ":maybe_schedule": to_blob(Some(schedule))?,
-                    ":scheduled_fn": scheduled_fn.fn_name().to_string(),
-                    ":start": start,
-                    ":end": end,
-                    ":ephemeral": ephemeral,
-                },
-            )?;
+            let end = start
+                + chrono::Duration::milliseconds(
+                    holochain_zome_types::schedule::PERSISTED_TIMEOUT_MILLIS,
+                );
+            (Timestamp::from(start), Timestamp::from(end), false)
         }
-        (false, maybe_schedule) => {
-            dbg!(&scheduled_fn, &maybe_schedule);
-            sql_insert!(txn, ScheduledFunctions, {
-                "zome_name": scheduled_fn.zome_name().to_string(),
-                "maybe_schedule": to_blob::<Option<Schedule>>(maybe_schedule)?,
-                "scheduled_fn": scheduled_fn.fn_name().to_string(),
-                "start": now.to_sql_ms_lossy(),
-                "end": i64::MAX,
-                "ephemeral": true,
-            })?;
-            assert!(fn_is_scheduled(txn, scheduled_fn).unwrap());
-        }
-        (true, None) => {
-            // None schedule for an already-scheduled fn is a no-op.
-            dbg!(&scheduled_fn, "none");
-        }
+        Some(Schedule::Ephemeral(duration)) => (
+            (now + duration).map_err(|e| ScheduleError::Timestamp(e))?,
+            Timestamp::max(),
+            true,
+        ),
+        None => (
+            now,
+            Timestamp::max(),
+            true
+        ),
     };
+    if fn_is_scheduled(txn, scheduled_fn.clone())? {
+        txn.execute(
+            "
+            UPDATE ScheduledFunctions
+            SET
+            maybe_schedule = :maybe_schedule,
+            start = :start,
+            end = :end,
+            ephemeral = :ephemeral
+            WHERE
+            zome_name = :zome_name
+            AND scheduled_fn = :scheduled_fn
+            ",
+            named_params! {
+                ":zome_name": scheduled_fn.zome_name().to_string(),
+                ":maybe_schedule": to_blob::<Option<Schedule>>(maybe_schedule)?,
+                ":scheduled_fn": scheduled_fn.fn_name().to_string(),
+                ":start": start,
+                ":end": end,
+                ":ephemeral": ephemeral,
+            },
+        )?;
+    }
+    else {
+        sql_insert!(txn, ScheduledFunctions, {
+            "zome_name": scheduled_fn.zome_name().to_string(),
+            "maybe_schedule": to_blob::<Option<Schedule>>(maybe_schedule)?,
+            "scheduled_fn": scheduled_fn.fn_name().to_string(),
+            "start": start,
+            "end": end,
+            "ephemeral": ephemeral,
+        })?;
+    }
     Ok(())
 }

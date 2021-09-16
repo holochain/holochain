@@ -32,7 +32,6 @@ pub mod tests {
     use crate::conductor::ConductorBuilder;
     use holochain_state::schedule::fn_is_scheduled;
     use holochain_state::prelude::schedule_fn;
-    use holochain_types::timestamp::now;
     use rusqlite::Transaction;
     use holochain_state::prelude::*;
 
@@ -74,23 +73,46 @@ pub mod tests {
         let cell_env = conductor.handle().get_cell_env(&cell_id).await.unwrap();
 
         cell_env.async_commit(move |txn: &mut Transaction| {
-            let now = now();
+            let now = Timestamp::now();
             let the_past = (now - std::time::Duration::from_millis(1)).unwrap();
-            dbg!(&now, &the_past);
-            let scheduled_fn = ScheduledFn::new("foo".into(), "bar".into());
-            schedule_fn(txn, scheduled_fn.clone(), None, now).unwrap();
-            assert!(fn_is_scheduled(txn, scheduled_fn.clone()).unwrap());
+            let the_future = (now + std::time::Duration::from_millis(1)).unwrap();
+
+            let ephemeral_scheduled_fn = ScheduledFn::new("foo".into(), "bar".into());
+            let persisted_scheduled_fn = ScheduledFn::new("1".into(), "2".into());
+            let persisted_schedule = Schedule::Persisted("* * * * * * * ".into());
+
+            schedule_fn(txn, persisted_scheduled_fn.clone(), Some(persisted_schedule), now).unwrap();
+            schedule_fn(txn, ephemeral_scheduled_fn.clone(), None, now).unwrap();
+
+            assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone()).unwrap());
+            assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone()).unwrap());
 
             // Deleting live ephemeral scheduled fns from now should delete.
             delete_live_ephemeral_scheduled_fns(txn, now).unwrap();
-            assert!(!fn_is_scheduled(txn, scheduled_fn.clone()).unwrap());
+            assert!(!fn_is_scheduled(txn, ephemeral_scheduled_fn.clone()).unwrap());
+            assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone()).unwrap());
 
-            schedule_fn(txn, scheduled_fn.clone(), None, now).unwrap();
-            assert!(fn_is_scheduled(txn, scheduled_fn.clone()).unwrap());
+            schedule_fn(txn, ephemeral_scheduled_fn.clone(), None, now).unwrap();
+            assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone()).unwrap());
+            assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone()).unwrap());
 
             // Deleting live ephemeral fns from a past time should do nothing.
             delete_live_ephemeral_scheduled_fns(txn, the_past).unwrap();
-            assert!(fn_is_scheduled(txn, scheduled_fn).unwrap());
+            assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone()).unwrap());
+            assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone()).unwrap());
+
+            // Deleting live ephemeral fns from the future should delete.
+            delete_live_ephemeral_scheduled_fns(txn, the_future).unwrap();
+            assert!(!fn_is_scheduled(txn, ephemeral_scheduled_fn.clone()).unwrap());
+            assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone()).unwrap());
+
+            // Deleting all ephemeral fns should delete.
+            schedule_fn(txn, ephemeral_scheduled_fn.clone(), None, now).unwrap();
+            assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone()).unwrap());
+            delete_all_ephemeral_scheduled_fns(txn).unwrap();
+            assert!(!fn_is_scheduled(txn, ephemeral_scheduled_fn.clone()).unwrap());
+            assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone()).unwrap());
+
             Result::<(), DatabaseError>::Ok(())
         }).await.unwrap();
         Ok(())
@@ -154,6 +176,7 @@ pub mod tests {
                     ()
                 )
                 .await;
+            dbg!(&query);
             l = query.len();
             i = i + 1;
         }

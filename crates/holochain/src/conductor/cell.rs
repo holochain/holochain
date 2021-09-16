@@ -243,7 +243,7 @@ impl Cell {
     }
 
     pub(super) async fn dispatch_scheduled_fns(self: Arc<Self>) {
-        let now = timestamp::now();
+        let now = Timestamp::now();
         let lives = self
             .env
             .async_commit(move |txn: &mut Transaction| {
@@ -291,12 +291,14 @@ impl Cell {
                     futures::future::join_all(tasks).await;
 
                 dbg!(&lives);
+                dbg!(&results);
 
                 // We don't do anything with errors in here.
                 let _ = self
                     .env
                     .async_commit(move |txn: &mut Transaction| {
                         for ((scheduled_fn, _), result) in lives.iter().zip(results.iter()) {
+                            dbg!(&result);
                             match result {
                                 Ok(Ok(ZomeCallResponse::Ok(extern_io))) => {
                                     let next_schedule: Schedule = match extern_io.decode() {

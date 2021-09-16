@@ -12,7 +12,14 @@ entry_defs![Tick::entry_def(), Tock::entry_def()];
 
 #[hdk_extern(infallible)]
 fn scheduled_fn(_: Option<Schedule>) -> Option<Schedule> {
-    if create_entry(&Tick).is_err() {
+    if HDK.with(|h| {
+        h.borrow().create(CreateInput::new(
+            Tick.into(),
+            Tick.try_into().unwrap(),
+            // This will be running concurrently with cron_scheduled_fn.
+            ChainTopOrdering::Relaxed,
+        ))
+    }).is_err() {
         return Some(Schedule::Ephemeral(std::time::Duration::from_millis(1)));
     }
     if hdk::prelude::query(ChainQueryFilter::default().entry_type(entry_type!(Tick).unwrap())).unwrap().len() < TICKS {
@@ -25,7 +32,14 @@ fn scheduled_fn(_: Option<Schedule>) -> Option<Schedule> {
 
 #[hdk_extern(infallible)]
 fn cron_scheduled_fn(_: Option<Schedule>) -> Option<Schedule> {
-    create_entry(&Tock).ok();
+    HDK.with(|h| {
+        h.borrow().create(CreateInput::new(
+            Tock.into(),
+            Tock.try_into().unwrap(),
+            // This will be running concurrently with scheduled_fn.
+            ChainTopOrdering::Relaxed,
+        ))
+    }).ok();
     Some(Schedule::Persisted("* * * * * * *".to_string()))
 }
 

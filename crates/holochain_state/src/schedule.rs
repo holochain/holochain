@@ -53,7 +53,7 @@ pub fn live_scheduled_fns(
         start <= ?
         AND ? <= end",
     )?;
-    let rows = stmt.query_map([now.to_sql_ms_lossy(), now.to_sql_ms_lossy()], |row| {
+    let rows = stmt.query_map([now, now], |row| {
         Ok((
             ScheduledFn::new(ZomeName(row.get(0)?), FunctionName(row.get(1)?)),
             row.get(2)?,
@@ -64,6 +64,5 @@ pub fn live_scheduled_fns(
         let (scheduled_fn, maybe_schedule_serialized) = row?;
         ret.push((scheduled_fn, from_blob(maybe_schedule_serialized)?));
     }
-    dbg!(&ret);
     Ok(ret)
 }
