@@ -30,6 +30,71 @@ pub mod tests {
     use hdk::prelude::*;
     use crate::sweettest::SweetConductor;
     use crate::conductor::ConductorBuilder;
+    use holochain_state::schedule::fn_is_scheduled;
+    use holochain_state::prelude::schedule_fn;
+    use holochain_types::timestamp::now;
+    use rusqlite::Transaction;
+    use holochain_state::prelude::*;
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[cfg(feature = "test_utils")]
+    async fn schedule_test_low_level() -> anyhow::Result<()> {
+        observability::test_run().ok();
+        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Schedule])
+            .await
+            .unwrap();
+
+        let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
+        let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
+
+        let mut dna_store = MockDnaStore::new();
+        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
+        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
+        dna_store.expect_add_dna().return_const(());
+        dna_store
+            .expect_get()
+            .return_const(Some(dna_file.clone().into()));
+        dna_store
+            .expect_get_entry_def()
+            .return_const(EntryDef::default_with_id("thing"));
+
+        let mut conductor =
+            SweetConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
+
+        let _apps = conductor
+        .setup_app_for_agents(
+            "app-",
+            &[alice_pubkey.clone(), bob_pubkey.clone()],
+            &[dna_file.into()],
+        )
+        .await
+        .unwrap();
+
+        let cell_id = conductor.handle().list_cell_ids(None).await.unwrap()[0].clone();
+        let cell_env = conductor.handle().get_cell_env(&cell_id).await.unwrap();
+
+        cell_env.async_commit(move |txn: &mut Transaction| {
+            let now = now();
+            let the_past = (now - std::time::Duration::from_millis(1)).unwrap();
+            dbg!(&now, &the_past);
+            let scheduled_fn = ScheduledFn::new("foo".into(), "bar".into());
+            schedule_fn(txn, scheduled_fn.clone(), None, now).unwrap();
+            assert!(fn_is_scheduled(txn, scheduled_fn.clone()).unwrap());
+
+            // Deleting live ephemeral scheduled fns from now should delete.
+            delete_live_ephemeral_scheduled_fns(txn, now).unwrap();
+            assert!(!fn_is_scheduled(txn, scheduled_fn.clone()).unwrap());
+
+            schedule_fn(txn, scheduled_fn.clone(), None, now).unwrap();
+            assert!(fn_is_scheduled(txn, scheduled_fn.clone()).unwrap());
+
+            // Deleting live ephemeral fns from a past time should do nothing.
+            delete_live_ephemeral_scheduled_fns(txn, the_past).unwrap();
+            assert!(fn_is_scheduled(txn, scheduled_fn).unwrap());
+            Result::<(), DatabaseError>::Ok(())
+        }).await.unwrap();
+        Ok(())
+    }
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "test_utils")]
@@ -67,18 +132,19 @@ pub mod tests {
 
         let ((alice,), (bobbo,)) = apps.into_tuples();
         let alice = alice.zome(TestWasm::Schedule);
-        let _bobbo = bobbo.zome(TestWasm::Schedule);
+        let bobbo = bobbo.zome(TestWasm::Schedule);
 
-        let schedule: () = conductor
+        // Let's just drive alice to exhaust all ticks.
+        let _schedule: () = conductor
             .call(
                 &alice,
                 "schedule",
                 ()
             )
             .await;
-        dbg!(&schedule);
         let mut i: usize = 0;
-        while i < 6 {
+        let mut l: usize = 0;
+        while i < 10 {
             tokio::time::sleep(std::time::Duration::from_millis(2)).await;
             conductor.handle().dispatch_scheduled_fns().await;
             let query: Vec<Element> = conductor
@@ -88,9 +154,28 @@ pub mod tests {
                     ()
                 )
                 .await;
-            dbg!(&query);
+            l = query.len();
             i = i + 1;
         }
+        assert_eq!(l, 5);
+
+        // If Bob does a few ticks and then calls `start_scheduler` the
+        // ephemeral scheduled task will be flushed so the ticks will not be
+        // exhaused until the function is rescheduled.
+        let _shedule: () = conductor
+            .call(
+                &bobbo,
+                "schedule",
+                ()
+            ).await;
+        conductor.handle().dispatch_scheduled_fns().await;
+        let query: Vec<Element> = conductor
+            .call(
+                &bobbo,
+                "query",
+                ()
+            ).await;
+        dbg!(query.len());
         Ok(())
     }
 }

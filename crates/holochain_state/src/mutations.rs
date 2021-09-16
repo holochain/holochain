@@ -603,7 +603,7 @@ pub fn unlock_chain(txn: &mut Transaction) -> StateMutationResult<()> {
 }
 
 pub fn delete_all_ephemeral_scheduled_fns(txn: &mut Transaction) -> StateMutationResult<()> {
-    txn.execute("DELETE FROM ScheduledFunctions WHERE ephemeral", [])?;
+    txn.execute("DELETE FROM ScheduledFunctions WHERE ephemeral = true", [])?;
     Ok(())
 }
 
@@ -612,8 +612,8 @@ pub fn delete_live_ephemeral_scheduled_fns(
     now: Timestamp,
 ) -> StateMutationResult<()> {
     txn.execute(
-        "DELETE FROM ScheduledFunctions WHERE ephemeral AND start <= ?",
-        [now],
+        "DELETE FROM ScheduledFunctions WHERE ephemeral = true AND start <= ?",
+        [now.to_sql_ms_lossy()],
     )?;
     Ok(())
 }
@@ -631,7 +631,7 @@ pub fn reschedule_expired(txn: &mut Transaction, now: Timestamp) -> StateMutatio
             NOT ephemeral
             AND end < ?",
         )?;
-        let rows = stmt.query_map([now], |row| {
+        let rows = stmt.query_map([now.to_sql_ms_lossy()], |row| {
             Ok((
                 ZomeName(row.get(0)?),
                 FunctionName(row.get(1)?),
@@ -645,6 +645,7 @@ pub fn reschedule_expired(txn: &mut Transaction, now: Timestamp) -> StateMutatio
         ret
     };
     for (zome_name, scheduled_fn, maybe_schedule) in rows {
+        dbg!("reschedule expired", &scheduled_fn);
         schedule_fn(
             txn,
             ScheduledFn::new(zome_name, scheduled_fn),
@@ -722,17 +723,20 @@ pub fn schedule_fn(
             )?;
         }
         (false, maybe_schedule) => {
+            dbg!(&scheduled_fn, &maybe_schedule);
             sql_insert!(txn, ScheduledFunctions, {
                 "zome_name": scheduled_fn.zome_name().to_string(),
                 "maybe_schedule": to_blob::<Option<Schedule>>(maybe_schedule)?,
                 "scheduled_fn": scheduled_fn.fn_name().to_string(),
-                "start": 0,
+                "start": now.to_sql_ms_lossy(),
                 "end": i64::MAX,
                 "ephemeral": true,
             })?;
+            assert!(fn_is_scheduled(txn, scheduled_fn).unwrap());
         }
         (true, None) => {
             // None schedule for an already-scheduled fn is a no-op.
+            dbg!(&scheduled_fn, "none");
         }
     };
     Ok(())

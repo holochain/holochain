@@ -12,23 +12,29 @@ pub fn fn_is_scheduled(txn: &Transaction, scheduled_fn: ScheduledFn) -> StateMut
     match txn
         .query_row(
             "
-            SELECT 1
+            SELECT zome_name, scheduled_fn
             FROM ScheduledFunctions
             WHERE
-            zome_name = :zome_name
-            AND scheduled_fn = :scheduled_fn
+            zome_name=:zome_name
+            AND scheduled_fn=:scheduled_fn
             LIMIT 1
             ",
             named_params! {
                 ":zome_name": scheduled_fn.zome_name().to_string(),
                 ":scheduled_fn": scheduled_fn.fn_name().to_string(),
             },
-            |row| row.get::<_, u32>(0),
+            |row| row.get::<_, String>(0),
         )
         .optional()?
     {
-        Some(_) => Ok(true),
-        None => Ok(false),
+        Some(_) => {
+            dbg!("fn_is_scheduled true", &scheduled_fn);
+            Ok(true)
+        },
+        None => {
+            dbg!("fn_is_scheduled false", &scheduled_fn);
+            Ok(false)
+        },
     }
 }
 
@@ -41,14 +47,13 @@ pub fn live_scheduled_fns(
         SELECT
         zome_name,
         scheduled_fn,
-        maybe_schedule,
-        ephemeral
+        maybe_schedule
         FROM ScheduledFunctions
         WHERE
         start <= ?
         AND ? <= end",
     )?;
-    let rows = stmt.query_map([now, now], |row| {
+    let rows = stmt.query_map([now.to_sql_ms_lossy(), now.to_sql_ms_lossy()], |row| {
         Ok((
             ScheduledFn::new(ZomeName(row.get(0)?), FunctionName(row.get(1)?)),
             row.get(2)?,
@@ -59,5 +64,6 @@ pub fn live_scheduled_fns(
         let (scheduled_fn, maybe_schedule_serialized) = row?;
         ret.push((scheduled_fn, from_blob(maybe_schedule_serialized)?));
     }
+    dbg!(&ret);
     Ok(ret)
 }

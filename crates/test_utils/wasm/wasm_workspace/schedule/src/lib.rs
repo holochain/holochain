@@ -5,7 +5,10 @@ const TICKS: usize = 5;
 #[hdk_entry(id = "tick")]
 struct Tick;
 
-entry_defs![Tick::entry_def()];
+#[hdk_entry(id = "tock")]
+struct Tock;
+
+entry_defs![Tick::entry_def(), Tock::entry_def()];
 
 #[hdk_extern(infallible)]
 fn scheduled_fn(_: Option<Schedule>) -> Option<Schedule> {
@@ -20,9 +23,17 @@ fn scheduled_fn(_: Option<Schedule>) -> Option<Schedule> {
     }
 }
 
+#[hdk_extern(infallible)]
+fn cron_scheduled_fn(_: Option<Schedule>) -> Option<Schedule> {
+    create_entry(&Tock).ok();
+    Some(Schedule::Persisted("* * * * * * *".to_string()))
+}
+
 #[hdk_extern]
 fn schedule(_: ()) -> ExternResult<()> {
-    hdk::prelude::schedule("scheduled_fn")
+    hdk::prelude::schedule("scheduled_fn")?;
+    hdk::prelude::schedule("cron_scheduled_fn")?;
+    Ok(())
 }
 
 #[hdk_extern]

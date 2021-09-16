@@ -290,6 +290,8 @@ impl Cell {
                 let results: Vec<CellResult<ZomeCallResult>> =
                     futures::future::join_all(tasks).await;
 
+                dbg!(&lives);
+
                 // We don't do anything with errors in here.
                 let _ = self
                     .env
@@ -310,6 +312,7 @@ impl Cell {
                                     // Ignore errors so that failing to schedule
                                     // one function doesn't error others.
                                     // For example if a zome returns a bad cron.
+                                    dbg!(&next_schedule);
                                     if let Err(e) = schedule_fn(
                                         txn,
                                         scheduled_fn.clone(),

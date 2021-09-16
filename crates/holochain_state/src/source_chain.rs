@@ -614,8 +614,9 @@ impl SourceChain {
         let persisted_head = self.persisted_head.clone();
         self.vault
             .async_commit(move |txn: &mut Transaction| {
+                let now = timestamp::now();
                 for scheduled_fn in scheduled_fns {
-                    schedule_fn(txn, scheduled_fn, None, timestamp::now())?;
+                    schedule_fn(txn, scheduled_fn, None, now)?;
                 }
                 // As at check.
                 let (new_persisted_head, _, _) = chain_head_db(&txn, author)?;
