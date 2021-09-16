@@ -48,7 +48,7 @@ pub mod request;
 pub mod schedule;
 pub mod signal;
 pub mod signature;
-pub mod timestamp;
+pub use kitsune_p2p_timestamp as timestamp;
 pub mod trace;
 #[allow(missing_docs)]
 pub mod validate;

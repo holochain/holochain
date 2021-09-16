@@ -11,6 +11,7 @@ use ghost_actor::dependencies::tracing;
 use governor::clock::DefaultClock;
 use governor::state::{InMemoryState, NotKeyed};
 use governor::RateLimiter;
+use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::*;
 use kitsune_p2p_types::dht_arc::{ArcInterval, DhtArcSet};
@@ -19,7 +20,6 @@ use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::*;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::ops::Range;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
@@ -65,7 +65,7 @@ struct TimedBloomFilter {
     /// for this time window.
     bloom: Option<BloomFilter>,
     /// The time window for this bloom filter.
-    time: TimeWindowMs,
+    time: TimeWindow,
 }
 
 /// Gossip has two distinct variants which share a lot of similarities but
@@ -360,7 +360,7 @@ impl ShardedGossipLocal {
     const UPPER_HASHES_BOUND: usize = 500;
 
     /// Calculate the time range for a gossip round.
-    fn calculate_time_ranges(&self) -> Vec<Range<u64>> {
+    fn calculate_time_ranges(&self) -> Vec<TimeWindow> {
         const NOW: Duration = Duration::from_secs(0);
         const HOUR: Duration = Duration::from_secs(60 * 60);
         const DAY: Duration = Duration::from_secs(60 * 60 * 24);
@@ -565,7 +565,7 @@ impl ShardedGossipLocal {
             &self.space,
             agent_arcs.as_slice(),
             &arcset,
-            full_time_window(),
+            full_time_range(),
             usize::MAX,
             true,
         )
@@ -684,19 +684,20 @@ impl RoundState {
 
 /// Time range from now into the past.
 /// Start must be < end.
-fn time_range(start: Duration, end: Duration) -> Range<u64> {
+fn time_range(start: Duration, end: Duration) -> TimeWindow {
+    // TODO: write in terms of chrono::now()
     let now = SystemTime::now();
     let start = now
         .checked_sub(start)
         .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
-        .map(|t| t.as_millis() as u64)
-        .unwrap_or(0);
+        .map(|t| Timestamp::from_micros(t.as_micros() as i64))
+        .unwrap_or(Timestamp::MIN);
 
     let end = now
         .checked_sub(end)
         .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
-        .map(|t| t.as_millis() as u64)
-        .unwrap_or(0);
+        .map(|t| Timestamp::from_micros(t.as_micros() as i64))
+        .unwrap_or(Timestamp::MAX);
 
     start..end
 }
@@ -711,7 +712,7 @@ pub enum EncodedTimedBloomFilter {
     /// Please send all your ops.
     MissingAllHashes {
         /// The time window that we are missing hashes for.
-        time_window: std::ops::Range<u64>,
+        time_window: TimeWindow,
     },
     /// I have overlap and I have some hashes.
     /// Please send any missing ops.
@@ -719,7 +720,7 @@ pub enum EncodedTimedBloomFilter {
         /// The encoded bloom filter.
         filter: PoolBuf,
         /// The time window these hashes are for.
-        time_window: std::ops::Range<u64>,
+        time_window: TimeWindow,
     },
 }
 

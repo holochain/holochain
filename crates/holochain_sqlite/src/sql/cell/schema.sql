@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS DhtOp (
     require_receipt  INTEGER        NOT NULL,      -- BOOLEAN
 
     storage_center_loc          INTEGER   NOT NULL,
-    authored_timestamp_ms       INTEGER   NOT NULL,
+    authored_timestamp       INTEGER   NOT NULL,
 
     -- This is the order that process ops should result
     -- in dependencies before dependants.
@@ -101,10 +101,7 @@ CREATE TABLE IF NOT EXISTS DhtOp (
     -- If this is null then validation is still in progress.
     validation_status INTEGER       NULL,
 
-    when_integrated  INTEGER NULL,          -- DATETIME
-    -- We need nanosecond accuracy which doesn't fit in
-    -- an INTEGER.
-    when_integrated_ns  BLOB NULL,          -- DATETIME
+    when_integrated   INTEGER       NULL,          -- DATETIME
 
     -- Used to withhold ops from publishing for things
     -- like countersigning.
@@ -145,7 +142,7 @@ CREATE TABLE IF NOT EXISTS DhtOp (
 CREATE INDEX IF NOT EXISTS DhtOp_type_idx ON DhtOp ( type );
 CREATE INDEX IF NOT EXISTS DhtOp_validation_stage_idx ON DhtOp ( validation_stage );
 CREATE INDEX IF NOT EXISTS DhtOp_validation_status_idx ON DhtOp ( validation_status );
-CREATE INDEX IF NOT EXISTS DhtOp_authored_timestamp_ms_idx ON DhtOp ( authored_timestamp_ms );
+CREATE INDEX IF NOT EXISTS DhtOp_authored_timestamp_idx ON DhtOp ( authored_timestamp );
 CREATE INDEX IF NOT EXISTS DhtOp_storage_center_loc_idx ON DhtOp ( storage_center_loc );
 CREATE INDEX IF NOT EXISTS DhtOp_header_hash_idx ON DhtOp ( header_hash );
 -- CREATE INDEX DhtOp_basis_hash_idx ON DhtOp ( basis_hash );
@@ -159,7 +156,8 @@ CREATE TABLE IF NOT EXISTS ValidationReceipt (
 
 CREATE TABLE IF NOT EXISTS ChainLock (
     lock BLOB PRIMARY KEY ON CONFLICT ROLLBACK,
-    end INTEGER NOT NULL
+    -- The expiration time of the lock as a Timestamp (microseconds)
+    expires_at_timestamp INTEGER NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS ScheduledFunctions (
@@ -171,3 +169,4 @@ CREATE TABLE IF NOT EXISTS ScheduledFunctions (
     ephemeral BOOLEAN NOT NULL,
     PRIMARY KEY (zome_name, scheduled_fn) ON CONFLICT ROLLBACK
 );
+

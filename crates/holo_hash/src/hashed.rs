@@ -1,6 +1,8 @@
 use crate::HasHash;
 use crate::HashableContent;
 use crate::HoloHashOf;
+
+#[cfg(feature = "serialization")]
 use holochain_serialized_bytes::prelude::*;
 
 #[cfg(feature = "arbitrary")]
@@ -10,7 +12,7 @@ use crate::PrimitiveHashType;
 /// hashes need not be calculated multiple times.
 /// Provides an easy constructor which consumes the content.
 // TODO: consider making lazy with OnceCell
-#[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "serialization", derive(Debug, Serialize, Deserialize))]
 pub struct HoloHashed<C: HashableContent> {
     /// Whatever type C is as data.
     pub(crate) content: C,

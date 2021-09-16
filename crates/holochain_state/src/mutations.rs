@@ -182,7 +182,7 @@ pub fn insert_op_lite(
         "hash": hash,
         "type": op_lite.get_type(),
         "storage_center_loc": basis.get_loc(),
-        "authored_timestamp_ms": timestamp.to_sql_ms_lossy(),
+        "authored_timestamp": timestamp,
         "basis_hash": basis,
         "header_hash": header_hash,
         "is_authored": is_authored,
@@ -314,7 +314,7 @@ pub fn set_validation_stage(
         ValidationLimboStatus::AwaitingAppDeps(_) => Some(2),
         ValidationLimboStatus::AwaitingIntegration => Some(3),
     };
-    let now = holochain_types::timestamp::now().0;
+    let now = holochain_zome_types::Timestamp::now();
     txn.execute(
         "
         UPDATE DhtOp
@@ -341,7 +341,6 @@ pub fn set_when_integrated(
     time: Timestamp,
 ) -> StateMutationResult<()> {
     dht_op_update!(txn, hash, {
-        "when_integrated_ns": to_blob(time)?,
         "when_integrated": time,
     })?;
     Ok(())
@@ -586,10 +585,14 @@ pub fn insert_entry(txn: &mut Transaction, entry: EntryHashed) -> StateMutationR
 /// because the chain is locked if there are ANY locks that don't match the
 /// current id being queried.
 /// In practise this is useless so don't do that. One lock at a time please.
-pub fn lock_chain(txn: &mut Transaction, lock: &[u8], end: &Timestamp) -> StateMutationResult<()> {
+pub fn lock_chain(
+    txn: &mut Transaction,
+    lock: &[u8],
+    expires_at: &Timestamp,
+) -> StateMutationResult<()> {
     sql_insert!(txn, ChainLock, {
         "lock": lock,
-        "end": end,
+        "expires_at_timestamp": expires_at,
     })?;
     Ok(())
 }

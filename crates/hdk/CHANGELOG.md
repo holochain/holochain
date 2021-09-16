@@ -16,6 +16,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - hdk: `map_extern_infallible` added to map infallible externs
 
+## 0.0.106
+
+## 0.0.105
+
 ## 0.0.104
 
 ## 0.0.103

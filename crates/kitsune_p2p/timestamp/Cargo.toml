@@ -1,0 +1,36 @@
+[package]
+name = "kitsune_p2p_timestamp"
+version = "0.0.2"
+description = "Microsecond-precision timestamp datatype for kitsune_p2p"
+license = "Apache-2.0"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://github.com/holochain/holochain"
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+keywords = [ "holochain", "holo", "p2p", "dht", "networking" ]
+categories = [ "network-programming" ]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+chrono = "0.4.6"
+serde = { version = "1.0", features = [ "derive" ] }
+thiserror = "1"
+
+# arbitrary
+arbitrary = { version = "1.0", features = ["derive"], optional = true }
+
+# rusqlite
+rusqlite = { version = "0.25", optional = true }
+
+[dev-dependencies]
+holochain_serialized_bytes = "=0.0.51"
+
+[features]
+now = []
+
+full = [
+  "now",
+  "rusqlite",
+]

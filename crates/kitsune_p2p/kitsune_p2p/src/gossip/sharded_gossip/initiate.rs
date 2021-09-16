@@ -159,16 +159,12 @@ impl ShardedGossipLocal {
             }
         }
 
-        let time_ranges = self.calculate_time_ranges();
-        let len = time_ranges.len();
+        let windows = self.calculate_time_ranges();
+        let len = windows.len();
         // Generate the ops bloom for all local agents within the common arc.
-        for (i, time_range) in time_ranges.into_iter().enumerate() {
+        for (i, window) in windows.into_iter().enumerate() {
             let blooms = self
-                .generate_ops_blooms_for_time_window(
-                    &local_agents,
-                    &state.common_arc_set,
-                    time_range,
-                )
+                .generate_ops_blooms_for_time_window(&local_agents, &state.common_arc_set, window)
                 .await?;
 
             // If no blooms were found for this time window then return a no overlap.
