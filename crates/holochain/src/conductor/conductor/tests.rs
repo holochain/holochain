@@ -92,6 +92,14 @@ async fn can_add_clone_cell_to_app() {
     let slot = AppSlot::new(cell_id.clone(), true, 1);
     let app1 = InstalledAppCommon::new_legacy("no clone", vec![installed_cell.clone()]).unwrap();
     let app2 = InstalledAppCommon::new("yes clone", agent, vec![("nick".into(), slot.clone())]);
+    assert_eq!(
+        app1.slots().keys().collect::<Vec<_>>(),
+        vec![&"nick".to_string()]
+    );
+    assert_eq!(
+        app2.slots().keys().collect::<Vec<_>>(),
+        vec![&"nick".to_string()]
+    );
 
     conductor.register_phenotype(dna).await.unwrap();
     conductor

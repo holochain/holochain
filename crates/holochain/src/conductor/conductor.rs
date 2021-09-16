@@ -746,7 +746,7 @@ where
         let (_, parent_dna_hash) = self
             .update_state_prime({
                 let app_id = app_id.clone();
-                let slot_id = app_id.clone();
+                let slot_id = slot_id.clone();
                 move |mut state| {
                     if let Some(app) = state.installed_apps_mut().get_mut(&app_id) {
                         let slot = app
