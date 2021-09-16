@@ -21,11 +21,11 @@ use holochain_types::link::WireLinkKey;
 use holochain_types::link::WireLinkOps;
 use holochain_types::metadata::MetadataSet;
 use holochain_types::prelude::ValidationPackageResponse;
-use holochain_types::timestamp;
 use holochain_zome_types::HeaderHashed;
 use holochain_zome_types::QueryFilter;
 use holochain_zome_types::SignedHeader;
 use holochain_zome_types::SignedHeaderHashed;
+use holochain_zome_types::Timestamp;
 use holochain_zome_types::TryInto;
 use holochain_zome_types::ValidationStatus;
 
@@ -227,7 +227,7 @@ pub fn fill_db(env: &EnvWrite, op: DhtOpHashed) {
             let hash = op.as_hash().clone();
             insert_op(txn, op, false).unwrap();
             set_validation_status(txn, hash.clone(), ValidationStatus::Valid).unwrap();
-            set_when_integrated(txn, hash, timestamp::now()).unwrap();
+            set_when_integrated(txn, hash, Timestamp::now()).unwrap();
             DatabaseResult::Ok(())
         })
         .unwrap();
@@ -240,7 +240,7 @@ pub fn fill_db_rejected(env: &EnvWrite, op: DhtOpHashed) {
             let hash = op.as_hash().clone();
             insert_op(txn, op, false).unwrap();
             set_validation_status(txn, hash.clone(), ValidationStatus::Rejected).unwrap();
-            set_when_integrated(txn, hash, timestamp::now()).unwrap();
+            set_when_integrated(txn, hash, Timestamp::now()).unwrap();
             DatabaseResult::Ok(())
         })
         .unwrap();

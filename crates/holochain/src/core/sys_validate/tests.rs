@@ -98,7 +98,7 @@ async fn check_valid_if_dna_test() {
 async fn check_previous_timestamp() {
     let mut header = fixt!(CreateLink);
     let mut prev_header = fixt!(CreateLink);
-    header.timestamp = timestamp::now().into();
+    header.timestamp = Timestamp::now().into();
     let before = chrono::Utc::now() - chrono::Duration::weeks(1);
     let after = chrono::Utc::now() + chrono::Duration::weeks(1);
 
