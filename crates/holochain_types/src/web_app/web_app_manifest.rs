@@ -58,4 +58,16 @@ impl WebAppManifest {
             Self::V1(WebAppManifestV1 { name, .. }) => name,
         }
     }
+
+    pub fn web_ui_location(&self) -> Location {
+        match self {
+            Self::V1(WebAppManifestV1 { ui, .. }) => ui.location.clone(),
+        }
+    }
+
+    pub fn happ_bundle_location(&self) -> Location {
+        match self {
+            Self::V1(WebAppManifestV1 { happ_manifest, .. }) => happ_manifest.location.clone(),
+        }
+    }
 }
