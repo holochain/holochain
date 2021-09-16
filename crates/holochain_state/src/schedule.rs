@@ -30,11 +30,11 @@ pub fn fn_is_scheduled(txn: &Transaction, scheduled_fn: ScheduledFn) -> StateMut
         Some(_) => {
             dbg!("fn_is_scheduled true", &scheduled_fn);
             Ok(true)
-        },
+        }
         None => {
             dbg!("fn_is_scheduled false", &scheduled_fn);
             Ok(false)
-        },
+        }
     }
 }
 
