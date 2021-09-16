@@ -1244,7 +1244,7 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
             .conductor
             .pending_cells()
             .into_iter()
-            .map(|(id, cell)| (id.clone(), cell.holochain_p2p_cell().clone()))
+            .map(|(id, cell)| (id, cell.holochain_p2p_cell().clone()))
             .collect();
 
         let tasks = pending_cells.into_iter()
