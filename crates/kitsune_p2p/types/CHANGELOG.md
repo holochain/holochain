@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## \[Unreleased\]
 - Adds a prototype protocol for checking consistency in a sharded network.
 
+## 0.0.5
+
 ## 0.0.4
 
 ## 0.0.3
