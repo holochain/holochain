@@ -9,7 +9,7 @@ use holochain_zome_types::Timestamp;
 use holochain_zome_types::ZomeName;
 
 pub fn fn_is_scheduled(txn: &Transaction, scheduled_fn: ScheduledFn) -> StateMutationResult<bool> {
-    match txn
+    Ok(txn
         .query_row(
             "
             SELECT zome_name, scheduled_fn
@@ -25,17 +25,7 @@ pub fn fn_is_scheduled(txn: &Transaction, scheduled_fn: ScheduledFn) -> StateMut
             },
             |row| row.get::<_, String>(0),
         )
-        .optional()?
-    {
-        Some(_) => {
-            dbg!("fn_is_scheduled true", &scheduled_fn);
-            Ok(true)
-        }
-        None => {
-            dbg!("fn_is_scheduled false", &scheduled_fn);
-            Ok(false)
-        }
-    }
+        .optional()?.is_some())
 }
 
 pub fn live_scheduled_fns(
@@ -51,7 +41,8 @@ pub fn live_scheduled_fns(
         FROM ScheduledFunctions
         WHERE
         start <= ?
-        AND ? <= end",
+        AND ? <= end
+        ORDER BY start ASC",
     )?;
     let rows = stmt.query_map([now, now], |row| {
         Ok((

@@ -34,6 +34,7 @@ pub mod tests {
     use holochain_state::prelude::schedule_fn;
     use rusqlite::Transaction;
     use holochain_state::prelude::*;
+    use holochain_state::schedule::live_scheduled_fns;
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "test_utils")]
@@ -75,13 +76,14 @@ pub mod tests {
         cell_env.async_commit(move |txn: &mut Transaction| {
             let now = Timestamp::now();
             let the_past = (now - std::time::Duration::from_millis(1)).unwrap();
-            let the_future = (now + std::time::Duration::from_millis(1)).unwrap();
+            let the_future = (now + std::time::Duration::from_millis(1000)).unwrap();
+            let the_distant_future = (now + std::time::Duration::from_millis(2000)).unwrap();
 
             let ephemeral_scheduled_fn = ScheduledFn::new("foo".into(), "bar".into());
             let persisted_scheduled_fn = ScheduledFn::new("1".into(), "2".into());
             let persisted_schedule = Schedule::Persisted("* * * * * * * ".into());
 
-            schedule_fn(txn, persisted_scheduled_fn.clone(), Some(persisted_schedule), now).unwrap();
+            schedule_fn(txn, persisted_scheduled_fn.clone(), Some(persisted_schedule.clone()), now).unwrap();
             schedule_fn(txn, ephemeral_scheduled_fn.clone(), None, now).unwrap();
 
             assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone()).unwrap());
@@ -112,6 +114,27 @@ pub mod tests {
             delete_all_ephemeral_scheduled_fns(txn).unwrap();
             assert!(!fn_is_scheduled(txn, ephemeral_scheduled_fn.clone()).unwrap());
             assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone()).unwrap());
+
+            let ephemeral_future_schedule = Schedule::Ephemeral(std::time::Duration::from_millis(1001));
+            schedule_fn(
+                txn,
+                ephemeral_scheduled_fn.clone(),
+                Some(ephemeral_future_schedule.clone()),
+                now
+            ).unwrap();
+            assert_eq!(
+                vec![
+                    (persisted_scheduled_fn.clone(), Some(persisted_schedule.clone()))
+                ],
+                live_scheduled_fns(txn, the_future).unwrap(),
+            );
+            assert_eq!(
+                vec![
+                    (persisted_scheduled_fn, Some(persisted_schedule)),
+                    (ephemeral_scheduled_fn, Some(ephemeral_future_schedule)),
+                ],
+                live_scheduled_fns(txn, the_distant_future).unwrap(),
+            );
 
             Result::<(), DatabaseError>::Ok(())
         }).await.unwrap();
@@ -165,22 +188,19 @@ pub mod tests {
             )
             .await;
         let mut i: usize = 0;
-        let mut l: usize = 0;
         while i < 10 {
             tokio::time::sleep(std::time::Duration::from_millis(2)).await;
             conductor.handle().dispatch_scheduled_fns().await;
-            let query: Vec<Element> = conductor
-                .call(
-                    &alice,
-                    "query",
-                    ()
-                )
-                .await;
-            dbg!(&query);
-            l = query.len();
             i = i + 1;
         }
-        assert_eq!(l, 5);
+        let query: Vec<Element> = conductor
+        .call(
+            &alice,
+            "query",
+            ()
+        )
+        .await;
+        assert_eq!(query.len(), 5);
 
         // If Bob does a few ticks and then calls `start_scheduler` the
         // ephemeral scheduled task will be flushed so the ticks will not be
@@ -192,13 +212,60 @@ pub mod tests {
                 ()
             ).await;
         conductor.handle().dispatch_scheduled_fns().await;
-        let query: Vec<Element> = conductor
+        let query1: Vec<Element> = conductor
             .call(
                 &bobbo,
                 "query",
                 ()
             ).await;
-        dbg!(query.len());
+        assert_eq!(query1.len(), 1);
+        conductor.handle().dispatch_scheduled_fns().await;
+        let query2: Vec<Element> = conductor
+            .call(
+                &bobbo,
+                "query",
+                ()
+            ).await;
+        assert_eq!(query2.len(), query1.len() + 1);
+
+        // With a fast scheduler bob should clear everything out.
+        let _ = conductor.clone().start_scheduler(std::time::Duration::from_millis(1)).await;
+
+        let mut i: usize = 0;
+        while i < 10 {
+            tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+            i = i + 1;
+        }
+        let q: Vec<Element> = conductor
+        .call(
+            &bobbo,
+            "query",
+            ()
+        )
+        .await;
+        assert_eq!(q.len(), query2.len());
+
+        // Rescheduling will allow bob catch up to alice.
+        let _shedule: () = conductor
+            .call(
+                &bobbo,
+                "schedule",
+                ()
+            ).await;
+        let mut i2: usize = 0;
+        while i2 < 10 {
+            tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+            i2 = i2 + 1;
+        }
+        let q2: Vec<Element> = conductor
+        .call(
+            &bobbo,
+            "query",
+            ()
+        )
+        .await;
+        assert_eq!(q2.len(), 5);
+
         Ok(())
     }
 }
