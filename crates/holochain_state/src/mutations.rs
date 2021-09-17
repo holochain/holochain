@@ -690,7 +690,7 @@ pub fn schedule_fn(
                     named_params! {
                         ":zome_name": scheduled_fn.zome_name().to_string(),
                         ":scheduled_fn": scheduled_fn.fn_name().to_string()
-                    }
+                    },
                 )?;
                 return Ok(());
             };
