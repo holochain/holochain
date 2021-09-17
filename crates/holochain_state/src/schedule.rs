@@ -25,7 +25,8 @@ pub fn fn_is_scheduled(txn: &Transaction, scheduled_fn: ScheduledFn) -> StateMut
             },
             |row| row.get::<_, String>(0),
         )
-        .optional()?.is_some())
+        .optional()?
+        .is_some())
 }
 
 pub fn live_scheduled_fns(

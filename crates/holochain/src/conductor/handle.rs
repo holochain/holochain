@@ -898,6 +898,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     /// Start the scheduler. None is not an option.
     async fn start_scheduler(self: Arc<Self>, interval_period: std::time::Duration) {
+        dbg!("start scheduler");
         // Clear all ephemeral cruft in all cells before starting a scheduler.
         let cell_arcs = {
             let lock = self.conductor.read().await;
@@ -921,12 +922,13 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
         let scheduler_handle = self.clone();
         let scheduler = tokio::task::spawn(async move {
-            let mut interval = tokio::time::interval(
-                interval_period,
-            );
+            let mut interval = tokio::time::interval(interval_period);
             loop {
+                dbg!("Schedule tick");
                 interval.tick().await;
+                dbg!("...");
                 scheduler_handle.clone().dispatch_scheduled_fns().await;
+                dbg!("///");
             }
         });
         self.conductor.write().await.set_scheduler(scheduler);

@@ -1398,9 +1398,11 @@ mod builder {
         ) -> ConductorResult<ConductorHandle> {
             tokio::task::spawn(p2p_event_task(p2p_evt, handle.clone()));
 
-            let _ = handle.clone().start_scheduler(
-                std::time::Duration::from_millis(holochain_zome_types::schedule::SCHEDULER_INTERVAL_MILLIS)
-            );
+            let _ = handle
+                .clone()
+                .start_scheduler(std::time::Duration::from_millis(
+                    holochain_zome_types::schedule::SCHEDULER_INTERVAL_MILLIS,
+                ));
 
             let configs = conductor_config.admin_interfaces.unwrap_or_default();
             let cell_startup_errors = handle.clone().initialize_conductor(configs).await?;

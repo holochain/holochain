@@ -231,11 +231,7 @@ pub mod tests {
         // With a fast scheduler bob should clear everything out.
         let _ = conductor.clone().start_scheduler(std::time::Duration::from_millis(1)).await;
 
-        let mut i: usize = 0;
-        while i < 10 {
-            tokio::time::sleep(std::time::Duration::from_millis(2)).await;
-            i = i + 1;
-        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         let q: Vec<Element> = conductor
         .call(
             &bobbo,
@@ -252,18 +248,15 @@ pub mod tests {
                 "schedule",
                 ()
             ).await;
-        let mut i2: usize = 0;
-        while i2 < 10 {
-            tokio::time::sleep(std::time::Duration::from_millis(2)).await;
-            i2 = i2 + 1;
-        }
+
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         let q2: Vec<Element> = conductor
-        .call(
-            &bobbo,
-            "query",
-            ()
-        )
-        .await;
+            .call(
+                &bobbo,
+                "query",
+                ()
+            )
+            .await;
         assert_eq!(q2.len(), 5);
 
         Ok(())
