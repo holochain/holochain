@@ -8,6 +8,7 @@ use thiserror::Error;
 
 use crate::prelude::StateMutationError;
 use crate::query::StateQueryError;
+use crate::scratch::ScratchError;
 use crate::scratch::SyncScratchError;
 
 #[derive(Error, Debug)]
@@ -18,10 +19,13 @@ pub enum SourceChainError {
     #[error(
         "Attempted to commit a bundle to the source chain, but the source chain head has moved since the bundle began. Bundle head: {0:?}, Current head: {1:?}"
     )]
-    HeadMoved(Option<HeaderHash>, Option<HeaderHash>),
+    HeadMoved(Option<HeaderHash>, Option<(HeaderHash, u32, Timestamp)>),
 
     #[error(transparent)]
     TimestampError(#[from] holochain_zome_types::TimestampError),
+
+    #[error(transparent)]
+    ScratchError(#[from] ScratchError),
 
     #[error("Attempted to write anything other than the countersigning session entry while the chain was locked for a countersigning session.")]
     ChainLocked,

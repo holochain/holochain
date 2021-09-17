@@ -60,7 +60,7 @@ async fn standard_responses(
             Ok(async {
                 Ok(Some((
                     vec![Arc::new(KitsuneOpHash(vec![0; 36]))],
-                    u64::MIN..u64::MAX,
+                    full_time_range(),
                 )))
             }
             .boxed()
@@ -158,6 +158,6 @@ pub fn dangerous_fake_agent_info_with_arc(
 
 pub fn empty_bloom() -> EncodedTimedBloomFilter {
     EncodedTimedBloomFilter::MissingAllHashes {
-        time_window: 0..u64::MAX,
+        time_window: full_time_range(),
     }
 }
