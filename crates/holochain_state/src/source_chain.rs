@@ -1,9 +1,12 @@
+use crate::scratch::ScratchError;
 use crate::scratch::SyncScratchError;
+use async_recursion::async_recursion;
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
+use holochain_keystore::KeystoreSender;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::dht_op::produce_op_lights_from_elements;
 use holochain_types::dht_op::produce_op_lights_from_iter;
@@ -525,65 +528,8 @@ impl SourceChain {
         })
     }
 
+    #[async_recursion]
     pub async fn flush(&self) -> SourceChainResult<()> {
-        #[allow(clippy::complexity)]
-        fn build_ops_from_headers(
-            signed_headers: Vec<SignedHeaderHashed>,
-        ) -> SourceChainResult<(
-            Vec<SignedHeaderHashed>,
-            Vec<(
-                DhtOpLight,
-                DhtOpHash,
-                OpOrder,
-                Timestamp,
-                Option<EntryVisibility>,
-                Dependency,
-            )>,
-        )> {
-            // Headers end up back in here.
-            let mut headers = Vec::with_capacity(signed_headers.len());
-            // The op related data ends up here.
-            let mut ops = Vec::with_capacity(headers.len());
-
-            // Loop through each header and produce op related data.
-            for shh in signed_headers {
-                // &HeaderHash, &Header, EntryHash are needed to produce the ops.
-                let entry_hash = shh.header().entry_hash().cloned();
-                let item = (shh.as_hash(), shh.header(), entry_hash);
-                let ops_inner = produce_op_lights_from_iter(vec![item].into_iter(), 1)?;
-
-                // Break apart the SignedHeaderHashed.
-                let (header, sig) = shh.into_header_and_signature();
-                let (header, hash) = header.into_inner();
-
-                // We need to take the header by value and put it back each loop.
-                let mut h = Some(header);
-                for op in ops_inner {
-                    let op_type = op.get_type();
-                    // Header is required by value to produce the DhtOpHash.
-                    let (header, op_hash) =
-                        UniqueForm::op_hash(op_type, h.expect("This can't be empty"))?;
-                    let op_order = OpOrder::new(op_type, header.timestamp());
-                    let timestamp = header.timestamp();
-                    let visibility = header.entry_type().map(|et| *et.visibility());
-                    // Put the header back by value.
-                    let dependency = get_dependency(op_type, &header);
-                    h = Some(header);
-                    // Collect the DhtOpLight, DhtOpHash and OpOrder.
-                    ops.push((op, op_hash, op_order, timestamp, visibility, dependency));
-                }
-
-                // Put the SignedHeaderHashed back together.
-                let shh = SignedHeaderHashed::with_presigned(
-                    HeaderHashed::with_pre_hashed(h.expect("This can't be empty"), hash),
-                    sig,
-                );
-                // Put the header back in the list.
-                headers.push(shh);
-            }
-            Ok((headers, ops))
-        }
-
         // Nothing to write
         if self.scratch.apply(|s| s.is_empty())? {
             return Ok(());
@@ -608,33 +554,25 @@ impl SourceChain {
         }
         let lock = Self::lock_for_entry(maybe_countersigned_entry)?;
 
-        let is_relaxed_ordering =
-            self.scratch
-                .apply_and_then::<bool, SyncScratchError, _>(|scratch| {
-                    Ok(scratch.chain_top_ordering() == ChainTopOrdering::Relaxed)
-                })?;
-
         // Write the entries, headers and ops to the database in one transaction.
         let author = self.author.clone();
         let persisted_head = self.persisted_head.clone();
-        self.vault
+        let headers_1 = headers.clone();
+        match self
+            .vault
             .async_commit(move |txn: &mut Transaction| {
                 // As at check.
-                let (new_persisted_head, _, _) = chain_head_db(&txn, author)?;
-                if headers.last().is_none() {
+                let (new_persisted_head, new_head_seq, new_timestamp) =
+                    chain_head_db(&txn, author)?;
+                if headers_1.last().is_none() {
                     // Nothing to write
                     return Ok(());
                 }
                 if persisted_head != new_persisted_head {
-                    if is_relaxed_ordering {
-                        // @TODO: rebuild all the headers here.
-                        todo!();
-                    } else {
-                        return Err(SourceChainError::HeadMoved(
-                            Some(persisted_head),
-                            Some(new_persisted_head),
-                        ));
-                    }
+                    return Err(SourceChainError::HeadMoved(
+                        Some(persisted_head),
+                        Some((new_persisted_head, new_head_seq, new_timestamp)),
+                    ));
                 }
 
                 // If the lock isn't empty this is a countersigning session.
@@ -656,7 +594,7 @@ impl SourceChain {
                 for entry in entries {
                     insert_entry(txn, entry)?;
                 }
-                for header in headers {
+                for header in headers_1 {
                     insert_header(txn, header)?;
                 }
                 for (op, op_hash, op_order, timestamp, visibility, dependency) in ops {
@@ -691,9 +629,124 @@ impl SourceChain {
                 }
                 SourceChainResult::Ok(())
             })
-            .await?;
-        Ok(())
+            .await
+        {
+            Err(SourceChainError::HeadMoved(
+                old_head,
+                Some((new_persisted_head, new_head_seq, new_timestamp)),
+            )) => {
+                let is_relaxed =
+                    self.scratch
+                        .apply_and_then::<bool, SyncScratchError, _>(|scratch| {
+                            Ok(scratch.chain_top_ordering() == ChainTopOrdering::Relaxed)
+                        })?;
+                if is_relaxed {
+                    let keystore = self.vault.keystore();
+                    // A child chain is needed with a new as-at that matches
+                    // the rebase.
+                    let child_chain = Self::new(self.vault.clone(), (*self.author).clone()).await?;
+                    let rebased_headers: Vec<SignedHeaderHashed> = rebase_headers_on(
+                        &keystore,
+                        headers,
+                        new_persisted_head,
+                        new_head_seq,
+                        new_timestamp,
+                    )
+                    .await?;
+                    child_chain.scratch.apply(|scratch| {
+                        for header in rebased_headers {
+                            scratch.add_header(header, ChainTopOrdering::Relaxed)
+                        }
+                    })?;
+                    child_chain.flush().await
+                } else {
+                    Err(SourceChainError::HeadMoved(
+                        old_head,
+                        Some((new_persisted_head, new_head_seq, new_timestamp)),
+                    ))
+                }
+            }
+            result => result,
+        }
     }
+}
+
+#[allow(clippy::complexity)]
+fn build_ops_from_headers(
+    signed_headers: Vec<SignedHeaderHashed>,
+) -> SourceChainResult<(
+    Vec<SignedHeaderHashed>,
+    Vec<(
+        DhtOpLight,
+        DhtOpHash,
+        OpOrder,
+        Timestamp,
+        Option<EntryVisibility>,
+        Dependency,
+    )>,
+)> {
+    // Headers end up back in here.
+    let mut headers_output = Vec::with_capacity(signed_headers.len());
+    // The op related data ends up here.
+    let mut ops = Vec::with_capacity(signed_headers.len());
+
+    // Loop through each header and produce op related data.
+    for shh in signed_headers {
+        // &HeaderHash, &Header, EntryHash are needed to produce the ops.
+        let entry_hash = shh.header().entry_hash().cloned();
+        let item = (shh.as_hash(), shh.header(), entry_hash);
+        let ops_inner = produce_op_lights_from_iter(vec![item].into_iter(), 1)?;
+
+        // Break apart the SignedHeaderHashed.
+        let (header, sig) = shh.into_header_and_signature();
+        let (header, hash) = header.into_inner();
+
+        // We need to take the header by value and put it back each loop.
+        let mut h = Some(header);
+        for op in ops_inner {
+            let op_type = op.get_type();
+            // Header is required by value to produce the DhtOpHash.
+            let (header, op_hash) = UniqueForm::op_hash(op_type, h.expect("This can't be empty"))?;
+            let op_order = OpOrder::new(op_type, header.timestamp());
+            let timestamp = header.timestamp();
+            let visibility = header.entry_type().map(|et| *et.visibility());
+            // Put the header back by value.
+            let dependency = get_dependency(op_type, &header);
+            h = Some(header);
+            // Collect the DhtOpLight, DhtOpHash and OpOrder.
+            ops.push((op, op_hash, op_order, timestamp, visibility, dependency));
+        }
+
+        // Put the SignedHeaderHashed back together.
+        let shh = SignedHeaderHashed::with_presigned(
+            HeaderHashed::with_pre_hashed(h.expect("This can't be empty"), hash),
+            sig,
+        );
+        // Put the header back in the list.
+        headers_output.push(shh);
+    }
+    Ok((headers_output, ops))
+}
+
+async fn rebase_headers_on(
+    keystore: &KeystoreSender,
+    mut headers: Vec<SignedHeaderHashed>,
+    mut rebase_header: HeaderHash,
+    mut rebase_seq: u32,
+    mut rebase_timestamp: Timestamp,
+) -> Result<Vec<SignedHeaderHashed>, ScratchError> {
+    headers.sort_by_key(|a| a.header().header_seq());
+    for shh in headers.iter_mut() {
+        let mut header = shh.header().clone();
+        header.rebase_on(rebase_header.clone(), rebase_seq, rebase_timestamp)?;
+        rebase_seq = header.header_seq();
+        rebase_timestamp = header.timestamp();
+        let hh = HeaderHashed::from_content_sync(header);
+        rebase_header = hh.as_hash().clone();
+        let new_shh = SignedHeaderHashed::new(keystore, hh).await?;
+        *shh = new_shh;
+    }
+    Ok(headers)
 }
 
 pub async fn genesis(
@@ -894,11 +947,11 @@ async fn _put_db<H: HeaderInner, B: HeaderBuilder<H>>(
     let entry = entry.into_option();
     let hash = header.as_hash().clone();
     vault.conn()?.with_commit_sync(|txn| {
-        let (new_head, _, _) = chain_head_db(txn, author.clone())?;
+        let (new_head, new_seq, new_timestamp) = chain_head_db(txn, author.clone())?;
         if new_head != prev_header {
             return Err(SourceChainError::HeadMoved(
                 Some(prev_header),
-                Some(new_head),
+                Some((new_head, new_seq, new_timestamp)),
             ));
         }
         SourceChainResult::Ok(put_raw(txn, header, ops, entry)?)
@@ -984,6 +1037,61 @@ pub mod tests {
 
     use crate::source_chain::SourceChainResult;
     use holochain_zome_types::Entry;
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_relaxed_ordering() -> SourceChainResult<()> {
+        let test_env = test_cell_env();
+        let env = test_env.env();
+        let alice = fixt!(AgentPubKey, Predictable, 0);
+
+        source_chain::genesis(env.clone(), fake_dna_hash(1), alice.clone(), None)
+            .await
+            .unwrap();
+        let chain_1 = SourceChain::new(env.clone().into(), alice.clone()).await?;
+        let chain_2 = SourceChain::new(env.clone().into(), alice.clone()).await?;
+        let chain_3 = SourceChain::new(env.clone().into(), alice.clone()).await?;
+
+        let header_builder = builder::CloseChain {
+            new_dna_hash: fixt!(DnaHash),
+        };
+        chain_1
+            .put(header_builder.clone(), None, ChainTopOrdering::Strict)
+            .await?;
+        chain_2
+            .put(header_builder.clone(), None, ChainTopOrdering::Strict)
+            .await?;
+        chain_3
+            .put(header_builder, None, ChainTopOrdering::Relaxed)
+            .await?;
+
+        let author = Arc::new(alice);
+        chain_1.flush().await?;
+        let author_1 = Arc::clone(&author);
+        let (_, seq, _) = env
+            .async_commit(move |txn: &mut Transaction| chain_head_db(&txn, author_1))
+            .await?;
+        assert_eq!(seq, 3);
+
+        assert!(matches!(
+            chain_2.flush().await,
+            Err(SourceChainError::HeadMoved(_, _))
+        ));
+        let author_2 = Arc::clone(&author);
+        let (_, seq, _) = env
+            .async_commit(move |txn: &mut Transaction| chain_head_db(&txn, author_2))
+            .await?;
+        assert_eq!(seq, 3);
+
+        chain_3.flush().await?;
+        let author_3 = Arc::clone(&author);
+        let (_, seq, _) = env
+            .async_commit(move |txn: &mut Transaction| chain_head_db(&txn, author_3))
+            .await?;
+        assert_eq!(seq, 4);
+
+        Ok(())
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     async fn test_get_cap_grant() -> SourceChainResult<()> {
         let test_env = test_cell_env();
