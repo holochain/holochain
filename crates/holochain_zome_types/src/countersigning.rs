@@ -1,6 +1,7 @@
 //! Countersigned entries involve preflights between many agents to build a session that is part of the entry.
 
 use std::iter::FromIterator;
+use std::time::Duration;
 
 use crate::prelude::*;
 use holo_hash::AgentPubKey;
@@ -9,11 +10,12 @@ use holo_hash::HeaderHash;
 
 /// The timestamps on headers for a session use this offset relative to the session start time.
 /// This makes it easier for agents to accept a preflight request with headers that are after their current chain top, after network latency.
-pub const SESSION_HEADER_TIME_OFFSET_MILLIS: i64 = 1000;
+pub const SESSION_HEADER_TIME_OFFSET: Duration = Duration::from_millis(1000);
 
 /// Maximum time in the future the session start can be in the opinion of the participating agent.
-/// As the header will be SESSION_HEADER_TIME_OFFSET_MILLIS after the session start we include that here.
-pub const SESSION_TIME_FUTURE_MAX_MILLIS: i64 = 5000 + SESSION_HEADER_TIME_OFFSET_MILLIS;
+/// As the header will be `SESSION_HEADER_TIME_OFFSET` after the session start we include that here.
+pub const SESSION_TIME_FUTURE_MAX: Duration =
+    Duration::from_millis(5000 + SESSION_HEADER_TIME_OFFSET.as_millis() as u64);
 
 /// Need at least two to countersign.
 pub const MIN_COUNTERSIGNING_AGENTS: usize = 2;
@@ -69,11 +71,11 @@ impl CounterSigningSessionTimes {
 
     /// Verify the difference between the end and start time is larger than the session header time offset.
     pub fn check_integrity(&self) -> Result<(), CounterSigningError> {
-        let times_are_valid = &Timestamp(0, 0) < self.start()
+        let times_are_valid = &Timestamp::from_micros(0) < self.start()
             && self.start()
-                <= &(self.end()
-                    - core::time::Duration::from_millis(SESSION_HEADER_TIME_OFFSET_MILLIS as u64))
-                .map_err(|_| CounterSigningError::CounterSigningSessionTimes((*self).clone()))?;
+                <= &(self.end() - SESSION_HEADER_TIME_OFFSET).map_err(|_| {
+                    CounterSigningError::CounterSigningSessionTimes((*self).clone())
+                })?;
         if times_are_valid {
             Ok(())
         } else {
@@ -487,7 +489,7 @@ impl Header {
         Ok(match session_data.preflight_request().header_base() {
             HeaderBase::Create(create_base) => Header::Create(Create {
                 author,
-                timestamp: Timestamp::from_countersigning_data(session_data),
+                timestamp: session_data.to_timestamp(),
                 header_seq: agent_state.header_seq + 1,
                 prev_header: agent_state.chain_top.clone(),
                 entry_type: create_base.entry_type.clone(),
@@ -495,7 +497,7 @@ impl Header {
             }),
             HeaderBase::Update(update_base) => Header::Update(Update {
                 author,
-                timestamp: Timestamp::from_countersigning_data(session_data),
+                timestamp: session_data.to_timestamp(),
                 header_seq: agent_state.header_seq + 1,
                 prev_header: agent_state.chain_top.clone(),
                 original_header_address: update_base.original_header_address.clone(),
@@ -610,6 +612,13 @@ impl CounterSigningSessionData {
         }
     }
 
+    /// Construct a Timestamp from countersigning session data.
+    /// Ostensibly used for the Header because the session itself covers a time range.
+    pub fn to_timestamp(&self) -> Timestamp {
+        (self.preflight_request().session_times().start() + SESSION_HEADER_TIME_OFFSET)
+            .unwrap_or(Timestamp::MAX)
+    }
+
     /// Accessor to the preflight request.
     pub fn preflight_request(&self) -> &PreflightRequest {
         &self.preflight_request
@@ -648,7 +657,7 @@ pub mod test {
     use super::CounterSigningError;
     use super::CounterSigningSessionTimes;
     use super::PreflightRequest;
-    use super::SESSION_HEADER_TIME_OFFSET_MILLIS;
+    use super::SESSION_HEADER_TIME_OFFSET;
     use crate::AgentPubKeyFixturator;
     use crate::Role;
     use arbitrary::Arbitrary;
@@ -675,9 +684,7 @@ pub mod test {
         );
 
         // Shifting the end forward by the session offset will _almost_ fix it.
-        *session_times.end_mut() = (session_times.end()
-            + core::time::Duration::from_millis(SESSION_HEADER_TIME_OFFSET_MILLIS as u64))
-        .unwrap();
+        *session_times.end_mut() = (session_times.end() + SESSION_HEADER_TIME_OFFSET).unwrap();
         assert_matches!(
             session_times.check_integrity(),
             Err(CounterSigningError::CounterSigningSessionTimes(_))

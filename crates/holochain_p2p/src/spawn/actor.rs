@@ -8,7 +8,7 @@ use kitsune_p2p::event::MetricDatum;
 use kitsune_p2p::event::MetricKind;
 use kitsune_p2p::event::MetricQuery;
 use kitsune_p2p::event::MetricQueryAnswer;
-use kitsune_p2p::event::TimeWindowMs;
+use kitsune_p2p::event::TimeWindow;
 
 use crate::types::AgentPubKeyExt;
 
@@ -32,7 +32,7 @@ macro_rules! timing_trace {
             if __elapsed_s >= 5.0 {
                 tracing::warn!( elapsed_s = %__elapsed_s $($rest)* );
             } else {
-                tracing::debug!( elapsed_s = %__elapsed_s $($rest)* );
+                tracing::trace!( elapsed_s = %__elapsed_s $($rest)* );
             }
             __out
         }
@@ -301,16 +301,16 @@ impl WrapEvtSender {
         &self,
         dna_hash: DnaHash,
         agents: Vec<(AgentPubKey, kitsune_p2p::dht_arc::DhtArcSet)>,
-        window_ms: TimeWindowMs,
+        window: TimeWindow,
         max_ops: usize,
         include_limbo: bool,
-    ) -> impl Future<Output = HolochainP2pResult<Option<(Vec<holo_hash::DhtOpHash>, TimeWindowMs)>>>
+    ) -> impl Future<Output = HolochainP2pResult<Option<(Vec<holo_hash::DhtOpHash>, TimeWindow)>>>
            + 'static
            + Send {
         timing_trace!(
             {
                 self.0
-                    .query_op_hashes(dna_hash, agents, window_ms, max_ops, include_limbo)
+                    .query_op_hashes(dna_hash, agents, window, max_ops, include_limbo)
             },
             "(hp2p:handle) query_op_hashes",
         )
@@ -892,12 +892,12 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         &mut self,
         input: kitsune_p2p::event::QueryOpHashesEvt,
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<
-        Option<(Vec<Arc<kitsune_p2p::KitsuneOpHash>>, TimeWindowMs)>,
+        Option<(Vec<Arc<kitsune_p2p::KitsuneOpHash>>, TimeWindow)>,
     > {
         let kitsune_p2p::event::QueryOpHashesEvt {
             space,
             agents,
-            window_ms: window,
+            window,
             max_ops,
             include_limbo,
         } = input;

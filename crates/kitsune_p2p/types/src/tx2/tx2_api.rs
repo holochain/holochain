@@ -81,7 +81,7 @@ impl<C: Codec + 'static + Send + Unpin> RMap<C> {
             crate::metrics::metric_push_api_req_res_elapsed_ms(elapsed.as_millis() as u64);
             let elapsed_s = elapsed.as_secs_f64();
 
-            tracing::debug!(
+            tracing::trace!(
                 %dbg_name,
                 %req_byte_count,
                 %resp_dbg_name,
@@ -129,7 +129,7 @@ impl<C: Codec + 'static + Send + Unpin> RMap<C> {
         }) = self.0.remove(&(uniq, msg_id))
         {
             let elapsed_s = start.elapsed().as_secs_f64();
-            tracing::debug!(
+            tracing::trace!(
                 %dbg_name,
                 %req_byte_count,
                 ?local_cert,
@@ -296,7 +296,7 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
             this.metrics.write_len(dbg_name, len);
 
             let peer_cert = this.peer_cert();
-            tracing::debug!(
+            tracing::trace!(
                 %dbg_name,
                 req_byte_count=%len,
                 local_cert=?this.local_cert,
@@ -570,7 +570,7 @@ impl<C: Codec + 'static + Send + Unpin> Tx2Respond<C> {
             let elapsed_s = time.elapsed().as_secs_f64();
             let resp_dbg_name = data.variant_type();
             let resp_byte_count = buf.len();
-            tracing::debug!(
+            tracing::trace!(
                 %dbg_name,
                 %req_byte_count,
                 %resp_dbg_name,

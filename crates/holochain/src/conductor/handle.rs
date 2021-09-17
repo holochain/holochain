@@ -640,7 +640,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             HolochainP2pEvent::QueryOpHashes {
                 dna_hash,
                 to_agents,
-                window_ms,
+                window,
                 max_ops,
                 include_limbo,
                 respond,
@@ -654,7 +654,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                     let cell_id = CellId::new(dna_hash.clone(), agent);
                     let cell = self.cell_by_id(&cell_id).await?;
                     match cell
-                        .handle_query_op_hashes(arc_set, window_ms.clone(), include_limbo)
+                        .handle_query_op_hashes(arc_set, window.clone(), include_limbo)
                         .await
                     {
                         Ok(t) => hashes_and_times.extend(t),
@@ -694,8 +694,14 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                     .collect();
 
                 // The range is exclusive so we add one to the end.
-                let range =
-                    start.and_then(|s| end.map(|e| (hashes, s..(e.checked_add(1).unwrap_or(0)))));
+                let range = start.and_then(|s| {
+                    end.map(|e| {
+                        (
+                            hashes,
+                            s..(e.saturating_add(&std::time::Duration::from_millis(1))),
+                        )
+                    })
+                });
 
                 respond.respond(Ok(async move { Ok(range) }.boxed().into()));
             }

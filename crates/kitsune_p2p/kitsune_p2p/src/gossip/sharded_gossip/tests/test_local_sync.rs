@@ -96,7 +96,7 @@ async fn local_sync_scenario() {
             // Only look at the first agent
             &agent_arcs[0..1],
             &DhtArcSet::Full,
-            full_time_window(),
+            full_time_range(),
             usize::MAX,
             false,
         )

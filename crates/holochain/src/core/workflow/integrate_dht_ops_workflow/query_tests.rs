@@ -110,7 +110,8 @@ fn create_and_insert_op(env: &EnvRead, facts: Facts, data: &mut SharedData) -> D
             insert_op(txn, state.clone(), false).unwrap();
             set_validation_status(txn, hash.clone(), ValidationStatus::Valid).unwrap();
             if facts.integrated {
-                set_when_integrated(txn, hash.clone(), holochain_types::timestamp::now()).unwrap();
+                set_when_integrated(txn, hash.clone(), holochain_zome_types::Timestamp::now())
+                    .unwrap();
             }
             if facts.awaiting_integration {
                 set_validation_stage(

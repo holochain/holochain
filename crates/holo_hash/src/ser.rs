@@ -60,7 +60,7 @@ impl<'de, T: HashType> serde::de::Visitor<'de> for HoloHashVisitor<T> {
         self.visit_bytes(&vec)
     }
 
-    #[cfg(feature = "string-encoding")]
+    #[cfg(feature = "encoding")]
     fn visit_str<E>(self, b64: &str) -> Result<Self::Value, E>
     where
         E: serde::de::Error,
@@ -116,7 +116,7 @@ mod tests {
     struct TestByteArray(#[serde(with = "serde_bytes")] Vec<u8>);
 
     #[test]
-    #[cfg(feature = "serialized-bytes")]
+    #[cfg(feature = "serialization")]
     fn test_serialized_bytes_roundtrip() {
         use holochain_serialized_bytes::SerializedBytes;
         use std::convert::TryInto;

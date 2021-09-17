@@ -115,6 +115,14 @@ impl SweetConductorBatch {
         }
         crate::conductor::p2p_agent_store::exchange_peer_info(all).await;
     }
+
+    /// Force trigger all dht ops that haven't received
+    /// enough validation receipts yet.
+    pub async fn force_all_publish_dht_ops(&self) {
+        for c in self.0.iter() {
+            c.force_all_publish_dht_ops().await;
+        }
+    }
 }
 
 impl std::ops::Index<usize> for SweetConductorBatch {

@@ -1,6 +1,6 @@
 [package]
 name = "holochain_zome_types"
-version = "0.0.6"
+version = "0.0.8"
 description = "Holochain zome types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -13,7 +13,8 @@ edition = "2018"
 
 [dependencies]
 chrono = "0.4.6"
-holo_hash = { version = "0.0.5", path = "../holo_hash", default-features = false }
+kitsune_p2p_timestamp = { version = "0.0.2", path = "../kitsune_p2p/timestamp" }
+holo_hash = { version = "0.0.6", path = "../holo_hash" }
 holochain_serialized_bytes = "=0.0.51"
 paste = "=1.0.5"
 serde = { version = "1.0", features = [ "derive" ] }
@@ -58,7 +59,7 @@ default = ["full-dna-def", "fixturators", "test_utils", "subtle-encoding"]
 # but used in Holochain
 full-dna-def = ["derive_builder", "nanoid", "shrinkwraprs"]
 
-full = ["default", "rusqlite", "num_enum"]
+full = ["default", "rusqlite", "num_enum", "kitsune_p2p_timestamp/full"]
 
 fixturators = ["fixt", "rand", "strum", "holo_hash/fixturators", ]
 
@@ -66,6 +67,8 @@ test_utils = [
   "arbitrary",
   "contrafact",
   "once_cell",
+  "kitsune_p2p_timestamp/arbitrary",
+  "kitsune_p2p_timestamp/rusqlite",
   "holo_hash/arbitrary",
   "holo_hash/hashing",
   "holo_hash/test_utils",

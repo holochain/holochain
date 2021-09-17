@@ -24,8 +24,9 @@ pub fn accept_countersigning_preflight_request<'a>(
                 return Ok(PreflightRequestAcceptance::Invalid(e.to_string()));
             }
             tokio_helper::block_forever_on(async move {
-                if holochain_types::timestamp::now().0 + SESSION_TIME_FUTURE_MAX_MILLIS
-                    < input.session_times().start().0
+                if (holochain_zome_types::Timestamp::now() + SESSION_TIME_FUTURE_MAX)
+                    .unwrap_or(Timestamp::MAX)
+                    < *input.session_times().start()
                 {
                     return Ok(PreflightRequestAcceptance::UnacceptableFutureStart);
                 }
@@ -111,13 +112,28 @@ pub mod wasm_test {
     use holochain_types::prelude::AgentPubKeyFixturator;
     use holochain_wasm_test_utils::TestWasm;
 
+    /// Allow ChainLocked error, panic on anything else
+    fn expect_chain_locked(
+        result: Result<Result<ZomeCallResponse, RibosomeError>, ConductorApiError>,
+    ) {
+        match result {
+            Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) => {
+                match *workflow_error {
+                    WorkflowError::SourceChainError(SourceChainError::ChainLocked) => {}
+                    _ => panic!("{:?}", workflow_error),
+                }
+            }
+            something_else => panic!("{:?}", something_else),
+        };
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
     async fn unlock_invalid_session() {
         observability::test_run().ok();
         let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning])
-        .await
-        .unwrap();
+            .await
+            .unwrap();
 
         let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
         let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
@@ -133,7 +149,8 @@ pub mod wasm_test {
             .expect_get_entry_def()
             .return_const(EntryDef::default_with_id("thing"));
 
-        let mut conductor = SweetConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
+        let mut conductor =
+            SweetConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
 
         let apps = conductor
             .setup_app_for_agents(
@@ -157,8 +174,8 @@ pub mod wasm_test {
                 "generate_invalid_countersigning_preflight_request",
                 vec![
                     (alice_pubkey.clone(), vec![Role(0)]),
-                    (bob_pubkey.clone(), vec![])
-                ]
+                    (bob_pubkey.clone(), vec![]),
+                ],
             )
             .await;
 
@@ -173,11 +190,12 @@ pub mod wasm_test {
                 preflight_request.clone(),
             )
             .await;
-        let alice_response = if let PreflightRequestAcceptance::Accepted(ref response) = alice_acceptance {
-            response
-        } else {
-            unreachable!();
-        };
+        let alice_response =
+            if let PreflightRequestAcceptance::Accepted(ref response) = alice_acceptance {
+                response
+            } else {
+                unreachable!();
+            };
 
         // Bob can also accept the preflight request.
         let bob_acceptance: PreflightRequestAcceptance = conductor
@@ -206,15 +224,8 @@ pub mod wasm_test {
                 payload: ExternIO::encode(()).unwrap(),
             })
             .await;
-        match thing_fail_create_alice {
-            Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) => {
-                match *workflow_error {
-                    WorkflowError::SourceChainError(SourceChainError::ChainLocked) => {}
-                    _ => unreachable!(),
-                }
-            }
-            _ => unreachable!(),
-        };
+
+        expect_chain_locked(thing_fail_create_alice);
 
         // Creating the INCORRECT countersigned entry WILL immediately unlock
         // the chain.
@@ -226,12 +237,11 @@ pub mod wasm_test {
                 fn_name: "create_an_invalid_countersigned_thing".into(),
                 cap: None,
                 provenance: alice_pubkey.clone(),
-                payload: ExternIO::encode(vec![alice_response.clone(), bob_response.clone()]).unwrap(),
+                payload: ExternIO::encode(vec![alice_response.clone(), bob_response.clone()])
+                    .unwrap(),
             })
             .await;
-        assert!(
-            matches!(countersign_fail_create_alice, Err(_))
-        );
+        assert!(matches!(countersign_fail_create_alice, Err(_)));
         let _: HeaderHash = conductor.call(&alice, "create_a_thing", ()).await;
     }
 
@@ -360,15 +370,7 @@ pub mod wasm_test {
                 payload: ExternIO::encode(()).unwrap(),
             })
             .await;
-        match thing_fail_create_alice {
-            Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) => {
-                match *workflow_error {
-                    WorkflowError::SourceChainError(SourceChainError::ChainLocked) => {}
-                    _ => unreachable!(),
-                }
-            }
-            _ => unreachable!(),
-        };
+        expect_chain_locked(thing_fail_create_alice);
 
         let thing_fail_create_bob = conductor
             .handle()
@@ -381,15 +383,7 @@ pub mod wasm_test {
                 payload: ExternIO::encode(()).unwrap(),
             })
             .await;
-        match thing_fail_create_bob {
-            Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) => {
-                match *workflow_error {
-                    WorkflowError::SourceChainError(SourceChainError::ChainLocked) => {}
-                    _ => unreachable!(),
-                }
-            }
-            _ => unreachable!(),
-        };
+        expect_chain_locked(thing_fail_create_bob);
 
         // Creating the correct countersigned entry will NOT immediately unlock
         // the chain (it needs Bob to countersign).
@@ -412,15 +406,8 @@ pub mod wasm_test {
             })
             .await;
         tokio::time::sleep(std::time::Duration::from_millis(4000)).await;
-        match thing_fail_create_alice {
-            Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) => {
-                match *workflow_error {
-                    WorkflowError::SourceChainError(SourceChainError::ChainLocked) => {}
-                    _ => unreachable!(),
-                }
-            }
-            _ => unreachable!(),
-        };
+
+        expect_chain_locked(thing_fail_create_alice);
 
         // The countersigned entry does NOT appear in alice's activity yet.
         let alice_activity_pre: AgentActivity = conductor
@@ -431,8 +418,9 @@ pub mod wasm_test {
                     agent_pubkey: alice_pubkey.clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
-                }
-            ).await;
+                },
+            )
+            .await;
         assert_eq!(alice_activity_pre.valid_activity.len(), 6);
 
         // Creation will still fail for bob.
@@ -447,15 +435,7 @@ pub mod wasm_test {
                 payload: ExternIO::encode(()).unwrap(),
             })
             .await;
-        match thing_fail_create_bob {
-            Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) => {
-                match *workflow_error {
-                    WorkflowError::SourceChainError(SourceChainError::ChainLocked) => {}
-                    _ => panic!("{:?}", workflow_error),
-                }
-            }
-            something_else => panic!("{:?}", something_else),
-        };
+        expect_chain_locked(thing_fail_create_bob);
 
         // After bob commits the same countersigned entry he can unlock his chain.
         let countersigned_header_hash_bob: HeaderHash = conductor
@@ -475,7 +455,7 @@ pub mod wasm_test {
             .call(
                 &bobbo,
                 "must_get_header",
-                countersigned_header_hash_bob.clone()
+                countersigned_header_hash_bob.clone(),
             )
             .await;
         let countersigned_header_alice: SignedHeaderHashed = conductor
@@ -483,16 +463,15 @@ pub mod wasm_test {
                 &alice,
                 "must_get_header",
                 countersigned_header_hash_alice.clone(),
-            ).await;
+            )
+            .await;
 
         // Entry get must not error.
-        if let Some((countersigned_entry_hash_bob, _)) = countersigned_header_bob.header().entry_data() {
+        if let Some((countersigned_entry_hash_bob, _)) =
+            countersigned_header_bob.header().entry_data()
+        {
             let _countersigned_entry_bob: EntryHashed = conductor
-                .call(
-                    &bobbo,
-                    "must_get_entry",
-                    countersigned_entry_hash_bob
-                )
+                .call(&bobbo, "must_get_entry", countersigned_entry_hash_bob)
                 .await;
         } else {
             unreachable!();
@@ -503,7 +482,7 @@ pub mod wasm_test {
             .call(
                 &bobbo,
                 "must_get_valid_element",
-                countersigned_header_hash_bob
+                countersigned_header_hash_bob,
             )
             .await;
 
@@ -515,8 +494,9 @@ pub mod wasm_test {
                     agent_pubkey: alice_pubkey.clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
-                }
-            ).await;
+                },
+            )
+            .await;
         assert_eq!(alice_activity.valid_activity.len(), 8);
         assert_eq!(
             &alice_activity.valid_activity[6].1,
@@ -528,11 +508,10 @@ pub mod wasm_test {
                 &bobbo,
                 "get_agent_activity",
                 GetAgentActivityInput {
-
                     agent_pubkey: bob_pubkey.clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
-                }
+                },
             )
             .await;
         assert_eq!(bob_activity.valid_activity.len(), 6);
