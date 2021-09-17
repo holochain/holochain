@@ -39,6 +39,11 @@ crates_io_api = "0.7"
 holochain_util = { path = "../holochain_util" ,version = "0.0.3"}
 crates-index = "0.16"
 
+# used for the example clippy fix-json
+rustfix = "0.6"
+serde_json = "1.0"
+serde_with = "1.9.4"
+
 [dev-dependencies]
 ctor = "0.1"
 prettydiff = "0.4"

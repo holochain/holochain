@@ -2,7 +2,6 @@ UPDATE
   DhtOp
 SET
   when_integrated = :when_integrated,
-  when_integrated_ns = :when_integrated_ns,
   validation_stage = NULL
 WHERE
   validation_stage = 3

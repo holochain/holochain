@@ -1,10 +1,10 @@
 [package]
 name = "holochain"
-version = "0.0.104-dev.0"
+version = "0.0.106"
 description = "Holochain, a framework for distributed applications"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
-documentation = "https://github.com/holochain/holochain"
+documentation = "https://docs.rs/holochain/"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2018"
 
@@ -21,22 +21,22 @@ either = "1.5.0"
 fallible-iterator = "0.2.0"
 fixt = { version = "0.0.5", path = "../fixt" }
 futures = "0.3.1"
-ghost_actor = "0.3.0-alpha.3"
-holo_hash = { version = "0.0.5", path = "../holo_hash", features = ["full"] }
-holochain_cascade = { version = "0.0.4-dev.0", path = "../holochain_cascade" }
-holochain_conductor_api = { version = "0.0.4-dev.0", path = "../holochain_conductor_api" }
-holochain_keystore = { version = "0.0.4-dev.0", path = "../holochain_keystore" }
-holochain_p2p = { version = "0.0.4-dev.0", path = "../holochain_p2p" }
-holochain_sqlite = { version = "0.0.4-dev.0", path = "../holochain_sqlite" }
+ghost_actor = "0.3.0-alpha.4"
+holo_hash = { version = "0.0.6", path = "../holo_hash", features = ["full"] }
+holochain_cascade = { version = "0.0.6", path = "../holochain_cascade" }
+holochain_conductor_api = { version = "0.0.6", path = "../holochain_conductor_api" }
+holochain_keystore = { version = "0.0.6", path = "../holochain_keystore" }
+holochain_p2p = { version = "0.0.6", path = "../holochain_p2p" }
+holochain_sqlite = { version = "0.0.6", path = "../holochain_sqlite" }
 holochain_serialized_bytes = "=0.0.51"
-holochain_state = { version = "0.0.4-dev.0", path = "../holochain_state" }
-holochain_types = { version = "0.0.4-dev.0", path = "../holochain_types" }
+holochain_state = { version = "0.0.6", path = "../holochain_state" }
+holochain_types = { version = "0.0.6", path = "../holochain_types" }
 holochain_wasmer_host = "=0.0.73"
-holochain_websocket = { version = "0.0.4-dev.0", path = "../holochain_websocket" }
-holochain_zome_types = { version = "0.0.5", path = "../holochain_zome_types" }
+holochain_websocket = { version = "0.0.6", path = "../holochain_websocket" }
+holochain_zome_types = { version = "0.0.8", path = "../holochain_zome_types", features = ["full"] }
 human-panic = "1.0.3"
-kitsune_p2p = { version = "0.0.4-dev.0", path = "../kitsune_p2p/kitsune_p2p" }
-kitsune_p2p_types = { version = "0.0.4-dev.0", path = "../kitsune_p2p/types" }
+kitsune_p2p = { version = "0.0.6", path = "../kitsune_p2p/kitsune_p2p" }
+kitsune_p2p_types = { version = "0.0.5", path = "../kitsune_p2p/types" }
 lazy_static = "1.4.0"
 mockall = "0.10.2"
 mr_bundle = { version = "0.0.3", path = "../mr_bundle" }
@@ -71,12 +71,12 @@ url2 = "0.0.6"
 url_serde = "0.2.0"
 uuid = { version = "0.7", features = [ "serde", "v4" ] }
 xsalsa20poly1305 = "0.6.0"
-holochain_wasm_test_utils = { version = "0.0.4-dev.0", path = "../test_utils/wasm" }
+holochain_wasm_test_utils = { version = "0.0.6", path = "../test_utils/wasm" }
 
 # Dependencies for test_utils: keep in sync with below
-hdk = { version = "0.0.103", path = "../hdk", optional = true }
+hdk = { version = "0.0.106", path = "../hdk", optional = true }
 matches = {version = "0.1.8", optional = true }
-holochain_test_wasm_common = { version = "0.0.3", path = "../test_utils/wasm_common", optional = true  }
+holochain_test_wasm_common = { version = "0.0.6", path = "../test_utils/wasm_common", optional = true  }
 unwrap_to = { version = "0.1.0", optional = true }
 itertools = { version = "0.10", optional = true }
 
@@ -94,9 +94,9 @@ serial_test = "0.4.0"
 test-case = "1.0.0"
 
 # Dependencies for test_utils: keep in sync with above
-hdk = { version = "0.0.103", path = "../hdk", optional = false }
+hdk = { version = "0.0.106", path = "../hdk", optional = false }
 matches = {version = "0.1.8", optional = false }
-holochain_test_wasm_common = { version = "0.0.3", path = "../test_utils/wasm_common", optional = false  }
+holochain_test_wasm_common = { version = "0.0.6", path = "../test_utils/wasm_common", optional = false  }
 unwrap_to = { version = "0.1.0", optional = false }
 arbitrary = { version = "1.0", features = ["derive"] }
 

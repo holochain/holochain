@@ -50,7 +50,7 @@ ghost_actor::ghost_chan! {
         ) -> ();
 
         /// Incoming Gossip
-        fn incoming_gossip(space: KSpace, con: WireConHnd, data: Payload, module_type: crate::types::gossip::GossipModuleType) -> ();
+        fn incoming_gossip(space: KSpace, con: WireConHnd, remote_url: TxUrl, data: Payload, module_type: crate::types::gossip::GossipModuleType) -> ();
     }
 }
 
@@ -313,11 +313,12 @@ impl SpaceInternalHandler for Space {
         &mut self,
         _space: Arc<KitsuneSpace>,
         con: Tx2ConHnd<wire::Wire>,
+        remote_url: TxUrl,
         data: Box<[u8]>,
         module_type: GossipModuleType,
     ) -> InternalHandlerResult<()> {
         match self.gossip_mod.get(&module_type) {
-            Some(module) => module.incoming_gossip(con, data)?,
+            Some(module) => module.incoming_gossip(con, remote_url, data)?,
             None => tracing::warn!(
                 "Received gossip for {:?} but this gossip module isn't running",
                 module_type

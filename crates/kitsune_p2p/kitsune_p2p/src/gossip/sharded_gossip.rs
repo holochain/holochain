@@ -11,6 +11,7 @@ use ghost_actor::dependencies::tracing;
 use governor::clock::DefaultClock;
 use governor::state::{InMemoryState, NotKeyed};
 use governor::RateLimiter;
+use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::*;
 use kitsune_p2p_types::dht_arc::{ArcInterval, DhtArcSet};
@@ -19,7 +20,6 @@ use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::*;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::ops::Range;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
@@ -65,7 +65,7 @@ struct TimedBloomFilter {
     /// for this time window.
     bloom: Option<BloomFilter>,
     /// The time window for this bloom filter.
-    time: TimeWindowMs,
+    time: TimeWindow,
 }
 
 /// Gossip has two distinct variants which share a lot of similarities but
@@ -154,11 +154,9 @@ impl ShardedGossip {
         let timeout = self.gossip.tuning_params.implicit_timeout();
 
         let con = match how {
-            HowToConnect::Con(con) => {
+            HowToConnect::Con(con, remote_url) => {
                 if con.is_closed() {
-                    self.ep_hnd
-                        .get_connection(con.peer_addr()?, timeout)
-                        .await?
+                    self.ep_hnd.get_connection(remote_url, timeout).await?
                 } else {
                     con
                 }
@@ -174,7 +172,7 @@ impl ShardedGossip {
 
     async fn process_incoming_outgoing(&self) -> KitsuneResult<()> {
         let (incoming, outgoing) = self.pop_queues()?;
-        if let Some((con, msg, bytes)) = incoming {
+        if let Some((con, remote_url, msg, bytes)) = incoming {
             self.bandwidth.incoming_bytes(bytes).await;
             let outgoing = match self.gossip.process_incoming(con.peer_cert(), msg).await {
                 Ok(r) => r,
@@ -187,7 +185,7 @@ impl ShardedGossip {
                 i.outgoing.extend(outgoing.into_iter().map(|msg| {
                     (
                         GossipTgt::new(Vec::with_capacity(0), con.peer_cert()),
-                        HowToConnect::Con(con.clone()),
+                        HowToConnect::Con(con.clone(), remote_url.clone()),
                         msg,
                     )
                 }));
@@ -258,7 +256,7 @@ pub struct ShardedGossipLocal {
 }
 
 /// Incoming gossip.
-type Incoming = (Tx2ConHnd<wire::Wire>, ShardedGossipWire, usize);
+type Incoming = (Tx2ConHnd<wire::Wire>, TxUrl, ShardedGossipWire, usize);
 /// Outgoing gossip.
 type Outgoing = (GossipTgt, HowToConnect, ShardedGossipWire);
 
@@ -291,12 +289,15 @@ impl ShardedGossipLocalState {
         {
             self.initiate_tgt = None;
         }
-        if error {
-            self.metrics.record_error(state_key.clone());
-        } else {
-            self.metrics.record_success(state_key.clone());
+        let r = self.round_map.remove(state_key);
+        if r.is_some() {
+            if error {
+                self.metrics.record_error(state_key.clone());
+            } else {
+                self.metrics.record_success(state_key.clone());
+            }
         }
-        self.round_map.remove(state_key)
+        r
     }
 
     fn check_tgt_expired(&mut self) {
@@ -359,7 +360,7 @@ impl ShardedGossipLocal {
     const UPPER_HASHES_BOUND: usize = 500;
 
     /// Calculate the time range for a gossip round.
-    fn calculate_time_ranges(&self) -> Vec<Range<u64>> {
+    fn calculate_time_ranges(&self) -> Vec<TimeWindow> {
         const NOW: Duration = Duration::from_secs(0);
         const HOUR: Duration = Duration::from_secs(60 * 60);
         const DAY: Duration = Duration::from_secs(60 * 60 * 24);
@@ -405,7 +406,7 @@ impl ShardedGossipLocal {
         self.inner.share_mut(|i, _| Ok(i.remove_state(id, error)))
     }
 
-    async fn remove_target(&self, id: &StateKey) -> KitsuneResult<()> {
+    async fn remove_target(&self, id: &StateKey, error: bool) -> KitsuneResult<()> {
         self.inner.share_mut(|i, _| {
             if i.initiate_tgt
                 .as_ref()
@@ -413,6 +414,11 @@ impl ShardedGossipLocal {
                 .unwrap_or(false)
             {
                 i.initiate_tgt = None;
+                if error {
+                    i.metrics.record_error(id.clone());
+                } else {
+                    i.metrics.record_success(id.clone());
+                }
             }
             Ok(())
         })
@@ -537,7 +543,7 @@ impl ShardedGossipLocal {
                 Vec::with_capacity(0)
             }
             ShardedGossipWire::AlreadyInProgress(_) => {
-                self.remove_target(&cert).await?;
+                self.remove_target(&cert, false).await?;
                 Vec::with_capacity(0)
             }
             ShardedGossipWire::Error(Error { message }) => {
@@ -559,7 +565,7 @@ impl ShardedGossipLocal {
             &self.space,
             agent_arcs.as_slice(),
             &arcset,
-            full_time_window(),
+            full_time_range(),
             usize::MAX,
             true,
         )
@@ -678,19 +684,20 @@ impl RoundState {
 
 /// Time range from now into the past.
 /// Start must be < end.
-fn time_range(start: Duration, end: Duration) -> Range<u64> {
+fn time_range(start: Duration, end: Duration) -> TimeWindow {
+    // TODO: write in terms of chrono::now()
     let now = SystemTime::now();
     let start = now
         .checked_sub(start)
         .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
-        .map(|t| t.as_millis() as u64)
-        .unwrap_or(0);
+        .map(|t| Timestamp::from_micros(t.as_micros() as i64))
+        .unwrap_or(Timestamp::MIN);
 
     let end = now
         .checked_sub(end)
         .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
-        .map(|t| t.as_millis() as u64)
-        .unwrap_or(0);
+        .map(|t| Timestamp::from_micros(t.as_micros() as i64))
+        .unwrap_or(Timestamp::MAX);
 
     start..end
 }
@@ -705,7 +712,7 @@ pub enum EncodedTimedBloomFilter {
     /// Please send all your ops.
     MissingAllHashes {
         /// The time window that we are missing hashes for.
-        time_window: std::ops::Range<u64>,
+        time_window: TimeWindow,
     },
     /// I have overlap and I have some hashes.
     /// Please send any missing ops.
@@ -713,7 +720,7 @@ pub enum EncodedTimedBloomFilter {
         /// The encoded bloom filter.
         filter: PoolBuf,
         /// The time window these hashes are for.
-        time_window: std::ops::Range<u64>,
+        time_window: TimeWindow,
     },
 }
 
@@ -787,13 +794,15 @@ impl AsGossipModule for ShardedGossip {
     fn incoming_gossip(
         &self,
         con: Tx2ConHnd<wire::Wire>,
+        remote_url: TxUrl,
         gossip_data: Box<[u8]>,
     ) -> KitsuneResult<()> {
         use kitsune_p2p_types::codec::*;
         let (bytes, gossip) =
             ShardedGossipWire::decode_ref(&gossip_data).map_err(KitsuneError::other)?;
         self.inner.share_mut(move |i, _| {
-            i.incoming.push_back((con, gossip, bytes as usize));
+            i.incoming
+                .push_back((con, remote_url, gossip, bytes as usize));
             if i.incoming.len() > 20 {
                 tracing::warn!(
                     "Overloaded with incoming gossip.. {} messages",
