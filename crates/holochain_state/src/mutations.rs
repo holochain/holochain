@@ -694,11 +694,7 @@ pub fn schedule_fn(
             Timestamp::max(),
             true,
         ),
-        None => (
-            now,
-            Timestamp::max(),
-            true
-        ),
+        None => (now, Timestamp::max(), true),
     };
     if fn_is_scheduled(txn, scheduled_fn.clone())? {
         txn.execute(
@@ -722,8 +718,7 @@ pub fn schedule_fn(
                 ":ephemeral": ephemeral,
             },
         )?;
-    }
-    else {
+    } else {
         sql_insert!(txn, ScheduledFunctions, {
             "zome_name": scheduled_fn.zome_name().to_string(),
             "maybe_schedule": to_blob::<Option<Schedule>>(maybe_schedule)?,
