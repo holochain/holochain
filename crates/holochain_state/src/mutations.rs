@@ -648,7 +648,6 @@ pub fn reschedule_expired(txn: &mut Transaction, now: Timestamp) -> StateMutatio
         ret
     };
     for (zome_name, scheduled_fn, maybe_schedule) in rows {
-        dbg!("reschedule expired", &scheduled_fn);
         schedule_fn(
             txn,
             ScheduledFn::new(zome_name, scheduled_fn),
@@ -679,8 +678,20 @@ pub fn schedule_fn(
             {
                 start
             } else {
-                // If there are no further executions then
-                // scheduling is a no-op.
+                // If there are no further executions then scheduling is a
+                // delete and bail.
+                let _ = txn.execute(
+                    "
+                    DELETE FROM ScheduledFunctions
+                    WHERE
+                    zome_name = :zome_name
+                    AND scheduled_fn = :scheduled_fn
+                    ",
+                    named_params! {
+                        ":zome_name": scheduled_fn.zome_name().to_string(),
+                        ":scheduled_fn": scheduled_fn.fn_name().to_string()
+                    }
+                )?;
                 return Ok(());
             };
             let end = start

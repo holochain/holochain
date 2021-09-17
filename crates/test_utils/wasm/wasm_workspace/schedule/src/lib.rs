@@ -51,6 +51,11 @@ fn schedule(_: ()) -> ExternResult<()> {
 }
 
 #[hdk_extern]
-fn query(_: ()) -> ExternResult<Vec<Element>> {
+fn query_tick(_: ()) -> ExternResult<Vec<Element>> {
     hdk::prelude::query(ChainQueryFilter::default().entry_type(entry_type!(Tick).unwrap()))
+}
+
+#[hdk_extern]
+fn query_tock(_: ()) -> ExternResult<Vec<Element>> {
+    hdk::prelude::query(ChainQueryFilter::default().entry_type(entry_type!(Tock).unwrap()))
 }

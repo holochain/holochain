@@ -193,14 +193,23 @@ pub mod tests {
             conductor.handle().dispatch_scheduled_fns().await;
             i = i + 1;
         }
-        let query: Vec<Element> = conductor
+        let query_tick: Vec<Element> = conductor
         .call(
             &alice,
-            "query",
+            "query_tick",
             ()
         )
         .await;
-        assert_eq!(query.len(), 5);
+        assert_eq!(query_tick.len(), 5);
+
+        // The persistent schedule should run once in second.
+        let query_tock: Vec<Element> = conductor
+            .call(
+                &alice,
+                "query_tock",
+                ()
+            ).await;
+        assert!(query_tock.len() < 3);
 
         // If Bob does a few ticks and then calls `start_scheduler` the
         // ephemeral scheduled task will be flushed so the ticks will not be
@@ -215,7 +224,7 @@ pub mod tests {
         let query1: Vec<Element> = conductor
             .call(
                 &bobbo,
-                "query",
+                "query_tick",
                 ()
             ).await;
         assert_eq!(query1.len(), 1);
@@ -223,7 +232,7 @@ pub mod tests {
         let query2: Vec<Element> = conductor
             .call(
                 &bobbo,
-                "query",
+                "query_tick",
                 ()
             ).await;
         assert_eq!(query2.len(), query1.len() + 1);
@@ -235,7 +244,7 @@ pub mod tests {
         let q: Vec<Element> = conductor
         .call(
             &bobbo,
-            "query",
+            "query_tick",
             ()
         )
         .await;
@@ -253,7 +262,7 @@ pub mod tests {
         let q2: Vec<Element> = conductor
             .call(
                 &bobbo,
-                "query",
+                "query_tick",
                 ()
             )
             .await;
