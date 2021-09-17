@@ -325,6 +325,9 @@ impl Cell {
                                         continue;
                                     }
                                 }
+                                Err(CellError::WorkflowError(workflow_error)) => {
+                                    dbg!(workflow_error.to_string());
+                                },
                                 errorish => error!("{:?}", errorish),
                             }
                         }
