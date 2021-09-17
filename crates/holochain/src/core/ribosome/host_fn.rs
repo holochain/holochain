@@ -152,7 +152,7 @@ host_fn_api_impls! {
     // fn send (()) -> ();
 
     // @todo
-    fn schedule (core::time::Duration) -> ();
+    fn schedule (String) -> ();
 
     // @todo
     fn sleep (core::time::Duration) -> ();
