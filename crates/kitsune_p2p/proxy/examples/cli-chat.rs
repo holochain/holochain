@@ -8,6 +8,7 @@ use kitsune_p2p_types::tx2::tx2_pool_promote::*;
 use kitsune_p2p_types::*;
 use std::collections::HashSet;
 use std::io::Write;
+use std::sync::Arc;
 
 kitsune_p2p_types::write_codec_enum! {
     codec Wire {
@@ -19,9 +20,11 @@ kitsune_p2p_types::write_codec_enum! {
     }
 }
 
+// trait Ch: AsTx2ConHnd<Wire> + PartialEq<RealTx2ConHnd<Wire>> + Eq {}
+
 #[derive(Debug)]
 enum Evt {
-    InCon(Tx2ConHnd<Wire>),
+    InCon(RealTx2ConHnd<Wire>),
     Output(String),
     Key(char),
     Backspace,
@@ -223,7 +226,7 @@ async fn main() {
     while let Some(evt) = evt.next().await {
         match evt {
             Evt::InCon(c) => {
-                con_set.insert(c);
+                con_set.insert(Arc::new(c));
             }
             Evt::Output(o) => pline!("{}", o),
             Evt::Key(evt) => line.push(evt),

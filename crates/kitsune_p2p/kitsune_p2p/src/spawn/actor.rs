@@ -338,8 +338,15 @@ impl KitsuneP2pActor {
                                     }) => {
                                         let data: Vec<u8> = data.into();
                                         let data: Box<[u8]> = data.into_boxed_slice();
-                                        if let Err(e) =
-                                            i_s.incoming_gossip(space, con, url, data, module).await
+                                        if let Err(e) = i_s
+                                            .incoming_gossip(
+                                                space,
+                                                Arc::new(con),
+                                                url,
+                                                data,
+                                                module,
+                                            )
+                                            .await
                                         {
                                             tracing::warn!(
                                                 "failed to handle incoming gossip: {:?}",

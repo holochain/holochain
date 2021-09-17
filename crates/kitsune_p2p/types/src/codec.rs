@@ -61,6 +61,10 @@ pub trait Codec: Clone + Sized {
     }
 }
 
+/// Alias for Codec plus the necessary additional trait bounds
+pub trait CodecBound: Codec + 'static + Send + std::fmt::Debug {}
+impl<T> CodecBound for T where T: Codec + 'static + Send + std::fmt::Debug {}
+
 /// DSL-style macro for generating a serialization protocol message enum.
 ///
 /// DSL:
