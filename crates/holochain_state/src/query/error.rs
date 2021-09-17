@@ -22,7 +22,7 @@ pub enum StateQueryError {
     #[error(transparent)]
     WrongHeaderError(#[from] holochain_zome_types::WrongHeaderError),
     #[error(transparent)]
-    HeaderError(#[from] holochain_types::header::error::HeaderError),
+    HeaderError(#[from] holochain_zome_types::header::HeaderError),
     #[error(transparent)]
     SyncScratchError(#[from] SyncScratchError),
 }
