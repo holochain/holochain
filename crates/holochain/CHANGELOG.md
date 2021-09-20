@@ -5,12 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 - Refactor conductor to use parking lot rw lock instead of tokio rw lock. (Faster and prevents deadlocks.)
 
+## 0.0.106
+
 ### Changed
 
 - HDK `sys_time` now returns a `holochain_zome_types::Timestamp` instead of a `core::time::Duration`.
 - Exposes `UninstallApp` in the conductor admin API.
 
 ## 0.0.105
+
 ## 0.0.104
 
 - Updates lair to 0.0.4 which pins rcgen to 0.8.11 to work around [https://github.com/est31/rcgen/issues/63](https://github.com/est31/rcgen/issues/63)

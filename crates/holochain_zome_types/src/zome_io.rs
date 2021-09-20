@@ -168,8 +168,8 @@ wasm_io_types! {
     // // @todo
     // fn send (()) -> ();
 
-    // @todo
-    fn schedule (core::time::Duration) -> ();
+    // Schedule a schedulable function if it is not already.
+    fn schedule (String) -> ();
 
     // @todo
     fn sleep (core::time::Duration) -> ();
