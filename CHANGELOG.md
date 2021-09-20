@@ -9,16 +9,81 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Adds the ability to lower the synchronous level for the sqlite backend to the conductor config. `db_sync_level`. See [sqlite documentation](https://www.sqlite.org/pragma.html#pragma_synchronous). This allows running on slower HDD but can result in corrupted databases and is not recommended for production or SSDs.
 - Fixes bug where WAL mode was set on every opening connection.
 
+# 20210916.085414
+
+## [holochain-0.0.106](crates/holochain/CHANGELOG.md#0.0.106)
+
+### Changed
+
+- HDK `sys_time` now returns a `holochain_zome_types::Timestamp` instead of a `core::time::Duration`.
+- Exposes `UninstallApp` in the conductor admin API.
+
+## [holochain\_test\_wasm\_common-0.0.6](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.6)
+
+## [holochain\_cascade-0.0.6](crates/holochain_cascade/CHANGELOG.md#0.0.6)
+
+## [holochain\_cli-0.0.7](crates/holochain_cli/CHANGELOG.md#0.0.7)
+
+- Added the `hc web-app` sub-command for bundling up a UI with a previously created hApp bundle.  It uses the same same behavior as `hc dna` and `hc app` to specify the .yaml manifest file.
+
+## [holochain\_cli\_sandbox-0.0.6](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.6)
+
+- Added `UninstallApp` command.
+
+## [holochain\_websocket-0.0.6](crates/holochain_websocket/CHANGELOG.md#0.0.6)
+
+## [holochain\_conductor\_api-0.0.6](crates/holochain_conductor_api/CHANGELOG.md#0.0.6)
+
+## [holochain\_state-0.0.6](crates/holochain_state/CHANGELOG.md#0.0.6)
+
+## [holochain\_wasm\_test\_utils-0.0.6](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.6)
+
+## [holochain\_p2p-0.0.6](crates/holochain_p2p/CHANGELOG.md#0.0.6)
+
+## [holochain\_cli\_bundle-0.0.5](crates/holochain_cli_bundle/CHANGELOG.md#0.0.5)
+
+- Added the `hc web-app` subcommand, with the exact same behaviour and functionality as `hc dna` and `hc app`.
+
+## [holochain\_types-0.0.6](crates/holochain_types/CHANGELOG.md#0.0.6)
+
+- Added `WebAppManifest` to support `.webhapp` bundles. This is necessary to package hApps together with web UIs, to export to the Launcher and Holo.
+
+## [holochain\_keystore-0.0.6](crates/holochain_keystore/CHANGELOG.md#0.0.6)
+
+## [holochain\_sqlite-0.0.6](crates/holochain_sqlite/CHANGELOG.md#0.0.6)
+
+## [kitsune\_p2p-0.0.6](crates/kitsune_p2p/CHANGELOG.md#0.0.6)
+
+## [kitsune\_p2p\_proxy-0.0.5](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.5)
+
+## [kitsune\_p2p\_transport\_quic-0.0.5](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.5)
+
+## [kitsune\_p2p\_types-0.0.5](crates/kitsune_p2p_types/CHANGELOG.md#0.0.5)
+
+## [hdk-0.0.106](crates/hdk/CHANGELOG.md#0.0.106)
+
+## [hdk\_derive-0.0.8](crates/hdk_derive/CHANGELOG.md#0.0.8)
+
+## [holochain\_zome\_types-0.0.8](crates/holochain_zome_types/CHANGELOG.md#0.0.8)
+
+## [kitsune\_p2p\_timestamp-0.0.2](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.0.2)
+
+## [holo\_hash-0.0.6](crates/holo_hash/CHANGELOG.md#0.0.6)
+
+### Fixed
+
+- Crate now builds with `--no-default-features`
+
 # 20210901.105419
 
 ***Note***: The following crates could not be published to crates.io due to build errors:
 
-- hdk_derive-0.0.7
+- hdk\_derive-0.0.7
 - hdk-0.0.105
-- holochain_state-0.0.5
-- holochain_conductor_api-0.0.5
-- holochain_cascade-0.0.5",
-- holochain_test_wasm_common-0.0.5
+- holochain\_state-0.0.5
+- holochain\_conductor\_api-0.0.5
+- holochain\_cascade-0.0.5”,
+- holochain\_test\_wasm\_common-0.0.5
 - holochain-0.0.105
 
 ## [holochain-0.0.105](crates/holochain/CHANGELOG.md#0.0.105)
