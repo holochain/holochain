@@ -127,22 +127,18 @@ fn next_remote_node(
         // Don't initiate with nodes we are currently gossiping with.
         .filter(|n| !metrics.is_current_round(n.cert()))
         .find(|n| {
-            // If we should force initiate then find all remaining nodes.
-            if metrics.forced_initiate() {
-                true
-            } else {
-                // Otherwise only find with nodes that have not been gossiped with too recently.
-                match metrics.last_outcome(n.cert()) {
-                    Some(metrics::RoundOutcome::Success(when)) => {
-                        when.elapsed().as_millis() as u32
+            match metrics.last_outcome(n.cert()) {
+                Some(metrics::RoundOutcome::Success(when)) => {
+                    // If we should force initiate then we don't need to wait for the delay.
+                    metrics.forced_initiate()
+                        || when.elapsed().as_millis() as u32
                             >= tuning_params.gossip_peer_on_success_next_gossip_delay_ms
-                    }
-                    Some(metrics::RoundOutcome::Error(when)) => {
-                        when.elapsed().as_millis() as u32
-                            >= tuning_params.gossip_peer_on_error_next_gossip_delay_ms
-                    }
-                    _ => true,
                 }
+                Some(metrics::RoundOutcome::Error(when)) => {
+                    when.elapsed().as_millis() as u32
+                        >= tuning_params.gossip_peer_on_error_next_gossip_delay_ms
+                }
+                _ => true,
             }
         })
 }

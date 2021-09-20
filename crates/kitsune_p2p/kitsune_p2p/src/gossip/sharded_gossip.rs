@@ -281,12 +281,12 @@ pub struct ShardedGossipLocalState {
 
 impl ShardedGossipLocalState {
     fn remove_state(&mut self, state_key: &StateKey, error: bool) -> Option<RoundState> {
-        if self
+        let init_tgt = self
             .initiate_tgt
             .as_ref()
             .map(|tgt| tgt.0.cert() == state_key)
-            .unwrap_or(false)
-        {
+            .unwrap_or(false);
+        if init_tgt {
             self.initiate_tgt = None;
         }
         let r = self.round_map.remove(state_key);
@@ -296,6 +296,8 @@ impl ShardedGossipLocalState {
             } else {
                 self.metrics.record_success(state_key.clone());
             }
+        } else if init_tgt && error {
+            self.metrics.record_error(state_key.clone());
         }
         r
     }
