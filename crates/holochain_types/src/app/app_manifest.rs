@@ -70,10 +70,10 @@ impl AppManifest {
         }
     }
 
-    /// Returns the list of app slots that this manifest declares 
+    /// Returns the list of app slots that this manifest declares
     pub fn app_slots(&self) -> Vec<AppSlotManifest> {
         match self {
-            Self::V1(manifest) => manifest.slots.clone()
+            Self::V1(manifest) => manifest.slots.clone(),
         }
     }
 }
