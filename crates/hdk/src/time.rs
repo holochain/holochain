@@ -66,8 +66,8 @@ pub fn sys_time() -> ExternResult<Timestamp> {
 }
 
 /// @todo Not implemented
-pub fn schedule(execute_after: std::time::Duration) -> ExternResult<()> {
-    HDK.with(|h| h.borrow().schedule(execute_after))
+pub fn schedule(scheduled_fn: &str) -> ExternResult<()> {
+    HDK.with(|h| h.borrow().schedule(String::from(scheduled_fn)))
 }
 
 /// @todo Not implemented
