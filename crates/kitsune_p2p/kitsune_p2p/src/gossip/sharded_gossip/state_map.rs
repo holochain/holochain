@@ -12,7 +12,7 @@ impl RoundStateMap {
     pub(super) fn check_timeout(&mut self, key: &StateKey) -> bool {
         let mut timed_out = false;
         if let Some(state) = self.map.get(key) {
-            if state.last_touch.elapsed().as_millis() as u32 > state.round_timeout {
+            if state.last_touch.elapsed() > state.round_timeout {
                 self.map.remove(key);
                 self.timed_out.push(key.clone());
                 timed_out = true;
@@ -47,7 +47,7 @@ impl RoundStateMap {
     pub(super) fn current_rounds(&mut self) -> HashSet<Tx2Cert> {
         let mut timed_out = Vec::new();
         self.map.retain(|k, v| {
-            if (v.last_touch.elapsed().as_millis() as u32) < v.round_timeout {
+            if v.last_touch.elapsed() < v.round_timeout {
                 true
             } else {
                 timed_out.push(k.clone());

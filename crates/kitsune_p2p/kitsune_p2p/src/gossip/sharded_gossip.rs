@@ -400,7 +400,7 @@ pub struct RoundState {
     /// Last moment we had any contact for this round.
     last_touch: std::time::Instant,
     /// Amount of time before a round is considered expired.
-    round_timeout: u32,
+    round_timeout: std::time::Duration,
 }
 
 impl ShardedGossipLocal {
@@ -439,7 +439,7 @@ impl ShardedGossipLocal {
             received_all_incoming_ops_blooms: false,
             created_at: std::time::Instant::now(),
             last_touch: std::time::Instant::now(),
-            round_timeout: ROUND_TIMEOUT_MS,
+            round_timeout: ROUND_TIMEOUT,
         })
     }
 

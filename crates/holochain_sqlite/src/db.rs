@@ -83,7 +83,7 @@ impl DbWrite {
     pub fn open(path_prefix: &Path, kind: DbKind) -> DatabaseResult<DbWrite> {
         Self::open_with_sync_level(path_prefix, kind, DbSyncLevel::default())
     }
-    
+
     pub fn open_with_sync_level(
         path_prefix: &Path,
         kind: DbKind,
