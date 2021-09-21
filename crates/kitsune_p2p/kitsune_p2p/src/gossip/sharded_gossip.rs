@@ -57,7 +57,7 @@ const MAX_SEND_BUF_BYTES: usize = 16000;
 const MAX_TRIGGERS: u8 = 2;
 
 /// The timeout for a gossip round if there is no contact. Five minutes.
-const ROUND_TIMEOUT_MS: u32 = 1000 * 60 * 5;
+const ROUND_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60 * 5);
 
 type BloomFilter = bloomfilter::Bloom<Arc<MetaOpKey>>;
 type EventSender = futures::channel::mpsc::Sender<event::KitsuneP2pEvent>;

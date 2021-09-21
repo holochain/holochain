@@ -121,11 +121,11 @@ pub mod tuning_params_struct {
 
         /// Allow only the first agent to join the space to
         /// have a sized storage arc. [Default: false]
-        // This is an experimental feature that sets the first
-        // agent to join as the full arc and all other later
-        // agents to empty.
-        // It should not be used in production unless you understand
-        // what you are doing.
+        /// This is an experimental feature that sets the first
+        /// agent to join as the full arc and all other later
+        /// agents to empty.
+        /// It should not be used in production unless you understand
+        /// what you are doing.
         gossip_single_storage_arc_per_space: bool = false,
 
         /// Default timeout for rpc single. [Default: 30s]

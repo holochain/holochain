@@ -128,6 +128,7 @@ pub async fn incoming_dht_ops_workflow(
         Vec::with_capacity(0)
     };
 
+    // Filter out ops that are already being tracked, so we don't do duplicate work
     if let Some(incoming_op_hashes) = &incoming_op_hashes {
         let mut set = incoming_op_hashes.0.lock();
         let mut o = Vec::with_capacity(ops.len());
