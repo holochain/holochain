@@ -1,97 +1,116 @@
 version: 2.1
 
 commands:
- build-docker:
-  description: "Build and deploy a docker box"
-  parameters:
-   box:
-    type: string
-    default: "minimal"
-  steps:
-   - checkout
-   - run: ./docker/login.sh
-   - run:
-      no_output_timeout: 45m
-      command: ./docker/build.sh << parameters.box >> $CIRCLE_BRANCH
-   - run:
-      no_output_timeout: 30m
-      command: ./docker/push.sh << parameters.box >> $CIRCLE_BRANCH
+   build-docker:
+      description: "Build and deploy a docker box"
+      parameters:
+         box:
+            type: string
+            default: "minimal"
+      steps:
+         - checkout
+         - run: ./docker/login.sh
+         - run:
+              no_output_timeout: 45m
+              command: ./docker/build.sh << parameters.box >> $CIRCLE_BRANCH
+         - run:
+              no_output_timeout: 30m
+              command: ./docker/push.sh << parameters.box >> $CIRCLE_BRANCH
 
 jobs:
-  merge-test:
-    docker:
-     - image: holochain/holochain:circle.build.develop
-       auth:
-        username: $DOCKER_USER
-        password: $DOCKER_PASS
-    resource_class: xlarge
-    environment:
-     NIXPKGS_ALLOW_UNFREE: 1
-    steps:
-      - checkout
-      - run:
-         name: Unset CircleCI's forced conversion of HTTPS->SSH
-         command: git config --global --unset "url.ssh://git@github.com.insteadof"
-      - run:
-         name: Set up Hydra cache
-         command: $(nix-build . --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
-      - run:
-         name: Run the merge tests
-         no_output_timeout: 30m
-         command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-merge-test
+   merge-release-test:
+      docker:
+         - image: nixos/nix:latest
+           auth:
+              username: $DOCKER_USER
+              password: $DOCKER_PASS
+      environment:
+         CACHIX_NAME: holochain-ci
+         NIXPKGS_ALLOW_UNFREE: 1
+      steps:
+         - checkout
+         - run:
+              name: Set up Hydra cache
+              command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
+         - run:
+              name: PR release tests
+              no_output_timeout: 30m
+              command: ./scripts/ci_merge-release-test.sh
+   merge-test:
+      docker:
+         - image: holochain/holochain:circle.build.develop
+           auth:
+              username: $DOCKER_USER
+              password: $DOCKER_PASS
+      resource_class: xlarge
+      environment:
+         NIXPKGS_ALLOW_UNFREE: 1
+      steps:
+         - checkout
+         - run:
+              name: Unset CircleCI's forced conversion of HTTPS->SSH
+              command: git config --global --unset "url.ssh://git@github.com.insteadof"
+         - run:
+              name: Set up Hydra cache
+              command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
+         - run:
+              name: Run the merge tests
+              no_output_timeout: 30m
+              command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-merge-test
 
-  merge-test-mac:
-   macos:
-    xcode: "12.0.0"
-   resource_class: xlarge
-   environment:
-    NIXPKGS_ALLOW_UNFREE: 1
-   steps:
-    - checkout
-    - run:
-       name: Test on mac
-       no_output_timeout: 30m
-       command: |
-        # fix for "too many open files" that breaks tokio
-        ulimit -n 10240
-        # catalina nixos install
-        sh <(curl -L https://nixos.org/nix/install) --darwin-use-unencrypted-nix-store-volume
-        . /Users/distiller/.nix-profile/etc/profile.d/nix.sh
-        # do tests
-        nix-shell --fallback --argstr flavor ci --run hc-merge-test
+   merge-test-mac:
+      macos:
+         xcode: "12.0.0"
+      resource_class: xlarge
+      environment:
+         NIXPKGS_ALLOW_UNFREE: 1
+      steps:
+         - checkout
+         - run:
+              name: Test on mac
+              no_output_timeout: 30m
+              command: |
+                 # fix for "too many open files" that breaks tokio
+                 ulimit -n 10240
+                 # catalina nixos install
+                 sh <(curl -L https://nixos.org/nix/install) --darwin-use-unencrypted-nix-store-volume
+                 . /Users/distiller/.nix-profile/etc/profile.d/nix.sh
+                 # do tests
+                 nix-shell --fallback --argstr flavor ci --run hc-merge-test
 
-  docker-build-latest:
-   resource_class: large
-   machine: true
-   steps:
-    - build-docker:
-       box: latest
+   docker-build-latest:
+      resource_class: large
+      machine: true
+      steps:
+         - build-docker:
+              box: latest
 
-  docker-build-circle-build:
-   resource_class: large
-   machine: true
-   steps:
-    - build-docker:
-       box: circle.build
+   docker-build-circle-build:
+      resource_class: large
+      machine: true
+      steps:
+         - build-docker:
+              box: circle.build
 
 workflows:
- version: 2.1
- tests:
-  jobs:
-   - merge-test
-   # - merge-test-mac
+   version: 2.1
+   tests:
+      jobs:
+         - merge-release-test
+         - merge-test
+         # - merge-test-mac
 
- docker-builds:
-  triggers:
-   - schedule:
-      cron: "0 0 * * *"
-      filters:
-       branches:
-        only:
-         - develop
-         - master
-  jobs:
-   - docker-build-latest
-   - docker-build-circle-build:
-      requires:
-       - docker-build-latest
+   docker-builds:
+      triggers:
+         - schedule:
+              cron: "0 0 * * *"
+              filters:
+                 branches:
+                    only:
+                       - develop
+                       - master
+      jobs:
+         - docker-build-latest
+         - docker-build-circle-build:
+              requires:
+                 - docker-build-latest
