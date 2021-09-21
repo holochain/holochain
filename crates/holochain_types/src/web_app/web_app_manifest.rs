@@ -59,12 +59,14 @@ impl WebAppManifest {
         }
     }
 
+    /// Get the bundle location of the Web UI zip included in the manifest
     pub fn web_ui_location(&self) -> Location {
         match self {
             Self::V1(WebAppManifestV1 { ui, .. }) => ui.location.clone(),
         }
     }
 
+    /// Get the location of the app bundle included in the manifest
     pub fn happ_bundle_location(&self) -> Location {
         match self {
             Self::V1(WebAppManifestV1 { happ_manifest, .. }) => happ_manifest.location.clone(),
