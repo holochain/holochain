@@ -337,7 +337,7 @@ fixturator!(
 
 fixturator!(
     PostCommitInvocation;
-    constructor fn new(Zome, HeaderHashes);
+    constructor fn new(Zome, SignedHeaderHashedVec);
 );
 
 fixturator!(

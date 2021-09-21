@@ -12,11 +12,11 @@ use holochain_types::prelude::*;
 #[derive(Clone)]
 pub struct PostCommitInvocation {
     zome: Zome,
-    headers: HeaderHashes,
+    headers: Vec<SignedHeaderHashed>,
 }
 
 impl PostCommitInvocation {
-    pub fn new(zome: Zome, headers: HeaderHashes) -> Self {
+    pub fn new(zome: Zome, headers: Vec<SignedHeaderHashed>) -> Self {
         Self { zome, headers }
     }
 }
@@ -36,7 +36,13 @@ impl From<PostCommitHostAccess> for HostContext {
 
 impl From<&PostCommitHostAccess> for HostFnAccess {
     fn from(_: &PostCommitHostAccess) -> Self {
-        Self::all()
+        let mut access = Self::all();
+        // Post commit happens after all workspace writes are complete.
+        // Writing more to the workspace becomes circular.
+        // If you need to trigger some more writes, try a `remote_call` back
+        // into the current cell.
+        access.write_workspace = Permission::Deny;
+        access
     }
 }
 

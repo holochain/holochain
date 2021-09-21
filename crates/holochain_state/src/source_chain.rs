@@ -529,10 +529,10 @@ impl SourceChain {
     }
 
     #[async_recursion]
-    pub async fn flush(&self) -> SourceChainResult<()> {
+    pub async fn flush(&self) -> SourceChainResult<Vec<SignedHeaderHashed>> {
         // Nothing to write
         if self.scratch.apply(|s| s.is_empty())? {
-            return Ok(());
+            return Ok(Vec::new());
         }
         let (headers, ops, entries) = self.scratch.apply_and_then(|scratch| {
             let (headers, ops) =
@@ -566,7 +566,7 @@ impl SourceChain {
                     chain_head_db(&txn, author)?;
                 if headers_1.last().is_none() {
                     // Nothing to write
-                    return Ok(());
+                    return Ok(Vec::new());
                 }
                 if persisted_head != new_persisted_head {
                     return Err(SourceChainError::HeadMoved(
@@ -594,7 +594,7 @@ impl SourceChain {
                 for entry in entries {
                     insert_entry(txn, entry)?;
                 }
-                for header in headers_1 {
+                for header in headers_1.clone() {
                     insert_header(txn, header)?;
                 }
                 for (op, op_hash, op_order, timestamp, visibility, dependency) in ops {
@@ -627,7 +627,7 @@ impl SourceChain {
                         set_withhold_publish(txn, op_hash)?;
                     }
                 }
-                SourceChainResult::Ok(())
+                SourceChainResult::Ok(headers_1)
             })
             .await
         {

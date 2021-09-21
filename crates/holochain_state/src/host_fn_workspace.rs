@@ -1,6 +1,7 @@
 use holo_hash::AgentPubKey;
 use holochain_types::env::EnvRead;
 use holochain_types::env::EnvWrite;
+use holochain_zome_types::SignedHeaderHashed;
 
 use crate::prelude::SourceChain;
 use crate::prelude::SourceChainResult;
@@ -35,7 +36,7 @@ impl HostFnWorkspace {
         })
     }
 
-    pub async fn flush(self) -> SourceChainResult<()> {
+    pub async fn flush(self) -> SourceChainResult<Vec<SignedHeaderHashed>> {
         self.source_chain.flush().await
     }
 

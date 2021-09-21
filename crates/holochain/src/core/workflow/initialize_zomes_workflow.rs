@@ -3,6 +3,8 @@ use crate::conductor::api::CellConductorApiT;
 use crate::core::ribosome::guest_callback::init::InitHostAccess;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
+use crate::core::ribosome::guest_callback::post_commit::PostCommitHostAccess;
+use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::RibosomeT;
 use derive_more::Constructor;
 use holochain_keystore::KeystoreSender;
@@ -41,7 +43,15 @@ where
 
     // only commit if the result was successful
     if result == InitResult::Pass {
-        workspace.flush().await?;
+        let flushed_headers = workspace.flush().await?;
+        args.ribosome.run_post_commit(
+            PostCommitHostAccess {
+                workspace,
+                network,
+                keystore,
+            },
+            PostCommitInvocation::new(args.invocation.zome, flushed_headers),
+        )?;
     }
     Ok(result)
 }
