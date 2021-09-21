@@ -18,6 +18,24 @@ commands:
               command: ./docker/push.sh << parameters.box >> $CIRCLE_BRANCH
 
 jobs:
+   merge-release-test:
+      docker:
+         - image: nixos/nix:latest
+           auth:
+              username: $DOCKER_USER
+              password: $DOCKER_PASS
+      environment:
+         CACHIX_NAME: holochain-ci
+         NIXPKGS_ALLOW_UNFREE: 1
+      steps:
+         - checkout
+         - run:
+              name: Set up Hydra cache
+              command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
+         - run:
+              name: PR release tests
+              no_output_timeout: 30m
+              command: ./scripts/ci_merge-release-test.sh
    merge-test:
       docker:
          - image: holochain/holochain:circle.build.develop
@@ -34,7 +52,7 @@ jobs:
               command: git config --global --unset "url.ssh://git@github.com.insteadof"
          - run:
               name: Set up Hydra cache
-              command: $(nix-build . --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
+              command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
          - run:
               name: Run the merge tests
               no_output_timeout: 30m
@@ -78,6 +96,7 @@ workflows:
    version: 2.1
    tests:
       jobs:
+         - merge-release-test
          - merge-test
          # - merge-test-mac
 
