@@ -189,8 +189,7 @@ pub mod tests {
         proxy_to_expire_ms: 42
       network_type: quic_bootstrap
     
-    db_sync_level: 
-        - type: off
+    db_sync_level: Off
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
         use holochain_p2p::kitsune_p2p::*;
