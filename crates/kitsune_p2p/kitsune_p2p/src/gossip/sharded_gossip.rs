@@ -281,6 +281,7 @@ pub struct ShardedGossipLocalState {
 
 impl ShardedGossipLocalState {
     fn remove_state(&mut self, state_key: &StateKey, error: bool) -> Option<RoundState> {
+        // Check if the round to be removed matches the current initiate_tgt
         let init_tgt = self
             .initiate_tgt
             .as_ref()
