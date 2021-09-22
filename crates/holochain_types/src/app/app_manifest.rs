@@ -95,6 +95,7 @@ pub mod tests {
 
         let sample_app_manifest_v1 = AppManifestV1Builder::default()
             .name(app_name.clone())
+            .description(Some(String::from("Some description")))
             .slots(vec![app_slot_manifest.clone()])
             .build()
             .unwrap();
