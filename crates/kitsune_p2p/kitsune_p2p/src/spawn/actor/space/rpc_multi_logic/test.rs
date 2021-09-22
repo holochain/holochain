@@ -97,7 +97,6 @@ async fn test_rpc_multi_logic_mocked() {
     let start = tokio::time::Instant::now();
     // don't return any infos to start, then return 4 to test our loops
     m.expect_handle_query_agents().returning(move |_| {
-        println!("QUERY: {}", start.elapsed().as_secs_f64());
         let mut out = Vec::new();
         if start.elapsed().as_secs_f64() > 1.0 {
             out.push(A1.clone());

@@ -650,9 +650,12 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
 
         Ok(async move {
             match (agents, window, arc_set, near_basis, limit) {
+                // If only basis and limit are set, this is a "near basis" query
                 (None, None, None, Some(basis), Some(limit)) => Ok(evt_sender
                     .query_agent_info_signed_near_basis(h_space, space, basis.as_u32(), limit)
                     .await?),
+
+                // If window and arc_set are set, this is a "gossip agents" query
                 (agents, Some(window), Some(arc_set), None, None) => {
                     let h_agents =
                         agents.map(|agents| agents.iter().map(AgentPubKey::from_kitsune).collect());
@@ -662,10 +665,17 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                         .query_gossip_agents(h_space, h_agents, space, since_ms, until_ms, arc_set)
                         .await?)
                 }
+                // Otherwise, do a simple agent query with optional agent filter
                 (agents, None, None, None, _) => Ok(evt_sender
                     .query_agent_info_signed(h_space, agents, space)
                     .await?),
-                _ => todo!(),
+
+                // If none of the above match, we have no implementation for such a query
+                // and must fail
+                tuple => unimplemented!(
+                    "Holochain cannot interpret the QueryAgentsEvt data as given: {:?}",
+                    tuple
+                ),
             }
         }
         .boxed()

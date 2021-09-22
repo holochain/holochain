@@ -80,6 +80,10 @@ pub struct QueryAgentsEvt {
     pub limit: Option<usize>,
 }
 
+// NB: if we want to play it safer, rather than providing these fine-grained
+//     builder methods, we could provide only the three "flavors" of query that
+//     Holochain supports, which would still provide us the full expressivity to
+//     implement Kitsune.
 impl QueryAgentsEvt {
     /// Constructor. Every query needs to know what space it's for.
     pub fn new(space: KSpace) -> Self {
