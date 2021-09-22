@@ -57,7 +57,7 @@ impl Query for GetElementDetailsQuery {
             let header = HeaderHashed::from_content_sync(header);
             let shh = SignedHeaderHashed::with_presigned(header, signature);
             let status = row.get(row.column_index("status")?)?;
-            let r = Judged::new(shh, status);
+            let r = Judged::raw(shh, status);
             Ok(r)
         };
         Arc::new(f)
