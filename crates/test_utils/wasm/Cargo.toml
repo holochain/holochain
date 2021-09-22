@@ -5,6 +5,7 @@ authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
 edition = "2018"
 description = "Utilities for Wasm testing for Holochain"
 license = "Apache-2.0"
+documentation = "https://docs.rs/holochain_wasm_test_utils"
 
 [lib]
 name = "holochain_wasm_test_utils"
