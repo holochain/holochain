@@ -655,8 +655,9 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                     .query_agent_info_signed_near_basis(h_space, space, basis.as_u32(), limit)
                     .await?),
 
-                // If window and arc_set are set, this is a "gossip agents" query
-                (agents, Some(window), Some(arc_set), None, None) => {
+                // If arc_set is set, this is a "gossip agents" query
+                (agents, window, Some(arc_set), None, None) => {
+                    let window = window.unwrap_or_else(full_time_range);
                     let h_agents =
                         agents.map(|agents| agents.iter().map(AgentPubKey::from_kitsune).collect());
                     let since_ms = (window.start.as_micros() / 1000) as u64;
@@ -666,7 +667,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                         .await?)
                 }
                 // Otherwise, do a simple agent query with optional agent filter
-                (agents, None, None, None, _) => Ok(evt_sender
+                (agents, None, None, None, None) => Ok(evt_sender
                     .query_agent_info_signed(h_space, agents, space)
                     .await?),
 
