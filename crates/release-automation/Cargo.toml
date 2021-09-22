@@ -3,6 +3,7 @@ name = "release-automation"
 version = "0.2.0-alpha.0"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2018"
+documentation = "https://docs.rs/release-automation"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
