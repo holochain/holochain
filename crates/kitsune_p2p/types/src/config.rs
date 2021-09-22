@@ -77,8 +77,8 @@ pub mod tuning_params_struct {
     }
 
     mk_tune! {
-        /// Gossip strategy to use. [Default: simple-bloom]
-        gossip_strategy: String = "simple-bloom".to_string(),
+        /// Gossip strategy to use. [Default: "sharded-gossip"]
+        gossip_strategy: String = "sharded-gossip".to_string(),
 
         /// Delay between gossip loop iteration. [Default: 1s]
         gossip_loop_iteration_delay_ms: u32 = 1000,
