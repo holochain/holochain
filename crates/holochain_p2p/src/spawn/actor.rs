@@ -78,16 +78,7 @@ impl WrapEvtSender {
         since_ms: u64,
         until_ms: u64,
         arc_set: Arc<kitsune_p2p_types::dht_arc::DhtArcSet>,
-    ) -> impl Future<
-        Output = HolochainP2pResult<
-            Vec<(
-                Arc<kitsune_p2p::KitsuneAgent>,
-                kitsune_p2p_types::dht_arc::ArcInterval,
-            )>,
-        >,
-    >
-           + 'static
-           + Send {
+    ) -> impl Future<Output = HolochainP2pResult<Vec<AgentInfoSigned>>> + 'static + Send {
         timing_trace!(
             {
                 self.0.query_gossip_agents(
@@ -123,7 +114,7 @@ impl WrapEvtSender {
         dna_hash: DnaHash,
         kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
         basis_loc: u32,
-        limit: u32,
+        limit: usize,
     ) -> impl Future<Output = HolochainP2pResult<Vec<AgentInfoSigned>>> + 'static + Send {
         timing_trace!(
             {
@@ -635,67 +626,47 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         .into())
     }
 
-    /// We need to get previously stored agent info.
+    /// We need to get previously stored agent info. A single kitusne agent query
+    /// can take one of three Holochain agent query paths. We do "duck typing"
+    /// on the query object to determine which query path to take. The reason for
+    /// this is that Holochain is optimized for these three query types, while
+    /// kitsune has a more general interface.
     #[tracing::instrument(skip(self), level = "trace")]
-    fn handle_query_agent_info_signed(
+    fn handle_query_agents(
         &mut self,
-        input: kitsune_p2p::event::QueryAgentInfoSignedEvt,
+        input: kitsune_p2p::event::QueryAgentsEvt,
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<Vec<AgentInfoSigned>> {
-        let kitsune_p2p::event::QueryAgentInfoSignedEvt { space, agents } = input;
-        let h_space = DnaHash::from_kitsune(&space);
-        let evt_sender = self.evt_sender.clone();
-        Ok(async move {
-            Ok(evt_sender
-                .query_agent_info_signed(h_space, agents, space)
-                .await?)
-        }
-        .boxed()
-        .into())
-    }
-
-    /// We need to get previously stored agent info.
-    #[tracing::instrument(skip(self), level = "trace")]
-    fn handle_query_gossip_agents(
-        &mut self,
-        input: kitsune_p2p::event::QueryGossipAgentsEvt,
-    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<
-        Vec<(
-            Arc<kitsune_p2p::KitsuneAgent>,
-            kitsune_p2p_types::dht_arc::ArcInterval,
-        )>,
-    > {
-        let kitsune_p2p::event::QueryGossipAgentsEvt {
+        let kitsune_p2p::event::QueryAgentsEvt {
             space,
             agents,
-            since_ms,
-            until_ms,
+            window,
             arc_set,
+            near_basis,
+            limit,
         } = input;
-        let h_space = DnaHash::from_kitsune(&space);
-        let h_agents = agents.map(|agents| agents.iter().map(AgentPubKey::from_kitsune).collect());
-        let evt_sender = self.evt_sender.clone();
-        Ok(async move {
-            Ok(evt_sender
-                .query_gossip_agents(h_space, h_agents, space, since_ms, until_ms, arc_set)
-                .await?)
-        }
-        .boxed()
-        .into())
-    }
 
-    #[tracing::instrument(skip(self), level = "trace")]
-    fn handle_query_agent_info_signed_near_basis(
-        &mut self,
-        space: Arc<kitsune_p2p::KitsuneSpace>,
-        basis_loc: u32,
-        limit: u32,
-    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<Vec<AgentInfoSigned>> {
         let h_space = DnaHash::from_kitsune(&space);
         let evt_sender = self.evt_sender.clone();
+
         Ok(async move {
-            Ok(evt_sender
-                .query_agent_info_signed_near_basis(h_space, space, basis_loc, limit)
-                .await?)
+            match (agents, window, arc_set, near_basis, limit) {
+                (None, None, None, Some(basis), Some(limit)) => Ok(evt_sender
+                    .query_agent_info_signed_near_basis(h_space, space, basis.as_u32(), limit)
+                    .await?),
+                (agents, Some(window), Some(arc_set), None, None) => {
+                    let h_agents =
+                        agents.map(|agents| agents.iter().map(AgentPubKey::from_kitsune).collect());
+                    let since_ms = (window.start.as_micros() / 1000) as u64;
+                    let until_ms = (window.end.as_micros() / 1000) as u64;
+                    Ok(evt_sender
+                        .query_gossip_agents(h_space, h_agents, space, since_ms, until_ms, arc_set)
+                        .await?)
+                }
+                (agents, None, None, None, _) => Ok(evt_sender
+                    .query_agent_info_signed(h_space, agents, space)
+                    .await?),
+                _ => todo!(),
+            }
         }
         .boxed()
         .into())

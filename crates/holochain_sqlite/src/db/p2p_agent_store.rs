@@ -3,7 +3,6 @@
 use crate::prelude::*;
 use crate::sql::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use kitsune_p2p::dht_arc::ArcInterval;
 use kitsune_p2p::dht_arc::DhtArcSet;
 use kitsune_p2p::KitsuneAgent;
 use rusqlite::*;
@@ -24,13 +23,13 @@ pub trait AsP2pAgentStoreConExt {
         since_ms: u64,
         until_ms: u64,
         arcset: DhtArcSet,
-    ) -> DatabaseResult<Vec<(KitsuneAgent, ArcInterval)>>;
+    ) -> DatabaseResult<Vec<AgentInfoSigned>>;
 
     /// Query agents sorted by nearness to basis loc
     fn p2p_query_near_basis(
         &mut self,
         basis: u32,
-        limit: u32,
+        limit: usize,
     ) -> DatabaseResult<Vec<AgentInfoSigned>>;
 }
 
@@ -49,10 +48,14 @@ pub trait AsP2pStateTxExt {
         since_ms: u64,
         until_ms: u64,
         arcset: DhtArcSet,
-    ) -> DatabaseResult<Vec<(KitsuneAgent, ArcInterval)>>;
+    ) -> DatabaseResult<Vec<AgentInfoSigned>>;
 
     /// Query agents sorted by nearness to basis loc
-    fn p2p_query_near_basis(&self, basis: u32, limit: u32) -> DatabaseResult<Vec<AgentInfoSigned>>;
+    fn p2p_query_near_basis(
+        &self,
+        basis: u32,
+        limit: usize,
+    ) -> DatabaseResult<Vec<AgentInfoSigned>>;
 }
 
 impl AsP2pAgentStoreConExt for crate::db::PConn {
@@ -69,14 +72,14 @@ impl AsP2pAgentStoreConExt for crate::db::PConn {
         since_ms: u64,
         until_ms: u64,
         arcset: DhtArcSet,
-    ) -> DatabaseResult<Vec<(KitsuneAgent, ArcInterval)>> {
+    ) -> DatabaseResult<Vec<AgentInfoSigned>> {
         self.with_reader(move |reader| reader.p2p_gossip_query_agents(since_ms, until_ms, arcset))
     }
 
     fn p2p_query_near_basis(
         &mut self,
         basis: u32,
-        limit: u32,
+        limit: usize,
     ) -> DatabaseResult<Vec<AgentInfoSigned>> {
         self.with_reader(move |reader| reader.p2p_query_near_basis(basis, limit))
     }
@@ -183,53 +186,42 @@ impl AsP2pStateTxExt for Transaction<'_> {
         since_ms: u64,
         until_ms: u64,
         arcset: DhtArcSet,
-    ) -> DatabaseResult<Vec<(KitsuneAgent, ArcInterval)>> {
+    ) -> DatabaseResult<Vec<AgentInfoSigned>> {
         let mut stmt = self
             .prepare(sql_p2p_agent_store::GOSSIP_QUERY)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
+        let mut out = Vec::new();
+        for r in stmt.query_map(
+            named_params! {
+                ":since_ms": clamp64(since_ms),
+                ":until_ms": clamp64(until_ms),
+                // we filter by arc in memory, not in the db query
+                ":storage_start_loc": Some(u32::MIN),
+                ":storage_end_loc": Some(u32::MAX),
+            },
+            |r| {
+                let r = r.get_ref(0)?;
+                let r = r.as_blob()?;
+                let signed = AgentInfoSigned::decode(r)
+                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
 
-        let query = stmt
-            .query_map(
-                named_params! {
-                    ":since_ms": clamp64(since_ms),
-                    ":until_ms": clamp64(until_ms),
-                    // we filter by arc in memory, not in the db query
-                    ":storage_start_loc": Some(u32::MIN),
-                    ":storage_end_loc": Some(u32::MAX),
-                },
-                |r| {
-                    let agent: Vec<u8> = r.get(0)?;
-                    let start: Option<u32> = r.get(1)?;
-                    let end: Option<u32> = r.get(2)?;
-                    let interval = match (start, end) {
-                        (Some(start), Some(end)) => Some(ArcInterval::new(start, end)),
-                        (None, None) => None,
-                        _ => {
-                            tracing::warn!(
-                            "Mismatch in arc bounds for an agent, treating as zero arc ({:?}, {:?})",
-                            start,
-                            end
-                        );
-                            None
-                        }
-                    };
-                    Ok(interval.map(|interval| (KitsuneAgent(agent), interval)))
-                },
-            )?;
-        query.fold(Ok(vec![]), |out, maybe_pair| {
-            if let Some((agent, interval)) = maybe_pair? {
-                if arcset.overlap(&interval.clone().into()) {
-                    return out.map(|mut out| {
-                        out.push((agent, interval));
-                        out
-                    });
-                }
+                Ok(signed)
+            },
+        )? {
+            let info = r?;
+            let interval = info.storage_arc.interval();
+            if arcset.overlap(&interval.into()) {
+                out.push(info);
             }
-            out
-        })
+        }
+        Ok(out)
     }
 
-    fn p2p_query_near_basis(&self, basis: u32, limit: u32) -> DatabaseResult<Vec<AgentInfoSigned>> {
+    fn p2p_query_near_basis(
+        &self,
+        basis: u32,
+        limit: usize,
+    ) -> DatabaseResult<Vec<AgentInfoSigned>> {
         let mut stmt = self
             .prepare(sql_p2p_agent_store::QUERY_NEAR_BASIS)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;

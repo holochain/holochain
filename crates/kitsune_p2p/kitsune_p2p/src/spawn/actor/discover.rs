@@ -239,16 +239,15 @@ pub(crate) fn get_cached_remotes_near_basis(
 ) -> impl Future<Output = KitsuneP2pResult<Vec<AgentInfoSigned>>> + 'static + Send {
     // as this is a local request, there isn't much cost to getting more
     // results than we strictly need
-    const LIMIT: u32 = 20;
+    const LIMIT: usize = 20;
 
     async move {
         let mut nodes = Vec::new();
 
-        for node in inner
-            .evt_sender
-            .query_agent_info_signed_near_basis(inner.space.clone(), basis_loc, LIMIT)
-            .await?
-        {
+        let query = QueryAgentsEvt::new(inner.space.clone())
+            .near_basis(basis_loc)
+            .limit(LIMIT);
+        for node in inner.evt_sender.query_agents(query).await? {
             if !inner
                 .i_s
                 .is_agent_local(node.agent.clone())
