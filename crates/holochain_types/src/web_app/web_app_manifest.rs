@@ -78,8 +78,7 @@ impl WebAppManifest {
 pub mod tests {
 
     use crate::web_app::{
-        web_app_manifest::WebAppManifestV1, AppManifestLocation,
-        WebAppManifest, WebUI,
+        web_app_manifest::WebAppManifestV1, AppManifestLocation, WebAppManifest, WebUI,
     };
     use mr_bundle::{Location, Manifest};
 
