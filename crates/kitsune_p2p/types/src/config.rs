@@ -119,6 +119,15 @@ pub mod tuning_params_struct {
         /// Should gossip dynamically resize storage arcs?
         gossip_dynamic_arcs: bool = false,
 
+        /// Allow only the first agent to join the space to
+        /// have a sized storage arc. [Default: false]
+        /// This is an experimental feature that sets the first
+        /// agent to join as the full arc and all other later
+        /// agents to empty.
+        /// It should not be used in production unless you understand
+        /// what you are doing.
+        gossip_single_storage_arc_per_space: bool = false,
+
         /// Default timeout for rpc single. [Default: 30s]
         default_rpc_single_timeout_ms: u32 = 1000 * 30,
 
