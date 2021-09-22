@@ -49,12 +49,16 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
         let key = self.clone();
         async move {
             let data = maybe_data?;
-            keystore
-                .sign(Sign {
-                    key,
-                    data: serde_bytes::ByteBuf::from(data),
-                })
-                .await
+            let f = keystore.sign(Sign {
+                key,
+                data: serde_bytes::ByteBuf::from(data),
+            });
+            match tokio::time::timeout(std::time::Duration::from_secs(30), f).await {
+                Ok(r) => r,
+                Err(_) => Err(KeystoreError::Other(
+                    "Keystore timeout while signing agent key".to_string(),
+                )),
+            }
         }
         .boxed()
         .into()

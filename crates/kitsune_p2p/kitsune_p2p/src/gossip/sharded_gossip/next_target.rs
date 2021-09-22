@@ -34,6 +34,7 @@ impl ShardedGossipLocal {
             .await?
             .into_iter()
             .filter(|a| remote_agents_within_arc_set.contains(&a.agent))
+            .filter(|a| !a.storage_arc.interval().is_empty())
         {
             // Get an address if there is one.
             let info = info
