@@ -41,6 +41,7 @@ use holochain_zome_types::Signature;
 use holochain_zome_types::SignedHeader;
 use holochain_zome_types::SignedHeaderHashed;
 use holochain_zome_types::Timestamp;
+use holochain_zome_types::ValidationStatus;
 
 use crate::chain_lock::is_chain_locked;
 use crate::chain_lock::is_lock_expired;
@@ -802,9 +803,27 @@ pub async fn genesis(
 
     vault
         .async_commit(move |txn| {
-            source_chain::put_raw(txn, dna_header, dna_ops, None)?;
-            source_chain::put_raw(txn, agent_validation_header, avh_ops, None)?;
-            source_chain::put_raw(txn, agent_header, agent_ops, agent_entry)?;
+            source_chain::put_raw(
+                txn,
+                dna_header,
+                dna_ops,
+                None,
+                Some(ValidationStatus::Valid),
+            )?;
+            source_chain::put_raw(
+                txn,
+                agent_validation_header,
+                avh_ops,
+                None,
+                Some(ValidationStatus::Valid),
+            )?;
+            source_chain::put_raw(
+                txn,
+                agent_header,
+                agent_ops,
+                agent_entry,
+                Some(ValidationStatus::Valid),
+            )?;
             SourceChainResult::Ok(())
         })
         .await
@@ -815,6 +834,7 @@ pub fn put_raw(
     shh: SignedHeaderHashed,
     ops: Vec<DhtOpLight>,
     entry: Option<Entry>,
+    validation_status: Option<ValidationStatus>,
 ) -> StateMutationResult<()> {
     let (header, signature) = shh.into_header_and_signature();
     let (header, hash) = header.into_inner();
@@ -850,11 +870,9 @@ pub fn put_raw(
         // StoreEntry ops with private entries are never gossiped or published
         // so we don't need to integrate them.
         // TODO: Can anything every depend on a private store entry op? I don't think so.
-        set_validation_status(
-            txn,
-            op_hash.clone(),
-            holochain_zome_types::ValidationStatus::Valid,
-        )?;
+        if let Some(status) = validation_status {
+            set_validation_status(txn, op_hash.clone(), status)?;
+        }
         if !(op_type == DhtOpType::StoreEntry && visibility == Some(EntryVisibility::Private)) {
             set_validation_stage(txn, op_hash, ValidationLimboStatus::AwaitingIntegration)?;
         }
@@ -959,7 +977,7 @@ async fn _put_db<H: HeaderInner, B: HeaderBuilder<H>>(
                 Some((new_head, new_seq, new_timestamp)),
             ));
         }
-        SourceChainResult::Ok(put_raw(txn, header, ops, entry)?)
+        SourceChainResult::Ok(put_raw(txn, header, ops, entry, None)?)
     })?;
     Ok(hash)
 }
