@@ -850,8 +850,13 @@ pub fn put_raw(
         // StoreEntry ops with private entries are never gossiped or published
         // so we don't need to integrate them.
         // TODO: Can anything every depend on a private store entry op? I don't think so.
+        set_validation_status(
+            txn,
+            op_hash.clone(),
+            holochain_zome_types::ValidationStatus::Valid,
+        )?;
         if !(op_type == DhtOpType::StoreEntry && visibility == Some(EntryVisibility::Private)) {
-            set_validation_stage(txn, op_hash, ValidationLimboStatus::Pending)?;
+            set_validation_stage(txn, op_hash, ValidationLimboStatus::AwaitingIntegration)?;
         }
     }
     Ok(())
