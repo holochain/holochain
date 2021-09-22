@@ -37,6 +37,7 @@ impl Query for GetEntryDetailsQuery {
         WHERE DhtOp.type IN (:create_type, :delete_type, :update_type)
         AND DhtOp.basis_hash = :entry_hash
         AND (DhtOp.when_integrated IS NOT NULL OR DhtOp.is_authored = 1)
+        AND DhtOp.validation_status IS NOT NULL
         "
         .into()
     }
