@@ -1,5 +1,6 @@
 //! Helpers for unit tests
 
+use crate::conn::DbSyncLevel;
 use crate::db::DbKind;
 use crate::db::DbWrite;
 use holochain_zome_types::test_utils::fake_cell_id;
@@ -16,7 +17,8 @@ pub fn test_cell_db() -> TestDb {
 fn test_db(kind: DbKind) -> TestDb {
     let tmpdir = TempDir::new("holochain-test-environments").unwrap();
     TestDb {
-        db: DbWrite::new(tmpdir.path(), kind).expect("Couldn't create test database"),
+        db: DbWrite::new(tmpdir.path(), kind, crate::conn::DbSyncLevel::default())
+            .expect("Couldn't create test database"),
         tmpdir,
     }
 }
@@ -68,11 +70,17 @@ impl TestDbs {
     /// Create all three non-cell environments at once
     pub fn new(tempdir: TempDir) -> Self {
         use DbKind::*;
-        let conductor = DbWrite::new(&tempdir.path(), Conductor).unwrap();
-        let wasm = DbWrite::new(&tempdir.path(), Wasm).unwrap();
+        let conductor = DbWrite::new(&tempdir.path(), Conductor, DbSyncLevel::default()).unwrap();
+        let wasm = DbWrite::new(&tempdir.path(), Wasm, DbSyncLevel::default()).unwrap();
         let space = Arc::new(kitsune_p2p::KitsuneSpace(vec![0; 36]));
-        let p2p_agent_store = DbWrite::new(&tempdir.path(), P2pAgentStore(space.clone())).unwrap();
-        let p2p_metrics = DbWrite::new(&tempdir.path(), P2pMetrics(space)).unwrap();
+        let p2p_agent_store = DbWrite::new(
+            &tempdir.path(),
+            P2pAgentStore(space.clone()),
+            DbSyncLevel::default(),
+        )
+        .unwrap();
+        let p2p_metrics =
+            DbWrite::new(&tempdir.path(), P2pMetrics(space), DbSyncLevel::default()).unwrap();
         Self {
             conductor,
             wasm,

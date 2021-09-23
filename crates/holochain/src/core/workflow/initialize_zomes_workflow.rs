@@ -69,14 +69,19 @@ where
     };
 
     // Insert the init marker
-    workspace
-        .source_chain()
-        .put(
-            builder::InitZomesComplete {},
-            None,
-            ChainTopOrdering::Strict,
-        )
-        .await?;
+    // FIXME: For some reason if we don't spawn here
+    // this future never gets polled again.
+    let ws = workspace.clone();
+    tokio::task::spawn(async move {
+        ws.source_chain()
+            .put(
+                builder::InitZomesComplete {},
+                None,
+                ChainTopOrdering::Strict,
+            )
+            .await
+    })
+    .await??;
 
     // TODO: Validate scratch items
     super::inline_validation(workspace, network, conductor_api, None, ribosome).await?;

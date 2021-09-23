@@ -329,7 +329,7 @@ pub async fn setup_app(
 
     conductor_handle
         .clone()
-        .enable_app(&"test app".to_string())
+        .enable_app("test app".to_string())
         .await
         .unwrap();
 

@@ -1,8 +1,9 @@
 [package]
 name = "release-automation"
-version = "0.1.0"
+version = "0.2.0-alpha.0"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2018"
+documentation = "https://docs.rs/release-automation"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -36,7 +37,7 @@ toml_edit = "0.2"
 thiserror = "1"
 regex = "1.5"
 crates_io_api = "0.7"
-holochain_util = { path = "../holochain_util" ,version = "0.0.3"}
+holochain_util = { path = "../holochain_util" ,version = "0.0.4"}
 crates-index = "0.16"
 
 # used for the example clippy fix-json

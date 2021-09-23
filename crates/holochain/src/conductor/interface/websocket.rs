@@ -249,7 +249,7 @@ pub mod test_utils {
 
         conductor_handle
             .clone()
-            .enable_app(&"test app".to_string())
+            .enable_app("test app".to_string())
             .await
             .unwrap();
 
@@ -352,7 +352,7 @@ pub mod test {
     async fn activate(conductor_handle: ConductorHandle) -> ConductorHandle {
         conductor_handle
             .clone()
-            .enable_app(&"test app".to_string())
+            .enable_app("test app".to_string())
             .await
             .unwrap();
 

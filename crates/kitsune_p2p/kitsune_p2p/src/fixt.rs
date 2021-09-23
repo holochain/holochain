@@ -5,6 +5,7 @@ use crate::agent_store::UrlList;
 use crate::dependencies::url2;
 use crate::KitsuneAgent;
 use crate::KitsuneBinType;
+use crate::KitsuneOpHash;
 use crate::KitsuneSignature;
 use crate::KitsuneSpace;
 use ::fixt::prelude::*;
@@ -43,6 +44,11 @@ fixturator!(
 
 fixturator!(
     KitsuneSpace;
+    constructor fn new(ThirtySixBytes);
+);
+
+fixturator!(
+    KitsuneOpHash;
     constructor fn new(ThirtySixBytes);
 );
 

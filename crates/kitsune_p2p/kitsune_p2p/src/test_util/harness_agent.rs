@@ -159,14 +159,35 @@ impl KitsuneP2pEventHandler for AgentHarness {
 
     fn handle_query_gossip_agents(
         &mut self,
-        _input: crate::event::QueryGossipAgentsEvt,
+        input: crate::event::QueryGossipAgentsEvt,
     ) -> KitsuneP2pEventHandlerResult<
         Vec<(
             Arc<crate::KitsuneAgent>,
             kitsune_p2p_types::dht_arc::ArcInterval,
         )>,
     > {
-        todo!()
+        let crate::event::QueryGossipAgentsEvt {
+            agents,
+            since_ms,
+            until_ms,
+            arc_set,
+            ..
+        } = input;
+        let res = self
+            .agent_store
+            .iter()
+            .filter(|(a, _)| match agents {
+                Some(ref agents) => agents.contains(a),
+                None => true,
+            })
+            .filter(|(_, i)| {
+                arc_set.contains(i.agent.get_loc())
+                    && i.signed_at_ms >= since_ms
+                    && i.signed_at_ms <= until_ms
+            })
+            .map(|(k, v)| (k.clone(), v.storage_arc.interval()))
+            .collect();
+        Ok(async move { Ok(res) }.boxed().into())
     }
 
     fn handle_query_agent_info_signed(

@@ -287,6 +287,11 @@ impl ArcInterval {
             .unwrap_or_default()
     }
 
+    /// Check if this arc is empty.
+    pub fn is_empty(&self) -> bool {
+        matches!(self, Self::Empty)
+    }
+
     #[cfg(any(test, feature = "test_utils"))]
     pub fn to_ascii(&self, len: usize) -> String {
         match self {
