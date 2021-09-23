@@ -184,7 +184,7 @@ impl KitsuneP2pEventHandler for AgentHarness {
             })
             .filter(|(_, i)| arc_set.contains(i.agent.get_loc()))
             .filter(|(_, i)| window.contains(&Timestamp::from_micros(i.signed_at_ms as i64 * 1000)))
-            .take(limit.unwrap_or(usize::MAX))
+            .take(limit.unwrap_or(u32::MAX) as usize)
             .map(|(_, i)| (**i).clone())
             .collect();
         Ok(async move { Ok(out) }.boxed().into())

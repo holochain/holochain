@@ -83,7 +83,7 @@ pub fn list_all_agent_info_signed_near_basis(
     environ: EnvWrite,
     _kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     basis_loc: u32,
-    limit: usize,
+    limit: u32,
 ) -> ConductorResult<Vec<AgentInfoSigned>> {
     Ok(environ.conn()?.p2p_query_near_basis(basis_loc, limit)?)
 }

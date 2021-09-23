@@ -77,7 +77,7 @@ pub struct QueryAgentsEvt {
     /// If set, results are ordered by proximity to the specified location
     pub near_basis: Option<DhtLocation>,
     /// Limit to the number of results returned
-    pub limit: Option<usize>,
+    pub limit: Option<u32>,
 }
 
 // NB: if we want to play it safer, rather than providing these fine-grained
@@ -123,7 +123,7 @@ impl QueryAgentsEvt {
     }
 
     /// Limit the number of results
-    pub fn limit(mut self, limit: usize) -> Self {
+    pub fn limit(mut self, limit: u32) -> Self {
         self.limit = Some(limit);
         self
     }

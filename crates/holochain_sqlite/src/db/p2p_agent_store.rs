@@ -29,7 +29,7 @@ pub trait AsP2pAgentStoreConExt {
     fn p2p_query_near_basis(
         &mut self,
         basis: u32,
-        limit: usize,
+        limit: u32,
     ) -> DatabaseResult<Vec<AgentInfoSigned>>;
 }
 
@@ -51,11 +51,7 @@ pub trait AsP2pStateTxExt {
     ) -> DatabaseResult<Vec<AgentInfoSigned>>;
 
     /// Query agents sorted by nearness to basis loc
-    fn p2p_query_near_basis(
-        &self,
-        basis: u32,
-        limit: usize,
-    ) -> DatabaseResult<Vec<AgentInfoSigned>>;
+    fn p2p_query_near_basis(&self, basis: u32, limit: u32) -> DatabaseResult<Vec<AgentInfoSigned>>;
 }
 
 impl AsP2pAgentStoreConExt for crate::db::PConn {
@@ -79,7 +75,7 @@ impl AsP2pAgentStoreConExt for crate::db::PConn {
     fn p2p_query_near_basis(
         &mut self,
         basis: u32,
-        limit: usize,
+        limit: u32,
     ) -> DatabaseResult<Vec<AgentInfoSigned>> {
         self.with_reader(move |reader| reader.p2p_query_near_basis(basis, limit))
     }
@@ -217,11 +213,7 @@ impl AsP2pStateTxExt for Transaction<'_> {
         Ok(out)
     }
 
-    fn p2p_query_near_basis(
-        &self,
-        basis: u32,
-        limit: usize,
-    ) -> DatabaseResult<Vec<AgentInfoSigned>> {
+    fn p2p_query_near_basis(&self, basis: u32, limit: u32) -> DatabaseResult<Vec<AgentInfoSigned>> {
         let mut stmt = self
             .prepare(sql_p2p_agent_store::QUERY_NEAR_BASIS)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;

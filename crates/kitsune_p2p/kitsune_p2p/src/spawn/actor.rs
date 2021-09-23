@@ -265,7 +265,7 @@ impl KitsuneP2pActor {
                                     wire::Wire::PeerQuery(wire::PeerQuery { space, basis_loc }) => {
                                         // this *does* go over the network...
                                         // so we don't want it to be too many
-                                        const LIMIT: usize = 8;
+                                        const LIMIT: u32 = 8;
                                         let query = QueryAgentsEvt::new(space)
                                             .near_basis(basis_loc)
                                             .limit(LIMIT);
