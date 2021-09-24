@@ -84,10 +84,11 @@ impl SwitchboardNetwork {
                     Tx2EpEvent::IncomingNotify(Tx2EpIncomingNotify { con, url, data, .. }) => {
                         match data {
                             wire::Wire::Gossip(wire::Gossip {
-                                space,
+                                space: _,
                                 data,
                                 module,
                             }) => {
+                                dbg!(&data, &module);
                                 let data: Vec<u8> = data.into();
                                 let data: Box<[u8]> = data.into_boxed_slice();
 

@@ -34,6 +34,7 @@ impl GossipScenarioNode {
 impl ghost_actor::GhostHandler<KitsuneP2pEvent> for GossipScenarioNode {}
 impl ghost_actor::GhostControlHandler for GossipScenarioNode {}
 
+#[allow(warnings)]
 impl KitsuneP2pEventHandler for GossipScenarioNode {
     fn handle_put_agent_info_signed(
         &mut self,
