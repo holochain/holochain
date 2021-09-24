@@ -23,6 +23,7 @@ pub use spawn::*;
 pub mod test_util;
 
 #[cfg(test)]
+#[cfg(feature = "test_utils")]
 mod test;
 
 pub mod fixt;
