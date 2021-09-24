@@ -11,6 +11,7 @@ use ghost_actor::dependencies::tracing;
 use governor::clock::DefaultClock;
 use governor::state::{InMemoryState, NotKeyed};
 use governor::RateLimiter;
+use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::*;
 use kitsune_p2p_types::dht_arc::{ArcInterval, DhtArcSet};
@@ -19,7 +20,6 @@ use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::*;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::ops::Range;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
@@ -56,6 +56,9 @@ const MAX_SEND_BUF_BYTES: usize = 16000;
 /// gossiped with if gossip is triggered.
 const MAX_TRIGGERS: u8 = 2;
 
+/// The timeout for a gossip round if there is no contact. Five minutes.
+const ROUND_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60 * 5);
+
 type BloomFilter = bloomfilter::Bloom<Arc<MetaOpKey>>;
 type EventSender = futures::channel::mpsc::Sender<event::KitsuneP2pEvent>;
 
@@ -65,7 +68,7 @@ struct TimedBloomFilter {
     /// for this time window.
     bloom: Option<BloomFilter>,
     /// The time window for this bloom filter.
-    time: TimeWindowMs,
+    time: TimeWindow,
 }
 
 /// Gossip has two distinct variants which share a lot of similarities but
@@ -98,6 +101,26 @@ pub struct ShardedGossip {
     bandwidth: Arc<BandwidthThrottle>,
 }
 
+/// Basic statistic for gossip loop processing performance.
+struct Stats {
+    start: std::time::Instant,
+    avg_processing_time: std::time::Duration,
+    max_processing_time: std::time::Duration,
+    count: u32,
+}
+
+impl Stats {
+    /// Reset the stats.
+    fn reset() -> Self {
+        Stats {
+            start: std::time::Instant::now(),
+            avg_processing_time: std::time::Duration::default(),
+            max_processing_time: std::time::Duration::default(),
+            count: 0,
+        }
+    }
+}
+
 impl ShardedGossip {
     /// Constructor
     pub fn new(
@@ -125,6 +148,7 @@ impl ShardedGossip {
             let this = this.clone();
 
             async move {
+                let mut stats = Stats::reset();
                 while !this
                     .gossip
                     .closing
@@ -132,6 +156,7 @@ impl ShardedGossip {
                 {
                     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
                     this.run_one_iteration().await;
+                    this.stats(&mut stats);
                 }
                 KitsuneResult::Ok(())
             }
@@ -239,6 +264,28 @@ impl ShardedGossip {
             Ok((incoming, outgoing))
         })
     }
+
+    /// Log the statistics for the gossip loop.
+    fn stats(&self, stats: &mut Stats) {
+        if let GossipType::Recent = self.gossip.gossip_type {
+            let elapsed = stats.start.elapsed();
+            stats.avg_processing_time += elapsed;
+            stats.max_processing_time = std::cmp::max(stats.max_processing_time, elapsed);
+            stats.count += 1;
+            if elapsed.as_secs() > 5 {
+                stats.avg_processing_time = stats
+                    .avg_processing_time
+                    .checked_div(stats.count)
+                    .unwrap_or_default();
+                let _ = self.gossip.inner.share_mut(|i, _| {
+                    let s = tracing::trace_span!("gossip_metrics");
+                    s.in_scope(|| tracing::trace!("{}\nStats over last 5s:\n\tAverage processing time {:?}\n\tIteration count: {}\n\tMax gossip processing time: {:?}", i.metrics, stats.avg_processing_time, stats.count, stats.max_processing_time));
+                    Ok(())
+                });
+                *stats = Stats::reset();
+            }
+        }
+    }
 }
 
 /// The parts of sharded gossip which are concerned only with the gossiping node:
@@ -273,6 +320,7 @@ pub struct ShardedGossipLocalState {
     /// Metrics that track remote node states and help guide
     /// the next node to gossip with.
     metrics: Metrics,
+    #[allow(dead_code)]
     /// Last moment we locally synced.
     last_local_sync: Option<std::time::Instant>,
     /// Trigger local sync to run on the next iteration.
@@ -281,12 +329,13 @@ pub struct ShardedGossipLocalState {
 
 impl ShardedGossipLocalState {
     fn remove_state(&mut self, state_key: &StateKey, error: bool) -> Option<RoundState> {
-        if self
+        // Check if the round to be removed matches the current initiate_tgt
+        let init_tgt = self
             .initiate_tgt
             .as_ref()
             .map(|tgt| tgt.0.cert() == state_key)
-            .unwrap_or(false)
-        {
+            .unwrap_or(false);
+        if init_tgt {
             self.initiate_tgt = None;
         }
         let r = self.round_map.remove(state_key);
@@ -296,6 +345,8 @@ impl ShardedGossipLocalState {
             } else {
                 self.metrics.record_success(state_key.clone());
             }
+        } else if init_tgt && error {
+            self.metrics.record_error(state_key.clone());
         }
         r
     }
@@ -349,8 +400,10 @@ pub struct RoundState {
     received_all_incoming_ops_blooms: bool,
     /// Round start time
     created_at: std::time::Instant,
+    /// Last moment we had any contact for this round.
+    last_touch: std::time::Instant,
     /// Amount of time before a round is considered expired.
-    round_timeout: u32,
+    round_timeout: std::time::Duration,
 }
 
 impl ShardedGossipLocal {
@@ -360,7 +413,7 @@ impl ShardedGossipLocal {
     const UPPER_HASHES_BOUND: usize = 500;
 
     /// Calculate the time range for a gossip round.
-    fn calculate_time_ranges(&self) -> Vec<Range<u64>> {
+    fn calculate_time_ranges(&self) -> Vec<TimeWindow> {
         const NOW: Duration = Duration::from_secs(0);
         const HOUR: Duration = Duration::from_secs(60 * 60);
         const DAY: Duration = Duration::from_secs(60 * 60 * 24);
@@ -388,12 +441,8 @@ impl ShardedGossipLocal {
             num_sent_ops_blooms: 0,
             received_all_incoming_ops_blooms: false,
             created_at: std::time::Instant::now(),
-            // TODO: Check if the node is a successful peer or not and set the timeout accordingly.
-            // TODO: Actually I think this is the wrong time out? This is
-            // how long we wait to timeout a round.
-            round_timeout: self
-                .tuning_params
-                .gossip_peer_on_success_next_gossip_delay_ms,
+            last_touch: std::time::Instant::now(),
+            round_timeout: ROUND_TIMEOUT,
         })
     }
 
@@ -565,7 +614,7 @@ impl ShardedGossipLocal {
             &self.space,
             agent_arcs.as_slice(),
             &arcset,
-            full_time_window(),
+            full_time_range(),
             usize::MAX,
             true,
         )
@@ -590,11 +639,15 @@ impl ShardedGossipLocal {
     /// Check if we should locally sync
     fn should_local_sync(&self) -> KitsuneResult<bool> {
         // Historical gossip should not locally sync.
-        if let GossipType::Historical = self.gossip_type {
+        if matches!(self.gossip_type, GossipType::Historical)
+            || self.tuning_params.gossip_single_storage_arc_per_space
+        {
             return Ok(false);
         }
         let update_last_sync = |i: &mut ShardedGossipLocalState, _: &mut bool| {
-            if i.trigger_local_sync {
+            if i.local_agents.len() < 2 {
+                Ok(false)
+            } else if i.trigger_local_sync {
                 // We are force triggering a local sync.
                 i.trigger_local_sync = false;
                 i.last_local_sync = Some(std::time::Instant::now());
@@ -684,19 +737,20 @@ impl RoundState {
 
 /// Time range from now into the past.
 /// Start must be < end.
-fn time_range(start: Duration, end: Duration) -> Range<u64> {
+fn time_range(start: Duration, end: Duration) -> TimeWindow {
+    // TODO: write in terms of chrono::now()
     let now = SystemTime::now();
     let start = now
         .checked_sub(start)
         .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
-        .map(|t| t.as_millis() as u64)
-        .unwrap_or(0);
+        .map(|t| Timestamp::from_micros(t.as_micros() as i64))
+        .unwrap_or(Timestamp::MIN);
 
     let end = now
         .checked_sub(end)
         .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
-        .map(|t| t.as_millis() as u64)
-        .unwrap_or(0);
+        .map(|t| Timestamp::from_micros(t.as_micros() as i64))
+        .unwrap_or(Timestamp::MAX);
 
     start..end
 }
@@ -711,7 +765,7 @@ pub enum EncodedTimedBloomFilter {
     /// Please send all your ops.
     MissingAllHashes {
         /// The time window that we are missing hashes for.
-        time_window: std::ops::Range<u64>,
+        time_window: TimeWindow,
     },
     /// I have overlap and I have some hashes.
     /// Please send any missing ops.
@@ -719,7 +773,7 @@ pub enum EncodedTimedBloomFilter {
         /// The encoded bloom filter.
         filter: PoolBuf,
         /// The time window these hashes are for.
-        time_window: std::ops::Range<u64>,
+        time_window: TimeWindow,
     },
 }
 

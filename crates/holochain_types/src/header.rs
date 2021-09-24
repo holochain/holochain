@@ -14,10 +14,6 @@ use derive_more::From;
 use holo_hash::EntryHash;
 use holochain_zome_types::prelude::*;
 
-use error::*;
-
-pub mod error;
-
 #[cfg(feature = "contrafact")]
 pub mod facts;
 

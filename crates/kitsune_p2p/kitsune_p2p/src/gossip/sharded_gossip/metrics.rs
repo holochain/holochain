@@ -133,3 +133,100 @@ fn record_instant(buffer: &mut VecDeque<Instant>) {
     }
     buffer.push_back(Instant::now());
 }
+
+impl std::fmt::Display for Metrics {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        static TRACE: once_cell::sync::Lazy<bool> = once_cell::sync::Lazy::new(|| {
+            std::env::var("GOSSIP_METRICS").map_or(false, |s| s == "trace")
+        });
+        let trace = *TRACE;
+        write!(f, "Metrics:")?;
+        let mut average_last_completion = Duration::default();
+        let mut max_last_completion = Duration::default();
+        let mut average_completion_frequency = Duration::default();
+        let mut complete_rounds = 0;
+        let mut min_complete_rounds = usize::MAX;
+        for (key, info) in &self.map {
+            let completion_frequency: Duration =
+                info.complete_rounds.iter().map(|i| i.elapsed()).sum();
+            let completion_frequency = completion_frequency
+                .checked_div(info.complete_rounds.len() as u32)
+                .unwrap_or_default();
+            let last_completion = info
+                .complete_rounds
+                .back()
+                .map(|i| i.elapsed())
+                .unwrap_or_default();
+            average_last_completion += last_completion;
+            max_last_completion = max_last_completion.max(last_completion);
+            average_completion_frequency += completion_frequency;
+            if !info.complete_rounds.is_empty() {
+                complete_rounds += 1;
+            }
+            min_complete_rounds = min_complete_rounds.min(info.complete_rounds.len());
+            if trace {
+                write!(f, "\n\t{:?}:", key)?;
+                write!(
+                    f,
+                    "\n\t\tErrors: {}, Last: {:?}",
+                    info.errors.len(),
+                    info.errors.back().map(|i| i.elapsed()).unwrap_or_default()
+                )?;
+                write!(
+                    f,
+                    "\n\t\tInitiates: {}, Last: {:?}",
+                    info.initiates.len(),
+                    info.initiates
+                        .back()
+                        .map(|i| i.elapsed())
+                        .unwrap_or_default()
+                )?;
+                write!(
+                    f,
+                    "\n\t\tRemote Rounds: {}, Last: {:?}",
+                    info.remote_rounds.len(),
+                    info.remote_rounds
+                        .back()
+                        .map(|i| i.elapsed())
+                        .unwrap_or_default()
+                )?;
+                write!(
+                    f,
+                    "\n\t\tComplete Rounds: {}, Last: {:?}, Average completion Frequency: {:?}",
+                    info.complete_rounds.len(),
+                    last_completion,
+                    completion_frequency
+                )?;
+                write!(f, "\n\t\tCurrent Round: {}", info.current_round)?;
+            }
+        }
+        write!(
+            f,
+            "\n\tNumber of remote nodes complete {} out of {}. Min per node: {}.",
+            complete_rounds,
+            self.map.len(),
+            min_complete_rounds
+        )?;
+        write!(
+            f,
+            "\n\tAverage time since last completion: {:?}",
+            average_last_completion
+                .checked_div(self.map.len() as u32)
+                .unwrap_or_default()
+        )?;
+        write!(
+            f,
+            "\n\tMax time since last completion: {:?}",
+            max_last_completion
+        )?;
+        write!(
+            f,
+            "\n\tAverage completion frequency: {:?}",
+            average_completion_frequency
+                .checked_div(self.map.len() as u32)
+                .unwrap_or_default()
+        )?;
+        write!(f, "\n\tForce Initiate: {}", self.force_initiates)?;
+        Ok(())
+    }
+}

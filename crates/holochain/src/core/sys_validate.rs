@@ -16,8 +16,8 @@ pub(super) use error::*;
 pub use holo_hash::*;
 pub use holochain_state::source_chain::SourceChainError;
 pub use holochain_state::source_chain::SourceChainResult;
-pub use holochain_types::Timestamp;
 pub use holochain_zome_types::HeaderHashed;
+pub use holochain_zome_types::Timestamp;
 
 #[allow(missing_docs)]
 mod error;
@@ -516,7 +516,7 @@ impl IncomingDhtOpSender {
     ) -> SysValidationResult<()> {
         if let Some(op) = make_op(element) {
             let ops = vec![op];
-            incoming_dht_ops_workflow(&self.env, self.sys_validation_trigger, ops, false)
+            incoming_dht_ops_workflow(&self.env, None, self.sys_validation_trigger, ops, false)
                 .await
                 .map_err(Box::new)?;
         }

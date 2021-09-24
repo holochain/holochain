@@ -57,6 +57,8 @@ pub(crate) async fn spawn_test_agent(
     Ok((agent, p2p, control))
 }
 
+use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_types::dht_arc::DhtArcSet;
 use lair_keystore_api::entry::EntrySignEd25519;
 use lair_keystore_api::internal::sign_ed25519::*;
 
@@ -157,38 +159,33 @@ impl KitsuneP2pEventHandler for AgentHarness {
         Ok(async move { Ok(res) }.boxed().into())
     }
 
-    fn handle_query_gossip_agents(
+    fn handle_query_agents(
         &mut self,
-        _input: crate::event::QueryGossipAgentsEvt,
-    ) -> KitsuneP2pEventHandlerResult<
-        Vec<(
-            Arc<crate::KitsuneAgent>,
-            kitsune_p2p_types::dht_arc::ArcInterval,
-        )>,
-    > {
-        todo!()
-    }
-
-    fn handle_query_agent_info_signed(
-        &mut self,
-        _input: QueryAgentInfoSignedEvt,
+        QueryAgentsEvt {
+            space: _,
+            agents,
+            window,
+            arc_set,
+            near_basis: _,
+            limit,
+        }: QueryAgentsEvt,
     ) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
-        let out = self.agent_store.values().map(|a| (**a).clone()).collect();
-        Ok(async move { Ok(out) }.boxed().into())
-    }
-
-    fn handle_query_agent_info_signed_near_basis(
-        &mut self,
-        _space: Arc<KitsuneSpace>,
-        _basis_loc: u32,
-        limit: u32,
-    ) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
-        // TODO - sort these?
+        let arc_set = arc_set.unwrap_or(Arc::new(DhtArcSet::Full));
+        let window = window.unwrap_or(full_time_range());
+        // TODO - sort by near_basis if set
         let out = self
             .agent_store
-            .values()
-            .map(|a| (**a).clone())
-            .take(limit as usize)
+            .iter()
+            .filter(|(a, _)| {
+                agents
+                    .as_ref()
+                    .map(|agents| agents.contains(*a))
+                    .unwrap_or(true)
+            })
+            .filter(|(_, i)| arc_set.contains(i.agent.get_loc()))
+            .filter(|(_, i)| window.contains(&Timestamp::from_micros(i.signed_at_ms as i64 * 1000)))
+            .take(limit.unwrap_or(u32::MAX) as usize)
+            .map(|(_, i)| (**i).clone())
             .collect();
         Ok(async move { Ok(out) }.boxed().into())
     }
@@ -270,11 +267,11 @@ impl KitsuneP2pEventHandler for AgentHarness {
     fn handle_query_op_hashes(
         &mut self,
         _input: QueryOpHashesEvt,
-    ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<super::KitsuneOpHash>>, TimeWindowMs)>> {
+    ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<super::KitsuneOpHash>>, TimeWindow)>> {
         let hashes: Vec<Arc<super::KitsuneOpHash>> = self.gossip_store.keys().cloned().collect();
         let slug_hashes: Vec<Slug> = hashes.iter().map(|h| h.into()).collect();
         tracing::trace!(?slug_hashes, "FETCH_OP_HASHES");
-        Ok(async move { Ok(Some((hashes, u64::MIN..u64::MAX))) }
+        Ok(async move { Ok(Some((hashes, full_time_range()))) }
             .boxed()
             .into())
     }

@@ -229,24 +229,24 @@ pub trait ConductorHandleT: Send + Sync {
     /// Activate an app
     async fn enable_app(
         self: Arc<Self>,
-        app_id: &InstalledAppId,
+        app_id: InstalledAppId,
     ) -> ConductorResult<(InstalledApp, CellStartupErrors)>;
 
     /// Disable an app
     async fn disable_app(
         self: Arc<Self>,
-        app_id: &InstalledAppId,
+        app_id: InstalledAppId,
         reason: DisabledAppReason,
     ) -> ConductorResult<InstalledApp>;
 
     /// Start an enabled but stopped (paused) app
-    async fn start_app(self: Arc<Self>, app_id: &InstalledAppId) -> ConductorResult<InstalledApp>;
+    async fn start_app(self: Arc<Self>, app_id: InstalledAppId) -> ConductorResult<InstalledApp>;
 
     /// Stop a running app while leaving it enabled. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
     async fn pause_app(
         self: Arc<Self>,
-        app_id: &InstalledAppId,
+        app_id: InstalledAppId,
         reason: PausedAppReason,
     ) -> ConductorResult<InstalledApp>;
 
@@ -341,7 +341,7 @@ pub trait ConductorHandleT: Send + Sync {
     #[cfg(any(test, feature = "test_utils"))]
     async fn transition_app_status(
         &self,
-        app_id: &InstalledAppId,
+        app_id: InstalledAppId,
         transition: AppStatusTransition,
     ) -> ConductorResult<(InstalledApp, AppStatusFx)>;
 
@@ -392,6 +392,9 @@ pub struct ConductorHandleImpl<DS: DnaStore + 'static> {
 
     /// The database for storing p2p MetricDatum(s)
     pub(super) p2p_metrics_env: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
+
+    /// Database sync level
+    pub(super) db_sync_level: DbSyncLevel,
 
     // Testing:
     #[cfg(any(test, feature = "test_utils"))]
@@ -555,13 +558,6 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 let res = env
                     .conn()?
                     .p2p_gossip_query_agents(since_ms, until_ms, (*arc_set).clone())
-                    // FIXME: This sucks we have to iterate through the whole vec just to add Arcs.
-                    // Are arcs really saving us that much?
-                    .map(|r| {
-                        r.into_iter()
-                            .map(|(agent, arc)| (Arc::new(agent), arc))
-                            .collect()
-                    })
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
@@ -640,7 +636,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             HolochainP2pEvent::QueryOpHashes {
                 dna_hash,
                 to_agents,
-                window_ms,
+                window,
                 max_ops,
                 include_limbo,
                 respond,
@@ -654,7 +650,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                     let cell_id = CellId::new(dna_hash.clone(), agent);
                     let cell = self.cell_by_id(&cell_id).await?;
                     match cell
-                        .handle_query_op_hashes(arc_set, window_ms.clone(), include_limbo)
+                        .handle_query_op_hashes(arc_set, window.clone(), include_limbo)
                         .await
                     {
                         Ok(t) => hashes_and_times.extend(t),
@@ -694,8 +690,14 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                     .collect();
 
                 // The range is exclusive so we add one to the end.
-                let range =
-                    start.and_then(|s| end.map(|e| (hashes, s..(e.checked_add(1).unwrap_or(0)))));
+                let range = start.and_then(|s| {
+                    end.map(|e| {
+                        (
+                            hashes,
+                            s..(e.saturating_add(&std::time::Duration::from_millis(1))),
+                        )
+                    })
+                });
 
                 respond.respond(Ok(async move { Ok(range) }.boxed().into()));
             }
@@ -764,14 +766,20 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             (root_env_dir, keystore)
         };
         // Run genesis on cells.
-        crate::conductor::conductor::genesis_cells(root_env_dir, keystore, cells, self.clone())
-            .await?;
+        crate::conductor::conductor::genesis_cells(
+            root_env_dir,
+            keystore,
+            cells,
+            self.clone(),
+            self.db_sync_level,
+        )
+        .await?;
 
         {
             let mut conductor = self.conductor.write().await;
             let properties = properties.unwrap_or_else(|| ().into());
             let cell_id = conductor
-                .add_clone_cell_to_app(&installed_app_id, &slot_id, properties)
+                .add_clone_cell_to_app(installed_app_id, slot_id, properties)
                 .await?;
             Ok(cell_id)
         }
@@ -802,6 +810,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 .map(|(c, p)| (c.as_id().clone(), p.clone()))
                 .collect(),
             self.clone(),
+            self.db_sync_level,
         )
         .await?;
 
@@ -867,6 +876,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             keystore,
             cells_to_create,
             self.clone(),
+            self.db_sync_level,
         )
         .await?;
 
@@ -911,13 +921,13 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     #[tracing::instrument(skip(self))]
     async fn enable_app(
         self: Arc<Self>,
-        app_id: &InstalledAppId,
+        app_id: InstalledAppId,
     ) -> ConductorResult<(InstalledApp, CellStartupErrors)> {
         let (app, delta) = self
             .conductor
             .write()
             .await
-            .transition_app_status(&app_id, AppStatusTransition::Enable)
+            .transition_app_status(app_id.clone(), AppStatusTransition::Enable)
             .await?;
         let errors = self
             .process_app_status_fx(delta, Some(vec![app_id.to_owned()].into_iter().collect()))
@@ -928,14 +938,14 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     #[tracing::instrument(skip(self))]
     async fn disable_app(
         self: Arc<Self>,
-        app_id: &InstalledAppId,
+        app_id: InstalledAppId,
         reason: DisabledAppReason,
     ) -> ConductorResult<InstalledApp> {
         let (app, delta) = self
             .conductor
             .write()
             .await
-            .transition_app_status(&app_id, AppStatusTransition::Disable(reason))
+            .transition_app_status(app_id.clone(), AppStatusTransition::Disable(reason))
             .await?;
         self.process_app_status_fx(delta, Some(vec![app_id.to_owned()].into_iter().collect()))
             .await?;
@@ -943,12 +953,12 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     #[tracing::instrument(skip(self))]
-    async fn start_app(self: Arc<Self>, app_id: &InstalledAppId) -> ConductorResult<InstalledApp> {
+    async fn start_app(self: Arc<Self>, app_id: InstalledAppId) -> ConductorResult<InstalledApp> {
         let (app, delta) = self
             .conductor
             .write()
             .await
-            .transition_app_status(&app_id, AppStatusTransition::Start)
+            .transition_app_status(app_id.clone(), AppStatusTransition::Start)
             .await?;
         self.process_app_status_fx(delta, Some(vec![app_id.to_owned()].into_iter().collect()))
             .await?;
@@ -959,14 +969,14 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     #[cfg(any(test, feature = "test_utils"))]
     async fn pause_app(
         self: Arc<Self>,
-        app_id: &InstalledAppId,
+        app_id: InstalledAppId,
         reason: PausedAppReason,
     ) -> ConductorResult<InstalledApp> {
         let (app, delta) = self
             .conductor
             .write()
             .await
-            .transition_app_status(&app_id, AppStatusTransition::Pause(reason))
+            .transition_app_status(app_id.clone(), AppStatusTransition::Pause(reason))
             .await?;
         self.process_app_status_fx(delta, Some(vec![app_id.clone()].into_iter().collect()))
             .await?;
@@ -1178,7 +1188,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     #[cfg(any(test, feature = "test_utils"))]
     async fn transition_app_status(
         &self,
-        app_id: &InstalledAppId,
+        app_id: InstalledAppId,
         transition: AppStatusTransition,
     ) -> ConductorResult<(InstalledApp, AppStatusFx)> {
         let mut lock = self.conductor.write().await;
@@ -1343,26 +1353,38 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
 
     pub(super) fn p2p_env(&self, space: Arc<KitsuneSpace>) -> EnvWrite {
         let mut p2p_env = self.p2p_env.lock();
+        let db_sync_level = self.db_sync_level;
         p2p_env
             .entry(space.clone())
             .or_insert_with(move || {
                 let root_env_dir = self.root_env_dir.as_ref();
                 let keystore = self.keystore.clone();
-                EnvWrite::open(root_env_dir, DbKind::P2pAgentStore(space), keystore)
-                    .expect("failed to open p2p_agent_store database")
+                EnvWrite::open_with_sync_level(
+                    root_env_dir,
+                    DbKind::P2pAgentStore(space),
+                    keystore,
+                    db_sync_level,
+                )
+                .expect("failed to open p2p_agent_store database")
             })
             .clone()
     }
 
     pub(super) fn p2p_metrics_env(&self, space: Arc<KitsuneSpace>) -> EnvWrite {
         let mut p2p_metrics_env = self.p2p_metrics_env.lock();
+        let db_sync_level = self.db_sync_level;
         p2p_metrics_env
             .entry(space.clone())
             .or_insert_with(move || {
                 let root_env_dir = self.root_env_dir.as_ref();
                 let keystore = self.keystore.clone();
-                EnvWrite::open(root_env_dir, DbKind::P2pMetrics(space), keystore)
-                    .expect("failed to open p2p_metrics database")
+                EnvWrite::open_with_sync_level(
+                    root_env_dir,
+                    DbKind::P2pMetrics(space),
+                    keystore,
+                    db_sync_level,
+                )
+                .expect("failed to open p2p_metrics database")
             })
             .clone()
     }

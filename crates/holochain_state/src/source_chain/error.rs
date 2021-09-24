@@ -1,6 +1,7 @@
 // use crate::holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
+use holochain_p2p::HolochainP2pError;
 use holochain_serialized_bytes::prelude::*;
 use holochain_sqlite::error::DatabaseError;
 use holochain_types::prelude::*;
@@ -8,6 +9,7 @@ use thiserror::Error;
 
 use crate::prelude::StateMutationError;
 use crate::query::StateQueryError;
+use crate::scratch::ScratchError;
 use crate::scratch::SyncScratchError;
 
 #[derive(Error, Debug)]
@@ -18,10 +20,13 @@ pub enum SourceChainError {
     #[error(
         "Attempted to commit a bundle to the source chain, but the source chain head has moved since the bundle began. Bundle head: {0:?}, Current head: {1:?}"
     )]
-    HeadMoved(Option<HeaderHash>, Option<HeaderHash>),
+    HeadMoved(Option<HeaderHash>, Option<(HeaderHash, u32, Timestamp)>),
 
     #[error(transparent)]
     TimestampError(#[from] holochain_zome_types::TimestampError),
+
+    #[error(transparent)]
+    ScratchError(#[from] ScratchError),
 
     #[error("Attempted to write anything other than the countersigning session entry while the chain was locked for a countersigning session.")]
     ChainLocked,
@@ -71,6 +76,9 @@ pub enum SourceChainError {
 
     #[error(transparent)]
     DhtOpError(#[from] DhtOpError),
+
+    #[error(transparent)]
+    HolochainP2pError(#[from] HolochainP2pError),
 
     #[error("Required the scratch space to be empty but contained values")]
     ScratchNotFresh,

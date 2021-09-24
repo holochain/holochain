@@ -52,7 +52,7 @@ impl LinkTestData {
         let mut later_create_link = create_link.clone();
         let mut delete_link = fixt!(DeleteLink);
 
-        let now = holochain_types::timestamp::now();
+        let now = holochain_zome_types::Timestamp::now();
         let before = (now - std::time::Duration::from_secs(10)).unwrap();
 
         create_link.timestamp = before;

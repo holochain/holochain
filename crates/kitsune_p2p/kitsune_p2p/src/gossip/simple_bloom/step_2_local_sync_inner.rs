@@ -49,7 +49,7 @@ impl Inner {
                 .query_op_hashes(QueryOpHashesEvt {
                     space: space.clone(),
                     agents: vec![(agent.clone(), ArcInterval::Full.into())],
-                    window_ms: u64::MIN..u64::MAX,
+                    window: full_time_range(),
                     max_ops: usize::MAX,
                     include_limbo: false,
                 })
@@ -79,10 +79,7 @@ impl Inner {
         // agent store is shared between agents in one space
         // we only have to query it once for all local_agents
         if let Ok(agent_infos) = evt_sender
-            .query_agent_info_signed(QueryAgentInfoSignedEvt {
-                space: space.clone(),
-                agents: Some(local_agents.clone().into_iter().collect()),
-            })
+            .query_agents(QueryAgentsEvt::new(space.clone()).by_agents(local_agents.clone()))
             .await
         {
             for agent_info in agent_infos {
