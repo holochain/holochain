@@ -219,3 +219,67 @@ async fn invalid_cell() -> anyhow::Result<()> {
     assert!(r.is_some());
     Ok(())
 }
+
+#[cfg(feature = "test_utils")]
+#[tokio::test(flavor = "multi_thread")]
+async fn sharded_consistency() {
+    use std::sync::Arc;
+
+    use holochain::test_utils::{
+        consistency::local_machine_session, inline_zomes::simple_create_read_zome,
+    };
+    use kitsune_p2p::KitsuneP2pConfig;
+
+    let _g = observability::test_run().ok();
+    const NUM_CONDUCTORS: usize = 3;
+    const NUM_CELLS: usize = 5;
+
+    let mut tuning =
+        kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+    tuning.gossip_strategy = "sharded-gossip".to_string();
+    tuning.gossip_dynamic_arcs = true;
+
+    let mut network = KitsuneP2pConfig::default();
+    network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
+        bind_to: None,
+        override_host: None,
+        override_port: None,
+    }];
+    network.tuning_params = Arc::new(tuning);
+    let config = ConductorConfig {
+        network: Some(network),
+        ..Default::default()
+    };
+    let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
+
+    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_create_read_zome())
+        .await
+        .unwrap();
+    let dnas = vec![dna_file];
+
+    let apps = conductors.setup_app("app", &dnas).await.unwrap();
+
+    let ((alice,), (bobbo,), (_carol,)) = apps.into_tuples();
+
+    for i in 0..NUM_CELLS {
+        conductors.setup_app(&i.to_string(), &dnas).await.unwrap();
+    }
+    conductors.exchange_peer_info().await;
+    conductors.force_all_publish_dht_ops().await;
+    // Call the "create" zome fn on Alice's app
+    let hash: HeaderHash = conductors[0].call(&alice.zome("zome1"), "create", ()).await;
+
+    let conductor_handles: Vec<_> = conductors.iter().map(|c| c.handle()).collect();
+    local_machine_session(&conductor_handles, std::time::Duration::from_secs(60)).await;
+
+    // Verify that bobbo can run "read" on his cell and get alice's Header
+    let element: Option<Element> = conductors[1].call(&bobbo.zome("zome1"), "read", hash).await;
+    let element = element.expect("Element was None: bobbo couldn't `get` it");
+
+    // Assert that the Element bobbo sees matches what alice committed
+    assert_eq!(element.header().author(), alice.agent_pubkey());
+    assert_eq!(
+        *element.entry(),
+        ElementEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
+    );
+}

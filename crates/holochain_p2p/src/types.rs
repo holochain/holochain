@@ -124,6 +124,9 @@ macro_rules! to_and_from_kitsune {
 
                 /// from Kitsune type
                 fn from_kitsune(k: &::std::sync::Arc<$k>) -> Self;
+
+                /// from Kitsune type
+                fn from_kitsune_raw(k: $k) -> Self;
             }
 
             impl $i for $h {
@@ -137,6 +140,10 @@ macro_rules! to_and_from_kitsune {
 
                 fn from_kitsune(k: &::std::sync::Arc<$k>) -> Self {
                     <$h>::from_raw_36((**k).clone().into()).into()
+                }
+
+                fn from_kitsune_raw(k: $k) -> Self {
+                    <$h>::from_raw_36(k.into()).into()
                 }
             }
         )*
