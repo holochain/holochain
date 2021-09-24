@@ -194,7 +194,7 @@ impl HostFnCaller {
         let output = host_fn::create::create(ribosome, call_context, input).unwrap();
 
         // Write
-        workspace_lock.flush().await.unwrap();
+        workspace_lock.flush(&self.network).await.unwrap();
 
         output
     }
@@ -211,7 +211,7 @@ impl HostFnCaller {
         };
 
         // Write
-        workspace_lock.flush().await.unwrap();
+        workspace_lock.flush(&self.network).await.unwrap();
 
         output
     }
@@ -230,7 +230,7 @@ impl HostFnCaller {
         let output = { host_fn::update::update(ribosome, call_context, input).unwrap() };
 
         // Write
-        workspace_lock.flush().await.unwrap();
+        workspace_lock.flush(&self.network).await.unwrap();
 
         output
     }
@@ -262,7 +262,7 @@ impl HostFnCaller {
         let output = { host_fn::create_link::create_link(ribosome, call_context, input).unwrap() };
 
         // Write
-        workspace_lock.flush().await.unwrap();
+        workspace_lock.flush(&self.network).await.unwrap();
 
         output
     }
@@ -279,7 +279,7 @@ impl HostFnCaller {
         };
 
         // Write
-        workspace_lock.flush().await.unwrap();
+        workspace_lock.flush(&self.network).await.unwrap();
 
         output
     }
@@ -301,7 +301,7 @@ impl HostFnCaller {
         };
 
         // Write
-        workspace_lock.flush().await.unwrap();
+        workspace_lock.flush(&self.network).await.unwrap();
 
         output.into()
     }
@@ -323,7 +323,7 @@ impl HostFnCaller {
         };
 
         // Write
-        workspace_lock.flush().await.unwrap();
+        workspace_lock.flush(&self.network).await.unwrap();
 
         output.into()
     }
@@ -349,7 +349,7 @@ impl HostFnCaller {
         };
 
         // Write
-        workspace_lock.flush().await.unwrap();
+        workspace_lock.flush(&self.network).await.unwrap();
         unwrap_to!(output => ZomeCallResponse::Ok).to_owned()
     }
 }
