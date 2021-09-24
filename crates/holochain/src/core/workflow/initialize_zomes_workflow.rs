@@ -35,13 +35,13 @@ where
     C: CellConductorApiT,
 {
     let result =
-        initialize_zomes_workflow_inner(workspace.clone(), network, keystore, args).await?;
+        initialize_zomes_workflow_inner(workspace.clone(), network.clone(), keystore, args).await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // only commit if the result was successful
     if result == InitResult::Pass {
-        workspace.flush().await?;
+        workspace.flush(&network).await?;
     }
     Ok(result)
 }
