@@ -16,12 +16,8 @@
 //! // handles are cloneable
 //! let handle2 = handle.clone();
 //!
-//! assert_eq!(handle.list_dnas().await.unwrap(), vec![]);
-//! handle.shutdown().await;
-//!
-//! // handle2 will only get errors from now on, since the other handle
-//! // shut down the conductor.
-//! assert!(handle2.list_dnas().await.is_err());
+//! assert_eq!(handle.list_dnas(), vec![]);
+//! handle.shutdown();
 //!
 //! # }
 //! ```
