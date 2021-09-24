@@ -805,7 +805,7 @@ async fn handle_query_gossip_agents(
         kitsune_p2p_types::dht_arc::ArcInterval,
     )>,
 > {
-    todo!()
+    Ok(vec![])
 }
 
 async fn handle_query_agent_info_signed(
