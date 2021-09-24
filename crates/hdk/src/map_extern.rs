@@ -18,7 +18,7 @@ macro_rules! map_extern_preamble {
             Ok(v) => v,
             Err(e) => {
                 let bytes = extern_io.0;
-                $crate::prelude::error!(output_type = std::any::type_name::<$output>(), bytes = ?bytes, "{}", e);
+                $crate::prelude::error!(output_type = ::std::any::type_name::<$output>(), bytes = ?bytes, "{}", e);
                 return $crate::prelude::return_err_ptr($crate::prelude::WasmError::Deserialize(bytes));
             }
         };
