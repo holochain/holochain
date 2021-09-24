@@ -189,6 +189,8 @@ impl AsP2pStateTxExt for Transaction<'_> {
         let mut out = Vec::new();
         for r in stmt.query_map(
             named_params! {
+                // TODO: just take i64 so we don't need to clamp (probably
+                //       should just do more Timestamp refactor)
                 ":since_ms": clamp64(since_ms),
                 ":until_ms": clamp64(until_ms),
                 // we filter by arc in memory, not in the db query
@@ -206,6 +208,7 @@ impl AsP2pStateTxExt for Transaction<'_> {
         )? {
             let info = r?;
             let interval = info.storage_arc.interval();
+            dbg!(&arcset, &interval);
             if arcset.overlap(&interval.into()) {
                 out.push(info);
             }

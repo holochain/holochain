@@ -650,27 +650,32 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         let evt_sender = self.evt_sender.clone();
 
         Ok(async move {
-            match (agents, window, arc_set, near_basis, limit) {
+            let agents = match (agents, window, arc_set, near_basis, limit) {
                 // If only basis and limit are set, this is a "near basis" query
-                (None, None, None, Some(basis), Some(limit)) => Ok(evt_sender
-                    .query_agent_info_signed_near_basis(h_space, space, basis.as_u32(), limit)
-                    .await?),
+                (None, None, None, Some(basis), Some(limit)) => {
+                    evt_sender
+                        .query_agent_info_signed_near_basis(h_space, space, basis.as_u32(), limit)
+                        .await?
+                }
 
                 // If arc_set is set, this is a "gossip agents" query
                 (agents, window, Some(arc_set), None, None) => {
                     let window = window.unwrap_or_else(full_time_range);
                     let h_agents =
                         agents.map(|agents| agents.iter().map(AgentPubKey::from_kitsune).collect());
-                    let since_ms = (window.start.as_micros() / 1000) as u64;
-                    let until_ms = (window.end.as_micros() / 1000) as u64;
-                    Ok(evt_sender
+                    let since_ms = window.start.as_millis().max(0) as u64;
+                    let until_ms = window.end.as_millis().max(0) as u64;
+                    evt_sender
                         .query_gossip_agents(h_space, h_agents, space, since_ms, until_ms, arc_set)
-                        .await?)
+                        .await?
                 }
+
                 // Otherwise, do a simple agent query with optional agent filter
-                (agents, None, None, None, None) => Ok(evt_sender
-                    .query_agent_info_signed(h_space, agents, space)
-                    .await?),
+                (agents, None, None, None, None) => {
+                    evt_sender
+                        .query_agent_info_signed(h_space, agents, space)
+                        .await?
+                }
 
                 // If none of the above match, we have no implementation for such a query
                 // and must fail
@@ -678,7 +683,8 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                     "Holochain cannot interpret the QueryAgentsEvt data as given: {:?}",
                     tuple
                 ),
-            }
+            };
+            Ok(agents)
         }
         .boxed()
         .into())
