@@ -1,6 +1,7 @@
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
+use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
 use holochain_keystore::KeystoreSender;
@@ -8,6 +9,7 @@ use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
+use itertools::Itertools;
 
 #[derive(Clone)]
 pub struct PostCommitInvocation {
@@ -93,6 +95,45 @@ impl From<Vec<PostCommitCallbackResult>> for PostCommitResult {
     }
 }
 
+pub async fn spawn_post_commit<Ribosome: 'static>(
+    ribosome: Ribosome,
+    workspace: HostFnWorkspace,
+    network: HolochainP2pCell,
+    keystore: KeystoreSender,
+    zomed_headers: Vec<(Option<Zome>, SignedHeaderHashed)>,
+) where
+    Ribosome: Clone + RibosomeT + Send,
+{
+    for (maybe_zome, grouped_headers) in &zomed_headers
+        .into_iter()
+        .group_by(|(zome, _shh)| zome.clone())
+    {
+        if let Some(zome) = maybe_zome {
+            let headers = grouped_headers
+                .into_iter()
+                .map(|(_zome, shh)| shh)
+                .collect::<Vec<_>>();
+            let zome = zome.clone();
+            let ribosome = ribosome.clone();
+            let workspace = workspace.clone();
+            let network = network.clone();
+            let keystore = keystore.clone();
+            tokio::task::spawn(async move {
+                if let Err(e) = ribosome.run_post_commit(
+                    PostCommitHostAccess {
+                        workspace,
+                        network,
+                        keystore,
+                    },
+                    PostCommitInvocation::new(zome, headers),
+                ) {
+                    tracing::error!(?e);
+                }
+            });
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::PostCommitResult;
@@ -154,10 +195,9 @@ mod test {
         let post_commit_host_access = PostCommitHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        assert_eq!(
-            HostFnAccess::from(&post_commit_host_access),
-            HostFnAccess::all()
-        );
+        let mut expected = HostFnAccess::all();
+        expected.write_workspace = Permission::Deny;
+        assert_eq!(HostFnAccess::from(&post_commit_host_access), expected);
     }
 
     #[test]

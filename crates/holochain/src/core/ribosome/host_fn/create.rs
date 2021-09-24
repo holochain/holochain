@@ -29,7 +29,7 @@ pub fn create<'a>(
                             .host_context
                             .workspace()
                             .source_chain()
-                            .put_countersigned(input.into_entry(), chain_top_ordering)
+                            .put_countersigned(Some(call_context.zome.clone()), input.into_entry(), chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))
                     })
@@ -76,7 +76,7 @@ pub fn create<'a>(
                             .host_context
                             .workspace()
                             .source_chain()
-                            .put(header_builder, Some(input.into_entry()), chain_top_ordering)
+                            .put(Some(call_context.zome.clone()), header_builder, Some(input.into_entry()), chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))
                     })

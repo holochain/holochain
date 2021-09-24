@@ -101,6 +101,7 @@ mod tests {
         observability::test_run().ok();
         let mut conn = Connection::open_in_memory().unwrap();
         SCHEMA_CELL.initialize(&mut conn, None).unwrap();
+        let zome = fixt!(Zome);
 
         let mut txn = conn
             .transaction_with_behavior(TransactionBehavior::Exclusive)
@@ -159,7 +160,7 @@ mod tests {
         // It's also totally invalid for a call_zome scratch to contain headers
         // from other authors, but it doesn't matter here
         for shh in &shhs[6..] {
-            scratch.add_header(shh.clone(), ChainTopOrdering::default());
+            scratch.add_header(Some(zome.clone()), shh.clone(), ChainTopOrdering::default());
         }
 
         let query = ChainHeadQuery::new(Arc::new(author));

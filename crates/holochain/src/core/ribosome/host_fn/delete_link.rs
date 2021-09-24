@@ -56,7 +56,8 @@ pub fn delete_link<'a>(
             }
             .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?;
 
-    let source_chain = call_context.host_context.workspace().source_chain();
+            let source_chain = call_context.host_context.workspace().source_chain();
+            let zome = call_context.zome.clone();
 
             // handle timeouts at the source chain layer
 
@@ -67,7 +68,7 @@ pub fn delete_link<'a>(
                     base_address,
                 };
                 let header_hash = source_chain
-                    .put(header_builder, None, chain_top_ordering)
+                    .put(Some(zome), header_builder, None, chain_top_ordering)
                     .await
                     .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
                 Ok(header_hash)

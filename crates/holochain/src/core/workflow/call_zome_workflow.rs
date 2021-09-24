@@ -7,8 +7,7 @@ use crate::conductor::interface::SignalBroadcaster;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::guest_callback::post_commit::PostCommitHostAccess;
-use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
+use crate::core::ribosome::guest_callback::post_commit::spawn_post_commit;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
@@ -67,7 +66,6 @@ where
     C: CellConductorApiT,
 {
     let should_write = args.is_root_zome_call;
-    let zome = args.invocation.zome.clone();
     let ribosome = args.ribosome.clone();
     let result =
         call_zome_workflow_inner(workspace.clone(), network.clone(), keystore.clone(), args)
@@ -79,7 +77,8 @@ where
     if should_write {
         let is_empty = workspace.source_chain().is_empty()?;
         let countersigning_op = workspace.source_chain().countersigning_op()?;
-        let flushed_headers: Vec<SignedHeaderHashed> = workspace.clone().flush().await?;
+        let flushed_headers: Vec<(Option<Zome>, SignedHeaderHashed)> =
+            workspace.clone().flush().await?;
         if !is_empty {
             match countersigning_op {
                 Some(op) => {
@@ -96,14 +95,7 @@ where
             }
         }
 
-        ribosome.run_post_commit(
-            PostCommitHostAccess {
-                workspace,
-                network,
-                keystore,
-            },
-            PostCommitInvocation::new(zome, flushed_headers),
-        )?;
+        spawn_post_commit(ribosome, workspace, network, keystore, flushed_headers).await;
     }
 
     Ok(result)

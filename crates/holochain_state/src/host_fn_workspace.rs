@@ -6,6 +6,7 @@ use holochain_zome_types::SignedHeaderHashed;
 use crate::prelude::SourceChain;
 use crate::prelude::SourceChainResult;
 use crate::scratch::SyncScratch;
+use holochain_zome_types::Zome;
 
 #[derive(Clone)]
 pub struct HostFnWorkspace {
@@ -36,7 +37,7 @@ impl HostFnWorkspace {
         })
     }
 
-    pub async fn flush(self) -> SourceChainResult<Vec<SignedHeaderHashed>> {
+    pub async fn flush(self) -> SourceChainResult<Vec<(Option<Zome>, SignedHeaderHashed)>> {
         self.source_chain.flush().await
     }
 

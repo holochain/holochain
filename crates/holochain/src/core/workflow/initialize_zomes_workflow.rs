@@ -3,8 +3,7 @@ use crate::conductor::api::CellConductorApiT;
 use crate::core::ribosome::guest_callback::init::InitHostAccess;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
-use crate::core::ribosome::guest_callback::post_commit::PostCommitHostAccess;
-use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
+use crate::core::ribosome::guest_callback::post_commit::spawn_post_commit;
 use crate::core::ribosome::RibosomeT;
 use derive_more::Constructor;
 use holochain_keystore::KeystoreSender;
@@ -26,32 +25,27 @@ where
 }
 
 #[instrument(skip(network, keystore, workspace, args))]
-pub async fn initialize_zomes_workflow<Ribosome, C>(
+pub async fn initialize_zomes_workflow<Ribosome, C: 'static>(
     workspace: HostFnWorkspace,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
     args: InitializeZomesWorkflowArgs<Ribosome, C>,
 ) -> WorkflowResult<InitResult>
 where
-    Ribosome: RibosomeT + Send + 'static,
+    Ribosome: RibosomeT + Clone + Send + 'static,
     C: CellConductorApiT,
 {
+    let ribosome = args.ribosome.clone();
     let result =
-        initialize_zomes_workflow_inner(workspace.clone(), network, keystore, args).await?;
+        initialize_zomes_workflow_inner(workspace.clone(), network.clone(), keystore.clone(), args)
+            .await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // only commit if the result was successful
     if result == InitResult::Pass {
-        let flushed_headers = workspace.flush().await?;
-        args.ribosome.run_post_commit(
-            PostCommitHostAccess {
-                workspace,
-                network,
-                keystore,
-            },
-            PostCommitInvocation::new(args.invocation.zome, flushed_headers),
-        )?;
+        let flushed_headers = workspace.clone().flush().await?;
+        spawn_post_commit(ribosome, workspace, network, keystore, flushed_headers).await;
     }
     Ok(result)
 }
@@ -82,6 +76,7 @@ where
     workspace
         .source_chain()
         .put(
+            None,
             builder::InitZomesComplete {},
             None,
             ChainTopOrdering::Strict,
