@@ -44,7 +44,7 @@ mod bandwidth;
 mod metrics;
 mod next_target;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "test_utils"))]
 pub(crate) mod tests;
 
 /// max send buffer size (keep it under 16384 with a little room for overhead)

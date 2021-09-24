@@ -13,7 +13,7 @@ use kitsune_p2p_types::*;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
 
-use super::scenario_event_handler::ScenarioEventHandler;
+use super::gossip_scenario_node::GossipScenarioNode;
 
 type KSpace = Arc<KitsuneSpace>;
 type KAgent = Arc<KitsuneAgent>;
@@ -54,7 +54,7 @@ impl SwitchboardNetwork {
 
         // TODO: randomize space
         let space = Arc::new(KitsuneSpace::new([0; 36].to_vec()));
-        let evt_handler = ScenarioEventHandler::new(space.clone());
+        let evt_handler = GossipScenarioNode::new(space.clone());
         let (evt_sender, task) = spawn_handler(evt_handler).await;
 
         self.handler_tasks.push(task);

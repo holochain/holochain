@@ -11,13 +11,13 @@ type KSpace = Arc<KitsuneSpace>;
 type KAgent = Arc<KitsuneAgent>;
 type KOpHash = Arc<KitsuneOpHash>;
 
-pub struct ScenarioEventHandler {
+pub struct GossipScenarioNode {
     space: KSpace,
     agents: HashMap<KAgent, AgentInfoSigned>,
     ops: HashMap<KOpHash, Vec<u8>>,
 }
 
-impl ScenarioEventHandler {
+impl GossipScenarioNode {
     pub fn new(space: KSpace) -> Self {
         Self {
             space,
@@ -31,10 +31,10 @@ impl ScenarioEventHandler {
     }
 }
 
-impl ghost_actor::GhostHandler<KitsuneP2pEvent> for ScenarioEventHandler {}
-impl ghost_actor::GhostControlHandler for ScenarioEventHandler {}
+impl ghost_actor::GhostHandler<KitsuneP2pEvent> for GossipScenarioNode {}
+impl ghost_actor::GhostControlHandler for GossipScenarioNode {}
 
-impl KitsuneP2pEventHandler for ScenarioEventHandler {
+impl KitsuneP2pEventHandler for GossipScenarioNode {
     fn handle_put_agent_info_signed(
         &mut self,
         PutAgentInfoSignedEvt { space, peer_data }: PutAgentInfoSignedEvt,

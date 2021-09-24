@@ -19,7 +19,7 @@ pub use config::*;
 mod spawn;
 pub use spawn::*;
 
-#[cfg(any(test, feature = "test_utils"))]
+#[cfg(feature = "test_utils")]
 pub mod test_util;
 
 #[cfg(test)]
