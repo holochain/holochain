@@ -38,13 +38,13 @@ pub struct CellHostFnCaller {
 
 impl CellHostFnCaller {
     pub async fn new(cell_id: &CellId, handle: &ConductorHandle, dna_file: &DnaFile) -> Self {
-        let env = handle.get_cell_env(cell_id).await.unwrap();
-        let cache = handle.get_cache_env(cell_id).await.unwrap();
+        let env = handle.get_cell_env(cell_id).unwrap();
+        let cache = handle.get_cache_env(cell_id).unwrap();
         let keystore = env.keystore().clone();
         let network = handle
             .holochain_p2p()
             .to_cell(cell_id.dna_hash().clone(), cell_id.agent_pubkey().clone());
-        let triggers = handle.get_cell_triggers(cell_id).await.unwrap();
+        let triggers = handle.get_cell_triggers(cell_id).unwrap();
         let cell_conductor_api = CellConductorApi::new(handle.clone(), cell_id.clone());
 
         let ribosome = RealRibosome::new(dna_file.clone());
@@ -193,8 +193,8 @@ impl ConductorTestData {
 
     /// Shutdown the conductor
     pub async fn shutdown_conductor(&mut self) {
-        let shutdown = self.handle.take_shutdown_handle().await.unwrap();
-        self.handle.shutdown().await;
+        let shutdown = self.handle.take_shutdown_handle().unwrap();
+        self.handle.shutdown();
         shutdown.await.unwrap().unwrap();
     }
 
