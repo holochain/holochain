@@ -1,7 +1,5 @@
 SELECT
-  agent,
-  storage_start_loc,
-  storage_end_loc
+  encoded
 FROM
   p2p_agent_store
 WHERE
