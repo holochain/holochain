@@ -171,7 +171,7 @@ impl KitsuneP2pEventHandler for AgentHarness {
         }: QueryAgentsEvt,
     ) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
         let arc_set = arc_set.unwrap_or(Arc::new(DhtArcSet::Full));
-        let window = window.unwrap_or(full_time_range());
+        let window = window.unwrap_or_else(full_time_window);
         // TODO - sort by near_basis if set
         let out = self
             .agent_store
