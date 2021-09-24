@@ -388,15 +388,6 @@ dependencies = [
 
 [[package]]
 name = "bit-set"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6e1e6fb1c9e3d6fcdec57216a74eaa03e41f52a22f13a16438251d8e88b89da"
-dependencies = [
- "bit-vec",
-]
-
-[[package]]
-name = "bit-set"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e11e16035ea35e4e5997b393eacbf6f63983188f7a2ad25bfb13465f5ad59de"
@@ -873,7 +864,7 @@ dependencies = [
  "arbitrary",
  "derive_more",
  "itertools 0.10.1",
- "num 0.4.0",
+ "num",
  "tracing",
 ]
 
@@ -1576,7 +1567,7 @@ version = "3.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b166c9e378360dd5a6666a9604bb4f54ae0cac39023ffbac425e917a2a04fef"
 dependencies = [
- "num-bigint 0.4.2",
+ "num-bigint",
  "num-traits",
  "proc-macro2 1.0.29",
  "quote 1.0.9",
@@ -1736,7 +1727,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a3371ac125221b609ce0cf587a53fbb624fb56267bbe85cf1929350043bf360"
 dependencies = [
- "bit-set 0.5.2",
+ "bit-set",
  "regex",
 ]
 
@@ -1976,12 +1967,13 @@ dependencies = [
 
 [[package]]
 name = "gcollections"
-version = "1.4.0"
+version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f3cd4ff93c61504b5045c23a76702f0757ce72fd0dec2d8ed944bec912213b1"
+checksum = "2f551fdf23ef80329f754919669147a71c67b6cfe3569cd93b6fabdd62044377"
 dependencies = [
- "bit-set 0.2.0",
- "num 0.1.42",
+ "bit-set",
+ "num-integer",
+ "num-traits",
  "trilean",
 ]
 
@@ -3118,13 +3110,14 @@ dependencies = [
 
 [[package]]
 name = "intervallum"
-version = "1.3.0"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c018942850c5d1ab0bc2f62aa08124e151a9942a4326ea30db95c946e8b0081"
+checksum = "c8ccecd834666f695ecec3ff0d5fc32e32c91abea91a28fd0aceb4b35a82cee1"
 dependencies = [
- "bit-set 0.2.0",
+ "bit-set",
  "gcollections",
- "num 0.1.42",
+ "num-integer",
+ "num-traits",
  "trilean",
 ]
 
@@ -4025,42 +4018,16 @@ dependencies = [
 
 [[package]]
 name = "num"
-version = "0.1.42"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4703ad64153382334aa8db57c637364c322d3372e097840c72000dabdcf6156e"
-dependencies = [
- "num-bigint 0.1.44",
- "num-complex 0.1.43",
- "num-integer",
- "num-iter",
- "num-rational 0.1.42",
- "num-traits",
-]
-
-[[package]]
-name = "num"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43db66d1170d347f9a065114077f7dccb00c1b9478c89384490a3425279a4606"
 dependencies = [
- "num-bigint 0.4.2",
- "num-complex 0.4.0",
+ "num-bigint",
+ "num-complex",
  "num-integer",
  "num-iter",
- "num-rational 0.4.0",
+ "num-rational",
  "num-traits",
-]
-
-[[package]]
-name = "num-bigint"
-version = "0.1.44"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e63899ad0da84ce718c14936262a41cee2c79c981fc0a0e7c7beb47d5a07e8c1"
-dependencies = [
- "num-integer",
- "num-traits",
- "rand 0.4.6",
- "rustc-serialize",
 ]
 
 [[package]]
@@ -4072,16 +4039,6 @@ dependencies = [
  "autocfg 1.0.1",
  "num-integer",
  "num-traits",
-]
-
-[[package]]
-name = "num-complex"
-version = "0.1.43"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b288631d7878aaf59442cffd36910ea604ecd7745c36054328595114001c9656"
-dependencies = [
- "num-traits",
- "rustc-serialize",
 ]
 
 [[package]]
@@ -4126,24 +4083,12 @@ dependencies = [
 
 [[package]]
 name = "num-rational"
-version = "0.1.42"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee314c74bd753fc86b4780aa9475da469155f3848473a261d2d18e35245a784e"
-dependencies = [
- "num-bigint 0.1.44",
- "num-integer",
- "num-traits",
- "rustc-serialize",
-]
-
-[[package]]
-name = "num-rational"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d41702bd167c2df5520b384281bc111a4b5efcf7fbc4c9c222c815b07e0a6a6a"
 dependencies = [
  "autocfg 1.0.1",
- "num-bigint 0.4.2",
+ "num-bigint",
  "num-integer",
  "num-traits",
 ]
@@ -5500,12 +5445,6 @@ name = "rustc-hash"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
-
-[[package]]
-name = "rustc-serialize"
-version = "0.3.24"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcf128d1287d2ea9d80910b5f1120d0b8eede3fbf1abe91c40d39ea7d51e6fda"
 
 [[package]]
 name = "rustc-workspace-hack"
