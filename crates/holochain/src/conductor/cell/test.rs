@@ -31,9 +31,6 @@ async fn test_cell_handle_publish() {
     mock_handle
         .expect_get_dna()
         .returning(|_| Some(fixt!(DnaFile)));
-    mock_handle
-        .expect_force_publish_handler()
-        .returning(|| Default::default());
 
     let mock_handle: crate::conductor::handle::ConductorHandle = Arc::new(mock_handle);
     let mut mock_ribosome = MockRibosomeT::new();

@@ -157,6 +157,9 @@ where
 
     /// Handle to the network actor.
     holochain_p2p: holochain_p2p::HolochainP2pRef,
+
+    /// Database sync level
+    db_sync_level: DbSyncLevel,
 }
 
 impl Conductor {
@@ -473,10 +476,11 @@ where
             Some(env) => Ok(env.clone()),
             None => {
                 let dir = self.root_env_dir.clone();
-                let env = EnvWrite::open(
+                let env = EnvWrite::open_with_sync_level(
                     dir.as_ref(),
                     DbKind::Cache(dna_hash.clone()),
                     self.keystore.clone(),
+                    self.db_sync_level,
                 )?;
                 caches.insert(dna_hash.clone(), env.clone());
                 Ok(env)
@@ -614,16 +618,18 @@ where
             let root_env_dir = root_env_dir.clone();
             let keystore = keystore.clone();
             let conductor_handle = conductor_handle.clone();
+            let db_sync_level = self.db_sync_level;
             async move {
                 use holochain_p2p::actor::HolochainP2pRefToCell;
                 let holochain_p2p_cell = self
                     .holochain_p2p
                     .to_cell(cell_id.dna_hash().clone(), cell_id.agent_pubkey().clone());
 
-                let env = EnvWrite::open(
+                let env = EnvWrite::open_with_sync_level(
                     &root_env_dir,
                     DbKind::Cell(cell_id.clone()),
                     keystore.clone(),
+                    db_sync_level,
                 )
                 .map_err(|err| (cell_id.clone(), err.into()))?;
 
@@ -670,7 +676,7 @@ where
     #[tracing::instrument(skip(self))]
     pub(super) async fn transition_app_status(
         &mut self,
-        app_id: &InstalledAppId,
+        app_id: InstalledAppId,
         transition: AppStatusTransition,
     ) -> ConductorResult<(InstalledApp, AppStatusFx)> {
         Ok(self
@@ -732,37 +738,41 @@ where
     /// Associate a Cell with an existing App
     pub(super) async fn add_clone_cell_to_app(
         &mut self,
-        app_id: &InstalledAppId,
-        slot_id: &SlotId,
+        app_id: InstalledAppId,
+        slot_id: SlotId,
         properties: YamlProperties,
     ) -> ConductorResult<CellId> {
         let dna_store = &self.dna_store;
-        let (_, child_dna) = self
-            .update_state_prime(move |mut state| {
-                if let Some(app) = state.installed_apps_mut().get_mut(app_id) {
-                    let slot = app
-                        .slots()
-                        .get(slot_id)
-                        .ok_or_else(|| AppError::SlotIdMissing(slot_id.to_owned()))?;
-                    let parent_dna_hash = slot.dna_hash();
-                    let dna = dna_store
-                        .get(parent_dna_hash)
-                        .ok_or_else(|| DnaError::DnaMissing(parent_dna_hash.to_owned()))?
-                        .modify_phenotype(random_uid(), properties)?;
-                    Ok((state, dna))
-                } else {
-                    Err(ConductorError::AppNotRunning(app_id.clone()))
+        let (_, parent_dna_hash) = self
+            .update_state_prime({
+                let app_id = app_id.clone();
+                let slot_id = slot_id.clone();
+                move |mut state| {
+                    if let Some(app) = state.installed_apps_mut().get_mut(&app_id) {
+                        let slot = app
+                            .slots()
+                            .get(&slot_id)
+                            .ok_or_else(|| AppError::SlotIdMissing(slot_id.to_owned()))?;
+                        let parent_dna_hash = slot.dna_hash().clone();
+                        Ok((state, parent_dna_hash))
+                    } else {
+                        Err(ConductorError::AppNotRunning(app_id.clone()))
+                    }
                 }
             })
             .await?;
+        let child_dna = dna_store
+            .get(&parent_dna_hash)
+            .ok_or_else(|| DnaError::DnaMissing(parent_dna_hash.to_owned()))?
+            .modify_phenotype(random_uid(), properties)?;
         let child_dna_hash = child_dna.dna_hash().to_owned();
         self.register_phenotype(child_dna).await?;
         let (_, cell_id) = self
-            .update_state_prime(|mut state| {
-                if let Some(app) = state.installed_apps_mut().get_mut(app_id) {
-                    let agent_key = app.slot(slot_id)?.agent_key().to_owned();
+            .update_state_prime(move |mut state| {
+                if let Some(app) = state.installed_apps_mut().get_mut(&app_id) {
+                    let agent_key = app.slot(&slot_id)?.agent_key().to_owned();
                     let cell_id = CellId::new(child_dna_hash, agent_key);
-                    app.add_clone(slot_id, cell_id.clone())?;
+                    app.add_clone(&slot_id, cell_id.clone())?;
                     Ok((state, cell_id))
                 } else {
                     Err(ConductorError::AppNotRunning(app_id.clone()))
@@ -1003,13 +1013,6 @@ where
     }
 
     #[cfg(any(test, feature = "test_utils"))]
-    pub(super) fn trigger_all_publish_dht_ops_workflows(&self) {
-        for cell in self.cells.values() {
-            cell.cell.triggers().publish_dht_ops.clone().trigger();
-        }
-    }
-
-    #[cfg(any(test, feature = "test_utils"))]
     pub(super) async fn get_state_from_handle(&self) -> ConductorResult<ConductorState> {
         self.get_state().await
     }
@@ -1041,6 +1044,7 @@ pub(super) async fn genesis_cells(
     keystore: KeystoreSender,
     cell_ids_with_proofs: Vec<(CellId, Option<MembraneProof>)>,
     conductor_handle: ConductorHandle,
+    db_sync_level: DbSyncLevel,
 ) -> ConductorResult<()> {
     let cells_tasks = cell_ids_with_proofs
         .into_iter()
@@ -1054,10 +1058,11 @@ pub(super) async fn genesis_cells(
                 .await
                 .map_err(Box::new)?;
             tokio::spawn(async move {
-                let env = EnvWrite::open(
+                let env = EnvWrite::open_with_sync_level(
                     &root_env_dir,
                     DbKind::Cell(cell_id_inner.clone()),
                     keystore.clone(),
+                    db_sync_level,
                 )?;
                 Cell::genesis(cell_id_inner, conductor_handle, env, ribosome, proof).await
             })
@@ -1076,7 +1081,8 @@ pub(super) async fn genesis_cells(
     // If there were errors, cleanup and return the errors
     if !errors.is_empty() {
         for cell_id in success {
-            let db = DbWrite::open(&root_env_dir, DbKind::Cell(cell_id))?;
+            let db =
+                DbWrite::open_with_sync_level(&root_env_dir, DbKind::Cell(cell_id), db_sync_level)?;
             db.remove().await?;
         }
 
@@ -1148,6 +1154,7 @@ where
         keystore: KeystoreSender,
         root_env_dir: EnvironmentRootPath,
         holochain_p2p: holochain_p2p::HolochainP2pRef,
+        db_sync_level: DbSyncLevel,
     ) -> ConductorResult<Self> {
         Ok(Self {
             conductor_env: env,
@@ -1162,6 +1169,7 @@ where
             keystore,
             root_env_dir,
             holochain_p2p,
+            db_sync_level,
         })
     }
 
@@ -1194,13 +1202,13 @@ where
     /// this function
     async fn update_state_prime<F, O>(&self, f: F) -> ConductorResult<(ConductorState, O)>
     where
-        F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)>,
-        O: Send,
+        F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)> + Send + 'static,
+        O: Send + 'static,
     {
         self.check_running()?;
         let output = self
             .conductor_env
-            .async_commit_in_place(move |txn| {
+            .async_commit(move |txn| {
                 let state = txn
                     .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
                         row.get("blob")
@@ -1238,7 +1246,6 @@ mod builder {
     use super::*;
     use crate::conductor::dna_store::RealDnaStore;
     use crate::conductor::ConductorHandle;
-    use crate::core::workflow::publish_dht_ops_workflow::ForcePublishSender;
     use holochain_sqlite::db::DbKind;
     #[cfg(any(test, feature = "test_utils"))]
     use holochain_state::test_utils::TestEnvs;
@@ -1331,11 +1338,19 @@ mod builder {
             };
             let env_path = self.config.environment_path.clone();
 
-            let environment =
-                EnvWrite::open(env_path.as_ref(), DbKind::Conductor, keystore.clone())?;
+            let environment = EnvWrite::open_with_sync_level(
+                env_path.as_ref(),
+                DbKind::Conductor,
+                keystore.clone(),
+                self.config.db_sync_level,
+            )?;
 
-            let wasm_environment =
-                EnvWrite::open(env_path.as_ref(), DbKind::Wasm, keystore.clone())?;
+            let wasm_environment = EnvWrite::open_with_sync_level(
+                env_path.as_ref(),
+                DbKind::Wasm,
+                keystore.clone(),
+                self.config.db_sync_level,
+            )?;
 
             #[cfg(any(test, feature = "test_utils"))]
             let state = self.state;
@@ -1366,6 +1381,7 @@ mod builder {
                 keystore,
                 env_path,
                 holochain_p2p,
+                config.db_sync_level,
             )
             .await?;
 
@@ -1382,7 +1398,7 @@ mod builder {
                 conductor: RwLock::new(conductor),
                 keystore,
                 holochain_p2p,
-                force_publish_sender: ForcePublishSender::new(),
+                db_sync_level: config.db_sync_level,
 
                 #[cfg(any(test, feature = "test_utils"))]
                 skip_publish: std::sync::atomic::AtomicBool::new(false),
@@ -1471,6 +1487,7 @@ mod builder {
                 keystore,
                 self.config.environment_path.clone(),
                 holochain_p2p,
+                self.config.db_sync_level,
             )
             .await?;
 
@@ -1488,7 +1505,7 @@ mod builder {
                 holochain_p2p,
                 p2p_env: envs.p2p(),
                 p2p_metrics_env: envs.p2p_metrics(),
-                force_publish_sender: ForcePublishSender::new(),
+                db_sync_level: self.config.db_sync_level,
                 #[cfg(any(test, feature = "test_utils"))]
                 skip_publish: std::sync::atomic::AtomicBool::new(false),
             });

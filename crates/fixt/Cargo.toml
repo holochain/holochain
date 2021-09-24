@@ -1,10 +1,10 @@
 [package]
 name = "fixt"
-version = "0.0.5"
+version = "0.0.6"
 description = "minimum viable fixtures"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
-documentation = "https://github.com/holochain/holochain"
+documentation = "https://docs.rs/fixt"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo", "test", "fixture" ]
 categories = [ "fixtures" ]

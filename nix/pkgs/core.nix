@@ -23,8 +23,8 @@ rec {
     cargo test --no-run --all-features --all-targets --manifest-path=crates/holochain/Cargo.toml
     cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,test_utils,build_wasms,db-encryption -- --nocapture --test-threads 1
     # run all the remaining cargo tests
-    cargo test --no-run --all-features --all-targets --workspace --exclude holochain
-    cargo test --workspace --exclude holochain -- --nocapture --test-threads 1
+    cargo test --no-run --all-features --all-targets --workspace --exclude holochain --exclude release-automation
+    cargo test --workspace --exclude holochain --exclude release-automation -- --nocapture --test-threads 1
     # run all the wasm tests (within wasm) with the conductor mocked
     cargo test --no-run --all-targets --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features
     cargo test --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features -- --nocapture --test-threads 1
@@ -32,6 +32,7 @@ rec {
 
   hcReleaseAutomationTest = writeShellScriptBin "hc-release-automation-test" ''
     set -euxo pipefail
+    export RUST_BACKTRACE=1
 
     # make sure the binary is built
     cargo build --manifest-path=crates/release-automation/Cargo.toml
@@ -93,8 +94,6 @@ rec {
   hcMergeTest = writeShellScriptBin "hc-merge-test" ''
     set -euxo pipefail
     export RUST_BACKTRACE=1
-    ${hcReleaseAutomationTest}/bin/hc-release-automation-test
-    ${hcReleaseAutomationTestRepo}/bin/hc-release-automation-test-repo
     hc-static-checks
     hc-test
   '';
@@ -107,10 +106,9 @@ rec {
     export NUM_JOBS=8
     export CARGO_BUILD_JOBS=8
 
-    hc-merge-test
-    cargo build --no-default-features --locked --frozen
+    ${hcReleaseAutomationTest}/bin/hc-release-automation-test
+    ${hcReleaseAutomationTestRepo}/bin/hc-release-automation-test-repo
   '';
-
 
   hcSpeedTest = writeShellScriptBin "hc-speed-test" ''
     cargo test speed_test_prep --test speed_tests --release --manifest-path=crates/holochain/Cargo.toml --features "build_wasms" -- --ignored

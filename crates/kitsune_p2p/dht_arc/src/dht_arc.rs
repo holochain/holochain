@@ -283,6 +283,11 @@ impl DhtArc {
     pub fn center_loc(&self) -> DhtLocation {
         self.center_loc
     }
+
+    /// Is this DhtArc empty?
+    pub fn is_empty(&self) -> bool {
+        self.half_length == 0
+    }
 }
 
 impl From<u32> for DhtLocation {

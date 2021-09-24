@@ -63,8 +63,6 @@ use crate::conductor::p2p_agent_store::query_peer_density;
 use crate::conductor::p2p_metrics::put_metric_datum;
 use crate::conductor::p2p_metrics::query_metrics;
 use crate::core::ribosome::real_ribosome::RealRibosome;
-use crate::core::workflow::publish_dht_ops_workflow::ForcePublishHandler;
-use crate::core::workflow::publish_dht_ops_workflow::ForcePublishSender;
 use crate::core::workflow::ZomeCallResult;
 use derive_more::From;
 use futures::future::FutureExt;
@@ -231,24 +229,24 @@ pub trait ConductorHandleT: Send + Sync {
     /// Activate an app
     async fn enable_app(
         self: Arc<Self>,
-        app_id: &InstalledAppId,
+        app_id: InstalledAppId,
     ) -> ConductorResult<(InstalledApp, CellStartupErrors)>;
 
     /// Disable an app
     async fn disable_app(
         self: Arc<Self>,
-        app_id: &InstalledAppId,
+        app_id: InstalledAppId,
         reason: DisabledAppReason,
     ) -> ConductorResult<InstalledApp>;
 
     /// Start an enabled but stopped (paused) app
-    async fn start_app(self: Arc<Self>, app_id: &InstalledAppId) -> ConductorResult<InstalledApp>;
+    async fn start_app(self: Arc<Self>, app_id: InstalledAppId) -> ConductorResult<InstalledApp>;
 
     /// Stop a running app while leaving it enabled. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
     async fn pause_app(
         self: Arc<Self>,
-        app_id: &InstalledAppId,
+        app_id: InstalledAppId,
         reason: PausedAppReason,
     ) -> ConductorResult<InstalledApp>;
 
@@ -302,14 +300,6 @@ pub trait ConductorHandleT: Send + Sync {
     /// allowing individual Cells to be shut down.
     async fn remove_cells(&self, cell_ids: &[CellId]);
 
-    /// Get the force publish handler.
-    fn force_publish_handler(&self) -> ForcePublishHandler;
-
-    #[cfg(any(test, feature = "test_utils"))]
-    /// Force all publish dht op workflows to publish DhtOps without enough
-    /// validation receipts immediately.
-    async fn force_all_publish_dht_ops(&self);
-
     /// Retrieve the environment for this cell. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvWrite>;
@@ -351,7 +341,7 @@ pub trait ConductorHandleT: Send + Sync {
     #[cfg(any(test, feature = "test_utils"))]
     async fn transition_app_status(
         &self,
-        app_id: &InstalledAppId,
+        app_id: InstalledAppId,
         transition: AppStatusTransition,
     ) -> ConductorResult<(InstalledApp, AppStatusFx)>;
 
@@ -403,9 +393,8 @@ pub struct ConductorHandleImpl<DS: DnaStore + 'static> {
     /// The database for storing p2p MetricDatum(s)
     pub(super) p2p_metrics_env: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
 
-    /// The force publish sender to force all publish dht op workflows to
-    /// publish any DhtOps without enough validation receipts.
-    pub(super) force_publish_sender: ForcePublishSender,
+    /// Database sync level
+    pub(super) db_sync_level: DbSyncLevel,
 
     // Testing:
     #[cfg(any(test, feature = "test_utils"))]
@@ -784,14 +773,20 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             (root_env_dir, keystore)
         };
         // Run genesis on cells.
-        crate::conductor::conductor::genesis_cells(root_env_dir, keystore, cells, self.clone())
-            .await?;
+        crate::conductor::conductor::genesis_cells(
+            root_env_dir,
+            keystore,
+            cells,
+            self.clone(),
+            self.db_sync_level,
+        )
+        .await?;
 
         {
             let mut conductor = self.conductor.write().await;
             let properties = properties.unwrap_or_else(|| ().into());
             let cell_id = conductor
-                .add_clone_cell_to_app(&installed_app_id, &slot_id, properties)
+                .add_clone_cell_to_app(installed_app_id, slot_id, properties)
                 .await?;
             Ok(cell_id)
         }
@@ -822,6 +817,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 .map(|(c, p)| (c.as_id().clone(), p.clone()))
                 .collect(),
             self.clone(),
+            self.db_sync_level,
         )
         .await?;
 
@@ -887,6 +883,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             keystore,
             cells_to_create,
             self.clone(),
+            self.db_sync_level,
         )
         .await?;
 
@@ -931,13 +928,13 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     #[tracing::instrument(skip(self))]
     async fn enable_app(
         self: Arc<Self>,
-        app_id: &InstalledAppId,
+        app_id: InstalledAppId,
     ) -> ConductorResult<(InstalledApp, CellStartupErrors)> {
         let (app, delta) = self
             .conductor
             .write()
             .await
-            .transition_app_status(&app_id, AppStatusTransition::Enable)
+            .transition_app_status(app_id.clone(), AppStatusTransition::Enable)
             .await?;
         let errors = self
             .process_app_status_fx(delta, Some(vec![app_id.to_owned()].into_iter().collect()))
@@ -948,14 +945,14 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     #[tracing::instrument(skip(self))]
     async fn disable_app(
         self: Arc<Self>,
-        app_id: &InstalledAppId,
+        app_id: InstalledAppId,
         reason: DisabledAppReason,
     ) -> ConductorResult<InstalledApp> {
         let (app, delta) = self
             .conductor
             .write()
             .await
-            .transition_app_status(&app_id, AppStatusTransition::Disable(reason))
+            .transition_app_status(app_id.clone(), AppStatusTransition::Disable(reason))
             .await?;
         self.process_app_status_fx(delta, Some(vec![app_id.to_owned()].into_iter().collect()))
             .await?;
@@ -963,12 +960,12 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     #[tracing::instrument(skip(self))]
-    async fn start_app(self: Arc<Self>, app_id: &InstalledAppId) -> ConductorResult<InstalledApp> {
+    async fn start_app(self: Arc<Self>, app_id: InstalledAppId) -> ConductorResult<InstalledApp> {
         let (app, delta) = self
             .conductor
             .write()
             .await
-            .transition_app_status(&app_id, AppStatusTransition::Start)
+            .transition_app_status(app_id.clone(), AppStatusTransition::Start)
             .await?;
         self.process_app_status_fx(delta, Some(vec![app_id.to_owned()].into_iter().collect()))
             .await?;
@@ -979,14 +976,14 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     #[cfg(any(test, feature = "test_utils"))]
     async fn pause_app(
         self: Arc<Self>,
-        app_id: &InstalledAppId,
+        app_id: InstalledAppId,
         reason: PausedAppReason,
     ) -> ConductorResult<InstalledApp> {
         let (app, delta) = self
             .conductor
             .write()
             .await
-            .transition_app_status(&app_id, AppStatusTransition::Pause(reason))
+            .transition_app_status(app_id.clone(), AppStatusTransition::Pause(reason))
             .await?;
         self.process_app_status_fx(delta, Some(vec![app_id.clone()].into_iter().collect()))
             .await?;
@@ -1140,19 +1137,6 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         lock.remove_cells(cell_ids.to_vec()).await
     }
 
-    fn force_publish_handler(&self) -> ForcePublishHandler {
-        self.force_publish_sender.handler()
-    }
-
-    #[cfg(any(test, feature = "test_utils"))]
-    async fn force_all_publish_dht_ops(&self) {
-        self.force_publish_sender.force();
-        self.conductor
-            .read()
-            .await
-            .trigger_all_publish_dht_ops_workflows()
-    }
-
     #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvWrite> {
         let cell = self.cell_by_id(cell_id).await?;
@@ -1211,7 +1195,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     #[cfg(any(test, feature = "test_utils"))]
     async fn transition_app_status(
         &self,
-        app_id: &InstalledAppId,
+        app_id: InstalledAppId,
         transition: AppStatusTransition,
     ) -> ConductorResult<(InstalledApp, AppStatusFx)> {
         let mut lock = self.conductor.write().await;
@@ -1376,26 +1360,38 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
 
     pub(super) fn p2p_env(&self, space: Arc<KitsuneSpace>) -> EnvWrite {
         let mut p2p_env = self.p2p_env.lock();
+        let db_sync_level = self.db_sync_level;
         p2p_env
             .entry(space.clone())
             .or_insert_with(move || {
                 let root_env_dir = self.root_env_dir.as_ref();
                 let keystore = self.keystore.clone();
-                EnvWrite::open(root_env_dir, DbKind::P2pAgentStore(space), keystore)
-                    .expect("failed to open p2p_agent_store database")
+                EnvWrite::open_with_sync_level(
+                    root_env_dir,
+                    DbKind::P2pAgentStore(space),
+                    keystore,
+                    db_sync_level,
+                )
+                .expect("failed to open p2p_agent_store database")
             })
             .clone()
     }
 
     pub(super) fn p2p_metrics_env(&self, space: Arc<KitsuneSpace>) -> EnvWrite {
         let mut p2p_metrics_env = self.p2p_metrics_env.lock();
+        let db_sync_level = self.db_sync_level;
         p2p_metrics_env
             .entry(space.clone())
             .or_insert_with(move || {
                 let root_env_dir = self.root_env_dir.as_ref();
                 let keystore = self.keystore.clone();
-                EnvWrite::open(root_env_dir, DbKind::P2pMetrics(space), keystore)
-                    .expect("failed to open p2p_metrics database")
+                EnvWrite::open_with_sync_level(
+                    root_env_dir,
+                    DbKind::P2pMetrics(space),
+                    keystore,
+                    db_sync_level,
+                )
+                .expect("failed to open p2p_metrics database")
             })
             .clone()
     }

@@ -72,14 +72,12 @@ pub async fn spawn_queue_consumer_tasks(
     countersigning_workspace: CountersigningWorkspace,
 ) -> (QueueTriggers, InitialQueueTriggers) {
     let cell_id = cell_network.cell_id();
-    let force_publish_handler = conductor_handle.force_publish_handler();
     // Publish
     let (tx_publish, handle) = spawn_publish_dht_ops_consumer(
         env.clone(),
         conductor_handle.clone(),
         stop.subscribe(),
         cell_network.clone(),
-        force_publish_handler,
     );
     task_sender
         .send(ManagedTaskAdd::cell_critical(

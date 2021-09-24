@@ -225,7 +225,7 @@ async fn run(
                             context
                         );
                         for app_id in app_ids.iter() {
-                            conductor.clone().disable_app(&app_id.to_string(), DisabledAppReason::Error(error.to_string())).await.map_err(TaskManagerError::internal)?;
+                            conductor.clone().disable_app(app_id.to_string(), DisabledAppReason::Error(error.to_string())).await.map_err(TaskManagerError::internal)?;
                         }
                         tracing::error!("Apps disabled.");
                     }

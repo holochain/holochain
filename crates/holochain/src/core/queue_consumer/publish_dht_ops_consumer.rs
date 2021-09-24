@@ -3,20 +3,17 @@
 use super::*;
 
 use crate::conductor::manager::ManagedTaskResult;
-use crate::core::workflow::publish_dht_ops_workflow::{
-    publish_dht_ops_workflow, ForcePublishHandler,
-};
+use crate::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
 use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for Publish workflow
-#[instrument(skip(env, conductor_handle, stop, cell_network, force_publish))]
+#[instrument(skip(env, conductor_handle, stop, cell_network))]
 pub fn spawn_publish_dht_ops_consumer(
     env: EnvWrite,
     conductor_handle: ConductorHandle,
     mut stop: sync::broadcast::Receiver<()>,
     cell_network: HolochainP2pCell,
-    mut force_publish: ForcePublishHandler,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
     let (tx, mut rx) = TriggerSender::new();
     let mut trigger_self = tx.clone();
@@ -38,9 +35,7 @@ pub fn spawn_publish_dht_ops_consumer(
             }
 
             // Run the workflow
-            match publish_dht_ops_workflow(env.clone(), cell_network.clone(), &mut force_publish)
-                .await
-            {
+            match publish_dht_ops_workflow(env.clone(), cell_network.clone()).await {
                 Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
                 Err(err) => {
                     handle_workflow_error(
