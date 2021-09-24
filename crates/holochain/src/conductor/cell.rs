@@ -279,7 +279,7 @@ impl Cell {
                         Ok(payload) => payload,
                         Err(e) => {
                             error!("{}", e.to_string());
-                            return;
+                            continue;
                         }
                     };
                     let invocation = ZomeCall {
