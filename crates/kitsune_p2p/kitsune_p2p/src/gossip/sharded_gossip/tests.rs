@@ -13,6 +13,8 @@ mod handler_builder;
 mod test_local_sync;
 mod test_two_nodes;
 
+pub use common::spawn_handler;
+
 impl ShardedGossipLocal {
     pub fn test(
         gossip_type: GossipType,

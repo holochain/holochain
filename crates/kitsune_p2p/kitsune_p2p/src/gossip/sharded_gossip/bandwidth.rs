@@ -49,7 +49,7 @@ pub struct BandwidthThrottle {
 
 impl BandwidthThrottle {
     /// Set the inbound and outbound bandwidth limits in megabits per second.
-    pub(super) fn new(inbound_mbps: f64, outbound_mbps: f64) -> Self {
+    pub fn new(inbound_mbps: f64, outbound_mbps: f64) -> Self {
         // Convert to bits per second.
         let inbound_bps = inbound_mbps * 1000.0 * 1000.0;
         let outbound_bps = outbound_mbps * 1000.0 * 1000.0;
@@ -68,7 +68,7 @@ impl BandwidthThrottle {
     }
 
     /// Wait until there's enough bandwidth to send this many bytes.
-    pub(super) async fn outgoing_bytes(&self, bytes: usize) {
+    pub async fn outgoing_bytes(&self, bytes: usize) {
         if let Some(bits) = NonZeroU32::new(bytes as u32 * 8) {
             if let Some(outbound) = &self.outbound {
                 if outbound.until_n_ready(bits).await.is_err() {
@@ -79,7 +79,7 @@ impl BandwidthThrottle {
     }
 
     /// Wait until there's enough bandwidth to receive this many bytes.
-    pub(super) async fn incoming_bytes(&self, bytes: usize) {
+    pub async fn incoming_bytes(&self, bytes: usize) {
         if let Some(bits) = NonZeroU32::new(bytes as u32 * 8) {
             if let Some(inbound) = &self.inbound {
                 if inbound.until_n_ready(bits).await.is_err() {

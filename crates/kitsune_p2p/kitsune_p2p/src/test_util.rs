@@ -41,6 +41,9 @@ test_val! {
     Arc<KitsuneOpHash> => { rand36() },
 }
 
+mod gossip_scenario;
+pub use gossip_scenario::*;
+
 mod harness_event;
 pub(crate) use harness_event::*;
 
