@@ -2,7 +2,7 @@ use arbitrary::Arbitrary;
 use futures::FutureExt;
 use ghost_actor::{GhostControlHandler, GhostResult};
 
-use crate::{spawn::MockKitsuneP2pEventHandler, NOISE};
+use crate::spawn::MockKitsuneP2pEventHandler;
 
 use super::*;
 use crate::fixt::*;

@@ -21,7 +21,20 @@ pub use dht_arc_bucket::*;
 #[cfg(any(test, feature = "test_utils"))]
 pub mod gaps;
 
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, From, Into)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    serde::Serialize,
+    serde::Deserialize,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    From,
+    Into,
+)]
 /// Type for representing a location that can wrap around
 /// a u32 dht arc
 pub struct DhtLocation(pub Wrapping<u32>);
@@ -33,6 +46,13 @@ impl DhtLocation {
 
     pub fn as_u32(&self) -> u32 {
         self.0 .0
+    }
+}
+
+#[cfg(any(test, feature = "test_utils"))]
+impl From<i32> for DhtLocation {
+    fn from(i: i32) -> Self {
+        (i as u32).into()
     }
 }
 
