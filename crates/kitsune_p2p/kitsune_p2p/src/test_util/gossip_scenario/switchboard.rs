@@ -1,5 +1,5 @@
-use crate::gossip::sharded_gossip::tests::spawn_handler;
 use crate::gossip::sharded_gossip::{BandwidthThrottle, GossipType, ShardedGossip};
+use crate::test_util::spawn_handler;
 use crate::types::gossip::*;
 use crate::types::wire;
 use futures::stream::StreamExt;

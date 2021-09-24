@@ -67,7 +67,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::*;
 
-#[cfg(any(test, feature = "test_utils"))]
+#[cfg(feature = "test_utils")]
 use super::handle::MockConductorHandleT;
 
 /// The status of an installed Cell, which captures different phases of its lifecycle

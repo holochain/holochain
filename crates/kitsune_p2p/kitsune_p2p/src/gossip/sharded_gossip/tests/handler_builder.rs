@@ -4,10 +4,9 @@ use kitsune_p2p_types::dht_arc::DhtArc;
 use crate::gossip::sharded_gossip::tests::common::dangerous_fake_agent_info_with_arc;
 
 use super::common::agent_info;
-use super::common::spawn_handler;
 use super::test_local_sync::three_way_sharded_ownership;
 use super::*;
-use crate::test_util::scenario_def_local::*;
+use crate::test_util::{scenario_def_local::*, spawn_handler};
 use crate::NOISE;
 
 /// Data which represents the agent store of a backend.

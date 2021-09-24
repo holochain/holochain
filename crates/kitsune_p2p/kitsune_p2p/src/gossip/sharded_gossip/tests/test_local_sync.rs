@@ -1,7 +1,7 @@
 use super::common::*;
 use super::handler_builder::{calculate_missing_ops, mock_agent_persistence, HandlerBuilder};
 use super::*;
-use crate::test_util::scenario_def_local::*;
+use crate::test_util::{scenario_def_local::*, spawn_handler};
 use crate::NOISE;
 
 /// Defines a sharded scenario where:

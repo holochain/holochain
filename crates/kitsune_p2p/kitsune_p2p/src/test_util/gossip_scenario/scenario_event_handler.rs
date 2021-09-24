@@ -3,8 +3,6 @@ use std::sync::Arc;
 
 use crate::event::*;
 use crate::types::event::{KitsuneP2pEvent, KitsuneP2pEventHandler, KitsuneP2pEventHandlerResult};
-use futures::future::{BoxFuture, FutureExt, Shared};
-use futures::stream::{Stream, StreamExt};
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::*;
