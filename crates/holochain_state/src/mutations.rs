@@ -688,7 +688,7 @@ pub fn schedule_fn(
             (Timestamp::from(start), Timestamp::from(end), false)
         }
         Some(Schedule::Ephemeral(duration)) => (
-            (now + duration).map_err(|e| ScheduleError::Timestamp(e))?,
+            (now + duration).map_err(ScheduleError::Timestamp)?,
             Timestamp::max(),
             true,
         ),
