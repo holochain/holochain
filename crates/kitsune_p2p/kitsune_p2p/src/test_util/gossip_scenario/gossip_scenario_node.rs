@@ -3,13 +3,16 @@ use std::sync::Arc;
 
 use crate::event::*;
 use crate::types::event::{KitsuneP2pEvent, KitsuneP2pEventHandler, KitsuneP2pEventHandlerResult};
-use kitsune_p2p_types::agent_info::AgentInfoSigned;
+use kitsune_p2p_types::agent_info::{AgentInfoInner, AgentInfoSigned};
 use kitsune_p2p_types::bin_types::*;
+use kitsune_p2p_types::dht_arc::{ArcInterval, DhtArc, DhtLocation};
 use kitsune_p2p_types::*;
 
 type KSpace = Arc<KitsuneSpace>;
 type KAgent = Arc<KitsuneAgent>;
 type KOpHash = Arc<KitsuneOpHash>;
+
+// pub struct GossipScenarioNode(RwShare<GossipScenarioNodeState>);
 
 pub struct GossipScenarioNode {
     space: KSpace,
@@ -26,9 +29,56 @@ impl GossipScenarioNode {
         }
     }
 
+    pub fn add_agents<L, A>(&mut self, agents: A)
+    where
+        L: Into<DhtLocation>,
+        A: Iterator<Item = (L, (L, L))>,
+    {
+        let space = self.space.clone();
+        self.agents
+            .extend(agents.map(|(agent_loc, (start, end)): (L, (L, L))| {
+                let agent_loc: DhtLocation = agent_loc.into();
+                let start: DhtLocation = start.into();
+                let end: DhtLocation = end.into();
+                let agent = Arc::new(KitsuneAgent::new(agent_loc.to_bytes_36()));
+                let interval = ArcInterval::new(start.as_u32(), end.as_u32());
+                (
+                    agent.clone(),
+                    fake_agent_info(space.clone(), agent, interval),
+                )
+            }));
+    }
+
+    pub fn add_ops<L, O>(&mut self, ops: O)
+    where
+        L: Into<DhtLocation>,
+        O: Iterator<Item = L>,
+    {
+        self.ops.extend(ops.map(|op_loc: L| {
+            let loc: DhtLocation = op_loc.into();
+            let hash = Arc::new(KitsuneOpHash::new(loc.to_bytes_36()));
+            let data = loc.as_u32().to_le_bytes().to_vec();
+            (hash, data)
+        }));
+    }
+
     fn assert_space(&self, space: KSpace) -> () {
         assert_eq!(self.space, space, "Got query for unexpected space");
     }
+}
+
+fn fake_agent_info(space: KSpace, agent: KAgent, interval: ArcInterval) -> AgentInfoSigned {
+    let inner = AgentInfoInner {
+        space,
+        agent,
+        storage_arc: DhtArc::from_interval(interval),
+        url_list: vec![],
+        signed_at_ms: 0,
+        expires_at_ms: 0,
+        signature: Arc::new(KitsuneSignature(vec![])),
+        encoded_bytes: Box::new([]),
+    };
+    AgentInfoSigned(Arc::new(inner))
 }
 
 impl ghost_actor::GhostHandler<KitsuneP2pEvent> for GossipScenarioNode {}
