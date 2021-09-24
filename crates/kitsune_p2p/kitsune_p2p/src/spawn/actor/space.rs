@@ -109,10 +109,7 @@ impl SpaceInternalHandler for Space {
             self.local_joined_agents.iter().cloned().collect();
         let all_peers_fut = self
             .evt_sender
-            .query_agent_info_signed(QueryAgentInfoSignedEvt {
-                space: self.space.clone(),
-                agents: None,
-            });
+            .query_agents(QueryAgentsEvt::new(self.space.clone()));
         Ok(async move {
             for peer in all_peers_fut.await? {
                 res.insert(peer.agent.clone());
