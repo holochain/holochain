@@ -665,7 +665,7 @@ pub fn schedule_fn(
                 .map_err(|e| ScheduleError::Cron(e.to_string()))?
                 .after(
                     &chrono::DateTime::<chrono::Utc>::try_from(now)
-                        .map_err(|e| ScheduleError::Timestamp(e))?,
+                        .map_err(ScheduleError::Timestamp)?,
                 )
                 .next()
             {
