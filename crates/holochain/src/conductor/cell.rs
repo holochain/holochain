@@ -319,7 +319,7 @@ impl Cell {
                                         txn,
                                         scheduled_fn.clone(),
                                         Some(next_schedule),
-                                        now.clone(),
+                                        now,
                                     ) {
                                         error!("{}", e.to_string());
                                         continue;
