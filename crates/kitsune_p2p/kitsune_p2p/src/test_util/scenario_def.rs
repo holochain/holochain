@@ -76,7 +76,7 @@ impl ScenarioDefAgent {
     pub fn new<O: Copy + Into<DhtLocation>>(arc: ArcInterval, ops: &[O]) -> Self {
         Self {
             arc,
-            ops: ops.into_iter().copied().map(Into::into).collect(),
+            ops: ops.iter().copied().map(Into::into).collect(),
         }
     }
 }
