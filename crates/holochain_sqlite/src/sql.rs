@@ -17,6 +17,15 @@ pub mod sql_cell {
         pub const FETCH_OP_HASHES_WRAPPED: &str =
             include_str!("sql/cell/fetch_hashes/integrated/fetch_op_hashes_wrapped_v1.sql");
     }
+    pub mod schedule {
+        pub const UPDATE: &str = include_str!("sql/cell/schedule/update.sql");
+        pub const DELETE: &str = include_str!("sql/cell/schedule/delete.sql");
+        pub const EXPIRED: &str = include_str!("sql/cell/schedule/expired.sql");
+        pub const DELETE_ALL_EPHEMERAL: &str =
+            include_str!("sql/cell/schedule/delete_all_ephemeral.sql");
+        pub const DELETE_LIVE_EPHEMERAL: &str =
+            include_str!("sql/cell/schedule/delete_live_ephemeral.sql");
+    }
 }
 
 pub(crate) mod sql_conductor {

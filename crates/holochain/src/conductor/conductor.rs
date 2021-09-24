@@ -1172,11 +1172,8 @@ where
             keystore,
             root_env_dir,
             holochain_p2p,
-<<<<<<< HEAD
             scheduler: None,
-=======
             db_sync_level,
->>>>>>> 98b36b82ce8cbb2b0bf49a88527a199fb123f7b8
         })
     }
 
