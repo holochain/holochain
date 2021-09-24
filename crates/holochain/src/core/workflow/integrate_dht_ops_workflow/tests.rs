@@ -436,7 +436,7 @@ impl Db {
                             let op = DhtOpHashed::from_content_sync(op.clone());
                             let hash = op.as_hash().clone();
                             mutations::insert_op(txn, op, false).unwrap();
-                            mutations::set_when_integrated(txn, hash.clone(), timestamp::now())
+                            mutations::set_when_integrated(txn, hash.clone(), Timestamp::now())
                                 .unwrap();
                             mutations::set_validation_status(txn, hash, ValidationStatus::Valid)
                                 .unwrap();
@@ -758,7 +758,7 @@ async fn commit_entry<'env>(
         .next()
         .unwrap();
 
-    let input = EntryWithDefId::new(entry_def_id.clone(), entry.clone());
+    let input = CreateInput::new(entry_def_id.clone(), entry.clone());
 
     let output = {
         let mut host_access = fixt!(ZomeCallHostAccess);

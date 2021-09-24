@@ -7,11 +7,12 @@ impl ShardedGossipLocal {
     /// have an outgoing gossip.
     pub(super) async fn try_initiate(&self) -> KitsuneResult<Option<Outgoing>> {
         // Get local agents
-        let (has_target, local_agents, current_rounds) = self.inner.share_mut(|i, _| {
+        let (has_target, local_agents) = self.inner.share_mut(|i, _| {
             i.check_tgt_expired();
             let has_target = i.initiate_tgt.is_some();
-            let current_rounds = i.round_map.current_rounds();
-            Ok((has_target, i.local_agents.clone(), current_rounds))
+            // Clear any expired rounds.
+            i.round_map.current_rounds();
+            Ok((has_target, i.local_agents.clone()))
         })?;
         // There's already a target so there's nothing to do.
         if has_target {
@@ -29,11 +30,7 @@ impl ShardedGossipLocal {
 
         // Choose a remote agent to gossip with.
         let remote_agent = self
-            .find_remote_agent_within_arcset(
-                Arc::new(intervals.clone().into()),
-                &local_agents,
-                current_rounds,
-            )
+            .find_remote_agent_within_arcset(Arc::new(intervals.clone().into()), &local_agents)
             .await?;
         let id = rand::thread_rng().gen();
 
@@ -120,6 +117,15 @@ impl ShardedGossipLocal {
 
         self.inner.share_mut(|inner, _| {
             inner.round_map.insert(peer_cert.clone(), state);
+            // If this is not the target we are accepting
+            // then record it as a remote round.
+            if inner
+                .initiate_tgt
+                .as_ref()
+                .map_or(true, |tgt| *tgt.0.cert() != peer_cert)
+            {
+                inner.metrics.record_remote_round(peer_cert);
+            }
             Ok(())
         })?;
         Ok(gossip)
@@ -153,16 +159,12 @@ impl ShardedGossipLocal {
             }
         }
 
-        let time_ranges = self.calculate_time_ranges();
-        let len = time_ranges.len();
+        let windows = self.calculate_time_ranges();
+        let len = windows.len();
         // Generate the ops bloom for all local agents within the common arc.
-        for (i, time_range) in time_ranges.into_iter().enumerate() {
+        for (i, window) in windows.into_iter().enumerate() {
             let blooms = self
-                .generate_ops_blooms_for_time_window(
-                    &local_agents,
-                    &state.common_arc_set,
-                    time_range,
-                )
+                .generate_ops_blooms_for_time_window(&local_agents, &state.common_arc_set, window)
                 .await?;
 
             // If no blooms were found for this time window then return a no overlap.

@@ -71,8 +71,9 @@ impl SimpleBloomMod {
             }
 
             if let Some(incoming) = maybe_incoming.take() {
-                let (con, gossip) = incoming;
-                if let Err(e) = step_4_com_loop_inner_incoming(&self, con, gossip).await {
+                let (con, remote_url, gossip) = incoming;
+                if let Err(e) = step_4_com_loop_inner_incoming(&self, con, remote_url, gossip).await
+                {
                     tracing::warn!("failed to process incoming: {:?}", e);
                 }
             }
@@ -100,7 +101,7 @@ pub(crate) async fn step_4_com_loop_inner_outgoing(
     let t = tuning_params.implicit_timeout();
 
     let con = match how {
-        HowToConnect::Con(con) => {
+        HowToConnect::Con(con, _) => {
             if con.is_closed() {
                 let url = pick_url_for_cert(inner, &peer_cert)?;
                 ep_hnd.get_connection(url, t).await?
@@ -118,6 +119,7 @@ pub(crate) async fn step_4_com_loop_inner_outgoing(
 pub(crate) async fn step_4_com_loop_inner_incoming(
     bloom: &SimpleBloomMod,
     con: Tx2ConHnd<wire::Wire>,
+    remote_url: TxUrl,
     gossip: GossipWire,
 ) -> KitsuneResult<()> {
     use crate::event::*;
@@ -220,6 +222,7 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
     // send accept if applicable / gather the keys the remote needs
     let con_clone = con.clone();
     let remote_agents_clone = remote_agents.clone();
+    let remote_url_clone = remote_url.clone();
     let out_keys = bloom.inner.share_mut(move |i, _| {
         // for now, just always accept gossip initiates
         if send_accept {
@@ -227,8 +230,11 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
             let gossip = GossipWire::accept(i.local_agents.clone(), local_filter);
             let peer_cert = con_clone.peer_cert();
             let endpoint = GossipTgt::new(remote_agents_clone, peer_cert);
-            i.outgoing
-                .push((endpoint, HowToConnect::Con(con_clone), gossip));
+            i.outgoing.push((
+                endpoint,
+                HowToConnect::Con(con_clone, remote_url_clone),
+                gossip,
+            ));
         }
 
         let mut out_keys = Vec::new();
@@ -251,6 +257,7 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
         // the remote doesn't need anything from us
         // ... if we initiated this gossip, mark it as done.
         let remote_agents_clone = remote_agents.clone();
+        let remote_url_clone = remote_url.clone();
         bloom.inner.share_mut(move |i, _| {
             if let Some(tgt) = i.initiate_tgt.clone() {
                 if con.peer_cert() == *tgt.cert() {
@@ -262,7 +269,8 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
             let gossip = GossipWire::chunk(i.local_agents.clone(), true, Vec::new());
             let peer_cert = con.peer_cert();
             let endpoint = GossipTgt::new(remote_agents_clone, peer_cert);
-            i.outgoing.push((endpoint, HowToConnect::Con(con), gossip));
+            i.outgoing
+                .push((endpoint, HowToConnect::Con(con, remote_url_clone), gossip));
 
             Ok(())
         })?;
@@ -319,8 +327,11 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
             let gossip = GossipWire::chunk(i.local_agents.clone(), finished, chunks);
             let peer_cert = con.peer_cert();
             let endpoint = GossipTgt::new(remote_agents.clone(), peer_cert);
-            i.outgoing
-                .push((endpoint, HowToConnect::Con(con.clone()), gossip));
+            i.outgoing.push((
+                endpoint,
+                HowToConnect::Con(con.clone(), remote_url.clone()),
+                gossip,
+            ));
         }
 
         Ok(())

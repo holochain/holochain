@@ -1,13 +1,19 @@
 use std::collections::HashSet;
 
+use crate::scratch::ScratchError;
+use crate::scratch::SyncScratchError;
+use async_recursion::async_recursion;
 use holo_hash::AgentPubKey;
+use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
+use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::dht_op::produce_op_lights_from_elements;
 use holochain_types::dht_op::produce_op_lights_from_iter;
+use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpLight;
 use holochain_types::dht_op::DhtOpType;
 use holochain_types::dht_op::OpOrder;
@@ -15,14 +21,14 @@ use holochain_types::dht_op::UniqueForm;
 use holochain_types::element::SignedHeaderHashedExt;
 use holochain_types::env::EnvRead;
 use holochain_types::env::EnvWrite;
-use holochain_types::timestamp;
-use holochain_types::Timestamp;
 use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::header;
 use holochain_zome_types::CapAccess;
 use holochain_zome_types::CapGrant;
 use holochain_zome_types::CapSecret;
+use holochain_zome_types::ChainTopOrdering;
 use holochain_zome_types::CounterSigningAgentState;
+use holochain_zome_types::CounterSigningSessionData;
 use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
 use holochain_zome_types::EntryVisibility;
@@ -37,12 +43,15 @@ use holochain_zome_types::QueryFilter;
 use holochain_zome_types::Signature;
 use holochain_zome_types::SignedHeader;
 use holochain_zome_types::SignedHeaderHashed;
+use holochain_zome_types::Timestamp;
 
 use crate::chain_lock::is_chain_locked;
+use crate::chain_lock::is_lock_expired;
 use crate::prelude::*;
 use crate::query::chain_head::ChainHeadQuery;
 use crate::scratch::Scratch;
 use crate::scratch::SyncScratch;
+use holo_hash::EntryHash;
 use holochain_serialized_bytes::prelude::*;
 
 pub use error::*;
@@ -119,7 +128,7 @@ impl SourceChain {
     // TODO: Maybe we should store data as elements in the scratch?
     // TODO: document that this is only the elemnts in the SCRATCH, not the
     //       entire source chain!
-    pub fn elements(&self) -> SourceChainResult<Vec<Element>> {
+    pub fn scratch_elements(&self) -> SourceChainResult<Vec<Element>> {
         Ok(self.scratch.apply(|scratch| scratch.elements().collect())?)
     }
 
@@ -142,21 +151,28 @@ impl SourceChain {
         &self,
         header: Header,
         maybe_entry: Option<Entry>,
+        chain_top_ordering: ChainTopOrdering,
     ) -> SourceChainResult<HeaderHash> {
         let header = HeaderHashed::from_content_sync(header);
         let hash = header.as_hash().clone();
         let header = SignedHeaderHashed::new(&self.vault.keystore(), header).await?;
         let element = Element::new(header, maybe_entry);
         self.scratch
-            .apply(|scratch| insert_element_scratch(scratch, element))?;
+            .apply(|scratch| insert_element_scratch(scratch, element, chain_top_ordering))?;
         Ok(hash)
     }
 
-    pub async fn put_countersigned(&self, entry: Entry) -> SourceChainResult<HeaderHash> {
+    pub async fn put_countersigned(
+        &self,
+        entry: Entry,
+        chain_top_ordering: ChainTopOrdering,
+    ) -> SourceChainResult<HeaderHash> {
+        let entry_hash = EntryHash::with_data_sync(&entry);
         if let Entry::CounterSign(ref session_data, _) = entry {
             self.put_with_header(
-                Header::from_countersigning_data(session_data, (*self.author).clone())?,
+                Header::from_countersigning_data(entry_hash, session_data, (*self.author).clone())?,
                 Some(entry),
+                chain_top_ordering,
             )
             .await
         } else {
@@ -169,6 +185,7 @@ impl SourceChain {
         &self,
         header_builder: B,
         maybe_entry: Option<Entry>,
+        chain_top_ordering: ChainTopOrdering,
     ) -> SourceChainResult<HeaderHash> {
         let (prev_header, chain_head_seq, chain_head_timestamp) = self.chain_head()?;
         let header_seq = chain_head_seq + 1;
@@ -176,12 +193,26 @@ impl SourceChain {
         // Build the header.
         let common = HeaderBuilderCommon {
             author: (*self.author).clone(),
-            timestamp: std::cmp::max(timestamp::now(), chain_head_timestamp),
+            // If the current time is equal to the current chain head timestamp,
+            // or even has drifted to be before it, just set the next timestamp
+            // to be one unit ahead of the previous.
+            //
+            // TODO: put a limit on the size of the negative time interval
+            //       we are willing to accept, beyond which we emit an error
+            //       rather than bumping the timestamp
+            timestamp: std::cmp::max(
+                Timestamp::now(),
+                (chain_head_timestamp + std::time::Duration::from_micros(1))?,
+            ),
             header_seq,
             prev_header,
         };
-        self.put_with_header(header_builder.build(common).into(), maybe_entry)
-            .await
+        self.put_with_header(
+            header_builder.build(common).into(),
+            maybe_entry,
+            chain_top_ordering,
+        )
+        .await
     }
 
     pub fn has_initialized(&self) -> SourceChainResult<bool> {
@@ -420,6 +451,13 @@ impl SourceChain {
         Ok(())
     }
 
+    pub async fn is_chain_locked(&self, lock: Vec<u8>) -> SourceChainResult<bool> {
+        Ok(self
+            .vault
+            .async_reader(move |txn| is_chain_locked(&txn, &lock))
+            .await?)
+    }
+
     pub async fn accept_countersigning_preflight_request(
         &self,
         preflight_request: PreflightRequest,
@@ -456,6 +494,44 @@ impl SourceChain {
         Ok(countersigning_agent_state)
     }
 
+    /// If there is a countersigning session get the
+    /// StoreEntry op to send to the entry authorities.
+    pub fn countersigning_op(&self) -> SourceChainResult<Option<DhtOp>> {
+        let r = self.scratch.apply(|scratch| {
+            scratch
+                .entries()
+                .find(|e| matches!(**e.1, Entry::CounterSign(_, _)))
+                .and_then(|(entry_hash, entry)| {
+                    scratch
+                        .headers()
+                        .find(|shh| {
+                            shh.header()
+                                .entry_hash()
+                                .map(|eh| eh == entry_hash)
+                                .unwrap_or(false)
+                        })
+                        .and_then(|shh| {
+                            Some(DhtOp::StoreEntry(
+                                shh.signature().clone(),
+                                shh.header().clone().try_into().ok()?,
+                                Box::new((**entry).clone()),
+                            ))
+                        })
+                })
+        })?;
+        Ok(r)
+    }
+
+    pub fn lock_for_entry(entry: Option<&Entry>) -> SourceChainResult<Vec<u8>> {
+        Ok(match entry {
+            Some(Entry::CounterSign(session_data, _)) => holo_hash::encode::blake2b_256(
+                &holochain_serialized_bytes::encode(session_data.preflight_request())?,
+            ),
+            _ => Vec::with_capacity(0),
+        })
+    }
+
+    #[async_recursion]
     pub async fn flush(
         &self,
         network: &(dyn HolochainP2pCellT + Send + Sync),
@@ -465,52 +541,8 @@ impl SourceChain {
             return Ok(());
         }
         let (headers, ops, entries) = self.scratch.apply_and_then(|scratch| {
-            let length = scratch.num_headers();
-
-            // The op related data ends up here.
-            let mut ops = Vec::with_capacity(length);
-
-            // Drain out the headers.
-            let signed_headers = scratch.drain_headers().collect::<Vec<_>>();
-            // Headers end up back in here.
-            let mut headers = Vec::with_capacity(signed_headers.len());
-
-            // Loop through each header and produce op related data.
-            for shh in signed_headers {
-                // &HeaderHash, &Header, EntryHash are needed to produce the ops.
-                let entry_hash = shh.header().entry_hash().cloned();
-                let item = (shh.as_hash(), shh.header(), entry_hash);
-                let ops_inner = produce_op_lights_from_iter(vec![item].into_iter(), 1)?;
-
-                // Break apart the SignedHeaderHashed.
-                let (header, sig) = shh.into_header_and_signature();
-                let (header, hash) = header.into_inner();
-
-                // We need to take the header by value and put it back each loop.
-                let mut h = Some(header);
-                for op in ops_inner {
-                    let op_type = op.get_type();
-                    // Header is required by value to produce the DhtOpHash.
-                    let (header, op_hash) =
-                        UniqueForm::op_hash(op_type, h.expect("This can't be empty"))?;
-                    let op_order = OpOrder::new(op_type, header.timestamp());
-                    let timestamp = header.timestamp();
-                    let visibility = header.entry_type().map(|et| *et.visibility());
-                    // Put the header back by value.
-                    let dependency = get_dependency(op_type, &header);
-                    h = Some(header);
-                    // Collect the DhtOpLight, DhtOpHash and OpOrder.
-                    ops.push((op, op_hash, op_order, timestamp, visibility, dependency));
-                }
-
-                // Put the SignedHeaderHashed back together.
-                let shh = SignedHeaderHashed::with_presigned(
-                    HeaderHashed::with_pre_hashed(h.expect("This can't be empty"), hash),
-                    sig,
-                );
-                // Put the header back in the list.
-                headers.push(shh);
-            }
+            let (headers, ops) =
+                build_ops_from_headers(scratch.drain_headers().collect::<Vec<_>>())?;
 
             // Drain out any entries.
             let entries = scratch.drain_entries().collect::<Vec<_>>();
@@ -528,51 +560,53 @@ impl SourceChain {
             .map(|entry| entry.as_content())
             .find(|entry| matches!(entry, Entry::CounterSign(_, _)));
 
-        let lock = match maybe_countersigned_entry {
-            Some(Entry::CounterSign(session_data, _)) => {
-                if headers.len() != 1 {
-                    return Err(SourceChainError::DirtyCounterSigningWrite);
-                }
-                holo_hash::encode::blake2b_256(&holochain_serialized_bytes::encode(
-                    session_data.preflight_request(),
-                )?)
-            }
-            _ => vec![],
-        };
+        if matches!(maybe_countersigned_entry, Some(Entry::CounterSign(_, _))) && headers.len() != 1
+        {
+            return Err(SourceChainError::DirtyCounterSigningWrite);
+        }
+        let lock = Self::lock_for_entry(maybe_countersigned_entry)?;
 
         // Write the entries, headers and ops to the database in one transaction.
         let author = self.author.clone();
         let persisted_head = self.persisted_head.clone();
-        self.vault
+        let headers_1 = headers.clone();
+        match self
+            .vault
             .async_commit(move |txn: &mut Transaction| {
                 // As at check.
-                let (new_persisted_head, _, _) = chain_head_db(&txn, author)?;
-                if headers.last().is_none() {
+                let (new_persisted_head, new_head_seq, new_timestamp) =
+                    chain_head_db(&txn, author)?;
+                if headers_1.last().is_none() {
                     // Nothing to write
                     return Ok(());
                 }
                 if persisted_head != new_persisted_head {
                     return Err(SourceChainError::HeadMoved(
                         Some(persisted_head),
-                        Some(new_persisted_head),
+                        Some((new_persisted_head, new_head_seq, new_timestamp)),
                     ));
                 }
+
+                // If the lock isn't empty this is a countersigning session.
+                let is_countersigning_session = !lock.is_empty();
 
                 if is_chain_locked(txn, &lock)? {
                     return Err(SourceChainError::ChainLocked);
                 }
-                // If the lock is not just the empty lock, and the chain is NOT
+                // If this is a countersigning session, and the chain is NOT
                 // locked then either the session expired or the countersigning
-                // entry being committed now is the correct one for the lock,
-                // in either case we should unlock the chain.
-                else if !lock.is_empty() {
-                    unlock_chain(txn)?;
+                // entry being committed now is the correct one for the lock.
+                else if is_countersigning_session {
+                    // If the lock is expired then we can't write this countersigning session.
+                    if is_lock_expired(txn, &lock)? {
+                        return Err(SourceChainError::LockExpired);
+                    }
                 }
 
                 for entry in entries {
                     insert_entry(txn, entry)?;
                 }
-                for header in headers {
+                for header in headers_1 {
                     insert_header(txn, header)?;
                 }
                 for (op, op_hash, op_order, timestamp, visibility, dependency) in ops {
@@ -587,19 +621,144 @@ impl SourceChain {
                     // TODO: Can anything every depend on a private store entry op? I don't think so.
                     let is_private_entry = op_type == DhtOpType::StoreEntry
                         && visibility == Some(EntryVisibility::Private);
-                    if !is_private_entry && ops_to_integrate.contains(&op_hash) {
+
+                    // Don't publish private entries or countersigning sessions.
+                    if !is_private_entry
+                        && !is_countersigning_session
+                        && ops_to_integrate.contains(&op_hash)
+                    {
                         set_validation_stage(
                             txn,
-                            op_hash,
+                            op_hash.clone(),
                             ValidationLimboStatus::AwaitingIntegration,
                         )?;
+                    }
+                    // If this is a countersigning session we want to withhold
+                    // publishing the ops until the session is successful.
+                    if is_countersigning_session {
+                        set_withhold_publish(txn, op_hash)?;
                     }
                 }
                 SourceChainResult::Ok(())
             })
-            .await?;
-        Ok(())
+            .await
+        {
+            Err(SourceChainError::HeadMoved(
+                old_head,
+                Some((new_persisted_head, new_head_seq, new_timestamp)),
+            )) => {
+                let is_relaxed =
+                    self.scratch
+                        .apply_and_then::<bool, SyncScratchError, _>(|scratch| {
+                            Ok(scratch.chain_top_ordering() == ChainTopOrdering::Relaxed)
+                        })?;
+                if is_relaxed {
+                    let keystore = self.vault.keystore();
+                    // A child chain is needed with a new as-at that matches
+                    // the rebase.
+                    let child_chain = Self::new(self.vault.clone(), (*self.author).clone()).await?;
+                    let rebased_headers: Vec<SignedHeaderHashed> = rebase_headers_on(
+                        &keystore,
+                        headers,
+                        new_persisted_head,
+                        new_head_seq,
+                        new_timestamp,
+                    )
+                    .await?;
+                    child_chain.scratch.apply(|scratch| {
+                        for header in rebased_headers {
+                            scratch.add_header(header, ChainTopOrdering::Relaxed)
+                        }
+                    })?;
+                    child_chain.flush(network).await
+                } else {
+                    Err(SourceChainError::HeadMoved(
+                        old_head,
+                        Some((new_persisted_head, new_head_seq, new_timestamp)),
+                    ))
+                }
+            }
+            result => result,
+        }
     }
+}
+
+#[allow(clippy::complexity)]
+fn build_ops_from_headers(
+    signed_headers: Vec<SignedHeaderHashed>,
+) -> SourceChainResult<(
+    Vec<SignedHeaderHashed>,
+    Vec<(
+        DhtOpLight,
+        DhtOpHash,
+        OpOrder,
+        Timestamp,
+        Option<EntryVisibility>,
+        Dependency,
+    )>,
+)> {
+    // Headers end up back in here.
+    let mut headers_output = Vec::with_capacity(signed_headers.len());
+    // The op related data ends up here.
+    let mut ops = Vec::with_capacity(signed_headers.len());
+
+    // Loop through each header and produce op related data.
+    for shh in signed_headers {
+        // &HeaderHash, &Header, EntryHash are needed to produce the ops.
+        let entry_hash = shh.header().entry_hash().cloned();
+        let item = (shh.as_hash(), shh.header(), entry_hash);
+        let ops_inner = produce_op_lights_from_iter(vec![item].into_iter(), 1)?;
+
+        // Break apart the SignedHeaderHashed.
+        let (header, sig) = shh.into_header_and_signature();
+        let (header, hash) = header.into_inner();
+
+        // We need to take the header by value and put it back each loop.
+        let mut h = Some(header);
+        for op in ops_inner {
+            let op_type = op.get_type();
+            // Header is required by value to produce the DhtOpHash.
+            let (header, op_hash) = UniqueForm::op_hash(op_type, h.expect("This can't be empty"))?;
+            let op_order = OpOrder::new(op_type, header.timestamp());
+            let timestamp = header.timestamp();
+            let visibility = header.entry_type().map(|et| *et.visibility());
+            // Put the header back by value.
+            let dependency = get_dependency(op_type, &header);
+            h = Some(header);
+            // Collect the DhtOpLight, DhtOpHash and OpOrder.
+            ops.push((op, op_hash, op_order, timestamp, visibility, dependency));
+        }
+
+        // Put the SignedHeaderHashed back together.
+        let shh = SignedHeaderHashed::with_presigned(
+            HeaderHashed::with_pre_hashed(h.expect("This can't be empty"), hash),
+            sig,
+        );
+        // Put the header back in the list.
+        headers_output.push(shh);
+    }
+    Ok((headers_output, ops))
+}
+
+async fn rebase_headers_on(
+    keystore: &KeystoreSender,
+    mut headers: Vec<SignedHeaderHashed>,
+    mut rebase_header: HeaderHash,
+    mut rebase_seq: u32,
+    mut rebase_timestamp: Timestamp,
+) -> Result<Vec<SignedHeaderHashed>, ScratchError> {
+    headers.sort_by_key(|a| a.header().header_seq());
+    for shh in headers.iter_mut() {
+        let mut header = shh.header().clone();
+        header.rebase_on(rebase_header.clone(), rebase_seq, rebase_timestamp)?;
+        rebase_seq = header.header_seq();
+        rebase_timestamp = header.timestamp();
+        let hh = HeaderHashed::from_content_sync(header);
+        rebase_header = hh.as_hash().clone();
+        let new_shh = SignedHeaderHashed::new(keystore, hh).await?;
+        *shh = new_shh;
+    }
+    Ok(headers)
 }
 
 pub async fn genesis(
@@ -611,7 +770,7 @@ pub async fn genesis(
     let keystore = vault.keystore().clone();
     let dna_header = Header::Dna(header::Dna {
         author: agent_pubkey.clone(),
-        timestamp: timestamp::now(),
+        timestamp: Timestamp::now(),
         hash: dna_hash,
     });
     let dna_header = HeaderHashed::from_content_sync(dna_header);
@@ -624,7 +783,7 @@ pub async fn genesis(
     // create the agent validation entry and add it directly to the store
     let agent_validation_header = Header::AgentValidationPkg(header::AgentValidationPkg {
         author: agent_pubkey.clone(),
-        timestamp: timestamp::now(),
+        timestamp: Timestamp::now(),
         header_seq: 1,
         prev_header: dna_header_address,
         membrane_proof,
@@ -640,7 +799,7 @@ pub async fn genesis(
     // create a agent chain element and add it directly to the store
     let agent_header = Header::Create(header::Create {
         author: agent_pubkey.clone(),
-        timestamp: timestamp::now(),
+        timestamp: Timestamp::now(),
         header_seq: 2,
         prev_header: avh_addr,
         entry_type: header::EntryType::AgentPubKey,
@@ -741,6 +900,39 @@ fn chain_head_scratch(
         .max_by_key(|h| h.1)
 }
 
+/// Check if there is a current countersigning session and if so, return the
+/// session data and the entry hash.
+pub fn current_countersigning_session(
+    txn: &Transaction<'_>,
+    author: Arc<AgentPubKey>,
+) -> SourceChainResult<Option<(EntryHash, CounterSigningSessionData)>> {
+    // The chain must be locked for a session to be active.
+    if is_chain_locked(txn, &[])? {
+        match chain_head_db(txn, author) {
+            // We haven't done genesis so no session can be active.
+            Err(SourceChainError::ChainEmpty) => Ok(None),
+            Err(e) => Err(e),
+            Ok((hash, _, _)) => {
+                let txn: Txn = txn.into();
+                // Get the session data from the database.
+                let element = match txn.get_element(&hash.into())? {
+                    Some(element) => element,
+                    None => return Ok(None),
+                };
+                let (shh, ee) = element.into_inner();
+                Ok(match (shh.header().entry_hash(), ee.into_option()) {
+                    (Some(entry_hash), Some(Entry::CounterSign(cs, _))) => {
+                        Some((entry_hash.to_owned(), *cs))
+                    }
+                    _ => None,
+                })
+            }
+        }
+    } else {
+        Ok(None)
+    }
+}
+
 #[cfg(test)]
 async fn _put_db<H: HeaderInner, B: HeaderBuilder<H>>(
     vault: holochain_types::env::EnvWrite,
@@ -754,7 +946,7 @@ async fn _put_db<H: HeaderInner, B: HeaderBuilder<H>>(
 
     let common = HeaderBuilderCommon {
         author: (*author).clone(),
-        timestamp: timestamp::now(),
+        timestamp: Timestamp::now(),
         header_seq,
         prev_header: prev_header.clone(),
     };
@@ -767,11 +959,11 @@ async fn _put_db<H: HeaderInner, B: HeaderBuilder<H>>(
     let entry = entry.into_option();
     let hash = header.as_hash().clone();
     vault.conn()?.with_commit_sync(|txn| {
-        let (new_head, _, _) = chain_head_db(txn, author.clone())?;
+        let (new_head, new_seq, new_timestamp) = chain_head_db(txn, author.clone())?;
         if new_head != prev_header {
             return Err(SourceChainError::HeadMoved(
                 Some(prev_header),
-                Some(new_head),
+                Some((new_head, new_seq, new_timestamp)),
             ));
         }
         SourceChainResult::Ok(put_raw(txn, header, ops, entry)?)
@@ -858,6 +1050,64 @@ pub mod tests {
 
     use crate::source_chain::SourceChainResult;
     use holochain_zome_types::Entry;
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_relaxed_ordering() -> SourceChainResult<()> {
+        let test_env = test_cell_env();
+        let env = test_env.env();
+        let alice = fixt!(AgentPubKey, Predictable, 0);
+
+        let mut mock = MockHolochainP2pCellT::new();
+        mock.expect_authority_for_hash().returning(|_| Ok(false));
+
+        source_chain::genesis(env.clone(), fake_dna_hash(1), alice.clone(), None)
+            .await
+            .unwrap();
+        let chain_1 = SourceChain::new(env.clone().into(), alice.clone()).await?;
+        let chain_2 = SourceChain::new(env.clone().into(), alice.clone()).await?;
+        let chain_3 = SourceChain::new(env.clone().into(), alice.clone()).await?;
+
+        let header_builder = builder::CloseChain {
+            new_dna_hash: fixt!(DnaHash),
+        };
+        chain_1
+            .put(header_builder.clone(), None, ChainTopOrdering::Strict)
+            .await?;
+        chain_2
+            .put(header_builder.clone(), None, ChainTopOrdering::Strict)
+            .await?;
+        chain_3
+            .put(header_builder, None, ChainTopOrdering::Relaxed)
+            .await?;
+
+        let author = Arc::new(alice);
+        chain_1.flush(&mock).await?;
+        let author_1 = Arc::clone(&author);
+        let (_, seq, _) = env
+            .async_commit(move |txn: &mut Transaction| chain_head_db(&txn, author_1))
+            .await?;
+        assert_eq!(seq, 3);
+
+        assert!(matches!(
+            chain_2.flush(&mock).await,
+            Err(SourceChainError::HeadMoved(_, _))
+        ));
+        let author_2 = Arc::clone(&author);
+        let (_, seq, _) = env
+            .async_commit(move |txn: &mut Transaction| chain_head_db(&txn, author_2))
+            .await?;
+        assert_eq!(seq, 3);
+
+        chain_3.flush(&mock).await?;
+        let author_3 = Arc::clone(&author);
+        let (_, seq, _) = env
+            .async_commit(move |txn: &mut Transaction| chain_head_db(&txn, author_3))
+            .await?;
+        assert_eq!(seq, 4);
+
+        Ok(())
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     async fn test_get_cap_grant() -> SourceChainResult<()> {
         let test_env = test_cell_env();
@@ -902,7 +1152,9 @@ pub mod tests {
                 entry_type: EntryType::CapGrant,
                 entry_hash: entry_hash.clone(),
             };
-            let header = chain.put(header_builder, Some(entry)).await?;
+            let header = chain
+                .put(header_builder, Some(entry), ChainTopOrdering::default())
+                .await?;
 
             chain.flush(&mock).await.unwrap();
 
@@ -943,7 +1195,9 @@ pub mod tests {
                 original_header_address,
                 original_entry_address,
             };
-            let header = chain.put(header_builder, Some(entry)).await?;
+            let header = chain
+                .put(header_builder, Some(entry), ChainTopOrdering::default())
+                .await?;
 
             chain.flush(&mock).await.unwrap();
 
@@ -980,7 +1234,9 @@ pub mod tests {
                 deletes_address: updated_header_hash,
                 deletes_entry_address: updated_entry_hash,
             };
-            chain.put(header_builder, None).await?;
+            chain
+                .put(header_builder, None, ChainTopOrdering::default())
+                .await?;
 
             chain.flush(&mock).await.unwrap();
         }
@@ -1088,13 +1344,19 @@ pub mod tests {
             entry_type: EntryType::App(fixt!(AppEntryType)),
             entry_hash: EntryHash::with_data_sync(&entry),
         };
-        let h1 = source_chain.put(create, Some(entry)).await.unwrap();
+        let h1 = source_chain
+            .put(create, Some(entry), ChainTopOrdering::default())
+            .await
+            .unwrap();
         let entry = Entry::App(fixt!(AppEntryBytes));
         let create = builder::Create {
             entry_type: EntryType::App(fixt!(AppEntryType)),
             entry_hash: EntryHash::with_data_sync(&entry),
         };
-        let h2 = source_chain.put(create, Some(entry)).await.unwrap();
+        let h2 = source_chain
+            .put(create, Some(entry), ChainTopOrdering::default())
+            .await
+            .unwrap();
         source_chain.flush(&mock).await.unwrap();
 
         fresh_reader_test!(vault, |txn| {

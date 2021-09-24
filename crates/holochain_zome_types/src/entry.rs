@@ -9,6 +9,7 @@ use crate::capability::CapClaim;
 use crate::capability::CapGrant;
 use crate::capability::ZomeCallCapGrant;
 use crate::countersigning::CounterSigningSessionData;
+use crate::header::ChainTopOrdering;
 use holo_hash::hash_type;
 use holo_hash::AgentPubKey;
 use holo_hash::EntryHash;
@@ -187,28 +188,47 @@ impl HashableContent for Entry {
 
 /// Data to create an entry.
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-pub struct EntryWithDefId {
-    entry_def_id: crate::entry_def::EntryDefId,
-    entry: crate::entry::Entry,
+pub struct CreateInput {
+    /// EntryDefId for the created entry.
+    pub entry_def_id: crate::entry_def::EntryDefId,
+    /// Entry body.
+    pub entry: crate::entry::Entry,
+    /// ChainTopBehaviour for the write.
+    pub chain_top_ordering: ChainTopOrdering,
 }
 
-impl EntryWithDefId {
+impl CreateInput {
     /// Constructor.
-    pub fn new(entry_def_id: crate::entry_def::EntryDefId, entry: crate::entry::Entry) -> Self {
+    pub fn new(
+        entry_def_id: crate::entry_def::EntryDefId,
+        entry: crate::entry::Entry,
+        chain_top_ordering: ChainTopOrdering,
+    ) -> Self {
         Self {
             entry_def_id,
             entry,
+            chain_top_ordering,
         }
+    }
+
+    /// Consume into an Entry.
+    pub fn into_entry(self) -> Entry {
+        self.entry
+    }
+
+    /// Accessor.
+    pub fn chain_top_ordering(&self) -> &ChainTopOrdering {
+        &self.chain_top_ordering
     }
 }
 
-impl AsRef<crate::Entry> for EntryWithDefId {
+impl AsRef<crate::Entry> for CreateInput {
     fn as_ref(&self) -> &crate::Entry {
         &self.entry
     }
 }
 
-impl AsRef<crate::EntryDefId> for EntryWithDefId {
+impl AsRef<crate::EntryDefId> for CreateInput {
     fn as_ref(&self) -> &crate::EntryDefId {
         &self.entry_def_id
     }
@@ -286,19 +306,38 @@ impl MustGetHeaderInput {
 pub struct UpdateInput {
     /// Header of the element being updated.
     pub original_header_address: holo_hash::HeaderHash,
-    /// Value of the update.
-    pub entry_with_def_id: EntryWithDefId,
+    /// Create portion of the update.
+    pub create_input: CreateInput,
 }
 
 impl UpdateInput {
     /// Constructor.
-    pub fn new(
-        original_header_address: holo_hash::HeaderHash,
-        entry_with_def_id: EntryWithDefId,
-    ) -> Self {
+    pub fn new(original_header_address: holo_hash::HeaderHash, create_input: CreateInput) -> Self {
         Self {
             original_header_address,
-            entry_with_def_id,
+            create_input,
+        }
+    }
+}
+
+/// Zome IO inner for delete.
+#[derive(PartialEq, Debug, Deserialize, Serialize, Clone)]
+pub struct DeleteInput {
+    /// Header of the element being deleted.
+    pub deletes_header_address: holo_hash::HeaderHash,
+    /// Chain top ordering behaviour for the delete.
+    pub chain_top_ordering: ChainTopOrdering,
+}
+
+impl DeleteInput {
+    /// Constructor.
+    pub fn new(
+        deletes_header_address: holo_hash::HeaderHash,
+        chain_top_ordering: ChainTopOrdering,
+    ) -> Self {
+        Self {
+            deletes_header_address,
+            chain_top_ordering,
         }
     }
 }

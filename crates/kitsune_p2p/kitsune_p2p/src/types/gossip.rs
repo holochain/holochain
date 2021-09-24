@@ -1,6 +1,7 @@
 use crate::types::*;
 use kitsune_p2p_types::config::*;
 use kitsune_p2p_types::tx2::tx2_api::*;
+use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use kitsune_p2p_types::*;
 use std::sync::Arc;
 
@@ -17,6 +18,7 @@ pub trait AsGossipModule: 'static + Send + Sync {
     fn incoming_gossip(
         &self,
         con: Tx2ConHnd<wire::Wire>,
+        remote_url: TxUrl,
         gossip_data: Box<[u8]>,
     ) -> KitsuneResult<()>;
     fn local_agent_join(&self, a: Arc<KitsuneAgent>);
@@ -34,9 +36,10 @@ impl GossipModule {
     pub fn incoming_gossip(
         &self,
         con: Tx2ConHnd<wire::Wire>,
+        remote_url: TxUrl,
         gossip_data: Box<[u8]>,
     ) -> KitsuneResult<()> {
-        self.0.incoming_gossip(con, gossip_data)
+        self.0.incoming_gossip(con, remote_url, gossip_data)
     }
 
     pub fn local_agent_join(&self, a: Arc<KitsuneAgent>) {
@@ -87,9 +90,9 @@ pub struct GossipTgt {
     /// In the current full-sync case, it makes sense to address gossip to all
     /// known agents on a node, but after sharding, we may make this a single
     /// agent target.
-    agents: Vec<Arc<KitsuneAgent>>,
+    pub agents: Vec<Arc<KitsuneAgent>>,
     /// The cert which represents the remote node to talk to.
-    cert: Tx2Cert,
+    pub cert: Tx2Cert,
 }
 
 impl GossipTgt {

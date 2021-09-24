@@ -190,7 +190,7 @@ impl HostFnCaller {
         entry_def_id: E,
     ) -> HeaderHash {
         let (_, ribosome, call_context, workspace_lock) = self.unpack().await;
-        let input = EntryWithDefId::new(entry_def_id.into(), entry);
+        let input = CreateInput::new(entry_def_id.into(), entry, ChainTopOrdering::default());
         let output = host_fn::create::create(ribosome, call_context, input).unwrap();
 
         // Write
@@ -199,10 +199,10 @@ impl HostFnCaller {
         output
     }
 
-    pub async fn delete_entry<'env>(&self, hash: HeaderHash) -> HeaderHash {
+    pub async fn delete_entry<'env>(&self, input: DeleteInput) -> HeaderHash {
         let (_, ribosome, call_context, workspace_lock) = self.unpack().await;
         let output = {
-            let r = host_fn::delete::delete(ribosome, call_context, hash);
+            let r = host_fn::delete::delete(ribosome, call_context, input);
             let r = r.map_err(|e| {
                 debug!(%e);
                 e
@@ -225,7 +225,7 @@ impl HostFnCaller {
         let (_, ribosome, call_context, workspace_lock) = self.unpack().await;
         let input = UpdateInput::new(
             original_header_hash,
-            EntryWithDefId::new(entry_def_id.into(), entry),
+            CreateInput::new(entry_def_id.into(), entry, ChainTopOrdering::default()),
         );
         let output = { host_fn::update::update(ribosome, call_context, input).unwrap() };
 
@@ -258,7 +258,7 @@ impl HostFnCaller {
         link_tag: LinkTag,
     ) -> HeaderHash {
         let (_, ribosome, call_context, workspace_lock) = self.unpack().await;
-        let input = CreateLinkInput::new(base, target, link_tag);
+        let input = CreateLinkInput::new(base, target, link_tag, ChainTopOrdering::default());
         let output = { host_fn::create_link::create_link(ribosome, call_context, input).unwrap() };
 
         // Write
@@ -269,8 +269,14 @@ impl HostFnCaller {
 
     pub async fn delete_link<'env>(&self, link_add_hash: HeaderHash) -> HeaderHash {
         let (_, ribosome, call_context, workspace_lock) = self.unpack().await;
-        let output =
-            { host_fn::delete_link::delete_link(ribosome, call_context, link_add_hash).unwrap() };
+        let output = {
+            host_fn::delete_link::delete_link(
+                ribosome,
+                call_context,
+                DeleteLinkInput::new(link_add_hash, ChainTopOrdering::default()),
+            )
+            .unwrap()
+        };
 
         // Write
         workspace_lock.flush(&self.network).await.unwrap();

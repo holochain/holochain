@@ -6,11 +6,14 @@ use holo_hash::hash_type::AnyDht;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
-use holochain_types::prelude::Judged;
+use holochain_keystore::KeystoreError;
+use holochain_types::prelude::*;
 use holochain_zome_types::entry::EntryHashed;
+use holochain_zome_types::ChainTopOrdering;
 use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
 use holochain_zome_types::SignedHeaderHashed;
+use holochain_zome_types::TimestampError;
 use thiserror::Error;
 
 use crate::prelude::Query;
@@ -32,6 +35,7 @@ use crate::query::Store;
 pub struct Scratch {
     headers: Vec<SignedHeaderHashed>,
     entries: HashMap<EntryHash, Arc<Entry>>,
+    chain_top_ordering: ChainTopOrdering,
 }
 
 #[derive(Debug, Clone)]
@@ -44,14 +48,29 @@ pub struct FilteredScratch {
 
 impl Scratch {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            chain_top_ordering: ChainTopOrdering::Relaxed,
+            ..Default::default()
+        }
     }
 
-    pub fn add_header(&mut self, item: SignedHeaderHashed) {
+    pub fn chain_top_ordering(&self) -> ChainTopOrdering {
+        self.chain_top_ordering
+    }
+
+    pub fn respect_chain_top_ordering(&mut self, chain_top_ordering: ChainTopOrdering) {
+        if chain_top_ordering == ChainTopOrdering::Strict {
+            self.chain_top_ordering = chain_top_ordering;
+        }
+    }
+
+    pub fn add_header(&mut self, item: SignedHeaderHashed, chain_top_ordering: ChainTopOrdering) {
+        self.respect_chain_top_ordering(chain_top_ordering);
         self.headers.push(item);
     }
 
-    pub fn add_entry(&mut self, entry_hashed: EntryHashed) {
+    pub fn add_entry(&mut self, entry_hashed: EntryHashed, chain_top_ordering: ChainTopOrdering) {
+        self.respect_chain_top_ordering(chain_top_ordering);
         let (entry, hash) = entry_hashed.into_inner();
         self.entries.insert(hash, Arc::new(entry));
     }
@@ -85,6 +104,11 @@ impl Scratch {
                 .and_then(|eh| self.entries.get(eh).map(|e| (**e).clone()));
             Element::new(shh, entry)
         })
+    }
+
+    /// Get the entries on in the scratch.
+    pub fn entries(&self) -> impl Iterator<Item = (&EntryHash, &Arc<Entry>)> {
+        self.entries.iter()
     }
 
     pub fn num_headers(&self) -> usize {
@@ -147,6 +171,7 @@ impl SyncScratch {
             .lock()
             .map_err(|_| SyncScratchError::ScratchLockPoison)?))
     }
+
     pub fn apply_and_then<T, E, F>(&self, f: F) -> Result<T, E>
     where
         E: From<SyncScratchError>,
@@ -215,6 +240,16 @@ impl StoresIter<Judged<SignedHeaderHashed>> for FilteredScratch {
             self.drain().map(Judged::valid).map(Ok),
         )))
     }
+}
+
+#[derive(Error, Debug)]
+pub enum ScratchError {
+    #[error(transparent)]
+    Timestamp(#[from] TimestampError),
+    #[error(transparent)]
+    Keystore(#[from] KeystoreError),
+    #[error(transparent)]
+    Header(#[from] HeaderError),
 }
 
 #[derive(Error, Debug)]

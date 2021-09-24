@@ -4,12 +4,12 @@ version = "0.0.1"
 description = "tests the fixturator macros in an external crate"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
-documentation = "https://github.com/holochain/holochain"
+documentation = "https://docs.rs/fixt_test"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo", "test", "fixture" ]
 categories = [ "fixtures" ]
 edition = "2018"
 
 [dependencies]
-fixt = { path = ".." ,version = "0.0.4"}
+fixt = { path = ".." ,version = "0.0.6"}
 paste = "1.0.5"

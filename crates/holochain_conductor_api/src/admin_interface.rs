@@ -92,6 +92,22 @@ pub enum AdminRequest {
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
     InstallAppBundle(Box<InstallAppBundlePayload>),
 
+    /// Uninstalls the `App` specified by argument `installed_app_id` from the conductor,
+    /// meaning that the app will be removed from the list of installed apps, and any Cells
+    /// which were referenced only by this app will be disabled and removed, clearing up
+    /// any persisted data.
+    /// Cells which are still referenced by other installed apps will not be removed.
+    ///
+    /// Will be responded to with an [`AdminResponse::AppUninstalled`]
+    /// or an [`AdminResponse::Error`]
+    ///
+    /// [`AdminResponse::AppUninstalled`]: enum.AdminResponse.html#variant.AppUninstalled
+    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
+    UninstallApp {
+        /// The InstalledAppId to uninstall
+        installed_app_id: InstalledAppId,
+    },
+
     /// List the hashes of all installed `Dna`s.
     /// Takes no arguments.
     ///
@@ -310,6 +326,13 @@ pub enum AdminResponse {
     /// [`CellId`]: ../../../holochain_types/cell/struct.CellId.html
     AppBundleInstalled(InstalledAppInfo),
 
+    /// The succesful response to an [`AdminRequest::UninstallApp`].
+    ///
+    /// It means the `App` was uninstalled successfully.
+    ///
+    /// [`AdminRequest::UninstallApp`]: enum.AdminRequest.html#variant.UninstallApp
+    AppUninstalled,
+
     /// The successful response to an [`AdminRequest::CreateCloneCell`].
     ///
     /// The response contains the [`CellId`] of the newly created clone.
@@ -460,6 +483,8 @@ pub enum ExternalApiWireError {
     ActivateApp(String),
     /// The zome call is unauthorized
     ZomeCallUnauthorized(String),
+    /// A countersigning session has failed.
+    CountersigningSessionError(String),
 }
 
 impl ExternalApiWireError {

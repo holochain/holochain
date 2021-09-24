@@ -19,8 +19,12 @@ use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::call_zome_workflow;
+use crate::core::workflow::countersigning_workflow::countersigning_success;
+use crate::core::workflow::countersigning_workflow::incoming_countersigning;
+use crate::core::workflow::countersigning_workflow::CountersigningWorkspace;
 use crate::core::workflow::genesis_workflow::genesis_workflow;
 use crate::core::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
+use crate::core::workflow::incoming_dht_ops_workflow::IncomingOpHashes;
 use crate::core::workflow::initialize_zomes_workflow;
 use crate::core::workflow::CallZomeWorkflowArgs;
 use crate::core::workflow::GenesisWorkflowArgs;
@@ -41,8 +45,9 @@ use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
-use kitsune_p2p::event::TimeWindowMs;
+use kitsune_p2p::event::TimeWindow;
 use observability::OpenSpanExt;
+use rusqlite::OptionalExtension;
 use std::hash::Hash;
 use std::hash::Hasher;
 use tokio::sync;
@@ -103,6 +108,10 @@ where
     holochain_p2p_cell: P2pCell,
     queue_triggers: QueueTriggers,
     init_mutex: tokio::sync::Mutex<()>,
+    /// Countersigning workspace that is shared across this cell.
+    countersigning_workspace: CountersigningWorkspace,
+    /// Incoming op hashes that are queued for processing.
+    incoming_op_hashes: IncomingOpHashes,
 }
 
 impl Cell {
@@ -132,6 +141,8 @@ impl Cell {
         };
 
         if has_genesis {
+            let incoming_op_hashes = IncomingOpHashes::default();
+            let countersigning_workspace = CountersigningWorkspace::new();
             let (queue_triggers, initial_queue_triggers) = spawn_queue_consumer_tasks(
                 env.clone(),
                 cache.clone(),
@@ -140,6 +151,7 @@ impl Cell {
                 conductor_api.clone(),
                 managed_task_add_sender,
                 managed_task_stop_broadcaster,
+                countersigning_workspace.clone(),
             )
             .await;
 
@@ -152,6 +164,8 @@ impl Cell {
                     holochain_p2p_cell,
                     queue_triggers,
                     init_mutex: Default::default(),
+                    countersigning_workspace,
+                    incoming_op_hashes,
                 },
                 initial_queue_triggers,
             ))
@@ -268,13 +282,14 @@ impl Cell {
                 span_context,
                 respond,
                 request_validation_receipt,
+                countersigning_session,
                 ops,
                 ..
             } => {
                 async {
                     tracing::Span::set_current_context(span_context);
                     let res = self
-                        .handle_publish(request_validation_receipt, ops)
+                        .handle_publish(request_validation_receipt, countersigning_session, ops)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
@@ -415,6 +430,21 @@ impl Cell {
                 .instrument(debug_span!("cell_handle_sign_network_data"))
                 .await;
             }
+            CountersigningAuthorityResponse {
+                respond,
+                signed_headers,
+                ..
+            } => {
+                async {
+                    let res = self
+                        .handle_countersigning_authority_response(signed_headers)
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::other);
+                    respond.respond(Ok(async move { res }.boxed().into()));
+                }
+                .instrument(debug_span!("cell_handle_countersigning_response"))
+                .await;
+            }
         }
         Ok(())
     }
@@ -424,19 +454,52 @@ impl Cell {
     async fn handle_publish(
         &self,
         request_validation_receipt: bool,
+        countersigning_session: bool,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> CellResult<()> {
-        incoming_dht_ops_workflow(
-            &self.env,
-            self.queue_triggers.sys_validation.clone(),
-            ops,
-            request_validation_receipt,
+        // If this is a countersigning session then
+        // send it to the countersigning workflow otherwise
+        // send it to the incoming ops workflow.
+        if countersigning_session {
+            incoming_countersigning(
+                ops,
+                &self.countersigning_workspace,
+                self.queue_triggers.countersigning.clone(),
+            )
+            .map_err(Box::new)
+            .map_err(ConductorApiError::from)
+            .map_err(Box::new)?;
+        } else {
+            incoming_dht_ops_workflow(
+                &self.env,
+                Some(&self.incoming_op_hashes),
+                self.queue_triggers.sys_validation.clone(),
+                ops,
+                request_validation_receipt,
+            )
+            .await
+            .map_err(Box::new)
+            .map_err(ConductorApiError::from)
+            .map_err(Box::new)?;
+        }
+        Ok(())
+    }
+    #[instrument(skip(self, signed_headers))]
+    /// we are receiving a response from a countersigning authority
+    async fn handle_countersigning_authority_response(
+        &self,
+        signed_headers: Vec<SignedHeader>,
+    ) -> CellResult<()> {
+        Ok(countersigning_success(
+            self.env.clone(),
+            &self.holochain_p2p_cell,
+            self.id.agent_pubkey().clone(),
+            signed_headers,
+            self.queue_triggers.publish_dht_ops.clone(),
+            self.conductor_api.signal_broadcaster().await,
         )
         .await
-        .map_err(Box::new)
-        .map_err(ConductorApiError::from)
-        .map_err(Box::new)?;
-        Ok(())
+        .map_err(Box::new)?)
     }
 
     #[instrument(skip(self))]
@@ -575,14 +638,71 @@ impl Cell {
     }
 
     /// a remote agent is sending us a validation receipt.
-    #[tracing::instrument(skip(self))]
+    #[tracing::instrument(skip(self, receipt))]
     async fn handle_validation_receipt(&self, receipt: SerializedBytes) -> CellResult<()> {
         let receipt: SignedValidationReceipt = receipt.try_into()?;
+        tracing::debug!(from = ?receipt.receipt.validator, to = ?self.id.agent_pubkey(), hash = ?receipt.receipt.dht_op_hash);
+
+        // Get the header for this op so we can check the entry type.
+        let header: Option<SignedHeader> = fresh_reader!(self.env, |txn| {
+            let h: Option<Vec<u8>> = txn
+                .query_row(
+                    "SELECT Header.blob as header_blob
+                    FROM DhtOp
+                    JOIN Header ON Header.hash = DhtOp.header_hash
+                    WHERE DhtOp.hash = :hash",
+                    named_params! {
+                        ":hash": receipt.receipt.dht_op_hash,
+                    },
+                    |row| row.get("header_blob"),
+                )
+                .optional()?;
+            match h {
+                Some(h) => from_blob(h),
+                None => Ok(None),
+            }
+        })?;
+
+        // If the header has an app entry type get the entry def
+        // from the conductor.
+        let required_receipt_count = match header.as_ref().and_then(|h| h.0.entry_type()) {
+            Some(EntryType::App(entry_type)) => {
+                let zome_index = u8::from(entry_type.zome_id()) as usize;
+                let dna_file = self.conductor_api.get_this_dna().await.map_err(Box::new)?;
+                let zome = dna_file.dna().zomes.get(zome_index).map(|(_, z)| z.clone());
+                match zome {
+                    Some(zome) => self
+                        .conductor_api
+                        .get_entry_def(&EntryDefBufferKey::new(zome, entry_type.id()))
+                        .await
+                        .map(|e| u8::from(e.required_validations)),
+                    None => None,
+                }
+            }
+            _ => None,
+        };
+
+        // If no required receipt count was found then fallback to the default.
+        let required_validation_count = required_receipt_count.unwrap_or(
+            crate::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE,
+        );
 
         self.env
             .async_commit(move |txn| {
-                // Update receipt count.
-                add_one_receipt_count(txn, &receipt.receipt.dht_op_hash)?;
+                // Get the current count for this dhtop.
+                let receipt_count: usize = txn.query_row(
+                    "SELECT COUNT(rowid) FROM ValidationReceipt WHERE op_hash = :op_hash",
+                    named_params! {
+                        ":op_hash": receipt.receipt.dht_op_hash,
+                    },
+                    |row| row.get(0),
+                )?;
+
+                // If we have enough receipts then set receipts to complete.
+                if receipt_count >= required_validation_count as usize {
+                    set_receipts_complete(txn, &receipt.receipt.dht_op_hash, true)?;
+                }
+
                 // Add to receipts db
                 validation_receipts::add_if_unique(txn, receipt)
             })
@@ -597,14 +717,14 @@ impl Cell {
     pub(super) async fn handle_query_op_hashes(
         &self,
         dht_arc_set: DhtArcSet,
-        window_ms: TimeWindowMs,
+        window: TimeWindow,
         include_limbo: bool,
-    ) -> CellResult<Vec<(DhtOpHash, u64)>> {
+    ) -> CellResult<Vec<(DhtOpHash, Timestamp)>> {
         let mut results = Vec::new();
 
         // The exclusive window bounds.
-        let start = clamp64(window_ms.start);
-        let end = clamp64(window_ms.end);
+        let start = window.start;
+        let end = window.end;
 
         let full = if include_limbo {
             holochain_sqlite::sql::sql_cell::any::FETCH_OP_HASHES_FULL
@@ -637,7 +757,7 @@ impl Cell {
                                     ":from": start,
                                     ":to": end,
                                 },
-                                |row| Ok((row.get("hash")?, row.get("authored_timestamp_ms")?)),
+                                |row| Ok((row.get("hash")?, row.get("authored_timestamp")?)),
                             )?
                             .collect::<rusqlite::Result<Vec<_>>>()?,
                         ArcInterval::Bounded(start_loc, end_loc) => {
@@ -654,7 +774,7 @@ impl Cell {
                                         ":storage_start_loc": start_loc,
                                         ":storage_end_loc": end_loc,
                                     },
-                                    |row| Ok((row.get("hash")?, row.get("authored_timestamp_ms")?)),
+                                    |row| Ok((row.get("hash")?, row.get("authored_timestamp")?)),
                                 )?
                                 .collect::<rusqlite::Result<Vec<_>>>()?
                         }

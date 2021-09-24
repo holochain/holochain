@@ -34,9 +34,9 @@ pub trait HdkT: Send + Sync {
     fn sign_ephemeral(&self, sign_ephemeral: SignEphemeral) -> ExternResult<EphemeralSignatures>;
     fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool>;
     // Entry
-    fn create(&self, entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash>;
+    fn create(&self, create_input: CreateInput) -> ExternResult<HeaderHash>;
     fn update(&self, update_input: UpdateInput) -> ExternResult<HeaderHash>;
-    fn delete(&self, hash: HeaderHash) -> ExternResult<HeaderHash>;
+    fn delete(&self, delete_input: DeleteInput) -> ExternResult<HeaderHash>;
     fn hash_entry(&self, entry: Entry) -> ExternResult<EntryHash>;
     fn get(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Element>>>;
     fn get_details(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Details>>>;
@@ -62,7 +62,7 @@ pub trait HdkT: Send + Sync {
     fn call_info(&self, call_info_input: ()) -> ExternResult<CallInfo>;
     // Link
     fn create_link(&self, create_link_input: CreateLinkInput) -> ExternResult<HeaderHash>;
-    fn delete_link(&self, add_link_header: HeaderHash) -> ExternResult<HeaderHash>;
+    fn delete_link(&self, delete_link_input: DeleteLinkInput) -> ExternResult<HeaderHash>;
     fn get_links(&self, get_links_input: Vec<GetLinksInput>) -> ExternResult<Vec<Links>>;
     fn get_link_details(
         &self,
@@ -77,7 +77,7 @@ pub trait HdkT: Send + Sync {
     fn random_bytes(&self, number_of_bytes: u32) -> ExternResult<Bytes>;
     // Time
     fn sys_time(&self, sys_time_input: ()) -> ExternResult<Timestamp>;
-    fn schedule(&self, execute_after: std::time::Duration) -> ExternResult<()>;
+    fn schedule(&self, scheduled_fn: String) -> ExternResult<()>;
     fn sleep(&self, wake_after: std::time::Duration) -> ExternResult<()>;
     // Trace
     fn trace(&self, trace_msg: TraceMsg) -> ExternResult<()>;
@@ -128,13 +128,13 @@ impl HdkT for ErrHdk {
     fn verify_signature(&self, _: VerifySignature) -> ExternResult<bool> {
         Self::err()
     }
-    fn create(&self, _: EntryWithDefId) -> ExternResult<HeaderHash> {
+    fn create(&self, _: CreateInput) -> ExternResult<HeaderHash> {
         Self::err()
     }
     fn update(&self, _: UpdateInput) -> ExternResult<HeaderHash> {
         Self::err()
     }
-    fn delete(&self, _: HeaderHash) -> ExternResult<HeaderHash> {
+    fn delete(&self, _: DeleteInput) -> ExternResult<HeaderHash> {
         Self::err()
     }
     fn hash_entry(&self, _: Entry) -> ExternResult<EntryHash> {
@@ -181,7 +181,7 @@ impl HdkT for ErrHdk {
     fn create_link(&self, _: CreateLinkInput) -> ExternResult<HeaderHash> {
         Self::err()
     }
-    fn delete_link(&self, _: HeaderHash) -> ExternResult<HeaderHash> {
+    fn delete_link(&self, _: DeleteLinkInput) -> ExternResult<HeaderHash> {
         Self::err()
     }
     fn get_links(&self, _: Vec<GetLinksInput>) -> ExternResult<Vec<Links>> {
@@ -211,7 +211,7 @@ impl HdkT for ErrHdk {
     fn sys_time(&self, _: ()) -> ExternResult<Timestamp> {
         Self::err()
     }
-    fn schedule(&self, _: std::time::Duration) -> ExternResult<()> {
+    fn schedule(&self, _: String) -> ExternResult<()> {
         Self::err()
     }
     fn sleep(&self, _: std::time::Duration) -> ExternResult<()> {
@@ -281,14 +281,14 @@ impl HdkT for HostHdk {
     fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool> {
         host_call::<VerifySignature, bool>(__verify_signature, verify_signature)
     }
-    fn create(&self, entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
-        host_call::<EntryWithDefId, HeaderHash>(__create, entry_with_def_id)
+    fn create(&self, create_input: CreateInput) -> ExternResult<HeaderHash> {
+        host_call::<CreateInput, HeaderHash>(__create, create_input)
     }
     fn update(&self, update_input: UpdateInput) -> ExternResult<HeaderHash> {
         host_call::<UpdateInput, HeaderHash>(__update, update_input)
     }
-    fn delete(&self, hash: HeaderHash) -> ExternResult<HeaderHash> {
-        host_call::<HeaderHash, HeaderHash>(__delete, hash)
+    fn delete(&self, hash: DeleteInput) -> ExternResult<HeaderHash> {
+        host_call::<DeleteInput, HeaderHash>(__delete, hash)
     }
     fn hash_entry(&self, entry: Entry) -> ExternResult<EntryHash> {
         host_call::<Entry, EntryHash>(__hash_entry, entry)
@@ -348,8 +348,8 @@ impl HdkT for HostHdk {
     fn create_link(&self, create_link_input: CreateLinkInput) -> ExternResult<HeaderHash> {
         host_call::<CreateLinkInput, HeaderHash>(__create_link, create_link_input)
     }
-    fn delete_link(&self, add_link_header: HeaderHash) -> ExternResult<HeaderHash> {
-        host_call::<HeaderHash, HeaderHash>(__delete_link, add_link_header)
+    fn delete_link(&self, delete_link_input: DeleteLinkInput) -> ExternResult<HeaderHash> {
+        host_call::<DeleteLinkInput, HeaderHash>(__delete_link, delete_link_input)
     }
     fn get_links(&self, get_links_input: Vec<GetLinksInput>) -> ExternResult<Vec<Links>> {
         host_call::<Vec<GetLinksInput>, Vec<Links>>(__get_links, get_links_input)
@@ -378,8 +378,8 @@ impl HdkT for HostHdk {
     fn sys_time(&self, _: ()) -> ExternResult<Timestamp> {
         host_call::<(), Timestamp>(__sys_time, ())
     }
-    fn schedule(&self, execute_after: std::time::Duration) -> ExternResult<()> {
-        host_call::<std::time::Duration, ()>(__schedule, execute_after)
+    fn schedule(&self, scheduled_fn: String) -> ExternResult<()> {
+        host_call::<String, ()>(__schedule, scheduled_fn)
     }
     fn sleep(&self, wake_after: std::time::Duration) -> ExternResult<()> {
         host_call::<std::time::Duration, ()>(__sleep, wake_after)

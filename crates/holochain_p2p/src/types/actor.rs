@@ -219,6 +219,7 @@ ghost_actor::ghost_chan! {
             dna_hash: DnaHash,
             from_agent: AgentPubKey,
             request_validation_receipt: bool,
+            countersigning_session: bool,
             dht_hash: holo_hash::AnyDhtHash,
             ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
             timeout_ms: Option<u64>,
@@ -268,6 +269,15 @@ ghost_actor::ghost_chan! {
 
         /// Check if an agent is an authority for a hash.
         fn authority_for_hash(dna_hash: DnaHash, from_agent: AgentPubKey, dht_hash: AnyDhtHash) -> bool;
+
+        /// Response from an authority to agents that are
+        /// part of a session.
+        fn countersigning_authority_response(
+            dna_hash: DnaHash,
+            from_agent: AgentPubKey,
+            agents: Vec<AgentPubKey>,
+            signed_headers: Vec<SignedHeader>,
+        ) -> ();
     }
 }
 

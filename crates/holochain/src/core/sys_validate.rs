@@ -16,8 +16,8 @@ pub(super) use error::*;
 pub use holo_hash::*;
 pub use holochain_state::source_chain::SourceChainError;
 pub use holochain_state::source_chain::SourceChainResult;
-pub use holochain_types::Timestamp;
 pub use holochain_zome_types::HeaderHashed;
+pub use holochain_zome_types::Timestamp;
 
 #[allow(missing_docs)]
 mod error;
@@ -53,11 +53,12 @@ pub async fn author_key_is_valid(_author: &AgentPubKey) -> SysValidationResult<(
 
 /// Verify the countersigning session contains the specified header.
 pub fn check_countersigning_session_data_contains_header(
+    entry_hash: EntryHash,
     session_data: &CounterSigningSessionData,
     header: NewEntryHeaderRef<'_>,
 ) -> SysValidationResult<()> {
     let header_is_in_session = session_data
-        .build_header_set()
+        .build_header_set(entry_hash)
         .map_err(SysValidationError::from)?
         .iter()
         .any(|session_header| match (&header, session_header) {
@@ -115,11 +116,12 @@ pub async fn check_countersigning_preflight_response_signature(
 
 /// Verify all the countersigning session data together.
 pub async fn check_countersigning_session_data(
+    entry_hash: EntryHash,
     session_data: &CounterSigningSessionData,
     header: NewEntryHeaderRef<'_>,
 ) -> SysValidationResult<()> {
     session_data.check_integrity()?;
-    check_countersigning_session_data_contains_header(session_data, header)?;
+    check_countersigning_session_data_contains_header(entry_hash, session_data, header)?;
 
     let tasks: Vec<_> = session_data
         .responses()
@@ -211,7 +213,7 @@ pub async fn check_spam(_header: &Header) -> SysValidationResult<()> {
 
 /// Check previous header timestamp is before this header
 pub fn check_prev_timestamp(header: &Header, prev_header: &Header) -> SysValidationResult<()> {
-    if header.timestamp() >= prev_header.timestamp() {
+    if header.timestamp() > prev_header.timestamp() {
         Ok(())
     } else {
         Err(PrevHeaderError::Timestamp).map_err(|e| ValidationOutcome::from(e).into())
@@ -514,7 +516,7 @@ impl IncomingDhtOpSender {
     ) -> SysValidationResult<()> {
         if let Some(op) = make_op(element) {
             let ops = vec![op];
-            incoming_dht_ops_workflow(&self.env, self.sys_validation_trigger, ops, false)
+            incoming_dht_ops_workflow(&self.env, None, self.sys_validation_trigger, ops, false)
                 .await
                 .map_err(Box::new)?;
         }

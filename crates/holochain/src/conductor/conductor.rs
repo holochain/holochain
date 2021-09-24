@@ -46,6 +46,7 @@ use futures::future;
 use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
 use holo_hash::DnaHash;
+use holochain_conductor_api::conductor::PassphraseServiceConfig;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::IntegrationStateDump;
@@ -156,6 +157,9 @@ where
 
     /// Handle to the network actor.
     holochain_p2p: holochain_p2p::HolochainP2pRef,
+
+    /// Database sync level
+    db_sync_level: DbSyncLevel,
 }
 
 impl Conductor {
@@ -466,81 +470,17 @@ where
         }
     }
 
-    /// Perform Genesis on the source chains for each of the specified CellIds.
-    ///
-    /// If genesis fails for any cell, this entire function fails, and all other
-    /// partial or complete successes are rolled back.
-    pub(super) async fn genesis_cells(
-        &self,
-        cell_ids_with_proofs: Vec<(CellId, Option<MembraneProof>)>,
-        conductor_handle: ConductorHandle,
-    ) -> ConductorResult<()> {
-        let root_env_dir = std::path::PathBuf::from(self.root_env_dir.clone());
-
-        let cells_tasks = cell_ids_with_proofs
-            .into_iter()
-            .map(|(cell_id, proof)| async {
-                let root_env_dir = root_env_dir.clone();
-                let keystore = self.keystore.clone();
-                let conductor_handle = conductor_handle.clone();
-                let cell_id_inner = cell_id.clone();
-                let ribosome = conductor_handle
-                    .get_ribosome(cell_id.dna_hash())
-                    .await
-                    .map_err(Box::new)?;
-                tokio::spawn(async move {
-                    let env = EnvWrite::open(
-                        &root_env_dir,
-                        DbKind::Cell(cell_id_inner.clone()),
-                        keystore.clone(),
-                    )?;
-                    Cell::genesis(cell_id_inner, conductor_handle, env, ribosome, proof).await
-                })
-                .map_err(CellError::from)
-                .and_then(|result| async move { result.map(|_| cell_id) })
-                .await
-            });
-        let (success, errors): (Vec<_>, Vec<_>) = futures::future::join_all(cells_tasks)
-            .await
-            .into_iter()
-            .partition(Result::is_ok);
-
-        // unwrap safe because of the partition
-        let success = success.into_iter().map(Result::unwrap);
-
-        // If there were errors, cleanup and return the errors
-        if !errors.is_empty() {
-            for cell_id in success {
-                let db = DbWrite::open(&root_env_dir, DbKind::Cell(cell_id))?;
-                db.remove().await?;
-            }
-
-            // match needed to avoid Debug requirement on unwrap_err
-            let errors = errors
-                .into_iter()
-                .map(|e| match e {
-                    Err(e) => e,
-                    Ok(_) => unreachable!("Safe because of the partition"),
-                })
-                .collect();
-
-            Err(ConductorError::GenesisFailed { errors })
-        } else {
-            // No errors so return the cells
-            Ok(())
-        }
-    }
-
     fn get_or_create_cache(&self, dna_hash: &DnaHash) -> ConductorResult<EnvWrite> {
         let mut caches = self.caches.lock();
         match caches.get(dna_hash) {
             Some(env) => Ok(env.clone()),
             None => {
                 let dir = self.root_env_dir.clone();
-                let env = EnvWrite::open(
+                let env = EnvWrite::open_with_sync_level(
                     dir.as_ref(),
                     DbKind::Cache(dna_hash.clone()),
                     self.keystore.clone(),
+                    self.db_sync_level,
                 )?;
                 caches.insert(dna_hash.clone(), env.clone());
                 Ok(env)
@@ -678,16 +618,18 @@ where
             let root_env_dir = root_env_dir.clone();
             let keystore = keystore.clone();
             let conductor_handle = conductor_handle.clone();
+            let db_sync_level = self.db_sync_level;
             async move {
                 use holochain_p2p::actor::HolochainP2pRefToCell;
                 let holochain_p2p_cell = self
                     .holochain_p2p
                     .to_cell(cell_id.dna_hash().clone(), cell_id.agent_pubkey().clone());
 
-                let env = EnvWrite::open(
+                let env = EnvWrite::open_with_sync_level(
                     &root_env_dir,
                     DbKind::Cell(cell_id.clone()),
                     keystore.clone(),
+                    db_sync_level,
                 )
                 .map_err(|err| (cell_id.clone(), err.into()))?;
 
@@ -734,7 +676,7 @@ where
     #[tracing::instrument(skip(self))]
     pub(super) async fn transition_app_status(
         &mut self,
-        app_id: &InstalledAppId,
+        app_id: InstalledAppId,
         transition: AppStatusTransition,
     ) -> ConductorResult<(InstalledApp, AppStatusFx)> {
         Ok(self
@@ -796,37 +738,41 @@ where
     /// Associate a Cell with an existing App
     pub(super) async fn add_clone_cell_to_app(
         &mut self,
-        app_id: &InstalledAppId,
-        slot_id: &SlotId,
+        app_id: InstalledAppId,
+        slot_id: SlotId,
         properties: YamlProperties,
     ) -> ConductorResult<CellId> {
         let dna_store = &self.dna_store;
-        let (_, child_dna) = self
-            .update_state_prime(move |mut state| {
-                if let Some(app) = state.installed_apps_mut().get_mut(app_id) {
-                    let slot = app
-                        .slots()
-                        .get(slot_id)
-                        .ok_or_else(|| AppError::SlotIdMissing(slot_id.to_owned()))?;
-                    let parent_dna_hash = slot.dna_hash();
-                    let dna = dna_store
-                        .get(parent_dna_hash)
-                        .ok_or_else(|| DnaError::DnaMissing(parent_dna_hash.to_owned()))?
-                        .modify_phenotype(random_uid(), properties)?;
-                    Ok((state, dna))
-                } else {
-                    Err(ConductorError::AppNotRunning(app_id.clone()))
+        let (_, parent_dna_hash) = self
+            .update_state_prime({
+                let app_id = app_id.clone();
+                let slot_id = slot_id.clone();
+                move |mut state| {
+                    if let Some(app) = state.installed_apps_mut().get_mut(&app_id) {
+                        let slot = app
+                            .slots()
+                            .get(&slot_id)
+                            .ok_or_else(|| AppError::SlotIdMissing(slot_id.to_owned()))?;
+                        let parent_dna_hash = slot.dna_hash().clone();
+                        Ok((state, parent_dna_hash))
+                    } else {
+                        Err(ConductorError::AppNotRunning(app_id.clone()))
+                    }
                 }
             })
             .await?;
+        let child_dna = dna_store
+            .get(&parent_dna_hash)
+            .ok_or_else(|| DnaError::DnaMissing(parent_dna_hash.to_owned()))?
+            .modify_phenotype(random_uid(), properties)?;
         let child_dna_hash = child_dna.dna_hash().to_owned();
         self.register_phenotype(child_dna).await?;
         let (_, cell_id) = self
-            .update_state_prime(|mut state| {
-                if let Some(app) = state.installed_apps_mut().get_mut(app_id) {
-                    let agent_key = app.slot(slot_id)?.agent_key().to_owned();
+            .update_state_prime(move |mut state| {
+                if let Some(app) = state.installed_apps_mut().get_mut(&app_id) {
+                    let agent_key = app.slot(&slot_id)?.agent_key().to_owned();
                     let cell_id = CellId::new(child_dna_hash, agent_key);
-                    app.add_clone(slot_id, cell_id.clone())?;
+                    app.add_clone(&slot_id, cell_id.clone())?;
                     Ok((state, cell_id))
                 } else {
                     Err(ConductorError::AppNotRunning(app_id.clone()))
@@ -847,24 +793,52 @@ where
         // Load out all dna defs
         let (wasm_tasks, defs) = env
             .async_reader(move |txn| {
-                let wasm_tasks = holochain_state::dna_def::get_all(&txn)?
+                // Get all the dna defs.
+                let dna_defs: Vec<_> = holochain_state::dna_def::get_all(&txn)?
                     .into_iter()
-                    .map(|dna_def| {
-                        // Load all wasms for each dna_def from the wasm db into memory
-                        let wasms = dna_def.zomes.clone().into_iter().map(|(zome_name, zome)| {
-                            let wasm_hash = zome.wasm_hash(&zome_name)?;
-                            holochain_state::wasm::get(&txn, &wasm_hash)?
-                                .map(|hashed| hashed.into_content())
-                                .ok_or(ConductorError::WasmMissing)
-                        });
-                        let wasms = wasms.collect::<ConductorResult<Vec<_>>>();
-                        async move {
-                            let dna_file = DnaFile::new(dna_def.into_content(), wasms?).await?;
-                            ConductorResult::Ok((dna_file.dna_hash().clone(), dna_file))
-                        }
+                    .collect();
+
+                // Gather all the unique wasms.
+                let unique_wasms = dna_defs
+                    .iter()
+                    .flat_map(|dna_def| {
+                        dna_def
+                            .zomes
+                            .iter()
+                            .map(|(zome_name, zome)| Ok(zome.wasm_hash(&zome_name)?))
                     })
-                    // This needs to happen due to the environment not being Send
-                    .collect::<Vec<_>>();
+                    .collect::<ConductorResult<HashSet<_>>>()?;
+
+                // Get the code for each unique wasm.
+                let wasms = unique_wasms
+                    .into_iter()
+                    .map(|wasm_hash| {
+                        holochain_state::wasm::get(&txn, &wasm_hash)?
+                            .map(|hashed| hashed.into_content())
+                            .ok_or(ConductorError::WasmMissing)
+                            .map(|wasm| (wasm_hash, wasm))
+                    })
+                    .collect::<ConductorResult<HashMap<_, _>>>()?;
+                let wasm_tasks =
+                    holochain_state::dna_def::get_all(&txn)?
+                        .into_iter()
+                        .map(|dna_def| {
+                            // Load all wasms for each dna_def from the wasm db into memory
+                            let wasms = dna_def.zomes.clone().into_iter().filter_map(
+                                |(zome_name, zome)| {
+                                    let wasm_hash = zome.wasm_hash(&zome_name).ok()?;
+                                    // Note this is a cheap arc clone.
+                                    wasms.get(&wasm_hash).cloned()
+                                },
+                            );
+                            let wasms = wasms.collect::<Vec<_>>();
+                            async move {
+                                let dna_file = DnaFile::new(dna_def.into_content(), wasms).await?;
+                                ConductorResult::Ok((dna_file.dna_hash().clone(), dna_file))
+                            }
+                        })
+                        // This needs to happen due to the environment not being Send
+                        .collect::<Vec<_>>();
                 let defs = holochain_state::entry_def::get_all(&txn)?;
                 ConductorResult::Ok((wasm_tasks, defs))
             })
@@ -872,6 +846,16 @@ where
         // try to join all the tasks and return the list of dna files
         let dnas = futures::future::try_join_all(wasm_tasks).await?;
         Ok((dnas, defs))
+    }
+
+    /// Get the root environment directory.
+    pub fn root_env_dir(&self) -> &EnvironmentRootPath {
+        &self.root_env_dir
+    }
+
+    /// Get the keystore.
+    pub fn keystore(&self) -> &KeystoreSender {
+        &self.keystore
     }
 
     /// Remove cells from the cell map in the Conductor
@@ -1050,6 +1034,74 @@ where
     }
 }
 
+/// Perform Genesis on the source chains for each of the specified CellIds.
+///
+/// If genesis fails for any cell, this entire function fails, and all other
+/// partial or complete successes are rolled back.
+/// Note this function takes read locks so should not be called from within a read lock.
+pub(super) async fn genesis_cells(
+    root_env_dir: PathBuf,
+    keystore: KeystoreSender,
+    cell_ids_with_proofs: Vec<(CellId, Option<MembraneProof>)>,
+    conductor_handle: ConductorHandle,
+    db_sync_level: DbSyncLevel,
+) -> ConductorResult<()> {
+    let cells_tasks = cell_ids_with_proofs
+        .into_iter()
+        .map(|(cell_id, proof)| async {
+            let root_env_dir = root_env_dir.clone();
+            let keystore = keystore.clone();
+            let conductor_handle = conductor_handle.clone();
+            let cell_id_inner = cell_id.clone();
+            let ribosome = conductor_handle
+                .get_ribosome(cell_id.dna_hash())
+                .await
+                .map_err(Box::new)?;
+            tokio::spawn(async move {
+                let env = EnvWrite::open_with_sync_level(
+                    &root_env_dir,
+                    DbKind::Cell(cell_id_inner.clone()),
+                    keystore.clone(),
+                    db_sync_level,
+                )?;
+                Cell::genesis(cell_id_inner, conductor_handle, env, ribosome, proof).await
+            })
+            .map_err(CellError::from)
+            .and_then(|result| async move { result.map(|_| cell_id) })
+            .await
+        });
+    let (success, errors): (Vec<_>, Vec<_>) = futures::future::join_all(cells_tasks)
+        .await
+        .into_iter()
+        .partition(Result::is_ok);
+
+    // unwrap safe because of the partition
+    let success = success.into_iter().map(Result::unwrap);
+
+    // If there were errors, cleanup and return the errors
+    if !errors.is_empty() {
+        for cell_id in success {
+            let db =
+                DbWrite::open_with_sync_level(&root_env_dir, DbKind::Cell(cell_id), db_sync_level)?;
+            db.remove().await?;
+        }
+
+        // match needed to avoid Debug requirement on unwrap_err
+        let errors = errors
+            .into_iter()
+            .map(|e| match e {
+                Err(e) => e,
+                Ok(_) => unreachable!("Safe because of the partition"),
+            })
+            .collect();
+
+        Err(ConductorError::GenesisFailed { errors })
+    } else {
+        // No errors so return the cells
+        Ok(())
+    }
+}
+
 /// Dump the integration json state.
 pub async fn integration_dump(vault: &EnvRead) -> ConductorApiResult<IntegrationStateDump> {
     vault
@@ -1102,6 +1154,7 @@ where
         keystore: KeystoreSender,
         root_env_dir: EnvironmentRootPath,
         holochain_p2p: holochain_p2p::HolochainP2pRef,
+        db_sync_level: DbSyncLevel,
     ) -> ConductorResult<Self> {
         Ok(Self {
             conductor_env: env,
@@ -1116,6 +1169,7 @@ where
             keystore,
             root_env_dir,
             holochain_p2p,
+            db_sync_level,
         })
     }
 
@@ -1148,13 +1202,13 @@ where
     /// this function
     async fn update_state_prime<F, O>(&self, f: F) -> ConductorResult<(ConductorState, O)>
     where
-        F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)>,
-        O: Send,
+        F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)> + Send + 'static,
+        O: Send + 'static,
     {
         self.check_running()?;
         let output = self
             .conductor_env
-            .async_commit_in_place(move |txn| {
+            .async_commit(move |txn| {
                 let state = txn
                     .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
                         row.get("blob")
@@ -1269,15 +1323,34 @@ mod builder {
                     .unwrap();
                 keystore
             } else {
-                spawn_lair_keystore(self.config.keystore_path.as_deref()).await?
+                let passphrase = match &self.config.passphrase_service {
+                    PassphraseServiceConfig::DangerInsecureFromConfig { passphrase } => {
+                        tracing::warn!("USING INSECURE PASSPHRASE FROM CONFIG--This defeats the whole purpose of having a passphrase. (unfortunately, there isn't another option at the moment).");
+                        // TODO - use `new_mem_locked` when we have a secure source
+                        sodoken::BufRead::new_no_lock(passphrase.as_bytes())
+                    }
+                    oth => {
+                        panic!("We don't support this passphrase_service yet: {:?}", oth);
+                    }
+                };
+
+                spawn_lair_keystore(self.config.keystore_path.as_deref(), passphrase).await?
             };
             let env_path = self.config.environment_path.clone();
 
-            let environment =
-                EnvWrite::open(env_path.as_ref(), DbKind::Conductor, keystore.clone())?;
+            let environment = EnvWrite::open_with_sync_level(
+                env_path.as_ref(),
+                DbKind::Conductor,
+                keystore.clone(),
+                self.config.db_sync_level,
+            )?;
 
-            let wasm_environment =
-                EnvWrite::open(env_path.as_ref(), DbKind::Wasm, keystore.clone())?;
+            let wasm_environment = EnvWrite::open_with_sync_level(
+                env_path.as_ref(),
+                DbKind::Wasm,
+                keystore.clone(),
+                self.config.db_sync_level,
+            )?;
 
             #[cfg(any(test, feature = "test_utils"))]
             let state = self.state;
@@ -1308,6 +1381,7 @@ mod builder {
                 keystore,
                 env_path,
                 holochain_p2p,
+                config.db_sync_level,
             )
             .await?;
 
@@ -1324,6 +1398,7 @@ mod builder {
                 conductor: RwLock::new(conductor),
                 keystore,
                 holochain_p2p,
+                db_sync_level: config.db_sync_level,
 
                 #[cfg(any(test, feature = "test_utils"))]
                 skip_publish: std::sync::atomic::AtomicBool::new(false),
@@ -1412,6 +1487,7 @@ mod builder {
                 keystore,
                 self.config.environment_path.clone(),
                 holochain_p2p,
+                self.config.db_sync_level,
             )
             .await?;
 
@@ -1429,6 +1505,7 @@ mod builder {
                 holochain_p2p,
                 p2p_env: envs.p2p(),
                 p2p_metrics_env: envs.p2p_metrics(),
+                db_sync_level: self.config.db_sync_level,
                 #[cfg(any(test, feature = "test_utils"))]
                 skip_publish: std::sync::atomic::AtomicBool::new(false),
             });

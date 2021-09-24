@@ -21,11 +21,11 @@ use holochain_types::link::WireLinkKey;
 use holochain_types::link::WireLinkOps;
 use holochain_types::metadata::MetadataSet;
 use holochain_types::prelude::ValidationPackageResponse;
-use holochain_types::timestamp;
 use holochain_zome_types::HeaderHashed;
 use holochain_zome_types::QueryFilter;
 use holochain_zome_types::SignedHeader;
 use holochain_zome_types::SignedHeaderHashed;
+use holochain_zome_types::Timestamp;
 use holochain_zome_types::TryInto;
 use holochain_zome_types::ValidationStatus;
 
@@ -191,6 +191,7 @@ impl HolochainP2pCellT for PassThroughNetwork {
     async fn publish(
         &self,
         _request_validation_receipt: bool,
+        _countersigning_session: bool,
         _dht_hash: holo_hash::AnyDhtHash,
         _ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
         _timeout_ms: Option<u64>,
@@ -202,6 +203,14 @@ impl HolochainP2pCellT for PassThroughNetwork {
         &self,
         _to_agent: AgentPubKey,
         _receipt: holochain_serialized_bytes::SerializedBytes,
+    ) -> actor::HolochainP2pResult<()> {
+        todo!()
+    }
+
+    async fn countersigning_authority_response(
+        &self,
+        _agents: Vec<AgentPubKey>,
+        _response: Vec<holochain_zome_types::SignedHeader>,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
@@ -218,7 +227,7 @@ pub fn fill_db(env: &EnvWrite, op: DhtOpHashed) {
             let hash = op.as_hash().clone();
             insert_op(txn, op, false).unwrap();
             set_validation_status(txn, hash.clone(), ValidationStatus::Valid).unwrap();
-            set_when_integrated(txn, hash, timestamp::now()).unwrap();
+            set_when_integrated(txn, hash, Timestamp::now()).unwrap();
             DatabaseResult::Ok(())
         })
         .unwrap();
@@ -231,7 +240,7 @@ pub fn fill_db_rejected(env: &EnvWrite, op: DhtOpHashed) {
             let hash = op.as_hash().clone();
             insert_op(txn, op, false).unwrap();
             set_validation_status(txn, hash.clone(), ValidationStatus::Rejected).unwrap();
-            set_when_integrated(txn, hash, timestamp::now()).unwrap();
+            set_when_integrated(txn, hash, Timestamp::now()).unwrap();
             DatabaseResult::Ok(())
         })
         .unwrap();
@@ -347,6 +356,7 @@ impl HolochainP2pCellT for MockNetwork {
     async fn publish(
         &self,
         _request_validation_receipt: bool,
+        _countersigning_session: bool,
         _dht_hash: holo_hash::AnyDhtHash,
         _ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
         _timeout_ms: Option<u64>,
@@ -358,6 +368,14 @@ impl HolochainP2pCellT for MockNetwork {
         &self,
         _to_agent: AgentPubKey,
         _receipt: holochain_serialized_bytes::SerializedBytes,
+    ) -> actor::HolochainP2pResult<()> {
+        todo!()
+    }
+
+    async fn countersigning_authority_response(
+        &self,
+        _agents: Vec<AgentPubKey>,
+        _response: Vec<holochain_zome_types::SignedHeader>,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }

@@ -15,6 +15,7 @@ use kitsune_p2p_transport_quic::tx2::*;
 use kitsune_p2p_types::async_lazy::AsyncLazy;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_pool_promote::*;
+use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use kitsune_p2p_types::tx2::*;
 use kitsune_p2p_types::*;
 use std::collections::hash_map::Entry;
@@ -56,7 +57,7 @@ ghost_actor::ghost_chan! {
         ) -> ();
 
         /// Incoming Gossip
-        fn incoming_gossip(space: KSpace, con: WireConHnd, data: Payload, module_type: crate::types::gossip::GossipModuleType) -> ();
+        fn incoming_gossip(space: KSpace, con: WireConHnd, remote_url: kitsune_p2p_types::tx2::tx2_utils::TxUrl, data: Payload, module_type: crate::types::gossip::GossipModuleType) -> ();
     }
 }
 
@@ -76,6 +77,7 @@ pub(crate) struct KitsuneP2pActor {
     >,
     config: Arc<KitsuneP2pConfig>,
     bandwidth_throttles: BandwidthThrottles,
+    parallel_notify_permit: Arc<tokio::sync::Semaphore>,
 }
 
 impl KitsuneP2pActor {
@@ -286,60 +288,68 @@ impl KitsuneP2pActor {
                                     data => unimplemented!("{:?}", data),
                                 }
                             }
-                            IncomingNotify(Tx2EpIncomingNotify { con, data, .. }) => match data {
-                                wire::Wire::DelegateBroadcast(wire::DelegateBroadcast {
-                                    space,
-                                    basis,
-                                    to_agent,
-                                    mod_idx,
-                                    mod_cnt,
-                                    data,
-                                }) => {
-                                    // one might be tempted to notify here
-                                    // as in Broadcast below... but we
-                                    // notify all relevent agents inside
-                                    // the space incoming_delegate_broadcast
-                                    // handler.
-                                    if let Err(err) = i_s
-                                        .incoming_delegate_broadcast(
-                                            space, basis, to_agent, mod_idx, mod_cnt, data,
-                                        )
-                                        .await
-                                    {
-                                        tracing::warn!(
-                                            ?err,
-                                            "failed to handle incoming delegate broadcast"
-                                        );
+                            IncomingNotify(Tx2EpIncomingNotify { con, data, url, .. }) => {
+                                match data {
+                                    wire::Wire::DelegateBroadcast(wire::DelegateBroadcast {
+                                        space,
+                                        basis,
+                                        to_agent,
+                                        mod_idx,
+                                        mod_cnt,
+                                        data,
+                                    }) => {
+                                        // one might be tempted to notify here
+                                        // as in Broadcast below... but we
+                                        // notify all relevent agents inside
+                                        // the space incoming_delegate_broadcast
+                                        // handler.
+                                        if let Err(err) = i_s
+                                            .incoming_delegate_broadcast(
+                                                space, basis, to_agent, mod_idx, mod_cnt, data,
+                                            )
+                                            .await
+                                        {
+                                            tracing::warn!(
+                                                ?err,
+                                                "failed to handle incoming delegate broadcast"
+                                            );
+                                        }
                                     }
-                                }
-                                wire::Wire::Broadcast(wire::Broadcast {
-                                    space,
-                                    to_agent,
-                                    data,
-                                    ..
-                                }) => {
-                                    if let Err(err) = evt_sender
-                                        .notify(space, to_agent.clone(), to_agent, data.into())
-                                        .await
-                                    {
-                                        tracing::warn!(?err, "error processing incoming broadcast");
+                                    wire::Wire::Broadcast(wire::Broadcast {
+                                        space,
+                                        to_agent,
+                                        data,
+                                        ..
+                                    }) => {
+                                        if let Err(err) = evt_sender
+                                            .notify(space, to_agent.clone(), to_agent, data.into())
+                                            .await
+                                        {
+                                            tracing::warn!(
+                                                ?err,
+                                                "error processing incoming broadcast"
+                                            );
+                                        }
                                     }
-                                }
-                                wire::Wire::Gossip(wire::Gossip {
-                                    space,
-                                    data,
-                                    module,
-                                }) => {
-                                    let data: Vec<u8> = data.into();
-                                    let data: Box<[u8]> = data.into_boxed_slice();
-                                    if let Err(e) =
-                                        i_s.incoming_gossip(space, con, data, module).await
-                                    {
-                                        tracing::warn!("failed to handle incoming gossip: {:?}", e);
+                                    wire::Wire::Gossip(wire::Gossip {
+                                        space,
+                                        data,
+                                        module,
+                                    }) => {
+                                        let data: Vec<u8> = data.into();
+                                        let data: Box<[u8]> = data.into_boxed_slice();
+                                        if let Err(e) =
+                                            i_s.incoming_gossip(space, con, url, data, module).await
+                                        {
+                                            tracing::warn!(
+                                                "failed to handle incoming gossip: {:?}",
+                                                e
+                                            );
+                                        }
                                     }
+                                    data => unimplemented!("{:?}", data),
                                 }
-                                data => unimplemented!("{:?}", data),
-                            },
+                            }
                             _ => (),
                         }
                     }
@@ -350,6 +360,9 @@ impl KitsuneP2pActor {
         });
 
         let bandwidth_throttles = BandwidthThrottles::new(&config.tuning_params);
+        let parallel_notify_permit = Arc::new(tokio::sync::Semaphore::new(
+            config.tuning_params.concurrent_limit_per_thread,
+        ));
 
         Ok(Self {
             this_addr: this_addr.into(),
@@ -360,6 +373,7 @@ impl KitsuneP2pActor {
             spaces: HashMap::new(),
             config: Arc::new(config),
             bandwidth_throttles,
+            parallel_notify_permit,
         })
     }
 }
@@ -432,6 +446,7 @@ impl InternalHandler for KitsuneP2pActor {
         &mut self,
         space: Arc<KitsuneSpace>,
         con: Tx2ConHnd<wire::Wire>,
+        remote_url: TxUrl,
         data: Box<[u8]>,
         module_type: GossipModuleType,
     ) -> InternalHandlerResult<()> {
@@ -445,7 +460,7 @@ impl InternalHandler for KitsuneP2pActor {
         Ok(async move {
             let (_, space_inner) = space_sender.await;
             space_inner
-                .incoming_gossip(space, con, data, module_type)
+                .incoming_gossip(space, con, remote_url, data, module_type)
                 .await
         }
         .boxed()
@@ -558,7 +573,7 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
     fn handle_query_op_hashes(
         &mut self,
         input: QueryOpHashesEvt,
-    ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowMs)>> {
+    ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindow)>> {
         Ok(self.evt_sender.query_op_hashes(input))
     }
 
@@ -589,13 +604,20 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         let ep_hnd = self.ep_hnd.clone();
         let config = Arc::clone(&self.config);
         let bandwidth_throttles = self.bandwidth_throttles.clone();
+        let parallel_notify_permit = self.parallel_notify_permit.clone();
         let space_sender = match self.spaces.entry(space.clone()) {
             Entry::Occupied(entry) => entry.into_mut(),
             Entry::Vacant(entry) => entry.insert(AsyncLazy::new(async move {
-                let (send, send_inner, evt_recv) =
-                    spawn_space(space2, this_addr, ep_hnd, config, bandwidth_throttles)
-                        .await
-                        .expect("cannot fail to create space");
+                let (send, send_inner, evt_recv) = spawn_space(
+                    space2,
+                    this_addr,
+                    ep_hnd,
+                    config,
+                    bandwidth_throttles,
+                    parallel_notify_permit,
+                )
+                .await
+                .expect("cannot fail to create space");
                 internal_sender
                     .register_space_event_handler(evt_recv)
                     .await
@@ -683,6 +705,28 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         Ok(async move {
             let (space_sender, _) = space_sender.await;
             space_sender.broadcast(space, basis, timeout, payload).await
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_targeted_broadcast(
+        &mut self,
+        space: Arc<KitsuneSpace>,
+        from_agent: Arc<KitsuneAgent>,
+        agents: Vec<Arc<KitsuneAgent>>,
+        timeout: KitsuneTimeout,
+        payload: Vec<u8>,
+    ) -> KitsuneP2pHandlerResult<()> {
+        let space_sender = match self.spaces.get_mut(&space) {
+            None => return Err(KitsuneP2pError::RoutingSpaceError(space)),
+            Some(space) => space.get(),
+        };
+        Ok(async move {
+            let (space_sender, _) = space_sender.await;
+            space_sender
+                .targeted_broadcast(space, from_agent, agents, timeout, payload)
+                .await
         }
         .boxed()
         .into())
@@ -801,7 +845,7 @@ mockall::mock! {
         fn handle_query_op_hashes(
             &mut self,
             input: QueryOpHashesEvt,
-        ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowMs)>>;
+        ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindow)>>;
 
         fn handle_fetch_op_data(
             &mut self,

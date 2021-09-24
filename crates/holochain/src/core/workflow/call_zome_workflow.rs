@@ -11,11 +11,13 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::ZomesToInvoke;
+use crate::core::workflow::error::WorkflowError;
 use either::Either;
 use holochain_cascade::Cascade;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
+use holochain_state::source_chain::SourceChain;
 use holochain_state::source_chain::SourceChainError;
 use holochain_zome_types::element::Element;
 
@@ -71,10 +73,22 @@ where
     // commit the workspace
     if should_write {
         let is_empty = workspace.source_chain().is_empty()?;
+        let countersigning_op = workspace.source_chain().countersigning_op()?;
         workspace.flush(&network).await?;
         if !is_empty {
-            trigger_publish_dht_ops.trigger();
-            trigger_integrate_dht_ops.trigger();
+            match countersigning_op {
+                Some(op) => {
+                    if let Err(error_response) =
+                        super::countersigning_workflow::countersigning_publish(&network, op).await
+                    {
+                        return Ok(Ok(error_response));
+                    }
+                }
+                None => {
+                    trigger_publish_dht_ops.trigger();
+                    trigger_integrate_dht_ops.trigger();
+                }
+            }
         }
     }
 
@@ -123,8 +137,37 @@ where
     .await?;
     tracing::trace!("After zome call");
 
-    inline_validation(workspace, network, conductor_api, Some(zome), ribosome).await?;
-
+    let validation_result = inline_validation(
+        workspace.clone(),
+        network,
+        conductor_api,
+        Some(zome),
+        ribosome,
+    )
+    .await;
+    if matches!(
+        validation_result,
+        Err(WorkflowError::SourceChainError(
+            SourceChainError::InvalidCommit(_)
+        ))
+    ) {
+        let scratch_elements = workspace.source_chain().scratch_elements()?;
+        if scratch_elements.len() == 1 {
+            let lock = SourceChain::lock_for_entry(scratch_elements[0].entry().as_option())?;
+            if !lock.is_empty()
+                && workspace
+                    .source_chain()
+                    .is_chain_locked(Vec::with_capacity(0))
+                    .await?
+                && !workspace.source_chain().is_chain_locked(lock).await?
+            {
+                if let Err(error) = workspace.source_chain().unlock_chain().await {
+                    tracing::error!(?error);
+                }
+            }
+        }
+    }
+    validation_result?;
     Ok(result)
 }
 
@@ -142,10 +185,10 @@ where
 {
     let to_app_validate = {
         // collect all the elements we need to validate in wasm
-        let mut to_app_validate: Vec<Element> =
-            Vec::with_capacity(workspace.source_chain().len()? as usize);
+        let scratch_elements = workspace.source_chain().scratch_elements()?;
+        let mut to_app_validate: Vec<Element> = Vec::with_capacity(scratch_elements.len());
         // Loop forwards through all the new elements
-        for element in workspace.source_chain().elements()? {
+        for element in scratch_elements {
             sys_validate_element(&element, &workspace, network.clone(), &conductor_api)
                 .await
                 // If the was en error exit

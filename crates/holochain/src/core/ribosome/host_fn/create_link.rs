@@ -19,6 +19,7 @@ pub fn create_link<'a>(
                 base_address,
                 target_address,
                 tag,
+                chain_top_ordering,
             } = input;
 
             // extract the zome position
@@ -35,7 +36,7 @@ pub fn create_link<'a>(
             .host_context
             .workspace()
             .source_chain()
-            .put(header_builder, None)
+            .put(header_builder, None, chain_top_ordering)
             .await?;
         Ok::<HeaderHash, RibosomeError>(header_hash)
     }))

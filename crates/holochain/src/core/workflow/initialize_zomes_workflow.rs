@@ -69,10 +69,19 @@ where
     };
 
     // Insert the init marker
-    workspace
-        .source_chain()
-        .put(builder::InitZomesComplete {}, None)
-        .await?;
+    // FIXME: For some reason if we don't spawn here
+    // this future never gets polled again.
+    let ws = workspace.clone();
+    tokio::task::spawn(async move {
+        ws.source_chain()
+            .put(
+                builder::InitZomesComplete {},
+                None,
+                ChainTopOrdering::Strict,
+            )
+            .await
+    })
+    .await??;
 
     // TODO: Validate scratch items
     super::inline_validation(workspace, network, conductor_api, None, ribosome).await?;
@@ -220,13 +229,14 @@ pub mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn commit_during_init_one_zome_unimplemented_one_fails() {
         let zome_fail = InlineZome::new_unique(vec![]).callback("init", |api, _: ()| {
-            api.create(EntryWithDefId::new(
+            api.create(CreateInput::new(
                 EntryDefId::CapGrant,
                 Entry::CapGrant(CapGrantEntry {
                     tag: "".into(),
                     access: ().into(),
                     functions: vec![("no-init".into(), "xxx".into())].into_iter().collect(),
                 }),
+                ChainTopOrdering::default(),
             ))?;
             Ok(InitCallbackResult::Fail("reason".into()))
         });

@@ -128,7 +128,7 @@ impl SweetConductor {
     /// Convenience function that uses the internal handle to enable an app
     pub async fn enable_app(
         &self,
-        id: &InstalledAppId,
+        id: InstalledAppId,
     ) -> ConductorResult<(InstalledApp, Vec<(CellId, CellError)>)> {
         self.handle().0.enable_app(id).await
     }
@@ -136,21 +136,21 @@ impl SweetConductor {
     /// Convenience function that uses the internal handle to disable an app
     pub async fn disable_app(
         &self,
-        id: &InstalledAppId,
+        id: InstalledAppId,
         reason: DisabledAppReason,
     ) -> ConductorResult<InstalledApp> {
         self.handle().0.disable_app(id, reason).await
     }
 
     /// Convenience function that uses the internal handle to start an app
-    pub async fn start_app(&self, id: &InstalledAppId) -> ConductorResult<InstalledApp> {
+    pub async fn start_app(&self, id: InstalledAppId) -> ConductorResult<InstalledApp> {
         self.handle().0.start_app(id).await
     }
 
     /// Convenience function that uses the internal handle to pause an app
     pub async fn pause_app(
         &self,
-        id: &InstalledAppId,
+        id: InstalledAppId,
         reason: PausedAppReason,
     ) -> ConductorResult<InstalledApp> {
         self.handle().0.pause_app(id, reason).await
@@ -192,11 +192,7 @@ impl SweetConductor {
             .install_app(installed_app_id.clone(), installed_cells)
             .await?;
 
-        self.handle()
-            .0
-            .clone()
-            .enable_app(&installed_app_id)
-            .await?;
+        self.handle().0.clone().enable_app(installed_app_id).await?;
         Ok(())
     }
 
@@ -369,6 +365,33 @@ impl SweetConductor {
             .as_ref()
             .map(|h| h.0.clone())
             .expect("Tried to use a conductor that is offline")
+    }
+
+    /// Force trigger all dht ops that haven't received
+    /// enough validation receipts yet.
+    pub async fn force_all_publish_dht_ops(&self) {
+        use futures::stream::StreamExt;
+        if let Some(handle) = self.handle.as_ref() {
+            let iter = handle
+                .list_cell_ids(None)
+                .await
+                .expect("Failed to list cell ids")
+                .into_iter()
+                .map(|id| async {
+                    let id = id;
+                    let env = self.get_cell_env(&id).await.unwrap();
+                    let trigger = self.get_cell_triggers(&id).await.unwrap();
+                    (env, trigger)
+                });
+            futures::stream::iter(iter)
+                .then(|f| f)
+                .for_each(|(env, mut triggers)| async move {
+                    crate::test_utils::force_publish_dht_ops(&env, &mut triggers.publish_dht_ops)
+                        .await
+                        .unwrap();
+                })
+                .await;
+        }
     }
 }
 

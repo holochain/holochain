@@ -9,6 +9,7 @@ use crate::conductor::config::InterfaceDriver;
 use crate::conductor::p2p_agent_store;
 use crate::conductor::ConductorBuilder;
 use crate::conductor::ConductorHandle;
+use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::ZomeCallInvocation;
 use ::fixt::prelude::*;
 use hdk::prelude::ZomeName;
@@ -25,6 +26,7 @@ use holochain_p2p::HolochainP2pRef;
 use holochain_p2p::HolochainP2pSender;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_serialized_bytes::SerializedBytesError;
+use holochain_sqlite::prelude::DatabaseResult;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::test_environments;
 use holochain_state::prelude::SourceChainResult;
@@ -250,7 +252,7 @@ pub async fn install_app(
 
     conductor_handle
         .clone()
-        .enable_app(&name.to_string())
+        .enable_app(name.to_string())
         .await
         .unwrap();
 
@@ -730,4 +732,21 @@ pub async fn fake_genesis_for_agent(vault: EnvWrite, agent: AgentPubKey) -> Sour
     let dna_hash = dna.dna_hash().clone();
 
     source_chain::genesis(vault, dna_hash, agent, None).await
+}
+
+/// Force all dht ops without enough validation receipts to be published.
+pub async fn force_publish_dht_ops(
+    vault: &EnvWrite,
+    publish_trigger: &mut TriggerSender,
+) -> DatabaseResult<()> {
+    vault
+        .async_commit(|txn| {
+            DatabaseResult::Ok(txn.execute(
+                "UPDATE DhtOp SET last_publish_time = NULL WHERE receipts_complete IS NULL",
+                [],
+            )?)
+        })
+        .await?;
+    publish_trigger.trigger();
+    Ok(())
 }

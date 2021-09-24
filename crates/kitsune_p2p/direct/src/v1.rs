@@ -265,10 +265,15 @@ impl AsKitsuneDirect for Kd1 {
         let ws_addr = self.get_ui_addr().unwrap();
 
         // TODO - this should also be configured in v1 conf
-        let pass = sodoken::Buffer::new_memlocked(4).unwrap();
+        let pass = sodoken::BufWrite::new_mem_locked(4).unwrap();
         pass.write_lock().copy_from_slice(&[1, 2, 3, 4]);
 
-        async move { new_handle_ws(ws_addr, pass).await.map_err(KdError::other) }.boxed()
+        async move {
+            new_handle_ws(ws_addr, pass.to_read())
+                .await
+                .map_err(KdError::other)
+        }
+        .boxed()
     }
 }
 
@@ -448,6 +453,26 @@ async fn handle_srv_events(
                                     })
                                 }.boxed()).await;
                             }
+                            KdApi::IsAuthorityReq {
+                                msg_id,
+                                root,
+                                agent,
+                                basis,
+                                ..
+                            } => {
+                                exec(msg_id.clone(), async {
+                                    let space = root.to_kitsune_space();
+                                    let agent = agent.to_kitsune_agent();
+                                    let basis = basis.to_kitsune_basis();
+                                    let is_authority = kdirect.inner.share_mut(move |i, _| {
+                                        Ok(i.p2p.authority_for_hash(space, agent, basis))
+                                    }).map_err(KdError::other)?.await.map_err(KdError::other)?;
+                                    Ok(KdApi::IsAuthorityRes {
+                                        msg_id,
+                                        is_authority,
+                                    })
+                                }.boxed()).await;
+                            }
                             KdApi::MessageSendReq {
                                 msg_id,
                                 root,
@@ -561,6 +586,7 @@ async fn handle_srv_events(
                             oth @ KdApi::AgentInfoStoreRes { .. } |
                             oth @ KdApi::AgentInfoGetRes { .. } |
                             oth @ KdApi::AgentInfoQueryRes { .. } |
+                            oth @ KdApi::IsAuthorityRes { .. } |
                             oth @ KdApi::MessageSendRes { .. } |
                             oth @ KdApi::MessageRecvEvt { .. } |
                             oth @ KdApi::EntryAuthorRes { .. } |
@@ -909,11 +935,11 @@ async fn handle_gossip(
 async fn handle_query_op_hashes(
     kdirect: Arc<Kd1>,
     input: QueryOpHashesEvt,
-) -> KdResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowMs)>> {
+) -> KdResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindow)>> {
     let QueryOpHashesEvt {
         space,
         agents,
-        window_ms,
+        window,
         max_ops,
         include_limbo: _,
     } = input;
@@ -930,7 +956,7 @@ async fn handle_query_op_hashes(
         let agent = KdHash::from_kitsune_agent(&agent);
         let es = kdirect
             .persist
-            .query_entries(root.clone(), agent, window_ms.clone(), arcset)
+            .query_entries(root.clone(), agent, window.clone(), arcset)
             .await?;
         entries.extend(es.into_iter());
     }
@@ -943,7 +969,7 @@ async fn handle_query_op_hashes(
     entries.dedup();
 
     // TODO: produce proper time window of actual data returned
-    Ok(Some((entries, window_ms)))
+    Ok(Some((entries, window)))
 }
 
 async fn handle_fetch_op_data(

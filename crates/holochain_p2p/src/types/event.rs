@@ -7,7 +7,7 @@ use crate::*;
 use holochain_zome_types::signature::Signature;
 use kitsune_p2p::{
     agent_store::AgentInfoSigned,
-    event::{MetricKind, MetricQuery, MetricQueryAnswer, TimeWindowMs},
+    event::{MetricKind, MetricQuery, MetricQueryAnswer, TimeWindow},
 };
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
@@ -156,6 +156,7 @@ ghost_actor::ghost_chan! {
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
             request_validation_receipt: bool,
+            countersigning_session: bool,
             ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
         ) -> ();
 
@@ -215,10 +216,10 @@ ghost_actor::ghost_chan! {
         fn query_op_hashes(
             dna_hash: DnaHash,
             to_agents: Vec<(AgentPubKey, kitsune_p2p::dht_arc::DhtArcSet)>,
-            window_ms: TimeWindowMs,
+            window: TimeWindow,
             max_ops: usize,
             include_limbo: bool,
-        ) -> Option<(Vec<holo_hash::DhtOpHash>, TimeWindowMs)>;
+        ) -> Option<(Vec<holo_hash::DhtOpHash>, TimeWindow)>;
 
         /// The p2p module needs access to the content for a given set of DhtOpHashes.
         fn fetch_op_data(
@@ -236,6 +237,14 @@ ghost_actor::ghost_chan! {
             // The data to sign.
             data: Vec<u8>,
         ) -> Signature;
+
+        /// Response from an authority to agents that are
+        /// part of a session.
+        fn countersigning_authority_response(
+            dna_hash: DnaHash,
+            to_agent: AgentPubKey,
+            signed_headers: Vec<SignedHeader>,
+        ) -> ();
     }
 }
 
@@ -256,6 +265,7 @@ macro_rules! match_p2p_evt {
             HolochainP2pEvent::GetAgentInfoSigned { $i, .. } => { $($t)* }
             HolochainP2pEvent::PutMetricDatum { $i, .. } => { $($t)* }
             HolochainP2pEvent::QueryMetrics { $i, .. } => { $($t)* }
+            HolochainP2pEvent::CountersigningAuthorityResponse { $i, .. } => { $($t)* }
             $($t2)*
         }
     };

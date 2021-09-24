@@ -27,6 +27,8 @@ pub enum SystemSignal {
     /// Since we have no real system signals, we use a test signal for testing
     /// TODO: replace instances of this with something real
     Test(String),
+    /// A countersigning session has successfully completed.
+    SuccessfulCountersigning(holo_hash::EntryHash),
 }
 
 /// Create a test signal

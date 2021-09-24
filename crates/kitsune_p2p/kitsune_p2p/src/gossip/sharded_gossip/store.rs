@@ -1,11 +1,11 @@
 //! This module is the ideal interface we would have for the conductor (or other store that kitsune uses).
 //! We should update the conductor to match this interface.
 
-use std::{collections::HashSet, ops::Range, sync::Arc};
+use std::{collections::HashSet, sync::Arc};
 
 use crate::event::{
-    FetchOpDataEvt, GetAgentInfoSignedEvt, PutAgentInfoSignedEvt, QueryAgentInfoSignedEvt,
-    QueryGossipAgentsEvt, QueryOpHashesEvt, TimeWindowMs,
+    FetchOpDataEvt, PutAgentInfoSignedEvt, QueryAgentInfoSignedEvt, QueryGossipAgentsEvt,
+    QueryOpHashesEvt, TimeWindow,
 };
 use crate::types::event::KitsuneP2pEventSender;
 use kitsune_p2p_types::{
@@ -26,21 +26,6 @@ pub(super) async fn all_agent_info(
         .query_agent_info_signed(QueryAgentInfoSignedEvt {
             space: space.clone(),
             agents: None,
-        })
-        .await
-        .map_err(KitsuneError::other)?)
-}
-
-/// Get a single agent info.
-pub(super) async fn get_agent_info(
-    evt_sender: &EventSender,
-    space: &Arc<KitsuneSpace>,
-    agent: &Arc<KitsuneAgent>,
-) -> KitsuneResult<Option<AgentInfoSigned>> {
-    Ok(evt_sender
-        .get_agent_info_signed(GetAgentInfoSignedEvt {
-            space: space.clone(),
-            agent: agent.clone(),
         })
         .await
         .map_err(KitsuneError::other)?)
@@ -128,10 +113,10 @@ pub(super) async fn all_op_hashes_within_arcset(
     space: &Arc<KitsuneSpace>,
     agents: &[(Arc<KitsuneAgent>, ArcInterval)],
     common_arc_set: &DhtArcSet,
-    window_ms: TimeWindowMs,
+    window: TimeWindow,
     max_ops: usize,
     include_limbo: bool,
-) -> KitsuneResult<Option<(Vec<Arc<KitsuneOpHash>>, Range<u64>)>> {
+) -> KitsuneResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindow)>> {
     let agents: Vec<_> = agents
         .iter()
         .map(|(a, i)| {
@@ -145,7 +130,7 @@ pub(super) async fn all_op_hashes_within_arcset(
         .query_op_hashes(QueryOpHashesEvt {
             space: space.clone(),
             agents,
-            window_ms,
+            window,
             max_ops,
             include_limbo,
         })

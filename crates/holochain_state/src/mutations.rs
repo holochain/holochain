@@ -6,6 +6,7 @@ use crate::validation_db::ValidationLimboStatus;
 use holo_hash::encode::blake2b_256;
 use holo_hash::*;
 use holochain_sqlite::rusqlite::named_params;
+use holochain_sqlite::rusqlite::types::Null;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::dht_op::DhtOpLight;
 use holochain_types::dht_op::OpOrder;
@@ -88,7 +89,11 @@ macro_rules! dht_op_update {
 }
 
 /// Insert a [`DhtOp`] into the [`Scratch`].
-pub fn insert_op_scratch(scratch: &mut Scratch, op: DhtOpHashed) -> StateMutationResult<()> {
+pub fn insert_op_scratch(
+    scratch: &mut Scratch,
+    op: DhtOpHashed,
+    chain_top_ordering: ChainTopOrdering,
+) -> StateMutationResult<()> {
     let (op, _) = op.into_inner();
     let op_light = op.to_light();
     let header = op.header();
@@ -101,19 +106,23 @@ pub fn insert_op_scratch(scratch: &mut Scratch, op: DhtOpHashed) -> StateMutatio
                 .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone()))?
                 .clone(),
         );
-        scratch.add_entry(entry_hashed);
+        scratch.add_entry(entry_hashed, chain_top_ordering);
     }
     let header_hashed = HeaderHashed::with_pre_hashed(header, op_light.header_hash().to_owned());
     let header_hashed = SignedHeaderHashed::with_presigned(header_hashed, signature);
-    scratch.add_header(header_hashed);
+    scratch.add_header(header_hashed, chain_top_ordering);
     Ok(())
 }
 
-pub fn insert_element_scratch(scratch: &mut Scratch, element: Element) {
+pub fn insert_element_scratch(
+    scratch: &mut Scratch,
+    element: Element,
+    chain_top_ordering: ChainTopOrdering,
+) {
     let (header, entry) = element.into_inner();
-    scratch.add_header(header);
+    scratch.add_header(header, chain_top_ordering);
     if let Some(entry) = entry.into_option() {
-        scratch.add_entry(EntryHashed::from_content_sync(entry))
+        scratch.add_entry(EntryHashed::from_content_sync(entry), chain_top_ordering);
     }
 }
 
@@ -170,7 +179,7 @@ pub fn insert_op_lite(
         "hash": hash,
         "type": op_lite.get_type(),
         "storage_center_loc": basis.get_loc(),
-        "authored_timestamp_ms": timestamp.to_sql_ms_lossy(),
+        "authored_timestamp": timestamp,
         "basis_hash": basis,
         "header_hash": header_hash,
         "is_authored": is_authored,
@@ -302,7 +311,7 @@ pub fn set_validation_stage(
         ValidationLimboStatus::AwaitingAppDeps(_) => Some(2),
         ValidationLimboStatus::AwaitingIntegration => Some(3),
     };
-    let now = holochain_types::timestamp::now().0;
+    let now = holochain_zome_types::Timestamp::now();
     txn.execute(
         "
         UPDATE DhtOp
@@ -329,7 +338,6 @@ pub fn set_when_integrated(
     time: Timestamp,
 ) -> StateMutationResult<()> {
     dht_op_update!(txn, hash, {
-        "when_integrated_ns": to_blob(time)?,
         "when_integrated": time,
     })?;
     Ok(())
@@ -347,24 +355,37 @@ pub fn set_last_publish_time(
     Ok(())
 }
 
-/// Set the receipt count for a [`DhtOp`].
-pub fn set_receipt_count(
-    txn: &mut Transaction,
-    hash: DhtOpHash,
-    count: u32,
-) -> StateMutationResult<()> {
+/// Set withhold publish for a [`DhtOp`].
+pub fn set_withhold_publish(txn: &mut Transaction, hash: DhtOpHash) -> StateMutationResult<()> {
     dht_op_update!(txn, hash, {
-        "receipt_count": count,
+        "withhold_publish": true,
     })?;
     Ok(())
 }
 
-/// Add one to the receipt count for a [`DhtOp`].
-pub fn add_one_receipt_count(txn: &mut Transaction, hash: &DhtOpHash) -> StateMutationResult<()> {
-    txn.execute(
-        "UPDATE DhtOp SET receipt_count = IFNULL(receipt_count, 0) + 1 WHERE hash = :hash;",
-        named_params! { ":hash": hash },
-    )?;
+/// Unset withhold publish for a [`DhtOp`].
+pub fn unset_withhold_publish(txn: &mut Transaction, hash: DhtOpHash) -> StateMutationResult<()> {
+    dht_op_update!(txn, hash, {
+        "withhold_publish": Null,
+    })?;
+    Ok(())
+}
+
+/// Set the receipt count for a [`DhtOp`].
+pub fn set_receipts_complete(
+    txn: &mut Transaction,
+    hash: &DhtOpHash,
+    complete: bool,
+) -> StateMutationResult<()> {
+    if complete {
+        dht_op_update!(txn, hash, {
+            "receipts_complete": true,
+        })?;
+    } else {
+        dht_op_update!(txn, hash, {
+            "receipts_complete": holochain_sqlite::rusqlite::types::Null,
+        })?;
+    }
     Ok(())
 }
 
@@ -561,10 +582,14 @@ pub fn insert_entry(txn: &mut Transaction, entry: EntryHashed) -> StateMutationR
 /// because the chain is locked if there are ANY locks that don't match the
 /// current id being queried.
 /// In practise this is useless so don't do that. One lock at a time please.
-pub fn lock_chain(txn: &mut Transaction, lock: &[u8], end: &Timestamp) -> StateMutationResult<()> {
+pub fn lock_chain(
+    txn: &mut Transaction,
+    lock: &[u8],
+    expires_at: &Timestamp,
+) -> StateMutationResult<()> {
     sql_insert!(txn, ChainLock, {
         "lock": lock,
-        "end": end,
+        "expires_at_timestamp": expires_at,
     })?;
     Ok(())
 }
