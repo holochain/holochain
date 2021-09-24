@@ -74,7 +74,7 @@ where
     if should_write {
         let is_empty = workspace.source_chain().is_empty()?;
         let countersigning_op = workspace.source_chain().countersigning_op()?;
-        workspace.flush().await?;
+        workspace.flush(&network).await?;
         if !is_empty {
             match countersigning_op {
                 Some(op) => {

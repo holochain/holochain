@@ -200,6 +200,11 @@ impl Timestamp {
         self.0
     }
 
+    /// Access time as milliseconds since UNIX epoch
+    pub fn as_millis(&self) -> i64 {
+        self.0 / 1000
+    }
+
     /// Access seconds since UNIX epoch plus nanosecond offset
     pub fn as_seconds_and_nanos(&self) -> (i64, u32) {
         let secs = self.0 / MM;

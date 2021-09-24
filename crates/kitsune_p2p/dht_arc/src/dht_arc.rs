@@ -26,6 +26,16 @@ pub mod gaps;
 /// a u32 dht arc
 pub struct DhtLocation(pub Wrapping<u32>);
 
+impl DhtLocation {
+    pub fn new(loc: u32) -> Self {
+        Self(Wrapping(loc))
+    }
+
+    pub fn as_u32(&self) -> u32 {
+        self.0 .0
+    }
+}
+
 /// The maximum you can hold either side of the hash location
 /// is half the circle.
 /// This is half of the furthest index you can hold
@@ -282,6 +292,11 @@ impl DhtArc {
     /// Get the center location of this arc.
     pub fn center_loc(&self) -> DhtLocation {
         self.center_loc
+    }
+
+    /// Is this DhtArc empty?
+    pub fn is_empty(&self) -> bool {
+        self.half_length == 0
     }
 }
 

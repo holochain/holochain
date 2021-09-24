@@ -20,23 +20,21 @@ async fn standard_responses(
 ) -> MockKitsuneP2pEventHandler {
     let mut evt_handler = MockKitsuneP2pEventHandler::new();
     let agents: Vec<_> = agents_with_arcs.iter().map(|(a, _)| a.clone()).collect();
-    evt_handler
-        .expect_handle_query_agent_info_signed()
-        .returning({
+    evt_handler.expect_handle_query_agents().returning({
+        let agents = agents.clone();
+        move |_| {
             let agents = agents.clone();
-            move |_| {
-                let agents = agents.clone();
-                Ok(async move {
-                    let mut infos = Vec::new();
-                    for agent in agents {
-                        infos.push(agent_info(agent).await);
-                    }
-                    Ok(infos)
+            Ok(async move {
+                let mut infos = Vec::new();
+                for agent in agents {
+                    infos.push(agent_info(agent).await);
                 }
-                .boxed()
-                .into())
+                Ok(infos)
             }
-        });
+            .boxed()
+            .into())
+        }
+    });
     evt_handler
         .expect_handle_get_agent_info_signed()
         .returning({
@@ -49,12 +47,7 @@ async fn standard_responses(
                     .into())
             }
         });
-    evt_handler.expect_handle_query_gossip_agents().returning({
-        move |_| {
-            let agents_with_arcs = agents_with_arcs.clone();
-            Ok(async move { Ok(agents_with_arcs) }.boxed().into())
-        }
-    });
+
     if with_data {
         evt_handler.expect_handle_query_op_hashes().returning(|_| {
             Ok(async {

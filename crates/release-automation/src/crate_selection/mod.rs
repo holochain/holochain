@@ -1005,15 +1005,38 @@ impl<'a> ReleaseWorkspace<'a> {
         self.changelog.as_ref()
     }
 
-    pub(crate) fn cargo_check(&'a self) -> Fallible<()> {
+    pub(crate) fn update_lockfile(&'a self, dry_run: bool) -> Fallible<()> {
+        let mut cmd = std::process::Command::new("cargo");
+        cmd.current_dir(self.root()).args(
+            &[
+                vec!["update", "--workspace", "--offline", "--verbose"],
+                if dry_run { vec!["--dry-run"] } else { vec![] },
+            ]
+            .concat(),
+        );
+        debug!("running command: {:?}", cmd);
+
+        if !dry_run {
+            let mut cmd = cmd.spawn()?;
+            let cmd_status = cmd.wait()?;
+            if !cmd_status.success() {
+                bail!("running {:?} failed: \n{:?}", cmd, cmd.stderr);
+            }
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn cargo_check(&'a self, offline: bool) -> Fallible<()> {
         let mut cmd = std::process::Command::new("cargo")
-            .args(&[
-                "check",
-                "--manifest-path",
-                &self.cargo_workspace()?.root_manifest().to_string_lossy(),
-                "--all-targets",
-                "--all-features",
-            ])
+            .current_dir(self.root())
+            .args(
+                &[
+                    vec!["check", "--workspace", "--all-targets", "--all-features"],
+                    if offline { vec!["--offline"] } else { vec![] },
+                ]
+                .concat(),
+            )
             .spawn()?;
 
         let cmd_status = cmd.wait()?;

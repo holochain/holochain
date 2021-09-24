@@ -300,6 +300,7 @@ pub mod bin_types;
 pub mod bootstrap;
 pub mod codec;
 pub mod config;
+pub mod consistency;
 pub mod metrics;
 pub mod reverse_semaphore;
 pub mod task_agg;

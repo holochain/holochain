@@ -4,6 +4,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.0.7
+
+- Added helper functions to `WebAppBundle` and `AppManifest` to be able to handle these types better in consuming applications.
+
+## 0.0.6
+
 - Added `WebAppManifest` to support `.webhapp` bundles. This is necessary to package hApps together with web UIs, to export to the Launcher and Holo.
 
 ## 0.0.5

@@ -36,7 +36,7 @@ pub fn get<'a>(
             }).collect();
             Ok(results?)
         },
-        _ => unreachable!(),
+        _ => unreachable!("tried to call `get` in a context where it is not permitted to be called"),
     }
 }
 

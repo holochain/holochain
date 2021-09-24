@@ -1,16 +1,16 @@
 [package]
 name = "holochain_util"
-version = "0.0.3"
+version = "0.0.4"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2018"
 description = "This crate is a collection of various utility functions that are used in the other crates in the holochain repository."
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
-documentation = "https://github.com/holochain/holochain"
+documentation = "https://docs.rs/holochain_util"
 
 [dependencies]
 once_cell = "1.4"
-tokio = { version = "1.3", features = [ "full" ], optional = true }
+tokio = { version = "1.11", features = [ "full" ], optional = true }
 num_cpus = "1.8"
 futures = "0.3"
 backtrace = { version = "0.3", optional = true }

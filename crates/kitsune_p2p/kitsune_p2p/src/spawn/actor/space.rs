@@ -109,10 +109,7 @@ impl SpaceInternalHandler for Space {
             self.local_joined_agents.iter().cloned().collect();
         let all_peers_fut = self
             .evt_sender
-            .query_agent_info_signed(QueryAgentInfoSignedEvt {
-                space: self.space.clone(),
-                agents: None,
-            });
+            .query_agents(QueryAgentsEvt::new(self.space.clone()));
         Ok(async move {
             for peer in all_peers_fut.await? {
                 res.insert(peer.agent.clone());
@@ -137,6 +134,10 @@ impl SpaceInternalHandler for Space {
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
         let dynamic_arcs = self.config.tuning_params.gossip_dynamic_arcs;
+        let single_storage_arc_per_space = self
+            .config
+            .tuning_params
+            .gossip_single_storage_arc_per_space;
         let internal_sender = self.i_s.clone();
         Ok(async move {
             let urls = vec![bound_url.into()];
@@ -154,6 +155,7 @@ impl SpaceInternalHandler for Space {
                     mdns_handles: &mut mdns_handles,
                     bootstrap_service: &bootstrap_service,
                     dynamic_arcs,
+                    single_storage_arc_per_space,
                 };
                 peer_data.push(update_single_agent_info(input).await?);
             }
@@ -182,6 +184,10 @@ impl SpaceInternalHandler for Space {
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
         let dynamic_arcs = self.config.tuning_params.gossip_dynamic_arcs;
+        let single_storage_arc_per_space = self
+            .config
+            .tuning_params
+            .gossip_single_storage_arc_per_space;
         let arc = self.get_agent_arc(&agent);
 
         Ok(async move {
@@ -198,6 +204,7 @@ impl SpaceInternalHandler for Space {
                 mdns_handles: &mut mdns_handles,
                 bootstrap_service: &bootstrap_service,
                 dynamic_arcs,
+                single_storage_arc_per_space,
             };
             let peer_data = vec![update_single_agent_info(input).await?];
             evt_sender
@@ -242,17 +249,21 @@ impl SpaceInternalHandler for Space {
         // local agents.
         let mut local_events = Vec::new();
         for agent in self.local_joined_agents.iter().cloned() {
-            let fut = self.evt_sender.notify(
-                space.clone(),
-                agent.clone(),
-                agent.clone(),
-                data.clone().into(),
-            );
-            local_events.push(async move {
-                if let Err(err) = fut.await {
-                    tracing::warn!(?err, "failed local broadcast");
+            if let Some(arc) = self.agent_arcs.get(&agent) {
+                if arc.contains(basis.get_loc()) {
+                    let fut = self.evt_sender.notify(
+                        space.clone(),
+                        agent.clone(),
+                        agent.clone(),
+                        data.clone().into(),
+                    );
+                    local_events.push(async move {
+                        if let Err(err) = fut.await {
+                            tracing::warn!(?err, "failed local broadcast");
+                        }
+                    });
                 }
-            });
+            }
         }
 
         // next, gather a list of agents covering this data to be
@@ -340,6 +351,7 @@ struct UpdateAgentInfoInput<'borrow> {
     mdns_handles: &'borrow mut HashMap<Vec<u8>, Arc<AtomicBool>>,
     bootstrap_service: &'borrow Option<Url2>,
     dynamic_arcs: bool,
+    single_storage_arc_per_space: bool,
 }
 
 async fn update_arc_length(
@@ -367,9 +379,13 @@ async fn update_single_agent_info(
         mdns_handles,
         bootstrap_service,
         dynamic_arcs,
+        single_storage_arc_per_space,
     } = input;
 
-    if dynamic_arcs {
+    // If there is only a single agent per space don't update the empty arcs.
+    let should_not_update_arc_length = single_storage_arc_per_space && arc.is_empty();
+
+    if dynamic_arcs && !should_not_update_arc_length {
         update_arc_length(evt_sender, space.clone(), &mut arc).await?;
     }
 
@@ -611,17 +627,21 @@ impl KitsuneP2pHandler for Space {
         // first, forward this data to all connected local agents.
         let mut local_events = Vec::new();
         for agent in self.local_joined_agents.iter().cloned() {
-            let fut = self.evt_sender.notify(
-                space.clone(),
-                agent.clone(),
-                agent.clone(),
-                payload.clone(),
-            );
-            local_events.push(async move {
-                if let Err(err) = fut.await {
-                    tracing::warn!(?err, "failed local broadcast");
+            if let Some(arc) = self.agent_arcs.get(&agent) {
+                if arc.contains(basis.get_loc()) {
+                    let fut = self.evt_sender.notify(
+                        space.clone(),
+                        agent.clone(),
+                        agent.clone(),
+                        payload.clone(),
+                    );
+                    local_events.push(async move {
+                        if let Err(err) = fut.await {
+                            tracing::warn!(?err, "failed local broadcast");
+                        }
+                    });
                 }
-            });
+            }
         }
 
         // then, find a list of agents in a potentially remote neighborhood
@@ -1092,11 +1112,29 @@ impl Space {
 
     /// Get the existing agent storage arc or create a new one.
     fn get_agent_arc(&self, agent: &Arc<KitsuneAgent>) -> DhtArc {
-        // TODO: We are simply setting the initial arc to full.
-        // In the future we may want to do something more intelligent.
-        self.agent_arcs
-            .get(agent)
-            .cloned()
-            .unwrap_or_else(|| DhtArc::full(agent.get_loc()))
+        if self
+            .config
+            .tuning_params
+            .gossip_single_storage_arc_per_space
+        {
+            let arc = self.agent_arcs.get(agent).cloned();
+            match arc {
+                Some(arc) => arc,
+                None => {
+                    if self.agent_arcs.is_empty() {
+                        DhtArc::full(agent.get_loc())
+                    } else {
+                        DhtArc::empty(agent.get_loc())
+                    }
+                }
+            }
+        } else {
+            // TODO: We are simply setting the initial arc to full.
+            // In the future we may want to do something more intelligent.
+            self.agent_arcs
+                .get(agent)
+                .cloned()
+                .unwrap_or_else(|| DhtArc::full(agent.get_loc()))
+        }
     }
 }

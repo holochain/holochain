@@ -31,6 +31,8 @@ use crate::changelog::{Changelog, WorkspaceCrateReleaseHeading};
 use crate::crate_selection::Crate;
 pub(crate) use crate_selection::{ReleaseWorkspace, SelectionCriteria};
 
+const TARGET_DIR_SUFFIX: &str = "target/release_automation";
+
 /// These steps make up the release workflow
 #[bitflags]
 #[repr(u64)]
@@ -200,6 +202,17 @@ fn bump_release_versions<'a>(
         return Ok(());
     }
 
+    // run the checks to ensure the repo is in a consistent state to begin with
+    info!("running consistency checks before changing the versions...");
+    publish_paths_to_crates_io(
+        &selection,
+        true,
+        true,
+        &cmd_args.allowed_missing_dependencies,
+        &cmd_args.cargo_target_dir,
+    )
+    .context("consistency checks failed")?;
+
     let mut changed_crate_changelogs = vec![];
 
     for crt in &selection {
@@ -279,6 +292,18 @@ fn bump_release_versions<'a>(
         }
     }
 
+    ws.update_lockfile(cmd_args.dry_run)?;
+
+    info!("running consistency checks after changing the versions...");
+    publish_paths_to_crates_io(
+        &selection,
+        true,
+        true,
+        &cmd_args.allowed_missing_dependencies,
+        &cmd_args.cargo_target_dir,
+    )
+    .context("consistency checks failed")?;
+
     // ## for the workspace release:
     let workspace_release_name = branch_name
         .strip_prefix(RELEASE_BRANCH_PREFIX)
@@ -309,15 +334,6 @@ fn bump_release_versions<'a>(
         ws_changelog.add_release(workspace_release_name, &changed_crate_changelogs)?;
     }
 
-    info!("running `cargo publish --dry-run --allow-dirty ..` for all selected crates...");
-    publish_paths_to_crates_io(
-        &selection,
-        true,
-        true,
-        &cmd_args.allowed_missing_dependencies,
-    )
-    .context("running 'cargo publish' in dry-run mode for all selected crates")?;
-
     // create a release commit with an overview of which crates are included
     let commit_msg = indoc::formatdoc!(
         r#"
@@ -335,9 +351,6 @@ fn bump_release_versions<'a>(
 
     info!("creating the following commit: {}", commit_msg);
     if !cmd_args.dry_run {
-        // this checks consistency and also updates the Cargo.lock file(s)
-        ws.cargo_check()?;
-
         ws.git_add_all_and_commit(&commit_msg, None)?;
     };
 
@@ -357,7 +370,13 @@ fn publish_to_crates_io<'a>(
 ) -> Fallible<()> {
     let crates = latest_release_crates(ws)?;
 
-    publish_paths_to_crates_io(&crates, cmd_args.dry_run, false, &Default::default())?;
+    publish_paths_to_crates_io(
+        &crates,
+        cmd_args.dry_run,
+        false,
+        &Default::default(),
+        &cmd_args.cargo_target_dir,
+    )?;
 
     Ok(())
 }
@@ -508,6 +527,13 @@ pub(crate) enum PublishError {
         version: String,
         location: String,
         retry_after: chrono::DateTime<Utc>,
+    },
+
+    #[error("{package}: check failed: {log}")]
+    CheckFailure {
+        package: String,
+        version: String,
+        log: String,
     },
 
     #[error("{}: {}", _0, _1)]
@@ -670,7 +696,7 @@ impl PublishError {
     }
 }
 
-mod crates_index_helper {
+pub(crate) mod crates_index_helper {
     use super::*;
 
     static CRATES_IO_INDEX: OnceCell<crates_index::Index> = OnceCell::new();
@@ -712,47 +738,125 @@ mod crates_index_helper {
 /// If dry-run is given, the following error conditoins are tolerated:
 /// - a dependency is not found but is part of the release
 /// - a version of a dependency is not found bu the dependency is part of the release
+///
+/// For this to work properly all changed crates need to have their dev versions applied.
+/// If they don't, `cargo publish` will prefer a published crates to the local ones.
 fn publish_paths_to_crates_io(
     crates: &[&Crate],
     dry_run: bool,
     allow_dirty: bool,
     allowed_missing_dependencies: &HashSet<String>,
+    cargo_target_dir: &Option<PathBuf>,
 ) -> Fallible<()> {
     static USER_AGENT: &str = "Holochain_Core_Dev_Team (devcore@holochain.org)";
     static CRATES_IO_CLIENT: OnceCell<crates_io_api::AsyncClient> = OnceCell::new();
 
     let crate_names: HashSet<String> = crates.iter().map(|crt| crt.name()).collect();
 
+    debug!("attempting to publish {:?}", crate_names);
+
     let mut queue = crates.iter().collect::<std::collections::LinkedList<_>>();
     let mut errors: Vec<PublishError> = vec![];
+
+    let mut check_cntr = 0;
+    let mut publish_cntr = 0;
+    let mut tolerated_cntr = 0;
+    let mut skip_cntr = 0;
+    let do_return =
+        |errors: Vec<PublishError>, check_cntr, publish_cntr, skip_cntr, tolerated_cntr| {
+            let msg = format!(
+                "crates processed: {}, consistent: {}, published: {}, skipped: {}, tolerated: {}",
+                crates.len(),
+                check_cntr,
+                publish_cntr,
+                skip_cntr,
+                tolerated_cntr,
+            );
+
+            info!("{}", msg);
+
+            if !errors.is_empty() {
+                let mut root = anyhow::anyhow!(msg);
+                for error in errors.into_iter().rev() {
+                    root = root.context(error);
+                }
+                Err(root)
+            } else {
+                Ok(())
+            }
+        };
+
     while let Some(crt) = queue.pop_front() {
-        if !dry_run && crates_index_helper::is_version_published(crt, false)? {
-            debug!("{} is already published, skipping..", crt.name_version());
-            continue;
+        if !crt.state().changed() && crates_index_helper::is_version_published(crt, false)? {
+            debug!(
+                "{} is unchanged and already published, skipping..",
+                crt.name_version()
+            );
+            skip_cntr += 1;
         }
 
+        let manifest_path = crt.manifest_path();
+        let cargo_target_dir_string = cargo_target_dir
+            .as_ref()
+            .map(|target_dir| format!("--target-dir={}", target_dir.to_string_lossy().to_string()));
+
         let mut cmd = std::process::Command::new("cargo");
-
-        let path = crt.manifest_path();
-
         cmd.args(
             [
-                vec!["publish"],
-                if dry_run {
-                    vec!["--dry-run", "--no-verify"]
+                vec![
+                    "check",
+                    "--locked",
+                    "--verbose",
+                    &format!("--manifest-path={}", manifest_path.to_string_lossy()),
+                ],
+                if let Some(target_dir) = cargo_target_dir_string.as_ref() {
+                    vec![target_dir]
                 } else {
                     vec![]
                 },
+            ]
+            .concat(),
+        );
+        debug!("Running command: {:?}", cmd);
+        let output = cmd.output().context("process exitted unsuccessfully")?;
+        if !output.status.success() {
+            let mut details = String::new();
+            for line in output.stderr.lines_with_terminator() {
+                let line = line.to_str_lossy();
+                details += &line;
+            }
+
+            let error = PublishError::CheckFailure {
+                package: crt.name(),
+                version: crt.version().to_string(),
+                log: details,
+            };
+            errors.push(error);
+        } else {
+            check_cntr += 1;
+        }
+
+        let mut cmd = std::process::Command::new("cargo");
+        cmd.args(
+            [
+                vec![
+                    "publish",
+                    "--locked",
+                    "--verbose",
+                    "--no-verify",
+                    &format!("--manifest-path={}", manifest_path.to_string_lossy()),
+                ],
+                if dry_run { vec!["--dry-run"] } else { vec![] },
                 if allow_dirty {
                     vec!["--allow-dirty"]
                 } else {
                     vec![]
                 },
-                vec![
-                    // "--no-default-features",
-                    "--verbose",
-                    &format!("--manifest-path={}", path.to_string_lossy()),
-                ],
+                if let Some(target_dir) = cargo_target_dir_string.as_ref() {
+                    vec![target_dir]
+                } else {
+                    vec![]
+                },
             ]
             .concat(),
         );
@@ -787,12 +891,16 @@ fn publish_paths_to_crates_io(
                     queue.push_front(crt);
                     continue;
                 }
+                PublishError::CheckFailure { .. } => true,
             } {
                 errors.push(error);
             } else {
+                tolerated_cntr += 1;
                 trace!("tolerating error: '{:#?}'", &error);
             }
-        } else if !dry_run {
+        } else if dry_run {
+            publish_cntr += 1;
+        } else {
             // wait until the published version is live
 
             let mut found = false;
@@ -810,7 +918,7 @@ fn publish_paths_to_crates_io(
                     break;
                 }
 
-                debug!(
+                warn!(
                     "Did not find {} on crates.io, retrying in {:?}...",
                     crt.name_version(),
                     duration
@@ -818,23 +926,20 @@ fn publish_paths_to_crates_io(
             }
 
             if !found {
-                bail!(
-                    "recently published version of {} not found in time on the crates_io index",
-                    crt.name_version()
-                );
+                errors.push(PublishError::Other(
+                    crt.name_version(),
+                    "recently published version not found in time on the crates_io index"
+                        .to_string(),
+                ));
+
+                return do_return(errors, check_cntr, publish_cntr, skip_cntr, tolerated_cntr);
             }
+
+            publish_cntr += 1;
         }
     }
 
-    if !errors.is_empty() {
-        let mut root = anyhow::anyhow!("cargo publish failed for at least one manifest");
-        for error in errors.into_iter().rev() {
-            root = root.context(error);
-        }
-        return Err(root);
-    }
-
-    Ok(())
+    do_return(errors, check_cntr, publish_cntr, skip_cntr, tolerated_cntr)
 }
 
 /// create a tag for each crate which will be used to identify its latest release

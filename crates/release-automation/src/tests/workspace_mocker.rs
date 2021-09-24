@@ -233,6 +233,30 @@ impl WorkspaceMocker {
             .map(|o| o.id())
             .map(|id| id.to_string())
     }
+
+    pub(crate) fn update_lockfile(&self) -> Fallible<()> {
+        let mut cmd = std::process::Command::new("cargo");
+        cmd.args(
+            &[vec![
+                "update",
+                "--workspace",
+                "--offline",
+                "--verbose",
+                "--manifest-path",
+                &format!("{}/Cargo.toml", self.root().to_string_lossy()),
+            ]]
+            .concat(),
+        );
+        debug!("running command: {:?}", cmd);
+
+        let mut cmd = cmd.spawn()?;
+        let cmd_status = cmd.wait()?;
+        if !cmd_status.success() {
+            bail!("running {:?} failed: \n{:?}", cmd, cmd.stderr);
+        }
+
+        Ok(())
+    }
 }
 
 /// Expected changelog after aggregation.
@@ -513,6 +537,9 @@ pub(crate) fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
             "#,
         },
     );
+    workspace_mocker.commit(None);
+
+    workspace_mocker.update_lockfile()?;
     workspace_mocker.commit(None);
 
     Ok(workspace_mocker)

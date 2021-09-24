@@ -6,6 +6,7 @@ use holochain_keystore::KeystoreSender;
 use holochain_sqlite::prelude::*;
 use shrinkwraprs::Shrinkwrap;
 
+pub use holochain_sqlite::conn::DbSyncLevel;
 /// Read access to a database, plus a keystore channel sender
 #[derive(Clone, Shrinkwrap)]
 pub struct EnvRead {
@@ -37,8 +38,19 @@ pub struct EnvWrite {
 impl EnvWrite {
     /// Constructor
     pub fn open(path: &Path, kind: DbKind, keystore: KeystoreSender) -> DatabaseResult<Self> {
+        Self::open_with_sync_level(path, kind, keystore, DbSyncLevel::default())
+    }
+
+    /// Open a database with a set synchronous level.
+    /// Note this won't override a database that already exists with a different level.
+    pub fn open_with_sync_level(
+        path: &Path,
+        kind: DbKind,
+        keystore: KeystoreSender,
+        sync_level: DbSyncLevel,
+    ) -> DatabaseResult<Self> {
         Ok(Self {
-            db: DbWrite::open(path, kind)?,
+            db: DbWrite::open_with_sync_level(path, kind, sync_level)?,
             keystore,
         })
     }
