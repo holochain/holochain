@@ -24,6 +24,7 @@ use crate::core::workflow::countersigning_workflow::incoming_countersigning;
 use crate::core::workflow::countersigning_workflow::CountersigningWorkspace;
 use crate::core::workflow::genesis_workflow::genesis_workflow;
 use crate::core::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
+use crate::core::workflow::incoming_dht_ops_workflow::IncomingOpHashes;
 use crate::core::workflow::initialize_zomes_workflow;
 use crate::core::workflow::CallZomeWorkflowArgs;
 use crate::core::workflow::GenesisWorkflowArgs;
@@ -111,6 +112,8 @@ where
     init_mutex: tokio::sync::Mutex<()>,
     /// Countersigning workspace that is shared across this cell.
     countersigning_workspace: CountersigningWorkspace,
+    /// Incoming op hashes that are queued for processing.
+    incoming_op_hashes: IncomingOpHashes,
 }
 
 impl Cell {
@@ -140,6 +143,7 @@ impl Cell {
         };
 
         if has_genesis {
+            let incoming_op_hashes = IncomingOpHashes::default();
             let countersigning_workspace = CountersigningWorkspace::new();
             let (queue_triggers, initial_queue_triggers) = spawn_queue_consumer_tasks(
                 env.clone(),
@@ -163,6 +167,7 @@ impl Cell {
                     queue_triggers,
                     init_mutex: Default::default(),
                     countersigning_workspace,
+                    incoming_op_hashes,
                 },
                 initial_queue_triggers,
             ))
@@ -564,6 +569,7 @@ impl Cell {
         } else {
             incoming_dht_ops_workflow(
                 &self.env,
+                Some(&self.incoming_op_hashes),
                 self.queue_triggers.sys_validation.clone(),
                 ops,
                 request_validation_receipt,

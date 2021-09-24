@@ -1774,7 +1774,7 @@ dependencies = [
 
 [[package]]
 name = "fixt"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "holochain_serialized_bytes",
  "lazy_static",
@@ -2220,7 +2220,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.0.106"
+version = "0.0.107"
 dependencies = [
  "fixt",
  "hdk_derive",
@@ -2239,7 +2239,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.0.8"
+version = "0.0.9"
 dependencies = [
  "holochain_zome_types",
  "paste",
@@ -2308,7 +2308,7 @@ dependencies = [
 
 [[package]]
 name = "holo_hash"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "arbitrary",
  "base64",
@@ -2329,7 +2329,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.0.106"
+version = "0.0.107"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2411,7 +2411,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2444,7 +2444,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.0.7"
+version = "0.0.8"
 dependencies = [
  "anyhow",
  "futures",
@@ -2457,7 +2457,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -2478,7 +2478,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -2505,7 +2505,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "derive_more",
  "directories 2.0.2",
@@ -2529,7 +2529,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_keystore"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "ghost_actor 0.3.0-alpha.4",
  "holo_hash",
@@ -2548,7 +2548,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "async-trait",
  "fixt",
@@ -2599,7 +2599,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_sqlite"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -2645,7 +2645,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -2686,7 +2686,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "hdk",
  "serde",
@@ -2694,7 +2694,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2745,7 +2745,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_util"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "backtrace",
  "cfg-if 0.1.10",
@@ -2759,7 +2759,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "fixt",
  "holo_hash",
@@ -2817,7 +2817,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_websocket"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "criterion",
  "futures",
@@ -2845,7 +2845,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.0.8"
+version = "0.0.9"
 dependencies = [
  "arbitrary",
  "chrono",
@@ -3190,7 +3190,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "arbitrary",
  "arrayref",
@@ -3250,7 +3250,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht_arc"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "derive_more",
  "gcollections",
@@ -3311,7 +3311,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_mdns"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "async-stream",
  "base64",
@@ -3326,7 +3326,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_proxy"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "base64",
  "blake2b_simd",
@@ -3352,7 +3352,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_timestamp"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "arbitrary",
  "chrono",
@@ -3364,7 +3364,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_transport_quic"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "blake2b_simd",
  "futures",
@@ -3383,7 +3383,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_types"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "arbitrary",
  "base64",
@@ -3867,7 +3867,7 @@ dependencies = [
 
 [[package]]
 name = "mr_bundle"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -5326,7 +5326,7 @@ dependencies = [
 
 [[package]]
 name = "release-automation"
-version = "0.1.0"
+version = "0.2.0-alpha.0"
 dependencies = [
  "anyhow",
  "assert_cmd",

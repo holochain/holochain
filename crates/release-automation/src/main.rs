@@ -255,6 +255,11 @@ pub(crate) mod cli {
         /// The dependencies that are allowed to be missing at the search location despite not being released.
         #[structopt(long, default_value="", parse(from_str = parse_string_set))]
         pub(crate) allowed_missing_dependencies: HashSet<String>,
+
+        /// Set a custom CARGO_TARGET_DIR when shelling out to `cargo`.
+        /// Currently only used for `cargo publish`.
+        #[structopt(long)]
+        pub(crate) cargo_target_dir: Option<PathBuf>,
     }
 
     /// Parses a commad separated input string to a set of strings.

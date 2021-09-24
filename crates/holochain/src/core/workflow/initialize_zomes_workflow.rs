@@ -35,13 +35,13 @@ where
     C: CellConductorApiT,
 {
     let result =
-        initialize_zomes_workflow_inner(workspace.clone(), network, keystore, args).await?;
+        initialize_zomes_workflow_inner(workspace.clone(), network.clone(), keystore, args).await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // only commit if the result was successful
     if result == InitResult::Pass {
-        workspace.flush().await?;
+        workspace.flush(&network).await?;
     }
     Ok(result)
 }
@@ -69,14 +69,19 @@ where
     };
 
     // Insert the init marker
-    workspace
-        .source_chain()
-        .put(
-            builder::InitZomesComplete {},
-            None,
-            ChainTopOrdering::Strict,
-        )
-        .await?;
+    // FIXME: For some reason if we don't spawn here
+    // this future never gets polled again.
+    let ws = workspace.clone();
+    tokio::task::spawn(async move {
+        ws.source_chain()
+            .put(
+                builder::InitZomesComplete {},
+                None,
+                ChainTopOrdering::Strict,
+            )
+            .await
+    })
+    .await??;
 
     // TODO: Validate scratch items
     super::inline_validation(workspace, network, conductor_api, None, ribosome).await?;

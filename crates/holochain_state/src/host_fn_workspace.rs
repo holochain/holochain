@@ -1,4 +1,5 @@
 use holo_hash::AgentPubKey;
+use holochain_p2p::HolochainP2pCellT;
 use holochain_types::env::EnvRead;
 use holochain_types::env::EnvWrite;
 
@@ -35,8 +36,11 @@ impl HostFnWorkspace {
         })
     }
 
-    pub async fn flush(self) -> SourceChainResult<()> {
-        self.source_chain.flush().await
+    pub async fn flush(
+        self,
+        network: &(dyn HolochainP2pCellT + Send + Sync),
+    ) -> SourceChainResult<()> {
+        self.source_chain.flush(network).await
     }
 
     pub fn source_chain(&self) -> &SourceChain {
