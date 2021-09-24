@@ -516,10 +516,10 @@ impl SourceChain {
             let entries = scratch.drain_entries().collect::<Vec<_>>();
             SourceChainResult::Ok((headers, ops, entries))
         })?;
-        let mut ops_to_self_publish = HashSet::with_capacity(ops.len());
+        let mut ops_to_integrate = HashSet::with_capacity(ops.len());
         for op in &ops {
             if network.authority_for_hash(op.0.dht_basis().clone()).await? {
-                ops_to_self_publish.insert(op.1.clone());
+                ops_to_integrate.insert(op.1.clone());
             }
         }
 
@@ -587,7 +587,7 @@ impl SourceChain {
                     // TODO: Can anything every depend on a private store entry op? I don't think so.
                     let is_private_entry = op_type == DhtOpType::StoreEntry
                         && visibility == Some(EntryVisibility::Private);
-                    if !is_private_entry && ops_to_self_publish.contains(&op_hash) {
+                    if !is_private_entry && ops_to_integrate.contains(&op_hash) {
                         set_validation_stage(
                             txn,
                             op_hash,
