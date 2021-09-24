@@ -1426,9 +1426,7 @@ mod builder {
 
             let _ = handle
                 .clone()
-                .start_scheduler(std::time::Duration::from_millis(
-                    holochain_zome_types::schedule::SCHEDULER_INTERVAL_MILLIS,
-                ));
+                .start_scheduler(holochain_zome_types::schedule::SCHEDULER_INTERVAL);
 
             let configs = conductor_config.admin_interfaces.unwrap_or_default();
             let cell_startup_errors = handle.clone().initialize_conductor(configs).await?;

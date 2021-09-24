@@ -606,7 +606,10 @@ pub fn unlock_chain(txn: &mut Transaction) -> StateMutationResult<()> {
 }
 
 pub fn delete_all_ephemeral_scheduled_fns(txn: &mut Transaction) -> StateMutationResult<()> {
-    txn.execute(holochain_sqlite::sql::schedule::DELETE_ALL_EPHEMERAL, [])?;
+    txn.execute(
+        holochain_sqlite::sql::sql_cell::schedule::DELETE_ALL_EPHEMERAL,
+        [],
+    )?;
     Ok(())
 }
 
@@ -615,7 +618,7 @@ pub fn delete_live_ephemeral_scheduled_fns(
     now: Timestamp,
 ) -> StateMutationResult<()> {
     txn.execute(
-        holochain_sqlite::sql::schedule::DELETE_LIVE_EPHEMERAL,
+        holochain_sqlite::sql::sql_cell::schedule::DELETE_LIVE_EPHEMERAL,
         [now],
     )?;
     Ok(())
@@ -623,7 +626,7 @@ pub fn delete_live_ephemeral_scheduled_fns(
 
 pub fn reschedule_expired(txn: &mut Transaction, now: Timestamp) -> StateMutationResult<()> {
     let rows = {
-        let mut stmt = txn.prepare(holochain_sqlite::sql::schedule::EXPIRED)?;
+        let mut stmt = txn.prepare(holochain_sqlite::sql::sql_cell::schedule::EXPIRED)?;
         let rows = stmt.query_map([now], |row| {
             Ok((
                 ZomeName(row.get(0)?),
@@ -671,7 +674,7 @@ pub fn schedule_fn(
                 // If there are no further executions then scheduling is a
                 // delete and bail.
                 let _ = txn.execute(
-                    holochain_sqlite::sql::schedule::DELETE,
+                    holochain_sqlite::sql::sql_cell::schedule::DELETE,
                     named_params! {
                         ":zome_name": scheduled_fn.zome_name().to_string(),
                         ":scheduled_fn": scheduled_fn.fn_name().to_string()
@@ -680,9 +683,8 @@ pub fn schedule_fn(
                 return Ok(());
             };
             let end = start
-                + chrono::Duration::milliseconds(
-                    holochain_zome_types::schedule::PERSISTED_TIMEOUT_MILLIS,
-                );
+                + chrono::Duration::from_std(holochain_zome_types::schedule::PERSISTED_TIMEOUT)
+                    .map_err(|e| ScheduleError::Cron(e.to_string()))?;
             (Timestamp::from(start), Timestamp::from(end), false)
         }
         Some(Schedule::Ephemeral(duration)) => (
@@ -694,7 +696,7 @@ pub fn schedule_fn(
     };
     if fn_is_scheduled(txn, scheduled_fn.clone())? {
         txn.execute(
-            holochain_sqlite::sql::schedule::UPDATE,
+            holochain_sqlite::sql::sql_cell::schedule::UPDATE,
             named_params! {
                 ":zome_name": scheduled_fn.zome_name().to_string(),
                 ":maybe_schedule": to_blob::<Option<Schedule>>(maybe_schedule)?,
