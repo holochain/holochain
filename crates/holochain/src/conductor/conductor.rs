@@ -162,9 +162,6 @@ where
     /// Handle to the network actor.
     holochain_p2p: holochain_p2p::HolochainP2pRef,
 
-    /// Keeps the reference to the scheduler interval alive.
-    scheduler: Option<tokio::task::JoinHandle<()>>,
-
     /// Database sync level
     db_sync_level: DbSyncLevel,
 }
@@ -1197,13 +1194,8 @@ where
             keystore,
             root_env_dir,
             holochain_p2p,
-            scheduler: None,
             db_sync_level,
         })
-    }
-
-    pub(super) fn set_scheduler(&mut self, scheduler: tokio::task::JoinHandle<()>) {
-        self.scheduler = Some(scheduler);
     }
 
     pub(super) async fn get_state(&self) -> ConductorResult<ConductorState> {

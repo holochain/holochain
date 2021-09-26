@@ -70,8 +70,8 @@ pub mod tests {
         .await
         .unwrap();
 
-        let cell_id = conductor.handle().list_cell_ids(None).await.unwrap()[0].clone();
-        let cell_env = conductor.handle().get_cell_env(&cell_id).await.unwrap();
+        let cell_id = conductor.handle().list_cell_ids(None)[0].clone();
+        let cell_env = conductor.handle().get_cell_env(&cell_id).unwrap();
 
         cell_env.async_commit(move |txn: &mut Transaction| {
             let now = Timestamp::now();

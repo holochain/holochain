@@ -866,18 +866,16 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     /// Start the scheduler. None is not an option.
+    /// Calling this will:
+    /// - Delete/unschedule all ephemeral scheduled functions GLOBALLY
+    /// - Add an interval that runs IN ADDITION to previous invocations
+    /// So ideally this would be called ONCE per conductor lifecyle ONLY.
     async fn start_scheduler(self: Arc<Self>, interval_period: std::time::Duration) {
         // Clear all ephemeral cruft in all cells before starting a scheduler.
         let cell_arcs = {
-            let lock = self.conductor.read().await;
-            let cell_ids = lock
-                .running_cells()
-                .map(|(cell_id, _)| cell_id)
-                .cloned()
-                .collect::<Vec<CellId>>();
             let mut cell_arcs = vec![];
-            for cell_id in cell_ids {
-                if let Ok(cell_arc) = self.cell_by_id(&cell_id).await {
+            for cell_id in self.conductor.running_cell_ids() {
+                if let Ok(cell_arc) = self.cell_by_id(&cell_id) {
                     cell_arcs.push(cell_arc);
                 }
             }
@@ -889,28 +887,21 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         futures::future::join_all(tasks).await;
 
         let scheduler_handle = self.clone();
-        let scheduler = tokio::task::spawn(async move {
+        tokio::task::spawn(async move {
             let mut interval = tokio::time::interval(interval_period);
             loop {
                 interval.tick().await;
                 scheduler_handle.clone().dispatch_scheduled_fns().await;
             }
         });
-        self.conductor.write().await.set_scheduler(scheduler);
     }
 
     /// The scheduler wants to dispatch any functions that are due.
     async fn dispatch_scheduled_fns(self: Arc<Self>) {
         let cell_arcs = {
-            let lock = self.conductor.read().await;
-            let cell_ids = lock
-                .running_cells()
-                .map(|(cell_id, _)| cell_id)
-                .cloned()
-                .collect::<Vec<CellId>>();
             let mut cell_arcs = vec![];
-            for cell_id in cell_ids {
-                if let Ok(cell_arc) = self.cell_by_id(&cell_id).await {
+            for cell_id in self.conductor.running_cell_ids() {
+                if let Ok(cell_arc) = self.cell_by_id(&cell_id) {
                     cell_arcs.push(cell_arc);
                 }
             }
