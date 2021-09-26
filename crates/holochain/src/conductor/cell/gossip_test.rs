@@ -104,7 +104,7 @@ async fn agent_info_test() {
 
     let alice_kit = alice_agent_id.to_kitsune();
 
-    let p2p_env = handle.get_p2p_env(dna_kit.clone()).await;
+    let p2p_env = handle.get_p2p_env(dna_kit.clone());
 
     let (agent_info, len) = fresh_reader_test(p2p_env.clone(), |txn| {
         let agent_info = txn.p2p_get_agent(&alice_kit).unwrap();

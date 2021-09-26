@@ -57,6 +57,8 @@ pub(crate) async fn spawn_test_agent(
     Ok((agent, p2p, control))
 }
 
+use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_types::dht_arc::DhtArcSet;
 use lair_keystore_api::entry::EntrySignEd25519;
 use lair_keystore_api::internal::sign_ed25519::*;
 
@@ -157,59 +159,33 @@ impl KitsuneP2pEventHandler for AgentHarness {
         Ok(async move { Ok(res) }.boxed().into())
     }
 
-    fn handle_query_gossip_agents(
+    fn handle_query_agents(
         &mut self,
-        input: crate::event::QueryGossipAgentsEvt,
-    ) -> KitsuneP2pEventHandlerResult<
-        Vec<(
-            Arc<crate::KitsuneAgent>,
-            kitsune_p2p_types::dht_arc::ArcInterval,
-        )>,
-    > {
-        let crate::event::QueryGossipAgentsEvt {
+        QueryAgentsEvt {
+            space: _,
             agents,
-            since_ms,
-            until_ms,
+            window,
             arc_set,
-            ..
-        } = input;
-        let res = self
-            .agent_store
-            .iter()
-            .filter(|(a, _)| match agents {
-                Some(ref agents) => agents.contains(a),
-                None => true,
-            })
-            .filter(|(_, i)| {
-                arc_set.contains(i.agent.get_loc())
-                    && i.signed_at_ms >= since_ms
-                    && i.signed_at_ms <= until_ms
-            })
-            .map(|(k, v)| (k.clone(), v.storage_arc.interval()))
-            .collect();
-        Ok(async move { Ok(res) }.boxed().into())
-    }
-
-    fn handle_query_agent_info_signed(
-        &mut self,
-        _input: QueryAgentInfoSignedEvt,
+            near_basis: _,
+            limit,
+        }: QueryAgentsEvt,
     ) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
-        let out = self.agent_store.values().map(|a| (**a).clone()).collect();
-        Ok(async move { Ok(out) }.boxed().into())
-    }
-
-    fn handle_query_agent_info_signed_near_basis(
-        &mut self,
-        _space: Arc<KitsuneSpace>,
-        _basis_loc: u32,
-        limit: u32,
-    ) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
-        // TODO - sort these?
+        let arc_set = arc_set.unwrap_or(Arc::new(DhtArcSet::Full));
+        let window = window.unwrap_or(full_time_range());
+        // TODO - sort by near_basis if set
         let out = self
             .agent_store
-            .values()
-            .map(|a| (**a).clone())
-            .take(limit as usize)
+            .iter()
+            .filter(|(a, _)| {
+                agents
+                    .as_ref()
+                    .map(|agents| agents.contains(*a))
+                    .unwrap_or(true)
+            })
+            .filter(|(_, i)| arc_set.contains(i.agent.get_loc()))
+            .filter(|(_, i)| window.contains(&Timestamp::from_micros(i.signed_at_ms as i64 * 1000)))
+            .take(limit.unwrap_or(u32::MAX) as usize)
+            .map(|(_, i)| (**i).clone())
             .collect();
         Ok(async move { Ok(out) }.boxed().into())
     }

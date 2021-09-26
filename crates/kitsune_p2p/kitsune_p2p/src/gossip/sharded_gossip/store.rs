@@ -4,8 +4,7 @@
 use std::{collections::HashSet, sync::Arc};
 
 use crate::event::{
-    FetchOpDataEvt, PutAgentInfoSignedEvt, QueryAgentInfoSignedEvt, QueryGossipAgentsEvt,
-    QueryOpHashesEvt, TimeWindow,
+    FetchOpDataEvt, PutAgentInfoSignedEvt, QueryAgentsEvt, QueryOpHashesEvt, TimeWindow,
 };
 use crate::types::event::KitsuneP2pEventSender;
 use kitsune_p2p_types::{
@@ -23,10 +22,7 @@ pub(super) async fn all_agent_info(
     space: &Arc<KitsuneSpace>,
 ) -> KitsuneResult<Vec<AgentInfoSigned>> {
     Ok(evt_sender
-        .query_agent_info_signed(QueryAgentInfoSignedEvt {
-            space: space.clone(),
-            agents: None,
-        })
+        .query_agents(QueryAgentsEvt::new(space.clone()))
         .await
         .map_err(KitsuneError::other)?)
 }
@@ -37,11 +33,9 @@ pub(super) async fn query_agent_info(
     space: &Arc<KitsuneSpace>,
     agents: &HashSet<Arc<KitsuneAgent>>,
 ) -> KitsuneResult<Vec<AgentInfoSigned>> {
+    let query = QueryAgentsEvt::new(space.clone()).by_agents(agents.clone());
     Ok(evt_sender
-        .query_agent_info_signed(QueryAgentInfoSignedEvt {
-            space: space.clone(),
-            agents: Some(agents.clone()),
-        })
+        .query_agents(query)
         .await
         .map_err(KitsuneError::other)?)
 }
@@ -96,15 +90,12 @@ pub(super) async fn agents_within_arcset(
     arc_set: Arc<DhtArcSet>,
 ) -> KitsuneResult<Vec<(Arc<KitsuneAgent>, ArcInterval)>> {
     Ok(evt_sender
-        .query_gossip_agents(QueryGossipAgentsEvt {
-            space: space.clone(),
-            agents: None,
-            since_ms: 0,
-            until_ms: u64::MAX,
-            arc_set,
-        })
+        .query_agents(QueryAgentsEvt::new(space.clone()).by_arc_set(arc_set))
         .await
-        .map_err(KitsuneError::other)?)
+        .map_err(KitsuneError::other)?
+        .iter()
+        .map(AgentInfoSigned::to_agent_arc)
+        .collect())
 }
 
 /// Get all ops for all agents that fall within the specified arcset.

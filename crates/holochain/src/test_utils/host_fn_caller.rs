@@ -111,8 +111,8 @@ impl HostFnCaller {
         dna_file: &DnaFile,
         zome_index: usize,
     ) -> HostFnCaller {
-        let env = handle.get_cell_env(cell_id).await.unwrap();
-        let cache = handle.get_cache_env(cell_id).await.unwrap();
+        let env = handle.get_cell_env(cell_id).unwrap();
+        let cache = handle.get_cache_env(cell_id).unwrap();
         let keystore = env.keystore().clone();
         let network = handle
             .holochain_p2p()
