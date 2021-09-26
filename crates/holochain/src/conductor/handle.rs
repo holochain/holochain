@@ -237,6 +237,12 @@ pub trait ConductorHandleT: Send + Sync {
     /// Start an enabled but stopped (paused) app
     async fn start_app(self: Arc<Self>, app_id: InstalledAppId) -> ConductorResult<InstalledApp>;
 
+    /// Start the scheduler. All ephemeral tasks are deleted.
+    async fn start_scheduler(self: Arc<Self>, interval_period: std::time::Duration);
+
+    /// Dispatch all due scheduled functions.
+    async fn dispatch_scheduled_fns(self: Arc<Self>);
+
     /// Stop a running app while leaving it enabled. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
     async fn pause_app(
@@ -857,6 +863,55 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let stopped_app = self.conductor.add_disabled_app_to_db(app).await?;
 
         Ok(stopped_app)
+    }
+
+    /// Start the scheduler. None is not an option.
+    /// Calling this will:
+    /// - Delete/unschedule all ephemeral scheduled functions GLOBALLY
+    /// - Add an interval that runs IN ADDITION to previous invocations
+    /// So ideally this would be called ONCE per conductor lifecyle ONLY.
+    async fn start_scheduler(self: Arc<Self>, interval_period: std::time::Duration) {
+        // Clear all ephemeral cruft in all cells before starting a scheduler.
+        let cell_arcs = {
+            let mut cell_arcs = vec![];
+            for cell_id in self.conductor.running_cell_ids() {
+                if let Ok(cell_arc) = self.cell_by_id(&cell_id) {
+                    cell_arcs.push(cell_arc);
+                }
+            }
+            cell_arcs
+        };
+        let tasks = cell_arcs
+            .into_iter()
+            .map(|cell_arc| cell_arc.delete_all_ephemeral_scheduled_fns());
+        futures::future::join_all(tasks).await;
+
+        let scheduler_handle = self.clone();
+        tokio::task::spawn(async move {
+            let mut interval = tokio::time::interval(interval_period);
+            loop {
+                interval.tick().await;
+                scheduler_handle.clone().dispatch_scheduled_fns().await;
+            }
+        });
+    }
+
+    /// The scheduler wants to dispatch any functions that are due.
+    async fn dispatch_scheduled_fns(self: Arc<Self>) {
+        let cell_arcs = {
+            let mut cell_arcs = vec![];
+            for cell_id in self.conductor.running_cell_ids() {
+                if let Ok(cell_arc) = self.cell_by_id(&cell_id) {
+                    cell_arcs.push(cell_arc);
+                }
+            }
+            cell_arcs
+        };
+
+        let tasks = cell_arcs
+            .into_iter()
+            .map(|cell_arc| cell_arc.dispatch_scheduled_fns());
+        futures::future::join_all(tasks).await;
     }
 
     #[tracing::instrument(skip(self))]

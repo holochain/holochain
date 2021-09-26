@@ -43,6 +43,7 @@ pub mod mutations;
 #[allow(missing_docs)]
 pub mod prelude;
 pub mod query;
+pub mod schedule;
 pub mod scratch;
 #[allow(missing_docs)]
 pub mod source_chain;

@@ -47,6 +47,7 @@ pub use crate::link::get_link_details;
 pub use crate::link::get_links;
 pub use crate::map_extern;
 pub use crate::map_extern::ExternResult;
+pub use crate::map_extern_infallible;
 pub use crate::p2p::call;
 pub use crate::p2p::call_remote;
 pub use crate::p2p::emit_signal;

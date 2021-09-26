@@ -540,13 +540,14 @@ impl SourceChain {
         if self.scratch.apply(|s| s.is_empty())? {
             return Ok(());
         }
-        let (headers, ops, entries) = self.scratch.apply_and_then(|scratch| {
+        let (scheduled_fns, headers, ops, entries) = self.scratch.apply_and_then(|scratch| {
             let (headers, ops) =
                 build_ops_from_headers(scratch.drain_headers().collect::<Vec<_>>())?;
 
             // Drain out any entries.
             let entries = scratch.drain_entries().collect::<Vec<_>>();
-            SourceChainResult::Ok((headers, ops, entries))
+            let scheduled_fns = scratch.drain_scheduled_fns().collect::<Vec<_>>();
+            SourceChainResult::Ok((scheduled_fns, headers, ops, entries))
         })?;
         let mut ops_to_integrate = HashSet::with_capacity(ops.len());
         for op in &ops {
@@ -573,6 +574,10 @@ impl SourceChain {
         match self
             .vault
             .async_commit(move |txn: &mut Transaction| {
+                let now = Timestamp::now();
+                for scheduled_fn in scheduled_fns {
+                    schedule_fn(txn, scheduled_fn, None, now)?;
+                }
                 // As at check.
                 let (new_persisted_head, new_head_seq, new_timestamp) =
                     chain_head_db(&txn, author)?;
