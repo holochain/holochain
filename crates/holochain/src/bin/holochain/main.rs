@@ -84,7 +84,6 @@ async fn async_main() {
     // Conductor activity has ceased
     let result = conductor
         .take_shutdown_handle()
-        .await
         .expect("The shutdown handle has already been taken.")
         .await;
 

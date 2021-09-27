@@ -26,11 +26,10 @@ pub(crate) async fn get_entry_def(
 ) -> EntryDefStoreResult<Option<EntryDef>> {
     // Try to get the entry def from the entry def store
     let key = EntryDefBufferKey::new(zome, entry_def_index);
-    let entry_def = conductor_api.get_entry_def(&key).await;
+    let entry_def = conductor_api.get_entry_def(&key);
     let dna_hash = dna_def.as_hash();
     let dna_file = conductor_api
         .get_dna(dna_hash)
-        .await
         .ok_or_else(|| EntryDefStoreError::DnaFileMissing(dna_hash.clone()))?;
 
     // If it's not found run the ribosome and get the entry defs
@@ -163,12 +162,9 @@ mod tests {
 
         handle.register_dna(dna).await.unwrap();
         // Check entry defs are here
+        assert_eq!(handle.get_entry_def(&post_def_key), Some(post_def.clone()));
         assert_eq!(
-            handle.get_entry_def(&post_def_key).await,
-            Some(post_def.clone())
-        );
-        assert_eq!(
-            handle.get_entry_def(&comment_def_key).await,
+            handle.get_entry_def(&comment_def_key),
             Some(comment_def.clone())
         );
 
@@ -177,9 +173,9 @@ mod tests {
         // Restart conductor and check defs are still here
         let handle = Conductor::builder().test(&envs.into(), &[]).await.unwrap();
 
-        assert_eq!(handle.get_entry_def(&post_def_key).await, Some(post_def));
+        assert_eq!(handle.get_entry_def(&post_def_key), Some(post_def));
         assert_eq!(
-            handle.get_entry_def(&comment_def_key).await,
+            handle.get_entry_def(&comment_def_key),
             Some(comment_def.clone())
         );
     }

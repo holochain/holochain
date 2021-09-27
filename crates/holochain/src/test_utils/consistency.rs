@@ -35,16 +35,16 @@ pub async fn local_machine_session(conductors: &[ConductorHandle], timeout: Dura
     // For each space get all the cells, their env and the p2p envs.
     let mut spaces = HashMap::new();
     for (i, c) in conductors.iter().enumerate() {
-        for cell_id in c.list_cell_ids(None).await.unwrap() {
+        for cell_id in c.list_cell_ids(None) {
             let space = spaces
                 .entry(cell_id.dna_hash().clone())
                 .or_insert_with(|| vec![None; conductors.len()]);
             if space[i].is_none() {
-                let p2p_env: EnvRead = c.get_p2p_env(cell_id.dna_hash().to_kitsune()).await.into();
+                let p2p_env: EnvRead = c.get_p2p_env(cell_id.dna_hash().to_kitsune()).into();
                 space[i] = Some((p2p_env, Vec::new()));
             }
             space[i].as_mut().unwrap().1.push((
-                c.get_cell_env_readonly(&cell_id).await.unwrap(),
+                c.get_cell_env_readonly(&cell_id).unwrap(),
                 cell_id.agent_pubkey().to_kitsune(),
             ));
         }
@@ -102,16 +102,16 @@ pub async fn local_machine_session_with_hashes(
     // Grab the environments and cells for each conductor in this space.
     let mut conductors = vec![None; handles.len()];
     for (i, c) in handles.iter().enumerate() {
-        for cell_id in c.list_cell_ids(None).await.unwrap() {
+        for cell_id in c.list_cell_ids(None) {
             if cell_id.dna_hash() != space {
                 continue;
             }
             if conductors[i].is_none() {
-                let p2p_env: EnvRead = c.get_p2p_env(cell_id.dna_hash().to_kitsune()).await.into();
+                let p2p_env: EnvRead = c.get_p2p_env(cell_id.dna_hash().to_kitsune()).into();
                 conductors[i] = Some((p2p_env, Vec::new()));
             }
             conductors[i].as_mut().unwrap().1.push((
-                c.get_cell_env_readonly(&cell_id).await.unwrap(),
+                c.get_cell_env_readonly(&cell_id).unwrap(),
                 cell_id.agent_pubkey().to_kitsune(),
             ));
         }
