@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::scratch::ScratchError;
 use crate::scratch::SyncScratchError;
 use async_recursion::async_recursion;
@@ -7,6 +9,7 @@ use holo_hash::DnaHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
 use holochain_keystore::KeystoreSender;
+use holochain_p2p::HolochainP2pCellT;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::dht_op::produce_op_lights_from_elements;
 use holochain_types::dht_op::produce_op_lights_from_iter;
@@ -535,19 +538,29 @@ impl SourceChain {
     }
 
     #[async_recursion]
-    pub async fn flush(&self) -> SourceChainResult<Vec<(Option<Zome>, SignedHeaderHashed)>> {
+    pub async fn flush(
+        &self,
+        network: &(dyn HolochainP2pCellT + Send + Sync),
+    ) -> SourceChainResult<Vec<(Option<Zome>, SignedHeaderHashed)>> {
         // Nothing to write
         if self.scratch.apply(|s| s.is_empty())? {
             return Ok(Vec::new());
         }
-        let (zomed_headers, ops, entries) = self.scratch.apply_and_then(|scratch| {
+        let (scheduled_fns, zomed_headers, ops, entries) = self.scratch.apply_and_then(|scratch| {
             let (zomed_headers, ops) =
                 build_ops_from_headers(scratch.drain_zomed_headers().collect::<Vec<_>>())?;
 
             // Drain out any entries.
             let entries = scratch.drain_entries().collect::<Vec<_>>();
-            SourceChainResult::Ok((zomed_headers, ops, entries))
+            let scheduled_fns = scratch.drain_scheduled_fns().collect::<Vec<_>>();
+            SourceChainResult::Ok((scheduled_fns, zomed_headers, ops, entries))
         })?;
+        let mut ops_to_integrate = HashSet::with_capacity(ops.len());
+        for op in &ops {
+            if network.authority_for_hash(op.0.dht_basis().clone()).await? {
+                ops_to_integrate.insert(op.1.clone());
+            }
+        }
 
         let maybe_countersigned_entry = entries
             .iter()
@@ -568,6 +581,10 @@ impl SourceChain {
         match self
             .vault
             .async_commit(move |txn: &mut Transaction| {
+                let now = Timestamp::now();
+                for scheduled_fn in scheduled_fns {
+                    schedule_fn(txn, scheduled_fn, None, now)?;
+                }
                 // As at check.
                 let (new_persisted_head, new_head_seq, new_timestamp) =
                     chain_head_db(&txn, author)?;
@@ -613,15 +630,15 @@ impl SourceChain {
                         holochain_zome_types::ValidationStatus::Valid,
                     )?;
                     set_dependency(txn, op_hash.clone(), dependency)?;
-                    // TODO: SHARDING: Check if we are the authority here.
-                    // StoreEntry ops with private entries are never gossiped or published
-                    // so we don't need to integrate them.
                     // TODO: Can anything every depend on a private store entry op? I don't think so.
                     let is_private_entry = op_type == DhtOpType::StoreEntry
                         && visibility == Some(EntryVisibility::Private);
 
                     // Don't publish private entries or countersigning sessions.
-                    if !is_private_entry && !is_countersigning_session {
+                    if !is_private_entry
+                        && !is_countersigning_session
+                        && ops_to_integrate.contains(&op_hash)
+                    {
                         set_validation_stage(
                             txn,
                             op_hash.clone(),
@@ -666,7 +683,7 @@ impl SourceChain {
                             scratch.add_header(zome, header, ChainTopOrdering::Relaxed)
                         }
                     })?;
-                    child_chain.flush().await
+                    child_chain.flush(network).await
                 } else {
                     Err(SourceChainError::HeadMoved(
                         old_head,
@@ -1041,6 +1058,7 @@ pub mod tests {
     use crate::prelude::*;
     use ::fixt::prelude::*;
     use hdk::prelude::*;
+    use holochain_p2p::MockHolochainP2pCellT;
     use matches::assert_matches;
 
     use crate::source_chain::SourceChainResult;
@@ -1052,6 +1070,9 @@ pub mod tests {
         let env = test_env.env();
         let alice = fixt!(AgentPubKey, Predictable, 0);
         let zome = fixt!(Zome);
+
+        let mut mock = MockHolochainP2pCellT::new();
+        mock.expect_authority_for_hash().returning(|_| Ok(false));
 
         source_chain::genesis(env.clone(), fake_dna_hash(1), alice.clone(), None)
             .await
@@ -1089,7 +1110,7 @@ pub mod tests {
             .await?;
 
         let author = Arc::new(alice);
-        chain_1.flush().await?;
+        chain_1.flush(&mock).await?;
         let author_1 = Arc::clone(&author);
         let (_, seq, _) = env
             .async_commit(move |txn: &mut Transaction| chain_head_db(&txn, author_1))
@@ -1097,7 +1118,7 @@ pub mod tests {
         assert_eq!(seq, 3);
 
         assert!(matches!(
-            chain_2.flush().await,
+            chain_2.flush(&mock).await,
             Err(SourceChainError::HeadMoved(_, _))
         ));
         let author_2 = Arc::clone(&author);
@@ -1106,7 +1127,7 @@ pub mod tests {
             .await?;
         assert_eq!(seq, 3);
 
-        chain_3.flush().await?;
+        chain_3.flush(&mock).await?;
         let author_3 = Arc::clone(&author);
         let (_, seq, _) = env
             .async_commit(move |txn: &mut Transaction| chain_head_db(&txn, author_3))
@@ -1123,6 +1144,8 @@ pub mod tests {
         let secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
         let access = CapAccess::from(secret.unwrap());
         let zome = fixt!(Zome);
+        let mut mock = MockHolochainP2pCellT::new();
+        mock.expect_authority_for_hash().returning(|_| Ok(false));
 
         // @todo curry
         let _curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
@@ -1168,7 +1191,7 @@ pub mod tests {
                 )
                 .await?;
 
-            chain.flush().await.unwrap();
+            chain.flush(&mock).await.unwrap();
 
             (header, entry_hash)
         };
@@ -1216,7 +1239,7 @@ pub mod tests {
                 )
                 .await?;
 
-            chain.flush().await.unwrap();
+            chain.flush(&mock).await.unwrap();
 
             (header, entry_hash)
         };
@@ -1260,7 +1283,7 @@ pub mod tests {
                 )
                 .await?;
 
-            chain.flush().await.unwrap();
+            chain.flush(&mock).await.unwrap();
         }
 
         {
@@ -1337,6 +1360,8 @@ pub mod tests {
         observability::test_run().ok();
         let test_env = test_cell_env();
         let vault = test_env.env();
+        let mut mock = MockHolochainP2pCellT::new();
+        mock.expect_authority_for_hash().returning(|_| Ok(false));
 
         let zome = fixt!(Zome);
 
@@ -1384,7 +1409,7 @@ pub mod tests {
             .put(Some(zome), create, Some(entry), ChainTopOrdering::default())
             .await
             .unwrap();
-        source_chain.flush().await.unwrap();
+        source_chain.flush(&mock).await.unwrap();
 
         fresh_reader_test!(vault, |txn| {
             assert_eq!(chain_head_db(&txn, author.clone()).unwrap().0, h2);

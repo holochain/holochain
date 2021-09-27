@@ -22,6 +22,7 @@ use crate::prelude::StoresIter;
 use crate::query::StateQueryResult;
 use crate::query::StmtIter;
 use crate::query::Store;
+use holochain_zome_types::ScheduledFn;
 
 /// The "scratch" is an in-memory space to stage Headers to be committed at the
 /// end of the CallZome workflow.
@@ -36,6 +37,7 @@ pub struct Scratch {
     zomed_headers: Vec<(Option<Zome>, SignedHeaderHashed)>,
     entries: HashMap<EntryHash, Arc<Entry>>,
     chain_top_ordering: ChainTopOrdering,
+    scheduled_fns: Vec<ScheduledFn>,
 }
 
 #[derive(Debug, Clone)]
@@ -52,6 +54,14 @@ impl Scratch {
             chain_top_ordering: ChainTopOrdering::Relaxed,
             ..Default::default()
         }
+    }
+
+    pub fn scheduled_fns(&self) -> &[ScheduledFn] {
+        &self.scheduled_fns
+    }
+
+    pub fn add_scheduled_fn(&mut self, scheduled_fn: ScheduledFn) {
+        self.scheduled_fns.push(scheduled_fn)
     }
 
     pub fn chain_top_ordering(&self) -> ChainTopOrdering {
@@ -100,7 +110,7 @@ impl Scratch {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.zomed_headers.is_empty()
+        self.zomed_headers.is_empty() && self.scheduled_fns.is_empty()
     }
 
     pub fn headers(&self) -> impl Iterator<Item = &SignedHeaderHashed> {
@@ -156,6 +166,10 @@ impl Scratch {
             Some(Element::new(shh, Some(entry)))
         });
         Ok(r)
+    }
+
+    pub fn drain_scheduled_fns(&mut self) -> impl Iterator<Item = ScheduledFn> + '_ {
+        self.scheduled_fns.drain(..)
     }
 
     /// Drain out all the headers.

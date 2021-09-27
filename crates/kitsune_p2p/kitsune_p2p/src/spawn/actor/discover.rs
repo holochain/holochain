@@ -244,11 +244,10 @@ pub(crate) fn get_cached_remotes_near_basis(
     async move {
         let mut nodes = Vec::new();
 
-        for node in inner
-            .evt_sender
-            .query_agent_info_signed_near_basis(inner.space.clone(), basis_loc, LIMIT)
-            .await?
-        {
+        let query = QueryAgentsEvt::new(inner.space.clone())
+            .near_basis(basis_loc)
+            .limit(LIMIT);
+        for node in inner.evt_sender.query_agents(query).await? {
             if !inner
                 .i_s
                 .is_agent_local(node.agent.clone())

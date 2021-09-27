@@ -24,6 +24,7 @@ use crate::core::workflow::countersigning_workflow::incoming_countersigning;
 use crate::core::workflow::countersigning_workflow::CountersigningWorkspace;
 use crate::core::workflow::genesis_workflow::genesis_workflow;
 use crate::core::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
+use crate::core::workflow::incoming_dht_ops_workflow::IncomingOpHashes;
 use crate::core::workflow::initialize_zomes_workflow;
 use crate::core::workflow::CallZomeWorkflowArgs;
 use crate::core::workflow::GenesisWorkflowArgs;
@@ -43,10 +44,12 @@ use holochain_serialized_bytes::SerializedBytes;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::prelude::*;
+use holochain_state::schedule::live_scheduled_fns;
 use holochain_types::prelude::*;
 use kitsune_p2p::event::TimeWindow;
 use observability::OpenSpanExt;
 use rusqlite::OptionalExtension;
+use rusqlite::Transaction;
 use std::hash::Hash;
 use std::hash::Hasher;
 use tokio::sync;
@@ -109,6 +112,8 @@ where
     init_mutex: tokio::sync::Mutex<()>,
     /// Countersigning workspace that is shared across this cell.
     countersigning_workspace: CountersigningWorkspace,
+    /// Incoming op hashes that are queued for processing.
+    incoming_op_hashes: IncomingOpHashes,
 }
 
 impl Cell {
@@ -138,6 +143,7 @@ impl Cell {
         };
 
         if has_genesis {
+            let incoming_op_hashes = IncomingOpHashes::default();
             let countersigning_workspace = CountersigningWorkspace::new();
             let (queue_triggers, initial_queue_triggers) = spawn_queue_consumer_tasks(
                 env.clone(),
@@ -161,6 +167,7 @@ impl Cell {
                     queue_triggers,
                     init_mutex: Default::default(),
                     countersigning_workspace,
+                    incoming_op_hashes,
                 },
                 initial_queue_triggers,
             ))
@@ -185,7 +192,6 @@ impl Cell {
         // get the dna
         let dna_file = conductor_handle
             .get_dna(id.dna_hash())
-            .await
             .ok_or_else(|| DnaError::DnaMissing(id.dna_hash().to_owned()))?;
 
         let conductor_api = CellConductorApi::new(conductor_handle, id.clone());
@@ -231,6 +237,101 @@ impl Cell {
 
     async fn signal_broadcaster(&self) -> SignalBroadcaster {
         self.conductor_api.signal_broadcaster().await
+    }
+
+    pub(super) async fn delete_all_ephemeral_scheduled_fns(self: Arc<Self>) -> CellResult<()> {
+        Ok(self
+            .env
+            .async_commit(move |txn: &mut Transaction| delete_all_ephemeral_scheduled_fns(txn))
+            .await?)
+    }
+
+    pub(super) async fn dispatch_scheduled_fns(self: Arc<Self>) {
+        let now = Timestamp::now();
+        let lives = self
+            .env
+            .async_commit(move |txn: &mut Transaction| {
+                // Rescheduling should not fail as the data in the database
+                // should be valid schedules only.
+                reschedule_expired(txn, now)?;
+                let lives = live_scheduled_fns(txn, now);
+                // We know what to run so we can delete the ephemerals.
+                if lives.is_ok() {
+                    // Failing to delete should rollback this attempt.
+                    delete_live_ephemeral_scheduled_fns(txn, now)?;
+                }
+                lives
+            })
+            .await;
+
+        match lives {
+            // Cannot proceed if we don't know what to run.
+            Err(e) => {
+                error!("{}", e.to_string());
+            }
+            Ok(lives) => {
+                let mut tasks = vec![];
+                for (scheduled_fn, schedule) in &lives {
+                    // Failing to encode a schedule should never happen.
+                    // If it does log the error and bail.
+                    let payload = match ExternIO::encode(schedule) {
+                        Ok(payload) => payload,
+                        Err(e) => {
+                            error!("{}", e.to_string());
+                            continue;
+                        }
+                    };
+                    let invocation = ZomeCall {
+                        cell_id: self.id.clone(),
+                        zome_name: scheduled_fn.zome_name().clone(),
+                        cap: None,
+                        payload,
+                        provenance: self.id.agent_pubkey().clone(),
+                        fn_name: scheduled_fn.fn_name().clone(),
+                    };
+                    tasks.push(self.call_zome(invocation, None));
+                }
+                let results: Vec<CellResult<ZomeCallResult>> =
+                    futures::future::join_all(tasks).await;
+
+                // We don't do anything with errors in here.
+                let _ = self
+                    .env
+                    .async_commit(move |txn: &mut Transaction| {
+                        for ((scheduled_fn, _), result) in lives.iter().zip(results.iter()) {
+                            match result {
+                                Ok(Ok(ZomeCallResponse::Ok(extern_io))) => {
+                                    let next_schedule: Schedule = match extern_io.decode() {
+                                        Ok(Some(v)) => v,
+                                        Ok(None) => {
+                                            continue;
+                                        }
+                                        Err(e) => {
+                                            error!("{}", e.to_string());
+                                            continue;
+                                        }
+                                    };
+                                    // Ignore errors so that failing to schedule
+                                    // one function doesn't error others.
+                                    // For example if a zome returns a bad cron.
+                                    if let Err(e) = schedule_fn(
+                                        txn,
+                                        scheduled_fn.clone(),
+                                        Some(next_schedule),
+                                        now,
+                                    ) {
+                                        error!("{}", e.to_string());
+                                        continue;
+                                    }
+                                }
+                                errorish => error!("{:?}", errorish),
+                            }
+                        }
+                        Result::<(), DatabaseError>::Ok(())
+                    })
+                    .await;
+            }
+        }
     }
 
     #[instrument(skip(self, evt))]
@@ -467,6 +568,7 @@ impl Cell {
         } else {
             incoming_dht_ops_workflow(
                 &self.env,
+                Some(&self.incoming_op_hashes),
                 self.queue_triggers.sys_validation.clone(),
                 ops,
                 request_validation_receipt,
@@ -662,13 +764,12 @@ impl Cell {
         let required_receipt_count = match header.as_ref().and_then(|h| h.0.entry_type()) {
             Some(EntryType::App(entry_type)) => {
                 let zome_index = u8::from(entry_type.zome_id()) as usize;
-                let dna_file = self.conductor_api.get_this_dna().await.map_err(Box::new)?;
+                let dna_file = self.conductor_api.get_this_dna().map_err(Box::new)?;
                 let zome = dna_file.dna().zomes.get(zome_index).map(|(_, z)| z.clone());
                 match zome {
                     Some(zome) => self
                         .conductor_api
                         .get_entry_def(&EntryDefBufferKey::new(zome, entry_type.id()))
-                        .await
                         .map(|e| u8::from(e.required_validations)),
                     None => None,
                 }
@@ -955,7 +1056,6 @@ impl Cell {
         // get the dna
         let dna_file = conductor_api
             .get_dna(id.dna_hash())
-            .await
             .ok_or_else(|| DnaError::DnaMissing(id.dna_hash().to_owned()))?;
         let dna_def = dna_file.dna_def().clone();
 
@@ -1017,7 +1117,7 @@ impl Cell {
     /// Instantiate a Ribosome for use by this Cell's workflows
     // TODO: reevaluate once Workflows are fully implemented (after B-01567)
     pub(crate) async fn get_ribosome(&self) -> CellResult<RealRibosome> {
-        match self.conductor_api.get_dna(self.dna_hash()).await {
+        match self.conductor_api.get_dna(self.dna_hash()) {
             Some(dna) => Ok(RealRibosome::new(dna)),
             None => Err(DnaError::DnaMissing(self.dna_hash().to_owned()).into()),
         }

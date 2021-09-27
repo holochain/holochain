@@ -2,7 +2,7 @@
 
 use crate::types::agent_store::AgentInfoSigned;
 use kitsune_p2p_timestamp::Timestamp;
-use kitsune_p2p_types::dht_arc::DhtArcSet;
+use kitsune_p2p_types::dht_arc::{DhtArcSet, DhtLocation};
 use std::{collections::HashSet, sync::Arc, time::SystemTime};
 
 /// Gather a list of op-hashes from our implementor that meet criteria.
@@ -65,26 +65,68 @@ pub struct GetAgentInfoSignedEvt {
 
 /// Get agent info which satisfies a query.
 #[derive(Debug)]
-pub struct QueryAgentInfoSignedEvt {
+pub struct QueryAgentsEvt {
     /// The "space" context.
     pub space: KSpace,
-    /// The optional list of agents to filter by.
+    /// Optional set of agents to filter by.
     pub agents: Option<HashSet<KAgent>>,
+    /// Optional time range to filter by.
+    pub window: Option<TimeWindow>,
+    /// Optional arcset to intersect by.
+    pub arc_set: Option<Arc<DhtArcSet>>,
+    /// If set, results are ordered by proximity to the specified location
+    pub near_basis: Option<DhtLocation>,
+    /// Limit to the number of results returned
+    pub limit: Option<u32>,
 }
 
-/// Get agent info which satisfies a query.
-#[derive(Debug)]
-pub struct QueryGossipAgentsEvt {
-    /// The "space" context.
-    pub space: KSpace,
-    /// The optional list of agents to filter by.
-    pub agents: Option<Vec<KAgent>>,
-    /// Start of the time window.
-    pub since_ms: u64,
-    /// End of the time window.
-    pub until_ms: u64,
-    /// The set that we need agents to fit into.
-    pub arc_set: Arc<kitsune_p2p_types::dht_arc::DhtArcSet>,
+// NB: if we want to play it safer, rather than providing these fine-grained
+//     builder methods, we could provide only the three "flavors" of query that
+//     Holochain supports, which would still provide us the full expressivity to
+//     implement Kitsune.
+impl QueryAgentsEvt {
+    /// Constructor. Every query needs to know what space it's for.
+    pub fn new(space: KSpace) -> Self {
+        Self {
+            space,
+            agents: None,
+            window: None,
+            arc_set: None,
+            near_basis: None,
+            limit: None,
+        }
+    }
+
+    /// Add in an agent list query
+    pub fn by_agents<A: IntoIterator<Item = KAgent>>(mut self, agents: A) -> Self {
+        self.agents = Some(agents.into_iter().collect());
+        self
+    }
+
+    /// Add in an a time window query
+    pub fn by_window(mut self, window: TimeWindow) -> Self {
+        self.window = Some(window);
+        self
+    }
+
+    /// Add in an an arcset query
+    pub fn by_arc_set(mut self, arc_set: Arc<DhtArcSet>) -> Self {
+        self.arc_set = Some(arc_set);
+        self
+    }
+
+    /// Specify that the results should be ordered by proximity to this basis
+    // TODO: make it take a DhtLocation
+    pub fn near_basis(mut self, basis: u32) -> Self {
+        self.near_basis = Some(DhtLocation::new(basis));
+        self
+    }
+
+    /// Limit the number of results
+    pub fn limit(mut self, limit: u32) -> Self {
+        self.limit = Some(limit);
+        self
+    }
 }
 
 /// A single datum of metric info about an Agent, to be recorded by the client.
@@ -160,7 +202,7 @@ pub enum MetricQueryAnswer {
 pub type TimeWindow = std::ops::Range<Timestamp>;
 
 /// A time window which covers all of recordable time
-pub fn full_time_range() -> TimeWindow {
+pub fn full_time_window() -> TimeWindow {
     Timestamp::MIN..Timestamp::MAX
 }
 type KSpace = Arc<super::KitsuneSpace>;
@@ -180,13 +222,7 @@ ghost_actor::ghost_chan! {
         fn get_agent_info_signed(input: GetAgentInfoSignedEvt) -> Option<crate::types::agent_store::AgentInfoSigned>;
 
         /// We need to get previously stored agent info.
-        fn query_agent_info_signed(input: QueryAgentInfoSignedEvt) -> Vec<crate::types::agent_store::AgentInfoSigned>;
-
-        /// We need to get agents that fit into an arc set for gossip.
-        fn query_gossip_agents(input: QueryGossipAgentsEvt) -> Vec<(KAgent, kitsune_p2p_types::dht_arc::ArcInterval)>;
-
-        /// query agent info in order of closeness to a basis location.
-        fn query_agent_info_signed_near_basis(space: KSpace, basis_loc: u32, limit: u32) -> Vec<crate::types::agent_store::AgentInfoSigned>;
+        fn query_agents(input: QueryAgentsEvt) -> Vec<crate::types::agent_store::AgentInfoSigned>;
 
         /// Query the peer density of a space for a given [`DhtArc`].
         fn query_peer_density(space: KSpace, dht_arc: kitsune_p2p_types::dht_arc::DhtArc) -> kitsune_p2p_types::dht_arc::PeerDensity;

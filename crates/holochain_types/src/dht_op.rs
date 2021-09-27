@@ -929,8 +929,13 @@ pub struct OpOrder {
 
 impl std::fmt::Display for OpOrder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let (secs, nsecs) = self.timestamp.as_seconds_and_nanos();
-        write!(f, "{}{:019}{:010}", self.order as u8, secs, nsecs)
+        write!(
+            f,
+            "{}{:019}",
+            self.order as u8,
+            // clamp unrealistic negative timestamps to 0
+            i64::max(0, self.timestamp.as_micros())
+        )
     }
 }
 

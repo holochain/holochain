@@ -37,14 +37,13 @@ where
 {
     let ribosome = args.ribosome.clone();
     let result =
-        initialize_zomes_workflow_inner(workspace.clone(), network.clone(), keystore.clone(), args)
-            .await?;
+        initialize_zomes_workflow_inner(workspace.clone(), network.clone(), keystore.clone(), args).await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // only commit if the result was successful
     if result == InitResult::Pass {
-        let flushed_headers = workspace.clone().flush().await?;
+        let flushed_headers = workspace.clone().flush(&network).await?;
         spawn_post_commit(ribosome, workspace, network, keystore, flushed_headers).await;
     }
     Ok(result)
@@ -73,15 +72,20 @@ where
     };
 
     // Insert the init marker
-    workspace
-        .source_chain()
-        .put(
-            None,
-            builder::InitZomesComplete {},
-            None,
-            ChainTopOrdering::Strict,
-        )
-        .await?;
+    // FIXME: For some reason if we don't spawn here
+    // this future never gets polled again.
+    let ws = workspace.clone();
+    tokio::task::spawn(async move {
+        ws.source_chain()
+            .put(
+                None,
+                builder::InitZomesComplete {},
+                None,
+                ChainTopOrdering::Strict,
+            )
+            .await
+    })
+    .await??;
 
     // TODO: Validate scratch items
     super::inline_validation(workspace, network, conductor_api, None, ribosome).await?;

@@ -78,7 +78,7 @@ where
         let is_empty = workspace.source_chain().is_empty()?;
         let countersigning_op = workspace.source_chain().countersigning_op()?;
         let flushed_headers: Vec<(Option<Zome>, SignedHeaderHashed)> =
-            workspace.clone().flush().await?;
+            workspace.clone().flush(&network).await?;
         if !is_empty {
             match countersigning_op {
                 Some(op) => {

@@ -159,3 +159,14 @@ CREATE TABLE IF NOT EXISTS ChainLock (
     -- The expiration time of the lock as a Timestamp (microseconds)
     expires_at_timestamp INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS ScheduledFunctions (
+    zome_name TEXT NOT NULL,
+    scheduled_fn TEXT NOT NULL,
+    maybe_schedule BLOB NOT NULL,
+    start INTEGER NOT NULL,
+    end INTEGER NOT NULL,
+    ephemeral BOOLEAN NOT NULL,
+    PRIMARY KEY (zome_name, scheduled_fn) ON CONFLICT ROLLBACK
+);
+

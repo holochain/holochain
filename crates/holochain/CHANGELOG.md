@@ -3,11 +3,20 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+- Refactor conductor to use parking lot rw lock instead of tokio rw lock. (Faster and prevents deadlocks.)
+
+### Changed
+
+- The scheduler should work now
+
+## 0.0.107
 
 ## 0.0.106
 
 ### Changed
 
+- All Holochain `Timestamp`s (including those in Headers) are now at the precision of microseconds rather than nanoseconds. This saves 4 bytes per timestamp in memory and on disk.
+- Various database field names changed. **Databases created in prior versions will be incompatible.**
 - HDK `sys_time` now returns a `holochain_zome_types::Timestamp` instead of a `core::time::Duration`.
 - Exposes `UninstallApp` in the conductor admin API.
 

@@ -1,4 +1,5 @@
 use holo_hash::AgentPubKey;
+use holochain_p2p::HolochainP2pCellT;
 use holochain_types::env::EnvRead;
 use holochain_types::env::EnvWrite;
 use holochain_zome_types::SignedHeaderHashed;
@@ -37,8 +38,11 @@ impl HostFnWorkspace {
         })
     }
 
-    pub async fn flush(self) -> SourceChainResult<Vec<(Option<Zome>, SignedHeaderHashed)>> {
-        self.source_chain.flush().await
+    pub async fn flush(
+        self,
+        network: &(dyn HolochainP2pCellT + Send + Sync),
+    ) -> SourceChainResult<Vec<(Option<Zome>, SignedHeaderHashed)>> {
+        self.source_chain.flush(network).await
     }
 
     pub fn source_chain(&self) -> &SourceChain {

@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use chashmap::CHashMap;
+use holochain_serialized_bytes::prelude::*;
 use once_cell::sync::Lazy;
 use rusqlite::*;
 use scheduled_thread_pool::ScheduledThreadPool;
@@ -46,13 +47,22 @@ static R2D2_THREADPOOL: Lazy<Arc<ScheduledThreadPool>> = Lazy::new(|| {
 pub type ConnectionPool = r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>;
 pub type PConnInner = r2d2::PooledConnection<r2d2_sqlite::SqliteConnectionManager>;
 
-pub(crate) fn new_connection_pool(path: &Path, kind: DbKind) -> ConnectionPool {
+pub(crate) fn new_connection_pool(
+    path: &Path,
+    kind: DbKind,
+    synchronous_level: DbSyncLevel,
+) -> ConnectionPool {
     use r2d2_sqlite::SqliteConnectionManager;
     let manager = SqliteConnectionManager::file(path);
-    let customizer = Box::new(ConnCustomizer { kind });
+    let customizer = Box::new(ConnCustomizer {
+        kind,
+        synchronous_level,
+    });
+    // We need the same amount of connections as reader threads plus one for the writer thread.
+    let max_cons = num_read_threads() + 1;
     r2d2::Pool::builder()
         // Only up to 20 connections at a time
-        .max_size(20)
+        .max_size(max_cons as u32)
         // Never maintain idle connections
         .min_idle(Some(0))
         // Close connections after 30-60 seconds of idle time
@@ -65,13 +75,32 @@ pub(crate) fn new_connection_pool(path: &Path, kind: DbKind) -> ConnectionPool {
 
 #[derive(Debug)]
 struct ConnCustomizer {
-    // path: PathBuf,
     kind: DbKind,
+    synchronous_level: DbSyncLevel,
+}
+
+/// The sqlite synchronous level.
+/// Corresponds to the `PRAGMA synchronous` pragma.
+/// See [sqlite documentation](https://www.sqlite.org/pragma.html#pragma_synchronous).
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
+pub enum DbSyncLevel {
+    /// Use xSync for all writes. Not needed for WAL mode.
+    Full,
+    /// Sync at critical moments. Default.
+    Normal,
+    /// Syncing is left to the operating system and power loss could result in corrupted database.
+    Off,
+}
+
+impl Default for DbSyncLevel {
+    fn default() -> Self {
+        DbSyncLevel::Normal
+    }
 }
 
 impl r2d2::CustomizeConnection<Connection, rusqlite::Error> for ConnCustomizer {
     fn on_acquire(&self, conn: &mut Connection) -> Result<(), rusqlite::Error> {
-        initialize_connection(conn, &self.kind, true)?;
+        initialize_connection(conn, &self.kind, self.synchronous_level, true)?;
         Ok(())
     }
 }
@@ -79,6 +108,7 @@ impl r2d2::CustomizeConnection<Connection, rusqlite::Error> for ConnCustomizer {
 fn initialize_connection(
     conn: &mut Connection,
     _kind: &DbKind,
+    synchronous_level: DbSyncLevel,
     _is_first: bool,
 ) -> rusqlite::Result<()> {
     // tell SQLite to wait this long during write contention
@@ -104,11 +134,14 @@ fn initialize_connection(
     // https://sqlite.org/pragma.html#pragma_trusted_schema
     conn.pragma_update(None, "trusted_schema", &false)?;
 
-    // set to faster write-ahead-log mode
-    conn.pragma_update(None, "journal_mode", &"WAL".to_string())?;
-
     // enable foreign key support
     conn.pragma_update(None, "foreign_keys", &"ON".to_string())?;
+
+    match synchronous_level {
+        DbSyncLevel::Full => conn.pragma_update(None, "synchronous", &"2".to_string())?,
+        DbSyncLevel::Normal => conn.pragma_update(None, "synchronous", &"1".to_string())?,
+        DbSyncLevel::Off => conn.pragma_update(None, "synchronous", &"0".to_string())?,
+    }
 
     Ok(())
 }
