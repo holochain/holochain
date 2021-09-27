@@ -28,6 +28,10 @@ pub fn test_cell_env_with_id(id: u8) -> TestEnv {
     test_env(DbKind::Cell(fake_cell_id(id)))
 }
 
+pub fn test_cell_env_with_cell_id(id: CellId) -> TestEnv {
+    test_env(DbKind::Cell(id))
+}
+
 /// Create a [TestEnv] of [DbKind::Cache], backed by a temp directory.
 pub fn test_cache_env() -> TestEnv {
     test_cache_env_with_id(1)

@@ -632,34 +632,11 @@ async fn handle_events(
                         .boxed()
                         .into()));
                 }
-                event::KitsuneP2pEvent::QueryAgentInfoSigned { respond, input, .. } => {
-                    respond.r(Ok(handle_query_agent_info_signed(kdirect.clone(), input)
+                event::KitsuneP2pEvent::QueryAgents { respond, input, .. } => {
+                    respond.r(Ok(handle_query_agents(kdirect.clone(), input)
                         .map_err(KitsuneP2pError::other)
                         .boxed()
                         .into()));
-                }
-                event::KitsuneP2pEvent::QueryGossipAgents { respond, input, .. } => {
-                    respond.r(Ok(handle_query_gossip_agents(kdirect.clone(), input)
-                        .map_err(KitsuneP2pError::other)
-                        .boxed()
-                        .into()));
-                }
-                event::KitsuneP2pEvent::QueryAgentInfoSignedNearBasis {
-                    respond,
-                    space,
-                    basis_loc,
-                    limit,
-                    ..
-                } => {
-                    respond.r(Ok(handle_query_agent_info_signed_near_basis(
-                        kdirect.clone(),
-                        space,
-                        basis_loc,
-                        limit,
-                    )
-                    .map_err(KitsuneP2pError::other)
-                    .boxed()
-                    .into()));
                 }
                 event::KitsuneP2pEvent::QueryPeerDensity {
                     respond,
@@ -796,41 +773,15 @@ async fn handle_get_agent_info_signed(
     })
 }
 
-async fn handle_query_gossip_agents(
-    _kdirect: Arc<Kd1>,
-    _input: kitsune_p2p::event::QueryGossipAgentsEvt,
-) -> KdResult<
-    Vec<(
-        Arc<kitsune_p2p::KitsuneAgent>,
-        kitsune_p2p_types::dht_arc::ArcInterval,
-    )>,
-> {
-    todo!()
-}
-
-async fn handle_query_agent_info_signed(
+async fn handle_query_agents(
     kdirect: Arc<Kd1>,
-    input: QueryAgentInfoSignedEvt,
+    input: QueryAgentsEvt,
 ) -> KdResult<Vec<AgentInfoSigned>> {
-    let QueryAgentInfoSignedEvt { space, .. } = input;
+    let QueryAgentsEvt { space, .. } = input;
 
     let root = KdHash::from_kitsune_space(&space);
 
     let map = kdirect.persist.query_agent_info(root).await?;
-    Ok(map.into_iter().map(|a| a.to_kitsune()).collect())
-}
-
-async fn handle_query_agent_info_signed_near_basis(
-    kdirect: Arc<Kd1>,
-    space: Arc<KitsuneSpace>,
-    basis_loc: u32,
-    limit: u32,
-) -> KdResult<Vec<AgentInfoSigned>> {
-    let root = KdHash::from_kitsune_space(&space);
-    let map = kdirect
-        .persist
-        .query_agent_info_near_basis(root, basis_loc, limit)
-        .await?;
     Ok(map.into_iter().map(|a| a.to_kitsune()).collect())
 }
 

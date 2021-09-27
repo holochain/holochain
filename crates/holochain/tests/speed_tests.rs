@@ -298,8 +298,8 @@ async fn speed_test(n: Option<usize>) -> TestEnvs {
             break;
         }
     }
-    let shutdown = handle.take_shutdown_handle().await.unwrap();
-    handle.shutdown().await;
+    let shutdown = handle.take_shutdown_handle().unwrap();
+    handle.shutdown();
     shutdown.await.unwrap().unwrap();
     test_env
 }
@@ -329,7 +329,7 @@ pub async fn setup_app(
 
     conductor_handle
         .clone()
-        .enable_app(&"test app".to_string())
+        .enable_app("test app".to_string())
         .await
         .unwrap();
 

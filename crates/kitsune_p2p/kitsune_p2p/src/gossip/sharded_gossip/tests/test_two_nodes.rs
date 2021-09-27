@@ -136,7 +136,8 @@ async fn partial_missing_doesnt_finish() {
                 num_sent_ops_blooms: 1,
                 received_all_incoming_ops_blooms: true,
                 created_at: std::time::Instant::now(),
-                round_timeout: u32::MAX,
+                last_touch: std::time::Instant::now(),
+                round_timeout: std::time::Duration::MAX,
             }
         }
         .into(),
@@ -178,7 +179,8 @@ async fn missing_ops_finishes() {
                 num_sent_ops_blooms: 1,
                 received_all_incoming_ops_blooms: true,
                 created_at: std::time::Instant::now(),
-                round_timeout: u32::MAX,
+                last_touch: std::time::Instant::now(),
+                round_timeout: std::time::Duration::MAX,
             }
         }
         .into(),
@@ -221,7 +223,8 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
                 num_sent_ops_blooms: 1,
                 received_all_incoming_ops_blooms: false,
                 created_at: std::time::Instant::now(),
-                round_timeout: u32::MAX,
+                last_touch: std::time::Instant::now(),
+                round_timeout: std::time::Duration::MAX,
             }
         }
         .into(),
@@ -264,7 +267,8 @@ async fn bloom_response_finishes() {
                 num_sent_ops_blooms: 0,
                 received_all_incoming_ops_blooms: false,
                 created_at: std::time::Instant::now(),
-                round_timeout: u32::MAX,
+                last_touch: std::time::Instant::now(),
+                round_timeout: std::time::Duration::MAX,
             }
         }
         .into(),
@@ -307,7 +311,8 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
                 num_sent_ops_blooms: 1,
                 received_all_incoming_ops_blooms: false,
                 created_at: std::time::Instant::now(),
-                round_timeout: u32::MAX,
+                last_touch: std::time::Instant::now(),
+                round_timeout: std::time::Duration::MAX,
             }
         }
         .into(),
@@ -353,7 +358,8 @@ async fn no_data_still_finishes() {
                 num_sent_ops_blooms: 0,
                 received_all_incoming_ops_blooms: false,
                 created_at: std::time::Instant::now(),
-                round_timeout: u32::MAX,
+                last_touch: std::time::Instant::now(),
+                round_timeout: std::time::Duration::MAX,
             }
         }
         .into(),
@@ -370,7 +376,8 @@ async fn no_data_still_finishes() {
                 num_sent_ops_blooms: 1,
                 received_all_incoming_ops_blooms: true,
                 created_at: std::time::Instant::now(),
-                round_timeout: u32::MAX,
+                last_touch: std::time::Instant::now(),
+                round_timeout: std::time::Duration::MAX,
             }
         }
         .into(),

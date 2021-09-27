@@ -366,7 +366,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     let response = client.request(request).await.unwrap();
     assert_matches!(response, AdminResponse::DnaRegistered(_));
 
-    conductor_handle.shutdown().await;
+    conductor_handle.shutdown();
 
     Ok(())
 }
@@ -400,12 +400,12 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
 
     info!("client connect");
 
-    conductor_handle.shutdown().await;
+    conductor_handle.shutdown();
 
     info!("shutdown");
 
     assert_matches!(
-        conductor_handle.check_running().await,
+        conductor_handle.check_running(),
         Err(ConductorError::ShuttingDown)
     );
 
@@ -460,7 +460,7 @@ async fn too_many_open() {
         .await
         .unwrap();
     }
-    conductor_handle.shutdown().await;
+    conductor_handle.shutdown();
 }
 
 #[tokio::test(flavor = "multi_thread")]

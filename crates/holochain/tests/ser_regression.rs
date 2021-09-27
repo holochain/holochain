@@ -172,8 +172,8 @@ async fn ser_regression_test() {
         _ => unreachable!(),
     };
 
-    let shutdown = handle.take_shutdown_handle().await.unwrap();
-    handle.shutdown().await;
+    let shutdown = handle.take_shutdown_handle().unwrap();
+    handle.shutdown();
     shutdown.await.unwrap().unwrap();
 }
 
@@ -195,7 +195,7 @@ pub async fn setup_app(
 
     conductor_handle
         .clone()
-        .enable_app(&"test app".to_string())
+        .enable_app("test app".to_string())
         .await
         .unwrap();
 

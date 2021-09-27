@@ -96,18 +96,16 @@ async fn test_rpc_multi_logic_mocked() {
     let mut m = MockKitsuneP2pEventHandler::new();
     let start = tokio::time::Instant::now();
     // don't return any infos to start, then return 4 to test our loops
-    m.expect_handle_query_agent_info_signed_near_basis()
-        .returning(move |_, _, _| {
-            println!("QUERY: {}", start.elapsed().as_secs_f64());
-            let mut out = Vec::new();
-            if start.elapsed().as_secs_f64() > 1.0 {
-                out.push(A1.clone());
-                out.push(A2.clone());
-                out.push(A3.clone());
-                out.push(A4.clone());
-            }
-            Ok(async move { Ok(out) }.boxed().into())
-        });
+    m.expect_handle_query_agents().returning(move |_| {
+        let mut out = Vec::new();
+        if start.elapsed().as_secs_f64() > 1.0 {
+            out.push(A1.clone());
+            out.push(A2.clone());
+            out.push(A3.clone());
+            out.push(A4.clone());
+        }
+        Ok(async move { Ok(out) }.boxed().into())
+    });
     let evt_sender = build_event_handler(m).await;
 
     let config = Arc::new(KitsuneP2pConfig::default());

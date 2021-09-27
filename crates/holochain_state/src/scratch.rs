@@ -6,12 +6,14 @@ use holo_hash::hash_type::AnyDht;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
-use holochain_types::prelude::Judged;
+use holochain_keystore::KeystoreError;
+use holochain_types::prelude::*;
 use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::ChainTopOrdering;
 use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
 use holochain_zome_types::SignedHeaderHashed;
+use holochain_zome_types::TimestampError;
 use thiserror::Error;
 
 use crate::prelude::Query;
@@ -20,6 +22,7 @@ use crate::prelude::StoresIter;
 use crate::query::StateQueryResult;
 use crate::query::StmtIter;
 use crate::query::Store;
+use holochain_zome_types::ScheduledFn;
 
 /// The "scratch" is an in-memory space to stage Headers to be committed at the
 /// end of the CallZome workflow.
@@ -34,6 +37,7 @@ pub struct Scratch {
     headers: Vec<SignedHeaderHashed>,
     entries: HashMap<EntryHash, Arc<Entry>>,
     chain_top_ordering: ChainTopOrdering,
+    scheduled_fns: Vec<ScheduledFn>,
 }
 
 #[derive(Debug, Clone)]
@@ -50,6 +54,14 @@ impl Scratch {
             chain_top_ordering: ChainTopOrdering::Relaxed,
             ..Default::default()
         }
+    }
+
+    pub fn scheduled_fns(&self) -> &[ScheduledFn] {
+        &self.scheduled_fns
+    }
+
+    pub fn add_scheduled_fn(&mut self, scheduled_fn: ScheduledFn) {
+        self.scheduled_fns.push(scheduled_fn)
     }
 
     pub fn chain_top_ordering(&self) -> ChainTopOrdering {
@@ -87,7 +99,7 @@ impl Scratch {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.headers.is_empty()
+        self.headers.is_empty() && self.scheduled_fns.is_empty()
     }
 
     pub fn headers(&self) -> impl Iterator<Item = &SignedHeaderHashed> {
@@ -146,6 +158,10 @@ impl Scratch {
         Ok(r)
     }
 
+    pub fn drain_scheduled_fns(&mut self) -> impl Iterator<Item = ScheduledFn> + '_ {
+        self.scheduled_fns.drain(..)
+    }
+
     /// Drain out all the headers.
     pub fn drain_headers(&mut self) -> impl Iterator<Item = SignedHeaderHashed> + '_ {
         self.headers.drain(..)
@@ -169,6 +185,7 @@ impl SyncScratch {
             .lock()
             .map_err(|_| SyncScratchError::ScratchLockPoison)?))
     }
+
     pub fn apply_and_then<T, E, F>(&self, f: F) -> Result<T, E>
     where
         E: From<SyncScratchError>,
@@ -237,6 +254,16 @@ impl StoresIter<Judged<SignedHeaderHashed>> for FilteredScratch {
             self.drain().map(Judged::valid).map(Ok),
         )))
     }
+}
+
+#[derive(Error, Debug)]
+pub enum ScratchError {
+    #[error(transparent)]
+    Timestamp(#[from] TimestampError),
+    #[error(transparent)]
+    Keystore(#[from] KeystoreError),
+    #[error(transparent)]
+    Header(#[from] HeaderError),
 }
 
 #[derive(Error, Debug)]

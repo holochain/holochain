@@ -8,6 +8,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased](https://github.com/holochain/holochain/compare/hdk-v0.0.100...HEAD)
 
+## 0.0.107
+
+### Changed
+
+- hdk: `scheduled` fn signature updated to a string
+
+### Added
+
+- hdk: `map_extern_infallible` added to map infallible externs
+- hdk: `schedule` function now takes a String giving a function name to schedule, rather than a Duration
+
+## 0.0.106
+
 ## 0.0.105
 
 ## 0.0.104

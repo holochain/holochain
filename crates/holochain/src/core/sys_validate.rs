@@ -253,7 +253,7 @@ pub async fn check_app_entry_type(
     let zome_index = u8::from(entry_type.zome_id()) as usize;
     // We want to be careful about holding locks open to the conductor api
     // so calls are made in blocks
-    let dna_file = conductor_api.get_this_dna().await.map_err(Box::new)?;
+    let dna_file = conductor_api.get_this_dna().map_err(Box::new)?;
 
     // Check if the zome is found
     let zome = dna_file
@@ -516,7 +516,7 @@ impl IncomingDhtOpSender {
     ) -> SysValidationResult<()> {
         if let Some(op) = make_op(element) {
             let ops = vec![op];
-            incoming_dht_ops_workflow(&self.env, self.sys_validation_trigger, ops, false)
+            incoming_dht_ops_workflow(&self.env, None, self.sys_validation_trigger, ops, false)
                 .await
                 .map_err(Box::new)?;
         }

@@ -332,7 +332,6 @@ impl ZomeCallInvocation {
         } = call;
         let zome = conductor_api
             .get_zome(cell_id.dna_hash(), &zome_name)
-            .await
             .expect("TODO");
         Self {
             cell_id,

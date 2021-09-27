@@ -44,6 +44,8 @@ pub mod post_commit;
 pub mod prelude;
 pub mod query;
 pub mod request;
+/// Schedule functions to run outside a direct zome call.
+pub mod schedule;
 pub mod signal;
 pub mod signature;
 pub use kitsune_p2p_timestamp as timestamp;

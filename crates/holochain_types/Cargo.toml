@@ -1,10 +1,10 @@
 [package]
 name = "holochain_types"
-version = "0.0.6-dev.0"
+version = "0.0.7"
 description = "Holochain common types"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
-documentation = "https://github.com/holochain/holochain"
+documentation = "https://docs.rs/holochain_types"
 readme = "README.md"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2018"
@@ -21,18 +21,18 @@ cfg-if = "0.1"
 chrono = "0.4.6"
 derive_more = "0.99.3"
 either = "1.5"
-fixt = { path = "../fixt", version = "0.0.5"}
+fixt = { path = "../fixt", version = "0.0.6"}
 flate2 = "1.0.14"
 futures = "0.3"
-holo_hash = { version = "0.0.5", path = "../holo_hash", features = ["string-encoding"] }
-holochain_keystore = { version = "0.0.6-dev.0", path = "../holochain_keystore" }
+holo_hash = { version = "0.0.7", path = "../holo_hash", features = ["encoding"] }
+holochain_keystore = { version = "0.0.7", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.51"
-holochain_sqlite = { path = "../holochain_sqlite", version = "0.0.6-dev.0"}
-holochain_zome_types = { path = "../holochain_zome_types", version = "0.0.7"}
+holochain_sqlite = { path = "../holochain_sqlite", version = "0.0.7"}
+holochain_zome_types = { path = "../holochain_zome_types", version = "0.0.9", features = ["full"] }
 itertools = { version = "0.10" }
 lazy_static = "1.4.0"
 mockall = "0.10.2"
-mr_bundle = { path = "../mr_bundle", features = ["packing"], version = "0.0.3"}
+mr_bundle = { path = "../mr_bundle", features = ["packing"], version = "0.0.4"}
 must_future = "0.1.1"
 nanoid = "0.3"
 observability = "0.1.3"
@@ -48,8 +48,8 @@ strum = "0.18.0"
 strum_macros = "0.18.0"
 tempdir = "0.3.7"
 thiserror = "1.0.22"
-tokio = { version = "1.3", features = [ "rt" ] }
-holochain_util = { version = "0.0.3", path = "../holochain_util", features = ["backtrace"] }
+tokio = { version = "1.11", features = [ "rt" ] }
+holochain_util = { version = "0.0.4", path = "../holochain_util", features = ["backtrace"] }
 tracing = "0.1.26"
 derive_builder = "0.9.0"
 
@@ -62,7 +62,7 @@ contrafact = { version = "0.1.0-dev.1", optional = true }
 maplit = "1"
 matches = "0.1"
 serde_json = "1"
-tokio = { version = "1.3", features = [ "full" ] }
+tokio = { version = "1.11", features = [ "full" ] }
 
 [features]
 default = ["fixturators", "test_utils"]

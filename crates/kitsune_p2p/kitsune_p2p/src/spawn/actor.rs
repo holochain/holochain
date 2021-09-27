@@ -281,12 +281,10 @@ impl KitsuneP2pActor {
                                         // this *does* go over the network...
                                         // so we don't want it to be too many
                                         const LIMIT: u32 = 8;
-                                        match evt_sender
-                                            .query_agent_info_signed_near_basis(
-                                                space, basis_loc, LIMIT,
-                                            )
-                                            .await
-                                        {
+                                        let query = QueryAgentsEvt::new(space)
+                                            .near_basis(basis_loc)
+                                            .limit(LIMIT);
+                                        match evt_sender.query_agents(query).await {
                                             Ok(list) if !list.is_empty() => {
                                                 let resp = wire::Wire::peer_query_resp(list);
                                                 resp!(respond, resp);
@@ -500,34 +498,11 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
         Ok(self.evt_sender.get_agent_info_signed(input))
     }
 
-    fn handle_query_agent_info_signed(
+    fn handle_query_agents(
         &mut self,
-        input: crate::event::QueryAgentInfoSignedEvt,
+        input: crate::event::QueryAgentsEvt,
     ) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
-        Ok(self.evt_sender.query_agent_info_signed(input))
-    }
-
-    fn handle_query_gossip_agents(
-        &mut self,
-        input: crate::event::QueryGossipAgentsEvt,
-    ) -> KitsuneP2pEventHandlerResult<
-        Vec<(
-            Arc<crate::KitsuneAgent>,
-            kitsune_p2p_types::dht_arc::ArcInterval,
-        )>,
-    > {
-        Ok(self.evt_sender.query_gossip_agents(input))
-    }
-
-    fn handle_query_agent_info_signed_near_basis(
-        &mut self,
-        space: Arc<KitsuneSpace>,
-        basis_loc: u32,
-        limit: u32,
-    ) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
-        Ok(self
-            .evt_sender
-            .query_agent_info_signed_near_basis(space, basis_loc, limit))
+        Ok(self.evt_sender.query_agents(input))
     }
 
     fn handle_query_peer_density(
@@ -799,26 +774,9 @@ mockall::mock! {
             input: crate::event::GetAgentInfoSignedEvt,
         ) -> KitsuneP2pEventHandlerResult<Option<crate::types::agent_store::AgentInfoSigned>>;
 
-        fn handle_query_agent_info_signed(
+        fn handle_query_agents(
             &mut self,
-            input: crate::event::QueryAgentInfoSignedEvt,
-        ) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>>;
-
-        fn handle_query_gossip_agents(
-            &mut self,
-            input: crate::event::QueryGossipAgentsEvt,
-        ) -> KitsuneP2pEventHandlerResult<
-            Vec<(
-                Arc<crate::KitsuneAgent>,
-                kitsune_p2p_types::dht_arc::ArcInterval,
-            )>,
-        >;
-
-        fn handle_query_agent_info_signed_near_basis(
-            &mut self,
-            space: Arc<KitsuneSpace>,
-            basis_loc: u32,
-            limit: u32,
+            input: crate::event::QueryAgentsEvt,
         ) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>>;
 
         fn handle_put_metric_datum(&mut self, datum: MetricDatum) -> KitsuneP2pEventHandlerResult<()>;

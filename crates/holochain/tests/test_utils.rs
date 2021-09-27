@@ -8,7 +8,6 @@ use holochain_websocket::WebsocketSender;
 pub async fn admin_port(conductor: &ConductorHandle) -> u16 {
     conductor
         .get_arbitrary_admin_websocket_port()
-        .await
         .expect("No admin port open on conductor")
 }
 
@@ -259,6 +258,7 @@ pub fn create_config(port: u16, environment_path: PathBuf) -> ConductorConfig {
         },
         keystore_path: None,
         use_dangerous_test_keystore: true,
+        db_sync_level: DbSyncLevel::default(),
     }
 }
 
