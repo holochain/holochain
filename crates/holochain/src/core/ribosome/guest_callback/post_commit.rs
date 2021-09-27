@@ -122,8 +122,8 @@ pub async fn spawn_post_commit<Ribosome: 'static>(
                 if let Err(e) = ribosome.run_post_commit(
                     PostCommitHostAccess {
                         workspace,
-                        network,
                         keystore,
+                        network,
                     },
                     PostCommitInvocation::new(zome, headers),
                 ) {
@@ -239,20 +239,20 @@ mod test {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
-    use ::fixt::prelude::*;
     use super::PostCommitResult;
+    use crate::conductor::ConductorBuilder;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
     use crate::fixt::PostCommitHostAccessFixturator;
     use crate::fixt::PostCommitInvocationFixturator;
     use crate::fixt::RealRibosomeFixturator;
-    use holo_hash::fixt::HeaderHashFixturator;
-    use holochain_wasm_test_utils::TestWasm;
-    use crate::sweettest::SweetDnaFile;
-    use hdk::prelude::*;
-    use crate::conductor::ConductorBuilder;
-    use holochain_types::prelude::MockDnaStore;
     use crate::sweettest::SweetConductor;
+    use crate::sweettest::SweetDnaFile;
+    use ::fixt::prelude::*;
+    use hdk::prelude::*;
+    use holo_hash::fixt::HeaderHashFixturator;
+    use holochain_types::prelude::MockDnaStore;
+    use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_post_commit_unimplemented() {
@@ -359,49 +359,19 @@ mod slow_tests {
         let alice = alice.zome(TestWasm::PostCommitVolley);
         let bobbo = bobbo.zome(TestWasm::PostCommitVolley);
 
-        let _set_access: () = conductor
-            .call::<_, (), _>(
-                &alice,
-                "set_access",
-                ()
-            )
-            .await;
+        let _set_access: () = conductor.call::<_, (), _>(&alice, "set_access", ()).await;
 
-        let _set_access: () = conductor
-            .call::<_, (), _>(
-                &bobbo,
-                "set_access",
-                ()
-            )
-            .await;
+        let _set_access: () = conductor.call::<_, (), _>(&bobbo, "set_access", ()).await;
 
-        let _ping: HeaderHash = conductor
-            .call(
-                &alice,
-                "ping",
-                bob_pubkey
-            )
-            .await;
+        let _ping: HeaderHash = conductor.call(&alice, "ping", bob_pubkey).await;
 
         tokio::time::sleep(std::time::Duration::from_millis(600)).await;
 
-        let alice_query: Vec<Element> = conductor
-            .call(
-                &alice,
-                "query",
-                ()
-            )
-            .await;
+        let alice_query: Vec<Element> = conductor.call(&alice, "query", ()).await;
 
         assert_eq!(alice_query.len(), 5);
 
-        let bob_query: Vec<Element> = conductor
-            .call(
-                &bobbo,
-                "query",
-                ()
-            )
-            .await;
+        let bob_query: Vec<Element> = conductor.call(&bobbo, "query", ()).await;
 
         assert_eq!(bob_query.len(), 4);
 
