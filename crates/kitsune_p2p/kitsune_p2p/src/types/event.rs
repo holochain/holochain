@@ -202,7 +202,7 @@ pub enum MetricQueryAnswer {
 pub type TimeWindow = std::ops::Range<Timestamp>;
 
 /// A time window which covers all of recordable time
-pub fn full_time_range() -> TimeWindow {
+pub fn full_time_window() -> TimeWindow {
     Timestamp::MIN..Timestamp::MAX
 }
 type KSpace = Arc<super::KitsuneSpace>;

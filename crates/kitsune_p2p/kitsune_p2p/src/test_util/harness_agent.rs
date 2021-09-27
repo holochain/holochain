@@ -171,7 +171,7 @@ impl KitsuneP2pEventHandler for AgentHarness {
         }: QueryAgentsEvt,
     ) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
         let arc_set = arc_set.unwrap_or(Arc::new(DhtArcSet::Full));
-        let window = window.unwrap_or(full_time_range());
+        let window = window.unwrap_or_else(full_time_window);
         // TODO - sort by near_basis if set
         let out = self
             .agent_store
@@ -271,7 +271,7 @@ impl KitsuneP2pEventHandler for AgentHarness {
         let hashes: Vec<Arc<super::KitsuneOpHash>> = self.gossip_store.keys().cloned().collect();
         let slug_hashes: Vec<Slug> = hashes.iter().map(|h| h.into()).collect();
         tracing::trace!(?slug_hashes, "FETCH_OP_HASHES");
-        Ok(async move { Ok(Some((hashes, full_time_range()))) }
+        Ok(async move { Ok(Some((hashes, full_time_window()))) }
             .boxed()
             .into())
     }
