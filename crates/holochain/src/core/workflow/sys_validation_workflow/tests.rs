@@ -57,8 +57,8 @@ async fn sys_validation_workflow_test() {
 
     run_test(alice_cell_id, bob_cell_id, handle.clone(), dna_file).await;
 
-    let shutdown = handle.take_shutdown_handle().await.unwrap();
-    handle.shutdown().await;
+    let shutdown = handle.take_shutdown_handle().unwrap();
+    handle.shutdown();
     shutdown.await.unwrap().unwrap();
 }
 
@@ -81,7 +81,7 @@ async fn run_test(
     // Init is not run because we aren't calling the zome.
     let expected_count = 9 + 14;
 
-    let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+    let alice_env = handle.get_cell_env(&alice_cell_id).unwrap();
     wait_for_integration(
         &alice_env,
         expected_count,
@@ -130,7 +130,7 @@ async fn run_test(
     // Integration should have 13 ops in it
     let expected_count = 14 + expected_count;
 
-    let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+    let alice_env = handle.get_cell_env(&alice_cell_id).unwrap();
     wait_for_integration(
         &alice_env,
         expected_count,
@@ -195,7 +195,7 @@ async fn run_test(
     // Integration should have new 4 ops in it
     let expected_count = 4 + expected_count;
 
-    let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+    let alice_env = handle.get_cell_env(&alice_cell_id).unwrap();
     wait_for_integration(
         &alice_env,
         expected_count,
@@ -264,7 +264,7 @@ async fn bob_links_in_a_legit_way(
         .await;
 
     // Produce and publish these commits
-    let mut triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
+    let mut triggers = handle.get_cell_triggers(&bob_cell_id).unwrap();
     triggers.publish_dht_ops.trigger();
     link_add_address
 }
@@ -320,7 +320,7 @@ async fn bob_makes_a_large_link(
         .await;
 
     // Produce and publish these commits
-    let mut triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
+    let mut triggers = handle.get_cell_triggers(&bob_cell_id).unwrap();
     triggers.publish_dht_ops.trigger();
     (bad_update_header, bad_update_entry_hash, link_add_address)
 }
@@ -350,7 +350,7 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
         .await;
 
     // Produce and publish these commits
-    let mut triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
+    let mut triggers = handle.get_cell_triggers(&bob_cell_id).unwrap();
     triggers.publish_dht_ops.trigger();
 }
 

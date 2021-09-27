@@ -33,6 +33,7 @@ thiserror = "1.0.22"
 tokio = { version = "1.11", features = [ "full" ] }
 tracing = "0.1.26"
 tracing-futures = "0.2.5"
+cron = "0.9"
 async-recursion = "0.3"
 
 tempdir = { version = "0.3", optional = true }

@@ -664,14 +664,10 @@ async fn display_integration(env: &EnvWrite) -> usize {
 }
 
 /// Helper for displaying agent infos stored on a conductor
-pub async fn display_agent_infos(conductor: &ConductorHandle) {
-    for cell_id in conductor
-        .list_cell_ids(Some(CellStatus::Joined))
-        .await
-        .unwrap()
-    {
+pub fn display_agent_infos(conductor: &ConductorHandle) {
+    for cell_id in conductor.list_cell_ids(Some(CellStatus::Joined)) {
         let space = cell_id.dna_hash().to_kitsune();
-        let env = conductor.get_p2p_env(space).await;
+        let env = conductor.get_p2p_env(space);
         let info = p2p_agent_store::dump_state(env.into(), Some(cell_id)).unwrap();
         tracing::debug!(%info);
     }

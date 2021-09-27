@@ -141,7 +141,7 @@ async fn validate_op(
     check_for_caps(&element)?;
 
     // Get the dna file
-    let dna_file = { conductor_api.get_this_dna().await };
+    let dna_file = conductor_api.get_this_dna();
     let dna_file =
         dna_file.map_err(|_| AppValidationError::DnaMissing(conductor_api.cell_id().clone()))?;
 
