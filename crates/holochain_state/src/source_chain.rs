@@ -546,15 +546,16 @@ impl SourceChain {
         if self.scratch.apply(|s| s.is_empty())? {
             return Ok(Vec::new());
         }
-        let (scheduled_fns, zomed_headers, ops, entries) = self.scratch.apply_and_then(|scratch| {
-            let (zomed_headers, ops) =
-                build_ops_from_headers(scratch.drain_zomed_headers().collect::<Vec<_>>())?;
+        let (scheduled_fns, zomed_headers, ops, entries) =
+            self.scratch.apply_and_then(|scratch| {
+                let (zomed_headers, ops) =
+                    build_ops_from_headers(scratch.drain_zomed_headers().collect::<Vec<_>>())?;
 
-            // Drain out any entries.
-            let entries = scratch.drain_entries().collect::<Vec<_>>();
-            let scheduled_fns = scratch.drain_scheduled_fns().collect::<Vec<_>>();
-            SourceChainResult::Ok((scheduled_fns, zomed_headers, ops, entries))
-        })?;
+                // Drain out any entries.
+                let entries = scratch.drain_entries().collect::<Vec<_>>();
+                let scheduled_fns = scratch.drain_scheduled_fns().collect::<Vec<_>>();
+                SourceChainResult::Ok((scheduled_fns, zomed_headers, ops, entries))
+            })?;
         let mut ops_to_integrate = HashSet::with_capacity(ops.len());
         for op in &ops {
             if network.authority_for_hash(op.0.dht_basis().clone()).await? {

@@ -37,7 +37,8 @@ where
 {
     let ribosome = args.ribosome.clone();
     let result =
-        initialize_zomes_workflow_inner(workspace.clone(), network.clone(), keystore.clone(), args).await?;
+        initialize_zomes_workflow_inner(workspace.clone(), network.clone(), keystore.clone(), args)
+            .await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
