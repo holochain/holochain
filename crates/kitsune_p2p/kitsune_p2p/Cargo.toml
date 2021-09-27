@@ -25,6 +25,7 @@ kitsune_p2p_types = { version = "0.0.6", path = "../types" }
 kitsune_p2p_proxy = { version = "0.0.6", path = "../proxy" }
 kitsune_p2p_transport_quic = { version = "0.0.6", path = "../transport_quic" }
 lair_keystore_api = "=0.0.4"
+num-traits = "0.2"
 parking_lot = "0.11.1"
 rand = "0.7"
 shrinkwraprs = "0.3.0"

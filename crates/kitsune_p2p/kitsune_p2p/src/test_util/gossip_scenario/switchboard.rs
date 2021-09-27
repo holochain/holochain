@@ -4,7 +4,6 @@ use crate::types::gossip::*;
 use crate::types::wire;
 use futures::stream::StreamExt;
 use kitsune_p2p_types::bin_types::*;
-use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::metrics::metric_task;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_pool_promote::*;
@@ -13,7 +12,7 @@ use kitsune_p2p_types::*;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
 
-use super::gossip_scenario_node::GossipScenarioNode;
+use super::gossip_scenario_node::{GossipScenarioEventHandler, GossipScenarioNode};
 
 type KSpace = Arc<KitsuneSpace>;
 type KAgent = Arc<KitsuneAgent>;
@@ -35,11 +34,7 @@ impl SwitchboardNetwork {
     }
 
     /// Set up a channel for a new node
-    pub async fn add_endpoint(
-        &mut self,
-        mem_config: MemConfig,
-        agents: &[i8],
-    ) -> Tx2EpHnd<wire::Wire> {
+    pub async fn add_endpoint(&mut self, mem_config: MemConfig) -> GossipScenarioNode {
         let f = tx2_mem_adapter(mem_config).await.unwrap();
         let f = tx2_pool_promote(f, Default::default());
         let f = tx2_api(f, Default::default());
@@ -54,8 +49,8 @@ impl SwitchboardNetwork {
 
         // TODO: randomize space
         let space = Arc::new(KitsuneSpace::new([0; 36].to_vec()));
-        let evt_handler = GossipScenarioNode::new(space.clone());
-        let (evt_sender, task) = spawn_handler(evt_handler).await;
+        let evt_handler = GossipScenarioEventHandler::new(space.clone());
+        let (evt_sender, task) = spawn_handler(evt_handler.clone()).await;
 
         self.handler_tasks.push(task);
 
@@ -73,7 +68,7 @@ impl SwitchboardNetwork {
             bandwidth,
         );
 
-        gossip.local_agent_join(Arc::new(KitsuneAgent::new([0; 36].to_vec())));
+        let node = GossipScenarioNode::new(evt_handler, GossipModule(gossip.clone()), ep_hnd);
 
         // TODO also call new_integrated_data when injecting ops
 
@@ -103,17 +98,6 @@ impl SwitchboardNetwork {
             Ok(())
         }));
 
-        ep_hnd
+        node
     }
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn smoke() {
-    let mut sb = SwitchboardNetwork::new();
-
-    let ep1 = sb.add_endpoint(Default::default(), &[0]).await;
-    let ep2 = sb.add_endpoint(Default::default(), &[0]).await;
-    let ep3 = sb.add_endpoint(Default::default(), &[0]).await;
-
-    tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
 }

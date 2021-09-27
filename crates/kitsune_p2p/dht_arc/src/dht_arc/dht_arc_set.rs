@@ -2,13 +2,13 @@ use gcollections::ops::*;
 use interval::{interval_set::*, IntervalSet};
 use std::{borrow::Borrow, collections::VecDeque, fmt::Debug};
 
-type T = u32;
+type Bound = u32;
 
 // For u32, IntervalSet excludes MAX from its set of valid values due to its
 // need to be able to express the width of an interval using a u32.
 // This min and max are set accordingly.
-const MIN: T = T::MIN;
-const MAX: T = T::MAX - 1;
+const MIN: Bound = Bound::MIN;
+const MAX: Bound = Bound::MAX - 1;
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum DhtArcSet {
@@ -17,7 +17,7 @@ pub enum DhtArcSet {
     /// implementation excludes `u32::MAX` from its set of valid bounds
     Full,
     /// Any coverage other than full, including empty
-    Partial(IntervalSet<T>),
+    Partial(IntervalSet<Bound>),
 }
 
 impl std::fmt::Debug for DhtArcSet {
@@ -82,7 +82,7 @@ impl DhtArcSet {
         match self {
             Self::Full => vec![ArcInterval::Full],
             Self::Partial(intervals) => {
-                let mut intervals: VecDeque<(T, T)> =
+                let mut intervals: VecDeque<(Bound, Bound)> =
                     intervals.iter().map(|i| (i.lower(), i.upper())).collect();
                 let wrapping = match (intervals.front(), intervals.back()) {
                     (Some(first), Some(last)) => {
@@ -122,7 +122,7 @@ impl DhtArcSet {
         }
     }
 
-    pub fn contains(&self, t: T) -> bool {
+    pub fn contains(&self, t: Bound) -> bool {
         self.overlap(&DhtArcSet::from(vec![(t, t)]))
     }
 
@@ -184,8 +184,8 @@ impl From<Vec<ArcInterval>> for DhtArcSet {
     }
 }
 
-impl From<Vec<(T, T)>> for DhtArcSet {
-    fn from(pairs: Vec<(T, T)>) -> Self {
+impl From<Vec<(Bound, Bound)>> for DhtArcSet {
+    fn from(pairs: Vec<(Bound, Bound)>) -> Self {
         pairs
             .into_iter()
             .map(|(a, b)| Self::from(&ArcInterval::new(a, b)))
@@ -214,14 +214,24 @@ fn fullness() {
 
 /// An alternate implementation of `ArcRange`
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub enum ArcInterval {
+pub enum ArcInterval<T = u32> {
     Empty,
     Full,
     Bounded(T, T),
 }
 
-impl ArcInterval {
-    pub fn new(start: T, end: T) -> Self {
+impl<T: num_traits::AsPrimitive<u32>> ArcInterval<T> {
+    pub fn to_u32(self) -> ArcInterval {
+        match self {
+            ArcInterval::Empty => ArcInterval::Empty,
+            ArcInterval::Full => ArcInterval::Full,
+            ArcInterval::Bounded(lo, hi) => ArcInterval::new(lo.as_(), hi.as_()),
+        }
+    }
+}
+
+impl ArcInterval<u32> {
+    pub fn new(start: Bound, end: Bound) -> Self {
         if is_full(start, end) {
             Self::Full
         } else {
@@ -234,11 +244,11 @@ impl ArcInterval {
         Self::Empty
     }
 
-    pub fn from_bounds(bounds: (T, T)) -> Self {
+    pub fn from_bounds(bounds: (Bound, Bound)) -> Self {
         Self::Bounded(bounds.0, bounds.1)
     }
 
-    pub fn contains<B: std::borrow::Borrow<T>>(&self, t: B) -> bool {
+    pub fn contains<B: std::borrow::Borrow<Bound>>(&self, t: B) -> bool {
         match self {
             Self::Empty => false,
             Self::Full => true,

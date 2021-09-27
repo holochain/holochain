@@ -439,8 +439,8 @@ impl std::fmt::Display for DhtArc {
 impl DhtArc {
     pub fn from_interval(interval: ArcInterval) -> Self {
         match interval {
-            ArcInterval::Empty => todo!(),
-            ArcInterval::Full => todo!(),
+            ArcInterval::Empty => Self::empty(0),
+            ArcInterval::Full => Self::full(0),
             ArcInterval::Bounded(start, end) => {
                 if start <= end {
                     // this should be +2 instead of +3, but we want to round up

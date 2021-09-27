@@ -26,6 +26,7 @@ pub trait AsGossipModule: 'static + Send + Sync {
     fn new_integrated_data(&self) {}
 }
 
+#[derive(Clone)]
 pub struct GossipModule(pub Arc<dyn AsGossipModule>);
 
 impl GossipModule {
