@@ -216,17 +216,18 @@ impl AsP2pStateTxExt for Transaction<'_> {
                     Ok(interval.map(|interval| (KitsuneAgent(agent), interval)))
                 },
             )?;
-        query.fold(Ok(vec![]), |out, maybe_pair| {
-            if let Some((agent, interval)) = maybe_pair? {
-                if arcset.overlap(&interval.clone().into()) {
-                    return out.map(|mut out| {
-                        out.push((agent, interval));
-                        out
-                    });
+        query
+            .fold(Ok(vec![]), |out, maybe_pair| {
+                if let Some((agent, interval)) = maybe_pair? {
+                    if arcset.overlap(&interval.clone().into()) {
+                        return out.map(|mut out| {
+                            out.push((agent, interval));
+                            out
+                        });
+                    }
                 }
-            }
-            out
-        })
+                out
+            })
     }
 
     fn p2p_query_near_basis(&self, basis: u32, limit: u32) -> DatabaseResult<Vec<AgentInfoSigned>> {

@@ -180,6 +180,12 @@ impl DhtArc {
         Self::new(center_loc, 0)
     }
 
+    /// Create an arc with a coverage.
+    pub fn with_coverage<I: Into<DhtLocation>>(center_loc: I, coverage: f64) -> Self {
+        let coverage = coverage.clamp(0.0, 1.0);
+        Self::new(center_loc, (MAX_HALF_LENGTH as f64 * coverage) as u32)
+    }
+
     /// Update the half length based on a density reading.
     /// This will converge on a new target instead of jumping directly
     /// to the new target and is designed to be called at a given rate

@@ -13,6 +13,7 @@ use kitsune_p2p_proxy::tx2::*;
 use kitsune_p2p_proxy::ProxyUrl;
 use kitsune_p2p_transport_quic::tx2::*;
 use kitsune_p2p_types::async_lazy::AsyncLazy;
+use kitsune_p2p_types::tx2::tx2_adapter::AdapterFactory;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_pool_promote::*;
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
@@ -87,10 +88,18 @@ impl KitsuneP2pActor {
         channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
         internal_sender: ghost_actor::GhostSender<Internal>,
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+        mock_network: Option<AdapterFactory>,
     ) -> KitsuneP2pResult<Self> {
         crate::types::metrics::init();
 
-        let tx2_conf = config.to_tx2().map_err(KitsuneP2pError::other)?;
+        let mut tx2_conf = config.to_tx2().map_err(KitsuneP2pError::other)?;
+
+        let is_mock = mock_network.is_some();
+        if let Some(mock_network) = mock_network {
+            tx2_conf.backend = KitsuneP2pTx2Backend::Mock {
+                mock_network: mock_network,
+            };
+        }
 
         // set up our backend based on config
         let (f, bind_to) = match tx2_conf.backend {
@@ -116,15 +125,21 @@ impl KitsuneP2pActor {
                     bind_to,
                 )
             }
+            KitsuneP2pTx2Backend::Mock { mock_network } => (mock_network, "none:".into()),
         };
 
         // convert to frontend
         let f = tx2_pool_promote(f, config.tuning_params.clone());
 
         // wrap in proxy
-        let mut conf = kitsune_p2p_proxy::tx2::ProxyConfig::default();
-        conf.tuning_params = Some(config.tuning_params.clone());
-        let f = tx2_proxy(f, conf)?;
+        let f = if !is_mock {
+            let mut conf = kitsune_p2p_proxy::tx2::ProxyConfig::default();
+            conf.tuning_params = Some(config.tuning_params.clone());
+            let f = tx2_proxy(f, conf)?;
+            f
+        } else {
+            f
+        };
 
         let metrics = Tx2ApiMetrics::default().set_write_len(|d, l| {
             let t = match d {

@@ -164,13 +164,17 @@ fixturator!(
 
 #[cfg(test)]
 mod tests {
+    use crate::mock_network::HolochainP2pMockChannel;
     use crate::*;
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
 
     use holochain_zome_types::ValidationStatus;
+    use kitsune_p2p::agent_store::AgentInfoSigned;
     use kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig;
+    use kitsune_p2p::dependencies::url2;
+    use kitsune_p2p::dht_arc::{ArcInterval, DhtArc, PeerDensity};
     use kitsune_p2p::KitsuneP2pConfig;
 
     macro_rules! newhash {
@@ -201,6 +205,7 @@ mod tests {
         let (p2p, mut evt) = spawn_holochain_p2p(
             KitsuneP2pConfig::default(),
             TlsConfig::new_ephemeral().await.unwrap(),
+            None,
         )
         .await
         .unwrap();
@@ -258,6 +263,7 @@ mod tests {
         let (p2p, mut evt) = spawn_holochain_p2p(
             KitsuneP2pConfig::default(),
             TlsConfig::new_ephemeral().await.unwrap(),
+            None,
         )
         .await
         .unwrap();
@@ -308,6 +314,7 @@ mod tests {
         let (p2p, mut evt) = spawn_holochain_p2p(
             KitsuneP2pConfig::default(),
             TlsConfig::new_ephemeral().await.unwrap(),
+            None,
         )
         .await
         .unwrap();
@@ -368,6 +375,7 @@ mod tests {
         let (p2p, mut evt) = spawn_holochain_p2p(
             KitsuneP2pConfig::default(),
             TlsConfig::new_ephemeral().await.unwrap(),
+            None,
         )
         .await
         .unwrap();
@@ -454,6 +462,7 @@ mod tests {
         let (p2p, mut evt) = spawn_holochain_p2p(
             KitsuneP2pConfig::default(),
             TlsConfig::new_ephemeral().await.unwrap(),
+            None,
         )
         .await
         .unwrap();
@@ -518,5 +527,191 @@ mod tests {
 
         p2p.ghost_actor_shutdown().await.unwrap();
         r_task.await.unwrap();
+    }
+
+    async fn agent_info() -> AgentInfoSigned {
+        use ::fixt::prelude::*;
+        use kitsune_p2p::fixt::*;
+        AgentInfoSigned::sign(
+            // FIXME: This space shouldn't be random.
+            Arc::new(fixt!(KitsuneSpace)),
+            Arc::new(fixt!(KitsuneAgent)),
+            u32::MAX / 2,
+            vec![url2::url2!("kitsune-proxy://CIW6PxKxsPPlcuvUCbMcKwUpaMSmB7kLD8xyyj4mqcw/kitsune-quic/h/localhost/p/5778/-").into()],
+            0,
+                    std::time::UNIX_EPOCH.elapsed().unwrap().as_millis() as u64 + 60_000_000,
+            |_| async move { Ok(Arc::new(fixt!(KitsuneSignature, Predictable))) },
+        )
+        .await
+        .unwrap()
+    }
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_mock_get_workflow() {
+        observability::test_run().ok();
+        let info1 = agent_info().await;
+        let info2 = agent_info().await;
+        let peer_data = vec![info1.clone(), info2.clone()];
+        let from_agents = vec![
+            holo_hash::AgentPubKey::from_kitsune(&info1.agent),
+            holo_hash::AgentPubKey::from_kitsune(&info2.agent),
+        ];
+
+        let (dna, a1, a2, _a3) = test_setup();
+        let (from_kitsune_tx, to_kitsune_rx, mut channel) =
+            HolochainP2pMockChannel::channel(peer_data, 1000);
+        tokio::task::spawn(async move {
+            while let Some((msg, _)) = channel.next().await {
+                dbg!(&msg);
+                let mock_network::AddressedHolochainP2pMockMsg { agent, msg } = msg;
+                match msg {
+                    mock_network::HolochainP2pMockMsg::Gossip {
+                        dna,
+                        module,
+                        gossip,
+                    } => {
+                        if let kitsune_p2p::GossipModuleType::ShardedRecent = module {
+                            use kitsune_p2p::gossip::sharded_gossip::*;
+                            dbg!(&gossip);
+                            match gossip {
+                                ShardedGossipWire::Initiate { .. } => {
+                                    let msg = mock_network::HolochainP2pMockMsg::Gossip {
+                                        dna: dna.clone(),
+                                        module: module.clone(),
+                                        gossip: ShardedGossipWire::accept(vec![ArcInterval::Full]),
+                                    };
+                                    channel.send(msg.addressed(agent.clone())).await;
+                                    let msg = mock_network::HolochainP2pMockMsg::Gossip {
+                                        dna,
+                                        module,
+                                        gossip: ShardedGossipWire::initiate(
+                                            vec![ArcInterval::Full],
+                                            100,
+                                        ),
+                                    };
+                                    let from_agent =
+                                        from_agents.iter().find(|a| **a != agent).unwrap();
+                                    channel.send(msg.addressed(from_agent.clone())).await;
+                                }
+                                _ => (),
+                            }
+                        }
+                    }
+                    _ => (),
+                }
+            }
+            dbg!();
+        });
+
+        let (p2p, mut evt) = spawn_holochain_p2p(
+            KitsuneP2pConfig::default(),
+            TlsConfig::new_ephemeral().await.unwrap(),
+            Some(Arc::new(
+                kitsune_p2p::test_util::mock_network::mock_network(from_kitsune_tx, to_kitsune_rx),
+            )),
+        )
+        .await
+        .unwrap();
+
+        let test_1 = WireOps::Element(WireElementOps {
+            header: Some(Judged::valid(SignedHeader(fixt!(Header), fixt!(Signature)))),
+            deletes: vec![],
+            updates: vec![],
+            entry: None,
+        });
+        let test_2 = WireOps::Element(WireElementOps {
+            header: Some(Judged::valid(SignedHeader(fixt!(Header), fixt!(Signature)))),
+            deletes: vec![],
+            updates: vec![],
+            entry: None,
+        });
+
+        let mut respond_queue = vec![test_1.clone(), test_2.clone()];
+        let r_task = tokio::task::spawn(async move {
+            use tokio_stream::StreamExt;
+            while let Some(evt) = evt.next().await {
+                let info1 = info1.clone();
+                let info2 = info2.clone();
+                use crate::types::event::HolochainP2pEvent::*;
+                match evt {
+                    Get { respond, .. } => {
+                        let resp = if let Some(h) = respond_queue.pop() {
+                            h
+                        } else {
+                            panic!("too many requests!")
+                        };
+                        tracing::info!("test - get respond");
+                        respond.r(Ok(async move { Ok(resp) }.boxed().into()));
+                    }
+                    SignNetworkData { respond, .. } => {
+                        respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
+                    }
+                    PutAgentInfoSigned { respond, .. } => {
+                        respond.r(Ok(async move { Ok(()) }.boxed().into()));
+                    }
+                    QueryAgentInfoSigned { respond, .. } => {
+                        respond.r(Ok(async move { Ok(vec![info1.clone(), info2.clone()]) }
+                            .boxed()
+                            .into()));
+                    }
+                    QueryGossipAgents { respond, .. } => {
+                        let info1 = info1.clone();
+                        let info2 = info2.clone();
+                        respond.r(Ok(async move {
+                            Ok(vec![
+                                (info1.agent.clone(), ArcInterval::Full),
+                                (info2.agent.clone(), ArcInterval::Full),
+                            ])
+                        }
+                        .boxed()
+                        .into()));
+                    }
+                    QueryOpHashes { respond, .. } => {
+                        respond.r(Ok(async move { Ok(None) }.boxed().into()));
+                    }
+                    QueryPeerDensity { respond, .. } => {
+                        let d = PeerDensity::new(DhtArc::full(0), 1.0, 2);
+                        respond.r(Ok(async move { Ok(d) }.boxed().into()));
+                    }
+                    QueryAgentInfoSignedNearBasis { respond, .. } => {
+                        respond.r(Ok(async move { Ok(vec![info1.clone(), info2.clone()]) }
+                            .boxed()
+                            .into()));
+                    }
+                    FetchOpData { respond, .. } => {
+                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                    }
+                    evt => println!("unhandled: {:?}", evt),
+                }
+            }
+        });
+
+        tracing::info!("test - join1");
+        p2p.join(dna.clone(), a1.clone()).await.unwrap();
+        tracing::info!("test - join2");
+        p2p.join(dna.clone(), a2.clone()).await.unwrap();
+
+        let hash = holo_hash::AnyDhtHash::from_raw_36_and_type(
+            b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
+            holo_hash::hash_type::AnyDht::Header,
+        );
+
+        tracing::info!("test - get");
+        let res = p2p
+            .get(dna, a1, hash, actor::GetOptions::default())
+            .await
+            .unwrap();
+
+        tracing::info!("test - check res");
+        assert_eq!(2, res.len());
+
+        for r in res {
+            assert!(r == test_1 || r == test_2);
+        }
+
+        tracing::info!("test - end of test shutdown p2p");
+        p2p.ghost_actor_shutdown().await.unwrap();
+        tracing::info!("test - end of test await task end");
+        r_task.await.unwrap();
+        tracing::info!("test - end of test - final done.");
     }
 }

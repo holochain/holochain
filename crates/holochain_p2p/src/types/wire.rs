@@ -19,7 +19,7 @@ impl WireDhtOpData {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "content")]
-pub(crate) enum WireMessage {
+pub enum WireMessage {
     CallRemote {
         zome_name: ZomeName,
         fn_name: FunctionName,

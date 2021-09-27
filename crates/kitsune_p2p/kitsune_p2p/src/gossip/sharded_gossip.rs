@@ -32,6 +32,10 @@ use super::simple_bloom::{HowToConnect, MetaOpKey};
 
 pub use bandwidth::BandwidthThrottles;
 
+#[cfg(feature = "test_utils")]
+#[allow(missing_docs)]
+pub mod test_utils;
+
 mod accept;
 mod agents;
 mod bloom;
