@@ -239,6 +239,7 @@ mod test {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
+    use ::fixt::prelude::*;
     use super::PostCommitResult;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
@@ -247,6 +248,11 @@ mod slow_tests {
     use crate::fixt::RealRibosomeFixturator;
     use holo_hash::fixt::HeaderHashFixturator;
     use holochain_wasm_test_utils::TestWasm;
+    use crate::sweettest::SweetDnaFile;
+    use hdk::prelude::*;
+    use crate::conductor::ConductorBuilder;
+    use holochain_types::prelude::MockDnaStore;
+    use crate::sweettest::SweetConductor;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_post_commit_unimplemented() {
@@ -313,5 +319,92 @@ mod slow_tests {
                 "empty header fail".into()
             ),
         );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[cfg(feature = "test_utils")]
+    async fn post_commit_test_volley() -> anyhow::Result<()> {
+        observability::test_run().ok();
+        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::PostCommitVolley])
+            .await
+            .unwrap();
+
+        let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
+        let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
+
+        let mut dna_store = MockDnaStore::new();
+        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
+        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
+        dna_store.expect_add_dna().return_const(());
+        dna_store
+            .expect_get()
+            .return_const(Some(dna_file.clone().into()));
+        dna_store
+            .expect_get_entry_def()
+            .return_const(EntryDef::default_with_id("thing"));
+
+        let mut conductor =
+            SweetConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
+
+        let apps = conductor
+            .setup_app_for_agents(
+                "app-",
+                &[alice_pubkey.clone(), bob_pubkey.clone()],
+                &[dna_file.into()],
+            )
+            .await
+            .unwrap();
+
+        let ((alice,), (bobbo,)) = apps.into_tuples();
+        let alice = alice.zome(TestWasm::PostCommitVolley);
+        let bobbo = bobbo.zome(TestWasm::PostCommitVolley);
+
+        let _set_access: () = conductor
+            .call::<_, (), _>(
+                &alice,
+                "set_access",
+                ()
+            )
+            .await;
+
+        let _set_access: () = conductor
+            .call::<_, (), _>(
+                &bobbo,
+                "set_access",
+                ()
+            )
+            .await;
+
+        let _ping: HeaderHash = conductor
+            .call(
+                &alice,
+                "ping",
+                bob_pubkey
+            )
+            .await;
+
+        tokio::time::sleep(std::time::Duration::from_millis(600)).await;
+
+        let alice_query: Vec<Element> = conductor
+            .call(
+                &alice,
+                "query",
+                ()
+            )
+            .await;
+
+        assert_eq!(alice_query.len(), 5);
+
+        let bob_query: Vec<Element> = conductor
+            .call(
+                &bobbo,
+                "query",
+                ()
+            )
+            .await;
+
+        assert_eq!(bob_query.len(), 4);
+
+        Ok(())
     }
 }

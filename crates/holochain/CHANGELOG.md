@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 
 - The scheduler should work now
+- Post commit hook should work now
 
 ## 0.0.107
 

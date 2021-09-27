@@ -1,9 +1,11 @@
 use hdk::prelude::*;
 
-const PING_LIMIT: usize = 5;
+const PINGS: usize = 5;
 
 #[hdk_entry(id = "ping")]
 struct Ping(AgentPubKey);
+
+entry_defs![Ping::entry_def()];
 
 #[hdk_extern]
 fn set_access(_: ()) -> ExternResult<()> {
@@ -20,18 +22,27 @@ fn set_access(_: ()) -> ExternResult<()> {
 }
 
 #[hdk_extern]
-fn ping(agent: AgentPubKey) -> ExternResult<()> {
+fn ping(agent: AgentPubKey) -> ExternResult<HeaderHash> {
     create_entry(Ping(agent))
 }
 
 #[hdk_extern]
-fn post_commit(header_hashes: Vec<SignedHeaderHashed>) -> ExternResult<PostCommitCallbackResult> {
-    let ping: Ping = must_get_entry(header_hashes.next().unwrap())?.try_into()?;
-    call_remote(
-        ping.0,
-        zome_info()?.zome_name,
-        "ping".to_string().into(),
-        None,
-        &agent_info().agent_pub_key,
-    )?;
+fn post_commit(shhs: Vec<SignedHeaderHashed>) -> ExternResult<PostCommitCallbackResult> {
+    if let Ok(ping) = Ping::try_from(must_get_entry(shhs[0].header().entry_hash().unwrap().clone())?) {
+        if hdk::prelude::query(ChainQueryFilter::default().entry_type(entry_type!(Ping).unwrap())).unwrap().len() < PINGS {
+            call_remote(
+                ping.0,
+                zome_info()?.zome_name,
+                "ping".to_string().into(),
+                None,
+                &agent_info()?.agent_latest_pubkey,
+            )?;
+        }
+    }
+    Ok(PostCommitCallbackResult::Success)
+}
+
+#[hdk_extern]
+fn query(_: ()) -> ExternResult<Vec<Element>> {
+    hdk::prelude::query(ChainQueryFilter::default().entry_type(entry_type!(Ping).unwrap()))
 }

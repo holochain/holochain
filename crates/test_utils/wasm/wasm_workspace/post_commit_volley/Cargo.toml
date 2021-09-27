@@ -1,11 +1,11 @@
 [package]
-name = "test_wasm_post_commit_success"
+name = "test_wasm_post_commit_volley"
 version = "0.0.1"
 authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
 edition = "2018"
 
 [lib]
-name = "test_wasm_post_commit_success"
+name = "test_wasm_post_commit_volley"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
