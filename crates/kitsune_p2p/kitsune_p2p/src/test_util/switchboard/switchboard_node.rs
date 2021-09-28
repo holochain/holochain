@@ -25,6 +25,12 @@ pub struct SwitchboardNode {
     state: Share<SwitchboardNodeState>,
 }
 
+impl std::hash::Hash for SwitchboardNode {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.ep_hnd.hash(state)
+    }
+}
+
 #[derive(Clone)]
 pub struct SwitchboardEventHandler {
     space: KSpace,

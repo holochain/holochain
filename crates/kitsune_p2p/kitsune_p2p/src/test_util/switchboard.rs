@@ -18,11 +18,10 @@ mod tests {
         let n2 = sb.add_node(Default::default()).await;
         let n3 = sb.add_node(Default::default()).await;
 
-        // sb.add_agent(n1, 1, ArcInterval::Full);
+        sb.add_agent(&n1, 1, ArcInterval::Full);
+        sb.add_agent(&n2, 2, ArcInterval::Full);
+        sb.add_agent(&n3, 3, ArcInterval::Full);
 
-        n1.add_agents([(1, ArcInterval::Full)]);
-        n2.add_agents([(2, ArcInterval::Full)]);
-        n3.add_agents([(3, ArcInterval::Full)]);
         n1.add_ops([2, 3, 4]);
         n2.add_ops([1, 2]);
         n3.add_ops([-2, -1]);
