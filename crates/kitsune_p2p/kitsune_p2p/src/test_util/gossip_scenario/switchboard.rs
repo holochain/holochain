@@ -70,11 +70,10 @@ impl SwitchboardNetwork {
 
         let node = GossipScenarioNode::new(evt_handler, GossipModule(gossip.clone()), ep_hnd);
 
-        // TODO also call new_integrated_data when injecting ops
-
         self.metric_tasks.push(metric_task(async move {
+            dbg!("begin metric task");
             while let Some(evt) = ep.next().await {
-                match evt {
+                match dbg!(evt) {
                     // what other messages do i need to handle?
                     Tx2EpEvent::IncomingNotify(Tx2EpIncomingNotify { con, url, data, .. }) => {
                         match data {

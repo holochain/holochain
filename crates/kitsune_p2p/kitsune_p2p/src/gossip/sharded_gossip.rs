@@ -518,6 +518,7 @@ impl ShardedGossipLocal {
         cert: Tx2Cert,
         msg: ShardedGossipWire,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
+        dbg!("incoming gossip", &msg);
         let s = tracing::trace_span!("process_incoming", ?cert, agents = ?self.show_local_agents(), ?msg);
         s.in_scope(|| self.log_state());
         // If we don't have the state for a message then the other node will need to timeout.

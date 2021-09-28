@@ -25,6 +25,11 @@ mod tests {
         n2.add_ops([1, 2]);
         n3.add_ops([-2, -1]);
 
+        let all = vec![-2, -1, 1, 2, 3, 4];
+        assert_eq!(n1.get_ops(), all);
+        assert_eq!(n2.get_ops(), all);
+        assert_eq!(n3.get_ops(), all);
+
         tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
     }
 }

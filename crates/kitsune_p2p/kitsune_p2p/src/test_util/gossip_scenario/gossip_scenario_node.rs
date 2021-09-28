@@ -7,6 +7,7 @@ use crate::types::gossip::GossipModule;
 use crate::types::wire;
 use kitsune_p2p_types::agent_info::{AgentInfoInner, AgentInfoSigned};
 use kitsune_p2p_types::bin_types::*;
+use kitsune_p2p_types::dht_arc::loc8::Loc8;
 use kitsune_p2p_types::dht_arc::{ArcInterval, DhtArc, DhtLocation};
 use kitsune_p2p_types::tx2::tx2_api::Tx2EpHnd;
 use kitsune_p2p_types::tx2::tx2_utils::Share;
@@ -63,18 +64,18 @@ impl GossipScenarioNode {
         }
     }
 
-    pub fn add_agents<L, A>(&self, agents: A)
+    pub fn add_agents<A>(&self, agents: A)
     where
-        L: Into<DhtLocation> + num_traits::AsPrimitive<u32>,
-        A: IntoIterator<Item = (L, ArcInterval<L>)>,
+        A: IntoIterator<Item = (Loc8, ArcInterval<Loc8>)>,
     {
+        // TODO: make the switchboard add this agent info to all other nodes too
         let space = self.space.clone();
         let new_agents: Vec<KAgent> = self
             .state
             .share_mut(|state, _| {
                 let info = agents
                     .into_iter()
-                    .map(|(agent_loc, arc): (L, ArcInterval<L>)| {
+                    .map(|(agent_loc, arc): (Loc8, ArcInterval<Loc8>)| {
                         let agent_loc: DhtLocation = agent_loc.into();
                         let agent = Arc::new(KitsuneAgent::new(agent_loc.to_bytes_36()));
                         (
@@ -93,14 +94,13 @@ impl GossipScenarioNode {
         }
     }
 
-    pub fn add_ops<L, O>(&self, ops: O)
+    pub fn add_ops<O>(&self, ops: O)
     where
-        L: Into<DhtLocation>,
-        O: IntoIterator<Item = L>,
+        O: IntoIterator<Item = Loc8>,
     {
         self.state
             .share_mut(|state, _| {
-                state.ops.extend(ops.into_iter().map(|op_loc: L| {
+                state.ops.extend(ops.into_iter().map(|op_loc: Loc8| {
                     let loc: DhtLocation = op_loc.into();
                     let hash = Arc::new(KitsuneOpHash::new(loc.to_bytes_36()));
                     let data = loc.as_u32().to_le_bytes().to_vec();
@@ -110,6 +110,20 @@ impl GossipScenarioNode {
             })
             .unwrap();
         self.gossip.new_integrated_data();
+    }
+
+    pub fn get_ops(&self) -> Vec<Loc8> {
+        self.state
+            .share_ref(|state| {
+                let mut ops: Vec<_> = state
+                    .ops
+                    .keys()
+                    .map(|hash| DhtLocation::new(hash.get_loc()).into())
+                    .collect();
+                ops.sort();
+                Ok(ops)
+            })
+            .unwrap()
     }
 }
 
@@ -136,6 +150,7 @@ impl KitsuneP2pEventHandler for GossipScenarioEventHandler {
         &mut self,
         PutAgentInfoSignedEvt { space, peer_data }: PutAgentInfoSignedEvt,
     ) -> KitsuneP2pEventHandlerResult<()> {
+        dbg!("handle_put_agent_info_signed");
         self.assert_space(space);
         self.state.share_mut(|state, _| {
             state
@@ -150,6 +165,7 @@ impl KitsuneP2pEventHandler for GossipScenarioEventHandler {
         &mut self,
         GetAgentInfoSignedEvt { space, agent }: GetAgentInfoSignedEvt,
     ) -> KitsuneP2pEventHandlerResult<Option<crate::types::agent_store::AgentInfoSigned>> {
+        dbg!("handle_get_agent_info_signed");
         self.assert_space(space);
         ok_fut(Ok(self
             .state
@@ -181,7 +197,7 @@ impl KitsuneP2pEventHandler for GossipScenarioEventHandler {
                 state.agents.iter().map(|(_, info)| info).cloned().collect()
             })
         })?;
-        ok_fut(Ok(result))
+        ok_fut(Ok(dbg!(result)))
     }
 
     fn handle_query_peer_density(
