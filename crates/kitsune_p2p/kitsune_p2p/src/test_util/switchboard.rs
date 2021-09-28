@@ -1,22 +1,24 @@
 //! A channel-based implementation of network connections, for direct manipulation
 //! of the medium of message exchange, used during testing
 
-mod gossip_scenario_node;
 mod switchboard;
+mod switchboard_node;
 
 #[cfg(test)]
 mod tests {
     use kitsune_p2p_types::dht_arc::ArcInterval;
 
-    use super::switchboard::SwitchboardNetwork;
+    use super::switchboard::Switchboard;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn smoke() {
-        let mut sb = SwitchboardNetwork::new();
+        let mut sb = Switchboard::new();
 
-        let n1 = sb.add_endpoint(Default::default()).await;
-        let n2 = sb.add_endpoint(Default::default()).await;
-        let n3 = sb.add_endpoint(Default::default()).await;
+        let n1 = sb.add_node(Default::default()).await;
+        let n2 = sb.add_node(Default::default()).await;
+        let n3 = sb.add_node(Default::default()).await;
+
+        // sb.add_agent(n1, 1, ArcInterval::Full);
 
         n1.add_agents([(1, ArcInterval::Full)]);
         n2.add_agents([(2, ArcInterval::Full)]);

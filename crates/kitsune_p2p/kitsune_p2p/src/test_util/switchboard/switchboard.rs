@@ -12,7 +12,7 @@ use kitsune_p2p_types::*;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
 
-use super::gossip_scenario_node::{GossipScenarioEventHandler, GossipScenarioNode};
+use super::switchboard_node::{SwitchboardEventHandler, SwitchboardNode};
 
 type KSpace = Arc<KitsuneSpace>;
 type KAgent = Arc<KitsuneAgent>;
@@ -20,12 +20,12 @@ type KOpHash = Arc<KitsuneOpHash>;
 
 /// An channel-based implementation of networking for tests, where messages are
 /// simply routed in-memory
-pub struct SwitchboardNetwork {
+pub struct Switchboard {
     metric_tasks: Vec<JoinHandle<KitsuneResult<()>>>,
     handler_tasks: Vec<JoinHandle<ghost_actor::GhostResult<()>>>,
 }
 
-impl SwitchboardNetwork {
+impl Switchboard {
     pub fn new() -> Self {
         Self {
             metric_tasks: Default::default(),
@@ -34,7 +34,7 @@ impl SwitchboardNetwork {
     }
 
     /// Set up a channel for a new node
-    pub async fn add_endpoint(&mut self, mem_config: MemConfig) -> GossipScenarioNode {
+    pub async fn add_node(&mut self, mem_config: MemConfig) -> SwitchboardNode {
         let f = tx2_mem_adapter(mem_config).await.unwrap();
         let f = tx2_pool_promote(f, Default::default());
         let f = tx2_api(f, Default::default());
@@ -49,7 +49,7 @@ impl SwitchboardNetwork {
 
         // TODO: randomize space
         let space = Arc::new(KitsuneSpace::new([0; 36].to_vec()));
-        let evt_handler = GossipScenarioEventHandler::new(space.clone());
+        let evt_handler = SwitchboardEventHandler::new(space.clone());
         let (evt_sender, task) = spawn_handler(evt_handler.clone()).await;
 
         self.handler_tasks.push(task);
@@ -68,7 +68,7 @@ impl SwitchboardNetwork {
             bandwidth,
         );
 
-        let node = GossipScenarioNode::new(evt_handler, GossipModule(gossip.clone()), ep_hnd);
+        let node = SwitchboardNode::new(evt_handler, GossipModule(gossip.clone()), ep_hnd);
 
         self.metric_tasks.push(metric_task(async move {
             dbg!("begin metric task");

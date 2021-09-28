@@ -18,20 +18,20 @@ type KAgent = Arc<KitsuneAgent>;
 type KOpHash = Arc<KitsuneOpHash>;
 
 #[derive(Clone)]
-pub struct GossipScenarioNode {
+pub struct SwitchboardNode {
     space: KSpace,
     gossip: GossipModule,
     ep_hnd: Tx2EpHnd<wire::Wire>,
-    state: Share<GossipScenarioNodeState>,
+    state: Share<SwitchboardNodeState>,
 }
 
 #[derive(Clone)]
-pub struct GossipScenarioEventHandler {
+pub struct SwitchboardEventHandler {
     space: KSpace,
-    state: Share<GossipScenarioNodeState>,
+    state: Share<SwitchboardNodeState>,
 }
 
-impl GossipScenarioEventHandler {
+impl SwitchboardEventHandler {
     pub fn new(space: KSpace) -> Self {
         Self {
             space,
@@ -45,14 +45,14 @@ impl GossipScenarioEventHandler {
 }
 
 #[derive(Default)]
-pub struct GossipScenarioNodeState {
+pub struct SwitchboardNodeState {
     agents: HashMap<KAgent, AgentInfoSigned>,
     ops: HashMap<KOpHash, Vec<u8>>,
 }
 
-impl GossipScenarioNode {
+impl SwitchboardNode {
     pub fn new(
-        handler: GossipScenarioEventHandler,
+        handler: SwitchboardEventHandler,
         gossip: GossipModule,
         ep_hnd: Tx2EpHnd<wire::Wire>,
     ) -> Self {
@@ -141,11 +141,11 @@ fn fake_agent_info(space: KSpace, agent: KAgent, interval: ArcInterval) -> Agent
     AgentInfoSigned(Arc::new(state))
 }
 
-impl ghost_actor::GhostHandler<KitsuneP2pEvent> for GossipScenarioEventHandler {}
-impl ghost_actor::GhostControlHandler for GossipScenarioEventHandler {}
+impl ghost_actor::GhostHandler<KitsuneP2pEvent> for SwitchboardEventHandler {}
+impl ghost_actor::GhostControlHandler for SwitchboardEventHandler {}
 
 #[allow(warnings)]
-impl KitsuneP2pEventHandler for GossipScenarioEventHandler {
+impl KitsuneP2pEventHandler for SwitchboardEventHandler {
     fn handle_put_agent_info_signed(
         &mut self,
         PutAgentInfoSignedEvt { space, peer_data }: PutAgentInfoSignedEvt,
