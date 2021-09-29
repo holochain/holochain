@@ -4,6 +4,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 - Refactor conductor to use parking lot rw lock instead of tokio rw lock. (Faster and prevents deadlocks.)
+- FIX: Prevent the conductor from trying to join cells to the network that are already in the process of joining.
 
 ### Changed
 
