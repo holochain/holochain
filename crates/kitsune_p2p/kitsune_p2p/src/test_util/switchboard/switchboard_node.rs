@@ -86,7 +86,7 @@ impl SwitchboardNode {
                         let agent = Arc::new(KitsuneAgent::new(agent_loc.to_bytes_36()));
                         (
                             agent.clone(),
-                            fake_agent_info(space.clone(), agent, arc.to_u32()),
+                            fake_agent_info(space.clone(), agent, arc.to_dht_location()),
                         )
                     })
                     .collect::<Vec<_>>();
@@ -121,11 +121,7 @@ impl SwitchboardNode {
     pub fn get_ops(&self) -> Vec<Loc8> {
         self.state
             .share_ref(|state| {
-                let mut ops: Vec<_> = state
-                    .ops
-                    .keys()
-                    .map(|hash| DhtLocation::new(hash.get_loc()).into())
-                    .collect();
+                let mut ops: Vec<_> = state.ops.keys().map(|hash| hash.get_loc().into()).collect();
                 ops.sort();
                 Ok(ops)
             })

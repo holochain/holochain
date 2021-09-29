@@ -42,7 +42,6 @@ impl Switchboard {
         }
     }
 
-    /// Set up a channel for a new node
     pub async fn add_node(&mut self, mem_config: MemConfig) -> SwitchboardNode {
         let f = tx2_mem_adapter(mem_config).await.unwrap();
         let f = tx2_pool_promote(f, Default::default());
@@ -115,7 +114,7 @@ impl Switchboard {
     ) {
         let agent_loc: DhtLocation = agent_loc8.clone().into();
         let agent = Arc::new(KitsuneAgent::new(agent_loc.to_bytes_36()));
-        let info = fake_agent_info(self.space.clone(), agent, interval.to_u32());
+        let info = fake_agent_info(self.space.clone(), agent, interval.to_dht_location());
         if let Some(old) = self.agents.insert(agent_loc8, (info, node.clone())) {
             panic!(
                 "Attempted to insert two agents at the same Loc8. Existing agent info: {:?}",
