@@ -3,7 +3,6 @@
 
 mod switchboard;
 mod switchboard_evt_handler;
-mod switchboard_node;
 
 #[cfg(test)]
 mod tests {
@@ -13,15 +12,20 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn smoke() {
-        let mut sb = Switchboard::new(None);
+        let mut sb = Switchboard::new();
 
-        // let n1 = sb.add_node(Default::default()).await;
-        // let n2 = sb.add_node(Default::default()).await;
-        // let n3 = sb.add_node(Default::default()).await;
+        let n1 = sb.add_node(Default::default()).await;
+        let n2 = sb.add_node(Default::default()).await;
+        let n3 = sb.add_node(Default::default()).await;
 
-        // sb.add_agent(&n1, 1, ArcInterval::Full);
-        // sb.add_agent(&n2, 2, ArcInterval::Full);
-        // sb.add_agent(&n3, 3, ArcInterval::Full);
+        sb.space_state()
+            .share_mut(|sb, _| {
+                sb.add_agent(&n1, 1, ArcInterval::Full);
+                sb.add_agent(&n2, 2, ArcInterval::Full);
+                sb.add_agent(&n3, 3, ArcInterval::Full);
+                Ok(())
+            })
+            .unwrap();
 
         // n1.add_ops([2, 3, 4]);
         // n2.add_ops([1, 2]);

@@ -4,19 +4,12 @@ use std::sync::Arc;
 use crate::event::*;
 use crate::test_util::switchboard::switchboard::AgentEntry;
 use crate::types::event::{KitsuneP2pEvent, KitsuneP2pEventHandler, KitsuneP2pEventHandlerResult};
-use crate::types::gossip::GossipModule;
-use crate::types::wire;
-use futures::FutureExt;
-use kitsune_p2p_types::agent_info::{AgentInfoInner, AgentInfoSigned};
 use kitsune_p2p_types::bin_types::*;
-use kitsune_p2p_types::dht_arc::loc8::Loc8;
-use kitsune_p2p_types::dht_arc::{ArcInterval, DhtArc, DhtArcSet, DhtLocation};
-use kitsune_p2p_types::tx2::tx2_api::Tx2EpHnd;
+use kitsune_p2p_types::dht_arc::DhtArcSet;
 use kitsune_p2p_types::tx2::tx2_utils::Share;
 use kitsune_p2p_types::*;
 
-use super::switchboard::{OpEntry, Switchboard, SwitchboardSpace};
-use super::switchboard_node::SwitchboardNode;
+use super::switchboard::{NodeEp, OpEntry, SwitchboardSpace};
 
 type KSpace = Arc<KitsuneSpace>;
 type KAgent = Arc<KitsuneAgent>;
@@ -24,12 +17,12 @@ type KOpHash = Arc<KitsuneOpHash>;
 
 #[derive(Clone)]
 pub struct SwitchboardEventHandler {
-    node: SwitchboardNode,
-    sb: Share<Switchboard>,
+    node: NodeEp,
+    sb: Share<SwitchboardSpace>,
 }
 
 impl SwitchboardEventHandler {
-    pub fn new(node: SwitchboardNode, sb: Share<Switchboard>) -> Self {
+    pub fn new(node: NodeEp, sb: Share<SwitchboardSpace>) -> Self {
         Self { node, sb }
     }
 }
@@ -45,19 +38,11 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
     ) -> KitsuneP2pEventHandlerResult<()> {
         dbg!("handle_put_agent_info_signed");
         self.sb.share_mut(|state, _| {
-            state
-                .space(space)
-                .agents
-                .extend(peer_data.into_iter().map(|info| {
-                    (
-                        info.agent.get_loc().into(),
-                        AgentEntry {
-                            info,
-                            // Empty map of ops
-                            ops: HashMap::new(),
-                        },
-                    )
-                }));
+            state.agents_for_node(&self.node).extend(
+                peer_data
+                    .into_iter()
+                    .map(|info| (info.agent.get_loc().into(), AgentEntry::new(info))),
+            );
             Ok(())
         })?;
         ok_fut(Ok(()))
@@ -70,8 +55,7 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
         dbg!("handle_get_agent_info_signed");
         ok_fut(Ok(self.sb.share_mut(|state, _| {
             Ok(state
-                .space(space)
-                .agents
+                .agents_for_node(&self.node)
                 .get(&agent.get_loc().into())
                 .map(|e| e.info.to_owned()))
         })?))
@@ -89,22 +73,16 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
         }: QueryAgentsEvt,
     ) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
         let result = self.sb.share_mut(|state, _| {
+            let agent_map = &state.nodes.get(&self.node).expect("Node not added").agents;
             Ok(if let Some(agents) = agents {
-                state
-                    .space(space)
-                    .agents
+                agent_map
                     .values()
                     .filter(|e| agents.contains(&e.info.agent))
                     .map(|e| e.info.to_owned())
                     // .cloned()
                     .collect()
             } else {
-                state
-                    .space(space)
-                    .agents
-                    .values()
-                    .map(|e| e.info.to_owned())
-                    .collect()
+                agent_map.values().map(|e| e.info.to_owned()).collect()
             })
         })?;
         ok_fut(Ok(dbg!(result)))
@@ -177,8 +155,7 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
             include_limbo: true, // TODO: is this correct?
             max_ops: usize::MAX,
         };
-        ok_fut(Ok(self.sb.share_ref(|sb| {
-            let sb = sb.space(space);
+        ok_fut(Ok(self.sb.share_mut(|sb, _| {
             let hashes = sb.query_op_hashes(query).unwrap().0;
             Ok(hashes
                 .into_iter()
@@ -194,9 +171,9 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
         &mut self,
         query: QueryOpHashesEvt,
     ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindow)>> {
-        ok_fut(Ok(self.sb.share_mut(|sb, _| {
-            Ok(sb.space(query.space.clone()).query_op_hashes(query))
-        })?))
+        ok_fut(Ok(self
+            .sb
+            .share_mut(|sb, _| Ok(sb.query_op_hashes(query)))?))
     }
 
     fn handle_sign_network_data(

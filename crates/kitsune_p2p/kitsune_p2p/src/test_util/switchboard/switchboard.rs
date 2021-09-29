@@ -4,6 +4,7 @@ use crate::test_util::spawn_handler;
 use crate::types::gossip::*;
 use crate::types::wire;
 use futures::stream::StreamExt;
+use ghost_actor::GhostResult;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::agent_info::{AgentInfoInner, AgentInfoSigned};
 use kitsune_p2p_types::bin_types::*;
@@ -12,18 +13,37 @@ use kitsune_p2p_types::dht_arc::{ArcInterval, DhtArc, DhtLocation};
 use kitsune_p2p_types::metrics::metric_task;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_pool_promote::*;
+use kitsune_p2p_types::tx2::tx2_utils::Share;
 use kitsune_p2p_types::tx2::*;
 use kitsune_p2p_types::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::task::JoinHandle;
 
 use super::switchboard_evt_handler::SwitchboardEventHandler;
-use super::switchboard_node::SwitchboardNode;
 
 type KSpace = Arc<KitsuneSpace>;
 type KAgent = Arc<KitsuneAgent>;
 type KOpHash = Arc<KitsuneOpHash>;
+
+pub type NodeEp = Tx2EpHnd<wire::Wire>;
+
+static ZERO_SPACE: once_cell::sync::Lazy<Arc<KitsuneSpace>> =
+    once_cell::sync::Lazy::new(|| Arc::new(KitsuneSpace::new([0; 36].to_vec())));
+
+pub struct NodeEntry {
+    pub(super) agents: HashMap<Loc8, AgentEntry>,
+}
+
+impl NodeEntry {
+    pub fn agent_by_loc8(&self, loc8: Loc8) -> Option<&AgentEntry> {
+        self.agents.get(&loc8)
+    }
+
+    pub fn agent_by_hash(&self, hash: &KitsuneAgent) -> Option<&AgentEntry> {
+        self.agent_by_loc8(hash.get_loc().into())
+    }
+}
 
 /// The value of the SwitchboardSpace::agents hashmap
 pub struct AgentEntry {
@@ -32,6 +52,19 @@ pub struct AgentEntry {
     /// The ops held by this agent.
     /// Other data for this op can be found in SwitchboardSpace::ops
     pub ops: HashMap<Loc8, AgentOpEntry>,
+}
+
+impl AgentEntry {
+    pub fn new(info: AgentInfoSigned) -> Self {
+        Self {
+            info,
+            ops: Default::default(),
+        }
+    }
+}
+
+pub struct AgentOpEntry {
+    pub is_integrated: bool,
 }
 
 /// The value of the SwitchboardSpace::ops hashmap
@@ -46,62 +79,52 @@ pub struct OpEntry {
     pub timestamp: Timestamp,
 }
 
-pub struct AgentOpEntry {
-    pub is_integrated: bool,
+pub struct SpaceEntry {
+    state: Share<SwitchboardSpace>,
+    tasks: Vec<(
+        tokio::task::JoinHandle<GhostResult<()>>,
+        tokio::task::JoinHandle<KitsuneResult<()>>,
+    )>,
 }
 
+#[derive(derive_more::AsRef, derive_more::AsMut, derive_more::Deref, derive_more::DerefMut)]
 pub struct Switchboard {
-    space: SwitchboardSpace,
+    /// Only a single space is currently supported.
+    ///
+    /// Eventually the switchboard could accomodate multiple spaces if needed.
+    /// The spaces will still have to be inside `Share`, because the event handler
+    /// for each node in the space needs shared mutable access to the state.
+    spaces: HashMap<KSpace, SpaceEntry>,
 }
 
 impl Switchboard {
-    pub fn new(space: Option<KSpace>) -> Self {
-        // TODO: randomize/parameterize space
-        let space = space.unwrap_or_else(|| Arc::new(KitsuneSpace::new([0; 36].to_vec())));
-        Self {
-            space: SwitchboardSpace::new(space),
-        }
+    pub fn new() -> Self {
+        // TODO: when supporting multiple spaces, don't add this default space
+        // in the constructor.
+        let space = ZERO_SPACE.clone();
+        let mut spaces = HashMap::new();
+        let entry = SpaceEntry {
+            state: Share::new(SwitchboardSpace::new(space.clone())),
+            tasks: Vec::new(),
+        };
+        spaces.insert(space, entry);
+        Self { spaces }
     }
 
-    /// Get the space-specific switchboard at this space hash.
-    /// NB: Currently only one space is supported. All other spaces will panic.
-    pub fn space(&mut self, space: KSpace) -> &mut SwitchboardSpace {
-        assert_eq!(self.space.space, space, "Got query for unexpected space");
-        &mut self.space
-    }
-}
+    // /// Get the hash of the singleton space
+    // pub fn space_hash(&self) -> Arc<KitsuneSpace> {
+    //     ZERO_SPACE.clone()
+    // }
 
-/// An channel-based implementation of networking for tests, where messages are
-/// simply routed in-memory
-pub struct SwitchboardSpace {
-    space: KSpace,
-    pub(super) agents: HashMap<Loc8, AgentEntry>,
-    pub(super) ops: HashMap<Loc8, OpEntry>,
-    metric_tasks: Vec<JoinHandle<KitsuneResult<()>>>,
-    handler_tasks: Vec<JoinHandle<ghost_actor::GhostResult<()>>>,
-}
-
-impl SwitchboardSpace {
-    pub fn new(space: KSpace) -> Self {
-        Self {
-            space,
-            agents: Default::default(),
-            ops: Default::default(),
-            metric_tasks: Default::default(),
-            handler_tasks: Default::default(),
-        }
+    /// Get the state for the singleton space
+    pub fn space_state(&self) -> Share<SwitchboardSpace> {
+        self.spaces.get(&**ZERO_SPACE).unwrap().state.clone()
     }
 
-    pub fn agent_by_loc8(&self, loc8: Loc8) -> Option<&AgentEntry> {
-        self.agents.get(&loc8)
-    }
+    /// Set up state and handler tasks for a new node in the space
+    pub async fn add_node(&mut self, mem_config: MemConfig) -> NodeEp {
+        let space = ZERO_SPACE.clone();
 
-    pub fn agent_by_hash(&self, hash: &KitsuneAgent) -> Option<&AgentEntry> {
-        self.agent_by_loc8(hash.get_loc().into())
-    }
-
-    /// Set up a channel for a new node
-    pub async fn add_node(&mut self, mem_config: MemConfig) -> SwitchboardNode {
         let f = tx2_mem_adapter(mem_config).await.unwrap();
         let f = tx2_pool_promote(f, Default::default());
         let f = tx2_api(f, Default::default());
@@ -114,10 +137,9 @@ impl SwitchboardSpace {
 
         let tuning_params = Arc::new(Default::default());
 
-        let evt_handler = SwitchboardEventHandler::new(todo!(), todo!());
-        let (evt_sender, task) = spawn_handler(evt_handler.clone()).await;
-
-        self.handler_tasks.push(task);
+        let space_state = self.spaces.get(&space).unwrap().state.clone();
+        let evt_handler = SwitchboardEventHandler::new(ep_hnd.clone(), space_state);
+        let (evt_sender, handler_task) = spawn_handler(evt_handler.clone()).await;
 
         // TODO: generalize
         let gossip_type = GossipType::Historical;
@@ -126,16 +148,15 @@ impl SwitchboardSpace {
 
         let gossip = ShardedGossip::new(
             tuning_params,
-            self.space.clone(),
+            space.clone(),
             ep_hnd.clone(),
             evt_sender,
             gossip_type,
             bandwidth,
         );
+        let gossip = GossipModule(gossip.clone());
 
-        let node = SwitchboardNode::new(evt_handler, GossipModule(gossip.clone()), ep_hnd);
-
-        self.metric_tasks.push(metric_task(async move {
+        let ep_task = metric_task(async move {
             dbg!("begin metric task");
             while let Some(evt) = ep.next().await {
                 match dbg!(evt) {
@@ -151,7 +172,7 @@ impl SwitchboardSpace {
                                 let data: Vec<u8> = data.into();
                                 let data: Box<[u8]> = data.into_boxed_slice();
 
-                                gossip.incoming_gossip(con, url, data).unwrap()
+                                gossip.incoming_gossip(con, url, data)?
                             }
                             _ => unimplemented!(),
                         }
@@ -160,26 +181,81 @@ impl SwitchboardSpace {
                 }
             }
             Ok(())
-        }));
+        });
 
-        node
+        self.spaces
+            .get_mut(&space)
+            .unwrap()
+            .tasks
+            .push((handler_task, ep_task));
+
+        ep_hnd
+    }
+}
+
+/// An channel-based implementation of networking for tests, where messages are
+/// simply routed in-memory
+pub struct SwitchboardSpace {
+    space: KSpace,
+    pub(super) nodes: HashMap<NodeEp, NodeEntry>,
+    pub(super) ops: HashMap<Loc8, OpEntry>,
+    metric_tasks: Vec<JoinHandle<KitsuneResult<()>>>,
+    handler_tasks: Vec<JoinHandle<ghost_actor::GhostResult<()>>>,
+}
+
+impl SwitchboardSpace {
+    pub fn new(space: KSpace) -> Self {
+        Self {
+            space,
+            nodes: Default::default(),
+            ops: Default::default(),
+            metric_tasks: Default::default(),
+            handler_tasks: Default::default(),
+        }
     }
 
-    pub fn add_agent(
-        &mut self,
-        node: &SwitchboardNode,
-        agent_loc8: Loc8,
-        interval: ArcInterval<Loc8>,
-    ) {
+    /// Look through all nodes for this agent Loc8
+    pub fn agent_by_loc8(&self, loc8: Loc8) -> Option<&AgentEntry> {
+        self.nodes
+            .values()
+            .filter_map(|n| n.agent_by_loc8(loc8))
+            .next()
+    }
+
+    /// Look through all nodes for this agent hash
+    pub fn agent_by_hash(&self, hash: &KitsuneAgent) -> Option<&AgentEntry> {
+        self.nodes
+            .values()
+            .filter_map(|n| n.agent_by_hash(hash))
+            .next()
+    }
+
+    /// Get the agent map for a node. Just for minor boilerplate reduction.
+    pub fn agents_for_node(&mut self, node: &NodeEp) -> &mut HashMap<Loc8, AgentEntry> {
+        &mut self.nodes.get_mut(node).expect("Node not added").agents
+    }
+
+    pub fn add_agent(&mut self, node: &NodeEp, agent_loc8: Loc8, interval: ArcInterval<Loc8>) {
         let agent_loc: DhtLocation = agent_loc8.clone().into();
         let agent = Arc::new(KitsuneAgent::new(agent_loc.to_bytes_36()));
         let info = fake_agent_info(self.space.clone(), agent, interval.to_dht_location());
-        if let Some(old) = self.agents.insert(agent_loc8, (info, node.clone())) {
+        self.agent_by_loc8(agent_loc8).map(|existing| {
             panic!(
                 "Attempted to insert two agents at the same Loc8. Existing agent info: {:?}",
-                old.info
+                existing.info
             )
-        }
+        });
+        self.nodes
+            .get_mut(node)
+            .expect("Node must be added first")
+            .agents
+            .insert(agent_loc8, AgentEntry::new(info))
+            .map(|existing| {
+                panic!(
+                    "Attempted to insert two agents at the same Loc8. Existing agent info: {:?}",
+                    existing.info
+                )
+            });
     }
 
     pub fn query_op_hashes(
@@ -200,13 +276,12 @@ impl SwitchboardSpace {
                 window.contains(&op.timestamp)
                     // Does the op fall within one of the specified arcsets
                     // with the correct integration/limbo criteria?
-                        && agents.into_iter().fold(false, |yes, (agent, arc_set)| {
+                        && agents.iter().fold(false, |yes, (agent, arc_set)| {
                             if yes {
                                 return true;
                             }
                             arc_set.contains((**op_loc8).into()) &&
-                            self.agents
-                                .get(&agent.get_loc().into())
+                            self.agent_by_hash(&agent)
                                 .and_then(|agent| {
                                     agent
                                         .ops
@@ -218,7 +293,7 @@ impl SwitchboardSpace {
                                 .unwrap_or(false)
                         })
             })
-            .map(|(_, op)| (op.hash, op.timestamp))
+            .map(|(_, op)| (op.hash.clone(), op.timestamp))
             .take(max_ops)
             .unzip();
 
