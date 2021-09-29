@@ -56,6 +56,7 @@ use super::CellError;
 use super::Conductor;
 use crate::conductor::p2p_agent_store::get_single_agent_info;
 use crate::conductor::p2p_agent_store::query_peer_density;
+use crate::conductor::p2p_agent_store::P2pBatch;
 use crate::conductor::p2p_metrics::put_metric_datum;
 use crate::conductor::p2p_metrics::query_metrics;
 use crate::core::ribosome::real_ribosome::RealRibosome;
@@ -397,6 +398,10 @@ pub struct ConductorHandleImpl<DS: DnaStore + 'static> {
     /// Database sync level
     pub(super) db_sync_level: DbSyncLevel,
 
+    /// The batch sender for writes to the p2p database.
+    pub(super) p2p_batch_senders:
+        Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, tokio::sync::mpsc::Sender<P2pBatch>>>>,
+
     // Testing:
     #[cfg(any(test, feature = "test_utils"))]
     /// All conductors should skip publishing.
@@ -509,10 +514,18 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             PutAgentInfoSigned {
                 peer_data, respond, ..
             } => {
-                let env = { self.p2p_env(space) };
-                let res = inject_agent_infos(env, peer_data.iter())
-                    .await
-                    .map_err(holochain_p2p::HolochainP2pError::other);
+                let sender = self.p2p_batch_sender(space);
+                let (result_sender, response) = tokio::sync::oneshot::channel();
+                let _ = sender
+                    .send(P2pBatch {
+                        peer_data,
+                        result_sender,
+                    })
+                    .await;
+                let res = match response.await {
+                    Ok(r) => r.map_err(holochain_p2p::HolochainP2pError::other),
+                    Err(e) => Err(holochain_p2p::HolochainP2pError::other(e)),
+                };
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
             GetAgentInfoSigned {
@@ -1347,6 +1360,22 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
                     db_sync_level,
                 )
                 .expect("failed to open p2p_agent_store database")
+            })
+            .clone()
+    }
+
+    pub(super) fn p2p_batch_sender(
+        &self,
+        space: Arc<KitsuneSpace>,
+    ) -> tokio::sync::mpsc::Sender<P2pBatch> {
+        let mut p2p_env = self.p2p_batch_senders.lock();
+        p2p_env
+            .entry(space.clone())
+            .or_insert_with(|| {
+                let (tx, rx) = tokio::sync::mpsc::channel(100);
+                let env = { self.p2p_env(space) };
+                tokio::spawn(p2p_agent_store::p2p_put_all_batch(env, rx));
+                tx
             })
             .clone()
     }

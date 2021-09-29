@@ -1431,6 +1431,7 @@ mod builder {
                 #[cfg(any(test, feature = "test_utils"))]
                 skip_publish: std::sync::atomic::AtomicBool::new(false),
                 p2p_env: Arc::new(parking_lot::Mutex::new(HashMap::new())),
+                p2p_batch_senders: Arc::new(parking_lot::Mutex::new(HashMap::new())),
                 p2p_metrics_env: Arc::new(parking_lot::Mutex::new(HashMap::new())),
             });
 
@@ -1536,6 +1537,7 @@ mod builder {
                 keystore,
                 holochain_p2p,
                 p2p_env: envs.p2p(),
+                p2p_batch_senders: Arc::new(parking_lot::Mutex::new(HashMap::new())),
                 p2p_metrics_env: envs.p2p_metrics(),
                 db_sync_level: self.config.db_sync_level,
                 #[cfg(any(test, feature = "test_utils"))]
