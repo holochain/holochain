@@ -4,6 +4,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 - Refactor conductor to use parking lot rw lock instead of tokio rw lock. (Faster and prevents deadlocks.)
+- Make validation run concurrently up to 50 DhtOps. This allows us to make progress on other ops when waiting for the network.
 
 ### Changed
 
