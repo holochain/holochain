@@ -1,6 +1,6 @@
 [package]
 name = "holochain_keystore"
-version = "0.0.7"
+version = "0.0.8"
 description = "keystore for libsodium keypairs"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -14,7 +14,7 @@ edition = "2018"
 ghost_actor = "=0.3.0-alpha.4"
 holo_hash = { version = "0.0.7", path = "../holo_hash", features = ["full"] }
 holochain_serialized_bytes = "=0.0.51"
-holochain_zome_types = { path = "../holochain_zome_types", version = "0.0.9"}
+holochain_zome_types = { path = "../holochain_zome_types", version = "0.0.10"}
 lair_keystore_api = "=0.0.4"
 lair_keystore_client = "=0.0.4"
 serde = { version = "1.0", features = [ "derive" ] }
@@ -26,4 +26,4 @@ tracing = "0.1"
 
 # This is a redundant dependency.
 # It's included only to set the proper feature flag for database encryption.
-holochain_sqlite = { version = "0.0.7", path = "../holochain_sqlite" }
+holochain_sqlite = { version = "0.0.8", path = "../holochain_sqlite" }
