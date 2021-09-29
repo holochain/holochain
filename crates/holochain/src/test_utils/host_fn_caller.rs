@@ -303,7 +303,7 @@ impl HostFnCaller {
         // Write
         workspace_lock.flush(&self.network).await.unwrap();
 
-        output.into()
+        output
     }
 
     pub async fn get_link_details<'env>(

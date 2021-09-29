@@ -41,7 +41,7 @@ pub fn get_links<'a>(
             });
             let results: Result<Vec<_>, _> = results.into_iter().map(|result|
                 match result {
-                    Ok(links_vec) => Ok(links_vec.into()),
+                    Ok(links_vec) => Ok(links_vec),
                     Err(cascade_error) => Err(WasmError::Host(cascade_error.to_string())),
                 }
             ).collect();
