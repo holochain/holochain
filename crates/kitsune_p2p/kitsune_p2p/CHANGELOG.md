@@ -3,6 +3,7 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
+- Fix rpc_multi bug that caused all request to wait 3 seconds.
 
 ### Changed
 

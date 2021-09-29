@@ -59,7 +59,7 @@ struct Outer {
     inner: Share<Inner>,
     ro_inner: Arc<SpaceReadOnlyInner>,
     agg: TaskAgg,
-    kill: Arc<Notify>,
+    kill: Arc<Kill>,
     got_data: Arc<Notify>,
     grace_rs: ReverseSemaphore,
     remote_request_grace_ms: u64,
@@ -68,6 +68,29 @@ struct Outer {
     from_agent: Arc<KitsuneAgent>,
     basis: Arc<KitsuneBasis>,
     payload: Vec<u8>,
+}
+struct Kill {
+    closed: AtomicBool,
+    kill: Notify,
+}
+
+impl Kill {
+    fn new() -> Arc<Self> {
+        Arc::new(Self {
+            closed: AtomicBool::new(false),
+            kill: Notify::new(),
+        })
+    }
+    fn kill_all(&self) {
+        self.closed
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        self.kill.notify_waiters();
+    }
+    async fn wait(&self) {
+        if !self.closed.load(std::sync::atomic::Ordering::Relaxed) {
+            self.kill.notified().await;
+        }
+    }
 }
 
 impl Outer {
@@ -100,7 +123,7 @@ impl Outer {
             }),
             ro_inner,
             agg,
-            kill: Arc::new(Notify::new()),
+            kill: Kill::new(),
             got_data: Arc::new(Notify::new()),
             grace_rs,
             remote_request_grace_ms,
@@ -141,7 +164,7 @@ impl Outer {
                 // either we got a unit value `()` from the driver
                 // or we got a notification from the kill Notify
                 // either way, we don't want to process any more.
-                let _ = futures::future::select(f, kill.notified().boxed()).await;
+                let _ = futures::future::select(f, kill.wait().boxed()).await;
             }
             .boxed(),
         )
@@ -167,7 +190,7 @@ impl Outer {
                 // either we got a unit value `()` from the driver
                 // or we got a notification from the kill Notify
                 // either way, we don't want to process any more.
-                let _ = futures::future::select(f, kill.notified().boxed()).await;
+                let _ = futures::future::select(f, kill.wait().boxed()).await;
             });
         })
     }
@@ -181,7 +204,7 @@ impl Outer {
             tokio::time::sleep(max_timeout.time_remaining()).await;
 
             // end all processing
-            kill.notify_waiters();
+            kill.kill_all();
 
             tracing::trace!("(rpc_multi_logic) max time elapsed");
         });
@@ -206,7 +229,7 @@ impl Outer {
             tracing::trace!("(rpc_multi_logic) grace time zero permits");
 
             // end all processing
-            kill.notify_waiters();
+            kill.kill_all();
 
             tracing::trace!("(rpc_multi_logic) grace time elapsed");
         });
@@ -219,15 +242,20 @@ impl Outer {
         let remote_request_grace_ms = self.remote_request_grace_ms;
         let agg = self.agg.clone();
         let grace_rs = self.grace_rs.clone();
+        let kill = self.kill.clone();
         Arc::new(move || {
             let permit = Share::new(grace_rs.acquire());
             let permit2 = permit.clone();
+            let kill = kill.clone();
 
             // the permit will exist for max grace period
             agg.push(
                 async move {
-                    tokio::time::sleep(std::time::Duration::from_millis(remote_request_grace_ms))
-                        .await;
+                    let f = tokio::time::sleep(std::time::Duration::from_millis(
+                        remote_request_grace_ms,
+                    ))
+                    .boxed();
+                    let _ = futures::future::select(f, kill.wait().boxed()).await;
                     permit2.close();
                 }
                 .boxed(),
