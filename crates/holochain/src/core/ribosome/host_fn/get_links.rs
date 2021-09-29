@@ -13,7 +13,7 @@ pub fn get_links<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     inputs: Vec<GetLinksInput>,
-) -> Result<Vec<Links>, WasmError> {
+) -> Result<Vec<Vec<Link>>, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ read_workspace: Permission::Allow, .. } => {
             let results: Vec<Result<Vec<Link>, _>> = tokio_helper::block_forever_on(async move {
@@ -115,14 +115,13 @@ pub mod slow_tests {
             "foo.baz".to_string()
         ).unwrap();
 
-        let children_output: holochain_zome_types::link::Links = crate::call_test_ribosome!(
+        let links: Vec<holochain_zome_types::link::Link> = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "children",
             "foo".to_string()
         ).unwrap();
 
-        let links = children_output.into_inner();
         assert_eq!(2, links.len());
         assert_eq!(links[0].target, foo_bar,);
         assert_eq!(links[1].target, foo_baz,);
@@ -247,19 +246,19 @@ pub mod slow_tests {
             "create_back_link",
             ()
         ).unwrap();
-        let forward_links: Links = crate::call_test_ribosome!(
+        let forward_links: Vec<Link> = crate::call_test_ribosome!(
             host_access,
             TestWasm::Link,
             "get_links",
             ()
         ).unwrap();
-        let back_links: Links = crate::call_test_ribosome!(
+        let back_links: Vec<Link> = crate::call_test_ribosome!(
             host_access,
             TestWasm::Link,
             "get_back_links",
             ()
         ).unwrap();
-        let links_bidi: Vec<Links> = crate::call_test_ribosome!(
+        let links_bidi: Vec<Vec<Link>> = crate::call_test_ribosome!(
             host_access,
             TestWasm::Link,
             "get_links_bidi",
@@ -339,10 +338,10 @@ pub mod slow_tests {
         .unwrap();
 
         let result = handle.call_zome(invocation).await.unwrap().unwrap();
-        let links: hdk::prelude::Links = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
+        let links: Vec<hdk::prelude::Link> = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
             .decode()
             .unwrap();
-        assert_eq!(links.into_inner().len(), 1);
+        assert_eq!(links.len(), 1);
         conductor_test.shutdown_conductor().await;
     }
 }

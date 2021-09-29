@@ -139,7 +139,7 @@ wasm_io_types! {
     fn get_link_details (Vec<zt::link::GetLinksInput>) -> Vec<zt::link::LinkDetails>;
 
     // Get links by entry hash from the cascade.
-    fn get_links (Vec<zt::link::GetLinksInput>) -> Vec<zt::link::Links>;
+    fn get_links (Vec<zt::link::GetLinksInput>) -> Vec<Vec<zt::link::Link>>;
 
     // Attempt to get a live entry from the cascade.
     fn get (Vec<zt::entry::GetInput>) -> Vec<Option<zt::element::Element>>;
