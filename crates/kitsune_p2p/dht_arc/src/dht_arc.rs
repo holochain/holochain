@@ -2,6 +2,7 @@
 
 use derive_more::From;
 use derive_more::Into;
+use num_traits::AsPrimitive;
 use std::num::Wrapping;
 use std::ops::Bound;
 use std::ops::RangeBounds;
@@ -21,7 +22,22 @@ pub use dht_arc_bucket::*;
 #[cfg(any(test, feature = "test_utils"))]
 pub mod gaps;
 
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, From, Into)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    serde::Serialize,
+    serde::Deserialize,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    From,
+    Into,
+    derive_more::AsRef,
+    derive_more::Deref,
+)]
 /// Type for representing a location that can wrap around
 /// a u32 dht arc
 pub struct DhtLocation(pub Wrapping<u32>);
@@ -306,6 +322,92 @@ impl From<u32> for DhtLocation {
     }
 }
 
+impl AsPrimitive<u32> for DhtLocation {
+    fn as_(self) -> u32 {
+        self.as_u32()
+    }
+}
+
+impl num_traits::Num for DhtLocation {
+    type FromStrRadixErr = <u32 as num_traits::Num>::FromStrRadixErr;
+
+    fn from_str_radix(str: &str, radix: u32) -> Result<Self, Self::FromStrRadixErr> {
+        u32::from_str_radix(str, radix).map(Self::new)
+    }
+}
+
+impl std::ops::Add for DhtLocation {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self(self.0 + rhs.0)
+    }
+}
+
+impl std::ops::Sub for DhtLocation {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self(self.0 - rhs.0)
+    }
+}
+
+impl std::ops::Mul for DhtLocation {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        Self(self.0 * rhs.0)
+    }
+}
+
+impl std::ops::Div for DhtLocation {
+    type Output = Self;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        Self(self.0 / rhs.0)
+    }
+}
+
+impl std::ops::Rem for DhtLocation {
+    type Output = Self;
+
+    fn rem(self, rhs: Self) -> Self::Output {
+        Self(self.0 % rhs.0)
+    }
+}
+
+impl num_traits::Zero for DhtLocation {
+    fn zero() -> Self {
+        Self::new(0)
+    }
+
+    fn is_zero(&self) -> bool {
+        self.0 .0 == 0
+    }
+}
+
+impl num_traits::One for DhtLocation {
+    fn one() -> Self {
+        Self::new(1)
+    }
+}
+
+impl interval::ops::Width for DhtLocation {
+    type Output = u32;
+
+    fn max_value() -> Self {
+        u32::max_value().into()
+    }
+
+    fn min_value() -> Self {
+        u32::min_value().into()
+    }
+
+    fn width(lower: &Self, upper: &Self) -> Self::Output {
+        u32::width(&lower.0 .0, &upper.0 .0)
+    }
+}
+
 impl From<DhtLocation> for u32 {
     fn from(l: DhtLocation) -> Self {
         (l.0).0
@@ -422,6 +524,8 @@ impl DhtArc {
             ArcInterval::Empty => todo!(),
             ArcInterval::Full => todo!(),
             ArcInterval::Bounded(start, end) => {
+                let start = start.as_u32();
+                let end = end.as_u32();
                 if start <= end {
                     // this should be +2 instead of +3, but we want to round up
                     // so that the arc covers the interval
@@ -441,26 +545,26 @@ impl DhtArc {
 #[test]
 fn dht_arc_interval_roundtrip() {
     let intervals = vec![
-        ArcInterval::new(0, 0),
-        ArcInterval::new(2, 2),
-        ArcInterval::new(3, 3),
-        ArcInterval::new(3, 5),
-        ArcInterval::new(2, 6),
-        ArcInterval::new(3, 6),
-        ArcInterval::new(3, 7),
-        ArcInterval::new(3, 8),
+        ArcInterval::<u32>::new(0, 0).to_dht_location(),
+        ArcInterval::<u32>::new(2, 2).to_dht_location(),
+        ArcInterval::<u32>::new(3, 3).to_dht_location(),
+        ArcInterval::<u32>::new(3, 5).to_dht_location(),
+        ArcInterval::<u32>::new(2, 6).to_dht_location(),
+        ArcInterval::<u32>::new(3, 6).to_dht_location(),
+        ArcInterval::<u32>::new(3, 7).to_dht_location(),
+        ArcInterval::<u32>::new(3, 8).to_dht_location(),
         // these wind up becoming FULL for some reason
-        // ArcInterval::new(1, u32::MAX),
-        // ArcInterval::new(2, u32::MAX),
-        // ArcInterval::new(3, u32::MAX),
-        // ArcInterval::new(3, u32::MAX - 1),
-        // ArcInterval::new(3, u32::MAX - 2),
-        ArcInterval::new(u32::MAX, u32::MAX),
-        ArcInterval::new(u32::MAX / 4 * 3, u32::MAX / 4),
-        ArcInterval::new(u32::MAX / 4 * 3 + 1, u32::MAX / 4),
-        ArcInterval::new(u32::MAX / 4 * 3 - 1, u32::MAX / 4),
-        ArcInterval::new(u32::MAX / 4 * 3 - 1, u32::MAX / 4 + 1),
-        ArcInterval::new(u32::MAX / 4 * 3 + 1, u32::MAX / 4 - 1),
+        // ArcInterval::<u32>::new(1, u32::MAX).to_dht_location(),
+        // ArcInterval::<u32>::new(2, u32::MAX).to_dht_location(),
+        // ArcInterval::<u32>::new(3, u32::MAX).to_dht_location(),
+        // ArcInterval::<u32>::new(3, u32::MAX - 1).to_dht_location(),
+        // ArcInterval::<u32>::new(3, u32::MAX - 2).to_dht_location(),
+        ArcInterval::<u32>::new(u32::MAX, u32::MAX).to_dht_location(),
+        ArcInterval::<u32>::new(u32::MAX / 4 * 3, u32::MAX / 4).to_dht_location(),
+        ArcInterval::<u32>::new(u32::MAX / 4 * 3 + 1, u32::MAX / 4).to_dht_location(),
+        ArcInterval::<u32>::new(u32::MAX / 4 * 3 - 1, u32::MAX / 4).to_dht_location(),
+        ArcInterval::<u32>::new(u32::MAX / 4 * 3 - 1, u32::MAX / 4 + 1).to_dht_location(),
+        ArcInterval::<u32>::new(u32::MAX / 4 * 3 + 1, u32::MAX / 4 - 1).to_dht_location(),
     ];
     let quantized: Vec<_> = intervals.iter().map(|i| i.quantized()).collect();
     let roundtrips: Vec<_> = intervals

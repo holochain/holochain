@@ -2309,6 +2309,7 @@ dependencies = [
  "fixt",
  "futures",
  "holochain_serialized_bytes",
+ "kitsune_p2p_dht_arc",
  "must_future",
  "rand 0.7.3",
  "rusqlite",
@@ -3247,6 +3248,7 @@ dependencies = [
  "derive_more",
  "gcollections",
  "intervallum",
+ "num-traits",
  "serde",
 ]
 
