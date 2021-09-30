@@ -12,6 +12,7 @@ edition = "2018"
 
 [dependencies]
 legacy_lair_api = { version = "=0.0.6", package = "lair_keystore_api" }
+new_lair_api = { version = "=0.1.0-alpha.1", git = "https://github.com/holochain/lair.git", rev = "97e7a536e38f7fe4fcacef740fd426aba7094b56", package = "lair_keystore_api" }
 base64 = "0.13"
 derive_more = "0.99.7"
 futures = "0.3"

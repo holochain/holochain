@@ -49,3 +49,5 @@ pub use agent_pubkey_ext::*;
 pub mod crude_mock_keystore;
 pub mod lair_keystore;
 pub mod test_keystore;
+
+pub mod new_lair;

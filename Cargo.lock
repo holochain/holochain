@@ -2211,6 +2211,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "hc_seed_bundle"
+version = "0.1.0-alpha.1"
+source = "git+https://github.com/holochain/lair.git?rev=97e7a536e38f7fe4fcacef740fd426aba7094b56#97e7a536e38f7fe4fcacef740fd426aba7094b56"
+dependencies = [
+ "futures",
+ "one_err",
+ "rmp-serde",
+ "rmpv",
+ "serde",
+ "serde_bytes",
+ "sodoken",
+]
+
+[[package]]
 name = "hdk"
 version = "0.0.108"
 dependencies = [
@@ -2365,7 +2379,7 @@ dependencies = [
  "mockall",
  "mr_bundle",
  "must_future",
- "nanoid",
+ "nanoid 0.3.0",
  "num_cpus",
  "observability",
  "once_cell",
@@ -2484,7 +2498,7 @@ dependencies = [
  "holochain_websocket",
  "lazy_static",
  "matches",
- "nanoid",
+ "nanoid 0.3.0",
  "observability",
  "portpicker",
  "serde_yaml",
@@ -2530,6 +2544,7 @@ dependencies = [
  "holochain_zome_types",
  "kitsune_p2p_types",
  "lair_keystore_client",
+ "nanoid 0.4.0",
  "serde",
  "serde_bytes",
  "sodoken",
@@ -2611,7 +2626,7 @@ dependencies = [
  "kitsune_p2p",
  "lazy_static",
  "must_future",
- "nanoid",
+ "nanoid 0.3.0",
  "num_cpus",
  "observability",
  "once_cell",
@@ -2716,7 +2731,7 @@ dependencies = [
  "mockall",
  "mr_bundle",
  "must_future",
- "nanoid",
+ "nanoid 0.3.0",
  "observability",
  "rand 0.7.3",
  "regex",
@@ -2818,7 +2833,7 @@ dependencies = [
  "holochain_types",
  "linefeed",
  "must_future",
- "nanoid",
+ "nanoid 0.3.0",
  "net2",
  "observability",
  "serde",
@@ -2849,7 +2864,7 @@ dependencies = [
  "holochain_wasmer_common",
  "kitsune_p2p_timestamp",
  "matches",
- "nanoid",
+ "nanoid 0.3.0",
  "num_enum",
  "once_cell",
  "paste",
@@ -3328,7 +3343,7 @@ dependencies = [
  "futures",
  "kitsune_p2p_transport_quic",
  "kitsune_p2p_types",
- "nanoid",
+ "nanoid 0.3.0",
  "observability",
  "parking_lot 0.11.2",
  "rmp-serde",
@@ -3361,7 +3376,7 @@ dependencies = [
  "futures",
  "if-addrs",
  "kitsune_p2p_types",
- "nanoid",
+ "nanoid 0.3.0",
  "once_cell",
  "quinn",
  "rcgen",
@@ -3382,10 +3397,11 @@ dependencies = [
  "futures",
  "ghost_actor 0.3.0-alpha.4",
  "kitsune_p2p_dht_arc",
- "lair_keystore_api",
+ "lair_keystore_api 0.0.6",
+ "lair_keystore_api 0.1.0-alpha.1",
  "lru",
  "mockall",
- "nanoid",
+ "nanoid 0.3.0",
  "observability",
  "once_cell",
  "parking_lot 0.11.2",
@@ -3430,7 +3446,7 @@ dependencies = [
  "directories 3.0.2",
  "futures",
  "ghost_actor 0.3.0-alpha.4",
- "nanoid",
+ "nanoid 0.3.0",
  "num_cpus",
  "once_cell",
  "one_err",
@@ -3448,6 +3464,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "lair_keystore_api"
+version = "0.1.0-alpha.1"
+source = "git+https://github.com/holochain/lair.git?rev=97e7a536e38f7fe4fcacef740fd426aba7094b56#97e7a536e38f7fe4fcacef740fd426aba7094b56"
+dependencies = [
+ "base64",
+ "dunce",
+ "futures",
+ "hc_seed_bundle",
+ "lru",
+ "nanoid 0.4.0",
+ "once_cell",
+ "one_err",
+ "parking_lot 0.11.2",
+ "rcgen",
+ "rmp-serde",
+ "serde",
+ "serde_bytes",
+ "serde_json",
+ "serde_yaml",
+ "sodoken",
+ "tokio",
+ "toml",
+ "tracing",
+ "url 2.2.2",
+ "winapi",
+]
+
+[[package]]
 name = "lair_keystore_client"
 version = "0.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3455,7 +3499,7 @@ checksum = "30a89867e50be651a26b4b089c41e41bcd56dc5492c61a8dde6c7ae954575c44"
 dependencies = [
  "futures",
  "ghost_actor 0.3.0-alpha.4",
- "lair_keystore_api",
+ "lair_keystore_api 0.0.6",
  "sodoken",
  "tempfile",
  "tokio",
@@ -3925,6 +3969,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6226bc4e142124cb44e309a37a04cd9bb10e740d8642855441d3b14808f635e"
 dependencies = [
  "rand 0.6.5",
+]
+
+[[package]]
+name = "nanoid"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ffa00dec017b5b1a8b7cf5e2c008bfda1aa7e0697ac1508b491fdf2622fb4d8"
+dependencies = [
+ "rand 0.8.4",
 ]
 
 [[package]]
@@ -5434,6 +5487,18 @@ dependencies = [
  "byteorder",
  "rmp",
  "serde",
+]
+
+[[package]]
+name = "rmpv"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de8813b3a2f95c5138fe5925bfb8784175d88d6bff059ba8ce090aa891319754"
+dependencies = [
+ "num-traits",
+ "rmp",
+ "serde",
+ "serde_bytes",
 ]
 
 [[package]]
