@@ -4,7 +4,7 @@ use crate::*;
 use legacy_lair_api::*;
 
 /// Spawn a new keystore backed by legacy_lair_client.
-pub async fn spawn_legacy_lair(
+pub async fn spawn_lair_keystore(
     lair_dir: Option<&std::path::Path>,
     passphrase: sodoken::BufRead,
 ) -> KeystoreApiResult<KeystoreSender> {
