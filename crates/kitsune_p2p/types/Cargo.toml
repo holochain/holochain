@@ -11,7 +11,7 @@ categories = [ "network-programming" ]
 edition = "2018"
 
 [dependencies]
-legacy_lair_api = { version = "=0.0.4", package = "lair_keystore_api" }
+legacy_lair_api = { version = "=0.0.6", package = "lair_keystore_api" }
 base64 = "0.13"
 derive_more = "0.99.7"
 futures = "0.3"

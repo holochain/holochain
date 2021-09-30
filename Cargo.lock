@@ -3417,9 +3417,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_api"
-version = "0.0.4"
+version = "0.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b31e2a5ccad740bc59428512de0645f051c293993ed79c26c21aaf6621a0ee95"
+checksum = "5e8728ad4b1541470fec2ede33a57d710004f2fb15937ffda4734045b92257b2"
 dependencies = [
  "arbitrary",
  "blake2b_simd",
@@ -3433,6 +3433,7 @@ dependencies = [
  "nanoid",
  "num_cpus",
  "once_cell",
+ "one_err",
  "parking_lot 0.11.2",
  "rand 0.7.3",
  "rayon",
@@ -3448,9 +3449,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_client"
-version = "0.0.4"
+version = "0.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74e03b3cb5076be7db2a54c64a661172a12686487a20332a960613f52913ff17"
+checksum = "30a89867e50be651a26b4b089c41e41bcd56dc5492c61a8dde6c7ae954575c44"
 dependencies = [
  "futures",
  "ghost_actor 0.3.0-alpha.4",
@@ -4200,6 +4201,18 @@ name = "once_cell"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "692fcb63b64b1758029e0a96ee63e049ce8c5948587f2f7208df04625e5f6b56"
+
+[[package]]
+name = "one_err"
+version = "0.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42901c1956c1ef1de5bce4428695aa03505a8e27bd2262173395c804834f44ec"
+dependencies = [
+ "indexmap",
+ "libc",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "oorandom"
@@ -5162,9 +5175,9 @@ dependencies = [
 
 [[package]]
 name = "rcgen"
-version = "0.8.11"
+version = "0.8.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48b4fc1b81d685fcd442a86da2e2c829d9e353142633a8159f42bf28e7e94428"
+checksum = "2351cbef4bf91837f5ff7face6091cb277ba960d1638d2c5ae2327859912fbba"
 dependencies = [
  "chrono",
  "pem",
@@ -6008,16 +6021,16 @@ dependencies = [
 
 [[package]]
 name = "sodoken"
-version = "0.0.1-alpha.10"
+version = "0.0.1-alpha.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f39afbc2d374fad30911f189625218312f8c93d6cd07f4f96181823a4316561"
+checksum = "4289c6852b505c8b6b8c6ec7de150de002694e5bb021e9a9b769e20427d1d0de"
 dependencies = [
  "libc",
  "libsodium-sys",
  "num_cpus",
  "once_cell",
+ "one_err",
  "parking_lot 0.11.2",
- "thiserror",
  "tokio",
 ]
 
