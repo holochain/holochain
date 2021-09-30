@@ -364,7 +364,7 @@ impl ShardedGossipLocalState {
                 Some(when_initiated)
                     if no_current_round_exist && when_initiated.elapsed() > ROUND_TIMEOUT =>
                 {
-                    self.metrics.record_error(cert.clone());
+                    self.metrics.record_error(cert);
                     self.initiate_tgt = None;
                 }
                 None if no_current_round_exist => {
