@@ -413,11 +413,10 @@ mod danger {
             None => {
                 let mut options = legacy_lair_api::actor::TlsCertOptions::default();
                 options.alg = legacy_lair_api::actor::TlsCertAlg::PkcsEcdsaP256Sha256;
-                let cert = legacy_lair_api::internal::tls::tls_cert_self_signed_new_from_entropy(
-                    options,
-                )
-                .await
-                .map_err(TransportError::other)?;
+                let cert =
+                    legacy_lair_api::internal::tls::tls_cert_self_signed_new_from_entropy(options)
+                        .await
+                        .map_err(TransportError::other)?;
                 (cert.cert_der, cert.priv_key_der)
             }
         };
