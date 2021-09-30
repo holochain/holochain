@@ -1,10 +1,10 @@
-//! Keystore backed by lair_keystore_client.
+//! Keystore backed by legacy_lair_client.
 
 use crate::*;
-use lair_keystore_api::*;
+use legacy_lair_api::*;
 
-/// Spawn a new keystore backed by lair_keystore_client.
-pub async fn spawn_lair_keystore(
+/// Spawn a new keystore backed by legacy_lair_client.
+pub async fn spawn_legacy_lair(
     lair_dir: Option<&std::path::Path>,
     passphrase: sodoken::BufRead,
 ) -> KeystoreApiResult<KeystoreSender> {
@@ -14,7 +14,7 @@ pub async fn spawn_lair_keystore(
     }
     let config = config.build();
 
-    let api = lair_keystore_client::assert_running_lair_and_connect(config, passphrase).await?;
+    let api = legacy_lair_client::assert_running_lair_and_connect(config, passphrase).await?;
 
     Ok(api)
 }
