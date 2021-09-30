@@ -90,7 +90,7 @@ impl KdHashExt for KdHash {
             async {
                 let sig = sodoken::BufReadSized::new_no_lock(*signature);
                 KdResult::Ok(
-                    sodoken::sign::sign_verify_detached(sig, data, pk)
+                    sodoken::sign::verify_detached(sig, data, pk)
                         .await
                         .map_err(KdError::other)?,
                 )
@@ -105,7 +105,7 @@ impl KdHashExt for KdHash {
         let r = sodoken::BufRead::new_no_lock(data);
         async move {
             let hash = <sodoken::BufWriteSized<32>>::new_no_lock();
-            sodoken::blake2b::hash(hash.clone(), r)
+            sodoken::hash::blake2b::hash(hash.clone(), r)
                 .await
                 .map_err(KdError::other)?;
             let mut out = [0; 32];
@@ -137,7 +137,7 @@ async fn loc_hash(d: sodoken::BufReadSized<32>) -> KdResult<[u8; 4]> {
     let mut out = [0; 4];
 
     let hash = <sodoken::BufWriteSized<16>>::new_no_lock();
-    sodoken::blake2b::hash(hash.clone(), d)
+    sodoken::hash::blake2b::hash(hash.clone(), d)
         .await
         .map_err(KdError::other)?;
 
