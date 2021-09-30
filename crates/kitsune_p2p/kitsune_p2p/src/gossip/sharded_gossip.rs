@@ -23,6 +23,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
+use tokio::time::Instant;
 
 use self::bandwidth::BandwidthThrottle;
 use self::metrics::Metrics;
@@ -103,7 +104,7 @@ pub struct ShardedGossip {
 
 /// Basic statistic for gossip loop processing performance.
 struct Stats {
-    start: std::time::Instant,
+    start: Instant,
     avg_processing_time: std::time::Duration,
     max_processing_time: std::time::Duration,
     count: u32,
@@ -113,7 +114,7 @@ impl Stats {
     /// Reset the stats.
     fn reset() -> Self {
         Stats {
-            start: std::time::Instant::now(),
+            start: Instant::now(),
             avg_processing_time: std::time::Duration::default(),
             max_processing_time: std::time::Duration::default(),
             count: 0,
@@ -315,14 +316,14 @@ pub struct ShardedGossipLocalState {
     /// The list of agents on this node
     local_agents: HashSet<Arc<KitsuneAgent>>,
     /// If Some, we are in the process of trying to initiate gossip with this target.
-    initiate_tgt: Option<(GossipTgt, u32, std::time::Instant)>,
+    initiate_tgt: Option<(GossipTgt, u32, Option<tokio::time::Instant>)>,
     round_map: RoundStateMap,
     /// Metrics that track remote node states and help guide
     /// the next node to gossip with.
     metrics: Metrics,
     #[allow(dead_code)]
     /// Last moment we locally synced.
-    last_local_sync: Option<std::time::Instant>,
+    last_local_sync: Option<Instant>,
     /// Trigger local sync to run on the next iteration.
     trigger_local_sync: bool,
 }
@@ -359,8 +360,17 @@ impl ShardedGossipLocalState {
         {
             // Check if no current round exists and we've timed out the initiate.
             let no_current_round_exist = !self.round_map.round_exists(&cert);
-            if no_current_round_exist && when_initiated.elapsed() > ROUND_TIMEOUT {
-                self.initiate_tgt = None;
+            match when_initiated {
+                Some(when_initiated)
+                    if no_current_round_exist && when_initiated.elapsed() > ROUND_TIMEOUT =>
+                {
+                    self.metrics.record_error(cert.clone());
+                    self.initiate_tgt = None;
+                }
+                None if no_current_round_exist => {
+                    self.initiate_tgt = None;
+                }
+                _ => (),
             }
         }
     }
@@ -405,9 +415,9 @@ pub struct RoundState {
     /// (the one with `finished` == true)
     received_all_incoming_ops_blooms: bool,
     /// Round start time
-    created_at: std::time::Instant,
+    created_at: Instant,
     /// Last moment we had any contact for this round.
-    last_touch: std::time::Instant,
+    last_touch: Instant,
     /// Amount of time before a round is considered expired.
     round_timeout: std::time::Duration,
 }
@@ -446,8 +456,8 @@ impl ShardedGossipLocal {
             common_arc_set,
             num_sent_ops_blooms: 0,
             received_all_incoming_ops_blooms: false,
-            created_at: std::time::Instant::now(),
-            last_touch: std::time::Instant::now(),
+            created_at: Instant::now(),
+            last_touch: Instant::now(),
             round_timeout: ROUND_TIMEOUT,
         })
     }
@@ -656,7 +666,7 @@ impl ShardedGossipLocal {
             } else if i.trigger_local_sync {
                 // We are force triggering a local sync.
                 i.trigger_local_sync = false;
-                i.last_local_sync = Some(std::time::Instant::now());
+                i.last_local_sync = Some(Instant::now());
                 let s = tracing::trace_span!("trigger",agents = ?i.show_local_agents(), i.trigger_local_sync);
                 s.in_scope(|| tracing::trace!("Force local sync"));
                 Ok(true)
@@ -668,7 +678,7 @@ impl ShardedGossipLocal {
                 >= self.tuning_params.gossip_local_sync_delay_ms
             {
                 // It's been long enough since the last local sync.
-                i.last_local_sync = Some(std::time::Instant::now());
+                i.last_local_sync = Some(Instant::now());
                 Ok(true)
             } else {
                 // Otherwise it's not time to sync.

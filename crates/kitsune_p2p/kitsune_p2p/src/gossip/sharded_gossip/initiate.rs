@@ -37,7 +37,7 @@ impl ShardedGossipLocal {
         let maybe_gossip = self.inner.share_mut(|inner, _| {
             Ok(if let Some((endpoint, url)) = remote_agent {
                 let gossip = ShardedGossipWire::initiate(intervals, id);
-                inner.initiate_tgt = Some((endpoint.clone(), id, std::time::Instant::now()));
+                inner.initiate_tgt = Some((endpoint.clone(), id, Some(Instant::now())));
                 Some((endpoint, HowToConnect::Url(url), gossip))
             } else {
                 None
@@ -124,7 +124,13 @@ impl ShardedGossipLocal {
                 .as_ref()
                 .map_or(true, |tgt| *tgt.0.cert() != peer_cert)
             {
-                inner.metrics.record_remote_round(peer_cert);
+                inner.metrics.record_remote_round(peer_cert.clone());
+            }
+            // If this is the target then we should clear the when initiated timeout.
+            if let Some((tgt, _, when_initiated)) = inner.initiate_tgt.as_mut() {
+                if *tgt.cert() == peer_cert {
+                    *when_initiated = None;
+                }
             }
             Ok(())
         })?;
