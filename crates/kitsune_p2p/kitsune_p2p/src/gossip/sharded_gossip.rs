@@ -56,8 +56,8 @@ const MAX_SEND_BUF_BYTES: usize = 16000;
 /// gossiped with if gossip is triggered.
 const MAX_TRIGGERS: u8 = 2;
 
-/// The timeout for a gossip round if there is no contact. Five minutes.
-const ROUND_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60 * 5);
+/// The timeout for a gossip round if there is no contact. One minute.
+const ROUND_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
 
 type BloomFilter = bloomfilter::Bloom<Arc<MetaOpKey>>;
 type EventSender = futures::channel::mpsc::Sender<event::KitsuneP2pEvent>;
@@ -315,7 +315,7 @@ pub struct ShardedGossipLocalState {
     /// The list of agents on this node
     local_agents: HashSet<Arc<KitsuneAgent>>,
     /// If Some, we are in the process of trying to initiate gossip with this target.
-    initiate_tgt: Option<(GossipTgt, u32)>,
+    initiate_tgt: Option<(GossipTgt, u32, std::time::Instant)>,
     round_map: RoundStateMap,
     /// Metrics that track remote node states and help guide
     /// the next node to gossip with.
@@ -352,8 +352,14 @@ impl ShardedGossipLocalState {
     }
 
     fn check_tgt_expired(&mut self) {
-        if let Some(cert) = self.initiate_tgt.as_ref().map(|tgt| tgt.0.cert().clone()) {
-            if self.round_map.check_timeout(&cert) {
+        if let Some((cert, when_initiated)) = self
+            .initiate_tgt
+            .as_ref()
+            .map(|tgt| (tgt.0.cert().clone(), tgt.2))
+        {
+            // Check if no current round exists and we've timed out the initiate.
+            let no_current_round_exist = !self.round_map.round_exists(&cert);
+            if no_current_round_exist && when_initiated.elapsed() > ROUND_TIMEOUT {
                 self.initiate_tgt = None;
             }
         }

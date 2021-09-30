@@ -37,7 +37,7 @@ impl ShardedGossipLocal {
         let maybe_gossip = self.inner.share_mut(|inner, _| {
             Ok(if let Some((endpoint, url)) = remote_agent {
                 let gossip = ShardedGossipWire::initiate(intervals, id);
-                inner.initiate_tgt = Some((endpoint.clone(), id));
+                inner.initiate_tgt = Some((endpoint.clone(), id, std::time::Instant::now()));
                 Some((endpoint, HowToConnect::Url(url), gossip))
             } else {
                 None
