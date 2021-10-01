@@ -26,7 +26,7 @@ mod tests {
 
                 sb.add_ops_now(1, true, [2, 3, 4]);
                 sb.add_ops_now(2, true, [1, 2]);
-                sb.add_ops_now(2, true, [-2, 1]);
+                sb.add_ops_now(3, true, [-2, 1]);
 
                 Ok(())
             })

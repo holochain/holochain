@@ -297,9 +297,9 @@ impl SwitchboardSpace {
         node.gossip.local_agent_join(agent);
     }
 
-    pub fn add_ops_now<L: Into<DhtLocation>, O: IntoIterator<Item = L>>(
+    pub fn add_ops_now<O: IntoIterator<Item = Loc8>>(
         &mut self,
-        agent_loc: L,
+        agent_loc: Loc8,
         is_integrated: bool,
         ops: O,
     ) {
@@ -328,7 +328,6 @@ impl SwitchboardSpace {
 
         {
             // Update the agent op state, dropping the mutable ref immediately after
-            dbg!(&self.nodes, &agent);
             let node = self
                 .node_for_agent_hash(&*agent)
                 .expect("No agent at this loc8 for node");
@@ -457,4 +456,13 @@ fn fake_agent_info(space: KSpace, agent: KAgent, interval: ArcInterval) -> Agent
         encoded_bytes: Box::new([]),
     };
     AgentInfoSigned(Arc::new(state))
+}
+
+#[test]
+fn hash_from_loc8_roundtrip() {
+    for i in [0, 1, -1, i8::MIN, i8::MAX] {
+        let i: Loc8 = i;
+        assert_eq!(Loc8::from(agent_from_loc(i).get_loc()), i);
+        assert_eq!(Loc8::from(op_hash_from_loc(i).get_loc()), i);
+    }
 }
