@@ -57,6 +57,12 @@ impl GossipModule {
     }
 }
 
+impl std::fmt::Debug for GossipModule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GossipModule").finish()
+    }
+}
+
 /// Represents an interchangeable gossip strategy module factory
 pub trait AsGossipModuleFactory: 'static + Send + Sync {
     fn spawn_gossip_task(

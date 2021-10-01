@@ -23,19 +23,27 @@ mod tests {
                 sb.add_agent(&n1, 1, ArcInterval::Full);
                 sb.add_agent(&n2, 2, ArcInterval::Full);
                 sb.add_agent(&n3, 3, ArcInterval::Full);
+
+                sb.add_ops_now(1, true, [2, 3, 4]);
+                sb.add_ops_now(2, true, [1, 2]);
+                sb.add_ops_now(2, true, [-2, 1]);
+
                 Ok(())
             })
             .unwrap();
 
-        // n1.add_ops([2, 3, 4]);
-        // n2.add_ops([1, 2]);
-        // n3.add_ops([-2, -1]);
-
-        // let all = vec![-2, -1, 1, 2, 3, 4];
-        // assert_eq!(n1.get_ops(), all);
-        // assert_eq!(n2.get_ops(), all);
-        // assert_eq!(n3.get_ops(), all);
-
         tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+
+        let all = vec![-2, -1, 1, 2, 3, 4];
+
+        sb.space_state()
+            .share_mut(|sb, _| {
+                assert_eq!(sb.get_ops_loc8(&n1), all);
+                assert_eq!(sb.get_ops_loc8(&n2), all);
+                assert_eq!(sb.get_ops_loc8(&n3), all);
+                Ok(())
+            })
+            .unwrap();
+
     }
 }

@@ -407,6 +407,14 @@ impl<C: Codec + 'static + Send + Unpin> std::hash::Hash for Tx2EpHnd<C> {
     }
 }
 
+impl<C: Codec + 'static + Send + Unpin> std::fmt::Debug for Tx2EpHnd<C> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Tx2EpHnd")
+            .field("uniq", &self.0.uniq())
+            .finish()
+    }
+}
+
 impl<C: Codec + 'static + Send + Unpin> Tx2EpHnd<C> {
     /// Capture a debugging internal state dump.
     pub fn debug(&self) -> serde_json::Value {

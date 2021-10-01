@@ -5,6 +5,7 @@ use crate::types::gossip::*;
 use crate::types::wire;
 use futures::stream::StreamExt;
 use ghost_actor::GhostResult;
+use itertools::Itertools;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::agent_info::{AgentInfoInner, AgentInfoSigned};
 use kitsune_p2p_types::bin_types::*;
@@ -31,8 +32,10 @@ pub type NodeEp = Tx2EpHnd<wire::Wire>;
 static ZERO_SPACE: once_cell::sync::Lazy<Arc<KitsuneSpace>> =
     once_cell::sync::Lazy::new(|| Arc::new(KitsuneSpace::new([0; 36].to_vec())));
 
+#[derive(Debug)]
 pub struct NodeEntry {
     pub(super) agents: HashMap<Loc8, AgentEntry>,
+    pub(super) gossip: GossipModule,
 }
 
 impl NodeEntry {
@@ -46,6 +49,7 @@ impl NodeEntry {
 }
 
 /// The value of the SwitchboardSpace::agents hashmap
+#[derive(Debug)]
 pub struct AgentEntry {
     /// The AgentInfoSigned for this agent
     pub info: AgentInfoSigned,
@@ -63,11 +67,14 @@ impl AgentEntry {
     }
 }
 
+#[derive(Debug)]
+
 pub struct AgentOpEntry {
     pub is_integrated: bool,
 }
 
 /// The value of the SwitchboardSpace::ops hashmap
+#[derive(Debug)]
 pub struct OpEntry {
     /// Not strictly necessary as it can be computed from the Loc8 key, but here
     /// for convenience since there is no one-step way to go from Loc8 -> KitsuneOpHash
@@ -138,7 +145,7 @@ impl Switchboard {
         let tuning_params = Arc::new(Default::default());
 
         let space_state = self.spaces.get(&space).unwrap().state.clone();
-        let evt_handler = SwitchboardEventHandler::new(ep_hnd.clone(), space_state);
+        let evt_handler = SwitchboardEventHandler::new(ep_hnd.clone(), space_state.clone());
         let (evt_sender, handler_task) = spawn_handler(evt_handler.clone()).await;
 
         // TODO: generalize
@@ -155,6 +162,7 @@ impl Switchboard {
             bandwidth,
         );
         let gossip = GossipModule(gossip.clone());
+        let gossip2 = gossip.clone();
 
         let ep_task = metric_task(async move {
             dbg!("begin metric task");
@@ -172,7 +180,7 @@ impl Switchboard {
                                 let data: Vec<u8> = data.into();
                                 let data: Box<[u8]> = data.into_boxed_slice();
 
-                                gossip.incoming_gossip(con, url, data)?
+                                gossip2.incoming_gossip(con, url, data)?
                             }
                             _ => unimplemented!(),
                         }
@@ -183,11 +191,26 @@ impl Switchboard {
             Ok(())
         });
 
+        // Register the task handles with the space
         self.spaces
             .get_mut(&space)
             .unwrap()
             .tasks
             .push((handler_task, ep_task));
+
+        // Add the node to the space state
+        space_state
+            .share_mut(|state, _| {
+                state.nodes.insert(
+                    ep_hnd.clone(),
+                    NodeEntry {
+                        agents: HashMap::new(),
+                        gossip,
+                    },
+                );
+                Ok(())
+            })
+            .unwrap();
 
         ep_hnd
     }
@@ -214,6 +237,17 @@ impl SwitchboardSpace {
         }
     }
 
+    pub fn node_for_agent_loc8(&mut self, loc8: Loc8) -> Option<&mut NodeEntry> {
+        self.nodes
+            .values_mut()
+            .find(|n| n.agents.keys().contains(&loc8))
+    }
+
+    pub fn node_for_agent_hash(&mut self, hash: &KitsuneAgent) -> Option<&mut NodeEntry> {
+        let agent_loc8 = hash.get_loc().into();
+        self.node_for_agent_loc8(agent_loc8)
+    }
+
     /// Look through all nodes for this agent Loc8
     pub fn agent_by_loc8(&self, loc8: Loc8) -> Option<&AgentEntry> {
         self.nodes
@@ -235,20 +269,24 @@ impl SwitchboardSpace {
         &mut self.nodes.get_mut(node).expect("Node not added").agents
     }
 
-    pub fn add_agent(&mut self, node: &NodeEp, agent_loc8: Loc8, interval: ArcInterval<Loc8>) {
-        let agent_loc: DhtLocation = agent_loc8.clone().into();
-        let agent = Arc::new(KitsuneAgent::new(agent_loc.to_bytes_36()));
-        let info = fake_agent_info(self.space.clone(), agent, interval.to_dht_location());
+    pub fn add_agent(&mut self, node_ep: &NodeEp, agent_loc8: Loc8, interval: ArcInterval<Loc8>) {
+        let agent = agent_from_loc(agent_loc8);
+        let info = fake_agent_info(
+            self.space.clone(),
+            agent.clone(),
+            interval.to_dht_location(),
+        );
         self.agent_by_loc8(agent_loc8).map(|existing| {
             panic!(
                 "Attempted to insert two agents at the same Loc8. Existing agent info: {:?}",
                 existing.info
             )
         });
-        self.nodes
-            .get_mut(node)
-            .expect("Node must be added first")
-            .agents
+        let node = self
+            .nodes
+            .get_mut(node_ep)
+            .expect("Node must be added first");
+        node.agents
             .insert(agent_loc8, AgentEntry::new(info))
             .map(|existing| {
                 panic!(
@@ -256,6 +294,87 @@ impl SwitchboardSpace {
                     existing.info
                 )
             });
+        node.gossip.local_agent_join(agent);
+    }
+
+    pub fn add_ops_now<L: Into<DhtLocation>, O: IntoIterator<Item = L>>(
+        &mut self,
+        agent_loc: L,
+        is_integrated: bool,
+        ops: O,
+    ) {
+        let ops = ops.into_iter().map(|op| (op, Timestamp::now()));
+        self.add_ops_timed(agent_loc, is_integrated, ops)
+    }
+
+    pub fn add_ops_timed<L: Into<DhtLocation>, O: IntoIterator<Item = (L, Timestamp)>>(
+        &mut self,
+        agent_loc: L,
+        is_integrated: bool,
+        ops: O,
+    ) {
+        let agent = agent_from_loc(agent_loc);
+
+        // Do some pre-computation
+        let ops: Vec<_> = ops
+            .into_iter()
+            .map(|(loc, timestamp)| {
+                let loc: DhtLocation = loc.into();
+                let loc8: Loc8 = loc.into();
+                let hash = op_hash_from_loc(loc8);
+                (loc8, hash, timestamp)
+            })
+            .collect();
+
+        {
+            // Update the agent op state, dropping the mutable ref immediately after
+            dbg!(&self.nodes, &agent);
+            let node = self
+                .node_for_agent_hash(&*agent)
+                .expect("No agent at this loc8 for node");
+            let agent_loc8 = agent.get_loc().into();
+            let agent_entry = node.agents.get_mut(&agent_loc8).unwrap();
+            for (loc8, _, _) in ops.iter() {
+                agent_entry
+                    .ops
+                    .insert(*loc8, AgentOpEntry { is_integrated });
+            }
+        }
+
+        // Update node-wide op store with data and timestamp
+        for (loc8, hash, timestamp) in ops {
+            if let Some(existing) = self.ops.insert(
+                loc8,
+                OpEntry {
+                    hash,
+                    data: vec![],
+                    timestamp,
+                },
+            ) {
+                panic!(
+                    "inserted same op twice. remove this panic if it's not a big deal. {:?}",
+                    existing
+                );
+            }
+        }
+
+        // Let gossip module know there's new integrated data now.
+        self.node_for_agent_hash(&*agent)
+            .expect("No agent at this loc8 for node")
+            .gossip
+            .new_integrated_data();
+    }
+
+    pub fn get_ops_loc8(&mut self, node_ep: &NodeEp) -> Vec<Loc8> {
+        let mut ops: Vec<_> = self
+            .agents_for_node(node_ep)
+            .values()
+            .map(|agent| agent.ops.keys())
+            .flatten()
+            .copied()
+            .collect();
+        ops.sort();
+        ops
     }
 
     pub fn query_op_hashes(
@@ -314,6 +433,16 @@ impl SwitchboardSpace {
             Some((ops, window))
         }
     }
+}
+
+fn agent_from_loc<L: Into<DhtLocation>>(loc8: L) -> KAgent {
+    let loc: DhtLocation = loc8.into();
+    Arc::new(KitsuneAgent::new(loc.to_bytes_36()))
+}
+
+fn op_hash_from_loc<L: Into<DhtLocation>>(loc8: L) -> KOpHash {
+    let loc: DhtLocation = loc8.into();
+    Arc::new(KitsuneOpHash::new(loc.to_bytes_36()))
 }
 
 fn fake_agent_info(space: KSpace, agent: KAgent, interval: ArcInterval) -> AgentInfoSigned {
