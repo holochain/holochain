@@ -239,11 +239,11 @@ async fn invalid_cell() -> anyhow::Result<()> {
     // Give small amount of time for cells to join the network
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
-    tracing::debug!(dnas = ?conductor.list_dnas().await.unwrap());
-    tracing::debug!(cell_ids = ?conductor.list_cell_ids(None).await.unwrap());
+    tracing::debug!(dnas = ?conductor.list_dnas());
+    tracing::debug!(cell_ids = ?conductor.list_cell_ids(None));
     tracing::debug!(apps = ?conductor.list_running_apps().await.unwrap());
 
-    display_agent_infos(&conductor).await;
+    display_agent_infos(&conductor);
 
     // Can't finish this test because there's no way to construct HolochainP2pEvents
     // and I can't directly call query on the conductor because it's private.

@@ -210,7 +210,7 @@ impl SweetConductor {
         let mut sweet_cells = Vec::new();
         for dna_hash in dna_hashes {
             let cell_id = CellId::new(dna_hash, agent.clone());
-            let cell_env = self.handle().0.get_cell_env(&cell_id).await?;
+            let cell_env = self.handle().0.get_cell_env(&cell_id)?;
             let cell = SweetCell { cell_id, cell_env };
             sweet_cells.push(cell);
         }
@@ -315,7 +315,6 @@ impl SweetConductor {
     pub async fn admin_ws_client(&self) -> (WebsocketSender, WebsocketReceiver) {
         let port = self
             .get_arbitrary_admin_websocket_port()
-            .await
             .expect("No admin port open on conductor");
         websocket_client_by_port(port).await.unwrap()
     }
@@ -372,17 +371,12 @@ impl SweetConductor {
     pub async fn force_all_publish_dht_ops(&self) {
         use futures::stream::StreamExt;
         if let Some(handle) = self.handle.as_ref() {
-            let iter = handle
-                .list_cell_ids(None)
-                .await
-                .expect("Failed to list cell ids")
-                .into_iter()
-                .map(|id| async {
-                    let id = id;
-                    let env = self.get_cell_env(&id).await.unwrap();
-                    let trigger = self.get_cell_triggers(&id).await.unwrap();
-                    (env, trigger)
-                });
+            let iter = handle.list_cell_ids(None).into_iter().map(|id| async {
+                let id = id;
+                let env = self.get_cell_env(&id).unwrap();
+                let trigger = self.get_cell_triggers(&id).unwrap();
+                (env, trigger)
+            });
             futures::stream::iter(iter)
                 .then(|f| f)
                 .for_each(|(env, mut triggers)| async move {
@@ -411,8 +405,8 @@ impl Drop for SweetConductor {
         if let Some(handle) = self.handle.take() {
             tokio::task::spawn(async move {
                 // Shutdown the conductor
-                if let Some(shutdown) = handle.take_shutdown_handle().await {
-                    handle.shutdown().await;
+                if let Some(shutdown) = handle.take_shutdown_handle() {
+                    handle.shutdown();
                     if let Err(e) = shutdown.await {
                         tracing::warn!("Failed to join conductor shutdown task: {:?}", e);
                     }

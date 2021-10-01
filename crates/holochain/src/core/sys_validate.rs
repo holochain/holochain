@@ -253,7 +253,7 @@ pub async fn check_app_entry_type(
     let zome_index = u8::from(entry_type.zome_id()) as usize;
     // We want to be careful about holding locks open to the conductor api
     // so calls are made in blocks
-    let dna_file = conductor_api.get_this_dna().await.map_err(Box::new)?;
+    let dna_file = conductor_api.get_this_dna().map_err(Box::new)?;
 
     // Check if the zome is found
     let zome = dna_file

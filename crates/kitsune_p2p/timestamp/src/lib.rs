@@ -190,6 +190,11 @@ impl Timestamp {
         Timestamp::from(chrono::offset::Utc::now())
     }
 
+    /// Largest possible Timestamp.
+    pub fn max() -> Timestamp {
+        Timestamp(i64::MAX)
+    }
+
     /// Construct from microseconds
     pub fn from_micros(micros: i64) -> Self {
         Self(micros)
@@ -198,6 +203,11 @@ impl Timestamp {
     /// Access time as microseconds since UNIX epoch
     pub fn as_micros(&self) -> i64 {
         self.0
+    }
+
+    /// Access time as milliseconds since UNIX epoch
+    pub fn as_millis(&self) -> i64 {
+        self.0 / 1000
     }
 
     /// Access seconds since UNIX epoch plus nanosecond offset

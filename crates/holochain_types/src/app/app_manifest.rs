@@ -77,3 +77,42 @@ impl AppManifest {
         }
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+
+    use mr_bundle::Manifest;
+
+    use crate::app::app_manifest::{AppManifest, AppManifestV1Builder, AppSlotManifest};
+
+    #[test]
+    /// Replicate this test for any new version of the manifest that gets created
+    fn app_manifest_v1_helper_functions() {
+        let app_name = String::from("sample-app");
+
+        let dna_slot = String::from("sample-dna");
+        let app_slot_manifest = AppSlotManifest::sample(dna_slot);
+
+        let sample_app_manifest_v1 = AppManifestV1Builder::default()
+            .name(app_name.clone())
+            .description(Some(String::from("Some description")))
+            .slots(vec![app_slot_manifest.clone()])
+            .build()
+            .unwrap();
+        let sample_app_manifest = AppManifest::V1(sample_app_manifest_v1.clone());
+
+        assert_eq!(app_name, sample_app_manifest.app_name());
+        assert_eq!(vec![app_slot_manifest], sample_app_manifest.app_slots());
+        assert_eq!(
+            vec![sample_app_manifest_v1
+                .slots
+                .get(0)
+                .unwrap()
+                .dna
+                .location
+                .clone()
+                .unwrap()],
+            sample_app_manifest.locations()
+        );
+    }
+}

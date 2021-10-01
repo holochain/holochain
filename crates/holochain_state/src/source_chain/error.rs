@@ -1,6 +1,7 @@
 // use crate::holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
+use holochain_p2p::HolochainP2pError;
 use holochain_serialized_bytes::prelude::*;
 use holochain_sqlite::error::DatabaseError;
 use holochain_types::prelude::*;
@@ -75,6 +76,9 @@ pub enum SourceChainError {
 
     #[error(transparent)]
     DhtOpError(#[from] DhtOpError),
+
+    #[error(transparent)]
+    HolochainP2pError(#[from] HolochainP2pError),
 
     #[error("Required the scratch space to be empty but contained values")]
     ScratchNotFresh,

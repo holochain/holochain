@@ -26,6 +26,7 @@ pub use crate::post_commit::*;
 pub use crate::query::ChainQueryFilter as QueryFilter;
 pub use crate::query::*;
 pub use crate::request::*;
+pub use crate::schedule::*;
 pub use crate::signal::*;
 pub use crate::signature::*;
 pub use crate::timestamp::*;

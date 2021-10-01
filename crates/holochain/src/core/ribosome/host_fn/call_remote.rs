@@ -1,11 +1,11 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeT;
+use futures::future::join_all;
+use holochain_p2p::HolochainP2pCellT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
-use futures::future::join_all;
-use holochain_p2p::HolochainP2pCellT;
 
 pub fn call_remote(
     _ribosome: Arc<impl RibosomeT>,
@@ -18,9 +18,9 @@ pub fn call_remote(
             ..
         } => {
             // it is the network's responsibility to handle timeouts and return an Err result in that case
-            let results: Vec<Result<SerializedBytes, _>> = tokio_helper::block_forever_on(async move {
-                join_all(inputs.into_iter().map(|input| {
-                    async {
+            let results: Vec<Result<SerializedBytes, _>> =
+                tokio_helper::block_forever_on(async move {
+                    join_all(inputs.into_iter().map(|input| async {
                         let CallRemote {
                             target_agent,
                             zome_name,
@@ -28,23 +28,24 @@ pub fn call_remote(
                             cap,
                             payload,
                         } = input;
-                        call_context.host_context().network().call_remote(
-                            target_agent,
-                            zome_name,
-                            fn_name,
-                            cap,
-                            payload,
-                        ).await
-                    }
-                })).await
-            });
-            let results: Result<Vec<_>, _> = results.into_iter().map(|result| match result {
-                Ok(r) => match ZomeCallResponse::try_from(r) {
-                    Ok(v) => Ok(v),
-                    Err(e) => Err(e),
-                },
-                Err(e) => Ok(ZomeCallResponse::NetworkError(e.to_string())),
-            }).collect();
+                        call_context
+                            .host_context()
+                            .network()
+                            .call_remote(target_agent, zome_name, fn_name, cap, payload)
+                            .await
+                    }))
+                    .await
+                });
+            let results: Result<Vec<_>, _> = results
+                .into_iter()
+                .map(|result| match result {
+                    Ok(r) => match ZomeCallResponse::try_from(r) {
+                        Ok(v) => Ok(v),
+                        Err(e) => Err(e),
+                    },
+                    Err(e) => Ok(ZomeCallResponse::NetworkError(e.to_string())),
+                })
+                .collect();
 
             Ok(results?)
         }
@@ -181,8 +182,8 @@ pub mod wasm_test {
             _ => unreachable!(),
         }
 
-        let shutdown = handle.take_shutdown_handle().await.unwrap();
-        handle.shutdown().await;
+        let shutdown = handle.take_shutdown_handle().unwrap();
+        handle.shutdown();
         shutdown.await.unwrap().unwrap();
     }
 }

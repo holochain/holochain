@@ -73,3 +73,39 @@ impl WebAppManifest {
         }
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+
+    use crate::web_app::{
+        web_app_manifest::WebAppManifestV1, AppManifestLocation, WebAppManifest, WebUI,
+    };
+    use mr_bundle::{Location, Manifest};
+
+    #[test]
+    /// Replicate this test for any new version of the manifest that gets created
+    fn web_app_manifest_v1_helper_functions() {
+        let ui_location = Location::Bundled("./path/to/my/ui.zip".into());
+        let happ_location = Location::Bundled("./path/to/my/happ-bundle.happ".into());
+        let app_name = String::from("sample-web-happ");
+        let web_app_manifest = WebAppManifest::V1(WebAppManifestV1 {
+            name: app_name.clone(),
+            ui: WebUI {
+                location: ui_location.clone(),
+            },
+            happ_manifest: AppManifestLocation {
+                location: happ_location.clone(),
+            },
+        });
+
+        assert_eq!(WebAppManifest::current(app_name.clone()), web_app_manifest);
+
+        assert_eq!(
+            vec![ui_location.clone(), happ_location.clone()],
+            web_app_manifest.locations()
+        );
+        assert_eq!(app_name, web_app_manifest.app_name());
+        assert_eq!(ui_location, web_app_manifest.web_ui_location());
+        assert_eq!(happ_location, web_app_manifest.happ_bundle_location());
+    }
+}

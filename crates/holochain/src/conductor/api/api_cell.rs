@@ -75,29 +75,26 @@ impl CellConductorApiT for CellConductorApi {
         self.conductor_handle.signal_broadcaster().await
     }
 
-    async fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile> {
-        self.conductor_handle.get_dna(dna_hash).await
+    fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile> {
+        self.conductor_handle.get_dna(dna_hash)
     }
 
-    async fn get_this_dna(&self) -> ConductorApiResult<DnaFile> {
-        Ok(self
-            .conductor_handle
+    fn get_this_dna(&self) -> ConductorApiResult<DnaFile> {
+        self.conductor_handle
             .get_dna(self.cell_id.dna_hash())
-            .await
-            .ok_or_else(|| ConductorApiError::DnaMissing(self.cell_id.dna_hash().clone()))?)
+            .ok_or_else(|| ConductorApiError::DnaMissing(self.cell_id.dna_hash().clone()))
     }
 
-    async fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
+    fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
         Ok(self
             .get_dna(dna_hash)
-            .await
             .ok_or_else(|| ConductorApiError::DnaMissing(dna_hash.clone()))?
             .dna_def()
             .get_zome(zome_name)?)
     }
 
-    async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
-        self.conductor_handle.get_entry_def(key).await
+    fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
+        self.conductor_handle.get_entry_def(key)
     }
 
     fn into_call_zome_handle(self) -> CellConductorReadHandle {
@@ -131,16 +128,16 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
     async fn signal_broadcaster(&self) -> SignalBroadcaster;
 
     /// Get a [Dna] from the [DnaStore]
-    async fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile>;
+    fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile>;
 
     /// Get the [Dna] of this cell from the [DnaStore]
-    async fn get_this_dna(&self) -> ConductorApiResult<DnaFile>;
+    fn get_this_dna(&self) -> ConductorApiResult<DnaFile>;
 
     /// Get a [Zome] from this cell's Dna
-    async fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome>;
+    fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome>;
 
     /// Get a [EntryDef] from the [EntryDefBuf]
-    async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
+    fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
 
     /// Turn this into a call zome handle
     fn into_call_zome_handle(self) -> CellConductorReadHandle;
@@ -161,7 +158,7 @@ pub trait CellConductorReadHandleT: Send + Sync {
     ) -> ConductorApiResult<ZomeCallResult>;
 
     /// Get a zome from this cell's Dna
-    async fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome>;
+    fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome>;
 }
 
 #[async_trait]
@@ -184,7 +181,7 @@ impl CellConductorReadHandleT for CellConductorApi {
         }
     }
 
-    async fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
-        CellConductorApiT::get_zome(self, dna_hash, zome_name).await
+    fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
+        CellConductorApiT::get_zome(self, dna_hash, zome_name)
     }
 }

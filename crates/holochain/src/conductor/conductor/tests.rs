@@ -19,7 +19,7 @@ use holochain_state::prelude::*;
 use holochain_types::test_utils::fake_cell_id;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::WebsocketSender;
-use kitsune_p2p_types::dependencies::lair_keystore_api::LairError;
+use kitsune_p2p_types::dependencies::legacy_lair_api::LairError;
 use maplit::hashset;
 use matches::assert_matches;
 
@@ -76,7 +76,7 @@ async fn can_add_clone_cell_to_app() {
 
     let dna_store = RealDnaStore::new();
 
-    let mut conductor = Conductor::new(
+    let conductor = Conductor::new(
         envs.conductor(),
         envs.wasm(),
         dna_store,
@@ -101,7 +101,7 @@ async fn can_add_clone_cell_to_app() {
         vec![&"nick".to_string()]
     );
 
-    conductor.register_phenotype(dna).await.unwrap();
+    conductor.register_phenotype(dna);
     conductor
         .update_state(move |mut state| {
             state
@@ -148,7 +148,7 @@ async fn app_ids_are_unique() {
     let environments = test_environments();
     let dna_store = MockDnaStore::new();
     let holochain_p2p = holochain_p2p::stub_network().await;
-    let mut conductor = Conductor::new(
+    let conductor = Conductor::new(
         environments.conductor(),
         environments.wasm(),
         dna_store,
@@ -952,7 +952,7 @@ async fn test_cell_and_app_status_reconciliation() {
     let mut conductor = SweetConductor::from_standard_config().await;
     conductor.setup_app(&app_id, &dnas).await.unwrap();
 
-    let cell_ids = conductor.list_cell_ids(None).await.unwrap();
+    let cell_ids = conductor.list_cell_ids(None);
     let cell1 = &cell_ids[0..1];
 
     let check = || async {
@@ -960,19 +960,15 @@ async fn test_cell_and_app_status_reconciliation() {
             AppStatusKind::from(AppStatus::from(
                 conductor.list_apps(None).await.unwrap()[0].status.clone(),
             )),
-            conductor.list_cell_ids(Some(Joined)).await.unwrap().len(),
-            conductor
-                .list_cell_ids(Some(PendingJoin))
-                .await
-                .unwrap()
-                .len(),
+            conductor.list_cell_ids(Some(Joined)).len(),
+            conductor.list_cell_ids(Some(PendingJoin)).len(),
         )
     };
 
     assert_eq!(check().await, (Running, 3, 0));
 
     // - Simulate a cell failing to join the network
-    conductor.update_cell_status(cell1, PendingJoin).await;
+    conductor.update_cell_status(cell1, PendingJoin);
     assert_eq!(check().await, (Running, 2, 1));
 
     // - Reconciled app state is Paused due to one unjoined Cell

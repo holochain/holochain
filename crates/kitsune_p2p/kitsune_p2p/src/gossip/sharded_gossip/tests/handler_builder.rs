@@ -46,12 +46,8 @@ impl HandlerBuilder {
     pub fn with_agent_persistence(mut self, agent_data: MockAgentPersistence) -> Self {
         let info_only: Vec<_> = agent_data.iter().map(|(info, _)| info.clone()).collect();
         let agents_only: Vec<_> = info_only.iter().map(|info| info.agent.clone()).collect();
-        let agents_arcs: Vec<_> = agent_data
-            .iter()
-            .map(|(info, _)| (info.agent.clone(), info.storage_arc.interval()))
-            .collect();
 
-        self.0.expect_handle_query_agent_info_signed().returning({
+        self.0.expect_handle_query_agents().returning({
             let info_only = info_only.clone();
             move |_| {
                 let info_only = info_only.clone();
@@ -67,13 +63,6 @@ impl HandlerBuilder {
                 Ok(async move { Ok(Some(agent_info(agent).await)) }
                     .boxed()
                     .into())
-            }
-        });
-
-        self.0.expect_handle_query_gossip_agents().returning({
-            move |_| {
-                let agents_arcs = agents_arcs.clone();
-                Ok(async move { Ok(agents_arcs) }.boxed().into())
             }
         });
 
@@ -328,7 +317,7 @@ async fn test_three_way_sharded_ownership() {
                 // Only look at one agent at a time
                 &agent_arcs[a..a + 1],
                 &DhtArcSet::Full,
-                full_time_range(),
+                full_time_window(),
                 usize::MAX,
                 false,
             )

@@ -274,7 +274,7 @@ impl AsKdPersist for PersistMem {
             let pk = sodoken::BufWriteSized::new_no_lock();
             let sk = sodoken::BufWriteSized::new_mem_locked().map_err(KdError::other)?;
 
-            sodoken::sign::sign_keypair(pk.clone(), sk.clone())
+            sodoken::sign::keypair(pk.clone(), sk.clone())
                 .await
                 .map_err(KdError::other)?;
 
@@ -309,7 +309,7 @@ impl AsKdPersist for PersistMem {
                 Some(sk) => sk,
             };
             let sig = <sodoken::BufWriteSized<64>>::new_no_lock();
-            sodoken::sign::sign_detached(sig.clone(), data, sk)
+            sodoken::sign::detached(sig.clone(), data, sk)
                 .await
                 .map_err(KdError::other)?;
             let mut out = [0; 64];

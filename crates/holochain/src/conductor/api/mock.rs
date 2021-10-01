@@ -68,19 +68,19 @@ impl CellConductorApiT for MockCellConductorApi {
         self.mock_signal_broadcaster()
     }
 
-    async fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile> {
+    fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile> {
         self.sync_get_dna(dna_hash)
     }
 
-    async fn get_this_dna(&self) -> ConductorApiResult<DnaFile> {
+    fn get_this_dna(&self) -> ConductorApiResult<DnaFile> {
         self.sync_get_this_dna()
     }
 
-    async fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
+    fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
         self.sync_get_zome(dna_hash, zome_name)
     }
 
-    async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
+    fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
         self.sync_get_entry_def(key)
     }
 

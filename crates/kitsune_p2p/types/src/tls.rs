@@ -2,7 +2,7 @@
 
 use crate::config::*;
 use crate::*;
-use lair_keystore_api::actor::*;
+use legacy_lair_api::actor::*;
 
 /// Tls Configuration.
 #[derive(Clone)]
@@ -20,9 +20,9 @@ pub struct TlsConfig {
 impl TlsConfig {
     /// Create a new ephemeral tls certificate that will not be persisted.
     pub async fn new_ephemeral() -> KitsuneResult<Self> {
-        let mut options = lair_keystore_api::actor::TlsCertOptions::default();
-        options.alg = lair_keystore_api::actor::TlsCertAlg::PkcsEcdsaP256Sha256;
-        let cert = lair_keystore_api::internal::tls::tls_cert_self_signed_new_from_entropy(options)
+        let mut options = legacy_lair_api::actor::TlsCertOptions::default();
+        options.alg = legacy_lair_api::actor::TlsCertAlg::PkcsEcdsaP256Sha256;
+        let cert = legacy_lair_api::internal::tls::tls_cert_self_signed_new_from_entropy(options)
             .await
             .map_err(KitsuneError::other)?;
         Ok(Self {
@@ -49,7 +49,7 @@ pub fn gen_tls_configs(
     let cert = rustls::Certificate(tls.cert.0.to_vec());
     let cert_priv_key = rustls::PrivateKey(tls.cert_priv_key.0.to_vec());
 
-    let root_cert = rustls::Certificate(lair_keystore_api::internal::tls::WK_CA_CERT_DER.to_vec());
+    let root_cert = rustls::Certificate(legacy_lair_api::internal::tls::WK_CA_CERT_DER.to_vec());
     let mut root_store = rustls::RootCertStore::empty();
     root_store.add(&root_cert).unwrap();
 
