@@ -24,7 +24,6 @@ kitsune_p2p_timestamp = { version = "0.0.4", path = "../timestamp" }
 kitsune_p2p_types = { version = "0.0.7", path = "../types" }
 kitsune_p2p_proxy = { version = "0.0.7", path = "../proxy" }
 kitsune_p2p_transport_quic = { version = "0.0.7", path = "../transport_quic" }
-lair_keystore_api = "=0.0.4"
 mockall = { version = "0.10.2", optional = true }
 parking_lot = "0.11.1"
 rand = "0.7"
