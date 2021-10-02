@@ -85,7 +85,7 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
                 agent_map.values().map(|e| e.info.to_owned()).collect()
             })
         })?;
-        ok_fut(Ok(dbg!(result)))
+        ok_fut(Ok(result))
     }
 
     fn handle_query_peer_density(

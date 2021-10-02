@@ -17,6 +17,7 @@ use kitsune_p2p_types::tx2::tx2_pool_promote::*;
 use kitsune_p2p_types::tx2::tx2_utils::Share;
 use kitsune_p2p_types::tx2::*;
 use kitsune_p2p_types::*;
+use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::task::JoinHandle;
@@ -49,7 +50,7 @@ impl NodeEntry {
 }
 
 /// The value of the SwitchboardSpace::agents hashmap
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AgentEntry {
     /// The AgentInfoSigned for this agent
     pub info: AgentInfoSigned,
@@ -67,14 +68,14 @@ impl AgentEntry {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 
 pub struct AgentOpEntry {
     pub is_integrated: bool,
 }
 
 /// The value of the SwitchboardSpace::ops hashmap
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct OpEntry {
     /// Not strictly necessary as it can be computed from the Loc8 key, but here
     /// for convenience since there is no one-step way to go from Loc8 -> KitsuneOpHash
@@ -237,15 +238,21 @@ impl SwitchboardSpace {
         }
     }
 
-    pub fn node_for_agent_loc8(&mut self, loc8: Loc8) -> Option<&mut NodeEntry> {
+    pub fn node_for_agent_loc8(&self, loc8: Loc8) -> Option<&NodeEntry> {
+        self.nodes
+            .values()
+            .find(|n| n.agents.keys().contains(&loc8))
+    }
+
+    pub fn node_for_agent_loc8_mut(&mut self, loc8: Loc8) -> Option<&mut NodeEntry> {
         self.nodes
             .values_mut()
             .find(|n| n.agents.keys().contains(&loc8))
     }
 
-    pub fn node_for_agent_hash(&mut self, hash: &KitsuneAgent) -> Option<&mut NodeEntry> {
+    pub fn node_for_agent_hash_mut(&mut self, hash: &KitsuneAgent) -> Option<&mut NodeEntry> {
         let agent_loc8 = hash.get_loc().into();
-        self.node_for_agent_loc8(agent_loc8)
+        self.node_for_agent_loc8_mut(agent_loc8)
     }
 
     /// Look through all nodes for this agent Loc8
@@ -297,6 +304,39 @@ impl SwitchboardSpace {
         node.gossip.local_agent_join(agent);
     }
 
+    pub fn exchange_peer_info<
+        'n,
+        L: Borrow<Loc8>,
+        A: IntoIterator<Item = L>,
+        P: IntoIterator<Item = (&'n NodeEp, A)>,
+    >(
+        &mut self,
+        peers: P,
+    ) {
+        for (node, agents) in peers.into_iter() {
+            let agents: Vec<_> = agents
+                .into_iter()
+                .map(|loc8| {
+                    let loc8: &Loc8 = loc8.borrow();
+                    (
+                        *loc8,
+                        self.node_for_agent_loc8(*loc8)
+                            .unwrap()
+                            .agents
+                            .get(loc8)
+                            .unwrap()
+                            .to_owned(),
+                    )
+                })
+                .collect();
+            self.nodes
+                .get_mut(node)
+                .expect("No node")
+                .agents
+                .extend(agents)
+        }
+    }
+
     pub fn add_ops_now<O: IntoIterator<Item = Loc8>>(
         &mut self,
         agent_loc: Loc8,
@@ -329,7 +369,7 @@ impl SwitchboardSpace {
         {
             // Update the agent op state, dropping the mutable ref immediately after
             let node = self
-                .node_for_agent_hash(&*agent)
+                .node_for_agent_hash_mut(&*agent)
                 .expect("No agent at this loc8 for node");
             let agent_loc8 = agent.get_loc().into();
             let agent_entry = node.agents.get_mut(&agent_loc8).unwrap();
@@ -358,7 +398,7 @@ impl SwitchboardSpace {
         }
 
         // Let gossip module know there's new integrated data now.
-        self.node_for_agent_hash(&*agent)
+        self.node_for_agent_hash_mut(&*agent)
             .expect("No agent at this loc8 for node")
             .gossip
             .new_integrated_data();

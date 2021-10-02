@@ -11,7 +11,7 @@ mod tests {
     use super::switchboard::Switchboard;
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn smoke() {
+    async fn basic_3way_full_sync_switchboard() {
         let mut sb = Switchboard::new();
 
         let n1 = sb.add_node(Default::default()).await;
@@ -24,17 +24,19 @@ mod tests {
                 sb.add_agent(&n2, 2, ArcInterval::Full);
                 sb.add_agent(&n3, 3, ArcInterval::Full);
 
-                sb.add_ops_now(1, true, [2, 3, 4]);
-                sb.add_ops_now(2, true, [1, 2]);
-                sb.add_ops_now(3, true, [-2, 1]);
+                sb.add_ops_now(1, true, [10, 20, 30]);
+                sb.add_ops_now(2, true, [-10, -20, -30]);
+                sb.add_ops_now(3, true, [-15, 15]);
+
+                sb.exchange_peer_info([(&n1, &[2, 3]), (&n2, &[1, 3]), (&n3, &[1, 2])]);
 
                 Ok(())
             })
             .unwrap();
 
-        tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
-        let all = vec![-2, -1, 1, 2, 3, 4];
+        let all = vec![-30, -20, -15, -10, 10, 15, 20, 30];
 
         sb.space_state()
             .share_mut(|sb, _| {
@@ -44,6 +46,5 @@ mod tests {
                 Ok(())
             })
             .unwrap();
-
     }
 }
