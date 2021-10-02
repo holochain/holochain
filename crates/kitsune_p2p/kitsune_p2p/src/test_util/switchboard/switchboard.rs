@@ -18,7 +18,7 @@ use kitsune_p2p_types::tx2::tx2_utils::Share;
 use kitsune_p2p_types::tx2::*;
 use kitsune_p2p_types::*;
 use std::borrow::Borrow;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
 
@@ -238,6 +238,13 @@ impl SwitchboardSpace {
         }
     }
 
+    pub fn assert_space(&self, space: KSpace) {
+        assert_eq!(
+            self.space, space,
+            "Space from request does not match SwitchboardSpace"
+        );
+    }
+
     pub fn node_for_agent_loc8(&self, loc8: Loc8) -> Option<&NodeEntry> {
         self.nodes
             .values()
@@ -426,6 +433,7 @@ impl SwitchboardSpace {
             include_limbo,
         }: QueryOpHashesEvt,
     ) -> Option<(Vec<Arc<KitsuneOpHash>>, TimeWindow)> {
+        self.assert_space(space);
         let (ops, timestamps): (Vec<_>, Vec<_>) = self
             .ops
             .iter()

@@ -3249,6 +3249,7 @@ dependencies = [
  "gcollections",
  "intervallum",
  "num-traits",
+ "rusqlite",
  "serde",
 ]
 

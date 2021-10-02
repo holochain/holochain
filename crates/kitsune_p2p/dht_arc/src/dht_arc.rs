@@ -59,6 +59,13 @@ impl From<i32> for DhtLocation {
     }
 }
 
+#[cfg(feature = "sqlite")]
+impl rusqlite::ToSql for DhtLocation {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
+        Ok(rusqlite::types::ToSqlOutput::Owned(self.0 .0.into()))
+    }
+}
+
 /// The maximum you can hold either side of the hash location
 /// is half the circle.
 /// This is half of the furthest index you can hold

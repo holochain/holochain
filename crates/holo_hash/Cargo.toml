@@ -37,7 +37,13 @@ serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 [features]
 
 default = ["serialization"]
-full = ["fixturators", "hashing", "encoding", "rusqlite"]
+full = [
+    "fixturators", 
+    "hashing", 
+    "encoding", 
+    "rusqlite",
+    "kitsune_p2p_dht_arc/sqlite"
+]
 
 fixturators = ["fixt", "rand", "hashing", "encoding"]
 hashing = ["futures", "must_future", "blake2b_simd", "serialization"]
