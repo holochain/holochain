@@ -58,9 +58,10 @@ pub(crate) async fn spawn_test_agent(
 }
 
 use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_types::dependencies::legacy_lair_api;
 use kitsune_p2p_types::dht_arc::DhtArcSet;
-use lair_keystore_api::entry::EntrySignEd25519;
-use lair_keystore_api::internal::sign_ed25519::*;
+use legacy_lair_api::entry::EntrySignEd25519;
+use legacy_lair_api::internal::sign_ed25519::*;
 
 struct AgentHarness {
     agent: Arc<KitsuneAgent>,

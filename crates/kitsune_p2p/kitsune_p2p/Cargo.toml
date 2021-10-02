@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p"
-version = "0.0.7"
+version = "0.0.8"
 description = "p2p / dht communication framework"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -20,11 +20,10 @@ ghost_actor = "=0.3.0-alpha.4"
 governor = "0.3.2"
 itertools = "0.10"
 kitsune_p2p_mdns = { version = "0.0.2", path = "../mdns" }
-kitsune_p2p_timestamp = { version = "0.0.3", path = "../timestamp", features = ["now"] }
-kitsune_p2p_types = { version = "0.0.6", path = "../types" }
-kitsune_p2p_proxy = { version = "0.0.6", path = "../proxy" }
-kitsune_p2p_transport_quic = { version = "0.0.6", path = "../transport_quic" }
-lair_keystore_api = "=0.0.4"
+kitsune_p2p_timestamp = { version = "0.0.4", path = "../timestamp" }
+kitsune_p2p_types = { version = "0.0.7", path = "../types" }
+kitsune_p2p_proxy = { version = "0.0.7", path = "../proxy" }
+kitsune_p2p_transport_quic = { version = "0.0.7", path = "../transport_quic" }
 num-traits = "0.2"
 parking_lot = "0.11.1"
 rand = "0.7"

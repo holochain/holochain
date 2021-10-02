@@ -77,9 +77,9 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
     {
         use ghost_actor::dependencies::futures::future::FutureExt;
 
-        let pub_key: lair_keystore_api::internal::sign_ed25519::SignEd25519PubKey =
+        let pub_key: legacy_lair_api::internal::sign_ed25519::SignEd25519PubKey =
             self.get_raw_32().to_vec().into();
-        let sig: lair_keystore_api::internal::sign_ed25519::SignEd25519Signature =
+        let sig: legacy_lair_api::internal::sign_ed25519::SignEd25519Signature =
             signature.0.to_vec().into();
 
         let data: Result<SerializedBytes, SerializedBytesError> = data.try_into();
@@ -96,9 +96,9 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
         use ghost_actor::dependencies::futures::future::FutureExt;
 
         let data = Arc::new(data.to_vec());
-        let pub_key: lair_keystore_api::internal::sign_ed25519::SignEd25519PubKey =
+        let pub_key: legacy_lair_api::internal::sign_ed25519::SignEd25519PubKey =
             self.get_raw_32().to_vec().into();
-        let sig: lair_keystore_api::internal::sign_ed25519::SignEd25519Signature =
+        let sig: legacy_lair_api::internal::sign_ed25519::SignEd25519Signature =
             signature.0.to_vec().into();
 
         async move { Ok(pub_key.verify(data, sig).await?) }
