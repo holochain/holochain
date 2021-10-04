@@ -24,7 +24,7 @@ pub struct PublishedData {
     /// The storage arc of the agent.
     pub storage_arc: DhtArc,
     /// The op hashes published by the agent.
-    pub published_hashes: Vec<KitsuneOpHash>,
+    pub published_hashes: Vec<(u32, KitsuneOpHash)>,
 }
 
 /// A consistency session for an individual agent

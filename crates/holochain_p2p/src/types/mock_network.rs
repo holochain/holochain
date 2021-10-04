@@ -2,10 +2,18 @@
 
 #![allow(missing_docs)]
 
+use fixt::prelude::Distribution;
+use futures::stream::Stream;
 use std::collections::HashMap;
+use std::collections::HashSet;
+use std::ops::Range;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::time::Duration;
 
 use crate::types::AgentPubKeyExt;
 use crate::types::DnaHashExt;
+use futures::StreamExt;
 use holo_hash::{AgentPubKey, DnaHash};
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::dependencies::kitsune_p2p_proxy::ProxyUrl;
@@ -13,9 +21,7 @@ use kitsune_p2p::test_util::mock_network::to_kitsune_channel;
 use kitsune_p2p::test_util::mock_network::KitsuneMock;
 use kitsune_p2p::test_util::mock_network::ToKitsuneMockChannelRx;
 use kitsune_p2p::test_util::mock_network::ToKitsuneMockChannelTx;
-use kitsune_p2p::test_util::mock_network::{
-    FromKitsuneMockChannelRx, FromKitsuneMockChannelTx, KitsuneMockRespond,
-};
+use kitsune_p2p::test_util::mock_network::{FromKitsuneMockChannelTx, KitsuneMockRespond};
 use kitsune_p2p::wire as kwire;
 use kitsune_p2p::GossipModuleType;
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
@@ -31,8 +37,31 @@ fn next_msg_id() -> MsgId {
 
 pub struct HolochainP2pMockChannel {
     address_map: HashMap<AgentPubKey, (Tx2Cert, TxUrl)>,
-    from_kitsune: FromKitsuneMockChannelRx,
+    from_kitsune: Pin<Box<dyn Stream<Item = KitsuneMock> + Send + Sync + 'static>>,
     to_kitsune: ToKitsuneMockChannelTx,
+}
+
+#[derive(Clone)]
+pub struct MockScenario {
+    /// Percentage of messages that will be dropped.
+    pub percent_drop_msg: f32,
+    /// Percentage of nodes that will not respond.
+    pub percent_offline: f32,
+    /// The range of time inbound messages will be delayed.
+    pub inbound_delay_range: Range<Duration>,
+    /// The range of time outbound messages will be delayed.
+    pub outbound_delay_range: Range<Duration>,
+}
+
+impl Default for MockScenario {
+    fn default() -> Self {
+        Self {
+            percent_drop_msg: 0.0,
+            percent_offline: 0.0,
+            inbound_delay_range: Duration::from_millis(0)..Duration::from_millis(0),
+            outbound_delay_range: Duration::from_millis(0)..Duration::from_millis(0),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -165,12 +194,13 @@ impl HolochainP2pMockChannel {
     pub fn channel(
         peer_data: Vec<AgentInfoSigned>,
         buffer: usize,
+        scenario: MockScenario,
     ) -> (
         FromKitsuneMockChannelTx,
         ToKitsuneMockChannelRx,
         HolochainP2pMockChannel,
     ) {
-        let address_map = peer_data
+        let address_map: HashMap<_, _> = peer_data
             .into_iter()
             .map(|info| {
                 let agent = holo_hash::AgentPubKey::from_kitsune(&info.agent);
@@ -179,15 +209,90 @@ impl HolochainP2pMockChannel {
                 (agent, (cert, url))
             })
             .collect();
+        let offline_nodes: HashSet<_> = {
+            let mut rng = rand::thread_rng();
+            address_map
+                .values()
+                .filter(|_| {
+                    let offline = rand::distributions::Uniform::from(0.0..1.0);
+                    offline.sample(&mut rng) <= scenario.percent_offline
+                })
+                .map(|(cert, _)| cert.clone())
+                .collect()
+        };
+        let offline_nodes = Arc::new(offline_nodes);
         let (from_kitsune_tx, from_kitsune_rx) = tokio::sync::mpsc::channel(buffer);
         let (to_kitsune_tx, to_kitsune_rx) = to_kitsune_channel(buffer);
+        let (tx, rx) = tokio::sync::mpsc::channel(buffer);
+
+        let stream = tokio_stream::wrappers::ReceiverStream::new(from_kitsune_rx)
+            .map({
+                let scenario = scenario.clone();
+                move |t: KitsuneMock| {
+                    let scenario = scenario.clone();
+                    let offline_nodes = offline_nodes.clone();
+                    async move {
+                        let (delay, keep) = {
+                            let mut rng = rand::thread_rng();
+                            let delay = if scenario.inbound_delay_range.is_empty() {
+                                Duration::from_millis(0)
+                            } else {
+                                let delay = rand::distributions::Uniform::from(
+                                    scenario.inbound_delay_range,
+                                );
+                                delay.sample(&mut rng)
+                            };
+                            let drop = rand::distributions::Uniform::from(0.0..1.0);
+                            let keep = drop.sample(&mut rng) > scenario.percent_drop_msg;
+                            (delay, keep)
+                        };
+                        tokio::time::sleep(delay).await;
+                        keep.then(|| t)
+                            .filter(|m| !offline_nodes.contains(m.cert()))
+                    }
+                }
+            })
+            .buffer_unordered(10)
+            .filter_map(|t| async move { t });
+        let from_kitsune = Box::pin(stream);
+        let stream = tokio_stream::wrappers::ReceiverStream::new(rx).for_each_concurrent(10, {
+            let scenario = scenario.clone();
+            move |msg| {
+                let scenario = scenario.clone();
+                let to_kitsune_tx = to_kitsune_tx.clone();
+                async move {
+                    let scenario = scenario.clone();
+                    let (delay, keep) = {
+                        let mut rng = rand::thread_rng();
+                        let delay = if scenario.outbound_delay_range.is_empty() {
+                            Duration::from_millis(0)
+                        } else {
+                            let delay =
+                                rand::distributions::Uniform::from(scenario.outbound_delay_range);
+                            delay.sample(&mut rng)
+                        };
+                        let drop = rand::distributions::Uniform::from(0.0..1.0);
+                        let keep = drop.sample(&mut rng) > scenario.percent_drop_msg;
+                        (delay, keep)
+                    };
+                    tokio::time::sleep(delay).await;
+                    if keep {
+                        to_kitsune_tx.send(msg).await.unwrap();
+                    }
+                }
+            }
+        });
+        tokio::spawn(async move {
+            stream.await;
+        });
+
         (
             from_kitsune_tx,
             to_kitsune_rx,
             Self {
                 address_map,
-                from_kitsune: from_kitsune_rx,
-                to_kitsune: to_kitsune_tx,
+                from_kitsune,
+                to_kitsune: tx,
             },
         )
     }
@@ -198,7 +303,7 @@ impl HolochainP2pMockChannel {
         AddressedHolochainP2pMockMsg,
         Option<HolochainP2pMockRespond>,
     )> {
-        while let Some(msg) = self.from_kitsune.recv().await {
+        while let Some(msg) = self.from_kitsune.next().await {
             let to_agent = self
                 .address_map
                 .iter()
@@ -318,13 +423,13 @@ impl HolochainP2pMockChannel {
         let msg = if id.is_notify() {
             KitsuneMock::notify(id, cert, url, to_wire_msg(msg))
         } else {
-            let (respond, rx) = tokio::sync::oneshot::channel();
+            let (respond, _) = tokio::sync::oneshot::channel();
 
             KitsuneMock::request(id, cert, url, to_wire_msg(msg), respond)
         };
-        self.to_kitsune.send(msg).await.unwrap();
+        let _ = self.to_kitsune.send(msg).await;
         if id.is_req() {
-            Some(todo!())
+            todo!("Add the ability to send requests to holochain")
         } else {
             None
         }

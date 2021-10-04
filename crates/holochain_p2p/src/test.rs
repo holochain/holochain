@@ -558,7 +558,7 @@ mod tests {
 
         let (dna, a1, a2, _a3) = test_setup();
         let (from_kitsune_tx, to_kitsune_rx, mut channel) =
-            HolochainP2pMockChannel::channel(peer_data, 1000);
+            HolochainP2pMockChannel::channel(peer_data, 1000, Default::default());
         tokio::task::spawn(async move {
             while let Some((msg, _)) = channel.next().await {
                 dbg!(&msg);
@@ -656,14 +656,9 @@ mod tests {
                     QueryGossipAgents { respond, .. } => {
                         let info1 = info1.clone();
                         let info2 = info2.clone();
-                        respond.r(Ok(async move {
-                            Ok(vec![
-                                (info1.agent.clone(), ArcInterval::Full),
-                                (info2.agent.clone(), ArcInterval::Full),
-                            ])
-                        }
-                        .boxed()
-                        .into()));
+                        respond.r(Ok(async move { Ok(vec![info1.clone(), info2.clone()]) }
+                            .boxed()
+                            .into()));
                     }
                     QueryOpHashes { respond, .. } => {
                         respond.r(Ok(async move { Ok(None) }.boxed().into()));

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use futures::future::Either;
 use futures::FutureExt;
 use futures::StreamExt;
 use kitsune_p2p_types::tx2::tx2_adapter::test_utils::*;
@@ -8,22 +9,23 @@ use kitsune_p2p_types::tx2::tx2_adapter::*;
 use kitsune_p2p_types::tx2::tx2_utils::PoolBuf;
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use kitsune_p2p_types::tx2::*;
+use kitsune_p2p_types::KitsuneError;
+use kitsune_p2p_types::KitsuneResult;
 use kitsune_p2p_types::Tx2Cert;
+use tokio::sync::mpsc;
+use tokio::sync::oneshot;
 
 use crate::wire;
 
-pub type FromKitsuneMockChannelTx = tokio::sync::mpsc::Sender<KitsuneMock>;
-pub type FromKitsuneMockChannelRx = tokio::sync::mpsc::Receiver<KitsuneMock>;
-pub type ToKitsuneMockChannelTx = tokio::sync::mpsc::Sender<KitsuneMock>;
-pub type ToKitsuneMockChannelRx =
-    Arc<parking_lot::Mutex<Option<tokio::sync::mpsc::Receiver<KitsuneMock>>>>;
+pub type FromKitsuneMockChannelTx = mpsc::Sender<KitsuneMock>;
+pub type FromKitsuneMockChannelRx = mpsc::Receiver<KitsuneMock>;
+pub type ToKitsuneMockChannelTx = mpsc::Sender<KitsuneMock>;
+pub struct ToKitsuneMockChannelRx(SharedRecv<KitsuneMock>);
 
-// const ADDR: &'static str =
-//     "kitsune-proxy://CIW6PxKxsPPlcuvUCbMcKwUpaMSmB7kLD8xyyj4mqcw/kitsune-quic/h/localhost/p/5778/-";
 #[derive(Debug)]
 pub struct KitsuneMock {
     msg: KitsuneMockMsg,
-    respond: Option<tokio::sync::oneshot::Sender<KitsuneMockMsg>>,
+    respond: Option<oneshot::Sender<KitsuneMockMsg>>,
     cert: Tx2Cert,
     url: TxUrl,
 }
@@ -37,20 +39,24 @@ pub struct KitsuneMockMsg {
 
 #[derive(Debug)]
 pub struct KitsuneMockRespond {
-    respond: tokio::sync::oneshot::Sender<KitsuneMockMsg>,
+    respond: oneshot::Sender<KitsuneMockMsg>,
     id: MsgId,
     buf: PoolBuf,
 }
 
 pub fn to_kitsune_channel(buffer: usize) -> (ToKitsuneMockChannelTx, ToKitsuneMockChannelRx) {
-    let (tx, rx) = tokio::sync::mpsc::channel(buffer);
-    (tx, Arc::new(parking_lot::Mutex::new(Some(rx))))
+    let (tx, rx) = mpsc::channel(buffer);
+    (tx, ToKitsuneMockChannelRx(SharedRecv::new(rx)))
 }
 
 impl KitsuneMockRespond {
     pub fn respond(self, msg: wire::Wire) {
         let Self { respond, id, buf } = self;
-        respond.send(KitsuneMockMsg { msg, id, buf }).unwrap();
+        let _ = respond.send(KitsuneMockMsg {
+            msg,
+            id: id.as_res(),
+            buf,
+        });
     }
 }
 
@@ -60,7 +66,7 @@ impl KitsuneMock {
         cert: Tx2Cert,
         url: TxUrl,
         msg: wire::Wire,
-        respond: tokio::sync::oneshot::Sender<KitsuneMockMsg>,
+        respond: oneshot::Sender<KitsuneMockMsg>,
     ) -> Self {
         Self {
             msg: KitsuneMockMsg {
@@ -96,129 +102,123 @@ impl KitsuneMock {
     }
 }
 
+struct MockNetwork {
+    from_kitsune_tx: FromKitsuneMockChannelTx,
+    to_kitsune_rx: ToKitsuneMockChannelRx,
+    response_map: Arc<parking_lot::Mutex<HashMap<u64, oneshot::Sender<KitsuneMockMsg>>>>,
+}
+
+struct MockOutConnection {
+    response_tx: mpsc::Sender<oneshot::Receiver<KitsuneMockMsg>>,
+    response_rx: SharedRecv<oneshot::Receiver<KitsuneMockMsg>>,
+    remote_url: TxUrl,
+    remote_cert: Tx2Cert,
+}
+
+struct MockInConnection {
+    incoming_rx: SharedRecv<KitsuneMock>,
+    out_connection: Arc<MockOutConnection>,
+}
+
+impl MockOutConnection {
+    fn new(remote_url: TxUrl) -> Arc<Self> {
+        let (response_tx, response_rx) = mpsc::channel(1000);
+        let response_rx = SharedRecv::new(response_rx);
+        let remote_cert = url_to_cert(&remote_url);
+        Arc::new(Self {
+            response_tx,
+            response_rx,
+            remote_cert,
+            remote_url,
+        })
+    }
+}
+
+impl MockInConnection {
+    fn new(msg: &KitsuneMock) -> (mpsc::Sender<KitsuneMock>, Arc<Self>) {
+        let (response_tx, response_rx) = mpsc::channel(1000);
+        let response_rx = SharedRecv::new(response_rx);
+        let (incoming_tx, incoming_rx) = mpsc::channel(1000);
+        let incoming_rx = SharedRecv::new(incoming_rx);
+        let out_connection = MockOutConnection {
+            response_tx,
+            response_rx,
+            remote_cert: msg.cert.clone(),
+            remote_url: msg.url.clone(),
+        };
+        let s = Self {
+            incoming_rx,
+            out_connection: Arc::new(out_connection),
+        };
+        (incoming_tx, Arc::new(s))
+    }
+}
+
 /// Create a mock network.
 pub fn mock_network(
     from_kitsune_tx: FromKitsuneMockChannelTx,
     to_kitsune_rx: ToKitsuneMockChannelRx,
 ) -> kitsune_p2p_types::tx2::tx2_adapter::MockBindAdapt {
     let mut mock_network = kitsune_p2p_types::tx2::tx2_adapter::MockBindAdapt::new();
-    mock_network.expect_bind().returning(move |_, _| {
-        let from_kitsune_tx = from_kitsune_tx.clone();
-        let to_kitsune_rx = to_kitsune_rx.clone();
-        let resp_map = Arc::new(parking_lot::Mutex::new(HashMap::new()));
+    let response_map = Arc::new(parking_lot::Mutex::new(HashMap::new()));
+    let network = MockNetwork {
+        from_kitsune_tx,
+        to_kitsune_rx,
+        response_map,
+    };
+    let network = Arc::new(network);
+    mock_network.expect_bind().returning(move |local_addr, _| {
+        let network = network.clone();
         async move {
             let mut m = MockEndpointAdapt::new();
             let uniq = Uniq::default();
-            // return a uniq identifier
             m.expect_uniq().returning(move || uniq);
-            // return a uniq cert
-            m.expect_local_cert().returning(move || {
-                // vec![TX2_CERT.fetch_add(1, std::sync::atomic::Ordering::SeqCst); 32].into()
-                vec![100; 32].into()
-            });
+            m.expect_local_cert().returning(move || vec![0; 32].into());
             m.expect_local_addr()
-                .returning(move || Ok("http://localhost".into()));
-            // allow making "outgoing" connections that will respond how
-            // we configure them to
+                .returning(move || Ok(local_addr.clone()));
             m.expect_connect().returning({
-                let from_kitsune_tx = from_kitsune_tx.clone();
-                let resp_map = resp_map.clone();
+                let network = network.clone();
                 move |remote_url, _| {
-                    let (resp_tx, resp_rx) = tokio::sync::mpsc::channel(1000);
-                    let resp_rx = Arc::new(parking_lot::Mutex::new(Some(resp_rx)));
-                    let from_kitsune_tx = from_kitsune_tx.clone();
-                    let resp_rx = resp_rx.clone();
-                    let resp_tx = resp_tx.clone();
-                    let resp_map = resp_map.clone();
-                    let cert = Tx2Cert::from(
-                        kitsune_p2p_proxy::ProxyUrl::from_full(remote_url.as_str())
-                            .unwrap()
-                            .digest(),
-                    );
+                    let network = network.clone();
+                    let connection = MockOutConnection::new(remote_url);
                     async move {
                         // mock out our connection adapter
                         let mut m = MockConAdapt::new();
-                        let uniq = Uniq::default();
                         // return a uniq identifier
+                        let uniq = Uniq::default();
                         m.expect_uniq().returning(move || uniq);
                         // this is an "outgoing" connection
                         m.expect_dir().returning(|| Tx2ConDir::Outgoing);
                         // return a uniq cert to identify our peer
-                        let c = cert.clone();
-                        m.expect_peer_cert().returning(move || c.clone());
+                        let cert = connection.remote_cert.clone();
+                        m.expect_peer_cert().returning(move || cert.clone());
                         m.expect_close()
                             .returning(move |_, _| async move { () }.boxed());
                         // allow making "outgoing" channels that will respond
                         // how we configure them to
-                        m.expect_out_chan().returning(move |_| {
-                            // let w_send = w_send.clone();
-                            let mut m = MockAsFramedWriter::new();
-                            // when we get an outgoing write event
-                            // turn around and respond appropriately for
-                            // our test
-                            let from_kitsune_tx = from_kitsune_tx.clone();
-                            let resp_tx = resp_tx.clone();
-                            let resp_map = resp_map.clone();
-                            let cert = cert.clone();
-                            let remote_url = remote_url.clone();
-                            m.expect_write().returning(move |msg_id, buf, _| {
-                                // buf.cheap_move_start(65);
-                                let f = write_msg(
-                                    msg_id,
-                                    cert.clone(),
-                                    remote_url.clone(),
-                                    buf,
-                                    from_kitsune_tx.clone(),
-                                    resp_tx.clone(),
-                                    resp_map.clone(),
-                                );
-                                async move {
-                                    f.await;
-                                    Ok(())
-                                }
-                                .boxed()
-                            });
-                            let out: OutChan = Box::new(m);
-                            async move { Ok(out) }.boxed()
+                        m.expect_out_chan().returning({
+                            let connection = connection.clone();
+                            move |_| {
+                                let mut m = MockAsFramedWriter::new();
+                                let network = network.clone();
+                                let connection = connection.clone();
+                                m.expect_write().returning(move |msg_id, buf, _| {
+                                    write_msg(msg_id, buf, network.clone(), connection.clone())
+                                        .boxed()
+                                });
+                                let out: OutChan = Box::new(m);
+                                async move { Ok(out) }.boxed()
+                            }
                         });
                         let con: Arc<dyn ConAdapt> = Arc::new(m);
 
                         // make an incoming reader that will forward responses
                         // according to the logic in the writer above
                         let mut m = MockAsFramedReader::new();
+                        let connection = connection.clone();
                         m.expect_read().returning(move |_| {
-                            let resp_rx = resp_rx.clone();
-                            async move {
-                                let mut resp = match resp_rx.lock().take() {
-                                    Some(resp) => resp,
-                                    None => return Err("end".into()),
-                                };
-
-                                let r = match resp.recv().await {
-                                    Some(r) => match r.await {
-                                        Ok(r) => {
-                                            let KitsuneMockMsg { msg, id, mut buf } = r;
-
-                                            use kitsune_p2p_types::codec::Codec;
-                                            let data = msg.encode_vec().unwrap();
-                                            buf.extend_from_slice(&data);
-                                            (id, buf)
-                                        }
-                                        Err(_) => {
-                                            *resp_rx.lock() = Some(resp);
-                                            return Err("end".into());
-                                        }
-                                    },
-                                    None => {
-                                        *resp_rx.lock() = Some(resp);
-                                        return Err("end".into());
-                                    }
-                                };
-
-                                *resp_rx.lock() = Some(resp);
-                                Ok(r)
-                            }
-                            .boxed()
+                            let connection = connection.clone();
+                            read_response(connection).boxed()
                         });
 
                         // we'll only establish one single in channel
@@ -235,40 +235,24 @@ pub fn mock_network(
             });
             let ep: Arc<dyn EndpointAdapt> = Arc::new(m);
 
-            let from_kitsune_tx = from_kitsune_tx.clone();
             let incoming = futures::stream::unfold(HashMap::new(), {
-                let to_kitsune_rx = to_kitsune_rx.clone();
+                let network = network.clone();
                 move |mut open_cons: HashMap<Tx2Cert, ToKitsuneMockChannelTx>| {
-                    let to_kitsune_rx = to_kitsune_rx.clone();
-                    let resp_map = resp_map.clone();
-                    let from_kitsune_tx = from_kitsune_tx.clone();
+                    let network = network.clone();
                     async move {
-                        let mut in_rx = match to_kitsune_rx.lock().take() {
-                            Some(rx) => rx,
-                            None => return None,
-                        };
-                        while let Some(msg) = in_rx.recv().await {
+                        while let Some(msg) = network.to_kitsune_rx.0.recv().await {
                             match open_cons.get(&msg.cert) {
                                 Some(tx) => {
                                     tx.send(msg).await.unwrap();
                                 }
                                 None => {
-                                    *to_kitsune_rx.lock() = Some(in_rx);
-                                    let (tx, rx) = tokio::sync::mpsc::channel(1000);
+                                    let (incoming_tx, incoming_connection) =
+                                        MockInConnection::new(&msg);
                                     let cert = msg.cert.clone();
-                                    let url = msg.url.clone();
-                                    tx.send(msg).await.unwrap();
-                                    open_cons.insert(cert.clone(), tx);
-                                    let rx = Arc::new(parking_lot::Mutex::new(Some(rx)));
+                                    incoming_tx.send(msg).await.unwrap();
+                                    open_cons.insert(cert, incoming_tx);
                                     let out = async move {
-                                        Ok(new_incoming(
-                                            cert,
-                                            url,
-                                            rx,
-                                            resp_map.clone(),
-                                            from_kitsune_tx.clone(),
-                                        )
-                                        .await)
+                                        Ok(new_incoming(network.clone(), incoming_connection).await)
                                     }
                                     .boxed();
                                     return Some((out, open_cons));
@@ -289,78 +273,54 @@ pub fn mock_network(
     mock_network
 }
 
-async fn new_incoming(
-    cert: Tx2Cert,
-    url: TxUrl,
-    to_kitsune_rx: ToKitsuneMockChannelRx,
-    resp_map: Arc<parking_lot::Mutex<HashMap<u64, tokio::sync::oneshot::Sender<KitsuneMockMsg>>>>,
-    from_kitsune_tx: FromKitsuneMockChannelTx,
-) -> Con {
-    let (resp_tx, resp_rx) = tokio::sync::mpsc::channel(1000);
-    let resp_rx = Arc::new(parking_lot::Mutex::new(Some(resp_rx)));
+async fn new_incoming(network: Arc<MockNetwork>, connection: Arc<MockInConnection>) -> Con {
     let in_chan = futures::stream::once({
-        let resp_map = resp_map.clone();
+        let connection = connection.clone();
+        let network = network.clone();
         async move {
-            let resp_map = resp_map.clone();
+            let network = network.clone();
+            let connection = connection.clone();
             async move {
+                let network = network.clone();
+                let connection = connection.clone();
                 let mut m = MockAsFramedReader::new();
                 m.expect_read().returning(move |_| {
-                    let to_kitsune_rx = to_kitsune_rx.clone();
-                    let resp_map = resp_map.clone();
-                    let resp_rx = resp_rx.clone();
+                    let network = network.clone();
+                    let connection = connection.clone();
                     async move {
-                        let mut rx = match to_kitsune_rx.lock().take() {
-                            Some(rx) => rx,
-                            None => return Err("end".into()),
-                        };
-                        let mut r_rx = match resp_rx.lock().take() {
-                            Some(rx) => rx,
-                            None => return Err("end".into()),
-                        };
+                        let result = connection
+                            .incoming_rx
+                            .select_recv(connection.out_connection.response_rx.clone())
+                            .await;
+                        match result {
+                            Some(Either::Left(r)) => {
+                                let KitsuneMock {
+                                    msg: KitsuneMockMsg { msg, id, mut buf },
+                                    respond,
+                                    ..
+                                } = r;
+                                if let Some(respond) = respond {
+                                    network.response_map.lock().insert(id.as_id(), respond);
+                                }
 
-                        let r = {
-                            let f1 = rx.recv();
-                            let f2 = r_rx.recv();
-                            futures::pin_mut!(f1, f2);
-                            let r = match futures::future::select(f1, f2).await {
-                                futures::future::Either::Left((msg, _)) => match msg {
-                                    Some(r) => {
-                                        let KitsuneMock {
-                                            msg: KitsuneMockMsg { msg, id, mut buf },
-                                            respond,
-                                            ..
-                                        } = r;
-                                        if let Some(respond) = respond {
-                                            resp_map.lock().insert(id.as_id(), respond);
-                                        }
+                                use kitsune_p2p_types::codec::Codec;
+                                let data = msg.encode_vec().map_err(k_error)?;
+                                buf.extend_from_slice(&data);
+                                Ok((id, buf))
+                            }
+                            Some(Either::Right(r)) => match r.await {
+                                Ok(r) => {
+                                    let KitsuneMockMsg { msg, id, mut buf } = r;
 
-                                        use kitsune_p2p_types::codec::Codec;
-                                        let data = msg.encode_vec().unwrap();
-                                        buf.extend_from_slice(&data);
-                                        Ok((id, buf))
-                                    }
-                                    None => Err("end".into()),
-                                },
-                                futures::future::Either::Right((r, _)) => match r {
-                                    Some(r) => match r.await {
-                                        Ok(r) => {
-                                            let KitsuneMockMsg { msg, id, mut buf } = r;
-
-                                            use kitsune_p2p_types::codec::Codec;
-                                            let data = msg.encode_vec().unwrap();
-                                            buf.extend_from_slice(&data);
-                                            Ok((id, buf))
-                                        }
-                                        Err(_) => Err("end".into()),
-                                    },
-                                    None => Err("end".into()),
-                                },
-                            };
-                            r
-                        };
-                        *to_kitsune_rx.lock() = Some(rx);
-                        *resp_rx.lock() = Some(r_rx);
-                        r
+                                    use kitsune_p2p_types::codec::Codec;
+                                    let data = msg.encode_vec().map_err(k_error)?;
+                                    buf.extend_from_slice(&data);
+                                    Ok((id, buf))
+                                }
+                                Err(_) => Err("end".into()),
+                            },
+                            None => Err("end".into()),
+                        }
                     }
                     .boxed()
                 });
@@ -374,36 +334,26 @@ async fn new_incoming(
     .boxed();
     let in_chan = gen_mock_in_chan_recv_adapt(in_chan);
     let mut m = MockConAdapt::new();
-    let c = cert.clone();
-    m.expect_peer_cert().returning(move || c.clone());
+    let cert = connection.out_connection.remote_cert.clone();
+
+    m.expect_peer_cert().returning(move || cert.clone());
     m.expect_dir().returning(|| Tx2ConDir::Incoming);
-    m.expect_uniq().returning(move || Uniq::default());
-    let u = url.clone();
-    m.expect_peer_addr().returning(move || Ok(u.clone()));
+    let uniq = Uniq::default();
+    m.expect_uniq().returning(move || uniq.clone());
+    let url = connection.out_connection.remote_url.clone();
+    m.expect_peer_addr().returning(move || Ok(url.clone()));
     m.expect_out_chan().returning({
-        let resp_map = resp_map.clone();
         move |_| {
             let mut m = MockAsFramedWriter::new();
-            let resp_map = resp_map.clone();
-            let from_kitsune_tx = from_kitsune_tx.clone();
-            let resp_tx = resp_tx.clone();
-            let cert = cert.clone();
-            let url = url.clone();
+            let network = network.clone();
+            let connection = connection.clone();
             m.expect_write().returning(move |msg_id, buf, _| {
-                let f = write_msg(
+                write_msg(
                     msg_id,
-                    cert.clone(),
-                    url.clone(),
                     buf,
-                    from_kitsune_tx.clone(),
-                    resp_tx.clone(),
-                    resp_map.clone(),
-                );
-
-                async move {
-                    f.await;
-                    Ok(())
-                }
+                    network.clone(),
+                    connection.out_connection.clone(),
+                )
                 .boxed()
             });
             let out: OutChan = Box::new(m);
@@ -416,22 +366,19 @@ async fn new_incoming(
 
 async fn write_msg(
     msg_id: MsgId,
-    cert: Tx2Cert,
-    url: TxUrl,
     mut buf: PoolBuf,
-    from_kitsune_tx: FromKitsuneMockChannelTx,
-    resp_tx: tokio::sync::mpsc::Sender<tokio::sync::oneshot::Receiver<KitsuneMockMsg>>,
-    resp_map: Arc<parking_lot::Mutex<HashMap<u64, tokio::sync::oneshot::Sender<KitsuneMockMsg>>>>,
-) {
+    network: Arc<MockNetwork>,
+    connection: Arc<MockOutConnection>,
+) -> KitsuneResult<()> {
     use kitsune_p2p_types::codec::Codec;
     let respond = if msg_id.is_req() {
-        let (respond, r_rx) = tokio::sync::oneshot::channel();
-        resp_tx.send(r_rx).await.unwrap();
+        let (respond, r_rx) = oneshot::channel();
+        connection.response_tx.send(r_rx).await.map_err(k_error)?;
         Some(respond)
     } else {
         None
     };
-    let wire = wire::Wire::decode_ref(&buf).unwrap().1;
+    let wire = wire::Wire::decode_ref(&buf).map_err(k_error)?.1;
     buf.clear();
     let msg = KitsuneMockMsg {
         msg: wire,
@@ -439,18 +386,116 @@ async fn write_msg(
         buf,
     };
     if msg_id.is_req() || msg_id.is_notify() {
-        from_kitsune_tx
+        network
+            .from_kitsune_tx
             .send(KitsuneMock {
                 msg,
                 respond,
-                cert,
-                url,
+                cert: connection.remote_cert.clone(),
+                url: connection.remote_url.clone(),
             })
             .await
-            .unwrap();
+            .map_err(k_error)?;
     } else if msg_id.is_res() {
-        if let Some(respond) = resp_map.lock().remove(&msg_id.as_id()) {
-            respond.send(msg).unwrap();
+        if let Some(respond) = network.response_map.lock().remove(&msg_id.as_id()) {
+            respond.send(msg).map_err(k_error)?;
+        }
+    }
+    Ok(())
+}
+
+fn k_error<E: std::fmt::Debug>(e: E) -> KitsuneError {
+    format!("{:?}", e).into()
+}
+
+fn url_to_cert(url: &TxUrl) -> Tx2Cert {
+    Tx2Cert::from(
+        kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str())
+            .expect("Mock network failed to parse url")
+            .digest(),
+    )
+}
+
+async fn read_response(connection: Arc<MockOutConnection>) -> KitsuneResult<(MsgId, PoolBuf)> {
+    let r = match connection.response_rx.recv().await {
+        Some(r) => match r.await {
+            Ok(r) => {
+                let KitsuneMockMsg { msg, id, mut buf } = r;
+
+                use kitsune_p2p_types::codec::Codec;
+                let data = msg.encode_vec().map_err(k_error)?;
+                buf.extend_from_slice(&data);
+                (id, buf)
+            }
+            Err(_) => {
+                return Err("end".into());
+            }
+        },
+        None => {
+            return Err("end".into());
+        }
+    };
+
+    Ok(r)
+}
+
+struct SharedRecv<T> {
+    recv: Arc<parking_lot::Mutex<Option<mpsc::Receiver<T>>>>,
+}
+
+impl<T> SharedRecv<T> {
+    fn new(recv: mpsc::Receiver<T>) -> Self {
+        Self {
+            recv: Arc::new(parking_lot::Mutex::new(Some(recv))),
+        }
+    }
+
+    async fn recv(&self) -> Option<T> {
+        let mut recv = {
+            self.recv
+                .lock()
+                .take()
+                .expect("This type cannot be used concurrently")
+        };
+        let r = recv.recv().await;
+        *self.recv.lock() = Some(recv);
+        r
+    }
+
+    async fn select_recv<U>(&self, other: SharedRecv<U>) -> Option<Either<T, U>> {
+        let mut a = {
+            self.recv
+                .lock()
+                .take()
+                .expect("This type cannot be used concurrently")
+        };
+        let mut b = {
+            other
+                .recv
+                .lock()
+                .take()
+                .expect("This type cannot be used concurrently")
+        };
+        let r = {
+            let f_a = a.recv();
+            let f_b = b.recv();
+            futures::pin_mut!(f_a, f_b);
+            match futures::future::select(f_a, f_b).await {
+                Either::Left((t, _)) => t.map(|t| Either::Left(t)),
+                Either::Right((u, _)) => u.map(|u| Either::Right(u)),
+            }
+        };
+
+        *self.recv.lock() = Some(a);
+        *other.recv.lock() = Some(b);
+        r
+    }
+}
+
+impl<T> Clone for SharedRecv<T> {
+    fn clone(&self) -> Self {
+        Self {
+            recv: self.recv.clone(),
         }
     }
 }

@@ -107,6 +107,9 @@ pub mod mock_network;
 
 pub(crate) mod wire;
 
+pub use wire::WireDhtOpData;
+pub use wire::WireMessage;
+
 macro_rules! to_and_from_kitsune {
     ($($i:ident<$h:ty> -> $k:ty,)*) => {
         $(

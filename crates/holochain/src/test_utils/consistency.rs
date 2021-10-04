@@ -12,7 +12,7 @@ use holochain_p2p::{dht_arc::DhtArc, AgentPubKeyExt, DhtOpHashExt, DnaHashExt};
 use holochain_sqlite::{db::AsP2pStateTxExt, prelude::DatabaseResult};
 use holochain_state::prelude::StateQueryResult;
 use holochain_types::{dht_op::DhtOpType, env::EnvRead};
-use kitsune_p2p::{KitsuneAgent, KitsuneBinType, KitsuneOpHash};
+use kitsune_p2p::{KitsuneAgent, KitsuneOpHash};
 use kitsune_p2p_types::consistency::*;
 use rusqlite::named_params;
 
@@ -95,7 +95,7 @@ pub async fn local_machine_session(conductors: &[ConductorHandle], timeout: Dura
 /// Get consistency for a particular hash.
 pub async fn local_machine_session_with_hashes(
     handles: Vec<&ConductorHandle>,
-    hashes: impl Iterator<Item = DhtOpHash>,
+    hashes: impl Iterator<Item = (u32, DhtOpHash)>,
     space: &DnaHash,
     timeout: Duration,
 ) {
@@ -120,7 +120,7 @@ pub async fn local_machine_session_with_hashes(
     // Convert the hashes to kitsune.
     let all_hashes = hashes
         .into_iter()
-        .map(|h| h.into_kitsune_raw())
+        .map(|(l, h)| (l, h.into_kitsune_raw()))
         .collect::<Vec<_>>();
     // The agents we need to wait for.
     let mut wait_for_agents = HashSet::new();
@@ -328,7 +328,7 @@ Average hashes held: {}%.
 async fn gather_conductor_data(
     p2p_env: EnvRead,
     agents: Vec<(EnvRead, Arc<KitsuneAgent>)>,
-) -> (Vec<(Arc<KitsuneAgent>, DhtArc)>, Vec<KitsuneOpHash>) {
+) -> (Vec<(Arc<KitsuneAgent>, DhtArc)>, Vec<(u32, KitsuneOpHash)>) {
     // Create the stores iterator with the environments to search.
     let stores = agents.iter().cloned().map(|(cell_env, agent)| Stores {
         agent,
@@ -359,7 +359,7 @@ async fn expect_all(
     tx: tokio::sync::mpsc::Sender<SessionMessage>,
     timeout: Duration,
     all_agents: Vec<(Arc<KitsuneAgent>, DhtArc)>,
-    all_hashes: Vec<KitsuneOpHash>,
+    all_hashes: Vec<(u32, KitsuneOpHash)>,
     agent_env_map: HashMap<Arc<KitsuneAgent>, EnvRead>,
     agent_p2p_map: HashMap<Arc<KitsuneAgent>, EnvRead>,
 ) {
@@ -371,7 +371,7 @@ async fn expect_all(
 /// This is where we check which agents should be holding which hashes and agents.
 fn generate_session<'iter>(
     all_agents: &'iter Vec<(Arc<KitsuneAgent>, DhtArc)>,
-    all_hashes: &'iter Vec<KitsuneOpHash>,
+    all_hashes: &'iter Vec<(u32, KitsuneOpHash)>,
     timeout: Duration,
     agent_env_map: HashMap<Arc<KitsuneAgent>, EnvRead>,
 ) -> impl Iterator<Item = (Arc<KitsuneAgent>, ConsistencySession, EnvRead)> + 'iter {
@@ -380,8 +380,8 @@ fn generate_session<'iter>(
         .map(move |(agent, arc)| {
             let mut published_hashes = Vec::new();
             let mut expected_agents = Vec::new();
-            for hash in all_hashes.iter() {
-                if arc.contains(hash.get_loc()) {
+            for (basis_loc, hash) in all_hashes.iter() {
+                if arc.contains(*basis_loc) {
                     published_hashes.push(hash.clone());
                 }
             }
@@ -634,7 +634,7 @@ async fn gather_published_data(
 }
 
 /// Request the published hashes for the given agent.
-async fn request_published_ops(env: &EnvRead) -> StateQueryResult<Vec<KitsuneOpHash>> {
+async fn request_published_ops(env: &EnvRead) -> StateQueryResult<Vec<(u32, KitsuneOpHash)>> {
     Ok(env
         .async_reader(|txn| {
             // Collect all ops except StoreEntry's that are private.
@@ -642,7 +642,8 @@ async fn request_published_ops(env: &EnvRead) -> StateQueryResult<Vec<KitsuneOpH
                 .prepare(
                     "
                     SELECT
-                    DhtOp.hash as dht_op_hash
+                    DhtOp.hash as dht_op_hash,
+                    DhtOp.storage_center_location as loc
                     FROM DhtOp
                     JOIN
                     Header ON DhtOp.header_hash = Header.hash
@@ -658,7 +659,8 @@ async fn request_published_ops(env: &EnvRead) -> StateQueryResult<Vec<KitsuneOpH
                     },
                     |row| {
                         let h: DhtOpHash = row.get("dht_op_hash")?;
-                        Ok(h.into_kitsune_raw())
+                        let loc = row.get("loc")?;
+                        Ok((loc, h.into_kitsune_raw()))
                     },
                 )?
                 .collect::<Result<_, _>>()?;
