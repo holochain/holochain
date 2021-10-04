@@ -567,13 +567,6 @@ impl SourceChain {
         }
         let lock = Self::lock_for_entry(maybe_countersigned_entry)?;
 
-        // This clone allows us to retry
-        // let maybe_cloned_entries: Option<Vec<EntryHashed>> = if is_relaxed {
-        //     Some(entries.clone())
-        // } else {
-        //     None
-        // };
-
         // Write the entries, headers and ops to the database in one transaction.
         let author = self.author.clone();
         let persisted_head = self.persisted_head.clone();
