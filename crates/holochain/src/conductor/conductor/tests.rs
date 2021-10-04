@@ -716,6 +716,7 @@ async fn test_cells_disable_on_validation_panic() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "Validation doesn't run from genesis so this test doesn't make sense anymore"]
 async fn test_cells_disable_on_validation_error() {
     observability::test_run().ok();
     let bad_zome =
