@@ -570,7 +570,6 @@ impl SourceChain {
         // Write the entries, headers and ops to the database in one transaction.
         let author = self.author.clone();
         let persisted_head = self.persisted_head.clone();
-        // let headers_1 = headers.clone();
         match self
             .vault
             .async_commit(move |txn: &mut Transaction| {
