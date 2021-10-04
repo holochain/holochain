@@ -567,13 +567,17 @@ impl SourceChain {
         }
         let lock = Self::lock_for_entry(maybe_countersigned_entry)?;
 
-        // TODO: remove the potentially very expensive clone
-        let cloned_entries = entries.clone();
+        // This clone allows us to retry
+        // let maybe_cloned_entries: Option<Vec<EntryHashed>> = if is_relaxed {
+        //     Some(entries.clone())
+        // } else {
+        //     None
+        // };
 
         // Write the entries, headers and ops to the database in one transaction.
         let author = self.author.clone();
         let persisted_head = self.persisted_head.clone();
-        let headers_1 = headers.clone();
+        // let headers_1 = headers.clone();
         match self
             .vault
             .async_commit(move |txn: &mut Transaction| {
@@ -584,12 +588,14 @@ impl SourceChain {
                 // As at check.
                 let (new_persisted_head, new_head_seq, new_timestamp) =
                     chain_head_db(&txn, author)?;
-                if headers_1.last().is_none() {
+                if headers.last().is_none() {
                     // Nothing to write
                     return Ok(());
                 }
                 if persisted_head != new_persisted_head {
                     return Err(SourceChainError::HeadMoved(
+                        headers,
+                        entries,
                         Some(persisted_head),
                         Some((new_persisted_head, new_head_seq, new_timestamp)),
                     ));
@@ -614,7 +620,7 @@ impl SourceChain {
                 for entry in entries {
                     insert_entry(txn, entry)?;
                 }
-                for header in headers_1 {
+                for header in headers {
                     insert_header(txn, header)?;
                 }
                 for (op, op_hash, op_order, timestamp, visibility, dependency) in ops {
@@ -652,6 +658,8 @@ impl SourceChain {
             .await
         {
             Err(SourceChainError::HeadMoved(
+                headers,
+                entries,
                 old_head,
                 Some((new_persisted_head, new_head_seq, new_timestamp)),
             )) => {
@@ -677,13 +685,15 @@ impl SourceChain {
                         for header in rebased_headers {
                             scratch.add_header(header, ChainTopOrdering::Relaxed);
                         }
-                        for entry in cloned_entries {
+                        for entry in entries {
                             scratch.add_entry(entry, ChainTopOrdering::Relaxed);
                         }
                     })?;
                     child_chain.flush(network).await
                 } else {
                     Err(SourceChainError::HeadMoved(
+                        headers,
+                        entries,
                         old_head,
                         Some((new_persisted_head, new_head_seq, new_timestamp)),
                     ))
