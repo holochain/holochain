@@ -214,7 +214,6 @@ impl AsP2pStateTxExt for Transaction<'_> {
         )? {
             let info = r?;
             let interval = info.storage_arc.interval();
-            dbg!(&arcset, &interval);
             if arcset.overlap(&interval.into()) {
                 out.push(info);
             }

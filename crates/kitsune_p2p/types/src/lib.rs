@@ -5,7 +5,7 @@
 pub mod dependencies {
     pub use ::futures;
     pub use ::ghost_actor;
-    pub use ::lair_keystore_api;
+    pub use ::legacy_lair_api;
     pub use ::observability;
     pub use ::paste;
     pub use ::rustls;
@@ -49,7 +49,7 @@ pub fn unit_ok_fut<E1, E2>() -> Result<MustBoxFuture<'static, Result<(), E2>>, E
 use ::ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::must_future::MustBoxFuture;
 
-pub use ::lair_keystore_api::actor::CertDigest;
+pub use ::legacy_lair_api::actor::CertDigest;
 
 /// Wrapper around CertDigest that provides some additional debugging helpers.
 #[derive(Clone)]
