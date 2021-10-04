@@ -3,8 +3,11 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
-- Refactor conductor to use parking lot rw lock instead of tokio rw lock. (Faster and prevents deadlocks.)
 - Make validation run concurrently up to 50 DhtOps. This allows us to make progress on other ops when waiting for the network.
+
+## 0.0.108
+
+- Refactor conductor to use parking lot rw lock instead of tokio rw lock. (Faster and prevents deadlocks.). [\#979](https://github.com/holochain/holochain/pull/979).
 
 ### Changed
 

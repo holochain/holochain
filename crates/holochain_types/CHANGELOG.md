@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.0.8
+
 ## 0.0.7
 
 - Added helper functions to `WebAppBundle` and `AppManifest` to be able to handle these types better in consuming applications.
