@@ -69,6 +69,7 @@ struct Outer {
     basis: Arc<KitsuneBasis>,
     payload: Vec<u8>,
 }
+
 struct Kill {
     closed: AtomicBool,
     kill: Notify,
@@ -83,11 +84,11 @@ impl Kill {
     }
     fn kill_all(&self) {
         self.closed
-            .store(true, std::sync::atomic::Ordering::Relaxed);
+            .store(true, std::sync::atomic::Ordering::Release);
         self.kill.notify_waiters();
     }
     async fn wait(&self) {
-        if !self.closed.load(std::sync::atomic::Ordering::Relaxed) {
+        if !self.closed.load(std::sync::atomic::Ordering::Acquire) {
             self.kill.notified().await;
         }
     }
@@ -255,6 +256,8 @@ impl Outer {
                         remote_request_grace_ms,
                     ))
                     .boxed();
+                    // This select is safe because we don't care if the timeout
+                    // or the kill notifier get cancelled.
                     let _ = futures::future::select(f, kill.wait().boxed()).await;
                     permit2.close();
                 }
