@@ -19,7 +19,7 @@ use holochain_state::prelude::*;
 use holochain_types::test_utils::fake_cell_id;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::WebsocketSender;
-use kitsune_p2p_types::dependencies::lair_keystore_api::LairError;
+use kitsune_p2p_types::dependencies::legacy_lair_api::LairError;
 use maplit::hashset;
 use matches::assert_matches;
 
