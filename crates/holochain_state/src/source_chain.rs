@@ -1103,7 +1103,7 @@ pub mod tests {
 
         assert!(matches!(
             chain_2.flush(&mock).await,
-            Err(SourceChainError::HeadMoved(_, _))
+            Err(SourceChainError::HeadMoved(_, _, _, _))
         ));
         let author_2 = Arc::clone(&author);
         let (_, seq, _) = env
@@ -1117,6 +1117,68 @@ pub mod tests {
             .async_commit(move |txn: &mut Transaction| chain_head_db(&txn, author_3))
             .await?;
         assert_eq!(seq, 4);
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_relaxed_ordering_with_entry() -> SourceChainResult<()> {
+        let test_env = test_cell_env();
+        let env = test_env.env();
+        let alice = fixt!(AgentPubKey, Predictable, 0);
+
+        let mut mock = MockHolochainP2pCellT::new();
+        mock.expect_authority_for_hash().returning(|_| Ok(false));
+
+        source_chain::genesis(env.clone(), fake_dna_hash(1), alice.clone(), None)
+            .await
+            .unwrap();
+        let source_chain = SourceChain::new(env.clone().into(), alice.clone()).await?;
+
+        let entry_1 = Entry::App(fixt!(AppEntryBytes));
+        let entry_hash_1 = EntryHash::with_data_sync(&entry_1);
+        let create = builder::Create {
+            entry_type: EntryType::App(fixt!(AppEntryType)),
+            entry_hash: entry_hash_1.clone(),
+        };
+        let h1 = source_chain
+            .put(create, Some(entry_1.clone()), ChainTopOrdering::Relaxed)
+            .await
+            .unwrap();
+        let entry_2 = Entry::App(fixt!(AppEntryBytes));
+        let entry_hash_2 = EntryHash::with_data_sync(&entry_2);
+        let create = builder::Create {
+            entry_type: EntryType::App(fixt!(AppEntryType)),
+            entry_hash: entry_hash_2.clone(),
+        };
+
+        let h2 = source_chain
+            .put(create, Some(entry_2.clone()), ChainTopOrdering::Relaxed)
+            .await
+            .unwrap();
+
+        source_chain.flush(&mock).await.unwrap();
+
+        let author = Arc::new(alice);
+        fresh_reader_test!(env, |txn| {
+            assert_eq!(chain_head_db(&txn, author.clone()).unwrap().0, h2);
+            // get the full element
+            let store = Txn::from(&txn);
+            let h1_element_entry_fetched = store
+                .get_element(&h1.clone().into())
+                .expect("error retrieving")
+                .expect("entry not found")
+                .into_inner()
+                .1;
+            let h2_element_entry_fetched = store
+                .get_element(&h2.clone().into())
+                .expect("error retrieving")
+                .expect("entry not found")
+                .into_inner()
+                .1;
+            assert_eq!(ElementEntry::Present(entry_1), h1_element_entry_fetched);
+            assert_eq!(ElementEntry::Present(entry_2), h2_element_entry_fetched);
+        });
 
         Ok(())
     }
