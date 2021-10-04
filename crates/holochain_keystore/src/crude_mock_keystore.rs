@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 
-use lair_keystore_api::{actor::*, internal::*, *};
+use crate::legacy_lair_api::{actor::*, internal::*, *};
 
 use crate::KeystoreSender;
 
