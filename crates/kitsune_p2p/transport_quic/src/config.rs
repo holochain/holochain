@@ -21,8 +21,8 @@ pub struct ConfigListenerQuic {
     /// Tls config
     /// Default: None = ephemeral.
     pub tls: Option<(
-        lair_keystore_api::actor::Cert,
-        lair_keystore_api::actor::CertPrivKey,
+        legacy_lair_api::actor::Cert,
+        legacy_lair_api::actor::CertPrivKey,
     )>,
 }
 
@@ -60,8 +60,8 @@ impl ConfigListenerQuic {
     pub fn set_tls(
         mut self,
         tls: Option<(
-            lair_keystore_api::actor::Cert,
-            lair_keystore_api::actor::CertPrivKey,
+            legacy_lair_api::actor::Cert,
+            legacy_lair_api::actor::CertPrivKey,
         )>,
     ) -> Self {
         self.tls = tls;
