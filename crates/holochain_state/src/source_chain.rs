@@ -567,6 +567,9 @@ impl SourceChain {
         }
         let lock = Self::lock_for_entry(maybe_countersigned_entry)?;
 
+        // TODO: remove the potentially very expensive clone
+        let cloned_entries = entries.clone();
+
         // Write the entries, headers and ops to the database in one transaction.
         let author = self.author.clone();
         let persisted_head = self.persisted_head.clone();
@@ -670,9 +673,12 @@ impl SourceChain {
                         new_timestamp,
                     )
                     .await?;
-                    child_chain.scratch.apply(|scratch| {
+                    child_chain.scratch.apply(move |scratch| {
                         for header in rebased_headers {
-                            scratch.add_header(header, ChainTopOrdering::Relaxed)
+                            scratch.add_header(header, ChainTopOrdering::Relaxed);
+                        }
+                        for entry in cloned_entries {
+                            scratch.add_entry(entry, ChainTopOrdering::Relaxed);
                         }
                     })?;
                     child_chain.flush(network).await
