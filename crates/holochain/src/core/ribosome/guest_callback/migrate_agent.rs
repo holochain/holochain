@@ -62,6 +62,12 @@ impl Invocation for MigrateAgentInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(self.migrate_agent)
     }
+    fn provenance(&self) -> Option<AgentPubKey> {
+        None
+    }
+    fn call_source(&self) -> CallSource {
+        CallSource::Callback
+    }
 }
 
 impl TryFrom<MigrateAgentInvocation> for ExternIO {

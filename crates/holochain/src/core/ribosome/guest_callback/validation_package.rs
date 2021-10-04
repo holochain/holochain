@@ -61,6 +61,12 @@ impl Invocation for ValidationPackageInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(self.app_entry_type)
     }
+    fn provenance(&self) -> Option<AgentPubKey> {
+        None
+    }
+    fn call_source(&self) -> CallSource {
+        CallSource::Callback
+    }
 }
 
 impl TryFrom<ValidationPackageInvocation> for ExternIO {

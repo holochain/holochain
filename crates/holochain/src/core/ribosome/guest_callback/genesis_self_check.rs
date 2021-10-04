@@ -38,6 +38,12 @@ impl Invocation for GenesisSelfCheckInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(self.payload)
     }
+    fn provenance(&self) -> Option<AgentPubKey> {
+        None
+    }
+    fn call_source(&self) -> CallSource {
+        CallSource::Callback
+    }
 }
 
 impl From<GenesisSelfCheckInvocation> for GenesisSelfCheckData {

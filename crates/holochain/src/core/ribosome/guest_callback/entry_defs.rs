@@ -48,6 +48,12 @@ impl Invocation for EntryDefsInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(())
     }
+    fn provenance(&self) -> Option<AgentPubKey> {
+        None
+    }
+    fn call_source(&self) -> CallSource {
+        CallSource::Callback
+    }
 }
 
 /// the aggregate result of _all_ entry defs callbacks

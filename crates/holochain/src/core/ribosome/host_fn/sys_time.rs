@@ -11,7 +11,7 @@ pub fn sys_time(
     call_context: Arc<CallContext>,
     _input: (),
 ) -> Result<Timestamp, WasmError> {
-    match HostFnAccess::from(&call_context.host_context()) {
+    match HostFnAccess::from(call_context.host_context()) {
         HostFnAccess {
             non_determinism: Permission::Allow,
             ..

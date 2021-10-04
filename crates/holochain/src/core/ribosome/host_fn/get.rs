@@ -13,7 +13,7 @@ pub fn get<'a>(
     call_context: Arc<CallContext>,
     inputs: Vec<GetInput>,
 ) -> Result<Vec<Option<Element>>, WasmError> {
-    match HostFnAccess::from(&call_context.host_context()) {
+    match HostFnAccess::from(call_context.host_context()) {
         HostFnAccess{ read_workspace: Permission::Allow, .. } => {
             let results: Vec<Result<Option<Element>, _>> = tokio_helper::block_forever_on(async move {
                 join_all(inputs.into_iter().map(|input| {

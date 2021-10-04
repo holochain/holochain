@@ -15,7 +15,7 @@ pub fn must_get_header<'a>(
     call_context: Arc<CallContext>,
     input: MustGetHeaderInput,
 ) -> Result<SignedHeaderHashed, WasmError> {
-    match HostFnAccess::from(&call_context.host_context()) {
+    match HostFnAccess::from(call_context.host_context()) {
         HostFnAccess{ read_workspace_deterministic: Permission::Allow, .. } => {
             let header_hash = input.into_inner();
             let network = call_context.host_context.network().clone();

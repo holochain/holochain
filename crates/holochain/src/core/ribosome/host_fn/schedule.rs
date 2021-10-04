@@ -9,7 +9,7 @@ pub fn schedule(
     call_context: Arc<CallContext>,
     input: String,
 ) -> Result<(), WasmError> {
-    match HostFnAccess::from(&call_context.host_context()) {
+    match HostFnAccess::from(call_context.host_context()) {
         HostFnAccess{ write_workspace: Permission::Allow, .. } => {
             call_context.host_context().workspace().source_chain().scratch().apply(|scratch| {
                 scratch.add_scheduled_fn(ScheduledFn::new(call_context.zome.zome_name().clone(), input.into()));

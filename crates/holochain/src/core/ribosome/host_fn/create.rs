@@ -16,7 +16,7 @@ pub fn create<'a>(
     call_context: Arc<CallContext>,
     input: CreateInput,
 ) -> Result<HeaderHash, WasmError> {
-    match HostFnAccess::from(&call_context.host_context()) {
+    match HostFnAccess::from(call_context.host_context()) {
         HostFnAccess {
             write_workspace: Permission::Allow,
             ..

@@ -710,6 +710,7 @@ where
         fn_name: func.into(),
         payload: ExternIO::encode(payload)?,
         provenance: cell_id.agent_pubkey().clone(),
+        call_source: CallSource::ClientAPI,
     })
 }
 

@@ -108,6 +108,12 @@ where
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         self.invocation.host_input()
     }
+    fn provenance(&self) -> Option<AgentPubKey> {
+        self.invocation.provenance()
+    }
+    fn call_source(&self) -> CallSource {
+        self.invocation.call_source()
+    }
 }
 
 impl Invocation for ValidateCreateLinkInvocation {
@@ -123,6 +129,12 @@ impl Invocation for ValidateCreateLinkInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(ValidateCreateLinkData::from(self))
     }
+    fn provenance(&self) -> Option<AgentPubKey> {
+        None
+    }
+    fn call_source(&self) -> CallSource {
+        CallSource::Callback
+    }
 }
 
 impl Invocation for ValidateDeleteLinkInvocation {
@@ -137,6 +149,12 @@ impl Invocation for ValidateDeleteLinkInvocation {
     }
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(ValidateDeleteLinkData::from(self))
+    }
+    fn provenance(&self) -> Option<AgentPubKey> {
+        None
+    }
+    fn call_source(&self) -> CallSource {
+        CallSource::Callback
     }
 }
 

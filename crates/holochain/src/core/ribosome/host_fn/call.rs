@@ -12,7 +12,7 @@ pub fn call(
     call_context: Arc<CallContext>,
     inputs: Vec<Call>,
 ) -> Result<Vec<ZomeCallResponse>, WasmError> {
-    match HostFnAccess::from(&call_context.host_context()) {
+    match HostFnAccess::from(call_context.host_context()) {
         HostFnAccess{ write_workspace: Permission::Allow, .. } => {
             let results: Vec<Result<Result<ZomeCallResponse, _>, _>> = tokio_helper::block_forever_on(async move {
                 join_all(inputs.into_iter().map(|input| {

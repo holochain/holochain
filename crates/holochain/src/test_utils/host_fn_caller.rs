@@ -168,6 +168,13 @@ impl HostFnCaller {
             HostFnWorkspace::new(env.clone(), cache, cell_id.agent_pubkey().clone())
                 .await
                 .unwrap();
+        // This is somewhat arbitrary.
+        // Feel free to change if it no longer makes sense.
+        let call_info = CallInfo::new(
+            CallSource::ClientAPI,
+            Some(cell_id.agent_pubkey().clone()),
+            vec![],
+        );
         let host_access = ZomeCallHostAccess::new(
             workspace_lock.clone(),
             keystore,
@@ -178,7 +185,7 @@ impl HostFnCaller {
         );
         let ribosome = Arc::new(ribosome);
         let zome = ribosome.dna_def().get_zome(&zome_name).unwrap();
-        let call_context = Arc::new(CallContext::new(zome, host_access.into()));
+        let call_context = Arc::new(CallContext::new(zome, host_access.into(), call_info));
         (env, ribosome, call_context, workspace_lock)
     }
 }

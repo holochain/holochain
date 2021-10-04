@@ -62,5 +62,32 @@ pub struct AppInfo;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DnaInfo;
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CallInfo;
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum CallSource {
+    Network,
+    ClientAPI,
+    LocalCell,
+    LocalDNAZome,
+    Callback,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CallInfo {
+    pub source: CallSource,
+    pub provenance: Option<AgentPubKey>,
+    pub permitted_functions: Vec<String>,
+}
+
+impl CallInfo {
+    pub fn new(
+        source: CallSource,
+        provenance: Option<AgentPubKey>,
+        permitted_functions: Vec<String>,
+    ) -> Self {
+        Self {
+            source,
+            provenance,
+            permitted_functions,
+        }
+    }
+}

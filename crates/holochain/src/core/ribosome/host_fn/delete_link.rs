@@ -14,7 +14,7 @@ pub fn delete_link<'a>(
     call_context: Arc<CallContext>,
     input: DeleteLinkInput,
 ) -> Result<HeaderHash, WasmError> {
-    match HostFnAccess::from(&call_context.host_context()) {
+    match HostFnAccess::from(call_context.host_context()) {
         HostFnAccess{ write_workspace: Permission::Allow, .. } => {
             let DeleteLinkInput { address, chain_top_ordering } = input;
             // get the base address from the add link header

@@ -11,7 +11,7 @@ pub fn verify_signature(
     call_context: Arc<CallContext>,
     input: VerifySignature,
 ) -> Result<bool, WasmError> {
-    match HostFnAccess::from(&call_context.host_context()) {
+    match HostFnAccess::from(call_context.host_context()) {
         HostFnAccess { keystore_deterministic: Permission::Allow, .. } => tokio_helper::block_forever_on(async move {
             input
                 .key

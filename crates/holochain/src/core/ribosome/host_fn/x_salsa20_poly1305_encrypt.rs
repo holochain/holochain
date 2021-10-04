@@ -14,7 +14,7 @@ pub fn x_salsa20_poly1305_encrypt(
     call_context: Arc<CallContext>,
     input: XSalsa20Poly1305Encrypt,
 ) -> Result<XSalsa20Poly1305EncryptedData, WasmError> {
-    match HostFnAccess::from(&call_context.host_context()) {
+    match HostFnAccess::from(call_context.host_context()) {
         HostFnAccess{ keystore: Permission::Allow, .. } => {
             let system_random = ring::rand::SystemRandom::new();
             let mut nonce_bytes = [0; holochain_zome_types::x_salsa20_poly1305::nonce::NONCE_BYTES];

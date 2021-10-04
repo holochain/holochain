@@ -11,7 +11,7 @@ pub fn agent_info<'a>(
     call_context: Arc<CallContext>,
     _input: (),
 ) -> Result<AgentInfo, WasmError> {
-    match HostFnAccess::from(&call_context.host_context()) {
+    match HostFnAccess::from(call_context.host_context()) {
         HostFnAccess{ agent_info: Permission::Allow, .. } => {
             let agent_pubkey = call_context
                 .host_context

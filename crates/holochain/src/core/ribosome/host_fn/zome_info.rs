@@ -11,7 +11,7 @@ pub fn zome_info(
     call_context: Arc<CallContext>,
     _input: (),
 ) -> Result<ZomeInfo, WasmError> {
-    match HostFnAccess::from(&call_context.host_context()) {
+    match HostFnAccess::from(call_context.host_context()) {
         HostFnAccess{ bindings_deterministic: Permission::Allow, .. } => {
             Ok(ZomeInfo {
                 dna_name: ribosome.dna_def().name.clone(),

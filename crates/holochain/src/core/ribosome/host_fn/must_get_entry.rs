@@ -15,7 +15,7 @@ pub fn must_get_entry<'a>(
     call_context: Arc<CallContext>,
     input: MustGetEntryInput,
 ) -> Result<EntryHashed, WasmError> {
-    match HostFnAccess::from(&call_context.host_context()) {
+    match HostFnAccess::from(call_context.host_context()) {
         HostFnAccess{ read_workspace_deterministic: Permission::Allow, .. } => {
             let entry_hash = input.into_inner();
             let network = call_context.host_context.network().clone();

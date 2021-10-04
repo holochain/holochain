@@ -60,19 +60,28 @@ use self::{
 pub struct CallContext {
     pub(crate) zome: Zome,
     pub(crate) host_context: HostContext,
+    pub(crate) call_info: CallInfo,
 }
 
 impl CallContext {
-    pub fn new(zome: Zome, host_context: HostContext) -> Self {
-        Self { zome, host_context }
+    pub fn new(zome: Zome, host_context: HostContext, call_info: CallInfo) -> Self {
+        Self {
+            zome,
+            host_context,
+            call_info,
+        }
     }
 
-    pub fn zome(&self) -> Zome {
-        self.zome.clone()
+    pub fn zome(&self) -> &Zome {
+        &self.zome
     }
 
-    pub fn host_context(&self) -> HostContext {
-        self.host_context.clone()
+    pub fn host_context(&self) -> &HostContext {
+        &self.host_context
+    }
+
+    pub fn call_info(&self) -> &CallInfo {
+        &self.call_info
     }
 }
 
@@ -250,6 +259,8 @@ pub trait Invocation: Clone {
     /// this is intentionally NOT a reference to self because ExternIO may be huge we want to be
     /// careful about cloning invocations
     fn host_input(self) -> Result<ExternIO, SerializedBytesError>;
+    fn provenance(&self) -> Option<AgentPubKey>;
+    fn call_source(&self) -> CallSource;
 }
 
 impl ZomeCallInvocation {
@@ -279,6 +290,8 @@ mockall::mock! {
         fn zomes(&self) -> ZomesToInvoke;
         fn fn_components(&self) -> FnComponents;
         fn host_input(self) -> Result<ExternIO, SerializedBytesError>;
+        fn provenance(&self) -> Option<AgentPubKey>;
+        fn call_source(&self) -> CallSource;
     }
     trait Clone {
         fn clone(&self) -> Self;
@@ -305,6 +318,7 @@ pub struct ZomeCallInvocation {
     /// The provenance of the call. Provenance means the 'source'
     /// so this expects the `AgentPubKey` of the agent calling the Zome function
     pub provenance: AgentPubKey,
+    pub call_source: CallSource,
 }
 
 impl Invocation for ZomeCallInvocation {
@@ -316,6 +330,12 @@ impl Invocation for ZomeCallInvocation {
     }
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         Ok(self.payload)
+    }
+    fn provenance(&self) -> Option<AgentPubKey> {
+        Some(self.provenance.clone())
+    }
+    fn call_source(&self) -> CallSource {
+        self.call_source.clone()
     }
 }
 
@@ -340,6 +360,7 @@ impl ZomeCallInvocation {
             fn_name,
             payload,
             provenance,
+            call_source: CallSource::ClientAPI,
         }
     }
 }
@@ -353,6 +374,7 @@ impl From<ZomeCallInvocation> for ZomeCall {
             cap,
             payload,
             provenance,
+            ..
         } = inv;
         Self {
             cell_id,

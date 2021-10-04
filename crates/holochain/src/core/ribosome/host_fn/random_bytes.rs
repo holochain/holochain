@@ -12,7 +12,7 @@ pub fn random_bytes(
     call_context: Arc<CallContext>,
     input: u32,
 ) -> Result<Bytes, WasmError> {
-    match HostFnAccess::from(&call_context.host_context()) {
+    match HostFnAccess::from(call_context.host_context()) {
         HostFnAccess{ non_determinism: Permission::Allow, .. } => {
             let system_random = ring::rand::SystemRandom::new();
             let mut bytes = vec![0; input as _];

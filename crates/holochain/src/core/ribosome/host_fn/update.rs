@@ -14,7 +14,7 @@ pub fn update<'a>(
     call_context: Arc<CallContext>,
     input: UpdateInput,
 ) -> Result<HeaderHash, WasmError> {
-    match HostFnAccess::from(&call_context.host_context()) {
+    match HostFnAccess::from(call_context.host_context()) {
         HostFnAccess{ write_workspace: Permission::Allow, .. } => {
             // destructure the args out into an app type def id and entry
             let UpdateInput {

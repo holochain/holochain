@@ -434,8 +434,32 @@ fixturator!(
 );
 
 fixturator!(
+    CallSource;
+    unit variants [ Network ClientAPI LocalCell LocalDNAZome Callback ] empty ClientAPI;
+);
+
+fixturator!(
+    CallInfo;
+    curve Empty CallInfo {
+        source: CallSourceFixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap(),
+        provenance: None,
+        permitted_functions: vec![],
+    };
+    curve Unpredictable CallInfo {
+        source: CallSourceFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap(),
+        provenance: Some(AgentPubKeyFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()),
+        permitted_functions: vec![],
+    };
+    curve Predictable CallInfo {
+        source: CallSourceFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
+        provenance: Some(AgentPubKeyFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap()),
+        permitted_functions: vec![],
+    };
+);
+
+fixturator!(
     CallContext;
-    constructor fn new(Zome, HostContext);
+    constructor fn new(Zome, HostContext, CallInfo);
 );
 
 fixturator!(
@@ -447,6 +471,7 @@ fixturator!(
         fn_name: FunctionNameFixturator::new(Empty).next().unwrap(),
         payload: ExternIoFixturator::new(Empty).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Empty).next().unwrap(),
+        call_source: CallSourceFixturator::new(Empty).next().unwrap(),
     };
     curve Unpredictable ZomeCallInvocation {
         cell_id: CellIdFixturator::new(Unpredictable).next().unwrap(),
@@ -455,6 +480,7 @@ fixturator!(
         fn_name: FunctionNameFixturator::new(Unpredictable).next().unwrap(),
         payload: ExternIoFixturator::new(Unpredictable).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
+        call_source: CallSourceFixturator::new(Unpredictable).next().unwrap(),
     };
     curve Predictable ZomeCallInvocation {
         cell_id: CellIdFixturator::new_indexed(Predictable, get_fixt_index!())
@@ -475,6 +501,7 @@ fixturator!(
         provenance: AgentPubKeyFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
+        call_source: CallSourceFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
     };
 );
 

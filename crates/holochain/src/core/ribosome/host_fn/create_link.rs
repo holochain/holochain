@@ -13,7 +13,7 @@ pub fn create_link<'a>(
     call_context: Arc<CallContext>,
     input: CreateLinkInput,
 ) -> Result<HeaderHash, WasmError> {
-    match HostFnAccess::from(&call_context.host_context()) {
+    match HostFnAccess::from(call_context.host_context()) {
         HostFnAccess{ write_workspace: Permission::Allow, .. } => {
             let CreateLinkInput {
                 base_address,

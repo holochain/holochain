@@ -13,7 +13,7 @@ pub fn accept_countersigning_preflight_request<'a>(
     call_context: Arc<CallContext>,
     input: PreflightRequest,
 ) -> Result<PreflightRequestAcceptance, WasmError> {
-    match HostFnAccess::from(&call_context.host_context()) {
+    match HostFnAccess::from(call_context.host_context()) {
         HostFnAccess {
             agent_info: Permission::Allow,
             keystore: Permission::Allow,

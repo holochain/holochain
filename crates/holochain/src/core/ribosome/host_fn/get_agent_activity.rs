@@ -12,7 +12,7 @@ pub fn get_agent_activity(
     call_context: Arc<CallContext>,
     input: GetAgentActivityInput,
 ) -> Result<AgentActivity, WasmError> {
-    match HostFnAccess::from(&call_context.host_context()) {
+    match HostFnAccess::from(call_context.host_context()) {
         HostFnAccess{ read_workspace: Permission::Allow, .. } => {
             let GetAgentActivityInput {
                 agent_pubkey,

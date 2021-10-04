@@ -16,7 +16,7 @@ pub fn remote_signal(
     call_context: Arc<CallContext>,
     input: RemoteSignal,
 ) -> Result<(), WasmError> {
-    match HostFnAccess::from(&call_context.host_context()) {
+    match HostFnAccess::from(call_context.host_context()) {
         HostFnAccess {
             write_network: Permission::Allow,
             ..
@@ -26,7 +26,7 @@ pub fn remote_signal(
             // this is a send and forget operation.
             let network = call_context.host_context().network().clone();
             let RemoteSignal { agents, signal } = input;
-            let zome_name: ZomeName = call_context.zome().into();
+            let zome_name: ZomeName = call_context.zome().zome_name().clone();
             let fn_name: FunctionName = FN_NAME.into();
             for agent in agents {
                 tokio::task::spawn(

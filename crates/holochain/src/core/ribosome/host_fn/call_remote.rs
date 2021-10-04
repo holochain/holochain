@@ -12,7 +12,7 @@ pub fn call_remote(
     call_context: Arc<CallContext>,
     inputs: Vec<CallRemote>,
 ) -> Result<Vec<ZomeCallResponse>, WasmError> {
-    match HostFnAccess::from(&call_context.host_context()) {
+    match HostFnAccess::from(call_context.host_context()) {
         HostFnAccess {
             write_network: Permission::Allow,
             ..
