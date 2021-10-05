@@ -838,7 +838,6 @@ impl SysValidationWorkspace {
         let cascade = Cascade::empty()
             .with_vault(self.vault.clone().into())
             .with_network(network, self.cache.clone());
-        // .with_cache(self.cache.clone());
         match &self.scratch {
             Some(scratch) => cascade.with_scratch(scratch.clone()),
             None => cascade,
