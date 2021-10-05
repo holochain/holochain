@@ -39,27 +39,27 @@ mod tests {
         assert_eq!(
             DhtArcSet::from(
                 vec![
-                    ArcInterval::new(0, 2).to_dht_location(),
-                    ArcInterval::new(u32::MAX - 2, u32::MAX).to_dht_location()
+                    ArcInterval::new(0, 2).canonical(),
+                    ArcInterval::new(u32::MAX - 2, u32::MAX).canonical()
                 ]
                 .as_slice()
             )
             .intervals(),
-            vec![ArcInterval::new(u32::MAX - 2, 2).to_dht_location()]
+            vec![ArcInterval::new(u32::MAX - 2, 2).canonical()]
         );
         assert_eq!(
             ascii("ooo    oo ").intervals(),
             vec![
-                ArcInterval::new(0, 2).to_dht_location(),
-                ArcInterval::new(7, 8).to_dht_location()
+                ArcInterval::new(0, 2).canonical(),
+                ArcInterval::new(7, 8).canonical()
             ]
         );
         assert_eq!(
             ascii("oo oo o   ").intervals(),
             vec![
-                ArcInterval::new(0, 1).to_dht_location(),
-                ArcInterval::new(3, 4).to_dht_location(),
-                ArcInterval::new(6, 6).to_dht_location(),
+                ArcInterval::new(0, 1).canonical(),
+                ArcInterval::new(3, 4).canonical(),
+                ArcInterval::new(6, 6).canonical(),
             ]
         );
     }

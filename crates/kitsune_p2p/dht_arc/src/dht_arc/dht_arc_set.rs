@@ -252,7 +252,7 @@ impl<T: PartialOrd + num_traits::Num + num_traits::AsPrimitive<u32>> ArcInterval
         }
     }
 
-    pub fn to_dht_location(self) -> ArcInterval {
+    pub fn canonical(self) -> ArcInterval {
         match self {
             ArcInterval::Empty => ArcInterval::Empty,
             ArcInterval::Full => ArcInterval::Full,
