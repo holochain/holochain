@@ -3,7 +3,7 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
-- FIX: Prevent the conductor from trying to join cells to the network that are already in the process of joining.
+- FIX: Prevent the conductor from trying to join cells to the network that are already in the process of joining. [#1006](https://github.com/holochain/holochain/pull/1006)
 
 ## 0.0.108
 
