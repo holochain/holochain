@@ -19,7 +19,7 @@ use holochain_state::prelude::*;
 use holochain_types::test_utils::fake_cell_id;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::WebsocketSender;
-use kitsune_p2p_types::dependencies::lair_keystore_api::LairError;
+use kitsune_p2p_types::dependencies::legacy_lair_api::LairError;
 use maplit::hashset;
 use matches::assert_matches;
 
@@ -705,33 +705,6 @@ async fn test_cells_disable_on_validation_panic() {
     let _ = common_genesis_test_app(&mut conductor, bad_zome).await;
 
     // - Ensure that the app was disabled because one Cell panicked during validation
-    //   (while publishing genesis elements)
-    assert_eq_retry_10s!(
-        {
-            let state = conductor.get_state_from_handle().await.unwrap();
-            (state.enabled_apps().count(), state.stopped_apps().count())
-        },
-        (0, 1)
-    );
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn test_cells_disable_on_validation_error() {
-    observability::test_run().ok();
-    let bad_zome =
-        InlineZome::new_unique(Vec::new()).callback("validate", |_api, _data: ValidateData| {
-            InlineZomeResult::<ValidateResult>::Err(InlineZomeError::TestError(
-                "intentional error".into(),
-            ))
-        });
-
-    let mut conductor = SweetConductor::from_standard_config().await;
-
-    // This may be an error, depending on if validation runs before or after
-    // the app is enabled. Proceed in either case.
-    let _ = common_genesis_test_app(&mut conductor, bad_zome).await;
-
-    // - Ensure that the app was disabled because one Cell had a validation error
     //   (while publishing genesis elements)
     assert_eq_retry_10s!(
         {
