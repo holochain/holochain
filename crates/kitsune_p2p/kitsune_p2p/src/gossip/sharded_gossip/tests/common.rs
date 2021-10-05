@@ -115,17 +115,27 @@ pub fn agents_with_full_arcs(num_agents: usize) -> Vec<(Arc<KitsuneAgent>, ArcIn
 }
 
 pub async fn agent_info(agent: Arc<KitsuneAgent>) -> AgentInfoSigned {
+    let rand_string: String = thread_rng()
+        .sample_iter(&rand::distributions::Alphanumeric)
+        .take(10)
+        .map(char::from)
+        .collect();
     AgentInfoSigned::sign(
-            Arc::new(fixt!(KitsuneSpace)),
-            agent,
-            u32::MAX / 4,
-            vec![url2::url2!("kitsune-proxy://CIW6PxKxsPPlcuvUCbMcKwUpaMSmB7kLD8xyyj4mqcw/kitsune-quic/h/localhost/p/5778/-").into()],
-            0,
-            0,
-            |_| async move { Ok(Arc::new(fixt!(KitsuneSignature, Predictable))) },
+        Arc::new(fixt!(KitsuneSpace)),
+        agent,
+        u32::MAX / 4,
+        vec![url2::url2!(
+            "kitsune-proxy://CIW6PxKxs{}cKwUpaMSmB7kLD8xyyj4mqcw/kitsune-quic/h/localhost/p/5778/-",
+            rand_string
         )
-        .await
-        .unwrap()
+        .into()],
+        std::time::UNIX_EPOCH.elapsed().unwrap().as_millis() as u64,
+        (std::time::UNIX_EPOCH.elapsed().unwrap() + std::time::Duration::from_secs(60 * 60))
+            .as_millis() as u64,
+        |_| async move { Ok(Arc::new(fixt!(KitsuneSignature, Predictable))) },
+    )
+    .await
+    .unwrap()
 }
 
 /// Create an AgentInfoSigned with arbitrary agent and arc.
