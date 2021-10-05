@@ -1,4 +1,4 @@
-use std::time::Instant;
+use Instant;
 
 use super::*;
 
