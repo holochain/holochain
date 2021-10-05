@@ -1120,7 +1120,6 @@ pub mod tests {
 
         Ok(())
     }
-
     #[tokio::test(flavor = "multi_thread")]
     async fn test_relaxed_ordering_with_entry() -> SourceChainResult<()> {
         let test_env = test_cell_env();
@@ -1133,35 +1132,72 @@ pub mod tests {
         source_chain::genesis(env.clone(), fake_dna_hash(1), alice.clone(), None)
             .await
             .unwrap();
-        let source_chain = SourceChain::new(env.clone().into(), alice.clone()).await?;
+
+        let chain_1 = SourceChain::new(env.clone().into(), alice.clone()).await?;
+        let chain_2 = SourceChain::new(env.clone().into(), alice.clone()).await?;
+        let chain_3 = SourceChain::new(env.clone().into(), alice.clone()).await?;
 
         let entry_1 = Entry::App(fixt!(AppEntryBytes));
-        let entry_hash_1 = EntryHash::with_data_sync(&entry_1);
+        let eh1 = EntryHash::with_data_sync(&entry_1);
         let create = builder::Create {
             entry_type: EntryType::App(fixt!(AppEntryType)),
-            entry_hash: entry_hash_1.clone(),
+            entry_hash: eh1.clone(),
         };
-        let h1 = source_chain
-            .put(create, Some(entry_1.clone()), ChainTopOrdering::Relaxed)
+        let h1 = chain_1
+            .put(create, Some(entry_1.clone()), ChainTopOrdering::Strict)
             .await
             .unwrap();
-        let entry_2 = Entry::App(fixt!(AppEntryBytes));
-        let entry_hash_2 = EntryHash::with_data_sync(&entry_2);
+
+        let entry_err = Entry::App(fixt!(AppEntryBytes));
+        let entry_hash_err = EntryHash::with_data_sync(&entry_err);
         let create = builder::Create {
             entry_type: EntryType::App(fixt!(AppEntryType)),
-            entry_hash: entry_hash_2.clone(),
+            entry_hash: entry_hash_err.clone(),
         };
+        chain_2
+            .put(create, Some(entry_err.clone()), ChainTopOrdering::Strict)
+            .await
+            .unwrap();
 
-        let h2 = source_chain
+        let entry_2 = Entry::App(fixt!(AppEntryBytes));
+        let eh2 = EntryHash::with_data_sync(&entry_2);
+        let create = builder::Create {
+            entry_type: EntryType::App(AppEntryType::new(
+                EntryDefIndex(0),
+                fixt!(ZomeId),
+                EntryVisibility::Private,
+            )),
+            entry_hash: eh2.clone(),
+        };
+        let old_h2 = chain_3
             .put(create, Some(entry_2.clone()), ChainTopOrdering::Relaxed)
             .await
             .unwrap();
 
-        source_chain.flush(&mock).await.unwrap();
-
         let author = Arc::new(alice);
+        chain_1.flush(&mock).await?;
+        let author_1 = Arc::clone(&author);
+        let (_, seq, _) = env
+            .async_commit(move |txn: &mut Transaction| chain_head_db(&txn, author_1))
+            .await?;
+        assert_eq!(seq, 3);
+
+        assert!(matches!(
+            chain_2.flush(&mock).await,
+            Err(SourceChainError::HeadMoved(_, _, _, _))
+        ));
+
+        chain_3.flush(&mock).await?;
+        let author_2 = Arc::clone(&author);
+        let (h2, seq, _) = env
+            .async_commit(move |txn: &mut Transaction| chain_head_db(&txn, author_2.clone()))
+            .await?;
+
+        // not equal since header hash change due to rebasing
+        assert_ne!(h2, old_h2);
+        assert_eq!(seq, 4);
+
         fresh_reader_test!(env, |txn| {
-            assert_eq!(chain_head_db(&txn, author.clone()).unwrap().0, h2);
             // get the full element
             let store = Txn::from(&txn);
             let h1_element_entry_fetched = store
