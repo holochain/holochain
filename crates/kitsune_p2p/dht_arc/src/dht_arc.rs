@@ -37,6 +37,7 @@ pub mod gaps;
     Into,
     derive_more::AsRef,
     derive_more::Deref,
+    derive_more::Display,
 )]
 /// Type for representing a location that can wrap around
 /// a u32 dht arc
