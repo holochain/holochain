@@ -221,10 +221,12 @@ where
         })
     }
 
-    /// Cells which are pending validation.
+    /// Return Cells which are pending network join, and mark them as
+    /// currently joining.
+    ///
     /// Used to discover which cells need to be joined to the network.
-    /// Cells status are upgraded to `Joining` when this function is called.
-    pub(super) fn pending_to_joining_cells(&self) -> Vec<(CellId, Arc<Cell>)> {
+    /// The cells' status are upgraded to `Joining` when this function is called.
+    pub(super) fn mark_pending_cells_as_joining(&self) -> Vec<(CellId, Arc<Cell>)> {
         self.cells.share_mut(|cells| {
             cells
                 .iter_mut()
