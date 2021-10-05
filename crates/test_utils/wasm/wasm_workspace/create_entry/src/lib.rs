@@ -48,18 +48,25 @@ fn create_post(post: crate::Post) -> ExternResult<HeaderHash> {
 
 #[hdk_extern]
 fn get_entry(_: ()) -> ExternResult<Option<Element>> {
-    get(
-        hash_entry(&post())?,
-        GetOptions::content(),
-    )
+    get(hash_entry(&post())?, GetOptions::content())
+}
+
+#[hdk_extern]
+fn get_entry_twice(_: ()) -> ExternResult<Vec<Option<Element>>> {
+    HDK.with(|h| {
+        h.borrow().get(vec![
+            GetInput::new(
+                hash_entry(&post())?.into(),
+                GetOptions::content()
+            );
+            2
+        ])
+    })
 }
 
 #[hdk_extern]
 fn get_post(hash: HeaderHash) -> ExternResult<Option<Element>> {
-    get(
-        hash,
-        GetOptions::content()
-    )
+    get(hash, GetOptions::content())
 }
 
 #[hdk_extern]
@@ -90,11 +97,7 @@ fn validate_create_entry_post(
 fn get_activity(
     input: holochain_test_wasm_common::AgentActivitySearch,
 ) -> ExternResult<AgentActivity> {
-    get_agent_activity(
-        input.agent,
-        input.query,
-        input.request
-    )
+    get_agent_activity(input.agent, input.query, input.request)
 }
 
 #[hdk_extern]
@@ -130,15 +133,25 @@ fn call_create_entry(_: ()) -> ExternResult<HeaderHash> {
 
     match zome_call_response {
         ZomeCallResponse::Ok(v) => Ok(v.decode()?),
-        // Should handle this in real code.
-        _ => unreachable!(),
+        ZomeCallResponse::Unauthorized(cell_id, zome_name, function_name, agent_pubkey) => {
+            Err(WasmError::Guest(format!(
+                "Unauthorized: {} {} {} {}",
+                cell_id, zome_name, function_name, agent_pubkey
+            )))
+        }
+        // Unbounded recursion.
+        ZomeCallResponse::NetworkError(_) => call_create_entry(()),
+        ZomeCallResponse::CountersigningSession(e) => Err(WasmError::Guest(format!(
+            "Countersigning session failed: {}",
+            e
+        ))),
     }
 }
 
 #[hdk_extern]
 fn call_create_entry_remotely(agent: AgentPubKey) -> ExternResult<HeaderHash> {
     let zome_call_response: ZomeCallResponse = call_remote(
-        agent,
+        agent.clone(),
         "create_entry".to_string().into(),
         "create_entry".to_string().into(),
         None,
@@ -147,7 +160,17 @@ fn call_create_entry_remotely(agent: AgentPubKey) -> ExternResult<HeaderHash> {
 
     match zome_call_response {
         ZomeCallResponse::Ok(v) => Ok(v.decode()?),
-        // Handle this in real code.
-        _ => unreachable!(),
+        ZomeCallResponse::Unauthorized(cell_id, zome_name, function_name, agent_pubkey) => {
+            Err(WasmError::Guest(format!(
+                "Unauthorized: {} {} {} {}",
+                cell_id, zome_name, function_name, agent_pubkey
+            )))
+        }
+        // Unbounded recursion.
+        ZomeCallResponse::NetworkError(_) => call_create_entry_remotely(agent),
+        ZomeCallResponse::CountersigningSession(e) => Err(WasmError::Guest(format!(
+            "Countersigning session failed: {}",
+            e
+        ))),
     }
 }

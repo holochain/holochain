@@ -43,6 +43,7 @@ impl From<holo_hash::AgentPubKey> for CapGrant {
 pub struct CurryPayloads(pub BTreeMap<GrantedFunction, SerializedBytes>);
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 /// The entry for the ZomeCall capability grant.
 /// This data is committed to the callee's source chain as a private entry.
 /// The remote calling agent must provide a secret and we source their pubkey from the active
@@ -124,6 +125,7 @@ impl CapGrant {
 
 /// Represents access requirements for capability grants.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum CapAccess {
     /// No restriction: callable by anyone.
     Unrestricted,

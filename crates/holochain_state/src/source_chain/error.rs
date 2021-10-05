@@ -1,10 +1,16 @@
 // use crate::holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
-use holochain_lmdb::error::DatabaseError;
+use holochain_p2p::HolochainP2pError;
 use holochain_serialized_bytes::prelude::*;
+use holochain_sqlite::error::DatabaseError;
 use holochain_types::prelude::*;
 use thiserror::Error;
+
+use crate::prelude::StateMutationError;
+use crate::query::StateQueryError;
+use crate::scratch::ScratchError;
+use crate::scratch::SyncScratchError;
 
 #[derive(Error, Debug)]
 pub enum SourceChainError {
@@ -12,9 +18,29 @@ pub enum SourceChainError {
     ChainEmpty,
 
     #[error(
-        "Attempted to commit a bundle to the source chain, but the source chain head has moved since the bundle began. Bundle head: {0:?}, Current head: {1:?}"
+        "Attempted to commit a bundle to the source chain, but the source chain head has moved since the bundle began. Bundle head: {2:?}, Current head: {3:?}"
     )]
-    HeadMoved(Option<HeaderHash>, Option<HeaderHash>),
+    HeadMoved(
+        Vec<SignedHeaderHashed>,
+        Vec<EntryHashed>,
+        Option<HeaderHash>,
+        Option<(HeaderHash, u32, Timestamp)>,
+    ),
+
+    #[error(transparent)]
+    TimestampError(#[from] holochain_zome_types::TimestampError),
+
+    #[error(transparent)]
+    ScratchError(#[from] ScratchError),
+
+    #[error("Attempted to write anything other than the countersigning session entry while the chain was locked for a countersigning session.")]
+    ChainLocked,
+
+    #[error("Attempted to write a countersigning session that has already expired")]
+    LockExpired,
+
+    #[error("Attempted to write anything other than the countersigning session entry at the same time as the session entry.")]
+    DirtyCounterSigningWrite,
 
     #[error(
         "The source chain's structure is invalid. This error is not recoverable. Detail:\n{0}"
@@ -56,6 +82,9 @@ pub enum SourceChainError {
     #[error(transparent)]
     DhtOpError(#[from] DhtOpError),
 
+    #[error(transparent)]
+    HolochainP2pError(#[from] HolochainP2pError),
+
     #[error("Required the scratch space to be empty but contained values")]
     ScratchNotFresh,
 
@@ -65,6 +94,18 @@ pub enum SourceChainError {
 
     #[error(transparent)]
     ElementGroupError(#[from] ElementGroupError),
+
+    #[error(transparent)]
+    StateMutationError(#[from] StateMutationError),
+
+    #[error(transparent)]
+    StateQueryError(#[from] StateQueryError),
+
+    #[error(transparent)]
+    SyncScratchError(#[from] SyncScratchError),
+
+    #[error(transparent)]
+    CounterSigningError(#[from] CounterSigningError),
 }
 
 // serde_json::Error does not implement PartialEq - why is that a requirement??

@@ -63,11 +63,11 @@ impl From<AnyDhtHash> for EntryHash {
     }
 }
 
-#[cfg(feature = "serialized-bytes")]
+#[cfg(feature = "serialization")]
 use holochain_serialized_bytes::prelude::*;
 
 /// A newtype for a collection of EntryHashes, needed for some wasm return types.
-#[cfg(feature = "serialized-bytes")]
+#[cfg(feature = "serialization")]
 #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[repr(transparent)]
 #[serde(transparent)]

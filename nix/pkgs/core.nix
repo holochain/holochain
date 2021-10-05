@@ -5,6 +5,8 @@
 
 , holonix
 , holonixPath
+, hcToplevelDir
+, releaseAutomation
 }:
 
 rec {
@@ -18,42 +20,60 @@ rec {
 
     # alas, we cannot specify --features in the virtual workspace
     # run the specific slow tests in the holochain crate
-    cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,build_wasms -- --nocapture
+    cargo test --no-run --all-features --all-targets --manifest-path=crates/holochain/Cargo.toml
+    cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,test_utils,build_wasms,db-encryption -- --nocapture --test-threads 1
     # run all the remaining cargo tests
-    cargo test --workspace --exclude holochain -- --nocapture
+    cargo test --no-run --all-features --all-targets --workspace --exclude holochain --exclude release-automation
+    cargo test --workspace --exclude holochain --exclude release-automation -- --nocapture --test-threads 1
     # run all the wasm tests (within wasm) with the conductor mocked
-    cargo test --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features -- --nocapture
+    cargo test --no-run --all-targets --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features
+    cargo test --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features -- --nocapture --test-threads 1
   '';
 
-  hcReleaseAutomationTest = let
-    releaseAutomationCmd = logLevel: ''
-      # todo: need a way to not make the hdk fail despite it being unreleasable
-      cargo run --manifest-path=crates/release-automation/Cargo.toml -- \
-          --workspace-path=$PWD \
-          --log-level=${logLevel}\
-        check \
-          --selection-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
-          --disallowed-version-reqs=">=0.1" \
-          --allowed-selection-blockers=UnreleasableViaChangelogFrontmatter \
-          --allowed-dependency-blockers=UnreleasableViaChangelogFrontmatter \
-          --exclude-optional-deps \
-          --exclude-dep-kinds=development
-    '';
-    in writeShellScriptBin "hc-release-automation-test" ''
+  hcReleaseAutomationTest = writeShellScriptBin "hc-release-automation-test" ''
     set -euxo pipefail
+    export RUST_BACKTRACE=1
 
+    # make sure the binary is built
+    cargo build --manifest-path=crates/release-automation/Cargo.toml
     # run the release-automation tests
     cargo test --manifest-path=crates/release-automation/Cargo.toml ''${@}
+  '';
+
+  hcReleaseAutomationTestRepo = let
+    crateCmd = logLevel: ''
+      ${releaseAutomation} \
+          --workspace-path=${hcToplevelDir} \
+          --log-level=${logLevel} \
+        crate \
+          apply-dev-versions \
+            --dry-run
+    '';
+    releaseCmd = logLevel: ''
+      ${releaseAutomation} \
+          --workspace-path=${hcToplevelDir} \
+          --log-level=${logLevel} \
+        release \
+          --dry-run \
+          --disallowed-version-reqs=">=0.1" \
+          --allowed-matched-blockers=UnreleasableViaChangelogFrontmatter \
+          --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
+          --steps=BumpReleaseVersions
+    '';
+    in writeShellScriptBin "hc-release-automation-test-repo" ''
+    set -euxo pipefail
 
     # check the state of the repository
     (
-      ${releaseAutomationCmd "warn"}
+      ${crateCmd "debug"}
+      ${releaseCmd "debug"}
     ) || (
-      ${releaseAutomationCmd "trace"}
+      ${crateCmd "trace"}
+      ${releaseCmd "trace"}
     )
   '';
 
-  hcMergeTest = let
+  hcStaticChecks = let
       pathPrefix = lib.makeBinPath
         (builtins.attrValues { inherit (holonix.pkgs)
           hnRustClippy
@@ -62,15 +82,32 @@ rec {
           ;
         })
       ;
-    in writeShellScriptBin "hc-merge-test" ''
+    in writeShellScriptBin "hc-static-checks" ''
     export PATH=${pathPrefix}:$PATH
 
     set -euxo pipefail
     export RUST_BACKTRACE=1
-    hc-release-automation-test
     hn-rust-fmt-check
     hn-rust-clippy
+  '';
+
+  hcMergeTest = writeShellScriptBin "hc-merge-test" ''
+    set -euxo pipefail
+    export RUST_BACKTRACE=1
+    hc-static-checks
     hc-test
+  '';
+
+  hcReleaseTest = writeShellScriptBin "hc-release-test" ''
+    set -euxo pipefail
+    export RUST_BACKTRACE=1
+
+    # limit parallel jobs to reduce memory consumption
+    export NUM_JOBS=8
+    export CARGO_BUILD_JOBS=8
+
+    ${hcReleaseAutomationTest}/bin/hc-release-automation-test
+    ${hcReleaseAutomationTestRepo}/bin/hc-release-automation-test-repo
   '';
 
   hcSpeedTest = writeShellScriptBin "hc-speed-test" ''
@@ -187,6 +224,10 @@ rec {
     compare=develop
     bench $compare
     add_comment_to_commit $compare $commit
+  '';
+
+  hcRegenReadmes = writeShellScriptBin "hc-regen-readmes" ''
+    cargo-readme readme --project-root=crates/release-automation/ --output=README.md;
   '';
 } // (if stdenv.isLinux then {
   hcCoverageTest = writeShellScriptBin "hc-coverage-test" ''

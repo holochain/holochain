@@ -38,19 +38,16 @@ fixturator!(
 fixturator!(
     Timestamp;
     curve Empty {
-        Timestamp((I64Fixturator::new(Empty).next().unwrap().abs()
-           % ((i32::MAX as i64) * 86_400)).abs(),
-          U32Fixturator::new(Empty).next().unwrap() % 1000000000)
+        Timestamp::from_micros((I64Fixturator::new(Empty).next().unwrap().abs()
+           % ((i32::MAX as i64) * 86_400)).abs())
     };
     curve Unpredictable {
-        Timestamp((I64Fixturator::new(Unpredictable).next().unwrap()
-           % ((i32::MAX as i64) * 86_400)).abs(),
-          U32Fixturator::new(Unpredictable).next().unwrap() % 1000000000)
+        Timestamp::from_micros((I64Fixturator::new(Unpredictable).next().unwrap()
+           % ((i32::MAX as i64) * 86_400)).abs())
     };
     curve Predictable {
-        Timestamp((I64Fixturator::new(Predictable).next().unwrap()
-           % ((i32::MAX as i64) * 86_400)).abs(),
-          U32Fixturator::new(Predictable).next().unwrap() % 1000000000)
+        Timestamp::from_micros((I64Fixturator::new(Predictable).next().unwrap()
+           % ((i32::MAX as i64) * 86_400)).abs())
     };
 );
 
@@ -112,6 +109,7 @@ pub struct KnownCreateLink {
 
 pub struct KnownDeleteLink {
     pub link_add_address: holo_hash::HeaderHash,
+    pub base_address: holo_hash::EntryHash,
 }
 
 impl Iterator for CreateLinkFixturator<KnownCreateLink> {
@@ -131,6 +129,7 @@ impl Iterator for DeleteLinkFixturator<KnownDeleteLink> {
     fn next(&mut self) -> Option<Self::Item> {
         let mut f = fixt!(DeleteLink);
         f.link_add_address = self.0.curve.link_add_address.clone();
+        f.base_address = self.0.curve.base_address.clone();
         Some(f)
     }
 }
@@ -558,7 +557,7 @@ fixturator!(
     };
     curve Entry {
         let et = match get_fixt_curve!() {
-            Entry::App(_) => EntryType::App(AppEntryTypeFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()),
+            Entry::App(_) | Entry::CounterSign(_, _) => EntryType::App(AppEntryTypeFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()),
             Entry::Agent(_) => EntryType::AgentPubKey,
             Entry::CapClaim(_) => EntryType::CapClaim,
             Entry::CapGrant(_) => EntryType::CapGrant,
@@ -594,7 +593,7 @@ fixturator!(
 
     curve Entry {
         let et = match get_fixt_curve!() {
-            Entry::App(_) => EntryType::App(AppEntryTypeFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()),
+            Entry::App(_) | Entry::CounterSign(_, _) => EntryType::App(AppEntryTypeFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()),
             Entry::Agent(_) => EntryType::AgentPubKey,
             Entry::CapClaim(_) => EntryType::CapClaim,
             Entry::CapGrant(_) => EntryType::CapGrant,
@@ -631,6 +630,16 @@ fixturator!(
             other_type => other_type,
         }
     };
+);
+
+fixturator!(
+    HeaderHashed;
+    constructor fn from_content_sync(Header);
+);
+
+fixturator!(
+    SignedHeaderHashed;
+    constructor fn with_presigned(HeaderHashed, Signature);
 );
 
 fixturator!(

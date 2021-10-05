@@ -10,13 +10,22 @@ use std::fmt;
 /// Cells are uniquely determined by this pair - this pair is necessary
 /// and sufficient to refer to a cell in a conductor
 #[derive(
-    Clone, Debug, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes,
+    Clone,
+    Debug,
+    Hash,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    SerializedBytes,
+    Ord,
+    PartialOrd,
 )]
 pub struct CellId(DnaHash, AgentPubKey);
 
 impl fmt::Display for CellId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "cell-{}-{}", self.dna_hash(), self.agent_pubkey())
+        write!(f, "Cell({}, {})", self.dna_hash(), self.agent_pubkey())
     }
 }
 

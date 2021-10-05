@@ -5,7 +5,6 @@
 , coreutils
 
 , holonix
-, hcRustPlatform
 , hcToplevelDir
 , nixEnvPrefixEval
 , pkgs
@@ -39,7 +38,11 @@ rec {
   # * everything needed to compile this repos' crates
   # * CI scripts
   coreDev = hcMkShell {
-    nativeBuildInputs = builtins.attrValues (pkgs.core);
+    nativeBuildInputs = builtins.attrValues (pkgs.core)
+      ++ (with holonix.pkgs;[
+        sqlcipher
+        gdb
+      ]);
   };
 
   ci = hcMkShell {
@@ -53,7 +56,14 @@ rec {
     inputsFrom = [
       (builtins.removeAttrs coreDev [ "shellHook" ])
     ];
-    nativeBuildInputs = builtins.attrValues pkgs.happ;
+    nativeBuildInputs = builtins.attrValues pkgs.happ
+      ++ (with holonix.pkgs; [
+        lair-keystore
+        sqlcipher
+        binaryen
+        gdb
+      ])
+      ;
   };
 
   coreDevRustup = coreDev.overrideAttrs (attrs: {

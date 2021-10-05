@@ -9,12 +9,18 @@ pub const HDK_NOT_REGISTERED: &str = "HDK not registered";
 /// Every test needs its own mock so each test needs to set it.
 use core::cell::RefCell;
 
-#[cfg(feature = "mock")]
+#[cfg(any(feature = "mock", not(target_arch = "wasm32")))]
 thread_local!(pub static HDK: RefCell<Box<dyn HdkT>> = RefCell::new(Box::new(ErrHdk)));
 
-#[cfg(not(feature = "mock"))]
+#[cfg(all(not(feature = "mock"), target_arch = "wasm32"))]
 thread_local!(pub static HDK: RefCell<Box<dyn HdkT>> = RefCell::new(Box::new(HostHdk)));
 
+/// When mocking is enabled the mockall crate automatically builds a MockHdkT for us.
+/// ```ignore
+/// let mut mock = MockHdkT::new();
+/// mock_hdk.expect_foo().times(1).etc().etc();
+/// set_hdk(mock_hdk);
+/// ```
 #[cfg_attr(feature = "mock", automock)]
 pub trait HdkT: Send + Sync {
     // Chain
@@ -28,12 +34,26 @@ pub trait HdkT: Send + Sync {
     fn sign_ephemeral(&self, sign_ephemeral: SignEphemeral) -> ExternResult<EphemeralSignatures>;
     fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool>;
     // Entry
-    fn create(&self, entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash>;
+    fn create(&self, create_input: CreateInput) -> ExternResult<HeaderHash>;
     fn update(&self, update_input: UpdateInput) -> ExternResult<HeaderHash>;
-    fn delete(&self, hash: HeaderHash) -> ExternResult<HeaderHash>;
+    fn delete(&self, delete_input: DeleteInput) -> ExternResult<HeaderHash>;
     fn hash_entry(&self, entry: Entry) -> ExternResult<EntryHash>;
-    fn get(&self, get_input: GetInput) -> ExternResult<Option<Element>>;
-    fn get_details(&self, get_input: GetInput) -> ExternResult<Option<Details>>;
+    fn get(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Element>>>;
+    fn get_details(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Details>>>;
+    fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed>;
+    fn must_get_header(
+        &self,
+        must_get_header_input: MustGetHeaderInput,
+    ) -> ExternResult<SignedHeaderHashed>;
+    fn must_get_valid_element(
+        &self,
+        must_get_valid_element_input: MustGetValidElementInput,
+    ) -> ExternResult<Element>;
+    // CounterSigning
+    fn accept_countersigning_preflight_request(
+        &self,
+        preflight_request: PreflightRequest,
+    ) -> ExternResult<PreflightRequestAcceptance>;
     // Info
     fn agent_info(&self, agent_info_input: ()) -> ExternResult<AgentInfo>;
     fn app_info(&self, app_info_input: ()) -> ExternResult<AppInfo>;
@@ -42,19 +62,22 @@ pub trait HdkT: Send + Sync {
     fn call_info(&self, call_info_input: ()) -> ExternResult<CallInfo>;
     // Link
     fn create_link(&self, create_link_input: CreateLinkInput) -> ExternResult<HeaderHash>;
-    fn delete_link(&self, add_link_header: HeaderHash) -> ExternResult<HeaderHash>;
-    fn get_links(&self, get_links_input: GetLinksInput) -> ExternResult<Links>;
-    fn get_link_details(&self, get_links_input: GetLinksInput) -> ExternResult<LinkDetails>;
+    fn delete_link(&self, delete_link_input: DeleteLinkInput) -> ExternResult<HeaderHash>;
+    fn get_links(&self, get_links_input: Vec<GetLinksInput>) -> ExternResult<Vec<Links>>;
+    fn get_link_details(
+        &self,
+        get_links_input: Vec<GetLinksInput>,
+    ) -> ExternResult<Vec<LinkDetails>>;
     // P2P
-    fn call(&self, call: Call) -> ExternResult<ZomeCallResponse>;
-    fn call_remote(&self, call_remote: CallRemote) -> ExternResult<ZomeCallResponse>;
+    fn call(&self, call: Vec<Call>) -> ExternResult<Vec<ZomeCallResponse>>;
+    fn call_remote(&self, call_remote: Vec<CallRemote>) -> ExternResult<Vec<ZomeCallResponse>>;
     fn emit_signal(&self, app_signal: AppSignal) -> ExternResult<()>;
     fn remote_signal(&self, remote_signal: RemoteSignal) -> ExternResult<()>;
     // Random
     fn random_bytes(&self, number_of_bytes: u32) -> ExternResult<Bytes>;
     // Time
-    fn sys_time(&self, sys_time_input: ()) -> ExternResult<core::time::Duration>;
-    fn schedule(&self, execute_after: std::time::Duration) -> ExternResult<()>;
+    fn sys_time(&self, sys_time_input: ()) -> ExternResult<Timestamp>;
+    fn schedule(&self, scheduled_fn: String) -> ExternResult<()>;
     fn sleep(&self, wake_after: std::time::Duration) -> ExternResult<()>;
     // Trace
     fn trace(&self, trace_msg: TraceMsg) -> ExternResult<()>;
@@ -79,6 +102,7 @@ pub trait HdkT: Send + Sync {
 }
 
 /// Used as a placeholder before any other Hdk is registered.
+/// Generally only useful for testing but technically can be set any time.
 pub struct ErrHdk;
 
 impl ErrHdk {
@@ -87,6 +111,7 @@ impl ErrHdk {
     }
 }
 
+/// Every call is an error for the ErrHdk.
 impl HdkT for ErrHdk {
     fn get_agent_activity(&self, _: GetAgentActivityInput) -> ExternResult<AgentActivity> {
         Self::err()
@@ -103,22 +128,38 @@ impl HdkT for ErrHdk {
     fn verify_signature(&self, _: VerifySignature) -> ExternResult<bool> {
         Self::err()
     }
-    fn create(&self, _: EntryWithDefId) -> ExternResult<HeaderHash> {
+    fn create(&self, _: CreateInput) -> ExternResult<HeaderHash> {
         Self::err()
     }
     fn update(&self, _: UpdateInput) -> ExternResult<HeaderHash> {
         Self::err()
     }
-    fn delete(&self, _: HeaderHash) -> ExternResult<HeaderHash> {
+    fn delete(&self, _: DeleteInput) -> ExternResult<HeaderHash> {
         Self::err()
     }
     fn hash_entry(&self, _: Entry) -> ExternResult<EntryHash> {
         Self::err()
     }
-    fn get(&self, _: GetInput) -> ExternResult<Option<Element>> {
+    fn get(&self, _: Vec<GetInput>) -> ExternResult<Vec<Option<Element>>> {
         Self::err()
     }
-    fn get_details(&self, _: GetInput) -> ExternResult<Option<Details>> {
+    fn get_details(&self, _: Vec<GetInput>) -> ExternResult<Vec<Option<Details>>> {
+        Self::err()
+    }
+    fn must_get_entry(&self, _: MustGetEntryInput) -> ExternResult<EntryHashed> {
+        Self::err()
+    }
+    fn must_get_header(&self, _: MustGetHeaderInput) -> ExternResult<SignedHeaderHashed> {
+        Self::err()
+    }
+    fn must_get_valid_element(&self, _: MustGetValidElementInput) -> ExternResult<Element> {
+        Self::err()
+    }
+    // CounterSigning
+    fn accept_countersigning_preflight_request(
+        &self,
+        _: PreflightRequest,
+    ) -> ExternResult<PreflightRequestAcceptance> {
         Self::err()
     }
     fn agent_info(&self, _: ()) -> ExternResult<AgentInfo> {
@@ -140,20 +181,20 @@ impl HdkT for ErrHdk {
     fn create_link(&self, _: CreateLinkInput) -> ExternResult<HeaderHash> {
         Self::err()
     }
-    fn delete_link(&self, _: HeaderHash) -> ExternResult<HeaderHash> {
+    fn delete_link(&self, _: DeleteLinkInput) -> ExternResult<HeaderHash> {
         Self::err()
     }
-    fn get_links(&self, _: GetLinksInput) -> ExternResult<Links> {
+    fn get_links(&self, _: Vec<GetLinksInput>) -> ExternResult<Vec<Links>> {
         Self::err()
     }
-    fn get_link_details(&self, _: GetLinksInput) -> ExternResult<LinkDetails> {
+    fn get_link_details(&self, _: Vec<GetLinksInput>) -> ExternResult<Vec<LinkDetails>> {
         Self::err()
     }
     // P2P
-    fn call(&self, _: Call) -> ExternResult<ZomeCallResponse> {
+    fn call(&self, _: Vec<Call>) -> ExternResult<Vec<ZomeCallResponse>> {
         Self::err()
     }
-    fn call_remote(&self, _: CallRemote) -> ExternResult<ZomeCallResponse> {
+    fn call_remote(&self, _: Vec<CallRemote>) -> ExternResult<Vec<ZomeCallResponse>> {
         Self::err()
     }
     fn emit_signal(&self, _: AppSignal) -> ExternResult<()> {
@@ -167,10 +208,10 @@ impl HdkT for ErrHdk {
         Self::err()
     }
     // Time
-    fn sys_time(&self, _: ()) -> ExternResult<core::time::Duration> {
+    fn sys_time(&self, _: ()) -> ExternResult<Timestamp> {
         Self::err()
     }
-    fn schedule(&self, _: std::time::Duration) -> ExternResult<()> {
+    fn schedule(&self, _: String) -> ExternResult<()> {
         Self::err()
     }
     fn sleep(&self, _: std::time::Duration) -> ExternResult<()> {
@@ -213,7 +254,11 @@ impl HdkT for ErrHdk {
 /// The HDK implemented as externs provided by the host.
 pub struct HostHdk;
 
-#[cfg(not(feature = "mock"))]
+/// The real hdk implements `host_call` for every hdk function.
+/// This is deferring to the standard `holochain_wasmer_guest` crate functionality.
+/// Every function works exactly the same way with the same basic signatures and patterns.
+/// Elsewhere in the hdk are more high level wrappers around this basic trait.
+#[cfg(all(not(feature = "mock"), target_arch = "wasm32"))]
 impl HdkT for HostHdk {
     fn get_agent_activity(
         &self,
@@ -227,7 +272,6 @@ impl HdkT for HostHdk {
     fn query(&self, filter: ChainQueryFilter) -> ExternResult<Vec<Element>> {
         host_call::<ChainQueryFilter, Vec<Element>>(__query, filter)
     }
-
     fn sign(&self, sign: Sign) -> ExternResult<Signature> {
         host_call::<Sign, Signature>(__sign, sign)
     }
@@ -237,26 +281,55 @@ impl HdkT for HostHdk {
     fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool> {
         host_call::<VerifySignature, bool>(__verify_signature, verify_signature)
     }
-
-    fn create(&self, entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
-        host_call::<EntryWithDefId, HeaderHash>(__create, entry_with_def_id)
+    fn create(&self, create_input: CreateInput) -> ExternResult<HeaderHash> {
+        host_call::<CreateInput, HeaderHash>(__create, create_input)
     }
     fn update(&self, update_input: UpdateInput) -> ExternResult<HeaderHash> {
         host_call::<UpdateInput, HeaderHash>(__update, update_input)
     }
-    fn delete(&self, hash: HeaderHash) -> ExternResult<HeaderHash> {
-        host_call::<HeaderHash, HeaderHash>(__delete, hash)
+    fn delete(&self, hash: DeleteInput) -> ExternResult<HeaderHash> {
+        host_call::<DeleteInput, HeaderHash>(__delete, hash)
     }
     fn hash_entry(&self, entry: Entry) -> ExternResult<EntryHash> {
         host_call::<Entry, EntryHash>(__hash_entry, entry)
     }
-    fn get(&self, get_input: GetInput) -> ExternResult<Option<Element>> {
-        host_call::<GetInput, Option<Element>>(__get, get_input)
+    fn get(&self, get_inputs: Vec<GetInput>) -> ExternResult<Vec<Option<Element>>> {
+        host_call::<Vec<GetInput>, Vec<Option<Element>>>(__get, get_inputs)
     }
-    fn get_details(&self, get_input: GetInput) -> ExternResult<Option<Details>> {
-        host_call::<GetInput, Option<Details>>(__get_details, get_input)
+    fn get_details(&self, get_inputs: Vec<GetInput>) -> ExternResult<Vec<Option<Details>>> {
+        host_call::<Vec<GetInput>, Vec<Option<Details>>>(__get_details, get_inputs)
     }
-
+    fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed> {
+        host_call::<MustGetEntryInput, EntryHashed>(__must_get_entry, must_get_entry_input)
+    }
+    fn must_get_header(
+        &self,
+        must_get_header_input: MustGetHeaderInput,
+    ) -> ExternResult<SignedHeaderHashed> {
+        host_call::<MustGetHeaderInput, SignedHeaderHashed>(
+            __must_get_header,
+            must_get_header_input,
+        )
+    }
+    fn must_get_valid_element(
+        &self,
+        must_get_valid_element_input: MustGetValidElementInput,
+    ) -> ExternResult<Element> {
+        host_call::<MustGetValidElementInput, Element>(
+            __must_get_valid_element,
+            must_get_valid_element_input,
+        )
+    }
+    // CounterSigning
+    fn accept_countersigning_preflight_request(
+        &self,
+        preflight_request: PreflightRequest,
+    ) -> ExternResult<PreflightRequestAcceptance> {
+        host_call::<PreflightRequest, PreflightRequestAcceptance>(
+            __accept_countersigning_preflight_request,
+            preflight_request,
+        )
+    }
     fn agent_info(&self, _: ()) -> ExternResult<AgentInfo> {
         host_call::<(), AgentInfo>(__agent_info, ())
     }
@@ -272,25 +345,26 @@ impl HdkT for HostHdk {
     fn call_info(&self, _: ()) -> ExternResult<CallInfo> {
         host_call::<(), CallInfo>(__call_info, ())
     }
-
     fn create_link(&self, create_link_input: CreateLinkInput) -> ExternResult<HeaderHash> {
         host_call::<CreateLinkInput, HeaderHash>(__create_link, create_link_input)
     }
-    fn delete_link(&self, add_link_header: HeaderHash) -> ExternResult<HeaderHash> {
-        host_call::<HeaderHash, HeaderHash>(__delete_link, add_link_header)
+    fn delete_link(&self, delete_link_input: DeleteLinkInput) -> ExternResult<HeaderHash> {
+        host_call::<DeleteLinkInput, HeaderHash>(__delete_link, delete_link_input)
     }
-    fn get_links(&self, get_links_input: GetLinksInput) -> ExternResult<Links> {
-        host_call::<GetLinksInput, Links>(__get_links, get_links_input)
+    fn get_links(&self, get_links_input: Vec<GetLinksInput>) -> ExternResult<Vec<Links>> {
+        host_call::<Vec<GetLinksInput>, Vec<Links>>(__get_links, get_links_input)
     }
-    fn get_link_details(&self, get_links_input: GetLinksInput) -> ExternResult<LinkDetails> {
-        host_call::<GetLinksInput, LinkDetails>(__get_link_details, get_links_input)
+    fn get_link_details(
+        &self,
+        get_links_input: Vec<GetLinksInput>,
+    ) -> ExternResult<Vec<LinkDetails>> {
+        host_call::<Vec<GetLinksInput>, Vec<LinkDetails>>(__get_link_details, get_links_input)
     }
-
-    fn call(&self, call: Call) -> ExternResult<ZomeCallResponse> {
-        host_call::<Call, ZomeCallResponse>(__call, call)
+    fn call(&self, call: Vec<Call>) -> ExternResult<Vec<ZomeCallResponse>> {
+        host_call::<Vec<Call>, Vec<ZomeCallResponse>>(__call, call)
     }
-    fn call_remote(&self, call_remote: CallRemote) -> ExternResult<ZomeCallResponse> {
-        host_call::<CallRemote, ZomeCallResponse>(__call_remote, call_remote)
+    fn call_remote(&self, call_remote: Vec<CallRemote>) -> ExternResult<Vec<ZomeCallResponse>> {
+        host_call::<Vec<CallRemote>, Vec<ZomeCallResponse>>(__call_remote, call_remote)
     }
     fn emit_signal(&self, app_signal: AppSignal) -> ExternResult<()> {
         host_call::<AppSignal, ()>(__emit_signal, app_signal)
@@ -298,25 +372,21 @@ impl HdkT for HostHdk {
     fn remote_signal(&self, remote_signal: RemoteSignal) -> ExternResult<()> {
         host_call::<RemoteSignal, ()>(__remote_signal, remote_signal)
     }
-
     fn random_bytes(&self, number_of_bytes: u32) -> ExternResult<Bytes> {
         host_call::<u32, Bytes>(__random_bytes, number_of_bytes)
     }
-
-    fn sys_time(&self, _: ()) -> ExternResult<core::time::Duration> {
-        host_call::<(), core::time::Duration>(__sys_time, ())
+    fn sys_time(&self, _: ()) -> ExternResult<Timestamp> {
+        host_call::<(), Timestamp>(__sys_time, ())
     }
-    fn schedule(&self, execute_after: std::time::Duration) -> ExternResult<()> {
-        host_call::<std::time::Duration, ()>(__schedule, execute_after)
+    fn schedule(&self, scheduled_fn: String) -> ExternResult<()> {
+        host_call::<String, ()>(__schedule, scheduled_fn)
     }
     fn sleep(&self, wake_after: std::time::Duration) -> ExternResult<()> {
         host_call::<std::time::Duration, ()>(__sleep, wake_after)
     }
-
     fn trace(&self, trace_msg: TraceMsg) -> ExternResult<()> {
         host_call::<TraceMsg, ()>(__trace, trace_msg)
     }
-
     fn create_x25519_keypair(&self, _: ()) -> ExternResult<X25519PubKey> {
         host_call::<(), X25519PubKey>(__create_x25519_keypair, ())
     }
@@ -358,6 +428,9 @@ impl HdkT for HostHdk {
     }
 }
 
+/// At any time the global HDK can be set to a different hdk.
+/// Generally this is only useful during rust unit testing.
+/// When executing wasm without the `mock` feature, the host will be assumed.
 pub fn set_hdk<H: 'static>(hdk: H)
 where
     H: HdkT,

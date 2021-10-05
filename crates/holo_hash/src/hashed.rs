@@ -1,13 +1,18 @@
 use crate::HasHash;
 use crate::HashableContent;
 use crate::HoloHashOf;
+
+#[cfg(feature = "serialization")]
 use holochain_serialized_bytes::prelude::*;
+
+#[cfg(feature = "arbitrary")]
+use crate::PrimitiveHashType;
 
 /// Represents some piece of content along with its hash representation, so that
 /// hashes need not be calculated multiple times.
 /// Provides an easy constructor which consumes the content.
 // TODO: consider making lazy with OnceCell
-#[derive(Serialize, Deserialize)]
+#[cfg_attr(feature = "serialization", derive(Debug, Serialize, Deserialize))]
 pub struct HoloHashed<C: HashableContent> {
     /// Whatever type C is as data.
     pub(crate) content: C,
@@ -25,6 +30,18 @@ impl<C: HashableContent> HasHash<C::HashType> for HoloHashed<C> {
     }
 }
 
+#[cfg(feature = "arbitrary")]
+impl<'a, C> arbitrary::Arbitrary<'a> for HoloHashed<C>
+where
+    C: HashableContent + arbitrary::Arbitrary<'a>,
+    C::HashType: PrimitiveHashType,
+{
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let hash = HoloHashOf::<C>::arbitrary(u)?;
+        let content = C::arbitrary(u)?;
+        Ok(Self { content, hash })
+    }
+}
 impl<C> HoloHashed<C>
 where
     C: HashableContent,
@@ -69,16 +86,6 @@ where
             content: self.content.clone(),
             hash: self.hash.clone(),
         }
-    }
-}
-
-impl<C> std::fmt::Debug for HoloHashed<C>
-where
-    C: HashableContent + std::fmt::Debug,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("HoloHashed({:?})", self.content))?;
-        Ok(())
     }
 }
 

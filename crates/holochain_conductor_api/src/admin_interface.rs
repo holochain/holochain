@@ -13,7 +13,7 @@ use crate::InstalledAppInfo;
 ///
 /// Expects a serialized object with any contents of the enum on a key `data`
 /// and the enum variant on a key `type`, e.g.
-/// `{ type: 'activate_app', data: { installed_app_id: 'test_app' } }`
+/// `{ type: 'enable_app', data: { installed_app_id: 'test_app' } }`
 ///
 /// [`AdminResponse`]: enum.AdminResponse.html
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -60,14 +60,14 @@ pub enum AdminRequest {
     /// installs all the Dnas with that `AgentPubKey` forming new `Cell`s.
     /// See [`InstallAppPayload`] for full details on the configuration.
     ///
-    /// Note that the new `App` will not be "activated" automatically after installation
-    /// and can be activated by calling [`AdminRequest::ActivateApp`].
+    /// Note that the new `App` will not be enabled automatically after installation
+    /// and can be enabled by calling [`AdminRequest::EnableApp`].
     ///
     /// Will be responded to with an [`AdminResponse::AppInstalled`]
     /// or an [`AdminResponse::Error`]
     ///
     /// [`InstallAppPayload`]: ../../../holochain_types/app/struct.InstallAppPayload.html
-    /// [`AdminRequest::ActivateApp`]: enum.AdminRequest.html#variant.ActivateApp
+    /// [`AdminRequest::EnableApp`]: enum.AdminRequest.html#variant.EnableApp
     /// [`AdminResponse::AppInstalled`]: enum.AdminResponse.html#variant.AppInstalled
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
     InstallApp(Box<InstallAppPayload>),
@@ -80,17 +80,33 @@ pub enum AdminRequest {
     /// installs all the Dnas with that `AgentPubKey` forming new `Cell`s.
     /// See [`InstallAppBundlePayload`] for full details on the configuration.
     ///
-    /// Note that the new `App` will not be "activated" automatically after installation
-    /// and can be activated by calling [`AdminRequest::ActivateApp`].
+    /// Note that the new `App` will not be enabled automatically after installation
+    /// and can be enabled by calling [`AdminRequest::EnableApp`].
     ///
     /// Will be responded to with an [`AdminResponse::AppInstalled`]
     /// or an [`AdminResponse::Error`]
     ///
     /// [`InstallAppBundlePayload`]: ../../../holochain_types/app/struct.InstallAppBundlePayload.html
-    /// [`AdminRequest::ActivateApp`]: enum.AdminRequest.html#variant.ActivateApp
+    /// [`AdminRequest::EnableApp`]: enum.AdminRequest.html#variant.EnableApp
     /// [`AdminResponse::AppInstalled`]: enum.AdminResponse.html#variant.AppInstalled
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
     InstallAppBundle(Box<InstallAppBundlePayload>),
+
+    /// Uninstalls the `App` specified by argument `installed_app_id` from the conductor,
+    /// meaning that the app will be removed from the list of installed apps, and any Cells
+    /// which were referenced only by this app will be disabled and removed, clearing up
+    /// any persisted data.
+    /// Cells which are still referenced by other installed apps will not be removed.
+    ///
+    /// Will be responded to with an [`AdminResponse::AppUninstalled`]
+    /// or an [`AdminResponse::Error`]
+    ///
+    /// [`AdminResponse::AppUninstalled`]: enum.AdminResponse.html#variant.AppUninstalled
+    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
+    UninstallApp {
+        /// The InstalledAppId to uninstall
+        installed_app_id: InstalledAppId,
+    },
 
     /// List the hashes of all installed `Dna`s.
     /// Takes no arguments.
@@ -121,7 +137,8 @@ pub enum AdminRequest {
     /// [`AdminResponse::CellIdsListed`]: enum.AdminResponse.html#variant.CellIdsListed
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
     ListCellIds,
-    /// List the ids of all the active (activated) Apps in the conductor.
+
+    /// List the ids of all the enabled Apps in the conductor.
     /// Takes no arguments.
     ///
     /// Will be responded to with an [`AdminResponse::ActiveAppsListed`]
@@ -129,35 +146,73 @@ pub enum AdminRequest {
     ///
     /// [`AdminResponse::ActiveAppsListed`]: enum.AdminResponse.html#variant.ActiveAppsListed
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
+    ListEnabledApps,
+
+    /// DEPRECATED. Alias for ListEnabledApps.
+    #[deprecated = "alias for ListEnabledApps"]
     ListActiveApps,
-    /// Changes the `App` specified by argument `installed_app_id` from an inactive state to an active state in the conductor,
+
+    /// List the ids of the Apps that are installed in the conductor, returning their information.
+    /// If `status_filter` is `Some(_)`, it will return only the `Apps` with the specified status
+    ///
+    /// Will be responded to with an [`AdminResponse::AppsListed`]
+    /// or an [`AdminResponse::Error`]
+    ///
+    /// [`AdminResponse::AppsListed`]: enum.AdminResponse.html#variant.AppsListed
+    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
+    ListApps {
+        status_filter: Option<AppStatusFilter>,
+    },
+
+    /// Changes the `App` specified by argument `installed_app_id` from a disabled state to an enabled state in the conductor,
     /// meaning that Zome calls can now be made and the `App` will be loaded on a reboot of the conductor.
     /// It is likely to want to call this after calling [`AdminRequest::InstallApp`], since a freshly
     /// installed `App` is not activated automatically.
     ///
-    /// Will be responded to with an [`AdminResponse::AppActivated`]
+    /// Will be responded to with an [`AdminResponse::AppEnabled`]
     /// or an [`AdminResponse::Error`]
     ///
     /// [`AdminRequest::InstallApp`]: enum.AdminRequest.html#variant.InstallApp
-    /// [`AdminResponse::AppActivated`]: enum.AdminResponse.html#variant.AppActivated
+    /// [`AdminResponse::AppEnabled`]: enum.AdminResponse.html#variant.AppEnabled
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
-    ActivateApp {
-        /// The InstalledAppId to activate
+    EnableApp {
+        /// The InstalledAppId to enable
         installed_app_id: InstalledAppId,
     },
-    /// Changes the `App` specified by argument `installed_app_id` from an active state to an inactive state in the conductor,
+
+    /// DEPRECATED. Alias for EnableApp.
+    #[deprecated = "alias for EnableApp"]
+    ActivateApp {
+        /// The InstalledAppId to enable
+        installed_app_id: InstalledAppId,
+    },
+
+    /// Changes the `App` specified by argument `installed_app_id` from an enabled state to a disabled state in the conductor,
     /// meaning that Zome calls can no longer be made, and the `App` will not be loaded on a
     /// reboot of the conductor.
     ///
-    /// Will be responded to with an [`AdminResponse::AppDeactivated`]
+    /// Will be responded to with an [`AdminResponse::AppDisabled`]
     /// or an [`AdminResponse::Error`]
     ///
-    /// [`AdminResponse::AppDeactivated`]: enum.AdminResponse.html#variant.AppDeactivated
+    /// [`AdminResponse::AppDisabled`]: enum.AdminResponse.html#variant.AppDisabled
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
-    DeactivateApp {
-        /// The InstalledAppId to deactivate
+    DisableApp {
+        /// The InstalledAppId to disable
         installed_app_id: InstalledAppId,
     },
+
+    /// DEPRECATED. Alias for DisableApp.
+    #[deprecated = "alias for DisableApp"]
+    DeactivateApp {
+        /// The InstalledAppId to disable
+        installed_app_id: InstalledAppId,
+    },
+
+    StartApp {
+        /// The InstalledAppId to (re)start
+        installed_app_id: InstalledAppId,
+    },
+
     /// Open up a new websocket interface at the networking port
     /// (optionally) specified by argument `port` (or using any free port if argument `port` is `None`)
     /// over which you can then use the [`AppRequest`] API.
@@ -175,8 +230,10 @@ pub enum AdminRequest {
         /// OS choose a free port
         port: Option<u16>,
     },
+
     /// List all the app interfaces currently attached with [`AttachAppInterface`].
     ListAppInterfaces,
+
     /// Dump the full state of the `Cell` specified by argument `cell_id`,
     /// including its chain, as a string containing JSON.
     ///
@@ -189,6 +246,7 @@ pub enum AdminRequest {
         /// The `CellId` for which to dump state
         cell_id: Box<CellId>,
     },
+
     /// Add a list [AgentInfoSigned] to this conductor's peer store.
     /// This is another way of finding peers on a dht.
     ///
@@ -201,6 +259,7 @@ pub enum AdminRequest {
         /// Vec of signed agent info to add to peer store
         agent_infos: Vec<AgentInfoSigned>,
     },
+
     /// Request the [AgentInfoSigned] stored in this conductor's
     /// peer store.
     ///
@@ -267,6 +326,13 @@ pub enum AdminResponse {
     /// [`CellId`]: ../../../holochain_types/cell/struct.CellId.html
     AppBundleInstalled(InstalledAppInfo),
 
+    /// The succesful response to an [`AdminRequest::UninstallApp`].
+    ///
+    /// It means the `App` was uninstalled successfully.
+    ///
+    /// [`AdminRequest::UninstallApp`]: enum.AdminRequest.html#variant.UninstallApp
+    AppUninstalled,
+
     /// The successful response to an [`AdminRequest::CreateCloneCell`].
     ///
     /// The response contains the [`CellId`] of the newly created clone.
@@ -303,12 +369,22 @@ pub enum AdminResponse {
     /// [`AdminRequest::ListCellIds`]: enum.AdminRequest.html#variant.ListCellIds
     CellIdsListed(Vec<CellId>),
 
-    /// The succesful response to an [`AdminRequest::ListActiveApps`].
+    /// The succesful response to an [`AdminRequest::ListEnabledApps`].
     ///
     /// Contains a list of all the active `App` ids in the conductor
     ///
-    /// [`AdminRequest::ListActiveApps`]: enum.AdminRequest.html#variant.ListActiveApps
+    /// [`AdminRequest::ListEnabledApps`]: enum.AdminRequest.html#variant.ListEnabledApps
+    EnabledAppsListed(Vec<InstalledAppId>),
+
+    #[deprecated = "alias for EnabledAppsListed"]
     ActiveAppsListed(Vec<InstalledAppId>),
+
+    /// The succesful response to an [`AdminRequest::ListApps`].
+    ///
+    /// Contains a list of the `InstalledAppInfo` of the installed `Apps` in the conductor
+    ///
+    /// [`AdminRequest::ListApps`]: enum.AdminRequest.html#variant.ListApps
+    AppsListed(Vec<InstalledAppInfo>),
 
     /// The succesful response to an [`AdminRequest::AttachAppInterface`].
     ///
@@ -325,18 +401,42 @@ pub enum AdminResponse {
     /// The list of attached app interfaces.
     AppInterfacesListed(Vec<u16>),
 
-    /// The succesful response to an [`AdminRequest::ActivateApp`].
+    /// The succesful response to an [`AdminRequest::EnableApp`].
     ///
-    /// It means the `App` was activated successfully
+    /// It means the `App` was enabled successfully. If it was possible to
+    /// put the app in a Running state, it will be Running, otherwise it will
+    /// be Paused.
     ///
-    /// [`AdminRequest::ActivateApp`]: enum.AdminRequest.html#variant.ActivateApp
-    AppActivated,
+    /// [`AdminRequest::EnableApp`]: enum.AdminRequest.html#variant.EnableApp
+    AppEnabled {
+        app: InstalledAppInfo,
+        errors: Vec<(CellId, String)>,
+    },
 
-    /// The succesful response to an [`AdminRequest::DeactivateApp`].
+    #[deprecated = "alias for AppEnabled"]
+    AppActivated {
+        app: InstalledAppInfo,
+        errors: Vec<(CellId, String)>,
+    },
+
+    /// The succesful response to an [`AdminRequest::DisableApp`].
     ///
-    /// It means the `App` was deactivated successfully.
+    /// It means the `App` was disabled successfully.
     ///
-    /// [`AdminRequest::DeactivateApp`]: enum.AdminRequest.html#variant.DeactivateApp
+    /// [`AdminRequest::DisableApp`]: enum.AdminRequest.html#variant.DisableApp
+    AppDisabled,
+
+    /// The succesful response to an [`AdminRequest::StartApp`].
+    ///
+    /// The boolean determines whether or not the was actually started.
+    /// If false, it was because the app was in a disabled state, or the app
+    /// failed to start.
+    /// TODO: add reason why app couldn't start
+    ///
+    /// [`AdminRequest::StartApp`]: enum.AdminRequest.html#variant.StartApp
+    AppStarted(bool),
+
+    #[deprecated = "alias for AppDisabled"]
     AppDeactivated,
 
     /// The succesful response to an [`AdminRequest::DumpState`].
@@ -383,6 +483,8 @@ pub enum ExternalApiWireError {
     ActivateApp(String),
     /// The zome call is unauthorized
     ZomeCallUnauthorized(String),
+    /// A countersigning session has failed.
+    CountersigningSessionError(String),
 }
 
 impl ExternalApiWireError {
@@ -392,4 +494,14 @@ impl ExternalApiWireError {
         // this version intended for users.
         ExternalApiWireError::InternalError(e.to_string())
     }
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, Clone)]
+/// Filter for `ListApps`.
+pub enum AppStatusFilter {
+    Enabled,
+    Disabled,
+    Running,
+    Stopped,
+    Paused,
 }

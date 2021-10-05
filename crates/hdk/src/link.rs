@@ -17,7 +17,7 @@ use crate::prelude::*;
 /// - can reference any entry regardless of type (e.g. posts can link to comments)
 /// - cannot reference other links or crud headers (@todo maybe we can do this in the future)
 ///
-/// Note: There is a hard limit of 400 bytes of data for the tag as it is used as an lmdb key.
+/// Note: There is a hard limit of 1kb of data for the tag.
 ///
 /// Crud:
 ///
@@ -65,6 +65,7 @@ pub fn create_link<T: Into<LinkTag>>(
             base_address,
             target_address,
             tag.into(),
+            ChainTopOrdering::default(),
         ))
     })
 }
@@ -92,8 +93,11 @@ pub fn create_link<T: Into<LinkTag>>(
 ///   link after any previous delete of any link.
 /// All of this is bad so link creates point to entries (See [ `create_link` ]) and deletes point to
 /// creates.
-pub fn delete_link(add_link_header: HeaderHash) -> ExternResult<HeaderHash> {
-    HDK.with(|h| h.borrow().delete_link(add_link_header))
+pub fn delete_link(address: HeaderHash) -> ExternResult<HeaderHash> {
+    HDK.with(|h| {
+        h.borrow()
+            .delete_link(DeleteLinkInput::new(address, ChainTopOrdering::default()))
+    })
 }
 
 /// Returns all links that reference a base entry hash, optionally filtered by tag.
@@ -116,7 +120,14 @@ pub fn delete_link(add_link_header: HeaderHash) -> ExternResult<HeaderHash> {
 ///
 /// See [ `get_link_details` ].
 pub fn get_links(base: EntryHash, link_tag: Option<LinkTag>) -> ExternResult<Links> {
-    HDK.with(|h| h.borrow().get_links(GetLinksInput::new(base, link_tag)))
+    Ok(HDK
+        .with(|h| {
+            h.borrow()
+                .get_links(vec![GetLinksInput::new(base, link_tag)])
+        })?
+        .into_iter()
+        .next()
+        .unwrap())
 }
 
 /// Get all link creates and deletes that reference a base entry hash, optionally filtered by tag
@@ -139,8 +150,12 @@ pub fn get_links(base: EntryHash, link_tag: Option<LinkTag>) -> ExternResult<Lin
 ///
 /// See [ `get_links` ].
 pub fn get_link_details(base: EntryHash, link_tag: Option<LinkTag>) -> ExternResult<LinkDetails> {
-    HDK.with(|h| {
-        h.borrow()
-            .get_link_details(GetLinksInput::new(base, link_tag))
-    })
+    Ok(HDK
+        .with(|h| {
+            h.borrow()
+                .get_link_details(vec![GetLinksInput::new(base, link_tag)])
+        })?
+        .into_iter()
+        .next()
+        .unwrap())
 }

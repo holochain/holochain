@@ -1,5 +1,37 @@
 use crate::prelude::*;
 
+#[macro_export]
+macro_rules! map_extern_preamble {
+    ( $guest_ptr:ident, $len:ident, $inner:ident, $input:ty, $output:ty ) => {
+        // Setup tracing.
+        // @TODO feature flag this?
+        let _subscriber_guard = $crate::prelude::tracing::subscriber::set_default(
+            $crate::trace::WasmSubscriber::default()
+        );
+
+        // Deserialize the input from the host.
+        let extern_io: $crate::prelude::ExternIO = match $crate::prelude::host_args($guest_ptr, $len) {
+            Ok(v) => v,
+            Err(err_ptr) => return err_ptr,
+        };
+        let $inner: $input = match extern_io.decode() {
+            Ok(v) => v,
+            Err(e) => {
+                let bytes = extern_io.0;
+                $crate::prelude::error!(output_type = std::any::type_name::<$output>(), bytes = ?bytes, "{}", e);
+                return $crate::prelude::return_err_ptr($crate::prelude::WasmError::Deserialize(bytes));
+            }
+        };
+    }
+}
+
+pub fn encode_to_guestptrlen<T: std::fmt::Debug + Serialize>(v: T) -> GuestPtrLen {
+    match ExternIO::encode(v) {
+        Ok(v) => return_ptr::<ExternIO>(v),
+        Err(serialized_bytes_error) => return_err_ptr(WasmError::Serialize(serialized_bytes_error)),
+    }
+}
+
 /// Hides away the gross bit where we hook up integer pointers to length-prefixed guest memory
 /// to serialization and deserialization, and returning things to the host, and memory allocation
 /// and deallocation.
@@ -29,42 +61,33 @@ macro_rules! map_extern {
                 use super::*;
 
                 #[no_mangle]
-                pub extern "C" fn $name(guest_ptr: $crate::prelude::GuestPtr) -> $crate::prelude::GuestPtr {
-                    // Setup tracing.
-                    // @TODO feature flag this?
-                    let _subscriber_guard = $crate::prelude::tracing::subscriber::set_default(
-                        $crate::trace::WasmSubscriber::default()
-                    );
-
-                    // Deserialize the input from the host.
-                    let extern_io: $crate::prelude::ExternIO = match $crate::prelude::host_args(guest_ptr) {
-                        Ok(v) => v,
-                        Err(err_ptr) => return err_ptr,
-                    };
-                    let inner: $input = match extern_io.decode() {
-                        Ok(v) => v,
-                        Err(e) => {
-                            let bytes = extern_io.0;
-                            $crate::prelude::error!(output_type = std::any::type_name::<$output>(), bytes = ?bytes, "{}", e);
-                            return $crate::prelude::return_err_ptr($crate::prelude::WasmError::Deserialize(bytes));
-                        }
-                    };
-
-                    // Call the function.
-                    let output: $output = match super::$f(inner) {
-                        Ok(v) => Ok(v),
-                        Err(wasm_error) => return $crate::prelude::return_err_ptr(wasm_error),
-                    };
-
-                    // Serialize the output for the host.
-                    match $crate::prelude::ExternIO::encode(output.unwrap()) {
-                        Ok(v) => $crate::prelude::return_ptr::<$crate::prelude::ExternIO>(v),
-                        Err(serialized_bytes_error) => $crate::prelude::return_err_ptr($crate::prelude::WasmError::Serialize(serialized_bytes_error)),
+                pub extern "C" fn $name(guest_ptr: $crate::prelude::GuestPtr, len: $crate::prelude::Len) -> $crate::prelude::GuestPtrLen {
+                    $crate::map_extern_preamble!(guest_ptr, len, inner, $input, $output);
+                    match super::$f(inner) {
+                        Ok(v) => $crate::map_extern::encode_to_guestptrlen(v),
+                        Err(e) => $crate::prelude::return_err_ptr(e),
                     }
                 }
             }
         }
     };
+}
+
+#[macro_export]
+macro_rules! map_extern_infallible {
+    ( $name:tt, $f:ident, $input:ty, $output:ty ) => {
+        $crate::paste::paste! {
+            mod [< __ $name _extern >] {
+                use super::*;
+
+                #[no_mangle]
+                pub extern "C" fn $name(guest_ptr: $crate::prelude::GuestPtr, len: $crate::prelude::Len) -> $crate::prelude::GuestPtrLen {
+                    $crate::map_extern_preamble!(guest_ptr, len, inner, $input, $output);
+                    $crate::map_extern::encode_to_guestptrlen(super::$f(inner))
+                }
+            }
+        }
+    }
 }
 
 /// Every extern _must_ retern a `WasmError` in the case of failure.

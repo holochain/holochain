@@ -3,23 +3,40 @@ use crate::*;
 use anyhow::Context;
 use cargo_test_support::git::{self, Repository};
 use cargo_test_support::{Project, ProjectBuilder};
+use educe::Educe;
 use log::debug;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use tempfile;
 
+#[derive(Educe)]
+#[educe(Default)]
 pub(crate) enum MockProjectType {
+    #[educe(Default)]
     Lib,
     Bin,
 }
 
+#[derive(Educe)]
+#[educe(Default)]
 pub(crate) struct MockProject {
     pub(crate) name: String,
     pub(crate) version: String,
     pub(crate) dependencies: Vec<String>,
+    pub(crate) dev_dependencies: Vec<String>,
     pub(crate) excluded: bool,
     pub(crate) ty: MockProjectType,
     pub(crate) changelog: Option<String>,
+    #[educe(Default(expression = r##"Some(indoc::formatdoc!(
+                r#"
+                # README
+                "#
+            ))
+    "##))]
+    pub(crate) readme: Option<String>,
+    #[educe(Default(expression = r##"Some("some crate".to_string())"##))]
+    pub(crate) description: Option<String>,
+    #[educe(Default(expression = r##"Some("Apache-2.0".to_string())"##))]
+    pub(crate) license: Option<String>,
 }
 
 pub(crate) struct WorkspaceMocker {
@@ -56,12 +73,13 @@ impl WorkspaceMocker {
 
         let excluded = projects.iter().fold(String::new(), |acc, (name, project)| {
             if project.excluded {
-                acc + &indoc::formatdoc!(
+                acc + indoc::formatdoc!(
                     r#"
                         "crates/{}",
                     "#,
                     name
                 )
+                .as_str()
             } else {
                 acc
             }
@@ -100,22 +118,47 @@ impl WorkspaceMocker {
                             format!("{}{}\n", dependencies, dependency)
                         });
 
+                    let dev_dependencies = project.dev_dependencies.iter().fold(
+                        String::new(),
+                        |dev_dependencies, dependency| {
+                            format!("{}{}\n", dev_dependencies, dependency)
+                        },
+                    );
+
                     let project_builder = project_builder
                         .file(
                             format!("crates/{}/Cargo.toml", &name),
                             &indoc::formatdoc!(
                                 r#"
-                                [project]
+                                [package]
                                 name = "{}"
                                 version = "{}"
                                 authors = []
+                                {description}
+                                {license}
+                                homepage = "https://github.com/holochain/holochain"
+                                documentation = "https://github.com/holochain/holochain"
 
                                 [dependencies]
-                                {}
+                                {dependencies}
+
+                                [dev-dependencies]
+                                {dev_dependencies}
                                 "#,
                                 &name,
                                 &project.version,
-                                dependencies
+                                description = &project
+                                    .description
+                                    .clone()
+                                    .map(|d| format!(r#"description = "{}""#, d))
+                                    .unwrap_or_default(),
+                                license = &project
+                                    .license
+                                    .clone()
+                                    .map(|d| format!(r#"license = "{}""#, d))
+                                    .unwrap_or_default(),
+                                dependencies = dependencies,
+                                dev_dependencies = dev_dependencies,
                             ),
                         )
                         .file(
@@ -133,8 +176,14 @@ impl WorkspaceMocker {
                             },
                         );
 
-                    if let Some(changelog) = &project.changelog {
-                        project_builder.file(format!("crates/{}/CHANGELOG.md", &name), &changelog)
+                    let project_builder = if let Some(changelog) = &project.changelog {
+                        project_builder.file(format!("crates/{}/CHANGELOG.md", &name), changelog)
+                    } else {
+                        project_builder
+                    };
+
+                    if let Some(readme) = &project.readme {
+                        project_builder.file(format!("crates/{}/README.md", &name), readme)
                     } else {
                         project_builder
                     }
@@ -173,8 +222,8 @@ impl WorkspaceMocker {
         commit
     }
 
-    pub(crate) fn tag(&self, tag: &str) -> () {
-        git::tag(&self.workspace_repo, &tag)
+    pub(crate) fn tag(&self, tag: &str) {
+        git::tag(&self.workspace_repo, tag)
     }
 
     pub(crate) fn head(&self) -> Fallible<String> {
@@ -184,6 +233,80 @@ impl WorkspaceMocker {
             .map(|o| o.id())
             .map(|id| id.to_string())
     }
+
+    pub(crate) fn update_lockfile(&self) -> Fallible<()> {
+        let mut cmd = std::process::Command::new("cargo");
+        cmd.args(
+            &[vec![
+                "update",
+                "--workspace",
+                "--offline",
+                "--verbose",
+                "--manifest-path",
+                &format!("{}/Cargo.toml", self.root().to_string_lossy()),
+            ]]
+            .concat(),
+        );
+        debug!("running command: {:?}", cmd);
+
+        let mut cmd = cmd.spawn()?;
+        let cmd_status = cmd.wait()?;
+        if !cmd_status.success() {
+            bail!("running {:?} failed: \n{:?}", cmd, cmd.stderr);
+        }
+
+        Ok(())
+    }
+}
+
+/// Expected changelog after aggregation.
+pub(crate) fn example_workspace_1_aggregated_changelog() -> String {
+    crate::changelog::sanitize(indoc::formatdoc!(
+        r#"
+        # Changelog
+        This file conveniently consolidates all of the crates individual CHANGELOG.md files and groups them by timestamps at which crates were released.
+        The file is updated every time one or more crates are released.
+
+        The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+        This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+        # [Unreleased]
+        The text beneath this heading will be retained which allows adding overarching release notes.
+
+        ## [crate_b](crates/crate_b/CHANGELOG.md#unreleased)
+        ### Changed
+        - `Signature` is a 64 byte 'secure primitive'
+
+        ## [crate_a](crates/crate_a/CHANGELOG.md#unreleased)
+        ### Added
+
+        - `InstallAppBundle`
+        - `DnaSource`
+
+        ### Removed
+
+        - BREAKING:  `InstallAppDnaPayload`
+        - BREAKING: `DnaSource(Path)`
+
+
+        ## [crate_c](crates/crate_c/CHANGELOG.md#unreleased)
+        Awesome changes!
+
+        ### Breaking
+        Breaking changes, be careful.
+
+        ## [crate_e](crates/crate_e/CHANGELOG.md#unreleased)
+        Awesome changes!
+
+        # [20210304.120604]
+        This will include the hdk-0.0.100 release.
+
+        ## [hdk-0.0.100](crates/hdk/CHANGELOG.md#0.0.100)
+
+        ### Changed
+        - hdk: fixup the autogenerated hdk documentation.
+        "#
+    ))
 }
 
 /// A workspace with four crates to test changelogs and change detection.
@@ -195,7 +318,7 @@ pub(crate) fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
             name: "crate_a".to_string(),
             version: "0.0.1".to_string(),
             dependencies: vec![
-                r#"crate_b = { path = "../crate_b", version = "0.0.1" }"#.to_string(),
+                r#"crate_b = { path = "../crate_b", version = "0.0.0-alpha.1" }"#.to_string(),
             ],
             excluded: false,
             ty: workspace_mocker::MockProjectType::Bin,
@@ -215,13 +338,13 @@ pub(crate) fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
 
                     ### Added
 
-                    - `InstallAppBundle` command added to admin conductor API. [#665](https://github.com/holochain/holochain/pull/665)
-                    - `DnaSource` in conductor_api `RegisterDna` call now can take a `DnaBundle` [#665](https://github.com/holochain/holochain/pull/665)
+                    - `InstallAppBundle`
+                    - `DnaSource`
 
                     ### Removed
 
-                    - BREAKING:  `InstallAppDnaPayload` in admin conductor API `InstallApp` command now only accepts a hash.  Both properties and path have been removed as per deprecation warning.  Use either `RegisterDna` or `InstallAppBundle` instead. [#665](https://github.com/holochain/holochain/pull/665)
-                    - BREAKING: `DnaSource(Path)` in conductor_api `RegisterDna` call now must point to `DnaBundle` as created by `hc dna pack` not a `DnaFile` created by `dna_util` [#665](https://github.com/holochain/holochain/pull/665)
+                    - BREAKING:  `InstallAppDnaPayload`
+                    - BREAKING: `DnaSource(Path)`
 
                     ## 0.0.1
 
@@ -230,10 +353,11 @@ pub(crate) fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
                 )
                 .to_string(),
             ),
+            .. Default::default()
         },
         MockProject {
             name: "crate_b".to_string(),
-            version: "0.0.1-alpha.1".to_string(),
+            version: "0.0.0-alpha.1".to_string(),
             dependencies: vec![],
             excluded: false,
             ty: workspace_mocker::MockProjectType::Lib,
@@ -248,11 +372,12 @@ pub(crate) fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
                 ### Changed
                 - `Signature` is a 64 byte 'secure primitive'
 
-                ## 0.0.1-alpha.1
+                ## 0.0.0-alpha.1
 
-                [Unreleased]: https://github.com/holochain/holochain/holochain_zome_types-v0.0.2-alpha.1...HEAD
+                [Unreleased]: https://duckduckgo.com/?q=version&t=hd&va=u
                 "#
             )),
+            .. Default::default()
         },
         MockProject {
             name: "crate_c".to_string(),
@@ -272,9 +397,13 @@ pub(crate) fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
                 ## [Unreleased]
                 Awesome changes!
 
+                ### Breaking
+                Breaking changes, be careful.
+
                 [Unreleased]: file:///dev/null
                 "#
             )),
+            .. Default::default()
         },
         MockProject {
             name: "crate_d".to_string(),
@@ -282,7 +411,7 @@ pub(crate) fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
             dependencies: vec![],
             excluded: true,
             ty: workspace_mocker::MockProjectType::Bin,
-            changelog: None,
+            .. Default::default()
         },
         MockProject {
             name: "crate_e".to_string(),
@@ -301,6 +430,7 @@ pub(crate) fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
                 [Unreleased]: file:///dev/null
                 "#
             )),
+            .. Default::default()
         },
         MockProject {
             name: "crate_f".to_string(),
@@ -313,12 +443,10 @@ pub(crate) fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
                     # Changelog
                     Hello. This crate is releasable.
 
-                    ## [Unreleased]
-                    Awesome changes!
-
-                    [Unreleased]: file:///dev/null
+                    ## Unreleased
                     "#
                 )),
+            .. Default::default()
         },
     ];
 
@@ -335,12 +463,21 @@ pub(crate) fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
         The text beneath this heading will be retained which allows adding overarching release notes.
 
         ## Something outdated maybe
-        This will be removed.
+        This will be removed by aggregation.
 
         ## [crate_a](crates/crate_a/CHANGELOG.md#unreleased)
         ### Added
 
-        - `InstallAppBundle` command added to admin conductor API. [#665](https://github.com/holochain/holochain/pull/665)
+        - `InstallAppBundle`
+
+        ## [crate_c](crates/crate_c/CHANGELOG.md#unreleased)
+        Awesome changes!
+
+        ### Breaking
+        Breaking changes, be careful.
+
+        ## [crate_f](crates/crate_f/CHANGELOG.md#unreleased)
+        This will be released in the future.
 
         # [20210304.120604]
         This will include the hdk-0.0.100 release.
@@ -355,9 +492,9 @@ pub(crate) fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
     )?;
 
     // todo: derive the tag from a function
-    workspace_mocker.tag("crate_a-v0.0.1");
+    workspace_mocker.tag("crate_a-0.0.1");
     workspace_mocker.add_or_replace_file(
-        "crates/crate_a/README",
+        "crates/crate_a/README.md",
         indoc::indoc! {r#"
             # Example
 
@@ -368,9 +505,9 @@ pub(crate) fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
     workspace_mocker.commit(None);
 
     // todo: derive the tag from a function
-    workspace_mocker.tag("crate_b-v0.0.1-alpha.1");
+    workspace_mocker.tag("crate_b-0.0.1-alpha.1");
     workspace_mocker.add_or_replace_file(
-        "crates/crate_b/README",
+        "crates/crate_b/README.md",
         indoc::indoc! {r#"
             # Example
 
@@ -381,7 +518,18 @@ pub(crate) fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
     workspace_mocker.commit(None);
 
     workspace_mocker.add_or_replace_file(
-        "crates/crate_e/README",
+        "crates/crate_e/README.md",
+        indoc::indoc! {r##"
+            # Example
+
+            Some changes
+            "##,
+        },
+    );
+    workspace_mocker.commit(None);
+
+    workspace_mocker.add_or_replace_file(
+        "crates/crate_f/README.md",
         indoc::indoc! {r#"
             # Example
 
@@ -391,15 +539,7 @@ pub(crate) fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
     );
     workspace_mocker.commit(None);
 
-    workspace_mocker.add_or_replace_file(
-        "crates/crate_f/README",
-        indoc::indoc! {r#"
-            # Example
-
-            Some changes
-            "#,
-        },
-    );
+    workspace_mocker.update_lockfile()?;
     workspace_mocker.commit(None);
 
     Ok(workspace_mocker)
@@ -419,7 +559,7 @@ pub(crate) fn example_workspace_2<'a>() -> Fallible<WorkspaceMocker> {
             ],
             excluded: false,
             ty: workspace_mocker::MockProjectType::Bin,
-            changelog: None,
+            ..Default::default()
         },
         MockProject {
             name: "crate_b".to_string(),
@@ -427,7 +567,7 @@ pub(crate) fn example_workspace_2<'a>() -> Fallible<WorkspaceMocker> {
             dependencies: vec![],
             excluded: false,
             ty: workspace_mocker::MockProjectType::Bin,
-            changelog: None,
+            ..Default::default()
         },
         MockProject {
             name: "crate_c".to_string(),
@@ -436,8 +576,9 @@ pub(crate) fn example_workspace_2<'a>() -> Fallible<WorkspaceMocker> {
                 r#"crate_b = { path = "../crate_b", version = "0.0.1" }"#.to_string()
             ],
             excluded: false,
-            ty: workspace_mocker::MockProjectType::Bin,
+            ty: workspace_mocker::MockProjectType::Lib,
             changelog: None,
+            ..Default::default()
         },
         MockProject {
             name: "crate_d".to_string(),
@@ -447,7 +588,7 @@ pub(crate) fn example_workspace_2<'a>() -> Fallible<WorkspaceMocker> {
             ],
             excluded: false,
             ty: workspace_mocker::MockProjectType::Bin,
-            changelog: None,
+            ..Default::default()
         },
     ];
 
@@ -463,7 +604,12 @@ pub(crate) fn example_workspace_3<'a>() -> Fallible<WorkspaceMocker> {
             name: "crate_a".to_string(),
             version: "0.0.1".to_string(),
             dependencies: vec![
-                r#"crate_b = { path = "../crate_b", version = "0.0.1" }"#.to_string()
+                r#"crate_b = { path = "../crate_b", version = "0.0.1", optional = true }"#
+                    .to_string(),
+            ],
+            dev_dependencies: vec![
+                r#"crate_b = { path = "../crate_b", version = "0.0.1", optional = false }"#
+                    .to_string(),
             ],
             excluded: false,
             ty: workspace_mocker::MockProjectType::Bin,
@@ -478,6 +624,7 @@ pub(crate) fn example_workspace_3<'a>() -> Fallible<WorkspaceMocker> {
                 [Unreleased]: file:///dev/null
                 "#
             )),
+            ..Default::default()
         },
         MockProject {
             name: "crate_b".to_string(),
@@ -502,10 +649,70 @@ pub(crate) fn example_workspace_3<'a>() -> Fallible<WorkspaceMocker> {
                 [Unreleased]: file:///dev/null
                 "#
             )),
+            ..Default::default()
         },
     ];
 
     let workspace_mocker = WorkspaceMocker::try_new(None, members)?;
+
+    Ok(workspace_mocker)
+}
+
+/// A workspace to test some release blockers
+pub(crate) fn example_workspace_4<'a>() -> Fallible<WorkspaceMocker> {
+    use crate::tests::workspace_mocker::{self, MockProject, WorkspaceMocker};
+
+    let members = vec![
+        MockProject {
+            name: "wildcard_dependency".to_string(),
+            version: "0.0.1".to_string(),
+            dependencies: vec![],
+            dev_dependencies: vec![r#"criterion = '*'"#.to_string()],
+            excluded: false,
+            ty: workspace_mocker::MockProjectType::Bin,
+            changelog: Some(indoc::formatdoc!(
+                r#"
+                # Changelog
+                "#
+            )),
+            ..Default::default()
+        },
+        MockProject {
+            name: "no_description".to_string(),
+            version: "0.0.1".to_string(),
+            dependencies: vec![],
+            excluded: false,
+            ty: workspace_mocker::MockProjectType::Bin,
+            changelog: Some(indoc::formatdoc!(
+                r#"
+                # Changelog
+                "#
+            )),
+            description: None,
+            ..Default::default()
+        },
+        MockProject {
+            name: "no_license".to_string(),
+            version: "0.0.1".to_string(),
+            dependencies: vec![],
+            excluded: false,
+            ty: workspace_mocker::MockProjectType::Bin,
+            changelog: Some(indoc::formatdoc!(
+                r#"
+                # Changelog
+                "#
+            )),
+            license: None,
+            ..Default::default()
+        },
+    ];
+
+    let workspace_mocker = WorkspaceMocker::try_new(
+        Some(indoc::indoc! {r#"
+        # Changelog
+        "#}),
+        members,
+    )?;
 
     Ok(workspace_mocker)
 }
@@ -518,7 +725,7 @@ mod tests {
     fn example() {
         let workspace_mocker = example_workspace_1().unwrap();
         workspace_mocker.add_or_replace_file(
-            "README",
+            "README.md",
             indoc::indoc! {r#"
             # Example
 

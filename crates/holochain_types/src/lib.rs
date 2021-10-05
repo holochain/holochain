@@ -17,11 +17,13 @@ pub mod activity;
 pub mod app;
 pub mod autonomic;
 pub mod chain;
+pub mod combinators;
 pub mod db;
 pub mod dht_op;
 pub mod dna;
 pub mod element;
 pub mod entry;
+pub mod env;
 pub mod fixt;
 pub mod header;
 pub mod link;
@@ -30,11 +32,9 @@ pub mod metadata;
 pub mod prelude;
 pub mod properties;
 pub mod signal;
-pub mod timestamp;
 pub mod validate;
+pub mod web_app;
 
-// #[cfg(test)]
 pub mod test_utils;
 
-pub use entry::EntryHashed;
-pub use timestamp::{Timestamp, TimestampKey};
+pub use holochain_zome_types::entry::EntryHashed;

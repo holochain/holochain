@@ -12,6 +12,8 @@ use holochain_wasm_test_utils::TestWasm;
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
 
+mod websocket;
+
 static TOKIO_RUNTIME: Lazy<Mutex<tokio::runtime::Runtime>> = Lazy::new(|| {
     Mutex::new(
         tokio::runtime::Builder::new_multi_thread()
@@ -67,7 +69,6 @@ pub fn wasm_call_n(c: &mut Criterion) {
         group.bench_function(BenchmarkId::from_parameter(n), |b| {
             // bytes
             let bytes = vec![0; n];
-
             let _g = TOKIO_RUNTIME.lock().unwrap().enter();
             let ha = HOST_ACCESS_FIXTURATOR.lock().unwrap().next().unwrap();
 
@@ -94,6 +95,6 @@ pub fn wasm_call_n(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, wasm_call_n,);
+criterion_group!(wasm, wasm_call_n);
 
-criterion_main!(benches);
+criterion_main!(wasm, websocket::websocket);

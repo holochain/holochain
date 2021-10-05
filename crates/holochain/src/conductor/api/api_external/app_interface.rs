@@ -26,12 +26,14 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
 
     /// Deal with error cases produced by `handle_app_request_inner`
     async fn handle_app_request(&self, request: AppRequest) -> AppResponse {
-        let res = self.handle_app_request_inner(request).await;
+        tracing::debug!("app request: {:?}", request);
 
-        match res {
+        let res = match self.handle_app_request_inner(request).await {
             Ok(response) => response,
             Err(e) => AppResponse::Error(e.into()),
-        }
+        };
+        tracing::debug!("app response: {:?}", res);
+        res
     }
 }
 
@@ -94,6 +96,12 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                         "Interface zome calls should never be routed to the network. This is a bug. Got {}",
                         e
                     ),
+                    Ok(ZomeCallResponse::CountersigningSession(e)) => Ok(AppResponse::Error(
+                        ExternalApiWireError::CountersigningSessionError(format!(
+                            "A countersigning session has failed to start on this zome call because: {}",
+                            e
+                        )),
+                    )),
                     Err(e) => Ok(AppResponse::Error(e.into())),
                 }
             }
@@ -114,7 +122,6 @@ impl InterfaceApi for RealAppInterfaceApi {
         {
             self.conductor_handle
                 .check_running()
-                .await
                 .map_err(Box::new)
                 .map_err(InterfaceError::RequestHandler)?;
         }

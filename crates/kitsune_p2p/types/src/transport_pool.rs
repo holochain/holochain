@@ -9,12 +9,14 @@ use ghost_actor::dependencies::tracing;
 use ghost_actor::GhostControlSender;
 use std::collections::HashMap;
 
+type SubListener = ghost_actor::GhostSender<TransportListener>;
+
 ghost_actor::ghost_chan! {
     /// Additional control functions for a transport pool
     pub chan TransportPool<TransportError> {
         /// Push a new sub-transport listener into the pool
         fn push_sub_transport(
-            sub_listener: ghost_actor::GhostSender<TransportListener>,
+            sub_listener: SubListener,
             sub_event: TransportEventReceiver,
         ) -> ();
     }
@@ -51,7 +53,7 @@ ghost_actor::ghost_chan! {
     chan InnerChan<TransportError> {
         fn inject_listener(
             scheme: String,
-            sub_listener: ghost_actor::GhostSender<TransportListener>,
+            sub_listener: SubListener,
         ) -> ();
     }
 }

@@ -3,8 +3,6 @@ use holochain_zome_types::zome::FunctionName;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub(crate) struct WireDhtOpData {
-    pub from_agent: holo_hash::AgentPubKey,
-    pub dht_hash: holo_hash::AnyDhtHash,
     pub op_data: holochain_types::dht_op::DhtOp,
 }
 
@@ -31,6 +29,7 @@ pub(crate) enum WireMessage {
     },
     Publish {
         request_validation_receipt: bool,
+        countersigning_session: bool,
         dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     },
@@ -47,7 +46,7 @@ pub(crate) enum WireMessage {
         options: event::GetMetaOptions,
     },
     GetLinks {
-        link_key: WireLinkMetaKey,
+        link_key: WireLinkKey,
         options: event::GetLinksOptions,
     },
     GetAgentActivity {
@@ -57,6 +56,9 @@ pub(crate) enum WireMessage {
     },
     GetValidationPackage {
         header_hash: HeaderHash,
+    },
+    CountersigningAuthorityResponse {
+        signed_headers: Vec<SignedHeader>,
     },
 }
 
@@ -85,11 +87,13 @@ impl WireMessage {
 
     pub fn publish(
         request_validation_receipt: bool,
+        countersigning_session: bool,
         dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> WireMessage {
         Self::Publish {
             request_validation_receipt,
+            countersigning_session,
             dht_hash,
             ops,
         }
@@ -112,7 +116,7 @@ impl WireMessage {
         Self::GetMeta { dht_hash, options }
     }
 
-    pub fn get_links(link_key: WireLinkMetaKey, options: event::GetLinksOptions) -> WireMessage {
+    pub fn get_links(link_key: WireLinkKey, options: event::GetLinksOptions) -> WireMessage {
         Self::GetLinks { link_key, options }
     }
 
@@ -129,5 +133,9 @@ impl WireMessage {
     }
     pub fn get_validation_package(header_hash: HeaderHash) -> WireMessage {
         Self::GetValidationPackage { header_hash }
+    }
+
+    pub fn countersigning_authority_response(signed_headers: Vec<SignedHeader>) -> WireMessage {
+        Self::CountersigningAuthorityResponse { signed_headers }
     }
 }

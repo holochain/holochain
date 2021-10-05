@@ -1,4 +1,13 @@
-{ nixpkgs ? null }:
+{ nixpkgs ? null
+, rustVersion ? {
+    track = "stable";
+    version = "1.53.0";
+  }
+
+, holonixArgs ? {
+    inherit rustVersion;
+  }
+}:
 
 # This is an example of what downstream consumers of holonix should do
 # This is also used to dogfood as many commands as possible for holonix
@@ -10,7 +19,7 @@ let
 
   # START HOLONIX IMPORT BOILERPLATE
   holonixPath = config.holonix.pathFn {};
-  holonix = config.holonix.importFn {};
+  holonix = config.holonix.importFn holonixArgs;
   # END HOLONIX IMPORT BOILERPLATE
 
   overlays = [
@@ -23,6 +32,8 @@ let
         if [[ -n "$NIX_ENV_PREFIX" ]]; then
           # don't touch it
           :
+        elif test -w "$PWD"; then
+          export NIX_ENV_PREFIX="$PWD"
         elif test -d "${builtins.toString self.hcToplevelDir}" &&
             test -w "${builtins.toString self.hcToplevelDir}"; then
           export NIX_ENV_PREFIX="${builtins.toString self.hcToplevelDir}"
@@ -33,8 +44,6 @@ let
           export NIX_ENV_PREFIX="$(${self.coreutils}/bin/mktemp -d)"
         fi
       '';
-
-      inherit (holonix.pkgs.callPackage ./nix/rust.nix { }) hcRustPlatform;
     })
   ];
 

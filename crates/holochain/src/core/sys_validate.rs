@@ -6,23 +6,18 @@ use super::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
 use super::workflow::sys_validation_workflow::SysValidationWorkspace;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::entry_def_store::get_entry_def;
-use fallible_iterator::FallibleIterator;
 use holochain_keystore::AgentPubKeyExt;
-use holochain_lmdb::env::EnvironmentWrite;
-use holochain_lmdb::error::DatabaseResult;
-use holochain_lmdb::fresh_reader;
 use holochain_p2p::HolochainP2pCell;
-use holochain_state::metadata::ChainItemKey;
-use holochain_state::metadata::MetadataBufT;
 use holochain_types::prelude::*;
+use holochain_zome_types::countersigning::CounterSigningSessionData;
 use std::convert::TryInto;
 
 pub(super) use error::*;
 pub use holo_hash::*;
 pub use holochain_state::source_chain::SourceChainError;
 pub use holochain_state::source_chain::SourceChainResult;
-pub use holochain_types::Timestamp;
 pub use holochain_zome_types::HeaderHashed;
+pub use holochain_zome_types::Timestamp;
 
 #[allow(missing_docs)]
 mod error;
@@ -33,28 +28,120 @@ mod tests;
 /// Consider splitting large entries up.
 pub const MAX_ENTRY_SIZE: usize = 16_000_000;
 
-/// 400b limit on LinkTags.
+/// 1kb limit on LinkTags.
 /// Tags are used as keys to the database to allow
-/// fast lookup so they need to be small.
-pub const MAX_TAG_SIZE: usize = 400;
+/// fast lookup so they should be small.
+pub const MAX_TAG_SIZE: usize = 1000;
 
 /// Verify the signature for this header
-pub async fn verify_header_signature(
-    sig: &Signature,
-    header: &Header,
-) -> SysValidationResult<bool> {
+pub async fn verify_header_signature(sig: &Signature, header: &Header) -> SysValidationResult<()> {
     if header.author().verify_signature(sig, header).await? {
-        Ok(true)
+        Ok(())
     } else {
-        Ok(false)
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::Counterfeit((*sig).clone(), (*header).clone()),
+        ))
     }
 }
 
 /// Verify the author key was valid at the time
 /// of signing with dpki
 /// TODO: This is just a stub until we have dpki.
-pub async fn author_key_is_valid(_author: &AgentPubKey) -> SysValidationResult<bool> {
-    Ok(true)
+pub async fn author_key_is_valid(_author: &AgentPubKey) -> SysValidationResult<()> {
+    Ok(())
+}
+
+/// Verify the countersigning session contains the specified header.
+pub fn check_countersigning_session_data_contains_header(
+    entry_hash: EntryHash,
+    session_data: &CounterSigningSessionData,
+    header: NewEntryHeaderRef<'_>,
+) -> SysValidationResult<()> {
+    let header_is_in_session = session_data
+        .build_header_set(entry_hash)
+        .map_err(SysValidationError::from)?
+        .iter()
+        .any(|session_header| match (&header, session_header) {
+            (NewEntryHeaderRef::Create(create), Header::Create(session_create)) => {
+                create == &session_create
+            }
+            (NewEntryHeaderRef::Update(update), Header::Update(session_update)) => {
+                update == &session_update
+            }
+            _ => false,
+        });
+    if !header_is_in_session {
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::HeaderNotInCounterSigningSession(
+                session_data.to_owned(),
+                header.to_new_entry_header(),
+            ),
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+/// Verify that the signature on a preflight request is valid.
+pub async fn check_countersigning_preflight_response_signature(
+    preflight_response: &PreflightResponse,
+) -> SysValidationResult<()> {
+    let signature_is_valid = preflight_response
+        .request()
+        .signing_agents()
+        .get(*preflight_response.agent_state().agent_index() as usize)
+        .ok_or_else(|| {
+            SysValidationError::ValidationOutcome(ValidationOutcome::PreflightResponseSignature(
+                (*preflight_response).clone(),
+            ))
+        })?
+        .0
+        .verify_signature_raw(
+            preflight_response.signature(),
+            &preflight_response.encode_for_signature().map_err(|_| {
+                SysValidationError::ValidationOutcome(
+                    ValidationOutcome::PreflightResponseSignature((*preflight_response).clone()),
+                )
+            })?,
+        )
+        .await?;
+    if signature_is_valid {
+        Ok(())
+    } else {
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::PreflightResponseSignature((*preflight_response).clone()),
+        ))
+    }
+}
+
+/// Verify all the countersigning session data together.
+pub async fn check_countersigning_session_data(
+    entry_hash: EntryHash,
+    session_data: &CounterSigningSessionData,
+    header: NewEntryHeaderRef<'_>,
+) -> SysValidationResult<()> {
+    session_data.check_integrity()?;
+    check_countersigning_session_data_contains_header(entry_hash, session_data, header)?;
+
+    let tasks: Vec<_> = session_data
+        .responses()
+        .iter()
+        .map(|(response, signature)| async move {
+            let preflight_response = PreflightResponse::try_new(
+                session_data.preflight_request().clone(),
+                response.clone(),
+                signature.clone(),
+            )?;
+            check_countersigning_preflight_response_signature(&preflight_response).await
+        })
+        .collect();
+
+    let results: Vec<SysValidationResult<()>> = futures::future::join_all(tasks).await;
+    let results: SysValidationResult<()> = results.into_iter().collect();
+    match results {
+        Ok(_) => Ok(()),
+        Err(e) => Err(e),
+    }
 }
 
 /// Check that previous header makes sense
@@ -81,69 +168,41 @@ pub fn check_prev_header(header: &Header) -> SysValidationResult<()> {
 /// Check that Dna headers are only added to empty source chains
 pub async fn check_valid_if_dna(
     header: &Header,
-    meta_vault: &impl MetadataBufT,
+    workspace: &SysValidationWorkspace,
 ) -> SysValidationResult<()> {
-    fresh_reader!(meta_vault.env(), |r| {
-        match header {
-            Header::Dna(_) => meta_vault
-                .get_activity(&r, ChainItemKey::Agent(header.author().clone()))?
-                .next()?
-                .map_or(Ok(()), |_| {
-                    Err(PrevHeaderError::InvalidRoot).map_err(|e| ValidationOutcome::from(e).into())
-                }),
-            _ => Ok(()),
+    match header {
+        Header::Dna(_) => {
+            if workspace.is_chain_empty(header.author())? {
+                Ok(())
+            } else {
+                Err(PrevHeaderError::InvalidRoot).map_err(|e| ValidationOutcome::from(e).into())
+            }
         }
-    })
+        _ => Ok(()),
+    }
 }
 
-// TODO: I think this can be removed now as rollbacks are detected when inserting
-// metadata into the metadata buf.
 /// Check if there are other headers at this
 /// sequence number
 pub async fn check_chain_rollback(
     header: &Header,
     workspace: &SysValidationWorkspace,
 ) -> SysValidationResult<()> {
-    let header_hash = HeaderHash::with_data_sync(header);
-    let k = ChainItemKey::AgentStatusSequence(
-        header.author().clone(),
-        ValidationStatus::Valid,
-        header.header_seq(),
-    );
-    let env = workspace.meta_vault.env();
-    // Check there are no conflicting chain items
-    // at any valid or potentially valid stores.
-    let count = fresh_reader!(env, |r| {
-        let vault_count = workspace
-            .meta_vault
-            .get_activity(&r, k.clone())?
-            .filter(|thh| Ok(thh.header_hash != header_hash))
-            .count()?;
-        let pending_count = workspace
-            .meta_pending
-            .get_activity(&r, k.clone())?
-            .filter(|thh| Ok(thh.header_hash != header_hash))
-            .count()?;
-        DatabaseResult::Ok(vault_count + pending_count)
-    })?;
+    let empty = workspace.header_seq_is_empty(header)?;
 
     // Ok or log warning
-    if count == 0 {
-        return Ok(());
+    if empty {
+        Ok(())
     } else {
-        let s = tracing::warn_span!("agent_activity");
-        let _g = s.enter();
         // TODO: implement real rollback detection once we know what that looks like
         tracing::error!(
-            "Chain rollback detected at position {} for agent {:?} from header {:?}
-            There were {} headers at this position",
+            "Chain rollback detected at position {} for agent {:?} from header {:?}",
             header.header_seq(),
             header.author(),
             header,
-            count,
         );
+        Ok(())
     }
-    Ok(())
 }
 
 /// Placeholder for future spam check.
@@ -161,7 +220,7 @@ pub fn check_prev_timestamp(header: &Header, prev_header: &Header) -> SysValidat
     }
 }
 
-/// Check the previous header is one less then the current
+/// Check the previous header is one less than the current
 pub fn check_prev_seq(header: &Header, prev_header: &Header) -> SysValidationResult<()> {
     let header_seq = header.header_seq();
     let prev_seq = prev_header.header_seq();
@@ -178,6 +237,7 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
     match (entry_type, entry) {
         (EntryType::AgentPubKey, Entry::Agent(_)) => Ok(()),
         (EntryType::App(_), Entry::App(_)) => Ok(()),
+        (EntryType::App(_), Entry::CounterSign(_, _)) => Ok(()),
         (EntryType::CapClaim, Entry::CapClaim(_)) => Ok(()),
         (EntryType::CapGrant, Entry::CapGrant(_)) => Ok(()),
         _ => Err(ValidationOutcome::EntryType.into()),
@@ -193,7 +253,7 @@ pub async fn check_app_entry_type(
     let zome_index = u8::from(entry_type.zome_id()) as usize;
     // We want to be careful about holding locks open to the conductor api
     // so calls are made in blocks
-    let dna_file = conductor_api.get_this_dna().await.map_err(Box::new)?;
+    let dna_file = conductor_api.get_this_dna().map_err(Box::new)?;
 
     // Check if the zome is found
     let zome = dna_file
@@ -441,9 +501,9 @@ where
 /// incoming_dht_ops_workflow if you
 /// found it on the network and were supposed
 /// to be holding it.
-#[derive(derive_more::Constructor)]
+#[derive(derive_more::Constructor, Clone)]
 pub struct IncomingDhtOpSender {
-    env: EnvironmentWrite,
+    env: EnvWrite,
     sys_validation_trigger: TriggerSender,
 }
 
@@ -456,7 +516,7 @@ impl IncomingDhtOpSender {
     ) -> SysValidationResult<()> {
         if let Some(op) = make_op(element) {
             let ops = vec![op];
-            incoming_dht_ops_workflow(&self.env, self.sys_validation_trigger, ops, None, false)
+            incoming_dht_ops_workflow(&self.env, None, self.sys_validation_trigger, ops, false)
                 .await
                 .map_err(Box::new)?;
         }
@@ -515,7 +575,7 @@ async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
         return Ok(Source::Local(el));
     }
     // Create a workspace with just the network
-    let mut network_only_cascade = workspace.network_only_cascade(network);
+    let mut network_only_cascade = workspace.full_cascade(network);
     match network_only_cascade
         .retrieve(hash.clone(), Default::default())
         .await?
@@ -550,7 +610,7 @@ fn make_store_element(element: Element) -> Option<(DhtOpHash, DhtOp)> {
 
     // Create the hash and op
     let op = DhtOp::StoreElement(signature, header, maybe_entry_box);
-    let hash = DhtOpHash::with_data_sync(&op);
+    let hash = op.to_hash();
     Some((hash, op))
 }
 
@@ -573,7 +633,7 @@ fn make_store_entry(element: Element) -> Option<(DhtOpHash, DhtOp)> {
 
     // Create the hash and op
     let op = DhtOp::StoreEntry(signature, header, entry_box);
-    let hash = DhtOpHash::with_data_sync(&op);
+    let hash = op.to_hash();
     Some((hash, op))
 }
 
@@ -593,7 +653,7 @@ fn make_register_add_link(element: Element) -> Option<(DhtOpHash, DhtOp)> {
 
     // Create the hash and op
     let op = DhtOp::RegisterAddLink(signature, header);
-    let hash = DhtOpHash::with_data_sync(&op);
+    let hash = op.to_hash();
     Some((hash, op))
 }
 
@@ -613,6 +673,55 @@ fn make_register_agent_activity(element: Element) -> Option<(DhtOpHash, DhtOp)> 
 
     // Create the hash and op
     let op = DhtOp::RegisterAgentActivity(signature, header);
-    let hash = DhtOpHash::with_data_sync(&op);
+    let hash = op.to_hash();
     Some((hash, op))
+}
+
+#[cfg(test)]
+pub mod test {
+    use super::check_countersigning_preflight_response_signature;
+    use crate::core::sys_validate::error::SysValidationError;
+    use crate::core::ValidationOutcome;
+    use arbitrary::Arbitrary;
+    use fixt::fixt;
+    use fixt::Predictable;
+    use hdk::prelude::AgentPubKeyFixturator;
+    use holochain_keystore::AgentPubKeyExt;
+    use holochain_state::test_utils::test_keystore;
+    use holochain_zome_types::countersigning::PreflightResponse;
+    use matches::assert_matches;
+
+    #[tokio::test(flavor = "multi_thread")]
+    pub async fn test_check_countersigning_preflight_response_signature() {
+        let keystore = test_keystore();
+        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
+        let mut preflight_response = PreflightResponse::arbitrary(&mut u).unwrap();
+        assert_matches!(
+            check_countersigning_preflight_response_signature(&preflight_response).await,
+            Err(SysValidationError::ValidationOutcome(
+                ValidationOutcome::PreflightResponseSignature(_)
+            ))
+        );
+
+        let alice = fixt!(AgentPubKey, Predictable);
+        let bob = fixt!(AgentPubKey, Predictable, 1);
+
+        (*preflight_response.request_mut().signing_agents_mut()).push((alice.clone(), vec![]));
+        (*preflight_response.request_mut().signing_agents_mut()).push((bob, vec![]));
+
+        *preflight_response.signature_mut() = alice
+            .sign_raw(
+                &keystore,
+                &preflight_response.encode_for_signature().unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            check_countersigning_preflight_response_signature(&preflight_response)
+                .await
+                .unwrap(),
+            (),
+        );
+    }
 }

@@ -8,12 +8,12 @@ use holochain_zome_types::signature::{Sign, Signature};
 use holochain_zome_types::x_salsa20_poly1305::{
     X25519XSalsa20Poly1305Decrypt, X25519XSalsa20Poly1305Encrypt,
 };
-use lair_keystore_api::actor::{
+use legacy_lair_api::actor::{
     Cert, CertDigest, CertPrivKey, LairClientApiSender, LairEntryType, TlsCertOptions,
 };
 
 /// GhostSender type for the KeystoreApi
-pub type KeystoreSender = ghost_actor::GhostSender<lair_keystore_api::actor::LairClientApi>;
+pub type KeystoreSender = ghost_actor::GhostSender<legacy_lair_api::actor::LairClientApi>;
 
 /// Result type for legacy API calls.
 pub type KeystoreApiResult<T> = Result<T, KeystoreError>;
@@ -81,7 +81,9 @@ impl KeystoreSenderExt for KeystoreSender {
             <Vec<u8>>::from(UnsafeBytes::from(input.data.to_vec())).into(),
         );
         async move {
+            tracing::trace!("signing request start");
             let res = fut.await?;
+            tracing::trace!("signing request end");
             Ok(Signature::try_from(res.to_vec().as_ref())?)
         }
         .boxed()
@@ -114,7 +116,7 @@ impl KeystoreSenderExt for KeystoreSender {
             }
 
             let mut tls_opt = TlsCertOptions::default();
-            tls_opt.alg = lair_keystore_api::actor::TlsCertAlg::PkcsEcdsaP256Sha256;
+            tls_opt.alg = legacy_lair_api::actor::TlsCertAlg::PkcsEcdsaP256Sha256;
             let _ = this.tls_cert_new_self_signed_from_entropy(tls_opt).await?;
 
             this.get_first_tls_cert().await
@@ -149,7 +151,7 @@ impl KeystoreSenderExt for KeystoreSender {
                     .try_into()?,
                 input.as_recipient_ref().as_ref()
                     .try_into()?,
-                std::sync::Arc::new(lair_keystore_api::internal::crypto_box::CryptoBoxData {
+                std::sync::Arc::new(legacy_lair_api::internal::crypto_box::CryptoBoxData {
                     data: std::sync::Arc::new(input.as_data_ref().as_ref().to_owned())
                 })
             );
@@ -175,7 +177,7 @@ impl KeystoreSenderExt for KeystoreSender {
                 input.as_recipient_ref().as_ref().try_into()?,
                 input.as_sender_ref().as_ref().try_into()?,
                 std::sync::Arc::new(
-                    lair_keystore_api::internal::crypto_box::CryptoBoxEncryptedData {
+                    legacy_lair_api::internal::crypto_box::CryptoBoxEncryptedData {
                         nonce: AsRef::<[u8]>::as_ref(&input.as_encrypted_data_ref().as_nonce_ref())
                             .try_into()?,
                         encrypted_data: std::sync::Arc::new(

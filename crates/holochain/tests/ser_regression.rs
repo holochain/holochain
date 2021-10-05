@@ -11,13 +11,12 @@ use holochain::conductor::api::ZomeCall;
 use holochain::conductor::ConductorBuilder;
 use holochain::conductor::ConductorHandle;
 
-use holochain_lmdb::test_utils::test_environments;
+use holochain_state::prelude::test_environments;
+use holochain_state::prelude::TestEnvs;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 pub use holochain_zome_types::capability::CapSecret;
 use observability;
-use std::sync::Arc;
-use tempdir::TempDir;
 
 #[derive(Serialize, Deserialize, SerializedBytes, Debug)]
 struct CreateMessageInput {
@@ -173,18 +172,18 @@ async fn ser_regression_test() {
         _ => unreachable!(),
     };
 
-    let shutdown = handle.take_shutdown_handle().await.unwrap();
-    handle.shutdown().await;
+    let shutdown = handle.take_shutdown_handle().unwrap();
+    handle.shutdown();
     shutdown.await.unwrap().unwrap();
 }
 
 pub async fn setup_app(
     cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
     dna_store: MockDnaStore,
-) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
+) -> (TestEnvs, RealAppInterfaceApi, ConductorHandle) {
     let envs = test_environments();
     let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-        .test(&envs)
+        .test(&envs, &[])
         .await
         .unwrap();
 
@@ -195,18 +194,23 @@ pub async fn setup_app(
         .unwrap();
 
     conductor_handle
-        .activate_app("test app".to_string())
+        .clone()
+        .enable_app("test app".to_string())
         .await
         .unwrap();
 
-    let errors = conductor_handle.clone().setup_cells().await.unwrap();
+    let errors = conductor_handle
+        .clone()
+        .reconcile_cell_status_with_app_status()
+        .await
+        .unwrap();
 
     assert!(errors.is_empty());
 
     let handle = conductor_handle.clone();
 
     (
-        envs.tempdir(),
+        envs,
         RealAppInterfaceApi::new(conductor_handle, Default::default()),
         handle,
     )

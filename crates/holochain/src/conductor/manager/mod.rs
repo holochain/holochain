@@ -8,8 +8,6 @@
 mod error;
 pub use error::*;
 
-use crate::conductor::error::ConductorError;
-use crate::core::workflow::error::WorkflowError;
 use futures::stream::FuturesUnordered;
 use holochain_types::prelude::*;
 use std::future::Future;
@@ -116,13 +114,12 @@ pub enum TaskOutcome {
     /// Log an info trace and take no other action.
     LogInfo(String),
     /// Log an error and take no other action.
-    MinorError(ManagedTaskError, String),
+    MinorError(Box<ManagedTaskError>, String),
     /// Close the conductor down because this is an unrecoverable error.
     ShutdownConductor(Box<ManagedTaskError>, String),
-    /// Remove the App which caused the panic, but let all other apps remain.
-    UninstallApp(CellId, Box<ManagedTaskError>, String),
-    /// Deactivate all apps which contain the problematic Cell.
-    DeactivateApps(CellId, Box<ManagedTaskError>, String),
+    /// Either pause or disable all apps which contain the problematic Cell,
+    /// depending upon the specific error.
+    StopApps(CellId, Box<ManagedTaskError>, String),
 }
 
 struct TaskManager {
@@ -195,33 +192,43 @@ async fn run(
                     error!("Shutting down conductor due to unrecoverable error: {:?}\nContext: {}", error, context);
                     return Err(TaskManagerError::Unrecoverable(error));
                 },
-                Some(TaskOutcome::UninstallApp(cell_id, error, context)) => {
-                    tracing::error!("About to uninstall apps");
-                    let app_ids = conductor.list_active_apps_for_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
-                    tracing::error!(
-                        "UNINSTALLING the following apps due to an unrecoverable error during genesis: {:?}\nError: {:?}\nContext: {}",
-                        app_ids,
-                        error,
-                        context
-                    );
-                    for app_id in app_ids.iter() {
-                        conductor.uninstall_app(app_id).await.map_err(TaskManagerError::internal)?;
+                Some(TaskOutcome::StopApps(cell_id, error, context)) => {
+                    tracing::error!("About to automatically stop apps");
+                    let app_ids = conductor.list_running_apps_for_required_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
+                    if error.is_recoverable() {
+                        conductor.remove_cells(&[cell_id]).await;
+
+                        // The following message assumes that only the app_ids calculated will be paused, but other apps
+                        // may have been paused as well.
+                        tracing::error!(
+                            "PAUSING the following apps due to a recoverable error: {:?}\nError: {:?}\nContext: {}",
+                            app_ids,
+                            error,
+                            context
+                        );
+
+                        // TODO: it could be helpful to modify this function so that when providing Some(app_ids),
+                        //   you can also pass in a PausedAppReason override, so that the reason for the apps being paused
+                        //   can be set to the specific error message encountered here, rather than having to read it from
+                        //   the logs.
+                        let delta = conductor.reconcile_app_status_with_cell_status(None).await.map_err(TaskManagerError::internal)?;
+                        tracing::debug!(delta = ?delta);
+
+                        tracing::error!("Apps paused.");
+                    } else {
+                        // Since the error is unrecoverable, we don't expect to be able to use this Cell anymore.
+                        // Therefore, we disable every app which requires that cell.
+                        tracing::error!(
+                            "DISABLING the following apps due to an unrecoverable error: {:?}\nError: {:?}\nContext: {}",
+                            app_ids,
+                            error,
+                            context
+                        );
+                        for app_id in app_ids.iter() {
+                            conductor.clone().disable_app(app_id.to_string(), DisabledAppReason::Error(error.to_string())).await.map_err(TaskManagerError::internal)?;
+                        }
+                        tracing::error!("Apps disabled.");
                     }
-                    tracing::error!("Apps uninstalled.");
-                },
-                Some(TaskOutcome::DeactivateApps(cell_id, error, context)) => {
-                    tracing::error!("About to deactivate apps");
-                    let app_ids = conductor.list_active_apps_for_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
-                    tracing::error!(
-                        "DEACTIVATING the following apps due to an unrecoverable error: {:?}\nError: {:?}\nContext: {}",
-                        app_ids,
-                        error,
-                        context
-                    );
-                    for app_id in app_ids.iter() {
-                        conductor.deactivate_app(app_id.to_string(), DeactivationReason::Quarantined { error: error.to_string() } ).await.map_err(TaskManagerError::internal)?;
-                    }
-                    tracing::error!("Apps quarantined via deactivation.");
                 },
                 None => return Ok(()),
             }}
@@ -235,7 +242,7 @@ fn handle_completed_task(kind: &TaskKind, result: ManagedTaskResult, name: Strin
     match kind {
         TaskKind::Ignore => match result {
             Ok(_) => LogInfo(name),
-            Err(err) => MinorError(err, name),
+            Err(err) => MinorError(Box::new(err), name),
         },
         TaskKind::Unrecoverable => match result {
             Ok(_) => LogInfo(name),
@@ -243,34 +250,7 @@ fn handle_completed_task(kind: &TaskKind, result: ManagedTaskResult, name: Strin
         },
         TaskKind::CellCritical(cell_id) => match result {
             Ok(_) => LogInfo(name),
-            Err(err) => match &err {
-                ManagedTaskError::Conductor(conductor_err) => match conductor_err {
-                    // If the error was due to validation failure during genesis,
-                    // just uninstall the app.
-                    ConductorError::WorkflowError(WorkflowError::GenesisFailure(_))
-                    | ConductorError::GenesisFailed { .. } => {
-                        UninstallApp(cell_id.to_owned(), Box::new(err), name)
-                    }
-
-                    // For all other errors, deactivate the offending app
-                    // TODO: revisit this and handle in a more fine-grained way.
-                    _ => DeactivateApps(cell_id.to_owned(), Box::new(err), name),
-                },
-                // If the task panicked, deactivate the app.
-                // TODO: ideally, we could differentiate between the case of
-                //   pre- and post-genesis failure, using UninstallApp for
-                //   the former and DeactivateApps for the latter. However,
-                //   there is no easy way to do this, so we simply deactivate
-                //   in both cases, so we don't lose data.
-                //   I think B-04188 would make this distinction possible.
-                ManagedTaskError::Join(_) => {
-                    DeactivateApps(cell_id.to_owned(), Box::new(err), name)
-                }
-
-                // For all others, deactivate the offending app
-                // TODO: revisit this and handle in a more fine-grained way.
-                _ => DeactivateApps(cell_id.to_owned(), Box::new(err), name),
-            },
+            Err(err) => StopApps(cell_id.to_owned(), Box::new(err), name),
         },
         TaskKind::Generic(f) => f(result),
     }
@@ -388,6 +368,7 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[should_panic]
+    #[ignore = "panics in tokio break other tests"]
     async fn unrecoverable_error() {
         observability::test_run().ok();
         let (_tx, rx) = tokio::sync::broadcast::channel(1);
@@ -417,6 +398,7 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[should_panic]
+    #[ignore = "panics in tokio break other tests"]
     async fn unrecoverable_panic() {
         observability::test_run().ok();
         let (_tx, rx) = tokio::sync::broadcast::channel(1);

@@ -4,20 +4,26 @@ use holochain_keystore::keystore_actor::KeystoreSenderExt;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
+use crate::core::ribosome::HostFnAccess;
 
 pub fn x_25519_x_salsa20_poly1305_encrypt(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: X25519XSalsa20Poly1305Encrypt,
 ) -> Result<XSalsa20Poly1305EncryptedData, WasmError> {
-    tokio_helper::block_forever_on(async move {
-        call_context
-            .host_access
-            .keystore()
-            .x_25519_x_salsa20_poly1305_encrypt(input)
-            .await
-    })
-    .map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))
+    match HostFnAccess::from(&call_context.host_context()) {
+        HostFnAccess{ keystore: Permission::Allow, .. } => {
+            tokio_helper::block_forever_on(async move {
+                call_context
+                    .host_context
+                    .keystore()
+                    .x_25519_x_salsa20_poly1305_encrypt(input)
+                    .await
+            })
+            .map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))
+        },
+        _ => unreachable!(),
+    }
 }
 
 #[cfg(test)]
@@ -27,28 +33,18 @@ pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use hdk::prelude::*;
+    // use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn invoke_import_x_25519_x_salsa20_poly1305_encrypt_test() {
-        let test_env = holochain_lmdb::test_utils::test_cell_env();
-        let env = test_env.env();
-        let mut workspace =
-            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
-            .await
-            .unwrap();
-
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
-
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock;
+        let host_access = fixt!(ZomeCallHostAccess, Predictable);
         let alice: X25519PubKey = crate::call_test_ribosome!(
             host_access,
             TestWasm::XSalsa20Poly1305,
             "create_x25519_keypair",
             ()
-        );
+        ).unwrap();
         assert_eq!(
             &alice.as_ref(),
             &[
@@ -61,7 +57,7 @@ pub mod wasm_test {
             TestWasm::XSalsa20Poly1305,
             "create_x25519_keypair",
             ()
-        );
+        ).unwrap();
         assert_eq!(
             &bob.as_ref(),
             &[
@@ -74,7 +70,7 @@ pub mod wasm_test {
             TestWasm::XSalsa20Poly1305,
             "create_x25519_keypair",
             ()
-        );
+        ).unwrap();
         assert_eq!(
             &carol.as_ref(),
             &[
@@ -93,7 +89,7 @@ pub mod wasm_test {
             TestWasm::XSalsa20Poly1305,
             "x_25519_x_salsa20_poly1305_encrypt",
             encrypt_input
-        );
+        ).unwrap();
 
         let decrypt_input =
             holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt::new(
@@ -107,7 +103,7 @@ pub mod wasm_test {
             TestWasm::XSalsa20Poly1305,
             "x_25519_x_salsa20_poly1305_decrypt",
             decrypt_input
-        );
+        ).unwrap();
 
         assert_eq!(decrypt_output, Some(data.clone()),);
 
@@ -122,7 +118,7 @@ pub mod wasm_test {
             TestWasm::XSalsa20Poly1305,
             "x_25519_x_salsa20_poly1305_decrypt",
             bad_decrypt_input
-        );
+        ).unwrap();
 
         assert_eq!(bad_decrypt_output, None,);
     }

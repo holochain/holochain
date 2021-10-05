@@ -8,11 +8,12 @@ use crate::core::workflow::error::WorkflowError;
 use crate::from_sub_error;
 use holo_hash::AnyDhtHash;
 use holo_hash::HeaderHash;
-use holochain_cascade::error::CascadeError;
 use holochain_keystore::KeystoreError;
-use holochain_lmdb::error::DatabaseError;
+use holochain_sqlite::error::DatabaseError;
 use holochain_state::workspace::WorkspaceError;
 use holochain_types::prelude::*;
+use holochain_zome_types::countersigning::CounterSigningError;
+use holochain_zome_types::countersigning::CounterSigningSessionData;
 use thiserror::Error;
 
 /// Validation can result in either
@@ -26,7 +27,7 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum SysValidationError {
     #[error(transparent)]
-    CascadeError(#[from] CascadeError),
+    CascadeError(#[from] holochain_cascade::error::CascadeError),
     #[error(transparent)]
     DatabaseError(#[from] DatabaseError),
     #[error(transparent)]
@@ -46,6 +47,14 @@ pub enum SysValidationError {
     WorkspaceError(#[from] WorkspaceError),
     #[error(transparent)]
     ConductorApiError(#[from] Box<ConductorApiError>),
+}
+
+impl From<CounterSigningError> for SysValidationError {
+    fn from(counter_signing_error: CounterSigningError) -> Self {
+        SysValidationError::ValidationOutcome(ValidationOutcome::CounterSigningError(
+            counter_signing_error,
+        ))
+    }
 }
 
 #[deprecated = "This will be replaced with SysValidationOutcome as we shouldn't treat outcomes as errors"]
@@ -88,6 +97,10 @@ impl<E> TryFrom<OutcomeOrError<ValidationOutcome, E>> for ValidationOutcome {
 pub enum ValidationOutcome {
     #[error("The element with signature {0:?} and header {1:?} was found to be counterfeit")]
     Counterfeit(Signature, Header),
+    #[error("The header {1:?} is not found in the countersigning session data {0:?}")]
+    HeaderNotInCounterSigningSession(CounterSigningSessionData, NewEntryHeader),
+    #[error(transparent)]
+    CounterSigningError(#[from] CounterSigningError),
     #[error("The dependency {0:?} was not found on the DHT")]
     DepMissingFromDht(AnyDhtHash),
     #[error("The app entry type {0:?} entry def id was out of range")]
@@ -108,6 +121,8 @@ pub enum ValidationOutcome {
     NotNewEntry(Header),
     #[error("The dependency {0:?} is not held")]
     NotHoldingDep(AnyDhtHash),
+    #[error("The PreflightResponse signature was not valid {0:?}")]
+    PreflightResponseSignature(PreflightResponse),
     #[error(transparent)]
     PrevHeaderError(#[from] PrevHeaderError),
     #[error("StoreEntry should not be gossiped for private entries")]
@@ -139,7 +154,7 @@ impl ValidationOutcome {
 pub enum PrevHeaderError {
     #[error("Root of source chain must be Dna")]
     InvalidRoot,
-    #[error("Previous header sequence number {1} is not {0} - 1")]
+    #[error("Previous header sequence number {1} != ({0} - 1)")]
     InvalidSeq(u32, u32),
     #[error("Previous header was missing from the metadata store")]
     MissingMeta(HeaderHash),

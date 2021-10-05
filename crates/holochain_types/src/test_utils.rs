@@ -1,10 +1,9 @@
 //! Some common testing helpers.
 
+use crate::dna::wasm::DnaWasm;
 use crate::element::SignedHeaderHashedExt;
 use crate::fixt::*;
 use crate::prelude::*;
-use crate::timestamp;
-use crate::{dna::wasm::DnaWasm, EntryHashed};
 use std::path::PathBuf;
 
 pub use holochain_zome_types::test_utils::*;
@@ -16,13 +15,23 @@ struct FakeProperties {
 
 /// A fixture example dna for unit testing.
 pub fn fake_dna_file(uid: &str) -> DnaFile {
-    fake_dna_zomes(uid, vec![("test".into(), vec![].into())])
+    fake_dna_file_named(uid, "test")
+}
+
+/// A named dna for unit testing.
+pub fn fake_dna_file_named(uid: &str, name: &str) -> DnaFile {
+    fake_dna_zomes_named(uid, name, vec![(name.into(), vec![].into())])
 }
 
 /// A fixture example dna for unit testing.
 pub fn fake_dna_zomes(uid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
+    fake_dna_zomes_named(uid, "test", zomes)
+}
+
+/// A named dna for unit testing.
+pub fn fake_dna_zomes_named(uid: &str, name: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
     let mut dna = DnaDef {
-        name: "test".to_string(),
+        name: name.to_string(),
         properties: YamlProperties::new(serde_yaml::from_str("p: hi").unwrap())
             .try_into()
             .unwrap(),
@@ -82,11 +91,11 @@ pub async fn fake_unique_element(
 ) -> anyhow::Result<(SignedHeaderHashed, EntryHashed)> {
     let content: SerializedBytes =
         UnsafeBytes::from(nanoid::nanoid!().as_bytes().to_owned()).into();
-    let entry = EntryHashed::from_content_sync(Entry::App(content.try_into().unwrap()));
+    let entry = Entry::App(content.try_into().unwrap()).into_hashed();
     let app_entry_type = AppEntryTypeFixturator::new(visibility).next().unwrap();
     let header_1 = Header::Create(Create {
         author: agent_key,
-        timestamp: timestamp::now(),
+        timestamp: Timestamp::now(),
         header_seq: 0,
         prev_header: fake_header_hash(1),
 
@@ -95,7 +104,34 @@ pub async fn fake_unique_element(
     });
 
     Ok((
-        SignedHeaderHashed::new(&keystore, HeaderHashed::from_content_sync(header_1)).await?,
+        SignedHeaderHashed::new(&keystore, header_1.into_hashed()).await?,
         entry,
     ))
+}
+
+/// Generate a test keystore pre-populated with a couple test keypairs.
+pub fn test_keystore() -> holochain_keystore::KeystoreSender {
+    use holochain_keystore::KeystoreSenderExt;
+
+    tokio_helper::block_on(
+        async move {
+            let keystore = holochain_keystore::test_keystore::spawn_test_keystore()
+                .await
+                .unwrap();
+
+            // pre-populate with our two fixture agent keypairs
+            keystore
+                .generate_sign_keypair_from_pure_entropy()
+                .await
+                .unwrap();
+            keystore
+                .generate_sign_keypair_from_pure_entropy()
+                .await
+                .unwrap();
+
+            keystore
+        },
+        std::time::Duration::from_secs(1),
+    )
+    .expect("timeout elapsed")
 }

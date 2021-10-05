@@ -19,22 +19,22 @@ use mockall::mock;
 mock! {
 
     pub CellConductorApi {
-        fn cell_id(&self) -> &CellId;
-        fn sync_call_zome(
+        pub fn cell_id(&self) -> &CellId;
+        pub fn sync_call_zome(
             &self,
             cell_id: &CellId,
             call: ZomeCall,
         ) -> ConductorApiResult<ZomeCallResult>;
 
-        fn sync_dpki_request(&self, method: String, args: String) -> ConductorApiResult<String>;
+        pub fn sync_dpki_request(&self, method: String, args: String) -> ConductorApiResult<String>;
 
-        fn mock_keystore(&self) -> &KeystoreSender;
-        fn mock_signal_broadcaster(&self) -> SignalBroadcaster;
-        fn sync_get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile>;
-        fn sync_get_this_dna(&self) -> ConductorApiResult<DnaFile>;
-        fn sync_get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome>;
-        fn sync_get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
-        fn into_call_zome_handle(self) -> super::CellConductorReadHandle;
+        pub fn mock_keystore(&self) -> &KeystoreSender;
+        pub fn mock_signal_broadcaster(&self) -> SignalBroadcaster;
+        pub fn sync_get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile>;
+        pub fn sync_get_this_dna(&self) -> ConductorApiResult<DnaFile>;
+        pub fn sync_get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome>;
+        pub fn sync_get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
+        pub fn into_call_zome_handle(self) -> super::CellConductorReadHandle;
     }
 
     trait Clone {
@@ -68,19 +68,19 @@ impl CellConductorApiT for MockCellConductorApi {
         self.mock_signal_broadcaster()
     }
 
-    async fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile> {
+    fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile> {
         self.sync_get_dna(dna_hash)
     }
 
-    async fn get_this_dna(&self) -> ConductorApiResult<DnaFile> {
+    fn get_this_dna(&self) -> ConductorApiResult<DnaFile> {
         self.sync_get_this_dna()
     }
 
-    async fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
+    fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
         self.sync_get_zome(dna_hash, zome_name)
     }
 
-    async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
+    fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
         self.sync_get_entry_def(key)
     }
 

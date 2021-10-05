@@ -18,7 +18,7 @@ pub fn capability_grants(
 pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use crate::{conductor::ConductorBuilder, sweettest::SweetConductor};
-    use crate::{core::workflow::call_zome_workflow::CallZomeWorkspace, sweettest::SweetDnaFile};
+    use crate::{sweettest::SweetDnaFile};
     use ::fixt::prelude::*;
     use hdk::prelude::*;
     use holochain_types::fixt::CapSecretFixturator;
@@ -32,47 +32,27 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_capability_secret_test<'a>() {
         observability::test_run().ok();
-        // test workspace boilerplate
-        let test_env = holochain_lmdb::test_utils::test_cell_env();
-        let env = test_env.env();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
+        let host_access = fixt!(ZomeCallHostAccess, Predictable);
 
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
-            .await
-            .unwrap();
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock.clone();
-
-        let _output: CapSecret =
-            crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ());
+        let _: CapSecret =
+            crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ()).unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_transferable_cap_grant<'a>() {
         observability::test_run().ok();
-        // test workspace boilerplate
-        let test_env = holochain_lmdb::test_utils::test_cell_env();
-        let env = test_env.env();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
-
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
-            .await
-            .unwrap();
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock.clone();
+        let host_access = fixt!(ZomeCallHostAccess, Predictable);
 
         let secret: CapSecret =
-            crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ());
+            crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ()).unwrap();
         let header: HeaderHash = crate::call_test_ribosome!(
             host_access,
             TestWasm::Capability,
             "transferable_cap_grant",
             secret
-        );
+        ).unwrap();
         let maybe_element: Option<Element> =
-            crate::call_test_ribosome!(host_access, TestWasm::Capability, "get_entry", header);
+            crate::call_test_ribosome!(host_access, TestWasm::Capability, "get_entry", header).unwrap();
 
         let entry_secret: CapSecret = match maybe_element {
             Some(element) => {

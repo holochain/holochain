@@ -23,7 +23,7 @@ type ShareRMap<C> = Arc<Share<RMap<C>>>;
 
 struct RMapItem<C: Codec + 'static + Send + Unpin> {
     sender: RSend<C>,
-    start: std::time::Instant,
+    start: tokio::time::Instant,
     timeout: std::time::Duration,
     dbg_name: &'static str,
     req_byte_count: usize,
@@ -55,7 +55,7 @@ impl<C: Codec + 'static + Send + Unpin> RMap<C> {
             (uniq, msg_id),
             RMapItem {
                 sender: s_res,
-                start: std::time::Instant::now(),
+                start: tokio::time::Instant::now(),
                 timeout,
                 dbg_name,
                 req_byte_count,
@@ -81,7 +81,7 @@ impl<C: Codec + 'static + Send + Unpin> RMap<C> {
             crate::metrics::metric_push_api_req_res_elapsed_ms(elapsed.as_millis() as u64);
             let elapsed_s = elapsed.as_secs_f64();
 
-            tracing::debug!(
+            tracing::trace!(
                 %dbg_name,
                 %req_byte_count,
                 %resp_dbg_name,
@@ -129,7 +129,7 @@ impl<C: Codec + 'static + Send + Unpin> RMap<C> {
         }) = self.0.remove(&(uniq, msg_id))
         {
             let elapsed_s = start.elapsed().as_secs_f64();
-            tracing::debug!(
+            tracing::trace!(
                 %dbg_name,
                 %req_byte_count,
                 ?local_cert,
@@ -281,6 +281,33 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
         self.con.close(code, reason)
     }
 
+    fn priv_notify(
+        &self,
+        data: PoolBuf,
+        timeout: KitsuneTimeout,
+        dbg_name: &'static str,
+    ) -> impl std::future::Future<Output = KitsuneResult<()>> + 'static + Send {
+        let this = self.clone();
+        async move {
+            let msg_id = MsgId::new_notify();
+            let len = data.len();
+            this.con.write(msg_id, data, timeout).await?;
+
+            this.metrics.write_len(dbg_name, len);
+
+            let peer_cert = this.peer_cert();
+            tracing::trace!(
+                %dbg_name,
+                req_byte_count=%len,
+                local_cert=?this.local_cert,
+                ?peer_cert,
+                "(api) notify",
+            );
+
+            Ok(())
+        }
+    }
+
     fn priv_request(
         &self,
         data: PoolBuf,
@@ -319,6 +346,20 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
 
             timeout.mix(r_res.map_err(KitsuneError::other)).await?
         }
+    }
+
+    /// Write a notify to this connection.
+    pub fn notify(
+        &self,
+        data: &C,
+        timeout: KitsuneTimeout,
+    ) -> impl std::future::Future<Output = KitsuneResult<()>> + 'static + Send {
+        let dbg_name = data.variant_type();
+        let mut buf = PoolBuf::new();
+        if let Err(e) = data.encode(&mut buf) {
+            return async move { Err(KitsuneError::other(e)) }.boxed();
+        }
+        self.priv_notify(buf, timeout, dbg_name).boxed()
     }
 
     /// Write a request to this connection.
@@ -429,6 +470,24 @@ impl<C: Codec + 'static + Send + Unpin> Tx2EpHnd<C> {
         }
     }
 
+    /// Write a notify to this connection.
+    pub fn notify<U: Into<TxUrl>>(
+        &self,
+        remote: U,
+        data: &C,
+        timeout: KitsuneTimeout,
+    ) -> impl std::future::Future<Output = KitsuneResult<()>> + 'static + Send {
+        let dbg_name = data.variant_type();
+        let mut buf = PoolBuf::new();
+        if let Err(e) = data.encode(&mut buf) {
+            return async move { Err(KitsuneError::other(e)) }.boxed();
+        }
+        let con_fut = self.get_connection(remote.into(), timeout);
+        futures::future::FutureExt::boxed(async move {
+            con_fut.await?.priv_notify(buf, timeout, dbg_name).await
+        })
+    }
+
     /// Write a request to this connection.
     pub fn request<U: Into<TxUrl>>(
         &self,
@@ -452,7 +511,7 @@ impl<C: Codec + 'static + Send + Unpin> Tx2EpHnd<C> {
 pub struct Tx2Respond<C: Codec + 'static + Send + Unpin> {
     local_cert: Tx2Cert,
     peer_cert: Tx2Cert,
-    time: std::time::Instant,
+    time: tokio::time::Instant,
     dbg_name: &'static str,
     req_byte_count: usize,
     con: ConHnd,
@@ -475,7 +534,7 @@ impl<C: Codec + 'static + Send + Unpin> Tx2Respond<C> {
         con: ConHnd,
         msg_id: u64,
     ) -> Self {
-        let time = std::time::Instant::now();
+        let time = tokio::time::Instant::now();
         Self {
             local_cert,
             peer_cert,
@@ -511,7 +570,7 @@ impl<C: Codec + 'static + Send + Unpin> Tx2Respond<C> {
             let elapsed_s = time.elapsed().as_secs_f64();
             let resp_dbg_name = data.variant_type();
             let resp_byte_count = buf.len();
-            tracing::debug!(
+            tracing::trace!(
                 %dbg_name,
                 %req_byte_count,
                 %resp_dbg_name,
@@ -555,6 +614,20 @@ pub struct Tx2EpIncomingRequest<C: Codec + 'static + Send + Unpin> {
     pub respond: Tx2Respond<C>,
 }
 
+/// Data associated with an IncomingNotify EpEvent
+#[derive(Debug)]
+pub struct Tx2EpIncomingNotify<C: Codec + 'static + Send + Unpin> {
+    /// the remote connection handle (could be closed)
+    pub con: Tx2ConHnd<C>,
+
+    /// the remote url from which this data originated
+    /// this is included incase the con is closed
+    pub url: TxUrl,
+
+    /// the actual incoming message data
+    pub data: C,
+}
+
 /// Data associated with a ConnectionClosed EpEvent
 #[derive(Debug)]
 pub struct Tx2EpConnectionClosed<C: Codec + 'static + Send + Unpin> {
@@ -582,6 +655,9 @@ pub enum Tx2EpEvent<C: Codec + 'static + Send + Unpin> {
 
     /// We've received an incoming request on an open connection.
     IncomingRequest(Tx2EpIncomingRequest<C>),
+
+    /// We've received an incoming notification on an open connection.
+    IncomingNotify(Tx2EpIncomingNotify<C>),
 
     /// A connection has closed (Url, Code, Reason).
     ConnectionClosed(Tx2EpConnectionClosed<C>),
@@ -646,7 +722,17 @@ impl<C: Codec + 'static + Send + Unpin> Stream for Tx2Ep<C> {
                         };
                         let dbg_name = c.variant_type();
                         match msg_id.get_type() {
-                            MsgIdType::Notify => unimplemented!(),
+                            MsgIdType::Notify => Tx2EpEvent::IncomingNotify(Tx2EpIncomingNotify {
+                                con: Tx2ConHnd::new(
+                                    local_cert,
+                                    con.clone(),
+                                    url.clone(),
+                                    rmap,
+                                    self.2.clone(),
+                                ),
+                                url,
+                                data: c,
+                            }),
                             MsgIdType::Req => Tx2EpEvent::IncomingRequest(Tx2EpIncomingRequest {
                                 con: Tx2ConHnd::new(
                                     local_cert.clone(),
@@ -678,14 +764,17 @@ impl<C: Codec + 'static + Send + Unpin> Stream for Tx2Ep<C> {
                     EpEvent::IncomingError(EpIncomingError {
                         con, msg_id, err, ..
                     }) => match msg_id.get_type() {
-                        MsgIdType::Notify => unimplemented!(),
-                        MsgIdType::Req => unimplemented!(),
                         MsgIdType::Res => {
                             let _ = rmap.share_mut(move |i, _| {
                                 i.respond_err(con.uniq(), msg_id.as_id(), err);
                                 Ok(())
                             });
                             Tx2EpEvent::Tick
+                        }
+                        _ => {
+                            // TODO - should this be a connection-specific
+                            // error type, so we can give the con handle?
+                            Tx2EpEvent::Error(err)
                         }
                     },
                     EpEvent::ConnectionClosed(EpConnectionClosed {

@@ -9,8 +9,8 @@ use crate::prelude::*;
 ///
 /// Usually you don't need to use this function directly; it is the most general way to create an
 /// entry and standardises the internals of higher level create functions.
-pub fn create(entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
-    HDK.with(|h| h.borrow().create(entry_with_def_id))
+pub fn create(create_input: CreateInput) -> ExternResult<HeaderHash> {
+    HDK.with(|h| h.borrow().create(create_input))
 }
 
 /// Update any entry type.
@@ -23,8 +23,8 @@ pub fn create(entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
 ///
 /// Usually you don't need to use this function directly; it is the most general way to update an
 /// entry and standardises the internals of higher level create functions.
-pub fn update(hash: HeaderHash, entry_with_def_id: EntryWithDefId) -> ExternResult<HeaderHash> {
-    HDK.with(|h| h.borrow().update(UpdateInput::new(hash, entry_with_def_id)))
+pub fn update(hash: HeaderHash, create_input: CreateInput) -> ExternResult<HeaderHash> {
+    HDK.with(|h| h.borrow().update(UpdateInput::new(hash, create_input)))
 }
 
 /// General function that can delete any entry type.
@@ -36,8 +36,13 @@ pub fn update(hash: HeaderHash, entry_with_def_id: EntryWithDefId) -> ExternResu
 ///
 /// Usually you don't need to use this function directly; it is the most general way to update an
 /// entry and standardises the internals of higher level create functions.
-pub fn delete(hash: HeaderHash) -> ExternResult<HeaderHash> {
-    HDK.with(|h| h.borrow().delete(hash))
+pub fn delete(deletes_header_address: HeaderHash) -> ExternResult<HeaderHash> {
+    HDK.with(|h| {
+        h.borrow().delete(DeleteInput::new(
+            deletes_header_address,
+            ChainTopOrdering::default(),
+        ))
+    })
 }
 
 /// Create an app entry.
@@ -45,10 +50,10 @@ pub fn delete(hash: HeaderHash) -> ExternResult<HeaderHash> {
 /// Apps define app entries by registering entry def ids with the `entry_defs` callback and serialize the
 /// entry content when committing to the source chain.
 ///
-/// This function accepts any input that implements [ `TryInto<EntryWithDefId>` ].
+/// This function accepts any input that implements [ `TryInto<CreateInput>` ].
 /// The default impls from the `#[hdk_entry( .. )]` and [ `entry_def!` ] macros include this.
 ///
-/// With generic type handling it may make sense to directly construct [ `EntryWithDefId` ] and [ `create` ].
+/// With generic type handling it may make sense to directly construct [ `CreateInput` ] and [ `create` ].
 ///
 /// e.g.
 /// ```ignore
@@ -60,10 +65,10 @@ pub fn delete(hash: HeaderHash) -> ExternResult<HeaderHash> {
 /// See [ `get` ] and [ `get_details` ] for more information on CRUD.
 pub fn create_entry<I, E>(input: I) -> ExternResult<HeaderHash>
 where
-    EntryWithDefId: TryFrom<I, Error = E>,
+    CreateInput: TryFrom<I, Error = E>,
     WasmError: From<E>,
 {
-    create(EntryWithDefId::try_from(input)?)
+    create(CreateInput::try_from(input)?)
 }
 
 /// Alias to delete
@@ -125,7 +130,7 @@ where
 }
 
 /// Thin wrapper around update for app entries.
-/// The hash is the [ `HeaderHash` ] of the deleted element, the input is a [ `TryInto<EntryWithDefId>` ].
+/// The hash is the [ `HeaderHash` ] of the deleted element, the input is a [ `TryInto<CreateInput>` ].
 ///
 /// Updates can reference Elements which contain Entry data -- namely, Creates and other Updates -- but
 /// not Deletes or system Elements
@@ -154,10 +159,10 @@ where
 /// See [ `delete_entry` ]
 pub fn update_entry<I, E>(hash: HeaderHash, input: I) -> ExternResult<HeaderHash>
 where
-    EntryWithDefId: TryFrom<I, Error = E>,
+    CreateInput: TryFrom<I, Error = E>,
     WasmError: From<E>,
 {
-    update(hash, EntryWithDefId::try_from(input)?)
+    update(hash, CreateInput::try_from(input)?)
 }
 
 /// Gets an element for a given entry or header hash.
@@ -209,9 +214,116 @@ pub fn get<H>(hash: H, options: GetOptions) -> ExternResult<Option<Element>>
 where
     AnyDhtHash: From<H>,
 {
+    Ok(HDK
+        .with(|h| {
+            h.borrow()
+                .get(vec![GetInput::new(AnyDhtHash::from(hash), options)])
+        })?
+        .into_iter()
+        .next()
+        .unwrap())
+}
+
+/// MUST get an EntryHashed at a given EntryHash.
+///
+/// The EntryHashed is NOT guaranteed to be associated with a valid (or even validated) Header/Element.
+/// For example, an invalid Element could be published and `must_get_entry` would return the EntryHashed.
+///
+/// This may be useful during validation callbacks where the validity and relevance of some content can be
+/// asserted by the CURRENT validation callback independent of an Element. This behaviour avoids the potential for
+/// eclipse attacks to lie about the validity of some data and cause problems for a hApp.
+/// If you NEED to know that a dependency is valid in order for the current validation logic
+/// (e.g. inductive validation of a tree) then `must_get_valid_element` is likely what you need.
+///
+/// `must_get_entry` is available in contexts such as validation where both determinism and network access is desirable.
+///
+/// An EntryHashed will NOT be returned if:
+/// - @TODO It is PURGED (community redacted entry)
+/// - @TODO ALL headers pointing to it are WITHDRAWN by the authors
+/// - ALL headers pointing to it are ABANDONED by ALL authorities due to validation failure
+/// - Nobody knows about it on the currently visible network
+///
+/// If an EntryHashed fails to be returned:
+///
+/// - Callbacks will return early with `UnresolvedDependencies`
+/// - Zome calls will receive a `WasmError` from the host
+pub fn must_get_entry(entry_hash: EntryHash) -> ExternResult<EntryHashed> {
     HDK.with(|h| {
         h.borrow()
-            .get(GetInput::new(AnyDhtHash::from(hash), options))
+            .must_get_entry(MustGetEntryInput::new(entry_hash))
+    })
+}
+
+/// MUST get a SignedHeaderHashed at a given HeaderHash.
+///
+/// The SignedHeaderHashed is NOT guaranteed to be a valid (or even validated) Element.
+/// For example, an invalid Header could be published and `must_get_header` would return the `SignedHeaderHashed`.
+///
+/// This may be useful during validation callbacks where the validity depends on a Header existing regardless of its associated Entry.
+/// For example, we may simply need to check that the author is the same for two referenced Headers.
+///
+/// `must_get_header` is available in contexts such as validation where both determinism and network access is desirable.
+///
+/// A `SignedHeaderHashed` will NOT be returned if:
+///
+/// - @TODO The header is WITHDRAWN by the author
+/// - @TODO The header is ABANDONED by ALL authorities
+/// - Nobody knows about it on the currently visible network
+///
+/// If a `SignedHeaderHashed` fails to be returned:
+///
+/// - Callbacks will return early with `UnresolvedDependencies`
+/// - Zome calls will receive a `WasmError` from the host
+pub fn must_get_header(header_hash: HeaderHash) -> ExternResult<SignedHeaderHashed> {
+    HDK.with(|h| {
+        h.borrow()
+            .must_get_header(MustGetHeaderInput::new(header_hash))
+    })
+}
+
+/// MUST get a VALID Element at a given HeaderHash
+///
+/// The Element is guaranteed to be valid.
+/// More accurately the Element is guarantee to be consistently reported as valid by the visible network.
+///
+/// The validity requirement makes this more complex but notably enables inductive validation of arbitrary graph structures.
+/// For example "If this Element is valid, and its parent is valid, up to the root, then the whole tree of Elements is valid".
+///
+/// If at least one authority (1 of N trust) claims the Element is invalid then a conflict resolution/warranting round will be triggered.
+///
+/// In the case of a total eclipse (every visible authority is lying) then we cannot immediately detect an invalid Element.
+/// Unlike `must_get_entry` and `must_get_header` we cannot simply inspect the cryptographic integrity to know this.
+///
+/// In theory we can run validation of the returned Element ourselves, which itself may be based on `must_get_X` calls.
+/// If there is a large nested graph of `must_get_valid_element` calls this could be extremely heavy.
+/// Note though that each "hop" in recursive validation is routed to a completely different set of authorities.
+/// It does not take many hops to reach the point where an attacker needs to eclipse the entire network to lie about Element validity.
+///
+/// @TODO We keep signed receipts from authorities serving up "valid elements".
+/// - If we ever discover an element we were told is valid is invalid we can retroactively look to warrant authorities
+/// - We can async (e.g. in a background task) be recursively validating Element dependencies ourselves, following hops until there is no room for lies
+/// - We can with small probability recursively validate to several hops inline to discourage potential eclipse attacks with a credible immediate threat
+///
+/// If you do not care about validity and simply want a pair of Header+Entry data, then use both `must_get_header` and `must_get_entry` together.
+///
+/// `must_get_valid_element` is available in contexts such as validation where both determinism and network access is desirable.
+///
+/// An `Element` will not be returned if:
+///
+/// - @TODO It is WITHDRAWN by the author
+/// - @TODO The Entry is PURGED by the community
+/// - It is ABANDONED by ALL authorities due to failed validation
+/// - If ANY authority (1 of N trust) OR ourselves (0 of N trust) believes it INVALID
+/// - Nobody knows about it on the visible network
+///
+/// If an `Element` fails to be returned:
+///
+/// - Callbacks will return early with `UnresolvedDependencies`
+/// - Zome calls will receive a `WasmError` from the host
+pub fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> {
+    HDK.with(|h| {
+        h.borrow()
+            .must_get_valid_element(MustGetValidElementInput::new(header_hash))
     })
 }
 
@@ -263,7 +375,14 @@ pub fn get_details<H: Into<AnyDhtHash>>(
     hash: H,
     options: GetOptions,
 ) -> ExternResult<Option<Details>> {
-    HDK.with(|h| h.borrow().get_details(GetInput::new(hash.into(), options)))
+    Ok(HDK
+        .with(|h| {
+            h.borrow()
+                .get_details(vec![GetInput::new(hash.into(), options)])
+        })?
+        .into_iter()
+        .next()
+        .unwrap())
 }
 
 /// Trait for binding static [ `EntryDef` ] property access for a type.
@@ -297,8 +416,11 @@ macro_rules! app_entry {
                     $crate::prelude::Entry::App(eb) => Ok(Self::try_from(
                         $crate::prelude::SerializedBytes::from(eb.to_owned()),
                     )?),
+                    $crate::prelude::Entry::CounterSign(_, eb) => Ok(Self::try_from(
+                        $crate::prelude::SerializedBytes::from(eb.to_owned()),
+                    )?),
                     _ => Err($crate::prelude::SerializedBytesError::Deserialize(format!(
-                        "{:?} is not an Entry::App so has no serialized bytes",
+                        "{:?} is not an Entry::App or Entry::CounterSign so has no serialized bytes",
                         entry
                     ))
                     .into()),
@@ -313,20 +435,55 @@ macro_rules! app_entry {
             }
         }
 
+        impl TryFrom<$crate::prelude::EntryHashed> for $t {
+            type Error = $crate::prelude::WasmError;
+            fn try_from(entry_hashed: $crate::prelude::EntryHashed) -> Result<Self, Self::Error> {
+                Self::try_from(entry_hashed.as_content())
+            }
+        }
+
+        impl TryFrom<&$crate::prelude::Element> for $t {
+            type Error = $crate::prelude::WasmError;
+            fn try_from(element: &$crate::prelude::Element) -> Result<Self, Self::Error> {
+                Ok(match element.entry() {
+                    ElementEntry::Present(entry) => Self::try_from(entry)?,
+                    _ => return Err(Self::Error::Guest(format!("Tried to deserialize an element, expecting it to contain entry data, but there was none. Element HeaderHash: {}", element.header_hashed().as_hash()))),
+                })
+            }
+        }
+
+        impl TryFrom<$crate::prelude::Element> for $t {
+            type Error = $crate::prelude::WasmError;
+            fn try_from(element: $crate::prelude::Element) -> Result<Self, Self::Error> {
+                (&element).try_into()
+            }
+        }
+
+        impl TryFrom<&$t> for $crate::prelude::AppEntryBytes {
+            type Error = $crate::prelude::WasmError;
+            fn try_from(t: &$t) -> Result<Self, Self::Error> {
+                AppEntryBytes::try_from(SerializedBytes::try_from(t)?).map_err(|entry_error| match entry_error {
+                    EntryError::SerializedBytes(serialized_bytes_error) => {
+                        WasmError::Serialize(serialized_bytes_error)
+                    }
+                    EntryError::EntryTooLarge(_) => {
+                        WasmError::Guest(entry_error.to_string())
+                    }
+                })
+            }
+        }
+
+        impl TryFrom<$t> for $crate::prelude::AppEntryBytes {
+            type Error = $crate::prelude::WasmError;
+            fn try_from(t: $t) -> Result<Self, Self::Error> {
+                Self::try_from(&t)
+            }
+        }
+
         impl TryFrom<&$t> for $crate::prelude::Entry {
             type Error = $crate::prelude::WasmError;
             fn try_from(t: &$t) -> Result<Self, Self::Error> {
-                match AppEntryBytes::try_from(SerializedBytes::try_from(t)?) {
-                    Ok(app_entry_bytes) => Ok(Self::App(app_entry_bytes)),
-                    Err(entry_error) => match entry_error {
-                        EntryError::SerializedBytes(serialized_bytes_error) => {
-                            Err(WasmError::Serialize(serialized_bytes_error))
-                        }
-                        EntryError::EntryTooLarge(_) => {
-                            Err(WasmError::Guest(entry_error.to_string()))
-                        }
-                    },
-                }
+                Ok(Self::App($crate::prelude::AppEntryBytes::try_from(t)?))
             }
         }
 
@@ -407,17 +564,21 @@ macro_rules! register_entry {
             }
         }
 
-        impl TryFrom<&$t> for $crate::prelude::EntryWithDefId
+        impl TryFrom<&$t> for $crate::prelude::CreateInput
         where
             $t: $crate::prelude::EntryDefRegistration,
         {
             type Error = $crate::prelude::WasmError;
             fn try_from(t: &$t) -> Result<Self, Self::Error> {
-                Ok(Self::new($t::entry_def_id(), t.try_into()?))
+                Ok(Self::new(
+                    $t::entry_def_id(),
+                    t.try_into()?,
+                    ChainTopOrdering::default(),
+                ))
             }
         }
 
-        impl TryFrom<$t> for $crate::prelude::EntryWithDefId {
+        impl TryFrom<$t> for $crate::prelude::CreateInput {
             type Error = $crate::prelude::WasmError;
             fn try_from(t: $t) -> Result<Self, Self::Error> {
                 (&t).try_into()
@@ -585,12 +746,6 @@ macro_rules! entry_def_index {
                         )
                     }
                 }
-            }
-            Ok($crate::prelude::EntryDefsCallbackResult::Err(error)) => {
-                $crate::prelude::tracing::error!(?error, "Failed to lookup entry defs.");
-                Err::<$crate::prelude::EntryDefIndex, $crate::prelude::WasmError>(
-                    $crate::prelude::WasmError::Guest(error),
-                )
             }
             Err(error) => {
                 $crate::prelude::tracing::error!(?error, "Failed to lookup entry defs.");

@@ -1,16 +1,28 @@
 use once_cell::sync::Lazy;
 use tokio::runtime::Runtime;
 
-pub static TOKIO: Lazy<Runtime> = Lazy::new(new_runtime);
+pub static TOKIO: Lazy<Runtime> = Lazy::new(|| new_runtime(None, None));
 
 /// Instantiate a new runtime.
-fn new_runtime() -> Runtime {
+pub fn new_runtime(worker_threads: Option<usize>, max_blocking_threads: Option<usize>) -> Runtime {
     // we want to use multiple threads
-    tokio::runtime::Builder::new_multi_thread()
+    let mut builder = tokio::runtime::Builder::new_multi_thread();
+
+    builder
         // we use both IO and Time tokio utilities
         .enable_all()
         // give our threads a descriptive name (they'll be numbered too)
-        .thread_name("holochain-tokio-thread")
+        .thread_name("holochain-tokio-thread");
+
+    if let Some(worker_threads) = worker_threads {
+        builder.worker_threads(worker_threads);
+    };
+
+    if let Some(max_blocking_threads) = max_blocking_threads {
+        builder.max_blocking_threads(max_blocking_threads);
+    };
+
+    builder
         // build the runtime
         .build()
         // panic if we cannot (we cannot run without it)
@@ -33,7 +45,7 @@ pub fn block_on<F>(
 where
     F: futures::future::Future,
 {
-    block_on_given(tokio::time::timeout(timeout, f), &TOKIO)
+    block_on_given(async { tokio::time::timeout(timeout, f).await }, &TOKIO)
 }
 
 /// Run a blocking thread on `TOKIO`.
@@ -49,7 +61,7 @@ mod test {
     use super::*;
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn block_on_works() {
+    async fn block_forever_on_works() {
         block_forever_on(async { println!("stdio can block") });
         assert_eq!(1, super::block_forever_on(async { 1 }));
 
@@ -73,5 +85,14 @@ mod test {
         let r = "works";
         let test = block_forever_on(tokio::task::spawn(async move { r.to_string() })).unwrap();
         assert_eq!("works", &test);
+    }
+
+    // test calling without an existing reactor
+    #[test]
+    fn block_on_works() {
+        assert_eq!(
+            Ok(1),
+            block_on(async { 1 }, std::time::Duration::from_millis(0))
+        );
     }
 }

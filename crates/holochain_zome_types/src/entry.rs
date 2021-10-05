@@ -8,10 +8,14 @@
 use crate::capability::CapClaim;
 use crate::capability::CapGrant;
 use crate::capability::ZomeCallCapGrant;
+use crate::countersigning::CounterSigningSessionData;
+use crate::header::ChainTopOrdering;
 use holo_hash::hash_type;
 use holo_hash::AgentPubKey;
+use holo_hash::EntryHash;
 use holo_hash::HashableContent;
 use holo_hash::HashableContentBytes;
+use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 
 mod app_entry_bytes;
@@ -31,6 +35,15 @@ pub type CapGrantEntry = ZomeCallCapGrant;
 
 /// The data type written to the source chain to denote a capability claim
 pub type CapClaimEntry = CapClaim;
+
+/// An Entry paired with its EntryHash
+pub type EntryHashed = holo_hash::HoloHashed<Entry>;
+
+impl From<EntryHashed> for Entry {
+    fn from(entry_hashed: EntryHashed) -> Self {
+        entry_hashed.into_content()
+    }
+}
 
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 /// Options for controlling how get works
@@ -93,6 +106,7 @@ pub enum GetStrategy {
 
 /// Structure holding the entry portion of a chain element.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[serde(tag = "entry_type", content = "entry")]
 pub enum Entry {
     /// The `Agent` system entry, the third entry of every source chain,
@@ -100,6 +114,8 @@ pub enum Entry {
     Agent(AgentPubKey),
     /// The application entry data for entries that aren't system created entries
     App(AppEntryBytes),
+    /// Application entry data for entries that need countersigning to move forward multiple chains together.
+    CounterSign(Box<CounterSigningSessionData>, AppEntryBytes),
     /// The capability claim system entry which allows committing a granted permission
     /// for later use
     CapClaim(CapClaimEntry),
@@ -172,34 +188,53 @@ impl HashableContent for Entry {
 
 /// Data to create an entry.
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-pub struct EntryWithDefId {
-    entry_def_id: crate::entry_def::EntryDefId,
-    entry: crate::entry::Entry,
+pub struct CreateInput {
+    /// EntryDefId for the created entry.
+    pub entry_def_id: crate::entry_def::EntryDefId,
+    /// Entry body.
+    pub entry: crate::entry::Entry,
+    /// ChainTopBehaviour for the write.
+    pub chain_top_ordering: ChainTopOrdering,
 }
 
-impl EntryWithDefId {
+impl CreateInput {
     /// Constructor.
-    pub fn new(entry_def_id: crate::entry_def::EntryDefId, entry: crate::entry::Entry) -> Self {
+    pub fn new(
+        entry_def_id: crate::entry_def::EntryDefId,
+        entry: crate::entry::Entry,
+        chain_top_ordering: ChainTopOrdering,
+    ) -> Self {
         Self {
             entry_def_id,
             entry,
+            chain_top_ordering,
         }
+    }
+
+    /// Consume into an Entry.
+    pub fn into_entry(self) -> Entry {
+        self.entry
+    }
+
+    /// Accessor.
+    pub fn chain_top_ordering(&self) -> &ChainTopOrdering {
+        &self.chain_top_ordering
     }
 }
 
-impl AsRef<crate::Entry> for EntryWithDefId {
+impl AsRef<crate::Entry> for CreateInput {
     fn as_ref(&self) -> &crate::Entry {
         &self.entry
     }
 }
 
-impl AsRef<crate::EntryDefId> for EntryWithDefId {
+impl AsRef<crate::EntryDefId> for CreateInput {
     fn as_ref(&self) -> &crate::EntryDefId {
         &self.entry_def_id
     }
 }
 
-/// Zome IO inner for get and get_details calls.
+/// Zome IO for get and get_details calls.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct GetInput {
     /// Any DHT hash to pass to get or get_details.
@@ -218,24 +253,91 @@ impl GetInput {
     }
 }
 
+/// Zome IO for must_get_valid_element.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct MustGetValidElementInput(HeaderHash);
+
+impl MustGetValidElementInput {
+    /// Constructor.
+    pub fn new(header_hash: HeaderHash) -> Self {
+        Self(header_hash)
+    }
+
+    /// Consumes self for inner.
+    pub fn into_inner(self) -> HeaderHash {
+        self.0
+    }
+}
+
+/// Zome IO for must_get_entry.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct MustGetEntryInput(EntryHash);
+
+impl MustGetEntryInput {
+    /// Constructor.
+    pub fn new(entry_hash: EntryHash) -> Self {
+        Self(entry_hash)
+    }
+
+    /// Consumes self for inner.
+    pub fn into_inner(self) -> EntryHash {
+        self.0
+    }
+}
+
+/// Zome IO for must_get_header.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct MustGetHeaderInput(HeaderHash);
+
+impl MustGetHeaderInput {
+    /// Constructor.
+    pub fn new(header_hash: HeaderHash) -> Self {
+        Self(header_hash)
+    }
+
+    /// Consumes self for inner.
+    pub fn into_inner(self) -> HeaderHash {
+        self.0
+    }
+}
+
 /// Zome IO inner for update.
 #[derive(PartialEq, Debug, Deserialize, Serialize, Clone)]
 pub struct UpdateInput {
     /// Header of the element being updated.
     pub original_header_address: holo_hash::HeaderHash,
-    /// Value of the update.
-    pub entry_with_def_id: EntryWithDefId,
+    /// Create portion of the update.
+    pub create_input: CreateInput,
 }
 
 impl UpdateInput {
     /// Constructor.
-    pub fn new(
-        original_header_address: holo_hash::HeaderHash,
-        entry_with_def_id: EntryWithDefId,
-    ) -> Self {
+    pub fn new(original_header_address: holo_hash::HeaderHash, create_input: CreateInput) -> Self {
         Self {
             original_header_address,
-            entry_with_def_id,
+            create_input,
+        }
+    }
+}
+
+/// Zome IO inner for delete.
+#[derive(PartialEq, Debug, Deserialize, Serialize, Clone)]
+pub struct DeleteInput {
+    /// Header of the element being deleted.
+    pub deletes_header_address: holo_hash::HeaderHash,
+    /// Chain top ordering behaviour for the delete.
+    pub chain_top_ordering: ChainTopOrdering,
+}
+
+impl DeleteInput {
+    /// Constructor.
+    pub fn new(
+        deletes_header_address: holo_hash::HeaderHash,
+        chain_top_ordering: ChainTopOrdering,
+    ) -> Self {
+        Self {
+            deletes_header_address,
+            chain_top_ordering,
         }
     }
 }

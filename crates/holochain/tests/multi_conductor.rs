@@ -13,22 +13,6 @@ use holochain::test_utils::WaitOps;
 #[repr(transparent)]
 struct AppString(String);
 
-fn simple_crud_zome() -> InlineZome {
-    let entry_def = EntryDef::default_with_id("entrydef");
-
-    InlineZome::new_unique(vec![entry_def.clone()])
-        .callback("create", move |api, ()| {
-            let entry_def_id: EntryDefId = entry_def.id.clone();
-            let entry = Entry::app(().try_into().unwrap()).unwrap();
-            let hash = api.create(EntryWithDefId::new(entry_def_id, entry))?;
-            Ok(hash)
-        })
-        .callback("read", |api, hash: HeaderHash| {
-            api.get(GetInput::new(hash.into(), GetOptions::default()))
-                .map_err(Into::into)
-        })
-}
-
 fn invalid_cell_zome() -> InlineZome {
     let entry_def = EntryDef::default_with_id("entrydef");
 
@@ -36,24 +20,82 @@ fn invalid_cell_zome() -> InlineZome {
         .callback("create", move |api, entry: Post| {
             let entry_def_id: EntryDefId = entry_def.id.clone();
             let entry = Entry::app(entry.try_into().unwrap()).unwrap();
-            let hash = api.create(EntryWithDefId::new(entry_def_id, entry))?;
+            let hash = api.create(CreateInput::new(
+                entry_def_id,
+                entry,
+                ChainTopOrdering::default(),
+            ))?;
             Ok(hash)
         })
         .callback("read", |api, hash: HeaderHash| {
-            api.get(GetInput::new(hash.into(), GetOptions::default()))
+            api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
                 .map_err(Into::into)
         })
+}
+
+/// Test that op publishing is sufficient for bobbo to get alice's op
+/// even with gossip disabled.
+#[cfg(feature = "test_utils")]
+#[tokio::test(flavor = "multi_thread")]
+async fn test_publish() -> anyhow::Result<()> {
+    use std::sync::Arc;
+
+    use holochain::test_utils::{consistency_10s, inline_zomes::simple_create_read_zome};
+    use kitsune_p2p::KitsuneP2pConfig;
+
+    let _g = observability::test_run().ok();
+    const NUM_CONDUCTORS: usize = 3;
+
+    let mut tuning =
+        kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+    tuning.gossip_strategy = "none".to_string();
+
+    let mut network = KitsuneP2pConfig::default();
+    network.tuning_params = Arc::new(tuning);
+    let mut config = ConductorConfig::default();
+    config.network = Some(network);
+    let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
+
+    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_create_read_zome())
+        .await
+        .unwrap();
+
+    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+    conductors.exchange_peer_info().await;
+
+    let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
+
+    // Call the "create" zome fn on Alice's app
+    let hash: HeaderHash = conductors[0].call(&alice.zome("zome1"), "create", ()).await;
+
+    // Wait long enough for Bob to receive gossip
+    consistency_10s(&[&alice, &bobbo, &carol]).await;
+
+    // Verify that bobbo can run "read" on his cell and get alice's Header
+    let element: Option<Element> = conductors[1].call(&bobbo.zome("zome1"), "read", hash).await;
+    let element = element.expect("Element was None: bobbo couldn't `get` it");
+
+    // Assert that the Element bobbo sees matches what alice committed
+    assert_eq!(element.header().author(), alice.agent_pubkey());
+    assert_eq!(
+        *element.entry(),
+        ElementEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
+    );
+
+    Ok(())
 }
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
 async fn multi_conductor() -> anyhow::Result<()> {
+    use holochain::test_utils::inline_zomes::simple_create_read_zome;
+
     let _g = observability::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;
 
     let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
 
-    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_crud_zome())
+    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_create_read_zome())
         .await
         .unwrap();
 
@@ -176,4 +218,68 @@ async fn invalid_cell() -> anyhow::Result<()> {
         .await;
     assert!(r.is_some());
     Ok(())
+}
+
+#[cfg(feature = "test_utils")]
+#[tokio::test(flavor = "multi_thread")]
+async fn sharded_consistency() {
+    use std::sync::Arc;
+
+    use holochain::test_utils::{
+        consistency::local_machine_session, inline_zomes::simple_create_read_zome,
+    };
+    use kitsune_p2p::KitsuneP2pConfig;
+
+    let _g = observability::test_run().ok();
+    const NUM_CONDUCTORS: usize = 3;
+    const NUM_CELLS: usize = 5;
+
+    let mut tuning =
+        kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+    tuning.gossip_strategy = "sharded-gossip".to_string();
+    tuning.gossip_dynamic_arcs = true;
+
+    let mut network = KitsuneP2pConfig::default();
+    network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
+        bind_to: None,
+        override_host: None,
+        override_port: None,
+    }];
+    network.tuning_params = Arc::new(tuning);
+    let config = ConductorConfig {
+        network: Some(network),
+        ..Default::default()
+    };
+    let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
+
+    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_create_read_zome())
+        .await
+        .unwrap();
+    let dnas = vec![dna_file];
+
+    let apps = conductors.setup_app("app", &dnas).await.unwrap();
+
+    let ((alice,), (bobbo,), (_carol,)) = apps.into_tuples();
+
+    for i in 0..NUM_CELLS {
+        conductors.setup_app(&i.to_string(), &dnas).await.unwrap();
+    }
+    conductors.exchange_peer_info().await;
+    conductors.force_all_publish_dht_ops().await;
+    // Call the "create" zome fn on Alice's app
+    let hash: HeaderHash = conductors[0].call(&alice.zome("zome1"), "create", ()).await;
+
+    let conductor_handles: Vec<_> = conductors.iter().map(|c| c.handle()).collect();
+    local_machine_session(&conductor_handles, std::time::Duration::from_secs(60)).await;
+
+    // Verify that bobbo can run "read" on his cell and get alice's Header
+    let element: Option<Element> = conductors[1].call(&bobbo.zome("zome1"), "read", hash).await;
+    let element = element.expect("Element was None: bobbo couldn't `get` it");
+
+    // Assert that the Element bobbo sees matches what alice committed
+    assert_eq!(element.header().author(), alice.agent_pubkey());
+    assert_eq!(
+        *element.entry(),
+        ElementEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
+    );
 }

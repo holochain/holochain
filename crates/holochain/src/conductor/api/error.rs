@@ -1,13 +1,12 @@
 //! Errors occurring during a [CellConductorApi] or [InterfaceApi] call
 
 use crate::conductor::error::ConductorError;
-use crate::conductor::error::CreateAppError;
 use crate::conductor::interface::error::InterfaceError;
 use crate::conductor::CellError;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::workflow::error::WorkflowError;
 use holo_hash::DnaHash;
-use holochain_lmdb::error::DatabaseError;
+use holochain_sqlite::error::DatabaseError;
 use holochain_state::source_chain::SourceChainError;
 use holochain_state::workspace::WorkspaceError;
 use holochain_types::prelude::*;
@@ -35,7 +34,7 @@ pub enum ConductorApiError {
 
     /// Conductor threw an error during API call.
     #[error("Conductor returned an error while using a ConductorApi: {0:?}")]
-    ConductorError(#[from] ConductorError),
+    ConductorError(#[from] Box<ConductorError>),
 
     /// Io error.
     #[error("Io error while using a Interface Api: {0:?}")]
@@ -98,6 +97,32 @@ pub enum ConductorApiError {
 
     #[error(transparent)]
     JsonDumpError(#[from] serde_json::Error),
+
+    #[error(transparent)]
+    StateQueryError(#[from] holochain_state::query::StateQueryError),
+
+    #[error(transparent)]
+    StateMutationError(#[from] holochain_state::mutations::StateMutationError),
+
+    #[error(transparent)]
+    RusqliteError(#[from] rusqlite::Error),
+
+    /// Other
+    #[error("Other: {0}")]
+    Other(Box<dyn std::error::Error + Send + Sync>),
+}
+
+impl ConductorApiError {
+    /// promote a custom error type to a KitsuneP2pError
+    pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
+        Self::Other(e.into())
+    }
+}
+
+impl From<ConductorError> for ConductorApiError {
+    fn from(conductor_api_error: ConductorError) -> Self {
+        Self::from(Box::new(conductor_api_error))
+    }
 }
 
 /// All the serialization errors that can occur
@@ -135,11 +160,5 @@ impl From<SerializationError> for ExternalApiWireError {
 impl From<RibosomeError> for ExternalApiWireError {
     fn from(e: RibosomeError) -> Self {
         ExternalApiWireError::RibosomeError(e.to_string())
-    }
-}
-
-impl From<CreateAppError> for ExternalApiWireError {
-    fn from(e: CreateAppError) -> Self {
-        ExternalApiWireError::ActivateApp(e.to_string())
     }
 }

@@ -12,24 +12,22 @@ use crate::core::ribosome::real_ribosome::RealRibosome;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
-use holochain_lmdb::env::EnvironmentWrite;
-use holochain_lmdb::test_utils::test_environments;
-use holochain_lmdb::test_utils::TestEnvironments;
 use holochain_p2p::actor::HolochainP2pRefToCell;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::SerializedBytes;
+use holochain_state::{prelude::test_environments, test_utils::TestEnvs};
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::sync::Arc;
-use tempdir::TempDir;
 
 /// A "factory" for HostFnCaller, which will produce them when given a ZomeName
 pub struct CellHostFnCaller {
     pub cell_id: CellId,
-    pub env: EnvironmentWrite,
+    pub env: EnvWrite,
+    pub cache: EnvWrite,
     pub ribosome: RealRibosome,
     pub network: HolochainP2pCell,
     pub keystore: KeystoreSender,
@@ -40,12 +38,13 @@ pub struct CellHostFnCaller {
 
 impl CellHostFnCaller {
     pub async fn new(cell_id: &CellId, handle: &ConductorHandle, dna_file: &DnaFile) -> Self {
-        let env = handle.get_cell_env(cell_id).await.unwrap();
+        let env = handle.get_cell_env(cell_id).unwrap();
+        let cache = handle.get_cache_env(cell_id).unwrap();
         let keystore = env.keystore().clone();
         let network = handle
             .holochain_p2p()
             .to_cell(cell_id.dna_hash().clone(), cell_id.agent_pubkey().clone());
-        let triggers = handle.get_cell_triggers(cell_id).await.unwrap();
+        let triggers = handle.get_cell_triggers(cell_id).unwrap();
         let cell_conductor_api = CellConductorApi::new(handle.clone(), cell_id.clone());
 
         let ribosome = RealRibosome::new(dna_file.clone());
@@ -53,6 +52,7 @@ impl CellHostFnCaller {
         CellHostFnCaller {
             cell_id: cell_id.clone(),
             env,
+            cache,
             ribosome,
             network,
             keystore,
@@ -69,6 +69,7 @@ impl CellHostFnCaller {
         let call_zome_handle = self.cell_conductor_api.clone().into_call_zome_handle();
         HostFnCaller {
             env: self.env.clone(),
+            cache: self.cache.clone(),
             ribosome: self.ribosome.clone(),
             zome_path,
             network: self.network.clone(),
@@ -82,14 +83,14 @@ impl CellHostFnCaller {
 /// Everything you need to run a test that uses the conductor
 // TODO: refactor this to be the "Test Conductor" wrapper
 pub struct ConductorTestData {
-    __tmpdir: Arc<TempDir>,
+    _envs: TestEnvs,
     handle: ConductorHandle,
-    cell_apis: HashMap<CellId, CellHostFnCaller>,
+    cell_apis: BTreeMap<CellId, CellHostFnCaller>,
 }
 
 impl ConductorTestData {
     pub async fn new(
-        envs: TestEnvironments,
+        envs: TestEnvs,
         dna_files: Vec<DnaFile>,
         agents: Vec<AgentPubKey>,
         network_config: KitsuneP2pConfig,
@@ -111,7 +112,7 @@ impl ConductorTestData {
             cell_id_by_dna_file.push((dna_file, cell_ids));
         }
 
-        let (__tmpdir, _app_api, handle) = setup_app_inner(
+        let (_envs, _app_api, handle) = setup_app_inner(
             envs,
             vec![("test_app", cells)],
             dna_files.clone(),
@@ -119,7 +120,7 @@ impl ConductorTestData {
         )
         .await;
 
-        let mut cell_apis = HashMap::new();
+        let mut cell_apis = BTreeMap::new();
 
         for (dna_file, cell_ids) in cell_id_by_dna_file.iter() {
             for cell_id in cell_ids {
@@ -131,7 +132,7 @@ impl ConductorTestData {
         }
 
         let this = Self {
-            __tmpdir,
+            _envs,
             // app_api,
             handle,
             cell_apis,
@@ -192,8 +193,8 @@ impl ConductorTestData {
 
     /// Shutdown the conductor
     pub async fn shutdown_conductor(&mut self) {
-        let shutdown = self.handle.take_shutdown_handle().await.unwrap();
-        self.handle.shutdown().await;
+        let shutdown = self.handle.take_shutdown_handle().unwrap();
+        self.handle.shutdown();
         shutdown.await.unwrap().unwrap();
     }
 
@@ -219,11 +220,21 @@ impl ConductorTestData {
 
     #[allow(clippy::iter_nth_zero)]
     pub fn alice_call_data(&self) -> &CellHostFnCaller {
-        &self.cell_apis.values().nth(0).unwrap()
+        match self.cell_apis.values().len() {
+            0 => unreachable!(),
+            1 => &self.cell_apis.values().next().unwrap(),
+            2 => &self.cell_apis.values().nth(1).unwrap(),
+            _ => unimplemented!(),
+        }
     }
 
     pub fn bob_call_data(&self) -> Option<&CellHostFnCaller> {
-        self.cell_apis.values().nth(1)
+        match self.cell_apis.values().len() {
+            0 => unreachable!(),
+            1 => None,
+            2 => self.cell_apis.values().next(),
+            _ => unimplemented!(),
+        }
     }
 
     #[allow(clippy::iter_nth_zero)]

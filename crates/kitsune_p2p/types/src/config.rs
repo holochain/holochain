@@ -77,23 +77,68 @@ pub mod tuning_params_struct {
     }
 
     mk_tune! {
-        /// Delay between gossip loop iteration. [Default: 10ms]
-        gossip_loop_iteration_delay_ms: u32 = 10,
+        /// Gossip strategy to use. [Default: "sharded-gossip"]
+        gossip_strategy: String = "sharded-gossip".to_string(),
 
-        /// Default agent count for remote notify. [Default: 5]
-        default_notify_remote_agent_count: u32 = 5,
+        /// Delay between gossip loop iteration. [Default: 1s]
+        gossip_loop_iteration_delay_ms: u32 = 1000,
 
-        /// Default timeout for remote notify. [Default: 30s]
-        default_notify_timeout_ms: u32 = 1000 * 30,
+        /// The gossip loop will attempt to rate-limit output
+        /// to this count mega bits per second. [Default: 0.5]
+        gossip_outbound_target_mbps: f64 = 0.5,
+
+        /// The gossip loop will attempt to rate-limit input
+        /// to this count mega bits per second. [Default: 0.5]
+        gossip_inbound_target_mbps: f64 = 0.5,
+
+        /// The gossip loop will attempt to rate-limit outbound
+        /// traffic for the historic loop (if there is one)
+        /// to this count mega bits per second. [Default: 0.1]
+        gossip_historic_outbound_target_mbps: f64 = 0.1,
+
+        /// The gossip loop will attempt to rate-limit inbound
+        /// traffic for the historic loop (if there is one)
+        /// to this count mega bits per second. [Default: 0.1]
+        gossip_historic_inbound_target_mbps: f64 = 0.1,
+
+        /// How long should we hold off talking to a peer
+        /// we've previously spoken successfully to.
+        /// [Default: 1 minute]
+        gossip_peer_on_success_next_gossip_delay_ms: u32 = 1000 * 60,
+
+        /// How long should we hold off talking to a peer
+        /// we've previously gotten errors speaking to.
+        /// [Default: 5 minute]
+        gossip_peer_on_error_next_gossip_delay_ms: u32 = 1000 * 60 * 5,
+
+        /// How frequently we should locally sync when there is
+        /// no new data. Agents arc can change so this shouldn't
+        /// be too long. [Default: 1 minutes]
+        gossip_local_sync_delay_ms: u32 = 1000 * 60,
+
+        /// Should gossip dynamically resize storage arcs?
+        gossip_dynamic_arcs: bool = false,
+
+        /// Allow only the first agent to join the space to
+        /// have a sized storage arc. [Default: false]
+        /// This is an experimental feature that sets the first
+        /// agent to join as the full arc and all other later
+        /// agents to empty.
+        /// It should not be used in production unless you understand
+        /// what you are doing.
+        gossip_single_storage_arc_per_space: bool = false,
 
         /// Default timeout for rpc single. [Default: 30s]
         default_rpc_single_timeout_ms: u32 = 1000 * 30,
 
-        /// Default agent count for rpc multi. [Default: 2]
-        default_rpc_multi_remote_agent_count: u32 = 2,
+        /// Default agent count for rpc multi. [Default: 3]
+        default_rpc_multi_remote_agent_count: u8 = 3,
 
-        /// Default timeout for rpc multi. [Default: 30s]
-        default_rpc_multi_timeout_ms: u32 = 1000 * 30,
+        /// Default remote request grace ms. [Default: 3s]
+        /// If we already have results from other sources,
+        /// but made any additional outgoing remote requests,
+        /// we'll wait at least this long for additional responses.
+        default_rpc_multi_remote_request_grace_ms: u64 = 1000 * 3,
 
         /// Default agent expires after milliseconds. [Default: 20 minutes]
         agent_info_expires_after_ms: u32 = 1000 * 60 * 20,
@@ -113,7 +158,8 @@ pub mod tuning_params_struct {
         /// Mainly used as the for_each_concurrent limit,
         /// this restricts the number of active polled futures
         /// on a single thread.
-        concurrent_limit_per_thread: usize = 32,
+        /// [Default: 4096]
+        concurrent_limit_per_thread: usize = 4096,
 
         /// tx2 quic max_idle_timeout
         /// [Default: 30 seconds]
@@ -124,8 +170,8 @@ pub mod tuning_params_struct {
         tx2_pool_max_connection_count: usize = 4096,
 
         /// tx2 channel count per connection
-        /// [Default: 3]
-        tx2_channel_count_per_connection: usize = 3,
+        /// [Default: 16]
+        tx2_channel_count_per_connection: usize = 16,
 
         /// tx2 timeout used for passive background operations
         /// like reads / responds.

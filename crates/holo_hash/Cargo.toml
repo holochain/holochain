@@ -1,6 +1,6 @@
 [package]
 name = "holo_hash"
-version = "0.0.2-alpha.1"
+version = "0.0.7"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo", "hash", "blake", "blake2b" ]
 categories = [ "cryptography" ]
@@ -8,35 +8,38 @@ edition = "2018"
 description = "hashing helpers supporting dht sharding"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
-documentation = "https://github.com/holochain/holochain"
+documentation = "https://docs.rs/holo_hash"
+
+[package.metadata.cargo-udeps.ignore]
+normal = ["tracing"]
 
 [dependencies]
-serde = "1"
-serde_bytes = "0.11"
+thiserror = "1.0.22"
 
 arbitrary = {version = "1.0", optional = true}
 base64 = {version = "0.13", optional = true}
 blake2b_simd = {version = "0.5.10", optional = true}
 derive_more = { version = "0.99", optional = true }
-fixt = { version = "^0.0.2-alpha.1", path = "../fixt", optional = true }
-holochain_serialized_bytes = {version = "=0.0.50", optional = true }
+fixt = { version = "0.0.6", path = "../fixt", optional = true }
+futures = {version = "0.3", optional = true}
+holochain_serialized_bytes = {version = "=0.0.51", optional = true }
+must_future = {version = "0.1", optional = true}
 rand = {version = "0.7", optional = true}
+rusqlite = { version = "0.25", optional = true }
+serde = { version = "1", optional = true }
+serde_bytes = { version = "0.11", optional = true }
 tracing = { version = "0.1", optional = true}
-thiserror = "1.0.22"
 
 [dev-dependencies]
 serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 
 [features]
 
-default = ["serialized-bytes", "fixturators"]
-full = ["fixturators", "hashing", "string-encoding"]
+default = ["serialization"]
+full = ["fixturators", "hashing", "encoding", "rusqlite"]
 
-fixturators = ["fixt", "rand", "serialized-bytes", "string-encoding"]
-serialized-bytes = ["holochain_serialized_bytes"]
-string-encoding = ["base64", "blake2b_simd", "derive_more"]
-hashing = ["blake2b_simd", "serialized-bytes"]
-test_utils = []
-
-[package.metadata.cargo-udeps.ignore]
-normal = ["tracing"]
+fixturators = ["fixt", "rand", "hashing", "encoding"]
+hashing = ["futures", "must_future", "blake2b_simd", "serialization"]
+serialization = ["holochain_serialized_bytes", "serde", "serde_bytes"]
+encoding = ["base64", "blake2b_simd", "derive_more"]
+test_utils = ["fixturators"]

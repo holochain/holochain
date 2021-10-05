@@ -2,15 +2,15 @@
 #![allow(missing_docs)]
 
 use super::app_validation_workflow::AppValidationError;
-use super::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::CellError;
 use crate::core::queue_consumer::QueueTriggerClosedError;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::SysValidationError;
 use holochain_cascade::error::CascadeError;
-use holochain_lmdb::error::DatabaseError;
+use holochain_keystore::KeystoreError;
 use holochain_p2p::HolochainP2pError;
+use holochain_sqlite::error::DatabaseError;
 use holochain_state::source_chain::SourceChainError;
 use holochain_state::workspace::WorkspaceError;
 use holochain_types::prelude::*;
@@ -33,6 +33,9 @@ pub enum WorkflowError {
     #[error(transparent)]
     CascadeError(#[from] CascadeError),
 
+    #[error(transparent)]
+    CounterSigningError(#[from] CounterSigningError),
+
     #[error("Workspace error: {0}")]
     WorkspaceError(#[from] WorkspaceError),
 
@@ -52,9 +55,6 @@ pub enum WorkflowError {
     SerializedBytesError(#[from] SerializedBytesError),
 
     #[error(transparent)]
-    DhtOpConvertError(#[from] DhtOpConvertError),
-
-    #[error(transparent)]
     CellError(#[from] CellError),
 
     #[error(transparent)]
@@ -70,10 +70,31 @@ pub enum WorkflowError {
     HoloHashError(#[from] holo_hash::error::HoloHashError),
 
     #[error(transparent)]
+    InterfaceError(#[from] crate::conductor::interface::error::InterfaceError),
+
+    #[error(transparent)]
     DhtOpError(#[from] DhtOpError),
 
     #[error(transparent)]
     SysValidationError(#[from] SysValidationError),
+
+    #[error(transparent)]
+    KeystoreError(#[from] KeystoreError),
+
+    #[error(transparent)]
+    SqlError(#[from] holochain_sqlite::rusqlite::Error),
+
+    #[error(transparent)]
+    StateQueryError(#[from] holochain_state::query::StateQueryError),
+
+    #[error(transparent)]
+    StateMutationError(#[from] holochain_state::mutations::StateMutationError),
+
+    #[error(transparent)]
+    SystemTimeError(#[from] std::time::SystemTimeError),
+
+    #[error("RecvError")]
+    RecvError,
 }
 
 /// Internal type to handle running workflows

@@ -1,25 +1,24 @@
+use crate::conductor::manager::spawn_task_manager;
+use crate::core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult;
 use crate::core::ribosome::MockRibosomeT;
-use crate::core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
+use crate::core::workflow::incoming_dht_ops_workflow::op_exists;
 use crate::fixt::DnaFileFixturator;
-use crate::fixt::SignatureFixturator;
 use crate::test_utils::test_network;
-use crate::{
-    conductor::manager::spawn_task_manager,
-    core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult,
-};
 use ::fixt::prelude::*;
 use holo_hash::HasHash;
-use holochain_lmdb::test_utils::test_cell_env;
+use holochain_state::prelude::*;
+use holochain_state::test_utils::test_keystore;
 use holochain_types::prelude::*;
 use holochain_zome_types::header;
-use holochain_zome_types::HeaderHashed;
 use std::sync::Arc;
 use tokio::sync;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_cell_handle_publish() {
     let cell_env = test_cell_env();
+    let cache_env = test_cache_env();
     let env = cell_env.env();
+    let cache = cache_env.env();
 
     let cell_id = fake_cell_id(1);
     let dna = cell_id.dna_hash().clone();
@@ -56,6 +55,7 @@ async fn test_cell_handle_publish() {
         cell_id,
         mock_handle,
         env.clone(),
+        cache.clone(),
         holochain_p2p_cell,
         add_task_sender,
         stop_tx.clone(),
@@ -63,29 +63,22 @@ async fn test_cell_handle_publish() {
     .await
     .unwrap();
 
-    let sig = fixt!(Signature);
+    let keystore = test_keystore();
     let header = header::Header::Dna(header::Dna {
         author: agent.clone(),
-        timestamp: timestamp::now().into(),
+        timestamp: Timestamp::now().into(),
         hash: dna.clone(),
     });
-    let op = DhtOp::StoreElement(sig, header.clone(), None);
+    let hh = HeaderHashed::from_content_sync(header.clone());
+    let shh = SignedHeaderHashed::new(&keystore, hh).await.unwrap();
+    let op = DhtOp::StoreElement(shh.signature().clone(), header.clone(), None);
     let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
-    let header_hash = HeaderHashed::from_content_sync(header.clone()).into_hash();
 
-    cell.handle_publish(
-        fake_agent_pubkey_2(),
-        true,
-        header_hash.clone().into(),
-        vec![(op_hash.clone(), op.clone())],
-    )
-    .await
-    .unwrap();
+    cell.handle_publish(true, false, vec![(op_hash.clone(), op.clone())])
+        .await
+        .unwrap();
 
-    let workspace =
-        IncomingDhtOpsWorkspace::new(cell.env.clone().into()).expect("Could not create Workspace");
-
-    workspace.op_exists(&op_hash).unwrap();
+    op_exists(&cell.env, &op_hash).unwrap();
 
     stop_tx.send(()).unwrap();
     shutdown.await.unwrap().unwrap();

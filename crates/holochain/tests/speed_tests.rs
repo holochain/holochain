@@ -31,8 +31,7 @@ use holochain::conductor::config::InterfaceDriver;
 use holochain::conductor::ConductorBuilder;
 use holochain::conductor::ConductorHandle;
 
-use holochain_lmdb::test_utils::test_environments;
-use holochain_lmdb::test_utils::TestEnvironments;
+use holochain_state::{prelude::test_environments, test_utils::TestEnvs};
 use holochain_test_wasm_common::AnchorInput;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
@@ -92,17 +91,14 @@ async fn speed_test_normal() {
     speed_test(None).await;
 }
 
-/// Run this test to execute the speed test, but then keep the LMDB env files
-/// around in temp dirs for inspection by e.g. `mdb_stat`
+/// Run this test to execute the speed test, but then keep the database files
+/// around in temp dirs for inspection
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_persisted() {
     observability::test_run().unwrap();
     let envs = speed_test(None).await;
-    let tmpdir = envs.tempdir();
-    drop(envs);
-    let tmpdir = std::sync::Arc::try_unwrap(tmpdir).unwrap();
-    let path = tmpdir.into_path();
+    let path = envs.into_tempdir().into_path();
     println!("Run the following to see info about the test that just ran,");
     println!("with the correct cell env dir appended to the path:");
     println!();
@@ -122,7 +118,7 @@ fn speed_test_all(n: usize) {
 }
 
 #[instrument]
-async fn speed_test(n: Option<usize>) -> TestEnvironments {
+async fn speed_test(n: Option<usize>) -> TestEnvs {
     let num = n.unwrap_or(DEFAULT_NUM);
 
     // ////////////
@@ -302,8 +298,8 @@ async fn speed_test(n: Option<usize>) -> TestEnvironments {
             break;
         }
     }
-    let shutdown = handle.take_shutdown_handle().await.unwrap();
-    handle.shutdown().await;
+    let shutdown = handle.take_shutdown_handle().unwrap();
+    handle.shutdown();
     shutdown.await.unwrap().unwrap();
     test_env
 }
@@ -311,7 +307,7 @@ async fn speed_test(n: Option<usize>) -> TestEnvironments {
 pub async fn setup_app(
     cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
     dna_store: MockDnaStore,
-) -> (TestEnvironments, RealAppInterfaceApi, ConductorHandle) {
+) -> (TestEnvs, RealAppInterfaceApi, ConductorHandle) {
     let envs = test_environments();
 
     let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
@@ -321,7 +317,7 @@ pub async fn setup_app(
             }]),
             ..Default::default()
         })
-        .test(&envs)
+        .test(&envs, &[])
         .await
         .unwrap();
 
@@ -332,11 +328,16 @@ pub async fn setup_app(
         .unwrap();
 
     conductor_handle
-        .activate_app("test app".to_string())
+        .clone()
+        .enable_app("test app".to_string())
         .await
         .unwrap();
 
-    let errors = conductor_handle.clone().setup_cells().await.unwrap();
+    let errors = conductor_handle
+        .clone()
+        .reconcile_cell_status_with_app_status()
+        .await
+        .unwrap();
 
     assert!(errors.is_empty());
 

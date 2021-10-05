@@ -6,6 +6,8 @@ pub use crate::capability::generate_cap_secret;
 pub use crate::capability::update_cap_grant;
 pub use crate::chain::get_agent_activity;
 pub use crate::chain::query;
+pub use crate::countersigning::accept_countersigning_preflight_request;
+pub use crate::countersigning::session_times_from_millis;
 pub use crate::ed25519::sign;
 pub use crate::ed25519::sign_ephemeral;
 pub use crate::ed25519::sign_ephemeral_raw;
@@ -19,6 +21,9 @@ pub use crate::entry::delete_entry;
 pub use crate::entry::get;
 pub use crate::entry::get_details;
 pub use crate::entry::hash_entry;
+pub use crate::entry::must_get_entry;
+pub use crate::entry::must_get_header;
+pub use crate::entry::must_get_valid_element;
 pub use crate::entry::update;
 pub use crate::entry::update_entry;
 pub use crate::entry::EntryDefRegistration;
@@ -42,6 +47,7 @@ pub use crate::link::get_link_details;
 pub use crate::link::get_links;
 pub use crate::map_extern;
 pub use crate::map_extern::ExternResult;
+pub use crate::map_extern_infallible;
 pub use crate::p2p::call;
 pub use crate::p2p::call_remote;
 pub use crate::p2p::emit_signal;
@@ -67,6 +73,7 @@ pub use holo_hash::EntryHashes;
 pub use holo_hash::HasHash;
 pub use holo_hash::HeaderHash;
 pub use holo_hash::HoloHash;
+pub use holo_hash::HoloHashed;
 pub use holochain_wasmer_guest::*;
 pub use holochain_zome_types;
 pub use holochain_zome_types::prelude::*;
@@ -84,7 +91,6 @@ pub use mockall;
 #[macro_export]
 macro_rules! holochain_externs {
     () => {
-        holochain_wasmer_guest::memory_externs!();
         holochain_wasmer_guest::host_externs!(
             __trace,
             __hash_entry,
@@ -107,6 +113,10 @@ macro_rules! holochain_externs {
             __get_links,
             __get_link_details,
             __get_agent_activity,
+            __must_get_entry,
+            __must_get_valid_element,
+            __must_get_header,
+            __accept_countersigning_preflight_request,
             __query,
             __call_remote,
             __call,

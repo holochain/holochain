@@ -1,6 +1,7 @@
 #![deny(missing_docs)]
 //! This module is used to configure the conductor
 
+use holochain_types::env::DbSyncLevel;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
@@ -28,7 +29,7 @@ use std::path::PathBuf;
 /// All the config information for the conductor
 #[derive(Clone, Deserialize, Serialize, Default, Debug, PartialEq)]
 pub struct ConductorConfig {
-    /// The path to the LMDB environment for this conductor.
+    /// The path to the database for this conductor.
     /// If omitted, chooses a default path.
     pub environment_path: EnvironmentRootPath,
 
@@ -50,13 +51,19 @@ pub struct ConductorConfig {
     /// The conductor is independent of the specialized implementation of the trait
     /// PassphraseService. It just needs something to provide a passphrase when needed.
     /// This config setting selects one of the available services (i.e. CLI prompt, IPC, FromConfig)
-    pub passphrase_service: Option<PassphraseServiceConfig>,
+    pub passphrase_service: PassphraseServiceConfig,
 
     /// Setup admin interfaces to control this conductor through a websocket connection
     pub admin_interfaces: Option<Vec<AdminInterfaceConfig>>,
 
     /// Config options for the network module. Optional.
     pub network: Option<holochain_p2p::kitsune_p2p::KitsuneP2pConfig>,
+
+    #[serde(default)]
+    /// Override the default database synchronous level.
+    /// See [sqlite documentation](https://www.sqlite.org/pragma.html#pragma_synchronous).
+    /// Warning: Using `Off` level could result in database corruption that cannot be recovered from.
+    pub db_sync_level: DbSyncLevel,
     //
     //
     // /// Which signals to emit
@@ -116,7 +123,8 @@ pub mod tests {
     environment_path: /path/to/env
 
     passphrase_service:
-      type: cmd
+      type: danger_insecure_from_config
+      passphrase: "test-passphrase"
     "#;
         let result: ConductorConfig = config_from_yaml(yaml).unwrap();
         assert_eq!(
@@ -125,10 +133,13 @@ pub mod tests {
                 environment_path: PathBuf::from("/path/to/env").into(),
                 network: None,
                 dpki: None,
-                passphrase_service: Some(PassphraseServiceConfig::Cmd),
+                passphrase_service: PassphraseServiceConfig::DangerInsecureFromConfig {
+                    passphrase: "test-passphrase".to_string(),
+                },
                 keystore_path: None,
                 admin_interfaces: None,
                 use_dangerous_test_keystore: false,
+                db_sync_level: DbSyncLevel::default(),
             }
         );
     }
@@ -145,7 +156,8 @@ pub mod tests {
     decryption_service_uri: ws://localhost:9003
 
     passphrase_service:
-      type: cmd
+      type: danger_insecure_from_config
+      passphrase: "test-passphrase"
 
     dpki:
       instance_id: some_id
@@ -168,16 +180,16 @@ pub mod tests {
             proxy_accept_config: reject_all
       tuning_params:
         gossip_loop_iteration_delay_ms: 42
-        default_notify_remote_agent_count: 42
-        default_notify_timeout_ms: 42
         default_rpc_single_timeout_ms: 42
         default_rpc_multi_remote_agent_count: 42
-        default_rpc_multi_timeout_ms: 42
+        default_rpc_multi_remote_request_grace_ms: 42
         agent_info_expires_after_ms: 42
         tls_in_mem_session_storage: 42
         proxy_keepalive_ms: 42
         proxy_to_expire_ms: 42
       network_type: quic_bootstrap
+    
+    db_sync_level: Off
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
         use holochain_p2p::kitsune_p2p::*;
@@ -196,11 +208,9 @@ pub mod tests {
         let mut tuning_params =
             kitsune_p2p::dependencies::kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
         tuning_params.gossip_loop_iteration_delay_ms = 42;
-        tuning_params.default_notify_remote_agent_count = 42;
-        tuning_params.default_notify_timeout_ms = 42;
         tuning_params.default_rpc_single_timeout_ms = 42;
         tuning_params.default_rpc_multi_remote_agent_count = 42;
-        tuning_params.default_rpc_multi_timeout_ms = 42;
+        tuning_params.default_rpc_multi_remote_request_grace_ms = 42;
         tuning_params.agent_info_expires_after_ms = 42;
         tuning_params.tls_in_mem_session_storage = 42;
         tuning_params.proxy_keepalive_ms = 42;
@@ -215,12 +225,15 @@ pub mod tests {
                     instance_id: "some_id".into(),
                     init_params: "some_params".into()
                 }),
-                passphrase_service: Some(PassphraseServiceConfig::Cmd),
+                passphrase_service: PassphraseServiceConfig::DangerInsecureFromConfig {
+                    passphrase: "test-passphrase".to_string(),
+                },
                 keystore_path: None,
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
                     driver: InterfaceDriver::Websocket { port: 1234 }
                 }]),
                 network: Some(network_config),
+                db_sync_level: DbSyncLevel::Off,
             }
         );
     }
@@ -233,8 +246,8 @@ pub mod tests {
     keystore_path: /path/to/keystore
 
     passphrase_service:
-      type: fromconfig
-      passphrase: foobar
+      type: danger_insecure_from_config
+      passphrase: "foobar"
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
         assert_eq!(
@@ -243,12 +256,13 @@ pub mod tests {
                 environment_path: PathBuf::from("/path/to/env").into(),
                 network: None,
                 dpki: None,
-                passphrase_service: Some(PassphraseServiceConfig::FromConfig {
+                passphrase_service: PassphraseServiceConfig::DangerInsecureFromConfig {
                     passphrase: "foobar".into()
-                }),
+                },
                 keystore_path: Some(PathBuf::from("/path/to/keystore").into()),
                 admin_interfaces: None,
                 use_dangerous_test_keystore: true,
+                db_sync_level: DbSyncLevel::default(),
             }
         );
     }

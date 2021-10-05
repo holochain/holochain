@@ -1,12 +1,14 @@
 [package]
 name = "holochain_cli"
-version = "0.0.1-dev.0"
+version = "0.0.9"
 homepage = "https://github.com/holochain/holochain"
-documentation = "https://github.com/holochain/holochain"
+documentation = "https://docs.rs/holochain_cli"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo" ]
 categories = [ "command-line-utilities", "development-tools::build-utils", "filesystem" ]
 edition = "2018"
+license = "Apache-2.0"
+description = "Provides the `hc` binary, a helpful CLI tool for working with Holochain."
 
 [[bin]]
 name = "hc"
@@ -19,8 +21,8 @@ path = "src/lib.rs"
 [dependencies]
 anyhow = "1.0"
 futures = "0.3"
-holochain_cli_bundle = { path = "../hc_bundle" }
-holochain_cli_sandbox = { path = "../hc_sandbox" }
+holochain_cli_bundle = { path = "../hc_bundle", version = "0.0.6"}
+holochain_cli_sandbox = { path = "../hc_sandbox", version = "0.0.7"}
 observability = "0.1.3"
 structopt = "0.3"
-tokio = { version = "1.3", features = [ "full" ] }
+tokio = { version = "1.11", features = [ "full" ] }

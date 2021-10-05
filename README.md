@@ -17,7 +17,7 @@ This code is in alpha. It is not for production use. The code is guaranteed NOT 
 
 We will be frequently and heavily restructuring code APIs and data chains until Beta.
 
-**We are currently only supporting Linux at this time**. You may or may not be able to successfully build and run Holochain on macOS. You definitely won't be able to on Windows (unless you are using WSL, but even that is untested). We will definitely be rolling out support for these OSes in the future, but in the meantime please use Linux for development!
+**We are currently only supporting Linux at this time**. You may or may not be able to successfully build and run Holochain on macOS or Windows. We will definitely be rolling out support for these OSes in the future, but in the meantime please use Linux for development!
 
 ## Making the Holochain binaries available in your shell
 There are a number of contexts and purposes you might be running in which yield different ways to access binaries.
@@ -32,11 +32,21 @@ nix-shell --argstr flavor happDev
 
 This nix-shell flavor installs wrapper binaries for `holochain` and `hc` that will automatically compile and run the binaries.  This is very useful if you are tracking changes in the holochain repo because when you check out a new rev, running holochain will compile automatically to the version at that rev.
 
-### Building with cargo if you already have rust installed:
+### Building with a pre-installed cargo
+
+Another way to install the `holochain` and `hc` binaries (if the previous didn't work) is by using rust
+
+[Install Rust](https://www.rust-lang.org/tools/install)
+
+Install holochain binaries:
 ```
 cargo install --path crates/holochain
 cargo install --path crates/hc
 ```
+
+be sure to add `$HOME/.cargo/bin` to your PATH to be able to run the installed binaries
+
+
 ## Usage
 
 ``` bash
@@ -63,16 +73,22 @@ There is no conductor config YAML file at the path specified (/home/eric/.config
 Would you like to create a default config file at this location? [Y/n]
 Y
 Conductor config written.
-There is no database environment set at the path specified (/home/eric/.local/share/holochain/databases)
+There is no database set at the path specified (/home/eric/.local/share/holochain/databases)
 Would you like to create one now? [Y/n]
 Y
-LMDB environment created.
+Database created.
 Conductor ready.
 ```
 
-As well as creating the config file this process also instantiates the initial LMDB database environment.   If you provide a config file on first run with just the `-c` flag `holochain` will also initialize the environment even if not in interactive mode.
+As well as creating the config file this process also instantiates the database.   If you provide a config file on first run with just the `-c` flag `holochain` will also initialize the environment even if not in interactive mode.
 
-## Development Environment
+## Documentation for Application Developers
+
+- [Read the HDK API docs](https://docs.rs/hdk)
+- [Get started developing hApps](https://github.com/holochain/happ-build-tutorial/)
+- [Read the wasm API docs](./crates/hdk/README.md)
+
+## Environment for Development on this Project
 
 Assuming you have [installed the nix shell](https://nixos.wiki/wiki/Nix_Installation_Guide):
 
@@ -118,16 +134,19 @@ rough advice, because anything we say today could be out of date tomorrow:
 - Write your own scaffolding, build and development tools
 - Plan for dependency management as we ship new binaries
 
-## Application Developer
+### Advanced nix-shell usage
 
-[Read the wasm API docs](./crates/hdk/README.md)
+#### Custom rust version
 
-Build the hdk docs:
-```bash
-cargo doc --manifest-path=crates/hdk/Cargo.toml --open
+The shell function in this repository takes a `rustVersion` argument that works in the following way:
+
+```shell
+$ nix-shell --arg rustVersion '{ track = "nightly"; version = "2021-07-01"; }' --run "rustc --version"
+Using /home/steveej/src/holo/holochain as target prefix...
+rustc 1.55.0-nightly (868c702d0 2021-06-30)
 ```
 
-## Core Developer
+### Additional Documentation
 
 Build the holochain docs:
 ```bash

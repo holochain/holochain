@@ -1,21 +1,13 @@
 use crate::types::agent_store::AgentInfoSigned;
-use crate::types::KitsuneBinType;
-use crate::types::KitsuneSpace;
+use kitsune_p2p_types::bootstrap::RandomQuery;
 use once_cell::sync::Lazy;
 use once_cell::sync::OnceCell;
 use std::convert::TryFrom;
 use std::convert::TryInto;
-use std::sync::Arc;
 use url2::Url2;
 
 /// Reuse a single reqwest Client for efficiency as we likely need several connections.
 static CLIENT: Lazy<reqwest::Client> = Lazy::new(reqwest::Client::new);
-
-#[allow(dead_code)]
-/// The number of random agent infos we want to collect from the bootstrap service when we want to
-/// populate an empty local space.
-/// @todo expose this to network config.
-const RANDOM_LIMIT_DEFAULT: u32 = 16;
 
 /// A cell to hold our local offset for calculating a 'now' that is compatible with the remote
 /// service. This is much less precise and comprehensive than NTP style calculations.
@@ -142,35 +134,6 @@ pub async fn now_once(url: Option<Url2>) -> crate::types::actor::KitsuneP2pResul
     }
 }
 
-/// Struct to be encoded for the `random` op.
-#[derive(serde::Deserialize, serde::Serialize)]
-pub struct RandomQuery {
-    // The space to get random agents from.
-    pub space: Arc<KitsuneSpace>,
-    // The maximum number of random agents to retrieve for this query.
-    pub limit: RandomLimit,
-}
-
-impl Default for RandomQuery {
-    fn default() -> Self {
-        Self {
-            // This is useless, it's here as a placeholder so that ..Default::default() syntax
-            // works for limits, not because you'd actually ever want a "default" space.
-            space: Arc::new(KitsuneSpace::new(vec![0; 36])),
-            limit: RandomLimit::default(),
-        }
-    }
-}
-
-#[derive(serde::Deserialize, serde::Serialize, derive_more::From, derive_more::Into)]
-pub struct RandomLimit(u32);
-
-impl Default for RandomLimit {
-    fn default() -> Self {
-        Self(RANDOM_LIMIT_DEFAULT)
-    }
-}
-
 /// `do_api` wrapper around the `random` op.
 ///
 /// Fetches up to `limit` agent infos randomly from the `space`.
@@ -202,13 +165,14 @@ pub async fn random(
 mod tests {
     use super::*;
     use crate::fixt::*;
-    use crate::types::agent_store::*;
     use crate::types::KitsuneAgent;
     use crate::types::KitsuneBinType;
     use crate::types::KitsuneSignature;
     use ::fixt::prelude::*;
-    use lair_keystore_api::internal::sign_ed25519::sign_ed25519_keypair_new_from_entropy;
+    use kitsune_p2p_types::dependencies::legacy_lair_api::internal::sign_ed25519::sign_ed25519_keypair_new_from_entropy;
+    use kitsune_p2p_types::KitsuneError;
     use std::convert::TryInto;
+    use std::sync::Arc;
 
     // TODO - FIXME - davidb
     // I'm disabling all these tests that depend on outside systems
@@ -220,28 +184,34 @@ mod tests {
         let keypair = sign_ed25519_keypair_new_from_entropy().await.unwrap();
         let space = fixt!(KitsuneSpace);
         let agent = KitsuneAgent::new((*keypair.pub_key.0).clone());
-        let urls = fixt!(Urls);
+        let urls = fixt!(UrlList);
         let now = std::time::SystemTime::now();
         let millis = now
             .duration_since(std::time::UNIX_EPOCH)
             .expect("Time went backwards")
             .as_millis();
-        let agent_info = AgentInfo::new(
-            space,
-            agent.clone(),
+        let signed_at_ms = (millis - 100).try_into().unwrap();
+        let expires_at_ms = signed_at_ms + 1000 * 60 * 20;
+        let agent_info_signed = AgentInfoSigned::sign(
+            Arc::new(space),
+            Arc::new(agent),
+            u32::MAX,
             urls,
-            (millis - 100).try_into().unwrap(),
-            1000 * 60 * 20,
-        );
-        let mut data = Vec::new();
-        kitsune_p2p_types::codec::rmp_encode(&mut data, &agent_info).unwrap();
-        let signature = keypair
-            .sign(std::sync::Arc::new(data.clone()))
-            .await
-            .unwrap();
-        let agent_info_signed =
-            AgentInfoSigned::try_new(agent, KitsuneSignature((*signature.0).clone()), data)
-                .unwrap();
+            signed_at_ms,
+            expires_at_ms,
+            |d| {
+                let d = Arc::new(d.to_vec());
+                async {
+                    keypair
+                        .sign(d)
+                        .await
+                        .map(|s| Arc::new(KitsuneSignature(s.0.to_vec())))
+                        .map_err(KitsuneError::other)
+                }
+            },
+        )
+        .await
+        .unwrap();
 
         // Simply hitting the endpoint should be OK.
         super::put(
@@ -312,21 +282,27 @@ mod tests {
         let mut expected: Vec<AgentInfoSigned> = Vec::new();
         for agent in vec![alice.clone(), bob.clone()] {
             let kitsune_agent = KitsuneAgent::new((*agent.pub_key.0).clone());
-            let agent_info = AgentInfo::new(
-                space.clone(),
-                kitsune_agent.clone(),
-                fixt!(Urls),
-                now,
-                1000 * 60 * 20,
-            );
-            let mut data = Vec::new();
-            kitsune_p2p_types::codec::rmp_encode(&mut data, &agent_info).unwrap();
-            let signature = agent.sign(std::sync::Arc::new(data.clone())).await.unwrap();
-            let agent_info_signed = AgentInfoSigned::try_new(
-                kitsune_agent,
-                KitsuneSignature((*signature.0).clone()),
-                data,
+            let signed_at_ms = now;
+            let expires_at_ms = now + 1000 * 60 * 20;
+            let agent_info_signed = AgentInfoSigned::sign(
+                Arc::new(space.clone()),
+                Arc::new(kitsune_agent.clone()),
+                u32::MAX,
+                fixt!(UrlList),
+                signed_at_ms,
+                expires_at_ms,
+                |d| {
+                    let d = Arc::new(d.to_vec());
+                    async {
+                        agent
+                            .sign(d)
+                            .await
+                            .map(|s| Arc::new(KitsuneSignature(s.0.to_vec())))
+                            .map_err(KitsuneError::other)
+                    }
+                },
             )
+            .await
             .unwrap();
 
             super::put(
@@ -349,8 +325,8 @@ mod tests {
         .await
         .unwrap();
 
-        expected.sort();
-        random.sort();
+        expected.sort_by(|a, b| a.agent.partial_cmp(&b.agent).unwrap());
+        random.sort_by(|a, b| a.agent.partial_cmp(&b.agent).unwrap());
 
         assert!(random.len() == 2);
         assert!(random == expected);

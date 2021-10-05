@@ -94,14 +94,17 @@ macro_rules! primitive_hash_type {
             fn new() -> Self {
                 Self
             }
+
             fn static_prefix() -> &'static [u8] {
                 &$prefix
             }
+
             fn hash_name(self) -> &'static str {
                 stringify!($display)
             }
         }
 
+        #[cfg(feature = "serialization")]
         impl serde::Serialize for $name {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where
@@ -111,6 +114,7 @@ macro_rules! primitive_hash_type {
             }
         }
 
+        #[cfg(feature = "serialization")]
         impl<'de> serde::Deserialize<'de> for $name {
             fn deserialize<D>(deserializer: D) -> Result<$name, D::Error>
             where
@@ -120,8 +124,10 @@ macro_rules! primitive_hash_type {
             }
         }
 
+        #[cfg(feature = "serialization")]
         struct $visitor;
 
+        #[cfg(feature = "serialization")]
         impl<'de> serde::de::Visitor<'de> for $visitor {
             type Value = $name;
 
