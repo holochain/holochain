@@ -30,7 +30,7 @@ strum = { version = "0.18.0", optional = true }
 rand = {version = "0.7", optional = true}
 
 # sqlite dependencies
-rusqlite = { version = "0.25", optional = true }
+rusqlite = { version = "0.26", optional = true }
 num_enum = { version = "0.5", optional = true }
 
 # full-dna-def dependencies
