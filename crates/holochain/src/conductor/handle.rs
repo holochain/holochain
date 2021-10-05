@@ -1297,7 +1297,7 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
 
         let pending_cells: Vec<(CellId, HolochainP2pCell)> = self
             .conductor
-            .pending_to_joining_cells()
+            .mark_pending_cells_as_joining()
             .into_iter()
             .map(|(id, cell)| (id, cell.holochain_p2p_cell().clone()))
             .collect();
