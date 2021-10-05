@@ -997,7 +997,13 @@ async fn _put_db<H: HeaderInner, B: HeaderBuilder<H>>(
     vault.conn()?.with_commit_sync(|txn| {
         let (new_head, new_seq, new_timestamp) = chain_head_db(txn, author.clone())?;
         if new_head != prev_header {
+            let entries = match entry {
+                Some(e) => vec![EntryHashed::from_content_sync(e)],
+                None => vec![],
+            };
             return Err(SourceChainError::HeadMoved(
+                vec![header],
+                entries,
                 Some(prev_header),
                 Some((new_head, new_seq, new_timestamp)),
             ));
