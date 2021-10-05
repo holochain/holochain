@@ -324,7 +324,7 @@ pub fn dump_db(txn: &Transaction) {
     let dump = |mut stmt: Statement| {
         let mut rows = stmt.query([]).unwrap();
         while let Some(row) = rows.next().unwrap() {
-            for column in row.column_names() {
+            for column in row.as_ref().column_names() {
                 let row = row.get_ref_unwrap(column);
                 match row {
                     holochain_sqlite::rusqlite::types::ValueRef::Null
