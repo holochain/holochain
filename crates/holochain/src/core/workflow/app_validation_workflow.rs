@@ -53,7 +53,7 @@ pub mod validation_package;
 #[instrument(skip(workspace, trigger_integration, conductor_api, network))]
 pub async fn app_validation_workflow(
     mut workspace: AppValidationWorkspace,
-    mut trigger_integration: TriggerSender,
+    trigger_integration: TriggerSender,
     conductor_api: impl CellConductorApiT,
     network: HolochainP2pCell,
 ) -> WorkflowResult<WorkComplete> {

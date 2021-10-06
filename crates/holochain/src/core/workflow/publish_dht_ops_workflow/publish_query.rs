@@ -12,6 +12,7 @@ use holochain_zome_types::Entry;
 use holochain_zome_types::EntryVisibility;
 use holochain_zome_types::SignedHeader;
 use rusqlite::named_params;
+use rusqlite::Transaction;
 
 use crate::core::workflow::error::WorkflowResult;
 
@@ -91,6 +92,30 @@ pub async fn get_ops_to_publish(
         .await?;
     tracing::debug!(?results);
     results
+}
+
+/// Get the number of ops that might need to publish again in the future.
+pub fn num_still_needing_publish(txn: &Transaction) -> WorkflowResult<usize> {
+    let count = txn.query_row(
+        "
+        SELECT 
+        COUNT(DhtOp.rowid) as num_ops
+        FROM Header
+        JOIN
+        DhtOp ON DhtOp.header_hash = Header.hash
+        WHERE
+        DhtOp.is_authored = 1
+        AND
+        DhtOp.receipts_complete IS NULL 
+        AND
+        (DhtOp.type != :store_entry OR Header.private_entry = 0)
+        ",
+        named_params! {
+            ":store_entry": DhtOpType::StoreEntry,
+        },
+        |row| row.get("num_ops"),
+    )?;
+    Ok(count)
 }
 
 #[cfg(test)]

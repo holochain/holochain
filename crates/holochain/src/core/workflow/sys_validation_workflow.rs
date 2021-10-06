@@ -46,7 +46,7 @@ mod tests;
 ))]
 pub async fn sys_validation_workflow(
     mut workspace: SysValidationWorkspace,
-    mut trigger_app_validation: TriggerSender,
+    trigger_app_validation: TriggerSender,
     sys_validation_trigger: TriggerSender,
     // TODO: Update HolochainP2p to reflect changes to pass through network.
     network: HolochainP2pCell,

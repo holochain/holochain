@@ -15,8 +15,12 @@ pub fn spawn_publish_dht_ops_consumer(
     mut stop: sync::broadcast::Receiver<()>,
     cell_network: HolochainP2pCell,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
-    let (tx, mut rx) = TriggerSender::new();
-    let mut trigger_self = tx.clone();
+    // Create a trigger with an exponential back off starting at 1 minute
+    // and maxing out at 5 minutes.
+    // The back off is reset any time the trigger is called (when new data is committed)
+    let (tx, mut rx) =
+        TriggerSender::new_with_loop(Duration::from_secs(60)..Duration::from_secs(60 * 5), true);
+    let trigger_self = tx.clone();
     let handle = tokio::spawn(async move {
         loop {
             // Wait for next job
@@ -35,7 +39,7 @@ pub fn spawn_publish_dht_ops_consumer(
             }
 
             // Run the workflow
-            match publish_dht_ops_workflow(env.clone(), cell_network.clone()).await {
+            match publish_dht_ops_workflow(env.clone(), cell_network.clone(), &trigger_self).await {
                 Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
                 Err(err) => {
                     handle_workflow_error(

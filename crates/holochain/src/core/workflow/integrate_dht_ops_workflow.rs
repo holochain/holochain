@@ -19,7 +19,7 @@ mod tests;
 #[instrument(skip(vault, trigger_receipt, cell_network))]
 pub async fn integrate_dht_ops_workflow(
     vault: EnvWrite,
-    mut trigger_receipt: TriggerSender,
+    trigger_receipt: TriggerSender,
     cell_network: HolochainP2pCell,
 ) -> WorkflowResult<WorkComplete> {
     let time = holochain_zome_types::Timestamp::now();

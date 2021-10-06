@@ -26,12 +26,16 @@
 //! Implicitly, every workflow also writes to its own source queue, i.e. to
 //! remove the item it has just processed.
 
+use std::ops::Range;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
+
 use derive_more::Display;
 use futures::future::Either;
 use holochain_types::prelude::*;
 use holochain_zome_types::CellId;
-use tokio::sync;
-use tokio::sync::mpsc;
+use tokio::sync::{self, broadcast};
 
 // TODO: move these to workflow mod
 mod integrate_dht_ops_consumer;
@@ -51,6 +55,9 @@ use publish_dht_ops_consumer::*;
 
 mod countersigning_consumer;
 use countersigning_consumer::*;
+
+#[cfg(test)]
+mod tests;
 
 use super::workflow::countersigning_workflow::CountersigningWorkspace;
 use super::workflow::error::WorkflowError;
@@ -231,7 +238,7 @@ impl InitialQueueTriggers {
     }
 
     /// Initialize all the workflows once.
-    pub fn initialize_workflows(mut self) {
+    pub fn initialize_workflows(self) {
         self.sys_validation.trigger();
         self.app_validation.trigger();
         self.integrate_dht_ops.trigger();
@@ -241,37 +248,105 @@ impl InitialQueueTriggers {
 }
 /// The means of nudging a queue consumer to tell it to look for more work
 #[derive(Clone)]
-pub struct TriggerSender(mpsc::Sender<()>);
+pub struct TriggerSender {
+    trigger: broadcast::Sender<()>,
+    reset_back_off: Option<Arc<AtomicBool>>,
+    pause_back_off: Option<Arc<AtomicBool>>,
+}
 
 /// The receiving end of a queue trigger channel
 pub struct TriggerReceiver {
-    rx: mpsc::Receiver<()>,
-    waker: core::task::Waker,
+    rx: broadcast::Receiver<()>,
+    reset_on_trigger: bool,
+    back_off: Option<BackOff>,
+}
+
+struct BackOff {
+    start: Duration,
+    range: Range<Duration>,
+    reset_back_off: Arc<AtomicBool>,
+    paused: Arc<AtomicBool>,
 }
 
 impl TriggerSender {
     /// Create a new channel for waking a consumer
-    ///
-    /// The channel buffer is set to num_cpus to deal with the potential
-    /// inconsistency from the perspective of any particular CPU thread
     pub fn new() -> (TriggerSender, TriggerReceiver) {
-        let (tx, rx) = mpsc::channel(num_cpus::get());
-        let waker = futures::task::noop_waker();
-        (TriggerSender(tx), TriggerReceiver { rx, waker })
+        let (tx, rx) = broadcast::channel(1);
+        (
+            TriggerSender {
+                trigger: tx,
+                reset_back_off: None,
+                pause_back_off: None,
+            },
+            TriggerReceiver {
+                rx,
+                back_off: None,
+                reset_on_trigger: false,
+            },
+        )
+    }
+
+    /// Create a new channel trigger that will also trigger
+    /// on a loop.
+    /// The duration takes a range so that the loop  can
+    /// be set to back off from the lowest to the highest duration.
+    /// If you do not want a back off, set the duration range
+    /// to the same value like: `Duration::from_millis(10)..Duration::from_millis(10)`
+    /// If reset_on_trigger is true, the back off will be reset whenever a
+    /// trigger is received.
+    pub fn new_with_loop(
+        range: Range<Duration>,
+        reset_on_trigger: bool,
+    ) -> (TriggerSender, TriggerReceiver) {
+        let (tx, rx) = broadcast::channel(1);
+        let reset_back_off = Arc::new(AtomicBool::new(false));
+        let pause_back_off = Arc::new(AtomicBool::new(false));
+        (
+            TriggerSender {
+                trigger: tx,
+                reset_back_off: Some(reset_back_off.clone()),
+                pause_back_off: Some(pause_back_off.clone()),
+            },
+            TriggerReceiver {
+                rx,
+                reset_on_trigger,
+                back_off: Some(BackOff::new(range, reset_back_off, pause_back_off)),
+            },
+        )
     }
 
     /// Lazily nudge the consumer task, ignoring the case where the consumer
     /// already has a pending trigger signal
-    pub fn trigger(&mut self) {
-        match self.0.try_send(()) {
-            Err(mpsc::error::TrySendError::Closed(_)) => {
-                tracing::warn!(
-                    "Queue consumer trigger was sent while Cell is shutting down: ignoring."
-                );
-            }
-            Err(mpsc::error::TrySendError::Full(_)) => {}
-            Ok(()) => {}
+    pub fn trigger(&self) {
+        if self.trigger.send(()).is_err() {
+            tracing::warn!(
+                "Queue consumer trigger was sent while Cell is shutting down: ignoring."
+            );
         };
+    }
+
+    /// Reset the back off to the lowest duration.
+    /// If no back off is set this is a no-op.
+    pub fn reset_back_off(&self) {
+        if let Some(tx) = &self.reset_back_off {
+            tx.store(true, Ordering::Relaxed);
+        }
+    }
+
+    /// Pause the trigger loop if there is one.
+    pub fn pause_loop(&self) {
+        if let Some(pause) = &self.pause_back_off {
+            pause.store(true, Ordering::Relaxed);
+        }
+    }
+
+    /// Resume the trigger loop if there is one.
+    pub fn resume_loop(&self) {
+        if let Some(pause) = &self.pause_back_off {
+            if pause.fetch_and(false, Ordering::AcqRel) {
+                self.trigger();
+            }
+        }
     }
 }
 
@@ -279,22 +354,97 @@ impl TriggerReceiver {
     /// Listen for one or more items to come through, draining the channel
     /// each time. Bubble up errors on empty channel.
     pub async fn listen(&mut self) -> Result<(), QueueTriggerClosedError> {
-        use core::task::Poll;
+        let Self {
+            back_off,
+            rx,
+            reset_on_trigger,
+        } = self;
 
-        // wait for next item
-        if self.rx.recv().await.is_some() {
-            // drain the channel
-            let mut ctx = core::task::Context::from_waker(&self.waker);
-            loop {
-                match self.rx.poll_recv(&mut ctx) {
-                    Poll::Ready(None) => return Err(QueueTriggerClosedError),
-                    Poll::Pending => return Ok(()),
-                    Poll::Ready(Some(())) => {}
+        let mut flush_buffer = false;
+
+        {
+            let rx_fut = Self::rx_fut(rx);
+            match back_off {
+                Some(back_off) if !back_off.is_paused() => {
+                    let paused = back_off.paused.clone();
+                    let reset_back_off = {
+                        let back_off_fut = back_off.wait();
+                        futures::pin_mut!(back_off_fut, rx_fut);
+                        match futures::future::select(rx_fut, back_off_fut).await {
+                            Either::Left((result, _)) => {
+                                result?;
+                                flush_buffer = true;
+                                *reset_on_trigger
+                            }
+                            Either::Right((_, rx_fut)) => {
+                                if paused.load(Ordering::Acquire) {
+                                    rx_fut.await?;
+                                    true
+                                } else {
+                                    false
+                                }
+                            }
+                        }
+                    };
+                    if reset_back_off {
+                        back_off.reset();
+                    }
+                }
+                _ => {
+                    rx_fut.await?;
+                    flush_buffer = true;
                 }
             }
-        } else {
-            Err(QueueTriggerClosedError)
         }
+        if flush_buffer {
+            // Do one try recv to empty the buffer.
+            let _ = self.rx.try_recv();
+        }
+        Ok(())
+    }
+
+    async fn rx_fut(rx: &mut broadcast::Receiver<()>) -> Result<(), QueueTriggerClosedError> {
+        match rx.recv().await {
+            Ok(_) => Ok(()),
+            Err(broadcast::error::RecvError::Closed) => Err(QueueTriggerClosedError),
+            Err(broadcast::error::RecvError::Lagged(_)) => Ok(()),
+        }
+    }
+}
+
+impl BackOff {
+    fn new(
+        range: Range<Duration>,
+        reset_back_off: Arc<AtomicBool>,
+        pause_back_off: Arc<AtomicBool>,
+    ) -> Self {
+        Self {
+            start: range.start,
+            range,
+            reset_back_off,
+            paused: pause_back_off,
+        }
+    }
+
+    async fn wait(&mut self) {
+        if self.reset_back_off.fetch_and(false, Ordering::Relaxed) {
+            self.reset();
+        }
+        let dur = if self.range.is_empty() {
+            self.range.end
+        } else {
+            self.range.start
+        };
+        tokio::time::sleep(dur).await;
+        self.range.start = std::cmp::min(self.range.start * 2, self.range.end);
+    }
+
+    fn reset(&mut self) {
+        self.range.start = self.start;
+    }
+
+    fn is_paused(&self) -> bool {
+        self.paused.load(Ordering::Acquire)
     }
 }
 
