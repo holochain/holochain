@@ -281,7 +281,7 @@ checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
 
 [[package]]
 name = "hdk"
-version = "0.0.109-dev.0"
+version = "0.0.109"
 dependencies = [
  "hdk_derive",
  "holo_hash",
@@ -299,7 +299,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.0.11-dev.0"
+version = "0.0.11"
 dependencies = [
  "holochain_zome_types",
  "paste",
@@ -319,7 +319,7 @@ dependencies = [
 
 [[package]]
 name = "holo_hash"
-version = "0.0.8-dev.0"
+version = "0.0.8"
 dependencies = [
  "base64",
  "blake2b_simd",
@@ -361,7 +361,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.0.9-dev.0"
+version = "0.0.9"
 dependencies = [
  "hdk",
  "serde",
@@ -394,7 +394,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.0.11-dev.0"
+version = "0.0.11"
 dependencies = [
  "chrono",
  "fixt",
@@ -439,7 +439,7 @@ checksum = "b71991ff56294aa922b450139ee08b3bfc70982c6b2c7562771375cf73542dd4"
 
 [[package]]
 name = "kitsune_p2p_timestamp"
-version = "0.0.5-dev.0"
+version = "0.0.5"
 dependencies = [
  "chrono",
  "serde",

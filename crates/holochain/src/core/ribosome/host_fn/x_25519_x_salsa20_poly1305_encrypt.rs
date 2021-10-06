@@ -126,13 +126,13 @@ pub mod wasm_test {
                 alice.clone(),
                 encrypt_output,
             );
-        let bad_decrypt_output: Option<XSalsa20Poly1305Data> = crate::call_test_ribosome!(
+        let bad_decrypt_output: Result<Option<XSalsa20Poly1305Data>, _> = crate::call_test_ribosome!(
             host_access,
             TestWasm::XSalsa20Poly1305,
             "x_25519_x_salsa20_poly1305_decrypt",
             bad_decrypt_input
-        ).unwrap();
+        );
 
-        assert_eq!(bad_decrypt_output, None,);
+        assert!(bad_decrypt_output.is_err());
     }
 }
