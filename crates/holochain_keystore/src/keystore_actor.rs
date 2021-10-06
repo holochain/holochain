@@ -3,8 +3,6 @@
 
 use crate::*;
 use ghost_actor::dependencies::futures::future::FutureExt;
-use holo_hash::{HOLO_HASH_CORE_LEN, HOLO_HASH_PREFIX_LEN};
-use holochain_zome_types::signature::{Sign, Signature};
 use holochain_zome_types::x_salsa20_poly1305::{
     X25519XSalsa20Poly1305Decrypt, X25519XSalsa20Poly1305Encrypt,
 };
@@ -24,9 +22,6 @@ pub type KeystoreApiFuture<T> =
 
 /// Some legacy APIs to make refactor easier.
 pub trait KeystoreSenderExt {
-    /// Generate a signature for a given blob of binary data.
-    fn sign(&self, input: Sign) -> KeystoreApiFuture<Signature>;
-
     /// If we have a TLS cert in lair - return the first one
     /// Errors if no certs in lair
     fn get_first_tls_cert(&self) -> KeystoreApiFuture<(CertDigest, Cert, CertPrivKey)>;
@@ -60,23 +55,6 @@ pub trait KeystoreSenderExt {
 }
 
 impl KeystoreSenderExt for KeystoreSender {
-    fn sign(&self, input: Sign) -> KeystoreApiFuture<Signature> {
-        let fut = self.sign_ed25519_sign_by_pub_key(
-            input.key.as_ref()[HOLO_HASH_PREFIX_LEN..HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN]
-                .to_vec()
-                .into(),
-            <Vec<u8>>::from(UnsafeBytes::from(input.data.to_vec())).into(),
-        );
-        async move {
-            tracing::trace!("signing request start");
-            let res = fut.await?;
-            tracing::trace!("signing request end");
-            Ok(Signature::try_from(res.to_vec().as_ref())?)
-        }
-        .boxed()
-        .into()
-    }
-
     fn get_first_tls_cert(&self) -> KeystoreApiFuture<(CertDigest, Cert, CertPrivKey)> {
         let this = self.clone();
         async move {

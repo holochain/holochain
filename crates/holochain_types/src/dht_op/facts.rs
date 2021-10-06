@@ -37,9 +37,8 @@ pub fn valid_dht_op(keystore: MetaLairClient) -> Facts<'static, DhtOp> {
             use holochain_keystore::AgentPubKeyExt;
             let header = op.header();
             let agent = header.author();
-            let actual =
-                tokio_helper::block_forever_on(agent.sign(keystore.unwrap_legacy(), &header))
-                    .expect("Can sign the header");
+            let actual = tokio_helper::block_forever_on(agent.sign(&keystore, &header))
+                .expect("Can sign the header");
             facts![lens("signature", DhtOp::signature_mut, eq_(actual))]
         })
     ]

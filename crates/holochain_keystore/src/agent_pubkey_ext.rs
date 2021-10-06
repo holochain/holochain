@@ -16,7 +16,11 @@ pub trait AgentPubKeyExt {
         Self: Sized;
 
     /// sign some arbitrary raw bytes
-    fn sign_raw(&self, keystore: &KeystoreSender, data: &[u8]) -> KeystoreApiFuture<Signature>;
+    fn sign_raw(
+        &self,
+        keystore: &MetaLairClient,
+        data: Arc<[u8]>,
+    ) -> MustBoxFuture<'static, LairResult<Signature>>;
 
     /// verify a signature for given raw bytes with this agent public_key is valid
     fn verify_signature_raw(&self, signature: &Signature, data: &[u8]) -> KeystoreApiFuture<bool>;
@@ -24,7 +28,11 @@ pub trait AgentPubKeyExt {
     // -- provided -- //
 
     /// sign some arbitrary data
-    fn sign<S>(&self, keystore: &KeystoreSender, input: S) -> KeystoreApiFuture<Signature>
+    fn sign<S>(
+        &self,
+        keystore: &MetaLairClient,
+        input: S,
+    ) -> MustBoxFuture<'static, LairResult<Signature>>
     where
         S: Serialize + std::fmt::Debug,
     {
@@ -32,12 +40,12 @@ pub trait AgentPubKeyExt {
 
         let data = match holochain_serialized_bytes::encode(&input) {
             Err(e) => {
-                return async move { Err(e.into()) }.boxed().into();
+                return async move { Err(one_err::OneErr::new(e)) }.boxed().into();
             }
             Ok(data) => data,
         };
 
-        self.sign_raw(keystore, &data)
+        self.sign_raw(keystore, data.into())
     }
 
     /// verify a signature for given data with this agent public_key is valid
@@ -69,21 +77,13 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
         MustBoxFuture::new(async move { f.await })
     }
 
-    fn sign_raw(&self, keystore: &KeystoreSender, data: &[u8]) -> KeystoreApiFuture<Signature> {
-        use ghost_actor::dependencies::futures::future::FutureExt;
-        let keystore = keystore.clone();
-        let input = Sign::new_raw(self.clone(), data.to_vec());
-        async move {
-            let f = keystore.sign(input);
-            match tokio::time::timeout(std::time::Duration::from_secs(30), f).await {
-                Ok(r) => r,
-                Err(_) => Err(KeystoreError::Other(
-                    "Keystore timeout while signing agent key".to_string(),
-                )),
-            }
-        }
-        .boxed()
-        .into()
+    fn sign_raw(
+        &self,
+        keystore: &MetaLairClient,
+        data: Arc<[u8]>,
+    ) -> MustBoxFuture<'static, LairResult<Signature>> {
+        let f = keystore.sign(self.clone(), data);
+        MustBoxFuture::new(async move { f.await })
     }
 
     fn verify_signature_raw(&self, signature: &Signature, data: &[u8]) -> KeystoreApiFuture<bool> {

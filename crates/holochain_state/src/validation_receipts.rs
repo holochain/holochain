@@ -2,8 +2,8 @@
 
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
+use holochain_keystore::AgentPubKeyExt;
 use holochain_keystore::MetaLairClient;
-use holochain_keystore::{keystore_actor::KeystoreApiResult, AgentPubKeyExt};
 use holochain_serialized_bytes::prelude::*;
 use holochain_sqlite::prelude::*;
 use holochain_sqlite::rusqlite::named_params;
@@ -50,11 +50,8 @@ impl ValidationReceipt {
     pub async fn sign(
         self,
         keystore: &MetaLairClient,
-    ) -> KeystoreApiResult<SignedValidationReceipt> {
-        let signature = self
-            .validator
-            .sign(keystore.unwrap_legacy(), self.clone())
-            .await?;
+    ) -> holochain_keystore::LairResult<SignedValidationReceipt> {
+        let signature = self.validator.sign(keystore, self.clone()).await?;
         Ok(SignedValidationReceipt {
             receipt: self,
             validator_signature: signature,

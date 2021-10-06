@@ -610,9 +610,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 data,
                 ..
             } => {
-                let signature = to_agent
-                    .sign_raw(self.keystore().unwrap_legacy(), &data)
-                    .await?;
+                let signature = to_agent.sign_raw(self.keystore(), data.into()).await?;
                 respond.respond(Ok(async move { Ok(signature) }.boxed().into()));
             }
             HolochainP2pEvent::CallRemote { .. }

@@ -1,7 +1,6 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeT;
-use holochain_keystore::KeystoreSenderExt;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
@@ -57,14 +56,13 @@ pub fn accept_countersigning_preflight_request<'a>(
                 let signature: Signature = match call_context
                     .host_context
                     .keystore()
-                    .unwrap_legacy()
-                    .sign(Sign::new_raw(
+                    .sign(
                         author,
                         PreflightResponse::encode_fields_for_signature(
                             &input,
                             &countersigning_agent_state,
-                        )?,
-                    ))
+                        )?.into(),
+                    )
                     .await
                 {
                     Ok(signature) => signature,

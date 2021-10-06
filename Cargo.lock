@@ -2681,6 +2681,7 @@ dependencies = [
  "matches",
  "mockall",
  "observability",
+ "one_err",
  "parking_lot 0.10.2",
  "pretty_assertions 0.6.1",
  "serde",
