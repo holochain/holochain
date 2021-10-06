@@ -2212,7 +2212,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.0.108"
+version = "0.0.109"
 dependencies = [
  "fixt",
  "hdk_derive",
@@ -2231,7 +2231,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "holochain_zome_types",
  "paste",
@@ -2300,7 +2300,7 @@ dependencies = [
 
 [[package]]
 name = "holo_hash"
-version = "0.0.7"
+version = "0.0.8"
 dependencies = [
  "arbitrary",
  "base64",
@@ -2322,7 +2322,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.0.108"
+version = "0.0.109"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2404,7 +2404,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.0.8"
+version = "0.0.9"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2437,7 +2437,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.0.9"
+version = "0.0.10"
 dependencies = [
  "anyhow",
  "futures",
@@ -2450,7 +2450,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -2471,7 +2471,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.0.7"
+version = "0.0.8"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -2498,7 +2498,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.0.8"
+version = "0.0.9"
 dependencies = [
  "derive_more",
  "directories 2.0.2",
@@ -2522,7 +2522,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_keystore"
-version = "0.0.8"
+version = "0.0.9"
 dependencies = [
  "ghost_actor 0.3.0-alpha.4",
  "holo_hash",
@@ -2541,7 +2541,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.0.8"
+version = "0.0.9"
 dependencies = [
  "async-trait",
  "fixt",
@@ -2592,7 +2592,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_sqlite"
-version = "0.0.8"
+version = "0.0.9"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -2620,7 +2620,7 @@ dependencies = [
  "parking_lot 0.10.2",
  "pretty_assertions 0.7.2",
  "r2d2",
- "r2d2_sqlite",
+ "r2d2_sqlite_neonphog",
  "rand 0.7.3",
  "rmp-serde",
  "rusqlite",
@@ -2638,7 +2638,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.0.8"
+version = "0.0.9"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -2679,7 +2679,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.0.8"
+version = "0.0.9"
 dependencies = [
  "hdk",
  "serde",
@@ -2687,7 +2687,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.0.8"
+version = "0.0.9"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2752,7 +2752,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.0.8"
+version = "0.0.9"
 dependencies = [
  "fixt",
  "holo_hash",
@@ -2810,7 +2810,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_websocket"
-version = "0.0.8"
+version = "0.0.9"
 dependencies = [
  "criterion",
  "futures",
@@ -2838,7 +2838,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "arbitrary",
  "chrono",
@@ -3184,7 +3184,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p"
-version = "0.0.8"
+version = "0.0.9"
 dependencies = [
  "arbitrary",
  "arrayref",
@@ -3243,7 +3243,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht_arc"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "derive_more",
  "gcollections",
@@ -3321,7 +3321,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_proxy"
-version = "0.0.7"
+version = "0.0.8"
 dependencies = [
  "base64",
  "blake2b_simd",
@@ -3346,7 +3346,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_timestamp"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "arbitrary",
  "chrono",
@@ -3358,7 +3358,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_transport_quic"
-version = "0.0.7"
+version = "0.0.8"
 dependencies = [
  "blake2b_simd",
  "futures",
@@ -3376,7 +3376,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_types"
-version = "0.0.7"
+version = "0.0.8"
 dependencies = [
  "arbitrary",
  "base64",
@@ -3420,9 +3420,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_api"
-version = "0.0.6"
+version = "0.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e8728ad4b1541470fec2ede33a57d710004f2fb15937ffda4734045b92257b2"
+checksum = "a25c9fa16214ffe482d7daa84246c04a553d70ba18d52cd5a8d43150111d7d2a"
 dependencies = [
  "arbitrary",
  "blake2b_simd",
@@ -3452,9 +3452,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_client"
-version = "0.0.6"
+version = "0.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30a89867e50be651a26b4b089c41e41bcd56dc5492c61a8dde6c7ae954575c44"
+checksum = "c2a7dd6f048af058c76bb15f7060aa997a34e15fd1fddc47fb96d57949a00ee4"
 dependencies = [
  "futures",
  "ghost_actor 0.3.0-alpha.4",
@@ -3555,11 +3555,12 @@ dependencies = [
 
 [[package]]
 name = "libsqlite3-sys"
-version = "0.22.2"
+version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "290b64917f8b0cb885d9de0f9959fe1f775d7fa12f1da2db9001c1c8ab60f89d"
+checksum = "c4ecc4273169aeb654a26ba8c7e087947caad92c9d121886eafa6446d4ebe138"
 dependencies = [
  "cc",
+ "openssl-sys",
  "pkg-config",
  "vcpkg",
 ]
@@ -4265,6 +4266,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28988d872ab76095a6e6ac88d99b54fd267702734fd7ffe610ca27f533ddb95a"
 
 [[package]]
+name = "openssl-src"
+version = "111.16.0+1.1.1l"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ab2173f69416cf3ec12debb5823d244127d23a9b127d5a5189aa97c5fa2859f"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "openssl-sys"
 version = "0.9.67"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4273,6 +4283,7 @@ dependencies = [
  "autocfg 1.0.1",
  "cc",
  "libc",
+ "openssl-src",
  "pkg-config",
  "vcpkg",
 ]
@@ -4923,10 +4934,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "r2d2_sqlite"
+name = "r2d2_sqlite_neonphog"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d24607049214c5e42d3df53ac1d8a23c34cc6a5eefe3122acb2c72174719959"
+checksum = "75681c1503fca52049c7236548026c156b51a452440bfa4be2074dc06fe5ce6f"
 dependencies = [
  "r2d2",
  "rusqlite",
@@ -5441,9 +5452,9 @@ dependencies = [
 
 [[package]]
 name = "rusqlite"
-version = "0.25.3"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57adcf67c8faaf96f3248c2a7b419a0dbc52ebe36ba83dd57fe83827c1ea4eb3"
+checksum = "6e2aebd07fccf5c0d3f1458219965b0861d45f5db9f9b2617277fa7f85179213"
 dependencies = [
  "bitflags",
  "fallible-iterator",
