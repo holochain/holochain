@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_types"
-version = "0.0.8-dev.0"
+version = "0.0.8"
 description = "types subcrate for kitsune-p2p"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -16,7 +16,7 @@ base64 = "0.13"
 derive_more = "0.99.7"
 futures = "0.3"
 ghost_actor = "=0.3.0-alpha.4"
-kitsune_p2p_dht_arc = { version = "0.0.5-dev.0", path = "../dht_arc" }
+kitsune_p2p_dht_arc = { version = "0.0.5", path = "../dht_arc" }
 lru = "0.6.5"
 mockall = { version = "0.10.2", optional = true }
 nanoid = "0.3"
