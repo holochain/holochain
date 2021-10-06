@@ -217,8 +217,6 @@ async fn can_set_fake_state() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn proxy_tls_with_test_keystore() {
-    use ghost_actor::GhostControlSender;
-
     observability::test_run().ok();
 
     let keystore1 = spawn_test_keystore().await.unwrap();
@@ -228,8 +226,8 @@ async fn proxy_tls_with_test_keystore() {
         panic!("{:#?}", e);
     }
 
-    let _ = keystore1.ghost_actor_shutdown_immediate().await;
-    let _ = keystore2.ghost_actor_shutdown_immediate().await;
+    let _ = keystore1.shutdown().await;
+    let _ = keystore2.shutdown().await;
 }
 
 async fn proxy_tls_inner(

@@ -124,7 +124,6 @@ mod tests {
     use super::*;
     use fixt::prelude::*;
     use holo_hash::HasHash;
-    use holochain_keystore::KeystoreSenderExt;
     use holochain_sqlite::db::ReadManager;
     use holochain_types::dht_op::DhtOp;
     use holochain_types::dht_op::DhtOpHashed;
@@ -134,11 +133,7 @@ mod tests {
         dht_op_hash: &DhtOpHash,
         keystore: &MetaLairClient,
     ) -> SignedValidationReceipt {
-        let agent = keystore
-            .clone()
-            .generate_sign_keypair_from_pure_entropy()
-            .await
-            .unwrap();
+        let agent = keystore.new_sign_keypair_random().await.unwrap();
         let receipt = ValidationReceipt {
             dht_op_hash: dht_op_hash.clone(),
             validation_status: ValidationStatus::Valid,

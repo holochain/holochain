@@ -376,7 +376,7 @@ impl SignedHeaderHashedExt for SignedHeaderHashed {
             .header()
             .author()
             .verify_signature(self.signature(), self.header())
-            .await?
+            .await
         {
             return Err(KeystoreError::InvalidSignature(
                 self.signature().clone(),

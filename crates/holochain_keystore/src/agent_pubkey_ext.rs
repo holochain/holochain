@@ -23,7 +23,11 @@ pub trait AgentPubKeyExt {
     ) -> MustBoxFuture<'static, LairResult<Signature>>;
 
     /// verify a signature for given raw bytes with this agent public_key is valid
-    fn verify_signature_raw(&self, signature: &Signature, data: &[u8]) -> KeystoreApiFuture<bool>;
+    fn verify_signature_raw(
+        &self,
+        signature: &Signature,
+        data: Arc<[u8]>,
+    ) -> MustBoxFuture<'static, bool>;
 
     // -- provided -- //
 
@@ -49,7 +53,7 @@ pub trait AgentPubKeyExt {
     }
 
     /// verify a signature for given data with this agent public_key is valid
-    fn verify_signature<D>(&self, signature: &Signature, data: D) -> KeystoreApiFuture<bool>
+    fn verify_signature<D>(&self, signature: &Signature, data: D) -> MustBoxFuture<'static, bool>
     where
         D: TryInto<SerializedBytes, Error = SerializedBytesError>,
     {
@@ -57,12 +61,15 @@ pub trait AgentPubKeyExt {
 
         let data = match data.try_into() {
             Err(e) => {
-                return async move { Err(e.into()) }.boxed().into();
+                tracing::error!("Serialization Error: {:?}", e);
+                return async move { false }.boxed().into();
             }
             Ok(data) => data,
         };
 
-        self.verify_signature_raw(signature, data.bytes())
+        let data: Vec<u8> = UnsafeBytes::from(data).into();
+
+        self.verify_signature_raw(signature, data.into())
     }
 }
 
@@ -86,17 +93,21 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
         MustBoxFuture::new(async move { f.await })
     }
 
-    fn verify_signature_raw(&self, signature: &Signature, data: &[u8]) -> KeystoreApiFuture<bool> {
-        use ghost_actor::dependencies::futures::future::FutureExt;
+    fn verify_signature_raw(
+        &self,
+        signature: &Signature,
+        data: Arc<[u8]>,
+    ) -> MustBoxFuture<'static, bool> {
+        let mut pub_key = [0; 32];
+        pub_key.copy_from_slice(self.get_raw_32());
+        let pub_key = <new_lair_api::prelude::BinDataSized<32>>::from(pub_key);
+        let sig = signature.0;
 
-        let data = Arc::new(data.to_vec());
-        let pub_key: legacy_lair_api::internal::sign_ed25519::SignEd25519PubKey =
-            self.get_raw_32().to_vec().into();
-        let sig: legacy_lair_api::internal::sign_ed25519::SignEd25519Signature =
-            signature.0.to_vec().into();
-
-        async move { Ok(pub_key.verify(data, sig).await?) }
-            .boxed()
-            .into()
+        MustBoxFuture::new(async move {
+            match pub_key.verify_detached(sig.into(), data).await {
+                Ok(b) => b,
+                _ => false,
+            }
+        })
     }
 }

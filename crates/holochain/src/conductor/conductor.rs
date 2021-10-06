@@ -53,7 +53,6 @@ use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::test_keystore::spawn_test_keystore;
-use holochain_keystore::KeystoreSenderExt;
 use holochain_keystore::MetaLairClient;
 use holochain_sqlite::db::DbKind;
 use holochain_sqlite::prelude::*;
@@ -1392,10 +1391,8 @@ mod builder {
                 None => holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default(),
                 Some(config) => config.clone(),
             };
-            let (cert_digest, cert, cert_priv_key) = keystore
-                .unwrap_legacy()
-                .get_or_create_first_tls_cert()
-                .await?;
+            let (cert_digest, cert, cert_priv_key) =
+                keystore.get_or_create_first_tls_cert().await?;
             let tls_config =
                 holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig {
                     cert,

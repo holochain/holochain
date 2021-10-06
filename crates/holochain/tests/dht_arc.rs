@@ -1,6 +1,6 @@
 use holochain::sweettest::SweetAgents;
 use holochain::sweettest::SweetConductor;
-use holochain_keystore::KeystoreSender;
+use holochain_keystore::MetaLairClient;
 use holochain_p2p::dht_arc::MAX_HALF_LENGTH;
 use holochain_p2p::dht_arc::MIN_PEERS;
 use holochain_p2p::dht_arc::MIN_REDUNDANCY;

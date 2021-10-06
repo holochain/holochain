@@ -98,7 +98,7 @@ pub mod tests {
     use crate::conductor::handle::MockConductorHandleT;
     use crate::core::ribosome::MockRibosomeT;
     use crate::fixt::DnaDefFixturator;
-    use crate::fixt::KeystoreSenderFixturator;
+    use crate::fixt::MetaLairClientFixturator;
     use crate::sweettest::*;
     use crate::test_utils::fake_genesis;
     use ::fixt::prelude::*;

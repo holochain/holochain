@@ -186,7 +186,6 @@ impl LairClientApiHandler for CrudeMockKeystore {
 mod tests {
     use super::*;
     use crate::agent_pubkey_ext::AgentPubKeyExt;
-    use crate::*;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_crude_mock_keystore() {
@@ -196,8 +195,8 @@ mod tests {
                 .unwrap();
 
             assert_eq!(
-                holo_hash::AgentPubKey::new_from_pure_entropy(&keystore).await,
-                Err(KeystoreError::LairError(LairError::other("err")))
+                holo_hash::AgentPubKey::new_random(&keystore).await,
+                Err(one_err::OneErr::new("err"))
             );
             // let agent = holo_hash::AgentPubKey::new_from_pure_entropy(&keystore)
             //     .await

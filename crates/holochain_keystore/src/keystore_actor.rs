@@ -168,7 +168,6 @@ impl KeystoreSenderExt for KeystoreSender {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::test_keystore::*;
 
     #[tokio::test(flavor = "multi_thread")]

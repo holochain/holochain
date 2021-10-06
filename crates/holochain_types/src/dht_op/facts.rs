@@ -59,7 +59,7 @@ mod tests {
         let mut uu = Unstructured::new(&NOISE);
         let u = &mut uu;
         let keystore = spawn_test_keystore().await.unwrap();
-        let agent = AgentPubKey::new_from_pure_entropy(&keystore).await.unwrap();
+        let agent = AgentPubKey::new_random(&keystore).await.unwrap();
 
         let e = Entry::arbitrary(u).unwrap();
 
