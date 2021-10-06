@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_types"
-version = "0.0.7"
+version = "0.0.8"
 description = "types subcrate for kitsune-p2p"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -11,13 +11,13 @@ categories = [ "network-programming" ]
 edition = "2018"
 
 [dependencies]
-legacy_lair_api = { version = "=0.0.6", package = "lair_keystore_api" }
-new_lair_api = { version = "=0.1.0-alpha.1", git = "https://github.com/holochain/lair.git", rev = "97e7a536e38f7fe4fcacef740fd426aba7094b56", package = "lair_keystore_api" }
+legacy_lair_api = { version = "=0.0.7", package = "lair_keystore_api" }
+new_lair_api = { version = "=0.1.0-alpha.1", git = "https://github.com/holochain/lair.git", rev = "cca7f304c55b3c066c03c53e57e34f237342b73d", package = "lair_keystore_api" }
 base64 = "0.13"
 derive_more = "0.99.7"
 futures = "0.3"
 ghost_actor = "=0.3.0-alpha.4"
-kitsune_p2p_dht_arc = { version = "0.0.4", path = "../dht_arc" }
+kitsune_p2p_dht_arc = { version = "0.0.5", path = "../dht_arc" }
 lru = "0.6.5"
 mockall = { version = "0.10.2", optional = true }
 nanoid = "0.3"

@@ -96,9 +96,10 @@ impl Query for GetEntryOpsQuery {
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
         let f = |row: &Row| {
-            let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?)?;
-            let op_type = row.get(row.column_index("dht_type")?)?;
-            let validation_status = row.get(row.column_index("status")?)?;
+            let header =
+                from_blob::<SignedHeader>(row.get(row.as_ref().column_index("header_blob")?)?)?;
+            let op_type = row.get(row.as_ref().column_index("dht_type")?)?;
+            let validation_status = row.get(row.as_ref().column_index("status")?)?;
             Ok(Judged::raw(Item { op_type, header }, validation_status))
         };
         Arc::new(f)

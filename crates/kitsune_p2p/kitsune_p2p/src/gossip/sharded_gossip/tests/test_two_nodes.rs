@@ -135,8 +135,8 @@ async fn partial_missing_doesnt_finish() {
                 common_arc_set: Arc::new(ArcInterval::Full.into()),
                 num_sent_ops_blooms: 1,
                 received_all_incoming_ops_blooms: true,
-                created_at: std::time::Instant::now(),
-                last_touch: std::time::Instant::now(),
+                created_at: Instant::now(),
+                last_touch: Instant::now(),
                 round_timeout: std::time::Duration::MAX,
             }
         }
@@ -178,8 +178,8 @@ async fn missing_ops_finishes() {
                 common_arc_set: Arc::new(ArcInterval::Full.into()),
                 num_sent_ops_blooms: 1,
                 received_all_incoming_ops_blooms: true,
-                created_at: std::time::Instant::now(),
-                last_touch: std::time::Instant::now(),
+                created_at: Instant::now(),
+                last_touch: Instant::now(),
                 round_timeout: std::time::Duration::MAX,
             }
         }
@@ -222,8 +222,8 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
                 common_arc_set: Arc::new(ArcInterval::Full.into()),
                 num_sent_ops_blooms: 1,
                 received_all_incoming_ops_blooms: false,
-                created_at: std::time::Instant::now(),
-                last_touch: std::time::Instant::now(),
+                created_at: Instant::now(),
+                last_touch: Instant::now(),
                 round_timeout: std::time::Duration::MAX,
             }
         }
@@ -266,8 +266,8 @@ async fn bloom_response_finishes() {
                 common_arc_set: Arc::new(ArcInterval::Full.into()),
                 num_sent_ops_blooms: 0,
                 received_all_incoming_ops_blooms: false,
-                created_at: std::time::Instant::now(),
-                last_touch: std::time::Instant::now(),
+                created_at: Instant::now(),
+                last_touch: Instant::now(),
                 round_timeout: std::time::Duration::MAX,
             }
         }
@@ -310,8 +310,8 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
                 common_arc_set: Arc::new(ArcInterval::Full.into()),
                 num_sent_ops_blooms: 1,
                 received_all_incoming_ops_blooms: false,
-                created_at: std::time::Instant::now(),
-                last_touch: std::time::Instant::now(),
+                created_at: Instant::now(),
+                last_touch: Instant::now(),
                 round_timeout: std::time::Duration::MAX,
             }
         }
@@ -357,8 +357,8 @@ async fn no_data_still_finishes() {
                 common_arc_set: Arc::new(ArcInterval::Full.into()),
                 num_sent_ops_blooms: 0,
                 received_all_incoming_ops_blooms: false,
-                created_at: std::time::Instant::now(),
-                last_touch: std::time::Instant::now(),
+                created_at: Instant::now(),
+                last_touch: Instant::now(),
                 round_timeout: std::time::Duration::MAX,
             }
         }
@@ -375,8 +375,8 @@ async fn no_data_still_finishes() {
                 common_arc_set: Arc::new(ArcInterval::Full.into()),
                 num_sent_ops_blooms: 1,
                 received_all_incoming_ops_blooms: true,
-                created_at: std::time::Instant::now(),
-                last_touch: std::time::Instant::now(),
+                created_at: Instant::now(),
+                last_touch: Instant::now(),
                 round_timeout: std::time::Duration::MAX,
             }
         }
@@ -496,4 +496,118 @@ async fn initiate_after_target_is_set() {
     // - Bob cannot initiate a round with anyone because he
     // already has a round with the only other player.
     assert!(bob_initiate.is_none());
+}
+
+#[tokio::test(flavor = "current_thread", start_paused = true)]
+/// Test the initiates timeout after the round timeout has elapsed.
+async fn initiate_times_out() {
+    let mut u = arbitrary::Unstructured::new(&NOISE);
+    let alice_cert = Tx2Cert::arbitrary(&mut u).unwrap();
+
+    let agents = agents(2);
+    let alice = setup_empty_player(ShardedGossipLocalState {
+        local_agents: maplit::hashset!(agents[0].clone()),
+        ..Default::default()
+    })
+    .await;
+    let bob = setup_empty_player(ShardedGossipLocalState {
+        local_agents: maplit::hashset!(agents[1].clone()),
+        ..Default::default()
+    })
+    .await;
+
+    // Trying to initiate a round should succeed.
+    let (tgt, _, _) = alice
+        .try_initiate()
+        .await
+        .unwrap()
+        .expect("Failed to initiate");
+    alice
+        .inner
+        .share_mut(|i, _| {
+            assert!(i.initiate_tgt.is_some());
+            Ok(())
+        })
+        .unwrap();
+    let r = alice.try_initiate().await.unwrap();
+
+    // Doesn't re-initiate.
+    assert!(r.is_none());
+    alice
+        .inner
+        .share_mut(|i, _| {
+            assert!(i.initiate_tgt.is_some());
+            Ok(())
+        })
+        .unwrap();
+
+    // Wait slightly longer then the timeout.
+    tokio::time::sleep(ROUND_TIMEOUT + std::time::Duration::from_millis(1)).await;
+
+    let (tgt2, _, alice_initiate) = alice
+        .try_initiate()
+        .await
+        .unwrap()
+        .expect("Failed to initiate");
+
+    // Now it should re-initiate with a different node.
+    assert_ne!(tgt, tgt2);
+    alice
+        .inner
+        .share_mut(|i, _| {
+            assert!(i.initiate_tgt.is_some());
+            Ok(())
+        })
+        .unwrap();
+
+    // Process the initiate with Bob.
+    let bob_outgoing = bob
+        .process_incoming(alice_cert.clone(), alice_initiate)
+        .await
+        .unwrap();
+
+    // Process the Bob's accept with Alice.
+    for bo in bob_outgoing {
+        alice
+            .process_incoming(tgt2.cert().clone(), bo)
+            .await
+            .unwrap();
+    }
+
+    // Check the round is now active.
+    alice
+        .inner
+        .share_mut(|i, _| {
+            assert!(i.initiate_tgt.is_some());
+            assert_eq!(i.round_map.current_rounds().len(), 1);
+            Ok(())
+        })
+        .unwrap();
+
+    // Wait slightly longer then the timeout but touch the round in between.
+    tokio::time::sleep(ROUND_TIMEOUT / 2).await;
+
+    // Get the map so the round doesn't timeout
+    alice
+        .inner
+        .share_mut(|i, _| {
+            i.round_map.get(tgt2.cert());
+            Ok(())
+        })
+        .unwrap();
+
+    tokio::time::sleep(ROUND_TIMEOUT / 2 + std::time::Duration::from_millis(1)).await;
+
+    // Check that initiating again doesn't do anything.
+
+    let r = alice.try_initiate().await.unwrap();
+    // Doesn't re-initiate.
+    assert!(r.is_none());
+    alice
+        .inner
+        .share_mut(|i, _| {
+            assert!(i.initiate_tgt.is_some());
+            Ok(())
+        })
+        .unwrap();
 }
