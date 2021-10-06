@@ -23,12 +23,12 @@ use std::convert::TryInto;
 // hC8k 6020 <Buffer 84 2f 24>
 
 // Valid Holo.Host options for prefixes:
-// hhAk 2054 <Buffer 86 10 24> HOST KEY
+// hhAk 2054 <Buffer 86 10 24> * HOST KEY
 // hhEk 2182 <Buffer 86 11 24>
 // hhIk 2310 <Buffer 86 12 24>
 // hhMk 2438 <Buffer 86 13 24>
-// hhQk 2566 <Buffer 86 14 24> ANONYMOUS KEY (They can Query-only / no source chain)
-// hhUk 2694 <Buffer 86 15 24> WEB USER KEY
+// hhQk 2566 <Buffer 86 14 24> * ANONYMOUS KEY (They can Query-only / no source chain)
+// hhUk 2694 <Buffer 86 15 24> * WEB USER KEY
 // hhYk 2822 <Buffer 86 16 24>
 // hhck 2950 <Buffer 86 17 24>
 // hhgk 3078 <Buffer 86 18 24>
@@ -36,7 +36,7 @@ use std::convert::TryInto;
 // hhok 3334 <Buffer 86 1a 24>
 // hhsk 3462 <Buffer 86 1b 24>
 // hhwk 3590 <Buffer 86 1c 24>
-// hh0k 3718 <Buffer 86 1d 24> HOSTED APP Bundle (UI with websdk, etc.)
+// hh0k 3718 <Buffer 86 1d 24> * HOSTED APP Bundle (UI with websdk, etc.)
 // hh4k 3846 <Buffer 86 1e 24>
 // hh8k 3974 <Buffer 86 1f 24>
 
