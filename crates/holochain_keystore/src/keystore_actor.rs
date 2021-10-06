@@ -3,9 +3,6 @@
 
 use crate::*;
 use ghost_actor::dependencies::futures::future::FutureExt;
-use holochain_zome_types::x_salsa20_poly1305::{
-    X25519XSalsa20Poly1305Decrypt, X25519XSalsa20Poly1305Encrypt,
-};
 use legacy_lair_api::actor::{
     Cert, CertDigest, CertPrivKey, LairClientApiSender, LairEntryType, TlsCertOptions,
 };
@@ -29,29 +26,6 @@ pub trait KeystoreSenderExt {
     /// If we have a TLS cert in lair - return the first one
     /// otherwise, generate a TLS cert and return it
     fn get_or_create_first_tls_cert(&self) -> KeystoreApiFuture<(CertDigest, Cert, CertPrivKey)>;
-
-    /// Generate a new x25519 keypair in lair and get the pubkey back for general usage.
-    fn create_x25519_keypair(
-        &self,
-    ) -> KeystoreApiFuture<holochain_zome_types::x_salsa20_poly1305::x25519::X25519PubKey>;
-
-    /// If we have an X25519 pub key in lair use it to ECDH negotiate a shared key and then
-    /// Salsa20Poly1305 encrypt the data with that and a random nonce.
-    /// a.k.a. libsodium crypto_box()
-    fn x_25519_x_salsa20_poly1305_encrypt(
-        &self,
-        input: X25519XSalsa20Poly1305Encrypt,
-    ) -> KeystoreApiFuture<
-        holochain_zome_types::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData,
-    >;
-    /// The inverse of x_25519_x_salsa20_poly1305_encrypt.
-    /// Returns None if decryption fails.
-    fn x_25519_x_salsa20_poly1305_decrypt(
-        &self,
-        input: X25519XSalsa20Poly1305Decrypt,
-    ) -> KeystoreApiFuture<
-        Option<holochain_zome_types::x_salsa20_poly1305::data::XSalsa20Poly1305Data>,
-    >;
 }
 
 impl KeystoreSenderExt for KeystoreSender {
@@ -85,81 +59,6 @@ impl KeystoreSenderExt for KeystoreSender {
             let _ = this.tls_cert_new_self_signed_from_entropy(tls_opt).await?;
 
             this.get_first_tls_cert().await
-        }
-        .boxed()
-        .into()
-    }
-
-    fn create_x25519_keypair(
-        &self,
-    ) -> KeystoreApiFuture<holochain_zome_types::x_salsa20_poly1305::x25519::X25519PubKey> {
-        let this = self.clone();
-        async move {
-            let fut = this.x25519_new_from_entropy();
-            let (_, pubkey) = fut.await?;
-            Ok(AsRef::<[u8]>::as_ref(&pubkey).try_into()?)
-        }
-        .boxed()
-        .into()
-    }
-
-    fn x_25519_x_salsa20_poly1305_encrypt(
-        &self,
-        input: X25519XSalsa20Poly1305Encrypt,
-    ) -> KeystoreApiFuture<
-        holochain_zome_types::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData,
-    > {
-        let this = self.clone();
-        async move {
-            let fut = this.crypto_box_by_pub_key(
-                input.as_sender_ref().as_ref()
-                    .try_into()?,
-                input.as_recipient_ref().as_ref()
-                    .try_into()?,
-                std::sync::Arc::new(legacy_lair_api::internal::crypto_box::CryptoBoxData {
-                    data: std::sync::Arc::new(input.as_data_ref().as_ref().to_owned())
-                })
-            );
-            let res = fut.await?;
-            Ok(holochain_zome_types::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData::new(
-                AsRef::<[u8]>::as_ref(&res.nonce).try_into()?,
-                res.encrypted_data.to_vec(),
-            ))
-        }
-        .boxed()
-        .into()
-    }
-
-    fn x_25519_x_salsa20_poly1305_decrypt(
-        &self,
-        input: X25519XSalsa20Poly1305Decrypt,
-    ) -> KeystoreApiFuture<
-        Option<holochain_zome_types::x_salsa20_poly1305::data::XSalsa20Poly1305Data>,
-    > {
-        let this = self.clone();
-        async move {
-            let fut = this.crypto_box_open_by_pub_key(
-                input.as_recipient_ref().as_ref().try_into()?,
-                input.as_sender_ref().as_ref().try_into()?,
-                std::sync::Arc::new(
-                    legacy_lair_api::internal::crypto_box::CryptoBoxEncryptedData {
-                        nonce: AsRef::<[u8]>::as_ref(&input.as_encrypted_data_ref().as_nonce_ref())
-                            .try_into()?,
-                        encrypted_data: std::sync::Arc::new(
-                            input
-                                .as_encrypted_data_ref()
-                                .as_encrypted_data_ref()
-                                .to_vec(),
-                        ),
-                    },
-                ),
-            );
-            let res = fut.await?;
-            Ok(res.map(|data| {
-                holochain_zome_types::x_salsa20_poly1305::data::XSalsa20Poly1305Data::from(
-                    data.data.to_vec(),
-                )
-            }))
         }
         .boxed()
         .into()

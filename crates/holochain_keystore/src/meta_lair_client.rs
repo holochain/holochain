@@ -23,15 +23,6 @@ pub enum MetaLairClient {
 }
 
 impl MetaLairClient {
-    /// TODO this is just a temp helper to ease implementing the switch
-    pub fn unwrap_legacy(&self) -> &KeystoreSender {
-        if let MetaLairClient::Legacy(client) = self {
-            client
-        } else {
-            todo!()
-        }
-    }
-
     /// Shutdown this keystore client
     pub fn shutdown(&self) -> impl Future<Output = LairResult<()>> + 'static + Send {
         let this = self.clone();
@@ -104,6 +95,109 @@ impl MetaLairClient {
             })
             .await
             .map_err(one_err::OneErr::new)?
+        }
+    }
+
+    /// Construct a new randomized encryption keypair
+    pub fn new_x25519_keypair_random(
+        &self,
+    ) -> impl Future<Output = LairResult<X25519PubKey>> + 'static + Send {
+        let this = self.clone();
+        async move {
+            match this {
+                Self::Legacy(client) => {
+                    let (_, pk) = client
+                        .x25519_new_from_entropy()
+                        .await
+                        .map_err(one_err::OneErr::new)?;
+                    Ok(pk.to_bytes().into())
+                }
+                Self::NewLair(client) => {
+                    let tag = nanoid::nanoid!();
+                    let info = client.new_seed(tag.into(), None).await?;
+                    let pub_key = info.x25519_pub_key;
+                    Ok(pub_key)
+                }
+            }
+        }
+    }
+
+    /// Encrypt an authenticated "box"ed message to a specific recipient.
+    pub fn crypto_box_xsalsa(
+        &self,
+        sender_pub_key: X25519PubKey,
+        recipient_pub_key: X25519PubKey,
+        data: Arc<[u8]>,
+    ) -> impl Future<Output = LairResult<([u8; 24], Arc<[u8]>)>> + 'static + Send {
+        let this = self.clone();
+        async move {
+            match this {
+                Self::Legacy(client) => {
+                    let res = client
+                        .crypto_box_by_pub_key(
+                            (*sender_pub_key).into(),
+                            (*recipient_pub_key).into(),
+                            legacy_lair_api::internal::crypto_box::CryptoBoxData {
+                                data: data.to_vec().into(),
+                            }
+                            .into(),
+                        )
+                        .await
+                        .map_err(one_err::OneErr::new)?;
+                    Ok((*res.nonce.as_ref(), res.encrypted_data.to_vec().into()))
+                }
+                Self::NewLair(client) => {
+                    client
+                        .crypto_box_xsalsa_by_pub_key(sender_pub_key, recipient_pub_key, None, data)
+                        .await
+                }
+            }
+        }
+    }
+
+    /// Decrypt an authenticated "box"ed message from a specific sender.
+    pub fn crypto_box_xsalsa_open(
+        &self,
+        sender_pub_key: X25519PubKey,
+        recipient_pub_key: X25519PubKey,
+        nonce: [u8; 24],
+        data: Arc<[u8]>,
+    ) -> impl Future<Output = LairResult<Arc<[u8]>>> + 'static + Send {
+        let this = self.clone();
+        async move {
+            match this {
+                Self::Legacy(client) => {
+                    let res = client
+                        .crypto_box_open_by_pub_key(
+                            (*sender_pub_key).into(),
+                            (*recipient_pub_key).into(),
+                            legacy_lair_api::internal::crypto_box::CryptoBoxEncryptedData {
+                                nonce: nonce.into(),
+                                encrypted_data: data.to_vec().into(),
+                            }
+                            .into(),
+                        )
+                        .await
+                        .map_err(one_err::OneErr::new)?;
+                    let res = res.ok_or_else(|| {
+                        one_err::OneErr::new(
+                            "None returned from crypto_box_open--why is that an Option??",
+                        )
+                    })?;
+                    Ok(res.data.to_vec().into())
+                }
+                Self::NewLair(client) => {
+                    client
+                        .crypto_box_xsalsa_open_by_pub_key(
+                            sender_pub_key,
+                            recipient_pub_key,
+                            None,
+                            nonce,
+                            data,
+                        )
+                        .await
+                }
+            }
         }
     }
 
