@@ -15,7 +15,7 @@
 //! async fn main() {
 //!     tokio::task::spawn(async move {
 //!         let keystore = test_keystore::spawn_test_keystore().await.unwrap();
-//!         let agent_pubkey = AgentPubKey::new_from_pure_entropy(&keystore).await.unwrap();
+//!         let agent_pubkey = AgentPubKey::new_random(&keystore).await.unwrap();
 //!
 //!         #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 //!         struct MyData(Vec<u8>);
