@@ -10,11 +10,9 @@ pub struct SweetAgents;
 impl SweetAgents {
     /// Get an infinite stream of AgentPubKeys
     pub fn stream(keystore: MetaLairClient) -> impl futures::Stream<Item = AgentPubKey> {
-        use holochain_keystore::KeystoreSenderExt;
         futures::stream::unfold(keystore, |keystore| async {
             let key = keystore
-                .unwrap_legacy()
-                .generate_sign_keypair_from_pure_entropy()
+                .new_sign_keypair_random()
                 .await
                 .expect("can generate AgentPubKey");
             Some((key, keystore))

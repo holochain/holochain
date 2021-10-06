@@ -1348,16 +1348,8 @@ mod builder {
             } else if self.config.use_dangerous_test_keystore {
                 let keystore = spawn_test_keystore().await?;
                 // pre-populate with our two fixture agent keypairs
-                keystore
-                    .unwrap_legacy()
-                    .generate_sign_keypair_from_pure_entropy()
-                    .await
-                    .unwrap();
-                keystore
-                    .unwrap_legacy()
-                    .generate_sign_keypair_from_pure_entropy()
-                    .await
-                    .unwrap();
+                keystore.new_sign_keypair_random().await.unwrap();
+                keystore.new_sign_keypair_random().await.unwrap();
                 keystore
             } else {
                 let passphrase = match &self.config.passphrase_service {

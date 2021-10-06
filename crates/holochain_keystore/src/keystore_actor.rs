@@ -24,9 +24,6 @@ pub type KeystoreApiFuture<T> =
 
 /// Some legacy APIs to make refactor easier.
 pub trait KeystoreSenderExt {
-    /// Generates a new pure entropy keypair in the keystore, returning the public key.
-    fn generate_sign_keypair_from_pure_entropy(&self) -> KeystoreApiFuture<holo_hash::AgentPubKey>;
-
     /// Generate a signature for a given blob of binary data.
     fn sign(&self, input: Sign) -> KeystoreApiFuture<Signature>;
 
@@ -63,16 +60,6 @@ pub trait KeystoreSenderExt {
 }
 
 impl KeystoreSenderExt for KeystoreSender {
-    fn generate_sign_keypair_from_pure_entropy(&self) -> KeystoreApiFuture<holo_hash::AgentPubKey> {
-        let fut = self.sign_ed25519_new_from_entropy();
-        async move {
-            let (_, pk) = fut.await?;
-            Ok(holo_hash::AgentPubKey::from_raw_32(pk.to_vec()))
-        }
-        .boxed()
-        .into()
-    }
-
     fn sign(&self, input: Sign) -> KeystoreApiFuture<Signature> {
         let fut = self.sign_ed25519_sign_by_pub_key(
             input.key.as_ref()[HOLO_HASH_PREFIX_LEN..HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN]

@@ -38,6 +38,9 @@ use kitsune_p2p_types::dependencies::legacy_lair_api;
 mod error;
 pub use error::*;
 
+mod meta_lair_client;
+pub use meta_lair_client::*;
+
 pub mod keystore_actor;
 pub use keystore_actor::KeystoreSender;
 pub use keystore_actor::KeystoreSenderExt;

@@ -84,8 +84,6 @@ pub fn test_environments() -> TestEnvs {
 
 /// Generate a test keystore pre-populated with a couple test keypairs.
 pub fn test_keystore() -> holochain_keystore::MetaLairClient {
-    use holochain_keystore::KeystoreSenderExt;
-
     tokio_helper::block_on(
         async move {
             let keystore = holochain_keystore::test_keystore::spawn_test_keystore()
@@ -93,16 +91,8 @@ pub fn test_keystore() -> holochain_keystore::MetaLairClient {
                 .unwrap();
 
             // pre-populate with our two fixture agent keypairs
-            keystore
-                .unwrap_legacy()
-                .generate_sign_keypair_from_pure_entropy()
-                .await
-                .unwrap();
-            keystore
-                .unwrap_legacy()
-                .generate_sign_keypair_from_pure_entropy()
-                .await
-                .unwrap();
+            keystore.new_sign_keypair_random().await.unwrap();
+            keystore.new_sign_keypair_random().await.unwrap();
 
             keystore
         },

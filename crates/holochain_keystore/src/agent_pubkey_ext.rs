@@ -1,38 +1,17 @@
 use crate::*;
+use ghost_actor::dependencies::must_future::MustBoxFuture;
 use holochain_zome_types::prelude::*;
 use kitsune_p2p_types::dependencies::new_lair_api;
-use new_lair_api::prelude::*;
+use new_lair_api::LairResult;
 use std::sync::Arc;
-
-/// Abstraction around runtime switching/upgrade of lair keystore / client.
-/// Can delete this when we finally delete deprecated legacy lair option.
-#[derive(Clone)]
-pub enum MetaLairClient {
-    /// oldschool deprecated lair keystore client
-    Legacy(KeystoreSender),
-
-    /// new lair keystore api client
-    NewLair(LairClient),
-}
-
-impl MetaLairClient {
-    /// TODO this is just a temp helper to ease implementing the switch
-    pub fn unwrap_legacy(&self) -> &KeystoreSender {
-        if let MetaLairClient::Legacy(client) = self {
-            client
-        } else {
-            todo!()
-        }
-    }
-}
 
 /// Extend holo_hash::AgentPubKey with additional signature functionality
 /// from Keystore.
 pub trait AgentPubKeyExt {
     /// create a new agent keypair in given keystore, returning the AgentPubKey
-    fn new_from_pure_entropy(
-        keystore: &KeystoreSender,
-    ) -> KeystoreApiFuture<holo_hash::AgentPubKey>
+    fn new_random(
+        keystore: &MetaLairClient,
+    ) -> MustBoxFuture<'static, LairResult<holo_hash::AgentPubKey>>
     where
         Self: Sized;
 
@@ -54,12 +33,14 @@ pub trait AgentPubKeyExt {
 }
 
 impl AgentPubKeyExt for holo_hash::AgentPubKey {
-    fn new_from_pure_entropy(keystore: &KeystoreSender) -> KeystoreApiFuture<holo_hash::AgentPubKey>
+    fn new_random(
+        keystore: &MetaLairClient,
+    ) -> MustBoxFuture<'static, LairResult<holo_hash::AgentPubKey>>
     where
         Self: Sized,
     {
-        let f = keystore.generate_sign_keypair_from_pure_entropy();
-        ghost_actor::dependencies::must_future::MustBoxFuture::new(async move { f.await })
+        let f = keystore.new_sign_keypair_random();
+        MustBoxFuture::new(async move { f.await })
     }
 
     fn sign<S>(&self, keystore: &KeystoreSender, input: S) -> KeystoreApiFuture<Signature>

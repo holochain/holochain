@@ -18,6 +18,7 @@ holochain_zome_types = { path = "../holochain_zome_types", version = "0.0.11"}
 kitsune_p2p_types = { version = "0.0.8", path = "../kitsune_p2p/types" }
 legacy_lair_client = { version = "=0.0.7", package = "lair_keystore_client" }
 nanoid = "0.4.0"
+one_err = "0.0.5"
 serde = { version = "1.0", features = [ "derive" ] }
 serde_bytes = "0.11"
 sodoken = "=0.0.1-alpha.21"
