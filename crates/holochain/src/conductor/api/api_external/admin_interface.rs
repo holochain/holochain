@@ -215,6 +215,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .conductor_handle
                     .keystore()
                     .clone()
+                    .unwrap_legacy()
                     .generate_sign_keypair_from_pure_entropy()
                     .await?;
                 Ok(AdminResponse::AgentPubKeyGenerated(agent_pub_key))

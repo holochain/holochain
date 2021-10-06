@@ -48,7 +48,7 @@ const X25519_PUB3: [u8; 32] = [
 
 /// Construct a new TestKeystore.
 /// DANGER! This is a mock keystore for testing, DO NOT USE THIS IN PRODUCTION!
-pub async fn spawn_test_keystore() -> KeystoreApiResult<KeystoreSender> {
+pub async fn spawn_test_keystore() -> KeystoreApiResult<MetaLairClient> {
     use legacy_lair_api::test::*;
     let (api, _evt) = spawn_test_keystore(
         vec![
@@ -78,7 +78,7 @@ pub async fn spawn_test_keystore() -> KeystoreApiResult<KeystoreSender> {
         ],
     )
     .await?;
-    Ok(api)
+    Ok(MetaLairClient::Legacy(api))
 }
 
 #[cfg(test)]

@@ -233,8 +233,8 @@ async fn proxy_tls_with_test_keystore() {
 }
 
 async fn proxy_tls_inner(
-    keystore1: KeystoreSender,
-    keystore2: KeystoreSender,
+    keystore1: MetaLairClient,
+    keystore2: MetaLairClient,
 ) -> anyhow::Result<()> {
     use ghost_actor::GhostControlSender;
     use kitsune_p2p::dependencies::*;
@@ -509,7 +509,7 @@ async fn make_signing_call(client: &mut WebsocketSender, cell: &SweetCell) -> Ap
 /// to fail.
 ///
 /// This test was written making the assumption that we could swap out the
-/// KeystoreSender for each Cell at runtime, but given our current concurrency
+/// MetaLairClient for each Cell at runtime, but given our current concurrency
 /// model which puts each Cell in an Arc, this is not possible.
 /// In order to implement this test, we should probably have the "crude mock
 /// keystore" listen on a channel which toggles its behavior from always-correct

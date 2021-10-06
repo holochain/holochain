@@ -13,7 +13,7 @@ pub fn sign(
 ) -> Result<Signature, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess { keystore: Permission::Allow, .. } => tokio_helper::block_forever_on(async move {
-            call_context.host_context.keystore().sign(input).await
+            call_context.host_context.keystore().unwrap_legacy().sign(input).await
         })
         .map_err(|keystore_error| WasmError::Host(keystore_error.to_string())),
         _ => unreachable!(),

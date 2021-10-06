@@ -17,6 +17,7 @@ pub fn x_25519_x_salsa20_poly1305_decrypt(
                 call_context
                     .host_context
                     .keystore()
+                    .unwrap_legacy()
                     .x_25519_x_salsa20_poly1305_decrypt(input)
                     .await
             })

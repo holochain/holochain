@@ -18,6 +18,7 @@ pub fn create_x25519_keypair(
             call_context
                 .host_context
                 .keystore()
+                .unwrap_legacy()
                 .create_x25519_keypair()
                 .await
         })

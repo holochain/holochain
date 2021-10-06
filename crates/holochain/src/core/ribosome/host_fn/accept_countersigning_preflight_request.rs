@@ -57,6 +57,7 @@ pub fn accept_countersigning_preflight_request<'a>(
                 let signature: Signature = match call_context
                     .host_context
                     .keystore()
+                    .unwrap_legacy()
                     .sign(Sign::new_raw(
                         author,
                         PreflightResponse::encode_fields_for_signature(

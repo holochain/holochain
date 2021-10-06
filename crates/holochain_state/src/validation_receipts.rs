@@ -2,7 +2,7 @@
 
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
-use holochain_keystore::KeystoreSender;
+use holochain_keystore::MetaLairClient;
 use holochain_keystore::{keystore_actor::KeystoreApiResult, AgentPubKeyExt};
 use holochain_serialized_bytes::prelude::*;
 use holochain_sqlite::prelude::*;
@@ -49,9 +49,12 @@ impl ValidationReceipt {
     /// Sign this validation receipt.
     pub async fn sign(
         self,
-        keystore: &KeystoreSender,
+        keystore: &MetaLairClient,
     ) -> KeystoreApiResult<SignedValidationReceipt> {
-        let signature = self.validator.sign(keystore, self.clone()).await?;
+        let signature = self
+            .validator
+            .sign(keystore.unwrap_legacy(), self.clone())
+            .await?;
         Ok(SignedValidationReceipt {
             receipt: self,
             validator_signature: signature,
@@ -132,7 +135,7 @@ mod tests {
 
     async fn fake_vr(
         dht_op_hash: &DhtOpHash,
-        keystore: &KeystoreSender,
+        keystore: &MetaLairClient,
     ) -> SignedValidationReceipt {
         let agent = keystore
             .clone()

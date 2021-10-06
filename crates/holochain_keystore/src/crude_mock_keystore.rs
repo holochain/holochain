@@ -6,10 +6,10 @@ use std::sync::Arc;
 
 use crate::legacy_lair_api::{actor::*, internal::*, *};
 
-use crate::KeystoreSender;
+use crate::MetaLairClient;
 
 /// Spawn a test keystore which always returns the same LairError for every call.
-pub async fn spawn_crude_mock_keystore<F>(err_fn: F) -> LairResult<KeystoreSender>
+pub async fn spawn_crude_mock_keystore<F>(err_fn: F) -> LairResult<MetaLairClient>
 where
     F: Fn() -> LairError + Send + 'static,
 {
@@ -22,7 +22,7 @@ where
 
     tokio::task::spawn(builder.spawn(CrudeMockKeystore(Box::new(err_fn))));
 
-    Ok(sender)
+    Ok(MetaLairClient::Legacy(sender))
 }
 
 /// A keystore which always returns the same LairError for every call.
