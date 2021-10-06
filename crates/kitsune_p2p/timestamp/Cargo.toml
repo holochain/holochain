@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_timestamp"
-version = "0.0.4"
+version = "0.0.5"
 description = "Microsecond-precision timestamp datatype for kitsune_p2p"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -22,7 +22,7 @@ thiserror = "1"
 arbitrary = { version = "1.0", features = ["derive"], optional = true }
 
 # rusqlite
-rusqlite = { version = "0.25", optional = true }
+rusqlite = { version = "0.26", optional = true }
 
 [dev-dependencies]
 holochain_serialized_bytes = "=0.0.51"

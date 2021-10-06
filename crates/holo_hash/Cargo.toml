@@ -1,6 +1,6 @@
 [package]
 name = "holo_hash"
-version = "0.0.7"
+version = "0.0.8"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo", "hash", "blake", "blake2b" ]
 categories = [ "cryptography" ]
@@ -25,7 +25,7 @@ futures = {version = "0.3", optional = true}
 holochain_serialized_bytes = {version = "=0.0.51", optional = true }
 must_future = {version = "0.1", optional = true}
 rand = {version = "0.7", optional = true}
-rusqlite = { version = "0.25", optional = true }
+rusqlite = { version = "0.26", optional = true }
 serde = { version = "1", optional = true }
 serde_bytes = { version = "0.11", optional = true }
 tracing = { version = "0.1", optional = true}
