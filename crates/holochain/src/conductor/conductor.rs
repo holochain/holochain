@@ -580,14 +580,15 @@ where
 
         // Clean up all cells that will be dropped (leave network, etc.)
         let to_cleanup: Vec<_> = self.cells.share_mut(|cells| {
-            let to_cleanup: Vec<_> = cells
+            let to_remove = cells
                 .keys()
                 .filter(|id| !keepers.contains(id))
                 .cloned()
-                .collect();
-            to_cleanup
-                .into_iter()
-                .filter_map(|cell_id| cells.remove(&cell_id))
+                .collect::<Vec<_>>();
+
+            to_remove
+                .iter()
+                .filter_map(|cell_id| cells.remove(cell_id))
                 .collect()
         });
         for cell in to_cleanup {
@@ -834,7 +835,7 @@ where
                         dna_def
                             .zomes
                             .iter()
-                            .map(|(zome_name, zome)| Ok(zome.wasm_hash(&zome_name)?))
+                            .map(|(zome_name, zome)| Ok(zome.wasm_hash(zome_name)?))
                     })
                     .collect::<ConductorResult<HashSet<_>>>()?;
 

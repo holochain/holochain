@@ -121,7 +121,7 @@ impl Query for GetLiveEntryQuery {
                     .entry_hash()
                     .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.header().clone()))?;
                 let element = stores
-                    .get_entry(&entry_hash)?
+                    .get_entry(entry_hash)?
                     .map(|entry| Element::new(header, Some(entry)));
                 Ok(element)
             }

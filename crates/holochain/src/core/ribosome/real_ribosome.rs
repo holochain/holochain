@@ -172,7 +172,7 @@ impl HostFnBuilder {
                 },
             ),
         );
-        &self
+        self
     }
 }
 
@@ -240,7 +240,7 @@ impl RealRibosome {
             .get_wasm_zome(zome_name)?
             .wasm_hash
             .get_raw_32();
-        key.copy_from_slice(&bytes);
+        key.copy_from_slice(bytes);
         Ok(key)
     }
 

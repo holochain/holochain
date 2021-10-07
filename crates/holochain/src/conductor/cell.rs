@@ -217,12 +217,12 @@ impl Cell {
     }
 
     fn dna_hash(&self) -> &DnaHash {
-        &self.id.dna_hash()
+        self.id.dna_hash()
     }
 
     #[allow(unused)]
     fn agent_pubkey(&self) -> &AgentPubKey {
-        &self.id.agent_pubkey()
+        self.id.agent_pubkey()
     }
 
     /// Accessor

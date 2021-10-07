@@ -266,7 +266,7 @@ impl TestEnvs {
     pub fn path(&self) -> &Path {
         match &self.dir {
             Either::Left(tempdir) => tempdir.path(),
-            Either::Right(path) => &path,
+            Either::Right(path) => path,
         }
     }
 

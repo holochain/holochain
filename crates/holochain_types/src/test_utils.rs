@@ -105,7 +105,7 @@ pub async fn fake_unique_element(
     });
 
     Ok((
-        SignedHeaderHashed::new(&keystore, header_1.into_hashed()).await?,
+        SignedHeaderHashed::new(keystore, header_1.into_hashed()).await?,
         entry,
     ))
 }

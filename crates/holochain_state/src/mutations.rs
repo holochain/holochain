@@ -661,7 +661,7 @@ pub fn schedule_fn(
         Some(Schedule::Persisted(ref schedule_string)) => {
             // If this cron doesn't parse cleanly we don't even want to
             // write it to the db.
-            let start = if let Some(start) = cron::Schedule::from_str(&schedule_string)
+            let start = if let Some(start) = cron::Schedule::from_str(schedule_string)
                 .map_err(|e| ScheduleError::Cron(e.to_string()))?
                 .after(
                     &chrono::DateTime::<chrono::Utc>::try_from(now)
