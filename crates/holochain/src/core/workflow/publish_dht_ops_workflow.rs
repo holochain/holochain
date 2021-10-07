@@ -14,7 +14,6 @@ use super::error::WorkflowResult;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use holo_hash::*;
-use holochain_p2p::HolochainP2pCell;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
@@ -35,7 +34,7 @@ pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(60 * 
 #[instrument(skip(env, network, trigger_self))]
 pub async fn publish_dht_ops_workflow(
     env: EnvWrite,
-    network: HolochainP2pCell,
+    network: &(dyn HolochainP2pCellT + Send + Sync),
     trigger_self: &TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     let mut complete = WorkComplete::Complete;
@@ -57,6 +56,7 @@ pub async fn publish_dht_ops_workflow(
             success.extend(hashes);
         }
     }
+
     tracing::info!("sent {} ops", success.len());
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
     let continue_publish = env
@@ -67,6 +67,8 @@ pub async fn publish_dht_ops_workflow(
             WorkflowResult::Ok(publish_query::num_still_needing_publish(writer)? > 0)
         })
         .await?;
+
+    // If we have more ops that could be published then continue looping.
     if continue_publish {
         trigger_self.resume_loop();
     } else {
@@ -111,6 +113,7 @@ mod tests {
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use holochain_p2p::actor::HolochainP2pSender;
+    use holochain_p2p::HolochainP2pCell;
     use holochain_p2p::HolochainP2pRef;
     use observability;
     use rusqlite::Transaction;
@@ -222,7 +225,7 @@ mod tests {
     /// Call the workflow
     async fn call_workflow(env: EnvWrite, cell_network: HolochainP2pCell) {
         let (trigger_sender, _) = TriggerSender::new();
-        publish_dht_ops_workflow(env.clone().into(), cell_network, &trigger_sender)
+        publish_dht_ops_workflow(env.clone().into(), &cell_network, &trigger_sender)
             .await
             .unwrap();
     }
@@ -610,6 +613,4 @@ mod tests {
             .instrument(debug_span!("private_entries")),
         );
     }
-
-    // TODO: COVERAGE: Test public ops do publish
 }

@@ -84,7 +84,7 @@ pub async fn spawn_queue_consumer_tasks(
         env.clone(),
         conductor_handle.clone(),
         stop.subscribe(),
-        cell_network.clone(),
+        Box::new(cell_network.clone()),
     );
     task_sender
         .send(ManagedTaskAdd::cell_critical(
@@ -249,22 +249,35 @@ impl InitialQueueTriggers {
 /// The means of nudging a queue consumer to tell it to look for more work
 #[derive(Clone)]
 pub struct TriggerSender {
+    /// The actual trigger sender.
     trigger: broadcast::Sender<()>,
+    /// Reset the back off loop if there is one.
     reset_back_off: Option<Arc<AtomicBool>>,
+    /// Pause / resume the back off loop if there is one.
     pause_back_off: Option<Arc<AtomicBool>>,
 }
 
 /// The receiving end of a queue trigger channel
 pub struct TriggerReceiver {
+    /// The actual trigger.
     rx: broadcast::Receiver<()>,
+    /// If there is a back off loop, should
+    /// the trigger reset the back off.
     reset_on_trigger: bool,
+    /// The optional back off loop.
     back_off: Option<BackOff>,
 }
 
+/// A loop that can optionally back off, pause and resume.
 struct BackOff {
+    /// The starting duration for the back off.
+    /// This allows resetting the range.
     start: Duration,
+    /// The range of duration for the back off.
     range: Range<Duration>,
+    /// If we should reset the range on next iteration.
     reset_back_off: Arc<AtomicBool>,
+    /// If we should pause the loop on next iteration.
     paused: Arc<AtomicBool>,
 }
 
@@ -340,12 +353,35 @@ impl TriggerSender {
         }
     }
 
-    /// Resume the trigger loop if there is one.
-    pub fn resume_loop(&self) {
+    /// Resume the trigger loop now if there is one.
+    ///
+    /// This will resume the loop even if it is currently
+    /// listening (the workflow is not running).
+    /// The downside to this call is that if the workflow
+    /// is running it will immediately run a second time.
+    ///
+    /// This call is a no-op if the loop is not paused.
+    pub fn resume_loop_now(&self) {
         if let Some(pause) = &self.pause_back_off {
             if pause.fetch_and(false, Ordering::AcqRel) {
                 self.trigger();
             }
+        }
+    }
+
+    /// Resume the trigger loop if there is one.
+    ///
+    /// This will cause the loop to to resume after the
+    /// next trigger (or if the workflow is currently in progress).
+    /// It will not cause the loop to resume immediately.
+    /// If the loop is currently listening (the workflow is not running)
+    /// then nothing will happen until the next trigger.
+    /// See `resume_loop_now` for a version that will resume immediately.
+    ///
+    /// This call is a no-op if the loop is not paused.
+    pub fn resume_loop(&self) {
+        if let Some(pause) = &self.pause_back_off {
+            pause.store(false, Ordering::Release);
         }
     }
 }
@@ -360,49 +396,66 @@ impl TriggerReceiver {
             reset_on_trigger,
         } = self;
 
-        let mut flush_buffer = false;
-
+        let mut was_trigger = true;
         {
-            let rx_fut = Self::rx_fut(rx);
+            // Create the trigger future
+            let trigger_fut = Self::rx_fut(rx);
             match back_off {
+                // We have a back off loop that is running.
                 Some(back_off) if !back_off.is_paused() => {
                     let paused = back_off.paused.clone();
-                    let reset_back_off = {
+                    {
+                        // Get the back off future.
                         let back_off_fut = back_off.wait();
-                        futures::pin_mut!(back_off_fut, rx_fut);
-                        match futures::future::select(rx_fut, back_off_fut).await {
+                        futures::pin_mut!(back_off_fut, trigger_fut);
+
+                        // Race between either a trigger or the loop.
+                        match futures::future::select(trigger_fut, back_off_fut).await {
                             Either::Left((result, _)) => {
+                                // We got a trigger, check the result and drop the wait future.
                                 result?;
-                                flush_buffer = true;
-                                *reset_on_trigger
                             }
-                            Either::Right((_, rx_fut)) => {
+                            Either::Right((_, trigger_fut)) => {
+                                // We got the loop future.
                                 if paused.load(Ordering::Acquire) {
-                                    rx_fut.await?;
-                                    true
+                                    // If we are now paused then we should wait for a trigger.
+                                    trigger_fut.await?;
                                 } else {
-                                    false
+                                    // We are not pause so this was not a trigger.
+                                    was_trigger = false;
                                 }
                             }
                         }
-                    };
-                    if reset_back_off {
-                        back_off.reset();
                     }
                 }
                 _ => {
-                    rx_fut.await?;
-                    flush_buffer = true;
+                    // We either have no back off loop or it's paused
+                    // so wait for a trigger.
+                    trigger_fut.await?;
                 }
             }
         }
-        if flush_buffer {
+        // We want to flush the buffer if a trigger
+        // that woke the listen.
+        if was_trigger {
             // Do one try recv to empty the buffer.
+            // This is needed as we can't have an empty buffer
+            // but we don't want a second trigger to be stored in
+            // the buffer and cause the workflow to run twice.
             let _ = self.rx.try_recv();
+
+            // If we have a back off loop and got a trigger then
+            // we should reset the back off if that flag is on.
+            if *reset_on_trigger {
+                if let Some(back_off) = back_off {
+                    back_off.reset();
+                }
+            }
         }
         Ok(())
     }
 
+    /// Create a future that will be ok with either a recv or a lagged.
     async fn rx_fut(rx: &mut broadcast::Receiver<()>) -> Result<(), QueueTriggerClosedError> {
         match rx.recv().await {
             Ok(_) => Ok(()),
@@ -427,15 +480,21 @@ impl BackOff {
     }
 
     async fn wait(&mut self) {
+        // Check if we should reset the back off.
         if self.reset_back_off.fetch_and(false, Ordering::Relaxed) {
             self.reset();
         }
+        // If the range is empty we are just looping.
         let dur = if self.range.is_empty() {
             self.range.end
         } else {
+            // If not we take the current start value.
             self.range.start
         };
+        // Sleep this task for the chosen duration.
         tokio::time::sleep(dur).await;
+        // If the sleep completes then we bump the start of the range
+        // or take the end if we have reached the end.
         self.range.start = std::cmp::min(self.range.start * 2, self.range.end);
     }
 
