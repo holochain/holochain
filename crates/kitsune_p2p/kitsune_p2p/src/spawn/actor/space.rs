@@ -609,10 +609,21 @@ impl KitsuneP2pHandler for Space {
         &mut self,
         input: actor::RpcMulti,
     ) -> KitsuneP2pHandlerResult<Vec<actor::RpcMultiResponse>> {
+        let location = input.basis.get_loc();
+        let local_agents_holding_basis = self
+            .local_joined_agents
+            .iter()
+            .filter(|agent| {
+                self.agent_arcs
+                    .get(*agent)
+                    .map_or(false, |arc| arc.contains(location))
+            })
+            .cloned()
+            .collect();
         let fut = rpc_multi_logic::handle_rpc_multi(
             input,
             self.ro_inner.clone(),
-            self.local_joined_agents.clone(),
+            local_agents_holding_basis,
         );
         Ok(async move { fut.await }.boxed().into())
     }

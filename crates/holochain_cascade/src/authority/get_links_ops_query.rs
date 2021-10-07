@@ -31,6 +31,14 @@ impl GetLinksOpsQuery {
             tag: key.tag.map(Arc::new),
         }
     }
+    pub fn tag_to_hex(tag: &LinkTag) -> String {
+        use std::fmt::Write;
+        let mut s = String::with_capacity(tag.0.len());
+        for b in &tag.0 {
+            write!(&mut s, "{:02X}", b).ok();
+        }
+        s
+    }
 }
 
 pub struct Item {
@@ -62,15 +70,19 @@ impl Query for GetLinksOpsQuery {
             AND
             DhtOp.when_integrated IS NOT NULL
         ";
-        // TODO: This should not be = but should be a partial match.
-        let tag = "
-            AND
-            Header.tag = :tag
-        ";
-        let common_query = if self.tag.is_some() {
-            format!("{}{}", common, tag)
-        } else {
-            common.into()
+        let common_query = match &self.tag {
+            Some(tag) => {
+                let tag = Self::tag_to_hex(tag.as_ref());
+                let tag = format!(
+                    "
+                    AND
+                    HEX(Header.tag) like '{}%'
+                ",
+                    tag
+                );
+                format!("{}{}", common, tag)
+            }
+            None => common.into(),
         };
         let create_query = format!("{}{}", create, common_query);
         let sub_create_query = format!("{}{}", sub_create, common_query);
@@ -92,19 +104,15 @@ impl Query for GetLinksOpsQuery {
     }
 
     fn params(&self) -> Vec<Params> {
-        let mut params = named_params! {
-            ":create": DhtOpType::RegisterAddLink,
-            ":delete": DhtOpType::RegisterRemoveLink,
-            ":base_hash": self.base,
-            ":zome_id": self.zome_id,
+        {
+            named_params! {
+                ":create": DhtOpType::RegisterAddLink,
+                ":delete": DhtOpType::RegisterRemoveLink,
+                ":base_hash": self.base,
+                ":zome_id": self.zome_id,
+            }
         }
-        .to_vec();
-        if self.tag.is_some() {
-            params.extend(named_params! {
-                ":tag": self.tag,
-            });
-        }
-        params
+        .to_vec()
     }
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
@@ -132,19 +140,11 @@ impl Query for GetLinksOpsQuery {
                     Some(validation_status),
                 ) = (item, validation_status)
                 {
-                    if self.tag.is_some() {
-                        state.creates.push(WireCreateLink::condense_base_only(
-                            header,
-                            signature,
-                            validation_status,
-                        ));
-                    } else {
-                        state.creates.push(WireCreateLink::condense(
-                            header,
-                            signature,
-                            validation_status,
-                        ));
-                    }
+                    state.creates.push(WireCreateLink::condense(
+                        header,
+                        signature,
+                        validation_status,
+                    ));
                 }
             }
             DhtOpType::RegisterRemoveLink => {
