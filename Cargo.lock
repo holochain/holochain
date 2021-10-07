@@ -2213,7 +2213,8 @@ dependencies = [
 [[package]]
 name = "hc_seed_bundle"
 version = "0.1.0-alpha.1"
-source = "git+https://github.com/holochain/lair.git?rev=cca7f304c55b3c066c03c53e57e34f237342b73d#cca7f304c55b3c066c03c53e57e34f237342b73d"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ebe44e0fed2c1857f2267cc76fecb98de20a41569a52efab19e21cc4b8ed86f6"
 dependencies = [
  "futures",
  "one_err",
@@ -3469,7 +3470,8 @@ dependencies = [
 [[package]]
 name = "lair_keystore_api"
 version = "0.1.0-alpha.1"
-source = "git+https://github.com/holochain/lair.git?rev=cca7f304c55b3c066c03c53e57e34f237342b73d#cca7f304c55b3c066c03c53e57e34f237342b73d"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b4098da90ef53bb05cb1da45b2a2775cccb1f3fbb24b949ac7e26b67737a93bb"
 dependencies = [
  "base64",
  "dunce",
