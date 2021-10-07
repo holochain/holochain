@@ -126,7 +126,7 @@ pub trait ConductorHandleT: Send + Sync {
     /// List the app interfaces currently install.
     async fn list_app_interfaces(&self) -> ConductorResult<Vec<u16>>;
 
-    /// Install a [Dna] in this Conductor
+    /// Install a [DnaFile] in this Conductor
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()>;
 
     /// Get the list of hashes of installed Dnas in this Conductor
