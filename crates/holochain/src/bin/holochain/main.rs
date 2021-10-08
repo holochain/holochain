@@ -5,6 +5,7 @@ use holochain::conductor::paths::ConfigFilePath;
 use holochain::conductor::Conductor;
 use holochain::conductor::ConductorHandle;
 use holochain_conductor_api::conductor::ConductorConfigError;
+use holochain_conductor_api::config::conductor::KeystoreConfig;
 use holochain_util::tokio_helper;
 use kitsune_p2p_types::dependencies::new_lair_api::LairResult;
 use observability::Output;
@@ -47,13 +48,6 @@ struct Opt {
     #[structopt(short = "p", long)]
     pub piped: bool,
 
-    /// Mutually exclusive with --piped / -p. Some legacy keystore
-    /// configs allow specifying the passphrase directly. This
-    /// is insecure, but if you still want to use that, you must
-    /// specify this parameter to not prompt for the passphrase.
-    #[structopt(long)]
-    pub danger_legacy_no_cli_passphrase: bool,
-
     #[structopt(
         short = "i",
         long,
@@ -75,10 +69,6 @@ async fn async_main() {
     human_panic::setup_panic!();
 
     let opt = Opt::from_args();
-
-    if opt.piped && opt.danger_legacy_no_cli_passphrase {
-        panic!("--piped / -p cannot be specified at the same time as --danger-legacy-no-cli-passphrase");
-    }
 
     observability::init_fmt(opt.structured.clone()).expect("Failed to start contextual logging");
     debug!("observability initialized");
@@ -206,16 +196,20 @@ async fn conductor_handle_from_config_path(opt: &Opt) -> ConductorHandle {
 
     // read the passphrase to prepare for usage,
     // but we don't have any keystore config types that use this yet.
-    let _passphrase = if opt.danger_legacy_no_cli_passphrase {
-        None
-    } else if opt.piped {
-        Some(read_piped_passphrase().await.unwrap())
-    } else {
-        Some(
-            read_interactive_passphrase("\n# passphrase> ")
-                .await
-                .unwrap(),
-        )
+    let _passphrase = match &config.keystore {
+        KeystoreConfig::DangerTestKeystoreLegacyDeprecated => None,
+        KeystoreConfig::LairServerLegacyDeprecated { .. } => None,
+        _ => {
+            if opt.piped {
+                Some(read_piped_passphrase().await.unwrap())
+            } else {
+                Some(
+                    read_interactive_passphrase("\n# passphrase> ")
+                        .await
+                        .unwrap(),
+                )
+            }
+        }
     };
 
     // Check if database is present
