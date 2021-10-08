@@ -7,9 +7,9 @@ use holochain_types::prelude::Permission;
 use holochain_types::prelude::HostFnAccess;
 
 pub fn call_info(
-    _ribosome: Arc<impl RibosomeT>,
+    ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    _input: (),
+    input: (),
 ) -> Result<CallInfo, WasmError> {
     match HostFnAccess::from(call_context.host_context()) {
         HostFnAccess { bindings: Permission::Allow, .. } => {

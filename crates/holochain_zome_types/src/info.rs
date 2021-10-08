@@ -4,7 +4,6 @@ use crate::CapGrant;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_serialized_bytes::prelude::*;
-use crate::FunctionName;
 
 /// The properties of the current dna/zome being called.
 #[allow(missing_docs)]
@@ -66,49 +65,19 @@ pub struct DnaInfo;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum CallSource {
-    Network,
-    ClientAPI,
-    LocalCell,
-    LocalDNAZome,
-    Callback,
+    Call(Box<CallSource>, ZomeInfo, AgentPubKey),
+    Client(ZomeInfo, AgentPubKey),
+    Callback(ZomeInfo, AgentPubKey),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum CallInfo {
-    // This call was called by a host function, either `call` or `call_remote`.
-    // - `CallInfo` of the calling function, same as if `call_info` was called
-    //    in the calling context. This is nested/recursive as we may be in call
-    //    inception.
-    // - `AgentPubKey` of the provenance of the caller. This can be different
-    //   to the provenance in `CallInfo` e.g. a `call_remote` could have alice
-    //   in bob's `CallInfo` and bob is the current provenance on carol's cell.
-    // - `ZomeName` of the caller
-    // - `FunctionName` of the caller
-    // - `CapGrant` used to authorise _this_ call, i.e. NOT the cap grant in
-    //   the calling context, the cap grant use to authorize THIS context
-    Call(Box<CallInfo>, AgentPubKey, ZomeName, FunctionName, CapGrant),
-    // This call originates from outside the conductor.
-    // There is a defined provenance and cap grant but no additional calling
-    // context relevant to the DNA such as zome and function as the client
-    // operates outside the DNA by definition.
-    Client(AgentPubKey, CapGrant),
-    // This call is a callback.
-    // Authorization is meaningless to a callback. The author of the chain is
-    // always implied and the callback implementation itself defines the zome
-    // and function.
-    Callback,
+pub struct CallInfo {
+    source: CallSource,
+    cap_grant: CapGrant,
 }
 
 impl CallInfo {
-    pub fn new(
-        source: CallSource,
-        provenance: Option<AgentPubKey>,
-        cap_claim: Option<CapClaim>,
-    ) -> Self {
-        Self {
-            source,
-            provenance,
-            cap_claim,
-        }
+    pub fn new(source: CallSource, cap_grant: CapGrant) -> Self {
+        Self { source, cap_grant }
     }
 }

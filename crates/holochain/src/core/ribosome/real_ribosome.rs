@@ -487,16 +487,9 @@ impl RibosomeT for RealRibosome {
         zome: &Zome,
         to_call: &FunctionName,
     ) -> Result<Option<ExternIO>, RibosomeError> {
-        let call_info = CallInfo::new(
-            invocation.call_source(),
-            invocation.provenance(),
-            // @todo
-            vec![],
-        );
         let call_context = CallContext {
             zome: zome.clone(),
             host_context,
-            call_info,
         };
 
         match zome.zome_def() {

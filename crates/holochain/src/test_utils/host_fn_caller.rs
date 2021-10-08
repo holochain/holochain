@@ -171,7 +171,7 @@ impl HostFnCaller {
         // This is somewhat arbitrary.
         // Feel free to change if it no longer makes sense.
         let call_info = CallInfo::new(
-            CallSource::ClientAPI,
+            CallSource::Client,
             Some(cell_id.agent_pubkey().clone()),
             vec![],
         );

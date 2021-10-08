@@ -259,8 +259,7 @@ pub trait Invocation: Clone {
     /// this is intentionally NOT a reference to self because ExternIO may be huge we want to be
     /// careful about cloning invocations
     fn host_input(self) -> Result<ExternIO, SerializedBytesError>;
-    fn provenance(&self) -> Option<AgentPubKey>;
-    fn call_source(&self) -> CallSource;
+    fn call_info(&self) -> &CallInfo;
 }
 
 impl ZomeCallInvocation {
@@ -290,8 +289,7 @@ mockall::mock! {
         fn zomes(&self) -> ZomesToInvoke;
         fn fn_components(&self) -> FnComponents;
         fn host_input(self) -> Result<ExternIO, SerializedBytesError>;
-        fn provenance(&self) -> Option<AgentPubKey>;
-        fn call_source(&self) -> CallSource;
+        fn call_info(&self) -> &CallInfo;
     }
     trait Clone {
         fn clone(&self) -> Self;
@@ -318,7 +316,7 @@ pub struct ZomeCallInvocation {
     /// The provenance of the call. Provenance means the 'source'
     /// so this expects the `AgentPubKey` of the agent calling the Zome function
     pub provenance: AgentPubKey,
-    pub call_source: CallSource,
+    pub call_info: CallInfo,
 }
 
 impl Invocation for ZomeCallInvocation {
@@ -331,11 +329,8 @@ impl Invocation for ZomeCallInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         Ok(self.payload)
     }
-    fn provenance(&self) -> Option<AgentPubKey> {
-        Some(self.provenance.clone())
-    }
-    fn call_source(&self) -> CallSource {
-        self.call_source.clone()
+    fn call_info(&self) -> &CallInfo {
+        &self.call_info
     }
 }
 
@@ -360,7 +355,11 @@ impl ZomeCallInvocation {
             fn_name,
             payload,
             provenance,
-            call_source: CallSource::ClientAPI,
+            call_info: CallInfo::new(
+                CallSource::new(
+                    
+                )
+            )
         }
     }
 }
