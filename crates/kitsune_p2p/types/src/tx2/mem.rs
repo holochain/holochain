@@ -307,21 +307,7 @@ impl EndpointAdapt for MemEndpointAdapt {
         async move {
             let con_id = NEXT_MEM_ID.fetch_add(1, atomic::Ordering::Relaxed);
 
-            let bad_url = || Err(format!("invalid url: {}", url).into());
-
-            if url.scheme() != "kitsune-mem" {
-                return bad_url();
-            }
-
-            let id = match url.host_str() {
-                None => return bad_url(),
-                Some(id) => id,
-            };
-
-            let id = match id.parse::<u64>() {
-                Err(_) => return bad_url(),
-                Ok(id) => id,
-            };
+            let id = parse_mem_url(&url)?;
 
             let (c_send, oth_ep_active, remote_cert) = match MEM_ENDPOINTS.lock().get(&id) {
                 None => return Err(format!("remote not found: {}", url).into()),
@@ -394,6 +380,27 @@ impl EndpointAdapt for MemEndpointAdapt {
         lock.c_send.close_channel();
         async move {}.boxed()
     }
+}
+
+/// Parse the u64 ID from a kitsune-mem url, or the error if unparseable
+pub fn parse_mem_url(url: &TxUrl) -> Result<u64, String> {
+    let bad_url = |reason: &str| Err(format!("invalid url {} : {}", url, reason).into());
+
+    if url.scheme() != "kitsune-mem" {
+        return bad_url("scheme must be kitsune-mem");
+    }
+
+    let id = match url.host_str() {
+        None => return bad_url("no id specified in the hostname position"),
+        Some(id) => id,
+    };
+
+    let id = match id.parse::<u64>() {
+        Err(_) => return bad_url("id not parseable as u64"),
+        Ok(id) => id,
+    };
+
+    Ok(id)
 }
 
 /// Memory-based test endpoint adapter for kitsune tx2.

@@ -1,5 +1,7 @@
 use std::cmp::Ordering;
 
+use kitsune_p2p_types::tx2::parse_mem_url;
+
 use super::metrics::Metrics;
 use super::*;
 
@@ -47,16 +49,28 @@ impl ShardedGossipLocal {
                 .url_list
                 .iter()
                 .filter_map(|url| {
-                    kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str())
-                        .map_err(|e| tracing::error!("Failed to parse url {:?}", e))
-                        .ok()
-                        .map(|purl| {
-                            (
+                    match kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()) {
+                        Err(proxy_err) => {
+                            match parse_mem_url(url) {
+                                Err(mem_err) => {
+                                    tracing::error!("Failed to parse url as either proxy url or mem url.\nproxy parse error: {:?}\nmem parse error: {:?}", proxy_err, mem_err);
+                                    None
+                                },
+                                Ok(id) => Some((
+                                    info.agent.clone(),
+                                    Tx2Cert::from(id.to_le_bytes().to_vec()),
+                                    TxUrl::from(url.as_str()),
+                                ))
+                            }
+                        }
+                        Ok(purl) => {
+                            Some((
                                 info.agent.clone(),
                                 Tx2Cert::from(purl.digest()),
                                 TxUrl::from(url.as_str()),
-                            )
-                        })
+                            ))
+                        }
+                    }
                 })
                 .next();
 
