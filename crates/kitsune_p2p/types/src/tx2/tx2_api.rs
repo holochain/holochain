@@ -291,7 +291,9 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
         async move {
             let msg_id = MsgId::new_notify();
             let len = data.len();
+            dbg!("con write: before");
             this.con.write(msg_id, data, timeout).await?;
+            dbg!("con write: after");
 
             this.metrics.write_len(dbg_name, len);
 
@@ -404,6 +406,14 @@ impl<C: Codec + 'static + Send + Unpin> Eq for Tx2EpHnd<C> {}
 impl<C: Codec + 'static + Send + Unpin> std::hash::Hash for Tx2EpHnd<C> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.0.uniq().hash(state);
+    }
+}
+
+impl<C: Codec + 'static + Send + Unpin> std::fmt::Debug for Tx2EpHnd<C> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Tx2EpHnd")
+            .field("uniq", &self.0.uniq())
+            .finish()
     }
 }
 

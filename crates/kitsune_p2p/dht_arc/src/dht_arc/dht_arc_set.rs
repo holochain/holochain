@@ -2,7 +2,7 @@ use gcollections::ops::*;
 use interval::{interval_set::*, IntervalSet};
 use std::{borrow::Borrow, collections::VecDeque, fmt::Debug};
 
-use crate::DhtLocation;
+use crate::{loc8::Loc8, DhtLocation};
 
 // For u32, IntervalSet excludes MAX from its set of valid values due to its
 // need to be able to express the width of an interval using a u32.
@@ -233,7 +233,24 @@ pub enum ArcInterval<T = DhtLocation> {
     Bounded(T, T),
 }
 
-impl<T: PartialOrd + num_traits::Num + num_traits::AsPrimitive<u32>> ArcInterval<T> {
+impl<T: PartialOrd + num_traits::Num> ArcInterval<T> {
+    pub fn contains<B: std::borrow::Borrow<T>>(&self, t: B) -> bool {
+        match self {
+            Self::Empty => false,
+            Self::Full => true,
+            Self::Bounded(lo, hi) => {
+                let t = t.borrow();
+                if lo <= hi {
+                    lo <= t && t <= hi
+                } else {
+                    lo <= t || t <= hi
+                }
+            }
+        }
+    }
+}
+
+impl<T: num_traits::AsPrimitive<u32>> ArcInterval<T> {
     pub fn new(start: T, end: T) -> ArcInterval<DhtLocation> {
         let start = start.as_();
         let end = end.as_();
@@ -251,29 +268,29 @@ impl<T: PartialOrd + num_traits::Num + num_traits::AsPrimitive<u32>> ArcInterval
             Self::Bounded(start, end)
         }
     }
+}
 
+impl ArcInterval<u32> {
     pub fn canonical(self) -> ArcInterval {
         match self {
             ArcInterval::Empty => ArcInterval::Empty,
             ArcInterval::Full => ArcInterval::Full,
             ArcInterval::Bounded(lo, hi) => {
-                ArcInterval::new(DhtLocation::new(lo.as_()), DhtLocation::new(hi.as_()))
+                ArcInterval::new(DhtLocation::new(lo), DhtLocation::new(hi))
             }
         }
     }
+}
 
-    pub fn contains<B: std::borrow::Borrow<T>>(&self, t: B) -> bool {
+impl ArcInterval<Loc8> {
+    pub fn canonical(self) -> ArcInterval {
         match self {
-            Self::Empty => false,
-            Self::Full => true,
-            Self::Bounded(lo, hi) => {
-                let t = t.borrow();
-                if lo <= hi {
-                    lo <= t && t <= hi
-                } else {
-                    lo <= t || t <= hi
-                }
-            }
+            ArcInterval::Empty => ArcInterval::Empty,
+            ArcInterval::Full => ArcInterval::Full,
+            ArcInterval::Bounded(lo, hi) => ArcInterval::new(
+                DhtLocation::new(lo as u8 as u32),
+                DhtLocation::new(hi as u8 as u32),
+            ),
         }
     }
 }
@@ -352,6 +369,10 @@ impl ArcInterval<DhtLocation> {
                 .join("")
             }
         }
+    }
+
+    pub fn canonical(self) -> ArcInterval {
+        self
     }
 }
 

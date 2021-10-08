@@ -37,7 +37,7 @@ impl ShardedGossipLocal {
                 std::time::Duration::from_millis(a.expires_at_ms)
                     > std::time::UNIX_EPOCH
                         .elapsed()
-                        .expect("You computer time is set before unix epoch")
+                        .expect("Your system clock is set before UNIX epoch")
             })
             .filter(|a| remote_agents_within_arc_set.contains(&a.agent))
             .filter(|a| !a.storage_arc.interval().is_empty())
@@ -59,6 +59,8 @@ impl ShardedGossipLocal {
                         })
                 })
                 .next();
+
+            // dbg!(&info);
 
             // If we found a remote address add this agent to the node
             // or create the node if it doesn't exist.
@@ -90,6 +92,7 @@ impl ShardedGossipLocal {
         self.inner.share_mut(|i, _| {
             let node = next_remote_node(remote_nodes, &i.metrics, tuning_params)
                 .map(|n| (n.target, n.url));
+            dbg!(&node);
             Ok(node)
         })
     }
@@ -103,6 +106,8 @@ fn next_remote_node(
 ) -> Option<Node> {
     use rand::prelude::*;
     let mut rng = thread_rng();
+
+    // dbg!(&remote_nodes, metrics);
 
     // Sort the nodes by longest time since we last successfully gossiped with them.
     // Randomly break ties between nodes we haven't successfully gossiped with.

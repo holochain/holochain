@@ -25,7 +25,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::time::Instant;
 
-use self::bandwidth::BandwidthThrottle;
+pub use self::bandwidth::BandwidthThrottle;
 use self::metrics::Metrics;
 use self::state_map::RoundStateMap;
 
@@ -45,8 +45,8 @@ mod bandwidth;
 mod metrics;
 mod next_target;
 
-#[cfg(test)]
-mod tests;
+#[cfg(all(test, feature = "test_utils"))]
+pub(crate) mod tests;
 
 /// max send buffer size (keep it under 16384 with a little room for overhead)
 /// (this is not a tuning_param because it must be coordinated
@@ -260,6 +260,7 @@ impl ShardedGossip {
 
     fn pop_queues(&self) -> KitsuneResult<(Option<Incoming>, Option<Outgoing>)> {
         self.inner.share_mut(move |inner, _| {
+            dbg!(&inner.incoming, &inner.outgoing);
             let incoming = inner.incoming.pop_front();
             let outgoing = inner.outgoing.pop_front();
             Ok((incoming, outgoing))
@@ -534,6 +535,7 @@ impl ShardedGossipLocal {
         cert: Tx2Cert,
         msg: ShardedGossipWire,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
+        dbg!("incoming gossip", &msg);
         let s = tracing::trace_span!("process_incoming", ?cert, agents = ?self.show_local_agents(), ?msg);
         s.in_scope(|| self.log_state());
         // If we don't have the state for a message then the other node will need to timeout.

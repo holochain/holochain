@@ -10,12 +10,19 @@ use std::sync::atomic;
 static UNIQ: atomic::AtomicUsize = atomic::AtomicUsize::new(1);
 
 /// Opaque identifier, allows Eq/Hash through trait-object types.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, derive_more::Display)]
 pub struct Uniq(usize);
 
 impl Default for Uniq {
     fn default() -> Self {
         Self(UNIQ.fetch_add(1, atomic::Ordering::Relaxed))
+    }
+}
+
+impl Uniq {
+    /// Return the inner numerical value as a usize
+    pub fn as_usize(&self) -> usize {
+        self.0
     }
 }
 

@@ -50,6 +50,8 @@ impl ShardedGossipLocal {
             .inner
             .share_mut(|inner, _| Ok(inner.local_agents.clone()))?;
 
+        dbg!(&local_agents);
+
         // Get all the local agents that are relevant to this
         // common arc set.
         let agents_within_common_arc: HashSet<_> =
@@ -59,6 +61,9 @@ impl ShardedGossipLocal {
                 .map(|(a, _)| a)
                 .filter(|a| local_agents.contains(a))
                 .collect();
+
+        dbg!(&agents_within_common_arc);
+        todo!("good if we get here");
 
         // Add the agents to the stores.
         store::put_agent_info(
