@@ -384,7 +384,7 @@ impl EndpointAdapt for MemEndpointAdapt {
 
 /// Parse the u64 ID from a kitsune-mem url, or the error if unparseable
 pub fn parse_mem_url(url: &TxUrl) -> Result<u64, String> {
-    let bad_url = |reason: &str| Err(format!("invalid url {} : {}", url, reason).into());
+    let bad_url = |reason: &str| Err(format!("invalid url {} : {}", url, reason));
 
     if url.scheme() != "kitsune-mem" {
         return bad_url("scheme must be kitsune-mem");
