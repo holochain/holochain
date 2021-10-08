@@ -4,6 +4,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.0.9
+
+- Update to lair 0.0.7 which updates to rusqlite 0.26.0 [\#1023](https://github.com/holochain/holochain/pull/1023)
+  - provides `bundled-sqlcipher-vendored-openssl` to ease build process on non-windows systems (windows is still using `bundled` which doesn’t provide at-rest encryption).
+
+## 0.0.8
+
 ## 0.0.7
 
 ## 0.0.6

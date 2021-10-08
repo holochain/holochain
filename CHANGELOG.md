@@ -6,6 +6,132 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20211006.105406
+
+## [holochain-0.0.109](crates/holochain/CHANGELOG.md#0.0.109)
+
+- Make validation run concurrently up to 50 DhtOps. This allows us to make progress on other ops when waiting for the network. [\#1005](https://github.com/holochain/holochain/pull/1005)
+- FIX: Prevent the conductor from trying to join cells to the network that are already in the process of joining. [\#1006](https://github.com/holochain/holochain/pull/1006)
+
+## [holochain\_test\_wasm\_common-0.0.9](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.9)
+
+## [holochain\_cascade-0.0.9](crates/holochain_cascade/CHANGELOG.md#0.0.9)
+
+## [holochain\_cli-0.0.10](crates/holochain_cli/CHANGELOG.md#0.0.10)
+
+## [holochain\_cli\_sandbox-0.0.8](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.8)
+
+## [holochain\_websocket-0.0.9](crates/holochain_websocket/CHANGELOG.md#0.0.9)
+
+## [holochain\_conductor\_api-0.0.9](crates/holochain_conductor_api/CHANGELOG.md#0.0.9)
+
+## [holochain\_state-0.0.9](crates/holochain_state/CHANGELOG.md#0.0.9)
+
+- Fixed a bug when creating an entry with `ChainTopOrdering::Relaxed`, in which the header was created and stored in the Source Chain, but the actual entry was not.
+- Geneis ops will no longer run validation for the authored node and only genesis self check will run. [\#995](https://github.com/holochain/holochain/pull/995)
+
+## [holochain\_wasm\_test\_utils-0.0.9](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.9)
+
+## [holochain\_p2p-0.0.9](crates/holochain_p2p/CHANGELOG.md#0.0.9)
+
+## [holochain\_cli\_bundle-0.0.7](crates/holochain_cli_bundle/CHANGELOG.md#0.0.7)
+
+## [holochain\_types-0.0.9](crates/holochain_types/CHANGELOG.md#0.0.9)
+
+## [holochain\_keystore-0.0.9](crates/holochain_keystore/CHANGELOG.md#0.0.9)
+
+- Update to lair 0.0.7 which updates to rusqlite 0.26.0 [\#1023](https://github.com/holochain/holochain/pull/1023)
+  - provides `bundled-sqlcipher-vendored-openssl` to ease build process on non-windows systems (windows is still using `bundled` which doesn’t provide at-rest encryption).
+
+## [holochain\_sqlite-0.0.9](crates/holochain_sqlite/CHANGELOG.md#0.0.9)
+
+- Update to rusqlite 0.26.0 [\#1023](https://github.com/holochain/holochain/pull/1023)
+  - provides `bundled-sqlcipher-vendored-openssl` to ease build process on non-windows systems (windows is still using `bundled` which doesn’t provide at-rest encryption).
+
+## [kitsune\_p2p-0.0.9](crates/kitsune_p2p/CHANGELOG.md#0.0.9)
+
+- Fix rpc\_multi bug that caused all request to wait 3 seconds. [\#1009](https://github.com/holochain/holochain/pull/1009/)
+- Fix to gossip’s round initiate. We were not timing out a round if there was no response to an initiate message. [\#1014](https://github.com/holochain/holochain/pull/1014).
+- Make gossip only initiate with agents that have info that is not expired. [\#1014](https://github.com/holochain/holochain/pull/1014).
+
+## [kitsune\_p2p\_proxy-0.0.8](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.8)
+
+## [kitsune\_p2p\_transport\_quic-0.0.8](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.8)
+
+## [kitsune\_p2p\_types-0.0.8](crates/kitsune_p2p_types/CHANGELOG.md#0.0.8)
+
+## [kitsune\_p2p\_dht\_arc-0.0.5](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.0.5)
+
+## [hdk-0.0.109](crates/hdk/CHANGELOG.md#0.0.109)
+
+## [hdk\_derive-0.0.11](crates/hdk_derive/CHANGELOG.md#0.0.11)
+
+## [holochain\_zome\_types-0.0.11](crates/holochain_zome_types/CHANGELOG.md#0.0.11)
+
+## [kitsune\_p2p\_timestamp-0.0.5](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.0.5)
+
+## [holo\_hash-0.0.8](crates/holo_hash/CHANGELOG.md#0.0.8)
+
+# 20210929.090317
+
+## [holochain-0.0.108](crates/holochain/CHANGELOG.md#0.0.108)
+
+- Refactor conductor to use parking lot rw lock instead of tokio rw lock. (Faster and prevents deadlocks.). [\#979](https://github.com/holochain/holochain/pull/979).
+
+### Changed
+
+- The scheduler should work now
+
+## [holochain\_test\_wasm\_common-0.0.8](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.8)
+
+## [holochain\_cascade-0.0.8](crates/holochain_cascade/CHANGELOG.md#0.0.8)
+
+## [holochain\_cli-0.0.9](crates/holochain_cli/CHANGELOG.md#0.0.9)
+
+## [holochain\_websocket-0.0.8](crates/holochain_websocket/CHANGELOG.md#0.0.8)
+
+## [holochain\_conductor\_api-0.0.8](crates/holochain_conductor_api/CHANGELOG.md#0.0.8)
+
+## [holochain\_state-0.0.8](crates/holochain_state/CHANGELOG.md#0.0.8)
+
+## [holochain\_wasm\_test\_utils-0.0.8](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.8)
+
+## [holochain\_p2p-0.0.8](crates/holochain_p2p/CHANGELOG.md#0.0.8)
+
+## [holochain\_types-0.0.8](crates/holochain_types/CHANGELOG.md#0.0.8)
+
+## [holochain\_keystore-0.0.8](crates/holochain_keystore/CHANGELOG.md#0.0.8)
+
+## [holochain\_sqlite-0.0.8](crates/holochain_sqlite/CHANGELOG.md#0.0.8)
+
+## [kitsune\_p2p-0.0.8](crates/kitsune_p2p/CHANGELOG.md#0.0.8)
+
+### Changed
+
+- `query_gossip_agents`, `query_agent_info_signed`, and `query_agent_info_signed_near_basis` are now unified into a single `query_agents` call in `KitsuneP2pEvent`
+
+## [kitsune\_p2p\_proxy-0.0.7](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.7)
+
+## [kitsune\_p2p\_transport\_quic-0.0.7](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.7)
+
+## [kitsune\_p2p\_types-0.0.7](crates/kitsune_p2p_types/CHANGELOG.md#0.0.7)
+
+- Adds a prototype protocol for checking consistency in a sharded network.
+
+## [kitsune\_p2p\_dht\_arc-0.0.4](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.0.4)
+
+## [hdk-0.0.108](crates/hdk/CHANGELOG.md#0.0.108)
+
+## [hdk\_derive-0.0.10](crates/hdk_derive/CHANGELOG.md#0.0.10)
+
+### Added
+
+- Added support for `#[hdk_extern(infallible)]`
+
+## [holochain\_zome\_types-0.0.10](crates/holochain_zome_types/CHANGELOG.md#0.0.10)
+
+## [kitsune\_p2p\_timestamp-0.0.4](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.0.4)
+
 # 20210922.083906
 
 - Adds experimental feature for one storage agent per space to kitsune tuning params. `gossip_single_storage_arc_per_space`.

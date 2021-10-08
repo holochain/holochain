@@ -1,6 +1,6 @@
 [package]
 name = "holochain_zome_types"
-version = "0.0.9"
+version = "0.0.11"
 description = "Holochain zome types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -13,8 +13,8 @@ edition = "2018"
 
 [dependencies]
 chrono = "0.4.6"
-kitsune_p2p_timestamp = { version = "0.0.3", path = "../kitsune_p2p/timestamp" }
-holo_hash = { version = "0.0.7", path = "../holo_hash" }
+kitsune_p2p_timestamp = { version = "0.0.5", path = "../kitsune_p2p/timestamp" }
+holo_hash = { version = "0.0.8", path = "../holo_hash" }
 holochain_serialized_bytes = "=0.0.51"
 paste = "=1.0.5"
 serde = { version = "1.0", features = [ "derive" ] }
@@ -30,7 +30,7 @@ strum = { version = "0.18.0", optional = true }
 rand = {version = "0.7", optional = true}
 
 # sqlite dependencies
-rusqlite = { version = "0.25", optional = true }
+rusqlite = { version = "0.26", optional = true }
 num_enum = { version = "0.5", optional = true }
 
 # full-dna-def dependencies

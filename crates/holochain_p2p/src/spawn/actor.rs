@@ -4,7 +4,7 @@ use crate::event::*;
 use crate::*;
 
 use futures::future::FutureExt;
-use kitsune_p2p::event::full_time_range;
+use kitsune_p2p::event::full_time_window;
 use kitsune_p2p::event::MetricDatum;
 use kitsune_p2p::event::MetricKind;
 use kitsune_p2p::event::MetricQuery;
@@ -662,7 +662,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
 
                 // If arc_set is set, this is a "gossip agents" query
                 (agents, window, Some(arc_set), None, None) => {
-                    let window = window.unwrap_or_else(full_time_range);
+                    let window = window.unwrap_or_else(full_time_window);
                     let h_agents =
                         agents.map(|agents| agents.iter().map(AgentPubKey::from_kitsune).collect());
                     let since_ms = window.start.as_millis().max(0) as u64;

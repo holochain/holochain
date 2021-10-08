@@ -317,7 +317,7 @@ async fn test_three_way_sharded_ownership() {
                 // Only look at one agent at a time
                 &agent_arcs[a..a + 1],
                 &DhtArcSet::Full,
-                full_time_range(),
+                full_time_window(),
                 usize::MAX,
                 false,
             )

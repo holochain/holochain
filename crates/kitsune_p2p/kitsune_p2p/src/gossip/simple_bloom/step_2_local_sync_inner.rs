@@ -49,7 +49,7 @@ impl Inner {
                 .query_op_hashes(QueryOpHashesEvt {
                     space: space.clone(),
                     agents: vec![(agent.clone(), ArcInterval::Full.into())],
-                    window: full_time_range(),
+                    window: full_time_window(),
                     max_ops: usize::MAX,
                     include_limbo: false,
                 })
