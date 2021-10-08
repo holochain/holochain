@@ -4,8 +4,7 @@ use crate::hash_type;
 use crate::AgentPubKey;
 use crate::EntryHash;
 use std::convert::TryInto;
-
-// Valid options for prefixes:
+// Valid Holochain options for prefixes:
 // hCAk 4100 <Buffer 84 20 24> * AGENT
 // hCEk 4228 <Buffer 84 21 24> * ENTRY
 // hCIk 4356 <Buffer 84 22 24> * NET_ID
@@ -22,6 +21,25 @@ use std::convert::TryInto;
 // hC0k 5764 <Buffer 84 2d 24> * DNA
 // hC4k 5892 <Buffer 84 2e 24>
 // hC8k 6020 <Buffer 84 2f 24>
+
+// Valid Holo.Host options for prefixes:
+// hhAk 2054 <Buffer 86 10 24> * HOST KEY
+// hhEk 2182 <Buffer 86 11 24>
+// hhIk 2310 <Buffer 86 12 24>
+// hhMk 2438 <Buffer 86 13 24>
+// hhQk 2566 <Buffer 86 14 24> * ANONYMOUS KEY (They can Query-only / no source chain)
+// hhUk 2694 <Buffer 86 15 24> * WEB USER KEY
+// hhYk 2822 <Buffer 86 16 24>
+// hhck 2950 <Buffer 86 17 24>
+// hhgk 3078 <Buffer 86 18 24>
+// hhkk 3206 <Buffer 86 19 24>
+// hhok 3334 <Buffer 86 1a 24>
+// hhsk 3462 <Buffer 86 1b 24>
+// hhwk 3590 <Buffer 86 1c 24>
+// hh0k 3718 <Buffer 86 1d 24> * HOSTED APP Bundle (UI with websdk, etc.)
+// hh4k 3846 <Buffer 86 1e 24>
+// hh8k 3974 <Buffer 86 1f 24>
+
 pub(crate) const AGENT_PREFIX: &[u8] = &[0x84, 0x20, 0x24]; // uhCAk [132, 32, 36]
 pub(crate) const ENTRY_PREFIX: &[u8] = &[0x84, 0x21, 0x24]; // uhCEk [132, 33, 36]
 pub(crate) const DHTOP_PREFIX: &[u8] = &[0x84, 0x24, 0x24]; // uhCQk [132, 36, 36]

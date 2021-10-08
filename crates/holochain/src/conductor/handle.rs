@@ -1310,7 +1310,7 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
 
         let pending_cells: Vec<(CellId, HolochainP2pCell)> = self
             .conductor
-            .pending_cells()
+            .mark_pending_cells_as_joining()
             .into_iter()
             .map(|(id, cell)| (id, cell.holochain_p2p_cell().clone()))
             .collect();
@@ -1320,13 +1320,13 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
                 match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join()).await {
                     Ok(Err(e)) => {
                         tracing::info!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");
-                        None
+                        Err(cell_id)
                     }
                     Err(_) => {
                         tracing::info!(cell_id = ?cell_id, "Timed out trying to join the network");
-                        None
+                        Err(cell_id)
                     }
-                    Ok(Ok(_)) => Some(cell_id),
+                    Ok(Ok(_)) => Ok(cell_id),
                 }
             });
 
@@ -1335,12 +1335,20 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
             .collect()
             .await;
 
-        let cell_ids: Vec<_> = maybes.into_iter().flatten().collect();
+        let (cell_ids, failed_joins): (Vec<_>, Vec<_>) =
+            maybes.into_iter().partition(Result::is_ok);
+
+        // These unwraps are both safe because of the partition.
+        let cell_ids: Vec<_> = cell_ids.into_iter().map(Result::unwrap).collect();
+        let failed_joins: Vec<_> = failed_joins.into_iter().map(Result::unwrap_err).collect();
 
         // Update the status of the cells which were able to join the network
         // (may or may not be all cells which were added)
         self.conductor
             .update_cell_status(cell_ids.as_slice(), CellStatus::Joined);
+
+        self.conductor
+            .update_cell_status(failed_joins.as_slice(), CellStatus::PendingJoin);
 
         cell_ids
     }
