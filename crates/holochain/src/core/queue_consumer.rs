@@ -492,6 +492,8 @@ impl BackOff {
             self.range.start
         };
         // Sleep this task for the chosen duration.
+        // This future may be cancelled during this await,
+        // and any code following will not be executed.
         tokio::time::sleep(dur).await;
         // If the sleep completes then we bump the start of the range
         // or take the end if we have reached the end.
