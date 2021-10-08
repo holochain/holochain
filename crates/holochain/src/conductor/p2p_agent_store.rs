@@ -1,5 +1,5 @@
 //! Queries for the P2pAgentStore db
-
+use futures::StreamExt;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_conductor_api::AgentInfoDump;
@@ -16,8 +16,27 @@ use holochain_types::prelude::*;
 use holochain_zome_types::CellId;
 use kitsune_p2p::KitsuneBinType;
 use std::sync::Arc;
+use thiserror::Error;
 
 use super::error::ConductorResult;
+
+/// A set of agent information that are to be committed
+/// with any other active batches.
+pub struct P2pBatch {
+    /// Agent information to be committed.
+    pub peer_data: Vec<AgentInfoSigned>,
+    /// The result of this commit.
+    pub result_sender: tokio::sync::oneshot::Sender<Result<(), P2pBatchError>>,
+}
+
+#[derive(Debug, Error)]
+#[allow(missing_docs)]
+pub enum P2pBatchError {
+    #[error(transparent)]
+    DatabaseError(#[from] DatabaseError),
+    #[error("Batch transaction failed {0}")]
+    BatchFailed(String),
+}
 
 /// Inject multiple agent info entries into the peer store
 pub async fn inject_agent_infos<'iter, I: IntoIterator<Item = &'iter AgentInfoSigned> + Send>(
@@ -25,6 +44,54 @@ pub async fn inject_agent_infos<'iter, I: IntoIterator<Item = &'iter AgentInfoSi
     iter: I,
 ) -> StateMutationResult<()> {
     Ok(p2p_put_all(&env, iter.into_iter()).await?)
+}
+
+/// Inject multiple agent info entries into the peer store in batches.
+pub async fn p2p_put_all_batch(env: EnvWrite, rx: tokio::sync::mpsc::Receiver<P2pBatch>) {
+    let stream = tokio_stream::wrappers::ReceiverStream::new(rx);
+    let mut stream = stream.ready_chunks(100);
+    while let Some(batch) = stream.next().await {
+        let mut responses = Vec::with_capacity(batch.len());
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        let result = env
+            .async_commit(move |mut txn| {
+                'batch: for P2pBatch {
+                    peer_data: batch,
+                    result_sender: response,
+                } in batch
+                {
+                    for info in batch {
+                        match p2p_put_single(&mut txn, &info) {
+                            Ok(_) => (),
+                            Err(e) => {
+                                responses.push((Err(e), response));
+                                continue 'batch;
+                            }
+                        }
+                    }
+                    responses.push((Ok(()), response));
+                }
+                tx.send(responses)
+                    .expect("We never drop the receiver before this send");
+                DatabaseResult::Ok(())
+            })
+            .await;
+        let responses = rx
+            .await
+            .expect("We never drop the sender before sending the responses");
+        match result {
+            Ok(_) => {
+                for (result, response) in responses {
+                    let _ = response.send(result.map_err(P2pBatchError::from));
+                }
+            }
+            Err(e) => {
+                for (_, response) in responses {
+                    let _ = response.send(Err(P2pBatchError::BatchFailed(format!("{:?}", e))));
+                }
+            }
+        }
+    }
 }
 
 /// Helper function to get all the peer data from this conductor
