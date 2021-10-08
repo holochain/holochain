@@ -10,6 +10,7 @@ use crate::gossip::simple_bloom::{decode_bloom_filter, encode_bloom_filter, Meta
 
 use super::EncodedTimedBloomFilter;
 
+/// Create an agent bloom for testing.
 pub fn create_agent_bloom<'a>(
     agents: impl Iterator<Item = &'a AgentInfoSigned>,
     filter: Option<&AgentInfoSigned>,
@@ -35,6 +36,7 @@ pub fn create_agent_bloom<'a>(
     }
 }
 
+/// Create an ops bloom for testing.
 pub fn create_ops_bloom(ops: Vec<Arc<KitsuneOpHash>>) -> PoolBuf {
     let len = ops.len();
     let bloom = ops.into_iter().fold(
@@ -49,6 +51,7 @@ pub fn create_ops_bloom(ops: Vec<Arc<KitsuneOpHash>>) -> PoolBuf {
     encode_bloom_filter(&bloom)
 }
 
+/// Check an ops bloom for testing.
 pub fn check_ops_boom<'a>(
     ops: impl Iterator<Item = (kitsune_p2p_timestamp::Timestamp, &'a Arc<KitsuneOpHash>)>,
     bloom: EncodedTimedBloomFilter,

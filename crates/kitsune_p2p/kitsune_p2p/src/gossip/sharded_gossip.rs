@@ -107,7 +107,8 @@ pub struct ShardedGossip {
 
 /// Basic statistic for gossip loop processing performance.
 struct Stats {
-    start: std::time::Instant,
+    start: tokio::time::Instant,
+    last: Option<tokio::time::Instant>,
     avg_processing_time: std::time::Duration,
     max_processing_time: std::time::Duration,
     count: u32,
@@ -117,7 +118,8 @@ impl Stats {
     /// Reset the stats.
     fn reset() -> Self {
         Stats {
-            start: std::time::Instant::now(),
+            start: tokio::time::Instant::now(),
+            last: None,
             avg_processing_time: std::time::Duration::default(),
             max_processing_time: std::time::Duration::default(),
             count: 0,
@@ -272,10 +274,14 @@ impl ShardedGossip {
     /// Log the statistics for the gossip loop.
     fn stats(&self, stats: &mut Stats) {
         if let GossipType::Recent = self.gossip.gossip_type {
-            let elapsed = stats.start.elapsed();
-            stats.avg_processing_time += elapsed;
-            stats.max_processing_time = std::cmp::max(stats.max_processing_time, elapsed);
+            if let Some(last) = stats.last {
+                let elapsed = last.elapsed();
+                stats.avg_processing_time += elapsed;
+                stats.max_processing_time = std::cmp::max(stats.max_processing_time, elapsed);
+            }
+            stats.last = Some(tokio::time::Instant::now());
             stats.count += 1;
+            let elapsed = stats.start.elapsed();
             if elapsed.as_secs() > 5 {
                 stats.avg_processing_time = stats
                     .avg_processing_time
@@ -541,9 +547,8 @@ impl ShardedGossipLocal {
                 }
             }
             ShardedGossipWire::MissingAgents(MissingAgents { agents }) => {
-                if let Some(state) = self.get_state(&cert).await? {
-                    self.incoming_missing_agents(state, agents.as_slice())
-                        .await?;
+                if self.get_state(&cert).await?.is_some() {
+                    self.incoming_missing_agents(agents.as_slice()).await?;
                 }
                 Vec::with_capacity(0)
             }

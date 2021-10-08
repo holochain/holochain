@@ -1135,7 +1135,6 @@ impl Space {
             self.agent_arcs
                 .get(agent)
                 .cloned()
-                // .unwrap_or_else(|| DhtArc::with_coverage(agent.get_loc(), 0.1))
                 .unwrap_or_else(|| DhtArc::full(agent.get_loc()))
         }
     }

@@ -1,6 +1,5 @@
-//! Utilities for mocking the holochain network.
-
-#![allow(missing_docs)]
+//! Tools for simulating a network around real holochain nodes.
+//! This is a very early prototype and subject to change.
 
 use fixt::prelude::Distribution;
 use futures::stream::Stream;
@@ -27,7 +26,6 @@ use kitsune_p2p::GossipModuleType;
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use kitsune_p2p_types::tx2::MsgId;
 use kitsune_p2p_types::Tx2Cert;
-use observability::tracing;
 
 static MSG_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
@@ -35,6 +33,8 @@ fn next_msg_id() -> MsgId {
     MsgId::new(MSG_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
 }
 
+/// A channel between the simulated network and the set of real
+/// holochain nodes.
 pub struct HolochainP2pMockChannel {
     address_map: HashMap<AgentPubKey, (Tx2Cert, TxUrl)>,
     from_kitsune: Pin<Box<dyn Stream<Item = KitsuneMock> + Send + Sync + 'static>>,
@@ -42,10 +42,11 @@ pub struct HolochainP2pMockChannel {
 }
 
 #[derive(Clone)]
+/// The conditions the simulated network will have.
 pub struct MockScenario {
     /// Percentage of messages that will be dropped.
     pub percent_drop_msg: f32,
-    /// Percentage of nodes that will not respond.
+    /// Percentage of nodes that will not respond for the whole test.
     pub percent_offline: f32,
     /// The range of time inbound messages will be delayed.
     pub inbound_delay_range: Range<Duration>,
@@ -65,132 +66,98 @@ impl Default for MockScenario {
 }
 
 #[derive(Debug)]
+/// When a message is received or sent it needs to be
+/// associated with a simulated connection.
+/// This type wraps the message with simulated agent that
+/// is associated with the connection.
 pub struct AddressedHolochainP2pMockMsg {
+    /// The network message.
     pub msg: HolochainP2pMockMsg,
+    /// The simulated agent associated with this connection.
     pub agent: AgentPubKey,
 }
 
 #[derive(Debug)]
+/// The network message for communicating with holochain.
+/// This collapses a few levels of wire messages to make it
+/// easier to build a network simulation.
+/// Some wire messages are handled entirely within kitsune
+/// which means there would be no way to simulate things like gossip
+/// without this type.
 pub enum HolochainP2pMockMsg {
+    /// The holochain p2p wire messages.
+    /// These can be either notifies or requests (Calls).
     Wire {
+        /// The agent this message is addressed to.
         to_agent: AgentPubKey,
+        /// The agent this message is from if there is one.
         from_agent: Option<AgentPubKey>,
+        /// The dna space this message is for.
         dna: DnaHash,
+        /// The actual wire message.
         msg: super::wire::WireMessage,
     },
+    /// A response to a request (Call).
     CallResp(kitsune_p2p::wire::WireData),
+    /// A request from kitsune for a peers agent info.
     PeerGet(kitsune_p2p::wire::PeerGet),
+    /// A response to a peer get.
     PeerGetResp(kitsune_p2p::wire::PeerGetResp),
+    /// A query for multiple peers agent info.
     PeerQuery(kitsune_p2p::wire::PeerQuery),
+    /// A response to peer query.
     PeerQueryResp(kitsune_p2p::wire::PeerQueryResp),
+    /// A gossip protocol message.
+    /// These messages are all notifies and not request.
     Gossip {
+        /// The dna space this gossip is about.
         dna: DnaHash,
+        /// The type of gossip module this message is for.
         module: GossipModuleType,
-        gossip: kitsune_p2p::gossip::sharded_gossip::ShardedGossipWire,
+        /// The actual gossip wire protocol.
+        gossip: GossipProtocol,
     },
+    /// Aan error has occurred.
+    Failure(String),
+}
+
+#[derive(Debug)]
+/// The type of protocol for the gossip wire message.
+pub enum GossipProtocol {
+    /// Simple bloom gossip wire protocol.
+    // TODO: Implement this.
+    Simple,
+    /// Sharded gossip wire protocol.
+    Sharded(kitsune_p2p::gossip::sharded_gossip::ShardedGossipWire),
 }
 
 impl HolochainP2pMockMsg {
-    pub fn addressed(self, from: AgentPubKey) -> AddressedHolochainP2pMockMsg {
-        AddressedHolochainP2pMockMsg {
-            msg: self,
-            agent: from,
-        }
+    /// Associate a message with the simulated agent that is sending or receiving
+    /// this message. From holochain's point of view this is the remote node that
+    /// the message is being sent to or received from.
+    pub fn addressed(self, agent: AgentPubKey) -> AddressedHolochainP2pMockMsg {
+        AddressedHolochainP2pMockMsg { msg: self, agent }
     }
 }
 
+/// This type allows a response to be sent to
+/// a request message such as a call.
 pub struct HolochainP2pMockRespond {
     respond: KitsuneMockRespond,
 }
 
-fn to_id(msg: &HolochainP2pMockMsg) -> MsgId {
-    match msg {
-        HolochainP2pMockMsg::Wire { msg, .. } => match &msg {
-            crate::wire::WireMessage::CallRemote { .. }
-            | crate::wire::WireMessage::ValidationReceipt { .. }
-            | crate::wire::WireMessage::Get { .. }
-            | crate::wire::WireMessage::GetMeta { .. }
-            | crate::wire::WireMessage::GetLinks { .. }
-            | crate::wire::WireMessage::GetAgentActivity { .. }
-            | crate::wire::WireMessage::GetValidationPackage { .. } => next_msg_id().as_req(),
-            crate::wire::WireMessage::Publish { .. }
-            | crate::wire::WireMessage::CountersigningAuthorityResponse { .. } => {
-                MsgId::new_notify()
-            }
-        },
-        HolochainP2pMockMsg::PeerGet(_) | HolochainP2pMockMsg::PeerQuery(_) => {
-            next_msg_id().as_req()
-        }
-        HolochainP2pMockMsg::Gossip { .. } => MsgId::new_notify(),
-        _ => panic!("Should not be sending responses"),
-    }
-}
-fn to_wire_msg(msg: HolochainP2pMockMsg) -> kwire::Wire {
-    match msg {
-        HolochainP2pMockMsg::Wire {
-            to_agent,
-            msg,
-            from_agent,
-            dna,
-        } => {
-            let call = match &msg {
-                crate::wire::WireMessage::CallRemote { .. }
-                | crate::wire::WireMessage::ValidationReceipt { .. }
-                | crate::wire::WireMessage::Get { .. }
-                | crate::wire::WireMessage::GetMeta { .. }
-                | crate::wire::WireMessage::GetLinks { .. }
-                | crate::wire::WireMessage::GetAgentActivity { .. }
-                | crate::wire::WireMessage::GetValidationPackage { .. } => true,
-                crate::wire::WireMessage::Publish { .. }
-                | crate::wire::WireMessage::CountersigningAuthorityResponse { .. } => false,
-            };
-            let to_agent = to_agent.to_kitsune();
-            let space = dna.to_kitsune();
-            let data = msg.encode().unwrap().into();
-            if call {
-                let from_agent = from_agent.unwrap().to_kitsune();
-                kwire::Wire::Call(kwire::Call {
-                    to_agent,
-                    space,
-                    from_agent,
-                    data,
-                })
-            } else {
-                kwire::Wire::Broadcast(kwire::Broadcast {
-                    to_agent,
-                    space,
-                    data,
-                })
-            }
-        }
-        HolochainP2pMockMsg::CallResp(data) => kwire::Wire::call_resp(data),
-        HolochainP2pMockMsg::PeerGet(data) => kwire::Wire::PeerGet(data),
-        HolochainP2pMockMsg::PeerGetResp(data) => kwire::Wire::PeerGetResp(data),
-        HolochainP2pMockMsg::PeerQuery(data) => kwire::Wire::PeerQuery(data),
-        HolochainP2pMockMsg::PeerQueryResp(data) => kwire::Wire::PeerQueryResp(data),
-        HolochainP2pMockMsg::Gossip {
-            dna,
-            module,
-            gossip,
-        } => {
-            use kitsune_p2p_types::codec::Codec;
-            let space = dna.to_kitsune();
-            let data = gossip.encode_vec().unwrap().into();
-            kwire::Wire::Gossip(kwire::Gossip {
-                space,
-                module,
-                data,
-            })
-        }
-    }
-}
 impl HolochainP2pMockRespond {
+    /// Respond to a message request.
     pub fn respond(self, msg: HolochainP2pMockMsg) {
         self.respond.respond(to_wire_msg(msg));
     }
 }
 
 impl HolochainP2pMockChannel {
+    /// Create a new mock simulated network channel.
+    /// The peer data is the simulated nodes.
+    /// The buffer is the amount of messages that can be buffered.
+    /// The scenario sets up the why this simulated network will behave.
     pub fn channel(
         peer_data: Vec<AgentInfoSigned>,
         buffer: usize,
@@ -297,6 +264,10 @@ impl HolochainP2pMockChannel {
         )
     }
 
+    /// Await the next message from the real nodes.
+    /// Note that all messages are routed through this call so blocking
+    /// on the loop that calls next will slow down all simulated node response times.
+    /// This is probably not what you want.
     pub async fn next(
         &mut self,
     ) -> Option<(
@@ -318,120 +289,196 @@ impl HolochainP2pMockChannel {
 
             let (msg, respond) = msg.into_msg_respond();
 
-            let needs_response;
-            let msg = match msg {
-                kwire::Wire::Call(kwire::Call {
-                    to_agent,
-                    data,
-                    space,
-                    from_agent,
-                }) => {
-                    let to_agent = holo_hash::AgentPubKey::from_kitsune(&to_agent);
-                    let from_agent = holo_hash::AgentPubKey::from_kitsune(&from_agent);
-                    let dna = holo_hash::DnaHash::from_kitsune(&space);
-                    let msg = crate::wire::WireMessage::decode(data.as_ref()).unwrap();
-                    needs_response = true;
-                    HolochainP2pMockMsg::Wire {
-                        to_agent,
-                        msg,
-                        dna,
-                        from_agent: Some(from_agent),
-                    }
-                }
-                kwire::Wire::Broadcast(kwire::Broadcast {
-                    to_agent,
-                    data,
-                    space,
-                    ..
-                })
-                | kwire::Wire::DelegateBroadcast(kwire::DelegateBroadcast {
-                    to_agent,
-                    data,
-                    space,
-                    ..
-                }) => {
-                    let to_agent = holo_hash::AgentPubKey::from_kitsune(&to_agent);
-                    let dna = holo_hash::DnaHash::from_kitsune(&space);
-                    let msg = crate::wire::WireMessage::decode(data.as_ref()).unwrap();
-                    needs_response = false;
-                    HolochainP2pMockMsg::Wire {
-                        to_agent,
-                        msg,
-                        dna,
-                        from_agent: None,
-                    }
-                }
-                kwire::Wire::Gossip(kwire::Gossip {
-                    data,
-                    space,
-                    module,
-                }) => {
-                    use kitsune_p2p::gossip::sharded_gossip::*;
-                    use kitsune_p2p_types::codec::Codec;
-                    let (_, gossip) = ShardedGossipWire::decode_ref(data.as_ref()).unwrap();
-                    let dna = holo_hash::DnaHash::from_kitsune(&space);
-                    needs_response = false;
-                    HolochainP2pMockMsg::Gossip {
-                        module,
-                        dna,
-                        gossip,
-                    }
-                }
-                kwire::Wire::PeerGet(msg) => {
-                    needs_response = true;
-                    HolochainP2pMockMsg::PeerGet(msg)
-                }
-                kwire::Wire::PeerGetResp(msg) => {
-                    needs_response = false;
-                    HolochainP2pMockMsg::PeerGetResp(msg)
-                }
-                kwire::Wire::PeerQuery(msg) => {
-                    needs_response = true;
-                    HolochainP2pMockMsg::PeerQuery(msg)
-                }
-                kwire::Wire::PeerQueryResp(msg) => {
-                    needs_response = false;
-                    HolochainP2pMockMsg::PeerQueryResp(msg)
-                }
-                kwire::Wire::CallResp(msg) => {
-                    needs_response = false;
-                    HolochainP2pMockMsg::CallResp(msg.data)
-                }
-                kwire::Wire::Failure(msg) => {
-                    tracing::error!("HolochainP2pMock Failure {}", msg.reason);
-                    continue;
-                }
-            };
+            let msg = from_wire_msg(msg);
 
-            let respond = if needs_response {
-                match respond {
-                    Some(respond) => Some(HolochainP2pMockRespond { respond }),
-                    None => None,
-                }
-            } else {
-                None
+            let respond = match respond {
+                Some(respond) => Some(HolochainP2pMockRespond { respond }),
+                None => None,
             };
             return Some((msg.addressed(to_agent), respond));
         }
         None
     }
 
+    /// Send a notify or request from an addressed simulated agent.
+    /// If this is a request you will get back the response.
     pub async fn send(&self, msg: AddressedHolochainP2pMockMsg) -> Option<HolochainP2pMockMsg> {
         let AddressedHolochainP2pMockMsg { msg, agent: from } = msg;
         let (cert, url) = self.address_map.get(&from).cloned().unwrap();
         let id = to_id(&msg);
-        let msg = if id.is_notify() {
-            KitsuneMock::notify(id, cert, url, to_wire_msg(msg))
+        let (msg, rx) = if id.is_notify() {
+            (KitsuneMock::notify(id, cert, url, to_wire_msg(msg)), None)
         } else {
-            let (respond, _) = tokio::sync::oneshot::channel();
+            let (respond, rx) = tokio::sync::oneshot::channel();
 
-            KitsuneMock::request(id, cert, url, to_wire_msg(msg), respond)
+            (
+                KitsuneMock::request(id, cert, url, to_wire_msg(msg), respond),
+                Some(rx),
+            )
         };
         let _ = self.to_kitsune.send(msg).await;
-        if id.is_req() {
-            todo!("Add the ability to send requests to holochain")
-        } else {
-            None
+        match rx {
+            Some(rx) => rx.await.ok().map(|k| from_wire_msg(k.into_wire())),
+            None => None,
         }
+    }
+}
+
+/// Generate the correct message id associated with this message.
+fn to_id(msg: &HolochainP2pMockMsg) -> MsgId {
+    match msg {
+        HolochainP2pMockMsg::Wire { msg, .. } => match &msg {
+            crate::wire::WireMessage::CallRemote { .. }
+            | crate::wire::WireMessage::ValidationReceipt { .. }
+            | crate::wire::WireMessage::Get { .. }
+            | crate::wire::WireMessage::GetMeta { .. }
+            | crate::wire::WireMessage::GetLinks { .. }
+            | crate::wire::WireMessage::GetAgentActivity { .. }
+            | crate::wire::WireMessage::GetValidationPackage { .. } => next_msg_id().as_req(),
+            crate::wire::WireMessage::Publish { .. }
+            | crate::wire::WireMessage::CountersigningAuthorityResponse { .. } => {
+                MsgId::new_notify()
+            }
+        },
+        HolochainP2pMockMsg::PeerGet(_) | HolochainP2pMockMsg::PeerQuery(_) => {
+            next_msg_id().as_req()
+        }
+        HolochainP2pMockMsg::Gossip { .. } => MsgId::new_notify(),
+        _ => panic!("Should not be sending responses"),
+    }
+}
+
+/// Turn a mock message into a kitsune wire message.
+fn to_wire_msg(msg: HolochainP2pMockMsg) -> kwire::Wire {
+    match msg {
+        HolochainP2pMockMsg::Wire {
+            to_agent,
+            msg,
+            from_agent,
+            dna,
+        } => {
+            let call = match &msg {
+                crate::wire::WireMessage::CallRemote { .. }
+                | crate::wire::WireMessage::ValidationReceipt { .. }
+                | crate::wire::WireMessage::Get { .. }
+                | crate::wire::WireMessage::GetMeta { .. }
+                | crate::wire::WireMessage::GetLinks { .. }
+                | crate::wire::WireMessage::GetAgentActivity { .. }
+                | crate::wire::WireMessage::GetValidationPackage { .. } => true,
+                crate::wire::WireMessage::Publish { .. }
+                | crate::wire::WireMessage::CountersigningAuthorityResponse { .. } => false,
+            };
+            let to_agent = to_agent.to_kitsune();
+            let space = dna.to_kitsune();
+            let data = msg.encode().unwrap().into();
+            if call {
+                let from_agent = from_agent.unwrap().to_kitsune();
+                kwire::Wire::Call(kwire::Call {
+                    to_agent,
+                    space,
+                    from_agent,
+                    data,
+                })
+            } else {
+                kwire::Wire::Broadcast(kwire::Broadcast {
+                    to_agent,
+                    space,
+                    data,
+                })
+            }
+        }
+        HolochainP2pMockMsg::CallResp(data) => kwire::Wire::call_resp(data),
+        HolochainP2pMockMsg::PeerGet(data) => kwire::Wire::PeerGet(data),
+        HolochainP2pMockMsg::PeerGetResp(data) => kwire::Wire::PeerGetResp(data),
+        HolochainP2pMockMsg::PeerQuery(data) => kwire::Wire::PeerQuery(data),
+        HolochainP2pMockMsg::PeerQueryResp(data) => kwire::Wire::PeerQueryResp(data),
+        HolochainP2pMockMsg::Gossip {
+            dna,
+            module,
+            gossip,
+        } => {
+            use kitsune_p2p_types::codec::Codec;
+            let space = dna.to_kitsune();
+            let data = match gossip {
+                GossipProtocol::Simple => todo!(),
+                GossipProtocol::Sharded(gossip) => gossip.encode_vec().unwrap().into(),
+            };
+            kwire::Wire::Gossip(kwire::Gossip {
+                space,
+                module,
+                data,
+            })
+        }
+        HolochainP2pMockMsg::Failure(reason) => kwire::Wire::Failure(kwire::Failure { reason }),
+    }
+}
+
+fn from_wire_msg(msg: kwire::Wire) -> HolochainP2pMockMsg {
+    match msg {
+        kwire::Wire::Call(kwire::Call {
+            to_agent,
+            data,
+            space,
+            from_agent,
+        }) => {
+            let to_agent = holo_hash::AgentPubKey::from_kitsune(&to_agent);
+            let from_agent = holo_hash::AgentPubKey::from_kitsune(&from_agent);
+            let dna = holo_hash::DnaHash::from_kitsune(&space);
+            let msg = crate::wire::WireMessage::decode(data.as_ref()).unwrap();
+            HolochainP2pMockMsg::Wire {
+                to_agent,
+                msg,
+                dna,
+                from_agent: Some(from_agent),
+            }
+        }
+        kwire::Wire::Broadcast(kwire::Broadcast {
+            to_agent,
+            data,
+            space,
+            ..
+        })
+        | kwire::Wire::DelegateBroadcast(kwire::DelegateBroadcast {
+            to_agent,
+            data,
+            space,
+            ..
+        }) => {
+            let to_agent = holo_hash::AgentPubKey::from_kitsune(&to_agent);
+            let dna = holo_hash::DnaHash::from_kitsune(&space);
+            let msg = crate::wire::WireMessage::decode(data.as_ref()).unwrap();
+            HolochainP2pMockMsg::Wire {
+                to_agent,
+                msg,
+                dna,
+                from_agent: None,
+            }
+        }
+        kwire::Wire::Gossip(kwire::Gossip {
+            data,
+            space,
+            module,
+        }) => {
+            use kitsune_p2p::gossip::sharded_gossip::*;
+            use kitsune_p2p_types::codec::Codec;
+            let gossip = match module {
+                GossipModuleType::Simple => todo!(),
+                GossipModuleType::ShardedRecent | GossipModuleType::ShardedHistorical => {
+                    GossipProtocol::Sharded(ShardedGossipWire::decode_ref(data.as_ref()).unwrap().1)
+                }
+            };
+            let dna = holo_hash::DnaHash::from_kitsune(&space);
+            HolochainP2pMockMsg::Gossip {
+                module,
+                dna,
+                gossip,
+            }
+        }
+        kwire::Wire::PeerGet(msg) => HolochainP2pMockMsg::PeerGet(msg),
+        kwire::Wire::PeerGetResp(msg) => HolochainP2pMockMsg::PeerGetResp(msg),
+        kwire::Wire::PeerQuery(msg) => HolochainP2pMockMsg::PeerQuery(msg),
+        kwire::Wire::PeerQueryResp(msg) => HolochainP2pMockMsg::PeerQueryResp(msg),
+        kwire::Wire::CallResp(msg) => HolochainP2pMockMsg::CallResp(msg.data),
+        kwire::Wire::Failure(msg) => HolochainP2pMockMsg::Failure(msg.reason),
     }
 }

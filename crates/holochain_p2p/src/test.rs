@@ -164,7 +164,7 @@ fixturator!(
 
 #[cfg(test)]
 mod tests {
-    use crate::mock_network::HolochainP2pMockChannel;
+    use crate::mock_network::{GossipProtocol, HolochainP2pMockChannel};
     use crate::*;
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
@@ -570,29 +570,35 @@ mod tests {
                         gossip,
                     } => {
                         if let kitsune_p2p::GossipModuleType::ShardedRecent = module {
-                            use kitsune_p2p::gossip::sharded_gossip::*;
-                            dbg!(&gossip);
-                            match gossip {
-                                ShardedGossipWire::Initiate { .. } => {
-                                    let msg = mock_network::HolochainP2pMockMsg::Gossip {
-                                        dna: dna.clone(),
-                                        module: module.clone(),
-                                        gossip: ShardedGossipWire::accept(vec![ArcInterval::Full]),
-                                    };
-                                    channel.send(msg.addressed(agent.clone())).await;
-                                    let msg = mock_network::HolochainP2pMockMsg::Gossip {
-                                        dna,
-                                        module,
-                                        gossip: ShardedGossipWire::initiate(
-                                            vec![ArcInterval::Full],
-                                            100,
-                                        ),
-                                    };
-                                    let from_agent =
-                                        from_agents.iter().find(|a| **a != agent).unwrap();
-                                    channel.send(msg.addressed(from_agent.clone())).await;
+                            if let GossipProtocol::Sharded(gossip) = gossip {
+                                use kitsune_p2p::gossip::sharded_gossip::*;
+                                dbg!(&gossip);
+                                match gossip {
+                                    ShardedGossipWire::Initiate { .. } => {
+                                        let msg = mock_network::HolochainP2pMockMsg::Gossip {
+                                            dna: dna.clone(),
+                                            module: module.clone(),
+                                            gossip: GossipProtocol::Sharded(
+                                                ShardedGossipWire::accept(vec![ArcInterval::Full]),
+                                            ),
+                                        };
+                                        channel.send(msg.addressed(agent.clone())).await;
+                                        let msg = mock_network::HolochainP2pMockMsg::Gossip {
+                                            dna,
+                                            module,
+                                            gossip: GossipProtocol::Sharded(
+                                                ShardedGossipWire::initiate(
+                                                    vec![ArcInterval::Full],
+                                                    100,
+                                                ),
+                                            ),
+                                        };
+                                        let from_agent =
+                                            from_agents.iter().find(|a| **a != agent).unwrap();
+                                        channel.send(msg.addressed(from_agent.clone())).await;
+                                    }
+                                    _ => (),
                                 }
-                                _ => (),
                             }
                         }
                     }

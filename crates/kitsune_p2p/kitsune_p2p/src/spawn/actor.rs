@@ -96,9 +96,7 @@ impl KitsuneP2pActor {
 
         let is_mock = mock_network.is_some();
         if let Some(mock_network) = mock_network {
-            tx2_conf.backend = KitsuneP2pTx2Backend::Mock {
-                mock_network: mock_network,
-            };
+            tx2_conf.backend = KitsuneP2pTx2Backend::Mock { mock_network };
         }
 
         // set up our backend based on config

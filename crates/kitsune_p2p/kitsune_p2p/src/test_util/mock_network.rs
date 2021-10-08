@@ -37,6 +37,14 @@ pub struct KitsuneMockMsg {
     buf: PoolBuf,
 }
 
+impl KitsuneMockMsg {
+    /// Get the underlying wire message and discard
+    /// the id / buffer.
+    pub fn into_wire(self) -> wire::Wire {
+        self.msg
+    }
+}
+
 #[derive(Debug)]
 pub struct KitsuneMockRespond {
     respond: oneshot::Sender<KitsuneMockMsg>,
@@ -120,6 +128,14 @@ struct MockInConnection {
     out_connection: Arc<MockOutConnection>,
 }
 
+/// A type to allow sharing a single receiver between threads.
+/// This is not able to be used concurrently as it will panic.
+/// It is needed to allow the receiver to be moved into a single future
+/// at a time.
+struct SharedRecv<T> {
+    recv: Arc<parking_lot::Mutex<Option<mpsc::Receiver<T>>>>,
+}
+
 impl MockOutConnection {
     fn new(remote_url: TxUrl) -> Arc<Self> {
         let (response_tx, response_rx) = mpsc::channel(1000);
@@ -193,7 +209,7 @@ pub fn mock_network(
                         let cert = connection.remote_cert.clone();
                         m.expect_peer_cert().returning(move || cert.clone());
                         m.expect_close()
-                            .returning(move |_, _| async move { () }.boxed());
+                            .returning(move |_, _| async move {}.boxed());
                         // allow making "outgoing" channels that will respond
                         // how we configure them to
                         m.expect_out_chan().returning({
@@ -437,10 +453,6 @@ async fn read_response(connection: Arc<MockOutConnection>) -> KitsuneResult<(Msg
     };
 
     Ok(r)
-}
-
-struct SharedRecv<T> {
-    recv: Arc<parking_lot::Mutex<Option<mpsc::Receiver<T>>>>,
 }
 
 impl<T> SharedRecv<T> {
