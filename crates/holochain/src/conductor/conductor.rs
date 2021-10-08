@@ -88,6 +88,9 @@ pub enum CellStatus {
     /// app status, i.e. if any app has a required Cell with this status,
     /// the app is considered to be in the Paused state.
     PendingJoin,
+
+    /// The Cell is currently in the process of trying to join the network.
+    Joining,
 }
 
 /// Declarative filter for CellStatus
@@ -224,14 +227,18 @@ where
         })
     }
 
-    /// Iterator over only the cells which are pending validation. Used to
-    /// discover which cells need to be joined to the network.
-    pub(super) fn pending_cells(&self) -> Vec<(CellId, Arc<Cell>)> {
-        self.cells.share_ref(|cells| {
+    /// Return Cells which are pending network join, and mark them as
+    /// currently joining.
+    ///
+    /// Used to discover which cells need to be joined to the network.
+    /// The cells' status are upgraded to `Joining` when this function is called.
+    pub(super) fn mark_pending_cells_as_joining(&self) -> Vec<(CellId, Arc<Cell>)> {
+        self.cells.share_mut(|cells| {
             cells
-                .iter()
+                .iter_mut()
                 .filter_map(|(id, item)| {
                     if item.is_pending() {
+                        item.status = CellStatus::Joining;
                         Some((id.clone(), item.cell.clone()))
                     } else {
                         None
@@ -1448,6 +1455,7 @@ mod builder {
                 #[cfg(any(test, feature = "test_utils"))]
                 skip_publish: std::sync::atomic::AtomicBool::new(false),
                 p2p_env: Arc::new(parking_lot::Mutex::new(HashMap::new())),
+                p2p_batch_senders: Arc::new(parking_lot::Mutex::new(HashMap::new())),
                 p2p_metrics_env: Arc::new(parking_lot::Mutex::new(HashMap::new())),
             });
 
@@ -1560,6 +1568,7 @@ mod builder {
                 keystore,
                 holochain_p2p,
                 p2p_env: envs.p2p(),
+                p2p_batch_senders: Arc::new(parking_lot::Mutex::new(HashMap::new())),
                 p2p_metrics_env: envs.p2p_metrics(),
                 db_sync_level: self.config.db_sync_level,
                 #[cfg(any(test, feature = "test_utils"))]

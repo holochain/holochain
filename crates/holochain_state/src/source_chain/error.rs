@@ -18,9 +18,14 @@ pub enum SourceChainError {
     ChainEmpty,
 
     #[error(
-        "Attempted to commit a bundle to the source chain, but the source chain head has moved since the bundle began. Bundle head: {0:?}, Current head: {1:?}"
+        "Attempted to commit a bundle to the source chain, but the source chain head has moved since the bundle began. Bundle head: {2:?}, Current head: {3:?}"
     )]
-    HeadMoved(Option<HeaderHash>, Option<(HeaderHash, u32, Timestamp)>),
+    HeadMoved(
+        Vec<(Option<Zome>, SignedHeaderHashed)>,
+        Vec<EntryHashed>,
+        Option<HeaderHash>,
+        Option<(HeaderHash, u32, Timestamp)>,
+    ),
 
     #[error(transparent)]
     TimestampError(#[from] holochain_zome_types::TimestampError),

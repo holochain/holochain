@@ -33,6 +33,12 @@ impl ShardedGossipLocal {
         for info in store::all_agent_info(&self.evt_sender, &self.space)
             .await?
             .into_iter()
+            .filter(|a| {
+                std::time::Duration::from_millis(a.expires_at_ms)
+                    > std::time::UNIX_EPOCH
+                        .elapsed()
+                        .expect("You computer time is set before unix epoch")
+            })
             .filter(|a| remote_agents_within_arc_set.contains(&a.agent))
             .filter(|a| !a.storage_arc.interval().is_empty())
         {

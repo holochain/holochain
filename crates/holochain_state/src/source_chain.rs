@@ -44,6 +44,7 @@ use holochain_zome_types::Signature;
 use holochain_zome_types::SignedHeader;
 use holochain_zome_types::SignedHeaderHashed;
 use holochain_zome_types::Timestamp;
+use holochain_zome_types::ValidationStatus;
 use holochain_zome_types::Zome;
 
 use crate::chain_lock::is_chain_locked;
@@ -578,7 +579,6 @@ impl SourceChain {
         // Write the entries, headers and ops to the database in one transaction.
         let author = self.author.clone();
         let persisted_head = self.persisted_head.clone();
-        let headers_1 = zomed_headers.clone();
         match self
             .vault
             .async_commit(move |txn: &mut Transaction| {
@@ -589,12 +589,14 @@ impl SourceChain {
                 // As at check.
                 let (new_persisted_head, new_head_seq, new_timestamp) =
                     chain_head_db(&txn, author)?;
-                if headers_1.last().is_none() {
+                if zomed_headers.last().is_none() {
                     // Nothing to write
                     return Ok(Vec::new());
                 }
                 if persisted_head != new_persisted_head {
                     return Err(SourceChainError::HeadMoved(
+                        zomed_headers,
+                        entries,
                         Some(persisted_head),
                         Some((new_persisted_head, new_head_seq, new_timestamp)),
                     ));
@@ -619,7 +621,7 @@ impl SourceChain {
                 for entry in entries {
                     insert_entry(txn, entry)?;
                 }
-                for shh in headers_1.iter().map(|(_zome, shh)| shh) {
+                for shh in zomed_headers.iter().map(|(_zome, shh)| shh) {
                     insert_header(txn, shh.clone())?;
                 }
                 for (op, op_hash, op_order, timestamp, visibility, dependency) in ops {
@@ -652,11 +654,13 @@ impl SourceChain {
                         set_withhold_publish(txn, op_hash)?;
                     }
                 }
-                SourceChainResult::Ok(headers_1)
+                SourceChainResult::Ok(zomed_headers)
             })
             .await
         {
             Err(SourceChainError::HeadMoved(
+                zomed_headers,
+                entries,
                 old_head,
                 Some((new_persisted_head, new_head_seq, new_timestamp)),
             )) => {
@@ -681,12 +685,17 @@ impl SourceChain {
                         .await?;
                     child_chain.scratch.apply(|scratch| {
                         for (zome, header) in rebased_headers {
-                            scratch.add_header(zome, header, ChainTopOrdering::Relaxed)
+                            scratch.add_header(zome, header, ChainTopOrdering::Relaxed);
+                        }
+                        for entry in entries {
+                            scratch.add_entry(entry, ChainTopOrdering::Relaxed);
                         }
                     })?;
                     child_chain.flush(network).await
                 } else {
                     Err(SourceChainError::HeadMoved(
+                        zomed_headers,
+                        entries,
                         old_head,
                         Some((new_persisted_head, new_head_seq, new_timestamp)),
                     ))
@@ -828,9 +837,27 @@ pub async fn genesis(
 
     vault
         .async_commit(move |txn| {
-            source_chain::put_raw(txn, dna_header, dna_ops, None)?;
-            source_chain::put_raw(txn, agent_validation_header, avh_ops, None)?;
-            source_chain::put_raw(txn, agent_header, agent_ops, agent_entry)?;
+            source_chain::put_raw(
+                txn,
+                dna_header,
+                dna_ops,
+                None,
+                Some(ValidationStatus::Valid),
+            )?;
+            source_chain::put_raw(
+                txn,
+                agent_validation_header,
+                avh_ops,
+                None,
+                Some(ValidationStatus::Valid),
+            )?;
+            source_chain::put_raw(
+                txn,
+                agent_header,
+                agent_ops,
+                agent_entry,
+                Some(ValidationStatus::Valid),
+            )?;
             SourceChainResult::Ok(())
         })
         .await
@@ -841,6 +868,7 @@ pub fn put_raw(
     shh: SignedHeaderHashed,
     ops: Vec<DhtOpLight>,
     entry: Option<Entry>,
+    validation_status: Option<ValidationStatus>,
 ) -> StateMutationResult<()> {
     let (header, signature) = shh.into_header_and_signature();
     let (header, hash) = header.into_inner();
@@ -876,8 +904,11 @@ pub fn put_raw(
         // StoreEntry ops with private entries are never gossiped or published
         // so we don't need to integrate them.
         // TODO: Can anything every depend on a private store entry op? I don't think so.
+        if let Some(status) = validation_status {
+            set_validation_status(txn, op_hash.clone(), status)?;
+        }
         if !(op_type == DhtOpType::StoreEntry && visibility == Some(EntryVisibility::Private)) {
-            set_validation_stage(txn, op_hash, ValidationLimboStatus::Pending)?;
+            set_validation_stage(txn, op_hash, ValidationLimboStatus::AwaitingIntegration)?;
         }
     }
     Ok(())
@@ -975,12 +1006,20 @@ async fn _put_db<H: HeaderInner, B: HeaderBuilder<H>>(
     vault.conn()?.with_commit_sync(|txn| {
         let (new_head, new_seq, new_timestamp) = chain_head_db(txn, author.clone())?;
         if new_head != prev_header {
+            let entries = match (entry, header.header().entry_hash()) {
+                (Some(e), Some(entry_hash)) => {
+                    vec![EntryHashed::with_pre_hashed(e, entry_hash.clone())]
+                }
+                _ => vec![],
+            };
             return Err(SourceChainError::HeadMoved(
+                vec![header],
+                entries,
                 Some(prev_header),
                 Some((new_head, new_seq, new_timestamp)),
             ));
         }
-        SourceChainResult::Ok(put_raw(txn, header, ops, entry)?)
+        SourceChainResult::Ok(put_raw(txn, header, ops, entry, None)?)
     })?;
     Ok(hash)
 }
@@ -1120,7 +1159,7 @@ pub mod tests {
 
         assert!(matches!(
             chain_2.flush(&mock).await,
-            Err(SourceChainError::HeadMoved(_, _))
+            Err(SourceChainError::HeadMoved(_, _, _, _))
         ));
         let author_2 = Arc::clone(&author);
         let (_, seq, _) = env
@@ -1134,6 +1173,104 @@ pub mod tests {
             .async_commit(move |txn: &mut Transaction| chain_head_db(&txn, author_3))
             .await?;
         assert_eq!(seq, 4);
+
+        Ok(())
+    }
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_relaxed_ordering_with_entry() -> SourceChainResult<()> {
+        let test_env = test_cell_env();
+        let env = test_env.env();
+        let alice = fixt!(AgentPubKey, Predictable, 0);
+
+        let mut mock = MockHolochainP2pCellT::new();
+        mock.expect_authority_for_hash().returning(|_| Ok(false));
+
+        source_chain::genesis(env.clone(), fake_dna_hash(1), alice.clone(), None)
+            .await
+            .unwrap();
+
+        let chain_1 = SourceChain::new(env.clone().into(), alice.clone()).await?;
+        let chain_2 = SourceChain::new(env.clone().into(), alice.clone()).await?;
+        let chain_3 = SourceChain::new(env.clone().into(), alice.clone()).await?;
+
+        let entry_1 = Entry::App(fixt!(AppEntryBytes));
+        let eh1 = EntryHash::with_data_sync(&entry_1);
+        let create = builder::Create {
+            entry_type: EntryType::App(fixt!(AppEntryType)),
+            entry_hash: eh1.clone(),
+        };
+        let h1 = chain_1
+            .put(create, Some(entry_1.clone()), ChainTopOrdering::Strict)
+            .await
+            .unwrap();
+
+        let entry_err = Entry::App(fixt!(AppEntryBytes));
+        let entry_hash_err = EntryHash::with_data_sync(&entry_err);
+        let create = builder::Create {
+            entry_type: EntryType::App(fixt!(AppEntryType)),
+            entry_hash: entry_hash_err.clone(),
+        };
+        chain_2
+            .put(create, Some(entry_err.clone()), ChainTopOrdering::Strict)
+            .await
+            .unwrap();
+
+        let entry_2 = Entry::App(fixt!(AppEntryBytes));
+        let eh2 = EntryHash::with_data_sync(&entry_2);
+        let create = builder::Create {
+            entry_type: EntryType::App(AppEntryType::new(
+                EntryDefIndex(0),
+                fixt!(ZomeId),
+                EntryVisibility::Private,
+            )),
+            entry_hash: eh2.clone(),
+        };
+        let old_h2 = chain_3
+            .put(create, Some(entry_2.clone()), ChainTopOrdering::Relaxed)
+            .await
+            .unwrap();
+
+        let author = Arc::new(alice);
+        chain_1.flush(&mock).await?;
+        let author_1 = Arc::clone(&author);
+        let (_, seq, _) = env
+            .async_commit(move |txn: &mut Transaction| chain_head_db(&txn, author_1))
+            .await?;
+        assert_eq!(seq, 3);
+
+        assert!(matches!(
+            chain_2.flush(&mock).await,
+            Err(SourceChainError::HeadMoved(_, _, _, _))
+        ));
+
+        chain_3.flush(&mock).await?;
+        let author_2 = Arc::clone(&author);
+        let (h2, seq, _) = env
+            .async_commit(move |txn: &mut Transaction| chain_head_db(&txn, author_2.clone()))
+            .await?;
+
+        // not equal since header hash change due to rebasing
+        assert_ne!(h2, old_h2);
+        assert_eq!(seq, 4);
+
+        fresh_reader_test!(env, |txn| {
+            // get the full element
+            let store = Txn::from(&txn);
+            let h1_element_entry_fetched = store
+                .get_element(&h1.clone().into())
+                .expect("error retrieving")
+                .expect("entry not found")
+                .into_inner()
+                .1;
+            let h2_element_entry_fetched = store
+                .get_element(&h2.clone().into())
+                .expect("error retrieving")
+                .expect("entry not found")
+                .into_inner()
+                .1;
+            assert_eq!(ElementEntry::Present(entry_1), h1_element_entry_fetched);
+            assert_eq!(ElementEntry::Present(entry_2), h2_element_entry_fetched);
+        });
 
         Ok(())
     }
