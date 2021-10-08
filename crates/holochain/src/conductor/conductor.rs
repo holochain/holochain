@@ -39,6 +39,8 @@ use crate::conductor::config::ConductorConfig;
 use crate::conductor::error::ConductorResult;
 use crate::conductor::handle::ConductorHandle;
 use crate::core::queue_consumer::InitialQueueTriggers;
+use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
+use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CHANNEL_BOUND;
 use crate::{
     conductor::api::error::ConductorApiResult, core::ribosome::real_ribosome::RealRibosome,
 };
@@ -66,6 +68,8 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use tokio::sync::mpsc::error::SendError;
+use tokio::sync::mpsc::OwnedPermit;
 use tracing::*;
 
 #[cfg(any(test, feature = "test_utils"))]
@@ -164,6 +168,8 @@ where
 
     /// Database sync level
     db_sync_level: DbSyncLevel,
+
+    post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
 }
 
 impl Conductor {
@@ -1058,6 +1064,11 @@ where
             Ok(())
         })
     }
+
+    /// Get and OwnedPermit to the post commit task.
+    pub async fn post_commit_permit(&self) -> Result<OwnedPermit<PostCommitArgs>, SendError<()>> {
+        self.post_commit.clone().reserve_owned().await
+    }
 }
 
 /// Perform Genesis on the source chains for each of the specified CellIds.
@@ -1180,6 +1191,7 @@ where
         root_env_dir: EnvironmentRootPath,
         holochain_p2p: holochain_p2p::HolochainP2pRef,
         db_sync_level: DbSyncLevel,
+        post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
     ) -> ConductorResult<Self> {
         Ok(Self {
             conductor_env: env,
@@ -1195,6 +1207,7 @@ where
             root_env_dir,
             holochain_p2p,
             db_sync_level,
+            post_commit,
         })
     }
 
@@ -1402,6 +1415,9 @@ mod builder {
             let (holochain_p2p, p2p_evt) =
                 holochain_p2p::spawn_holochain_p2p(network_config, tls_config).await?;
 
+            let (post_commit_sender, post_commit_receiver) =
+                tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
+
             let conductor = Conductor::new(
                 environment,
                 wasm_environment,
@@ -1410,6 +1426,7 @@ mod builder {
                 env_path,
                 holochain_p2p,
                 config.db_sync_level,
+                post_commit_sender,
             )
             .await?;
 
@@ -1434,19 +1451,22 @@ mod builder {
                 p2p_metrics_env: Arc::new(parking_lot::Mutex::new(HashMap::new())),
             });
 
-            Self::finish(handle, config, p2p_evt).await
+            Self::finish(handle, config, p2p_evt, post_commit_receiver).await
         }
 
         async fn finish(
             handle: ConductorHandle,
             conductor_config: ConductorConfig,
             p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
+            post_commit_receiver: tokio::sync::mpsc::Receiver<PostCommitArgs>,
         ) -> ConductorResult<ConductorHandle> {
             tokio::task::spawn(p2p_event_task(p2p_evt, handle.clone()));
 
             let _ = handle
                 .clone()
                 .start_scheduler(holochain_zome_types::schedule::SCHEDULER_INTERVAL);
+
+            let _ = handle.clone().spawn_post_commit(post_commit_receiver);
 
             let configs = conductor_config.admin_interfaces.unwrap_or_default();
             let cell_startup_errors = handle.clone().initialize_conductor(configs).await?;
@@ -1512,6 +1532,9 @@ mod builder {
                 holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default(), holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig::new_ephemeral().await.unwrap())
                     .await?;
 
+            let (post_commit_sender, post_commit_receiver) =
+                tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
+
             let conductor = Conductor::new(
                 envs.conductor(),
                 envs.wasm(),
@@ -1520,6 +1543,7 @@ mod builder {
                 self.config.environment_path.clone(),
                 holochain_p2p,
                 self.config.db_sync_level,
+                post_commit_sender,
             )
             .await?;
 
@@ -1552,7 +1576,7 @@ mod builder {
                     .expect("Could not install DNA");
             }
 
-            Self::finish(handle, self.config, p2p_evt).await
+            Self::finish(handle, self.config, p2p_evt, post_commit_receiver).await
         }
     }
 }

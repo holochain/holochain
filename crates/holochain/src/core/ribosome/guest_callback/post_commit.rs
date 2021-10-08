@@ -11,6 +11,8 @@ use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
 use itertools::Itertools;
 
+pub const POST_COMMIT_CHANNEL_BOUND: usize = 100;
+
 #[derive(Clone)]
 pub struct PostCommitInvocation {
     zome: Zome,
@@ -93,6 +95,15 @@ impl From<Vec<PostCommitCallbackResult>> for PostCommitResult {
             }
         })
     }
+}
+
+// trait PostCommitRibosome: RibosomeT + Clone + Send {}
+
+#[derive(Clone)]
+pub struct PostCommitArgs {
+    pub host_access: PostCommitHostAccess,
+    pub invocation: PostCommitInvocation,
+    pub dna: DnaHash,
 }
 
 pub async fn spawn_post_commit<Ribosome: 'static>(
