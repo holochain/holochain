@@ -2390,6 +2390,7 @@ dependencies = [
  "pretty_assertions 0.6.1",
  "rand 0.7.3",
  "ring",
+ "rpassword",
  "rusqlite",
  "sd-notify",
  "serde",
@@ -5515,6 +5516,16 @@ dependencies = [
  "rmp",
  "serde",
  "serde_bytes",
+]
+
+[[package]]
+name = "rpassword"
+version = "5.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ffc936cf8a7ea60c58f030fd36a612a48f440610214dc54bc36431f9ea0c3efb"
+dependencies = [
+ "libc",
+ "winapi",
 ]
 
 [[package]]
