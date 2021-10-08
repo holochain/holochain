@@ -6,6 +6,7 @@ use crate::types::wire;
 use futures::stream::StreamExt;
 use ghost_actor::GhostResult;
 use itertools::Itertools;
+use kitsune_p2p_proxy::tx2::tx2_proxy;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::agent_info::{AgentInfoInner, AgentInfoSigned};
 use kitsune_p2p_types::bin_types::*;
@@ -238,10 +239,10 @@ impl SwitchboardSpace {
     pub fn new(space: KSpace) -> Self {
         Self {
             space,
-            nodes: Default::default(),
-            ops: Default::default(),
-            metric_tasks: Default::default(),
-            handler_tasks: Default::default(),
+            nodes: HashMap::new(),
+            ops: HashMap::new(),
+            metric_tasks: Vec::new(),
+            handler_tasks: Vec::new(),
         }
     }
 
@@ -508,15 +509,8 @@ fn fake_agent_info(
     agent: KAgent,
     interval: ArcInterval,
 ) -> AgentInfoSigned {
-    let bytes: Vec<u8> = (node.uniq().as_usize() as u32)
-        .to_le_bytes()
-        .iter()
-        .cycle()
-        .take(32)
-        .copied()
-        .collect();
-    let b64 = base64::encode(bytes);
-    let fake_url = format!("kitsune-proxy://{}/kitsune-mem/h/localhost/p/1111/--", b64).into();
+    let id = node.uniq().as_usize();
+    let fake_url = format!("kitsune-mem://{}", id).into();
     let state = AgentInfoInner {
         space,
         agent,
