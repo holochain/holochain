@@ -291,10 +291,7 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
         async move {
             let msg_id = MsgId::new_notify();
             let len = data.len();
-            dbg!("con write: before");
             this.con.write(msg_id, data, timeout).await?;
-            dbg!("con write: after");
-
             this.metrics.write_len(dbg_name, len);
 
             let peer_cert = this.peer_cert();

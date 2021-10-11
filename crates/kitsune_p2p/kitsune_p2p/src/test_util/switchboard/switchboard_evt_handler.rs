@@ -9,7 +9,7 @@ use kitsune_p2p_types::dht_arc::DhtArcSet;
 use kitsune_p2p_types::tx2::tx2_utils::Share;
 use kitsune_p2p_types::*;
 
-use super::switchboard::{NodeEp, OpEntry, SwitchboardSpace};
+use super::switchboard::{AgentOpEntry, NodeEp, OpEntry, SwitchboardSpace};
 
 type KSpace = Arc<KitsuneSpace>;
 type KAgent = Arc<KitsuneAgent>;
@@ -136,7 +136,24 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
         to_agent: Arc<KitsuneAgent>,
         ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
     ) -> KitsuneP2pEventHandlerResult<()> {
-        todo!()
+        ok_fut(Ok(self.sb.share_mut(|sb, _| {
+            let agent = sb
+                .node_for_local_agent_hash_mut(&*to_agent)
+                .unwrap()
+                .local_agent_by_hash_mut(&*to_agent)
+                .unwrap();
+            for (hash, op_data) in ops {
+                let loc8 = hash.get_loc().into();
+                // TODO: allow setting integration status
+                agent.ops.insert(
+                    loc8,
+                    AgentOpEntry {
+                        is_integrated: true,
+                    },
+                );
+            }
+            Ok(())
+        })?))
     }
 
     fn handle_fetch_op_data(

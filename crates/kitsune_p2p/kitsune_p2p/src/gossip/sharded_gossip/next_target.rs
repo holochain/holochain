@@ -92,7 +92,6 @@ impl ShardedGossipLocal {
         self.inner.share_mut(|i, _| {
             let node = next_remote_node(remote_nodes, &i.metrics, tuning_params)
                 .map(|n| (n.target, n.url));
-            dbg!(&node);
             Ok(node)
         })
     }

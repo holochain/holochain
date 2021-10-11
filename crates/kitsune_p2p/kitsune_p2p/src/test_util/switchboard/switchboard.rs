@@ -6,7 +6,7 @@ use crate::types::wire;
 use futures::stream::StreamExt;
 use ghost_actor::GhostResult;
 use itertools::Itertools;
-use kitsune_p2p_proxy::tx2::tx2_proxy;
+use kitsune_p2p_proxy::tx2::{tx2_proxy, ProxyConfig};
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::agent_info::{AgentInfoInner, AgentInfoSigned};
 use kitsune_p2p_types::bin_types::*;
@@ -47,8 +47,16 @@ impl NodeEntry {
         self.local_agents.get(&loc8)
     }
 
+    pub fn local_agent_by_loc8_mut(&mut self, loc8: Loc8) -> Option<&mut AgentEntry> {
+        self.local_agents.get_mut(&loc8)
+    }
+
     pub fn local_agent_by_hash(&self, hash: &KitsuneAgent) -> Option<&AgentEntry> {
         self.local_agent_by_loc8(hash.get_loc().into())
+    }
+
+    pub fn local_agent_by_hash_mut(&mut self, hash: &KitsuneAgent) -> Option<&mut AgentEntry> {
+        self.local_agent_by_loc8_mut(hash.get_loc().into())
     }
 }
 
@@ -140,11 +148,17 @@ impl Switchboard {
     }
 
     /// Set up state and handler tasks for a new node in the space
-    pub async fn add_node(&mut self, mem_config: MemConfig) -> NodeEp {
+    pub async fn add_node(&mut self) -> NodeEp {
         let space = ZERO_SPACE.clone();
+
+        let mem_config = MemConfig::default();
+        let proxy_config = ProxyConfig::default();
+        // proxy_config.allow_proxy_fwd = true;
 
         let f = tx2_mem_adapter(mem_config).await.unwrap();
         let f = tx2_pool_promote(f, Default::default());
+        // Proxy wrapping is needed because sharded_gossip expects it
+        let f = tx2_proxy(f, proxy_config).unwrap();
         let f = tx2_api(f, Default::default());
 
         let mut ep = f
@@ -175,7 +189,7 @@ impl Switchboard {
         let ep_task = metric_task(async move {
             dbg!("begin metric task");
             while let Some(evt) = ep.next().await {
-                match dbg!(evt) {
+                match evt {
                     // what other messages do i need to handle?
                     Tx2EpEvent::IncomingNotify(Tx2EpIncomingNotify { con, url, data, .. }) => {
                         match data {
@@ -184,7 +198,6 @@ impl Switchboard {
                                 data,
                                 module,
                             }) => {
-                                dbg!(&data, &module);
                                 let data: Vec<u8> = data.into();
                                 let data: Box<[u8]> = data.into_boxed_slice();
 
@@ -193,7 +206,7 @@ impl Switchboard {
                             _ => unimplemented!(),
                         }
                     }
-                    _ => unimplemented!(),
+                    _ => (),
                 }
             }
             Ok(())
@@ -509,13 +522,12 @@ fn fake_agent_info(
     agent: KAgent,
     interval: ArcInterval,
 ) -> AgentInfoSigned {
-    let id = node.uniq().as_usize();
-    let fake_url = format!("kitsune-mem://{}", id).into();
+    let url = node.local_addr().unwrap();
     let state = AgentInfoInner {
         space,
         agent,
         storage_arc: DhtArc::from_interval(interval),
-        url_list: vec![fake_url],
+        url_list: vec![url],
         signed_at_ms: 0,
         // Never expires
         expires_at_ms: u64::MAX,

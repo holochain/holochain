@@ -15,12 +15,12 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn basic_3way_full_sync_switchboard() {
-        observability::test_run().ok();
+        // observability::test_run().ok();
         let mut sb = Switchboard::new(GossipType::Recent);
 
-        let n1 = sb.add_node(Default::default()).await;
-        let n2 = sb.add_node(Default::default()).await;
-        let n3 = sb.add_node(Default::default()).await;
+        let n1 = sb.add_node().await;
+        let n2 = sb.add_node().await;
+        let n3 = sb.add_node().await;
 
         sb.space_state()
             .share_mut(|sb, _| {
@@ -31,7 +31,9 @@ mod tests {
                 sb.add_ops_now(1, true, [10, 20, 30]);
                 sb.add_ops_now(2, true, [-10, -20, -30]);
                 sb.add_ops_now(3, true, [-15, 15]);
+
                 // we wouldn't expect this op to be gossiped, since it's from 50+ years ago
+                // and hardly "recent"
                 sb.add_ops_timed(3, true, [(40, Timestamp::from_micros(0))]);
 
                 sb.exchange_peer_info([(&n1, &[2, 3]), (&n2, &[1, 3]), (&n3, &[1, 2])]);
@@ -46,7 +48,7 @@ mod tests {
             .unwrap();
 
         // let gossip do its thing
-        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
         let all = vec![-30, -20, -15, -10, 10, 15, 20, 30];
 
@@ -64,9 +66,9 @@ mod tests {
     async fn basic_3way_sharded_switchboard() {
         let mut sb = Switchboard::new(GossipType::Recent);
 
-        let n1 = sb.add_node(Default::default()).await;
-        let n2 = sb.add_node(Default::default()).await;
-        let n3 = sb.add_node(Default::default()).await;
+        let n1 = sb.add_node().await;
+        let n2 = sb.add_node().await;
+        let n3 = sb.add_node().await;
 
         sb.space_state()
             .share_mut(|sb, _| {
@@ -85,7 +87,7 @@ mod tests {
             .unwrap();
 
         // let gossip do its thing
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
         let all = vec![
             -120, -90, -80, -70, -60, -50, -40, -30, -20, -10, 10, 20, 30, 40, 50, 60, 70, 80, 90,

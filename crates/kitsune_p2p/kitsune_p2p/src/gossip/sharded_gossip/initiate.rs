@@ -16,13 +16,11 @@ impl ShardedGossipLocal {
         })?;
         // There's already a target so there's nothing to do.
         if has_target {
-            dbg!("has_target");
             return Ok(None);
         }
 
         // If we don't have a local agent then there's nothing to do.
         if local_agents.is_empty() {
-            dbg!("no local agents");
             // No local agents so there's no one to initiate gossip from.
             return Ok(None);
         }
@@ -34,9 +32,6 @@ impl ShardedGossipLocal {
         let remote_agent = self
             .find_remote_agent_within_arcset(Arc::new(intervals.clone().into()), &local_agents)
             .await?;
-        if remote_agent.is_some() {
-            dbg!(&intervals, &local_agents, &remote_agent);
-        }
 
         let id = rand::thread_rng().gen();
 
