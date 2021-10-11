@@ -282,14 +282,17 @@ impl ArcInterval<u32> {
     }
 }
 
-impl ArcInterval<Loc8> {
+impl<L> ArcInterval<L>
+where
+    Loc8: From<L>,
+{
     pub fn canonical(self) -> ArcInterval {
         match self {
             ArcInterval::Empty => ArcInterval::Empty,
             ArcInterval::Full => ArcInterval::Full,
             ArcInterval::Bounded(lo, hi) => ArcInterval::new(
-                DhtLocation::new(lo as u8 as u32),
-                DhtLocation::new(hi as u8 as u32),
+                DhtLocation::new(Loc8::from(lo).as_u8() as u32),
+                DhtLocation::new(Loc8::from(hi).as_u8() as u32),
             ),
         }
     }

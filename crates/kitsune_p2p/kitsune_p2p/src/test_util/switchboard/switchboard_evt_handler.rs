@@ -41,7 +41,7 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
             state.local_agents_for_node(&self.node).extend(
                 peer_data
                     .into_iter()
-                    .map(|info| (info.agent.get_loc().into(), AgentEntry::new(info))),
+                    .map(|info| (info.agent.get_loc().as_loc8(), AgentEntry::new(info))),
             );
             Ok(())
         })?;
@@ -56,7 +56,7 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
         ok_fut(Ok(self.sb.share_mut(|state, _| {
             Ok(state
                 .local_agents_for_node(&self.node)
-                .get(&agent.get_loc().into())
+                .get(&agent.get_loc().as_loc8())
                 .map(|e| e.info.to_owned()))
         })?))
     }
@@ -143,7 +143,7 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
                 .local_agent_by_hash_mut(&*to_agent)
                 .unwrap();
             for (hash, op_data) in ops {
-                let loc8 = hash.get_loc().into();
+                let loc8 = hash.get_loc().as_loc8();
                 // TODO: allow setting integration status
                 agent.ops.insert(
                     loc8,
@@ -180,7 +180,7 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
             Ok(hashes
                 .into_iter()
                 .map(|hash| {
-                    let e: &OpEntry = sb.ops.get(&hash.get_loc().into()).unwrap();
+                    let e: &OpEntry = sb.ops.get(&hash.get_loc().as_loc8()).unwrap();
                     (e.hash.to_owned(), e.data.to_owned())
                 })
                 .collect())

@@ -7,7 +7,7 @@ mod switchboard_evt_handler;
 #[cfg(test)]
 mod tests {
     use kitsune_p2p_timestamp::Timestamp;
-    use kitsune_p2p_types::dht_arc::ArcInterval;
+    use kitsune_p2p_types::dht_arc::{loc8::Loc8, ArcInterval};
 
     use crate::gossip::sharded_gossip::GossipType;
 
@@ -39,9 +39,9 @@ mod tests {
                 sb.exchange_peer_info([(&n1, &[2, 3]), (&n2, &[1, 3]), (&n3, &[1, 2])]);
 
                 // Ensure that the initial conditions are set up properly
-                assert_eq!(sb.get_ops_loc8(&n1), vec![10, 20, 30]);
-                assert_eq!(sb.get_ops_loc8(&n2), vec![-30, -20, -10]);
-                assert_eq!(sb.get_ops_loc8(&n3), vec![-15, 15, 40]);
+                assert_eq!(sb.get_ops_loc8(&n1), Loc8::vec([10, 20, 30]));
+                assert_eq!(sb.get_ops_loc8(&n2), Loc8::vec([-30, -20, -10]));
+                assert_eq!(sb.get_ops_loc8(&n3), Loc8::vec([-15, 15, 40]));
 
                 Ok(())
             })
@@ -50,7 +50,7 @@ mod tests {
         // let gossip do its thing
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-        let all = vec![-30, -20, -15, -10, 10, 15, 20, 30];
+        let all = Loc8::vec([-30, -20, -15, -10, 10, 15, 20, 30]);
 
         sb.space_state()
             .share_mut(|sb, _| {
@@ -80,7 +80,7 @@ mod tests {
                 sb.add_ops_now(2, true, [-10, -20, -30, -40, -50, -60, -70, -80]);
                 sb.add_ops_now(3, true, [90, 120, -120, -90]);
 
-                sb.exchange_peer_info([(&n1, &[2, 3]), (&n2, &[1, 3]), (&n3, &[1, 2])]);
+                sb.exchange_peer_info([(&n1, &[2 as i8, 3]), (&n2, &[1, 3]), (&n3, &[1, 2])]);
 
                 Ok(())
             })
@@ -89,24 +89,24 @@ mod tests {
         // let gossip do its thing
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-        let all = vec![
+        let all = Loc8::vec([
             -120, -90, -80, -70, -60, -50, -40, -30, -20, -10, 10, 20, 30, 40, 50, 60, 70, 80, 90,
             120,
-        ];
+        ]);
 
         sb.space_state()
             .share_mut(|sb, _| {
                 assert_eq!(
                     sb.get_ops_loc8(&n1),
-                    vec![-30, -20, -10, 10, 20, 30, 40, 50, 60, 70, 80, 90]
+                    Loc8::vec([-30, -20, -10, 10, 20, 30, 40, 50, 60, 70, 80, 90])
                 );
                 assert_eq!(
                     sb.get_ops_loc8(&n2),
-                    vec![-90, -80, -70, -60, -50, -40, -30, -20, -10, 10, 20, 30]
+                    Loc8::vec([-90, -80, -70, -60, -50, -40, -30, -20, -10, 10, 20, 30])
                 );
                 assert_eq!(
                     sb.get_ops_loc8(&n3),
-                    vec![-120, -90, -80, -70, -60, 60, 70, 80, 90, 120]
+                    Loc8::vec([-120, -90, -80, -70, -60, 60, 70, 80, 90, 120])
                 );
                 Ok(())
             })

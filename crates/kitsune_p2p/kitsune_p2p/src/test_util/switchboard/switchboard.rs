@@ -52,11 +52,11 @@ impl NodeEntry {
     }
 
     pub fn local_agent_by_hash(&self, hash: &KitsuneAgent) -> Option<&AgentEntry> {
-        self.local_agent_by_loc8(hash.get_loc().into())
+        self.local_agent_by_loc8(hash.get_loc().as_loc8())
     }
 
     pub fn local_agent_by_hash_mut(&mut self, hash: &KitsuneAgent) -> Option<&mut AgentEntry> {
-        self.local_agent_by_loc8_mut(hash.get_loc().into())
+        self.local_agent_by_loc8_mut(hash.get_loc().as_loc8())
     }
 }
 
@@ -272,7 +272,7 @@ impl SwitchboardSpace {
     }
 
     pub fn node_for_local_agent_hash_mut(&mut self, hash: &KitsuneAgent) -> Option<&mut NodeEntry> {
-        let agent_loc8 = hash.get_loc().into();
+        let agent_loc8 = hash.get_loc().as_loc8();
         self.node_for_local_agent_loc8_mut(agent_loc8)
     }
 
@@ -301,12 +301,11 @@ impl SwitchboardSpace {
             .local_agents
     }
 
-    pub fn add_local_agent(
-        &mut self,
-        node_ep: &NodeEp,
-        agent_loc8: Loc8,
-        interval: ArcInterval<Loc8>,
-    ) {
+    pub fn add_local_agent<L>(&mut self, node_ep: &NodeEp, agent_loc8: L, interval: ArcInterval<L>)
+    where
+        Loc8: From<L>,
+    {
+        let agent_loc8 = agent_loc8.into();
         let agent = agent_from_loc(agent_loc8);
         let info = fake_agent_info(
             self.space.clone(),
@@ -337,8 +336,7 @@ impl SwitchboardSpace {
 
     pub fn exchange_peer_info<
         'n,
-        L: Borrow<Loc8>,
-        A: IntoIterator<Item = L>,
+        A: IntoIterator<Item = &'n i8>,
         P: IntoIterator<Item = (&'n NodeEp, A)>,
     >(
         &mut self,
@@ -348,13 +346,13 @@ impl SwitchboardSpace {
             let agents: Vec<_> = agents
                 .into_iter()
                 .map(|loc8| {
-                    let loc8: &Loc8 = loc8.borrow();
+                    let loc8: Loc8 = Loc8::from(*loc8);
                     (
-                        *loc8,
-                        self.node_for_local_agent_loc8(*loc8)
+                        loc8,
+                        self.node_for_local_agent_loc8(loc8)
                             .unwrap()
                             .local_agents
-                            .get(loc8)
+                            .get(&loc8)
                             .unwrap()
                             .info
                             .to_owned(),
@@ -369,9 +367,9 @@ impl SwitchboardSpace {
         }
     }
 
-    pub fn add_ops_now<O: IntoIterator<Item = Loc8>>(
+    pub fn add_ops_now<L: Into<Loc8>, O: IntoIterator<Item = L>>(
         &mut self,
-        agent_loc: Loc8,
+        agent_loc: L,
         is_integrated: bool,
         ops: O,
     ) {
@@ -379,20 +377,20 @@ impl SwitchboardSpace {
         self.add_ops_timed(agent_loc, is_integrated, ops)
     }
 
-    pub fn add_ops_timed<O: IntoIterator<Item = (Loc8, Timestamp)>>(
+    pub fn add_ops_timed<L: Into<Loc8>, O: IntoIterator<Item = (L, Timestamp)>>(
         &mut self,
-        agent_loc: Loc8,
+        agent_loc: L,
         is_integrated: bool,
         ops: O,
     ) {
-        let agent = agent_from_loc(agent_loc);
+        let agent = agent_from_loc(agent_loc.into());
 
         // Do some pre-computation
         let ops: Vec<_> = ops
             .into_iter()
-            .map(|(loc, timestamp)| {
-                let loc: DhtLocation = loc.into();
-                let loc8: Loc8 = loc.into();
+            .map(|(l, timestamp)| {
+                let loc8: Loc8 = l.into();
+                let loc: DhtLocation = loc8.into();
                 let hash = op_hash_from_loc(loc8);
                 (loc8, hash, timestamp)
             })
@@ -403,7 +401,7 @@ impl SwitchboardSpace {
             let node = self
                 .node_for_local_agent_hash_mut(&*agent)
                 .expect("No agent at this loc8 for node");
-            let agent_loc8 = agent.get_loc().into();
+            let agent_loc8 = agent.get_loc().as_loc8();
             let agent_entry = node.local_agents.get_mut(&agent_loc8).unwrap();
             for (loc8, _, _) in ops.iter() {
                 agent_entry
@@ -540,8 +538,8 @@ fn fake_agent_info(
 #[test]
 fn hash_from_loc8_roundtrip() {
     for i in [0, 1, -1, i8::MIN, i8::MAX] {
-        let i: Loc8 = i;
-        assert_eq!(Loc8::from(agent_from_loc(i).get_loc()), i);
-        assert_eq!(Loc8::from(op_hash_from_loc(i).get_loc()), i);
+        let i: Loc8 = i.into();
+        assert_eq!(agent_from_loc(i).get_loc().as_loc8(), i);
+        assert_eq!(op_hash_from_loc(i).get_loc().as_loc8(), i);
     }
 }
