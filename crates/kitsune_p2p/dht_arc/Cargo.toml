@@ -14,7 +14,11 @@ edition = "2018"
 derive_more = "0.99"
 intervallum = "1.4.0"
 gcollections = "1.5.0"
+num-traits = "0.2"
 serde = {version = "1.0", features = ["derive"]}
 
+rusqlite = { version = "0.26", optional = true }
+
 [features]
+sqlite = ["rusqlite"]
 test_utils = []

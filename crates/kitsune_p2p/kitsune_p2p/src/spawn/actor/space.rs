@@ -284,7 +284,7 @@ impl SpaceInternalHandler for Space {
             let mut all = Vec::new();
             for info in info_list
                 .into_iter()
-                .filter(|info| info.agent.get_loc() % mod_cnt == mod_idx)
+                .filter(|info| info.agent.get_loc().as_u32() % mod_cnt == mod_idx)
             {
                 let ro_inner = ro_inner.clone();
                 let space = space.clone();
