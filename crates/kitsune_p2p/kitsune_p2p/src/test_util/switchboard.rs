@@ -34,7 +34,7 @@ mod tests {
 
                 // we wouldn't expect this op to be gossiped, since it's from 50+ years ago
                 // and hardly "recent"
-                sb.add_ops_timed(3, true, [(40, Timestamp::from_micros(0))]);
+                sb.add_ops_timed(3, true, [(40, Timestamp::from_micros(1))]);
 
                 sb.exchange_peer_info([(&n1, &[2, 3]), (&n2, &[1, 3]), (&n3, &[1, 2])]);
 
@@ -50,12 +50,14 @@ mod tests {
         // let gossip do its thing
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-        let all = Loc8::vec([-30, -20, -15, -10, 10, 15, 20, 30]);
+        let most = Loc8::vec([-30, -20, -15, -10, 10, 15, 20, 30]);
+        let mut all = most.clone();
+        all.extend(Loc8::vec([40]));
 
         sb.space_state()
             .share_mut(|sb, _| {
-                assert_eq!(sb.get_ops_loc8(&n1), all);
-                assert_eq!(sb.get_ops_loc8(&n2), all);
+                assert_eq!(sb.get_ops_loc8(&n1), most);
+                assert_eq!(sb.get_ops_loc8(&n2), most);
                 assert_eq!(sb.get_ops_loc8(&n3), all);
                 Ok(())
             })
@@ -80,7 +82,7 @@ mod tests {
                 sb.add_ops_now(2, true, [-10, -20, -30, -40, -50, -60, -70, -80]);
                 sb.add_ops_now(3, true, [90, 120, -120, -90]);
 
-                sb.exchange_peer_info([(&n1, &[2 as i8, 3]), (&n2, &[1, 3]), (&n3, &[1, 2])]);
+                sb.exchange_peer_info([(&n1, &[2, 3]), (&n2, &[1, 3]), (&n3, &[1, 2])]);
 
                 Ok(())
             })

@@ -156,6 +156,15 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
         })?))
     }
 
+    fn handle_query_op_hashes(
+        &mut self,
+        query: QueryOpHashesEvt,
+    ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindow)>> {
+        ok_fut(Ok(self
+            .sb
+            .share_mut(|sb, _| Ok(dbg!(sb.query_op_hashes(query))))?))
+    }
+
     fn handle_fetch_op_data(
         &mut self,
         FetchOpDataEvt {
@@ -164,20 +173,8 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
             op_hashes,
         }: FetchOpDataEvt,
     ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> {
-        let agents = agents
-            .into_iter()
-            .map(|agent| (agent, DhtArcSet::Full))
-            .collect();
-        let query = QueryOpHashesEvt {
-            space: space.clone(),
-            agents,
-            window: full_time_window(),
-            include_limbo: true, // TODO: is this correct?
-            max_ops: usize::MAX,
-        };
         ok_fut(Ok(self.sb.share_mut(|sb, _| {
-            let hashes = sb.query_op_hashes(query).unwrap().0;
-            Ok(hashes
+            Ok(op_hashes
                 .into_iter()
                 .map(|hash| {
                     let e: &OpEntry = sb.ops.get(&hash.get_loc().as_loc8()).unwrap();
@@ -185,15 +182,6 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
                 })
                 .collect())
         })?))
-    }
-
-    fn handle_query_op_hashes(
-        &mut self,
-        query: QueryOpHashesEvt,
-    ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindow)>> {
-        ok_fut(Ok(self
-            .sb
-            .share_mut(|sb, _| Ok(sb.query_op_hashes(query)))?))
     }
 
     fn handle_sign_network_data(

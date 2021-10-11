@@ -491,10 +491,10 @@ impl SwitchboardSpace {
             let window = timestamps
                 .into_iter()
                 .fold(window, |mut window, timestamp| {
-                    if window.start < timestamp {
+                    if timestamp < window.start {
                         window.start = timestamp;
                     }
-                    if window.end > timestamp {
+                    if timestamp > window.end {
                         window.end = timestamp;
                     }
                     window
