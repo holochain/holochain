@@ -3,6 +3,7 @@
 use crate::agent_store::AgentInfoSigned;
 use crate::types::*;
 use derive_more::*;
+use kitsune_p2p_types::dht_arc::DhtLocation;
 use std::sync::Arc;
 
 /// Type used for content data of wire messages.
@@ -83,7 +84,7 @@ kitsune_p2p_types::write_codec_enum! {
         /// or nearest to holding a u32 location.
         PeerQuery(0x52) {
             space.0: Arc<KitsuneSpace>,
-            basis_loc.1: u32,
+            basis_loc.1: DhtLocation,
         },
 
         /// Response to a peer query

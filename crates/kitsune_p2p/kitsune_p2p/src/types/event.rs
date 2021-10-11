@@ -116,9 +116,8 @@ impl QueryAgentsEvt {
     }
 
     /// Specify that the results should be ordered by proximity to this basis
-    // TODO: make it take a DhtLocation
-    pub fn near_basis(mut self, basis: u32) -> Self {
-        self.near_basis = Some(DhtLocation::new(basis));
+    pub fn near_basis(mut self, basis: DhtLocation) -> Self {
+        self.near_basis = Some(basis);
         self
     }
 
