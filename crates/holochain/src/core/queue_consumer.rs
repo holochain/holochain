@@ -399,7 +399,7 @@ impl TriggerReceiver {
         let mut was_trigger = true;
         {
             // Create the trigger future
-            let trigger_fut = Self::rx_fut(rx);
+            let trigger_fut = rx_fut(rx);
             match back_off {
                 // We have a back off loop that is running.
                 Some(back_off) if !back_off.is_paused() => {
@@ -454,14 +454,14 @@ impl TriggerReceiver {
         }
         Ok(())
     }
+}
 
-    /// Create a future that will be ok with either a recv or a lagged.
-    async fn rx_fut(rx: &mut broadcast::Receiver<()>) -> Result<(), QueueTriggerClosedError> {
-        match rx.recv().await {
-            Ok(_) => Ok(()),
-            Err(broadcast::error::RecvError::Closed) => Err(QueueTriggerClosedError),
-            Err(broadcast::error::RecvError::Lagged(_)) => Ok(()),
-        }
+/// Create a future that will be ok with either a recv or a lagged.
+async fn rx_fut(rx: &mut broadcast::Receiver<()>) -> Result<(), QueueTriggerClosedError> {
+    match rx.recv().await {
+        Ok(_) => Ok(()),
+        Err(broadcast::error::RecvError::Closed) => Err(QueueTriggerClosedError),
+        Err(broadcast::error::RecvError::Lagged(_)) => Ok(()),
     }
 }
 
