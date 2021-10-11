@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use super::*;
-use kitsune_p2p_types::agent_info::AgentInfoSigned;
+use kitsune_p2p_types::{agent_info::AgentInfoSigned, dht_arc::DhtLocation};
 use std::future::Future;
 
 /// This enum represents the outcomes from peer discovery
@@ -137,7 +137,7 @@ pub(crate) fn peer_connect(
 /// by requesting closer agents from remote nodes
 pub(crate) fn search_remotes_covering_basis(
     inner: Arc<SpaceReadOnlyInner>,
-    basis_loc: u32,
+    basis_loc: DhtLocation,
     timeout: KitsuneTimeout,
 ) -> impl Future<Output = KitsuneP2pResult<Vec<AgentInfoSigned>>> + 'static + Send {
     const INITIAL_DELAY: u64 = 100;
@@ -234,7 +234,7 @@ pub(crate) fn search_remotes_covering_basis(
 /// local search for remote (non-local) agents closest to basis
 pub(crate) fn get_cached_remotes_near_basis(
     inner: Arc<SpaceReadOnlyInner>,
-    basis_loc: u32,
+    basis_loc: DhtLocation,
     _timeout: KitsuneTimeout,
 ) -> impl Future<Output = KitsuneP2pResult<Vec<AgentInfoSigned>>> + 'static + Send {
     // as this is a local request, there isn't much cost to getting more
