@@ -73,14 +73,14 @@ impl Query for GetLinksOpsQuery {
         let common_query = match &self.tag {
             Some(tag) => {
                 let tag = Self::tag_to_hex(tag.as_ref());
-                let tag = format!(
+                format!(
                     "
+                    {}
                     AND
-                    HEX(Header.tag) like '{}%'
+                    HEX(Header.tag) LIKE '{}%'
                 ",
-                    tag
-                );
-                format!("{}{}", common, tag)
+                    common, tag
+                )
             }
             None => common.into(),
         };
