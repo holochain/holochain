@@ -31,7 +31,6 @@ pub async fn spawn_new_lair_keystore(
         connection_url: connection_url.into(),
         passphrase,
         exact_client_server_version_match: true,
-        danger_unlock_without_server_validate: false,
     };
     let client = ipc_keystore_connect_options(opts).await?;
     Ok(MetaLairClient::NewLair(client))
