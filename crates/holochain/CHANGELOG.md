@@ -9,6 +9,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Preparation for new lair api [#1017](https://github.com/holochain/holochain/pull/1017)
   - there should be no functional changes with this update.
   - adds new lair as an additional dependency and begins preparation for a config-time switch allowing use of new api lair keystore.
+- BREAKING conductor config changes [#1031](https://github.com/holochain/holochain/pull/1031)
+
+Where previously, you might have had:
+
+```yaml
+use_dangerous_test_keystore: false
+keystore_path: /my/path
+passphrase_service:
+  type: danger_insecure_from_config
+  passphrase: "test-passphrase"
+```
+
+now you will use:
+
+```yaml
+keystore:
+  type: lair_server_legacy_deprecated
+  keystore_path: /my/path
+  danger_passphrase_insecure_from_config: "test-passphrase"
+```
+
+or:
+
+```yaml
+keystore:
+  type: danger_test_keystore_legacy_deprecated
+```
 
 ## 0.0.109
 
