@@ -2213,6 +2213,8 @@ dependencies = [
 [[package]]
 name = "hc_seed_bundle"
 version = "0.1.0-alpha.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25c6772b065c3357cf24797b2f459d9bd7a70eaab08e181d8ed27e99901d87ae"
 dependencies = [
  "futures",
  "one_err",
@@ -3473,6 +3475,8 @@ dependencies = [
 [[package]]
 name = "lair_keystore_api"
 version = "0.1.0-alpha.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7de362117cc887bb3d14ce83376e36409739d5a73cbcfdc8a6474e3f8c96c0b"
 dependencies = [
  "base64",
  "dunce",
