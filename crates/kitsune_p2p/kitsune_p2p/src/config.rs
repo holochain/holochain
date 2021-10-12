@@ -1,4 +1,5 @@
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
+use kitsune_p2p_types::tx2::tx2_adapter::AdapterFactory;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::*;
 use url2::Url2;
@@ -14,6 +15,7 @@ pub const BOOTSTRAP_SERVICE_DEV: &str = "https://bootstrap-dev.holohost.workers.
 pub(crate) enum KitsuneP2pTx2Backend {
     Mem,
     Quic { bind_to: TxUrl },
+    Mock { mock_network: AdapterFactory },
 }
 
 pub(crate) struct KitsuneP2pTx2Config {

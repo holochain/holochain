@@ -201,6 +201,7 @@ mod tests {
         let (p2p, mut evt) = spawn_holochain_p2p(
             KitsuneP2pConfig::default(),
             TlsConfig::new_ephemeral().await.unwrap(),
+            None,
         )
         .await
         .unwrap();
@@ -258,6 +259,7 @@ mod tests {
         let (p2p, mut evt) = spawn_holochain_p2p(
             KitsuneP2pConfig::default(),
             TlsConfig::new_ephemeral().await.unwrap(),
+            None,
         )
         .await
         .unwrap();
@@ -308,6 +310,7 @@ mod tests {
         let (p2p, mut evt) = spawn_holochain_p2p(
             KitsuneP2pConfig::default(),
             TlsConfig::new_ephemeral().await.unwrap(),
+            None,
         )
         .await
         .unwrap();
@@ -368,6 +371,7 @@ mod tests {
         let (p2p, mut evt) = spawn_holochain_p2p(
             KitsuneP2pConfig::default(),
             TlsConfig::new_ephemeral().await.unwrap(),
+            None,
         )
         .await
         .unwrap();
@@ -454,6 +458,7 @@ mod tests {
         let (p2p, mut evt) = spawn_holochain_p2p(
             KitsuneP2pConfig::default(),
             TlsConfig::new_ephemeral().await.unwrap(),
+            None,
         )
         .await
         .unwrap();

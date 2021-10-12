@@ -19,6 +19,8 @@ use holochain_cascade::Cascade;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::IntegrationStateDumps;
 use holochain_p2p::actor::HolochainP2pRefToCell;
+use holochain_p2p::dht_arc::DhtArc;
+use holochain_p2p::dht_arc::PeerDensity;
 use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::spawn_holochain_p2p;
 use holochain_p2p::HolochainP2pCell;
@@ -199,6 +201,7 @@ where
         holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig::new_ephemeral()
             .await
             .unwrap(),
+        None,
     )
     .await
     .unwrap();
@@ -222,6 +225,13 @@ where
                 }
                 QueryAgentInfoSigned { respond, .. } => {
                     respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                }
+                QueryPeerDensity { respond, .. } => {
+                    respond.r(Ok(
+                        async move { Ok(PeerDensity::new(DhtArc::full(0), 1.0, 1)) }
+                            .boxed()
+                            .into(),
+                    ));
                 }
                 _ => {}
             }
