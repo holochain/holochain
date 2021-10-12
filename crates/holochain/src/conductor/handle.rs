@@ -68,6 +68,7 @@ use holochain_conductor_api::conductor::EnvironmentRootPath;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::JsonDump;
+use holochain_keystore::MetaLairClient;
 use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_p2p::DnaHashExt;
@@ -176,7 +177,7 @@ pub trait ConductorHandleT: Send + Sync {
     fn shutdown(&self);
 
     /// Request access to this conductor's keystore
-    fn keystore(&self) -> &KeystoreSender;
+    fn keystore(&self) -> &MetaLairClient;
 
     /// Request access to this conductor's networking handle
     fn holochain_p2p(&self) -> &holochain_p2p::HolochainP2pRef;
@@ -383,7 +384,7 @@ pub trait ConductorHandleT: Send + Sync {
 #[derive(From)]
 pub struct ConductorHandleImpl<DS: DnaStore + 'static> {
     pub(super) conductor: Conductor<DS>,
-    pub(super) keystore: KeystoreSender,
+    pub(super) keystore: MetaLairClient,
     pub(super) holochain_p2p: holochain_p2p::HolochainP2pRef,
 
     /// The root environment directory where all environments are created
@@ -622,7 +623,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 data,
                 ..
             } => {
-                let signature = to_agent.sign_raw(self.keystore(), &data).await?;
+                let signature = to_agent.sign_raw(self.keystore(), data.into()).await?;
                 respond.respond(Ok(async move { Ok(signature) }.boxed().into()));
             }
             HolochainP2pEvent::CallRemote { .. }
@@ -743,7 +744,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self.conductor.shutdown()
     }
 
-    fn keystore(&self) -> &KeystoreSender {
+    fn keystore(&self) -> &MetaLairClient {
         &self.keystore
     }
 

@@ -6,6 +6,7 @@ pub mod dependencies {
     pub use ::futures;
     pub use ::ghost_actor;
     pub use ::legacy_lair_api;
+    pub use ::new_lair_api;
     pub use ::observability;
     pub use ::paste;
     pub use ::rustls;

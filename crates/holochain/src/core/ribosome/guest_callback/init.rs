@@ -4,7 +4,7 @@ use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
 use holo_hash::AnyDhtHash;
-use holochain_keystore::KeystoreSender;
+use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
@@ -24,7 +24,7 @@ impl InitInvocation {
 #[derive(Clone, Constructor)]
 pub struct InitHostAccess {
     pub workspace: HostFnWorkspace,
-    pub keystore: KeystoreSender,
+    pub keystore: MetaLairClient,
     pub network: HolochainP2pCell,
 }
 

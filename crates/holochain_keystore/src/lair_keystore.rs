@@ -7,7 +7,7 @@ use legacy_lair_api::*;
 pub async fn spawn_lair_keystore(
     lair_dir: Option<&std::path::Path>,
     passphrase: sodoken::BufRead,
-) -> KeystoreApiResult<KeystoreSender> {
+) -> KeystoreApiResult<MetaLairClient> {
     let mut config = Config::builder();
     if let Some(lair_dir) = lair_dir {
         config = config.set_root_path(lair_dir);
@@ -16,5 +16,5 @@ pub async fn spawn_lair_keystore(
 
     let api = legacy_lair_client::assert_running_lair_and_connect(config, passphrase).await?;
 
-    Ok(api)
+    Ok(MetaLairClient::Legacy(api))
 }

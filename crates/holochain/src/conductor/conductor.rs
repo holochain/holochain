@@ -53,8 +53,7 @@ use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::test_keystore::spawn_test_keystore;
-use holochain_keystore::KeystoreSender;
-use holochain_keystore::KeystoreSenderExt;
+use holochain_keystore::MetaLairClient;
 use holochain_sqlite::db::DbKind;
 use holochain_sqlite::prelude::*;
 use holochain_state::mutations;
@@ -157,7 +156,7 @@ where
     dna_store: RwShare<DS>,
 
     /// Access to private keys for signing and encryption.
-    keystore: KeystoreSender,
+    keystore: MetaLairClient,
 
     /// The root environment directory where all environments are created
     root_env_dir: EnvironmentRootPath,
@@ -884,7 +883,7 @@ where
     }
 
     /// Get the keystore.
-    pub fn keystore(&self) -> &KeystoreSender {
+    pub fn keystore(&self) -> &MetaLairClient {
         &self.keystore
     }
 
@@ -1074,7 +1073,7 @@ where
 /// Note this function takes read locks so should not be called from within a read lock.
 pub(super) async fn genesis_cells(
     root_env_dir: PathBuf,
-    keystore: KeystoreSender,
+    keystore: MetaLairClient,
     cell_ids_with_proofs: Vec<(CellId, Option<MembraneProof>)>,
     conductor_handle: ConductorHandle,
     db_sync_level: DbSyncLevel,
@@ -1183,7 +1182,7 @@ where
         env: EnvWrite,
         wasm_env: EnvWrite,
         dna_store: DS,
-        keystore: KeystoreSender,
+        keystore: MetaLairClient,
         root_env_dir: EnvironmentRootPath,
         holochain_p2p: holochain_p2p::HolochainP2pRef,
         db_sync_level: DbSyncLevel,
@@ -1293,7 +1292,7 @@ mod builder {
         /// The DnaStore (mockable)
         pub dna_store: DS,
         /// Optional keystore override
-        pub keystore: Option<KeystoreSender>,
+        pub keystore: Option<MetaLairClient>,
         #[cfg(any(test, feature = "test_utils"))]
         /// Optional state override (for testing)
         pub state: Option<ConductorState>,
@@ -1348,14 +1347,8 @@ mod builder {
             } else if self.config.use_dangerous_test_keystore {
                 let keystore = spawn_test_keystore().await?;
                 // pre-populate with our two fixture agent keypairs
-                keystore
-                    .generate_sign_keypair_from_pure_entropy()
-                    .await
-                    .unwrap();
-                keystore
-                    .generate_sign_keypair_from_pure_entropy()
-                    .await
-                    .unwrap();
+                keystore.new_sign_keypair_random().await.unwrap();
+                keystore.new_sign_keypair_random().await.unwrap();
                 keystore
             } else {
                 let passphrase = match &self.config.passphrase_service {
@@ -1474,7 +1467,7 @@ mod builder {
 
         /// Pass a test keystore in, to ensure that generated test agents
         /// are actually available for signing (especially for tryorama compat)
-        pub fn with_keystore(mut self, keystore: KeystoreSender) -> Self {
+        pub fn with_keystore(mut self, keystore: MetaLairClient) -> Self {
             self.keystore = Some(keystore);
             self
         }

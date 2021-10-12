@@ -2,8 +2,8 @@
 
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
-use holochain_keystore::KeystoreSender;
-use holochain_keystore::{keystore_actor::KeystoreApiResult, AgentPubKeyExt};
+use holochain_keystore::AgentPubKeyExt;
+use holochain_keystore::MetaLairClient;
 use holochain_serialized_bytes::prelude::*;
 use holochain_sqlite::prelude::*;
 use holochain_sqlite::rusqlite::named_params;
@@ -49,8 +49,8 @@ impl ValidationReceipt {
     /// Sign this validation receipt.
     pub async fn sign(
         self,
-        keystore: &KeystoreSender,
-    ) -> KeystoreApiResult<SignedValidationReceipt> {
+        keystore: &MetaLairClient,
+    ) -> holochain_keystore::LairResult<SignedValidationReceipt> {
         let signature = self.validator.sign(keystore, self.clone()).await?;
         Ok(SignedValidationReceipt {
             receipt: self,
@@ -124,7 +124,6 @@ mod tests {
     use super::*;
     use fixt::prelude::*;
     use holo_hash::HasHash;
-    use holochain_keystore::KeystoreSenderExt;
     use holochain_sqlite::db::ReadManager;
     use holochain_types::dht_op::DhtOp;
     use holochain_types::dht_op::DhtOpHashed;
@@ -132,13 +131,9 @@ mod tests {
 
     async fn fake_vr(
         dht_op_hash: &DhtOpHash,
-        keystore: &KeystoreSender,
+        keystore: &MetaLairClient,
     ) -> SignedValidationReceipt {
-        let agent = keystore
-            .clone()
-            .generate_sign_keypair_from_pure_entropy()
-            .await
-            .unwrap();
+        let agent = keystore.new_sign_keypair_random().await.unwrap();
         let receipt = ValidationReceipt {
             dht_op_hash: dht_op_hash.clone(),
             validation_status: ValidationStatus::Valid,

@@ -9,7 +9,7 @@ use crate::conductor::{
 use hdk::prelude::*;
 use holo_hash::DnaHash;
 use holochain_conductor_api::{AdminInterfaceConfig, InterfaceDriver};
-use holochain_keystore::KeystoreSender;
+use holochain_keystore::MetaLairClient;
 use holochain_state::test_utils::{test_environments, TestEnvs};
 use holochain_types::prelude::*;
 use holochain_websocket::*;
@@ -120,8 +120,8 @@ impl SweetConductor {
         &self.envs
     }
 
-    /// Access the KeystoreSender for this conductor
-    pub fn keystore(&self) -> KeystoreSender {
+    /// Access the MetaLairClient for this conductor
+    pub fn keystore(&self) -> MetaLairClient {
         self.envs.keystore()
     }
 

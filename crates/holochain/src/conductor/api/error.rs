@@ -125,6 +125,12 @@ impl From<ConductorError> for ConductorApiError {
     }
 }
 
+impl From<one_err::OneErr> for ConductorApiError {
+    fn from(e: one_err::OneErr) -> Self {
+        Self::other(e)
+    }
+}
+
 /// All the serialization errors that can occur
 #[derive(Error, Debug)]
 pub enum SerializationError {

@@ -32,7 +32,7 @@ use ::fixt::prelude::*;
 pub use holo_hash::fixt::*;
 use holo_hash::HeaderHash;
 use holo_hash::WasmHash;
-use holochain_keystore::keystore_actor::KeystoreSender;
+use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pCellFixturator;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::test_utils::test_keystore;
@@ -226,7 +226,7 @@ fixturator!(
 );
 
 fixturator!(
-    KeystoreSender;
+    MetaLairClient;
     curve Empty {
         tokio_helper::block_forever_on(async {
             // an empty keystore
@@ -302,7 +302,7 @@ fixturator!(
 
 fixturator!(
     ZomeCallHostAccess;
-    constructor fn new(HostFnWorkspace, KeystoreSender, HolochainP2pCell, SignalBroadcaster, CellConductorReadHandle, CellId);
+    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pCell, SignalBroadcaster, CellConductorReadHandle, CellId);
 );
 
 fixturator!(
@@ -322,7 +322,7 @@ fixturator!(
 
 fixturator!(
     InitHostAccess;
-    constructor fn new(HostFnWorkspace, KeystoreSender, HolochainP2pCell);
+    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pCell);
 );
 
 fixturator!(
@@ -342,7 +342,7 @@ fixturator!(
 
 fixturator!(
     PostCommitHostAccess;
-    constructor fn new(HostFnWorkspace, KeystoreSender, HolochainP2pCell);
+    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pCell);
 );
 
 fixturator!(
