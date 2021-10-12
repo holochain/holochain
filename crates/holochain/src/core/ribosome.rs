@@ -355,11 +355,7 @@ impl ZomeCallInvocation {
             fn_name,
             payload,
             provenance,
-            call_info: CallInfo::new(
-                CallSource::new(
-                    
-                )
-            )
+            call_info: CallInfo::new(CallSource::new()),
         }
     }
 }

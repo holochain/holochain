@@ -29,7 +29,9 @@ pub enum CapGrant {
     /// The pubkey of the calling agent is secured by the cryptographic handshake at the network
     /// layer and the caller must provide a secret that we check for in a private entry in the
     /// local chain.
-    RemoteAgent(ZomeCallCapGrant),
+    /// The caller's key is included because the `ZomeCallCapGrant` alone does
+    /// not indicate who is calling, only their token that allows it.
+    RemoteAgent(AgentPubKey, ZomeCallCapGrant),
 }
 
 impl From<holo_hash::AgentPubKey> for CapGrant {
@@ -77,14 +79,11 @@ impl ZomeCallCapGrant {
     }
 }
 
-impl From<ZomeCallCapGrant> for CapGrant {
-    /// Create a new ZomeCall capability grant
-    fn from(zccg: ZomeCallCapGrant) -> Self {
-        CapGrant::RemoteAgent(zccg)
-    }
-}
-
 impl CapGrant {
+    pub fn new_remote_agent(provenance: AgentPubKey, zccg: ZomeCallCapGrant) -> Self {
+        Self::RemoteAgent(provenance, zccg)
+    }
+
     /// Given a grant, is it valid in isolation?
     /// In a world of CRUD, some new entry might update or delete an existing one, but we can check
     /// if a grant is valid in a standalone way.
@@ -98,11 +97,15 @@ impl CapGrant {
             // Grant is always valid if the author matches the check agent.
             CapGrant::ChainAuthor(author) => author == check_agent,
             // Otherwise we need to do more work…
-            CapGrant::RemoteAgent(ZomeCallCapGrant {
-                access, functions, ..
-            }) => {
+            CapGrant::RemoteAgent(
+                provenance,
+                ZomeCallCapGrant {
+                    access, functions, ..
+                },
+            ) => {
+                provenance == check_agent
                 // The checked function needs to be in the grant…
-                functions.contains(check_function)
+                && functions.contains(check_function)
                 // The agent needs to be valid…
                 && match access {
                     // The grant is assigned so the agent needs to match…

@@ -7,39 +7,6 @@ use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
 use futures::future::join_all;
 
-// None = Me
-// SomeoneElse = (AgentPubKey, Option<CapSecret>) => Secret maybe needed to cross agency
-type TargetAgent = (AgentPubKey, Option<CapSecret>);
-
-enum DestinationDHT {
-    // This is a remote call on the current network.
-    Current,
-    // This is for a different DNA within the same happ.
-    // "invalid target" error immediately for remote agents
-    Nick(String),
-    // This is for a different DNA running on the same local conductor.
-    // "invalid target" error immediately for remote agents
-    DNAHash(DnaHash),
-}
-
-struct Context {
-    target_agent: TargetAgent,
-    destination: DestinationDHT,
-}
-
-context:
-
-- DNA nick (locally within happ) || current network (remote call) || DNA hash (different happ bridge)
-- agent
-- cap
-
-content:
-
-- zome
-- fn
-- payload
-
-
 pub fn call(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,

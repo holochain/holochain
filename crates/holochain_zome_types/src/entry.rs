@@ -126,13 +126,13 @@ pub enum Entry {
 
 impl Entry {
     /// If this entry represents a capability grant, return a `CapGrant`.
-    pub fn as_cap_grant(&self) -> Option<CapGrant> {
-        match self {
-            Entry::Agent(key) => Some(CapGrant::ChainAuthor(key.clone())),
-            Entry::CapGrant(data) => Some(CapGrant::RemoteAgent(data.clone())),
-            _ => None,
-        }
-    }
+    // pub fn as_cap_grant(&self) -> Option<CapGrant> {
+    //     match self {
+    //         Entry::Agent(key) => Some(CapGrant::ChainAuthor(key.clone())),
+    //         Entry::CapGrant(data) => Some(CapGrant::RemoteAgent(data.clone())),
+    //         _ => None,
+    //     }
+    // }
 
     /// If this entry represents a capability claim, return a `CapClaim`.
     pub fn as_cap_claim(&self) -> Option<&CapClaim> {
