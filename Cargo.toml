@@ -70,3 +70,4 @@ codegen-units = 16
 # lair_keystore_client = { path = "../lair/crates/lair_keystore_client" }
 # observability = { path = "../../rust/observability" }
 # r2d2_sqlite = { path = "../r2d2-sqlite" }
+new_lair_api = { path = "../lair/crates/lair_keystore_api", package = "lair_keystore_api" }

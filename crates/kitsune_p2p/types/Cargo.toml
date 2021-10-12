@@ -12,7 +12,7 @@ edition = "2018"
 
 [dependencies]
 legacy_lair_api = { version = "=0.0.7", package = "lair_keystore_api" }
-new_lair_api = { version = "=0.1.0-alpha.2", package = "lair_keystore_api" }
+new_lair_api = { version = "=0.1.0-alpha.3", package = "lair_keystore_api" }
 base64 = "0.13"
 derive_more = "0.99.7"
 futures = "0.3"

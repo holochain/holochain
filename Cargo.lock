@@ -2212,9 +2212,7 @@ dependencies = [
 
 [[package]]
 name = "hc_seed_bundle"
-version = "0.1.0-alpha.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7235eaf124c42f93655629137486773f9a464a1fd59a28b6427dc280b983bcc9"
+version = "0.1.0-alpha.3"
 dependencies = [
  "futures",
  "one_err",
@@ -3407,7 +3405,7 @@ dependencies = [
  "ghost_actor 0.3.0-alpha.4",
  "kitsune_p2p_dht_arc",
  "lair_keystore_api 0.0.7",
- "lair_keystore_api 0.1.0-alpha.2",
+ "lair_keystore_api 0.1.0-alpha.3",
  "lru",
  "mockall",
  "nanoid 0.3.0",
@@ -3474,9 +3472,7 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_api"
-version = "0.1.0-alpha.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58377db7dfa2b89f619cdf47487967ec888eaa5e56e373890b0ba4e6f28498ea"
+version = "0.1.0-alpha.3"
 dependencies = [
  "base64",
  "dunce",
