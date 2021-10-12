@@ -62,7 +62,7 @@ pub async fn call_zome_workflow<Ribosome, C>(
     mut trigger_integrate_dht_ops: TriggerSender,
 ) -> WorkflowResult<ZomeCallResult>
 where
-    Ribosome: RibosomeT + Clone + Send + 'static,
+    Ribosome: RibosomeT + Send + 'static,
     C: CellConductorApiT + Clone,
 {
     let should_write = args.is_root_zome_call;
