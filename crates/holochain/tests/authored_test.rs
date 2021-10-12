@@ -41,7 +41,7 @@ async fn authored_test() {
         .await;
 
     // publish these commits
-    let mut triggers = handle.get_cell_triggers(&alice_call_data.cell_id).unwrap();
+    let triggers = handle.get_cell_triggers(&alice_call_data.cell_id).unwrap();
     triggers.publish_dht_ops.trigger();
 
     // Alice commits the entry
@@ -104,7 +104,7 @@ async fn authored_test() {
         .await;
 
     // Produce and publish these commits
-    let mut triggers = handle.get_cell_triggers(&bob_call_data.cell_id).unwrap();
+    let triggers = handle.get_cell_triggers(&bob_call_data.cell_id).unwrap();
     triggers.publish_dht_ops.trigger();
 
     fresh_reader_test(bob_call_data.env.clone(), |txn| {

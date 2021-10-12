@@ -493,6 +493,9 @@ impl Cell {
                 }
                 .instrument(debug_span!("cell_handle_validation_receipt_received"))
                 .await;
+                // We got a receipt so we must be connected to the network
+                // and should reset the publish back off loop to its minimum.
+                self.queue_triggers.publish_dht_ops.reset_back_off();
             }
 
             FetchOpData {
