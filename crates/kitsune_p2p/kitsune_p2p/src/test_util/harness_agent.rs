@@ -99,7 +99,7 @@ impl HarnessAgentControlHandler for AgentHarness {
     fn handle_dump_agent_info(
         &mut self,
     ) -> HarnessAgentControlHandlerResult<Vec<Arc<AgentInfoSigned>>> {
-        let all = self.agent_store.values().map(|a| a.clone()).collect();
+        let all = self.agent_store.values().cloned().collect();
         Ok(async move { Ok(all) }.boxed().into())
     }
 
@@ -172,7 +172,7 @@ impl KitsuneP2pEventHandler for AgentHarness {
             limit,
         }: QueryAgentsEvt,
     ) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
-        let arc_set = arc_set.unwrap_or(Arc::new(DhtArcSet::Full));
+        let arc_set = arc_set.unwrap_or_else(|| Arc::new(DhtArcSet::Full));
         let window = window.unwrap_or_else(full_time_window);
         // TODO - sort by near_basis if set
         let out = self
