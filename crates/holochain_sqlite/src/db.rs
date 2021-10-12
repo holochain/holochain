@@ -112,6 +112,49 @@ impl DbWrite {
             std::fs::create_dir_all(parent)
                 .map_err(|_e| DatabaseError::DatabaseMissing(parent.to_owned()))?;
         }
+        // Check if the database is valid and take the appropriate
+        // action if it isn't.
+        match Connection::open(&path)
+            // For some reason calling pragma_update is necessary to prove the database file is valid.
+            .and_then(|c| c.pragma_update(None, "synchronous", &"0".to_string()))
+        {
+            Ok(_) => (),
+            // These are the two errors that can
+            // occur if the database is not valid.
+            Err(Error::SqliteFailure(
+                rusqlite::ffi::Error {
+                    code: ErrorCode::DatabaseCorrupt,
+                    extended_code,
+                },
+                s,
+            ))
+            | Err(Error::SqliteFailure(
+                rusqlite::ffi::Error {
+                    code: ErrorCode::NotADatabase,
+                    extended_code,
+                },
+                s,
+            )) => {
+                // Check if this database kind requires wiping.
+                if kind.if_corrupt_wipe() {
+                    std::fs::remove_file(&path)?;
+                } else {
+                    // If we don't wipe we need to return an error.
+                    return Err(Error::SqliteFailure(
+                        rusqlite::ffi::Error {
+                            code: ErrorCode::DatabaseCorrupt,
+                            extended_code,
+                        },
+                        s,
+                    )
+                    .into());
+                }
+            }
+            // Another error has occurred when trying to open the db.
+            Err(e) => return Err(e.into()),
+        }
+
+        // Now we know the database file is valid we can open a connection pool.
         let pool = new_connection_pool(&path, kind.clone(), sync_level);
         let mut conn = pool.get()?;
         // set to faster write-ahead-log mode
@@ -197,7 +240,7 @@ pub enum DbKind {
 
 impl DbKind {
     /// Constuct a partial Path based on the kind
-    fn filename(&self) -> PathBuf {
+    pub fn filename(&self) -> PathBuf {
         let mut path: PathBuf = match self {
             DbKind::Cell(cell_id) => ["cell", &cell_id.to_string()].iter().collect(),
             DbKind::Cache(dna) => ["cache", &format!("cache-{}", dna)].iter().collect(),
@@ -212,6 +255,25 @@ impl DbKind {
         };
         path.set_extension("sqlite3");
         path
+    }
+
+    /// Whether to wipe the database if it is corrupt.
+    /// Some database it's safe to wipe them if they are corrupt because
+    /// they can be refilled from the network. Other databases cannot
+    /// be refilled and some manual intervention is required.
+    fn if_corrupt_wipe(&self) -> bool {
+        match self {
+            // These databases can safely be wiped if they are corrupt.
+            DbKind::Cache(_) => true,
+            DbKind::Wasm => true,
+            DbKind::P2pAgentStore(_) => true,
+            DbKind::P2pMetrics(_) => true,
+            // These databases cannot be safely wiped if they are corrupt.
+            // TODO: When splitting the source chain and authority db the
+            // authority db can be wiped but the source chain db cannot.
+            DbKind::Cell(_) => false,
+            DbKind::Conductor => false,
+        }
     }
 }
 
