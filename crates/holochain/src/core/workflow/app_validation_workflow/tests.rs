@@ -445,7 +445,7 @@ async fn commit_invalid(
         .await;
 
     // Produce and publish these commits
-    let mut triggers = handle.get_cell_triggers(&bob_cell_id).unwrap();
+    let triggers = handle.get_cell_triggers(&bob_cell_id).unwrap();
     triggers.publish_dht_ops.trigger();
     (invalid_header_hash, entry_hash)
 }
@@ -468,7 +468,7 @@ async fn commit_invalid_post(
         .await;
 
     // Produce and publish these commits
-    let mut triggers = handle.get_cell_triggers(&bob_cell_id).unwrap();
+    let triggers = handle.get_cell_triggers(&bob_cell_id).unwrap();
     triggers.publish_dht_ops.trigger();
     (invalid_header_hash, entry_hash)
 }
@@ -484,7 +484,7 @@ async fn call_zome_directly(
     let output = call_data.call_zome_direct(invocation).await;
 
     // Produce and publish these commits
-    let mut triggers = handle.get_cell_triggers(&bob_cell_id).unwrap();
+    let triggers = handle.get_cell_triggers(&bob_cell_id).unwrap();
     triggers.publish_dht_ops.trigger();
     output
 }
