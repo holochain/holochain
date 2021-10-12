@@ -25,14 +25,14 @@ where
 }
 
 #[instrument(skip(network, keystore, workspace, args))]
-pub async fn initialize_zomes_workflow<Ribosome, C: 'static>(
+pub async fn initialize_zomes_workflow<Ribosome, C>(
     workspace: HostFnWorkspace,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
     args: InitializeZomesWorkflowArgs<Ribosome, C>,
 ) -> WorkflowResult<InitResult>
 where
-    Ribosome: RibosomeT + Clone + Send + 'static,
+    Ribosome: RibosomeT + Send + 'static,
     C: CellConductorApiT,
 {
     let conductor_api = args.conductor_api.clone();
