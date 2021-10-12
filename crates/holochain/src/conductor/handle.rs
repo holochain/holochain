@@ -947,12 +947,12 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     ) {
         tokio::task::spawn(async move {
             while let Some(PostCommitArgs {
-                dna,
                 host_access,
                 invocation,
+                cell_id,
             }) = receiver.recv().await
             {
-                match self.get_ribosome(&dna) {
+                match self.get_ribosome(&cell_id.dna_hash()) {
                     Ok(ribosome) => {
                         if let Err(e) = ribosome.run_post_commit(host_access, invocation) {
                             tracing::error!(?e);

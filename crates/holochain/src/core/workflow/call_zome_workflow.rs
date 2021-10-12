@@ -7,7 +7,7 @@ use crate::conductor::interface::SignalBroadcaster;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::guest_callback::post_commit::spawn_post_commit;
+use crate::core::ribosome::guest_callback::post_commit::send_post_commit;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
@@ -63,10 +63,10 @@ pub async fn call_zome_workflow<Ribosome, C>(
 ) -> WorkflowResult<ZomeCallResult>
 where
     Ribosome: RibosomeT + Clone + Send + 'static,
-    C: CellConductorApiT,
+    C: CellConductorApiT + Clone,
 {
     let should_write = args.is_root_zome_call;
-    let ribosome = args.ribosome.clone();
+    let conductor_api = args.conductor_api.clone();
     let result =
         call_zome_workflow_inner(workspace.clone(), network.clone(), keystore.clone(), args)
             .await?;
@@ -95,7 +95,7 @@ where
             }
         }
 
-        spawn_post_commit(ribosome, workspace, network, keystore, flushed_headers).await;
+        send_post_commit(conductor_api, workspace, network, keystore, flushed_headers).await?;
     }
 
     Ok(result)

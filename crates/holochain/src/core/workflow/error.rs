@@ -95,6 +95,9 @@ pub enum WorkflowError {
 
     #[error("RecvError")]
     RecvError,
+
+    #[error(transparent)]
+    SendError(#[from] tokio::sync::mpsc::error::SendError<()>),
 }
 
 /// Internal type to handle running workflows

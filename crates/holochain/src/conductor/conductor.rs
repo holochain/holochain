@@ -1072,7 +1072,7 @@ where
         })
     }
 
-    /// Get and OwnedPermit to the post commit task.
+    /// Get an OwnedPermit to the post commit task.
     pub async fn post_commit_permit(&self) -> Result<OwnedPermit<PostCommitArgs>, SendError<()>> {
         self.post_commit.clone().reserve_owned().await
     }

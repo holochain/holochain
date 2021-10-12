@@ -1,11 +1,12 @@
+use crate::conductor::api::CellConductorApiT;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
-use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pCellT;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
@@ -97,52 +98,53 @@ impl From<Vec<PostCommitCallbackResult>> for PostCommitResult {
     }
 }
 
-// trait PostCommitRibosome: RibosomeT + Clone + Send {}
+pub async fn send_post_commit<C>(
+    conductor_api: C,
+    workspace: HostFnWorkspace,
+    network: HolochainP2pCell,
+    keystore: KeystoreSender,
+    zomed_headers: Vec<(Option<Zome>, SignedHeaderHashed)>,
+) -> Result<(), tokio::sync::mpsc::error::SendError<()>>
+where
+    C: CellConductorApiT,
+{
+    let groups = zomed_headers
+        .iter()
+        .group_by(|(zome, _shh)| zome.clone())
+        .into_iter()
+        .map(|(maybe_zome, group)| {
+            (
+                maybe_zome,
+                group.map(|(_maybe_zome, shh)| shh.clone()).collect(),
+            )
+        })
+        .collect::<Vec<(Option<Zome>, Vec<SignedHeaderHashed>)>>();
+
+    for (maybe_zome, headers) in groups {
+        if let Some(zome) = maybe_zome {
+            let zome = zome.clone();
+            conductor_api
+                .post_commit_permit()
+                .await?
+                .send(PostCommitArgs {
+                    host_access: PostCommitHostAccess {
+                        workspace: workspace.clone(),
+                        keystore: keystore.clone(),
+                        network: network.clone(),
+                    },
+                    invocation: PostCommitInvocation::new(zome, headers),
+                    cell_id: CellId::new(network.dna_hash().clone(), network.from_agent().clone()),
+                });
+        }
+    }
+    Ok(())
+}
 
 #[derive(Clone)]
 pub struct PostCommitArgs {
     pub host_access: PostCommitHostAccess,
     pub invocation: PostCommitInvocation,
-    pub dna: DnaHash,
-}
-
-pub async fn spawn_post_commit<Ribosome: 'static>(
-    ribosome: Ribosome,
-    workspace: HostFnWorkspace,
-    network: HolochainP2pCell,
-    keystore: KeystoreSender,
-    zomed_headers: Vec<(Option<Zome>, SignedHeaderHashed)>,
-) where
-    Ribosome: Clone + RibosomeT + Send,
-{
-    for (maybe_zome, grouped_headers) in &zomed_headers
-        .into_iter()
-        .group_by(|(zome, _shh)| zome.clone())
-    {
-        if let Some(zome) = maybe_zome {
-            let headers = grouped_headers
-                .into_iter()
-                .map(|(_zome, shh)| shh)
-                .collect::<Vec<_>>();
-            let zome = zome.clone();
-            let ribosome = ribosome.clone();
-            let workspace = workspace.clone();
-            let network = network.clone();
-            let keystore = keystore.clone();
-            tokio::task::spawn(async move {
-                if let Err(e) = ribosome.run_post_commit(
-                    PostCommitHostAccess {
-                        workspace,
-                        keystore,
-                        network,
-                    },
-                    PostCommitInvocation::new(zome, headers),
-                ) {
-                    tracing::error!(?e);
-                }
-            });
-        }
-    }
+    pub cell_id: CellId,
 }
 
 #[cfg(test)]

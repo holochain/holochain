@@ -3,7 +3,7 @@ use crate::conductor::api::CellConductorApiT;
 use crate::core::ribosome::guest_callback::init::InitHostAccess;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
-use crate::core::ribosome::guest_callback::post_commit::spawn_post_commit;
+use crate::core::ribosome::guest_callback::post_commit::send_post_commit;
 use crate::core::ribosome::RibosomeT;
 use derive_more::Constructor;
 use holochain_keystore::KeystoreSender;
@@ -17,7 +17,7 @@ use tracing::*;
 pub struct InitializeZomesWorkflowArgs<Ribosome, C>
 where
     Ribosome: RibosomeT + Send + 'static,
-    C: CellConductorApiT,
+    C: CellConductorApiT + Clone,
 {
     pub dna_def: DnaDef,
     pub ribosome: Ribosome,
@@ -35,7 +35,7 @@ where
     Ribosome: RibosomeT + Clone + Send + 'static,
     C: CellConductorApiT,
 {
-    let ribosome = args.ribosome.clone();
+    let conductor_api = args.conductor_api.clone();
     let result =
         initialize_zomes_workflow_inner(workspace.clone(), network.clone(), keystore.clone(), args)
             .await?;
@@ -45,7 +45,7 @@ where
     // only commit if the result was successful
     if result == InitResult::Pass {
         let flushed_headers = workspace.clone().flush(&network).await?;
-        spawn_post_commit(ribosome, workspace, network, keystore, flushed_headers).await;
+        send_post_commit(conductor_api, workspace, network, keystore, flushed_headers).await?;
     }
     Ok(result)
 }
