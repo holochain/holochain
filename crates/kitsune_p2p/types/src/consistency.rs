@@ -13,7 +13,7 @@
 use std::time::Duration;
 
 use crate::bin_types::*;
-use dht_arc::DhtArc;
+use dht_arc::{DhtArc, DhtLocation};
 
 use super::*;
 
@@ -24,7 +24,7 @@ pub struct PublishedData {
     /// The storage arc of the agent.
     pub storage_arc: DhtArc,
     /// The op hashes published by the agent.
-    pub published_hashes: Vec<(u32, KitsuneOpHash)>,
+    pub published_hashes: Vec<(DhtLocation, KitsuneOpHash)>,
 }
 
 /// A consistency session for an individual agent

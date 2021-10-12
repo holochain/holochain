@@ -8,7 +8,10 @@ use std::{
 
 use futures::stream::StreamExt;
 use holo_hash::{DhtOpHash, DnaHash};
-use holochain_p2p::{dht_arc::DhtArc, AgentPubKeyExt, DhtOpHashExt, DnaHashExt};
+use holochain_p2p::{
+    dht_arc::{DhtArc, DhtLocation},
+    AgentPubKeyExt, DhtOpHashExt, DnaHashExt,
+};
 use holochain_sqlite::{db::AsP2pStateTxExt, prelude::DatabaseResult};
 use holochain_state::prelude::StateQueryResult;
 use holochain_types::{dht_op::DhtOpType, env::EnvRead};
@@ -95,7 +98,7 @@ pub async fn local_machine_session(conductors: &[ConductorHandle], timeout: Dura
 /// Get consistency for a particular hash.
 pub async fn local_machine_session_with_hashes(
     handles: Vec<&ConductorHandle>,
-    hashes: impl Iterator<Item = (u32, DhtOpHash)>,
+    hashes: impl Iterator<Item = (DhtLocation, DhtOpHash)>,
     space: &DnaHash,
     timeout: Duration,
 ) {
@@ -328,7 +331,10 @@ Average hashes held: {}%.
 async fn gather_conductor_data(
     p2p_env: EnvRead,
     agents: Vec<(EnvRead, Arc<KitsuneAgent>)>,
-) -> (Vec<(Arc<KitsuneAgent>, DhtArc)>, Vec<(u32, KitsuneOpHash)>) {
+) -> (
+    Vec<(Arc<KitsuneAgent>, DhtArc)>,
+    Vec<(DhtLocation, KitsuneOpHash)>,
+) {
     // Create the stores iterator with the environments to search.
     let stores = agents.iter().cloned().map(|(cell_env, agent)| Stores {
         agent,
@@ -359,7 +365,7 @@ async fn expect_all(
     tx: tokio::sync::mpsc::Sender<SessionMessage>,
     timeout: Duration,
     all_agents: Vec<(Arc<KitsuneAgent>, DhtArc)>,
-    all_hashes: Vec<(u32, KitsuneOpHash)>,
+    all_hashes: Vec<(DhtLocation, KitsuneOpHash)>,
     agent_env_map: HashMap<Arc<KitsuneAgent>, EnvRead>,
     agent_p2p_map: HashMap<Arc<KitsuneAgent>, EnvRead>,
 ) {
@@ -371,7 +377,7 @@ async fn expect_all(
 /// This is where we check which agents should be holding which hashes and agents.
 fn generate_session<'iter>(
     all_agents: &'iter Vec<(Arc<KitsuneAgent>, DhtArc)>,
-    all_hashes: &'iter Vec<(u32, KitsuneOpHash)>,
+    all_hashes: &'iter Vec<(DhtLocation, KitsuneOpHash)>,
     timeout: Duration,
     agent_env_map: HashMap<Arc<KitsuneAgent>, EnvRead>,
 ) -> impl Iterator<Item = (Arc<KitsuneAgent>, ConsistencySession, EnvRead)> + 'iter {
@@ -634,7 +640,9 @@ async fn gather_published_data(
 }
 
 /// Request the published hashes for the given agent.
-async fn request_published_ops(env: &EnvRead) -> StateQueryResult<Vec<(u32, KitsuneOpHash)>> {
+async fn request_published_ops(
+    env: &EnvRead,
+) -> StateQueryResult<Vec<(DhtLocation, KitsuneOpHash)>> {
     Ok(env
         .async_reader(|txn| {
             // Collect all ops except StoreEntry's that are private.
@@ -659,7 +667,8 @@ async fn request_published_ops(env: &EnvRead) -> StateQueryResult<Vec<(u32, Kits
                     },
                     |row| {
                         let h: DhtOpHash = row.get("dht_op_hash")?;
-                        let loc = row.get("loc")?;
+                        let loc: u32 = row.get("loc")?;
+                        let loc = loc.into();
                         Ok((loc, h.into_kitsune_raw()))
                     },
                 )?
