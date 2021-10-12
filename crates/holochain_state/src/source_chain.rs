@@ -1202,7 +1202,12 @@ pub mod tests {
             entry_hash: eh1.clone(),
         };
         let h1 = chain_1
-            .put(None, create, Some(entry_1.clone()), ChainTopOrdering::Strict)
+            .put(
+                None,
+                create,
+                Some(entry_1.clone()),
+                ChainTopOrdering::Strict,
+            )
             .await
             .unwrap();
 
@@ -1213,7 +1218,12 @@ pub mod tests {
             entry_hash: entry_hash_err.clone(),
         };
         chain_2
-            .put(None, create, Some(entry_err.clone()), ChainTopOrdering::Strict)
+            .put(
+                None,
+                create,
+                Some(entry_err.clone()),
+                ChainTopOrdering::Strict,
+            )
             .await
             .unwrap();
 
@@ -1228,7 +1238,12 @@ pub mod tests {
             entry_hash: eh2.clone(),
         };
         let old_h2 = chain_3
-            .put(None, create, Some(entry_2.clone()), ChainTopOrdering::Relaxed)
+            .put(
+                None,
+                create,
+                Some(entry_2.clone()),
+                ChainTopOrdering::Relaxed,
+            )
             .await
             .unwrap();
 
