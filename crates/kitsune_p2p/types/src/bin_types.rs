@@ -1,5 +1,7 @@
 //! Binary types, hashes, signatures, etc used by kitsune.
 
+use kitsune_p2p_dht_arc::DhtLocation;
+
 /// Kitsune hashes are expected to be 36 bytes.
 /// The first 32 bytes are the proper hash.
 /// The final 4 bytes are a hash-of-the-hash that can be treated like a u32 "location".
@@ -23,7 +25,7 @@ pub trait KitsuneBinType:
     fn get_bytes(&self) -> &[u8];
 
     /// Fetch the dht "loc" / location for this hash.
-    fn get_loc(&self) -> u32;
+    fn get_loc(&self) -> DhtLocation;
 }
 
 /// internal convert 4 location bytes into a u32 location
@@ -74,8 +76,8 @@ macro_rules! make_kitsune_bin_type {
                     &self.0[..self.0.len() - 4]
                 }
 
-                fn get_loc(&self) -> u32 {
-                    bytes_to_loc(&self.0[self.0.len() - 4..])
+                fn get_loc(&self) -> DhtLocation {
+                    DhtLocation::new(bytes_to_loc(&self.0[self.0.len() - 4..]))
                 }
             }
 
