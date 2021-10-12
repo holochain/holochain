@@ -55,7 +55,7 @@ struct Session {
 pub(crate) fn incoming_countersigning(
     ops: Vec<(DhtOpHash, DhtOp)>,
     workspace: &CountersigningWorkspace,
-    mut trigger: TriggerSender,
+    trigger: TriggerSender,
 ) -> WorkflowResult<()> {
     let mut should_trigger = false;
 
@@ -141,7 +141,7 @@ pub(crate) async fn countersigning_success(
     network: &HolochainP2pCell,
     author: AgentPubKey,
     signed_headers: Vec<SignedHeader>,
-    mut publish_trigger: TriggerSender,
+    publish_trigger: TriggerSender,
     mut signal: SignalBroadcaster,
 ) -> WorkflowResult<()> {
     // Using iterators is fine in this function as there can only be a maximum of 8 headers.

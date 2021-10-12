@@ -57,8 +57,8 @@ pub async fn call_zome_workflow<Ribosome, C>(
     network: HolochainP2pCell,
     keystore: KeystoreSender,
     args: CallZomeWorkflowArgs<Ribosome, C>,
-    mut trigger_publish_dht_ops: TriggerSender,
-    mut trigger_integrate_dht_ops: TriggerSender,
+    trigger_publish_dht_ops: TriggerSender,
+    trigger_integrate_dht_ops: TriggerSender,
 ) -> WorkflowResult<ZomeCallResult>
 where
     Ribosome: RibosomeT + Send + 'static,
