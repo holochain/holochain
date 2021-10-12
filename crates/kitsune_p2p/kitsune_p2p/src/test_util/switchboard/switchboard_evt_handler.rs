@@ -1,11 +1,9 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::event::*;
 use crate::test_util::switchboard::switchboard::AgentEntry;
 use crate::types::event::{KitsuneP2pEvent, KitsuneP2pEventHandler, KitsuneP2pEventHandlerResult};
 use kitsune_p2p_types::bin_types::*;
-use kitsune_p2p_types::dht_arc::DhtArcSet;
 use kitsune_p2p_types::tx2::tx2_utils::Share;
 use kitsune_p2p_types::*;
 

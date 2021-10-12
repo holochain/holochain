@@ -207,6 +207,9 @@ impl ShardedGossip {
                     vec![ShardedGossipWire::error(e.to_string())]
                 }
             };
+            if !outgoing.is_empty() {
+                dbg!(&outgoing);
+            }
             self.inner.share_mut(|i, _| {
                 i.outgoing.extend(outgoing.into_iter().map(|msg| {
                     (
@@ -537,7 +540,7 @@ impl ShardedGossipLocal {
         let s = tracing::trace_span!("process_incoming", ?cert, agents = ?self.show_local_agents(), ?msg);
         s.in_scope(|| self.log_state());
         // If we don't have the state for a message then the other node will need to timeout.
-        Ok(match msg {
+        Ok(match dbg!(msg) {
             ShardedGossipWire::Initiate(Initiate { intervals, id }) => {
                 self.incoming_initiate(cert, intervals, id).await?
             }

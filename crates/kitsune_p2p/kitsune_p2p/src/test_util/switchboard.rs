@@ -23,21 +23,31 @@ mod tests {
         let n2 = sb.add_node().await;
         let n3 = sb.add_node().await;
 
+        // These become agent locations, but currently kitsune doesn't care
+        // where the agents are located, it only cares about their storage arc
+        let a1 = 1;
+        let a2 = 2;
+        let a3 = 3;
+
         sb.space_state()
             .share_mut(|sb, _| {
                 sb.add_local_agent(&n1, 1, ArcInterval::Full);
                 sb.add_local_agent(&n2, 2, ArcInterval::Full);
                 sb.add_local_agent(&n3, 3, ArcInterval::Full);
 
-                sb.add_ops_now(1, true, [10, 20, 30]);
-                sb.add_ops_now(2, true, [-10, -20, -30]);
-                sb.add_ops_now(3, true, [-15, 15]);
+                sb.add_ops_now(a1, true, [10, 20, 30]);
+                sb.add_ops_now(a2, true, [-10, -20, -30]);
+                sb.add_ops_now(a3, true, [-15, 15]);
 
                 // we wouldn't expect this op to be gossiped, since it's from 50+ years ago
                 // and hardly "recent"
                 sb.add_ops_timed(3, true, [(40, Timestamp::from_micros(1))]);
 
-                sb.exchange_peer_info([(&n1, &[2, 3]), (&n2, &[1, 3]), (&n3, &[1, 2])]);
+                sb.exchange_peer_info([
+                    (&n1, vec![a2, a3]),
+                    (&n2, vec![a1, a3]),
+                    (&n3, vec![a1, a2]),
+                ]);
 
                 // Ensure that the initial conditions are set up properly
                 assert_eq!(sb.get_ops_loc8(&n1), Loc8::vec([10, 20, 30]));
@@ -89,7 +99,11 @@ mod tests {
                 sb.add_ops_now(a2, true, [-10, -20, -30, -40, -50, -60, -70, -80]);
                 sb.add_ops_now(a3, true, [90, 120, -120, -90]);
 
-                sb.exchange_peer_info([(&n1, &[a2, a3]), (&n2, &[a1, a3]), (&n3, &[a1, a2])]);
+                sb.exchange_peer_info([
+                    (&n1, vec![a2, a3]),
+                    (&n2, vec![a1, a3]),
+                    (&n3, vec![a1, a2]),
+                ]);
 
                 Ok(())
             })
@@ -97,6 +111,59 @@ mod tests {
 
         // let gossip do its thing
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+        sb.space_state()
+            .share_mut(|sb, _| {
+                sb.print_ascii_arcs(32);
+                assert_eq!(
+                    (
+                        sb.get_ops_loc8(&n1),
+                        sb.get_ops_loc8(&n2),
+                        sb.get_ops_loc8(&n3)
+                    ),
+                    (
+                        Loc8::vec([-30, -20, -10, 10, 20, 30, 40, 50, 60, 70, 80, 90]),
+                        Loc8::vec([-90, -80, -70, -60, -50, -40, -30, -20, -10, 10, 20, 30]),
+                        Loc8::vec([-120, -90, -80, -70, -60, 60, 70, 80, 90, 120]),
+                    )
+                );
+                Ok(())
+            })
+            .unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn peer_gossip() {
+        let mut sb = Switchboard::new(GossipType::Recent);
+
+        let n1 = sb.add_node().await;
+        let n2 = sb.add_node().await;
+        let n3 = sb.add_node().await;
+
+        // These become agent locations, but currently kitsune doesn't care
+        // where the agents are located, it only cares about their storage arc
+        let a1 = 30;
+        let a2 = -30;
+        let a3 = 120;
+
+        sb.space_state()
+            .share_mut(|sb, _| {
+                sb.add_local_agent(&n1, a1, ArcInterval::Bounded(-30, 90));
+                sb.add_local_agent(&n2, a2, ArcInterval::Bounded(-90, 30));
+                sb.add_local_agent(&n3, a3, ArcInterval::Bounded(60, -60));
+
+                sb.add_ops_now(a1, true, [10, 20, 30, 40, 50, 60, 70, 80]);
+                sb.add_ops_now(a2, true, [-10, -20, -30, -40, -50, -60, -70, -80]);
+                sb.add_ops_now(a3, true, [90, 120, -120, -90]);
+
+                sb.exchange_peer_info([(&n1, vec![a2]), (&n2, vec![a3]), (&n3, vec![a1])]);
+
+                Ok(())
+            })
+            .unwrap();
+
+        // let gossip do its thing
+        tokio::time::sleep(tokio::time::Duration::from_millis(5000)).await;
 
         sb.space_state()
             .share_mut(|sb, _| {

@@ -44,13 +44,12 @@ impl ShardedGossipLocal {
         state: RoundState,
         agents: &[Arc<AgentInfoSigned>],
     ) -> KitsuneResult<()> {
+        dbg!(&agents);
         // Unpack state, get any agent and get all local agents.
         let RoundState { common_arc_set, .. } = state;
         let local_agents = self
             .inner
             .share_mut(|inner, _| Ok(inner.local_agents.clone()))?;
-
-        dbg!(&local_agents);
 
         // Get all the local agents that are relevant to this
         // common arc set.
@@ -61,9 +60,6 @@ impl ShardedGossipLocal {
                 .map(|(a, _)| a)
                 .filter(|a| local_agents.contains(a))
                 .collect();
-
-        dbg!(&agents_within_common_arc);
-        todo!("good if we get here");
 
         // Add the agents to the stores.
         store::put_agent_info(

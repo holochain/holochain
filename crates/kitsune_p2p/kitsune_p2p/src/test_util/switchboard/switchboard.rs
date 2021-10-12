@@ -14,13 +14,11 @@ use kitsune_p2p_types::dht_arc::loc8::Loc8;
 use kitsune_p2p_types::dht_arc::{ArcInterval, DhtArc, DhtLocation};
 use kitsune_p2p_types::metrics::metric_task;
 use kitsune_p2p_types::tx2::tx2_api::*;
-use kitsune_p2p_types::tx2::tx2_pool::AsConHnd;
 use kitsune_p2p_types::tx2::tx2_pool_promote::*;
 use kitsune_p2p_types::tx2::tx2_utils::Share;
 use kitsune_p2p_types::tx2::*;
 use kitsune_p2p_types::*;
-use std::borrow::Borrow;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
 
@@ -196,7 +194,7 @@ impl Switchboard {
                             wire::Wire::Gossip(wire::Gossip {
                                 space: _,
                                 data,
-                                module,
+                                module: _,
                             }) => {
                                 let data: Vec<u8> = data.into();
                                 let data: Box<[u8]> = data.into_boxed_slice();
@@ -206,7 +204,9 @@ impl Switchboard {
                             _ => unimplemented!(),
                         }
                     }
-                    _ => (),
+                    evt => {
+                        dbg!(evt);
+                    }
                 }
             }
             Ok(())
@@ -335,7 +335,7 @@ impl SwitchboardSpace {
     }
 
     pub fn print_ascii_arcs(&self, width: usize) {
-        println!("node agent | arc");
+        println!("node agent .");
         let mut nodes: Vec<_> = self.nodes.iter().collect();
         nodes.sort_by_key(|(ep, _)| ep.uniq().as_usize());
         for (ep, node) in nodes.into_iter() {
@@ -355,7 +355,7 @@ impl SwitchboardSpace {
 
     pub fn exchange_peer_info<
         'n,
-        A: IntoIterator<Item = &'n i8>,
+        A: IntoIterator<Item = i8>,
         P: IntoIterator<Item = (&'n NodeEp, A)>,
     >(
         &mut self,
@@ -365,7 +365,7 @@ impl SwitchboardSpace {
             let agents: Vec<_> = agents
                 .into_iter()
                 .map(|loc8| {
-                    let loc8: Loc8 = Loc8::from(*loc8);
+                    let loc8: Loc8 = Loc8::from(loc8);
                     (
                         loc8,
                         self.node_for_local_agent_loc8(loc8)
@@ -409,7 +409,6 @@ impl SwitchboardSpace {
             .into_iter()
             .map(|(l, timestamp)| {
                 let loc8: Loc8 = l.into();
-                let loc: DhtLocation = loc8.into();
                 let hash = op_hash_from_loc(loc8);
                 (loc8, hash, timestamp)
             })
@@ -468,7 +467,7 @@ impl SwitchboardSpace {
     pub fn query_op_hashes(
         &mut self,
         QueryOpHashesEvt {
-            space,
+            space: _,
             agents,
             window,
             max_ops,
