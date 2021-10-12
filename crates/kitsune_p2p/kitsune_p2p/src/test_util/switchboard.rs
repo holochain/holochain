@@ -12,6 +12,7 @@ mod tests {
     use crate::gossip::sharded_gossip::GossipType;
 
     use super::switchboard::Switchboard;
+    use pretty_assertions::assert_eq;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn basic_3way_full_sync_switchboard() {

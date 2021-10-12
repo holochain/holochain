@@ -48,6 +48,7 @@ mockall = { version = "0.10.2", optional = true }
 [dev-dependencies]
 maplit = "1"
 mockall = "0.10.2"
+pretty_assertions = "0.7"
 test-case = "1.0.0"
 tracing-subscriber = "0.2"
 

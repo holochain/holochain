@@ -3,18 +3,16 @@ use crate::DhtLocation;
 const F: u32 = 16777216;
 
 #[derive(
-    Copy,
-    Clone,
-    Debug,
-    PartialEq,
-    Eq,
-    Hash,
-    PartialOrd,
-    Ord,
-    derive_more::From,
-    derive_more::Display,
+    Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, derive_more::From, derive_more::Display,
 )]
+#[display(fmt = "{}", _0)]
 pub struct Loc8(i8);
+
+impl std::fmt::Debug for Loc8 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.to_string())
+    }
+}
 
 impl Loc8 {
     pub fn as_i8(&self) -> i8 {
