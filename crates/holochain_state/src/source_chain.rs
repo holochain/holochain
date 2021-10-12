@@ -8,7 +8,7 @@ use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
-use holochain_keystore::KeystoreSender;
+use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::dht_op::produce_op_lights_from_elements;
@@ -759,7 +759,7 @@ fn build_ops_from_headers(
 }
 
 async fn rebase_headers_on(
-    keystore: &KeystoreSender,
+    keystore: &MetaLairClient,
     mut headers: Vec<SignedHeaderHashed>,
     mut rebase_header: HeaderHash,
     mut rebase_seq: u32,

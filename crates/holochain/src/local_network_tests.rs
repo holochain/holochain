@@ -532,9 +532,7 @@ async fn setup(
         let (_envs, _, handle) =
             setup_app_with_network(vec![], vec![], network.clone().unwrap_or_default()).await;
 
-        let agent_key = AgentPubKey::new_from_pure_entropy(handle.keystore())
-            .await
-            .unwrap();
+        let agent_key = AgentPubKey::new_random(handle.keystore()).await.unwrap();
         let cell_id = CellId::new(dna_file.dna_hash().to_owned(), agent_key.clone());
         let app = InstalledCell::new(cell_id.clone(), "cell_handle".into());
         install_app("test_app", vec![(app, None)], dnas.clone(), handle.clone()).await;

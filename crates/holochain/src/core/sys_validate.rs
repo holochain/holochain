@@ -35,7 +35,7 @@ pub const MAX_TAG_SIZE: usize = 1000;
 
 /// Verify the signature for this header
 pub async fn verify_header_signature(sig: &Signature, header: &Header) -> SysValidationResult<()> {
-    if header.author().verify_signature(sig, header).await? {
+    if header.author().verify_signature(sig, header).await {
         Ok(())
     } else {
         Err(SysValidationError::ValidationOutcome(
@@ -98,13 +98,18 @@ pub async fn check_countersigning_preflight_response_signature(
         .0
         .verify_signature_raw(
             preflight_response.signature(),
-            &preflight_response.encode_for_signature().map_err(|_| {
-                SysValidationError::ValidationOutcome(
-                    ValidationOutcome::PreflightResponseSignature((*preflight_response).clone()),
-                )
-            })?,
+            preflight_response
+                .encode_for_signature()
+                .map_err(|_| {
+                    SysValidationError::ValidationOutcome(
+                        ValidationOutcome::PreflightResponseSignature(
+                            (*preflight_response).clone(),
+                        ),
+                    )
+                })?
+                .into(),
         )
-        .await?;
+        .await;
     if signature_is_valid {
         Ok(())
     } else {
@@ -358,7 +363,7 @@ pub fn check_update_reference(
 /// run again if we weren't holding it.
 pub async fn check_and_hold_register_add_link<F>(
     hash: &HeaderHash,
-    workspace: &mut SysValidationWorkspace,
+    workspace: &SysValidationWorkspace,
     network: HolochainP2pCell,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
@@ -388,7 +393,7 @@ where
 /// run again if we weren't holding it.
 pub async fn check_and_hold_register_agent_activity<F>(
     hash: &HeaderHash,
-    workspace: &mut SysValidationWorkspace,
+    workspace: &SysValidationWorkspace,
     network: HolochainP2pCell,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
@@ -418,7 +423,7 @@ where
 /// run again if we weren't holding it.
 pub async fn check_and_hold_store_entry<F>(
     hash: &HeaderHash,
-    workspace: &mut SysValidationWorkspace,
+    workspace: &SysValidationWorkspace,
     network: HolochainP2pCell,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
@@ -451,7 +456,7 @@ where
 /// run again if we weren't holding it.
 pub async fn check_and_hold_any_store_entry<F>(
     hash: &EntryHash,
-    workspace: &mut SysValidationWorkspace,
+    workspace: &SysValidationWorkspace,
     network: HolochainP2pCell,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
@@ -479,7 +484,7 @@ where
 /// run again if we weren't holding it.
 pub async fn check_and_hold_store_element<F>(
     hash: &HeaderHash,
-    workspace: &mut SysValidationWorkspace,
+    workspace: &SysValidationWorkspace,
     network: HolochainP2pCell,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
@@ -562,7 +567,7 @@ impl AsRef<Element> for Source {
 /// it to the incoming ops.
 async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
     hash: &I,
-    workspace: &mut SysValidationWorkspace,
+    workspace: &SysValidationWorkspace,
     network: HolochainP2pCell,
 ) -> SysValidationResult<Source> {
     let hash: AnyDhtHash = hash.clone().into();
@@ -712,7 +717,7 @@ pub mod test {
         *preflight_response.signature_mut() = alice
             .sign_raw(
                 &keystore,
-                &preflight_response.encode_for_signature().unwrap(),
+                preflight_response.encode_for_signature().unwrap().into(),
             )
             .await
             .unwrap();

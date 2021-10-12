@@ -47,14 +47,13 @@ use futures::future;
 use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
 use holo_hash::DnaHash;
-use holochain_conductor_api::conductor::PassphraseServiceConfig;
+use holochain_conductor_api::conductor::KeystoreConfig;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::test_keystore::spawn_test_keystore;
-use holochain_keystore::KeystoreSender;
-use holochain_keystore::KeystoreSenderExt;
+use holochain_keystore::MetaLairClient;
 use holochain_sqlite::db::DbKind;
 use holochain_sqlite::prelude::*;
 use holochain_state::mutations;
@@ -84,6 +83,9 @@ pub enum CellStatus {
     /// app status, i.e. if any app has a required Cell with this status,
     /// the app is considered to be in the Paused state.
     PendingJoin,
+
+    /// The Cell is currently in the process of trying to join the network.
+    Joining,
 }
 
 /// Declarative filter for CellStatus
@@ -154,7 +156,7 @@ where
     dna_store: RwShare<DS>,
 
     /// Access to private keys for signing and encryption.
-    keystore: KeystoreSender,
+    keystore: MetaLairClient,
 
     /// The root environment directory where all environments are created
     root_env_dir: EnvironmentRootPath,
@@ -218,14 +220,18 @@ where
         })
     }
 
-    /// Iterator over only the cells which are pending validation. Used to
-    /// discover which cells need to be joined to the network.
-    pub(super) fn pending_cells(&self) -> Vec<(CellId, Arc<Cell>)> {
-        self.cells.share_ref(|cells| {
+    /// Return Cells which are pending network join, and mark them as
+    /// currently joining.
+    ///
+    /// Used to discover which cells need to be joined to the network.
+    /// The cells' status are upgraded to `Joining` when this function is called.
+    pub(super) fn mark_pending_cells_as_joining(&self) -> Vec<(CellId, Arc<Cell>)> {
+        self.cells.share_mut(|cells| {
             cells
-                .iter()
+                .iter_mut()
                 .filter_map(|(id, item)| {
                     if item.is_pending() {
+                        item.status = CellStatus::Joining;
                         Some((id.clone(), item.cell.clone()))
                     } else {
                         None
@@ -877,7 +883,7 @@ where
     }
 
     /// Get the keystore.
-    pub fn keystore(&self) -> &KeystoreSender {
+    pub fn keystore(&self) -> &MetaLairClient {
         &self.keystore
     }
 
@@ -1067,7 +1073,7 @@ where
 /// Note this function takes read locks so should not be called from within a read lock.
 pub(super) async fn genesis_cells(
     root_env_dir: PathBuf,
-    keystore: KeystoreSender,
+    keystore: MetaLairClient,
     cell_ids_with_proofs: Vec<(CellId, Option<MembraneProof>)>,
     conductor_handle: ConductorHandle,
     db_sync_level: DbSyncLevel,
@@ -1176,7 +1182,7 @@ where
         env: EnvWrite,
         wasm_env: EnvWrite,
         dna_store: DS,
-        keystore: KeystoreSender,
+        keystore: MetaLairClient,
         root_env_dir: EnvironmentRootPath,
         holochain_p2p: holochain_p2p::HolochainP2pRef,
         db_sync_level: DbSyncLevel,
@@ -1286,7 +1292,7 @@ mod builder {
         /// The DnaStore (mockable)
         pub dna_store: DS,
         /// Optional keystore override
-        pub keystore: Option<KeystoreSender>,
+        pub keystore: Option<MetaLairClient>,
         #[cfg(any(test, feature = "test_utils"))]
         /// Optional state override (for testing)
         pub state: Option<ConductorState>,
@@ -1338,32 +1344,31 @@ mod builder {
 
             let keystore = if let Some(keystore) = self.keystore {
                 keystore
-            } else if self.config.use_dangerous_test_keystore {
-                let keystore = spawn_test_keystore().await?;
-                // pre-populate with our two fixture agent keypairs
-                keystore
-                    .generate_sign_keypair_from_pure_entropy()
-                    .await
-                    .unwrap();
-                keystore
-                    .generate_sign_keypair_from_pure_entropy()
-                    .await
-                    .unwrap();
-                keystore
             } else {
-                let passphrase = match &self.config.passphrase_service {
-                    PassphraseServiceConfig::DangerInsecureFromConfig { passphrase } => {
-                        tracing::warn!("USING INSECURE PASSPHRASE FROM CONFIG--This defeats the whole purpose of having a passphrase. (unfortunately, there isn't another option at the moment).");
-                        // TODO - use `new_mem_locked` when we have a secure source
-                        sodoken::BufRead::new_no_lock(passphrase.as_bytes())
+                match &self.config.keystore {
+                    KeystoreConfig::DangerTestKeystoreLegacyDeprecated => {
+                        tracing::warn!("Using DEPRECATED legacy lair api.");
+                        let keystore = spawn_test_keystore().await?;
+                        // pre-populate with our two fixture agent keypairs
+                        keystore.new_sign_keypair_random().await.unwrap();
+                        keystore.new_sign_keypair_random().await.unwrap();
+                        keystore
                     }
-                    oth => {
-                        panic!("We don't support this passphrase_service yet: {:?}", oth);
+                    KeystoreConfig::LairServerLegacyDeprecated {
+                        keystore_path,
+                        danger_passphrase_insecure_from_config,
+                    } => {
+                        tracing::warn!("Using DEPRECATED legacy lair api.");
+                        tracing::warn!("USING INSECURE PASSPHRASE FROM CONFIG--This defeats the whole purpose of having a passphrase.");
+                        let passphrase = sodoken::BufRead::new_no_lock(
+                            danger_passphrase_insecure_from_config.as_bytes(),
+                        );
+                        spawn_lair_keystore(keystore_path.as_deref(), passphrase).await?
                     }
-                };
-
-                spawn_lair_keystore(self.config.keystore_path.as_deref(), passphrase).await?
+                    oth => unimplemented!("unimplemented keystore config: {:?}", oth),
+                }
             };
+
             let env_path = self.config.environment_path.clone();
 
             let environment = EnvWrite::open_with_sync_level(
@@ -1431,6 +1436,7 @@ mod builder {
                 #[cfg(any(test, feature = "test_utils"))]
                 skip_publish: std::sync::atomic::AtomicBool::new(false),
                 p2p_env: Arc::new(parking_lot::Mutex::new(HashMap::new())),
+                p2p_batch_senders: Arc::new(parking_lot::Mutex::new(HashMap::new())),
                 p2p_metrics_env: Arc::new(parking_lot::Mutex::new(HashMap::new())),
             });
 
@@ -1466,7 +1472,7 @@ mod builder {
 
         /// Pass a test keystore in, to ensure that generated test agents
         /// are actually available for signing (especially for tryorama compat)
-        pub fn with_keystore(mut self, keystore: KeystoreSender) -> Self {
+        pub fn with_keystore(mut self, keystore: MetaLairClient) -> Self {
             self.keystore = Some(keystore);
             self
         }
@@ -1536,6 +1542,7 @@ mod builder {
                 keystore,
                 holochain_p2p,
                 p2p_env: envs.p2p(),
+                p2p_batch_senders: Arc::new(parking_lot::Mutex::new(HashMap::new())),
                 p2p_metrics_env: envs.p2p_metrics(),
                 db_sync_level: self.config.db_sync_level,
                 #[cfg(any(test, feature = "test_utils"))]

@@ -9,7 +9,6 @@ use crate::conductor::error::ConductorError;
 use crate::conductor::interface::error::InterfaceError;
 use crate::conductor::interface::error::InterfaceResult;
 use crate::conductor::ConductorHandle;
-use holochain_keystore::KeystoreSenderExt;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::DnaBundle;
 use holochain_types::prelude::*;
@@ -215,7 +214,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .conductor_handle
                     .keystore()
                     .clone()
-                    .generate_sign_keypair_from_pure_entropy()
+                    .new_sign_keypair_random()
                     .await?;
                 Ok(AdminResponse::AgentPubKeyGenerated(agent_pub_key))
             }
