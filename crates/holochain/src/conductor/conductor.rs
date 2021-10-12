@@ -47,7 +47,7 @@ use futures::future;
 use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
 use holo_hash::DnaHash;
-use holochain_conductor_api::conductor::PassphraseServiceConfig;
+use holochain_conductor_api::conductor::KeystoreConfig;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::IntegrationStateDump;
@@ -1344,26 +1344,31 @@ mod builder {
 
             let keystore = if let Some(keystore) = self.keystore {
                 keystore
-            } else if self.config.use_dangerous_test_keystore {
-                let keystore = spawn_test_keystore().await?;
-                // pre-populate with our two fixture agent keypairs
-                keystore.new_sign_keypair_random().await.unwrap();
-                keystore.new_sign_keypair_random().await.unwrap();
-                keystore
             } else {
-                let passphrase = match &self.config.passphrase_service {
-                    PassphraseServiceConfig::DangerInsecureFromConfig { passphrase } => {
-                        tracing::warn!("USING INSECURE PASSPHRASE FROM CONFIG--This defeats the whole purpose of having a passphrase. (unfortunately, there isn't another option at the moment).");
-                        // TODO - use `new_mem_locked` when we have a secure source
-                        sodoken::BufRead::new_no_lock(passphrase.as_bytes())
+                match &self.config.keystore {
+                    KeystoreConfig::DangerTestKeystoreLegacyDeprecated => {
+                        tracing::warn!("Using DEPRECATED legacy lair api.");
+                        let keystore = spawn_test_keystore().await?;
+                        // pre-populate with our two fixture agent keypairs
+                        keystore.new_sign_keypair_random().await.unwrap();
+                        keystore.new_sign_keypair_random().await.unwrap();
+                        keystore
                     }
-                    oth => {
-                        panic!("We don't support this passphrase_service yet: {:?}", oth);
+                    KeystoreConfig::LairServerLegacyDeprecated {
+                        keystore_path,
+                        danger_passphrase_insecure_from_config,
+                    } => {
+                        tracing::warn!("Using DEPRECATED legacy lair api.");
+                        tracing::warn!("USING INSECURE PASSPHRASE FROM CONFIG--This defeats the whole purpose of having a passphrase.");
+                        let passphrase = sodoken::BufRead::new_no_lock(
+                            danger_passphrase_insecure_from_config.as_bytes(),
+                        );
+                        spawn_lair_keystore(keystore_path.as_deref(), passphrase).await?
                     }
-                };
-
-                spawn_lair_keystore(self.config.keystore_path.as_deref(), passphrase).await?
+                    oth => unimplemented!("unimplemented keystore config: {:?}", oth),
+                }
             };
+
             let env_path = self.config.environment_path.clone();
 
             let environment = EnvWrite::open_with_sync_level(
