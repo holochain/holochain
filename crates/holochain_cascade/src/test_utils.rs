@@ -411,8 +411,7 @@ pub fn handle_get_entry_txn(
     _options: holochain_p2p::event::GetOptions,
 ) -> WireEntryOps {
     let query = GetEntryOpsQuery::new(hash);
-    let results = query.run(Txn::from(txn)).unwrap();
-    results
+    query.run(Txn::from(txn)).unwrap()
 }
 
 /// Utility for network simulation response to get element.
@@ -422,8 +421,7 @@ pub fn handle_get_element_txn(
     options: holochain_p2p::event::GetOptions,
 ) -> WireElementOps {
     let query = GetElementOpsQuery::new(hash, options);
-    let results = query.run(Txn::from(txn)).unwrap();
-    results
+    query.run(Txn::from(txn)).unwrap()
 }
 
 /// Utility for network simulation response to get.
