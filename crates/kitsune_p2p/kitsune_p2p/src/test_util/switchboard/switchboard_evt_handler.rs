@@ -162,7 +162,7 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
     ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindow)>> {
         ok_fut(Ok(self
             .sb
-            .share_mut(|sb, _| Ok(dbg!(sb.query_op_hashes(query))))?))
+            .share_mut(|sb, _| Ok(sb.query_op_hashes(query)))?))
     }
 
     fn handle_fetch_op_data(

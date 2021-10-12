@@ -250,6 +250,16 @@ impl<T: PartialOrd + num_traits::Num> ArcInterval<T> {
     }
 }
 
+impl<T> ArcInterval<T> {
+    pub fn map<U, F: Fn(T) -> U>(self, f: F) -> ArcInterval<U> {
+        match self {
+            Self::Empty => ArcInterval::Empty,
+            Self::Full => ArcInterval::Full,
+            Self::Bounded(lo, hi) => ArcInterval::Bounded(f(lo), f(hi)),
+        }
+    }
+}
+
 impl<T: num_traits::AsPrimitive<u32>> ArcInterval<T> {
     pub fn new(start: T, end: T) -> ArcInterval<DhtLocation> {
         let start = start.as_();
@@ -291,8 +301,8 @@ where
             ArcInterval::Empty => ArcInterval::Empty,
             ArcInterval::Full => ArcInterval::Full,
             ArcInterval::Bounded(lo, hi) => ArcInterval::new(
-                DhtLocation::new(Loc8::from(lo).as_u8() as u32),
-                DhtLocation::new(Loc8::from(hi).as_u8() as u32),
+                DhtLocation::from(Loc8::from(lo)),
+                DhtLocation::from(Loc8::from(hi)),
             ),
         }
     }

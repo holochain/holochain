@@ -334,6 +334,25 @@ impl SwitchboardSpace {
         node.gossip.local_agent_join(agent);
     }
 
+    pub fn print_ascii_arcs(&self, width: usize) {
+        println!("node agent | arc");
+        let mut nodes: Vec<_> = self.nodes.iter().collect();
+        nodes.sort_by_key(|(ep, _)| ep.uniq().as_usize());
+        for (ep, node) in nodes.into_iter() {
+            let node_id = ep.uniq().as_usize();
+            for (agent_loc8, agent) in node.local_agents.iter() {
+                let interval = agent.info.storage_arc.interval();
+                println!(
+                    "{:>4} {:>+5} |{}| {:?}",
+                    node_id,
+                    agent_loc8.as_i8(),
+                    interval.to_ascii(width),
+                    interval.map(|b| DhtLocation::as_loc8(&b)),
+                );
+            }
+        }
+    }
+
     pub fn exchange_peer_info<
         'n,
         A: IntoIterator<Item = &'n i8>,

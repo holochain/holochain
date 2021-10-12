@@ -10,7 +10,7 @@ pub struct Loc8(i8);
 
 impl std::fmt::Debug for Loc8 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.to_string())
+        self.0.fmt(f)
     }
 }
 
@@ -36,7 +36,7 @@ impl From<Loc8> for DhtLocation {
 
 impl DhtLocation {
     pub fn as_loc8(&self) -> Loc8 {
-        Loc8::from((self.as_u32() / F) as u8 as i8)
+        Loc8((self.as_u32() / F) as u8 as i8)
     }
 }
 
