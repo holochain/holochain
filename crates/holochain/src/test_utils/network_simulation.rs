@@ -111,8 +111,8 @@ impl MockNetworkData {
             agent_to_arc,
             agent_to_info,
             ops_by_loc,
-            ops,
             op_to_loc,
+            ops,
             uuid,
         }
     }
@@ -134,7 +134,7 @@ impl MockNetworkData {
     }
 
     /// The agent info of the simulated agents.
-    pub fn agent_info<'iter>(&'iter self) -> impl Iterator<Item = &'iter AgentInfoSigned> + 'iter {
+    pub fn agent_info(&self) -> impl Iterator<Item = &AgentInfoSigned> {
         self.agent_to_info.values()
     }
 
@@ -356,9 +356,11 @@ async fn create_test_data(
 
     let mut network = KitsuneP2pConfig::default();
     network.tuning_params = Arc::new(tuning);
-    let mut config = ConductorConfig::default();
-    config.db_sync_level = DbSyncLevel::Off;
-    config.network = Some(network);
+    let config = ConductorConfig {
+        db_sync_level: DbSyncLevel::Off,
+        network: Some(network),
+        ..Default::default()
+    };
     let mut conductor = SweetConductor::from_config(config).await;
     conductor.set_skip_publish(true);
     let mut agents = Vec::new();
@@ -403,10 +405,10 @@ async fn create_test_data(
     let peer_data = conductor.get_agent_infos(None).await.unwrap();
     dbg!("Done");
     GeneratedData {
-        ops,
-        authored,
-        peer_data,
         uuid,
+        peer_data,
+        authored,
+        ops,
     }
 }
 
@@ -458,10 +460,7 @@ fn get_ops(txn: &mut Transaction<'_>) -> HashMap<Arc<DhtOpHash>, DhtOpHashed> {
         let hash: DhtOpHash = row.get("hash")?;
         // Check the entry isn't private before gossiping it.
         let e: Option<Vec<u8>> = row.get("entry_blob")?;
-        let entry = match e {
-            Some(entry) => Some(from_blob::<Entry>(entry).unwrap()),
-            None => None,
-        };
+        let entry = e.map(|entry| from_blob::<Entry>(entry).unwrap());
         let op = DhtOp::from_type(op_type, header, entry).unwrap();
         let op = DhtOpHashed::with_pre_hashed(op, hash.clone());
         Ok((Arc::new(hash), op))
