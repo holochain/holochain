@@ -5,7 +5,7 @@ use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::RibosomeT;
 use derive_more::Constructor;
-use holochain_keystore::KeystoreSender;
+use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
@@ -27,7 +27,7 @@ where
 pub async fn initialize_zomes_workflow<Ribosome, C>(
     workspace: HostFnWorkspace,
     network: HolochainP2pCell,
-    keystore: KeystoreSender,
+    keystore: MetaLairClient,
     args: InitializeZomesWorkflowArgs<Ribosome, C>,
 ) -> WorkflowResult<InitResult>
 where
@@ -49,7 +49,7 @@ where
 async fn initialize_zomes_workflow_inner<Ribosome, C>(
     workspace: HostFnWorkspace,
     network: HolochainP2pCell,
-    keystore: KeystoreSender,
+    keystore: MetaLairClient,
     args: InitializeZomesWorkflowArgs<Ribosome, C>,
 ) -> WorkflowResult<InitResult>
 where
@@ -98,7 +98,7 @@ pub mod tests {
     use crate::conductor::handle::MockConductorHandleT;
     use crate::core::ribosome::MockRibosomeT;
     use crate::fixt::DnaDefFixturator;
-    use crate::fixt::KeystoreSenderFixturator;
+    use crate::fixt::MetaLairClientFixturator;
     use crate::sweettest::*;
     use crate::test_utils::fake_genesis;
     use ::fixt::prelude::*;
@@ -152,7 +152,7 @@ pub mod tests {
             dna_def,
             conductor_api,
         };
-        let keystore = fixt!(KeystoreSender);
+        let keystore = fixt!(MetaLairClient);
         let network = fixt!(HolochainP2pCell);
 
         initialize_zomes_workflow_inner(workspace.clone(), network, keystore, args)

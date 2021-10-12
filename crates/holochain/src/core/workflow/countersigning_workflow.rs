@@ -197,7 +197,7 @@ pub(crate) async fn countersigning_success(
 
     // Verify signatures of headers.
     for SignedHeader(header, signature) in &signed_headers {
-        if !header.author().verify_signature(signature, header).await? {
+        if !header.author().verify_signature(signature, header).await {
             return Ok(());
         }
     }

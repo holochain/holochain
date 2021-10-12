@@ -48,7 +48,7 @@ const X25519_PUB3: [u8; 32] = [
 
 /// Construct a new TestKeystore.
 /// DANGER! This is a mock keystore for testing, DO NOT USE THIS IN PRODUCTION!
-pub async fn spawn_test_keystore() -> KeystoreApiResult<KeystoreSender> {
+pub async fn spawn_test_keystore() -> KeystoreApiResult<MetaLairClient> {
     use legacy_lair_api::test::*;
     let (api, _evt) = spawn_test_keystore(
         vec![
@@ -78,7 +78,7 @@ pub async fn spawn_test_keystore() -> KeystoreApiResult<KeystoreSender> {
         ],
     )
     .await?;
-    Ok(api)
+    Ok(MetaLairClient::Legacy(api))
 }
 
 #[cfg(test)]
@@ -89,16 +89,12 @@ mod tests {
     async fn test_test_keystore() {
         tokio::task::spawn(async move {
             let keystore = spawn_test_keystore().await.unwrap();
-            let agent_pubkey1 = holo_hash::AgentPubKey::new_from_pure_entropy(&keystore)
-                .await
-                .unwrap();
+            let agent_pubkey1 = holo_hash::AgentPubKey::new_random(&keystore).await.unwrap();
             assert_eq!(
                 "uhCAkmrkoAHPVf_eufG7eC5fm6QKrW5pPMoktvG5LOC0SnJ4vV1Uv",
                 &agent_pubkey1.to_string()
             );
-            let agent_pubkey2 = holo_hash::AgentPubKey::new_from_pure_entropy(&keystore)
-                .await
-                .unwrap();
+            let agent_pubkey2 = holo_hash::AgentPubKey::new_random(&keystore).await.unwrap();
             assert_eq!(
                 "uhCAke1j8Z2a-_min0h0pGuEMcYlo_V1l1mt9OtBuywKmHlg4L_R-",
                 &agent_pubkey2.to_string()
@@ -111,10 +107,7 @@ mod tests {
 
             let signature = agent_pubkey1.sign(&keystore, &my_data_1).await.unwrap();
 
-            assert!(agent_pubkey1
-                .verify_signature(&signature, &my_data_1)
-                .await
-                .unwrap());
+            assert!(agent_pubkey1.verify_signature(&signature, &my_data_1).await);
         })
         .await
         .unwrap();
