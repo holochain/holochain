@@ -171,7 +171,7 @@ impl HolochainP2pMockChannel {
             .into_iter()
             .map(|info| {
                 let agent = holo_hash::AgentPubKey::from_kitsune(&info.agent);
-                let url = info.url_list.iter().next().cloned().unwrap();
+                let url = info.url_list.get(0).cloned().unwrap();
                 let cert = Tx2Cert::from(ProxyUrl::from_full(url.as_str()).unwrap().digest());
                 (agent, (cert, url))
             })
@@ -223,7 +223,6 @@ impl HolochainP2pMockChannel {
             .filter_map(|t| async move { t });
         let from_kitsune = Box::pin(stream);
         let stream = tokio_stream::wrappers::ReceiverStream::new(rx).for_each_concurrent(10, {
-            let scenario = scenario.clone();
             move |msg| {
                 let scenario = scenario.clone();
                 let to_kitsune_tx = to_kitsune_tx.clone();
@@ -274,30 +273,29 @@ impl HolochainP2pMockChannel {
         AddressedHolochainP2pMockMsg,
         Option<HolochainP2pMockRespond>,
     )> {
-        while let Some(msg) = self.from_kitsune.next().await {
-            let to_agent = self
-                .address_map
-                .iter()
-                .find_map(|(agent, (cert, _))| {
-                    if cert == msg.cert() {
-                        Some(agent.clone())
-                    } else {
-                        None
-                    }
-                })
-                .unwrap();
+        match self.from_kitsune.next().await {
+            Some(msg) => {
+                let to_agent = self
+                    .address_map
+                    .iter()
+                    .find_map(|(agent, (cert, _))| {
+                        if cert == msg.cert() {
+                            Some(agent.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap();
 
-            let (msg, respond) = msg.into_msg_respond();
+                let (msg, respond) = msg.into_msg_respond();
 
-            let msg = from_wire_msg(msg);
+                let msg = from_wire_msg(msg);
 
-            let respond = match respond {
-                Some(respond) => Some(HolochainP2pMockRespond { respond }),
-                None => None,
-            };
-            return Some((msg.addressed(to_agent), respond));
+                let respond = respond.map(|respond| HolochainP2pMockRespond { respond });
+                Some((msg.addressed(to_agent), respond))
+            }
+            None => None,
         }
-        None
     }
 
     /// Send a notify or request from an addressed simulated agent.
@@ -374,15 +372,15 @@ fn to_wire_msg(msg: HolochainP2pMockMsg) -> kwire::Wire {
             if call {
                 let from_agent = from_agent.unwrap().to_kitsune();
                 kwire::Wire::Call(kwire::Call {
-                    to_agent,
                     space,
                     from_agent,
+                    to_agent,
                     data,
                 })
             } else {
                 kwire::Wire::Broadcast(kwire::Broadcast {
-                    to_agent,
                     space,
+                    to_agent,
                     data,
                 })
             }
@@ -405,8 +403,8 @@ fn to_wire_msg(msg: HolochainP2pMockMsg) -> kwire::Wire {
             };
             kwire::Wire::Gossip(kwire::Gossip {
                 space,
-                module,
                 data,
+                module,
             })
         }
         HolochainP2pMockMsg::Failure(reason) => kwire::Wire::Failure(kwire::Failure { reason }),

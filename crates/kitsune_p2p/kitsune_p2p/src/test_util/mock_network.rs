@@ -144,8 +144,8 @@ impl MockOutConnection {
         Arc::new(Self {
             response_tx,
             response_rx,
-            remote_cert,
             remote_url,
+            remote_cert,
         })
     }
 }
@@ -239,6 +239,7 @@ pub fn mock_network(
 
                         // we'll only establish one single in channel
                         let once: InChan = Box::new(m);
+                        #[allow(clippy::async_yields_async)]
                         let once =
                             futures::stream::once(async move { async move { Ok(once) }.boxed() });
                         // then just pend the stream
@@ -293,6 +294,7 @@ async fn new_incoming(network: Arc<MockNetwork>, connection: Arc<MockInConnectio
     let in_chan = futures::stream::once({
         let connection = connection.clone();
         let network = network.clone();
+        #[allow(clippy::async_yields_async)]
         async move {
             let network = network.clone();
             let connection = connection.clone();
@@ -355,7 +357,7 @@ async fn new_incoming(network: Arc<MockNetwork>, connection: Arc<MockInConnectio
     m.expect_peer_cert().returning(move || cert.clone());
     m.expect_dir().returning(|| Tx2ConDir::Incoming);
     let uniq = Uniq::default();
-    m.expect_uniq().returning(move || uniq.clone());
+    m.expect_uniq().returning(move || uniq);
     let url = connection.out_connection.remote_url.clone();
     m.expect_peer_addr().returning(move || Ok(url.clone()));
     m.expect_out_chan().returning({
@@ -493,8 +495,8 @@ impl<T> SharedRecv<T> {
             let f_b = b.recv();
             futures::pin_mut!(f_a, f_b);
             match futures::future::select(f_a, f_b).await {
-                Either::Left((t, _)) => t.map(|t| Either::Left(t)),
-                Either::Right((u, _)) => u.map(|u| Either::Right(u)),
+                Either::Left((t, _)) => t.map(Either::Left),
+                Either::Right((u, _)) => u.map(Either::Right),
             }
         };
 
