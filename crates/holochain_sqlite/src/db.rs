@@ -121,33 +121,30 @@ impl DbWrite {
             Ok(_) => (),
             // These are the two errors that can
             // occur if the database is not valid.
+            err
+            @
             Err(Error::SqliteFailure(
                 rusqlite::ffi::Error {
                     code: ErrorCode::DatabaseCorrupt,
-                    extended_code,
+                    ..
                 },
-                s,
+                ..,
             ))
-            | Err(Error::SqliteFailure(
+            | err
+            @
+            Err(Error::SqliteFailure(
                 rusqlite::ffi::Error {
                     code: ErrorCode::NotADatabase,
-                    extended_code,
+                    ..
                 },
-                s,
+                ..,
             )) => {
                 // Check if this database kind requires wiping.
                 if kind.if_corrupt_wipe() {
                     std::fs::remove_file(&path)?;
                 } else {
                     // If we don't wipe we need to return an error.
-                    return Err(Error::SqliteFailure(
-                        rusqlite::ffi::Error {
-                            code: ErrorCode::DatabaseCorrupt,
-                            extended_code,
-                        },
-                        s,
-                    )
-                    .into());
+                    err?;
                 }
             }
             // Another error has occurred when trying to open the db.
@@ -265,13 +262,13 @@ impl DbKind {
         match self {
             // These databases can safely be wiped if they are corrupt.
             DbKind::Cache(_) => true,
-            DbKind::Wasm => true,
             DbKind::P2pAgentStore(_) => true,
             DbKind::P2pMetrics(_) => true,
             // These databases cannot be safely wiped if they are corrupt.
             // TODO: When splitting the source chain and authority db the
             // authority db can be wiped but the source chain db cannot.
             DbKind::Cell(_) => false,
+            DbKind::Wasm => false,
             DbKind::Conductor => false,
         }
     }
