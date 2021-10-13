@@ -942,29 +942,39 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self.conductor.post_commit_permit().await
     }
 
-    fn spawn_post_commit(
-        self: Arc<Self>,
-        mut receiver: tokio::sync::mpsc::Receiver<PostCommitArgs>,
-    ) {
-        tokio::task::spawn(async move {
-            while let Some(PostCommitArgs {
-                host_access,
-                invocation,
-                cell_id,
-            }) = receiver.recv().await
-            {
-                match self.get_ribosome(&cell_id.dna_hash()) {
-                    Ok(ribosome) => {
-                        if let Err(e) = ribosome.run_post_commit(host_access, invocation) {
+    fn spawn_post_commit(self: Arc<Self>, receiver: tokio::sync::mpsc::Receiver<PostCommitArgs>) {
+        use futures::stream::StreamExt;
+
+        let self_arc = self.clone();
+        let receiver_stream = tokio_stream::wrappers::ReceiverStream::new(receiver);
+        tokio::task::spawn(
+            receiver_stream.for_each_concurrent(5, move |post_commit_args| {
+                let self_arc = self_arc.clone();
+                async move {
+                    let PostCommitArgs {
+                        host_access,
+                        invocation,
+                        cell_id,
+                    } = post_commit_args;
+                    match self_arc.clone().get_ribosome(&cell_id.dna_hash()) {
+                        Ok(ribosome) => {
+                            if let Err(e) = tokio::task::spawn_blocking(move || {
+                                if let Err(e) = ribosome.run_post_commit(host_access, invocation) {
+                                    tracing::error!(?e);
+                                }
+                            })
+                            .await
+                            {
+                                tracing::error!(?e);
+                            }
+                        }
+                        Err(e) => {
                             tracing::error!(?e);
                         }
                     }
-                    Err(e) => {
-                        tracing::error!(?e);
-                    }
                 }
-            }
-        });
+            }),
+        );
     }
 
     #[tracing::instrument(skip(self))]

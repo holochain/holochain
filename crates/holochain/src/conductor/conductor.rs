@@ -68,7 +68,6 @@ use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use tokio::sync::mpsc::error::SendError;
-use tokio::sync::mpsc::OwnedPermit;
 use tracing::*;
 
 #[cfg(any(test, feature = "test_utils"))]
@@ -1071,8 +1070,10 @@ where
         })
     }
 
-    /// Get an OwnedPermit to the post commit task.
-    pub async fn post_commit_permit(&self) -> Result<OwnedPermit<PostCommitArgs>, SendError<()>> {
+    /// Get the post commit sender.
+    pub async fn post_commit_permit(
+        &self,
+    ) -> Result<tokio::sync::mpsc::OwnedPermit<PostCommitArgs>, SendError<()>> {
         self.post_commit.clone().reserve_owned().await
     }
 }
