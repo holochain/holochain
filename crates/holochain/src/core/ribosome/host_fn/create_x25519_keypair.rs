@@ -1,6 +1,5 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_keystore::keystore_actor::KeystoreSenderExt;
 use holochain_util::tokio_helper;
 use holochain_wasmer_host::prelude::WasmError;
 use holochain_zome_types::X25519PubKey;
@@ -18,8 +17,9 @@ pub fn create_x25519_keypair(
             call_context
                 .host_context
                 .keystore()
-                .create_x25519_keypair()
+                .new_x25519_keypair_random()
                 .await
+                .map(|k| (*k).into())
         })
         .map_err(|keystore_error| WasmError::Host(keystore_error.to_string())),
         _ => unreachable!(),

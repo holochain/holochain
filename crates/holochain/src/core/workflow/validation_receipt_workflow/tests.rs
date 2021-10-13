@@ -67,7 +67,7 @@ async fn test_validation_receipt() {
             } = receipt;
             let validator = receipt.validator.clone();
             assert!(validator == *bobbo.agent_pubkey() || validator == *carol.agent_pubkey());
-            assert!(validator.verify_signature(&sig, receipt).await.unwrap());
+            assert!(validator.verify_signature(&sig, receipt).await);
         }
     }
 

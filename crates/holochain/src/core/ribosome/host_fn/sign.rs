@@ -1,6 +1,5 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_keystore::keystore_actor::KeystoreSenderExt;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
@@ -13,7 +12,7 @@ pub fn sign(
 ) -> Result<Signature, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess { keystore: Permission::Allow, .. } => tokio_helper::block_forever_on(async move {
-            call_context.host_context.keystore().sign(input).await
+            call_context.host_context.keystore().sign(input.key, input.data.into_vec().into()).await
         })
         .map_err(|keystore_error| WasmError::Host(keystore_error.to_string())),
         _ => unreachable!(),

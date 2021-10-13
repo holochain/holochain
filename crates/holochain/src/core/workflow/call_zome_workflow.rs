@@ -14,7 +14,7 @@ use crate::core::ribosome::ZomesToInvoke;
 use crate::core::workflow::error::WorkflowError;
 use either::Either;
 use holochain_cascade::Cascade;
-use holochain_keystore::KeystoreSender;
+use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::source_chain::SourceChain;
@@ -55,7 +55,7 @@ where
 pub async fn call_zome_workflow<Ribosome, C>(
     workspace: HostFnWorkspace,
     network: HolochainP2pCell,
-    keystore: KeystoreSender,
+    keystore: MetaLairClient,
     args: CallZomeWorkflowArgs<Ribosome, C>,
     trigger_publish_dht_ops: TriggerSender,
     trigger_integrate_dht_ops: TriggerSender,
@@ -98,7 +98,7 @@ where
 async fn call_zome_workflow_inner<Ribosome, C>(
     workspace: HostFnWorkspace,
     network: HolochainP2pCell,
-    keystore: KeystoreSender,
+    keystore: MetaLairClient,
     args: CallZomeWorkflowArgs<Ribosome, C>,
 ) -> WorkflowResult<ZomeCallResult>
 where
@@ -375,7 +375,7 @@ pub mod tests {
         ribosome: Ribosome,
         invocation: ZomeCallInvocation,
     ) -> WorkflowResult<ZomeCallResult> {
-        let keystore = fixt!(KeystoreSender);
+        let keystore = fixt!(MetaLairClient);
         let network = fixt!(HolochainP2pCell);
         let cell_id = CellId::new(ribosome.dna_def().as_hash().clone(), fixt!(AgentPubKey));
         let conductor_api = Arc::new(MockConductorHandleT::new());

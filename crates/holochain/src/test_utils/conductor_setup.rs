@@ -11,7 +11,7 @@ use crate::core::queue_consumer::QueueTriggers;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
-use holochain_keystore::KeystoreSender;
+use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::HolochainP2pRefToCell;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::SerializedBytes;
@@ -30,7 +30,7 @@ pub struct CellHostFnCaller {
     pub cache: EnvWrite,
     pub ribosome: RealRibosome,
     pub network: HolochainP2pCell,
-    pub keystore: KeystoreSender,
+    pub keystore: MetaLairClient,
     pub signal_tx: SignalBroadcaster,
     pub triggers: QueueTriggers,
     pub cell_conductor_api: CellConductorApi,
