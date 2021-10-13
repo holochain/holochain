@@ -946,12 +946,11 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     fn spawn_post_commit(self: Arc<Self>, receiver: tokio::sync::mpsc::Receiver<PostCommitArgs>) {
         use futures::stream::StreamExt;
 
-        let self_arc = self.clone();
         let receiver_stream = tokio_stream::wrappers::ReceiverStream::new(receiver);
         tokio::task::spawn(receiver_stream.for_each_concurrent(
             POST_COMMIT_CONCURRENT_LIMIT,
             move |post_commit_args| {
-                let self_arc = self_arc.clone();
+                let self_arc = self.clone();
                 async move {
                     let PostCommitArgs {
                         host_access,
