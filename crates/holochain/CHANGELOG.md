@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - adds new lair as an additional dependency and begins preparation for a config-time switch allowing use of new api lair keystore.
 - Add method `SweetDnaFile::from_bundle_with_overrides` [\#1030](https://github.com/holochain/holochain/pull/1030)
 - Some `SweetConductor::setup_app_*` methods now take anything iterable, instead of array slices, for specifying lists of agents and DNAs [\#1030](https://github.com/holochain/holochain/pull/1030)
+- Post commit hook should work now [PR 1000](https://github.com/holochain/holochain/pull/1000)
 - BREAKING conductor config changes [#1031](https://github.com/holochain/holochain/pull/1031)
 
 Where previously, you might have had:
@@ -50,7 +51,6 @@ keystore:
 ### Changed
 
 - The scheduler should work now
-- Post commit hook should work now
 
 ## 0.0.107
 
