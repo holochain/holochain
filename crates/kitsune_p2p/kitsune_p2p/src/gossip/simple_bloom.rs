@@ -63,7 +63,7 @@ impl MetaOpData {
 
 type KeySet = HashSet<Arc<MetaOpKey>>;
 type DataMap = HashMap<Arc<MetaOpKey>, Arc<MetaOpData>>;
-type BloomFilter = bloomfilter::Bloom<Arc<MetaOpKey>>;
+pub type BloomFilter = bloomfilter::Bloom<Arc<MetaOpKey>>;
 
 pub(crate) fn encode_bloom_filter(bloom: &BloomFilter) -> PoolBuf {
     let bitmap: Vec<u8> = bloom.bitmap();
