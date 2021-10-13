@@ -3,18 +3,21 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
-- Publish now runs on a loop if there are ops still needing receipts. [#1024](https://github.com/holochain/holochain/pull/1024)
+
+## 0.0.110
+
+- Publish now runs on a loop if there are ops still needing receipts. [\#1024](https://github.com/holochain/holochain/pull/1024)
 - Batch peer store write so we use less transactions. [\#1007](https://github.com/holochain/holochain/pull/1007/).
 - Preparation for new lair api [\#1017](https://github.com/holochain/holochain/pull/1017)
   - there should be no functional changes with this update.
   - adds new lair as an additional dependency and begins preparation for a config-time switch allowing use of new api lair keystore.
 - Add method `SweetDnaFile::from_bundle_with_overrides` [\#1030](https://github.com/holochain/holochain/pull/1030)
 - Some `SweetConductor::setup_app_*` methods now take anything iterable, instead of array slices, for specifying lists of agents and DNAs [\#1030](https://github.com/holochain/holochain/pull/1030)
-- BREAKING conductor config changes [#1031](https://github.com/holochain/holochain/pull/1031)
+- BREAKING conductor config changes [\#1031](https://github.com/holochain/holochain/pull/1031)
 
 Where previously, you might have had:
 
-```yaml
+``` yaml
 use_dangerous_test_keystore: false
 keystore_path: /my/path
 passphrase_service:
@@ -24,7 +27,7 @@ passphrase_service:
 
 now you will use:
 
-```yaml
+``` yaml
 keystore:
   type: lair_server_legacy_deprecated
   keystore_path: /my/path
@@ -33,7 +36,7 @@ keystore:
 
 or:
 
-```yaml
+``` yaml
 keystore:
   type: danger_test_keystore_legacy_deprecated
 ```
