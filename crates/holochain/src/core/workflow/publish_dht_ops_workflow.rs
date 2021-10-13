@@ -11,9 +11,9 @@
 //!
 
 use super::error::WorkflowResult;
+use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use holo_hash::*;
-use holochain_p2p::HolochainP2pCell;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
@@ -29,16 +29,13 @@ pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u8 = 5;
 /// Don't publish a DhtOp more than once during this interval.
 /// This allows us to trigger the publish workflow as often as we like, without
 /// flooding the network with spurious publishes.
-/// Republish an op at most once per day.
-/// Publish is only triggered by new commits so at worst we'll publish never
-/// republish.
-// TODO: We need a republish workflow to make sure the data is actually saturated.
-pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(60 * 60 * 24);
+pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(60 * 5);
 
-#[instrument(skip(env, network))]
+#[instrument(skip(env, network, trigger_self))]
 pub async fn publish_dht_ops_workflow(
     env: EnvWrite,
-    network: HolochainP2pCell,
+    network: &(dyn HolochainP2pCellT + Send + Sync),
+    trigger_self: &TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     let mut complete = WorkComplete::Complete;
     let to_publish =
@@ -59,16 +56,26 @@ pub async fn publish_dht_ops_workflow(
             success.extend(hashes);
         }
     }
+
     tracing::info!("sent {} ops", success.len());
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
-    env.async_commit(move |writer| {
-        for hash in success {
-            mutations::set_last_publish_time(writer, hash, now)?;
-        }
-        WorkflowResult::Ok(())
-    })
-    .await?;
-    tracing::info!("commited sent ops");
+    let continue_publish = env
+        .async_commit(move |writer| {
+            for hash in success {
+                mutations::set_last_publish_time(writer, hash, now)?;
+            }
+            WorkflowResult::Ok(publish_query::num_still_needing_publish(writer)? > 0)
+        })
+        .await?;
+
+    // If we have more ops that could be published then continue looping.
+    if continue_publish {
+        trigger_self.resume_loop();
+    } else {
+        trigger_self.pause_loop();
+    }
+
+    tracing::info!("committed sent ops");
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     Ok(complete)
@@ -106,6 +113,7 @@ mod tests {
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use holochain_p2p::actor::HolochainP2pSender;
+    use holochain_p2p::HolochainP2pCell;
     use holochain_p2p::HolochainP2pRef;
     use observability;
     use rusqlite::Transaction;
@@ -216,7 +224,8 @@ mod tests {
 
     /// Call the workflow
     async fn call_workflow(env: EnvWrite, cell_network: HolochainP2pCell) {
-        publish_dht_ops_workflow(env.clone().into(), cell_network)
+        let (trigger_sender, _) = TriggerSender::new();
+        publish_dht_ops_workflow(env.clone().into(), &cell_network, &trigger_sender)
             .await
             .unwrap();
     }
@@ -604,6 +613,4 @@ mod tests {
             .instrument(debug_span!("private_entries")),
         );
     }
-
-    // TODO: COVERAGE: Test public ops do publish
 }
