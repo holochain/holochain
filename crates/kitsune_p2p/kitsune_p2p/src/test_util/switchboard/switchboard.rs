@@ -18,7 +18,7 @@ use kitsune_p2p_types::tx2::tx2_pool_promote::*;
 use kitsune_p2p_types::tx2::tx2_utils::Share;
 use kitsune_p2p_types::tx2::*;
 use kitsune_p2p_types::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::task::JoinHandle;
 
@@ -143,6 +143,15 @@ impl Switchboard {
     /// Get the state for the singleton space
     pub fn space_state(&self) -> Share<SwitchboardSpace> {
         self.spaces.get(&**ZERO_SPACE).unwrap().state.clone()
+    }
+
+    pub async fn add_nodes<const N: usize>(&mut self) -> [NodeEp; N] {
+        use std::convert::TryInto;
+        let mut nodes = vec![];
+        for _ in 0..N {
+            nodes.push(self.add_node().await);
+        }
+        nodes.try_into().unwrap()
     }
 
     /// Set up state and handler tasks for a new node in the space
@@ -353,37 +362,61 @@ impl SwitchboardSpace {
         }
     }
 
-    pub fn exchange_peer_info<
-        'n,
-        A: IntoIterator<Item = i8>,
-        P: IntoIterator<Item = (&'n NodeEp, A)>,
-    >(
-        &mut self,
-        peers: P,
-    ) {
-        for (node, agents) in peers.into_iter() {
-            let agents: Vec<_> = agents
-                .into_iter()
-                .map(|loc8| {
-                    let loc8: Loc8 = Loc8::from(loc8);
-                    (
-                        loc8,
-                        self.node_for_local_agent_loc8(loc8)
-                            .unwrap()
-                            .local_agents
-                            .get(&loc8)
-                            .unwrap()
-                            .info
-                            .to_owned(),
-                    )
-                })
-                .collect();
-            self.nodes
-                .get_mut(node)
-                .expect("No node")
-                .remote_agents
-                .extend(agents)
+    pub fn exchange_all_peer_info(&mut self) {
+        let all_agent_locs: Vec<_> = self
+            .nodes
+            .values()
+            .flat_map(|n| n.local_agents.keys())
+            .collect();
+        let info: Vec<(_, Vec<_>)> = self
+            .nodes
+            .iter()
+            .map(|(ep, n)| {
+                let local: HashSet<_> = n.local_agents.keys().collect();
+                (
+                    ep.clone(),
+                    all_agent_locs
+                        .iter()
+                        .filter(|loc| !local.contains(**loc))
+                        .copied()
+                        .copied()
+                        .collect(),
+                )
+            })
+            .collect();
+        for (node, agents) in info {
+            self.inject_peer_info(&node, agents);
         }
+    }
+
+    pub fn inject_peer_info<'n, L, A: IntoIterator<Item = L>>(
+        &mut self,
+        node: &'n NodeEp,
+        agents: A,
+    ) where
+        Loc8: From<L>,
+    {
+        let agents: Vec<_> = agents
+            .into_iter()
+            .map(|loc8| {
+                let loc8: Loc8 = Loc8::from(loc8);
+                (
+                    loc8,
+                    self.node_for_local_agent_loc8(loc8)
+                        .unwrap()
+                        .local_agents
+                        .get(&loc8)
+                        .unwrap()
+                        .info
+                        .to_owned(),
+                )
+            })
+            .collect();
+        self.nodes
+            .get_mut(node)
+            .expect("No node")
+            .remote_agents
+            .extend(agents)
     }
 
     pub fn add_ops_now<L: Into<Loc8>, O: IntoIterator<Item = L>>(

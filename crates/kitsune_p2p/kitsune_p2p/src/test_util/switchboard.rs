@@ -19,9 +19,7 @@ mod tests {
         // observability::test_run().ok();
         let mut sb = Switchboard::new(GossipType::Recent);
 
-        let n1 = sb.add_node().await;
-        let n2 = sb.add_node().await;
-        let n3 = sb.add_node().await;
+        let [n1, n2, n3] = sb.add_nodes().await;
 
         // These become agent locations, but currently kitsune doesn't care
         // where the agents are located, it only cares about their storage arc
@@ -31,9 +29,9 @@ mod tests {
 
         sb.space_state()
             .share_mut(|sb, _| {
-                sb.add_local_agent(&n1, 1, ArcInterval::Full);
-                sb.add_local_agent(&n2, 2, ArcInterval::Full);
-                sb.add_local_agent(&n3, 3, ArcInterval::Full);
+                sb.add_local_agent(&n1, a1, ArcInterval::Full);
+                sb.add_local_agent(&n2, a2, ArcInterval::Full);
+                sb.add_local_agent(&n3, a3, ArcInterval::Full);
 
                 sb.add_ops_now(a1, true, [10, 20, 30]);
                 sb.add_ops_now(a2, true, [-10, -20, -30]);
@@ -43,11 +41,7 @@ mod tests {
                 // and hardly "recent"
                 sb.add_ops_timed(3, true, [(40, Timestamp::from_micros(1))]);
 
-                sb.exchange_peer_info([
-                    (&n1, vec![a2, a3]),
-                    (&n2, vec![a1, a3]),
-                    (&n3, vec![a1, a2]),
-                ]);
+                sb.exchange_all_peer_info();
 
                 // Ensure that the initial conditions are set up properly
                 assert_eq!(sb.get_ops_loc8(&n1), Loc8::vec([10, 20, 30]));
@@ -79,9 +73,7 @@ mod tests {
     async fn basic_3way_sharded_switchboard() {
         let mut sb = Switchboard::new(GossipType::Recent);
 
-        let n1 = sb.add_node().await;
-        let n2 = sb.add_node().await;
-        let n3 = sb.add_node().await;
+        let [n1, n2, n3] = sb.add_nodes().await;
 
         // These become agent locations, but currently kitsune doesn't care
         // where the agents are located, it only cares about their storage arc
@@ -99,11 +91,7 @@ mod tests {
                 sb.add_ops_now(a2, true, [-10, -20, -30, -40, -50, -60, -70, -80]);
                 sb.add_ops_now(a3, true, [90, 120, -120, -90]);
 
-                sb.exchange_peer_info([
-                    (&n1, vec![a2, a3]),
-                    (&n2, vec![a1, a3]),
-                    (&n3, vec![a1, a2]),
-                ]);
+                sb.exchange_all_peer_info();
 
                 Ok(())
             })
@@ -136,9 +124,7 @@ mod tests {
     async fn peer_gossip() {
         let mut sb = Switchboard::new(GossipType::Recent);
 
-        let n1 = sb.add_node().await;
-        let n2 = sb.add_node().await;
-        let n3 = sb.add_node().await;
+        let [n1, n2, n3] = sb.add_nodes().await;
 
         // These become agent locations, but currently kitsune doesn't care
         // where the agents are located, it only cares about their storage arc
@@ -156,14 +142,16 @@ mod tests {
                 sb.add_ops_now(a2, true, [-10, -20, -30, -40, -50, -60, -70, -80]);
                 sb.add_ops_now(a3, true, [90, 120, -120, -90]);
 
-                sb.exchange_peer_info([(&n1, vec![a2]), (&n2, vec![a3]), (&n3, vec![a1])]);
+                sb.inject_peer_info(&n1, [a2]);
+                sb.inject_peer_info(&n2, [a3]);
+                sb.inject_peer_info(&n3, [a1]);
 
                 Ok(())
             })
             .unwrap();
 
         // let gossip do its thing
-        tokio::time::sleep(tokio::time::Duration::from_millis(5000)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
 
         sb.space_state()
             .share_mut(|sb, _| {
