@@ -118,10 +118,6 @@ pub fn test_keystore() -> holochain_keystore::MetaLairClient {
                 .await
                 .unwrap();
 
-            // pre-populate with our two fixture agent keypairs
-            keystore.new_sign_keypair_random().await.unwrap();
-            keystore.new_sign_keypair_random().await.unwrap();
-
             keystore
         },
         std::time::Duration::from_secs(1),
