@@ -1,6 +1,6 @@
 use holochain::sweettest::SweetAgents;
 use holochain::sweettest::SweetConductor;
-use holochain_keystore::KeystoreSender;
+use holochain_keystore::MetaLairClient;
 use holochain_p2p::dht_arc::MAX_HALF_LENGTH;
 use holochain_p2p::dht_arc::MIN_PEERS;
 use holochain_p2p::dht_arc::MIN_REDUNDANCY;
@@ -10,7 +10,7 @@ use kitsune_p2p::*;
 use kitsune_p2p_types::dht_arc::gaps::check_for_gaps;
 use kitsune_p2p_types::dht_arc::gaps::check_redundancy;
 
-async fn get_peers(num: usize, half_lens: &[u32], keystore: KeystoreSender) -> Vec<DhtArc> {
+async fn get_peers(num: usize, half_lens: &[u32], keystore: MetaLairClient) -> Vec<DhtArc> {
     let mut half_lens = half_lens.iter().cycle();
     let mut out = Vec::with_capacity(num);
 

@@ -1,6 +1,5 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_keystore::keystore_actor::KeystoreSenderExt;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
@@ -14,11 +13,25 @@ pub fn x_25519_x_salsa20_poly1305_encrypt(
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ keystore: Permission::Allow, .. } => {
             tokio_helper::block_forever_on(async move {
-                call_context
+                // zome_types too restrictive,
+                // causing us to have to clone everything because there's
+                // no access to the actual internal data (*$%&^#(*$&^
+                let mut s_pk: [u8; 32] = [0; 32];
+                s_pk.copy_from_slice(input.as_sender_ref().as_ref());
+                let mut r_pk: [u8; 32] = [0; 32];
+                r_pk.copy_from_slice(input.as_recipient_ref().as_ref());
+                let data = input.as_data_ref().as_ref().to_vec();
+
+                let (nonce, cipher) = call_context
                     .host_context
                     .keystore()
-                    .x_25519_x_salsa20_poly1305_encrypt(input)
-                    .await
+                    .crypto_box_xsalsa(s_pk.into(), r_pk.into(), data.into())
+                    .await?;
+
+                holochain_keystore::LairResult::Ok(XSalsa20Poly1305EncryptedData::new(
+                    nonce.into(),
+                    cipher.to_vec(),
+                ))
             })
             .map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))
         },
@@ -113,13 +126,13 @@ pub mod wasm_test {
                 alice.clone(),
                 encrypt_output,
             );
-        let bad_decrypt_output: Option<XSalsa20Poly1305Data> = crate::call_test_ribosome!(
+        let bad_decrypt_output: Result<Option<XSalsa20Poly1305Data>, _> = crate::call_test_ribosome!(
             host_access,
             TestWasm::XSalsa20Poly1305,
             "x_25519_x_salsa20_poly1305_decrypt",
             bad_decrypt_input
-        ).unwrap();
+        );
 
-        assert_eq!(bad_decrypt_output, None,);
+        assert!(bad_decrypt_output.is_err());
     }
 }

@@ -97,8 +97,10 @@ pub mod agent_store {
 pub mod actor;
 pub mod event;
 pub(crate) mod gossip;
-pub(crate) mod wire;
+#[allow(missing_docs)]
+pub mod wire;
 
+pub use gossip::GossipModuleType;
 pub use kitsune_p2p_types::dht_arc;
 
 #[allow(missing_docs)]

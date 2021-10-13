@@ -8,7 +8,7 @@ use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
 use crate::core::workflow::ZomeCallResult;
 use async_trait::async_trait;
 use holo_hash::DnaHash;
-use holochain_keystore::KeystoreSender;
+use holochain_keystore::MetaLairClient;
 use holochain_types::prelude::*;
 use mockall::mock;
 use tokio::sync::mpsc::error::SendError;
@@ -31,7 +31,7 @@ mock! {
 
         pub fn sync_dpki_request(&self, method: String, args: String) -> ConductorApiResult<String>;
 
-        pub fn mock_keystore(&self) -> &KeystoreSender;
+        pub fn mock_keystore(&self) -> &MetaLairClient;
         pub fn mock_signal_broadcaster(&self) -> SignalBroadcaster;
         pub fn sync_get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile>;
         pub fn sync_get_this_dna(&self) -> ConductorApiResult<DnaFile>;
@@ -64,7 +64,7 @@ impl CellConductorApiT for MockCellConductorApi {
         self.sync_dpki_request(method, args)
     }
 
-    fn keystore(&self) -> &KeystoreSender {
+    fn keystore(&self) -> &MetaLairClient {
         self.mock_keystore()
     }
 

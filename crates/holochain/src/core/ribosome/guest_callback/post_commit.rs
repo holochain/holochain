@@ -4,7 +4,7 @@ use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
-use holochain_keystore::KeystoreSender;
+use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pCell;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_serialized_bytes::prelude::*;
@@ -29,7 +29,7 @@ impl PostCommitInvocation {
 #[derive(Clone, Constructor)]
 pub struct PostCommitHostAccess {
     pub workspace: HostFnWorkspace,
-    pub keystore: KeystoreSender,
+    pub keystore: MetaLairClient,
     pub network: HolochainP2pCell,
 }
 

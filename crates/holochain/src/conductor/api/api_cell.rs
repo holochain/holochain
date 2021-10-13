@@ -11,7 +11,7 @@ use crate::core::workflow::ZomeCallResult;
 use async_trait::async_trait;
 use holo_hash::DnaHash;
 use holochain_conductor_api::ZomeCall;
-use holochain_keystore::KeystoreSender;
+use holochain_keystore::MetaLairClient;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
 use tokio::sync::mpsc::error::SendError;
@@ -70,7 +70,7 @@ impl CellConductorApiT for CellConductorApi {
         Ok("TODO".to_string())
     }
 
-    fn keystore(&self) -> &KeystoreSender {
+    fn keystore(&self) -> &MetaLairClient {
         self.conductor_handle.keystore()
     }
 
@@ -128,7 +128,7 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
     async fn dpki_request(&self, method: String, args: String) -> ConductorApiResult<String>;
 
     /// Request access to this conductor's keystore
-    fn keystore(&self) -> &KeystoreSender;
+    fn keystore(&self) -> &MetaLairClient;
 
     /// Access the broadcast Sender which will send a Signal across every
     /// attached app interface
