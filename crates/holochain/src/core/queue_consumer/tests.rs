@@ -215,7 +215,10 @@ async fn test_concurrency() {
 #[tokio::test(flavor = "current_thread", start_paused = true)]
 async fn publish_loop() {
     let mut u = arbitrary::Unstructured::new(&[0; 1000]);
-    let keystore = holochain_keystore::test_keystore::spawn_test_keystore()
+    // HNNRGG... new lair keystore is multi_thread...
+    //           it won't work for this test...
+    //           we may have to make a dummy mock keystore here
+    let keystore = holochain_keystore::test_keystore::spawn_legacy_test_keystore()
         .await
         .unwrap();
     let kind = DbKind::Cell(CellId::new(
