@@ -31,6 +31,10 @@ pub enum DnaError {
     #[error(transparent)]
     MrBundleError(#[from] mr_bundle::error::MrBundleError),
 
+    /// serde_yaml Error
+    #[error(transparent)]
+    YamlSerializationError(#[from] serde_yaml::Error),
+
     /// SerializedBytesError
     #[error(transparent)]
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),

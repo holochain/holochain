@@ -4,6 +4,7 @@ use crate::dna::wasm::DnaWasm;
 use crate::element::SignedHeaderHashedExt;
 use crate::fixt::*;
 use crate::prelude::*;
+use holochain_keystore::MetaLairClient;
 use std::path::PathBuf;
 
 pub use holochain_zome_types::test_utils::*;
@@ -85,7 +86,7 @@ pub fn fake_cap_secret() -> CapSecret {
 
 /// Create a fake SignedHeaderHashed and EntryHashed pair with random content
 pub async fn fake_unique_element(
-    keystore: &KeystoreSender,
+    keystore: &MetaLairClient,
     agent_key: AgentPubKey,
     visibility: EntryVisibility,
 ) -> anyhow::Result<(SignedHeaderHashed, EntryHashed)> {
@@ -110,9 +111,7 @@ pub async fn fake_unique_element(
 }
 
 /// Generate a test keystore pre-populated with a couple test keypairs.
-pub fn test_keystore() -> holochain_keystore::KeystoreSender {
-    use holochain_keystore::KeystoreSenderExt;
-
+pub fn test_keystore() -> holochain_keystore::MetaLairClient {
     tokio_helper::block_on(
         async move {
             let keystore = holochain_keystore::test_keystore::spawn_test_keystore()
@@ -120,14 +119,8 @@ pub fn test_keystore() -> holochain_keystore::KeystoreSender {
                 .unwrap();
 
             // pre-populate with our two fixture agent keypairs
-            keystore
-                .generate_sign_keypair_from_pure_entropy()
-                .await
-                .unwrap();
-            keystore
-                .generate_sign_keypair_from_pure_entropy()
-                .await
-                .unwrap();
+            keystore.new_sign_keypair_random().await.unwrap();
+            keystore.new_sign_keypair_random().await.unwrap();
 
             keystore
         },

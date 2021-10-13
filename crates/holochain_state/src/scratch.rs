@@ -260,10 +260,29 @@ impl StoresIter<Judged<SignedHeaderHashed>> for FilteredScratch {
 pub enum ScratchError {
     #[error(transparent)]
     Timestamp(#[from] TimestampError),
+
     #[error(transparent)]
     Keystore(#[from] KeystoreError),
+
     #[error(transparent)]
     Header(#[from] HeaderError),
+
+    /// Other
+    #[error("Other: {0}")]
+    Other(Box<dyn std::error::Error + Send + Sync>),
+}
+
+impl ScratchError {
+    /// promote a custom error type to a ScratchError
+    pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
+        Self::Other(e.into())
+    }
+}
+
+impl From<one_err::OneErr> for ScratchError {
+    fn from(e: one_err::OneErr) -> Self {
+        Self::other(e)
+    }
 }
 
 #[derive(Error, Debug)]

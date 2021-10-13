@@ -6,10 +6,10 @@ use std::sync::Arc;
 
 use crate::legacy_lair_api::{actor::*, internal::*, *};
 
-use crate::KeystoreSender;
+use crate::MetaLairClient;
 
 /// Spawn a test keystore which always returns the same LairError for every call.
-pub async fn spawn_crude_mock_keystore<F>(err_fn: F) -> LairResult<KeystoreSender>
+pub async fn spawn_crude_mock_keystore<F>(err_fn: F) -> LairResult<MetaLairClient>
 where
     F: Fn() -> LairError + Send + 'static,
 {
@@ -22,7 +22,7 @@ where
 
     tokio::task::spawn(builder.spawn(CrudeMockKeystore(Box::new(err_fn))));
 
-    Ok(sender)
+    Ok(MetaLairClient::Legacy(sender))
 }
 
 /// A keystore which always returns the same LairError for every call.
@@ -186,7 +186,6 @@ impl LairClientApiHandler for CrudeMockKeystore {
 mod tests {
     use super::*;
     use crate::agent_pubkey_ext::AgentPubKeyExt;
-    use crate::*;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_crude_mock_keystore() {
@@ -196,8 +195,8 @@ mod tests {
                 .unwrap();
 
             assert_eq!(
-                holo_hash::AgentPubKey::new_from_pure_entropy(&keystore).await,
-                Err(KeystoreError::LairError(LairError::other("err")))
+                holo_hash::AgentPubKey::new_random(&keystore).await,
+                Err(one_err::OneErr::new("err"))
             );
             // let agent = holo_hash::AgentPubKey::new_from_pure_entropy(&keystore)
             //     .await

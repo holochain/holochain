@@ -1,108 +1,113 @@
 use crate::*;
+use ghost_actor::dependencies::must_future::MustBoxFuture;
 use holochain_zome_types::prelude::*;
+use kitsune_p2p_types::dependencies::new_lair_api;
+use new_lair_api::LairResult;
 use std::sync::Arc;
 
 /// Extend holo_hash::AgentPubKey with additional signature functionality
 /// from Keystore.
 pub trait AgentPubKeyExt {
     /// create a new agent keypair in given keystore, returning the AgentPubKey
-    fn new_from_pure_entropy(
-        keystore: &KeystoreSender,
-    ) -> KeystoreApiFuture<holo_hash::AgentPubKey>
+    fn new_random(
+        keystore: &MetaLairClient,
+    ) -> MustBoxFuture<'static, LairResult<holo_hash::AgentPubKey>>
     where
         Self: Sized;
 
-    /// sign some arbitrary data
-    fn sign<S>(&self, keystore: &KeystoreSender, data: S) -> KeystoreApiFuture<Signature>
-    where
-        S: Serialize + std::fmt::Debug;
-
     /// sign some arbitrary raw bytes
-    fn sign_raw(&self, keystore: &KeystoreSender, data: &[u8]) -> KeystoreApiFuture<Signature>;
-
-    /// verify a signature for given data with this agent public_key is valid
-    fn verify_signature<D>(&self, signature: &Signature, data: D) -> KeystoreApiFuture<bool>
-    where
-        D: TryInto<SerializedBytes, Error = SerializedBytesError>;
+    fn sign_raw(
+        &self,
+        keystore: &MetaLairClient,
+        data: Arc<[u8]>,
+    ) -> MustBoxFuture<'static, LairResult<Signature>>;
 
     /// verify a signature for given raw bytes with this agent public_key is valid
-    fn verify_signature_raw(&self, signature: &Signature, data: &[u8]) -> KeystoreApiFuture<bool>;
-}
+    fn verify_signature_raw(
+        &self,
+        signature: &Signature,
+        data: Arc<[u8]>,
+    ) -> MustBoxFuture<'static, bool>;
 
-impl AgentPubKeyExt for holo_hash::AgentPubKey {
-    fn new_from_pure_entropy(keystore: &KeystoreSender) -> KeystoreApiFuture<holo_hash::AgentPubKey>
-    where
-        Self: Sized,
-    {
-        let f = keystore.generate_sign_keypair_from_pure_entropy();
-        ghost_actor::dependencies::must_future::MustBoxFuture::new(async move { f.await })
-    }
+    // -- provided -- //
 
-    fn sign<S>(&self, keystore: &KeystoreSender, input: S) -> KeystoreApiFuture<Signature>
+    /// sign some arbitrary data
+    fn sign<S>(
+        &self,
+        keystore: &MetaLairClient,
+        input: S,
+    ) -> MustBoxFuture<'static, LairResult<Signature>>
     where
         S: Serialize + std::fmt::Debug,
     {
         use ghost_actor::dependencies::futures::future::FutureExt;
-        let keystore = keystore.clone();
-        let maybe_data: Result<Vec<u8>, SerializedBytesError> =
-            holochain_serialized_bytes::encode(&input);
-        let key = self.clone();
-        async move {
-            let data = maybe_data?;
-            let f = keystore.sign(Sign {
-                key,
-                data: serde_bytes::ByteBuf::from(data),
-            });
-            match tokio::time::timeout(std::time::Duration::from_secs(30), f).await {
-                Ok(r) => r,
-                Err(_) => Err(KeystoreError::Other(
-                    "Keystore timeout while signing agent key".to_string(),
-                )),
+
+        let data = match holochain_serialized_bytes::encode(&input) {
+            Err(e) => {
+                return async move { Err(one_err::OneErr::new(e)) }.boxed().into();
             }
-        }
-        .boxed()
-        .into()
+            Ok(data) => data,
+        };
+
+        self.sign_raw(keystore, data.into())
     }
 
-    fn sign_raw(&self, keystore: &KeystoreSender, data: &[u8]) -> KeystoreApiFuture<Signature> {
-        use ghost_actor::dependencies::futures::future::FutureExt;
-        let keystore = keystore.clone();
-        let input = Sign::new_raw(self.clone(), data.to_vec());
-        async move { keystore.sign(input).await }.boxed().into()
-    }
-
-    fn verify_signature<D>(&self, signature: &Signature, data: D) -> KeystoreApiFuture<bool>
+    /// verify a signature for given data with this agent public_key is valid
+    fn verify_signature<D>(&self, signature: &Signature, data: D) -> MustBoxFuture<'static, bool>
     where
         D: TryInto<SerializedBytes, Error = SerializedBytesError>,
     {
         use ghost_actor::dependencies::futures::future::FutureExt;
 
-        let pub_key: legacy_lair_api::internal::sign_ed25519::SignEd25519PubKey =
-            self.get_raw_32().to_vec().into();
-        let sig: legacy_lair_api::internal::sign_ed25519::SignEd25519Signature =
-            signature.0.to_vec().into();
+        let data = match data.try_into() {
+            Err(e) => {
+                tracing::error!("Serialization Error: {:?}", e);
+                return async move { false }.boxed().into();
+            }
+            Ok(data) => data,
+        };
 
-        let data: Result<SerializedBytes, SerializedBytesError> = data.try_into();
+        let data: Vec<u8> = UnsafeBytes::from(data).into();
 
-        async move {
-            let data = Arc::new(data?.bytes().to_vec());
-            Ok(pub_key.verify(data, sig).await?)
-        }
-        .boxed()
-        .into()
+        self.verify_signature_raw(signature, data.into())
+    }
+}
+
+impl AgentPubKeyExt for holo_hash::AgentPubKey {
+    fn new_random(
+        keystore: &MetaLairClient,
+    ) -> MustBoxFuture<'static, LairResult<holo_hash::AgentPubKey>>
+    where
+        Self: Sized,
+    {
+        let f = keystore.new_sign_keypair_random();
+        MustBoxFuture::new(async move { f.await })
     }
 
-    fn verify_signature_raw(&self, signature: &Signature, data: &[u8]) -> KeystoreApiFuture<bool> {
-        use ghost_actor::dependencies::futures::future::FutureExt;
+    fn sign_raw(
+        &self,
+        keystore: &MetaLairClient,
+        data: Arc<[u8]>,
+    ) -> MustBoxFuture<'static, LairResult<Signature>> {
+        let f = keystore.sign(self.clone(), data);
+        MustBoxFuture::new(async move { f.await })
+    }
 
-        let data = Arc::new(data.to_vec());
-        let pub_key: legacy_lair_api::internal::sign_ed25519::SignEd25519PubKey =
-            self.get_raw_32().to_vec().into();
-        let sig: legacy_lair_api::internal::sign_ed25519::SignEd25519Signature =
-            signature.0.to_vec().into();
+    fn verify_signature_raw(
+        &self,
+        signature: &Signature,
+        data: Arc<[u8]>,
+    ) -> MustBoxFuture<'static, bool> {
+        let mut pub_key = [0; 32];
+        pub_key.copy_from_slice(self.get_raw_32());
+        let pub_key = <new_lair_api::prelude::BinDataSized<32>>::from(pub_key);
+        let sig = signature.0;
 
-        async move { Ok(pub_key.verify(data, sig).await?) }
-            .boxed()
-            .into()
+        MustBoxFuture::new(async move {
+            match pub_key.verify_detached(sig.into(), data).await {
+                Ok(b) => b,
+                _ => false,
+            }
+        })
     }
 }
