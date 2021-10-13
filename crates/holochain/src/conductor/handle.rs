@@ -60,6 +60,7 @@ use crate::conductor::p2p_agent_store::P2pBatch;
 use crate::conductor::p2p_metrics::put_metric_datum;
 use crate::conductor::p2p_metrics::query_metrics;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
+use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CONCURRENT_LIMIT;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::RibosomeT;
 use crate::core::workflow::ZomeCallResult;
@@ -947,8 +948,9 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
         let self_arc = self.clone();
         let receiver_stream = tokio_stream::wrappers::ReceiverStream::new(receiver);
-        tokio::task::spawn(
-            receiver_stream.for_each_concurrent(5, move |post_commit_args| {
+        tokio::task::spawn(receiver_stream.for_each_concurrent(
+            POST_COMMIT_CONCURRENT_LIMIT,
+            move |post_commit_args| {
                 let self_arc = self_arc.clone();
                 async move {
                     let PostCommitArgs {
@@ -973,8 +975,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                         }
                     }
                 }
-            }),
-        );
+            },
+        ));
     }
 
     #[tracing::instrument(skip(self))]

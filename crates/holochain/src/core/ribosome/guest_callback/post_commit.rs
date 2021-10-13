@@ -13,6 +13,7 @@ use holochain_types::prelude::*;
 use itertools::Itertools;
 
 pub const POST_COMMIT_CHANNEL_BOUND: usize = 100;
+pub const POST_COMMIT_CONCURRENT_LIMIT: usize = 5;
 
 #[derive(Clone)]
 pub struct PostCommitInvocation {
