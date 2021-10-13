@@ -102,7 +102,7 @@ pub async fn send_post_commit<C>(
     conductor_api: C,
     workspace: HostFnWorkspace,
     network: HolochainP2pCell,
-    keystore: KeystoreSender,
+    keystore: MetaLairClient,
     zomed_headers: Vec<(Option<Zome>, SignedHeaderHashed)>,
 ) -> Result<(), tokio::sync::mpsc::error::SendError<()>>
 where
