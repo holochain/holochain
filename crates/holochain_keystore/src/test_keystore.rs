@@ -54,7 +54,7 @@ fn s(s: &str) -> [u8; 32] {
 
 /// Construct a new TestKeystore.
 /// DANGER! This is a mock keystore for testing, DO NOT USE THIS IN PRODUCTION!
-pub async fn spawn_test_keystore() -> KeystoreApiResult<MetaLairClient> {
+pub async fn spawn_legacy_test_keystore() -> KeystoreApiResult<MetaLairClient> {
     use legacy_lair_api::test::*;
     let (api, _evt) = spawn_test_keystore(
         vec![
@@ -105,7 +105,7 @@ pub async fn spawn_test_keystore() -> KeystoreApiResult<MetaLairClient> {
 }
 
 /// Construct a new TestKeystore with the new lair api.
-pub async fn spawn_new_test_keystore() -> LairResult<MetaLairClient> {
+pub async fn spawn_test_keystore() -> LairResult<MetaLairClient> {
     // in-memory secure random passphrase
     let passphrase = sodoken::BufWrite::new_mem_locked(32)?;
     sodoken::random::bytes_buf(passphrase.clone()).await?;

@@ -53,7 +53,7 @@ use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::lair_keystore::spawn_new_lair_keystore;
-use holochain_keystore::test_keystore::spawn_new_test_keystore;
+use holochain_keystore::test_keystore::spawn_legacy_test_keystore;
 use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_keystore::MetaLairClient;
 use holochain_sqlite::db::DbKind;
@@ -1358,7 +1358,7 @@ mod builder {
                 match &self.config.keystore {
                     KeystoreConfig::DangerTestKeystoreLegacyDeprecated => {
                         tracing::warn!("Using DEPRECATED legacy lair api.");
-                        spawn_test_keystore().await?
+                        spawn_legacy_test_keystore().await?
                     }
                     KeystoreConfig::LairServerLegacyDeprecated {
                         keystore_path,
@@ -1371,7 +1371,7 @@ mod builder {
                         );
                         spawn_lair_keystore(keystore_path.as_deref(), passphrase).await?
                     }
-                    KeystoreConfig::DangerTestKeystore => spawn_new_test_keystore().await?,
+                    KeystoreConfig::DangerTestKeystore => spawn_test_keystore().await?,
                     KeystoreConfig::LairServer { connection_url } => {
                         let passphrase = match self.passphrase {
                             None => {
