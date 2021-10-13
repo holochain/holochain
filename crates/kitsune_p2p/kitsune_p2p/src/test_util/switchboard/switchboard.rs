@@ -214,7 +214,7 @@ impl Switchboard {
                         }
                     }
                     evt => {
-                        dbg!(evt);
+                        // NB: all other events are ignored
                     }
                 }
             }

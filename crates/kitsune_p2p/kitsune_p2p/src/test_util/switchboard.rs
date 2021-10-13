@@ -71,6 +71,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn basic_3way_sharded_switchboard() {
+        observability::test_run().ok();
         let mut sb = Switchboard::new(GossipType::Recent);
 
         let [n1, n2, n3] = sb.add_nodes().await;
@@ -122,6 +123,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn peer_gossip() {
+        observability::test_run().ok();
         let mut sb = Switchboard::new(GossipType::Recent);
 
         let [n1, n2, n3] = sb.add_nodes().await;
@@ -151,7 +153,7 @@ mod tests {
             .unwrap();
 
         // let gossip do its thing
-        tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(10000)).await;
 
         sb.space_state()
             .share_mut(|sb, _| {
