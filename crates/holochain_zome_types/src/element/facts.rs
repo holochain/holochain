@@ -39,7 +39,7 @@ pub fn header_and_entry_match() -> Facts<'static, Pair> {
                     // so use a prism instead.
                     facts![prism(
                         "header's entry hash",
-                        |pair: &mut Pair| dbg!(pair).0.entry_data_mut().map(|(hash, _)| hash),
+                        |pair: &mut Pair| pair.0.entry_data_mut().map(|(hash, _)| hash),
                         eq("hash of matching entry", EntryHash::with_data_sync(entry)),
                     )]
                 } else {
@@ -67,10 +67,10 @@ mod tests {
         *he.entry_data_mut().unwrap().0 = EntryHash::with_data_sync(&e);
         let he = Header::from(he);
 
-        let pair1: Pair = dbg!((hn.clone(), None));
-        let pair2: Pair = dbg!((hn.clone(), Some(e.clone())));
-        let pair3: Pair = dbg!((he.clone(), None));
-        let pair4: Pair = dbg!((he.clone(), Some(e.clone())));
+        let pair1: Pair = (hn.clone(), None);
+        let pair2: Pair = (hn.clone(), Some(e.clone()));
+        let pair3: Pair = (he.clone(), None);
+        let pair4: Pair = (he.clone(), Some(e.clone()));
 
         let fact = header_and_entry_match();
 

@@ -53,3 +53,6 @@ pub use harness_actor::*;
 //   downstream, and just copy it upstream here for now.
 mod metric_store;
 pub use metric_store::*;
+
+#[cfg(feature = "test_utils")]
+pub mod mock_network;

@@ -55,4 +55,5 @@ test_utils = [
   "ghost_actor/test_utils",
   "kitsune_p2p_types/test_utils",
   "mockall",
+  "kitsune_p2p_timestamp/now"
 ]
