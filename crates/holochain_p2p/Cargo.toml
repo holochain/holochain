@@ -31,3 +31,8 @@ thiserror = "1.0.22"
 tokio = { version = "1.11", features = [ "full" ] }
 tokio-stream = "0.1"
 holochain_util = { version = "0.0.4", path = "../holochain_util" }
+
+[features]
+mock_network = [
+  "kitsune_p2p/mock_network",
+]

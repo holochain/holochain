@@ -54,5 +54,5 @@ pub use harness_actor::*;
 mod metric_store;
 pub use metric_store::*;
 
-#[cfg(feature = "test_utils")]
+#[cfg(feature = "mock_network")]
 pub mod mock_network;

@@ -57,3 +57,7 @@ test_utils = [
   "mockall",
   "kitsune_p2p_timestamp/now"
 ]
+mock_network = [
+  "kitsune_p2p_types/test_utils",
+  "mockall",
+]
