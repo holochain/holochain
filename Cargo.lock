@@ -3405,7 +3405,7 @@ dependencies = [
  "futures",
  "ghost_actor 0.3.0-alpha.4",
  "kitsune_p2p_dht_arc",
- "lair_keystore_api 0.0.7",
+ "lair_keystore_api 0.0.8",
  "lair_keystore_api 0.1.0-alpha.1",
  "lru",
  "mockall",
@@ -3441,9 +3441,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_api"
-version = "0.0.7"
+version = "0.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a25c9fa16214ffe482d7daa84246c04a553d70ba18d52cd5a8d43150111d7d2a"
+checksum = "893dc7c66b3f2abd1d05f4df4fda3d28615249c6254e0a6120d38d80f98a4343"
 dependencies = [
  "arbitrary",
  "blake2b_simd",
@@ -3502,13 +3502,13 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_client"
-version = "0.0.7"
+version = "0.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2a7dd6f048af058c76bb15f7060aa997a34e15fd1fddc47fb96d57949a00ee4"
+checksum = "3e6a3807675e92606f82a5c4c489b06fb5d07fe543999c7e06173200bb0737b0"
 dependencies = [
  "futures",
  "ghost_actor 0.3.0-alpha.4",
- "lair_keystore_api 0.0.7",
+ "lair_keystore_api 0.0.8",
  "sodoken",
  "tempfile",
  "tokio",

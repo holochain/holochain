@@ -1,7 +1,7 @@
 //! Keystore backed by legacy_lair_client.
 
 use crate::*;
-use legacy_lair_api::*;
+use lair_keystore_api_0_0::*;
 
 /// Spawn a new keystore backed by legacy_lair_client.
 pub async fn spawn_lair_keystore(
@@ -14,7 +14,7 @@ pub async fn spawn_lair_keystore(
     }
     let config = config.build();
 
-    let api = legacy_lair_client::assert_running_lair_and_connect(config, passphrase).await?;
+    let api = lair_keystore_client_0_0::assert_running_lair_and_connect(config, passphrase).await?;
 
     Ok(MetaLairClient::Legacy(api))
 }

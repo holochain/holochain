@@ -6,11 +6,11 @@ use futures::future::FutureExt;
 use ghost_actor::dependencies::must_future::MustBoxFuture;
 use ghost_actor::GhostControlSender;
 use kitsune_p2p_types::dependencies::ghost_actor;
-use kitsune_p2p_types::dependencies::legacy_lair_api;
+use kitsune_p2p_types::dependencies::lair_keystore_api_0_0;
 use kitsune_p2p_types::dependencies::url2;
 use kitsune_p2p_types::metrics::metric_task;
 use kitsune_p2p_types::transport::*;
-use legacy_lair_api::actor::*;
+use lair_keystore_api_0_0::actor::*;
 use std::sync::Arc;
 
 pub(crate) fn blake2b_32(data: &[u8]) -> Vec<u8> {
