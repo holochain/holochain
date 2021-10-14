@@ -174,7 +174,7 @@ fixturator!(
 
 fixturator!(
     ZomeInfo;
-    constructor fn new(String, DnaHash, ZomeName, ZomeId, SerializedBytes);
+    constructor fn new(ZomeName, ZomeId);
 );
 
 fixturator!(
