@@ -3,7 +3,6 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
-<<<<<<< HEAD
 - Check local agents for basis when doing a RPCMulti call. [#1027](https://github.com/holochain/holochain/pull/1027).
 - Check local agents for basis when doing a RPCMulti call. [#1009](https://github.com/holochain/holochain/pull/1009).
 - Gossip all agent info within the common arc set even in they are empty. [#1042](https://github.com/holochain/holochain/pull/1042).
@@ -15,9 +14,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Make gossip only initiate with agents that have info that is not expired. [\#1014](https://github.com/holochain/holochain/pull/1014).
 
 ## 0.0.8
-=======
-- Fix rpc_multi bug that caused all request to wait 3 seconds.
->>>>>>> df05a681c... properly kill rpc multi
 
 ### Changed
 
