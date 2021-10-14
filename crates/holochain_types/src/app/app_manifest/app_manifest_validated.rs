@@ -29,10 +29,12 @@ impl AppManifestValidated {
         name: String,
         roles: HashMap<AppRoleId, AppRoleManifestValidated>,
     ) -> AppManifestResult<Self> {
-        for (nick, cell) in roles.iter() {
-            if let AppRoleManifestValidated::Disabled { clone_limit, .. } = cell {
+        for (role_id, role) in roles.iter() {
+            if let AppRoleManifestValidated::Disabled { clone_limit, .. } = role {
                 if *clone_limit == 0 {
-                    return Err(AppManifestError::InvalidStrategyDisabled(nick.to_owned()));
+                    return Err(AppManifestError::InvalidStrategyDisabled(
+                        role_id.to_owned(),
+                    ));
                 }
             }
         }

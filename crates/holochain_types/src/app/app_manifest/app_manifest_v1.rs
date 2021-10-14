@@ -320,7 +320,7 @@ pub mod tests {
         let version = DnaVersionSpec::from(hashes.clone()).into();
 
         let roles = vec![AppRoleManifest {
-            id: "nick".into(),
+            id: "role_id".into(),
             dna: AppSlotDnaManifest {
                 location,
                 properties: Some(app_manifest_properties_fixture()),
@@ -355,7 +355,7 @@ manifest_version: "1"
 name: "Test app"
 description: "Serialization roundtrip test"
 roles:
-  - id: "nick"
+  - id: "role_id"
     provisioning:
       strategy: "create"
       deferred: false

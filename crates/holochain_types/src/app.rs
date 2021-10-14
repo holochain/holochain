@@ -32,11 +32,7 @@ use self::error::{AppError, AppResult};
 /// The unique identifier for an installed app in this conductor
 pub type InstalledAppId = String;
 
-/// A friendly (nick)name used by UIs to refer to the Cells which make up the app
-#[deprecated = "Remove when InstallApp goes away; use AppRoleId instead"]
-pub type CellNick = String;
-
-/// Identifier for an Approle
+/// Identifier for an App Role, a foundational concept in the App manifest.
 pub type AppRoleId = String;
 
 /// The source of the DNA to be installed, either as binary data, or from a path
@@ -117,8 +113,8 @@ pub struct InstallAppBundlePayload {
     pub installed_app_id: Option<InstalledAppId>,
 
     /// Include proof-of-membrane-membership data for cells that require it,
-    /// keyed by the CellNick specified in the app bundle manifest.
-    pub membrane_proofs: HashMap<CellNick, MembraneProof>,
+    /// keyed by the AppRoleId specified in the app bundle manifest.
+    pub membrane_proofs: HashMap<AppRoleId, MembraneProof>,
 
     /// Optional: overwrites all UIDs for all DNAs of Cells created by this app.
     /// The app can still use existing Cells, i.e. this does not require that
@@ -154,18 +150,18 @@ impl AppBundleSource {
 pub struct InstallAppDnaPayload {
     /// The hash of the DNA
     pub hash: DnaHash,
-    /// The CellNick which will be assigned to this Dna when installed
-    pub nick: CellNick,
+    /// The AppRoleId which will be assigned to this Dna when installed
+    pub role_id: AppRoleId,
     /// App-specific proof-of-membrane-membership, if required by this app
     pub membrane_proof: Option<MembraneProof>,
 }
 
 impl InstallAppDnaPayload {
     /// Create a payload from hash. Good for tests.
-    pub fn hash_only(hash: DnaHash, nick: CellNick) -> Self {
+    pub fn hash_only(hash: DnaHash, role_id: AppRoleId) -> Self {
         Self {
             hash,
-            nick,
+            role_id,
             membrane_proof: None,
         }
     }
@@ -178,13 +174,13 @@ impl InstallAppDnaPayload {
 pub struct InstalledCell {
     cell_id: CellId,
     // TODO: rename to role_id
-    cell_nick: CellNick,
+    role_id: AppRoleId,
 }
 
 impl InstalledCell {
     /// Constructor
-    pub fn new(cell_id: CellId, cell_nick: CellNick) -> Self {
-        Self { cell_id, cell_nick }
+    pub fn new(cell_id: CellId, role_id: AppRoleId) -> Self {
+        Self { cell_id, role_id }
     }
 
     /// Get the CellId
@@ -192,14 +188,14 @@ impl InstalledCell {
         self.cell_id
     }
 
-    /// Get the CellNick
-    pub fn into_nick(self) -> CellNick {
-        self.cell_nick
+    /// Get the AppRoleId
+    pub fn into_role_id(self) -> AppRoleId {
+        self.role_id
     }
 
     /// Get the inner data as a tuple
-    pub fn into_inner(self) -> (CellId, CellNick) {
-        (self.cell_id, self.cell_nick)
+    pub fn into_inner(self) -> (CellId, AppRoleId) {
+        (self.cell_id, self.role_id)
     }
 
     /// Get the CellId
@@ -207,9 +203,9 @@ impl InstalledCell {
         &self.cell_id
     }
 
-    /// Get the CellNick
-    pub fn as_nick(&self) -> &CellNick {
-        &self.cell_nick
+    /// Get the AppRoleId
+    pub fn as_role_id(&self) -> &AppRoleId {
+        &self.role_id
     }
 }
 
@@ -388,7 +384,7 @@ pub struct InstalledAppCommon {
     /// have formal significance.
     _agent_key: AgentPubKey,
     /// The "roles" as specified in the AppManifest
-    roles: HashMap<CellNick, AppRole>,
+    roles: HashMap<AppRoleId, AppRole>,
 }
 
 impl InstalledAppCommon {
@@ -414,14 +410,14 @@ impl InstalledAppCommon {
     pub fn provisioned_cells(&self) -> impl Iterator<Item = (&AppRoleId, &CellId)> {
         self.roles
             .iter()
-            .filter_map(|(nick, role)| role.provisioned_cell().map(|c| (nick, c)))
+            .filter_map(|(role_id, role)| role.provisioned_cell().map(|c| (role_id, c)))
     }
 
     /// Accessor
     pub fn into_provisioned_cells(self) -> impl Iterator<Item = (AppRoleId, CellId)> {
         self.roles
             .into_iter()
-            .filter_map(|(nick, role)| role.into_provisioned_cell().map(|c| (nick, c)))
+            .filter_map(|(role_id, role)| role.into_provisioned_cell().map(|c| (role_id, c)))
     }
 
     /// Accessor
@@ -517,12 +513,12 @@ impl InstalledAppCommon {
         }
 
         // ensure all cells use the same agent key
-        let duplicates: Vec<CellNick> = installed_cells
+        let duplicates: Vec<AppRoleId> = installed_cells
             .iter()
-            .map(|c| c.cell_nick.to_owned())
+            .map(|c| c.role_id.to_owned())
             .counts()
             .into_iter()
-            .filter_map(|(nick, count)| if count > 1 { Some(nick) } else { None })
+            .filter_map(|(role_id, count)| if count > 1 { Some(role_id) } else { None })
             .collect();
         if !duplicates.is_empty() {
             return Err(AppError::DuplicateAppRoleIds(installed_app_id, duplicates));
@@ -530,14 +526,14 @@ impl InstalledAppCommon {
 
         let roles = installed_cells
             .into_iter()
-            .map(|InstalledCell { cell_nick, cell_id }| {
+            .map(|InstalledCell { role_id, cell_id }| {
                 let role = AppRole {
                     base_cell_id: cell_id,
                     is_provisioned: true,
                     clones: HashSet::new(),
                     clone_limit: 0,
                 };
-                (cell_nick, role)
+                (role_id, role)
             })
             .collect();
         Ok(Self {
