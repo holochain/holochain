@@ -520,7 +520,7 @@ async fn concurrent_install_dna() {
 
             println!(
                 "[{}] installed dna with hash {} and name {}",
-                i, dna_hash, role_id
+                i, dna_hash, name
             );
         })
     }))
