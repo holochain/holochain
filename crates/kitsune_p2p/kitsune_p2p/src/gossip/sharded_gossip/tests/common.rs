@@ -1,4 +1,7 @@
-use kitsune_p2p_types::{agent_info::AgentInfoInner, dht_arc::DhtArc};
+use kitsune_p2p_types::{
+    agent_info::{AgentInfoInner, UrlList},
+    dht_arc::DhtArc,
+};
 
 use super::*;
 
@@ -129,6 +132,21 @@ pub async fn agent_info(agent: Arc<KitsuneAgent>) -> AgentInfoSigned {
             rand_string
         )
         .into()],
+        std::time::UNIX_EPOCH.elapsed().unwrap().as_millis() as u64,
+        (std::time::UNIX_EPOCH.elapsed().unwrap() + std::time::Duration::from_secs(60 * 60))
+            .as_millis() as u64,
+        |_| async move { Ok(Arc::new(fixt!(KitsuneSignature, Predictable))) },
+    )
+    .await
+    .unwrap()
+}
+
+pub async fn empty_agent_info(agent: Arc<KitsuneAgent>, url_list: UrlList) -> AgentInfoSigned {
+    AgentInfoSigned::sign(
+        Arc::new(fixt!(KitsuneSpace)),
+        agent,
+        0,
+        url_list,
         std::time::UNIX_EPOCH.elapsed().unwrap().as_millis() as u64,
         (std::time::UNIX_EPOCH.elapsed().unwrap() + std::time::Duration::from_secs(60 * 60))
             .as_millis() as u64,
