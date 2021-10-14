@@ -62,10 +62,10 @@ async fn provisioning_1_create() {
     // NB: this relies heavily on the particulars of the `app_manifest_fixture`
     let role = AppRoleAssignment::new(cell_id, true, 50);
 
-    let expected = CellRoleResolution {
+    let expected = AppRoleResolution {
         agent,
         dnas_to_register: vec![(dna, None)],
-        roles: vec![("role_id".into(), role)],
+        role_assignments: vec![("role_id".into(), role)],
     };
     assert_eq!(resolution, expected);
 }

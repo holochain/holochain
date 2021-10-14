@@ -47,16 +47,16 @@ pub struct AppRoleManifest {
 
     /// Declares where to find the DNA, and options to modify it before
     /// inclusion in a Cell
-    pub dna: AppSlotDnaManifest,
+    pub dna: AppRoleDnaManifest,
 }
 
 impl AppRoleManifest {
-    /// Create a sample AppSlotManifest as a template to be followed
+    /// Create a sample AppRoleManifest as a template to be followed
     pub fn sample(id: AppRoleId) -> Self {
         Self {
             id,
             provisioning: Some(CellProvisioning::default()),
-            dna: AppSlotDnaManifest::sample(),
+            dna: AppRoleDnaManifest::sample(),
         }
     }
 }
@@ -65,7 +65,7 @@ impl AppRoleManifest {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct AppSlotDnaManifest {
+pub struct AppRoleDnaManifest {
     /// Where to find this Dna. To specify a DNA included in a hApp Bundle,
     /// use a local relative path that corresponds with the bundle structure.
     ///
@@ -92,8 +92,8 @@ pub struct AppSlotDnaManifest {
     pub clone_limit: u32,
 }
 
-impl AppSlotDnaManifest {
-    /// Create a sample AppSlotDnaManifest as a template to be followed
+impl AppRoleDnaManifest {
+    /// Create a sample AppRoleDnaManifest as a template to be followed
     pub fn sample() -> Self {
         Self {
             location: Some(mr_bundle::Location::Bundled(
@@ -219,7 +219,7 @@ impl AppManifestV1 {
                      provisioning,
                      dna,
                  }| {
-                    let AppSlotDnaManifest {
+                    let AppRoleDnaManifest {
                         location,
                         properties,
                         version,
@@ -321,7 +321,7 @@ pub mod tests {
 
         let roles = vec![AppRoleManifest {
             id: "role_id".into(),
-            dna: AppSlotDnaManifest {
+            dna: AppRoleDnaManifest {
                 location,
                 properties: Some(app_manifest_properties_fixture()),
                 uid: Some("uid".into()),

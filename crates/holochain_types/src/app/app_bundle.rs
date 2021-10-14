@@ -52,7 +52,7 @@ impl AppBundle {
         agent: AgentPubKey,
         _gamut: DnaGamut,
         membrane_proofs: HashMap<AppRoleId, MembraneProof>,
-    ) -> AppBundleResult<CellRoleResolution> {
+    ) -> AppBundleResult<AppRoleResolution> {
         let AppManifestValidated { name: _, roles } = self.manifest().clone().validate()?;
         let bundle = Arc::new(self);
         let tasks = roles.into_iter().map(|(role_id, role)| async {
@@ -65,8 +65,8 @@ impl AppBundle {
             .collect::<AppBundleResult<Vec<_>>>()?
             .into_iter()
             .fold(
-                Ok(CellRoleResolution::new(agent.clone())),
-                |acc: AppBundleResult<CellRoleResolution>, (role_id, op)| {
+                Ok(AppRoleResolution::new(agent.clone())),
+                |acc: AppBundleResult<AppRoleResolution>, (role_id, op)| {
                     if let Ok(mut resolution) = acc {
                         match op {
                             CellProvisioningOp::Create(dna, clone_limit) => {
@@ -77,14 +77,14 @@ impl AppBundle {
                                 // TODO: could sequentialize this to remove the clone
                                 let proof = membrane_proofs.get(&role_id).cloned();
                                 resolution.dnas_to_register.push((dna, proof));
-                                resolution.roles.push((role_id, role));
+                                resolution.role_assignments.push((role_id, role));
                             }
                             CellProvisioningOp::Existing(cell_id, clone_limit) => {
                                 let role = AppRoleAssignment::new(cell_id, true, clone_limit);
-                                resolution.roles.push((role_id, role));
+                                resolution.role_assignments.push((role_id, role));
                             }
                             CellProvisioningOp::Noop(cell_id, clone_limit) => {
-                                resolution.roles.push((
+                                resolution.role_assignments.push((
                                     role_id,
                                     AppRoleAssignment::new(cell_id, false, clone_limit),
                                 ));
@@ -207,23 +207,25 @@ pub fn we_must_remember_to_rework_cell_panic_handling_after_implementing_use_exi
 ) {
 }
 
-/// The result of running Cell resolution
+/// The answer to the question:
+/// "how do we concretely assign DNAs to the open roles of this App?"
+/// Includes the DNAs selected to fill the roles and the details of the role assignments.
 // TODO: rework, make fields private
 #[allow(missing_docs)]
 #[derive(PartialEq, Eq, Debug)]
-pub struct CellRoleResolution {
+pub struct AppRoleResolution {
     pub agent: AgentPubKey,
     pub dnas_to_register: Vec<(DnaFile, Option<MembraneProof>)>,
-    pub roles: Vec<(AppRoleId, AppRoleAssignment)>,
+    pub role_assignments: Vec<(AppRoleId, AppRoleAssignment)>,
 }
 
 #[allow(missing_docs)]
-impl CellRoleResolution {
+impl AppRoleResolution {
     pub fn new(agent: AgentPubKey) -> Self {
         Self {
             agent,
             dnas_to_register: Default::default(),
-            roles: Default::default(),
+            role_assignments: Default::default(),
         }
     }
 

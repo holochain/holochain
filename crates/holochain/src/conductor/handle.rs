@@ -870,7 +870,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         )
         .await?;
 
-        let roles = ops.roles;
+        let roles = ops.role_assignments;
         let app = InstalledAppCommon::new(installed_app_id, agent_key, roles);
 
         // Update the db
