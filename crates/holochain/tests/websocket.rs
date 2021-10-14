@@ -497,11 +497,10 @@ async fn concurrent_install_dna() {
         let zomes = vec![(TestWasm::Foo.into(), TestWasm::Foo.into())];
         let mut client = client.clone();
         tokio::spawn(async move {
-            let role_id = format!("fake_dna_{}", i);
+            let name = format!("fake_dna_{}", i);
 
             // Install Dna
-            let dna =
-                fake_dna_zomes_named(&uuid::Uuid::new_v4().to_string(), &role_id, zomes.clone());
+            let dna = fake_dna_zomes_named(&uuid::Uuid::new_v4().to_string(), &name, zomes.clone());
             let original_dna_hash = dna.dna_hash().clone();
             let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
             let agent_key = generate_agent_pubkey(&mut client, REQ_TIMEOUT_MS).await;
@@ -513,8 +512,8 @@ async fn concurrent_install_dna() {
                 agent_key,
                 fake_dna_path.clone(),
                 None,
-                role_id.clone(),
-                role_id.clone(),
+                name.clone(),
+                name.clone(),
                 REQ_TIMEOUT_MS,
             )
             .await;

@@ -383,21 +383,21 @@ pub struct InstalledAppCommon {
     /// but I'm leaving it here as a placeholder in case we ever want it to
     /// have formal significance.
     _agent_key: AgentPubKey,
-    /// The "roles" as specified in the AppManifest
-    roles: HashMap<AppRoleId, AppRole>,
+    /// The assignments of the roles as specified in the AppManifest
+    role_assignments: HashMap<AppRoleId, AppRoleAssignment>,
 }
 
 impl InstalledAppCommon {
     /// Constructor
-    pub fn new<S: ToString, I: IntoIterator<Item = (AppRoleId, AppRole)>>(
+    pub fn new<S: ToString, I: IntoIterator<Item = (AppRoleId, AppRoleAssignment)>>(
         installed_app_id: S,
         _agent_key: AgentPubKey,
-        roles: I,
+        role_assignments: I,
     ) -> Self {
         InstalledAppCommon {
             installed_app_id: installed_app_id.to_string(),
             _agent_key,
-            roles: roles.into_iter().collect(),
+            role_assignments: role_assignments.into_iter().collect(),
         }
     }
 
@@ -408,21 +408,24 @@ impl InstalledAppCommon {
 
     /// Accessor
     pub fn provisioned_cells(&self) -> impl Iterator<Item = (&AppRoleId, &CellId)> {
-        self.roles
+        self.role_assignments
             .iter()
             .filter_map(|(role_id, role)| role.provisioned_cell().map(|c| (role_id, c)))
     }
 
     /// Accessor
     pub fn into_provisioned_cells(self) -> impl Iterator<Item = (AppRoleId, CellId)> {
-        self.roles
+        self.role_assignments
             .into_iter()
             .filter_map(|(role_id, role)| role.into_provisioned_cell().map(|c| (role_id, c)))
     }
 
     /// Accessor
     pub fn cloned_cells(&self) -> impl Iterator<Item = &CellId> {
-        self.roles.iter().map(|(_, role)| &role.clones).flatten()
+        self.role_assignments
+            .iter()
+            .map(|(_, role)| &role.clones)
+            .flatten()
     }
 
     /// Iterator of all cells, both provisioned and cloned
@@ -440,21 +443,21 @@ impl InstalledAppCommon {
     }
 
     /// Accessor for particular role
-    pub fn role(&self, role_id: &AppRoleId) -> AppResult<&AppRole> {
-        self.roles
+    pub fn role(&self, role_id: &AppRoleId) -> AppResult<&AppRoleAssignment> {
+        self.role_assignments
             .get(role_id)
             .ok_or_else(|| AppError::AppRoleIdMissing(role_id.clone()))
     }
 
-    fn role_mut(&mut self, role_id: &AppRoleId) -> AppResult<&mut AppRole> {
-        self.roles
+    fn role_mut(&mut self, role_id: &AppRoleId) -> AppResult<&mut AppRoleAssignment> {
+        self.role_assignments
             .get_mut(role_id)
             .ok_or_else(|| AppError::AppRoleIdMissing(role_id.clone()))
     }
 
     /// Accessor
-    pub fn roles(&self) -> &HashMap<AppRoleId, AppRole> {
-        &self.roles
+    pub fn roles(&self) -> &HashMap<AppRoleId, AppRoleAssignment> {
+        &self.role_assignments
     }
 
     /// Add a cloned cell
@@ -527,7 +530,7 @@ impl InstalledAppCommon {
         let roles = installed_cells
             .into_iter()
             .map(|InstalledCell { role_id, cell_id }| {
-                let role = AppRole {
+                let role = AppRoleAssignment {
                     base_cell_id: cell_id,
                     is_provisioned: true,
                     clones: HashSet::new(),
@@ -539,7 +542,7 @@ impl InstalledAppCommon {
         Ok(Self {
             installed_app_id,
             _agent_key,
-            roles,
+            role_assignments: roles,
         })
     }
 }
@@ -744,9 +747,9 @@ pub enum DisabledAppReason {
     Error(String),
 }
 
-/// Cell "roles" correspond to cell entries in the AppManifest.
+/// App "roles" correspond to cell entries in the AppManifest.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct AppRole {
+pub struct AppRoleAssignment {
     /// The Id of the Cell which will be provisioned for this role.
     /// This also identifies the basis for cloned DNAs, and this is how the
     /// Agent is determined for clones (always the same as the provisioned cell).
@@ -763,7 +766,7 @@ pub struct AppRole {
     clones: HashSet<CellId>,
 }
 
-impl AppRole {
+impl AppRoleAssignment {
     /// Constructor. List of clones always starts empty.
     pub fn new(base_cell_id: CellId, is_provisioned: bool, clone_limit: u32) -> Self {
         Self {
@@ -810,7 +813,7 @@ impl AppRole {
 
 #[cfg(test)]
 mod tests {
-    use super::{AppRole, RunningApp};
+    use super::{AppRoleAssignment, RunningApp};
     use crate::prelude::*;
     use ::fixt::prelude::*;
     use std::collections::HashSet;
@@ -820,7 +823,7 @@ mod tests {
         let base_cell_id = fixt!(CellId);
         let agent = base_cell_id.agent_pubkey().clone();
         let new_clone = || CellId::new(fixt!(DnaHash), agent.clone());
-        let role1 = AppRole::new(base_cell_id, false, 3);
+        let role1 = AppRoleAssignment::new(base_cell_id, false, 3);
         let agent = fixt!(AgentPubKey);
         let role_id: AppRoleId = "role_id".into();
         let mut app: RunningApp =

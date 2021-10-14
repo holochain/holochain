@@ -60,7 +60,7 @@ async fn provisioning_1_create() {
 
     // Build the expected output.
     // NB: this relies heavily on the particulars of the `app_manifest_fixture`
-    let role = AppRole::new(cell_id, true, 50);
+    let role = AppRoleAssignment::new(cell_id, true, 50);
 
     let expected = CellRoleResolution {
         agent,

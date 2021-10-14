@@ -89,7 +89,7 @@ async fn can_add_clone_cell_to_app() {
     .unwrap();
 
     let installed_cell = InstalledCell::new(cell_id.clone(), "role_id".to_string());
-    let role = AppRole::new(cell_id.clone(), true, 1);
+    let role = AppRoleAssignment::new(cell_id.clone(), true, 1);
     let app1 = InstalledAppCommon::new_legacy("no clone", vec![installed_cell.clone()]).unwrap();
     let app2 = InstalledAppCommon::new("yes clone", agent, vec![("role_id".into(), role.clone())]);
     assert_eq!(
@@ -190,7 +190,7 @@ async fn app_ids_are_unique() {
 
 /// App can't be installed if it contains duplicate AppRoleIds
 #[tokio::test(flavor = "multi_thread")]
-async fn cell_role_ids_are_unique() {
+async fn app_role_ids_are_unique() {
     let cells = vec![
         InstalledCell::new(fixt!(CellId), "1".into()),
         InstalledCell::new(fixt!(CellId), "1".into()),

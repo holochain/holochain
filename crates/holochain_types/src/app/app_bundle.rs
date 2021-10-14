@@ -73,20 +73,21 @@ impl AppBundle {
                                 let agent = resolution.agent.clone();
                                 let dna_hash = dna.dna_hash().clone();
                                 let cell_id = CellId::new(dna_hash, agent);
-                                let role = AppRole::new(cell_id, true, clone_limit);
+                                let role = AppRoleAssignment::new(cell_id, true, clone_limit);
                                 // TODO: could sequentialize this to remove the clone
                                 let proof = membrane_proofs.get(&role_id).cloned();
                                 resolution.dnas_to_register.push((dna, proof));
                                 resolution.roles.push((role_id, role));
                             }
                             CellProvisioningOp::Existing(cell_id, clone_limit) => {
-                                let role = AppRole::new(cell_id, true, clone_limit);
+                                let role = AppRoleAssignment::new(cell_id, true, clone_limit);
                                 resolution.roles.push((role_id, role));
                             }
                             CellProvisioningOp::Noop(cell_id, clone_limit) => {
-                                resolution
-                                    .roles
-                                    .push((role_id, AppRole::new(cell_id, false, clone_limit)));
+                                resolution.roles.push((
+                                    role_id,
+                                    AppRoleAssignment::new(cell_id, false, clone_limit),
+                                ));
                             }
                             other => {
                                 tracing::error!(
@@ -213,7 +214,7 @@ pub fn we_must_remember_to_rework_cell_panic_handling_after_implementing_use_exi
 pub struct CellRoleResolution {
     pub agent: AgentPubKey,
     pub dnas_to_register: Vec<(DnaFile, Option<MembraneProof>)>,
-    pub roles: Vec<(AppRoleId, AppRole)>,
+    pub roles: Vec<(AppRoleId, AppRoleAssignment)>,
 }
 
 #[allow(missing_docs)]

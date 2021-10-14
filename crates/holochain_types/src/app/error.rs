@@ -1,12 +1,12 @@
 #![allow(missing_docs)]
 
-use super::AppRole;
+use super::AppRoleAssignment;
 use crate::prelude::*;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
     #[error("Clone limit of {0} exceeded for cell: {1:?}")]
-    CloneLimitExceeded(u32, AppRole),
+    CloneLimitExceeded(u32, AppRoleAssignment),
 
     #[error("Tried to access missing role id: '{0}'")]
     AppRoleIdMissing(AppRoleId),
