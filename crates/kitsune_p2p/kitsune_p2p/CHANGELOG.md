@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 - Check local agents for basis when doing a RPCMulti call. [#1027](https://github.com/holochain/holochain/pull/1027).
+- Check local agents for basis when doing a RPCMulti call. [#1009](https://github.com/holochain/holochain/pull/1009).
+- Gossip all agent info within the common arc set even in they are empty. [#1042](https://github.com/holochain/holochain/pull/1042).
 
 ## 0.0.9
 

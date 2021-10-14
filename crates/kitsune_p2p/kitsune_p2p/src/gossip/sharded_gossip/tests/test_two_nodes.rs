@@ -611,3 +611,146 @@ async fn initiate_times_out() {
         })
         .unwrap();
 }
+
+#[tokio::test(flavor = "multi_thread")]
+/// Runs through a happy path gossip round between two agents.
+async fn gossips_empty_info() {
+    // - Setup players and data.
+    let mut u = arbitrary::Unstructured::new(&NOISE);
+    let bob_cert = Tx2Cert::arbitrary(&mut u).unwrap();
+
+    // - Create some agents.
+    let mut agents = agents(4).into_iter();
+    let alice_agent = agents.next().unwrap();
+    let bob_agent = agents.next().unwrap();
+    let empty_agent_1 = agents.next().unwrap();
+    let empty_agent_2 = agents.next().unwrap();
+
+    // - Get their agent info.
+    let alice_info = agent_info(alice_agent.clone()).await;
+    let bob_info = agent_info(bob_agent.clone()).await;
+    let empty_1_info = empty_agent_info(empty_agent_1.clone(), alice_info.url_list.clone()).await;
+    let empty_2_info = empty_agent_info(empty_agent_2.clone(), bob_info.url_list.clone()).await;
+    let peer_data = vec![alice_info.clone(), bob_info.clone(), empty_1_info.clone()];
+
+    // - Setup alice's conductor.
+    let mut evt_handler = MockKitsuneP2pEventHandler::new();
+    evt_handler.expect_handle_query_agents().returning({
+        let peer_data = peer_data.clone();
+        move |a| {
+            let peer_data = peer_data.clone();
+            Ok(async move { Ok(peer_data) }.boxed().into())
+        }
+    });
+    evt_handler
+        .expect_handle_query_op_hashes()
+        .returning(|_| Ok(async { Ok(None) }.boxed().into()));
+    evt_handler
+        .expect_handle_put_agent_info_signed()
+        // - Assert alice get's only the empty agent from bob's node.
+        .withf({
+            let empty_2_info = empty_2_info.clone();
+            move |info| info.peer_data == vec![empty_2_info.clone()]
+        })
+        .returning(|_| Ok(async { Ok(()) }.boxed().into()));
+    evt_handler
+        .expect_handle_gossip()
+        .returning(|_, _, _| Ok(async { Ok(()) }.boxed().into()));
+
+    // - Setup alice's local state.
+    let state = ShardedGossipLocalState {
+        local_agents: maplit::hashset! { alice_agent.clone(), empty_agent_1.clone() },
+        ..Default::default()
+    };
+    let (evt_sender, _) = spawn_handler(evt_handler).await;
+    let alice = ShardedGossipLocal::test(GossipType::Recent, evt_sender, state);
+
+    // - Setup bob's conductor.
+    let mut evt_handler = MockKitsuneP2pEventHandler::new();
+    let peer_data = vec![alice_info.clone(), bob_info.clone(), empty_2_info.clone()];
+    evt_handler.expect_handle_query_agents().returning({
+        let peer_data = peer_data.clone();
+        move |_| {
+            let peer_data = peer_data.clone();
+            Ok(async move { Ok(peer_data) }.boxed().into())
+        }
+    });
+    evt_handler
+        .expect_handle_query_op_hashes()
+        .returning(|_| Ok(async { Ok(None) }.boxed().into()));
+    evt_handler
+        .expect_handle_put_agent_info_signed()
+        // - Assert bob get's only the empty agent from alice's node.
+        .withf({
+            let empty_1_info = empty_1_info.clone();
+            move |info| info.peer_data == vec![empty_1_info.clone()]
+        })
+        .returning(|_| Ok(async { Ok(()) }.boxed().into()));
+    evt_handler
+        .expect_handle_gossip()
+        .returning(|_, _, _| Ok(async { Ok(()) }.boxed().into()));
+
+    // - Setup bob's local state.
+    let state = ShardedGossipLocalState {
+        local_agents: maplit::hashset! { bob_agent.clone(), empty_agent_2.clone() },
+        ..Default::default()
+    };
+    let (evt_sender, _) = spawn_handler(evt_handler).await;
+    let bob = ShardedGossipLocal::test(GossipType::Recent, evt_sender, state);
+
+    // - Bob try's to initiate.
+    let (_, _, bob_outgoing) = bob.try_initiate().await.unwrap().unwrap();
+    let alices_cert = bob
+        .inner
+        .share_ref(|i| Ok(i.initiate_tgt.as_ref().unwrap().0.cert().clone()))
+        .unwrap();
+
+    // - Send initiate to alice.
+    let alice_outgoing = alice
+        .process_incoming(bob_cert.clone(), bob_outgoing)
+        .await
+        .unwrap();
+
+    // - Alice responds to the initiate with 1 accept and 2 blooms.
+    assert_eq!(alice_outgoing.len(), 3);
+
+    let mut bob_outgoing = Vec::new();
+
+    // - Send the above to bob.
+    for incoming in alice_outgoing {
+        let outgoing = bob
+            .process_incoming(alices_cert.clone(), incoming)
+            .await
+            .unwrap();
+        bob_outgoing.extend(outgoing);
+    }
+
+    // - Bob responds with 2 blooms and 2 responses to alice's blooms.
+    assert_eq!(bob_outgoing.len(), 4);
+
+    let mut alice_outgoing = Vec::new();
+
+    // - Send the above to bob.
+    for incoming in bob_outgoing {
+        let outgoing = alice
+            .process_incoming(bob_cert.clone(), incoming)
+            .await
+            .unwrap();
+        alice_outgoing.extend(outgoing);
+    }
+
+    assert_eq!(alice_outgoing.len(), 2);
+
+    let mut bob_outgoing = Vec::new();
+
+    // - Send the above to bob.
+    for incoming in alice_outgoing {
+        let outgoing = bob
+            .process_incoming(alices_cert.clone(), incoming)
+            .await
+            .unwrap();
+        bob_outgoing.extend(outgoing);
+    }
+
+    assert_eq!(bob_outgoing.len(), 0);
+}

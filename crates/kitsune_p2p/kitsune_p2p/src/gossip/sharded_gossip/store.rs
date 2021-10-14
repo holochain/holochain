@@ -7,6 +7,7 @@ use crate::event::{
     FetchOpDataEvt, PutAgentInfoSignedEvt, QueryAgentsEvt, QueryOpHashesEvt, TimeWindow,
 };
 use crate::types::event::KitsuneP2pEventSender;
+use kitsune_p2p_types::bin_types::KitsuneBinType;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
     bin_types::{KitsuneAgent, KitsuneBinType, KitsuneOpHash, KitsuneSpace},
@@ -72,15 +73,10 @@ pub(super) async fn agent_info_within_arc_set(
     space: &Arc<KitsuneSpace>,
     arc_set: Arc<DhtArcSet>,
 ) -> KitsuneResult<impl Iterator<Item = AgentInfoSigned>> {
-    let set: HashSet<_> = agents_within_arcset(evt_sender, space, arc_set)
-        .await?
-        .into_iter()
-        .map(|(a, _)| a)
-        .collect();
     Ok(all_agent_info(evt_sender, space)
         .await?
         .into_iter()
-        .filter(move |info| set.contains(info.agent.as_ref())))
+        .filter(move |info| arc_set.contains(info.agent.get_loc())))
 }
 
 /// Get agents and their intervals within a `DhtArcSet`.
