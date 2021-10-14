@@ -38,7 +38,7 @@ impl AppManifestValidated {
                 }
             }
         }
-        Ok(AppManifestValidated { name, roles: roles })
+        Ok(AppManifestValidated { name, roles })
     }
 }
 
