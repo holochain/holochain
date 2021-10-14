@@ -153,7 +153,7 @@ mod tests {
             .unwrap();
 
         // let gossip do its thing
-        tokio::time::sleep(tokio::time::Duration::from_millis(10000)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
 
         sb.space_state()
             .share_mut(|sb, _| {

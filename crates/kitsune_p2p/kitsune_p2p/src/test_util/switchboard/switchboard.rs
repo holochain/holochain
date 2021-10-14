@@ -8,6 +8,7 @@ use ghost_actor::GhostResult;
 use itertools::Itertools;
 use kitsune_p2p_proxy::tx2::{tx2_proxy, ProxyConfig};
 use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_types::agent_info::agent_info_helper::{AgentInfoEncode, AgentMetaInfoEncode};
 use kitsune_p2p_types::agent_info::{AgentInfoInner, AgentInfoSigned};
 use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::dht_arc::loc8::Loc8;
@@ -213,7 +214,7 @@ impl Switchboard {
                             _ => unimplemented!(),
                         }
                     }
-                    evt => {
+                    _evt => {
                         // NB: all other events are ignored
                     }
                 }
@@ -571,17 +572,35 @@ fn fake_agent_info(
     agent: KAgent,
     interval: ArcInterval,
 ) -> AgentInfoSigned {
-    let url = node.local_addr().unwrap();
+    use crate::fixt::*;
+    let url_list = vec![node.local_addr().unwrap()];
+    let meta_info = AgentMetaInfoEncode {
+        dht_storage_arc_half_length: 0,
+    };
+    let mut buf = Vec::new();
+    kitsune_p2p_types::codec::rmp_encode(&mut buf, meta_info).unwrap();
+    let meta_info = buf.into_boxed_slice();
+
+    let info = AgentInfoEncode {
+        space: space.clone(),
+        agent: agent.clone(),
+        urls: url_list.clone(),
+        signed_at_ms: 0,
+        expires_after_ms: u64::MAX,
+        meta_info,
+    };
+    let mut buf = Vec::new();
+    kitsune_p2p_types::codec::rmp_encode(&mut buf, info).unwrap();
+    let encoded_bytes = buf.into_boxed_slice();
     let state = AgentInfoInner {
         space,
         agent,
         storage_arc: DhtArc::from_interval(interval),
-        url_list: vec![url],
+        url_list,
         signed_at_ms: 0,
-        // Never expires
         expires_at_ms: u64::MAX,
-        signature: Arc::new(KitsuneSignature(vec![])),
-        encoded_bytes: Box::new([]),
+        signature: Arc::new(fixt::prelude::fixt!(KitsuneSignature)),
+        encoded_bytes,
     };
     AgentInfoSigned(Arc::new(state))
 }
