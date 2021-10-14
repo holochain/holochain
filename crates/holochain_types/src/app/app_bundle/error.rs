@@ -6,7 +6,7 @@ use crate::prelude::{AppManifestError, CellNick, DnaError};
 /// Errors occurring while installing an AppBundle
 #[derive(thiserror::Error, Debug)]
 pub enum AppBundleError {
-    #[error("Could not resolve the cell slot '{0}'")]
+    #[error("Could not resolve the cell role '{0}'")]
     CellResolutionFailure(CellNick),
 
     #[error(transparent)]

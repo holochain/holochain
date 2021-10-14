@@ -89,15 +89,15 @@ async fn can_add_clone_cell_to_app() {
     .unwrap();
 
     let installed_cell = InstalledCell::new(cell_id.clone(), "nick".to_string());
-    let slot = AppSlot::new(cell_id.clone(), true, 1);
+    let role = AppRole::new(cell_id.clone(), true, 1);
     let app1 = InstalledAppCommon::new_legacy("no clone", vec![installed_cell.clone()]).unwrap();
-    let app2 = InstalledAppCommon::new("yes clone", agent, vec![("nick".into(), slot.clone())]);
+    let app2 = InstalledAppCommon::new("yes clone", agent, vec![("role_id".into(), role.clone())]);
     assert_eq!(
-        app1.slots().keys().collect::<Vec<_>>(),
+        app1.roles().keys().collect::<Vec<_>>(),
         vec![&"nick".to_string()]
     );
     assert_eq!(
-        app2.slots().keys().collect::<Vec<_>>(),
+        app2.roles().keys().collect::<Vec<_>>(),
         vec![&"nick".to_string()]
     );
 
@@ -199,7 +199,7 @@ async fn cell_nicks_are_unique() {
     let result = InstalledAppCommon::new_legacy("id", cells.into_iter());
     matches::assert_matches!(
         result,
-        Err(AppError::DuplicateSlotIds(_, nicks)) if nicks == vec!["1".to_string()]
+        Err(AppError::DuplicateAppRoleIds(_, nicks)) if nicks == vec!["1".to_string()]
     );
 }
 
