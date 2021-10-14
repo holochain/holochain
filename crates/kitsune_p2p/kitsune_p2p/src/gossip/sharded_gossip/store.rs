@@ -7,7 +7,6 @@ use crate::event::{
     FetchOpDataEvt, PutAgentInfoSignedEvt, QueryAgentsEvt, QueryOpHashesEvt, TimeWindow,
 };
 use crate::types::event::KitsuneP2pEventSender;
-use kitsune_p2p_types::bin_types::KitsuneBinType;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
     bin_types::{KitsuneAgent, KitsuneBinType, KitsuneOpHash, KitsuneSpace},

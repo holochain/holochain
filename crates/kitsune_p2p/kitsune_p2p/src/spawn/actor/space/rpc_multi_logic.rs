@@ -94,30 +94,6 @@ impl Kill {
     }
 }
 
-struct Kill {
-    closed: AtomicBool,
-    kill: Notify,
-}
-
-impl Kill {
-    fn new() -> Arc<Self> {
-        Arc::new(Self {
-            closed: AtomicBool::new(false),
-            kill: Notify::new(),
-        })
-    }
-    fn kill_all(&self) {
-        self.closed
-            .store(true, std::sync::atomic::Ordering::Release);
-        self.kill.notify_waiters();
-    }
-    async fn wait(&self) {
-        if !self.closed.load(std::sync::atomic::Ordering::Acquire) {
-            self.kill.notified().await;
-        }
-    }
-}
-
 impl Outer {
     /// construct a new container for this rpc_multi logic
     fn new(
