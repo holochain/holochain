@@ -4,6 +4,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE**: The notion of "cell nicknames" ("nicks") and "app slots" has been unified into the notion of "app roles". This introduces several breaking changes. In general, you will need to rebuild any app bundles you are using, and potentially update some usages of the admin interface. In particular:
+  - The `slots` field in App manifests is now called `roles`
+  - The `InstallApp` admin method now takes a `role_id` field instead of a `nick` field
+  - In the return value for any admin method which lists installed apps, e.g. `ListEnabledApps`, any reference to `"slots"` is now named `"roles"`
+  - See [\#1045](https://github.com/holochain/holochain/pull/1045)
+
 ## 0.0.110
 
 - Publish now runs on a loop if there are ops still needing receipts. [\#1024](https://github.com/holochain/holochain/pull/1024)
