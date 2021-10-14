@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p"
-version = "0.0.9"
+version = "0.0.10"
 description = "p2p / dht communication framework"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -21,9 +21,9 @@ governor = "0.3.2"
 itertools = "0.10"
 kitsune_p2p_mdns = { version = "0.0.2", path = "../mdns" }
 kitsune_p2p_timestamp = { version = "0.0.5", path = "../timestamp" }
-kitsune_p2p_types = { version = "0.0.8", path = "../types" }
-kitsune_p2p_proxy = { version = "0.0.8", path = "../proxy" }
-kitsune_p2p_transport_quic = { version = "0.0.8", path = "../transport_quic" }
+kitsune_p2p_types = { version = "0.0.9", path = "../types" }
+kitsune_p2p_proxy = { version = "0.0.9", path = "../proxy" }
+kitsune_p2p_transport_quic = { version = "0.0.9", path = "../transport_quic" }
 mockall = { version = "0.10.2", optional = true }
 parking_lot = "0.11.1"
 rand = "0.7"
@@ -36,7 +36,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_bytes = "0.11"
 reqwest = "0.11.2"
 once_cell = "1.4.1"
-fixt = { path = "../../fixt", version = "0.0.6"}
+fixt = { path = "../../fixt", version = "0.0.7"}
 observability = "0.1.3"
 
 # arbitrary could be made optional
