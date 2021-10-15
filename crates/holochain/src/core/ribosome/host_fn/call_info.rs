@@ -11,7 +11,7 @@ pub fn call_info(
     _input: (),
 ) -> Result<CallInfo, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
-        HostFnAccess{ bindings_deterministic: Permission::Allow, .. } => {
+        HostFnAccess{ bindings: Permission::Allow, .. } => {
             Ok(CallInfo {
                 as_at: call_context
                     .host_context
