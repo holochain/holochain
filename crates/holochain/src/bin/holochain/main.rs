@@ -7,7 +7,7 @@ use holochain::conductor::ConductorHandle;
 use holochain_conductor_api::conductor::ConductorConfigError;
 use holochain_conductor_api::config::conductor::KeystoreConfig;
 use holochain_util::tokio_helper;
-use kitsune_p2p_types::dependencies::new_lair_api::LairResult;
+use kitsune_p2p_types::dependencies::lair_keystore_api::LairResult;
 use observability::Output;
 #[cfg(unix)]
 use sd_notify::{notify, NotifyState};

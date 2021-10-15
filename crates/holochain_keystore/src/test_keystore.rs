@@ -1,8 +1,8 @@
 //! DANGER! This is a mock keystore for testing, DO NOT USE THIS IN PRODUCTION!
 
 use crate::*;
-use kitsune_p2p_types::dependencies::new_lair_api;
-use new_lair_api::prelude::*;
+use kitsune_p2p_types::dependencies::lair_keystore_api;
+use lair_keystore_api::prelude::*;
 use std::sync::Arc;
 
 /// First Test Agent Pub Key
@@ -55,7 +55,7 @@ fn s(s: &str) -> [u8; 32] {
 /// Construct a new TestKeystore.
 /// DANGER! This is a mock keystore for testing, DO NOT USE THIS IN PRODUCTION!
 pub async fn spawn_legacy_test_keystore() -> KeystoreApiResult<MetaLairClient> {
-    use legacy_lair_api::test::*;
+    use lair_keystore_api_0_0::test::*;
     let (api, _evt) = spawn_test_keystore(
         vec![
             FixtureSignEd25519Keypair {
@@ -114,15 +114,15 @@ pub async fn spawn_test_keystore() -> LairResult<MetaLairClient> {
     let config = Arc::new(
         PwHashLimits::Minimum
             .with_exec(|| {
-                new_lair_api::config::LairServerConfigInner::new("/", passphrase.to_read())
+                lair_keystore_api::config::LairServerConfigInner::new("/", passphrase.to_read())
             })
             .await?,
     );
 
     // the keystore
-    let keystore = new_lair_api::in_proc_keystore::InProcKeystore::new(
+    let keystore = lair_keystore_api::in_proc_keystore::InProcKeystore::new(
         config,
-        new_lair_api::mem_store::create_mem_store_factory(),
+        lair_keystore_api::mem_store::create_mem_store_factory(),
         passphrase.to_read(),
     )
     .await?;

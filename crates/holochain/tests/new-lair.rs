@@ -3,11 +3,11 @@ use holochain_conductor_api::config::conductor::ConductorConfig;
 use holochain_conductor_api::config::conductor::KeystoreConfig;
 use holochain_conductor_api::AdminInterfaceConfig;
 use holochain_conductor_api::InterfaceDriver;
-use kitsune_p2p_types::dependencies::new_lair_api;
-use new_lair_api::dependencies::*;
-use new_lair_api::ipc_keystore::*;
-use new_lair_api::mem_store::*;
-use new_lair_api::prelude::*;
+use kitsune_p2p_types::dependencies::lair_keystore_api;
+use lair_keystore_api::dependencies::*;
+use lair_keystore_api::ipc_keystore::*;
+use lair_keystore_api::mem_store::*;
+use lair_keystore_api::prelude::*;
 use std::sync::Arc;
 
 mod test_utils;

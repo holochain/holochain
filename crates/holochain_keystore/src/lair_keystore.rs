@@ -1,9 +1,10 @@
 //! Keystore backed by legacy_lair_client.
 
 use crate::*;
-use kitsune_p2p_types::dependencies::{new_lair_api, url2};
-use legacy_lair_api::*;
-use new_lair_api::LairResult;
+use kitsune_p2p_types::dependencies::{lair_keystore_api, url2};
+use lair_keystore_api_0_0::*;
+
+use lair_keystore_api::LairResult;
 
 /// Spawn a new keystore backed by legacy_lair_client.
 pub async fn spawn_lair_keystore(
@@ -16,17 +17,17 @@ pub async fn spawn_lair_keystore(
     }
     let config = config.build();
 
-    let api = legacy_lair_client::assert_running_lair_and_connect(config, passphrase).await?;
+    let api = lair_keystore_client_0_0::assert_running_lair_and_connect(config, passphrase).await?;
 
     Ok(MetaLairClient::Legacy(api))
 }
 
-/// Spawn a new keystore backed by new_lair_api.
+/// Spawn a new keystore backed by lair_keystore_api.
 pub async fn spawn_new_lair_keystore(
     connection_url: url2::Url2,
     passphrase: sodoken::BufRead,
 ) -> LairResult<MetaLairClient> {
-    use new_lair_api::ipc_keystore::*;
+    use lair_keystore_api::ipc_keystore::*;
     let opts = IpcKeystoreClientOptions {
         connection_url: connection_url.into(),
         passphrase,
