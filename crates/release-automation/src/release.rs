@@ -364,7 +364,7 @@ fn bump_release_versions<'a>(
             .iter()
             .map(|wcrh| wcrh.title())
             .collect::<Vec<String>>();
-        create_crate_tags(&ws, tags_to_create, cmd_args)?;
+        create_crate_tags(ws, tags_to_create, cmd_args)?;
     }
 
     Ok(())
