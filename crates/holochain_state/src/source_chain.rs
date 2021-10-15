@@ -134,7 +134,11 @@ impl SourceChain {
     }
 
     pub fn persisted_chain_head(&self) -> (HeaderHash, u32, Timestamp) {
-        (self.persisted_head.clone(), self.persisted_seq, self.persisted_timestamp)
+        (
+            self.persisted_head.clone(),
+            self.persisted_seq,
+            self.persisted_timestamp,
+        )
     }
 
     pub fn chain_head(&self) -> SourceChainResult<(HeaderHash, u32, Timestamp)> {
