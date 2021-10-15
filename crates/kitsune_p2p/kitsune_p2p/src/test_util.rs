@@ -41,6 +41,20 @@ test_val! {
     Arc<KitsuneOpHash> => { rand36() },
 }
 
+/// Create a handler task and produce a Sender for interacting with it
+pub async fn spawn_handler<H: KitsuneP2pEventHandler + ghost_actor::GhostControlHandler>(
+    h: H,
+) -> (
+    futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
+    tokio::task::JoinHandle<ghost_actor::GhostResult<()>>,
+) {
+    let builder = ghost_actor::actor_builder::GhostActorBuilder::new();
+    let (tx, rx) = futures::channel::mpsc::channel(4096);
+    builder.channel_factory().attach_receiver(rx).await.unwrap();
+    let driver = builder.spawn(h);
+    (tx, tokio::task::spawn(driver))
+}
+
 mod harness_event;
 pub(crate) use harness_event::*;
 

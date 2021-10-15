@@ -544,8 +544,8 @@ impl std::fmt::Display for DhtArc {
 impl DhtArc {
     pub fn from_interval(interval: ArcInterval) -> Self {
         match interval {
-            ArcInterval::Empty => todo!(),
-            ArcInterval::Full => todo!(),
+            ArcInterval::Empty => Self::empty(0),
+            ArcInterval::Full => Self::full(0),
             ArcInterval::Bounded(start, end) => {
                 let start = start.as_u32();
                 let end = end.as_u32();

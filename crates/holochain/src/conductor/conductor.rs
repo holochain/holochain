@@ -67,7 +67,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use tracing::*;
 
-#[cfg(any(test, feature = "test_utils"))]
+#[cfg(feature = "test_utils")]
 use super::handle::MockConductorHandleT;
 
 mod share;

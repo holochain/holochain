@@ -37,7 +37,7 @@ impl ShardedGossipLocal {
                 std::time::Duration::from_millis(a.expires_at_ms)
                     > std::time::UNIX_EPOCH
                         .elapsed()
-                        .expect("You computer time is set before unix epoch")
+                        .expect("Your system clock is set before UNIX epoch")
             })
             .filter(|a| remote_agents_within_arc_set.contains(&a.agent))
             .filter(|a| !a.storage_arc.interval().is_empty())

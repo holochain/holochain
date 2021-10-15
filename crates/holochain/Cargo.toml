@@ -124,6 +124,7 @@ default = ["slow_tests", "test_utils", "no-deps"]
 # Exposes additional functionality only needed for integration tests.
 # This feature should be turned off for production builds.
 test_utils = [
+  "ghost_actor/test_utils",
   "hdk",
   "holochain_sqlite/test_utils",
   "holochain_state/test_utils",

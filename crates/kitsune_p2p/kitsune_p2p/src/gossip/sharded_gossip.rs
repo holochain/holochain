@@ -25,7 +25,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::time::Instant;
 
-use self::bandwidth::BandwidthThrottle;
+pub use self::bandwidth::BandwidthThrottle;
 use self::metrics::Metrics;
 use self::state_map::RoundStateMap;
 
@@ -49,8 +49,8 @@ mod bandwidth;
 mod metrics;
 mod next_target;
 
-#[cfg(test)]
-mod tests;
+#[cfg(all(test, feature = "test_utils"))]
+pub(crate) mod tests;
 
 /// max send buffer size (keep it under 16384 with a little room for overhead)
 /// (this is not a tuning_param because it must be coordinated
