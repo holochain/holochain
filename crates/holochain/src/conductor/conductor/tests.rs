@@ -161,6 +161,7 @@ async fn app_ids_are_unique() {
     .unwrap();
 
     let cell_id = fake_cell_id(1);
+
     let installed_cell = InstalledCell::new(cell_id.clone(), "handle".to_string());
     let app = InstalledAppCommon::new_legacy("id".to_string(), vec![installed_cell]).unwrap();
 

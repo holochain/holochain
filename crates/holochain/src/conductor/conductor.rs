@@ -52,6 +52,8 @@ use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
+use holochain_keystore::lair_keystore::spawn_new_lair_keystore;
+use holochain_keystore::test_keystore::spawn_legacy_test_keystore;
 use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_keystore::MetaLairClient;
 use holochain_sqlite::db::DbKind;
@@ -1292,6 +1294,8 @@ mod builder {
         pub config: ConductorConfig,
         /// The DnaStore (mockable)
         pub dna_store: DS,
+        /// For new lair, passphrase is required
+        pub passphrase: Option<sodoken::BufRead>,
         /// Optional keystore override
         pub keystore: Option<MetaLairClient>,
         #[cfg(any(test, feature = "test_utils"))]
@@ -1329,6 +1333,12 @@ mod builder {
             self
         }
 
+        /// Set the passphrase for use in keystore initialization
+        pub fn passphrase(mut self, passphrase: Option<sodoken::BufRead>) -> Self {
+            self.passphrase = passphrase;
+            self
+        }
+
         /// Initialize a "production" Conductor
         pub async fn build(self) -> ConductorResult<ConductorHandle> {
             cfg_if::cfg_if! {
@@ -1349,11 +1359,7 @@ mod builder {
                 match &self.config.keystore {
                     KeystoreConfig::DangerTestKeystoreLegacyDeprecated => {
                         tracing::warn!("Using DEPRECATED legacy lair api.");
-                        let keystore = spawn_test_keystore().await?;
-                        // pre-populate with our two fixture agent keypairs
-                        keystore.new_sign_keypair_random().await.unwrap();
-                        keystore.new_sign_keypair_random().await.unwrap();
-                        keystore
+                        spawn_legacy_test_keystore().await?
                     }
                     KeystoreConfig::LairServerLegacyDeprecated {
                         keystore_path,
@@ -1365,6 +1371,19 @@ mod builder {
                             danger_passphrase_insecure_from_config.as_bytes(),
                         );
                         spawn_lair_keystore(keystore_path.as_deref(), passphrase).await?
+                    }
+                    KeystoreConfig::DangerTestKeystore => spawn_test_keystore().await?,
+                    KeystoreConfig::LairServer { connection_url } => {
+                        let passphrase = match self.passphrase {
+                            None => {
+                                return Err(one_err::OneErr::new(
+                                    "passphrase required for new lair keystore api",
+                                )
+                                .into())
+                            }
+                            Some(p) => p,
+                        };
+                        spawn_new_lair_keystore(connection_url.clone(), passphrase).await?
                     }
                     oth => unimplemented!("unimplemented keystore config: {:?}", oth),
                 }

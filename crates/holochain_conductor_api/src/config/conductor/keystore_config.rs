@@ -27,22 +27,20 @@ pub enum KeystoreConfig {
         /// Passphrase is pulled directly from the config file.
         danger_passphrase_insecure_from_config: String,
     },
-    //
-    // DISABLED - Pending implementation of new lair api initialization
-    // /// Enabling this will use a test keystore instead of lair.
-    // /// This generates publicly accessible private keys.
-    // /// DO NOT USE THIS IN PRODUCTION!
-    // DangerTestKeystore,
-    //
-    // DISABLED - Pending implementation of new lair api initialization
-    // /// Connect to an external lair-keystore process.
-    // /// This keystore type requires a secure passphrase specified
-    // /// to the cli binary entrypoint for this Holochain conductor process.
-    // LairServer {
-    //     /// The "connectionUrl" as defined in your "lair-keystore-config.yaml".
-    //     /// This value is also accessible by running `lair-keystore url`.
-    //     connection_url: url2::Url2,
-    // },
+
+    /// Enabling this will use a test keystore instead of lair.
+    /// This generates publicly accessible private keys.
+    /// DO NOT USE THIS IN PRODUCTION!
+    DangerTestKeystore,
+
+    /// Connect to an external lair-keystore process.
+    /// This keystore type requires a secure passphrase specified
+    /// to the cli binary entrypoint for this Holochain conductor process.
+    LairServer {
+        /// The "connectionUrl" as defined in your "lair-keystore-config.yaml".
+        /// This value is also accessible by running `lair-keystore url`.
+        connection_url: url2::Url2,
+    },
     //
     // DISABLED - we can't pull the full lair_keystore crate in as a dep
     //            until we make db-encryption feature the default.
