@@ -333,7 +333,7 @@ pub mod tests {
         let manifest = AppManifest::V1(AppManifestV1 {
             name: "Test app".to_string(),
             description: Some("Serialization roundtrip test".to_string()),
-            roles: roles,
+            roles,
         });
         (manifest, hashes)
     }
