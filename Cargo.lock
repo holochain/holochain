@@ -3221,7 +3221,7 @@ dependencies = [
  "kitsune_p2p_timestamp",
  "kitsune_p2p_transport_quic",
  "kitsune_p2p_types",
- "lair_keystore_api 0.0.2",
+ "lair_keystore_api 0.1.0-alpha.1",
  "maplit",
  "mockall",
  "observability",
@@ -3437,34 +3437,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0de8b303297635ad57c9f5059fd9cee7a47f8e8daa09df0fcd07dd39fb22977f"
 dependencies = [
  "log",
-]
-
-[[package]]
-name = "lair_keystore_api"
-version = "0.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26bf69f6ad88274191ef2ad12850193d267c9b76d5cc33874afac9337604e25b"
-dependencies = [
- "blake2b_simd",
- "block-padding 0.2.1",
- "byteorder",
- "crypto_box",
- "derive_more",
- "directories 3.0.2",
- "futures",
- "ghost_actor 0.3.0-alpha.4",
- "nanoid 0.3.0",
- "num_cpus",
- "once_cell",
- "rand 0.7.3",
- "rayon",
- "rcgen",
- "ring",
- "subtle",
- "thiserror",
- "tokio",
- "toml",
- "winapi",
 ]
 
 [[package]]

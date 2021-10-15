@@ -22,6 +22,8 @@ pub use dht_arc_bucket::*;
 #[cfg(any(test, feature = "test_utils"))]
 pub mod gaps;
 
+/// Type for representing a location that can wrap around
+/// a u32 dht arc
 #[derive(
     Debug,
     Clone,
@@ -39,8 +41,6 @@ pub mod gaps;
     derive_more::Deref,
     derive_more::Display,
 )]
-/// Type for representing a location that can wrap around
-/// a u32 dht arc
 pub struct DhtLocation(pub Wrapping<u32>);
 
 impl DhtLocation {
@@ -53,6 +53,8 @@ impl DhtLocation {
     }
 }
 
+// This From impl exists to make it easier to construct DhtLocations near the
+// maximum value in tests
 #[cfg(any(test, feature = "test_utils"))]
 impl From<i32> for DhtLocation {
     fn from(i: i32) -> Self {
