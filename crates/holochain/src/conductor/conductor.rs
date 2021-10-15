@@ -41,6 +41,8 @@ use crate::conductor::handle::ConductorHandle;
 use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
 use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CHANNEL_BOUND;
+use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CONCURRENT_LIMIT;
+use crate::core::ribosome::RibosomeT;
 use crate::{
     conductor::api::error::ConductorApiResult, core::ribosome::real_ribosome::RealRibosome,
 };
@@ -69,8 +71,6 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use tokio::sync::mpsc::error::SendError;
 use tracing::*;
-use crate::core::ribosome::RibosomeT;
-use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CONCURRENT_LIMIT;
 
 #[cfg(any(test, feature = "test_utils"))]
 use super::handle::MockConductorHandleT;
@@ -1463,7 +1463,10 @@ mod builder {
             Self::finish(handle, config, p2p_evt, post_commit_receiver).await
         }
 
-        fn spawn_post_commit(conductor_handle: ConductorHandle, receiver: tokio::sync::mpsc::Receiver<PostCommitArgs>) {
+        fn spawn_post_commit(
+            conductor_handle: ConductorHandle,
+            receiver: tokio::sync::mpsc::Receiver<PostCommitArgs>,
+        ) {
             let receiver_stream = tokio_stream::wrappers::ReceiverStream::new(receiver);
             tokio::task::spawn(receiver_stream.for_each_concurrent(
                 POST_COMMIT_CONCURRENT_LIMIT,
@@ -1478,7 +1481,9 @@ mod builder {
                         match conductor_handle.clone().get_ribosome(&cell_id.dna_hash()) {
                             Ok(ribosome) => {
                                 if let Err(e) = tokio::task::spawn_blocking(move || {
-                                    if let Err(e) = ribosome.run_post_commit(host_access, invocation) {
+                                    if let Err(e) =
+                                        ribosome.run_post_commit(host_access, invocation)
+                                    {
                                         tracing::error!(?e);
                                     }
                                 })
