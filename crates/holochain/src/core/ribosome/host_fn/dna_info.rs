@@ -36,7 +36,7 @@ pub mod test {
     async fn invoke_import_dna_info_test() {
         let host_access = fixt!(ZomeCallHostAccess, Predictable);
         let dna_info: DnaInfo =
-            crate::call_test_ribosome!(host_access, TestWasm::ZomeInfo, "zome_info", ()).unwrap();
-        assert_eq!(dna_info.name, "test".into());
+            crate::call_test_ribosome!(host_access, TestWasm::ZomeInfo, "dna_info", ()).unwrap();
+        assert_eq!(dna_info.name, String::from("test"));
     }
 }
