@@ -69,6 +69,8 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use tokio::sync::mpsc::error::SendError;
 use tracing::*;
+use crate::core::ribosome::RibosomeT;
+use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CONCURRENT_LIMIT;
 
 #[cfg(any(test, feature = "test_utils"))]
 use super::handle::MockConductorHandleT;
@@ -1461,6 +1463,39 @@ mod builder {
             Self::finish(handle, config, p2p_evt, post_commit_receiver).await
         }
 
+        fn spawn_post_commit(conductor_handle: ConductorHandle, receiver: tokio::sync::mpsc::Receiver<PostCommitArgs>) {
+            let receiver_stream = tokio_stream::wrappers::ReceiverStream::new(receiver);
+            tokio::task::spawn(receiver_stream.for_each_concurrent(
+                POST_COMMIT_CONCURRENT_LIMIT,
+                move |post_commit_args| {
+                    let conductor_handle = conductor_handle.clone();
+                    async move {
+                        let PostCommitArgs {
+                            host_access,
+                            invocation,
+                            cell_id,
+                        } = post_commit_args;
+                        match conductor_handle.clone().get_ribosome(&cell_id.dna_hash()) {
+                            Ok(ribosome) => {
+                                if let Err(e) = tokio::task::spawn_blocking(move || {
+                                    if let Err(e) = ribosome.run_post_commit(host_access, invocation) {
+                                        tracing::error!(?e);
+                                    }
+                                })
+                                .await
+                                {
+                                    tracing::error!(?e);
+                                }
+                            }
+                            Err(e) => {
+                                tracing::error!(?e);
+                            }
+                        }
+                    }
+                },
+            ));
+        }
+
         async fn finish(
             handle: ConductorHandle,
             conductor_config: ConductorConfig,
@@ -1473,7 +1508,7 @@ mod builder {
                 .clone()
                 .start_scheduler(holochain_zome_types::schedule::SCHEDULER_INTERVAL);
 
-            let _ = handle.clone().spawn_post_commit(post_commit_receiver);
+            let _ = Self::spawn_post_commit(handle.clone(), post_commit_receiver);
 
             let configs = conductor_config.admin_interfaces.unwrap_or_default();
             let cell_startup_errors = handle.clone().initialize_conductor(configs).await?;

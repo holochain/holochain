@@ -60,9 +60,7 @@ use crate::conductor::p2p_agent_store::P2pBatch;
 use crate::conductor::p2p_metrics::put_metric_datum;
 use crate::conductor::p2p_metrics::query_metrics;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
-use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CONCURRENT_LIMIT;
 use crate::core::ribosome::real_ribosome::RealRibosome;
-use crate::core::ribosome::RibosomeT;
 use crate::core::workflow::ZomeCallResult;
 use derive_more::From;
 use futures::future::FutureExt;
@@ -252,9 +250,6 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Get an OwnedPermit to the post commit task.
     async fn post_commit_permit(&self) -> Result<OwnedPermit<PostCommitArgs>, SendError<()>>;
-
-    /// Spawn the post commit task.
-    fn spawn_post_commit(self: Arc<Self>, receiver: tokio::sync::mpsc::Receiver<PostCommitArgs>);
 
     /// Stop a running app while leaving it enabled. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
@@ -941,41 +936,6 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn post_commit_permit(&self) -> Result<OwnedPermit<PostCommitArgs>, SendError<()>> {
         self.conductor.post_commit_permit().await
-    }
-
-    fn spawn_post_commit(self: Arc<Self>, receiver: tokio::sync::mpsc::Receiver<PostCommitArgs>) {
-        use futures::stream::StreamExt;
-
-        let receiver_stream = tokio_stream::wrappers::ReceiverStream::new(receiver);
-        tokio::task::spawn(receiver_stream.for_each_concurrent(
-            POST_COMMIT_CONCURRENT_LIMIT,
-            move |post_commit_args| {
-                let self_arc = self.clone();
-                async move {
-                    let PostCommitArgs {
-                        host_access,
-                        invocation,
-                        cell_id,
-                    } = post_commit_args;
-                    match self_arc.clone().get_ribosome(&cell_id.dna_hash()) {
-                        Ok(ribosome) => {
-                            if let Err(e) = tokio::task::spawn_blocking(move || {
-                                if let Err(e) = ribosome.run_post_commit(host_access, invocation) {
-                                    tracing::error!(?e);
-                                }
-                            })
-                            .await
-                            {
-                                tracing::error!(?e);
-                            }
-                        }
-                        Err(e) => {
-                            tracing::error!(?e);
-                        }
-                    }
-                }
-            },
-        ));
     }
 
     #[tracing::instrument(skip(self))]
