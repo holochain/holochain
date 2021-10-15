@@ -133,18 +133,15 @@ impl SourceChain {
         Ok(self.scratch.apply(|scratch| scratch.elements().collect())?)
     }
 
+    pub fn persisted_chain_head(&self) -> (HeaderHash, u32, Timestamp) {
+        (self.persisted_head.clone(), self.persisted_seq, self.persisted_timestamp)
+    }
+
     pub fn chain_head(&self) -> SourceChainResult<(HeaderHash, u32, Timestamp)> {
         // Check scratch for newer head.
         Ok(self.scratch.apply(|scratch| {
-            let chain_head = chain_head_scratch(&(*scratch), self.author.as_ref());
-            let (prev_header, header_seq, timestamp) = chain_head.unwrap_or_else(|| {
-                (
-                    self.persisted_head.clone(),
-                    self.persisted_seq,
-                    self.persisted_timestamp,
-                )
-            });
-            (prev_header, header_seq, timestamp)
+            chain_head_scratch(&(*scratch), self.author.as_ref())
+                .unwrap_or_else(|| self.persisted_chain_head())
         })?)
     }
 

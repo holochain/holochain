@@ -1,8 +1,21 @@
 use hdk::prelude::*;
 
+#[hdk_entry(id = "thing")]
+struct Thing;
+
+entry_defs![Thing::entry_def()];
+
 #[hdk_extern]
 fn zome_info(_: ()) -> ExternResult<ZomeInfo> {
     hdk::prelude::zome_info()
+}
+
+#[hdk_extern]
+fn call_info(_: ()) -> ExternResult<CallInfo> {
+    // Commit something here so we can show the as_at won't shift in the call
+    // info returned.
+    create_entry(Thing)?;
+    hdk::prelude::call_info()
 }
 
 #[cfg(test)]
