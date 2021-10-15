@@ -5,6 +5,11 @@ fn zome_info(_: ()) -> ExternResult<ZomeInfo> {
     hdk::prelude::zome_info()
 }
 
+#[hdk_extern]
+fn dna_info(_: ()) -> ExternResult<DnaInfo> {
+    hdk::prelude::dna_info()
+}
+
 #[cfg(test)]
 pub mod tests {
     use hdk::prelude::*;

@@ -38,6 +38,6 @@ pub mod test {
         let host_access = fixt!(ZomeCallHostAccess, Predictable);
         let zome_info: ZomeInfo =
             crate::call_test_ribosome!(host_access, TestWasm::ZomeInfo, "zome_info", ()).unwrap();
-        assert_eq!(zome_info.name, "test".into());
+        assert_eq!(zome_info.name, "zome_info".into());
     }
 }
