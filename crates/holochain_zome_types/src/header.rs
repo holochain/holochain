@@ -598,7 +598,7 @@ impl EntryType {
     pub fn visibility(&self) -> &EntryVisibility {
         match self {
             EntryType::AgentPubKey => &EntryVisibility::Public,
-            EntryType::App(t) => &t.visibility(),
+            EntryType::App(t) => t.visibility(),
             EntryType::CapClaim => &EntryVisibility::Private,
             EntryType::CapGrant => &EntryVisibility::Private,
         }
