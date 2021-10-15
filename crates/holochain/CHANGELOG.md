@@ -40,6 +40,7 @@ or:
 keystore:
   type: danger_test_keystore_legacy_deprecated
 ```
+- Bump legacy lair version to 0.0.8 fixing a crash when error message was too long [#1046](https://github.com/holochain/holochain/pull/1046)
 
 ## 0.0.109
 
