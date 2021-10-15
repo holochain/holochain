@@ -126,7 +126,7 @@ impl ConductorTestData {
             for cell_id in cell_ids {
                 cell_apis.insert(
                     cell_id.clone(),
-                    CellHostFnCaller::new(&cell_id, &handle, &dna_file).await,
+                    CellHostFnCaller::new(cell_id, &handle, dna_file).await,
                 );
             }
         }
@@ -222,8 +222,8 @@ impl ConductorTestData {
     pub fn alice_call_data(&self) -> &CellHostFnCaller {
         match self.cell_apis.values().len() {
             0 => unreachable!(),
-            1 => &self.cell_apis.values().next().unwrap(),
-            2 => &self.cell_apis.values().nth(1).unwrap(),
+            1 => self.cell_apis.values().next().unwrap(),
+            2 => self.cell_apis.values().nth(1).unwrap(),
             _ => unimplemented!(),
         }
     }
