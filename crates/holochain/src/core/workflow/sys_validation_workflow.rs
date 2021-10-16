@@ -482,7 +482,7 @@ async fn sys_validate_element_inner(
 /// Check if the op has valid signature and author.
 /// Ops that fail this check should be dropped.
 pub async fn counterfeit_check(signature: &Signature, header: &Header) -> SysValidationResult<()> {
-    verify_header_signature(&signature, &header).await?;
+    verify_header_signature(signature, header).await?;
     author_key_is_valid(header.author()).await?;
     Ok(())
 }
@@ -497,8 +497,8 @@ async fn register_agent_activity(
     let prev_header_hash = header.prev_header();
 
     // Checks
-    check_prev_header(&header)?;
-    check_valid_if_dna(&header, &workspace).await?;
+    check_prev_header(header)?;
+    check_valid_if_dna(header, workspace).await?;
     if let Some(prev_header_hash) = prev_header_hash {
         check_and_hold_register_agent_activity(
             prev_header_hash,
@@ -509,7 +509,7 @@ async fn register_agent_activity(
         )
         .await?;
     }
-    check_chain_rollback(&header, &workspace).await?;
+    check_chain_rollback(header, workspace).await?;
     Ok(())
 }
 
@@ -529,8 +529,8 @@ async fn store_element(
             .retrieve_header(prev_header_hash.clone(), Default::default())
             .await?
             .ok_or_else(|| ValidationOutcome::DepMissingFromDht(prev_header_hash.clone().into()))?;
-        check_prev_timestamp(&header, prev_header.header())?;
-        check_prev_seq(&header, prev_header.header())?;
+        check_prev_timestamp(header, prev_header.header())?;
+        check_prev_seq(header, prev_header.header())?;
     }
     Ok(())
 }

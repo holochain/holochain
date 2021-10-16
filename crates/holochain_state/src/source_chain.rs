@@ -487,7 +487,7 @@ impl SourceChain {
                 if is_chain_locked(txn, &hashed_preflight_request)? {
                     return Err(SourceChainError::ChainLocked);
                 }
-                let (persisted_head, persisted_seq, _) = chain_head_db(&txn, author)?;
+                let (persisted_head, persisted_seq, _) = chain_head_db(txn, author)?;
                 let countersigning_agent_state =
                     CounterSigningAgentState::new(agent_index, persisted_head, persisted_seq);
                 lock_chain(
@@ -588,7 +588,7 @@ impl SourceChain {
                 }
                 // As at check.
                 let (new_persisted_head, new_head_seq, new_timestamp) =
-                    chain_head_db(&txn, author)?;
+                    chain_head_db(txn, author)?;
                 if zomed_headers.last().is_none() {
                     // Nothing to write
                     return Ok(Vec::new());

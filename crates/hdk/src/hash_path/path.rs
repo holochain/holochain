@@ -293,7 +293,7 @@ impl Path {
     /// Touch and list all the links from this anchor to anchors below it.
     /// Only returns links between anchors, not to other entries that might have their own links.
     pub fn children(&self) -> ExternResult<holochain_zome_types::link::Links> {
-        Self::ensure(&self)?;
+        Self::ensure(self)?;
         let links = get_links(
             self.hash()?,
             Some(holochain_zome_types::link::LinkTag::new(NAME)),
@@ -306,7 +306,7 @@ impl Path {
     }
 
     pub fn children_details(&self) -> ExternResult<holochain_zome_types::link::LinkDetails> {
-        Self::ensure(&self)?;
+        Self::ensure(self)?;
         get_link_details(
             self.hash()?,
             Some(holochain_zome_types::link::LinkTag::new(NAME)),

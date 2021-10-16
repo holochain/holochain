@@ -41,6 +41,22 @@ or:
 keystore:
   type: danger_test_keystore_legacy_deprecated
 ```
+- Bump legacy lair version to 0.0.8 fixing a crash when error message was too long [#1046](https://github.com/holochain/holochain/pull/1046)
+
+- Options to use new lair keystore [#1040](https://github.com/holochain/holochain/pull/1040)
+
+```yaml
+keystore:
+  type: danger_test_keystore
+```
+
+or
+
+```yaml
+keystore:
+  type: lair_server
+  connection_url: "unix:///my/path/socket?k=Foo"
+```
 
 ## 0.0.109
 

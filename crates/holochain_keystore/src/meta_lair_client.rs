@@ -1,15 +1,15 @@
 use crate::*;
 use holochain_zome_types::Signature;
-use kitsune_p2p_types::dependencies::new_lair_api;
-use legacy_lair_api::actor::Cert as LegacyCert;
-use legacy_lair_api::actor::CertDigest as LegacyCertDigest;
-use legacy_lair_api::actor::CertPrivKey as LegacyCertPrivKey;
-use legacy_lair_api::actor::LairClientApiSender;
-use new_lair_api::prelude::*;
+use kitsune_p2p_types::dependencies::lair_keystore_api;
+use lair_keystore_api::prelude::*;
+use lair_keystore_api_0_0::actor::Cert as LegacyCert;
+use lair_keystore_api_0_0::actor::CertDigest as LegacyCertDigest;
+use lair_keystore_api_0_0::actor::CertPrivKey as LegacyCertPrivKey;
+use lair_keystore_api_0_0::actor::LairClientApiSender;
 use std::future::Future;
 use std::sync::Arc;
 
-pub use kitsune_p2p_types::dependencies::new_lair_api::LairResult;
+pub use kitsune_p2p_types::dependencies::lair_keystore_api::LairResult;
 
 /// Abstraction around runtime switching/upgrade of lair keystore / client.
 /// Can delete this when we finally delete deprecated legacy lair option.
@@ -137,7 +137,7 @@ impl MetaLairClient {
                         .crypto_box_by_pub_key(
                             (*sender_pub_key).into(),
                             (*recipient_pub_key).into(),
-                            legacy_lair_api::internal::crypto_box::CryptoBoxData {
+                            lair_keystore_api_0_0::internal::crypto_box::CryptoBoxData {
                                 data: data.to_vec().into(),
                             }
                             .into(),
@@ -171,7 +171,7 @@ impl MetaLairClient {
                         .crypto_box_open_by_pub_key(
                             (*sender_pub_key).into(),
                             (*recipient_pub_key).into(),
-                            legacy_lair_api::internal::crypto_box::CryptoBoxEncryptedData {
+                            lair_keystore_api_0_0::internal::crypto_box::CryptoBoxEncryptedData {
                                 nonce: nonce.into(),
                                 encrypted_data: data.to_vec().into(),
                             }

@@ -785,12 +785,12 @@ impl AppSlot {
 
     /// Accessor
     pub fn dna_hash(&self) -> &DnaHash {
-        &self.base_cell_id.dna_hash()
+        self.base_cell_id.dna_hash()
     }
 
     /// Accessor
     pub fn agent_key(&self) -> &AgentPubKey {
-        &self.base_cell_id.agent_pubkey()
+        self.base_cell_id.agent_pubkey()
     }
 
     /// Accessor

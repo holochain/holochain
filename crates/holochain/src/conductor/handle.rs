@@ -73,7 +73,7 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_p2p::DnaHashExt;
-use holochain_p2p::HolochainP2pCell;
+
 use holochain_p2p::HolochainP2pCellT;
 use holochain_sqlite::db::DbKind;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
@@ -1319,14 +1319,11 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
         // Join the network but ignore errors because the
         // space retries joining all cells every 5 minutes.
 
-        let pending_cells: Vec<(CellId, HolochainP2pCell)> = self
+        let tasks = self
             .conductor
             .mark_pending_cells_as_joining()
             .into_iter()
             .map(|(id, cell)| (id, cell.holochain_p2p_cell().clone()))
-            .collect();
-
-        let tasks = pending_cells.into_iter()
             .map(|(cell_id, network)| async move {
                 match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join()).await {
                     Ok(Err(e)) => {
