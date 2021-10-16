@@ -94,6 +94,7 @@ macro_rules! dht_op_update {
 /// Insert a [`DhtOp`] into the [`Scratch`].
 pub fn insert_op_scratch(
     scratch: &mut Scratch,
+    zome: Option<Zome>,
     op: DhtOpHashed,
     chain_top_ordering: ChainTopOrdering,
 ) -> StateMutationResult<()> {
@@ -113,17 +114,18 @@ pub fn insert_op_scratch(
     }
     let header_hashed = HeaderHashed::with_pre_hashed(header, op_light.header_hash().to_owned());
     let header_hashed = SignedHeaderHashed::with_presigned(header_hashed, signature);
-    scratch.add_header(header_hashed, chain_top_ordering);
+    scratch.add_header(zome, header_hashed, chain_top_ordering);
     Ok(())
 }
 
 pub fn insert_element_scratch(
     scratch: &mut Scratch,
+    zome: Option<Zome>,
     element: Element,
     chain_top_ordering: ChainTopOrdering,
 ) {
     let (header, entry) = element.into_inner();
-    scratch.add_header(header, chain_top_ordering);
+    scratch.add_header(zome, header, chain_top_ordering);
     if let Some(entry) = entry.into_option() {
         scratch.add_entry(EntryHashed::from_content_sync(entry), chain_top_ordering);
     }

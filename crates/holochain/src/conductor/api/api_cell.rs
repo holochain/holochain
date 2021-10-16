@@ -6,6 +6,7 @@ use super::error::ConductorApiError;
 use super::error::ConductorApiResult;
 use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
+use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
 use crate::core::workflow::ZomeCallResult;
 use async_trait::async_trait;
 use holo_hash::DnaHash;
@@ -13,6 +14,8 @@ use holochain_conductor_api::ZomeCall;
 use holochain_keystore::MetaLairClient;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
+use tokio::sync::mpsc::error::SendError;
+use tokio::sync::mpsc::OwnedPermit;
 use tracing::*;
 
 /// The concrete implementation of [CellConductorApiT], which is used to give
@@ -23,7 +26,7 @@ pub struct CellConductorApi {
     cell_id: CellId,
 }
 
-/// A handle that cn only call zome functions to avoid
+/// A handle that can only call zome functions to avoid
 /// making write lock calls
 pub type CellConductorReadHandle = Arc<dyn CellConductorReadHandleT>;
 
@@ -100,6 +103,10 @@ impl CellConductorApiT for CellConductorApi {
     fn into_call_zome_handle(self) -> CellConductorReadHandle {
         Arc::new(self)
     }
+
+    async fn post_commit_permit(&self) -> Result<OwnedPermit<PostCommitArgs>, SendError<()>> {
+        self.conductor_handle.post_commit_permit().await
+    }
 }
 
 /// The "internal" Conductor API interface, for a Cell to talk to its calling Conductor.
@@ -141,6 +148,9 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
 
     /// Turn this into a call zome handle
     fn into_call_zome_handle(self) -> CellConductorReadHandle;
+
+    /// Get an OwnedPermit to the post commit task.
+    async fn post_commit_permit(&self) -> Result<OwnedPermit<PostCommitArgs>, SendError<()>>;
 }
 
 #[async_trait]
