@@ -1,3 +1,5 @@
+//! An in-memory network for sharded kitsune tests.
+
 use crate::event::{QueryOpHashesEvt, TimeWindow};
 use crate::gossip::sharded_gossip::{BandwidthThrottle, GossipType, ShardedGossip};
 use crate::test_util::spawn_handler;
@@ -36,6 +38,17 @@ pub type NodeEp = Tx2EpHnd<wire::Wire>;
 static ZERO_SPACE: once_cell::sync::Lazy<Arc<KitsuneSpace>> =
     once_cell::sync::Lazy::new(|| Arc::new(KitsuneSpace::new([0; 36].to_vec())));
 
+/// Wrapper around the shared state for a Switchboard network. This state
+/// represents the shared state across all nodes in a space.
+///
+/// This is essentially an Arc<Clone<SwitchboardState>>, which is passed to
+/// SwitchboardEventHandler and is alsoaccessible to your test, so that you can
+/// manually modify state while gossip is modifying the same state.
+///
+/// When calling `add_node(s)`, a new gossip module is created, a task is
+/// spawned to feed incoming network messages to the gossip module, and another
+/// task is spawned which handles the events received, mutating the state
+/// in the process.
 #[derive(Clone)]
 pub struct Switchboard {
     inner: Share<SwitchboardState>,
@@ -43,6 +56,13 @@ pub struct Switchboard {
 }
 
 impl Switchboard {
+    /// Constructor. Only works for one GossipType at a time.
+    // TODO: if it's desirable to test multiple gossip loops running at the
+    //   same time on the same state, another method could be exposed to take
+    //   an already instantiated `Share<SwitchboardState>`, which will cause
+    //   both gossip loops to share the same state.
+    //   Or, this could be modified to take a list of GossipTypes, so that
+    //   multiple loops will be created internally.
     pub fn new(gossip_type: GossipType) -> Self {
         Self {
             inner: Share::new(SwitchboardState::new()),
@@ -59,6 +79,13 @@ impl Switchboard {
         self.inner.share_mut(|sb, _| Ok(f(sb))).unwrap()
     }
 
+    /// Convenience for creating multiple nodes at once, easily destructurable
+    /// using array syntax:
+    ///
+    /// ```ignore
+    /// // no need to specify the number, the destructuring will deduce that.
+    /// let [n1, n2, n3] = sb.add_nodes();
+    /// ```
     pub async fn add_nodes<const N: usize>(&self) -> [NodeEp; N] {
         use std::convert::TryInto;
         let mut nodes = vec![];
@@ -154,8 +181,11 @@ impl Switchboard {
     }
 }
 
-/// An channel-based implementation of networking for tests, where messages are
-/// simply routed in-memory
+/// The state of the switchboard, which represents the persisted state of all
+/// nodes in a space. These methods may be called directly in your test, after
+/// getting a lock on the state via `Switchboard::share`. This same state is
+/// modified directly by an actively running GossipModule which is processing
+/// messages from other nodes.
 pub struct SwitchboardState {
     space: KSpace,
     pub(super) nodes: HashMap<NodeEp, NodeEntry>,
@@ -176,48 +206,8 @@ impl SwitchboardState {
         }
     }
 
-    pub fn node_for_local_agent_loc8(&self, loc8: Loc8) -> Option<&NodeEntry> {
-        self.nodes
-            .values()
-            .find(|n| n.local_agents.keys().contains(&loc8))
-    }
-
-    pub fn node_for_local_agent_loc8_mut(&mut self, loc8: Loc8) -> Option<&mut NodeEntry> {
-        self.nodes
-            .values_mut()
-            .find(|n| n.local_agents.keys().contains(&loc8))
-    }
-
-    pub fn node_for_local_agent_hash_mut(&mut self, hash: &KitsuneAgent) -> Option<&mut NodeEntry> {
-        let agent_loc8 = hash.get_loc().as_loc8();
-        self.node_for_local_agent_loc8_mut(agent_loc8)
-    }
-
-    /// Look through all nodes for this agent Loc8
-    pub fn local_agent_by_loc8(&self, loc8: Loc8) -> Option<&AgentEntry> {
-        self.nodes
-            .values()
-            .filter_map(|n| n.local_agent_by_loc8(loc8))
-            .next()
-    }
-
-    /// Look through all nodes for this agent hash
-    pub fn local_agent_by_hash(&self, hash: &KitsuneAgent) -> Option<&AgentEntry> {
-        self.nodes
-            .values()
-            .filter_map(|n| n.local_agent_by_hash(hash))
-            .next()
-    }
-
-    /// Get the agent map for a node. Just for minor boilerplate reduction.
-    pub fn local_agents_for_node(&mut self, node: &NodeEp) -> &mut HashMap<Loc8, AgentEntry> {
-        &mut self
-            .nodes
-            .get_mut(node)
-            .expect("Node not added")
-            .local_agents
-    }
-
+    /// Add a local agent to the specified node. Specify the agent's location
+    /// and storage arc in terms of Loc8.
     pub fn add_local_agent<L>(&mut self, node_ep: &NodeEp, agent_loc8: L, interval: ArcInterval<L>)
     where
         Loc8: From<L>,
@@ -251,6 +241,8 @@ impl SwitchboardState {
         node.gossip.local_agent_join(agent);
     }
 
+    /// Helpful ascii visualization of each agent's storage arc coverage
+    /// across all nodes.
     pub fn print_ascii_arcs(&self, width: usize) {
         println!("node agent .");
         let mut nodes: Vec<_> = self.nodes.iter().collect();
@@ -270,33 +262,11 @@ impl SwitchboardState {
         }
     }
 
-    pub fn exchange_all_peer_info(&mut self) {
-        let all_agent_locs: Vec<_> = self
-            .nodes
-            .values()
-            .flat_map(|n| n.local_agents.keys())
-            .collect();
-        let info: Vec<(_, Vec<_>)> = self
-            .nodes
-            .iter()
-            .map(|(ep, n)| {
-                let local: HashSet<_> = n.local_agents.keys().collect();
-                (
-                    ep.clone(),
-                    all_agent_locs
-                        .iter()
-                        .filter(|loc| !local.contains(**loc))
-                        .copied()
-                        .copied()
-                        .collect(),
-                )
-            })
-            .collect();
-        for (node, agents) in info {
-            self.inject_peer_info(&node, agents);
-        }
-    }
-
+    /// Inject the agent info from the specified agents into the specified
+    /// node's remote agent store.
+    ///
+    /// This is used to set up arbitrary situations where not every peer
+    /// knows about every other peer.
     pub fn inject_peer_info<'n, L, A: IntoIterator<Item = L>>(
         &mut self,
         node: &'n NodeEp,
@@ -327,16 +297,39 @@ impl SwitchboardState {
             .extend(agents)
     }
 
-    pub fn add_ops_now<L: Into<Loc8>, O: IntoIterator<Item = L>>(
-        &mut self,
-        agent_loc: L,
-        is_integrated: bool,
-        ops: O,
-    ) {
-        let ops = ops.into_iter().map(|op| (op, Timestamp::now()));
-        self.add_ops_timed(agent_loc, is_integrated, ops)
+    /// Let every node know about every other agent.
+    ///
+    /// This is not realistic, but useful as a convenience when not needing to
+    /// explicitly test peer gossip.
+    pub fn exchange_all_peer_info(&mut self) {
+        let all_agent_locs: Vec<_> = self
+            .nodes
+            .values()
+            .flat_map(|n| n.local_agents.keys())
+            .collect();
+        let info: Vec<(_, Vec<_>)> = self
+            .nodes
+            .iter()
+            .map(|(ep, n)| {
+                let local: HashSet<_> = n.local_agents.keys().collect();
+                (
+                    ep.clone(),
+                    all_agent_locs
+                        .iter()
+                        .filter(|loc| !local.contains(**loc))
+                        .copied()
+                        .copied()
+                        .collect(),
+                )
+            })
+            .collect();
+        for (node, agents) in info {
+            self.inject_peer_info(&node, agents);
+        }
     }
 
+    /// Add ops by Loc8 location, specifying the Timestamp that each was created.
+    /// Each Loc8 becomes a new Op added to an agent's op store.
     pub fn add_ops_timed<L: Into<Loc8>, O: IntoIterator<Item = (L, Timestamp)>>(
         &mut self,
         agent_loc: L,
@@ -393,6 +386,21 @@ impl SwitchboardState {
             .new_integrated_data();
     }
 
+    /// Convenient counterpart to `add_ops_timed`, causes each op to be added
+    /// at the current system time.
+    pub fn add_ops_now<L: Into<Loc8>, O: IntoIterator<Item = L>>(
+        &mut self,
+        agent_loc: L,
+        is_integrated: bool,
+        ops: O,
+    ) {
+        let ops = ops.into_iter().map(|op| (op, Timestamp::now()));
+        self.add_ops_timed(agent_loc, is_integrated, ops)
+    }
+
+    /// Get all ops held by a node in terms of their Loc8 location.
+    ///
+    /// Use this to make assertions about what ops are held after gossip has run.
     pub fn get_ops_loc8(&mut self, node_ep: &NodeEp) -> Vec<Loc8> {
         let mut ops: Vec<_> = self
             .local_agents_for_node(node_ep)
@@ -405,7 +413,55 @@ impl SwitchboardState {
         ops
     }
 
-    pub fn query_op_hashes(
+    pub(super) fn node_for_local_agent_loc8(&self, loc8: Loc8) -> Option<&NodeEntry> {
+        self.nodes
+            .values()
+            .find(|n| n.local_agents.keys().contains(&loc8))
+    }
+
+    pub(super) fn node_for_local_agent_loc8_mut(&mut self, loc8: Loc8) -> Option<&mut NodeEntry> {
+        self.nodes
+            .values_mut()
+            .find(|n| n.local_agents.keys().contains(&loc8))
+    }
+
+    pub(super) fn node_for_local_agent_hash_mut(
+        &mut self,
+        hash: &KitsuneAgent,
+    ) -> Option<&mut NodeEntry> {
+        let agent_loc8 = hash.get_loc().as_loc8();
+        self.node_for_local_agent_loc8_mut(agent_loc8)
+    }
+
+    /// Look through all nodes for this agent Loc8
+    pub(super) fn local_agent_by_loc8(&self, loc8: Loc8) -> Option<&AgentEntry> {
+        self.nodes
+            .values()
+            .filter_map(|n| n.local_agent_by_loc8(loc8))
+            .next()
+    }
+
+    /// Look through all nodes for this agent hash
+    pub(super) fn local_agent_by_hash(&self, hash: &KitsuneAgent) -> Option<&AgentEntry> {
+        self.nodes
+            .values()
+            .filter_map(|n| n.local_agent_by_hash(hash))
+            .next()
+    }
+
+    /// Get the agent map for a node. Just for minor boilerplate reduction.
+    pub(super) fn local_agents_for_node(
+        &mut self,
+        node: &NodeEp,
+    ) -> &mut HashMap<Loc8, AgentEntry> {
+        &mut self
+            .nodes
+            .get_mut(node)
+            .expect("Node not added")
+            .local_agents
+    }
+
+    pub(super) fn query_op_hashes(
         &mut self,
         QueryOpHashesEvt {
             space: _,
@@ -481,19 +537,22 @@ pub struct NodeEntry {
 }
 
 impl NodeEntry {
-    pub fn local_agent_by_loc8(&self, loc8: Loc8) -> Option<&AgentEntry> {
+    pub(super) fn local_agent_by_loc8(&self, loc8: Loc8) -> Option<&AgentEntry> {
         self.local_agents.get(&loc8)
     }
 
-    pub fn local_agent_by_loc8_mut(&mut self, loc8: Loc8) -> Option<&mut AgentEntry> {
+    pub(super) fn local_agent_by_loc8_mut(&mut self, loc8: Loc8) -> Option<&mut AgentEntry> {
         self.local_agents.get_mut(&loc8)
     }
 
-    pub fn local_agent_by_hash(&self, hash: &KitsuneAgent) -> Option<&AgentEntry> {
+    pub(super) fn local_agent_by_hash(&self, hash: &KitsuneAgent) -> Option<&AgentEntry> {
         self.local_agent_by_loc8(hash.get_loc().as_loc8())
     }
 
-    pub fn local_agent_by_hash_mut(&mut self, hash: &KitsuneAgent) -> Option<&mut AgentEntry> {
+    pub(super) fn local_agent_by_hash_mut(
+        &mut self,
+        hash: &KitsuneAgent,
+    ) -> Option<&mut AgentEntry> {
         self.local_agent_by_loc8_mut(hash.get_loc().as_loc8())
     }
 }

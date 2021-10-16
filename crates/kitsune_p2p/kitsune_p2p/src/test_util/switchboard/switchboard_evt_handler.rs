@@ -1,3 +1,5 @@
+//! Gossip event handler which uses `SwitchboardState` as its underlying persisted store.
+
 use std::sync::Arc;
 
 use crate::event::*;
