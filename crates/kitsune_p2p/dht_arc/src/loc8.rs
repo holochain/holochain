@@ -1,5 +1,6 @@
 use crate::DhtLocation;
 
+/// F == u32::MAX / u8::MAX
 const F: u32 = 16777216;
 
 #[derive(
