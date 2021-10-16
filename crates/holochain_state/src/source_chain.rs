@@ -587,8 +587,7 @@ impl SourceChain {
                     schedule_fn(txn, scheduled_fn, None, now)?;
                 }
                 // As at check.
-                let (new_persisted_head, new_head_seq, new_timestamp) =
-                    chain_head_db(txn, author)?;
+                let (new_persisted_head, new_head_seq, new_timestamp) = chain_head_db(txn, author)?;
                 if zomed_headers.last().is_none() {
                     // Nothing to write
                     return Ok(Vec::new());
