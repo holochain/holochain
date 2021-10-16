@@ -1498,7 +1498,7 @@ mod builder {
                             invocation,
                             cell_id,
                         } = post_commit_args;
-                        match conductor_handle.clone().get_ribosome(&cell_id.dna_hash()) {
+                        match conductor_handle.clone().get_ribosome(cell_id.dna_hash()) {
                             Ok(ribosome) => {
                                 if let Err(e) = tokio::task::spawn_blocking(move || {
                                     if let Err(e) =
