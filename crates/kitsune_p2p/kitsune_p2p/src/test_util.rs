@@ -75,4 +75,7 @@ pub use metric_store::*;
 #[cfg(feature = "test_utils")]
 pub mod mock_network;
 
+#[cfg(feature = "test_utils")]
+pub mod switchboard;
+
 pub(crate) mod scenario_def_local;
