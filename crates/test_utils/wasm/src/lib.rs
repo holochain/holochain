@@ -31,6 +31,7 @@ pub enum TestWasm {
     MustGet,
     PostCommitFail,
     PostCommitSuccess,
+    PostCommitVolley,
     Query,
     RandomBytes,
     Schedule,
@@ -80,6 +81,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::MustGet => "must_get",
             TestWasm::PostCommitFail => "post_commit_fail",
             TestWasm::PostCommitSuccess => "post_commit_success",
+            TestWasm::PostCommitVolley => "post_commit_volley",
             TestWasm::Query => "query",
             TestWasm::RandomBytes => "random_bytes",
             TestWasm::Schedule => "schedule",
@@ -166,6 +168,9 @@ impl From<TestWasm> for DnaWasm {
             }
             TestWasm::PostCommitSuccess => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_post_commit_success.wasm")
+            }
+            TestWasm::PostCommitVolley => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_post_commit_volley.wasm")
             }
             TestWasm::Query => get_code("wasm32-unknown-unknown/release/test_wasm_query.wasm"),
             TestWasm::RandomBytes => {

@@ -372,7 +372,7 @@ impl ConItem {
                 logic_hnd: i.logic_hnd.clone(),
                 item: con_item,
             };
-            i.pend_cons.remove(&url);
+            i.pend_cons.remove(url);
             i.cons.insert(url.clone(), con_item.clone());
             Ok((i.logic_hnd.clone(), con_item))
         })?;

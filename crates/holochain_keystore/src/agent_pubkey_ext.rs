@@ -1,8 +1,8 @@
 use crate::*;
 use ghost_actor::dependencies::must_future::MustBoxFuture;
 use holochain_zome_types::prelude::*;
-use kitsune_p2p_types::dependencies::new_lair_api;
-use new_lair_api::LairResult;
+use kitsune_p2p_types::dependencies::lair_keystore_api;
+use lair_keystore_api::LairResult;
 use std::sync::Arc;
 
 /// Extend holo_hash::AgentPubKey with additional signature functionality
@@ -100,7 +100,7 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
     ) -> MustBoxFuture<'static, bool> {
         let mut pub_key = [0; 32];
         pub_key.copy_from_slice(self.get_raw_32());
-        let pub_key = <new_lair_api::prelude::BinDataSized<32>>::from(pub_key);
+        let pub_key = <lair_keystore_api::prelude::BinDataSized<32>>::from(pub_key);
         let sig = signature.0;
 
         MustBoxFuture::new(async move {
