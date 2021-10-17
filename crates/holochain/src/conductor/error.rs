@@ -114,11 +114,28 @@ pub enum ConductorError {
 
     #[error(transparent)]
     RusqliteError(#[from] rusqlite::Error),
+
+    /// Other
+    #[error("Other: {0}")]
+    Other(Box<dyn std::error::Error + Send + Sync>),
+}
+
+impl ConductorError {
+    /// promote a custom error type to a ConductorError
+    pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
+        Self::Other(e.into())
+    }
 }
 
 // TODO: can this be removed?
 impl From<String> for ConductorError {
     fn from(s: String) -> Self {
         ConductorError::Todo(s)
+    }
+}
+
+impl From<one_err::OneErr> for ConductorError {
+    fn from(e: one_err::OneErr) -> Self {
+        Self::other(e)
     }
 }

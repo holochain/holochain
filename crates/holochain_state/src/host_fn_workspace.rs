@@ -2,10 +2,12 @@ use holo_hash::AgentPubKey;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_types::env::EnvRead;
 use holochain_types::env::EnvWrite;
+use holochain_zome_types::SignedHeaderHashed;
 
 use crate::prelude::SourceChain;
 use crate::prelude::SourceChainResult;
 use crate::scratch::SyncScratch;
+use holochain_zome_types::Zome;
 
 #[derive(Clone)]
 pub struct HostFnWorkspace {
@@ -39,7 +41,7 @@ impl HostFnWorkspace {
     pub async fn flush(
         self,
         network: &(dyn HolochainP2pCellT + Send + Sync),
-    ) -> SourceChainResult<()> {
+    ) -> SourceChainResult<Vec<(Option<Zome>, SignedHeaderHashed)>> {
         self.source_chain.flush(network).await
     }
 

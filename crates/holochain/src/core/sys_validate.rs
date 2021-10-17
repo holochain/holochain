@@ -35,7 +35,7 @@ pub const MAX_TAG_SIZE: usize = 1000;
 
 /// Verify the signature for this header
 pub async fn verify_header_signature(sig: &Signature, header: &Header) -> SysValidationResult<()> {
-    if header.author().verify_signature(sig, header).await? {
+    if header.author().verify_signature(sig, header).await {
         Ok(())
     } else {
         Err(SysValidationError::ValidationOutcome(
@@ -98,13 +98,18 @@ pub async fn check_countersigning_preflight_response_signature(
         .0
         .verify_signature_raw(
             preflight_response.signature(),
-            &preflight_response.encode_for_signature().map_err(|_| {
-                SysValidationError::ValidationOutcome(
-                    ValidationOutcome::PreflightResponseSignature((*preflight_response).clone()),
-                )
-            })?,
+            preflight_response
+                .encode_for_signature()
+                .map_err(|_| {
+                    SysValidationError::ValidationOutcome(
+                        ValidationOutcome::PreflightResponseSignature(
+                            (*preflight_response).clone(),
+                        ),
+                    )
+                })?
+                .into(),
         )
-        .await?;
+        .await;
     if signature_is_valid {
         Ok(())
     } else {
@@ -712,7 +717,7 @@ pub mod test {
         *preflight_response.signature_mut() = alice
             .sign_raw(
                 &keystore,
-                &preflight_response.encode_for_signature().unwrap(),
+                preflight_response.encode_for_signature().unwrap().into(),
             )
             .await
             .unwrap();

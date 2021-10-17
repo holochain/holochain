@@ -2,13 +2,14 @@
 
 use super::*;
 use ::contrafact::*;
+use holochain_keystore::MetaLairClient;
 
 /// Fact: The DhtOp is internally consistent in all of its references:
 /// - TODO: The DhtOp variant matches the Header variant
 /// - The Signature matches the Header
 /// - If the header references an Entry, the Entry will exist and be of the appropriate hash
 /// - If the header does not reference an Entry, the entry will be None
-pub fn valid_dht_op(keystore: KeystoreSender) -> Facts<'static, DhtOp> {
+pub fn valid_dht_op(keystore: MetaLairClient) -> Facts<'static, DhtOp> {
     facts![
         brute("Header type matches Entry existence", |op: &DhtOp| {
             let has_header = op.header().entry_data().is_some();
@@ -58,7 +59,7 @@ mod tests {
         let mut uu = Unstructured::new(&NOISE);
         let u = &mut uu;
         let keystore = spawn_test_keystore().await.unwrap();
-        let agent = AgentPubKey::new_from_pure_entropy(&keystore).await.unwrap();
+        let agent = AgentPubKey::new_random(&keystore).await.unwrap();
 
         let e = Entry::arbitrary(u).unwrap();
 

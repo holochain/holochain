@@ -9,8 +9,8 @@ License: [![License: CAL 1.0](https://img.shields.io/badge/License-CAL%201.0-blu
 
 Current version: 0.0.1
 
-A Keystore is a secure repository of private keys. KeystoreSender is a
-reference to a Keystore. KeystoreSender allows async generation of keypairs,
+A Keystore is a secure repository of private keys. MetaLairClient is a
+reference to a Keystore. MetaLairClient allows async generation of keypairs,
 and usage of those keypairs, reference by the public AgentPubKey.
 
 ## Example

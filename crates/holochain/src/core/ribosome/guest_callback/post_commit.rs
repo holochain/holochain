@@ -1,22 +1,28 @@
+use crate::conductor::api::CellConductorApiT;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
-use holochain_keystore::KeystoreSender;
+use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pCellT;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
+use itertools::Itertools;
+
+pub const POST_COMMIT_CHANNEL_BOUND: usize = 100;
+pub const POST_COMMIT_CONCURRENT_LIMIT: usize = 5;
 
 #[derive(Clone)]
 pub struct PostCommitInvocation {
     zome: Zome,
-    headers: HeaderHashes,
+    headers: Vec<SignedHeaderHashed>,
 }
 
 impl PostCommitInvocation {
-    pub fn new(zome: Zome, headers: HeaderHashes) -> Self {
+    pub fn new(zome: Zome, headers: Vec<SignedHeaderHashed>) -> Self {
         Self { zome, headers }
     }
 }
@@ -24,7 +30,7 @@ impl PostCommitInvocation {
 #[derive(Clone, Constructor)]
 pub struct PostCommitHostAccess {
     pub workspace: HostFnWorkspace,
-    pub keystore: KeystoreSender,
+    pub keystore: MetaLairClient,
     pub network: HolochainP2pCell,
 }
 
@@ -36,7 +42,13 @@ impl From<PostCommitHostAccess> for HostContext {
 
 impl From<&PostCommitHostAccess> for HostFnAccess {
     fn from(_: &PostCommitHostAccess) -> Self {
-        Self::all()
+        let mut access = Self::all();
+        // Post commit happens after all workspace writes are complete.
+        // Writing more to the workspace becomes circular.
+        // If you need to trigger some more writes, try a `call_remote` back
+        // into the current cell.
+        access.write_workspace = Permission::Deny;
+        access
     }
 }
 
@@ -85,6 +97,55 @@ impl From<Vec<PostCommitCallbackResult>> for PostCommitResult {
             }
         })
     }
+}
+
+pub async fn send_post_commit<C>(
+    conductor_api: C,
+    workspace: HostFnWorkspace,
+    network: HolochainP2pCell,
+    keystore: MetaLairClient,
+    zomed_headers: Vec<(Option<Zome>, SignedHeaderHashed)>,
+) -> Result<(), tokio::sync::mpsc::error::SendError<()>>
+where
+    C: CellConductorApiT,
+{
+    let groups = zomed_headers
+        .iter()
+        .group_by(|(zome, _shh)| zome.clone())
+        .into_iter()
+        .map(|(maybe_zome, group)| {
+            (
+                maybe_zome,
+                group.map(|(_maybe_zome, shh)| shh.clone()).collect(),
+            )
+        })
+        .collect::<Vec<(Option<Zome>, Vec<SignedHeaderHashed>)>>();
+
+    for (maybe_zome, headers) in groups {
+        if let Some(zome) = maybe_zome {
+            let zome = zome.clone();
+            conductor_api
+                .post_commit_permit()
+                .await?
+                .send(PostCommitArgs {
+                    host_access: PostCommitHostAccess {
+                        workspace: workspace.clone(),
+                        keystore: keystore.clone(),
+                        network: network.clone(),
+                    },
+                    invocation: PostCommitInvocation::new(zome, headers),
+                    cell_id: CellId::new(network.dna_hash().clone(), network.from_agent().clone()),
+                });
+        }
+    }
+    Ok(())
+}
+
+#[derive(Clone)]
+pub struct PostCommitArgs {
+    pub host_access: PostCommitHostAccess,
+    pub invocation: PostCommitInvocation,
+    pub cell_id: CellId,
 }
 
 #[cfg(test)]
@@ -148,10 +209,9 @@ mod test {
         let post_commit_host_access = PostCommitHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        assert_eq!(
-            HostFnAccess::from(&post_commit_host_access),
-            HostFnAccess::all()
-        );
+        let mut expected = HostFnAccess::all();
+        expected.write_workspace = Permission::Deny;
+        assert_eq!(HostFnAccess::from(&post_commit_host_access), expected);
     }
 
     #[test]
@@ -194,12 +254,18 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
     use super::PostCommitResult;
+    use crate::conductor::ConductorBuilder;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
     use crate::fixt::PostCommitHostAccessFixturator;
     use crate::fixt::PostCommitInvocationFixturator;
     use crate::fixt::RealRibosomeFixturator;
+    use crate::sweettest::SweetConductor;
+    use crate::sweettest::SweetDnaFile;
+    use ::fixt::prelude::*;
+    use hdk::prelude::*;
     use holo_hash::fixt::HeaderHashFixturator;
+    use holochain_types::prelude::MockDnaStore;
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(flavor = "multi_thread")]
@@ -267,5 +333,62 @@ mod slow_tests {
                 "empty header fail".into()
             ),
         );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[cfg(feature = "test_utils")]
+    async fn post_commit_test_volley() -> anyhow::Result<()> {
+        observability::test_run().ok();
+        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::PostCommitVolley])
+            .await
+            .unwrap();
+
+        let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
+        let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
+
+        let mut dna_store = MockDnaStore::new();
+        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
+        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
+        dna_store.expect_add_dna().return_const(());
+        dna_store
+            .expect_get()
+            .return_const(Some(dna_file.clone().into()));
+        dna_store
+            .expect_get_entry_def()
+            .return_const(EntryDef::default_with_id("thing"));
+
+        let mut conductor =
+            SweetConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
+
+        let apps = conductor
+            .setup_app_for_agents(
+                "app-",
+                &[alice_pubkey.clone(), bob_pubkey.clone()],
+                &[dna_file.into()],
+            )
+            .await
+            .unwrap();
+
+        let ((alice,), (bobbo,)) = apps.into_tuples();
+        let alice = alice.zome(TestWasm::PostCommitVolley);
+        let bobbo = bobbo.zome(TestWasm::PostCommitVolley);
+
+        let _set_access: () = conductor.call::<_, (), _>(&alice, "set_access", ()).await;
+
+        let _set_access: () = conductor.call::<_, (), _>(&bobbo, "set_access", ()).await;
+
+        let _ping: HeaderHash = conductor.call(&alice, "ping", bob_pubkey).await;
+
+        tokio::time::sleep(std::time::Duration::from_millis(600)).await;
+
+        let alice_query: Vec<Element> = conductor.call(&alice, "query", ()).await;
+
+        assert_eq!(alice_query.len(), 5);
+
+        let bob_query: Vec<Element> = conductor.call(&bobbo, "query", ()).await;
+
+        assert_eq!(bob_query.len(), 4);
+
+        Ok(())
     }
 }

@@ -8,9 +8,27 @@ pub struct SweetDnaFile(DnaFile);
 impl SweetDnaFile {
     /// Create a DnaFile from a path to a *.dna bundle
     pub async fn from_bundle(path: &Path) -> DnaResult<DnaFile> {
+        Self::from_bundle_with_overrides(path, None, Option::<()>::None).await
+    }
+
+    /// Create a DnaFile from a path to a *.dna bundle, applying the specified
+    /// "phenotype" overrides
+    pub async fn from_bundle_with_overrides<P>(
+        path: &Path,
+        uid: Option<Uid>,
+        props: Option<P>,
+    ) -> DnaResult<DnaFile>
+    where
+        P: Serialize,
+    {
+        let props = if let Some(p) = props {
+            Some(YamlProperties::from(serde_yaml::to_value(p)?))
+        } else {
+            None
+        };
         Ok(DnaBundle::read_from_file(path)
             .await?
-            .into_dna_file(None, None)
+            .into_dna_file(uid, props)
             .await?
             .0)
     }

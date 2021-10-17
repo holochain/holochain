@@ -64,36 +64,32 @@ pub mod wasm_test {
             .key
             .verify_signature_raw(
                 &output[0].signatures[0],
-                &holochain_serialized_bytes::encode(&One([1, 2])).unwrap()
+                holochain_serialized_bytes::encode(&One([1, 2])).unwrap().into()
             )
-            .await
-            .unwrap());
+            .await);
 
         assert!(output[0]
             .key
             .verify_signature_raw(
                 &output[0].signatures[1],
-                &holochain_serialized_bytes::encode(&One([3, 4])).unwrap()
+                holochain_serialized_bytes::encode(&One([3, 4])).unwrap().into()
             )
-            .await
-            .unwrap());
+            .await);
 
         assert!(output[1]
             .key
             .verify_signature_raw(
                 &output[1].signatures[0],
-                &holochain_serialized_bytes::encode(&One([1, 2])).unwrap()
+                holochain_serialized_bytes::encode(&One([1, 2])).unwrap().into()
             )
-            .await
-            .unwrap());
+            .await);
 
         assert!(output[1]
             .key
             .verify_signature_raw(
                 &output[1].signatures[1],
-                &holochain_serialized_bytes::encode(&Two([2, 3])).unwrap()
+                holochain_serialized_bytes::encode(&Two([2, 3])).unwrap().into()
             )
-            .await
-            .unwrap());
+            .await);
     }
 }
