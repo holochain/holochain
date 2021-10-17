@@ -294,7 +294,7 @@ impl Path {
     /// Only returns links between anchors, not to other entries that might have their own links.
     pub fn children(&self) -> ExternResult<Vec<holochain_zome_types::link::Link>> {
         Self::ensure(self)?;
-        let unwrapped = get_links(
+        let mut unwrapped = get_links(
             self.hash()?,
             Some(holochain_zome_types::link::LinkTag::new(NAME)),
         )?;
