@@ -22,7 +22,6 @@ use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation;
 use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
-use crate::core::ribosome::guest_callback::post_commit::PostCommitResult;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::guest_callback::validate_link::ValidateLinkHostAccess;
@@ -208,6 +207,12 @@ impl Iterator for FnComponents {
 impl From<Vec<String>> for FnComponents {
     fn from(vs: Vec<String>) -> Self {
         Self(vs)
+    }
+}
+
+impl FnComponents {
+    pub fn into_inner(self) -> Vec<String> {
+        self.0
     }
 }
 
@@ -484,7 +489,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
         &self,
         access: PostCommitHostAccess,
         invocation: PostCommitInvocation,
-    ) -> RibosomeResult<PostCommitResult>;
+    ) -> RibosomeResult<()>;
 
     /// Helper function for running a validation callback. Just calls
     /// [`run_callback`][] under the hood.

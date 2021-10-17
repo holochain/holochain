@@ -124,6 +124,7 @@ fixturator!(
 );
 
 fixturator!(
+    with_vec 0 5;
     HeaderHash;
     constructor fn from_raw_36(ThirtySixHashBytes);
 );
