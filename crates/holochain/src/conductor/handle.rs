@@ -59,6 +59,7 @@ use crate::conductor::p2p_agent_store::query_peer_density;
 use crate::conductor::p2p_agent_store::P2pBatch;
 use crate::conductor::p2p_metrics::put_metric_datum;
 use crate::conductor::p2p_metrics::query_metrics;
+use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::workflow::ZomeCallResult;
 use derive_more::From;
@@ -72,7 +73,7 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_p2p::DnaHashExt;
-use holochain_p2p::HolochainP2pCell;
+
 use holochain_p2p::HolochainP2pCellT;
 use holochain_sqlite::db::DbKind;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
@@ -83,6 +84,8 @@ use kitsune_p2p::KitsuneSpace;
 use kitsune_p2p_types::config::JOIN_NETWORK_TIMEOUT;
 use std::collections::HashMap;
 use std::{collections::HashSet, sync::Arc};
+use tokio::sync::mpsc::error::SendError;
+use tokio::sync::mpsc::OwnedPermit;
 use tracing::*;
 
 #[cfg(any(test, feature = "test_utils"))]
@@ -244,6 +247,9 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Dispatch all due scheduled functions.
     async fn dispatch_scheduled_fns(self: Arc<Self>);
+
+    /// Get an OwnedPermit to the post commit task.
+    async fn post_commit_permit(&self) -> Result<OwnedPermit<PostCommitArgs>, SendError<()>>;
 
     /// Stop a running app while leaving it enabled. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
@@ -928,6 +934,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         futures::future::join_all(tasks).await;
     }
 
+    async fn post_commit_permit(&self) -> Result<OwnedPermit<PostCommitArgs>, SendError<()>> {
+        self.conductor.post_commit_permit().await
+    }
+
     #[tracing::instrument(skip(self))]
     async fn reconcile_app_status_with_cell_status(
         &self,
@@ -1309,14 +1319,11 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
         // Join the network but ignore errors because the
         // space retries joining all cells every 5 minutes.
 
-        let pending_cells: Vec<(CellId, HolochainP2pCell)> = self
+        let tasks = self
             .conductor
             .mark_pending_cells_as_joining()
             .into_iter()
             .map(|(id, cell)| (id, cell.holochain_p2p_cell().clone()))
-            .collect();
-
-        let tasks = pending_cells.into_iter()
             .map(|(cell_id, network)| async move {
                 match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join()).await {
                     Ok(Err(e)) => {

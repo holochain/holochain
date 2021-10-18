@@ -33,7 +33,7 @@
 
 use holochain_serialized_bytes::prelude::*;
 
-use kitsune_p2p_types::dependencies::legacy_lair_api;
+use kitsune_p2p_types::dependencies::lair_keystore_api_0_0;
 
 mod error;
 pub use error::*;

@@ -113,7 +113,7 @@ fn next_remote_node(
             metrics.last_success(b.cert()),
         ) {
             // Choose the smallest (oldest) Instant.
-            (Some(a), Some(b)) => a.cmp(&b),
+            (Some(a), Some(b)) => a.cmp(b),
             // Put a behind b that hasn't been gossiped with.
             (Some(_), None) => Ordering::Greater,
             // Put b behind a that hasn't been gossiped with.
