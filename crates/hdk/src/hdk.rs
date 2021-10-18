@@ -63,7 +63,7 @@ pub trait HdkT: Send + Sync {
     // Link
     fn create_link(&self, create_link_input: CreateLinkInput) -> ExternResult<HeaderHash>;
     fn delete_link(&self, delete_link_input: DeleteLinkInput) -> ExternResult<HeaderHash>;
-    fn get_links(&self, get_links_input: Vec<GetLinksInput>) -> ExternResult<Vec<Links>>;
+    fn get_links(&self, get_links_input: Vec<GetLinksInput>) -> ExternResult<Vec<Vec<Link>>>;
     fn get_link_details(
         &self,
         get_links_input: Vec<GetLinksInput>,
@@ -184,7 +184,7 @@ impl HdkT for ErrHdk {
     fn delete_link(&self, _: DeleteLinkInput) -> ExternResult<HeaderHash> {
         Self::err()
     }
-    fn get_links(&self, _: Vec<GetLinksInput>) -> ExternResult<Vec<Links>> {
+    fn get_links(&self, _: Vec<GetLinksInput>) -> ExternResult<Vec<Vec<Link>>> {
         Self::err()
     }
     fn get_link_details(&self, _: Vec<GetLinksInput>) -> ExternResult<Vec<LinkDetails>> {
@@ -351,8 +351,8 @@ impl HdkT for HostHdk {
     fn delete_link(&self, delete_link_input: DeleteLinkInput) -> ExternResult<HeaderHash> {
         host_call::<DeleteLinkInput, HeaderHash>(__delete_link, delete_link_input)
     }
-    fn get_links(&self, get_links_input: Vec<GetLinksInput>) -> ExternResult<Vec<Links>> {
-        host_call::<Vec<GetLinksInput>, Vec<Links>>(__get_links, get_links_input)
+    fn get_links(&self, get_links_input: Vec<GetLinksInput>) -> ExternResult<Vec<Vec<Link>>> {
+        host_call::<Vec<GetLinksInput>, Vec<Vec<Link>>>(__get_links, get_links_input)
     }
     fn get_link_details(
         &self,
