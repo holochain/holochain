@@ -244,7 +244,7 @@ impl AgentInfoSigned {
 
     /// decode from msgpack
     pub fn decode(b: &[u8]) -> KitsuneResult<Self> {
-        let mut bytes: &[u8] = &b;
+        let mut bytes: &[u8] = b;
         crate::codec::rmp_decode(&mut bytes).map_err(KitsuneError::other)
     }
 

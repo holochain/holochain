@@ -156,6 +156,13 @@ impl DhtArcSet {
             }
         }
     }
+
+    pub fn size(&self) -> u32 {
+        match self {
+            Self::Full => u32::MAX,
+            Self::Partial(intervals) => intervals.size(),
+        }
+    }
 }
 
 impl From<&ArcInterval> for DhtArcSet {
@@ -355,6 +362,14 @@ impl ArcInterval<DhtLocation> {
     /// Check if this arc is empty.
     pub fn is_empty(&self) -> bool {
         matches!(self, Self::Empty)
+    }
+
+    /// Amount of intersection between two arcs
+    pub fn overlap_coverage(&self, other: &Self) -> f64 {
+        let a = DhtArcSet::from(self);
+        let b = DhtArcSet::from(other);
+        let c = a.intersection(&b);
+        c.size() as f64 / a.size() as f64
     }
 
     #[cfg(any(test, feature = "test_utils"))]

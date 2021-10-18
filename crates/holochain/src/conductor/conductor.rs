@@ -39,6 +39,10 @@ use crate::conductor::config::ConductorConfig;
 use crate::conductor::error::ConductorResult;
 use crate::conductor::handle::ConductorHandle;
 use crate::core::queue_consumer::InitialQueueTriggers;
+use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
+use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CHANNEL_BOUND;
+use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CONCURRENT_LIMIT;
+use crate::core::ribosome::RibosomeT;
 use crate::{
     conductor::api::error::ConductorApiResult, core::ribosome::real_ribosome::RealRibosome,
 };
@@ -47,14 +51,15 @@ use futures::future;
 use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
 use holo_hash::DnaHash;
-use holochain_conductor_api::conductor::PassphraseServiceConfig;
+use holochain_conductor_api::conductor::KeystoreConfig;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
+use holochain_keystore::lair_keystore::spawn_new_lair_keystore;
+use holochain_keystore::test_keystore::spawn_legacy_test_keystore;
 use holochain_keystore::test_keystore::spawn_test_keystore;
-use holochain_keystore::KeystoreSender;
-use holochain_keystore::KeystoreSenderExt;
+use holochain_keystore::MetaLairClient;
 use holochain_sqlite::db::DbKind;
 use holochain_sqlite::prelude::*;
 use holochain_state::mutations;
@@ -66,6 +71,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use tokio::sync::mpsc::error::SendError;
 use tracing::*;
 
 #[cfg(feature = "test_utils")]
@@ -157,7 +163,7 @@ where
     dna_store: RwShare<DS>,
 
     /// Access to private keys for signing and encryption.
-    keystore: KeystoreSender,
+    keystore: MetaLairClient,
 
     /// The root environment directory where all environments are created
     root_env_dir: EnvironmentRootPath,
@@ -167,6 +173,8 @@ where
 
     /// Database sync level
     db_sync_level: DbSyncLevel,
+
+    post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
 }
 
 impl Conductor {
@@ -581,14 +589,15 @@ where
 
         // Clean up all cells that will be dropped (leave network, etc.)
         let to_cleanup: Vec<_> = self.cells.share_mut(|cells| {
-            let to_cleanup: Vec<_> = cells
+            let to_remove = cells
                 .keys()
                 .filter(|id| !keepers.contains(id))
                 .cloned()
-                .collect();
-            to_cleanup
-                .into_iter()
-                .filter_map(|cell_id| cells.remove(&cell_id))
+                .collect::<Vec<_>>();
+
+            to_remove
+                .iter()
+                .filter_map(|cell_id| cells.remove(cell_id))
                 .collect()
         });
         for cell in to_cleanup {
@@ -835,7 +844,7 @@ where
                         dna_def
                             .zomes
                             .iter()
-                            .map(|(zome_name, zome)| Ok(zome.wasm_hash(&zome_name)?))
+                            .map(|(zome_name, zome)| Ok(zome.wasm_hash(zome_name)?))
                     })
                     .collect::<ConductorResult<HashSet<_>>>()?;
 
@@ -884,7 +893,7 @@ where
     }
 
     /// Get the keystore.
-    pub fn keystore(&self) -> &KeystoreSender {
+    pub fn keystore(&self) -> &MetaLairClient {
         &self.keystore
     }
 
@@ -1065,6 +1074,13 @@ where
             Ok(())
         })
     }
+
+    /// Get the post commit sender.
+    pub async fn post_commit_permit(
+        &self,
+    ) -> Result<tokio::sync::mpsc::OwnedPermit<PostCommitArgs>, SendError<()>> {
+        self.post_commit.clone().reserve_owned().await
+    }
 }
 
 /// Perform Genesis on the source chains for each of the specified CellIds.
@@ -1074,7 +1090,7 @@ where
 /// Note this function takes read locks so should not be called from within a read lock.
 pub(super) async fn genesis_cells(
     root_env_dir: PathBuf,
-    keystore: KeystoreSender,
+    keystore: MetaLairClient,
     cell_ids_with_proofs: Vec<(CellId, Option<MembraneProof>)>,
     conductor_handle: ConductorHandle,
     db_sync_level: DbSyncLevel,
@@ -1183,10 +1199,11 @@ where
         env: EnvWrite,
         wasm_env: EnvWrite,
         dna_store: DS,
-        keystore: KeystoreSender,
+        keystore: MetaLairClient,
         root_env_dir: EnvironmentRootPath,
         holochain_p2p: holochain_p2p::HolochainP2pRef,
         db_sync_level: DbSyncLevel,
+        post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
     ) -> ConductorResult<Self> {
         Ok(Self {
             conductor_env: env,
@@ -1202,6 +1219,7 @@ where
             root_env_dir,
             holochain_p2p,
             db_sync_level,
+            post_commit,
         })
     }
 
@@ -1293,8 +1311,10 @@ mod builder {
         pub config: ConductorConfig,
         /// The DnaStore (mockable)
         pub dna_store: DS,
+        /// For new lair, passphrase is required
+        pub passphrase: Option<sodoken::BufRead>,
         /// Optional keystore override
-        pub keystore: Option<KeystoreSender>,
+        pub keystore: Option<MetaLairClient>,
         #[cfg(any(test, feature = "test_utils"))]
         /// Optional state override (for testing)
         pub state: Option<ConductorState>,
@@ -1330,6 +1350,12 @@ mod builder {
             self
         }
 
+        /// Set the passphrase for use in keystore initialization
+        pub fn passphrase(mut self, passphrase: Option<sodoken::BufRead>) -> Self {
+            self.passphrase = passphrase;
+            self
+        }
+
         /// Initialize a "production" Conductor
         pub async fn build(self) -> ConductorResult<ConductorHandle> {
             cfg_if::cfg_if! {
@@ -1346,32 +1372,40 @@ mod builder {
 
             let keystore = if let Some(keystore) = self.keystore {
                 keystore
-            } else if self.config.use_dangerous_test_keystore {
-                let keystore = spawn_test_keystore().await?;
-                // pre-populate with our two fixture agent keypairs
-                keystore
-                    .generate_sign_keypair_from_pure_entropy()
-                    .await
-                    .unwrap();
-                keystore
-                    .generate_sign_keypair_from_pure_entropy()
-                    .await
-                    .unwrap();
-                keystore
             } else {
-                let passphrase = match &self.config.passphrase_service {
-                    PassphraseServiceConfig::DangerInsecureFromConfig { passphrase } => {
-                        tracing::warn!("USING INSECURE PASSPHRASE FROM CONFIG--This defeats the whole purpose of having a passphrase. (unfortunately, there isn't another option at the moment).");
-                        // TODO - use `new_mem_locked` when we have a secure source
-                        sodoken::BufRead::new_no_lock(passphrase.as_bytes())
+                match &self.config.keystore {
+                    KeystoreConfig::DangerTestKeystoreLegacyDeprecated => {
+                        tracing::warn!("Using DEPRECATED legacy lair api.");
+                        spawn_legacy_test_keystore().await?
                     }
-                    oth => {
-                        panic!("We don't support this passphrase_service yet: {:?}", oth);
+                    KeystoreConfig::LairServerLegacyDeprecated {
+                        keystore_path,
+                        danger_passphrase_insecure_from_config,
+                    } => {
+                        tracing::warn!("Using DEPRECATED legacy lair api.");
+                        tracing::warn!("USING INSECURE PASSPHRASE FROM CONFIG--This defeats the whole purpose of having a passphrase.");
+                        let passphrase = sodoken::BufRead::new_no_lock(
+                            danger_passphrase_insecure_from_config.as_bytes(),
+                        );
+                        spawn_lair_keystore(keystore_path.as_deref(), passphrase).await?
                     }
-                };
-
-                spawn_lair_keystore(self.config.keystore_path.as_deref(), passphrase).await?
+                    KeystoreConfig::DangerTestKeystore => spawn_test_keystore().await?,
+                    KeystoreConfig::LairServer { connection_url } => {
+                        let passphrase = match self.passphrase {
+                            None => {
+                                return Err(one_err::OneErr::new(
+                                    "passphrase required for new lair keystore api",
+                                )
+                                .into())
+                            }
+                            Some(p) => p,
+                        };
+                        spawn_new_lair_keystore(connection_url.clone(), passphrase).await?
+                    }
+                    oth => unimplemented!("unimplemented keystore config: {:?}", oth),
+                }
             };
+
             let env_path = self.config.environment_path.clone();
 
             let environment = EnvWrite::open_with_sync_level(
@@ -1410,6 +1444,9 @@ mod builder {
             let (holochain_p2p, p2p_evt) =
                 holochain_p2p::spawn_holochain_p2p(network_config, tls_config).await?;
 
+            let (post_commit_sender, post_commit_receiver) =
+                tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
+
             let conductor = Conductor::new(
                 environment,
                 wasm_environment,
@@ -1418,6 +1455,7 @@ mod builder {
                 env_path,
                 holochain_p2p,
                 config.db_sync_level,
+                post_commit_sender,
             )
             .await?;
 
@@ -1443,19 +1481,60 @@ mod builder {
                 dev_settings: parking_lot::RwLock::new(DevSettings::default()),
             });
 
-            Self::finish(handle, config, p2p_evt).await
+            Self::finish(handle, config, p2p_evt, post_commit_receiver).await
+        }
+
+        fn spawn_post_commit(
+            conductor_handle: ConductorHandle,
+            receiver: tokio::sync::mpsc::Receiver<PostCommitArgs>,
+        ) {
+            let receiver_stream = tokio_stream::wrappers::ReceiverStream::new(receiver);
+            tokio::task::spawn(receiver_stream.for_each_concurrent(
+                POST_COMMIT_CONCURRENT_LIMIT,
+                move |post_commit_args| {
+                    let conductor_handle = conductor_handle.clone();
+                    async move {
+                        let PostCommitArgs {
+                            host_access,
+                            invocation,
+                            cell_id,
+                        } = post_commit_args;
+                        match conductor_handle.clone().get_ribosome(cell_id.dna_hash()) {
+                            Ok(ribosome) => {
+                                if let Err(e) = tokio::task::spawn_blocking(move || {
+                                    if let Err(e) =
+                                        ribosome.run_post_commit(host_access, invocation)
+                                    {
+                                        tracing::error!(?e);
+                                    }
+                                })
+                                .await
+                                {
+                                    tracing::error!(?e);
+                                }
+                            }
+                            Err(e) => {
+                                tracing::error!(?e);
+                            }
+                        }
+                    }
+                },
+            ));
         }
 
         async fn finish(
             handle: ConductorHandle,
             conductor_config: ConductorConfig,
             p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
+            post_commit_receiver: tokio::sync::mpsc::Receiver<PostCommitArgs>,
         ) -> ConductorResult<ConductorHandle> {
             tokio::task::spawn(p2p_event_task(p2p_evt, handle.clone()));
 
             let _ = handle
                 .clone()
                 .start_scheduler(holochain_zome_types::schedule::SCHEDULER_INTERVAL);
+
+            let _ = Self::spawn_post_commit(handle.clone(), post_commit_receiver);
 
             let configs = conductor_config.admin_interfaces.unwrap_or_default();
             let cell_startup_errors = handle.clone().initialize_conductor(configs).await?;
@@ -1475,7 +1554,7 @@ mod builder {
 
         /// Pass a test keystore in, to ensure that generated test agents
         /// are actually available for signing (especially for tryorama compat)
-        pub fn with_keystore(mut self, keystore: KeystoreSender) -> Self {
+        pub fn with_keystore(mut self, keystore: MetaLairClient) -> Self {
             self.keystore = Some(keystore);
             self
         }
@@ -1521,6 +1600,9 @@ mod builder {
                 holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default(), holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig::new_ephemeral().await.unwrap())
                     .await?;
 
+            let (post_commit_sender, post_commit_receiver) =
+                tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
+
             let conductor = Conductor::new(
                 envs.conductor(),
                 envs.wasm(),
@@ -1529,6 +1611,7 @@ mod builder {
                 self.config.environment_path.clone(),
                 holochain_p2p,
                 self.config.db_sync_level,
+                post_commit_sender,
             )
             .await?;
 
@@ -1561,7 +1644,7 @@ mod builder {
                     .expect("Could not install DNA");
             }
 
-            Self::finish(handle, self.config, p2p_evt).await
+            Self::finish(handle, self.config, p2p_evt, post_commit_receiver).await
         }
     }
 }

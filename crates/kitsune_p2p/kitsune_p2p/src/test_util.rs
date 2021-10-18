@@ -75,5 +75,7 @@ pub(crate) use harness_actor::*;
 mod metric_store;
 pub use metric_store::*;
 
-pub mod scenario_def;
 pub(crate) mod scenario_def_local;
+
+#[cfg(feature = "test_utils")]
+pub mod mock_network;

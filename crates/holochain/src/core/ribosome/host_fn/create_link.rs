@@ -36,7 +36,7 @@ pub fn create_link<'a>(
             .host_context
             .workspace()
             .source_chain()
-            .put(header_builder, None, chain_top_ordering)
+            .put(Some(call_context.zome.clone()), header_builder, None, chain_top_ordering)
             .await?;
         Ok::<HeaderHash, RibosomeError>(header_hash)
     }))

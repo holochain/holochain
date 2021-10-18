@@ -41,13 +41,13 @@ pub fn fake_agent_pub_key(name: u8) -> AgentPubKey {
 /// A fixture AgentPubKey for unit testing.
 /// NB: This must match up with AgentPubKeyFixturator's Predictable curve
 pub fn fake_agent_pubkey_1() -> AgentPubKey {
-    AgentPubKey::try_from("uhCAkmrkoAHPVf_eufG7eC5fm6QKrW5pPMoktvG5LOC0SnJ4vV1Uv").unwrap()
+    AgentPubKey::try_from("uhCAkJCuynkgVdMn_bzZ2ZYaVfygkn0WCuzfFspczxFnZM1QAyXoo").unwrap()
 }
 
 /// Another fixture AgentPubKey for unit testing.
 /// NB: This must match up with AgentPubKeyFixturator's Predictable curve
 pub fn fake_agent_pubkey_2() -> AgentPubKey {
-    AgentPubKey::try_from("uhCAke1j8Z2a-_min0h0pGuEMcYlo_V1l1mt9OtBuywKmHlg4L_R-").unwrap()
+    AgentPubKey::try_from("uhCAk39SDf7rynCg5bYgzroGaOJKGKrloI1o57Xao6S-U5KNZ0dUH").unwrap()
 }
 
 /// A fixture CapSecret for unit testing.
