@@ -58,7 +58,7 @@ pub(crate) fn set_version<'a>(
 
         if !dry_run {
             set_dependency_version(
-                &target_manifest,
+                target_manifest,
                 &crt.name(),
                 release_version.to_string().as_str(),
             )?;

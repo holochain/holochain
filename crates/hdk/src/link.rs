@@ -119,7 +119,7 @@ pub fn delete_link(address: HeaderHash) -> ExternResult<HeaderHash> {
 /// deleted c.f. get_link_details that returns all the creates and all the deletes together.
 ///
 /// See [ `get_link_details` ].
-pub fn get_links(base: EntryHash, link_tag: Option<LinkTag>) -> ExternResult<Links> {
+pub fn get_links(base: EntryHash, link_tag: Option<LinkTag>) -> ExternResult<Vec<Link>> {
     Ok(HDK
         .with(|h| {
             h.borrow()

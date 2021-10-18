@@ -11,6 +11,7 @@ categories = [ "cryptography" ]
 edition = "2018"
 
 [dependencies]
+base64 = "0.13.0"
 ghost_actor = "=0.3.0-alpha.4"
 holo_hash = { version = "0.0.9", path = "../holo_hash", features = ["full"] }
 holochain_serialized_bytes = "=0.0.51"

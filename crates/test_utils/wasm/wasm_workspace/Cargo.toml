@@ -26,6 +26,7 @@ members = [
     "must_get",
     "post_commit_fail",
     "post_commit_success",
+    "post_commit_volley",
     "query",
     "random_bytes",
     "schedule",

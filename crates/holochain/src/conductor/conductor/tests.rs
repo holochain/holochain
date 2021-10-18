@@ -29,6 +29,8 @@ async fn can_update_state() {
     let dna_store = MockDnaStore::new();
     let keystore = envs.conductor().keystore().clone();
     let holochain_p2p = holochain_p2p::stub_network().await;
+    let (post_commit_sender, _post_commit_receiver) =
+        tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
     let conductor = Conductor::new(
         envs.conductor(),
         envs.wasm(),
@@ -37,6 +39,7 @@ async fn can_update_state() {
         envs.path().to_path_buf().into(),
         holochain_p2p,
         DbSyncLevel::default(),
+        post_commit_sender,
     )
     .await
     .unwrap();
@@ -75,7 +78,8 @@ async fn can_add_clone_cell_to_app() {
     let cell_id = CellId::new(dna.dna_hash().to_owned(), agent.clone());
 
     let dna_store = RealDnaStore::new();
-
+    let (post_commit_sender, _post_commit_receiver) =
+        tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
     let conductor = Conductor::new(
         envs.conductor(),
         envs.wasm(),
@@ -84,6 +88,7 @@ async fn can_add_clone_cell_to_app() {
         envs.path().to_path_buf().into(),
         holochain_p2p,
         DbSyncLevel::default(),
+        post_commit_sender,
     )
     .await
     .unwrap();
@@ -148,6 +153,8 @@ async fn app_ids_are_unique() {
     let environments = test_environments();
     let dna_store = MockDnaStore::new();
     let holochain_p2p = holochain_p2p::stub_network().await;
+    let (post_commit_sender, _post_commit_receiver) =
+        tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
     let conductor = Conductor::new(
         environments.conductor(),
         environments.wasm(),
@@ -156,11 +163,13 @@ async fn app_ids_are_unique() {
         environments.path().to_path_buf().into(),
         holochain_p2p,
         DbSyncLevel::default(),
+        post_commit_sender,
     )
     .await
     .unwrap();
 
     let cell_id = fake_cell_id(1);
+
     let installed_cell = InstalledCell::new(cell_id.clone(), "handle".to_string());
     let app = InstalledAppCommon::new_legacy("id".to_string(), vec![installed_cell]).unwrap();
 
