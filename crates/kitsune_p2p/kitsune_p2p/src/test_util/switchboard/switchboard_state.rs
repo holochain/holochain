@@ -601,12 +601,12 @@ pub struct OpEntry {
 
 fn agent_from_loc<L: Into<DhtLocation>>(loc8: L) -> KAgent {
     let loc: DhtLocation = loc8.into();
-    Arc::new(KitsuneAgent::new(loc.to_bytes_36()))
+    Arc::new(KitsuneAgent::new(loc.as_bytes_36()))
 }
 
 fn op_hash_from_loc<L: Into<DhtLocation>>(loc8: L) -> KOpHash {
     let loc: DhtLocation = loc8.into();
-    Arc::new(KitsuneOpHash::new(loc.to_bytes_36()))
+    Arc::new(KitsuneOpHash::new(loc.as_bytes_36()))
 }
 
 fn fake_agent_info(

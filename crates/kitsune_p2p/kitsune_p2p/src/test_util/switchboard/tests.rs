@@ -5,7 +5,7 @@ mod tests {
 
     use crate::gossip::sharded_gossip::GossipType;
 
-    use super::super::switchboard::Switchboard;
+    use super::super::switchboard_state::Switchboard;
     use pretty_assertions::assert_eq;
 
     #[tokio::test(flavor = "multi_thread")]

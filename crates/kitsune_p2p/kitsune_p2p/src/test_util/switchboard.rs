@@ -3,8 +3,8 @@
 
 #![warn(missing_docs)]
 
-pub mod switchboard;
 pub mod switchboard_evt_handler;
+pub mod switchboard_state;
 
 #[cfg(test)]
 mod tests;

@@ -3,12 +3,12 @@
 use std::sync::Arc;
 
 use crate::event::*;
-use crate::test_util::switchboard::switchboard::AgentEntry;
+use crate::test_util::switchboard::switchboard_state::AgentEntry;
 use crate::types::event::{KitsuneP2pEvent, KitsuneP2pEventHandler, KitsuneP2pEventHandlerResult};
 use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::*;
 
-use super::switchboard::{AgentOpEntry, NodeEp, OpEntry, Switchboard};
+use super::switchboard_state::{AgentOpEntry, NodeEp, OpEntry, Switchboard};
 
 type KSpace = Arc<KitsuneSpace>;
 type KAgent = Arc<KitsuneAgent>;
