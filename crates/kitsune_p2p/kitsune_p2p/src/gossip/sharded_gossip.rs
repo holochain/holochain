@@ -205,7 +205,7 @@ GOSSIP OUT
 {} ---> {:?} 
 {:#?}
         ",
-            self.ep_hnd.uniq().as_usize(),
+            self.ep_hnd.uniq(),
             how,
             gossip,
         );
@@ -221,7 +221,7 @@ GOSSIP IN
 {} <--- {}: 
 {:#?}
             ",
-                self.ep_hnd.uniq().as_usize(),
+                self.ep_hnd.uniq(),
                 remote_url,
                 msg
             );
@@ -900,7 +900,7 @@ impl AsGossipModule for ShardedGossip {
             ShardedGossipWire::decode_ref(&gossip_data).map_err(KitsuneError::other)?;
         println!(
             "gossip sanity check: {} <--- {}\n{:#?}",
-            self.ep_hnd.uniq().as_usize(),
+            self.ep_hnd.uniq(),
             remote_url,
             gossip
         );

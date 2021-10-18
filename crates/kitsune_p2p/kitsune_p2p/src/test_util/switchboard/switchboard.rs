@@ -347,9 +347,9 @@ impl SwitchboardSpace {
     pub fn print_ascii_arcs(&self, width: usize) {
         println!("node agent .");
         let mut nodes: Vec<_> = self.nodes.iter().collect();
-        nodes.sort_by_key(|(ep, _)| ep.uniq().as_usize());
+        nodes.sort_by_key(|(ep, _)| ep.uniq());
         for (ep, node) in nodes.into_iter() {
-            let node_id = ep.uniq().as_usize();
+            let node_id = ep.uniq();
             for (agent_loc8, agent) in node.local_agents.iter() {
                 let interval = agent.info.storage_arc.interval();
                 println!(
@@ -558,12 +558,12 @@ impl SwitchboardSpace {
 
 fn agent_from_loc<L: Into<DhtLocation>>(loc8: L) -> KAgent {
     let loc: DhtLocation = loc8.into();
-    Arc::new(KitsuneAgent::new(loc.as_bytes_36()))
+    Arc::new(KitsuneAgent::new(loc.to_representative_test_bytes_36()))
 }
 
 fn op_hash_from_loc<L: Into<DhtLocation>>(loc8: L) -> KOpHash {
     let loc: DhtLocation = loc8.into();
-    Arc::new(KitsuneOpHash::new(loc.as_bytes_36()))
+    Arc::new(KitsuneOpHash::new(loc.to_representative_test_bytes_36()))
 }
 
 fn fake_agent_info(
