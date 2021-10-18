@@ -153,7 +153,7 @@
 //!   - Close runs when an agent is deprecating an old source chain in favour of a new one
 //!   - All zomes in a DNA migrate at the same time
 //!   - Any failure fails the migration
-//! - `fn post_commit(headers: Vec<HeaderHash>)`:
+//! - `fn post_commit(headers: Vec<SignedHeaderHashed>)`:
 //!   - Executes after the wasm call that originated the commits so not bound by the original atomic transaction
 //!   - Input is all the header hashes that were committed
 //!   - The zome that originated the commits is called
