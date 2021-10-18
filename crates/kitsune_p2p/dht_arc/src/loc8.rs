@@ -1,5 +1,6 @@
 use crate::DhtLocation;
 
+/// F == 2^32 / 2^8
 const F: u32 = 16777216;
 
 #[derive(
@@ -43,7 +44,7 @@ impl DhtLocation {
 impl DhtLocation {
     /// Turn this location into a "representative" 36 byte vec,
     /// suitable for use as a hash type.
-    pub fn to_bytes_36(&self) -> Vec<u8> {
+    pub fn as_bytes_36(&self) -> Vec<u8> {
         self.as_u32()
             .to_le_bytes()
             .iter()

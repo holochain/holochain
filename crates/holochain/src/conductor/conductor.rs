@@ -1631,7 +1631,9 @@ mod builder {
                 p2p_batch_senders: Arc::new(parking_lot::Mutex::new(HashMap::new())),
                 p2p_metrics_env: envs.p2p_metrics(),
                 db_sync_level: self.config.db_sync_level,
-                dev_settings: Default::default(),
+
+                #[cfg(any(test, feature = "test_utils"))]
+                dev_settings: parking_lot::RwLock::new(DevSettings::default()),
             });
 
             // Install extra DNAs, in particular:

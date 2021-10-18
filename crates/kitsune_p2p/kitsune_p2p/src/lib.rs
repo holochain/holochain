@@ -20,7 +20,7 @@ mod spawn;
 pub use spawn::*;
 
 #[allow(missing_docs)]
-#[cfg(any(test, feature = "test_utils"))]
+#[cfg(feature = "test_utils")]
 pub mod test_util;
 
 #[cfg(test)]
