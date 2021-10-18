@@ -227,7 +227,7 @@ impl<T: HashType> IntoIterator for HoloHash<T> {
 
 impl<T: HashType> HasHash<T> for HoloHash<T> {
     fn as_hash(&self) -> &HoloHash<T> {
-        &self
+        self
     }
     fn into_hash(self) -> HoloHash<T> {
         self

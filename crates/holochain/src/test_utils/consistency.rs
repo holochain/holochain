@@ -139,7 +139,7 @@ pub async fn local_machine_session_with_hashes(
         agent_env_map.extend(agents.iter().cloned().map(|(e, a)| (a, e)));
         agent_p2p_map.extend(agents.iter().cloned().map(|(_, a)| (a, p2p_env.clone())));
         for (_, agent) in &agents {
-            if let Some(storage_arc) = request_arc(&p2p_env, &agent).await.unwrap() {
+            if let Some(storage_arc) = request_arc(&p2p_env, agent).await.unwrap() {
                 all_agents.push((agent.clone(), storage_arc));
             }
         }

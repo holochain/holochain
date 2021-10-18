@@ -3,12 +3,12 @@
 
 use crate::*;
 use ghost_actor::dependencies::futures::future::FutureExt;
-use legacy_lair_api::actor::{
+use lair_keystore_api_0_0::actor::{
     Cert, CertDigest, CertPrivKey, LairClientApiSender, LairEntryType, TlsCertOptions,
 };
 
 /// GhostSender type for the KeystoreApi
-pub type KeystoreSender = ghost_actor::GhostSender<legacy_lair_api::actor::LairClientApi>;
+pub type KeystoreSender = ghost_actor::GhostSender<lair_keystore_api_0_0::actor::LairClientApi>;
 
 /// Result type for legacy API calls.
 pub type KeystoreApiResult<T> = Result<T, KeystoreError>;
@@ -55,7 +55,7 @@ impl KeystoreSenderExt for KeystoreSender {
             }
 
             let mut tls_opt = TlsCertOptions::default();
-            tls_opt.alg = legacy_lair_api::actor::TlsCertAlg::PkcsEcdsaP256Sha256;
+            tls_opt.alg = lair_keystore_api_0_0::actor::TlsCertAlg::PkcsEcdsaP256Sha256;
             let _ = this.tls_cert_new_self_signed_from_entropy(tls_opt).await?;
 
             this.get_first_tls_cert().await
