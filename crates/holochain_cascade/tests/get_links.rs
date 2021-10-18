@@ -1,3 +1,4 @@
+use fixt::prelude::*;
 use ghost_actor::dependencies::observability;
 use holochain_cascade::test_utils::*;
 use holochain_cascade::Cascade;
@@ -7,6 +8,7 @@ use holochain_state::prelude::test_cell_env;
 use holochain_state::scratch::Scratch;
 use holochain_types::link::WireLinkOps;
 use holochain_zome_types::ChainTopOrdering;
+use holochain_zome_types::ZomeFixturator;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn links_not_authority() {
@@ -112,17 +114,20 @@ async fn links_authoring() {
     // Environments
     let cache = test_cell_env();
     let mut scratch = Scratch::new();
+    let zome = fixt!(Zome);
 
     // Data
     let td = EntryTestData::create();
     insert_op_scratch(
         &mut scratch,
+        Some(zome.clone()),
         td.store_entry_op.clone(),
         ChainTopOrdering::default(),
     )
     .unwrap();
     insert_op_scratch(
         &mut scratch,
+        Some(zome.clone()),
         td.create_link_op.clone(),
         ChainTopOrdering::default(),
     )
@@ -154,6 +159,7 @@ async fn links_authoring() {
 
     insert_op_scratch(
         &mut scratch,
+        Some(zome),
         td.delete_link_op.clone(),
         ChainTopOrdering::default(),
     )

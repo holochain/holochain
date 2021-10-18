@@ -3,11 +3,11 @@
 use std::sync::Arc;
 
 use crate::event::*;
-use crate::test_util::switchboard::switchboard_state::AgentEntry;
 use crate::types::event::{KitsuneP2pEvent, KitsuneP2pEventHandler, KitsuneP2pEventHandlerResult};
 use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::*;
 
+use super::switchboard_state::AgentEntry;
 use super::switchboard_state::{AgentOpEntry, NodeEp, OpEntry, Switchboard};
 
 type KSpace = Arc<KitsuneSpace>;
@@ -20,23 +20,23 @@ type KOpHash = Arc<KitsuneOpHash>;
 /// to what a Kitsune implementor like Holochain would implement.
 /// It's used to implement nodes in the Switchboard.
 #[derive(Clone)]
-pub struct SwitchboardEvtHandler {
+pub struct SwitchboardEventHandler {
     node: NodeEp,
     sb: Switchboard,
 }
 
-impl SwitchboardEvtHandler {
+impl SwitchboardEventHandler {
     /// Constructor
     pub fn new(node: NodeEp, sb: Switchboard) -> Self {
         Self { node, sb }
     }
 }
 
-impl ghost_actor::GhostHandler<KitsuneP2pEvent> for SwitchboardEvtHandler {}
-impl ghost_actor::GhostControlHandler for SwitchboardEvtHandler {}
+impl ghost_actor::GhostHandler<KitsuneP2pEvent> for SwitchboardEventHandler {}
+impl ghost_actor::GhostControlHandler for SwitchboardEventHandler {}
 
 #[allow(warnings)]
-impl KitsuneP2pEventHandler for SwitchboardEvtHandler {
+impl KitsuneP2pEventHandler for SwitchboardEventHandler {
     fn handle_put_agent_info_signed(
         &mut self,
         PutAgentInfoSignedEvt { space, peer_data }: PutAgentInfoSignedEvt,

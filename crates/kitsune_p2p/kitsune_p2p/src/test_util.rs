@@ -55,6 +55,9 @@ pub async fn spawn_handler<H: KitsuneP2pEventHandler + ghost_actor::GhostControl
     (tx, tokio::task::spawn(driver))
 }
 
+mod switchboard;
+pub use switchboard::*;
+
 mod harness_event;
 pub(crate) use harness_event::*;
 
@@ -72,10 +75,7 @@ pub(crate) use harness_actor::*;
 mod metric_store;
 pub use metric_store::*;
 
+pub(crate) mod scenario_def_local;
+
 #[cfg(feature = "test_utils")]
 pub mod mock_network;
-
-#[cfg(feature = "test_utils")]
-pub mod switchboard;
-
-pub(crate) mod scenario_def_local;

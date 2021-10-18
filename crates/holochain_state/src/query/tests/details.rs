@@ -9,6 +9,7 @@ async fn entry_scratch_same_as_sql() {
     observability::test_run().ok();
     let mut scratch = Scratch::new();
     let mut conn = Connection::open_in_memory().unwrap();
+    let zome = fixt!(Zome);
     SCHEMA_CELL.initialize(&mut conn, None).unwrap();
 
     let mut txn = conn
@@ -19,6 +20,7 @@ async fn entry_scratch_same_as_sql() {
     let query = GetEntryDetailsQuery::new(td.hash.clone());
     insert_op_scratch(
         &mut scratch,
+        Some(zome),
         td.store_entry_op.clone(),
         ChainTopOrdering::default(),
     )
@@ -46,6 +48,7 @@ async fn element_scratch_same_as_sql() {
     observability::test_run().ok();
     let mut scratch = Scratch::new();
     let mut conn = Connection::open_in_memory().unwrap();
+    let zome = fixt!(Zome);
     SCHEMA_CELL.initialize(&mut conn, None).unwrap();
 
     let mut txn = conn
@@ -56,6 +59,7 @@ async fn element_scratch_same_as_sql() {
     let query = GetElementDetailsQuery::new(td.header.as_hash().clone());
     insert_op_scratch(
         &mut scratch,
+        Some(zome),
         td.store_element_op.clone(),
         ChainTopOrdering::default(),
     )

@@ -60,6 +60,8 @@ impl ShardedGossipLocal {
                 })
                 .next();
 
+            // dbg!(&info);
+
             // If we found a remote address add this agent to the node
             // or create the node if it doesn't exist.
             if let Some((agent, cert, url)) = info {
@@ -104,6 +106,8 @@ fn next_remote_node(
     use rand::prelude::*;
     let mut rng = thread_rng();
 
+    // dbg!(&remote_nodes, metrics);
+
     // Sort the nodes by longest time since we last successfully gossiped with them.
     // Randomly break ties between nodes we haven't successfully gossiped with.
     // Note the smaller an Instant the longer it is in the past.
@@ -113,7 +117,7 @@ fn next_remote_node(
             metrics.last_success(b.cert()),
         ) {
             // Choose the smallest (oldest) Instant.
-            (Some(a), Some(b)) => a.cmp(&b),
+            (Some(a), Some(b)) => a.cmp(b),
             // Put a behind b that hasn't been gossiped with.
             (Some(_), None) => Ordering::Greater,
             // Put b behind a that hasn't been gossiped with.

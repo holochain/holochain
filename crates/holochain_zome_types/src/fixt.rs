@@ -638,6 +638,7 @@ fixturator!(
 );
 
 fixturator!(
+    with_vec 0 5;
     SignedHeaderHashed;
     constructor fn with_presigned(HeaderHashed, Signature);
 );

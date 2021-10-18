@@ -60,7 +60,7 @@ impl SConn {
 impl DbRead {
     #[deprecated = "remove if we never use singleton connections"]
     fn _connection_naive(&self) -> DatabaseResult<SConn> {
-        SConn::open(self.path(), &self.kind())
+        SConn::open(self.path(), self.kind())
     }
 
     #[deprecated = "remove if we never use singleton connections"]

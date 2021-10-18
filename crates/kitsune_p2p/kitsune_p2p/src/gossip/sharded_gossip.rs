@@ -185,7 +185,7 @@ impl ShardedGossip {
 
         let timeout = self.gossip.tuning_params.implicit_timeout();
 
-        let con = match how {
+        let con = match how.clone() {
             HowToConnect::Con(con, remote_url) => {
                 if con.is_closed() {
                     self.ep_hnd.get_connection(remote_url, timeout).await?
@@ -199,12 +199,32 @@ impl ShardedGossip {
         // actually sending the gossip.
         self.bandwidth.outgoing_bytes(bytes).await;
         con.notify(&gossip, timeout).await?;
+        println!(
+            "
+GOSSIP OUT 
+{} ---> {:?} 
+{:#?}
+        ",
+            self.ep_hnd.uniq(),
+            how,
+            gossip,
+        );
         Ok(())
     }
 
     async fn process_incoming_outgoing(&self) -> KitsuneResult<()> {
         let (incoming, outgoing) = self.pop_queues()?;
         if let Some((con, remote_url, msg, bytes)) = incoming {
+            println!(
+                "
+GOSSIP IN 
+{} <--- {}: 
+{:#?}
+            ",
+                self.ep_hnd.uniq(),
+                remote_url,
+                msg
+            );
             self.bandwidth.incoming_bytes(bytes).await;
             let outgoing = match self.gossip.process_incoming(con.peer_cert(), msg).await {
                 Ok(r) => r,
@@ -878,6 +898,12 @@ impl AsGossipModule for ShardedGossip {
         use kitsune_p2p_types::codec::*;
         let (bytes, gossip) =
             ShardedGossipWire::decode_ref(&gossip_data).map_err(KitsuneError::other)?;
+        println!(
+            "gossip sanity check: {} <--- {}\n{:#?}",
+            self.ep_hnd.uniq(),
+            remote_url,
+            gossip
+        );
         self.inner.share_mut(move |i, _| {
             i.incoming
                 .push_back((con, remote_url, gossip, bytes as usize));

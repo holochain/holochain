@@ -292,7 +292,6 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
             let msg_id = MsgId::new_notify();
             let len = data.len();
             this.con.write(msg_id, data, timeout).await?;
-
             this.metrics.write_len(dbg_name, len);
 
             let peer_cert = this.peer_cert();
