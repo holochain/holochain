@@ -203,15 +203,17 @@ fn bump_release_versions<'a>(
     }
 
     // run the checks to ensure the repo is in a consistent state to begin with
-    info!("running consistency checks before changing the versions...");
-    publish_paths_to_crates_io(
-        &selection,
-        true,
-        true,
-        &cmd_args.allowed_missing_dependencies,
-        &cmd_args.cargo_target_dir,
-    )
-    .context("consistency checks failed")?;
+    if !cmd_args.no_verify {
+        info!("running consistency checks before changing the versions...");
+        publish_paths_to_crates_io(
+            &selection,
+            true,
+            true,
+            &cmd_args.allowed_missing_dependencies,
+            &cmd_args.cargo_target_dir,
+        )
+        .context("consistency checks failed")?;
+    }
 
     let mut changed_crate_changelogs = vec![];
 
@@ -294,15 +296,17 @@ fn bump_release_versions<'a>(
 
     ws.update_lockfile(cmd_args.dry_run)?;
 
-    info!("running consistency checks after changing the versions...");
-    publish_paths_to_crates_io(
-        &selection,
-        true,
-        true,
-        &cmd_args.allowed_missing_dependencies,
-        &cmd_args.cargo_target_dir,
-    )
-    .context("consistency checks failed")?;
+    if !cmd_args.no_verify {
+        info!("running consistency checks after changing the versions...");
+        publish_paths_to_crates_io(
+            &selection,
+            true,
+            true,
+            &cmd_args.allowed_missing_dependencies,
+            &cmd_args.cargo_target_dir,
+        )
+        .context("consistency checks failed")?;
+    }
 
     // ## for the workspace release:
     let workspace_release_name = branch_name
@@ -354,12 +358,14 @@ fn bump_release_versions<'a>(
         ws.git_add_all_and_commit(&commit_msg, None)?;
     };
 
-    // create tags for all released crates
-    let tags_to_create = changed_crate_changelogs
-        .iter()
-        .map(|wcrh| wcrh.title())
-        .collect::<Vec<String>>();
-    create_crate_tags(&ws, tags_to_create, cmd_args)?;
+    if !cmd_args.no_tag_creation {
+        // create tags for all released crates
+        let tags_to_create = changed_crate_changelogs
+            .iter()
+            .map(|wcrh| wcrh.title())
+            .collect::<Vec<String>>();
+        create_crate_tags(ws, tags_to_create, cmd_args)?;
+    }
 
     Ok(())
 }

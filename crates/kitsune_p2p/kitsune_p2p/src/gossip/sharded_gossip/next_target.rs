@@ -33,6 +33,12 @@ impl ShardedGossipLocal {
         for info in store::all_agent_info(&self.evt_sender, &self.space)
             .await?
             .into_iter()
+            .filter(|a| {
+                std::time::Duration::from_millis(a.expires_at_ms)
+                    > std::time::UNIX_EPOCH
+                        .elapsed()
+                        .expect("You computer time is set before unix epoch")
+            })
             .filter(|a| remote_agents_within_arc_set.contains(&a.agent))
             .filter(|a| !a.storage_arc.interval().is_empty())
         {
@@ -107,7 +113,7 @@ fn next_remote_node(
             metrics.last_success(b.cert()),
         ) {
             // Choose the smallest (oldest) Instant.
-            (Some(a), Some(b)) => a.cmp(&b),
+            (Some(a), Some(b)) => a.cmp(b),
             // Put a behind b that hasn't been gossiped with.
             (Some(_), None) => Ordering::Greater,
             // Put b behind a that hasn't been gossiped with.

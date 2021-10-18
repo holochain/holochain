@@ -193,13 +193,13 @@ impl<'stmt, Q: Query> Stores<Q> for Txn<'stmt, '_> {
     type O = QueryStmt<'stmt, Q>;
 
     fn get_initial_data(&self, query: Q) -> StateQueryResult<Self::O> {
-        QueryStmt::new(&self.txn, query)
+        QueryStmt::new(self.txn, query)
     }
 }
 
 impl<'stmt> Store for Txn<'stmt, '_> {
     fn get_entry(&self, hash: &EntryHash) -> StateQueryResult<Option<Entry>> {
-        get_entry_from_db(&self.txn, hash)
+        get_entry_from_db(self.txn, hash)
     }
 
     fn contains_entry(&self, hash: &EntryHash) -> StateQueryResult<bool> {
@@ -270,10 +270,11 @@ impl<'stmt> Store for Txn<'stmt, '_> {
                 ":hash": hash,
             },
             |row| {
-                let header = from_blob::<SignedHeader>(row.get(row.column_index("blob")?)?);
+                let header =
+                    from_blob::<SignedHeader>(row.get(row.as_ref().column_index("blob")?)?);
                 Ok(header.and_then(|header| {
                     let SignedHeader(header, signature) = header;
-                    let hash: HeaderHash = row.get(row.column_index("hash")?)?;
+                    let hash: HeaderHash = row.get(row.as_ref().column_index("hash")?)?;
                     let header = HeaderHashed::with_pre_hashed(header, hash);
                     let shh = SignedHeaderHashed::with_presigned(header, signature);
                     Ok(shh)
@@ -310,13 +311,15 @@ impl<'stmt> Txn<'stmt, '_> {
                 ":hash": hash,
             },
             |row| {
-                let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
+                let header =
+                    from_blob::<SignedHeader>(row.get(row.as_ref().column_index("header_blob")?)?);
                 Ok(header.and_then(|header| {
                     let SignedHeader(header, signature) = header;
-                    let hash: HeaderHash = row.get(row.column_index("hash")?)?;
+                    let hash: HeaderHash = row.get(row.as_ref().column_index("hash")?)?;
                     let header = HeaderHashed::with_pre_hashed(header, hash);
                     let shh = SignedHeaderHashed::with_presigned(header, signature);
-                    let entry: Option<Vec<u8>> = row.get(row.column_index("entry_blob")?)?;
+                    let entry: Option<Vec<u8>> =
+                        row.get(row.as_ref().column_index("entry_blob")?)?;
                     let entry = match entry {
                         Some(entry) => Some(from_blob::<Entry>(entry)?),
                         None => None,
@@ -345,13 +348,15 @@ impl<'stmt> Txn<'stmt, '_> {
                 ":hash": hash,
             },
             |row| {
-                let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?);
+                let header =
+                    from_blob::<SignedHeader>(row.get(row.as_ref().column_index("header_blob")?)?);
                 Ok(header.and_then(|header| {
                     let SignedHeader(header, signature) = header;
-                    let hash: HeaderHash = row.get(row.column_index("hash")?)?;
+                    let hash: HeaderHash = row.get(row.as_ref().column_index("hash")?)?;
                     let header = HeaderHashed::with_pre_hashed(header, hash);
                     let shh = SignedHeaderHashed::with_presigned(header, signature);
-                    let entry: Option<Vec<u8>> = row.get(row.column_index("entry_blob")?)?;
+                    let entry: Option<Vec<u8>> =
+                        row.get(row.as_ref().column_index("entry_blob")?)?;
                     let entry = match entry {
                         Some(entry) => Some(from_blob::<Entry>(entry)?),
                         None => None,
@@ -612,7 +617,7 @@ pub fn row_blob_and_hash_to_header(
     move |row| {
         let header = from_blob::<SignedHeader>(row.get(blob_index)?)?;
         let SignedHeader(header, signature) = header;
-        let hash: HeaderHash = row.get(row.column_index(hash_index)?)?;
+        let hash: HeaderHash = row.get(row.as_ref().column_index(hash_index)?)?;
         let header = HeaderHashed::with_pre_hashed(header, hash);
         let shh = SignedHeaderHashed::with_presigned(header, signature);
         Ok(shh)
@@ -656,7 +661,7 @@ pub fn get_entry_from_db(
         },
         |row| {
             Ok(from_blob::<Entry>(
-                row.get(row.column_index("entry_blob")?)?,
+                row.get(row.as_ref().column_index("entry_blob")?)?,
             ))
         },
     );

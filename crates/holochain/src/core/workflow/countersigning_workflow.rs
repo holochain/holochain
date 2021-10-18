@@ -55,7 +55,7 @@ struct Session {
 pub(crate) fn incoming_countersigning(
     ops: Vec<(DhtOpHash, DhtOp)>,
     workspace: &CountersigningWorkspace,
-    mut trigger: TriggerSender,
+    trigger: TriggerSender,
 ) -> WorkflowResult<()> {
     let mut should_trigger = false;
 
@@ -115,7 +115,7 @@ pub(crate) async fn countersigning_workflow(
 
     // For each complete session send the ops to validation.
     for (agents, ops, headers) in complete_sessions {
-        incoming_dht_ops_workflow(&env, None, sys_validation_trigger.clone(), ops, false).await?;
+        incoming_dht_ops_workflow(env, None, sys_validation_trigger.clone(), ops, false).await?;
         notify_agents.push((agents, headers));
     }
 
@@ -141,7 +141,7 @@ pub(crate) async fn countersigning_success(
     network: &HolochainP2pCell,
     author: AgentPubKey,
     signed_headers: Vec<SignedHeader>,
-    mut publish_trigger: TriggerSender,
+    publish_trigger: TriggerSender,
     mut signal: SignalBroadcaster,
 ) -> WorkflowResult<()> {
     // Using iterators is fine in this function as there can only be a maximum of 8 headers.
@@ -197,7 +197,7 @@ pub(crate) async fn countersigning_success(
 
     // Verify signatures of headers.
     for SignedHeader(header, signature) in &signed_headers {
-        if !header.author().verify_signature(signature, header).await? {
+        if !header.author().verify_signature(signature, header).await {
             return Ok(());
         }
     }
@@ -360,7 +360,7 @@ impl CountersigningWorkspace {
                         if session.map.values().all(|(_, _, required_hashes)| {
                             required_hashes
                                 .iter()
-                                .all(|hash| session.map.contains_key(&hash))
+                                .all(|hash| session.map.contains_key(hash))
                         }) {
                             Some(entry_hash.clone())
                         } else {

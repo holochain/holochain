@@ -72,7 +72,7 @@ impl RoundStateMap {
     /// Touch a round to reset its timeout.
     fn touch(&mut self, key: &StateKey) {
         if let Some(state) = self.map.get_mut(key) {
-            state.last_touch = std::time::Instant::now();
+            state.last_touch = Instant::now();
         }
     }
 }

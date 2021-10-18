@@ -2,9 +2,9 @@ use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::CallContext;
+use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeT;
 use holochain_wasmer_host::prelude::WasmError;
-use crate::core::ribosome::HostFnAccess;
 
 use holochain_types::prelude::*;
 use std::sync::Arc;
@@ -17,27 +17,29 @@ pub fn create<'a>(
     input: CreateInput,
 ) -> Result<HeaderHash, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
-        HostFnAccess{ write_workspace: Permission::Allow, .. } => {
+        HostFnAccess {
+            write_workspace: Permission::Allow,
+            ..
+        } => {
             let entry = AsRef::<Entry>::as_ref(&input);
             let chain_top_ordering = *input.chain_top_ordering();
 
             // Countersigned entries have different header handling.
             match entry {
-                Entry::CounterSign(_, _) => {
-                    tokio_helper::block_forever_on(async move {
-                        call_context
-                            .host_context
-                            .workspace()
-                            .source_chain()
-                            .put_countersigned(input.into_entry(), chain_top_ordering)
-                            .await
-                            .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))
-                    })
-                },
+                Entry::CounterSign(_, _) => tokio_helper::block_forever_on(async move {
+                    call_context
+                        .host_context
+                        .workspace()
+                        .source_chain()
+                        .put_countersigned(Some(call_context.zome.clone()), input.into_entry(), chain_top_ordering)
+                        .await
+                        .map_err(|source_chain_error| {
+                            WasmError::Host(source_chain_error.to_string())
+                        })
+                }),
                 _ => {
                     // build the entry hash
-                    let entry_hash =
-                    EntryHash::with_data_sync(AsRef::<Entry>::as_ref(&input));
+                    let entry_hash = EntryHash::with_data_sync(AsRef::<Entry>::as_ref(&input));
 
                     // extract the zome position
                     let header_zome_id = ribosome
@@ -52,8 +54,11 @@ pub fn create<'a>(
                                 call_context.clone(),
                                 entry_def_id.to_owned().into(),
                             )?;
-                            let app_entry_type =
-                                AppEntryType::new(header_entry_def_id, header_zome_id, entry_visibility);
+                            let app_entry_type = AppEntryType::new(
+                                header_entry_def_id,
+                                header_zome_id,
+                                entry_visibility,
+                            );
                             EntryType::App(app_entry_type)
                         }
                         EntryDefId::CapGrant => EntryType::CapGrant,
@@ -76,14 +81,15 @@ pub fn create<'a>(
                             .host_context
                             .workspace()
                             .source_chain()
-                            .put(header_builder, Some(input.into_entry()), chain_top_ordering)
+                            .put(Some(call_context.zome.clone()), header_builder, Some(input.into_entry()), chain_top_ordering)
                             .await
-                            .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))
+                            .map_err(|source_chain_error| {
+                                WasmError::Host(source_chain_error.to_string())
+                            })
                     })
                 }
             }
-
-        },
+        }
         _ => unreachable!(),
     }
 }
@@ -103,10 +109,12 @@ pub fn extract_entry_def(
             match maybe_entry_defs {
                 // convert the entry def id string into a numeric position in the defs
                 Some(entry_defs) => {
-                    entry_defs.entry_def_index_from_id(entry_def_id.clone()).map(|index| {
-                        // build an app entry type from the entry def at the found position
-                        (index, entry_defs[index.0 as usize].visibility)
-                                                      })
+                    entry_defs
+                        .entry_def_index_from_id(entry_def_id.clone())
+                        .map(|index| {
+                            // build an app entry type from the entry def at the found position
+                            (index, entry_defs[index.0 as usize].visibility)
+                        })
                 }
                 None => None,
             }
@@ -201,11 +209,10 @@ pub mod wasm_test {
         // this should be the content "foo" of the committed post
         assert_eq!(vec![163, 102, 111, 111], bytes);
 
-        let round_twice: Vec<Option<Element>> = crate::call_test_ribosome!(host_access, TestWasm::Create, "get_entry_twice", ()).unwrap();
-        assert_eq!(
-            round_twice,
-            vec![round.clone(), round],
-        );
+        let round_twice: Vec<Option<Element>> =
+            crate::call_test_ribosome!(host_access, TestWasm::Create, "get_entry_twice", ())
+                .unwrap();
+        assert_eq!(round_twice, vec![round.clone(), round],);
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -315,8 +322,8 @@ pub mod wasm_test {
             ZomeCallResponse::Ok(ExternIO::encode(expected).unwrap())
         );
 
-        let shutdown = handle.take_shutdown_handle().await.unwrap();
-        handle.shutdown().await;
+        let shutdown = handle.take_shutdown_handle().unwrap();
+        handle.shutdown();
         shutdown.await.unwrap().unwrap();
     }
 

@@ -8,7 +8,6 @@ use holochain_websocket::WebsocketSender;
 pub async fn admin_port(conductor: &ConductorHandle) -> u16 {
     conductor
         .get_arbitrary_admin_websocket_port()
-        .await
         .expect("No admin port open on conductor")
 }
 
@@ -24,7 +23,7 @@ pub use holochain::sweettest::websocket_client_by_port;
 use assert_cmd::prelude::*;
 use futures::Future;
 use holochain_conductor_api::conductor::ConductorConfig;
-use holochain_conductor_api::conductor::PassphraseServiceConfig;
+use holochain_conductor_api::conductor::KeystoreConfig;
 use holochain_conductor_api::AdminInterfaceConfig;
 use holochain_conductor_api::InterfaceDriver;
 use matches::assert_matches;
@@ -254,11 +253,7 @@ pub fn create_config(port: u16, environment_path: PathBuf) -> ConductorConfig {
         environment_path: environment_path.into(),
         network: None,
         dpki: None,
-        passphrase_service: PassphraseServiceConfig::DangerInsecureFromConfig {
-            passphrase: "password".into(),
-        },
-        keystore_path: None,
-        use_dangerous_test_keystore: true,
+        keystore: KeystoreConfig::DangerTestKeystoreLegacyDeprecated,
         db_sync_level: DbSyncLevel::default(),
     }
 }

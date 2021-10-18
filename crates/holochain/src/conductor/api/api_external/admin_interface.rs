@@ -9,7 +9,6 @@ use crate::conductor::error::ConductorError;
 use crate::conductor::interface::error::InterfaceError;
 use crate::conductor::interface::error::InterfaceResult;
 use crate::conductor::ConductorHandle;
-use holochain_keystore::KeystoreSenderExt;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::DnaBundle;
 use holochain_types::prelude::*;
@@ -92,13 +91,12 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                                     .to_string(),
                             ));
                         }
-                        let mut dna =
-                            self.conductor_handle.get_dna(hash).await.ok_or_else(|| {
-                                ConductorApiError::DnaReadError(format!(
-                                    "Unable to create derived Dna: {} not registered",
-                                    hash
-                                ))
-                            })?;
+                        let mut dna = self.conductor_handle.get_dna(hash).ok_or_else(|| {
+                            ConductorApiError::DnaReadError(format!(
+                                "Unable to create derived Dna: {} not registered",
+                                hash
+                            ))
+                        })?;
                         if let Some(props) = properties {
                             let properties = SerializedBytes::try_from(props)
                                 .map_err(SerializationError::from)?;
@@ -124,7 +122,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 };
 
                 let hash = dna.dna_hash().clone();
-                let dna_list = self.conductor_handle.list_dnas().await?;
+                let dna_list = self.conductor_handle.list_dnas();
                 if !dna_list.contains(&hash) {
                     self.conductor_handle.register_dna(dna).await?;
                 }
@@ -155,14 +153,14 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     } = dna_payload;
 
                     // confirm that hash has been installed
-                    let dna_list = self.conductor_handle.list_dnas().await?;
+                    let dna_list = self.conductor_handle.list_dnas();
                     if !dna_list.contains(&hash) {
                         return Err(ConductorApiError::DnaReadError(format!(
                             "Given dna has not been registered: {}",
                             hash
                         )));
                     }
-                    let cell_id = CellId::from((hash.clone(), agent_key.clone()));
+                    let cell_id = CellId::from((hash, agent_key.clone()));
                     ConductorApiResult::Ok((InstalledCell::new(cell_id, nick), membrane_proof))
                 });
 
@@ -208,7 +206,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 Ok(AdminResponse::AppUninstalled)
             }
             ListDnas => {
-                let dna_list = self.conductor_handle.list_dnas().await?;
+                let dna_list = self.conductor_handle.list_dnas();
                 Ok(AdminResponse::DnasListed(dna_list))
             }
             GenerateAgentPubKey => {
@@ -216,15 +214,14 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .conductor_handle
                     .keystore()
                     .clone()
-                    .generate_sign_keypair_from_pure_entropy()
+                    .new_sign_keypair_random()
                     .await?;
                 Ok(AdminResponse::AgentPubKeyGenerated(agent_pub_key))
             }
             ListCellIds => {
                 let cell_ids = self
                     .conductor_handle
-                    .list_cell_ids(Some(CellStatus::Joined))
-                    .await?;
+                    .list_cell_ids(Some(CellStatus::Joined));
                 Ok(AdminResponse::CellIdsListed(cell_ids))
             }
             ListEnabledApps => {
@@ -363,7 +360,6 @@ impl InterfaceApi for RealAdminInterfaceApi {
         {
             self.conductor_handle
                 .check_running()
-                .await
                 .map_err(Box::new)
                 .map_err(InterfaceError::RequestHandler)?;
         }
@@ -394,7 +390,7 @@ mod test {
         observability::test_run().ok();
         let envs = test_environments();
         let handle = Conductor::builder().test(&envs.into(), &[]).await?;
-        let shutdown = handle.take_shutdown_handle().await.unwrap();
+        let shutdown = handle.take_shutdown_handle().unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
         let uid = Uuid::new_v4();
         let dna = fake_dna_zomes(
@@ -514,7 +510,7 @@ mod test {
             AdminResponse::DnaRegistered(hash) if hash != dna_hash
         );
 
-        handle.shutdown().await;
+        handle.shutdown();
         tokio::time::timeout(std::time::Duration::from_secs(1), shutdown)
             .await
             .ok();
@@ -526,7 +522,7 @@ mod test {
         observability::test_run().ok();
         let envs = test_environments();
         let handle = Conductor::builder().test(&envs.into(), &[]).await.unwrap();
-        let shutdown = handle.take_shutdown_handle().await.unwrap();
+        let shutdown = handle.take_shutdown_handle().unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
         let uid = Uuid::new_v4();
         let dna = fake_dna_zomes(
@@ -636,7 +632,7 @@ mod test {
         assert_matches!(res, AdminResponse::EnabledAppsListed(v) if v.contains(&"test-by-path".to_string()) && v.contains(&"test-by-hash".to_string())
         );
 
-        handle.shutdown().await;
+        handle.shutdown();
         tokio::time::timeout(std::time::Duration::from_secs(1), shutdown)
             .await
             .ok();

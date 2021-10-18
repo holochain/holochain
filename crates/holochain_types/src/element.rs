@@ -8,6 +8,8 @@ use crate::prelude::*;
 use error::ElementGroupError;
 use error::ElementGroupResult;
 use holochain_keystore::KeystoreError;
+use holochain_keystore::LairResult;
+use holochain_keystore::MetaLairClient;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::entry::EntryHashed;
 use std::borrow::Cow;
@@ -346,10 +348,8 @@ pub trait SignedHeaderHashedExt {
     fn from_content_sync(signed_header: SignedHeader) -> SignedHeaderHashed;
     /// Sign some content
     #[allow(clippy::new_ret_no_self)]
-    async fn new(
-        keystore: &KeystoreSender,
-        header: HeaderHashed,
-    ) -> Result<SignedHeaderHashed, KeystoreError>;
+    async fn new(keystore: &MetaLairClient, header: HeaderHashed)
+        -> LairResult<SignedHeaderHashed>;
     /// Validate the data
     async fn validate(&self) -> Result<(), KeystoreError>;
 }
@@ -365,7 +365,7 @@ impl SignedHeaderHashedExt for SignedHeaderHashed {
         Self::with_presigned(header.into_hashed(), signature)
     }
     /// SignedHeader constructor
-    async fn new(keystore: &KeystoreSender, header: HeaderHashed) -> Result<Self, KeystoreError> {
+    async fn new(keystore: &MetaLairClient, header: HeaderHashed) -> LairResult<Self> {
         let signature = header.author().sign(keystore, &*header).await?;
         Ok(Self::with_presigned(header, signature))
     }
@@ -376,7 +376,7 @@ impl SignedHeaderHashedExt for SignedHeaderHashed {
             .header()
             .author()
             .verify_signature(self.signature(), self.header())
-            .await?
+            .await
         {
             return Err(KeystoreError::InvalidSignature(
                 self.signature().clone(),

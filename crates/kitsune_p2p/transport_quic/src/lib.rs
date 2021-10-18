@@ -7,6 +7,7 @@ pub mod dependencies {
     pub use ::quinn;
 }
 
+use kitsune_p2p_types::dependencies::lair_keystore_api_0_0;
 use kitsune_p2p_types::dependencies::url2::*;
 use kitsune_p2p_types::metrics::metric_task;
 use kitsune_p2p_types::transport::TransportResult;

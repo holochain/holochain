@@ -22,6 +22,7 @@ use crate::prelude::StoresIter;
 use crate::query::StateQueryResult;
 use crate::query::StmtIter;
 use crate::query::Store;
+use holochain_zome_types::ScheduledFn;
 
 /// The "scratch" is an in-memory space to stage Headers to be committed at the
 /// end of the CallZome workflow.
@@ -33,9 +34,10 @@ use crate::query::Store;
 /// Cascade.
 #[derive(Debug, Clone, Default)]
 pub struct Scratch {
-    headers: Vec<SignedHeaderHashed>,
+    zomed_headers: Vec<(Option<Zome>, SignedHeaderHashed)>,
     entries: HashMap<EntryHash, Arc<Entry>>,
     chain_top_ordering: ChainTopOrdering,
+    scheduled_fns: Vec<ScheduledFn>,
 }
 
 #[derive(Debug, Clone)]
@@ -54,6 +56,14 @@ impl Scratch {
         }
     }
 
+    pub fn scheduled_fns(&self) -> &[ScheduledFn] {
+        &self.scheduled_fns
+    }
+
+    pub fn add_scheduled_fn(&mut self, scheduled_fn: ScheduledFn) {
+        self.scheduled_fns.push(scheduled_fn)
+    }
+
     pub fn chain_top_ordering(&self) -> ChainTopOrdering {
         self.chain_top_ordering
     }
@@ -64,9 +74,14 @@ impl Scratch {
         }
     }
 
-    pub fn add_header(&mut self, item: SignedHeaderHashed, chain_top_ordering: ChainTopOrdering) {
+    pub fn add_header(
+        &mut self,
+        zome: Option<Zome>,
+        item: SignedHeaderHashed,
+        chain_top_ordering: ChainTopOrdering,
+    ) {
         self.respect_chain_top_ordering(chain_top_ordering);
-        self.headers.push(item);
+        self.zomed_headers.push((zome, item));
     }
 
     pub fn add_entry(&mut self, entry_hashed: EntryHashed, chain_top_ordering: ChainTopOrdering) {
@@ -76,7 +91,13 @@ impl Scratch {
     }
 
     pub fn as_filter(&self, f: impl Fn(&SignedHeaderHashed) -> bool) -> FilteredScratch {
-        let headers = self.headers.iter().filter(|&t| f(t)).cloned().collect();
+        let headers = self
+            .zomed_headers
+            .iter()
+            .map(|(_zome, shh)| shh)
+            .filter(|&shh| f(shh))
+            .cloned()
+            .collect();
         FilteredScratch { headers }
     }
 
@@ -85,19 +106,19 @@ impl Scratch {
     }
 
     pub fn len(&self) -> usize {
-        self.headers.len()
+        self.zomed_headers.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.headers.is_empty()
+        self.zomed_headers.is_empty() && self.scheduled_fns.is_empty()
     }
 
     pub fn headers(&self) -> impl Iterator<Item = &SignedHeaderHashed> {
-        self.headers.iter()
+        self.zomed_headers.iter().map(|(_zome, shh)| shh)
     }
 
     pub fn elements(&self) -> impl Iterator<Item = Element> + '_ {
-        self.headers.iter().cloned().map(move |shh| {
+        self.zomed_headers.iter().cloned().map(move |(_, shh)| {
             let entry = shh
                 .header()
                 .entry_hash()
@@ -112,7 +133,7 @@ impl Scratch {
     }
 
     pub fn num_headers(&self) -> usize {
-        self.headers.len()
+        self.zomed_headers.len()
     }
 
     fn get_exact_element(
@@ -134,9 +155,8 @@ impl Scratch {
     ) -> StateQueryResult<Option<holochain_zome_types::Element>> {
         let r = self.get_entry(hash)?.and_then(|entry| {
             let shh = self
-                .headers
-                .iter()
-                .find(|h| {
+                .headers()
+                .find(|&h| {
                     h.header()
                         .entry_hash()
                         .map(|eh| eh == hash)
@@ -148,9 +168,15 @@ impl Scratch {
         Ok(r)
     }
 
+    pub fn drain_scheduled_fns(&mut self) -> impl Iterator<Item = ScheduledFn> + '_ {
+        self.scheduled_fns.drain(..)
+    }
+
     /// Drain out all the headers.
-    pub fn drain_headers(&mut self) -> impl Iterator<Item = SignedHeaderHashed> + '_ {
-        self.headers.drain(..)
+    pub fn drain_zomed_headers(
+        &mut self,
+    ) -> impl Iterator<Item = (Option<Zome>, SignedHeaderHashed)> + '_ {
+        self.zomed_headers.drain(..)
     }
 
     /// Drain out all the entries.
@@ -194,14 +220,13 @@ impl Store for Scratch {
     }
 
     fn contains_header(&self, hash: &HeaderHash) -> StateQueryResult<bool> {
-        Ok(self.headers.iter().any(|h| h.header_address() == hash))
+        Ok(self.headers().any(|h| h.header_address() == hash))
     }
 
     fn get_header(&self, hash: &HeaderHash) -> StateQueryResult<Option<SignedHeaderHashed>> {
         Ok(self
-            .headers
-            .iter()
-            .find(|h| h.header_address() == hash)
+            .headers()
+            .find(|&h| h.header_address() == hash)
             .cloned())
     }
 
@@ -246,10 +271,29 @@ impl StoresIter<Judged<SignedHeaderHashed>> for FilteredScratch {
 pub enum ScratchError {
     #[error(transparent)]
     Timestamp(#[from] TimestampError),
+
     #[error(transparent)]
     Keystore(#[from] KeystoreError),
+
     #[error(transparent)]
     Header(#[from] HeaderError),
+
+    /// Other
+    #[error("Other: {0}")]
+    Other(Box<dyn std::error::Error + Send + Sync>),
+}
+
+impl ScratchError {
+    /// promote a custom error type to a ScratchError
+    pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
+        Self::Other(e.into())
+    }
+}
+
+impl From<one_err::OneErr> for ScratchError {
+    fn from(e: one_err::OneErr) -> Self {
+        Self::other(e)
+    }
 }
 
 #[derive(Error, Debug)]

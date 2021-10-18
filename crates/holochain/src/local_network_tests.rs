@@ -73,7 +73,7 @@ fn conductors_call_remote(num_conductors: usize) {
         let mut envs = Vec::with_capacity(handles.len());
         for h in &handles {
             let space = h.cell_id.dna_hash().to_kitsune();
-            envs.push(h.get_p2p_env(space).await);
+            envs.push(h.get_p2p_env(space));
         }
 
         exchange_peer_info(envs).await;
@@ -295,7 +295,7 @@ async fn conductors_gossip_inner(
     let mut envs = Vec::with_capacity(handles.len() + second_handles.len());
     for h in handles.iter().chain(second_handles.iter()) {
         let space = h.cell_id.dna_hash().to_kitsune();
-        envs.push(h.get_p2p_env(space).await);
+        envs.push(h.get_p2p_env(space));
     }
 
     if share_peers {
@@ -327,7 +327,7 @@ async fn conductors_gossip_inner(
     let mut envs = Vec::with_capacity(third_handles.len() + second_handles.len());
     for h in third_handles.iter().chain(second_handles.iter()) {
         let space = h.cell_id.dna_hash().to_kitsune();
-        envs.push(h.get_p2p_env(space).await);
+        envs.push(h.get_p2p_env(space));
     }
 
     if share_peers {
@@ -444,13 +444,13 @@ async fn check_gossip(
 
     let mut others = Vec::with_capacity(all_handles.len());
     for other in all_handles {
-        let other = other.get_cell_env(&other.cell_id).await.unwrap();
+        let other = other.get_cell_env(&other.cell_id).unwrap();
         others.push(other);
     }
     let others_ref = others.iter().collect::<Vec<_>>();
 
     wait_for_integration_with_others(
-        &handle.get_cell_env(&handle.cell_id).await.unwrap(),
+        &handle.get_cell_env(&handle.cell_id).unwrap(),
         &others_ref,
         expected_count,
         NUM_ATTEMPTS,
@@ -496,8 +496,8 @@ struct TestHandle {
 
 impl TestHandle {
     async fn shutdown(self) {
-        let shutdown = self.handle.take_shutdown_handle().await.unwrap();
-        self.handle.shutdown().await;
+        let shutdown = self.handle.take_shutdown_handle().unwrap();
+        self.handle.shutdown();
         shutdown.await.unwrap().unwrap();
     }
 }
@@ -532,9 +532,7 @@ async fn setup(
         let (_envs, _, handle) =
             setup_app_with_network(vec![], vec![], network.clone().unwrap_or_default()).await;
 
-        let agent_key = AgentPubKey::new_from_pure_entropy(handle.keystore())
-            .await
-            .unwrap();
+        let agent_key = AgentPubKey::new_random(handle.keystore()).await.unwrap();
         let cell_id = CellId::new(dna_file.dna_hash().to_owned(), agent_key.clone());
         let app = InstalledCell::new(cell_id.clone(), "cell_handle".into());
         install_app("test_app", vec![(app, None)], dnas.clone(), handle.clone()).await;

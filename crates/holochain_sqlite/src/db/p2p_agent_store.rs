@@ -105,6 +105,12 @@ pub async fn p2p_put_all(
     .await
 }
 
+/// Insert a p2p record from within a write transaction.
+pub fn p2p_put_single(txn: &mut Transaction<'_>, signed: &AgentInfoSigned) -> DatabaseResult<()> {
+    let record = P2pRecord::from_signed(signed)?;
+    tx_p2p_put(txn, record)
+}
+
 fn tx_p2p_put(txn: &mut Transaction, record: P2pRecord) -> DatabaseResult<()> {
     txn.execute(
         sql_p2p_agent_store::INSERT,
@@ -208,7 +214,6 @@ impl AsP2pStateTxExt for Transaction<'_> {
         )? {
             let info = r?;
             let interval = info.storage_arc.interval();
-            dbg!(&arcset, &interval);
             if arcset.overlap(&interval.into()) {
                 out.push(info);
             }

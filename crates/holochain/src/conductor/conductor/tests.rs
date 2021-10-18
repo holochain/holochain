@@ -19,7 +19,7 @@ use holochain_state::prelude::*;
 use holochain_types::test_utils::fake_cell_id;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::WebsocketSender;
-use kitsune_p2p_types::dependencies::lair_keystore_api::LairError;
+use kitsune_p2p_types::dependencies::lair_keystore_api_0_0::LairError;
 use maplit::hashset;
 use matches::assert_matches;
 
@@ -29,6 +29,8 @@ async fn can_update_state() {
     let dna_store = MockDnaStore::new();
     let keystore = envs.conductor().keystore().clone();
     let holochain_p2p = holochain_p2p::stub_network().await;
+    let (post_commit_sender, _post_commit_receiver) =
+        tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
     let conductor = Conductor::new(
         envs.conductor(),
         envs.wasm(),
@@ -37,6 +39,7 @@ async fn can_update_state() {
         envs.path().to_path_buf().into(),
         holochain_p2p,
         DbSyncLevel::default(),
+        post_commit_sender,
     )
     .await
     .unwrap();
@@ -75,8 +78,9 @@ async fn can_add_clone_cell_to_app() {
     let cell_id = CellId::new(dna.dna_hash().to_owned(), agent.clone());
 
     let dna_store = RealDnaStore::new();
-
-    let mut conductor = Conductor::new(
+    let (post_commit_sender, _post_commit_receiver) =
+        tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
+    let conductor = Conductor::new(
         envs.conductor(),
         envs.wasm(),
         dna_store,
@@ -84,6 +88,7 @@ async fn can_add_clone_cell_to_app() {
         envs.path().to_path_buf().into(),
         holochain_p2p,
         DbSyncLevel::default(),
+        post_commit_sender,
     )
     .await
     .unwrap();
@@ -101,7 +106,7 @@ async fn can_add_clone_cell_to_app() {
         vec![&"nick".to_string()]
     );
 
-    conductor.register_phenotype(dna).await.unwrap();
+    conductor.register_phenotype(dna);
     conductor
         .update_state(move |mut state| {
             state
@@ -148,7 +153,9 @@ async fn app_ids_are_unique() {
     let environments = test_environments();
     let dna_store = MockDnaStore::new();
     let holochain_p2p = holochain_p2p::stub_network().await;
-    let mut conductor = Conductor::new(
+    let (post_commit_sender, _post_commit_receiver) =
+        tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
+    let conductor = Conductor::new(
         environments.conductor(),
         environments.wasm(),
         dna_store,
@@ -156,11 +163,13 @@ async fn app_ids_are_unique() {
         environments.path().to_path_buf().into(),
         holochain_p2p,
         DbSyncLevel::default(),
+        post_commit_sender,
     )
     .await
     .unwrap();
 
     let cell_id = fake_cell_id(1);
+
     let installed_cell = InstalledCell::new(cell_id.clone(), "handle".to_string());
     let app = InstalledAppCommon::new_legacy("id".to_string(), vec![installed_cell]).unwrap();
 
@@ -217,8 +226,6 @@ async fn can_set_fake_state() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn proxy_tls_with_test_keystore() {
-    use ghost_actor::GhostControlSender;
-
     observability::test_run().ok();
 
     let keystore1 = spawn_test_keystore().await.unwrap();
@@ -228,13 +235,13 @@ async fn proxy_tls_with_test_keystore() {
         panic!("{:#?}", e);
     }
 
-    let _ = keystore1.ghost_actor_shutdown_immediate().await;
-    let _ = keystore2.ghost_actor_shutdown_immediate().await;
+    let _ = keystore1.shutdown().await;
+    let _ = keystore2.shutdown().await;
 }
 
 async fn proxy_tls_inner(
-    keystore1: KeystoreSender,
-    keystore2: KeystoreSender,
+    keystore1: MetaLairClient,
+    keystore2: MetaLairClient,
 ) -> anyhow::Result<()> {
     use ghost_actor::GhostControlSender;
     use kitsune_p2p::dependencies::*;
@@ -509,7 +516,7 @@ async fn make_signing_call(client: &mut WebsocketSender, cell: &SweetCell) -> Ap
 /// to fail.
 ///
 /// This test was written making the assumption that we could swap out the
-/// KeystoreSender for each Cell at runtime, but given our current concurrency
+/// MetaLairClient for each Cell at runtime, but given our current concurrency
 /// model which puts each Cell in an Arc, this is not possible.
 /// In order to implement this test, we should probably have the "crude mock
 /// keystore" listen on a channel which toggles its behavior from always-correct
@@ -705,33 +712,6 @@ async fn test_cells_disable_on_validation_panic() {
     let _ = common_genesis_test_app(&mut conductor, bad_zome).await;
 
     // - Ensure that the app was disabled because one Cell panicked during validation
-    //   (while publishing genesis elements)
-    assert_eq_retry_10s!(
-        {
-            let state = conductor.get_state_from_handle().await.unwrap();
-            (state.enabled_apps().count(), state.stopped_apps().count())
-        },
-        (0, 1)
-    );
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn test_cells_disable_on_validation_error() {
-    observability::test_run().ok();
-    let bad_zome =
-        InlineZome::new_unique(Vec::new()).callback("validate", |_api, _data: ValidateData| {
-            InlineZomeResult::<ValidateResult>::Err(InlineZomeError::TestError(
-                "intentional error".into(),
-            ))
-        });
-
-    let mut conductor = SweetConductor::from_standard_config().await;
-
-    // This may be an error, depending on if validation runs before or after
-    // the app is enabled. Proceed in either case.
-    let _ = common_genesis_test_app(&mut conductor, bad_zome).await;
-
-    // - Ensure that the app was disabled because one Cell had a validation error
     //   (while publishing genesis elements)
     assert_eq_retry_10s!(
         {
@@ -952,7 +932,7 @@ async fn test_cell_and_app_status_reconciliation() {
     let mut conductor = SweetConductor::from_standard_config().await;
     conductor.setup_app(&app_id, &dnas).await.unwrap();
 
-    let cell_ids = conductor.list_cell_ids(None).await.unwrap();
+    let cell_ids = conductor.list_cell_ids(None);
     let cell1 = &cell_ids[0..1];
 
     let check = || async {
@@ -960,19 +940,15 @@ async fn test_cell_and_app_status_reconciliation() {
             AppStatusKind::from(AppStatus::from(
                 conductor.list_apps(None).await.unwrap()[0].status.clone(),
             )),
-            conductor.list_cell_ids(Some(Joined)).await.unwrap().len(),
-            conductor
-                .list_cell_ids(Some(PendingJoin))
-                .await
-                .unwrap()
-                .len(),
+            conductor.list_cell_ids(Some(Joined)).len(),
+            conductor.list_cell_ids(Some(PendingJoin)).len(),
         )
     };
 
     assert_eq!(check().await, (Running, 3, 0));
 
     // - Simulate a cell failing to join the network
-    conductor.update_cell_status(cell1, PendingJoin).await;
+    conductor.update_cell_status(cell1, PendingJoin);
     assert_eq!(check().await, (Running, 2, 1));
 
     // - Reconciled app state is Paused due to one unjoined Cell

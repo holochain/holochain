@@ -1,6 +1,7 @@
 //! Helpers for unit tests
 
 use either::Either;
+use holochain_keystore::MetaLairClient;
 use holochain_sqlite::prelude::*;
 use holochain_sqlite::rusqlite::Statement;
 use holochain_sqlite::rusqlite::Transaction;
@@ -69,8 +70,8 @@ fn test_env(kind: DbKind) -> TestEnv {
     }
 }
 
-/// Create a fresh set of test environments with a new TempDir and custom KeystoreSender
-pub fn test_envs_with_keystore(keystore: KeystoreSender) -> TestEnvs {
+/// Create a fresh set of test environments with a new TempDir and custom MetaLairClient
+pub fn test_envs_with_keystore(keystore: MetaLairClient) -> TestEnvs {
     let tempdir = TempDir::new("holochain-test-environments").unwrap();
     TestEnvs::with_keystore(tempdir, keystore)
 }
@@ -82,22 +83,10 @@ pub fn test_environments() -> TestEnvs {
 }
 
 /// Generate a test keystore pre-populated with a couple test keypairs.
-pub fn test_keystore() -> holochain_keystore::KeystoreSender {
-    use holochain_keystore::KeystoreSenderExt;
-
+pub fn test_keystore() -> holochain_keystore::MetaLairClient {
     tokio_helper::block_on(
         async move {
             let keystore = holochain_keystore::test_keystore::spawn_test_keystore()
-                .await
-                .unwrap();
-
-            // pre-populate with our two fixture agent keypairs
-            keystore
-                .generate_sign_keypair_from_pure_entropy()
-                .await
-                .unwrap();
-            keystore
-                .generate_sign_keypair_from_pure_entropy()
                 .await
                 .unwrap();
 
@@ -204,7 +193,7 @@ pub struct TestEnvs {
 #[allow(missing_docs)]
 impl TestEnvs {
     /// Create all three non-cell environments at once with a custom keystore
-    pub fn with_keystore(tempdir: TempDir, keystore: KeystoreSender) -> Self {
+    pub fn with_keystore(tempdir: TempDir, keystore: MetaLairClient) -> Self {
         use DbKind::*;
         let conductor = EnvWrite::test(&tempdir, Conductor, keystore.clone()).unwrap();
         let wasm = EnvWrite::test(&tempdir, Wasm, keystore).unwrap();
@@ -273,11 +262,11 @@ impl TestEnvs {
     pub fn path(&self) -> &Path {
         match &self.dir {
             Either::Left(tempdir) => tempdir.path(),
-            Either::Right(path) => &path,
+            Either::Right(path) => path,
         }
     }
 
-    pub fn keystore(&self) -> KeystoreSender {
+    pub fn keystore(&self) -> MetaLairClient {
         self.conductor.keystore()
     }
 }
@@ -324,7 +313,7 @@ pub fn dump_db(txn: &Transaction) {
     let dump = |mut stmt: Statement| {
         let mut rows = stmt.query([]).unwrap();
         while let Some(row) = rows.next().unwrap() {
-            for column in row.column_names() {
+            for column in row.as_ref().column_names() {
                 let row = row.get_ref_unwrap(column);
                 match row {
                     holochain_sqlite::rusqlite::types::ValueRef::Null

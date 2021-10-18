@@ -52,11 +52,12 @@ impl Query for GetEntryDetailsQuery {
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
         let f = |row: &Row| {
-            let header = from_blob::<SignedHeader>(row.get(row.column_index("header_blob")?)?)?;
+            let header =
+                from_blob::<SignedHeader>(row.get(row.as_ref().column_index("header_blob")?)?)?;
             let SignedHeader(header, signature) = header;
             let header = HeaderHashed::from_content_sync(header);
             let shh = SignedHeaderHashed::with_presigned(header, signature);
-            let status = row.get(row.column_index("status")?)?;
+            let status = row.get(row.as_ref().column_index("status")?)?;
             let r = Judged::new(shh, status);
             Ok(r)
         };
@@ -150,7 +151,7 @@ impl Query for GetEntryDetailsQuery {
                     .header()
                     .entry_hash()
                     .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.header().clone()))?;
-                let details = stores.get_entry(&entry_hash)?.map(|entry| {
+                let details = stores.get_entry(entry_hash)?.map(|entry| {
                     let entry_dht_status = compute_entry_status(&state);
                     EntryDetails {
                         entry,

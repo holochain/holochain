@@ -81,8 +81,8 @@ async fn app_validation_workflow_test() {
     )
     .await;
 
-    let shutdown = handle.take_shutdown_handle().await.unwrap();
-    handle.shutdown().await;
+    let shutdown = handle.take_shutdown_handle().unwrap();
+    handle.shutdown();
     shutdown.await.unwrap().unwrap();
 }
 
@@ -236,11 +236,11 @@ async fn run_test(
     // Plus another 16 for genesis + init
     // Plus 2 for Cap Grant
     let expected_count = 3 + 16 + 2;
-    let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+    let alice_env = handle.get_cell_env(&alice_cell_id).unwrap();
     wait_for_integration(&alice_env, expected_count, num_attempts, delay_per_attempt).await;
     holochain_state::prelude::dump_tmp(&alice_env);
 
-    let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+    let alice_env = handle.get_cell_env(&alice_cell_id).unwrap();
 
     fresh_reader_test(alice_env, |txn| {
         // Validation should be empty
@@ -259,7 +259,7 @@ async fn run_test(
     // RegisterAgentActivity doesn't run app validation
     // So they will be valid.
     let expected_count = 3 + expected_count;
-    let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+    let alice_env = handle.get_cell_env(&alice_cell_id).unwrap();
     wait_for_integration(&alice_env, expected_count, num_attempts, delay_per_attempt).await;
 
     fresh_reader_test(alice_env, |txn| {
@@ -281,7 +281,7 @@ async fn run_test(
 
     // Integration should have 6 ops in it
     let expected_count = 6 + expected_count;
-    let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+    let alice_env = handle.get_cell_env(&alice_cell_id).unwrap();
     wait_for_integration(&alice_env, expected_count, num_attempts, delay_per_attempt).await;
 
     fresh_reader_test(alice_env, |txn| {
@@ -307,7 +307,7 @@ async fn run_test(
 
     // Integration should have 9 ops in it
     let expected_count = 9 + expected_count;
-    let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+    let alice_env = handle.get_cell_env(&alice_cell_id).unwrap();
     wait_for_integration(&alice_env, expected_count, num_attempts, delay_per_attempt).await;
 
     fresh_reader_test(alice_env, |txn| {
@@ -335,7 +335,7 @@ async fn run_test(
 
     // Integration should have 9 ops in it
     let expected_count = 9 + expected_count;
-    let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+    let alice_env = handle.get_cell_env(&alice_cell_id).unwrap();
     wait_for_integration(&alice_env, expected_count, num_attempts, delay_per_attempt).await;
 
     fresh_reader_test(alice_env, |txn| {
@@ -367,7 +367,7 @@ async fn run_test(
 
     // Integration should have 12 ops in it
     let expected_count = 12 + expected_count;
-    let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+    let alice_env = handle.get_cell_env(&alice_cell_id).unwrap();
     wait_for_integration(&alice_env, expected_count, num_attempts, delay_per_attempt).await;
 
     fresh_reader_test(alice_env, |txn| {
@@ -412,7 +412,7 @@ async fn run_test_entry_def_id(
     // Integration should have 3 ops in it
     // StoreEntry and StoreElement should be invalid.
     let expected_count = 3 + expected_count;
-    let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+    let alice_env = handle.get_cell_env(&alice_cell_id).unwrap();
     wait_for_integration(&alice_env, expected_count, num_attempts, delay_per_attempt).await;
 
     fresh_reader_test(alice_env, |txn| {
@@ -445,7 +445,7 @@ async fn commit_invalid(
         .await;
 
     // Produce and publish these commits
-    let mut triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
+    let triggers = handle.get_cell_triggers(&bob_cell_id).unwrap();
     triggers.publish_dht_ops.trigger();
     (invalid_header_hash, entry_hash)
 }
@@ -468,7 +468,7 @@ async fn commit_invalid_post(
         .await;
 
     // Produce and publish these commits
-    let mut triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
+    let triggers = handle.get_cell_triggers(&bob_cell_id).unwrap();
     triggers.publish_dht_ops.trigger();
     (invalid_header_hash, entry_hash)
 }
@@ -484,7 +484,7 @@ async fn call_zome_directly(
     let output = call_data.call_zome_direct(invocation).await;
 
     // Produce and publish these commits
-    let mut triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
+    let triggers = handle.get_cell_triggers(&bob_cell_id).unwrap();
     triggers.publish_dht_ops.trigger();
     output
 }

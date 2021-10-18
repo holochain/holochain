@@ -40,7 +40,7 @@ use guest_callback::post_commit::PostCommitHostAccess;
 use guest_callback::validate::ValidateHostAccess;
 use guest_callback::validation_package::ValidationPackageHostAccess;
 use holo_hash::AgentPubKey;
-use holochain_keystore::KeystoreSender;
+use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
@@ -123,7 +123,7 @@ impl HostContext {
     }
 
     /// Get the keystore, panics if none was provided
-    pub fn keystore(&self) -> &KeystoreSender {
+    pub fn keystore(&self) -> &MetaLairClient {
         match self {
             Self::ZomeCall(ZomeCallHostAccess { keystore, .. })
             | Self::Init(InitHostAccess { keystore, .. })
@@ -332,7 +332,6 @@ impl ZomeCallInvocation {
         } = call;
         let zome = conductor_api
             .get_zome(cell_id.dna_hash(), &zome_name)
-            .await
             .expect("TODO");
         Self {
             cell_id,
@@ -369,7 +368,7 @@ impl From<ZomeCallInvocation> for ZomeCall {
 #[derive(Clone, Constructor)]
 pub struct ZomeCallHostAccess {
     pub workspace: HostFnWorkspace,
-    pub keystore: KeystoreSender,
+    pub keystore: MetaLairClient,
     pub network: HolochainP2pCell,
     pub signal_tx: SignalBroadcaster,
     pub call_zome_handle: CellConductorReadHandle,

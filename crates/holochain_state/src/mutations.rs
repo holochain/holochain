@@ -1,6 +1,8 @@
 use crate::entry_def::EntryDefStoreKey;
 use crate::prelude::SignedValidationReceipt;
+use crate::query::from_blob;
 use crate::query::to_blob;
+use crate::schedule::fn_is_scheduled;
 use crate::scratch::Scratch;
 use crate::validation_db::ValidationLimboStatus;
 use holo_hash::encode::blake2b_256;
@@ -16,6 +18,7 @@ use holochain_types::prelude::DnaDefHashed;
 use holochain_types::prelude::DnaWasmHashed;
 use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::*;
+use std::str::FromStr;
 
 pub use error::*;
 
@@ -91,6 +94,7 @@ macro_rules! dht_op_update {
 /// Insert a [`DhtOp`] into the [`Scratch`].
 pub fn insert_op_scratch(
     scratch: &mut Scratch,
+    zome: Option<Zome>,
     op: DhtOpHashed,
     chain_top_ordering: ChainTopOrdering,
 ) -> StateMutationResult<()> {
@@ -110,17 +114,18 @@ pub fn insert_op_scratch(
     }
     let header_hashed = HeaderHashed::with_pre_hashed(header, op_light.header_hash().to_owned());
     let header_hashed = SignedHeaderHashed::with_presigned(header_hashed, signature);
-    scratch.add_header(header_hashed, chain_top_ordering);
+    scratch.add_header(zome, header_hashed, chain_top_ordering);
     Ok(())
 }
 
 pub fn insert_element_scratch(
     scratch: &mut Scratch,
+    zome: Option<Zome>,
     element: Element,
     chain_top_ordering: ChainTopOrdering,
 ) {
     let (header, entry) = element.into_inner();
-    scratch.add_header(header, chain_top_ordering);
+    scratch.add_header(zome, header, chain_top_ordering);
     if let Some(entry) = entry.into_option() {
         scratch.add_entry(EntryHashed::from_content_sync(entry), chain_top_ordering);
     }
@@ -599,5 +604,119 @@ pub fn lock_chain(
 /// countersigning session that is inflight.
 pub fn unlock_chain(txn: &mut Transaction) -> StateMutationResult<()> {
     txn.execute("DELETE FROM ChainLock", [])?;
+    Ok(())
+}
+
+pub fn delete_all_ephemeral_scheduled_fns(txn: &mut Transaction) -> StateMutationResult<()> {
+    txn.execute(
+        holochain_sqlite::sql::sql_cell::schedule::DELETE_ALL_EPHEMERAL,
+        [],
+    )?;
+    Ok(())
+}
+
+pub fn delete_live_ephemeral_scheduled_fns(
+    txn: &mut Transaction,
+    now: Timestamp,
+) -> StateMutationResult<()> {
+    txn.execute(
+        holochain_sqlite::sql::sql_cell::schedule::DELETE_LIVE_EPHEMERAL,
+        [now],
+    )?;
+    Ok(())
+}
+
+pub fn reschedule_expired(txn: &mut Transaction, now: Timestamp) -> StateMutationResult<()> {
+    let rows = {
+        let mut stmt = txn.prepare(holochain_sqlite::sql::sql_cell::schedule::EXPIRED)?;
+        let rows = stmt.query_map([now], |row| {
+            Ok((
+                ZomeName(row.get(0)?),
+                FunctionName(row.get(1)?),
+                row.get(2)?,
+            ))
+        })?;
+        let mut ret = vec![];
+        for row in rows {
+            ret.push(row?);
+        }
+        ret
+    };
+    for (zome_name, scheduled_fn, maybe_schedule) in rows {
+        schedule_fn(
+            txn,
+            ScheduledFn::new(zome_name, scheduled_fn),
+            from_blob(maybe_schedule)?,
+            now,
+        )?;
+    }
+    Ok(())
+}
+
+pub fn schedule_fn(
+    txn: &mut Transaction,
+    scheduled_fn: ScheduledFn,
+    maybe_schedule: Option<Schedule>,
+    now: Timestamp,
+) -> StateMutationResult<()> {
+    let (start, end, ephemeral) = match maybe_schedule {
+        Some(Schedule::Persisted(ref schedule_string)) => {
+            // If this cron doesn't parse cleanly we don't even want to
+            // write it to the db.
+            let start = if let Some(start) = cron::Schedule::from_str(schedule_string)
+                .map_err(|e| ScheduleError::Cron(e.to_string()))?
+                .after(
+                    &chrono::DateTime::<chrono::Utc>::try_from(now)
+                        .map_err(ScheduleError::Timestamp)?,
+                )
+                .next()
+            {
+                start
+            } else {
+                // If there are no further executions then scheduling is a
+                // delete and bail.
+                let _ = txn.execute(
+                    holochain_sqlite::sql::sql_cell::schedule::DELETE,
+                    named_params! {
+                        ":zome_name": scheduled_fn.zome_name().to_string(),
+                        ":scheduled_fn": scheduled_fn.fn_name().to_string()
+                    },
+                )?;
+                return Ok(());
+            };
+            let end = start
+                + chrono::Duration::from_std(holochain_zome_types::schedule::PERSISTED_TIMEOUT)
+                    .map_err(|e| ScheduleError::Cron(e.to_string()))?;
+            (Timestamp::from(start), Timestamp::from(end), false)
+        }
+        Some(Schedule::Ephemeral(duration)) => (
+            (now + duration).map_err(ScheduleError::Timestamp)?,
+            Timestamp::max(),
+            true,
+        ),
+        None => (now, Timestamp::max(), true),
+    };
+    if fn_is_scheduled(txn, scheduled_fn.clone())? {
+        txn.execute(
+            holochain_sqlite::sql::sql_cell::schedule::UPDATE,
+            named_params! {
+                ":zome_name": scheduled_fn.zome_name().to_string(),
+                ":maybe_schedule": to_blob::<Option<Schedule>>(maybe_schedule)?,
+                ":scheduled_fn": scheduled_fn.fn_name().to_string(),
+                ":start": start,
+                ":end": end,
+                ":ephemeral": ephemeral,
+            },
+        )?;
+    } else {
+        sql_insert!(txn, ScheduledFunctions, {
+            "zome_name": scheduled_fn.zome_name().to_string(),
+            "maybe_schedule": to_blob::<Option<Schedule>>(maybe_schedule)?,
+            "scheduled_fn": scheduled_fn.fn_name().to_string(),
+            "start": start,
+            "end": end,
+            "ephemeral": ephemeral,
+        })?;
+    }
     Ok(())
 }

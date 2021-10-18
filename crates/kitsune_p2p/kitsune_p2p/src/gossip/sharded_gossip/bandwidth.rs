@@ -104,7 +104,7 @@ mod tests {
         let mut count = 0;
 
         // Now we will be limited to 0.1 mbps.
-        let now = std::time::Instant::now();
+        let now = Instant::now();
         for _ in 0..5 {
             bandwidth.outgoing_bytes(bytes).await;
             count += bytes;

@@ -31,8 +31,10 @@ pub enum TestWasm {
     MustGet,
     PostCommitFail,
     PostCommitSuccess,
+    PostCommitVolley,
     Query,
     RandomBytes,
+    Schedule,
     XSalsa20Poly1305,
     SerRegression,
     Sign,
@@ -79,8 +81,10 @@ impl From<TestWasm> for ZomeName {
             TestWasm::MustGet => "must_get",
             TestWasm::PostCommitFail => "post_commit_fail",
             TestWasm::PostCommitSuccess => "post_commit_success",
+            TestWasm::PostCommitVolley => "post_commit_volley",
             TestWasm::Query => "query",
             TestWasm::RandomBytes => "random_bytes",
+            TestWasm::Schedule => "schedule",
             TestWasm::XSalsa20Poly1305 => "x_salsa20_poly1305",
             TestWasm::SerRegression => "ser_regression",
             TestWasm::Sign => "sign",
@@ -165,9 +169,15 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::PostCommitSuccess => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_post_commit_success.wasm")
             }
+            TestWasm::PostCommitVolley => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_post_commit_volley.wasm")
+            }
             TestWasm::Query => get_code("wasm32-unknown-unknown/release/test_wasm_query.wasm"),
             TestWasm::RandomBytes => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_random_bytes.wasm")
+            }
+            TestWasm::Schedule => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_schedule.wasm")
             }
             TestWasm::XSalsa20Poly1305 => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_x_salsa20_poly1305.wasm")

@@ -9,7 +9,7 @@ use crate::conductor::{
 use hdk::prelude::*;
 use holo_hash::DnaHash;
 use holochain_conductor_api::{AdminInterfaceConfig, InterfaceDriver};
-use holochain_keystore::KeystoreSender;
+use holochain_keystore::MetaLairClient;
 use holochain_state::test_utils::{test_environments, TestEnvs};
 use holochain_types::prelude::*;
 use holochain_websocket::*;
@@ -120,8 +120,8 @@ impl SweetConductor {
         &self.envs
     }
 
-    /// Access the KeystoreSender for this conductor
-    pub fn keystore(&self) -> KeystoreSender {
+    /// Access the MetaLairClient for this conductor
+    pub fn keystore(&self) -> MetaLairClient {
         self.envs.keystore()
     }
 
@@ -159,8 +159,8 @@ impl SweetConductor {
     /// Install the dna first.
     /// This allows a big speed up when
     /// installing many apps with the same dna
-    async fn setup_app_1_register_dna(&mut self, dna_files: &[DnaFile]) -> ConductorApiResult<()> {
-        for dna_file in dna_files {
+    async fn setup_app_1_register_dna(&mut self, dna_files: &[&DnaFile]) -> ConductorApiResult<()> {
+        for &dna_file in dna_files {
             self.register_dna(dna_file.clone()).await?;
             self.dnas.push(dna_file.clone());
         }
@@ -174,13 +174,13 @@ impl SweetConductor {
         &mut self,
         installed_app_id: &str,
         agent: AgentPubKey,
-        dna_files: &[DnaFile],
+        dna_files: &[&DnaFile],
     ) -> ConductorApiResult<()> {
         let installed_app_id = installed_app_id.to_string();
 
         let installed_cells = dna_files
             .iter()
-            .map(|dna| {
+            .map(|&dna| {
                 let cell_handle = format!("{}", dna.dna_hash());
                 let cell_id = CellId::new(dna.dna_hash().clone(), agent.clone());
                 (InstalledCell::new(cell_id, cell_handle), None)
@@ -210,7 +210,7 @@ impl SweetConductor {
         let mut sweet_cells = Vec::new();
         for dna_hash in dna_hashes {
             let cell_id = CellId::new(dna_hash, agent.clone());
-            let cell_env = self.handle().0.get_cell_env(&cell_id).await?;
+            let cell_env = self.handle().0.get_cell_env(&cell_id)?;
             let cell = SweetCell { cell_id, cell_env };
             sweet_cells.push(cell);
         }
@@ -220,14 +220,18 @@ impl SweetConductor {
 
     /// Opinionated app setup.
     /// Creates an app for the given agent, using the given DnaFiles, with no extra configuration.
-    pub async fn setup_app_for_agent(
+    pub async fn setup_app_for_agent<'a, D>(
         &mut self,
         installed_app_id: &str,
         agent: AgentPubKey,
-        dna_files: &[DnaFile],
-    ) -> ConductorApiResult<SweetApp> {
-        self.setup_app_1_register_dna(dna_files).await?;
-        self.setup_app_2_install_and_enable(installed_app_id, agent.clone(), dna_files)
+        dna_files: D,
+    ) -> ConductorApiResult<SweetApp>
+    where
+        D: IntoIterator<Item = &'a DnaFile>,
+    {
+        let dna_files: Vec<_> = dna_files.into_iter().collect();
+        self.setup_app_1_register_dna(dna_files.as_slice()).await?;
+        self.setup_app_2_install_and_enable(installed_app_id, agent.clone(), dna_files.as_slice())
             .await?;
 
         self.handle()
@@ -244,11 +248,14 @@ impl SweetConductor {
     /// Opinionated app setup.
     /// Creates an app using the given DnaFiles, with no extra configuration.
     /// An AgentPubKey will be generated, and is accessible via the returned SweetApp.
-    pub async fn setup_app(
+    pub async fn setup_app<'a, D>(
         &mut self,
         installed_app_id: &str,
-        dna_files: &[DnaFile],
-    ) -> ConductorApiResult<SweetApp> {
+        dna_files: D,
+    ) -> ConductorApiResult<SweetApp>
+    where
+        D: IntoIterator<Item = &'a DnaFile>,
+    {
         let agent = SweetAgents::one(self.keystore()).await;
         self.setup_app_for_agent(installed_app_id, agent, dna_files)
             .await
@@ -263,17 +270,27 @@ impl SweetConductor {
     /// - CellNick: {dna_hash}
     ///
     /// Returns a batch of SweetApps, sorted in the same order as Agents passed in.
-    pub async fn setup_app_for_agents(
+    pub async fn setup_app_for_agents<'a, A, D>(
         &mut self,
         app_id_prefix: &str,
-        agents: &[AgentPubKey],
-        dna_files: &[DnaFile],
-    ) -> ConductorApiResult<SweetAppBatch> {
-        self.setup_app_1_register_dna(dna_files).await?;
-        for agent in agents.iter() {
+        agents: A,
+        dna_files: D,
+    ) -> ConductorApiResult<SweetAppBatch>
+    where
+        A: IntoIterator<Item = &'a AgentPubKey>,
+        D: IntoIterator<Item = &'a DnaFile>,
+    {
+        let agents: Vec<_> = agents.into_iter().collect();
+        let dna_files: Vec<_> = dna_files.into_iter().collect();
+        self.setup_app_1_register_dna(dna_files.as_slice()).await?;
+        for &agent in agents.iter() {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
-            self.setup_app_2_install_and_enable(&installed_app_id, agent.clone(), dna_files)
-                .await?;
+            self.setup_app_2_install_and_enable(
+                &installed_app_id,
+                agent.to_owned(),
+                dna_files.as_slice(),
+            )
+            .await?;
         }
 
         self.handle()
@@ -315,7 +332,6 @@ impl SweetConductor {
     pub async fn admin_ws_client(&self) -> (WebsocketSender, WebsocketReceiver) {
         let port = self
             .get_arbitrary_admin_websocket_port()
-            .await
             .expect("No admin port open on conductor");
         websocket_client_by_port(port).await.unwrap()
     }
@@ -372,17 +388,12 @@ impl SweetConductor {
     pub async fn force_all_publish_dht_ops(&self) {
         use futures::stream::StreamExt;
         if let Some(handle) = self.handle.as_ref() {
-            let iter = handle
-                .list_cell_ids(None)
-                .await
-                .expect("Failed to list cell ids")
-                .into_iter()
-                .map(|id| async {
-                    let id = id;
-                    let env = self.get_cell_env(&id).await.unwrap();
-                    let trigger = self.get_cell_triggers(&id).await.unwrap();
-                    (env, trigger)
-                });
+            let iter = handle.list_cell_ids(None).into_iter().map(|id| async {
+                let id = id;
+                let env = self.get_cell_env(&id).unwrap();
+                let trigger = self.get_cell_triggers(&id).unwrap();
+                (env, trigger)
+            });
             futures::stream::iter(iter)
                 .then(|f| f)
                 .for_each(|(env, mut triggers)| async move {
@@ -411,8 +422,8 @@ impl Drop for SweetConductor {
         if let Some(handle) = self.handle.take() {
             tokio::task::spawn(async move {
                 // Shutdown the conductor
-                if let Some(shutdown) = handle.take_shutdown_handle().await {
-                    handle.shutdown().await;
+                if let Some(shutdown) = handle.take_shutdown_handle() {
+                    handle.shutdown();
                     if let Err(e) = shutdown.await {
                         tracing::warn!("Failed to join conductor shutdown task: {:?}", e);
                     }

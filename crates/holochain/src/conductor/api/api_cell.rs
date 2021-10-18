@@ -6,13 +6,16 @@ use super::error::ConductorApiError;
 use super::error::ConductorApiResult;
 use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
+use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
 use crate::core::workflow::ZomeCallResult;
 use async_trait::async_trait;
 use holo_hash::DnaHash;
 use holochain_conductor_api::ZomeCall;
-use holochain_keystore::KeystoreSender;
+use holochain_keystore::MetaLairClient;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
+use tokio::sync::mpsc::error::SendError;
+use tokio::sync::mpsc::OwnedPermit;
 use tracing::*;
 
 /// The concrete implementation of [CellConductorApiT], which is used to give
@@ -23,7 +26,7 @@ pub struct CellConductorApi {
     cell_id: CellId,
 }
 
-/// A handle that cn only call zome functions to avoid
+/// A handle that can only call zome functions to avoid
 /// making write lock calls
 pub type CellConductorReadHandle = Arc<dyn CellConductorReadHandleT>;
 
@@ -67,7 +70,7 @@ impl CellConductorApiT for CellConductorApi {
         Ok("TODO".to_string())
     }
 
-    fn keystore(&self) -> &KeystoreSender {
+    fn keystore(&self) -> &MetaLairClient {
         self.conductor_handle.keystore()
     }
 
@@ -75,33 +78,34 @@ impl CellConductorApiT for CellConductorApi {
         self.conductor_handle.signal_broadcaster().await
     }
 
-    async fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile> {
-        self.conductor_handle.get_dna(dna_hash).await
+    fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile> {
+        self.conductor_handle.get_dna(dna_hash)
     }
 
-    async fn get_this_dna(&self) -> ConductorApiResult<DnaFile> {
-        Ok(self
-            .conductor_handle
+    fn get_this_dna(&self) -> ConductorApiResult<DnaFile> {
+        self.conductor_handle
             .get_dna(self.cell_id.dna_hash())
-            .await
-            .ok_or_else(|| ConductorApiError::DnaMissing(self.cell_id.dna_hash().clone()))?)
+            .ok_or_else(|| ConductorApiError::DnaMissing(self.cell_id.dna_hash().clone()))
     }
 
-    async fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
+    fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
         Ok(self
             .get_dna(dna_hash)
-            .await
             .ok_or_else(|| ConductorApiError::DnaMissing(dna_hash.clone()))?
             .dna_def()
             .get_zome(zome_name)?)
     }
 
-    async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
-        self.conductor_handle.get_entry_def(key).await
+    fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
+        self.conductor_handle.get_entry_def(key)
     }
 
     fn into_call_zome_handle(self) -> CellConductorReadHandle {
         Arc::new(self)
+    }
+
+    async fn post_commit_permit(&self) -> Result<OwnedPermit<PostCommitArgs>, SendError<()>> {
+        self.conductor_handle.post_commit_permit().await
     }
 }
 
@@ -124,26 +128,29 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
     async fn dpki_request(&self, method: String, args: String) -> ConductorApiResult<String>;
 
     /// Request access to this conductor's keystore
-    fn keystore(&self) -> &KeystoreSender;
+    fn keystore(&self) -> &MetaLairClient;
 
     /// Access the broadcast Sender which will send a Signal across every
     /// attached app interface
     async fn signal_broadcaster(&self) -> SignalBroadcaster;
 
     /// Get a [Dna] from the [DnaStore]
-    async fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile>;
+    fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile>;
 
     /// Get the [Dna] of this cell from the [DnaStore]
-    async fn get_this_dna(&self) -> ConductorApiResult<DnaFile>;
+    fn get_this_dna(&self) -> ConductorApiResult<DnaFile>;
 
     /// Get a [Zome] from this cell's Dna
-    async fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome>;
+    fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome>;
 
     /// Get a [EntryDef] from the [EntryDefBuf]
-    async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
+    fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
 
     /// Turn this into a call zome handle
     fn into_call_zome_handle(self) -> CellConductorReadHandle;
+
+    /// Get an OwnedPermit to the post commit task.
+    async fn post_commit_permit(&self) -> Result<OwnedPermit<PostCommitArgs>, SendError<()>>;
 }
 
 #[async_trait]
@@ -161,7 +168,7 @@ pub trait CellConductorReadHandleT: Send + Sync {
     ) -> ConductorApiResult<ZomeCallResult>;
 
     /// Get a zome from this cell's Dna
-    async fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome>;
+    fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome>;
 }
 
 #[async_trait]
@@ -184,7 +191,7 @@ impl CellConductorReadHandleT for CellConductorApi {
         }
     }
 
-    async fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
-        CellConductorApiT::get_zome(self, dna_hash, zome_name).await
+    fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
+        CellConductorApiT::get_zome(self, dna_hash, zome_name)
     }
 }

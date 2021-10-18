@@ -17,7 +17,7 @@ use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
-use holochain_keystore::KeystoreSender;
+use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::HolochainP2pRefToCell;
 use holochain_p2p::HolochainP2pCell;
@@ -88,7 +88,7 @@ pub struct HostFnCaller {
     pub ribosome: RealRibosome,
     pub zome_path: ZomePath,
     pub network: HolochainP2pCell,
-    pub keystore: KeystoreSender,
+    pub keystore: MetaLairClient,
     pub signal_tx: SignalBroadcaster,
     pub call_zome_handle: CellConductorReadHandle,
 }
@@ -111,8 +111,8 @@ impl HostFnCaller {
         dna_file: &DnaFile,
         zome_index: usize,
     ) -> HostFnCaller {
-        let env = handle.get_cell_env(cell_id).await.unwrap();
-        let cache = handle.get_cache_env(cell_id).await.unwrap();
+        let env = handle.get_cell_env(cell_id).unwrap();
+        let cache = handle.get_cache_env(cell_id).unwrap();
         let keystore = env.keystore().clone();
         let network = handle
             .holochain_p2p()
@@ -303,7 +303,7 @@ impl HostFnCaller {
         // Write
         workspace_lock.flush(&self.network).await.unwrap();
 
-        output.into()
+        output
     }
 
     pub async fn get_link_details<'env>(

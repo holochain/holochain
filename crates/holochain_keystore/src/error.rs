@@ -10,7 +10,7 @@ pub enum KeystoreError {
 
     /// Error from Lair
     #[error(transparent)]
-    LairError(#[from] lair_keystore_api::LairError),
+    LairError(#[from] lair_keystore_api_0_0::LairError),
 
     /// Error serializing data.
     #[error("SerializedBytesError: {0}")]
@@ -29,11 +29,11 @@ pub enum KeystoreError {
     Other(String),
 }
 
-impl From<KeystoreError> for lair_keystore_api::LairError {
-    fn from(e: KeystoreError) -> lair_keystore_api::LairError {
+impl From<KeystoreError> for lair_keystore_api_0_0::LairError {
+    fn from(e: KeystoreError) -> lair_keystore_api_0_0::LairError {
         match e {
             KeystoreError::LairError(e) => e,
-            _ => lair_keystore_api::LairError::other(e),
+            _ => lair_keystore_api_0_0::LairError::other(e),
         }
     }
 }
