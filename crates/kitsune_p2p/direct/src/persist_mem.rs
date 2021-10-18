@@ -166,7 +166,7 @@ impl UiStore {
         use kitsune_p2p_direct_api::kd_sys_kind::*;
 
         if entry.kind() == "s.file" {
-            return match KdSysKind::from_kind(&entry.kind(), entry.raw_data().clone()) {
+            return match KdSysKind::from_kind(entry.kind(), entry.raw_data().clone()) {
                 Ok(KdSysKind::File(file)) => {
                     let path = format!("/{}/{}", root, file.name);
                     println!("caching ui file: {}", path);

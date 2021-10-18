@@ -183,7 +183,8 @@ impl TestData {
             Header::CreateLink(self.link_add.clone()),
             fixt!(Signature),
         ));
-        self.scratch.add_header(header, ChainTopOrdering::default());
+        self.scratch
+            .add_header(Some(fixt!(Zome)), header, ChainTopOrdering::default());
     }
     fn delete_link(&self) {
         let op = DhtOpHashed::from_content_sync(DhtOp::RegisterRemoveLink(
@@ -201,10 +202,11 @@ impl TestData {
             Header::DeleteLink(self.link_remove.clone()),
             fixt!(Signature),
         ));
-        self.scratch.add_header(header, ChainTopOrdering::default());
+        self.scratch
+            .add_header(Some(fixt!(Zome)), header, ChainTopOrdering::default());
     }
     fn clear_scratch(&mut self) {
-        self.scratch.drain_headers().for_each(|_| ());
+        self.scratch.drain_zomed_headers().for_each(|_| ());
     }
 
     fn only_these_on_base<'a>(td: &'a [Self], test: &'static str) {

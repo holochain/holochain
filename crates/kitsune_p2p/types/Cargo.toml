@@ -11,8 +11,8 @@ categories = [ "network-programming" ]
 edition = "2018"
 
 [dependencies]
-legacy_lair_api = { version = "=0.0.7", package = "lair_keystore_api" }
-new_lair_api = { version = "=0.1.0-alpha.1", package = "lair_keystore_api" }
+lair_keystore_api_0_0 = { version = "=0.0.8", package = "lair_keystore_api" }
+lair_keystore_api = "=0.1.0-alpha.4"
 base64 = "0.13"
 derive_more = "0.99.7"
 futures = "0.3"
@@ -53,7 +53,7 @@ harness = false
 [features]
 test_utils = [
   "arbitrary",
-  "legacy_lair_api/arbitrary",
+  "lair_keystore_api_0_0/arbitrary",
   "kitsune_p2p_dht_arc/test_utils",
   "ghost_actor/test_utils",
   "mockall",

@@ -151,7 +151,7 @@ impl Query for GetEntryDetailsQuery {
                     .header()
                     .entry_hash()
                     .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.header().clone()))?;
-                let details = stores.get_entry(&entry_hash)?.map(|entry| {
+                let details = stores.get_entry(entry_hash)?.map(|entry| {
                     let entry_dht_status = compute_entry_status(&state);
                     EntryDetails {
                         entry,

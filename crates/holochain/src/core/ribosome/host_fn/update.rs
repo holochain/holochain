@@ -35,7 +35,7 @@ pub fn update<'a>(
                             .host_context
                             .workspace()
                             .source_chain()
-                            .put_countersigned(entry, chain_top_ordering)
+                            .put_countersigned(Some(call_context.zome.clone()), entry, chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))
                     })
@@ -77,6 +77,7 @@ pub fn update<'a>(
                         entry_hash,
                     };
                     let workspace = call_context.host_context.workspace();
+                    let zome = call_context.zome.clone();
 
                     // return the hash of the updated entry
                     // note that validation is handled by the workflow
@@ -86,7 +87,7 @@ pub fn update<'a>(
                         let source_chain = workspace.source_chain();
                         // push the header and the entry into the source chain
                         let header_hash = source_chain
-                            .put(header_builder, Some(entry), chain_top_ordering)
+                            .put(Some(zome), header_builder, Some(entry), chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
                         Ok(header_hash)
