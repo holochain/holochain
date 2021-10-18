@@ -360,7 +360,7 @@ pub async fn spawn_transport_listener_quic(
 
 // TODO - modernize all this taking hints from TLS code in proxy crate.
 mod danger {
-    use crate::legacy_lair_api;
+    use crate::lair_keystore_api_0_0;
     use kitsune_p2p_types::transport::TransportError;
     use kitsune_p2p_types::transport::TransportResult;
     use once_cell::sync::Lazy;
@@ -404,19 +404,21 @@ mod danger {
     #[allow(dead_code)]
     pub(crate) async fn configure_server(
         cert: Option<(
-            legacy_lair_api::actor::Cert,
-            legacy_lair_api::actor::CertPrivKey,
+            lair_keystore_api_0_0::actor::Cert,
+            lair_keystore_api_0_0::actor::CertPrivKey,
         )>,
     ) -> TransportResult<ServerConfig> {
         let (cert, cert_priv) = match cert {
             Some(r) => r,
             None => {
-                let mut options = legacy_lair_api::actor::TlsCertOptions::default();
-                options.alg = legacy_lair_api::actor::TlsCertAlg::PkcsEcdsaP256Sha256;
+                let mut options = lair_keystore_api_0_0::actor::TlsCertOptions::default();
+                options.alg = lair_keystore_api_0_0::actor::TlsCertAlg::PkcsEcdsaP256Sha256;
                 let cert =
-                    legacy_lair_api::internal::tls::tls_cert_self_signed_new_from_entropy(options)
-                        .await
-                        .map_err(TransportError::other)?;
+                    lair_keystore_api_0_0::internal::tls::tls_cert_self_signed_new_from_entropy(
+                        options,
+                    )
+                    .await
+                    .map_err(TransportError::other)?;
                 (cert.cert_der, cert.priv_key_der)
             }
         };

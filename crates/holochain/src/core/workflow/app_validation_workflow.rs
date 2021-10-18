@@ -351,7 +351,7 @@ pub async fn get_zomes_to_invoke(
 ) -> AppValidationOutcome<ZomesToInvoke> {
     let aet = { get_app_entry_type(element, cascade).await? };
     match aet {
-        Some(aet) => Ok(ZomesToInvoke::One(get_zome(&aet, &dna_def)?)),
+        Some(aet) => Ok(ZomesToInvoke::One(get_zome(&aet, dna_def)?)),
         None => match element.header() {
             Header::CreateLink(_) | Header::DeleteLink(_) => {
                 get_link_zome(element, dna_def, cascade).await
