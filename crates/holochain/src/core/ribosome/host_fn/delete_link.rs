@@ -81,20 +81,20 @@ pub fn delete_link<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
+    use hdk::prelude::*;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use holo_hash::HeaderHash;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::link::Links;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_delete_link_add_remove() {
         let host_access = fixt!(ZomeCallHostAccess, Predictable);
 
         // links should start empty
-        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
+        let links: Vec<Vec<Link>> = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
 
-        assert!(links.into_inner().len() == 0);
+        assert!(links.len() == 0);
 
         // add a couple of links
         let link_one: HeaderHash =
@@ -104,25 +104,25 @@ pub mod slow_tests {
         let link_two: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::Link, "create_link", ()).unwrap();
 
-        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
+        let links: Vec<Link> = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
 
-        assert!(links.into_inner().len() == 2);
+        assert!(links.len() == 2);
 
         // remove a link
         let _: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::Link, "delete_link", link_one).unwrap();
 
-        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
+        let links: Vec<Link> = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
 
-        assert!(links.into_inner().len() == 1);
+        assert!(links.len() == 1);
 
         // remove a link
         let _: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::Link, "delete_link", link_two).unwrap();
 
-        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
+        let links: Vec<Link> = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
 
-        assert!(links.into_inner().len() == 0);
+        assert!(links.len() == 0);
 
         // Add some links then delete them all
         let _h: HeaderHash =
@@ -130,15 +130,15 @@ pub mod slow_tests {
         let _h: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::Link, "create_link", ()).unwrap();
 
-        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
+        let links: Vec<Link> = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
 
-        assert!(links.into_inner().len() == 2);
+        assert!(links.len() == 2);
 
         let _: () = crate::call_test_ribosome!(host_access, TestWasm::Link, "delete_all_links", ()).unwrap();
 
         // Should be no links left
-        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
+        let links: Vec<Link> = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
 
-        assert!(links.into_inner().len() == 0);
+        assert!(links.len() == 0);
     }
 }

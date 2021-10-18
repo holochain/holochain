@@ -120,7 +120,7 @@ host_fn_api_impls! {
     fn get_details (Vec<zt::entry::GetInput>) -> Vec<Option<zt::metadata::Details>>;
 
     // Get links by entry hash from the cascade.
-    fn get_links (Vec<zt::link::GetLinksInput>) -> Vec<zt::link::Links>;
+    fn get_links (Vec<zt::link::GetLinksInput>) -> Vec<Vec<zt::link::Link>>;
 
     fn get_link_details (Vec<zt::link::GetLinksInput>) -> Vec<zt::link::LinkDetails>;
 
