@@ -136,7 +136,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn agent_activity_query() {
         observability::test_run().ok();
-        let test_env = test_cell_env();
+        let test_env = test_authored_env();
         let env = test_env.env();
         let entry_type_1 = fixt!(EntryType);
         let agents = [fixt!(AgentPubKey), fixt!(AgentPubKey), fixt!(AgentPubKey)];

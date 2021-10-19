@@ -10,8 +10,6 @@ use holochain_types::activity::AgentActivityResponse;
 pub struct GetValidationPackage {
     /// The dna_hash / space_hash context.
     pub dna_hash: DnaHash,
-    /// The agent_id / agent_pub_key context.
-    pub agent_pub_key: AgentPubKey,
     /// Request the package from this agent.
     pub request_from: AgentPubKey,
     /// Request the package for this Header
@@ -217,7 +215,6 @@ ghost_actor::ghost_chan! {
         /// Publish data to the correct neighborhood.
         fn publish(
             dna_hash: DnaHash,
-            from_agent: AgentPubKey,
             request_validation_receipt: bool,
             countersigning_session: bool,
             dht_hash: holo_hash::AnyDhtHash,
@@ -231,7 +228,6 @@ ghost_actor::ghost_chan! {
         /// Get an entry from the DHT.
         fn get(
             dna_hash: DnaHash,
-            from_agent: AgentPubKey,
             dht_hash: holo_hash::AnyDhtHash,
             options: GetOptions,
         ) -> Vec<WireOps>;
@@ -239,7 +235,6 @@ ghost_actor::ghost_chan! {
         /// Get metadata from the DHT.
         fn get_meta(
             dna_hash: DnaHash,
-            from_agent: AgentPubKey,
             dht_hash: holo_hash::AnyDhtHash,
             options: GetMetaOptions,
         ) -> Vec<MetadataSet>;
@@ -247,7 +242,6 @@ ghost_actor::ghost_chan! {
         /// Get links from the DHT.
         fn get_links(
             dna_hash: DnaHash,
-            from_agent: AgentPubKey,
             link_key: WireLinkKey,
             options: GetLinksOptions,
         ) -> Vec<WireLinkOps>;
@@ -255,26 +249,24 @@ ghost_actor::ghost_chan! {
         /// Get agent activity from the DHT.
         fn get_agent_activity(
             dna_hash: DnaHash,
-            from_agent: AgentPubKey,
             agent: AgentPubKey,
             query: ChainQueryFilter,
             options: GetActivityOptions,
         ) -> Vec<AgentActivityResponse<HeaderHash>>;
 
         /// Send a validation receipt to a remote node.
-        fn send_validation_receipt(dna_hash: DnaHash, to_agent: AgentPubKey, from_agent: AgentPubKey, receipt: SerializedBytes) -> ();
+        fn send_validation_receipt(dna_hash: DnaHash, to_agent: AgentPubKey, receipt: SerializedBytes) -> ();
 
         /// New data has been integrated and is ready for gossiping.
         fn new_integrated_data(dna_hash: DnaHash) -> ();
 
-        /// Check if an agent is an authority for a hash.
-        fn authority_for_hash(dna_hash: DnaHash, from_agent: AgentPubKey, dht_hash: AnyDhtHash) -> bool;
+        /// Check if any local agent in this space is an authority for a hash.
+        fn authority_for_hash(dna_hash: DnaHash, dht_hash: AnyDhtHash) -> bool;
 
         /// Response from an authority to agents that are
         /// part of a session.
         fn countersigning_authority_response(
             dna_hash: DnaHash,
-            from_agent: AgentPubKey,
             agents: Vec<AgentPubKey>,
             signed_headers: Vec<SignedHeader>,
         ) -> ();
@@ -284,27 +276,26 @@ ghost_actor::ghost_chan! {
 /// Convenience type for referring to the HolochainP2p GhostSender
 pub type HolochainP2pRef = ghost_actor::GhostSender<HolochainP2p>;
 
-/// Extension trait for converting GhostSender<HolochainP2p> into HolochainP2pCell
+/// Extension trait for converting GhostSender<HolochainP2p> into HolochainP2pDna
 pub trait HolochainP2pRefToCell {
     /// Partially apply dna_hash && agent_pub_key to this sender,
     /// binding it to a specific cell context.
-    fn into_cell(self, dna_hash: DnaHash, from_agent: AgentPubKey) -> crate::HolochainP2pCell;
+    fn into_cell(self, dna_hash: DnaHash) -> crate::HolochainP2pDna;
 
     /// Clone and partially apply dna_hash && agent_pub_key to this sender,
     /// binding it to a specific cell context.
-    fn to_cell(&self, dna_hash: DnaHash, from_agent: AgentPubKey) -> crate::HolochainP2pCell;
+    fn to_cell(&self, dna_hash: DnaHash) -> crate::HolochainP2pDna;
 }
 
 impl HolochainP2pRefToCell for HolochainP2pRef {
-    fn into_cell(self, dna_hash: DnaHash, from_agent: AgentPubKey) -> crate::HolochainP2pCell {
-        crate::HolochainP2pCell {
+    fn into_cell(self, dna_hash: DnaHash) -> crate::HolochainP2pDna {
+        crate::HolochainP2pDna {
             sender: self,
             dna_hash: Arc::new(dna_hash),
-            from_agent: Arc::new(from_agent),
         }
     }
 
-    fn to_cell(&self, dna_hash: DnaHash, from_agent: AgentPubKey) -> crate::HolochainP2pCell {
-        self.clone().into_cell(dna_hash, from_agent)
+    fn to_cell(&self, dna_hash: DnaHash) -> crate::HolochainP2pDna {
+        self.clone().into_cell(dna_hash)
     }
 }

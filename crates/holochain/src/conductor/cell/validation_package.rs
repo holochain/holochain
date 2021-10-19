@@ -1,30 +1,45 @@
 use super::*;
+use crate::conductor::handle::ConductorHandleT;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::RibosomeT;
 use crate::core::workflow::app_validation_workflow::validation_package::get_as_author_custom;
 use crate::core::workflow::app_validation_workflow::validation_package::get_as_author_full;
 use crate::core::workflow::app_validation_workflow::validation_package::get_as_author_sub_chain;
 use holochain_cascade::Cascade;
-use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pDna;
 use holochain_state::source_chain::SourceChain;
 use holochain_types::dna::DnaFile;
 use holochain_zome_types::HeaderHashed;
 
-#[instrument(skip(header_hashed, env, cache, ribosome, conductor_api, network))]
+#[instrument(skip(
+    header_hashed,
+    authored_env,
+    dht_env,
+    cache,
+    ribosome,
+    conductor_handle,
+    network
+))]
 pub(super) async fn get_as_author(
     header_hashed: HeaderHashed,
-    env: EnvRead,
-    cache: EnvWrite,
+    authored_env: DbReadOnly<DbKindAuthored>,
+    dht_env: DbReadOnly<DbKindDht>,
+    cache: DbWrite<DbKindCache>,
     ribosome: &impl RibosomeT,
-    conductor_api: &impl CellConductorApiT,
-    network: &HolochainP2pCell,
+    conductor_handle: &dyn ConductorHandleT,
+    network: &HolochainP2pDna,
 ) -> CellResult<ValidationPackageResponse> {
     let header = header_hashed.as_content();
 
     // Get the source chain with public data only
     // TODO: evaluate if we even need to use a source chain here
     // vs directly querying the database.
-    let mut source_chain = SourceChain::new(env.clone().into(), header.author().clone()).await?;
+    let mut source_chain = SourceChain::<DbReadOnly<DbKindAuthored>>::new(
+        authored_env.clone(),
+        conductor_handle.keystore().clone(),
+        header.author().clone(),
+    )
+    .await?;
     source_chain.public_only();
 
     // Get the header data
@@ -42,7 +57,7 @@ pub(super) async fn get_as_author(
         app_entry_type.zome_id(),
         app_entry_type.id(),
         ribosome.dna_def(),
-        conductor_api,
+        conductor_handle,
     )
     .await?;
 
@@ -66,7 +81,7 @@ pub(super) async fn get_as_author(
             Ok(Some(get_as_author_full(header_seq, &source_chain).await?).into())
         }
         RequiredValidationType::Custom => {
-            let cascade = Cascade::empty().with_vault(env.clone());
+            let cascade = Cascade::empty().with_authored(authored_env.clone().into());
 
             if let Some(elements) =
                 cascade.get_validation_package_local(&header_hashed.as_hash())?
@@ -75,9 +90,11 @@ pub(super) async fn get_as_author(
             }
 
             let workspace_lock = HostFnWorkspace::new(
-                env.into(),
+                authored_env.clone(),
+                dht_env.into(),
                 cache,
-                conductor_api.cell_id().agent_pubkey().clone(),
+                conductor_handle.keystore().clone(),
+                Some(header.author().clone()),
             )
             .await?;
             let result =
@@ -121,9 +138,9 @@ pub(super) async fn get_as_author(
 
 pub(super) async fn get_as_authority(
     header: HeaderHashed,
-    env: EnvRead,
+    env: DbReadOnly<DbKindDht>,
     dna_file: &DnaFile,
-    conductor_api: &impl CellConductorApiT,
+    conductor_api: &dyn ConductorHandleT,
 ) -> CellResult<ValidationPackageResponse> {
     // Get author and hash
     let (header, header_hash) = header.into_inner();
@@ -153,7 +170,7 @@ pub(super) async fn get_as_authority(
         None => return Ok(None.into()),
     };
 
-    let cascade = Cascade::empty().with_vault(env.clone());
+    let cascade = Cascade::empty().with_dht(env.clone());
 
     // Gather the package
     match required_validation_type {

@@ -17,11 +17,14 @@ pub fn accept_countersigning_preflight_request<'a>(
             agent_info: Permission::Allow,
             keystore: Permission::Allow,
             non_determinism: Permission::Allow,
+            write_workspace: Permission::Allow,
             ..
         } => {
             if let Err(e) = input.check_integrity() {
                 return Ok(PreflightRequestAcceptance::Invalid(e.to_string()));
             }
+            let author = super::agent_info::agent_info(_ribosome, call_context.clone(), ())?
+                .agent_latest_pubkey;
             tokio_helper::block_forever_on(async move {
                 if (holochain_zome_types::Timestamp::now() + SESSION_TIME_FUTURE_MAX)
                     .unwrap_or(Timestamp::MAX)
@@ -30,12 +33,6 @@ pub fn accept_countersigning_preflight_request<'a>(
                     return Ok(PreflightRequestAcceptance::UnacceptableFutureStart);
                 }
 
-                let author = call_context
-                    .host_context
-                    .workspace()
-                    .source_chain()
-                    .agent_pubkey()
-                    .clone();
                 let agent_index = match input
                     .signing_agents()
                     .iter()
@@ -46,8 +43,10 @@ pub fn accept_countersigning_preflight_request<'a>(
                 };
                 let countersigning_agent_state = call_context
                     .host_context
-                    .workspace()
+                    .workspace_write()
                     .source_chain()
+                    .as_ref()
+                    .expect("Must have source chain if write_workspace access is given")
                     .accept_countersigning_preflight_request(input.clone(), agent_index)
                     .await
                     .map_err(|source_chain_error| {
@@ -61,7 +60,8 @@ pub fn accept_countersigning_preflight_request<'a>(
                         PreflightResponse::encode_fields_for_signature(
                             &input,
                             &countersigning_agent_state,
-                        )?.into(),
+                        )?
+                        .into(),
                     )
                     .await
                 {
@@ -72,8 +72,10 @@ pub fn accept_countersigning_preflight_request<'a>(
                         // But also we're handling a keystore error already so we should return that.
                         if let Err(unlock_result) = call_context
                             .host_context
-                            .workspace()
+                            .workspace_write()
                             .source_chain()
+                            .as_ref()
+                            .expect("Must have source chain if write_workspace access is given")
                             .unlock_chain()
                             .await
                         {

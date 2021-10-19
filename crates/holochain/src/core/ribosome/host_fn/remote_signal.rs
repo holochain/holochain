@@ -1,7 +1,7 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeT;
-use holochain_p2p::HolochainP2pCellT;
+use holochain_p2p::HolochainP2pDnaT;
 use holochain_types::access::Permission;
 use holochain_wasmer_host::prelude::WasmError;
 use holochain_zome_types::signal::RemoteSignal;
@@ -19,6 +19,7 @@ pub fn remote_signal(
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             write_network: Permission::Allow,
+            agent_info: Permission::Allow,
             ..
         } => {
             const FN_NAME: &str = "recv_remote_signal";
@@ -28,6 +29,8 @@ pub fn remote_signal(
             let RemoteSignal { agents, signal } = input;
             let zome_name: ZomeName = call_context.zome().into();
             let fn_name: FunctionName = FN_NAME.into();
+            let from_agent = super::agent_info::agent_info(_ribosome, call_context.clone(), ())?
+                .agent_latest_pubkey;
             for agent in agents {
                 tokio::task::spawn(
                     {
@@ -35,10 +38,18 @@ pub fn remote_signal(
                         let zome_name = zome_name.clone();
                         let fn_name = fn_name.clone();
                         let payload = signal.clone();
+                        let from_agent = from_agent.clone();
                         async move {
                             tracing::debug!("sending to {:?}", agent);
                             let result = network
-                                .call_remote(agent.clone(), zome_name, fn_name, None, payload)
+                                .call_remote(
+                                    from_agent,
+                                    agent.clone(),
+                                    zome_name,
+                                    fn_name,
+                                    None,
+                                    payload,
+                                )
                                 .await;
                             tracing::debug!("sent to {:?}", agent);
                             if let Err(e) = result {

@@ -20,52 +20,65 @@ use crate::prelude::Txn;
 
 pub mod mutations_helpers;
 
-/// Create a [TestEnv] of [DbKind::Cell], backed by a temp directory.
-pub fn test_cell_env() -> TestEnv {
-    test_cell_env_with_id(1)
+/// Create a [TestEnv] of [`DbKindAuthored`], backed by a temp directory.
+pub fn test_authored_env() -> TestEnv<DbKindAuthored> {
+    test_authored_env_with_id(1)
 }
 
-pub fn test_cell_env_with_id(id: u8) -> TestEnv {
-    test_env(DbKind::Cell(fake_cell_id(id)))
+pub fn test_authored_env_with_id(id: u8) -> TestEnv<DbKindAuthored> {
+    test_env(DbKindAuthored(Arc::new(fake_dna_hash(id))))
 }
 
-pub fn test_cell_env_with_cell_id(id: CellId) -> TestEnv {
-    test_env(DbKind::Cell(id))
+pub fn test_authored_env_with_dna_hash(hash: DnaHash) -> TestEnv<DbKindAuthored> {
+    test_env(DbKindAuthored(Arc::new(hash)))
 }
 
-/// Create a [TestEnv] of [DbKind::Cache], backed by a temp directory.
-pub fn test_cache_env() -> TestEnv {
+/// Create a [TestEnv] of [`DbKindDht`], backed by a temp directory.
+pub fn test_dht_env() -> TestEnv<DbKindDht> {
+    test_dht_env_with_id(1)
+}
+
+pub fn test_dht_env_with_id(id: u8) -> TestEnv<DbKindDht> {
+    test_env(DbKindDht(Arc::new(fake_dna_hash(id))))
+}
+
+pub fn test_dht_env_with_dna_hash(hash: DnaHash) -> TestEnv<DbKindDht> {
+    test_env(DbKindDht(Arc::new(hash)))
+}
+
+/// Create a [TestEnv] of [`DbKindCache`], backed by a temp directory.
+pub fn test_cache_env() -> TestEnv<DbKindCache> {
     test_cache_env_with_id(1)
 }
 
-pub fn test_cache_env_with_id(id: u8) -> TestEnv {
-    test_env(DbKind::Cache(fake_cell_id(id).dna_hash().clone()))
+pub fn test_cache_env_with_id(id: u8) -> TestEnv<DbKindCache> {
+    test_env(DbKindCache(Arc::new(fake_cell_id(id).dna_hash().clone())))
 }
 
-/// Create a [TestEnv] of [DbKind::Conductor], backed by a temp directory.
-pub fn test_conductor_env() -> TestEnv {
-    test_env(DbKind::Conductor)
+/// Create a [TestEnv] of [DbKindConductor], backed by a temp directory.
+pub fn test_conductor_env() -> TestEnv<DbKindConductor> {
+    test_env(DbKindConductor)
 }
 
-/// Create a [TestEnv] of [DbKind::Wasm], backed by a temp directory.
-pub fn test_wasm_env() -> TestEnv {
-    test_env(DbKind::Wasm)
+/// Create a [TestEnv] of [DbKindWasm], backed by a temp directory.
+pub fn test_wasm_env() -> TestEnv<DbKindWasm> {
+    test_env(DbKindWasm)
 }
 
-/// Create a [TestEnv] of [DbKind::P2pAgentStore], backed by a temp directory.
-pub fn test_p2p_agent_store_env() -> TestEnv {
-    test_env(DbKind::P2pAgentStore(Arc::new(KitsuneSpace(vec![0; 36]))))
+/// Create a [TestEnv] of [DbKindP2pAgentStore], backed by a temp directory.
+pub fn test_p2p_agent_store_env() -> TestEnv<DbKindP2pAgentStore> {
+    test_env(DbKindP2pAgentStore(Arc::new(KitsuneSpace(vec![0; 36]))))
 }
 
-/// Create a [TestEnv] of [DbKind::P2pAgentStore], backed by a temp directory.
-pub fn test_p2p_metrics_env() -> TestEnv {
-    test_env(DbKind::P2pMetrics(Arc::new(KitsuneSpace(vec![0; 36]))))
+/// Create a [TestEnv] of [DbKindP2pMetrics], backed by a temp directory.
+pub fn test_p2p_metrics_env() -> TestEnv<DbKindP2pMetrics> {
+    test_env(DbKindP2pMetrics(Arc::new(KitsuneSpace(vec![0; 36]))))
 }
 
-fn test_env(kind: DbKind) -> TestEnv {
+fn test_env<Kind: DbKindT>(kind: Kind) -> TestEnv<Kind> {
     let tmpdir = TempDir::new("holochain-test-environments").unwrap();
     TestEnv {
-        env: EnvWrite::test(&tmpdir, kind, test_keystore()).expect("Couldn't create test database"),
+        env: DbWrite::test(&tmpdir, kind).expect("Couldn't create test database"),
         tmpdir,
     }
 }
@@ -103,17 +116,17 @@ pub fn test_keystore() -> holochain_keystore::MetaLairClient {
 
 /// A test database in a temp directory
 #[derive(Shrinkwrap)]
-pub struct TestEnv {
+pub struct TestEnv<Kind: DbKindT> {
     #[shrinkwrap(main_field)]
     /// sqlite database
-    env: EnvWrite,
+    env: DbWrite<Kind>,
     /// temp directory for this environment
     tmpdir: TempDir,
 }
 
-impl TestEnv {
+impl<Kind: DbKindT> TestEnv<Kind> {
     /// Accessor
-    pub fn env(&self) -> EnvWrite {
+    pub fn env(&self) -> DbWrite<Kind> {
         self.env.clone()
     }
 
@@ -145,15 +158,15 @@ impl TestEnv {
         dump_tmp(&self.env);
     }
 
-    pub fn cell_id(&self) -> Option<CellId> {
-        match self.env.kind() {
-            DbKind::Cell(cell_id) => Some(cell_id.clone()),
+    pub fn dna_hash(&self) -> Option<Arc<DnaHash>> {
+        match self.env.kind().kind() {
+            DbKind::Authored(hash) | DbKind::Cache(hash) | DbKind::Dht(hash) => Some(hash.clone()),
             _ => None,
         }
     }
 }
 // /// Dump db into `/tmp/test_dbs`.
-// pub fn dump_tmp(env: &EnvWrite) {
+// pub fn dump_tmp(env: &DbWrite) {
 //     let mut tmp = std::env::temp_dir();
 //     tmp.push("test_dbs");
 //     std::fs::create_dir(&tmp).ok();
@@ -167,7 +180,7 @@ impl TestEnv {
 //         .unwrap();
 // }
 /// Dump db into `/tmp/test_dbs`.
-pub fn dump_tmp(env: &EnvWrite) {
+pub fn dump_tmp<Kind: DbKindT>(env: &DbWrite<Kind>) {
     let mut tmp = std::env::temp_dir();
     tmp.push("test_dbs");
     std::fs::create_dir(&tmp).ok();
@@ -183,24 +196,25 @@ pub fn dump_tmp(env: &EnvWrite) {
 /// A container for all three non-cell environments
 pub struct TestEnvs {
     /// A test conductor environment
-    conductor: EnvWrite,
+    conductor: DbWrite<DbKindConductor>,
     /// A test wasm environment
-    wasm: EnvWrite,
+    wasm: DbWrite<DbKindWasm>,
     /// A test p2p environment
-    p2p: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
+    p2p: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, DbWrite<DbKindP2pAgentStore>>>>,
     /// A test p2p environment
-    p2p_metrics: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>>,
+    p2p_metrics: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, DbWrite<DbKindP2pMetrics>>>>,
     /// The shared root temp dir for these environments
     dir: Either<TempDir, PathBuf>,
+    /// The keystore sender for these environments
+    keystore: MetaLairClient,
 }
 
 #[allow(missing_docs)]
 impl TestEnvs {
     /// Create all three non-cell environments at once with a custom keystore
     pub fn with_keystore(tempdir: TempDir, keystore: MetaLairClient) -> Self {
-        use DbKind::*;
-        let conductor = EnvWrite::test(&tempdir, Conductor, keystore.clone()).unwrap();
-        let wasm = EnvWrite::test(&tempdir, Wasm, keystore).unwrap();
+        let conductor = DbWrite::test(&tempdir, DbKindConductor).unwrap();
+        let wasm = DbWrite::test(&tempdir, DbKindWasm).unwrap();
         let p2p = Arc::new(parking_lot::Mutex::new(HashMap::new()));
         let p2p_metrics = Arc::new(parking_lot::Mutex::new(HashMap::new()));
         Self {
@@ -209,6 +223,7 @@ impl TestEnvs {
             p2p,
             p2p_metrics,
             dir: Either::Left(tempdir),
+            keystore,
         }
     }
 
@@ -217,19 +232,23 @@ impl TestEnvs {
         Self::with_keystore(tempdir, test_keystore())
     }
 
-    pub fn conductor(&self) -> EnvWrite {
+    pub fn conductor(&self) -> DbWrite<DbKindConductor> {
         self.conductor.clone()
     }
 
-    pub fn wasm(&self) -> EnvWrite {
+    pub fn wasm(&self) -> DbWrite<DbKindWasm> {
         self.wasm.clone()
     }
 
-    pub fn p2p(&self) -> Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>> {
+    pub fn p2p(
+        &self,
+    ) -> Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, DbWrite<DbKindP2pAgentStore>>>> {
         self.p2p.clone()
     }
 
-    pub fn p2p_metrics(&self) -> Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, EnvWrite>>> {
+    pub fn p2p_metrics(
+        &self,
+    ) -> Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, DbWrite<DbKindP2pMetrics>>>> {
         self.p2p_metrics.clone()
     }
 
@@ -242,6 +261,7 @@ impl TestEnvs {
             p2p,
             p2p_metrics,
             dir,
+            keystore,
         } = self;
         let dir = dir.left_and_then(|tempdir| {
             let pathbuf = tempdir.into_path();
@@ -254,6 +274,7 @@ impl TestEnvs {
             p2p,
             p2p_metrics,
             dir,
+            keystore,
         }
     }
 
@@ -270,8 +291,8 @@ impl TestEnvs {
         }
     }
 
-    pub fn keystore(&self) -> MetaLairClient {
-        self.conductor.keystore()
+    pub fn keystore(&self) -> &MetaLairClient {
+        &self.keystore
     }
 }
 
@@ -283,10 +304,11 @@ macro_rules! here {
     };
 }
 
-/// Helper to get a [`Store`] from an [`EnvRead`].
-pub fn fresh_store_test<F, R>(env: &EnvRead, f: F) -> R
+/// Helper to get a [`Store`] from an [`DbReadOnly`].
+pub fn fresh_store_test<F, R, K>(env: &DbReadOnly<K>, f: F) -> R
 where
     F: FnOnce(&dyn Store) -> R,
+    K: DbKindT,
 {
     fresh_reader_test!(env, |txn| {
         let store = Txn::from(&txn);
@@ -295,19 +317,21 @@ where
 }
 
 /// Function to help avoid needing to specify types.
-pub fn fresh_reader_test<E, F, R>(env: E, f: F) -> R
+pub fn fresh_reader_test<E, F, R, K>(env: E, f: F) -> R
 where
-    E: Into<EnvRead>,
+    E: Into<DbReadOnly<K>>,
     F: FnOnce(Transaction) -> R,
+    K: DbKindT,
 {
     fresh_reader_test!(&env.into(), f)
 }
 
 /// Function to help avoid needing to specify types.
-pub fn print_stmts_test<E, F, R>(env: E, f: F) -> R
+pub fn print_stmts_test<E, F, R, K>(env: E, f: F) -> R
 where
-    E: Into<EnvRead>,
+    E: Into<DbReadOnly<K>>,
     F: FnOnce(Transaction) -> R,
+    K: DbKindT,
 {
     holochain_sqlite::print_stmts_test!(&env.into(), f)
 }

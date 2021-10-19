@@ -4,7 +4,8 @@ use std::sync::Arc;
 use holo_hash::{AgentPubKey, DhtOpHash, HeaderHash};
 use holo_hash::{AnyDhtHash, EntryHash};
 use holochain_keystore::AgentPubKeyExt;
-use holochain_p2p::{HolochainP2pCell, HolochainP2pCellT};
+use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
+use holochain_sqlite::db::{DbKindAuthored, DbKindDht};
 use holochain_sqlite::fresh_reader;
 use holochain_state::mutations;
 use holochain_state::prelude::{
@@ -13,7 +14,7 @@ use holochain_state::prelude::{
 };
 use holochain_state::validation_db::ValidationLimboStatus;
 use holochain_types::signal::{Signal, SystemSignal};
-use holochain_types::{dht_op::DhtOp, env::EnvWrite};
+use holochain_types::{dht_op::DhtOp, env::DbWrite};
 use holochain_zome_types::Timestamp;
 use holochain_zome_types::{Entry, SignedHeader, ZomeCallResponse};
 use kitsune_p2p_types::tx2::tx2_utils::Share;
@@ -104,9 +105,9 @@ pub(crate) fn incoming_countersigning(
 /// Countersigning workflow that checks for complete sessions and
 /// pushes the complete ops to validation then messages the signers.
 pub(crate) async fn countersigning_workflow(
-    env: &EnvWrite,
+    dht_env: &DbWrite<DbKindDht>,
     workspace: &CountersigningWorkspace,
-    network: &(dyn HolochainP2pCellT + Send + Sync),
+    network: &(dyn HolochainP2pDnaT + Send + Sync),
     sys_validation_trigger: &TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     // Get any complete sessions.
@@ -115,7 +116,8 @@ pub(crate) async fn countersigning_workflow(
 
     // For each complete session send the ops to validation.
     for (agents, ops, headers) in complete_sessions {
-        incoming_dht_ops_workflow(&env, None, sys_validation_trigger.clone(), ops, false).await?;
+        incoming_dht_ops_workflow(&dht_env, None, sys_validation_trigger.clone(), ops, false)
+            .await?;
         notify_agents.push((agents, headers));
     }
 
@@ -137,8 +139,8 @@ pub(crate) async fn countersigning_workflow(
 
 /// An incoming countersigning session success.
 pub(crate) async fn countersigning_success(
-    vault: EnvWrite,
-    network: &HolochainP2pCell,
+    vault: DbWrite<DbKindAuthored>,
+    network: &HolochainP2pDna,
     author: AgentPubKey,
     signed_headers: Vec<SignedHeader>,
     publish_trigger: TriggerSender,
@@ -285,7 +287,7 @@ pub(crate) async fn countersigning_success(
 /// Publish to entry authorities so they can gather all the signed
 /// headers for this session and respond with a session complete.
 pub async fn countersigning_publish(
-    network: &HolochainP2pCell,
+    network: &HolochainP2pDna,
     op: DhtOp,
 ) -> Result<(), ZomeCallResponse> {
     let basis = op.dht_basis();

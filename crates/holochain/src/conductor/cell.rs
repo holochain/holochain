@@ -43,6 +43,7 @@ use holochain_p2p::dht_arc::DhtArcSet;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
+use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::*;
 use holochain_state::schedule::live_scheduled_fns;
 use holochain_types::prelude::*;
@@ -98,15 +99,17 @@ impl PartialEq for Cell {
 /// The [Conductor] manages a collection of Cells, and will call functions
 /// on the Cell when a Conductor API method is called (either a
 /// [CellConductorApi] or an [AppInterfaceApi])
-pub struct Cell<Api = CellConductorApi, P2pCell = holochain_p2p::HolochainP2pCell>
+pub struct Cell<Api = CellConductorApi, P2pCell = holochain_p2p::HolochainP2pDna>
 where
     Api: CellConductorApiT,
-    P2pCell: holochain_p2p::HolochainP2pCellT,
+    P2pCell: holochain_p2p::HolochainP2pDnaT,
 {
     id: CellId,
     conductor_api: Api,
-    env: EnvWrite,
-    cache: EnvWrite,
+    conductor_handle: ConductorHandle,
+    authored_env: DbWrite<DbKindAuthored>,
+    dht_env: DbWrite<DbKindDht>,
+    cache: DbWrite<DbKindCache>,
     holochain_p2p_cell: P2pCell,
     queue_triggers: QueueTriggers,
     init_mutex: tokio::sync::Mutex<()>,
@@ -128,9 +131,10 @@ impl Cell {
     pub async fn create(
         id: CellId,
         conductor_handle: ConductorHandle,
-        env: EnvWrite,
-        cache: EnvWrite,
-        holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
+        authored_env: DbWrite<DbKindAuthored>,
+        dht_env: DbWrite<DbKindDht>,
+        cache: DbWrite<DbKindCache>,
+        holochain_p2p_cell: holochain_p2p::HolochainP2pDna,
         managed_task_add_sender: sync::mpsc::Sender<ManagedTaskAdd>,
         managed_task_stop_broadcaster: sync::broadcast::Sender<()>,
     ) -> CellResult<(Self, InitialQueueTriggers)> {
@@ -139,18 +143,22 @@ impl Cell {
         // check if genesis has been run
         let has_genesis = {
             // check if genesis ran.
-            GenesisWorkspace::new(env.clone())?.has_genesis(id.agent_pubkey())?
+            // TODO: Genesis marks ops as valid but we need to also mark them as
+            // valid if any other local agents are an authority.
+            GenesisWorkspace::new(authored_env.clone())?.has_genesis(id.agent_pubkey())?
         };
 
         if has_genesis {
             let incoming_op_hashes = IncomingOpHashes::default();
             let countersigning_workspace = CountersigningWorkspace::new();
+            // TODO: Only spawn if they aren't already running.
             let (queue_triggers, initial_queue_triggers) = spawn_queue_consumer_tasks(
-                env.clone(),
+                id.clone(),
+                authored_env.clone(),
+                dht_env.clone(),
                 cache.clone(),
                 holochain_p2p_cell.clone(),
                 conductor_handle.clone(),
-                conductor_api.clone(),
                 managed_task_add_sender,
                 managed_task_stop_broadcaster,
                 countersigning_workspace.clone(),
@@ -161,7 +169,9 @@ impl Cell {
                 Self {
                     id,
                     conductor_api,
-                    env,
+                    conductor_handle,
+                    authored_env,
+                    dht_env,
                     cache,
                     holochain_p2p_cell,
                     queue_triggers,
@@ -182,7 +192,7 @@ impl Cell {
     pub async fn genesis<Ribosome>(
         id: CellId,
         conductor_handle: ConductorHandle,
-        cell_env: EnvWrite,
+        authored_env: DbWrite<DbKindAuthored>,
         ribosome: Ribosome,
         membrane_proof: Option<SerializedBytes>,
     ) -> CellResult<()>
@@ -197,7 +207,7 @@ impl Cell {
         let conductor_api = CellConductorApi::new(conductor_handle, id.clone());
 
         // run genesis
-        let workspace = GenesisWorkspace::new(cell_env.clone())
+        let workspace = GenesisWorkspace::new(authored_env.clone())
             .map_err(ConductorApiError::from)
             .map_err(Box::new)?;
 
@@ -231,7 +241,7 @@ impl Cell {
     }
 
     /// Access a network sender that is partially applied to this cell's DnaHash/AgentPubKey
-    pub fn holochain_p2p_cell(&self) -> &holochain_p2p::HolochainP2pCell {
+    pub fn holochain_p2p_cell(&self) -> &holochain_p2p::HolochainP2pDna {
         &self.holochain_p2p_cell
     }
 
@@ -241,7 +251,7 @@ impl Cell {
 
     pub(super) async fn delete_all_ephemeral_scheduled_fns(self: Arc<Self>) -> CellResult<()> {
         Ok(self
-            .env
+            .authored_env
             .async_commit(move |txn: &mut Transaction| delete_all_ephemeral_scheduled_fns(txn))
             .await?)
     }
@@ -249,7 +259,7 @@ impl Cell {
     pub(super) async fn dispatch_scheduled_fns(self: Arc<Self>) {
         let now = Timestamp::now();
         let lives = self
-            .env
+            .authored_env
             .async_commit(move |txn: &mut Transaction| {
                 // Rescheduling should not fail as the data in the database
                 // should be valid schedules only.
@@ -296,7 +306,7 @@ impl Cell {
 
                 // We don't do anything with errors in here.
                 let _ = self
-                    .env
+                    .authored_env
                     .async_commit(move |txn: &mut Transaction| {
                         for ((scheduled_fn, _), result) in lives.iter().zip(results.iter()) {
                             match result {
@@ -570,7 +580,7 @@ impl Cell {
             .map_err(Box::new)?;
         } else {
             incoming_dht_ops_workflow(
-                &self.env,
+                &self.dht_env,
                 Some(&self.incoming_op_hashes),
                 self.queue_triggers.sys_validation.clone(),
                 ops,
@@ -590,7 +600,7 @@ impl Cell {
         signed_headers: Vec<SignedHeader>,
     ) -> CellResult<()> {
         Ok(countersigning_success(
-            self.env.clone(),
+            self.authored_env.clone(),
             &self.holochain_p2p_cell,
             self.id.agent_pubkey().clone(),
             signed_headers,
@@ -608,10 +618,10 @@ impl Cell {
         &self,
         header_hash: HeaderHash,
     ) -> CellResult<ValidationPackageResponse> {
-        let env: EnvRead = self.env.clone().into();
+        let env: DbReadOnly<DbKindDht> = self.dht_env().clone().into();
 
         // Get the header
-        let mut cascade = Cascade::empty().with_vault(env.clone());
+        let mut cascade = Cascade::empty().with_dht(env.clone());
         let header = match cascade
             .retrieve_header(header_hash, Default::default())
             .await?
@@ -626,10 +636,11 @@ impl Cell {
         if header.author() == self.id.agent_pubkey() {
             validation_package::get_as_author(
                 header,
-                env,
+                self.authored_env.clone().into(),
+                self.dht_env().clone().into(),
                 self.cache.clone(),
                 &ribosome,
-                &self.conductor_api,
+                &(*self.conductor_handle),
                 &self.holochain_p2p_cell,
             )
             .await
@@ -638,7 +649,7 @@ impl Cell {
                 header,
                 env,
                 &ribosome.dna_file,
-                &self.conductor_api,
+                self.conductor_handle.as_ref(),
             )
             .await
         }
@@ -678,7 +689,7 @@ impl Cell {
         hash: EntryHash,
         options: holochain_p2p::event::GetOptions,
     ) -> CellResult<WireEntryOps> {
-        let env = self.env.clone();
+        let env = self.dht_env.clone();
         authority::handle_get_entry(env.into(), hash, options)
             .await
             .map_err(Into::into)
@@ -690,7 +701,7 @@ impl Cell {
         hash: HeaderHash,
         options: holochain_p2p::event::GetOptions,
     ) -> CellResult<WireElementOps> {
-        let env = self.env.clone();
+        let env = self.dht_env.clone();
         authority::handle_get_element(env.into(), hash, options)
             .await
             .map_err(Into::into)
@@ -717,7 +728,7 @@ impl Cell {
         options: holochain_p2p::event::GetLinksOptions,
     ) -> CellResult<WireLinkOps> {
         debug!(id = ?self.id());
-        let env = self.env.clone();
+        let env = self.dht_env.clone();
         authority::handle_get_links(env.into(), link_key, options)
             .await
             .map_err(Into::into)
@@ -730,7 +741,7 @@ impl Cell {
         query: ChainQueryFilter,
         options: holochain_p2p::event::GetActivityOptions,
     ) -> CellResult<AgentActivityResponse<HeaderHash>> {
-        let env = self.env.clone();
+        let env = self.dht_env.clone();
         authority::handle_get_agent_activity(env.into(), agent, query, options)
             .await
             .map_err(Into::into)
@@ -740,10 +751,10 @@ impl Cell {
     #[tracing::instrument(skip(self, receipt))]
     async fn handle_validation_receipt(&self, receipt: SerializedBytes) -> CellResult<()> {
         let receipt: SignedValidationReceipt = receipt.try_into()?;
-        tracing::debug!(from = ?receipt.receipt.validator, to = ?self.id.agent_pubkey(), hash = ?receipt.receipt.dht_op_hash);
+        tracing::debug!(from = ?receipt.receipt.validators, to = ?self.id.agent_pubkey(), hash = ?receipt.receipt.dht_op_hash);
 
         // Get the header for this op so we can check the entry type.
-        let header: Option<SignedHeader> = fresh_reader!(self.env, |txn| {
+        let header: Option<SignedHeader> = fresh_reader!(self.authored_env, |txn| {
             let h: Option<Vec<u8>> = txn
                 .query_row(
                     "SELECT Header.blob as header_blob
@@ -785,7 +796,7 @@ impl Cell {
             crate::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE,
         );
 
-        self.env
+        self.dht_env
             .async_commit(move |txn| {
                 // Get the current count for this dhtop.
                 let receipt_count: usize = txn.query_row(
@@ -845,7 +856,7 @@ impl Cell {
         // For each interval in the set, fetch the hashes and timestamps.
         for interval in dht_arc_set.intervals() {
             let result = self
-                .env()
+                .dht_env()
                 .async_reader(move |txn| {
                     DatabaseResult::Ok(match interval {
                         ArcInterval::Full => txn
@@ -897,7 +908,7 @@ impl Cell {
         // but this is ideally not the case for most apps so is it
         // worth everyone paying the cost of asyncifying?
         let results = self
-            .env()
+            .dht_env()
             .async_reader(move |txn| {
                 let mut positions = "?,".repeat(op_hashes.len());
                 positions.pop();
@@ -980,38 +991,41 @@ impl Cell {
     pub async fn call_zome(
         &self,
         call: ZomeCall,
-        workspace_lock: Option<HostFnWorkspace>,
+        workspace_lock: Option<SourceChainWorkspace>,
     ) -> CellResult<ZomeCallResult> {
         // Check if init has run if not run it
         self.check_or_run_zome_init().await?;
 
-        let arc = self.env();
-        let keystore = arc.keystore().clone();
+        let keystore = self.conductor_api.keystore().clone();
 
         // If there is no existing zome call then this is the root zome call
         let is_root_zome_call = workspace_lock.is_none();
         let workspace_lock = match workspace_lock {
             Some(l) => l,
             None => {
-                HostFnWorkspace::new(
-                    self.env().clone(),
+                SourceChainWorkspace::new(
+                    self.authored_env().clone(),
+                    self.dht_env().clone().into(),
                     self.cache().clone(),
+                    keystore.clone(),
                     self.id.agent_pubkey().clone(),
                 )
                 .await?
             }
         };
 
-        let conductor_api = self.conductor_api.clone();
+        let conductor_handle = self.conductor_handle.clone();
         let signal_tx = self.signal_broadcaster().await;
         let ribosome = self.get_ribosome().await?;
-        let invocation = ZomeCallInvocation::from_interface_call(conductor_api.clone(), call).await;
+        let invocation =
+            ZomeCallInvocation::from_interface_call(self.conductor_api.clone(), call).await;
 
         let args = CallZomeWorkflowArgs {
+            cell_id: self.id.clone(),
             ribosome,
             invocation,
             signal_tx,
-            conductor_api,
+            conductor_handle,
             is_root_zome_call,
         };
         Ok(call_zome_workflow(
@@ -1038,14 +1052,15 @@ impl Cell {
         .map_err(|_| CellError::InitTimeout)?;
 
         // If not run it
-        let env = self.env.clone();
-        let keystore = env.keystore().clone();
+        let keystore = self.conductor_api.keystore().clone();
         let id = self.id.clone();
-        let conductor_api = self.conductor_api.clone();
+        let conductor_handle = self.conductor_handle.clone();
         // Create the workspace
-        let workspace = HostFnWorkspace::new(
-            self.env().clone(),
+        let workspace = SourceChainWorkspace::new(
+            self.authored_env().clone(),
+            self.dht_env().clone().into(),
             self.cache().clone(),
+            keystore.clone(),
             id.agent_pubkey().clone(),
         )
         .await?;
@@ -1057,7 +1072,7 @@ impl Cell {
         trace!("running init");
 
         // get the dna
-        let dna_file = conductor_api
+        let dna_file = conductor_handle
             .get_dna(id.dna_hash())
             .ok_or_else(|| DnaError::DnaMissing(id.dna_hash().to_owned()))?;
         let dna_def = dna_file.dna_def().clone();
@@ -1069,7 +1084,7 @@ impl Cell {
         let args = InitializeZomesWorkflowArgs {
             dna_def,
             ribosome,
-            conductor_api,
+            conductor_handle,
         };
         let init_result =
             initialize_zomes_workflow(workspace, self.holochain_p2p_cell.clone(), keystore, args)
@@ -1095,8 +1110,10 @@ impl Cell {
     //        TaskManager can have these Cell TaskManagers as children.
     //        [ B-04176 ]
     pub async fn cleanup(&self) -> CellResult<()> {
-        use holochain_p2p::HolochainP2pCellT;
-        self.holochain_p2p_cell().leave().await?;
+        use holochain_p2p::HolochainP2pDnaT;
+        self.holochain_p2p_cell()
+            .leave(self.id.agent_pubkey().clone())
+            .await?;
         tracing::info!("Cell removed, but cleanup is not yet fully implemented.");
         Ok(())
     }
@@ -1108,12 +1125,13 @@ impl Cell {
     #[tracing::instrument(skip(self))]
     pub async fn destroy(self) -> CellResult<()> {
         self.cleanup().await?;
-        let path = self.env.path().clone();
-        // Delete directory
-        self.env
-            .remove()
-            .await
-            .map_err(|e| CellError::Cleanup(e.to_string(), path))?;
+        todo!("This will need to be reference counted if we really want to delete it");
+        // let path = self.authored_env.path().clone();
+        // // Delete directory
+        // self.authored_env
+        //     .remove()
+        //     .await
+        //     .map_err(|e| CellError::Cleanup(e.to_string(), path))?;
         Ok(())
     }
 
@@ -1126,13 +1144,18 @@ impl Cell {
         }
     }
 
-    /// Accessor for the database backing this Cell
+    /// Accessor for the authored database backing this Cell
     // TODO: reevaluate once Workflows are fully implemented (after B-01567)
-    pub(crate) fn env(&self) -> &EnvWrite {
-        &self.env
+    pub(crate) fn authored_env(&self) -> &DbWrite<DbKindAuthored> {
+        &self.authored_env
     }
 
-    pub(crate) fn cache(&self) -> &EnvWrite {
+    /// Accessor for the authored database backing this Cell
+    pub(crate) fn dht_env(&self) -> &DbWrite<DbKindDht> {
+        &self.dht_env
+    }
+
+    pub(crate) fn cache(&self) -> &DbWrite<DbKindCache> {
         &self.cache
     }
 

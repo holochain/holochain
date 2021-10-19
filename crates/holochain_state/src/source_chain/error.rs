@@ -107,6 +107,9 @@ pub enum SourceChainError {
     #[error(transparent)]
     CounterSigningError(#[from] CounterSigningError),
 
+    #[error("The source chain was missing for a host call that requires it.")]
+    SourceChainMissing,
+
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),

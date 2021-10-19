@@ -1,9 +1,9 @@
 use crate::core::ribosome::CallContext;
+use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
-use crate::core::ribosome::HostFnAccess;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn agent_info<'a>(
@@ -12,18 +12,23 @@ pub fn agent_info<'a>(
     _input: (),
 ) -> Result<AgentInfo, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
-        HostFnAccess{ agent_info: Permission::Allow, .. } => {
+        HostFnAccess {
+            agent_info: Permission::Allow,
+            ..
+        } => {
             let agent_pubkey = call_context
                 .host_context
                 .workspace()
                 .source_chain()
+                .as_ref()
+                .expect("Must have source chain if agent_info access is given")
                 .agent_pubkey()
                 .clone();
             Ok(AgentInfo {
                 agent_initial_pubkey: agent_pubkey.clone(),
                 agent_latest_pubkey: agent_pubkey,
             })
-        },
+        }
         _ => unreachable!(),
     }
 }

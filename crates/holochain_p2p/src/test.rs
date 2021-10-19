@@ -1,8 +1,7 @@
 use crate::actor::*;
-use crate::HolochainP2pCell;
+use crate::HolochainP2pDna;
 use crate::*;
 use ::fixt::prelude::*;
-use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
@@ -43,7 +42,6 @@ impl HolochainP2pHandler for StubNetwork {
     fn handle_publish(
         &mut self,
         dna_hash: DnaHash,
-        from_agent: AgentPubKey,
         request_validation_receipt: bool,
         countersigning_session: bool,
         dht_hash: holo_hash::AnyDhtHash,
@@ -61,7 +59,6 @@ impl HolochainP2pHandler for StubNetwork {
     fn handle_get(
         &mut self,
         dna_hash: DnaHash,
-        from_agent: AgentPubKey,
         dht_hash: holo_hash::AnyDhtHash,
         options: actor::GetOptions,
     ) -> HolochainP2pHandlerResult<Vec<WireOps>> {
@@ -70,7 +67,6 @@ impl HolochainP2pHandler for StubNetwork {
     fn handle_get_meta(
         &mut self,
         dna_hash: DnaHash,
-        from_agent: AgentPubKey,
         dht_hash: holo_hash::AnyDhtHash,
         options: actor::GetMetaOptions,
     ) -> HolochainP2pHandlerResult<Vec<MetadataSet>> {
@@ -79,7 +75,6 @@ impl HolochainP2pHandler for StubNetwork {
     fn handle_get_links(
         &mut self,
         dna_hash: DnaHash,
-        from_agent: AgentPubKey,
         link_key: WireLinkKey,
         options: actor::GetLinksOptions,
     ) -> HolochainP2pHandlerResult<Vec<WireLinkOps>> {
@@ -88,7 +83,6 @@ impl HolochainP2pHandler for StubNetwork {
     fn handle_get_agent_activity(
         &mut self,
         dna_hash: DnaHash,
-        from_agent: AgentPubKey,
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
@@ -99,7 +93,6 @@ impl HolochainP2pHandler for StubNetwork {
         &mut self,
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
-        from_agent: AgentPubKey,
         receipt: SerializedBytes,
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
@@ -110,7 +103,6 @@ impl HolochainP2pHandler for StubNetwork {
     fn handle_authority_for_hash(
         &mut self,
         dna_hash: DnaHash,
-        agent: AgentPubKey,
         dht_hash: AnyDhtHash,
     ) -> HolochainP2pHandlerResult<bool> {
         Err("stub".into())
@@ -118,7 +110,6 @@ impl HolochainP2pHandler for StubNetwork {
     fn handle_countersigning_authority_response(
         &mut self,
         dna_hash: DnaHash,
-        from_agent: AgentPubKey,
         agents: Vec<AgentPubKey>,
         response: Vec<SignedHeader>,
     ) -> HolochainP2pHandlerResult<()> {
@@ -144,21 +135,20 @@ pub async fn stub_network() -> ghost_actor::GhostSender<HolochainP2p> {
 }
 
 fixturator!(
-    HolochainP2pCell;
+    HolochainP2pDna;
     curve Empty {
         tokio_helper::block_forever_on(async {
             let holochain_p2p = crate::test::stub_network().await;
             holochain_p2p.to_cell(
                 DnaHashFixturator::new(Empty).next().unwrap(),
-                AgentPubKeyFixturator::new(Empty).next().unwrap(),
             )
         })
     };
     curve Unpredictable {
-        HolochainP2pCellFixturator::new(Empty).next().unwrap()
+        HolochainP2pDnaFixturator::new(Empty).next().unwrap()
     };
     curve Predictable {
-        HolochainP2pCellFixturator::new(Empty).next().unwrap()
+        HolochainP2pDnaFixturator::new(Empty).next().unwrap()
     };
 );
 

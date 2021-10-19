@@ -29,8 +29,10 @@ pub fn create<'a>(
                 Entry::CounterSign(_, _) => tokio_helper::block_forever_on(async move {
                     call_context
                         .host_context
-                        .workspace()
+                        .workspace_write()
                         .source_chain()
+                        .as_ref()
+                        .expect("Must have source chain if write_workspace access is given")
                         .put_countersigned(input.into_entry(), chain_top_ordering)
                         .await
                         .map_err(|source_chain_error| {
@@ -79,8 +81,10 @@ pub fn create<'a>(
                         // push the header and the entry into the source chain
                         call_context
                             .host_context
-                            .workspace()
+                            .workspace_write()
                             .source_chain()
+                            .as_ref()
+                            .expect("Must have source chain if write_workspace access is given")
                             .put(header_builder, Some(input.into_entry()), chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| {

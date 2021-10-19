@@ -1,7 +1,7 @@
 use ghost_actor::dependencies::observability;
 use holochain_cascade::test_utils::*;
 use holochain_cascade::Cascade;
-use holochain_state::prelude::test_cell_env;
+use holochain_state::prelude::test_authored_env;
 use holochain_types::activity::*;
 use holochain_zome_types::ChainStatus;
 use pretty_assertions::assert_eq;
@@ -11,8 +11,8 @@ async fn get_activity() {
     observability::test_run().ok();
 
     // Environments
-    let cache = test_cell_env();
-    let authority = test_cell_env();
+    let cache = test_authored_env();
+    let authority = test_authored_env();
 
     // Data
     let td = ActivityTestData::valid_chain_scenario();

@@ -12,6 +12,7 @@ use futures::stream::FuturesUnordered;
 use holochain_types::prelude::*;
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
 use tokio::sync::broadcast;
@@ -42,6 +43,9 @@ pub enum TaskKind {
     /// If the task returns an error, "freeze" the cell which caused the error,
     /// but continue running the rest of the conductor and other managed tasks.
     CellCritical(CellId),
+    /// If the task returns an error, "freeze" all cells with this dna hash,
+    /// but continue running the rest of the conductor and other managed tasks.
+    DnaCritical(Arc<DnaHash>),
     /// A generic callback for handling the result
     // TODO: B-01455: reevaluate whether this should be a callback
     Generic(OnDeath),
@@ -77,6 +81,11 @@ impl ManagedTaskAdd {
     /// If this task fails, only the Cell which it runs under must be stopped
     pub fn cell_critical(handle: ManagedTaskHandle, cell_id: CellId, name: &str) -> Self {
         Self::new(handle, TaskKind::CellCritical(cell_id), name)
+    }
+
+    /// If this task fails, only the Cells with this DnaHash must be stopped
+    pub fn dna_critical(handle: ManagedTaskHandle, dna_hash: Arc<DnaHash>, name: &str) -> Self {
+        Self::new(handle, TaskKind::DnaCritical(dna_hash), name)
     }
 
     /// Handle a task's completion with a generic callback
@@ -120,6 +129,9 @@ pub enum TaskOutcome {
     /// Either pause or disable all apps which contain the problematic Cell,
     /// depending upon the specific error.
     StopApps(CellId, Box<ManagedTaskError>, String),
+    /// Either pause or disable all apps which contain the problematic Dna,
+    /// depending upon the specific error.
+    StopAppsWithDna(Arc<DnaHash>, Box<ManagedTaskError>, String),
 }
 
 struct TaskManager {
@@ -230,6 +242,45 @@ async fn run(
                         tracing::error!("Apps disabled.");
                     }
                 },
+                Some(TaskOutcome::StopAppsWithDna(dna_hash, error, context)) => {
+                    tracing::error!("About to automatically stop apps with dna {}", dna_hash);
+                    let app_ids = conductor.list_running_apps_for_required_dna_hash(dna_hash.as_ref()).await.map_err(TaskManagerError::internal)?;
+                    if error.is_recoverable() {
+                        let cells_with_same_dna: Vec<_> = conductor.list_cell_ids(None).into_iter().filter(|id| id.dna_hash() == dna_hash.as_ref()).collect();
+                        conductor.remove_cells(&cells_with_same_dna).await;
+
+                        // The following message assumes that only the app_ids calculated will be paused, but other apps
+                        // may have been paused as well.
+                        tracing::error!(
+                            "PAUSING the following apps due to a recoverable error: {:?}\nError: {:?}\nContext: {}",
+                            app_ids,
+                            error,
+                            context
+                        );
+
+                        // TODO: it could be helpful to modify this function so that when providing Some(app_ids),
+                        //   you can also pass in a PausedAppReason override, so that the reason for the apps being paused
+                        //   can be set to the specific error message encountered here, rather than having to read it from
+                        //   the logs.
+                        let delta = conductor.reconcile_app_status_with_cell_status(None).await.map_err(TaskManagerError::internal)?;
+                        tracing::debug!(delta = ?delta);
+
+                        tracing::error!("Apps paused.");
+                    } else {
+                        // Since the error is unrecoverable, we don't expect to be able to use this Cell anymore.
+                        // Therefore, we disable every app which requires that cell.
+                        tracing::error!(
+                            "DISABLING the following apps due to an unrecoverable error: {:?}\nError: {:?}\nContext: {}",
+                            app_ids,
+                            error,
+                            context
+                        );
+                        for app_id in app_ids.iter() {
+                            conductor.clone().disable_app(app_id.to_string(), DisabledAppReason::Error(error.to_string())).await.map_err(TaskManagerError::internal)?;
+                        }
+                        tracing::error!("Apps disabled.");
+                    }
+                },
                 None => return Ok(()),
             }}
         };
@@ -251,6 +302,10 @@ fn handle_completed_task(kind: &TaskKind, result: ManagedTaskResult, name: Strin
         TaskKind::CellCritical(cell_id) => match result {
             Ok(_) => LogInfo(name),
             Err(err) => StopApps(cell_id.to_owned(), Box::new(err), name),
+        },
+        TaskKind::DnaCritical(dna_hash) => match result {
+            Ok(_) => LogInfo(name),
+            Err(err) => StopAppsWithDna(dna_hash.to_owned(), Box::new(err), name),
         },
         TaskKind::Generic(f) => f(result),
     }

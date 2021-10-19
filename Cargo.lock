@@ -2614,6 +2614,7 @@ name = "holochain_sqlite"
 version = "0.0.9"
 dependencies = [
  "anyhow",
+ "async-trait",
  "byteorder",
  "cfg-if 0.1.10",
  "chashmap",
@@ -2670,6 +2671,7 @@ dependencies = [
  "either",
  "fallible-iterator",
  "fixt",
+ "futures",
  "hdk",
  "holo_hash",
  "holochain_keystore",

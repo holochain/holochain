@@ -93,6 +93,7 @@ where
 
     source_chain::genesis(
         workspace.vault.clone(),
+        api.keystore().clone(),
         dna_file.dna_hash().clone(),
         agent_pubkey,
         membrane_proof,
@@ -104,12 +105,12 @@ where
 
 /// The workspace for Genesis
 pub struct GenesisWorkspace {
-    vault: EnvWrite,
+    vault: DbWrite<DbKindAuthored>,
 }
 
 impl GenesisWorkspace {
     /// Constructor
-    pub fn new(env: EnvWrite) -> WorkspaceResult<Self> {
+    pub fn new(env: DbWrite<DbKindAuthored>) -> WorkspaceResult<Self> {
         Ok(Self { vault: env })
     }
 
@@ -144,7 +145,7 @@ pub mod tests {
 
     use crate::conductor::api::MockCellConductorApi;
     use crate::core::ribosome::MockRibosomeT;
-    use holochain_state::{prelude::test_cell_env, source_chain::SourceChain};
+    use holochain_state::{prelude::test_authored_env, source_chain::SourceChain};
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
     use holochain_zome_types::Header;
@@ -154,7 +155,7 @@ pub mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn genesis_initializes_source_chain() {
         observability::test_run().unwrap();
-        let test_env = test_cell_env();
+        let test_env = test_authored_env();
         let vault = test_env.env();
         let dna = fake_dna_file("a");
         let author = fake_agent_pubkey_1();

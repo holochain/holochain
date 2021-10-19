@@ -6,13 +6,14 @@ use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::RibosomeT;
 
-use super::api::CellConductorApiT;
 use error::EntryDefStoreError;
 use error::EntryDefStoreResult;
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
 use std::collections::HashMap;
+
+use super::handle::ConductorHandleT;
 
 pub mod error;
 
@@ -22,7 +23,7 @@ pub(crate) async fn get_entry_def(
     entry_def_index: EntryDefIndex,
     zome: ZomeDef,
     dna_def: &DnaDefHashed,
-    conductor_api: &impl CellConductorApiT,
+    conductor_api: &dyn ConductorHandleT,
 ) -> EntryDefStoreResult<Option<EntryDef>> {
     // Try to get the entry def from the entry def store
     let key = EntryDefBufferKey::new(zome, entry_def_index);
@@ -45,7 +46,7 @@ pub(crate) async fn get_entry_def_from_ids(
     zome_id: ZomeId,
     entry_def_index: EntryDefIndex,
     dna_def: &DnaDefHashed,
-    conductor_api: &impl CellConductorApiT,
+    conductor_api: &dyn ConductorHandleT,
 ) -> EntryDefStoreResult<Option<EntryDef>> {
     match dna_def.zomes.get(zome_id.index()) {
         Some((_, zome)) => {

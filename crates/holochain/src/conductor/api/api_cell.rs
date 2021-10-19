@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use holo_hash::DnaHash;
 use holochain_conductor_api::ZomeCall;
 use holochain_keystore::MetaLairClient;
-use holochain_state::host_fn_workspace::HostFnWorkspace;
+use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_types::prelude::*;
 use tracing::*;
 
@@ -154,7 +154,7 @@ pub trait CellConductorReadHandleT: Send + Sync {
     async fn call_zome(
         &self,
         call: ZomeCall,
-        workspace_lock: HostFnWorkspace,
+        workspace_lock: SourceChainWorkspace,
     ) -> ConductorApiResult<ZomeCallResult>;
 
     /// Get a zome from this cell's Dna
@@ -170,7 +170,7 @@ impl CellConductorReadHandleT for CellConductorApi {
     async fn call_zome(
         &self,
         call: ZomeCall,
-        workspace_lock: HostFnWorkspace,
+        workspace_lock: SourceChainWorkspace,
     ) -> ConductorApiResult<ZomeCallResult> {
         if self.cell_id == call.cell_id {
             self.conductor_handle
