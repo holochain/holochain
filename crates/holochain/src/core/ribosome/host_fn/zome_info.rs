@@ -54,4 +54,14 @@ pub mod test {
             crate::call_test_ribosome!(host_access, TestWasm::ZomeInfo, "zome_info", ()).unwrap();
         assert_eq!(zome_info.name, "zome_info".into());
     }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn zome_info_entry_defs() {
+        let host_access = fixt!(ZomeCallHostAccess, Predictable);
+        let zome_info: ZomeInfo = crate::call_test_ribosome!(host_access, TestWasm::EntryDefs, "zome_info", ()).unwrap();
+        assert_eq!(
+            zome_info.entry_defs,
+            vec![].into(),
+        );
+    }
 }
