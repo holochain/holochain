@@ -3,6 +3,7 @@ use crate::zome::ZomeName;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_serialized_bytes::prelude::*;
+use crate::EntryDefs;
 
 /// The properties of the current dna/zome being called.
 #[allow(missing_docs)]
@@ -11,11 +12,12 @@ pub struct ZomeInfo {
     pub name: ZomeName,
     /// The position of this zome in the `dna.json`
     pub id: ZomeId,
+    pub entry_defs: EntryDefs,
 }
 
 impl ZomeInfo {
-    pub fn new(name: ZomeName, id: ZomeId) -> Self {
-        Self { name, id }
+    pub fn new(name: ZomeName, id: ZomeId, entry_defs: EntryDefs) -> Self {
+        Self { name, id, entry_defs }
     }
 }
 

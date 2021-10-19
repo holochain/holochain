@@ -726,31 +726,36 @@ macro_rules! entry_defs {
 #[macro_export]
 macro_rules! entry_def_index {
     ( $t:ty ) => {
-        match crate::entry_defs(()) {
-            Ok($crate::prelude::EntryDefsCallbackResult::Defs(entry_defs)) => {
-                match entry_defs.entry_def_index_from_id(<$t>::entry_def_id()) {
-                    Some(entry_def_index) => Ok::<
-                        $crate::prelude::EntryDefIndex,
-                        $crate::prelude::WasmError,
-                    >(entry_def_index),
-                    None => {
-                        $crate::prelude::tracing::error!(
-                            entry_def_type = stringify!($t),
-                            ?entry_defs,
-                            "Failed to lookup index for entry def id."
-                        );
-                        Err::<$crate::prelude::EntryDefIndex, $crate::prelude::WasmError>(
-                            $crate::prelude::WasmError::Guest(
-                                "Failed to lookup index for entry def id.".into(),
-                            ),
-                        )
+        match zome_info() {
+            Ok(zome_info) => {
+                match zome_info.entry_defs {
+                    Ok($crate::prelude::EntryDefsCallbackResult::Defs(entry_defs)) => {
+                        match entry_defs.entry_def_index_from_id(<$t>::entry_def_id()) {
+                            Some(entry_def_index) => Ok::<
+                                $crate::prelude::EntryDefIndex,
+                                $crate::prelude::WasmError,
+                            >(entry_def_index),
+                            None => {
+                                $crate::prelude::tracing::error!(
+                                    entry_def_type = stringify!($t),
+                                    ?entry_defs,
+                                    "Failed to lookup index for entry def id."
+                                );
+                                Err::<$crate::prelude::EntryDefIndex, $crate::prelude::WasmError>(
+                                    $crate::prelude::WasmError::Guest(
+                                        "Failed to lookup index for entry def id.".into(),
+                                    ),
+                                )
+                            }
+                        }
+                    }
+                    Err(error) => {
+                        $crate::prelude::tracing::error!(?error, "Failed to lookup entry defs.");
+                        Err::<$crate::prelude::EntryDefIndex, $crate::prelude::WasmError>(error)
                     }
                 }
-            }
-            Err(error) => {
-                $crate::prelude::tracing::error!(?error, "Failed to lookup entry defs.");
-                Err::<$crate::prelude::EntryDefIndex, $crate::prelude::WasmError>(error)
-            }
+            },
+            Err(error) => Err(error),
         }
     };
 }
