@@ -42,7 +42,7 @@ pub struct DnaDef {
     #[cfg_attr(feature = "full-dna-def", builder(default = "().try_into().unwrap()"))]
     pub properties: SerializedBytes,
 
-    /// An array of zomes associated with your DNA.
+    /// A vector of zomes associated with your DNA.
     pub zomes: Zomes,
 }
 

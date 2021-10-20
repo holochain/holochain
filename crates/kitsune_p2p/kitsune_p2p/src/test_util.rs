@@ -74,5 +74,5 @@ pub use metric_store::*;
 
 pub(crate) mod scenario_def_local;
 
-#[cfg(feature = "test_utils")]
+#[cfg(feature = "mock_network")]
 pub mod mock_network;
