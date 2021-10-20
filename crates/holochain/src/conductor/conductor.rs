@@ -74,7 +74,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc::error::SendError;
 use tracing::*;
 
-#[cfg(any(test, feature = "test_utils"))]
+#[cfg(feature = "test_utils")]
 use super::handle::MockConductorHandleT;
 
 mod share;
@@ -1631,6 +1631,7 @@ mod builder {
                 p2p_batch_senders: Arc::new(parking_lot::Mutex::new(HashMap::new())),
                 p2p_metrics_env: envs.p2p_metrics(),
                 db_sync_level: self.config.db_sync_level,
+
                 #[cfg(any(test, feature = "test_utils"))]
                 dev_settings: parking_lot::RwLock::new(DevSettings::default()),
             });

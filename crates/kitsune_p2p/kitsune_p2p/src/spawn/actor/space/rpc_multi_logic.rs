@@ -520,4 +520,5 @@ impl Outer {
 }
 
 #[cfg(test)]
+#[cfg(feature = "test_utils")]
 mod test;

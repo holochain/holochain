@@ -3,6 +3,11 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+- Refactor conductor to use parking lot rw lock instead of tokio rw lock. (Faster and prevents deadlocks.)
+
+### Changed
+
+- The scheduler should work now
 
 - `call_info` is now implemented [1047](https://github.com/holochain/holochain/pull/1047)
 - `dna_info` now returns `DnaInfo` correctly [\#1044](https://github.com/holochain/holochain/pull/1044)

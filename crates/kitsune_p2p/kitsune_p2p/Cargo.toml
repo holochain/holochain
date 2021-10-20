@@ -20,11 +20,12 @@ ghost_actor = "=0.3.0-alpha.4"
 governor = "0.3.2"
 itertools = "0.10"
 kitsune_p2p_mdns = { version = "0.0.2", path = "../mdns" }
-kitsune_p2p_timestamp = { version = "0.0.5", path = "../timestamp" }
+kitsune_p2p_timestamp = { version = "0.0.5", path = "../timestamp", features = ["now"] }
 kitsune_p2p_types = { version = "0.0.9", path = "../types" }
 kitsune_p2p_proxy = { version = "0.0.9", path = "../proxy" }
 kitsune_p2p_transport_quic = { version = "0.0.9", path = "../transport_quic" }
 lair_keystore_api = "=0.1.0-alpha.4"
+num-traits = "0.2"
 parking_lot = "0.11.1"
 rand = "0.7"
 shrinkwraprs = "0.3.0"
@@ -48,6 +49,7 @@ mockall = { version = "0.10.2", optional = true }
 [dev-dependencies]
 maplit = "1"
 mockall = "0.10.2"
+pretty_assertions = "0.7"
 test-case = "1.0.0"
 tracing-subscriber = "0.2"
 
