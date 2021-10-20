@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `dna_info` now returns `DnaInfo` correctly [\#1044](https://github.com/holochain/holochain/pull/1044)
   - `ZomeInfo` no longer includes what is now on `DnaInfo`
   - `ZomeInfo` renames `zome_name` and `zome_id` to `name` and `id`
-  - `DnaInfo` includes `name`, `hash`, `properties`
+  - `DnaInfo` includes `name`, `hash`, `properties`, and `zome_names`
 
 ## 0.0.110
 
