@@ -1,8 +1,10 @@
 use crate::header::ZomeId;
 use crate::zome::ZomeName;
 use crate::EntryDefs;
+use crate::Timestamp;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
+use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 
 /// The properties of the current dna/zome being called.
@@ -22,7 +24,7 @@ impl ZomeInfo {
             id,
             entry_defs,
         }
-    }
+  }
 }
 
 /// The struct containing all information about the executing agent's identity.
@@ -60,4 +62,8 @@ pub struct DnaInfo {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct CallInfo;
+pub struct CallInfo {
+    /// Chain head as at the call start.
+    /// This will not change within a call even if the chain is written to.
+    pub as_at: (HeaderHash, u32, Timestamp),
+}

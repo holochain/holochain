@@ -31,8 +31,6 @@ pub fn zome_info(
                         },
                     }
                 },
-                // @TODO
-                // public_token: "".into(),
             })
         },
         _ => unreachable!(),

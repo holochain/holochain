@@ -24,6 +24,7 @@ pub fn dna_info(
                     .iter()
                     .map(|(zome_name, _zome_def)| zome_name.to_owned())
                     .collect(),
+                properties: ribosome.dna_def().properties.clone()
             })
         },
         _ => unreachable!(),
