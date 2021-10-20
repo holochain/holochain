@@ -104,7 +104,13 @@ pub fn space_holo_to_kit(d: holo_hash::DnaHash) -> kitsune_p2p::KitsuneSpace {
 pub mod actor;
 pub mod event;
 
+#[cfg(feature = "test_utils")]
+pub mod mock_network;
+
 pub(crate) mod wire;
+
+pub use wire::WireDhtOpData;
+pub use wire::WireMessage;
 
 macro_rules! to_and_from_kitsune {
     ($($i:ident<$h:ty> -> $k:ty,)*) => {
