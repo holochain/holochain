@@ -4,6 +4,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- `dna_info` now returns `DnaInfo` correctly [\#1044](https://github.com/holochain/holochain/pull/1044)
+  - `ZomeInfo` no longer includes what is now on `DnaInfo`
+  - `ZomeInfo` renames `zome_name` and `zome_id` to `name` and `id`
+  - `DnaInfo` includes `name`, `hash`, `properties`
+
 ## 0.0.110
 
 - Publish now runs on a loop if there are ops still needing receipts. [\#1024](https://github.com/holochain/holochain/pull/1024)
