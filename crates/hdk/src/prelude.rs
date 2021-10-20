@@ -40,6 +40,7 @@ pub use crate::hash_path::anchor::Anchor;
 pub use crate::hash_path::path::Path;
 pub use crate::hdk::*;
 pub use crate::info::agent_info;
+pub use crate::info::dna_info;
 pub use crate::info::zome_info;
 pub use crate::link::create_link;
 pub use crate::link::delete_link;

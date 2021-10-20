@@ -93,7 +93,7 @@ mod tests {
             .callback("init", move |api, ()| {
                 let mut functions: GrantedFunctions = BTreeSet::new();
                 functions.insert((
-                    api.zome_info(()).unwrap().zome_name,
+                    api.zome_info(()).unwrap().name,
                     "recv_remote_signal".into(),
                 ));
                 let cap_grant_entry = CapGrantEntry {

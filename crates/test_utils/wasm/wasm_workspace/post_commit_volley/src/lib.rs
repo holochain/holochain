@@ -10,7 +10,7 @@ entry_defs![Ping::entry_def()];
 #[hdk_extern]
 fn set_access(_: ()) -> ExternResult<()> {
     let mut functions: GrantedFunctions = BTreeSet::new();
-    functions.insert((zome_info()?.zome_name, "ping".into()));
+    functions.insert((zome_info()?.name, "ping".into()));
     create_cap_grant(CapGrantEntry {
         tag: "".into(),
         // empty access converts to unrestricted
@@ -32,7 +32,7 @@ fn post_commit(shhs: Vec<SignedHeaderHashed>) {
         if hdk::prelude::query(ChainQueryFilter::default().entry_type(entry_type!(Ping).unwrap())).unwrap().len() < PINGS {
             call_remote(
                 ping.0,
-                zome_info().unwrap().zome_name,
+                zome_info().unwrap().name,
                 "ping".to_string().into(),
                 None,
                 &agent_info().unwrap().agent_latest_pubkey,
