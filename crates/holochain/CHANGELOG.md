@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - The `InstallApp` admin method now takes a `role_id` field instead of a `nick` field
   - In the return value for any admin method which lists installed apps, e.g. `ListEnabledApps`, any reference to `"slots"` is now named `"roles"`
   - See [\#1045](https://github.com/holochain/holochain/pull/1045)
+- `call_info` is now implemented [1047](https://github.com/holochain/holochain/pull/1047)
 - `dna_info` now returns `DnaInfo` correctly [\#1044](https://github.com/holochain/holochain/pull/1044)
   - `ZomeInfo` no longer includes what is now on `DnaInfo`
   - `ZomeInfo` renames `zome_name` and `zome_id` to `name` and `id`
