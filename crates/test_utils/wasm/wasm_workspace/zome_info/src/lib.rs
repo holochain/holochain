@@ -18,6 +18,10 @@ fn call_info(_: ()) -> ExternResult<CallInfo> {
     hdk::prelude::call_info()
 }
 
+fn dna_info(_: ()) -> ExternResult<DnaInfo> {
+    hdk::prelude::dna_info()
+}
+
 #[cfg(test)]
 pub mod tests {
     use hdk::prelude::*;
