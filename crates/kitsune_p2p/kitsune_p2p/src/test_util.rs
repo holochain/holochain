@@ -55,6 +55,9 @@ pub async fn spawn_handler<H: KitsuneP2pEventHandler + ghost_actor::GhostControl
     (tx, tokio::task::spawn(driver))
 }
 
+mod switchboard;
+pub use switchboard::*;
+
 mod harness_event;
 pub(crate) use harness_event::*;
 
