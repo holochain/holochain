@@ -56,8 +56,10 @@ use super::CellError;
 use super::Conductor;
 use crate::conductor::p2p_agent_store::get_single_agent_info;
 use crate::conductor::p2p_agent_store::query_peer_density;
+use crate::conductor::p2p_agent_store::P2pBatch;
 use crate::conductor::p2p_metrics::put_metric_datum;
 use crate::conductor::p2p_metrics::query_metrics;
+use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::workflow::ZomeCallResult;
 use derive_more::From;
@@ -67,10 +69,11 @@ use holochain_conductor_api::conductor::EnvironmentRootPath;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::JsonDump;
+use holochain_keystore::MetaLairClient;
 use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_p2p::DnaHashExt;
-use holochain_p2p::HolochainP2pCell;
+
 use holochain_p2p::HolochainP2pCellT;
 use holochain_sqlite::db::DbKind;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
@@ -81,6 +84,8 @@ use kitsune_p2p::KitsuneSpace;
 use kitsune_p2p_types::config::JOIN_NETWORK_TIMEOUT;
 use std::collections::HashMap;
 use std::{collections::HashSet, sync::Arc};
+use tokio::sync::mpsc::error::SendError;
+use tokio::sync::mpsc::OwnedPermit;
 use tracing::*;
 
 #[cfg(any(test, feature = "test_utils"))]
@@ -126,7 +131,7 @@ pub trait ConductorHandleT: Send + Sync {
     /// List the app interfaces currently install.
     async fn list_app_interfaces(&self) -> ConductorResult<Vec<u16>>;
 
-    /// Install a [Dna] in this Conductor
+    /// Install a [DnaFile] in this Conductor
     async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()>;
 
     /// Get the list of hashes of installed Dnas in this Conductor
@@ -175,7 +180,7 @@ pub trait ConductorHandleT: Send + Sync {
     fn shutdown(&self);
 
     /// Request access to this conductor's keystore
-    fn keystore(&self) -> &KeystoreSender;
+    fn keystore(&self) -> &MetaLairClient;
 
     /// Request access to this conductor's networking handle
     fn holochain_p2p(&self) -> &holochain_p2p::HolochainP2pRef;
@@ -242,6 +247,9 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Dispatch all due scheduled functions.
     async fn dispatch_scheduled_fns(self: Arc<Self>);
+
+    /// Get an OwnedPermit to the post commit task.
+    async fn post_commit_permit(&self) -> Result<OwnedPermit<PostCommitArgs>, SendError<()>>;
 
     /// Stop a running app while leaving it enabled. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
@@ -382,7 +390,7 @@ pub trait ConductorHandleT: Send + Sync {
 #[derive(From)]
 pub struct ConductorHandleImpl<DS: DnaStore + 'static> {
     pub(super) conductor: Conductor<DS>,
-    pub(super) keystore: KeystoreSender,
+    pub(super) keystore: MetaLairClient,
     pub(super) holochain_p2p: holochain_p2p::HolochainP2pRef,
 
     /// The root environment directory where all environments are created
@@ -396,6 +404,10 @@ pub struct ConductorHandleImpl<DS: DnaStore + 'static> {
 
     /// Database sync level
     pub(super) db_sync_level: DbSyncLevel,
+
+    /// The batch sender for writes to the p2p database.
+    pub(super) p2p_batch_senders:
+        Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, tokio::sync::mpsc::Sender<P2pBatch>>>>,
 
     // Testing:
     #[cfg(any(test, feature = "test_utils"))]
@@ -509,10 +521,18 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             PutAgentInfoSigned {
                 peer_data, respond, ..
             } => {
-                let env = { self.p2p_env(space) };
-                let res = inject_agent_infos(env, peer_data.iter())
-                    .await
-                    .map_err(holochain_p2p::HolochainP2pError::other);
+                let sender = self.p2p_batch_sender(space);
+                let (result_sender, response) = tokio::sync::oneshot::channel();
+                let _ = sender
+                    .send(P2pBatch {
+                        peer_data,
+                        result_sender,
+                    })
+                    .await;
+                let res = match response.await {
+                    Ok(r) => r.map_err(holochain_p2p::HolochainP2pError::other),
+                    Err(e) => Err(holochain_p2p::HolochainP2pError::other(e)),
+                };
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
             GetAgentInfoSigned {
@@ -609,7 +629,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 data,
                 ..
             } => {
-                let signature = to_agent.sign_raw(self.keystore(), &data).await?;
+                let signature = to_agent.sign_raw(self.keystore(), data.into()).await?;
                 respond.respond(Ok(async move { Ok(signature) }.boxed().into()));
             }
             HolochainP2pEvent::CallRemote { .. }
@@ -730,7 +750,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self.conductor.shutdown()
     }
 
-    fn keystore(&self) -> &KeystoreSender {
+    fn keystore(&self) -> &MetaLairClient {
         &self.keystore
     }
 
@@ -912,6 +932,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .into_iter()
             .map(|cell_arc| cell_arc.dispatch_scheduled_fns());
         futures::future::join_all(tasks).await;
+    }
+
+    async fn post_commit_permit(&self) -> Result<OwnedPermit<PostCommitArgs>, SendError<()>> {
+        self.conductor.post_commit_permit().await
     }
 
     #[tracing::instrument(skip(self))]
@@ -1295,14 +1319,11 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
         // Join the network but ignore errors because the
         // space retries joining all cells every 5 minutes.
 
-        let pending_cells: Vec<(CellId, HolochainP2pCell)> = self
+        let tasks = self
             .conductor
             .mark_pending_cells_as_joining()
             .into_iter()
             .map(|(id, cell)| (id, cell.holochain_p2p_cell().clone()))
-            .collect();
-
-        let tasks = pending_cells.into_iter()
             .map(|(cell_id, network)| async move {
                 match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join()).await {
                     Ok(Err(e)) => {
@@ -1355,6 +1376,22 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
                     db_sync_level,
                 )
                 .expect("failed to open p2p_agent_store database")
+            })
+            .clone()
+    }
+
+    pub(super) fn p2p_batch_sender(
+        &self,
+        space: Arc<KitsuneSpace>,
+    ) -> tokio::sync::mpsc::Sender<P2pBatch> {
+        let mut p2p_env = self.p2p_batch_senders.lock();
+        p2p_env
+            .entry(space.clone())
+            .or_insert_with(|| {
+                let (tx, rx) = tokio::sync::mpsc::channel(100);
+                let env = { self.p2p_env(space) };
+                tokio::spawn(p2p_agent_store::p2p_put_all_batch(env, rx));
+                tx
             })
             .clone()
     }

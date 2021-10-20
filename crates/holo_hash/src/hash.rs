@@ -23,6 +23,8 @@
 //!
 //! The complete 39 bytes together are known as the "full" hash
 
+use kitsune_p2p_dht_arc::DhtLocation;
+
 use crate::error::HoloHashResult;
 use crate::has_hash::HasHash;
 use crate::HashType;
@@ -144,8 +146,10 @@ impl<T: HashType> HoloHash<T> {
     }
 
     /// Fetch the holo dht location for this hash
-    pub fn get_loc(&self) -> u32 {
-        bytes_to_loc(&self.hash[HOLO_HASH_FULL_LEN - HOLO_HASH_LOC_LEN..])
+    pub fn get_loc(&self) -> DhtLocation {
+        DhtLocation::new(bytes_to_loc(
+            &self.hash[HOLO_HASH_FULL_LEN - HOLO_HASH_LOC_LEN..],
+        ))
     }
 
     /// consume into the inner byte vector
@@ -223,7 +227,7 @@ impl<T: HashType> IntoIterator for HoloHash<T> {
 
 impl<T: HashType> HasHash<T> for HoloHash<T> {
     fn as_hash(&self) -> &HoloHash<T> {
-        &self
+        self
     }
     fn into_hash(self) -> HoloHash<T> {
         self

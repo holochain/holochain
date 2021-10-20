@@ -2,13 +2,13 @@ use gcollections::ops::*;
 use interval::{interval_set::*, IntervalSet};
 use std::{borrow::Borrow, collections::VecDeque, fmt::Debug};
 
-type T = u32;
+use crate::DhtLocation;
 
 // For u32, IntervalSet excludes MAX from its set of valid values due to its
 // need to be able to express the width of an interval using a u32.
 // This min and max are set accordingly.
-const MIN: T = T::MIN;
-const MAX: T = T::MAX - 1;
+const MIN: u32 = u32::MIN;
+const MAX: u32 = u32::MAX - 1;
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum DhtArcSet {
@@ -17,7 +17,7 @@ pub enum DhtArcSet {
     /// implementation excludes `u32::MAX` from its set of valid bounds
     Full,
     /// Any coverage other than full, including empty
-    Partial(IntervalSet<T>),
+    Partial(IntervalSet<DhtLocation>),
 }
 
 impl std::fmt::Debug for DhtArcSet {
@@ -43,7 +43,9 @@ impl DhtArcSet {
 
     pub fn normalized(self) -> Self {
         let make_full = if let Self::Partial(intervals) = &self {
-            intervals.iter().any(|i| is_full(i.lower(), i.upper()))
+            intervals
+                .iter()
+                .any(|i| is_full(i.lower().into(), i.upper().into()))
         } else {
             false
         };
@@ -55,15 +57,15 @@ impl DhtArcSet {
         }
     }
 
-    pub fn from_bounds(start: u32, end: u32) -> Self {
-        if is_full(start, end) {
+    pub fn from_bounds(start: DhtLocation, end: DhtLocation) -> Self {
+        if is_full(start.into(), end.into()) {
             Self::new_full()
         } else {
             Self::Partial(
                 if start <= end {
                     vec![(start, end)]
                 } else {
-                    vec![(MIN, end), (start, MAX)]
+                    vec![(MIN.into(), end), (start, MAX.into())]
                 }
                 .to_interval_set(),
             )
@@ -82,7 +84,7 @@ impl DhtArcSet {
         match self {
             Self::Full => vec![ArcInterval::Full],
             Self::Partial(intervals) => {
-                let mut intervals: VecDeque<(T, T)> =
+                let mut intervals: VecDeque<(DhtLocation, DhtLocation)> =
                     intervals.iter().map(|i| (i.lower(), i.upper())).collect();
                 let wrapping = match (intervals.front(), intervals.back()) {
                     (Some(first), Some(last)) => {
@@ -93,7 +95,7 @@ impl DhtArcSet {
                         // NB: this checks for values greater than the MAX,
                         // because MAX is not u32::MAX. We don't expect values
                         // greater than MAX, but it's no harm if we do see one.
-                        if first.0 == MIN && last.1 >= MAX {
+                        if first.0.as_u32() == MIN && last.1.as_u32() >= MAX {
                             Some((last.0, first.1))
                         } else {
                             None
@@ -122,7 +124,7 @@ impl DhtArcSet {
         }
     }
 
-    pub fn contains(&self, t: T) -> bool {
+    pub fn contains(&self, t: DhtLocation) -> bool {
         self.overlap(&DhtArcSet::from(vec![(t, t)]))
     }
 
@@ -152,6 +154,13 @@ impl DhtArcSet {
             (Self::Partial(this), Self::Partial(that)) => {
                 Self::Partial(this.intersection(that)).normalized()
             }
+        }
+    }
+
+    pub fn size(&self) -> u32 {
+        match self {
+            Self::Full => u32::MAX,
+            Self::Partial(intervals) => intervals.size(),
         }
     }
 }
@@ -184,12 +193,23 @@ impl From<Vec<ArcInterval>> for DhtArcSet {
     }
 }
 
-impl From<Vec<(T, T)>> for DhtArcSet {
-    fn from(pairs: Vec<(T, T)>) -> Self {
+impl From<Vec<(DhtLocation, DhtLocation)>> for DhtArcSet {
+    fn from(pairs: Vec<(DhtLocation, DhtLocation)>) -> Self {
         pairs
             .into_iter()
             .map(|(a, b)| Self::from(&ArcInterval::new(a, b)))
             .fold(Self::new_empty(), |a, b| a.union(&b))
+    }
+}
+
+impl From<Vec<(u32, u32)>> for DhtArcSet {
+    fn from(pairs: Vec<(u32, u32)>) -> Self {
+        Self::from(
+            pairs
+                .into_iter()
+                .map(|(a, b)| (DhtLocation::new(a), DhtLocation::new(b)))
+                .collect::<Vec<_>>(),
+        )
     }
 }
 
@@ -213,29 +233,40 @@ fn fullness() {
 }
 
 /// An alternate implementation of `ArcRange`
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum ArcInterval {
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum ArcInterval<T = DhtLocation> {
     Empty,
     Full,
     Bounded(T, T),
 }
 
-impl ArcInterval {
-    pub fn new(start: T, end: T) -> Self {
+impl<T: PartialOrd + num_traits::Num + num_traits::AsPrimitive<u32>> ArcInterval<T> {
+    pub fn new(start: T, end: T) -> ArcInterval<DhtLocation> {
+        let start = start.as_();
+        let end = end.as_();
         if is_full(start, end) {
+            ArcInterval::Full
+        } else {
+            ArcInterval::Bounded(DhtLocation::new(start), DhtLocation::new(end))
+        }
+    }
+
+    pub fn new_generic(start: T, end: T) -> Self {
+        if is_full(start.as_(), end.as_()) {
             Self::Full
         } else {
             Self::Bounded(start, end)
         }
     }
 
-    /// Constructor
-    pub fn new_empty() -> Self {
-        Self::Empty
-    }
-
-    pub fn from_bounds(bounds: (T, T)) -> Self {
-        Self::Bounded(bounds.0, bounds.1)
+    pub fn canonical(self) -> ArcInterval {
+        match self {
+            ArcInterval::Empty => ArcInterval::Empty,
+            ArcInterval::Full => ArcInterval::Full,
+            ArcInterval::Bounded(lo, hi) => {
+                ArcInterval::new(DhtLocation::new(lo.as_()), DhtLocation::new(hi.as_()))
+            }
+        }
     }
 
     pub fn contains<B: std::borrow::Borrow<T>>(&self, t: B) -> bool {
@@ -252,16 +283,27 @@ impl ArcInterval {
             }
         }
     }
+}
+
+impl ArcInterval<DhtLocation> {
+    /// Constructor
+    pub fn new_empty() -> Self {
+        Self::Empty
+    }
+
+    pub fn from_bounds(bounds: (DhtLocation, DhtLocation)) -> Self {
+        Self::Bounded(bounds.0, bounds.1)
+    }
 
     /// Shift the bounds so that an integer half-length is achieved. Always
     /// increase the half-length, so that the resulting quantized interval is
     /// a superset of the original
     pub fn quantized(&self) -> Self {
         if let Self::Bounded(lo, hi) = self {
-            if lo < hi && (hi - lo) % 2 == 1 {
-                Self::Bounded(lo.wrapping_sub(1), *hi)
-            } else if lo > hi && (lo - hi) % 2 == 1 {
-                Self::Bounded(*lo, hi.wrapping_add(1))
+            if lo < hi && (*hi - *lo) % 2.into() == 1.into() {
+                Self::Bounded(*lo - 1.into(), *hi)
+            } else if lo > hi && (*lo - *hi) % 2.into() == 1.into() {
+                Self::Bounded(*lo, *hi + 1.into())
             } else {
                 self.clone()
             }
@@ -272,16 +314,16 @@ impl ArcInterval {
 
     /// Represent an arc as an optional range of inclusive endpoints.
     /// If none, the arc length is 0
-    pub fn to_bounds_grouped(&self) -> Option<(u32, u32)> {
+    pub fn to_bounds_grouped(&self) -> Option<(DhtLocation, DhtLocation)> {
         match self {
             Self::Empty => None,
-            Self::Full => Some((0, u32::MAX)),
+            Self::Full => Some((u32::MIN.into(), u32::MAX.into())),
             &Self::Bounded(lo, hi) => Some((lo, hi)),
         }
     }
 
     /// Same as primitive_range, but with the return type "inside-out"
-    pub fn primitive_range_detached(&self) -> (Option<u32>, Option<u32>) {
+    pub fn primitive_range_detached(&self) -> (Option<DhtLocation>, Option<DhtLocation>) {
         self.to_bounds_grouped()
             .map(|(a, b)| (Some(a), Some(b)))
             .unwrap_or_default()
@@ -292,6 +334,14 @@ impl ArcInterval {
         matches!(self, Self::Empty)
     }
 
+    /// Amount of intersection between two arcs
+    pub fn overlap_coverage(&self, other: &Self) -> f64 {
+        let a = DhtArcSet::from(self);
+        let b = DhtArcSet::from(other);
+        let c = a.intersection(&b);
+        c.size() as f64 / a.size() as f64
+    }
+
     #[cfg(any(test, feature = "test_utils"))]
     pub fn to_ascii(&self, len: usize) -> String {
         match self {
@@ -299,8 +349,8 @@ impl ArcInterval {
             Self::Empty => "(EMPTY)".to_string(),
             Self::Bounded(lo, hi) => {
                 let factor = len as f64 / u32::MAX as f64;
-                let lo = (factor * *lo as f64) as usize;
-                let hi = (factor * *hi as f64) as usize;
+                let lo = (factor * lo.as_u32() as f64) as usize;
+                let hi = (factor * hi.as_u32() as f64) as usize;
                 if lo <= hi {
                     vec![
                         " ".repeat(lo),
@@ -355,33 +405,33 @@ mod tests {
     fn test_ascii() {
         let cent = u32::MAX / 100 + 1;
         assert_eq!(
-            ArcInterval::Bounded(cent * 30, cent * 60).to_ascii(10),
+            ArcInterval::new(cent * 30, cent * 60).to_ascii(10),
             "   ----   ".to_string()
         );
         assert_eq!(
-            ArcInterval::Bounded(cent * 33, cent * 63).to_ascii(10),
+            ArcInterval::new(cent * 33, cent * 63).to_ascii(10),
             "   ----   ".to_string()
         );
         assert_eq!(
-            ArcInterval::Bounded(cent * 29, cent * 59).to_ascii(10),
+            ArcInterval::new(cent * 29, cent * 59).to_ascii(10),
             "  ----    ".to_string()
         );
 
         assert_eq!(
-            ArcInterval::Bounded(cent * 60, cent * 30).to_ascii(10),
+            ArcInterval::new(cent * 60, cent * 30).to_ascii(10),
             "----  ----".to_string()
         );
         assert_eq!(
-            ArcInterval::Bounded(cent * 63, cent * 33).to_ascii(10),
+            ArcInterval::new(cent * 63, cent * 33).to_ascii(10),
             "----  ----".to_string()
         );
         assert_eq!(
-            ArcInterval::Bounded(cent * 59, cent * 29).to_ascii(10),
+            ArcInterval::new(cent * 59, cent * 29).to_ascii(10),
             "---  -----".to_string()
         );
 
         assert_eq!(
-            ArcInterval::Bounded(cent * 99, cent * 0).to_ascii(10),
+            ArcInterval::new(cent * 99, cent * 0).to_ascii(10),
             "-        -".to_string()
         );
     }

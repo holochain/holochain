@@ -16,7 +16,7 @@ pub fn parse_dnas(mut dnas: Vec<PathBuf>) -> anyhow::Result<Vec<PathBuf>> {
     }
     for dna in dnas.iter_mut() {
         if dna.is_dir() {
-            let file_path = search_for_dna(&dna)?;
+            let file_path = search_for_dna(dna)?;
             *dna = file_path;
         }
         ensure!(

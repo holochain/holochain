@@ -135,27 +135,6 @@ impl GetLinksInput {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Clone, Debug)]
-pub struct Links(Vec<Link>);
-
-impl From<Vec<Link>> for Links {
-    fn from(v: Vec<Link>) -> Self {
-        Self(v)
-    }
-}
-
-impl From<Links> for Vec<Link> {
-    fn from(links: Links) -> Self {
-        links.0
-    }
-}
-
-impl Links {
-    pub fn into_inner(self) -> Vec<Link> {
-        self.into()
-    }
-}
-
 type CreateLinkWithDeleteLinks = Vec<(SignedHeaderHashed, Vec<SignedHeaderHashed>)>;
 #[derive(Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// CreateLinks with and DeleteLinks on them

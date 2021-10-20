@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use holochain_keystore::KeystoreSender;
+use holochain_keystore::MetaLairClient;
 use holochain_sqlite::prelude::*;
 use shrinkwraprs::Shrinkwrap;
 
@@ -12,17 +12,17 @@ pub use holochain_sqlite::conn::DbSyncLevel;
 pub struct EnvRead {
     #[shrinkwrap(main_field)]
     db: DbRead,
-    keystore: KeystoreSender,
+    keystore: MetaLairClient,
 }
 
 impl EnvRead {
     /// Accessor
-    pub fn keystore(&self) -> &KeystoreSender {
+    pub fn keystore(&self) -> &MetaLairClient {
         &self.keystore
     }
 
     /// Construct from components
-    pub fn from_parts(db: DbRead, keystore: KeystoreSender) -> Self {
+    pub fn from_parts(db: DbRead, keystore: MetaLairClient) -> Self {
         Self { db, keystore }
     }
 }
@@ -32,12 +32,12 @@ impl EnvRead {
 pub struct EnvWrite {
     #[shrinkwrap(main_field)]
     db: DbWrite,
-    keystore: KeystoreSender,
+    keystore: MetaLairClient,
 }
 
 impl EnvWrite {
     /// Constructor
-    pub fn open(path: &Path, kind: DbKind, keystore: KeystoreSender) -> DatabaseResult<Self> {
+    pub fn open(path: &Path, kind: DbKind, keystore: MetaLairClient) -> DatabaseResult<Self> {
         Self::open_with_sync_level(path, kind, keystore, DbSyncLevel::default())
     }
 
@@ -46,7 +46,7 @@ impl EnvWrite {
     pub fn open_with_sync_level(
         path: &Path,
         kind: DbKind,
-        keystore: KeystoreSender,
+        keystore: MetaLairClient,
         sync_level: DbSyncLevel,
     ) -> DatabaseResult<Self> {
         Ok(Self {
@@ -59,7 +59,7 @@ impl EnvWrite {
     pub fn test(
         tmpdir: &tempdir::TempDir,
         kind: DbKind,
-        keystore: KeystoreSender,
+        keystore: MetaLairClient,
     ) -> DatabaseResult<Self> {
         Ok(Self {
             db: DbWrite::test(tmpdir, kind)?,
@@ -73,7 +73,7 @@ impl EnvWrite {
     }
 
     /// Accessor
-    pub fn keystore(&self) -> KeystoreSender {
+    pub fn keystore(&self) -> MetaLairClient {
         self.keystore.clone()
     }
 

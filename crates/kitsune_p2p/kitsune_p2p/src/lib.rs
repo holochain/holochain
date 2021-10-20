@@ -19,7 +19,8 @@ pub use config::*;
 mod spawn;
 pub use spawn::*;
 
-#[cfg(test)]
+#[allow(missing_docs)]
+#[cfg(any(test, feature = "test_utils"))]
 pub mod test_util;
 
 #[cfg(test)]

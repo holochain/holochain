@@ -759,9 +759,9 @@ macro_rules! entry_def_index {
 macro_rules! entry_type {
     ( $t:ty ) => {
         match $crate::prelude::entry_def_index!($t) {
-            Ok(id) => match $crate::prelude::zome_info() {
-                Ok(ZomeInfo { zome_id, .. }) => Ok($crate::prelude::EntryType::App(
-                    $crate::prelude::AppEntryType::new(id, zome_id, <$t>::entry_visibility()),
+            Ok(e_id) => match $crate::prelude::zome_info() {
+                Ok(ZomeInfo { id, .. }) => Ok($crate::prelude::EntryType::App(
+                    $crate::prelude::AppEntryType::new(e_id, id, <$t>::entry_visibility()),
                 )),
                 Err(e) => Err(e),
                 _ => unreachable!(),

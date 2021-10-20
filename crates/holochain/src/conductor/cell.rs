@@ -217,12 +217,12 @@ impl Cell {
     }
 
     fn dna_hash(&self) -> &DnaHash {
-        &self.id.dna_hash()
+        self.id.dna_hash()
     }
 
     #[allow(unused)]
     fn agent_pubkey(&self) -> &AgentPubKey {
-        &self.id.agent_pubkey()
+        self.id.agent_pubkey()
     }
 
     /// Accessor
@@ -493,6 +493,9 @@ impl Cell {
                 }
                 .instrument(debug_span!("cell_handle_validation_receipt_received"))
                 .await;
+                // We got a receipt so we must be connected to the network
+                // and should reset the publish back off loop to its minimum.
+                self.queue_triggers.publish_dht_ops.reset_back_off();
             }
 
             FetchOpData {

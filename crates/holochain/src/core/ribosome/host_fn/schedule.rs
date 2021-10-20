@@ -258,7 +258,7 @@ pub mod tests {
                 ()
             ).await;
 
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(150)).await;
         let q2: Vec<Element> = conductor
             .call(
                 &bobbo,
