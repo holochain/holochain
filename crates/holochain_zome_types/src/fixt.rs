@@ -174,7 +174,7 @@ fixturator!(
 
 fixturator!(
     ZomeInfo;
-    constructor fn new(String, DnaHash, ZomeName, ZomeId, SerializedBytes);
+    constructor fn new(ZomeName, ZomeId);
 );
 
 fixturator!(
@@ -638,6 +638,7 @@ fixturator!(
 );
 
 fixturator!(
+    with_vec 0 5;
     SignedHeaderHashed;
     constructor fn with_presigned(HeaderHashed, Signature);
 );

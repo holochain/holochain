@@ -23,12 +23,12 @@ impl SweetCell {
 
     /// Accessor for AgentPubKey
     pub fn agent_pubkey(&self) -> &AgentPubKey {
-        &self.cell_id.agent_pubkey()
+        self.cell_id.agent_pubkey()
     }
 
     /// Accessor for DnaHash
     pub fn dna_hash(&self) -> &DnaHash {
-        &self.cell_id.dna_hash()
+        self.cell_id.dna_hash()
     }
 
     /// Get a SweetZome with the given name
