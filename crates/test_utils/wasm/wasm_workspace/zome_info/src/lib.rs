@@ -18,6 +18,7 @@ fn call_info(_: ()) -> ExternResult<CallInfo> {
     hdk::prelude::call_info()
 }
 
+#[hdk_extern]
 fn dna_info(_: ()) -> ExternResult<DnaInfo> {
     hdk::prelude::dna_info()
 }
