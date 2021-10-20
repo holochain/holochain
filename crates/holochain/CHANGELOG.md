@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.0.111
+
 ## 0.0.110
 
 - Publish now runs on a loop if there are ops still needing receipts. [\#1024](https://github.com/holochain/holochain/pull/1024)
@@ -41,18 +43,21 @@ or:
 keystore:
   type: danger_test_keystore_legacy_deprecated
 ```
-- Bump legacy lair version to 0.0.8 fixing a crash when error message was too long [#1046](https://github.com/holochain/holochain/pull/1046)
 
-- Options to use new lair keystore [#1040](https://github.com/holochain/holochain/pull/1040)
+- Bump legacy lair version to 0.0.8 fixing a crash when error message was too long [\#1046](https://github.com/holochain/holochain/pull/1046)
 
-```yaml
+- Options to use new lair keystore [\#1040](https://github.com/holochain/holochain/pull/1040)
+
+<!-- end list -->
+
+``` yaml
 keystore:
   type: danger_test_keystore
 ```
 
 or
 
-```yaml
+``` yaml
 keystore:
   type: lair_server
   connection_url: "unix:///my/path/socket?k=Foo"
