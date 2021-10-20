@@ -134,6 +134,8 @@ impl SourceChain {
         Ok(self.scratch.apply(|scratch| scratch.elements().collect())?)
     }
 
+    /// Accessor for the chain head that will be used at flush time to check
+    /// the "as at" for ordering integrity etc.
     pub fn persisted_chain_head(&self) -> (HeaderHash, u32, Timestamp) {
         (
             self.persisted_head.clone(),
