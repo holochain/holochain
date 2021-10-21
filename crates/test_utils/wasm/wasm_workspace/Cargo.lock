@@ -308,7 +308,7 @@ checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
 
 [[package]]
 name = "hdk"
-version = "0.0.110"
+version = "0.0.111-dev.0"
 dependencies = [
  "hdk_derive",
  "holo_hash",
@@ -326,7 +326,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.0.12"
+version = "0.0.13-dev.0"
 dependencies = [
  "holochain_zome_types",
  "paste",
@@ -346,7 +346,7 @@ dependencies = [
 
 [[package]]
 name = "holo_hash"
-version = "0.0.9"
+version = "0.0.10-dev.0"
 dependencies = [
  "base64",
  "blake2b_simd",
@@ -389,7 +389,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.0.10"
+version = "0.0.11-dev.0"
 dependencies = [
  "hdk",
  "serde",
@@ -422,7 +422,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.0.12"
+version = "0.0.13-dev.0"
 dependencies = [
  "chrono",
  "fixt",
@@ -1219,14 +1219,6 @@ dependencies = [
  "holochain_test_wasm_common",
  "serde",
  "thiserror",
-]
-
-[[package]]
-name = "test_wasm_post_commit_fail"
-version = "0.0.1"
-dependencies = [
- "hdk",
- "serde",
 ]
 
 [[package]]

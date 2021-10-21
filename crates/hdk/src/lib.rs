@@ -153,13 +153,10 @@
 //!   - Close runs when an agent is deprecating an old source chain in favour of a new one
 //!   - All zomes in a DNA migrate at the same time
 //!   - Any failure fails the migration
-//! - `fn post_commit(headers: Vec<HeaderHash>) -> ExternResult<PostCommitCallbackResult>`:
-//!   - Allows the guest a final veto to entry commits or to perform side effects in response
+//! - `fn post_commit(headers: Vec<SignedHeaderHashed>)`:
 //!   - Executes after the wasm call that originated the commits so not bound by the original atomic transaction
-//!   - Guest is guaranteed that the commits will not be rolled back if Ok(PostCommitCallbackResult::Pass) is returned
 //!   - Input is all the header hashes that were committed
-//!   - Only the zome that originated the commits is called
-//!   - Any failure fails (rolls back) all commits
+//!   - The zome that originated the commits is called
 //! - `fn validate_create_link(create_link_data: ValidateCreateLinkData) -> ExternResult<ValidateLinkCallbackResult>`:
 //!   - Allows the guest to pass/fail/retry link creation validation
 //!   - Only the zome that created the link is called
