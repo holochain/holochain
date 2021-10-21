@@ -4,7 +4,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Always depend on `itertools` to make `cargo build --no-default-features` work [#1060](https://github.com/holochain/holochain/pull/1060)
+## 0.0.112
+
+- Always depend on `itertools` to make `cargo build --no-default-features` work [\#1060](https://github.com/holochain/holochain/pull/1060)
 
 ## 0.0.111
 
