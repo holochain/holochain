@@ -63,7 +63,7 @@ pub struct ConductorConfig {
     /// Example
     /// These `InstalledAppId`s would be set to zero length arcs
     /// `"###zero###-MyApp"` or `"MyApp:###zero###:OtherStuff"`
-    /// 
+    ///
     /// This defaults to `false`.
     pub zero_arc_workaround: bool,
 }
