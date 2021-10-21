@@ -30,7 +30,6 @@ use crate::core::ribosome::ZomesToInvoke;
 use crate::test_utils::fake_genesis;
 use ::fixt::prelude::*;
 pub use holo_hash::fixt::*;
-use holo_hash::HeaderHash;
 use holo_hash::WasmHash;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pCellFixturator;
@@ -199,31 +198,6 @@ fixturator!(
 //         Some(f)
 //     }
 // }
-
-fixturator!(
-    HeaderHashes,
-    vec![].into(),
-    {
-        let mut rng = rand::thread_rng();
-        let number_of_hashes = rng.gen_range(0, 5);
-
-        let mut hashes: Vec<HeaderHash> = vec![];
-        let mut header_hash_fixturator = HeaderHashFixturator::new(Unpredictable);
-        for _ in 0..number_of_hashes {
-            hashes.push(header_hash_fixturator.next().unwrap());
-        }
-        hashes.into()
-    },
-    {
-        let mut hashes: Vec<HeaderHash> = vec![];
-        let mut header_hash_fixturator =
-            HeaderHashFixturator::new_indexed(Predictable, get_fixt_index!());
-        for _ in 0..3 {
-            hashes.push(header_hash_fixturator.next().unwrap());
-        }
-        hashes.into()
-    }
-);
 
 fixturator!(
     MetaLairClient;
