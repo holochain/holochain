@@ -686,7 +686,7 @@ where
     Ok(ZomeCall {
         cell_id: cell_id.clone(),
         zome_name: zome.into(),
-        cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
+        cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: func.into(),
         payload: ExternIO::encode(payload)?,
         provenance: cell_id.agent_pubkey().clone(),
@@ -706,7 +706,7 @@ where
     Ok(ZomeCallInvocation {
         cell_id: cell_id.clone(),
         zome: zome.into(),
-        cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
+        cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: func.into(),
         payload: ExternIO::encode(payload)?,
         provenance: cell_id.agent_pubkey().clone(),

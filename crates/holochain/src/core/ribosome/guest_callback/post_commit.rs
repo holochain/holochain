@@ -62,6 +62,9 @@ impl Invocation for PostCommitInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(self.headers)
     }
+    fn cap_secret(&self) -> Option<CapSecret> {
+        None
+    }
 }
 
 impl TryFrom<PostCommitInvocation> for ExternIO {

@@ -100,7 +100,7 @@ pub struct ZomeCall {
     /// This can be `None` and still succeed in the case where the function
     /// in the zome being called has been given an Unrestricted status
     /// via a `CapGrant`. Otherwise, it will be necessary to provide a `CapSecret` for every call.
-    pub cap: Option<CapSecret>,
+    pub cap_secret: Option<CapSecret>,
     /// The provenance (source) of the call.
     ///
     /// NB: **This will go away** as soon as Holochain has a way of determining who

@@ -409,7 +409,7 @@ fixturator!(
 
 fixturator!(
     CallContext;
-    constructor fn new(Zome, HostContext);
+    constructor fn new(Zome, HostContext, CapSecret);
 );
 
 fixturator!(
@@ -417,7 +417,7 @@ fixturator!(
     curve Empty ZomeCallInvocation {
         cell_id: CellIdFixturator::new(Empty).next().unwrap(),
         zome: ZomeFixturator::new(Empty).next().unwrap(),
-        cap: Some(CapSecretFixturator::new(Empty).next().unwrap()),
+        cap_secret: Some(CapSecretFixturator::new(Empty).next().unwrap()),
         fn_name: FunctionNameFixturator::new(Empty).next().unwrap(),
         payload: ExternIoFixturator::new(Empty).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Empty).next().unwrap(),
@@ -425,7 +425,7 @@ fixturator!(
     curve Unpredictable ZomeCallInvocation {
         cell_id: CellIdFixturator::new(Unpredictable).next().unwrap(),
         zome: ZomeFixturator::new(Unpredictable).next().unwrap(),
-        cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
+        cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: FunctionNameFixturator::new(Unpredictable).next().unwrap(),
         payload: ExternIoFixturator::new(Unpredictable).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
@@ -437,7 +437,7 @@ fixturator!(
         zome: ZomeFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
-        cap: Some(CapSecretFixturator::new_indexed(Predictable, get_fixt_index!())
+        cap_secret: Some(CapSecretFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap()),
         fn_name: FunctionNameFixturator::new_indexed(Predictable, get_fixt_index!())
@@ -469,7 +469,7 @@ impl Iterator for ZomeCallInvocationFixturator<NamedInvocation> {
 
         // simulate a local transaction by setting the cap to empty and matching the provenance of
         // the call to the cell id
-        ret.cap = None;
+        ret.cap_secret = None;
         ret.provenance = ret.cell_id.agent_pubkey().clone();
 
         Some(ret)

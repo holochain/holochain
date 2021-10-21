@@ -174,11 +174,17 @@ impl HostFnCaller {
             network,
             signal_tx,
             call_zome_handle,
-            cell_id,
+            cell_id.clone(),
         );
         let ribosome = Arc::new(ribosome);
         let zome = ribosome.dna_def().get_zome(&zome_name).unwrap();
-        let call_context = Arc::new(CallContext::new(zome, host_access.into()));
+        let call_context = Arc::new(CallContext::new(
+            cell_id.agent_pubkey().clone(),
+            zome,
+            FunctionName::new("not_sure_what_should_be_here"),
+            host_access.into(),
+            None,
+        ));
         (env, ribosome, call_context, workspace_lock)
     }
 }

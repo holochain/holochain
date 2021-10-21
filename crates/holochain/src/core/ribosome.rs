@@ -57,21 +57,48 @@ use self::{
 
 #[derive(Clone)]
 pub struct CallContext {
+    pub(crate) provenance: AgentPubKey,
     pub(crate) zome: Zome,
+    pub(crate) function_name: FunctionName,
+    pub(crate) cap_secret: Option<CapSecret>,
     pub(crate) host_context: HostContext,
 }
 
 impl CallContext {
-    pub fn new(zome: Zome, host_context: HostContext) -> Self {
-        Self { zome, host_context }
+    pub fn new(
+        provenance: AgentPubKey,
+        zome: Zome,
+        function_name: FunctionName,
+        host_context: HostContext,
+        cap_secret: Option<CapSecret>,
+    ) -> Self {
+        Self {
+            provenance,
+            zome,
+            function_name,
+            host_context,
+            cap_secret,
+        }
     }
 
-    pub fn zome(&self) -> Zome {
-        self.zome.clone()
+    pub fn provenance(&self) -> &AgentPubKey {
+        &self.provenance
+    }
+
+    pub fn zome(&self) -> &Zome {
+        &self.zome
+    }
+
+    pub fn function_name(&self) -> &FunctionName {
+        &self.function_name
     }
 
     pub fn host_context(&self) -> HostContext {
         self.host_context.clone()
+    }
+
+    pub fn cap_secret(&self) -> Option<CapSecret> {
+        self.cap_secret.clone()
     }
 }
 
@@ -255,6 +282,13 @@ pub trait Invocation: Clone {
     /// this is intentionally NOT a reference to self because ExternIO may be huge we want to be
     /// careful about cloning invocations
     fn host_input(self) -> Result<ExternIO, SerializedBytesError>;
+    /// The `AgentPubKey` that authenticates this invocation.
+    /// If an invocation is a callback or otherwise originates "locally" then
+    fn provenance(&self) -> AgentPubKey;
+    /// The `CapSecret` for the `CapGrant` that authorizes this invocation.
+    /// If an invocation is a callback or otherwise originates "locally" then
+    /// `None` with a provenance of the author should be used.
+    fn cap_secret(&self) -> Option<CapSecret>;
 }
 
 impl ZomeCallInvocation {
@@ -266,7 +300,7 @@ impl ZomeCallInvocation {
     pub fn is_authorized<'a>(&self, host_access: &ZomeCallHostAccess) -> RibosomeResult<bool> {
         let check_function = (self.zome.zome_name().clone(), self.fn_name.clone());
         let check_agent = self.provenance.clone();
-        let check_secret = self.cap;
+        let check_secret = self.cap_secret;
 
         let maybe_grant: Option<CapGrant> = host_access.workspace.source_chain().valid_cap_grant(
             &check_function,
@@ -284,6 +318,7 @@ mockall::mock! {
         fn zomes(&self) -> ZomesToInvoke;
         fn fn_components(&self) -> FnComponents;
         fn host_input(self) -> Result<ExternIO, SerializedBytesError>;
+        fn cap_secret(&self) -> Option<CapSecret>;
     }
     trait Clone {
         fn clone(&self) -> Self;
@@ -302,7 +337,7 @@ pub struct ZomeCallInvocation {
     /// This can be `None` and still succeed in the case where the function
     /// in the zome being called has been given an Unrestricted status
     /// via a `CapGrant`. Otherwise, it will be necessary to provide a `CapSecret` for every call.
-    pub cap: Option<CapSecret>,
+    pub cap_secret: Option<CapSecret>,
     /// The name of the Zome function to call
     pub fn_name: FunctionName,
     /// The serialized data to pass as an argument to the Zome call
@@ -322,6 +357,9 @@ impl Invocation for ZomeCallInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         Ok(self.payload)
     }
+    fn cap_secret(&self) -> Option<CapSecret> {
+        self.cap_secret.clone()
+    }
 }
 
 impl ZomeCallInvocation {
@@ -331,7 +369,7 @@ impl ZomeCallInvocation {
             cell_id,
             zome_name,
             fn_name,
-            cap,
+            cap_secret,
             payload,
             provenance,
         } = call;
@@ -341,7 +379,7 @@ impl ZomeCallInvocation {
         Self {
             cell_id,
             zome,
-            cap,
+            cap_secret,
             fn_name,
             payload,
             provenance,
@@ -355,7 +393,7 @@ impl From<ZomeCallInvocation> for ZomeCall {
             cell_id,
             zome,
             fn_name,
-            cap,
+            cap_secret,
             payload,
             provenance,
         } = inv;
@@ -363,7 +401,7 @@ impl From<ZomeCallInvocation> for ZomeCall {
             cell_id,
             zome_name: zome.zome_name().clone(),
             fn_name,
-            cap,
+            cap_secret,
             payload,
             provenance,
         }

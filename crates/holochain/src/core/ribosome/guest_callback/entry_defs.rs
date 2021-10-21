@@ -48,6 +48,9 @@ impl Invocation for EntryDefsInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(())
     }
+    fn cap_secret(&self) -> Option<CapSecret> {
+        None
+    }
 }
 
 /// the aggregate result of _all_ entry defs callbacks
