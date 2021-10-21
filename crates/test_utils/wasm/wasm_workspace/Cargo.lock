@@ -1222,14 +1222,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "test_wasm_post_commit_fail"
-version = "0.0.1"
-dependencies = [
- "hdk",
- "serde",
-]
-
-[[package]]
 name = "test_wasm_post_commit_success"
 version = "0.0.1"
 dependencies = [
