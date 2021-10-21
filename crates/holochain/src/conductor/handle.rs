@@ -67,6 +67,8 @@ use holochain_conductor_api::conductor::EnvironmentRootPath;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::JsonDump;
+// use holochain_keystore::MetaLairClient;
+use holochain_p2p::dht_arc::DhtArc;
 use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_p2p::DnaHashExt;
@@ -1295,16 +1297,36 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
         // Join the network but ignore errors because the
         // space retries joining all cells every 5 minutes.
 
-        let pending_cells: Vec<(CellId, HolochainP2pCell)> = self
-            .conductor
-            .mark_pending_cells_as_joining()
-            .into_iter()
-            .map(|(id, cell)| (id, cell.holochain_p2p_cell().clone()))
-            .collect();
+        let joining_cells = self.conductor.mark_pending_cells_as_joining();
+        let mut cells = Vec::with_capacity(joining_cells.len());
 
-        let tasks = pending_cells.into_iter()
-            .map(|(cell_id, network)| async move {
-                match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join()).await {
+        // TODO: This is just a temporary workaround and will be removed when we
+        // have agent key prefixes.
+        for (id, cell) in joining_cells {
+            let starting_arc = if self.conductor.zero_arc_workaround {
+                let apps = match self.conductor.list_running_apps_for_cell_id(&id).await {
+                    Ok(apps) => apps,
+                    Err(e) => {
+                        error!(msg = "Failed to list running apps for cell", ?id, ?e);
+                        continue;
+                    }
+                };
+                if apps.iter().any(|app| app.contains("###zero###")) {
+                    Some(DhtArc::empty(id.agent_pubkey().get_loc()))
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+            cells.push((id, cell, starting_arc));
+        }
+
+        let tasks = cells
+            .into_iter()
+            .map(|(id, cell, arc)| (id, cell.holochain_p2p_cell().clone(), arc))
+            .map(|(cell_id, network, arc)| async move {
+                match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join(arc)).await {
                     Ok(Err(e)) => {
                         tracing::info!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");
                         Err(cell_id)

@@ -392,7 +392,7 @@ async fn handle_srv_events(
                             } => {
                                 exec(msg_id.clone(), async {
                                     kdirect.inner.share_mut(|i, _| {
-                                        Ok(i.p2p.join(root.to_kitsune_space(), agent.to_kitsune_agent()))
+                                        Ok(i.p2p.join(root.to_kitsune_space(), agent.to_kitsune_agent(), None))
                                     }).map_err(KdError::other)?.await.map_err(KdError::other)?;
                                     Ok(KdApi::AppJoinRes {
                                         msg_id,

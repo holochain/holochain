@@ -4,6 +4,7 @@
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
+use kitsune_p2p::dht_arc::DhtArc;
 use std::sync::Arc;
 
 mod types;
@@ -38,7 +39,7 @@ pub trait HolochainP2pCellT {
     }
 
     /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
-    async fn join(&self) -> actor::HolochainP2pResult<()>;
+    async fn join(&self, starting_arc: Option<DhtArc>) -> actor::HolochainP2pResult<()>;
 
     /// If a cell is disabled, we'll need to \"leave\" the network module as well.
     async fn leave(&self) -> actor::HolochainP2pResult<()>;
@@ -147,9 +148,13 @@ impl HolochainP2pCellT for HolochainP2pCell {
     }
 
     /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
-    async fn join(&self) -> actor::HolochainP2pResult<()> {
+    async fn join(&self, starting_arc: Option<DhtArc>) -> actor::HolochainP2pResult<()> {
         self.sender
-            .join((*self.dna_hash).clone(), (*self.from_agent).clone())
+            .join(
+                (*self.dna_hash).clone(),
+                (*self.from_agent).clone(),
+                starting_arc,
+            )
             .await
     }
 

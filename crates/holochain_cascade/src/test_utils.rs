@@ -7,6 +7,7 @@ use holochain_p2p::actor;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_p2p::HolochainP2pError;
 use holochain_p2p::MockHolochainP2pCellT;
+use holochain_p2p::dht_arc::DhtArc;
 use holochain_sqlite::db::WriteManager;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_state::mutations::insert_op;
@@ -169,7 +170,7 @@ impl HolochainP2pCellT for PassThroughNetwork {
         todo!()
     }
 
-    async fn join(&self) -> actor::HolochainP2pResult<()> {
+    async fn join(&self, _: Option<DhtArc>) -> actor::HolochainP2pResult<()> {
         todo!()
     }
 
@@ -334,7 +335,7 @@ impl HolochainP2pCellT for MockNetwork {
         todo!()
     }
 
-    async fn join(&self) -> actor::HolochainP2pResult<()> {
+    async fn join(&self, _: Option<DhtArc>) -> actor::HolochainP2pResult<()> {
         todo!()
     }
 

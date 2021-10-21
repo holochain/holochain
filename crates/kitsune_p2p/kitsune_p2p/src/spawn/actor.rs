@@ -13,6 +13,7 @@ use kitsune_p2p_proxy::tx2::*;
 use kitsune_p2p_proxy::ProxyUrl;
 use kitsune_p2p_transport_quic::tx2::*;
 use kitsune_p2p_types::async_lazy::AsyncLazy;
+use kitsune_p2p_types::dht_arc::DhtArc;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_pool_promote::*;
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
@@ -572,6 +573,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         &mut self,
         space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
+        starting_arc: Option<DhtArc>,
     ) -> KitsuneP2pHandlerResult<()> {
         let internal_sender = self.internal_sender.clone();
         let space2 = space.clone();
@@ -603,7 +605,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         let space_sender = space_sender.get();
         Ok(async move {
             let (space_sender, _) = space_sender.await;
-            space_sender.join(space, agent).await
+            space_sender.join(space, agent, starting_arc).await
         }
         .boxed()
         .into())

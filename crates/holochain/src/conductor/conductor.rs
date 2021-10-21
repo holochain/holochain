@@ -167,6 +167,14 @@ where
 
     /// Database sync level
     db_sync_level: DbSyncLevel,
+
+    // post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
+
+    /// Temporary workaround for setting arc lens to zero.
+    /// If this flag is set, then any [`InstalledAppId`] that contain
+    /// the string `###zero###` will set all the cells to a zero
+    /// length arc.
+    pub(super) zero_arc_workaround: bool,
 }
 
 impl Conductor {
@@ -1187,6 +1195,8 @@ where
         root_env_dir: EnvironmentRootPath,
         holochain_p2p: holochain_p2p::HolochainP2pRef,
         db_sync_level: DbSyncLevel,
+        // post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
+        zero_arc_workaround: bool,
     ) -> ConductorResult<Self> {
         Ok(Self {
             conductor_env: env,
@@ -1202,6 +1212,8 @@ where
             root_env_dir,
             holochain_p2p,
             db_sync_level,
+            // post_commit,
+            zero_arc_workaround,
         })
     }
 
@@ -1417,6 +1429,8 @@ mod builder {
                 env_path,
                 holochain_p2p,
                 config.db_sync_level,
+                // post_commit_sender,
+                config.zero_arc_workaround,
             )
             .await?;
 
@@ -1527,6 +1541,8 @@ mod builder {
                 self.config.environment_path.clone(),
                 holochain_p2p,
                 self.config.db_sync_level,
+                // post_commit_sender,
+                self.config.zero_arc_workaround,
             )
             .await?;
 
