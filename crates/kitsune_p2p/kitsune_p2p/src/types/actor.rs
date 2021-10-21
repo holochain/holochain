@@ -71,6 +71,7 @@ type KAgents = Vec<Arc<super::KitsuneAgent>>;
 type KBasis = Arc<super::KitsuneBasis>;
 type Payload = Vec<u8>;
 type OptU64 = Option<u64>;
+type MaybeArc = Option<kitsune_p2p_types::dht_arc::DhtArc>;
 
 ghost_actor::ghost_chan! {
     /// The KitsuneP2pSender allows async remote-control of the KitsuneP2p actor.
@@ -79,7 +80,7 @@ ghost_actor::ghost_chan! {
         fn list_transport_bindings() -> Vec<Url2>;
 
         /// Announce a space/agent pair on this network.
-        fn join(space: KSpace, agent: KAgent) -> ();
+        fn join(space: KSpace, agent: KAgent, starting_arc: MaybeArc) -> ();
 
         /// Withdraw this space/agent pair from this network.
         fn leave(space: KSpace, agent: KAgent) -> ();

@@ -486,10 +486,14 @@ impl KitsuneP2pHandler for Space {
         &mut self,
         space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
+        starting_arc: Option<DhtArc>,
     ) -> KitsuneP2pHandlerResult<()> {
         self.local_joined_agents.insert(agent.clone());
         for module in self.gossip_mod.values() {
             module.local_agent_join(agent.clone());
+        }
+        if let Some(arc) = starting_arc {
+            self.agent_arcs.insert(agent.clone(), arc);
         }
         let fut = self.i_s.update_single_agent_info(agent);
         let evt_sender = self.evt_sender.clone();
@@ -1123,29 +1127,11 @@ impl Space {
 
     /// Get the existing agent storage arc or create a new one.
     fn get_agent_arc(&self, agent: &Arc<KitsuneAgent>) -> DhtArc {
-        if self
-            .config
-            .tuning_params
-            .gossip_single_storage_arc_per_space
-        {
-            let arc = self.agent_arcs.get(agent).cloned();
-            match arc {
-                Some(arc) => arc,
-                None => {
-                    if self.agent_arcs.is_empty() {
-                        DhtArc::full(agent.get_loc())
-                    } else {
-                        DhtArc::empty(agent.get_loc())
-                    }
-                }
-            }
-        } else {
-            // TODO: We are simply setting the initial arc to full.
-            // In the future we may want to do something more intelligent.
-            self.agent_arcs
-                .get(agent)
-                .cloned()
-                .unwrap_or_else(|| DhtArc::full(agent.get_loc()))
-        }
+        // TODO: We are simply setting the initial arc to full.
+        // In the future we may want to do something more intelligent.
+        self.agent_arcs
+            .get(agent)
+            .cloned()
+            .unwrap_or_else(|| DhtArc::full(agent.get_loc()))
     }
 }

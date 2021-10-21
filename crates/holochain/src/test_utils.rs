@@ -231,7 +231,7 @@ where
     let mut key_fixt = AgentPubKeyFixturator::new(Predictable);
     let agent_key = agent_key.unwrap_or_else(|| key_fixt.next().unwrap());
     let cell_network = network.to_cell(dna.clone(), agent_key.clone());
-    network.join(dna.clone(), agent_key).await.unwrap();
+    network.join(dna.clone(), agent_key, None).await.unwrap();
     TestNetwork::new(network, respond_task, cell_network)
 }
 

@@ -4,6 +4,7 @@ use crate::event::*;
 use crate::*;
 
 use futures::future::FutureExt;
+use kitsune_p2p::dht_arc::DhtArc;
 use kitsune_p2p::event::full_time_window;
 use kitsune_p2p::event::MetricDatum;
 use kitsune_p2p::event::MetricKind;
@@ -977,14 +978,17 @@ impl HolochainP2pHandler for HolochainP2pActor {
         &mut self,
         dna_hash: DnaHash,
         agent_pub_key: AgentPubKey,
+        starting_arc: Option<DhtArc>,
     ) -> HolochainP2pHandlerResult<()> {
         let space = dna_hash.into_kitsune();
         let agent = agent_pub_key.into_kitsune();
 
         let kitsune_p2p = self.kitsune_p2p.clone();
-        Ok(async move { Ok(kitsune_p2p.join(space, agent).await?) }
-            .boxed()
-            .into())
+        Ok(
+            async move { Ok(kitsune_p2p.join(space, agent, starting_arc).await?) }
+                .boxed()
+                .into(),
+        )
     }
 
     #[tracing::instrument(skip(self), level = "trace")]

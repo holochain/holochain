@@ -56,6 +56,16 @@ pub struct ConductorConfig {
     // /// Which signals to emit
     // TODO: it's an open question whether signal config is stateful or not, i.e. whether it belongs here.
     // pub signals: SignalConfig,
+    #[serde(default)]
+    /// Set apps with [`InstalledAppId`] that contain the string `###zero###` to zero arc length.
+    /// This is a temporary workaround will be removed in a future release.
+    /// Do not use this unless you know what you're doing.
+    /// Example
+    /// These `InstalledAppId`s would be set to zero length arcs
+    /// `"###zero###-MyApp"` or `"MyApp:###zero###:OtherStuff"`
+    /// 
+    /// This defaults to `false`.
+    pub zero_arc_workaround: bool,
 }
 
 /// helper fnction function to load a `Config` from a yaml string.
@@ -122,6 +132,7 @@ pub mod tests {
                 keystore: KeystoreConfig::DangerTestKeystoreLegacyDeprecated,
                 admin_interfaces: None,
                 db_sync_level: DbSyncLevel::default(),
+                zero_arc_workaround: false,
             }
         );
     }
@@ -171,6 +182,8 @@ pub mod tests {
       network_type: quic_bootstrap
 
     db_sync_level: Off
+
+    zero_arc_token: true 
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
         use holochain_p2p::kitsune_p2p::*;
@@ -214,6 +227,7 @@ pub mod tests {
                 }]),
                 network: Some(network_config),
                 db_sync_level: DbSyncLevel::Off,
+                zero_arc_workaround: true,
             }
         );
     }
