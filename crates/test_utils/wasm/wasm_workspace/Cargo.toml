@@ -24,7 +24,6 @@ members = [
     "migrate_agent_pass",
     "multiple_calls",
     "must_get",
-    "post_commit_fail",
     "post_commit_success",
     "post_commit_volley",
     "query",
