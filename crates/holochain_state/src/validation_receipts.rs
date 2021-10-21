@@ -1,5 +1,6 @@
 //! Module for items related to aggregating validation_receipts
 
+use futures::StreamExt;
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holochain_keystore::AgentPubKeyExt;
@@ -39,7 +40,7 @@ pub struct ValidationReceipt {
     pub validation_status: ValidationStatus,
 
     /// the remote validator which is signing this receipt.
-    pub validator: AgentPubKey,
+    pub validators: Vec<AgentPubKey>,
 
     /// Time when the op was integrated
     pub when_integrated: Timestamp,
@@ -51,10 +52,26 @@ impl ValidationReceipt {
         self,
         keystore: &MetaLairClient,
     ) -> holochain_keystore::LairResult<SignedValidationReceipt> {
-        let signature = self.validator.sign(keystore, self.clone()).await?;
+        use futures::stream::TryStreamExt;
+        let this = self.clone();
+        let futures = self
+            .validators
+            .iter()
+            .map(|validator| {
+                let this = this.clone();
+                let validator = validator.clone();
+                let keystore = keystore.clone();
+                async move { validator.sign(&keystore, this).await }
+            })
+            .collect::<Vec<_>>();
+        let signatures = futures::stream::iter(futures)
+            .buffer_unordered(10)
+            .try_collect()
+            .await?;
+        // .sign(keystore, self.clone()).await?;
         Ok(SignedValidationReceipt {
             receipt: self,
-            validator_signature: signature,
+            validators_signatures: signatures,
         })
     }
 }
@@ -77,7 +94,7 @@ pub struct SignedValidationReceipt {
     pub receipt: ValidationReceipt,
 
     /// the signature of the remote validator.
-    pub validator_signature: Signature,
+    pub validators_signatures: Vec<Signature>,
 }
 
 pub fn list_receipts(
@@ -137,7 +154,7 @@ mod tests {
         let receipt = ValidationReceipt {
             dht_op_hash: dht_op_hash.clone(),
             validation_status: ValidationStatus::Valid,
-            validator: agent,
+            validators: vec![agent],
             when_integrated: Timestamp::now(),
         };
         receipt.sign(keystore).await.unwrap()
@@ -147,7 +164,7 @@ mod tests {
     async fn test_validation_receipts_db_populate_and_list() -> StateMutationResult<()> {
         observability::test_run().ok();
 
-        let test_env = crate::test_utils::test_cell_env();
+        let test_env = crate::test_utils::test_authored_env();
         let env = test_env.env();
         let keystore = crate::test_utils::test_keystore();
 

@@ -32,7 +32,7 @@ pub fn get_link_details<'a>(
                             tag: tag_prefix,
                         };
                         Cascade::from_workspace_network(
-                            call_context.host_context.workspace(),
+                            &call_context.host_context.workspace(),
                             call_context.host_context.network().to_owned(),
                         ).get_link_details(key, GetLinksOptions::default()).await
                     }

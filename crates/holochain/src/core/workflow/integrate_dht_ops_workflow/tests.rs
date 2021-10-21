@@ -155,7 +155,7 @@ enum Db {
 impl Db {
     /// Checks that the database is in a state
     #[instrument(skip(expects, env))]
-    async fn check(expects: Vec<Self>, env: EnvWrite, here: String) {
+    async fn check(expects: Vec<Self>, env: DbWrite, here: String) {
         fresh_reader_test(env, |txn| {
             // print_stmts_test(env, |txn| {
             for expect in expects {
@@ -426,7 +426,7 @@ impl Db {
 
     // Sets the database to a certain state
     #[instrument(skip(pre_state, env))]
-    async fn set<'env>(pre_state: Vec<Self>, env: EnvWrite) {
+    async fn set<'env>(pre_state: Vec<Self>, env: DbWrite) {
         env.conn()
             .unwrap()
             .with_commit_sync::<WorkspaceError, _, _>(|txn| {
@@ -465,7 +465,7 @@ impl Db {
     }
 }
 
-async fn call_workflow<'env>(env: EnvWrite) {
+async fn call_workflow<'env>(env: DbWrite) {
     let (qt, _rx) = TriggerSender::new();
     let test_network = test_network(None, None).await;
     let holochain_p2p_cell = test_network.cell_network();
@@ -475,7 +475,7 @@ async fn call_workflow<'env>(env: EnvWrite) {
 }
 
 // Need to clear the data from the previous test
-fn clear_dbs(env: EnvWrite) {
+fn clear_dbs(env: DbWrite) {
     env.conn()
         .unwrap()
         .with_commit_sync(|txn| {
@@ -673,7 +673,7 @@ fn register_delete_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static
 #[tokio::test(flavor = "multi_thread")]
 async fn test_ops_state() {
     observability::test_run().ok();
-    let test_env = test_cell_env();
+    let test_env = test_authored_env();
     let env = test_env.env();
 
     let tests = [
@@ -703,7 +703,7 @@ async fn test_ops_state() {
 #[cfg(todo_redo_old_tests)]
 async fn commit_entry<'env>(
     pre_state: Vec<Db>,
-    env: EnvWrite,
+    env: DbWrite,
     zome_name: ZomeName,
 ) -> (EntryHash, HeaderHash) {
     let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
@@ -784,7 +784,7 @@ async fn commit_entry<'env>(
 }
 
 #[cfg(todo_redo_old_tests)]
-async fn get_entry(env: EnvWrite, entry_hash: EntryHash) -> Option<Entry> {
+async fn get_entry(env: DbWrite, entry_hash: EntryHash) -> Option<Entry> {
     let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
@@ -809,7 +809,7 @@ async fn get_entry(env: EnvWrite, entry_hash: EntryHash) -> Option<Entry> {
 
 #[cfg(todo_redo_old_tests)]
 async fn create_link(
-    env: EnvWrite,
+    env: DbWrite,
     base_address: EntryHash,
     target_address: EntryHash,
     zome_name: ZomeName,
@@ -865,7 +865,7 @@ async fn create_link(
 
 #[cfg(todo_redo_old_tests)]
 async fn get_links(
-    env: EnvWrite,
+    env: DbWrite,
     base_address: EntryHash,
     zome_name: ZomeName,
     link_tag: LinkTag,

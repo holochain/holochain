@@ -7,8 +7,8 @@ use error::SysValidationError;
 
 use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
+use holochain_state::prelude::test_authored_env;
 use holochain_state::prelude::test_cache_env;
-use holochain_state::prelude::test_cell_env;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::Header;
 use matches::assert_matches;
@@ -58,9 +58,9 @@ async fn check_previous_header() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn check_valid_if_dna_test() {
-    let tmp = test_cell_env();
+    let tmp = test_authored_env();
     let tmp_cache = test_cache_env();
-    let env: EnvRead = tmp.env().into();
+    let env: DbReadOnly = tmp.env().into();
     // Test data
     let _activity_return = vec![fixt!(HeaderHash)];
 

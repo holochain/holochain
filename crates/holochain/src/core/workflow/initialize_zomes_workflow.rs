@@ -1,38 +1,37 @@
 use super::error::WorkflowResult;
-use crate::conductor::api::CellConductorApiT;
+use crate::conductor::ConductorHandle;
 use crate::core::ribosome::guest_callback::init::InitHostAccess;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::RibosomeT;
 use derive_more::Constructor;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pDna;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
+use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_types::prelude::*;
 use holochain_zome_types::header::builder;
 use tracing::*;
 
-#[derive(Constructor, Debug)]
-pub struct InitializeZomesWorkflowArgs<Ribosome, C>
+#[derive(Constructor)]
+pub struct InitializeZomesWorkflowArgs<Ribosome>
 where
     Ribosome: RibosomeT + Send + 'static,
-    C: CellConductorApiT,
 {
     pub dna_def: DnaDef,
     pub ribosome: Ribosome,
-    pub conductor_api: C,
+    pub conductor_handle: ConductorHandle,
 }
 
 #[instrument(skip(network, keystore, workspace, args))]
-pub async fn initialize_zomes_workflow<Ribosome, C>(
-    workspace: HostFnWorkspace,
-    network: HolochainP2pCell,
+pub async fn initialize_zomes_workflow<Ribosome>(
+    workspace: SourceChainWorkspace,
+    network: HolochainP2pDna,
     keystore: MetaLairClient,
-    args: InitializeZomesWorkflowArgs<Ribosome, C>,
+    args: InitializeZomesWorkflowArgs<Ribosome>,
 ) -> WorkflowResult<InitResult>
 where
     Ribosome: RibosomeT + Send + 'static,
-    C: CellConductorApiT,
 {
     let result =
         initialize_zomes_workflow_inner(workspace.clone(), network.clone(), keystore, args).await?;
@@ -41,29 +40,28 @@ where
 
     // only commit if the result was successful
     if result == InitResult::Pass {
-        workspace.flush(&network).await?;
+        HostFnWorkspace::from(workspace).flush(&network).await?;
     }
     Ok(result)
 }
 
-async fn initialize_zomes_workflow_inner<Ribosome, C>(
-    workspace: HostFnWorkspace,
-    network: HolochainP2pCell,
+async fn initialize_zomes_workflow_inner<Ribosome>(
+    workspace: SourceChainWorkspace,
+    network: HolochainP2pDna,
     keystore: MetaLairClient,
-    args: InitializeZomesWorkflowArgs<Ribosome, C>,
+    args: InitializeZomesWorkflowArgs<Ribosome>,
 ) -> WorkflowResult<InitResult>
 where
     Ribosome: RibosomeT + Send + 'static,
-    C: CellConductorApiT,
 {
     let InitializeZomesWorkflowArgs {
         dna_def,
         ribosome,
-        conductor_api,
+        conductor_handle,
     } = args;
     // Call the init callback
     let result = {
-        let host_access = InitHostAccess::new(workspace.clone(), keystore, network.clone());
+        let host_access = InitHostAccess::new(workspace.clone().into(), keystore, network.clone());
         let invocation = InitInvocation { dna_def };
         ribosome.run_init(host_access, invocation)?
     };
@@ -84,7 +82,7 @@ where
     .await??;
 
     // TODO: Validate scratch items
-    super::inline_validation(workspace, network, conductor_api, None, ribosome).await?;
+    super::inline_validation(workspace, network, conductor_handle, None, ribosome).await?;
 
     Ok(result)
 }
@@ -104,9 +102,9 @@ pub mod tests {
     use ::fixt::prelude::*;
     use fixt::Unpredictable;
     use holo_hash::DnaHash;
-    use holochain_p2p::HolochainP2pCellFixturator;
+    use holochain_p2p::HolochainP2pDnaFixturator;
+    use holochain_state::prelude::test_authored_env;
     use holochain_state::prelude::test_cache_env;
-    use holochain_state::prelude::test_cell_env;
     use holochain_state::prelude::SourceChain;
     use holochain_types::prelude::DnaDefHashed;
     use holochain_wasm_test_utils::TestWasm;
@@ -123,7 +121,7 @@ pub mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn adds_init_marker() {
-        let test_env = test_cell_env();
+        let test_env = test_authored_env();
         let test_cache = test_cache_env();
         let env = test_env.env();
         let author = fake_agent_pubkey_1();
@@ -145,15 +143,14 @@ pub mod tests {
         ribosome.expect_dna_def().return_const(dna_def_hashed);
 
         let cell_id = CellId::new(dna_hash, fixt!(AgentPubKey));
-        let conductor_api = Arc::new(MockConductorHandleT::new());
-        let conductor_api = CellConductorApi::new(conductor_api, cell_id);
+        let conductor_handle = Arc::new(MockConductorHandleT::new());
         let args = InitializeZomesWorkflowArgs {
             ribosome,
             dna_def,
-            conductor_api,
+            conductor_handle,
         };
         let keystore = fixt!(MetaLairClient);
-        let network = fixt!(HolochainP2pCell);
+        let network = fixt!(HolochainP2pDna);
 
         initialize_zomes_workflow_inner(workspace.clone(), network, keystore, args)
             .await

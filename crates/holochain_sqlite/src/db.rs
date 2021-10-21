@@ -7,7 +7,6 @@ use crate::{
 use derive_more::Into;
 use futures::Future;
 use holo_hash::DnaHash;
-use holochain_zome_types::cell::CellId;
 use kitsune_p2p::KitsuneSpace;
 use parking_lot::Mutex;
 use rusqlite::*;
@@ -26,29 +25,100 @@ pub use p2p_agent_store::*;
 mod p2p_metrics;
 pub use p2p_metrics::*;
 
+#[async_trait::async_trait]
+pub trait ReadAccess<Kind: DbKindT>: Clone + Into<DbReadOnly<Kind>> {
+    async fn async_reader<E, R, F>(&self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError> + Send + 'static,
+        F: FnOnce(Transaction) -> Result<R, E> + Send + 'static,
+        R: Send + 'static;
+
+    fn sync_reader<E, R, F>(&self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError>,
+        F: FnOnce(Transaction) -> Result<R, E>;
+}
+#[async_trait::async_trait]
+pub trait WriteAccess<Kind: DbKindT>: ReadAccess<Kind> {
+    async fn async_commit<E, R, F>(&self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError> + Send + 'static,
+        F: FnOnce(&mut Transaction) -> Result<R, E> + Send + 'static,
+        R: Send + 'static;
+}
+
+#[async_trait::async_trait]
+impl<Kind: DbKindT> WriteAccess<Kind> for DbWrite<Kind> {
+    async fn async_commit<E, R, F>(&self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError> + Send + 'static,
+        F: FnOnce(&mut Transaction) -> Result<R, E> + Send + 'static,
+        R: Send + 'static,
+    {
+        DbWrite::async_commit(self, f).await
+    }
+}
+
+#[async_trait::async_trait]
+impl<Kind: DbKindT> ReadAccess<Kind> for DbWrite<Kind> {
+    async fn async_reader<E, R, F>(&self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError> + Send + 'static,
+        F: FnOnce(Transaction) -> Result<R, E> + Send + 'static,
+        R: Send + 'static,
+    {
+        let db: &DbReadOnly<Kind> = self.as_ref();
+        DbReadOnly::async_reader(db, f).await
+    }
+
+    fn sync_reader<E, R, F>(&self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError>,
+        F: FnOnce(Transaction) -> Result<R, E>,
+    {
+        let db: &DbReadOnly<Kind> = self.as_ref();
+        db.sync_reader(f)
+    }
+}
+
+#[async_trait::async_trait]
+impl<Kind: DbKindT> ReadAccess<Kind> for DbReadOnly<Kind> {
+    async fn async_reader<E, R, F>(&self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError> + Send + 'static,
+        F: FnOnce(Transaction) -> Result<R, E> + Send + 'static,
+        R: Send + 'static,
+    {
+        DbReadOnly::async_reader(self, f).await
+    }
+
+    fn sync_reader<E, R, F>(&self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError>,
+        F: FnOnce(Transaction) -> Result<R, E>,
+    {
+        self.conn()?.with_reader(f)
+    }
+}
+
 /// A read-only version of [DbWrite].
 /// This environment can only generate read-only transactions, never read-write.
 #[derive(Clone)]
-pub struct DbRead {
-    kind: DbKind,
+pub struct DbReadOnly<Kind: DbKindT> {
+    kind: Kind,
     path: PathBuf,
     connection_pool: ConnectionPool,
     write_semaphore: Arc<Semaphore>,
     read_semaphore: Arc<Semaphore>,
 }
 
-impl DbRead {
+impl<Kind: DbKindT> DbReadOnly<Kind> {
     pub fn conn(&self) -> DatabaseResult<PConn> {
         self.connection_pooled()
     }
 
-    #[deprecated = "remove this identity function"]
-    pub fn inner(&self) -> Self {
-        self.clone()
-    }
-
-    /// Accessor for the [DbKind] of the DbWrite
-    pub fn kind(&self) -> &DbKind {
+    /// Accessor for the [DbKindT] of the DbWrite
+    pub fn kind(&self) -> &Kind {
         &self.kind
     }
 
@@ -61,47 +131,72 @@ impl DbRead {
     /// TODO: We should eventually swap this for an async solution.
     fn connection_pooled(&self) -> DatabaseResult<PConn> {
         let now = std::time::Instant::now();
-        let r = Ok(PConn::new(self.connection_pool.get()?, self.kind.clone()));
+        let r = Ok(PConn::new(self.connection_pool.get()?));
         let el = now.elapsed();
         if el.as_millis() > 20 {
             tracing::error!("Connection pool took {:?} to be free'd", el);
         }
         r
     }
+
+    pub async fn async_reader<E, R, F>(&self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError> + Send + 'static,
+        F: FnOnce(Transaction) -> Result<R, E> + Send + 'static,
+        R: Send + 'static,
+    {
+        let _g = self.acquire_reader_permit().await;
+        let mut conn = self.conn()?;
+        let r = task::spawn_blocking(move || conn.with_reader(f))
+            .await
+            .map_err(DatabaseError::from)?;
+        r
+    }
+
+    async fn acquire_reader_permit(&self) -> OwnedSemaphorePermit {
+        self.read_semaphore
+            .clone()
+            .acquire_owned()
+            .await
+            .expect("We don't ever close these semaphores")
+    }
 }
 
+#[derive(Clone, Shrinkwrap, Into)]
+pub struct DbRead<Kind: DbKindT>(DbReadOnly<Kind>);
+
+impl<Kind: DbKindT + 'static> DbRead<Kind> {
+    pub fn upgrade(self) -> DbWrite<Kind> {
+        DbWrite(self)
+    }
+}
 /// The canonical representation of a (singleton) database.
 /// The wrapper contains methods for managing transactions
 /// and database connections,
-// FIXME: this `derive_more::From` impl shouldn't be here!!
-// But we have had this in the code for a long time...
-#[derive(Clone, Shrinkwrap, Into, derive_more::From)]
-pub struct DbWrite(DbRead);
+// TODO: Make upgradable read and read only.
+#[derive(Clone, Shrinkwrap, Into)]
+pub struct DbWrite<Kind: DbKindT>(DbRead<Kind>);
 
-impl DbWrite {
+impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
     /// Create or open an existing database reference,
-    pub fn open(path_prefix: &Path, kind: DbKind) -> DatabaseResult<DbWrite> {
+    pub fn open(path_prefix: &Path, kind: Kind) -> DatabaseResult<Self> {
         Self::open_with_sync_level(path_prefix, kind, DbSyncLevel::default())
     }
 
     pub fn open_with_sync_level(
         path_prefix: &Path,
-        kind: DbKind,
+        kind: Kind,
         sync_level: DbSyncLevel,
-    ) -> DatabaseResult<DbWrite> {
-        let path = path_prefix.join(kind.filename());
-        if let Some(v) = DATABASE_HANDLES.get(&path) {
-            Ok(v.clone())
-        } else {
-            let db = Self::new(path_prefix, kind, sync_level)?;
-            DATABASE_HANDLES.insert_new(path, db.clone());
-            Ok(db)
-        }
+    ) -> DatabaseResult<Self> {
+        // let path = path_prefix.join(kind.filename());
+        DATABASE_HANDLES.get_or_insert(&kind, path_prefix, |kind| {
+            Self::new(path_prefix, kind, sync_level)
+        })
     }
 
     pub(crate) fn new(
         path_prefix: &Path,
-        kind: DbKind,
+        kind: Kind,
         sync_level: DbSyncLevel,
     ) -> DatabaseResult<Self> {
         let path = path_prefix.join(kind.filename());
@@ -152,53 +247,43 @@ impl DbWrite {
         }
 
         // Now we know the database file is valid we can open a connection pool.
-        let pool = new_connection_pool(&path, kind.clone(), sync_level);
+        let pool = new_connection_pool(&path, sync_level);
         let mut conn = pool.get()?;
         // set to faster write-ahead-log mode
         conn.pragma_update(None, "journal_mode", &"WAL".to_string())?;
-        crate::table::initialize_database(&mut conn, &kind)?;
+        crate::table::initialize_database(&mut conn, kind.kind())?;
 
-        Ok(DbWrite(DbRead {
-            write_semaphore: Self::get_write_semaphore(&kind),
-            read_semaphore: Self::get_read_semaphore(&kind),
+        Ok(DbWrite(DbRead(DbReadOnly {
+            write_semaphore: Self::get_write_semaphore(kind.kind()),
+            read_semaphore: Self::get_read_semaphore(kind.kind()),
             kind,
             path,
             connection_pool: pool,
-        }))
+        })))
     }
 
-    fn get_write_semaphore(kind: &DbKind) -> Arc<Semaphore> {
+    fn get_write_semaphore(kind: DbKind) -> Arc<Semaphore> {
         static MAP: once_cell::sync::Lazy<Mutex<HashMap<DbKind, Arc<Semaphore>>>> =
             once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
-        let mut map = MAP.lock();
-        match map.get(kind) {
-            Some(s) => s.clone(),
-            None => {
-                let s = Arc::new(Semaphore::new(1));
-                map.insert(kind.clone(), s.clone());
-                s
-            }
-        }
+        MAP.lock()
+            .entry(kind)
+            .or_insert_with(|| Arc::new(Semaphore::new(1)))
+            .clone()
     }
 
-    fn get_read_semaphore(kind: &DbKind) -> Arc<Semaphore> {
+    fn get_read_semaphore(kind: DbKind) -> Arc<Semaphore> {
         static MAP: once_cell::sync::Lazy<Mutex<HashMap<DbKind, Arc<Semaphore>>>> =
             once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
-        let mut map = MAP.lock();
-        match map.get(kind) {
-            Some(s) => s.clone(),
-            None => {
-                let s = Arc::new(Semaphore::new(num_read_threads()));
-                map.insert(kind.clone(), s.clone());
-                s
-            }
-        }
+        MAP.lock()
+            .entry(kind)
+            .or_insert_with(|| Arc::new(Semaphore::new(num_read_threads())))
+            .clone()
     }
 
     /// Create a unique db in a temp dir with no static management of the
     /// connection pool, useful for testing.
     #[cfg(any(test, feature = "test_utils"))]
-    pub fn test(tmpdir: &tempdir::TempDir, kind: DbKind) -> DatabaseResult<Self> {
+    pub fn test(tmpdir: &tempdir::TempDir, kind: Kind) -> DatabaseResult<Self> {
         Self::new(tmpdir.path(), kind, DbSyncLevel::default())
     }
 
@@ -209,6 +294,41 @@ impl DbWrite {
             std::fs::remove_dir_all(parent)?;
         }
         Ok(())
+    }
+
+    pub async fn async_commit<E, R, F>(&self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError> + Send + 'static,
+        F: FnOnce(&mut Transaction) -> Result<R, E> + Send + 'static,
+        R: Send + 'static,
+    {
+        let _g = self.acquire_writer_permit().await;
+        let mut conn = self.conn()?;
+        let r = task::spawn_blocking(move || conn.with_commit_sync(f))
+            .await
+            .map_err(DatabaseError::from)?;
+        r
+    }
+
+    /// If possible prefer async_commit as this is slower and can starve chained futures.
+    pub async fn async_commit_in_place<E, R, F>(&self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError>,
+        F: FnOnce(&mut Transaction) -> Result<R, E>,
+        R: Send,
+    {
+        let _g = self.acquire_writer_permit().await;
+        let mut conn = self.conn()?;
+        task::block_in_place(move || conn.with_commit_sync(f))
+    }
+
+    async fn acquire_writer_permit(&self) -> OwnedSemaphorePermit {
+        self.0
+            .write_semaphore
+            .clone()
+            .acquire_owned()
+            .await
+            .expect("We don't ever close these semaphores")
     }
 }
 
@@ -222,9 +342,11 @@ pub fn num_read_threads() -> usize {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 pub enum DbKind {
     /// Specifies the environment used by each Cell
-    Cell(CellId),
+    Authored(Arc<DnaHash>),
+    /// Specifies the environment used by all cells on the same [`DnaHash`].
+    Dht(Arc<DnaHash>),
     /// Specifies the environment used by each Cache (one per dna).
-    Cache(DnaHash),
+    Cache(Arc<DnaHash>),
     /// Specifies the environment used by a Conductor
     Conductor,
     /// Specifies the environment used to save wasm
@@ -234,43 +356,174 @@ pub enum DbKind {
     /// Metrics for peers on p2p network (one per space).
     P2pMetrics(Arc<KitsuneSpace>),
 }
-
-impl DbKind {
+pub trait DbKindT: Clone + Send + Sync + 'static {
+    fn kind(&self) -> DbKind;
     /// Constuct a partial Path based on the kind
-    pub fn filename(&self) -> PathBuf {
-        let mut path: PathBuf = match self {
-            DbKind::Cell(cell_id) => ["cell", &cell_id.to_string()].iter().collect(),
-            DbKind::Cache(dna) => ["cache", &format!("cache-{}", dna)].iter().collect(),
-            DbKind::Conductor => ["conductor", "conductor"].iter().collect(),
-            DbKind::Wasm => ["wasm", "wasm"].iter().collect(),
-            DbKind::P2pAgentStore(space) => ["p2p", &format!("p2p_agent_store-{}", space)]
-                .iter()
-                .collect(),
-            DbKind::P2pMetrics(space) => {
-                ["p2p", &format!("p2p_metrics-{}", space)].iter().collect()
-            }
-        };
+    fn filename(&self) -> PathBuf {
+        let mut path = self.filename_inner();
         path.set_extension("sqlite3");
         path
     }
-
+    fn filename_inner(&self) -> PathBuf;
     /// Whether to wipe the database if it is corrupt.
     /// Some database it's safe to wipe them if they are corrupt because
     /// they can be refilled from the network. Other databases cannot
     /// be refilled and some manual intervention is required.
+    fn if_corrupt_wipe(&self) -> bool;
+}
+
+/// Specifies the environment used by each Cell
+#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
+pub struct DbKindAuthored(pub Arc<DnaHash>);
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
+/// Specifies the environment used by all cells on the same [`DnaHash`].
+pub struct DbKindDht(pub Arc<DnaHash>);
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
+/// Specifies the environment used by each Cache (one per dna).
+pub struct DbKindCache(pub Arc<DnaHash>);
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
+/// Specifies the environment used by a Conductor
+pub struct DbKindConductor;
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
+/// Specifies the environment used to save wasm
+pub struct DbKindWasm;
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
+/// State of the p2p network (one per space).
+pub struct DbKindP2pAgentStore(pub Arc<KitsuneSpace>);
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
+/// Metrics for peers on p2p network (one per space).
+pub struct DbKindP2pMetrics(pub Arc<KitsuneSpace>);
+
+impl DbKindT for DbKindAuthored {
+    fn kind(&self) -> DbKind {
+        DbKind::Authored(self.0.clone())
+    }
+
+    fn filename_inner(&self) -> PathBuf {
+        ["dht", &format!("authored-{}", self.0)].iter().collect()
+    }
+
     fn if_corrupt_wipe(&self) -> bool {
-        match self {
-            // These databases can safely be wiped if they are corrupt.
-            DbKind::Cache(_) => true,
-            DbKind::P2pAgentStore(_) => true,
-            DbKind::P2pMetrics(_) => true,
-            // These databases cannot be safely wiped if they are corrupt.
-            // TODO: When splitting the source chain and authority db the
-            // authority db can be wiped but the source chain db cannot.
-            DbKind::Cell(_) => false,
-            DbKind::Wasm => false,
-            DbKind::Conductor => false,
-        }
+        false
+    }
+}
+
+impl DbKindAuthored {
+    pub fn dna_hash(&self) -> &DnaHash {
+        &self.0
+    }
+    pub fn to_dna_hash(&self) -> Arc<DnaHash> {
+        self.0.clone()
+    }
+}
+
+impl DbKindT for DbKindDht {
+    fn kind(&self) -> DbKind {
+        DbKind::Dht(self.0.clone())
+    }
+
+    fn filename_inner(&self) -> PathBuf {
+        ["dht", &format!("dht-{}", self.0)].iter().collect()
+    }
+
+    fn if_corrupt_wipe(&self) -> bool {
+        true
+    }
+}
+
+impl DbKindDht {
+    pub fn dna_hash(&self) -> &DnaHash {
+        &self.0
+    }
+    pub fn to_dna_hash(&self) -> Arc<DnaHash> {
+        self.0.clone()
+    }
+}
+
+impl DbKindT for DbKindCache {
+    fn kind(&self) -> DbKind {
+        DbKind::Cache(self.0.clone())
+    }
+
+    fn filename_inner(&self) -> PathBuf {
+        ["cache", &format!("cache-{}", self.0)].iter().collect()
+    }
+
+    fn if_corrupt_wipe(&self) -> bool {
+        true
+    }
+}
+
+impl DbKindCache {
+    pub fn dna_hash(&self) -> &DnaHash {
+        &self.0
+    }
+    pub fn to_dna_hash(&self) -> Arc<DnaHash> {
+        self.0.clone()
+    }
+}
+
+impl DbKindT for DbKindConductor {
+    fn kind(&self) -> DbKind {
+        DbKind::Conductor
+    }
+
+    fn filename_inner(&self) -> PathBuf {
+        ["conductor", "conductor"].iter().collect()
+    }
+
+    fn if_corrupt_wipe(&self) -> bool {
+        false
+    }
+}
+
+impl DbKindT for DbKindWasm {
+    fn kind(&self) -> DbKind {
+        DbKind::Wasm
+    }
+
+    fn filename_inner(&self) -> PathBuf {
+        ["wasm", "wasm"].iter().collect()
+    }
+
+    fn if_corrupt_wipe(&self) -> bool {
+        false
+    }
+}
+
+impl DbKindT for DbKindP2pAgentStore {
+    fn kind(&self) -> DbKind {
+        DbKind::P2pAgentStore(self.0.clone())
+    }
+
+    fn filename_inner(&self) -> PathBuf {
+        ["p2p", &format!("p2p_agent_store-{}", self.0)]
+            .iter()
+            .collect()
+    }
+
+    fn if_corrupt_wipe(&self) -> bool {
+        true
+    }
+}
+
+impl DbKindT for DbKindP2pMetrics {
+    fn kind(&self) -> DbKind {
+        DbKind::P2pMetrics(self.0.clone())
+    }
+
+    fn filename_inner(&self) -> PathBuf {
+        ["p2p", &format!("p2p_metrics-{}", self.0)].iter().collect()
+    }
+
+    fn if_corrupt_wipe(&self) -> bool {
+        true
     }
 }
 
@@ -333,30 +586,6 @@ impl<'e> ReadManager<'e> for PConn {
     }
 }
 
-impl DbRead {
-    pub async fn async_reader<E, R, F>(&self, f: F) -> Result<R, E>
-    where
-        E: From<DatabaseError> + Send + 'static,
-        F: FnOnce(Transaction) -> Result<R, E> + Send + 'static,
-        R: Send + 'static,
-    {
-        let _g = self.acquire_reader_permit().await;
-        let mut conn = self.conn()?;
-        let r = task::spawn_blocking(move || conn.with_reader(f))
-            .await
-            .map_err(DatabaseError::from)?;
-        r
-    }
-
-    async fn acquire_reader_permit(&self) -> OwnedSemaphorePermit {
-        self.read_semaphore
-            .clone()
-            .acquire_owned()
-            .await
-            .expect("We don't ever close these semaphores")
-    }
-}
-
 impl<'e> WriteManager<'e> for PConn {
     #[cfg(feature = "test_utils")]
     fn with_commit_sync<E, R, F>(&'e mut self, f: F) -> Result<R, E>
@@ -370,43 +599,6 @@ impl<'e> WriteManager<'e> for PConn {
         let result = f(&mut txn)?;
         txn.commit().map_err(DatabaseError::from)?;
         Ok(result)
-    }
-}
-
-impl DbWrite {
-    pub async fn async_commit<E, R, F>(&self, f: F) -> Result<R, E>
-    where
-        E: From<DatabaseError> + Send + 'static,
-        F: FnOnce(&mut Transaction) -> Result<R, E> + Send + 'static,
-        R: Send + 'static,
-    {
-        let _g = self.acquire_writer_permit().await;
-        let mut conn = self.conn()?;
-        let r = task::spawn_blocking(move || conn.with_commit_sync(f))
-            .await
-            .map_err(DatabaseError::from)?;
-        r
-    }
-
-    /// If possible prefer async_commit as this is slower and can starve chained futures.
-    pub async fn async_commit_in_place<E, R, F>(&self, f: F) -> Result<R, E>
-    where
-        E: From<DatabaseError>,
-        F: FnOnce(&mut Transaction) -> Result<R, E>,
-        R: Send,
-    {
-        let _g = self.acquire_writer_permit().await;
-        let mut conn = self.conn()?;
-        task::block_in_place(move || conn.with_commit_sync(f))
-    }
-
-    async fn acquire_writer_permit(&self) -> OwnedSemaphorePermit {
-        self.0
-            .write_semaphore
-            .clone()
-            .acquire_owned()
-            .await
-            .expect("We don't ever close these semaphores")
     }
 }
 
@@ -456,5 +648,14 @@ where
             }
         }
         tokio::time::sleep(RETRY_INTERVAL).await;
+    }
+}
+
+impl<Kind> Into<DbReadOnly<Kind>> for DbWrite<Kind>
+where
+    Kind: DbKindT,
+{
+    fn into(self) -> DbReadOnly<Kind> {
+        self.0 .0
     }
 }

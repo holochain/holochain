@@ -115,7 +115,7 @@ pub struct IncomingOpHashes(Arc<parking_lot::Mutex<HashSet<DhtOpHash>>>);
 
 #[instrument(skip(vault, sys_validation_trigger, ops, incoming_op_hashes))]
 pub async fn incoming_dht_ops_workflow(
-    vault: &EnvWrite,
+    vault: &DbWrite<DbKindDht>,
     incoming_op_hashes: Option<&IncomingOpHashes>,
     sys_validation_trigger: TriggerSender,
     mut ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
@@ -163,7 +163,7 @@ pub async fn incoming_dht_ops_workflow(
         }
     }
 
-    let kind = vault.kind().clone();
+    let kind = vault.kind().kind().clone();
     let (mut maybe_batch, rcv) =
         batch_check_insert(kind.clone(), request_validation_receipt, filter_ops);
 
@@ -260,7 +260,7 @@ fn op_exists_inner(txn: &rusqlite::Transaction<'_>, hash: &DhtOpHash) -> Databas
     )?)
 }
 
-pub fn op_exists(vault: &EnvWrite, hash: &DhtOpHash) -> DatabaseResult<bool> {
+pub fn op_exists(vault: &DbWrite<DbKindDht>, hash: &DhtOpHash) -> DatabaseResult<bool> {
     vault.conn()?.with_reader(|txn| op_exists_inner(&txn, hash))
 }
 

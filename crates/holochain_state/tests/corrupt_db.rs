@@ -7,7 +7,7 @@ use holochain_sqlite::rusqlite::Connection;
 use holochain_state::prelude::{fresh_reader_test, mutations_helpers, test_keystore, DbKind};
 use holochain_types::{
     dht_op::{DhtOp, DhtOpHashed},
-    env::EnvWrite,
+    env::DbWrite,
 };
 use holochain_zome_types::{CellId, Header, Signature};
 use tempdir::TempDir;
@@ -24,7 +24,7 @@ async fn corrupt_cache_creates_new_db() {
     let testdir = create_corrupt_db(&kind, &mut u);
 
     // - Try to open it.
-    let env = EnvWrite::test(&testdir, kind, test_keystore()).unwrap();
+    let env = DbWrite::test(&testdir, kind, test_keystore()).unwrap();
 
     // - It opens successfully but the data is wiped.
     let n: usize = fresh_reader_test(env, |txn| {
@@ -39,16 +39,13 @@ async fn corrupt_source_chain_panics() {
     let mut u = arbitrary::Unstructured::new(&holochain_zome_types::NOISE);
     observability::test_run().ok();
 
-    let kind = DbKind::Cell(CellId::new(
-        DnaHash::arbitrary(&mut u).unwrap(),
-        AgentPubKey::arbitrary(&mut u).unwrap(),
-    ));
+    let kind = DbKind::Authored(DnaHash::arbitrary(&mut u).unwrap());
 
     // - Create a corrupt cell db.
     let testdir = create_corrupt_db(&kind, &mut u);
 
     // - Try to open it.
-    let result = EnvWrite::test(&testdir, kind, test_keystore());
+    let result = DbWrite::test(&testdir, kind, test_keystore());
 
     // - It cannot open.
     assert!(result.is_err());

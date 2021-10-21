@@ -15,7 +15,7 @@ use tokio::sync;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_cell_handle_publish() {
-    let cell_env = test_cell_env();
+    let cell_env = test_authored_env();
     let cache_env = test_cache_env();
     let env = cell_env.env();
     let cache = cache_env.env();

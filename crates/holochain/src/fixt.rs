@@ -33,8 +33,9 @@ pub use holo_hash::fixt::*;
 use holo_hash::HeaderHash;
 use holo_hash::WasmHash;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::HolochainP2pCellFixturator;
+use holochain_p2p::HolochainP2pDnaFixturator;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
+use holochain_state::host_fn_workspace::HostFnWorkspaceReadOnly;
 use holochain_state::test_utils::test_keystore;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
@@ -263,32 +264,72 @@ fixturator!(
 fixturator!(
     HostFnWorkspace;
     curve Empty {
-        let vault = holochain_state::test_utils::test_cell_env_with_id(get_fixt_index!() as u8);
-        let cache = holochain_state::test_utils::test_cell_env();
+        let authored_env = holochain_state::test_utils::test_authored_env_with_id(get_fixt_index!() as u8);
+        let dht_env = holochain_state::test_utils::test_dht_env_with_id(get_fixt_index!() as u8);
+        let cache = holochain_state::test_utils::test_cache_env();
+        let keystore = holochain_state::test_utils::test_keystore();
         tokio_helper::block_forever_on(async {
-            fake_genesis(vault.env()).await.unwrap();
-            HostFnWorkspace::new(vault.env(), cache.env(), fixt!(AgentPubKey, Predictable, get_fixt_index!())).await.unwrap()
+            fake_genesis(authored_env.env(), keystore.clone()).await.unwrap();
+            HostFnWorkspace::new(authored_env.env(), dht_env.env().into(), cache.env(), keystore, Some(fixt!(AgentPubKey, Predictable, get_fixt_index!()))).await.unwrap()
         })
     };
     curve Unpredictable {
-        let vault = holochain_state::test_utils::test_cell_env_with_id(get_fixt_index!() as u8);
-        let cache = holochain_state::test_utils::test_cell_env();
+        let authored_env = holochain_state::test_utils::test_authored_env_with_id(get_fixt_index!() as u8);
+        let dht_env = holochain_state::test_utils::test_dht_env_with_id(get_fixt_index!() as u8);
+        let cache = holochain_state::test_utils::test_cache_env();
+        let keystore = holochain_state::test_utils::test_keystore();
         tokio_helper::block_forever_on(async {
-            fake_genesis(vault.env()).await.unwrap();
-            HostFnWorkspace::new(vault.env(), cache.env(), fixt!(AgentPubKey, Predictable, get_fixt_index!())).await.unwrap()
+            fake_genesis(authored_env.env(), keystore.clone()).await.unwrap();
+            HostFnWorkspace::new(authored_env.env(), dht_env.env().into(), cache.env(), keystore, Some(fixt!(AgentPubKey, Predictable, get_fixt_index!()))).await.unwrap()
         })
     };
     curve Predictable {
-        let vault = holochain_state::test_utils::test_cell_env_with_id(get_fixt_index!() as u8);
+        let authored_env = holochain_state::test_utils::test_authored_env_with_id(get_fixt_index!() as u8);
+        let dht_env = holochain_state::test_utils::test_dht_env_with_id(get_fixt_index!() as u8);
         let cache = holochain_state::test_utils::test_cache_env_with_id(get_fixt_index!() as u8);
         let agent = fixt!(AgentPubKey, Predictable, get_fixt_index!());
+        let keystore = holochain_state::test_utils::test_keystore();
         tokio_helper::block_forever_on(async {
-            crate::test_utils::fake_genesis_for_agent(vault.env(), agent.clone()).await.unwrap();
-            HostFnWorkspace::new(vault.env(), cache.env(), agent).await.unwrap()
+            crate::test_utils::fake_genesis_for_agent(authored_env.env(), agent.clone(), keystore.clone()).await.unwrap();
+            HostFnWorkspace::new(authored_env.env(), dht_env.env().into(), cache.env(), keystore, Some(agent)).await.unwrap()
         })
     };
 );
 
+fixturator!(
+    HostFnWorkspaceReadOnly;
+    curve Empty {
+        let authored_env = holochain_state::test_utils::test_authored_env_with_id(get_fixt_index!() as u8);
+        let dht_env = holochain_state::test_utils::test_dht_env_with_id(get_fixt_index!() as u8);
+        let cache = holochain_state::test_utils::test_cache_env();
+        let keystore = holochain_state::test_utils::test_keystore();
+        tokio_helper::block_forever_on(async {
+            fake_genesis(authored_env.env(), keystore.clone()).await.unwrap();
+            HostFnWorkspaceReadOnly::new(authored_env.env().into(), dht_env.env().into(), cache.env(), keystore, Some(fixt!(AgentPubKey, Predictable, get_fixt_index!()))).await.unwrap()
+        })
+    };
+    curve Unpredictable {
+        let authored_env = holochain_state::test_utils::test_authored_env_with_id(get_fixt_index!() as u8);
+        let dht_env = holochain_state::test_utils::test_dht_env_with_id(get_fixt_index!() as u8);
+        let cache = holochain_state::test_utils::test_cache_env();
+        let keystore = holochain_state::test_utils::test_keystore();
+        tokio_helper::block_forever_on(async {
+            fake_genesis(authored_env.env(), keystore.clone()).await.unwrap();
+            HostFnWorkspaceReadOnly::new(authored_env.env().into(), dht_env.env().into(), cache.env(), keystore, Some(fixt!(AgentPubKey, Predictable, get_fixt_index!()))).await.unwrap()
+        })
+    };
+    curve Predictable {
+        let authored_env = holochain_state::test_utils::test_authored_env_with_id(get_fixt_index!() as u8);
+        let dht_env = holochain_state::test_utils::test_dht_env_with_id(get_fixt_index!() as u8);
+        let cache = holochain_state::test_utils::test_cache_env_with_id(get_fixt_index!() as u8);
+        let agent = fixt!(AgentPubKey, Predictable, get_fixt_index!());
+        let keystore = holochain_state::test_utils::test_keystore();
+        tokio_helper::block_forever_on(async {
+            crate::test_utils::fake_genesis_for_agent(authored_env.env(), agent.clone(), keystore.clone()).await.unwrap();
+            HostFnWorkspaceReadOnly::new(authored_env.env().into(), dht_env.env().into(), cache.env(), keystore, Some(agent)).await.unwrap()
+        })
+    };
+);
 fn make_call_zome_handle(cell_id: CellId) -> CellConductorReadHandle {
     let handle = Arc::new(MockConductorHandleT::new());
     let cell_conductor_api = CellConductorApi::new(handle, cell_id);
@@ -302,7 +343,7 @@ fixturator!(
 
 fixturator!(
     ZomeCallHostAccess;
-    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pCell, SignalBroadcaster, CellConductorReadHandle, CellId);
+    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna, SignalBroadcaster, CellConductorReadHandle, CellId);
 );
 
 fixturator!(
@@ -322,7 +363,7 @@ fixturator!(
 
 fixturator!(
     InitHostAccess;
-    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pCell);
+    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna);
 );
 
 fixturator!(
@@ -342,7 +383,7 @@ fixturator!(
 
 fixturator!(
     PostCommitHostAccess;
-    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pCell);
+    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna);
 );
 
 fixturator!(
@@ -402,12 +443,12 @@ fixturator!(
 
 fixturator!(
     ValidateLinkHostAccess;
-    constructor fn new(HostFnWorkspace, HolochainP2pCell);
+    constructor fn new(HostFnWorkspaceReadOnly, HolochainP2pDna);
 );
 
 fixturator!(
     ValidateHostAccess;
-    constructor fn new(HostFnWorkspace, HolochainP2pCell);
+    constructor fn new(HostFnWorkspaceReadOnly, HolochainP2pDna);
 );
 
 fixturator!(
@@ -417,7 +458,7 @@ fixturator!(
 
 fixturator!(
     ValidationPackageHostAccess;
-    constructor fn new(HostFnWorkspace, HolochainP2pCell);
+    constructor fn new(HostFnWorkspaceReadOnly, HolochainP2pDna);
 );
 
 fixturator!(

@@ -26,7 +26,7 @@ pub mod test_utils;
 pub use ::rusqlite;
 
 #[macro_export]
-/// Macro to generate a fresh reader from an DbRead with less boilerplate
+/// Macro to generate a fresh reader from an DbReadOnly with less boilerplate
 macro_rules! fresh_reader {
     ($env: expr, $f: expr) => {{
         let mut conn = $env.conn()?;

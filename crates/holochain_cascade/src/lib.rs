@@ -13,8 +13,8 @@ use holo_hash::HeaderHash;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
-use holochain_p2p::HolochainP2pCell;
-use holochain_p2p::HolochainP2pCellT;
+use holochain_p2p::HolochainP2pDna;
+use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_state::host_fn_workspace::HostFnStores;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
@@ -65,21 +65,30 @@ macro_rules! ok_or_return {
 }
 
 #[derive(Clone)]
-pub struct Cascade<Network = HolochainP2pCell> {
-    vault: Option<EnvRead>,
-    cache: Option<EnvWrite>,
+pub struct Cascade<Network = HolochainP2pDna> {
+    authored: Option<DbReadOnly<DbKindAuthored>>,
+    dht: Option<DbReadOnly<DbKindDht>>,
+    cache: Option<DbWrite<DbKindCache>>,
     scratch: Option<SyncScratch>,
     network: Option<Network>,
 }
 
 impl<Network> Cascade<Network>
 where
-    Network: HolochainP2pCellT + Clone + 'static + Send,
+    Network: HolochainP2pDnaT + Clone + 'static + Send,
 {
-    /// Add the vault to the cascade.
-    pub fn with_vault(self, vault: EnvRead) -> Self {
+    /// Add the authored env to the cascade.
+    pub fn with_authored(self, authored: DbReadOnly<DbKindAuthored>) -> Self {
         Self {
-            vault: Some(vault),
+            authored: Some(authored),
+            ..self
+        }
+    }
+
+    /// Add the dht env to the cascade.
+    pub fn with_dht(self, dht: DbReadOnly<DbKindDht>) -> Self {
+        Self {
+            dht: Some(dht),
             ..self
         }
     }
@@ -88,7 +97,7 @@ where
     // TODO: We do want to be able to use the cache without
     // the network but we always need a cache when we have a
     // network. Perhaps this can be proven at the type level?
-    pub fn with_cache(self, cache: EnvWrite) -> Self {
+    pub fn with_cache(self, cache: DbWrite<DbKindCache>) -> Self {
         Self {
             cache: Some(cache),
             ..self
@@ -104,56 +113,63 @@ where
     }
 
     /// Add the network and cache to the cascade.
-    pub fn with_network<N: HolochainP2pCellT + Clone>(
+    pub fn with_network<N: HolochainP2pDnaT + Clone>(
         self,
         network: N,
-        cache_env: EnvWrite,
+        cache_env: DbWrite<DbKindCache>,
     ) -> Cascade<N> {
         Cascade {
-            vault: self.vault,
+            authored: self.authored,
+            dht: self.dht,
             scratch: self.scratch,
             cache: Some(cache_env),
             network: Some(network),
         }
     }
 }
-impl Cascade<HolochainP2pCell> {
+impl Cascade<HolochainP2pDna> {
     /// Constructs an empty [Cascade].
     pub fn empty() -> Self {
         Self {
-            vault: None,
+            authored: None,
+            dht: None,
             network: None,
             cache: None,
             scratch: None,
         }
     }
 
-    pub fn from_workspace_network<N: HolochainP2pCellT + Clone>(
-        workspace: &HostFnWorkspace,
-        network: N,
-    ) -> Cascade<N> {
+    pub fn from_workspace_network<N, Db>(workspace: &HostFnWorkspace<Db>, network: N) -> Cascade<N>
+    where
+        N: HolochainP2pDnaT + Clone,
+        Db: ReadAccess<DbKindAuthored>,
+    {
         let HostFnStores {
-            vault,
+            authored,
+            dht,
             cache,
             scratch,
         } = workspace.stores();
         Cascade::<N> {
-            vault: Some(vault),
+            authored: Some(authored),
+            dht: Some(dht),
             cache: Some(cache),
-            scratch: Some(scratch),
+            scratch,
             network: Some(network),
         }
     }
-    pub fn from_workspace(workspace: &HostFnWorkspace) -> Self {
+    pub fn from_workspace(stores: HostFnStores) -> Self {
         let HostFnStores {
-            vault,
+            authored,
+            dht,
             cache,
             scratch,
-        } = workspace.stores();
+        } = stores;
         Self {
-            vault: Some(vault),
+            authored: Some(authored),
+            dht: Some(dht),
             cache: Some(cache),
-            scratch: Some(scratch),
+            scratch,
             network: None,
         }
     }
@@ -161,7 +177,7 @@ impl Cascade<HolochainP2pCell> {
 
 impl<Network> Cascade<Network>
 where
-    Network: HolochainP2pCellT + Clone + 'static + Send,
+    Network: HolochainP2pDnaT + Clone + 'static + Send,
 {
     fn insert_rendered_op(txn: &mut Transaction, op: RenderedOp) -> CascadeResult<()> {
         let RenderedOp {
@@ -276,8 +292,11 @@ where
         if let Some(cache) = &mut self.cache {
             conns.push(cache.conn()?);
         }
-        if let Some(vault) = &mut self.vault {
-            conns.push(vault.conn()?);
+        if let Some(dht) = &mut self.dht {
+            conns.push(dht.conn()?);
+        }
+        if let Some(authored) = &mut self.authored {
+            conns.push(authored.conn()?);
         }
         for conn in &mut conns {
             let txn = conn.transaction().map_err(StateQueryError::from)?;
@@ -307,8 +326,17 @@ where
                 return Ok(r);
             }
         }
-        if let Some(vault) = &mut self.vault {
-            let mut conn = vault.conn()?;
+        if let Some(dht) = &mut self.dht {
+            let mut conn = dht.conn()?;
+            let txn = conn.transaction().map_err(StateQueryError::from)?;
+            let txn = Txn::from(&txn);
+            let r = f(&txn)?;
+            if r.is_some() {
+                return Ok(r);
+            }
+        }
+        if let Some(authored) = &mut self.authored {
+            let mut conn = authored.conn()?;
             let txn = conn.transaction().map_err(StateQueryError::from)?;
             let txn = Txn::from(&txn);
             let r = f(&txn)?;
@@ -660,7 +688,7 @@ where
                 agent_activity::merge_activities(agent.clone(), &options, results)?;
             merged_response
         } else {
-            match self.vault.clone() {
+            match self.dht.clone() {
                 Some(vault) => {
                     authority::handle_get_agent_activity(
                         vault,

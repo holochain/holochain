@@ -23,6 +23,7 @@ pub(crate) enum WireMessage {
     CallRemote {
         zome_name: ZomeName,
         fn_name: FunctionName,
+        from_agent: holo_hash::AgentPubKey,
         cap: Option<CapSecret>,
         #[serde(with = "serde_bytes")]
         data: Vec<u8>,
@@ -74,12 +75,14 @@ impl WireMessage {
     pub fn call_remote(
         zome_name: ZomeName,
         fn_name: FunctionName,
+        from_agent: holo_hash::AgentPubKey,
         cap: Option<CapSecret>,
         payload: ExternIO,
     ) -> WireMessage {
         Self::CallRemote {
             zome_name,
             fn_name,
+            from_agent,
             cap,
             data: payload.into_vec(),
         }

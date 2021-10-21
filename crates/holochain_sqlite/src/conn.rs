@@ -1,20 +1,25 @@
 use crate::prelude::*;
-use chashmap::CHashMap;
 use holochain_serialized_bytes::prelude::*;
 use once_cell::sync::Lazy;
 use rusqlite::*;
 use scheduled_thread_pool::ScheduledThreadPool;
 use std::{
+    any::Any,
+    collections::HashMap,
     path::{Path, PathBuf},
     sync::Arc,
     time::Duration,
 };
 
-mod singleton_conn;
+// mod singleton_conn;
 
 const SQLITE_BUSY_TIMEOUT: Duration = Duration::from_secs(30);
 
-pub(crate) static DATABASE_HANDLES: Lazy<CHashMap<PathBuf, DbWrite>> = Lazy::new(|| {
+pub(crate) struct Databases {
+    dbs: parking_lot::RwLock<HashMap<PathBuf, Box<dyn Any + Send + Sync>>>,
+}
+
+pub(crate) static DATABASE_HANDLES: Lazy<Databases> = Lazy::new(|| {
     // This is just a convenient place that we know gets initialized
     // both in the final binary holochain && in all relevant tests
     //
@@ -36,7 +41,7 @@ pub(crate) static DATABASE_HANDLES: Lazy<CHashMap<PathBuf, DbWrite>> = Lazy::new
         // std::process::abort();
     }));
 
-    CHashMap::new()
+    Databases::new()
 });
 
 static R2D2_THREADPOOL: Lazy<Arc<ScheduledThreadPool>> = Lazy::new(|| {
@@ -47,17 +52,52 @@ static R2D2_THREADPOOL: Lazy<Arc<ScheduledThreadPool>> = Lazy::new(|| {
 pub type ConnectionPool = r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>;
 pub type PConnInner = r2d2::PooledConnection<r2d2_sqlite::SqliteConnectionManager>;
 
-pub(crate) fn new_connection_pool(
-    path: &Path,
-    kind: DbKind,
-    synchronous_level: DbSyncLevel,
-) -> ConnectionPool {
+impl Databases {
+    pub fn new() -> Self {
+        Databases {
+            dbs: parking_lot::RwLock::new(HashMap::new()),
+        }
+    }
+    pub fn get_or_insert<Kind, F>(
+        &self,
+        kind: &Kind,
+        path_prefix: &Path,
+        insert: F,
+    ) -> DatabaseResult<DbWrite<Kind>>
+    where
+        Kind: DbKindT + Send + Sync + 'static,
+        F: FnOnce(Kind) -> DatabaseResult<DbWrite<Kind>>,
+    {
+        let path = path_prefix.join(kind.filename());
+        let ret = self
+            .dbs
+            .read()
+            .get(&path)
+            .unwrap()
+            .downcast_ref::<DbWrite<Kind>>()
+            .cloned();
+        match ret {
+            Some(ret) => Ok(ret),
+            None => match self.dbs.write().entry(path) {
+                std::collections::hash_map::Entry::Occupied(o) => Ok(o
+                    .get()
+                    .downcast_ref::<DbWrite<Kind>>()
+                    .expect("Downcast to db kind failed. This is a bug")
+                    .clone()),
+                std::collections::hash_map::Entry::Vacant(v) => {
+                    let db = insert(kind.clone())?;
+                    v.insert(Box::new(db.clone()));
+                    Ok(db)
+                }
+            },
+        }
+    }
+}
+
+pub(crate) fn new_connection_pool(path: &Path, synchronous_level: DbSyncLevel) -> ConnectionPool {
     use r2d2_sqlite::SqliteConnectionManager;
     let manager = SqliteConnectionManager::file(path);
-    let customizer = Box::new(ConnCustomizer {
-        kind,
-        synchronous_level,
-    });
+    let customizer = Box::new(ConnCustomizer { synchronous_level });
     // We need the same amount of connections as reader threads plus one for the writer thread.
     let max_cons = num_read_threads() + 1;
     r2d2::Pool::builder()
@@ -75,7 +115,6 @@ pub(crate) fn new_connection_pool(
 
 #[derive(Debug)]
 struct ConnCustomizer {
-    kind: DbKind,
     synchronous_level: DbSyncLevel,
 }
 
@@ -100,16 +139,14 @@ impl Default for DbSyncLevel {
 
 impl r2d2::CustomizeConnection<Connection, rusqlite::Error> for ConnCustomizer {
     fn on_acquire(&self, conn: &mut Connection) -> Result<(), rusqlite::Error> {
-        initialize_connection(conn, &self.kind, self.synchronous_level, true)?;
+        initialize_connection(conn, self.synchronous_level)?;
         Ok(())
     }
 }
 
 fn initialize_connection(
     conn: &mut Connection,
-    _kind: &DbKind,
     synchronous_level: DbSyncLevel,
-    _is_first: bool,
 ) -> rusqlite::Result<()> {
     // tell SQLite to wait this long during write contention
     conn.busy_timeout(SQLITE_BUSY_TIMEOUT)?;
@@ -161,11 +198,10 @@ fn get_encryption_key_shim() -> [u8; 32] {
 pub struct PConn {
     #[shrinkwrap(main_field)]
     inner: PConnInner,
-    _kind: DbKind,
 }
 
 impl PConn {
-    pub(crate) fn new(inner: PConnInner, _kind: DbKind) -> Self {
-        Self { inner, _kind }
+    pub(crate) fn new(inner: PConnInner) -> Self {
+        Self { inner }
     }
 }

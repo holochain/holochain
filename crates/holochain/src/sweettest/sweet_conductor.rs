@@ -122,7 +122,7 @@ impl SweetConductor {
 
     /// Access the MetaLairClient for this conductor
     pub fn keystore(&self) -> MetaLairClient {
-        self.envs.keystore()
+        self.envs.keystore().clone()
     }
 
     /// Convenience function that uses the internal handle to enable an app
@@ -209,9 +209,14 @@ impl SweetConductor {
     ) -> ConductorApiResult<SweetApp> {
         let mut sweet_cells = Vec::new();
         for dna_hash in dna_hashes {
+            let cell_authored_env = self.handle().0.get_authored_env(&dna_hash)?;
+            let cell_dht_env = self.handle().0.get_dht_env(&dna_hash)?;
             let cell_id = CellId::new(dna_hash, agent.clone());
-            let cell_env = self.handle().0.get_cell_env(&cell_id)?;
-            let cell = SweetCell { cell_id, cell_env };
+            let cell = SweetCell {
+                cell_id,
+                cell_authored_env,
+                cell_dht_env,
+            };
             sweet_cells.push(cell);
         }
 
@@ -390,7 +395,7 @@ impl SweetConductor {
         if let Some(handle) = self.handle.as_ref() {
             let iter = handle.list_cell_ids(None).into_iter().map(|id| async {
                 let id = id;
-                let env = self.get_cell_env(&id).unwrap();
+                let env = self.get_authored_env(id.dna_hash()).unwrap();
                 let trigger = self.get_cell_triggers(&id).unwrap();
                 (env, trigger)
             });

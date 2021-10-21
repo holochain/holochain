@@ -32,7 +32,7 @@ async fn test_validation_receipt() {
     consistency_10s(&[&alice, &bobbo, &carol]).await;
 
     // Get op hashes
-    let vault: EnvRead = alice.env().clone().into();
+    let vault: DbReadOnly = alice.env().clone().into();
     let element = fresh_store_test(&vault, |store| {
         store.get_element(&hash.clone().into()).unwrap().unwrap()
     });

@@ -57,26 +57,26 @@ impl SConn {
     }
 }
 
-impl DbRead {
-    #[deprecated = "remove if we never use singleton connections"]
-    fn _connection_naive(&self) -> DatabaseResult<SConn> {
-        SConn::open(self.path(), &self.kind())
-    }
+// impl DbReadOnly {
+//     #[deprecated = "remove if we never use singleton connections"]
+//     fn _connection_naive(&self) -> DatabaseResult<SConn> {
+//         SConn::open(self.path(), &self.kind())
+//     }
 
-    #[deprecated = "remove if we never use singleton connections"]
-    fn _connection_singleton(&self) -> DatabaseResult<SConn> {
-        let mut map = CONNECTIONS.write();
-        let conn = match map.entry(self.path().to_owned()) {
-            Entry::Vacant(e) => {
-                let conn = SConn::open(self.path(), self.kind())?;
-                e.insert(conn).clone()
-            }
-            Entry::Occupied(e) => e.get().clone(),
-        };
+//     #[deprecated = "remove if we never use singleton connections"]
+//     fn _connection_singleton(&self) -> DatabaseResult<SConn> {
+//         let mut map = CONNECTIONS.write();
+//         let conn = match map.entry(self.path().to_owned()) {
+//             Entry::Vacant(e) => {
+//                 let conn = SConn::open(self.path(), self.kind())?;
+//                 e.insert(conn).clone()
+//             }
+//             Entry::Occupied(e) => e.get().clone(),
+//         };
 
-        Ok(conn)
-    }
-}
+//         Ok(conn)
+//     }
+// }
 
 // impl<'e> ReadManager<'e> for SConn {
 //     fn with_reader<E, R, F>(&'e mut self, f: F) -> Result<R, E>

@@ -38,7 +38,7 @@ struct Facts {
 #[tokio::test(flavor = "multi_thread")]
 async fn integrate_query() {
     observability::test_run().ok();
-    let env = test_cell_env();
+    let env = test_authored_env();
     let expected = test_data(&env.env().into());
     let (qt, _rx) = TriggerSender::new();
     // dump_tmp(&env.env());
@@ -71,7 +71,7 @@ async fn integrate_query() {
     assert_eq!(hashes, expected.hashes);
 }
 
-fn create_and_insert_op(env: &EnvRead, facts: Facts, data: &mut SharedData) -> DhtOpHashed {
+fn create_and_insert_op(env: &DbReadOnly, facts: Facts, data: &mut SharedData) -> DhtOpHashed {
     let mut update = fixt!(Update);
     if facts.original_header && facts.update_element {
         update.original_header_address = data.original_header.clone();
@@ -127,7 +127,7 @@ fn create_and_insert_op(env: &EnvRead, facts: Facts, data: &mut SharedData) -> D
     state
 }
 
-fn test_data(env: &EnvRead) -> Expected {
+fn test_data(env: &DbReadOnly) -> Expected {
     let mut hashes = HashSet::new();
     let mut ops = HashMap::new();
 
