@@ -5,11 +5,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 - Post commit is now infallible and expects no return value [PR1049](https://github.com/holochain/holochain/pull/1049)
+- Always depend on `itertools` to make `cargo build --no-default-features` work [#1060](https://github.com/holochain/holochain/pull/1060)
+
+## 0.0.111
+
 - `call_info` is now implemented [1047](https://github.com/holochain/holochain/pull/1047)
 - `dna_info` now returns `DnaInfo` correctly [\#1044](https://github.com/holochain/holochain/pull/1044)
+  
   - `ZomeInfo` no longer includes what is now on `DnaInfo`
   - `ZomeInfo` renames `zome_name` and `zome_id` to `name` and `id`
   - `DnaInfo` includes `name`, `hash`, `properties`
+
+- `post_commit` hook is implemented now [PR 1000](https://github.com/holochain/holochain/pull/1000)
+
+- Bump legacy lair version to 0.0.8 fixing a crash when error message was too long [\#1046](https://github.com/holochain/holochain/pull/1046)
+
+- Options to use new lair keystore [\#1040](https://github.com/holochain/holochain/pull/1040)
+
+<!-- end list -->
+
+``` yaml
+keystore:
+  type: danger_test_keystore
+```
+
+or
+
+``` yaml
+keystore:
+  type: lair_server
+  connection_url: "unix:///my/path/socket?k=Foo"
+```
 
 ## 0.0.110
 
@@ -20,7 +46,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - adds new lair as an additional dependency and begins preparation for a config-time switch allowing use of new api lair keystore.
 - Add method `SweetDnaFile::from_bundle_with_overrides` [\#1030](https://github.com/holochain/holochain/pull/1030)
 - Some `SweetConductor::setup_app_*` methods now take anything iterable, instead of array slices, for specifying lists of agents and DNAs [\#1030](https://github.com/holochain/holochain/pull/1030)
-- `post_commit` hook is implemented now [PR 1000](https://github.com/holochain/holochain/pull/1000)
 - BREAKING conductor config changes [\#1031](https://github.com/holochain/holochain/pull/1031)
 
 Where previously, you might have had:
@@ -47,22 +72,6 @@ or:
 ``` yaml
 keystore:
   type: danger_test_keystore_legacy_deprecated
-```
-- Bump legacy lair version to 0.0.8 fixing a crash when error message was too long [#1046](https://github.com/holochain/holochain/pull/1046)
-
-- Options to use new lair keystore [#1040](https://github.com/holochain/holochain/pull/1040)
-
-```yaml
-keystore:
-  type: danger_test_keystore
-```
-
-or
-
-```yaml
-keystore:
-  type: lair_server
-  connection_url: "unix:///my/path/socket?k=Foo"
 ```
 
 ## 0.0.109
