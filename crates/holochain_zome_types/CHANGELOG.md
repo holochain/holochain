@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `HeaderHashes` no longer exists [PR1049](https://github.com/holochain/holochain/pull/1049)
 - `HeaderHashedVec` no longer exists [PR1049](https://github.com/holochain/holochain/pull/1049)
 
+## 0.0.14
+
 ## 0.0.13
 
 - `CallInfo` now has `as_at` on it [PR 1047](https://github.com/holochain/holochain/pull/1047)
