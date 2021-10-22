@@ -38,7 +38,7 @@ impl Invocation for GenesisSelfCheckInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(self.payload)
     }
-    fn cap_secret(&self) -> Option<CapSecret> {
+    fn auth(&self) -> Option<(AgentPubKey, CapSecret)> {
         None
     }
 }

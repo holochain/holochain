@@ -56,6 +56,7 @@ pub struct DnaInfo {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CallInfo {
+    pub provenance: AgentPubKey,
     /// Chain head as at the call start.
     /// This will not change within a call even if the chain is written to.
     pub as_at: (HeaderHash, u32, Timestamp),

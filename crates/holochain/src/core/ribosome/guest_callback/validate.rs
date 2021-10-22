@@ -80,7 +80,7 @@ impl Invocation for ValidateInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(ValidateData::from(self))
     }
-    fn cap_secret(&self) -> Option<CapSecret> {
+    fn auth(&self) -> Option<(AgentPubKey, CapSecret)> {
         None
     }
 }

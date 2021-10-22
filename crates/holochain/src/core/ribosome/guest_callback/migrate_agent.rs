@@ -62,7 +62,7 @@ impl Invocation for MigrateAgentInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(self.migrate_agent)
     }
-    fn cap_secret(&self) -> Option<CapSecret> {
+    fn auth(&self) -> Option<(AgentPubKey, CapSecret)> {
         None
     }
 }

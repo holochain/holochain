@@ -108,7 +108,7 @@ where
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         self.invocation.host_input()
     }
-    fn cap_secret(&self) -> Option<CapSecret> {
+    fn auth(&self) -> Option<(AgentPubKey, CapSecret)> {
         None
     }
 }
@@ -126,7 +126,7 @@ impl Invocation for ValidateCreateLinkInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(ValidateCreateLinkData::from(self))
     }
-    fn cap_secret(&self) -> Option<CapSecret> {
+    fn auth(&self) -> Option<(AgentPubKey, CapSecret)> {
         None
     }
 }
@@ -144,7 +144,7 @@ impl Invocation for ValidateDeleteLinkInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(ValidateDeleteLinkData::from(self))
     }
-    fn cap_secret(&self) -> Option<CapSecret> {
+    fn auth(&self) -> Option<(AgentPubKey, CapSecret)> {
         None
     }
 }

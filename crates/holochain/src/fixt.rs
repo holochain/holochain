@@ -409,7 +409,24 @@ fixturator!(
 
 fixturator!(
     CallContext;
-    constructor fn new(Zome, HostContext, CapSecret);
+    curve Empty CallContext::new(
+        ZomeFixturator::new(Empty).next().unwrap(),
+        FunctionNameFixturator::new(Empty).next().unwrap(),
+        HostContextFixturator::new(Empty).next().unwrap(),
+        None,
+    );
+    curve Unpredictable CallContext::new(
+        ZomeFixturator::new(Unpredictable).next().unwrap(),
+        FunctionNameFixturator::new(Unpredictable).next().unwrap(),
+        HostContextFixturator::new(Unpredictable).next().unwrap(),
+        Some((AgentPubKeyFixturator::new(Unpredictable).next().unwrap(), CapSecretFixturator::new(Unpredictable).next().unwrap())),
+    );
+    curve Predictable CallContext::new(
+        ZomeFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
+        FunctionNameFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
+        HostContextFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
+        Some((AgentPubKeyFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(), CapSecretFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap()))
+    );
 );
 
 fixturator!(

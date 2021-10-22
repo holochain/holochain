@@ -61,7 +61,7 @@ impl Invocation for ValidationPackageInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(self.app_entry_type)
     }
-    fn cap_secret(&self) -> Option<CapSecret> {
+    fn auth(&self) -> Option<(AgentPubKey, CapSecret)> {
         None
     }
 }

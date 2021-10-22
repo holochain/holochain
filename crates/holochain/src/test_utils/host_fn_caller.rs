@@ -179,7 +179,6 @@ impl HostFnCaller {
         let ribosome = Arc::new(ribosome);
         let zome = ribosome.dna_def().get_zome(&zome_name).unwrap();
         let call_context = Arc::new(CallContext::new(
-            cell_id.agent_pubkey().clone(),
             zome,
             FunctionName::new("not_sure_what_should_be_here"),
             host_access.into(),

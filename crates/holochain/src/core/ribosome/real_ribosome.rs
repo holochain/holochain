@@ -490,8 +490,7 @@ impl RibosomeT for RealRibosome {
             zome: zome.clone(),
             function_name: to_call.clone(),
             host_context,
-            provenance: invocation.provenance(),
-            cap_secret: invocation.cap_secret(),
+            auth: invocation.auth(),
         };
 
         match zome.zome_def() {
