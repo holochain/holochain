@@ -1,6 +1,7 @@
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_state::source_chain::SourceChainJsonDump;
+use holochain_types::dht_op::DhtOpLight;
 use serde::Deserialize;
 use serde::Serialize;
 use std::sync::Arc;
@@ -25,12 +26,14 @@ pub struct IntegrationStateDumps(pub Vec<IntegrationStateDump>);
 pub struct IntegrationStateDump {
     /// Ops in validation limbo awaiting sys
     /// or app validation.
-    pub validation_limbo: usize,
+    pub validation_limbo: Vec<DhtOp>,
+
     /// Ops waiting to be integrated.
-    pub integration_limbo: usize,
+    pub integration_limbo: Vec<DhtOp>,
+    
     /// Ops that are integrated.
     /// This includes rejected.
-    pub integrated: usize,
+    pub integrated: Vec<DhtOp>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -89,7 +92,7 @@ impl std::fmt::Display for IntegrationStateDump {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
-            "({},{},{})",
+            "({:?},{:?},{:?})",
             self.validation_limbo, self.integration_limbo, self.integrated
         )
     }

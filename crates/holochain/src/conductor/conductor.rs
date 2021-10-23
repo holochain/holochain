@@ -1154,29 +1154,60 @@ pub(super) async fn genesis_cells(
 pub async fn integration_dump(vault: &EnvRead) -> ConductorApiResult<IntegrationStateDump> {
     vault
         .async_reader(move |txn| {
-            let integrated = txn.query_row(
-                "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NOT NULL",
-                [],
-                |row| row.get(0),
-            )?;
-            let integration_limbo = txn.query_row(
-            "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NULL AND validation_stage = 3",
-            [],
-            |row| row.get(0),
-        )?;
-            let validation_limbo = txn.query_row(
+            let integrated_stmt = txn.prepare(
                 "
-                SELECT count(hash) FROM DhtOp
+                SELECT 
+                    Header.blob as header_blob,
+                    Entry.blob as entry_blob,
+                    DhtOp.type as dht_type,
+                    DhtOp.hash as dht_hash
+                FROM Header
+                JOIN
+                    DhtOp ON DhtOp.header_hash = Header.hash
+                LEFT JOIN
+                    Entry ON Header.entry_hash = Entry.hash
+                WHERE when_integrated IS NOT NULL
+            ",
+            )?;
+            let integrated = query_dht_ops_from_statement(integrated_stmt).await?;
+
+            let validation_limbo_stmt = txn.prepare("
+                SELECT 
+                    Header.blob as header_blob,
+                    Entry.blob as entry_blob,
+                    DhtOp.type as dht_type,
+                    DhtOp.hash as dht_hash
+                FROM Header
+                JOIN
+                    DhtOp ON DhtOp.header_hash = Header.hash
+                LEFT JOIN
+                    Entry ON Header.entry_hash = Entry.hash
                 WHERE when_integrated IS NULL
                 AND (
                     (is_authored = 1 AND validation_stage IS NOT NULL AND validation_stage < 3)
                     OR
                     (is_authored = 0 AND (validation_stage IS NULL OR validation_stage < 3))
                 )
-                ",
-                [],
-                |row| row.get(0),
+            ",
             )?;
+            let validation_limbo = query_dht_ops_from_statement(validation_limbo_stmt).await?;
+
+            let integration_limbo_stmt = txn.prepare("
+                SELECT 
+                    Header.blob as header_blob,
+                    Entry.blob as entry_blob,
+                    DhtOp.type as dht_type,
+                    DhtOp.hash as dht_hash
+                FROM Header
+                JOIN
+                    DhtOp ON DhtOp.header_hash = Header.hash
+                LEFT JOIN
+                    Entry ON Header.entry_hash = Entry.hash
+                WHERE when_integrated IS NULL AND validation_stage = 3
+            ",
+            )?;
+            let integration_limbo = query_dht_ops_from_statement(integration_limbo_stmt).await?;
+
             ConductorApiResult::Ok(IntegrationStateDump {
                 validation_limbo,
                 integration_limbo,
@@ -1184,6 +1215,26 @@ pub async fn integration_dump(vault: &EnvRead) -> ConductorApiResult<Integration
             })
         })
         .await
+}
+
+async fn query_dht_ops_from_statement(stmt: Statement) -> ConductorApiResult<Vec<DhtOp>> {
+    let r = stmt.query_and_then([], |row| {
+        let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
+        let op_type: DhtOpType = row.get("dht_type")?;
+        let hash: DhtOpHash = row.get("dht_hash")?;
+        let entry = match header.0.entry_type().map(|et| et.visibility()) {
+            Some(EntryVisibility::Public) => {
+                let entry: Option<Vec<u8>> = row.get("entry_blob")?;
+                match entry {
+                    Some(entry) => Some(from_blob::<Entry>(entry)?),
+                    None => None,
+                }
+            }
+            _ => None,
+        };
+        Ok(DhtOp::from_type(op_type, header, entry)?)
+    })?;
+    Ok(r)
 }
 
 //-----------------------------------------------------------------------------

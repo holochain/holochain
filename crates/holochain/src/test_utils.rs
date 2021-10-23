@@ -539,9 +539,9 @@ pub async fn wait_for_integration_with_others(
     let mut last_total = 0;
     let this_start = std::time::Instant::now();
     for _ in 0..num_attempts {
-        let count = count_integration(env).await;
-        let counts = get_counts(others).await;
-        let total: usize = counts.0.clone().into_iter().map(|i| i.integrated).sum();
+        let count = query_integration(env).await;
+        let counts = get_integration_dumps(others).await;
+        let total: usize = counts.0.clone().into_iter().map(|i| i.integrated.len()).sum();
         let num_conductors = counts.0.len() + 1;
         let total_expected = num_conductors * expected_count;
         let progress = if total_expected == 0 {
@@ -551,7 +551,7 @@ pub async fn wait_for_integration_with_others(
         };
         let change = total.checked_sub(last_total).expect("LOST A VALUE");
         last_total = total;
-        if count.integrated == expected_count {
+        if count.integrated.len() == expected_count {
             return;
         } else {
             let time_waited = this_start.elapsed().as_secs();
@@ -563,9 +563,9 @@ pub async fn wait_for_integration_with_others(
             };
             tracing::debug!(
                 "Count: {}, val: {}, int: {}\nTime waited: {}s (total {}s),\nCounts: {:?}\nTotal: {} out of {} {:.4}% change:{} {:.4}ops/s\n",
-                count.integrated,
-                count.validation_limbo,
-                count.integration_limbo,
+                count.integrated.len(),
+                count.validation_limbo.len(),
+                count.integration_limbo.len(),
                 time_waited,
                 total_time_waited,
                 counts,
@@ -637,16 +637,16 @@ async fn show_data(env: &EnvWrite, op: &DhtOpLight) {
     }
 }
 
-async fn get_counts(envs: &[&EnvWrite]) -> IntegrationStateDumps {
+async fn get_integration_dumps(envs: &[&EnvWrite]) -> IntegrationStateDumps {
     let mut output = Vec::new();
     for env in envs {
         let env = *env;
-        output.push(count_integration(env).await);
+        output.push(query_integration(env).await);
     }
     IntegrationStateDumps(output)
 }
 
-async fn count_integration(env: &EnvWrite) -> IntegrationStateDump {
+async fn query_integration(env: &EnvWrite) -> IntegrationStateDump {
     crate::conductor::integration_dump(&env.clone().into())
         .await
         .unwrap()
