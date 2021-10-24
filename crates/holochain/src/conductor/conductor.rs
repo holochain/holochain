@@ -65,8 +65,10 @@ use holochain_sqlite::prelude::*;
 use holochain_state::mutations;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateMutationResult;
+use holochain_state::prelude::StateQueryResult;
 use holochain_types::prelude::*;
 use rusqlite::OptionalExtension;
+use rusqlite::Statement;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
@@ -1154,7 +1156,7 @@ pub(super) async fn genesis_cells(
 pub async fn integration_dump(vault: &EnvRead) -> ConductorApiResult<IntegrationStateDump> {
     vault
         .async_reader(move |txn| {
-            let integrated_stmt = txn.prepare(
+            let mut integrated_stmt = txn.prepare(
                 "
                 SELECT 
                     Header.blob as header_blob,
@@ -1169,9 +1171,10 @@ pub async fn integration_dump(vault: &EnvRead) -> ConductorApiResult<Integration
                 WHERE when_integrated IS NOT NULL
             ",
             )?;
-            let integrated = query_dht_ops_from_statement(integrated_stmt).await?;
+            let integrated = query_dht_ops_from_statement(&mut integrated_stmt)?;
 
-            let validation_limbo_stmt = txn.prepare("
+            let mut validation_limbo_stmt = txn.prepare(
+                "
                 SELECT 
                     Header.blob as header_blob,
                     Entry.blob as entry_blob,
@@ -1190,9 +1193,10 @@ pub async fn integration_dump(vault: &EnvRead) -> ConductorApiResult<Integration
                 )
             ",
             )?;
-            let validation_limbo = query_dht_ops_from_statement(validation_limbo_stmt).await?;
+            let validation_limbo = query_dht_ops_from_statement(&mut validation_limbo_stmt)?;
 
-            let integration_limbo_stmt = txn.prepare("
+            let mut integration_limbo_stmt = txn.prepare(
+                "
                 SELECT 
                     Header.blob as header_blob,
                     Entry.blob as entry_blob,
@@ -1206,7 +1210,7 @@ pub async fn integration_dump(vault: &EnvRead) -> ConductorApiResult<Integration
                 WHERE when_integrated IS NULL AND validation_stage = 3
             ",
             )?;
-            let integration_limbo = query_dht_ops_from_statement(integration_limbo_stmt).await?;
+            let integration_limbo = query_dht_ops_from_statement(&mut integration_limbo_stmt)?;
 
             ConductorApiResult::Ok(IntegrationStateDump {
                 validation_limbo,
@@ -1217,23 +1221,24 @@ pub async fn integration_dump(vault: &EnvRead) -> ConductorApiResult<Integration
         .await
 }
 
-async fn query_dht_ops_from_statement(stmt: Statement) -> ConductorApiResult<Vec<DhtOp>> {
-    let r = stmt.query_and_then([], |row| {
-        let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
-        let op_type: DhtOpType = row.get("dht_type")?;
-        let hash: DhtOpHash = row.get("dht_hash")?;
-        let entry = match header.0.entry_type().map(|et| et.visibility()) {
-            Some(EntryVisibility::Public) => {
-                let entry: Option<Vec<u8>> = row.get("entry_blob")?;
-                match entry {
-                    Some(entry) => Some(from_blob::<Entry>(entry)?),
-                    None => None,
+fn query_dht_ops_from_statement(stmt: &mut Statement) -> ConductorApiResult<Vec<DhtOp>> {
+    let r: Vec<DhtOp> = stmt
+        .query_and_then([], |row| {
+            let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
+            let op_type: DhtOpType = row.get("dht_type")?;
+            let entry = match header.0.entry_type().map(|et| et.visibility()) {
+                Some(EntryVisibility::Public) => {
+                    let entry: Option<Vec<u8>> = row.get("entry_blob")?;
+                    match entry {
+                        Some(entry) => Some(from_blob::<Entry>(entry)?),
+                        None => None,
+                    }
                 }
-            }
-            _ => None,
-        };
-        Ok(DhtOp::from_type(op_type, header, entry)?)
-    })?;
+                _ => None,
+            };
+            Ok(DhtOp::from_type(op_type, header, entry)?)
+        })?
+        .collect::<StateQueryResult<Vec<_>>>()?;
     Ok(r)
 }
 

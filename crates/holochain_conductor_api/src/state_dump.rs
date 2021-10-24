@@ -1,7 +1,7 @@
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_state::source_chain::SourceChainJsonDump;
-use holochain_types::dht_op::DhtOpLight;
+use holochain_types::dht_op::DhtOp;
 use serde::Deserialize;
 use serde::Serialize;
 use std::sync::Arc;
@@ -30,7 +30,7 @@ pub struct IntegrationStateDump {
 
     /// Ops waiting to be integrated.
     pub integration_limbo: Vec<DhtOp>,
-    
+
     /// Ops that are integrated.
     /// This includes rejected.
     pub integrated: Vec<DhtOp>,

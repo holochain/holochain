@@ -489,7 +489,7 @@ pub async fn wait_for_integration(
             return;
         } else {
             let total_time_waited = delay * i as u32;
-            tracing::debug!(?count, ?total_time_waited, counts = ?count_integration(env).await);
+            tracing::debug!(?count, ?total_time_waited, counts = ?query_integration(env).await.integrated.len());
         }
         tokio::time::sleep(delay).await;
     }
@@ -541,7 +541,12 @@ pub async fn wait_for_integration_with_others(
     for _ in 0..num_attempts {
         let count = query_integration(env).await;
         let counts = get_integration_dumps(others).await;
-        let total: usize = counts.0.clone().into_iter().map(|i| i.integrated.len()).sum();
+        let total: usize = counts
+            .0
+            .clone()
+            .into_iter()
+            .map(|i| i.integrated.len())
+            .sum();
         let num_conductors = counts.0.len() + 1;
         let total_expected = num_conductors * expected_count;
         let progress = if total_expected == 0 {
