@@ -24,6 +24,7 @@ use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
+use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::ZomesToInvoke;
@@ -43,7 +44,6 @@ use rand::Rng;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use strum::IntoEnumIterator;
-use crate::core::ribosome::InvocationAuth;
 
 pub use holochain_types::fixt::*;
 

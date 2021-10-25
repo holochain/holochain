@@ -9,6 +9,7 @@ use crate::core::ribosome::host_fn;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostContext;
+use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
@@ -28,7 +29,6 @@ use holochain_zome_types::AgentActivity;
 use std::sync::Arc;
 use tracing::*;
 use unwrap_to::unwrap_to;
-use crate::core::ribosome::InvocationAuth;
 
 // Commit entry types //
 // Useful for when you want to commit something
