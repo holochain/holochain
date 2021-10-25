@@ -11,7 +11,7 @@ use crate::core::queue_consumer::QueueTriggers;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
-use holochain_keystore::KeystoreSender;
+use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::HolochainP2pRefToCell;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::SerializedBytes;
@@ -30,7 +30,7 @@ pub struct CellHostFnCaller {
     pub cache: EnvWrite,
     pub ribosome: RealRibosome,
     pub network: HolochainP2pCell,
-    pub keystore: KeystoreSender,
+    pub keystore: MetaLairClient,
     pub signal_tx: SignalBroadcaster,
     pub triggers: QueueTriggers,
     pub cell_conductor_api: CellConductorApi,
@@ -126,7 +126,7 @@ impl ConductorTestData {
             for cell_id in cell_ids {
                 cell_apis.insert(
                     cell_id.clone(),
-                    CellHostFnCaller::new(&cell_id, &handle, &dna_file).await,
+                    CellHostFnCaller::new(cell_id, &handle, dna_file).await,
                 );
             }
         }
@@ -222,8 +222,8 @@ impl ConductorTestData {
     pub fn alice_call_data(&self) -> &CellHostFnCaller {
         match self.cell_apis.values().len() {
             0 => unreachable!(),
-            1 => &self.cell_apis.values().next().unwrap(),
-            2 => &self.cell_apis.values().nth(1).unwrap(),
+            1 => self.cell_apis.values().next().unwrap(),
+            2 => self.cell_apis.values().nth(1).unwrap(),
             _ => unimplemented!(),
         }
     }

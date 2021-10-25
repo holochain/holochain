@@ -139,7 +139,7 @@ pub async fn local_machine_session_with_hashes(
         agent_env_map.extend(agents.iter().cloned().map(|(e, a)| (a, e)));
         agent_p2p_map.extend(agents.iter().cloned().map(|(_, a)| (a, p2p_env.clone())));
         for (_, agent) in &agents {
-            if let Some(storage_arc) = request_arc(&p2p_env, &agent).await.unwrap() {
+            if let Some(storage_arc) = request_arc(&p2p_env, agent).await.unwrap() {
                 all_agents.push((agent.clone(), storage_arc));
             }
         }
@@ -643,7 +643,7 @@ async fn request_published_ops(env: &EnvRead) -> StateQueryResult<Vec<(u32, Kits
                     "
                     SELECT
                     DhtOp.hash as dht_op_hash,
-                    DhtOp.storage_center_location as loc
+                    DhtOp.storage_center_loc as loc
                     FROM DhtOp
                     JOIN
                     Header ON DhtOp.header_hash = Header.hash

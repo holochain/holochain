@@ -10,7 +10,6 @@ use kitsune_p2p::event::MetricKind;
 use kitsune_p2p::event::MetricQuery;
 use kitsune_p2p::event::MetricQueryAnswer;
 use kitsune_p2p::event::TimeWindow;
-use kitsune_p2p_types::tx2::tx2_adapter::AdapterFactory;
 
 use crate::types::AgentPubKeyExt;
 
@@ -372,11 +371,10 @@ impl HolochainP2pActor {
         tls_config: kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig,
         channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
         evt_sender: futures::channel::mpsc::Sender<HolochainP2pEvent>,
-        mock_network: Option<AdapterFactory>,
     ) -> HolochainP2pResult<Self> {
         let tuning_params = config.tuning_params.clone();
         let (kitsune_p2p, kitsune_p2p_events) =
-            kitsune_p2p::spawn_kitsune_p2p(config, tls_config, mock_network).await?;
+            kitsune_p2p::spawn_kitsune_p2p(config, tls_config).await?;
 
         channel_factory.attach_receiver(kitsune_p2p_events).await?;
 

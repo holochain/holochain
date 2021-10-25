@@ -27,7 +27,7 @@ pub fn spawn_sys_validation_consumer(
     conductor_api: impl CellConductorApiT + 'static,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
     let (tx, mut rx) = TriggerSender::new();
-    let mut trigger_self = tx.clone();
+    let trigger_self = tx.clone();
     let handle = tokio::spawn(async move {
         loop {
             // Wait for next job

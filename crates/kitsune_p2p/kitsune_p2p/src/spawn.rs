@@ -6,13 +6,11 @@ use actor::*;
 
 #[cfg(test)]
 pub use actor::MockKitsuneP2pEventHandler;
-use kitsune_p2p_types::tx2::tx2_adapter::AdapterFactory;
 
 /// Spawn a new KitsuneP2p actor.
 pub async fn spawn_kitsune_p2p(
     config: crate::KitsuneP2pConfig,
     tls_config: kitsune_p2p_types::tls::TlsConfig,
-    mock_network: Option<AdapterFactory>,
 ) -> KitsuneP2pResult<(
     ghost_actor::GhostSender<KitsuneP2p>,
     KitsuneP2pEventReceiver,
@@ -34,7 +32,6 @@ pub async fn spawn_kitsune_p2p(
                 channel_factory,
                 internal_sender,
                 evt_send,
-                mock_network,
             )
             .await?,
         ),
