@@ -357,7 +357,7 @@ impl Invocation for ZomeCallInvocation {
         Ok(self.payload)
     }
     fn auth(&self) -> InvocationAuth {
-        InvocationAuth::Cap(self.provenance.clone(), self.cap_secret.clone())
+        InvocationAuth::Cap(self.provenance.clone(), self.cap_secret)
     }
 }
 
