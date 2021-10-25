@@ -1172,8 +1172,6 @@ pub async fn integration_dump(vault: &EnvRead) -> ConductorApiResult<Integration
             ",
             )?;
             let integrated = query_dht_ops_from_statement(&mut integrated_stmt)?;
-            // TODO: remove
-            println!("integrated {:?}", integrated);
 
             let mut validation_limbo_stmt = txn.prepare(
                 "
