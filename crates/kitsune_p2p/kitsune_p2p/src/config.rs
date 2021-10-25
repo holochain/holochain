@@ -90,6 +90,12 @@ impl KitsuneP2pConfig {
                     use_proxy: None,
                 })
             }
+            Some(TransportConfig::Mock { mock_network }) => Ok(KitsuneP2pTx2Config {
+                backend: KitsuneP2pTx2Backend::Mock {
+                    mock_network: mock_network.0.clone(),
+                },
+                use_proxy: None,
+            }),
             None | Some(TransportConfig::Mem {}) => Ok(KitsuneP2pTx2Config {
                 backend: KitsuneP2pTx2Backend::Mem,
                 use_proxy: None,
@@ -134,6 +140,30 @@ pub enum TransportConfig {
         /// - be directly addressable, but not proxy for others
         proxy_config: ProxyConfig,
     },
+    #[serde(skip)]
+    /// A mock network for testing.
+    Mock {
+        /// The adaptor for mocking the network.
+        mock_network: AdapterFactoryMock,
+    },
+}
+
+#[derive(Clone)]
+/// A simple wrapper around the [`AdaptorFactory`] to allow implementing
+/// Debug and PartialEq.
+pub struct AdapterFactoryMock(pub AdapterFactory);
+
+impl std::fmt::Debug for AdapterFactoryMock {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("AdapterFactoryMock").finish()
+    }
+}
+
+impl std::cmp::PartialEq for AdapterFactoryMock {
+    fn eq(&self, _: &Self) -> bool {
+        // I don't think it matters if to mocks are compared.
+        true
+    }
 }
 
 /// Proxy configuration options

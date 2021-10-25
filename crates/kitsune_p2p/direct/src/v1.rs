@@ -152,7 +152,7 @@ pub fn new_kitsune_direct_v1(
 
         let tls = persist.singleton_tls_config().await?;
 
-        let (p2p, evt) = spawn_kitsune_p2p(sub_config, tls, None)
+        let (p2p, evt) = spawn_kitsune_p2p(sub_config, tls)
             .await
             .map_err(KdError::other)?;
 

@@ -643,7 +643,7 @@ async fn request_published_ops(env: &EnvRead) -> StateQueryResult<Vec<(u32, Kits
                     "
                     SELECT
                     DhtOp.hash as dht_op_hash,
-                    DhtOp.storage_center_location as loc
+                    DhtOp.storage_center_loc as loc
                     FROM DhtOp
                     JOIN
                     Header ON DhtOp.header_hash = Header.hash

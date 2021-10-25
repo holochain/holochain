@@ -1302,7 +1302,6 @@ mod builder {
     use holochain_sqlite::db::DbKind;
     #[cfg(any(test, feature = "test_utils"))]
     use holochain_state::test_utils::TestEnvs;
-    use kitsune_p2p_types::tx2::tx2_adapter::AdapterFactory;
 
     /// A configurable Builder for Conductor and sometimes ConductorHandle
     #[derive(Default)]
@@ -1321,8 +1320,6 @@ mod builder {
         #[cfg(any(test, feature = "test_utils"))]
         /// Optional handle mock (for testing)
         pub mock_handle: Option<MockConductorHandleT>,
-        /// Optional mock p2p network (for testing)
-        pub mock_network: Option<kitsune_p2p_types::tx2::tx2_adapter::MockBindAdapt>,
     }
 
     impl ConductorBuilder {
@@ -1427,11 +1424,6 @@ mod builder {
             #[cfg(any(test, feature = "test_utils"))]
             let state = self.state;
 
-            let mock_network: Option<AdapterFactory> = match self.mock_network {
-                Some(mock_network) => Some(Arc::new(mock_network)),
-                None => None,
-            };
-
             let Self {
                 dna_store, config, ..
             } = self;
@@ -1449,8 +1441,7 @@ mod builder {
                     cert_digest,
                 };
             let (holochain_p2p, p2p_evt) =
-                holochain_p2p::spawn_holochain_p2p(network_config, tls_config, mock_network)
-                    .await?;
+                holochain_p2p::spawn_holochain_p2p(network_config, tls_config).await?;
 
             let (post_commit_sender, post_commit_receiver) =
                 tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
@@ -1582,16 +1573,6 @@ mod builder {
             self
         }
 
-        /// Pass in a mock p2p network.
-        #[cfg(any(test, feature = "test_utils"))]
-        pub fn with_mock_p2p(
-            mut self,
-            mock_network: kitsune_p2p_types::tx2::tx2_adapter::MockBindAdapt,
-        ) -> Self {
-            self.mock_network = Some(mock_network);
-            self
-        }
-
         #[cfg(any(test, feature = "test_utils"))]
         async fn update_fake_state(
             state: Option<ConductorState>,
@@ -1614,14 +1595,8 @@ mod builder {
 
             self.config.environment_path = envs.path().to_path_buf().into();
 
-            let mock_network: Option<AdapterFactory> = match self.mock_network {
-                Some(mock_network) => Some(Arc::new(mock_network)),
-                None => None,
-            };
-
             let (holochain_p2p, p2p_evt) =
-                holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default(), holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig::new_ephemeral().await.unwrap(),
-                mock_network)
+                holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default(), holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig::new_ephemeral().await.unwrap())
                     .await?;
 
             let (post_commit_sender, post_commit_receiver) =
