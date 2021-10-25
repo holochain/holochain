@@ -21,7 +21,7 @@ pub enum SourceChainError {
         "Attempted to commit a bundle to the source chain, but the source chain head has moved since the bundle began. Bundle head: {2:?}, Current head: {3:?}"
     )]
     HeadMoved(
-        Vec<SignedHeaderHashed>,
+        Vec<(Option<Zome>, SignedHeaderHashed)>,
         Vec<EntryHashed>,
         Option<HeaderHash>,
         Option<(HeaderHash, u32, Timestamp)>,
@@ -106,12 +106,29 @@ pub enum SourceChainError {
 
     #[error(transparent)]
     CounterSigningError(#[from] CounterSigningError),
+
+    /// Other
+    #[error("Other: {0}")]
+    Other(Box<dyn std::error::Error + Send + Sync>),
+}
+
+impl SourceChainError {
+    /// promote a custom error type to a SourceChainError
+    pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
+        Self::Other(e.into())
+    }
 }
 
 // serde_json::Error does not implement PartialEq - why is that a requirement??
 impl From<serde_json::Error> for SourceChainError {
     fn from(e: serde_json::Error) -> Self {
         Self::SerdeJsonError(format!("{:?}", e))
+    }
+}
+
+impl From<one_err::OneErr> for SourceChainError {
+    fn from(e: one_err::OneErr) -> Self {
+        Self::other(e)
     }
 }
 

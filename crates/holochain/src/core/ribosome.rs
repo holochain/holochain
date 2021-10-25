@@ -22,7 +22,6 @@ use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation;
 use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
-use crate::core::ribosome::guest_callback::post_commit::PostCommitResult;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::guest_callback::validate_link::ValidateLinkHostAccess;
@@ -40,7 +39,7 @@ use guest_callback::post_commit::PostCommitHostAccess;
 use guest_callback::validate::ValidateHostAccess;
 use guest_callback::validation_package::ValidationPackageHostAccess;
 use holo_hash::AgentPubKey;
-use holochain_keystore::KeystoreSender;
+use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
@@ -123,7 +122,7 @@ impl HostContext {
     }
 
     /// Get the keystore, panics if none was provided
-    pub fn keystore(&self) -> &KeystoreSender {
+    pub fn keystore(&self) -> &MetaLairClient {
         match self {
             Self::ZomeCall(ZomeCallHostAccess { keystore, .. })
             | Self::Init(InitHostAccess { keystore, .. })
@@ -208,6 +207,12 @@ impl Iterator for FnComponents {
 impl From<Vec<String>> for FnComponents {
     fn from(vs: Vec<String>) -> Self {
         Self(vs)
+    }
+}
+
+impl FnComponents {
+    pub fn into_inner(self) -> Vec<String> {
+        self.0
     }
 }
 
@@ -368,7 +373,7 @@ impl From<ZomeCallInvocation> for ZomeCall {
 #[derive(Clone, Constructor)]
 pub struct ZomeCallHostAccess {
     pub workspace: HostFnWorkspace,
-    pub keystore: KeystoreSender,
+    pub keystore: MetaLairClient,
     pub network: HolochainP2pCell,
     pub signal_tx: SignalBroadcaster,
     pub call_zome_handle: CellConductorReadHandle,
@@ -484,7 +489,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
         &self,
         access: PostCommitHostAccess,
         invocation: PostCommitInvocation,
-    ) -> RibosomeResult<PostCommitResult>;
+    ) -> RibosomeResult<()>;
 
     /// Helper function for running a validation callback. Just calls
     /// [`run_callback`][] under the hood.

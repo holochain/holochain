@@ -115,7 +115,7 @@ impl Inner {
                     if !new_set.contains(old_key) {
                         local_synced_ops += 1;
                         let op_data =
-                            data_map_get(evt_sender, space, old_agent, data_map, &old_key).await?;
+                            data_map_get(evt_sender, space, old_agent, data_map, old_key).await?;
 
                         match &*op_data {
                             MetaOpData::Op(key, data) => {

@@ -117,7 +117,7 @@ pub struct IncomingOpHashes(Arc<parking_lot::Mutex<HashSet<DhtOpHash>>>);
 pub async fn incoming_dht_ops_workflow(
     vault: &EnvWrite,
     incoming_op_hashes: Option<&IncomingOpHashes>,
-    mut sys_validation_trigger: TriggerSender,
+    sys_validation_trigger: TriggerSender,
     mut ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     request_validation_receipt: bool,
 ) -> WorkflowResult<()> {

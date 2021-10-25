@@ -1,36 +1,23 @@
 use crate::header::ZomeId;
 use crate::zome::ZomeName;
+use crate::Timestamp;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
+use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 
 /// The properties of the current dna/zome being called.
 #[allow(missing_docs)]
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq)]
 pub struct ZomeInfo {
-    pub dna_name: String,
-    pub dna_hash: DnaHash,
-    pub zome_name: ZomeName,
+    pub name: ZomeName,
     /// The position of this zome in the `dna.json`
-    pub zome_id: ZomeId,
-    pub properties: SerializedBytes,
+    pub id: ZomeId,
 }
 
 impl ZomeInfo {
-    pub fn new(
-        dna_name: String,
-        dna_hash: DnaHash,
-        zome_name: ZomeName,
-        zome_id: ZomeId,
-        properties: SerializedBytes,
-    ) -> Self {
-        Self {
-            dna_name,
-            dna_hash,
-            zome_name,
-            zome_id,
-            properties,
-        }
+    pub fn new(name: ZomeName, id: ZomeId) -> Self {
+        Self { name, id }
     }
 }
 
@@ -60,7 +47,15 @@ impl AgentInfo {
 pub struct AppInfo;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct DnaInfo;
+pub struct DnaInfo {
+    pub name: String,
+    pub hash: DnaHash,
+    pub properties: SerializedBytes,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct CallInfo;
+pub struct CallInfo {
+    /// Chain head as at the call start.
+    /// This will not change within a call even if the chain is written to.
+    pub as_at: (HeaderHash, u32, Timestamp),
+}

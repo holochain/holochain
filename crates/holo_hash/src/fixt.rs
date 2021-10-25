@@ -74,7 +74,7 @@ fn append_location(mut base: Vec<u8>) -> Vec<u8> {
 }
 
 fixturator!(
-    // with_vec 0 5;
+    with_vec 0 5;
     AgentPubKey;
     curve Empty AgentPubKey::from_raw_36(ThirtySixHashBytesFixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap());
     curve Unpredictable AgentPubKey::from_raw_36(ThirtySixHashBytesFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap());
@@ -82,9 +82,9 @@ fixturator!(
         // these agent keys match what the mock keystore spits out for the first two agents
         // don't mess with this unless you also update the keystore!!!
         let agents = vec![
-            AgentPubKey::try_from("uhCAkmrkoAHPVf_eufG7eC5fm6QKrW5pPMoktvG5LOC0SnJ4vV1Uv")
+            AgentPubKey::try_from("uhCAkJCuynkgVdMn_bzZ2ZYaVfygkn0WCuzfFspczxFnZM1QAyXoo")
             .unwrap(),
-            AgentPubKey::try_from("uhCAke1j8Z2a-_min0h0pGuEMcYlo_V1l1mt9OtBuywKmHlg4L_R-")
+            AgentPubKey::try_from("uhCAk39SDf7rynCg5bYgzroGaOJKGKrloI1o57Xao6S-U5KNZ0dUH")
                 .unwrap(),
         ];
         agents[get_fixt_index!() % agents.len()].clone()
@@ -124,6 +124,7 @@ fixturator!(
 );
 
 fixturator!(
+    with_vec 0 5;
     HeaderHash;
     constructor fn from_raw_36(ThirtySixHashBytes);
 );

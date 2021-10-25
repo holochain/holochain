@@ -202,7 +202,6 @@ where
         holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig::new_ephemeral()
             .await
             .unwrap(),
-        None,
     )
     .await
     .unwrap();

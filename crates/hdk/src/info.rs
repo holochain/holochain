@@ -18,7 +18,10 @@ pub fn app_info() -> ExternResult<AppInfo> {
     HDK.with(|h| h.borrow().app_info(()))
 }
 
-/// @todo Not implemented
+/// Get the DNA information.
+/// There are no inputs to [ `dna_info` ].
+///
+/// DNA information includes dna name, hash and properties.
 pub fn dna_info() -> ExternResult<DnaInfo> {
     HDK.with(|h| h.borrow().dna_info(()))
 }
@@ -26,7 +29,7 @@ pub fn dna_info() -> ExternResult<DnaInfo> {
 /// Get the zome information.
 /// There are no inputs to [ `zome_info` ].
 ///
-/// Zome information includes dna name, hash, zome name and properties.
+/// Zome information includes zome name, id and properties.
 ///
 /// In general any holochain compatible wasm can be compiled and run in any zome so the zome info
 /// needs to be looked up at runtime to e.g. know where to send/receive `call_remote` rpc calls to.

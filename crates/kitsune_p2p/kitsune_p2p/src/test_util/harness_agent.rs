@@ -37,7 +37,6 @@ pub(crate) async fn spawn_test_agent(
     let (p2p, evt) = spawn_kitsune_p2p(
         config,
         kitsune_p2p_proxy::TlsConfig::new_ephemeral().await.unwrap(),
-        None,
     )
     .await?;
 
@@ -59,11 +58,11 @@ pub(crate) async fn spawn_test_agent(
 }
 
 use kitsune_p2p_timestamp::Timestamp;
-use kitsune_p2p_types::dependencies::legacy_lair_api;
+use kitsune_p2p_types::dependencies::lair_keystore_api_0_0;
 use kitsune_p2p_types::dht_arc::DhtArcBucket;
 use kitsune_p2p_types::dht_arc::DhtArcSet;
-use legacy_lair_api::entry::EntrySignEd25519;
-use legacy_lair_api::internal::sign_ed25519::*;
+use lair_keystore_api_0_0::entry::EntrySignEd25519;
+use lair_keystore_api_0_0::internal::sign_ed25519::*;
 
 struct AgentHarness {
     agent: Arc<KitsuneAgent>,

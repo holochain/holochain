@@ -264,7 +264,7 @@ async fn bob_links_in_a_legit_way(
         .await;
 
     // Produce and publish these commits
-    let mut triggers = handle.get_cell_triggers(&bob_cell_id).unwrap();
+    let triggers = handle.get_cell_triggers(&bob_cell_id).unwrap();
     triggers.publish_dht_ops.trigger();
     link_add_address
 }
@@ -320,7 +320,7 @@ async fn bob_makes_a_large_link(
         .await;
 
     // Produce and publish these commits
-    let mut triggers = handle.get_cell_triggers(&bob_cell_id).unwrap();
+    let triggers = handle.get_cell_triggers(&bob_cell_id).unwrap();
     triggers.publish_dht_ops.trigger();
     (bad_update_header, bad_update_entry_hash, link_add_address)
 }
@@ -350,7 +350,7 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
         .await;
 
     // Produce and publish these commits
-    let mut triggers = handle.get_cell_triggers(&bob_cell_id).unwrap();
+    let triggers = handle.get_cell_triggers(&bob_cell_id).unwrap();
     triggers.publish_dht_ops.trigger();
 }
 
