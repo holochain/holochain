@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Post commit is now infallible and expects no return value [PR1049](https://github.com/holochain/holochain/pull/1049)
 - Always depend on `itertools` to make `cargo build --no-default-features` work [#1060](https://github.com/holochain/holochain/pull/1060)
+- Cell `IntegratedStateDump` now returns the full `Vec<DhtOp>` instead of just their count, enabling more introspection of the state of the cell [#1065](https://github.com/holochain/holochain/pull/1065).
 
 ## 0.0.112
 
