@@ -394,10 +394,11 @@ async fn list_app_interfaces_succeeds() -> Result<()> {
     let request = AdminRequest::ListAppInterfaces;
 
     // Request the list of app interfaces that the conductor has attached
-    let response: Result<AdminResponse, _> = client.request(request).await;
+    let response: Result<Result<AdminResponse, _>, tokio::time::error::Elapsed> =
+        tokio::time::timeout(Duration::from_secs(1), client.request(request)).await;
 
     // There should be no app interfaces listed
-    assert_matches!(response, Ok(AdminResponse::AppInterfacesListed(interfaces)) if interfaces.len() == 0);
+    assert_matches!(response, Ok(Ok(AdminResponse::AppInterfacesListed(interfaces))) if interfaces.len() == 0);
 
     Ok(())
 }
