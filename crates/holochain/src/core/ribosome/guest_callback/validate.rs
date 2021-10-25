@@ -9,6 +9,7 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use crate::core::ribosome::InvocationAuth;
 
 #[derive(Clone, Debug)]
 pub struct ValidateInvocation {
@@ -80,8 +81,8 @@ impl Invocation for ValidateInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(ValidateData::from(self))
     }
-    fn auth(&self) -> Option<(AgentPubKey, CapSecret)> {
-        None
+    fn auth(&self) -> InvocationAuth {
+        InvocationAuth::LocalCallback
     }
 }
 

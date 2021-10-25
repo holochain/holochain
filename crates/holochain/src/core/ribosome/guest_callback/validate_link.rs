@@ -9,6 +9,7 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use crate::core::ribosome::InvocationAuth;
 
 #[derive(Clone)]
 pub struct ValidateLinkInvocation<I>
@@ -108,8 +109,8 @@ where
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         self.invocation.host_input()
     }
-    fn auth(&self) -> Option<(AgentPubKey, CapSecret)> {
-        None
+    fn auth(&self) -> InvocationAuth {
+        InvocationAuth::LocalCallback
     }
 }
 
@@ -126,8 +127,8 @@ impl Invocation for ValidateCreateLinkInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(ValidateCreateLinkData::from(self))
     }
-    fn auth(&self) -> Option<(AgentPubKey, CapSecret)> {
-        None
+    fn auth(&self) -> InvocationAuth {
+        InvocationAuth::LocalCallback
     }
 }
 
@@ -144,8 +145,8 @@ impl Invocation for ValidateDeleteLinkInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(ValidateDeleteLinkData::from(self))
     }
-    fn auth(&self) -> Option<(AgentPubKey, CapSecret)> {
-        None
+    fn auth(&self) -> InvocationAuth {
+        InvocationAuth::LocalCallback
     }
 }
 

@@ -8,6 +8,7 @@ use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
+use crate::core::ribosome::InvocationAuth;
 
 #[derive(Clone)]
 pub struct ValidationPackageInvocation {
@@ -61,8 +62,8 @@ impl Invocation for ValidationPackageInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(self.app_entry_type)
     }
-    fn auth(&self) -> Option<(AgentPubKey, CapSecret)> {
-        None
+    fn auth(&self) -> InvocationAuth {
+        InvocationAuth::LocalCallback
     }
 }
 

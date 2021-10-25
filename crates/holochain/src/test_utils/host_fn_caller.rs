@@ -28,6 +28,7 @@ use holochain_zome_types::AgentActivity;
 use std::sync::Arc;
 use tracing::*;
 use unwrap_to::unwrap_to;
+use crate::core::ribosome::InvocationAuth;
 
 // Commit entry types //
 // Useful for when you want to commit something
@@ -182,7 +183,8 @@ impl HostFnCaller {
             zome,
             FunctionName::new("not_sure_what_should_be_here"),
             host_access.into(),
-            None,
+            // Auth as the author.
+            InvocationAuth::Cap(cell_id.agent_pubkey().clone(), None),
         ));
         (env, ribosome, call_context, workspace_lock)
     }
@@ -345,6 +347,7 @@ impl HostFnCaller {
     }
 
     pub async fn call_zome_direct(&self, invocation: ZomeCallInvocation) -> ExternIO {
+        dbg!("call_zome_direct", &invocation);
         let (_, ribosome, call_context, workspace_lock) = self.unpack().await;
 
         let output = {

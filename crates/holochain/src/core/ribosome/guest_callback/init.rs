@@ -9,6 +9,7 @@ use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
+use crate::core::ribosome::InvocationAuth;
 
 #[derive(Debug, Clone)]
 pub struct InitInvocation {
@@ -50,8 +51,8 @@ impl Invocation for InitInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(())
     }
-    fn auth(&self) -> Option<(AgentPubKey, CapSecret)> {
-        None
+    fn auth(&self) -> InvocationAuth {
+        InvocationAuth::LocalCallback
     }
 }
 

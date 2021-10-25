@@ -59,7 +59,7 @@ use self::{
 pub struct CallContext {
     pub(crate) zome: Zome,
     pub(crate) function_name: FunctionName,
-    pub(crate) auth: Option<(AgentPubKey, CapSecret)>,
+    pub(crate) auth: InvocationAuth,
     pub(crate) host_context: HostContext,
 }
 
@@ -68,7 +68,7 @@ impl CallContext {
         zome: Zome,
         function_name: FunctionName,
         host_context: HostContext,
-        auth: Option<(AgentPubKey, CapSecret)>,
+        auth: InvocationAuth,
     ) -> Self {
         Self {
             zome,
@@ -90,7 +90,7 @@ impl CallContext {
         self.host_context.clone()
     }
 
-    pub fn auth(&self) -> Option<(AgentPubKey, CapSecret)> {
+    pub fn auth(&self) -> InvocationAuth {
         self.auth.clone()
     }
 }
@@ -248,6 +248,18 @@ impl ZomesToInvoke {
     }
 }
 
+#[derive(Clone, Debug)]
+pub enum InvocationAuth {
+    LocalCallback,
+    Cap(AgentPubKey, Option<CapSecret>),
+}
+
+impl InvocationAuth {
+    pub fn new(agent_pubkey: AgentPubKey, cap_secret: Option<CapSecret>) -> Self {
+        Self::Cap(agent_pubkey, cap_secret)
+    }
+}
+
 pub trait Invocation: Clone {
     /// Some invocations call into a single zome and some call into many or all zomes.
     /// An example of an invocation that calls across all zomes is init. Init must pass for every
@@ -275,7 +287,7 @@ pub trait Invocation: Clone {
     /// this is intentionally NOT a reference to self because ExternIO may be huge we want to be
     /// careful about cloning invocations
     fn host_input(self) -> Result<ExternIO, SerializedBytesError>;
-    fn auth(&self) -> Option<(AgentPubKey, CapSecret)>;
+    fn auth(&self) -> InvocationAuth;
 }
 
 impl ZomeCallInvocation {
@@ -305,7 +317,7 @@ mockall::mock! {
         fn zomes(&self) -> ZomesToInvoke;
         fn fn_components(&self) -> FnComponents;
         fn host_input(self) -> Result<ExternIO, SerializedBytesError>;
-        fn auth(&self) -> Option<(AgentPubKey, CapSecret)>;
+        fn auth(&self) -> InvocationAuth;
     }
     trait Clone {
         fn clone(&self) -> Self;
@@ -344,9 +356,8 @@ impl Invocation for ZomeCallInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         Ok(self.payload)
     }
-    fn auth(&self) -> Option<(AgentPubKey, CapSecret)> {
-        self.cap_secret
-            .map(|cap_secret| (self.provenance.clone(), cap_secret))
+    fn auth(&self) -> InvocationAuth {
+        InvocationAuth::Cap(self.provenance.clone(), self.cap_secret.clone())
     }
 }
 

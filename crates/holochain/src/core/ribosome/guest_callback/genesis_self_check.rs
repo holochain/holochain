@@ -5,6 +5,7 @@ use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
+use crate::core::ribosome::InvocationAuth;
 
 #[derive(Clone)]
 pub struct GenesisSelfCheckInvocation {
@@ -38,8 +39,8 @@ impl Invocation for GenesisSelfCheckInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(self.payload)
     }
-    fn auth(&self) -> Option<(AgentPubKey, CapSecret)> {
-        None
+    fn auth(&self) -> InvocationAuth {
+        InvocationAuth::LocalCallback
     }
 }
 

@@ -11,6 +11,7 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
 use itertools::Itertools;
+use crate::core::ribosome::InvocationAuth;
 
 pub const POST_COMMIT_CHANNEL_BOUND: usize = 100;
 pub const POST_COMMIT_CONCURRENT_LIMIT: usize = 5;
@@ -62,8 +63,8 @@ impl Invocation for PostCommitInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(self.headers)
     }
-    fn auth(&self) -> Option<(AgentPubKey, CapSecret)> {
-        None
+    fn auth(&self) -> InvocationAuth {
+        InvocationAuth::LocalCallback
     }
 }
 

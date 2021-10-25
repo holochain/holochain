@@ -6,6 +6,7 @@ use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
 use std::collections::BTreeMap;
+use crate::core::ribosome::InvocationAuth;
 
 #[derive(Debug, Clone)]
 pub struct EntryDefsInvocation;
@@ -48,8 +49,8 @@ impl Invocation for EntryDefsInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(())
     }
-    fn auth(&self) -> Option<(AgentPubKey, CapSecret)> {
-        None
+    fn auth(&self) -> InvocationAuth {
+        InvocationAuth::LocalCallback
     }
 }
 
