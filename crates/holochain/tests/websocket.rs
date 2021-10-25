@@ -372,6 +372,37 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn list_app_interfaces_succeeds() -> Result<()> {
+    observability::test_run().ok();
+
+    info!("creating config");
+    let tmp_dir = TempDir::new("conductor_cfg").unwrap();
+    let environment_path = tmp_dir.path().to_path_buf();
+    let config = create_config(0, environment_path);
+    let conductor_handle = Conductor::builder().config(config).build().await?;
+    let port = admin_port(&conductor_handle).await;
+    info!("building conductor");
+    let (mut client, mut _rx): (WebsocketSender, WebsocketReceiver) = holochain_websocket::connect(
+        url2!("ws://127.0.0.1:{}", port),
+        Arc::new(WebsocketConfig {
+            default_request_timeout_s: 1,
+            ..Default::default()
+        }),
+    )
+    .await?;
+
+    let request = AdminRequest::ListAppInterfaces;
+
+    // Request the list of app interfaces that the conductor has attached
+    let response: Result<AdminResponse, _> = client.request(request).await;
+
+    // There should be no app interfaces listed
+    assert_matches!(response, Ok(AdminResponse::AppInterfacesListed(interfaces)) if interfaces.len() == 0);
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
     if let Err(e) = conductor_admin_interface_ends_with_shutdown_inner().await {
         panic!("{:#?}", e);
