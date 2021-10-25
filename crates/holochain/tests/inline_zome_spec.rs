@@ -1,6 +1,6 @@
 #![cfg(feature = "test_utils")]
 
-use std::{assert_matches, sync::Arc};
+use std::sync::Arc;
 
 use hdk::prelude::*;
 use holochain::{
@@ -20,6 +20,7 @@ use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::element::ElementEntry;
 use tokio_stream::StreamExt;
+use matches::assert_matches;
 
 #[derive(
     Debug,
