@@ -129,7 +129,7 @@ impl EntryTestData {
             signature.clone(),
             ValidationStatus::Valid,
         );
-        let wire_create_link_base = WireCreateLink::condense_base_only(
+        let wire_create_link_base = WireCreateLink::condense(
             create_link_header.try_into().unwrap(),
             signature.clone(),
             ValidationStatus::Valid,

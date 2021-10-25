@@ -19,7 +19,7 @@ use holochain_state::prelude::*;
 use holochain_types::test_utils::fake_cell_id;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::WebsocketSender;
-use kitsune_p2p_types::dependencies::legacy_lair_api::LairError;
+use kitsune_p2p_types::dependencies::lair_keystore_api_0_0::LairError;
 use maplit::hashset;
 use matches::assert_matches;
 
@@ -29,6 +29,8 @@ async fn can_update_state() {
     let dna_store = MockDnaStore::new();
     let keystore = envs.conductor().keystore().clone();
     let holochain_p2p = holochain_p2p::stub_network().await;
+    let (post_commit_sender, _post_commit_receiver) =
+        tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
     let conductor = Conductor::new(
         envs.conductor(),
         envs.wasm(),
@@ -37,6 +39,7 @@ async fn can_update_state() {
         envs.path().to_path_buf().into(),
         holochain_p2p,
         DbSyncLevel::default(),
+        post_commit_sender,
     )
     .await
     .unwrap();
@@ -75,7 +78,8 @@ async fn can_add_clone_cell_to_app() {
     let cell_id = CellId::new(dna.dna_hash().to_owned(), agent.clone());
 
     let dna_store = RealDnaStore::new();
-
+    let (post_commit_sender, _post_commit_receiver) =
+        tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
     let conductor = Conductor::new(
         envs.conductor(),
         envs.wasm(),
@@ -84,6 +88,7 @@ async fn can_add_clone_cell_to_app() {
         envs.path().to_path_buf().into(),
         holochain_p2p,
         DbSyncLevel::default(),
+        post_commit_sender,
     )
     .await
     .unwrap();
@@ -148,6 +153,8 @@ async fn app_ids_are_unique() {
     let environments = test_environments();
     let dna_store = MockDnaStore::new();
     let holochain_p2p = holochain_p2p::stub_network().await;
+    let (post_commit_sender, _post_commit_receiver) =
+        tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
     let conductor = Conductor::new(
         environments.conductor(),
         environments.wasm(),
@@ -156,11 +163,13 @@ async fn app_ids_are_unique() {
         environments.path().to_path_buf().into(),
         holochain_p2p,
         DbSyncLevel::default(),
+        post_commit_sender,
     )
     .await
     .unwrap();
 
     let cell_id = fake_cell_id(1);
+
     let installed_cell = InstalledCell::new(cell_id.clone(), "handle".to_string());
     let app = InstalledAppCommon::new_legacy("id".to_string(), vec![installed_cell]).unwrap();
 
@@ -217,8 +226,6 @@ async fn can_set_fake_state() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn proxy_tls_with_test_keystore() {
-    use ghost_actor::GhostControlSender;
-
     observability::test_run().ok();
 
     let keystore1 = spawn_test_keystore().await.unwrap();
@@ -228,13 +235,13 @@ async fn proxy_tls_with_test_keystore() {
         panic!("{:#?}", e);
     }
 
-    let _ = keystore1.ghost_actor_shutdown_immediate().await;
-    let _ = keystore2.ghost_actor_shutdown_immediate().await;
+    let _ = keystore1.shutdown().await;
+    let _ = keystore2.shutdown().await;
 }
 
 async fn proxy_tls_inner(
-    keystore1: KeystoreSender,
-    keystore2: KeystoreSender,
+    keystore1: MetaLairClient,
+    keystore2: MetaLairClient,
 ) -> anyhow::Result<()> {
     use ghost_actor::GhostControlSender;
     use kitsune_p2p::dependencies::*;
@@ -509,7 +516,7 @@ async fn make_signing_call(client: &mut WebsocketSender, cell: &SweetCell) -> Ap
 /// to fail.
 ///
 /// This test was written making the assumption that we could swap out the
-/// KeystoreSender for each Cell at runtime, but given our current concurrency
+/// MetaLairClient for each Cell at runtime, but given our current concurrency
 /// model which puts each Cell in an Arc, this is not possible.
 /// In order to implement this test, we should probably have the "crude mock
 /// keystore" listen on a channel which toggles its behavior from always-correct

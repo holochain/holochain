@@ -29,8 +29,8 @@ pub enum TestWasm {
     MigrateAgentPass,
     MultipleCalls,
     MustGet,
-    PostCommitFail,
     PostCommitSuccess,
+    PostCommitVolley,
     Query,
     RandomBytes,
     Schedule,
@@ -78,8 +78,8 @@ impl From<TestWasm> for ZomeName {
             TestWasm::MigrateAgentPass => "migrate_agent_pass",
             TestWasm::MultipleCalls => "multiple_calls",
             TestWasm::MustGet => "must_get",
-            TestWasm::PostCommitFail => "post_commit_fail",
             TestWasm::PostCommitSuccess => "post_commit_success",
+            TestWasm::PostCommitVolley => "post_commit_volley",
             TestWasm::Query => "query",
             TestWasm::RandomBytes => "random_bytes",
             TestWasm::Schedule => "schedule",
@@ -161,11 +161,11 @@ impl From<TestWasm> for DnaWasm {
                 get_code("wasm32-unknown-unknown/release/test_wasm_multiple_calls.wasm")
             }
             TestWasm::MustGet => get_code("wasm32-unknown-unknown/release/test_wasm_must_get.wasm"),
-            TestWasm::PostCommitFail => {
-                get_code("wasm32-unknown-unknown/release/test_wasm_post_commit_fail.wasm")
-            }
             TestWasm::PostCommitSuccess => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_post_commit_success.wasm")
+            }
+            TestWasm::PostCommitVolley => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_post_commit_volley.wasm")
             }
             TestWasm::Query => get_code("wasm32-unknown-unknown/release/test_wasm_query.wasm"),
             TestWasm::RandomBytes => {

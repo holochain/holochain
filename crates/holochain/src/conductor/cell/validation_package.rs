@@ -68,9 +68,7 @@ pub(super) async fn get_as_author(
         RequiredValidationType::Custom => {
             let cascade = Cascade::empty().with_vault(env.clone());
 
-            if let Some(elements) =
-                cascade.get_validation_package_local(&header_hashed.as_hash())?
-            {
+            if let Some(elements) = cascade.get_validation_package_local(header_hashed.as_hash())? {
                 return Ok(Some(ValidationPackage::new(elements)).into());
             }
 

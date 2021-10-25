@@ -109,7 +109,6 @@ pub fn get_anchor(anchor_address: EntryHash) -> ExternResult<Option<Anchor>> {
 pub fn list_anchor_type_addresses() -> ExternResult<Vec<EntryHash>> {
     let links = Path::from(ROOT)
         .children()?
-        .into_inner()
         .into_iter()
         .map(|link| link.target)
         .collect();
@@ -128,7 +127,6 @@ pub fn list_anchor_addresses(anchor_type: String) -> ExternResult<Vec<EntryHash>
     path.ensure()?;
     let links = path
         .children()?
-        .into_inner()
         .into_iter()
         .map(|link| link.target)
         .collect();
@@ -148,7 +146,6 @@ pub fn list_anchor_tags(anchor_type: String) -> ExternResult<Vec<String>> {
     path.ensure()?;
     let hopefully_anchor_tags: Result<Vec<String>, SerializedBytesError> = path
         .children()?
-        .into_inner()
         .into_iter()
         .map(|link| match Path::try_from(&link.tag) {
             Ok(path) => match Anchor::try_from(&path) {

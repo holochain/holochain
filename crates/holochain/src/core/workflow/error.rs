@@ -95,6 +95,26 @@ pub enum WorkflowError {
 
     #[error("RecvError")]
     RecvError,
+
+    #[error(transparent)]
+    SendError(#[from] tokio::sync::mpsc::error::SendError<()>),
+
+    /// Other
+    #[error("Other: {0}")]
+    Other(Box<dyn std::error::Error + Send + Sync>),
+}
+
+impl WorkflowError {
+    /// promote a custom error type to a WorkflowError
+    pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
+        Self::Other(e.into())
+    }
+}
+
+impl From<one_err::OneErr> for WorkflowError {
+    fn from(e: one_err::OneErr) -> Self {
+        Self::other(e)
+    }
 }
 
 /// Internal type to handle running workflows
