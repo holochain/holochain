@@ -178,23 +178,9 @@ async fn mock_network_sharded_gossip() {
 
     let _g = observability::test_run().ok();
 
-    // Setup the network.
-    let mut tuning =
-        kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
-    tuning.gossip_strategy = "sharded-gossip".to_string();
-    tuning.gossip_dynamic_arcs = true;
-
-    let mut network = KitsuneP2pConfig::default();
-    network.tuning_params = Arc::new(tuning);
-    let mut config = ConductorConfig::default();
-    config.network = Some(network);
-
     // Generate or use cached test data.
     let (data, mut conn) = generate_test_data(num_agents, min_ops, false, force_new_data).await;
     let data = Arc::new(data);
-
-    #[derive(Debug)]
-    struct ExpectedData {}
 
     // We have to use the same dna that was used to generate the test data.
     // This is a short coming I hope to overcome in future versions.
@@ -530,14 +516,26 @@ async fn mock_network_sharded_gossip() {
         }
     });
 
+    // Setup the network.
+    let mut tuning =
+        kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+    tuning.gossip_strategy = "sharded-gossip".to_string();
+    tuning.gossip_dynamic_arcs = true;
+
+    let mut network = KitsuneP2pConfig::default();
+    network.transport_pool = vec![TransportConfig::Mock {
+        mock_network: mock_network.into(),
+    }];
+    network.tuning_params = Arc::new(tuning);
+    let mut config = ConductorConfig::default();
+    config.network = Some(network);
+
     // Create the mock network.
     let mock_network =
         kitsune_p2p::test_util::mock_network::mock_network(from_kitsune_tx, to_kitsune_rx);
 
     // Add it to the conductor builder.
-    let builder = ConductorBuilder::new()
-        .config(config)
-        .with_mock_p2p(mock_network);
+    let builder = ConductorBuilder::new().config(config);
     let mut conductor = SweetConductor::from_builder(builder).await;
 
     // Add in all the agent info.
