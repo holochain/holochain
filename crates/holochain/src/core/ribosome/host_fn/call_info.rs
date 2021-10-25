@@ -109,11 +109,14 @@ pub mod test {
         let bobbo = bobbo.zome(TestWasm::ZomeInfo);
 
         let _: () = conductor.call(&alice, "set_access", ()).await;
+        let _: () = conductor.call(&bobbo, "set_access", ()).await;
 
         let alice_call_info: CallInfo = conductor.call(&alice, "call_info", ()).await;
         let bobbo_call_info: CallInfo = conductor.call(&bobbo, "call_info", ()).await;
         let bobbo_call_alice_call_info: CallInfo = conductor.call(&bobbo, "remote_call_info", alice_pubkey.clone()).await;
+        let alice_call_bobbo_call_alice_call_info: CallInfo = conductor.call(&alice, "remote_remote_call_info", bob_pubkey.clone()).await;
 
+        // direct calls to alice/bob should have their own provenance
         assert_eq!(
             alice_call_info.provenance,
             alice_pubkey
@@ -122,8 +125,14 @@ pub mod test {
             bobbo_call_info.provenance,
             bob_pubkey
         );
+        // Bob calling into alice should have bob provenance.
         assert_eq!(
             bobbo_call_alice_call_info.provenance,
+            bob_pubkey
+        );
+        // Alice calling back into herself via. bob should have bob provenance.
+        assert_eq!(
+            alice_call_bobbo_call_alice_call_info.provenance,
             bob_pubkey
         );
     }

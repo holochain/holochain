@@ -9,6 +9,7 @@ entry_defs![Thing::entry_def()];
 fn set_access(_: ()) -> ExternResult<()> {
     let mut functions: GrantedFunctions = BTreeSet::new();
     functions.insert((hdk::prelude::zome_info()?.name, "call_info".into()));
+    functions.insert((hdk::prelude::zome_info()?.name, "remote_call_info".into()));
     create_cap_grant(CapGrantEntry {
         tag: "".into(),
         // empty access converts to unrestricted
@@ -42,7 +43,27 @@ fn remote_call_info(agent: AgentPubKey) -> ExternResult<CallInfo> {
         &(),
     )? {
         ZomeCallResponse::Ok(extern_io) => Ok(extern_io.decode()?),
-        _ => unreachable!(),
+        not_ok => {
+            tracing::warn!(?not_ok);
+            Err(WasmError::Guest(format!("{:?}", not_ok)))
+        },
+    }
+}
+
+#[hdk_extern]
+fn remote_remote_call_info(agent: AgentPubKey) -> ExternResult<CallInfo> {
+    match call_remote(
+        agent,
+        hdk::prelude::zome_info()?.name,
+        "remote_call_info".to_string().into(),
+        None,
+        agent_info()?.agent_initial_pubkey,
+    )? {
+        ZomeCallResponse::Ok(extern_io) => Ok(extern_io.decode()?),
+        not_ok => {
+            tracing::warn!(?not_ok);
+            Err(WasmError::Guest(format!("{:?}", not_ok)))
+        },
     }
 }
 

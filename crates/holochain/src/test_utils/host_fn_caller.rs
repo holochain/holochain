@@ -347,7 +347,6 @@ impl HostFnCaller {
     }
 
     pub async fn call_zome_direct(&self, invocation: ZomeCallInvocation) -> ExternIO {
-        dbg!("call_zome_direct", &invocation);
         let (_, ribosome, call_context, workspace_lock) = self.unpack().await;
 
         let output = {
