@@ -19,8 +19,8 @@ use holochain::{core::SourceChainError, test_utils::display_agent_infos};
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::element::ElementEntry;
-use tokio_stream::StreamExt;
 use matches::assert_matches;
+use tokio_stream::StreamExt;
 
 #[derive(
     Debug,
