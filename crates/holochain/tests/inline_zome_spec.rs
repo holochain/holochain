@@ -459,18 +459,18 @@ async fn call_non_existing_zome_fails_gracefully() -> anyhow::Result<()> {
     let mut conductor = SweetConductor::from_standard_config().await;
 
     // Get two agents
-    let alice = SweetAgents::one(conductor.keystore()).await;
+    let agent = SweetAgents::one(conductor.keystore()).await;
 
     // Install DNA and install and enable apps in conductor
-    let apps = conductor
-        .setup_app_for_agents("app", &[alice.clone()], &[dna_file])
+    let app = conductor
+        .setup_app_for_agent("app1", agent.clone(), &[dna_file.clone()])
         .await
         .unwrap();
 
-    let ((alice,)) = apps.into_tuples();
+    let (alice,) = app.into_tuple();
 
-    // Call the "create" zome fn on Alice's app
-    let result = conductor
+    // Call the a zome fn on a non existing zome on Alice's app
+    let result: ConductorApiResult<HeaderHash> = conductor
         .call_fallible(&alice.zome("non_existing_zome"), "create_unit", ())
         .await;
 
