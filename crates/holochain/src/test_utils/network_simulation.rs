@@ -9,7 +9,6 @@ use ::fixt::prelude::*;
 use hdk::prelude::*;
 use holo_hash::{DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::ConductorConfig;
-use holochain_keystore::KeystoreSenderExt;
 use holochain_p2p::dht_arc::{ArcInterval, DhtArc, DhtLocation};
 use holochain_p2p::{AgentPubKeyExt, DhtOpHashExt, DnaHashExt};
 use holochain_sqlite::conn::DbSyncLevel;
@@ -370,7 +369,7 @@ async fn create_test_data(
         let agent = conductor
             .keystore()
             .clone()
-            .generate_sign_keypair_from_pure_entropy()
+            .new_sign_keypair_random()
             .await
             .unwrap();
         agents.push(agent);
