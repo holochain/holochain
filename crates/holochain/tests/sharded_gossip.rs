@@ -9,11 +9,6 @@ use holochain::test_utils::network_simulation::{data_zome, generate_test_data};
 use holochain::{
     conductor::ConductorBuilder, test_utils::consistency::local_machine_session_with_hashes,
 };
-use holochain_p2p::mock_network::{GossipProtocol, MockScenario};
-use holochain_p2p::{
-    dht_arc::DhtArcSet,
-    mock_network::{AddressedHolochainP2pMockMsg, HolochainP2pMockChannel, HolochainP2pMockMsg},
-};
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::gossip::sharded_gossip::test_utils::create_ops_bloom;
 use kitsune_p2p::gossip::sharded_gossip::test_utils::{check_ops_boom, create_agent_bloom};
@@ -158,8 +153,17 @@ async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
 async fn mock_network_sharded_gossip() {
     use std::sync::atomic::AtomicUsize;
 
+    use holochain_p2p::mock_network::{GossipProtocol, MockScenario};
+    use holochain_p2p::{
+        dht_arc::DhtArcSet,
+        mock_network::{
+            AddressedHolochainP2pMockMsg, HolochainP2pMockChannel, HolochainP2pMockMsg,
+        },
+    };
     use holochain_p2p::{dht_arc::DhtLocation, AgentPubKeyExt, DnaHashExt};
     use holochain_sqlite::db::AsP2pAgentStoreConExt;
+    use kitsune_p2p::TransportConfig;
+    use kitsune_p2p_types::tx2::tx2_adapter::AdapterFactory;
 
     // Get the env var settings for number of simulated agents and
     // the minimum number of obs that should be held by each agent
@@ -516,6 +520,11 @@ async fn mock_network_sharded_gossip() {
         }
     });
 
+    // Create the mock network.
+    let mock_network =
+        kitsune_p2p::test_util::mock_network::mock_network(from_kitsune_tx, to_kitsune_rx);
+    let mock_network: AdapterFactory = Arc::new(mock_network);
+
     // Setup the network.
     let mut tuning =
         kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
@@ -529,10 +538,6 @@ async fn mock_network_sharded_gossip() {
     network.tuning_params = Arc::new(tuning);
     let mut config = ConductorConfig::default();
     config.network = Some(network);
-
-    // Create the mock network.
-    let mock_network =
-        kitsune_p2p::test_util::mock_network::mock_network(from_kitsune_tx, to_kitsune_rx);
 
     // Add it to the conductor builder.
     let builder = ConductorBuilder::new().config(config);
