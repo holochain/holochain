@@ -87,7 +87,6 @@ CREATE TABLE IF NOT EXISTS DhtOp (
     type             TEXT           NOT NULL,
     basis_hash       BLOB           NOT NULL,
     header_hash      BLOB           NOT NULL,
-    is_authored      INTEGER        NOT NULL,      -- BOOLEAN
     require_receipt  INTEGER        NOT NULL,      -- BOOLEAN
 
     storage_center_loc          INTEGER   NOT NULL,

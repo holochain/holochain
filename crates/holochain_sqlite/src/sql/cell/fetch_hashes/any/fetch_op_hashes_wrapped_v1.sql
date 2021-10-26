@@ -14,3 +14,7 @@ WHERE
     storage_center_loc < :storage_end_loc
     OR storage_center_loc > :storage_start_loc
   )
+ORDER BY
+  authored_timestamp ASC
+LIMIT
+  :limit

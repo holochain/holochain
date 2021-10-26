@@ -7,7 +7,6 @@ use crate::core::workflow::app_validation_workflow::validation_package::get_as_a
 use crate::core::workflow::app_validation_workflow::validation_package::get_as_author_sub_chain;
 use holochain_cascade::Cascade;
 use holochain_p2p::HolochainP2pDna;
-use holochain_state::source_chain::SourceChain;
 use holochain_types::dna::DnaFile;
 use holochain_zome_types::HeaderHashed;
 
@@ -34,8 +33,9 @@ pub(super) async fn get_as_author(
     // Get the source chain with public data only
     // TODO: evaluate if we even need to use a source chain here
     // vs directly querying the database.
-    let mut source_chain = SourceChain::<DbReadOnly<DbKindAuthored>>::new(
+    let mut source_chain = SourceChainReadOnly::new(
         authored_env.clone(),
+        dht_env.clone(),
         conductor_handle.keystore().clone(),
         header.author().clone(),
     )

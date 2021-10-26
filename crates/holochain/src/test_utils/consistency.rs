@@ -662,8 +662,6 @@ async fn request_published_ops(
                     JOIN
                     Header ON DhtOp.header_hash = Header.hash
                     WHERE
-                    DhtOp.is_authored = 1
-                    AND
                     (DhtOp.type != :store_entry OR Header.private_entry = 0)
                 ",
                 )?

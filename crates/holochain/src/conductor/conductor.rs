@@ -29,6 +29,8 @@ use super::manager::ManagedTaskAdd;
 use super::manager::ManagedTaskHandle;
 use super::manager::TaskManagerRunHandle;
 use super::paths::EnvironmentRootPath;
+use super::space::Space;
+use super::space::Spaces;
 use super::state::AppInterfaceId;
 use super::state::ConductorState;
 use super::CellError;
@@ -56,6 +58,7 @@ use holochain_conductor_api::IntegrationStateDump;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_keystore::MetaLairClient;
+use holochain_sqlite::conn::DbSyncStrategy;
 use holochain_sqlite::prelude::*;
 use holochain_state::mutations;
 use holochain_state::prelude::from_blob;
@@ -132,17 +135,8 @@ where
     /// A database for storing wasm
     wasm_env: DbWrite<DbKindWasm>,
 
-    /// The caches databases. These are shared across cells.
-    /// There is one per unique Dna.
-    caches: RwShare<HashMap<DnaHash, DbWrite<DbKindCache>>>,
-
-    /// The authored databases. These are shared across cells.
-    /// There is one per unique Dna.
-    authored_envs: RwShare<HashMap<DnaHash, DbWrite<DbKindAuthored>>>,
-
-    /// The dht databases. These are shared across cells.
-    /// There is one per unique Dna.
-    dht_envs: RwShare<HashMap<DnaHash, DbWrite<DbKindDht>>>,
+    /// The map of dna hash spaces.
+    pub(super) spaces: Spaces,
 
     /// Set to true when `conductor.shutdown()` has been called, so that other
     /// tasks can check on the shutdown status
@@ -172,8 +166,8 @@ where
     /// Handle to the network actor.
     holochain_p2p: holochain_p2p::HolochainP2pRef,
 
-    /// Database sync level
-    db_sync_level: DbSyncLevel,
+    /// Database sync strategy
+    db_sync_level: DbSyncStrategy,
 
     /// The map of running queue consumer workflows.
     queue_consumer_map: QueueConsumerMap,
@@ -497,62 +491,22 @@ where
         })
     }
 
-    fn get_or_create_cache(&self, dna_hash: &DnaHash) -> ConductorResult<DbWrite<DbKindCache>> {
-        let dir = &self.root_env_dir;
-        let db_sync_level = self.db_sync_level;
-        self.caches.share_mut(|caches| match caches.get(dna_hash) {
-            Some(env) => Ok(env.clone()),
-            None => {
-                let env = DbWrite::open_with_sync_level(
-                    dir.as_ref(),
-                    DbKindCache(Arc::new(dna_hash.clone())),
-                    db_sync_level,
-                )?;
-                caches.insert(dna_hash.clone(), env.clone());
-                Ok(env)
-            }
-        })
+    fn get_or_create_space(&self, dna_hash: &DnaHash) -> ConductorResult<Space> {
+        self.spaces.get_or_create_space(dna_hash)
     }
 
     pub(super) fn get_or_create_authored_env(
         &self,
         dna_hash: &DnaHash,
     ) -> ConductorResult<DbWrite<DbKindAuthored>> {
-        let dir = &self.root_env_dir;
-        let db_sync_level = self.db_sync_level;
-        self.authored_envs
-            .share_mut(|envs| match envs.get(dna_hash) {
-                Some(env) => Ok(env.clone()),
-                None => {
-                    let env = DbWrite::open_with_sync_level(
-                        dir.as_ref(),
-                        DbKindAuthored(Arc::new(dna_hash.clone())),
-                        db_sync_level,
-                    )?;
-                    envs.insert(dna_hash.clone(), env.clone());
-                    Ok(env)
-                }
-            })
+        self.spaces.authored_env(dna_hash)
     }
 
     pub(super) fn get_or_create_dht_env(
         &self,
         dna_hash: &DnaHash,
     ) -> ConductorResult<DbWrite<DbKindDht>> {
-        let dir = &self.root_env_dir;
-        let db_sync_level = self.db_sync_level;
-        self.dht_envs.share_mut(|envs| match envs.get(dna_hash) {
-            Some(env) => Ok(env.clone()),
-            None => {
-                let env = DbWrite::open_with_sync_level(
-                    dir.as_ref(),
-                    DbKindDht(Arc::new(dna_hash.clone())),
-                    db_sync_level,
-                )?;
-                envs.insert(dna_hash.clone(), env.clone());
-                Ok(env)
-            }
-        })
+        self.spaces.dht_env(dna_hash)
     }
 
     /// Adjust app statuses (via state transitions) to match the current
@@ -696,27 +650,15 @@ where
                 use holochain_p2p::actor::HolochainP2pRefToCell;
                 let holochain_p2p_cell = self.holochain_p2p.to_cell(cell_id.dna_hash().clone());
 
-                let authored_env = self
-                    .get_or_create_authored_env(cell_id.dna_hash())
-                    .map_err(|e| CellError::FailedToCreateAuthoredDb(e.into()))
-                    .map_err(|err| (cell_id.clone(), err))?;
-
-                let dht_env = self
-                    .get_or_create_dht_env(cell_id.dna_hash())
-                    .map_err(|e| CellError::FailedToCreateDhtDb(e.into()))
-                    .map_err(|err| (cell_id.clone(), err))?;
-
-                let cache = self
-                    .get_or_create_cache(cell_id.dna_hash())
-                    .map_err(|e| CellError::FailedToCreateCache(e.into()))
+                let space = self
+                    .get_or_create_space(cell_id.dna_hash())
+                    .map_err(|e| CellError::FailedToCreateDnaSpace(e.into()))
                     .map_err(|err| (cell_id.clone(), err))?;
 
                 Cell::create(
                     cell_id.clone(),
                     conductor_handle,
-                    authored_env,
-                    dht_env,
-                    cache,
+                    space,
                     holochain_p2p_cell,
                     managed_task_add_sender,
                     managed_task_stop_broadcaster,
@@ -1220,11 +1162,8 @@ pub async fn integration_dump(
                 "
                 SELECT count(hash) FROM DhtOp
                 WHERE when_integrated IS NULL
-                AND (
-                    (is_authored = 1 AND validation_stage IS NOT NULL AND validation_stage < 3)
-                    OR
-                    (is_authored = 0 AND (validation_stage IS NULL OR validation_stage < 3))
-                )
+                AND
+                (validation_stage IS NULL OR validation_stage < 3)
                 ",
                 [],
                 |row| row.get(0),
@@ -1254,14 +1193,17 @@ where
         keystore: MetaLairClient,
         root_env_dir: EnvironmentRootPath,
         holochain_p2p: holochain_p2p::HolochainP2pRef,
-        db_sync_level: DbSyncLevel,
+        db_sync_level: DbSyncStrategy,
     ) -> ConductorResult<Self> {
+        let queue_consumer_map = QueueConsumerMap::new();
         Ok(Self {
             conductor_env,
             wasm_env,
-            caches: RwShare::new(HashMap::new()),
-            authored_envs: RwShare::new(HashMap::new()),
-            dht_envs: RwShare::new(HashMap::new()),
+            spaces: Spaces::new(
+                root_env_dir.clone(),
+                db_sync_level,
+                queue_consumer_map.clone(),
+            ),
             cells: RwShare::new(HashMap::new()),
             shutting_down: Arc::new(AtomicBool::new(false)),
             app_interfaces: RwShare::new(HashMap::new()),
@@ -1272,7 +1214,7 @@ where
             root_env_dir,
             holochain_p2p,
             db_sync_level,
-            queue_consumer_map: QueueConsumerMap::new(),
+            queue_consumer_map,
         })
     }
 
@@ -1442,17 +1384,9 @@ mod builder {
 
             let env_path = self.config.environment_path.clone();
 
-            let environment = DbWrite::open_with_sync_level(
-                env_path.as_ref(),
-                DbKindConductor,
-                self.config.db_sync_level,
-            )?;
+            let environment = DbWrite::open(env_path.as_ref(), DbKindConductor)?;
 
-            let wasm_environment = DbWrite::open_with_sync_level(
-                env_path.as_ref(),
-                DbKindWasm,
-                self.config.db_sync_level,
-            )?;
+            let wasm_environment = DbWrite::open(env_path.as_ref(), DbKindWasm)?;
 
             #[cfg(any(test, feature = "test_utils"))]
             let state = self.state;
@@ -1483,7 +1417,7 @@ mod builder {
                 keystore,
                 env_path,
                 holochain_p2p,
-                config.db_sync_level,
+                config.db_sync_strategy,
             )
             .await?;
 
@@ -1500,7 +1434,7 @@ mod builder {
                 conductor,
                 keystore,
                 holochain_p2p,
-                db_sync_level: config.db_sync_level,
+                db_sync_strategy: config.db_sync_strategy,
 
                 #[cfg(any(test, feature = "test_utils"))]
                 skip_publish: std::sync::atomic::AtomicBool::new(false),
@@ -1594,7 +1528,7 @@ mod builder {
                 keystore,
                 self.config.environment_path.clone(),
                 holochain_p2p,
-                self.config.db_sync_level,
+                self.config.db_sync_strategy,
             )
             .await?;
 
@@ -1613,7 +1547,7 @@ mod builder {
                 p2p_env: envs.p2p(),
                 p2p_batch_senders: Arc::new(parking_lot::Mutex::new(HashMap::new())),
                 p2p_metrics_env: envs.p2p_metrics(),
-                db_sync_level: self.config.db_sync_level,
+                db_sync_strategy: self.config.db_sync_strategy,
                 #[cfg(any(test, feature = "test_utils"))]
                 skip_publish: std::sync::atomic::AtomicBool::new(false),
             });

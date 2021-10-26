@@ -57,6 +57,8 @@ pub enum CellError {
     FailedToCreateAuthoredDb(Box<ConductorError>),
     #[error("Failed to get or create the DHT db for this dna {0:?}")]
     FailedToCreateDhtDb(Box<ConductorError>),
+    #[error("Failed to get or create the dna space {0:?}")]
+    FailedToCreateDnaSpace(Box<ConductorError>),
     #[error(transparent)]
     HolochainP2pError(#[from] HolochainP2pError),
     #[error(transparent)]

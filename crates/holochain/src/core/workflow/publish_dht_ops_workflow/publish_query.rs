@@ -49,8 +49,6 @@ pub async fn get_ops_to_publish(
             LEFT JOIN
             Entry ON Header.entry_hash = Entry.hash
             WHERE
-            DhtOp.is_authored = 1
-            AND
             Header.author = :author
             AND
             (DhtOp.type != :store_entry OR Header.private_entry = 0)
@@ -105,8 +103,6 @@ pub fn num_still_needing_publish(txn: &Transaction) -> WorkflowResult<usize> {
         JOIN
         DhtOp ON DhtOp.header_hash = Header.hash
         WHERE
-        DhtOp.is_authored = 1
-        AND
         DhtOp.receipts_complete IS NULL 
         AND
         (DhtOp.type != :store_entry OR Header.private_entry = 0)
@@ -145,7 +141,6 @@ mod tests {
         within_min_period: bool,
         has_required_receipts: bool,
         is_this_agent: bool,
-        is_authored: bool,
         store_entry: bool,
     }
 
@@ -225,7 +220,7 @@ mod tests {
             .unwrap()
             .with_commit_sync(|txn| {
                 let hash = state.as_hash().clone();
-                insert_op(txn, state.clone(), facts.is_authored).unwrap();
+                insert_op(txn, state.clone()).unwrap();
                 set_last_publish_time(txn, hash.clone(), last_publish).unwrap();
                 set_receipts_complete(txn, &hash, facts.has_required_receipts).unwrap();
                 DatabaseResult::Ok(())
@@ -251,7 +246,6 @@ mod tests {
             within_min_period: false,
             has_required_receipts: false,
             is_this_agent: true,
-            is_authored: true,
             store_entry: true,
         };
         let op = create_and_insert_op(env, facts, &cd);
@@ -290,7 +284,6 @@ mod tests {
 
         // - IsAuthored: false.
         let mut f = facts;
-        f.is_authored = false;
         create_and_insert_op(env, f, &cd);
 
         Expected {

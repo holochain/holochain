@@ -1,5 +1,4 @@
-use std::collections::HashSet;
-
+use crate::integrate::authored_ops_to_dht_db;
 use crate::scratch::ScratchError;
 use crate::scratch::SyncScratchError;
 use async_recursion::async_recursion;
@@ -60,9 +59,10 @@ pub use error::*;
 mod error;
 
 #[derive(Clone)]
-pub struct SourceChain<AuthorDb = DbWrite<DbKindAuthored>> {
+pub struct SourceChain<AuthorDb = DbWrite<DbKindAuthored>, DhtDb = DbWrite<DbKindDht>> {
     scratch: SyncScratch,
     vault: AuthorDb,
+    dht_env: DhtDb,
     keystore: MetaLairClient,
     author: Arc<AgentPubKey>,
     persisted_seq: u32,
@@ -71,7 +71,7 @@ pub struct SourceChain<AuthorDb = DbWrite<DbKindAuthored>> {
     public_only: bool,
 }
 
-pub type SourceChainReadOnly = SourceChain<DbReadOnly<DbKindAuthored>>;
+pub type SourceChainReadOnly = SourceChain<DbReadOnly<DbKindAuthored>, DbReadOnly<DbKindDht>>;
 
 // TODO fix this.  We shouldn't really have nil values but this would
 // show if the database is corrupted and doesn't have an element
@@ -220,12 +220,6 @@ impl SourceChain {
             let scheduled_fns = scratch.drain_scheduled_fns().collect::<Vec<_>>();
             SourceChainResult::Ok((scheduled_fns, headers, ops, entries))
         })?;
-        let mut ops_to_integrate = HashSet::with_capacity(ops.len());
-        for op in &ops {
-            if network.authority_for_hash(op.0.dht_basis().clone()).await? {
-                ops_to_integrate.insert(op.1.clone());
-            }
-        }
 
         let maybe_countersigned_entry = entries
             .iter()
@@ -237,6 +231,14 @@ impl SourceChain {
             return Err(SourceChainError::DirtyCounterSigningWrite);
         }
         let lock = lock_for_entry(maybe_countersigned_entry)?;
+
+        // If the lock isn't empty this is a countersigning session.
+        let is_countersigning_session = !lock.is_empty();
+
+        let ops_to_integrate = ops
+            .iter()
+            .map(|op| (op.1.clone(), op.0.dht_basis().clone()))
+            .collect::<Vec<_>>();
 
         // Write the entries, headers and ops to the database in one transaction.
         let author = self.author.clone();
@@ -264,9 +266,6 @@ impl SourceChain {
                     ));
                 }
 
-                // If the lock isn't empty this is a countersigning session.
-                let is_countersigning_session = !lock.is_empty();
-
                 if is_chain_locked(txn, &lock)? {
                     return Err(SourceChainError::ChainLocked);
                 }
@@ -286,32 +285,14 @@ impl SourceChain {
                 for header in headers {
                     insert_header(txn, header)?;
                 }
-                for (op, op_hash, op_order, timestamp, visibility, dependency) in ops {
-                    let op_type = op.get_type();
-                    insert_op_lite(txn, op, op_hash.clone(), true, op_order, timestamp)?;
+                for (op, op_hash, op_order, timestamp, dependency) in ops {
+                    insert_op_lite(txn, op, op_hash.clone(), op_order, timestamp)?;
                     set_validation_status(
                         txn,
                         op_hash.clone(),
                         holochain_zome_types::ValidationStatus::Valid,
                     )?;
                     set_dependency(txn, op_hash.clone(), dependency)?;
-                    // TODO: Can anything every depend on a private store entry op? I don't think so.
-                    let is_private_entry = op_type == DhtOpType::StoreEntry
-                        && visibility == Some(EntryVisibility::Private);
-
-                    // Don't publish private entries or countersigning sessions.
-                    if !is_private_entry
-                        && !is_countersigning_session
-                        && ops_to_integrate.contains(&op_hash)
-                    {
-                        // FIXME: This is the wrong db to set the validation stage.
-                        // It should be the dht env.
-                        set_validation_stage(
-                            txn,
-                            op_hash.clone(),
-                            ValidationLimboStatus::AwaitingIntegration,
-                        )?;
-                    }
                     // If this is a countersigning session we want to withhold
                     // publishing the ops until the session is successful.
                     if is_countersigning_session {
@@ -337,9 +318,13 @@ impl SourceChain {
                     let keystore = self.keystore.clone();
                     // A child chain is needed with a new as-at that matches
                     // the rebase.
-                    let child_chain =
-                        Self::new(self.vault.clone(), keystore.clone(), (*self.author).clone())
-                            .await?;
+                    let child_chain = Self::new(
+                        self.vault.clone(),
+                        self.dht_env.clone(),
+                        keystore.clone(),
+                        (*self.author).clone(),
+                    )
+                    .await?;
                     let rebased_headers: Vec<SignedHeaderHashed> = rebase_headers_on(
                         &keystore,
                         headers,
@@ -366,17 +351,26 @@ impl SourceChain {
                     ))
                 }
             }
+            Ok(()) => Ok(authored_ops_to_dht_db(
+                network,
+                ops_to_integrate.into_iter(),
+                &self.vault,
+                &self.dht_env,
+            )
+            .await?),
             result => result,
         }
     }
 }
 
-impl<AuthorDb> SourceChain<AuthorDb>
+impl<AuthorDb, DhtDb> SourceChain<AuthorDb, DhtDb>
 where
     AuthorDb: ReadAccess<DbKindAuthored>,
+    DhtDb: ReadAccess<DbKindDht>,
 {
     pub async fn new(
         vault: AuthorDb,
+        dht_env: DhtDb,
         keystore: MetaLairClient,
         author: AgentPubKey,
     ) -> SourceChainResult<Self> {
@@ -391,6 +385,7 @@ where
         Ok(Self {
             scratch,
             vault,
+            dht_env,
             keystore,
             author,
             persisted_seq,
@@ -486,13 +481,9 @@ where
             FROM Header AS H_REF
             JOIN DhtOp AS D_REF ON D_REF.header_hash = H_REF.hash
             WHERE
-            D_REF.is_authored = 1
-            AND
-            (
-                H_REF.original_header_hash = Header.hash
-                OR
-                H_REF.deletes_header_hash = Header.hash
-            )
+            H_REF.original_header_hash = Header.hash
+            OR
+            H_REF.deletes_header_hash = Header.hash
             ";
             let sql = format!(
                 "
@@ -501,8 +492,6 @@ where
                 JOIN Header ON Header.entry_hash = Entry.hash
                 JOIN DhtOp ON Header.hash = DhtOp.header_hash
                 WHERE
-                DhtOp.is_authored = 1
-                AND
                 Entry.access_type IS NOT NULL
                 AND
                 ({}) = 0
@@ -620,8 +609,6 @@ where
                 WHERE
                 Header.author = :author
                 AND
-                DhtOp.is_authored = 1
-                AND
                 (:range_min IS NULL OR Header.seq >= :range_min)
                 AND
                 (:range_max IS NULL OR Header.seq < :range_max)
@@ -734,14 +721,7 @@ fn build_ops_from_headers(
     signed_headers: Vec<SignedHeaderHashed>,
 ) -> SourceChainResult<(
     Vec<SignedHeaderHashed>,
-    Vec<(
-        DhtOpLight,
-        DhtOpHash,
-        OpOrder,
-        Timestamp,
-        Option<EntryVisibility>,
-        Dependency,
-    )>,
+    Vec<(DhtOpLight, DhtOpHash, OpOrder, Timestamp, Dependency)>,
 )> {
     // Headers end up back in here.
     let mut headers_output = Vec::with_capacity(signed_headers.len());
@@ -767,12 +747,11 @@ fn build_ops_from_headers(
             let (header, op_hash) = UniqueForm::op_hash(op_type, h.expect("This can't be empty"))?;
             let op_order = OpOrder::new(op_type, header.timestamp());
             let timestamp = header.timestamp();
-            let visibility = header.entry_type().map(|et| *et.visibility());
             // Put the header back by value.
             let dependency = get_dependency(op_type, &header);
             h = Some(header);
             // Collect the DhtOpLight, DhtOpHash and OpOrder.
-            ops.push((op, op_hash, op_order, timestamp, visibility, dependency));
+            ops.push((op, op_hash, op_order, timestamp, dependency));
         }
 
         // Put the SignedHeaderHashed back together.
@@ -921,7 +900,7 @@ pub fn put_raw(
     for (op, (op_hash, op_type, op_order, timestamp, visibility, dependency)) in
         ops.into_iter().zip(hashes)
     {
-        insert_op_lite(txn, op, op_hash.clone(), true, op_order, timestamp)?;
+        insert_op_lite(txn, op, op_hash.clone(), op_order, timestamp)?;
         set_dependency(txn, op_hash.clone(), dependency)?;
         // TODO: SHARDING: Check if we are the authority here.
         // StoreEntry ops with private entries are never gossiped or published
@@ -1064,8 +1043,6 @@ pub async fn dump_state(
                 JOIN DhtOp ON DhtOp.header_hash = Header.hash
                 LEFT JOIN Entry ON Header.entry_hash = Entry.hash
                 WHERE
-                DhtOp.is_authored = 1
-                AND
                 Header.author = :author
                 ORDER BY Header.seq ASC
                 ",
@@ -1096,8 +1073,6 @@ pub async fn dump_state(
                 SELECT COUNT(DhtOp.hash) FROM DhtOp
                 JOIN Header ON DhtOp.header_hash = Header.hash
                 WHERE
-                DhtOp.is_authored = 1
-                AND
                 Header.author = :author
                 AND
                 last_publish_time IS NOT NULL
@@ -1119,6 +1094,7 @@ impl From<SourceChain> for SourceChainReadOnly {
     fn from(chain: SourceChain) -> Self {
         SourceChainReadOnly {
             vault: chain.vault.into(),
+            dht_env: chain.dht_env.into(),
             scratch: chain.scratch,
             keystore: chain.keystore,
             author: chain.author,

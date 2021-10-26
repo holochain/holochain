@@ -236,7 +236,7 @@ fn add_to_pending(
 ) -> StateMutationResult<()> {
     for op in ops {
         let op_hash = op.as_hash().clone();
-        insert_op(txn, op, false)?;
+        insert_op(txn, op)?;
         set_require_receipt(txn, op_hash, request_validation_receipt)?;
     }
     StateMutationResult::Ok(())

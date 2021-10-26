@@ -229,10 +229,6 @@ impl ShardedGossip {
             }
         }
 
-        if self.gossip.should_local_sync()? {
-            self.gossip.local_sync().await?;
-        }
-
         Ok(())
     }
 
@@ -321,11 +317,6 @@ pub struct ShardedGossipLocalState {
     /// Metrics that track remote node states and help guide
     /// the next node to gossip with.
     metrics: Metrics,
-    #[allow(dead_code)]
-    /// Last moment we locally synced.
-    last_local_sync: Option<Instant>,
-    /// Trigger local sync to run on the next iteration.
-    trigger_local_sync: bool,
 }
 
 impl ShardedGossipLocalState {
@@ -379,7 +370,6 @@ impl ShardedGossipLocalState {
         let s = tracing::trace_span!("gossip_trigger", agents = ?self.show_local_agents());
         s.in_scope(|| self.log_state());
         self.metrics.record_force_initiate();
-        self.trigger_local_sync = true;
         Ok(())
     }
 
@@ -598,8 +588,8 @@ impl ShardedGossipLocal {
                 } else {
                     self.get_state(&cert).await?
                 };
-                if let Some(state) = state {
-                    self.incoming_missing_ops(state, ops).await?;
+                if state.is_some() {
+                    self.incoming_missing_ops(ops).await?;
                 }
                 Vec::with_capacity(0)
             }
@@ -617,76 +607,6 @@ impl ShardedGossipLocal {
                 Vec::with_capacity(0)
             }
         })
-    }
-
-    async fn local_sync(&self) -> KitsuneResult<()> {
-        let local_agents = self.inner.share_mut(|i, _| Ok(i.local_agents.clone()))?;
-        let agent_arcs =
-            store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents).await?;
-        let arcs: Vec<_> = agent_arcs.iter().map(|(_, arc)| arc.clone()).collect();
-        let arcset = local_sync_arcset(arcs.as_slice());
-        let op_hashes = store::all_op_hashes_within_arcset(
-            &self.evt_sender,
-            &self.space,
-            agent_arcs.as_slice(),
-            &arcset,
-            full_time_window(),
-            usize::MAX,
-            true,
-        )
-        .await?
-        .map(|(ops, _window)| ops)
-        .unwrap_or_default();
-
-        let ops: Vec<_> = store::fetch_ops(
-            &self.evt_sender,
-            &self.space,
-            local_agents.iter(),
-            op_hashes,
-        )
-        .await?
-        .into_iter()
-        .collect();
-
-        store::put_ops(&self.evt_sender, &self.space, agent_arcs, ops).await?;
-        Ok(())
-    }
-
-    /// Check if we should locally sync
-    fn should_local_sync(&self) -> KitsuneResult<bool> {
-        // Historical gossip should not locally sync.
-        if matches!(self.gossip_type, GossipType::Historical)
-            || self.tuning_params.gossip_single_storage_arc_per_space
-        {
-            return Ok(false);
-        }
-        let update_last_sync = |i: &mut ShardedGossipLocalState, _: &mut bool| {
-            if i.local_agents.len() < 2 {
-                Ok(false)
-            } else if i.trigger_local_sync {
-                // We are force triggering a local sync.
-                i.trigger_local_sync = false;
-                i.last_local_sync = Some(Instant::now());
-                let s = tracing::trace_span!("trigger",agents = ?i.show_local_agents(), i.trigger_local_sync);
-                s.in_scope(|| tracing::trace!("Force local sync"));
-                Ok(true)
-            } else if i
-                .last_local_sync
-                .as_ref()
-                .map(|s| s.elapsed().as_millis() as u32)
-                .unwrap_or(u32::MAX)
-                >= self.tuning_params.gossip_local_sync_delay_ms
-            {
-                // It's been long enough since the last local sync.
-                i.last_local_sync = Some(Instant::now());
-                Ok(true)
-            } else {
-                // Otherwise it's not time to sync.
-                Ok(false)
-            }
-        };
-
-        self.inner.share_mut(update_last_sync)
     }
 
     /// Record all timed out rounds into metrics
@@ -715,33 +635,6 @@ impl ShardedGossipLocal {
             })
             .ok();
     }
-}
-
-/// Calculates the arcset used during local sync. This arcset determines the
-/// minimum set of ops to be spread across all local agents in order to reach
-/// local consistency
-fn local_sync_arcset(arcs: &[ArcInterval]) -> DhtArcSet {
-    arcs.iter()
-        .enumerate()
-        // For each agent's arc,
-        .map(|(i, arc_i)| {
-            // find the union of all arcs *other* than this one,
-            let other_arcset = arcs
-                .iter()
-                .enumerate()
-                .filter_map(|(j, arc_j)| {
-                    if i == j {
-                        None
-                    } else {
-                        Some(DhtArcSet::from(arc_j))
-                    }
-                })
-                .fold(DhtArcSet::new_empty(), |a, b| DhtArcSet::union(&a, &b));
-            // and return the intersection of this arc with the union of the others.
-            DhtArcSet::from(arc_i).intersection(&other_arcset)
-        })
-        // and take the union of all of the intersections
-        .fold(DhtArcSet::new_empty(), |a, b| DhtArcSet::union(&a, &b))
 }
 
 impl RoundState {

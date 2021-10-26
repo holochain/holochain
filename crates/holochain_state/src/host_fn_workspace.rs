@@ -14,8 +14,11 @@ use crate::prelude::SourceChainResult;
 use crate::scratch::SyncScratch;
 
 #[derive(Clone)]
-pub struct HostFnWorkspace<SourceChainDb = DbWrite<DbKindAuthored>> {
-    source_chain: Option<SourceChain<SourceChainDb>>,
+pub struct HostFnWorkspace<
+    SourceChainDb = DbWrite<DbKindAuthored>,
+    SourceChainDht = DbWrite<DbKindDht>,
+> {
+    source_chain: Option<SourceChain<SourceChainDb, SourceChainDht>>,
     authored: DbReadOnly<DbKindAuthored>,
     dht: DbReadOnly<DbKindDht>,
     cache: DbWrite<DbKindCache>,
@@ -35,7 +38,8 @@ pub struct HostFnStores {
     pub scratch: Option<SyncScratch>,
 }
 
-pub type HostFnWorkspaceReadOnly = HostFnWorkspace<DbReadOnly<DbKindAuthored>>;
+pub type HostFnWorkspaceReadOnly =
+    HostFnWorkspace<DbReadOnly<DbKindAuthored>, DbReadOnly<DbKindDht>>;
 
 impl HostFnWorkspace {
     pub async fn flush(
@@ -52,17 +56,18 @@ impl HostFnWorkspace {
 impl SourceChainWorkspace {
     pub async fn new(
         authored: DbWrite<DbKindAuthored>,
-        dht: DbReadOnly<DbKindDht>,
+        dht: DbWrite<DbKindDht>,
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         author: AgentPubKey,
     ) -> SourceChainResult<Self> {
-        let source_chain = SourceChain::new(authored.clone(), keystore, author).await?;
+        let source_chain =
+            SourceChain::new(authored.clone(), dht.clone(), keystore, author).await?;
         Ok(Self {
             inner: HostFnWorkspace {
                 source_chain: Some(source_chain.clone()),
                 authored: authored.into(),
-                dht,
+                dht: dht.clone().into(),
                 cache,
             },
             source_chain,
@@ -70,29 +75,32 @@ impl SourceChainWorkspace {
     }
 }
 
-impl<SourceChainDb> HostFnWorkspace<SourceChainDb>
+impl<SourceChainDb, SourceChainDht> HostFnWorkspace<SourceChainDb, SourceChainDht>
 where
     SourceChainDb: ReadAccess<DbKindAuthored>,
+    SourceChainDht: ReadAccess<DbKindDht>,
 {
     pub async fn new(
         authored: SourceChainDb,
-        dht: DbReadOnly<DbKindDht>,
+        dht: SourceChainDht,
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         author: Option<AgentPubKey>,
     ) -> SourceChainResult<Self> {
         let source_chain = match author {
-            Some(author) => Some(SourceChain::new(authored.clone(), keystore, author).await?),
+            Some(author) => {
+                Some(SourceChain::new(authored.clone(), dht.clone(), keystore, author).await?)
+            }
             None => None,
         };
         Ok(Self {
             source_chain,
             authored: authored.into(),
-            dht,
+            dht: dht.into(),
             cache,
         })
     }
-    pub fn source_chain(&self) -> &Option<SourceChain<SourceChainDb>> {
+    pub fn source_chain(&self) -> &Option<SourceChain<SourceChainDb, SourceChainDht>> {
         &self.source_chain
     }
 

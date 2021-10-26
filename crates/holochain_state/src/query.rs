@@ -3,6 +3,7 @@ use crate::scratch::Scratch;
 use fallible_iterator::FallibleIterator;
 use holo_hash::hash_type::AnyDht;
 use holo_hash::AnyDhtHash;
+use holo_hash::DhtOpHash;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
@@ -10,10 +11,15 @@ use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
 use holochain_sqlite::rusqlite::Statement;
 use holochain_sqlite::rusqlite::Transaction;
+use holochain_sqlite::sql::sql_cell::FETCH_OP;
+use holochain_types::dht_op::DhtOp;
+use holochain_types::dht_op::DhtOpHashed;
+use holochain_types::dht_op::DhtOpType;
 use holochain_types::prelude::HasValidationStatus;
 use holochain_types::prelude::Judged;
 use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
+use holochain_zome_types::EntryVisibility;
 use holochain_zome_types::HeaderHashed;
 use holochain_zome_types::SignedHeader;
 use holochain_zome_types::SignedHeaderHashed;
@@ -669,5 +675,58 @@ pub fn get_entry_from_db(
         Ok(None)
     } else {
         Ok(Some(entry??))
+    }
+}
+
+/// Get a [`DhtOp`] from the database
+/// filtering out private entries and
+/// [`DhtOp::StoreEntry`] where the entry
+/// is private.
+/// The ops are suitable for publishing / gossiping.
+pub fn get_public_op_from_db(
+    txn: &Transaction,
+    op_hash: &DhtOpHash,
+) -> StateQueryResult<Option<DhtOpHashed>> {
+    let result = txn.query_row_and_then(
+        FETCH_OP,
+        named_params! {
+            ":hash": op_hash,
+        },
+        |row| {
+            let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
+            let op_type: DhtOpType = row.get("type")?;
+            if header
+                .0
+                .entry_type()
+                .map_or(false, |et| *et.visibility() == EntryVisibility::Private)
+                && op_type == DhtOpType::StoreEntry
+            {
+                return Ok(None);
+            }
+            let hash: DhtOpHash = row.get("hash")?;
+            // Check the entry isn't private before gossiping it.
+            let mut entry: Option<Entry> = None;
+            if header
+                .0
+                .entry_type()
+                .filter(|et| *et.visibility() == EntryVisibility::Public)
+                .is_some()
+            {
+                let e: Option<Vec<u8>> = row.get("entry_blob")?;
+                entry = match e {
+                    Some(entry) => Some(from_blob::<Entry>(entry)?),
+                    None => None,
+                };
+            }
+            let op = DhtOp::from_type(op_type, header, entry)?;
+            StateQueryResult::Ok(Some(DhtOpHashed::with_pre_hashed(op, hash)))
+        },
+    );
+    match result {
+        Err(StateQueryError::Sql(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows)) => {
+            Ok(None)
+        }
+        Err(e) => Err(e),
+        Ok(result) => Ok(result),
     }
 }

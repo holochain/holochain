@@ -123,8 +123,6 @@ impl GenesisWorkspace {
                 FROM Header
                 JOIN DhtOp ON DhtOp.header_hash = Header.hash
                 WHERE
-                DhtOp.is_authored = 1
-                AND
                 Header.author = :author
                 LIMIT 3
                 ",
@@ -145,6 +143,7 @@ pub mod tests {
 
     use crate::conductor::api::MockCellConductorApi;
     use crate::core::ribosome::MockRibosomeT;
+    use holochain_state::prelude::test_dht_env;
     use holochain_state::{prelude::test_authored_env, source_chain::SourceChain};
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
@@ -156,6 +155,7 @@ pub mod tests {
     async fn genesis_initializes_source_chain() {
         observability::test_run().unwrap();
         let test_env = test_authored_env();
+        let dht_env = test_dht_env();
         let vault = test_env.env();
         let dna = fake_dna_file("a");
         let author = fake_agent_pubkey_1();
@@ -179,9 +179,10 @@ pub mod tests {
         }
 
         {
-            let source_chain = SourceChain::new(vault.clone().into(), author.clone())
-                .await
-                .unwrap();
+            let source_chain =
+                SourceChain::new(vault.clone().into(), dht_env.env(), author.clone())
+                    .await
+                    .unwrap();
             let headers = source_chain
                 .query(Default::default())
                 .await

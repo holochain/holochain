@@ -131,9 +131,31 @@ pub enum DbSyncLevel {
     Off,
 }
 
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
+/// The strategy for database file system synchronization.
+/// Some databases like the cache can be safety rebuilt if
+/// corruption occurs due to using the faster [`DbSyncLevel::Off`].
+pub enum DbSyncStrategy {
+    /// Allows databases that can be wiped and rebuilt to
+    /// use the faster [`DbSyncLevel::Off`].
+    /// This is the default.
+    Fast,
+    /// Makes all databases use at least [`DbSyncLevel::Normal`].
+    /// This is probably not needed unless you have an SSD and
+    /// would prefer to lower the chances of databases needing to
+    /// be rebuilt.
+    Resilient,
+}
+
 impl Default for DbSyncLevel {
     fn default() -> Self {
         DbSyncLevel::Normal
+    }
+}
+
+impl Default for DbSyncStrategy {
+    fn default() -> Self {
+        DbSyncStrategy::Fast
     }
 }
 

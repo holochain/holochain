@@ -224,7 +224,7 @@ pub fn fill_db(env: &DbWrite<DbKindDht>, op: DhtOpHashed) {
         .unwrap()
         .with_commit_sync(|txn| {
             let hash = op.as_hash().clone();
-            insert_op(txn, op, false).unwrap();
+            insert_op(txn, op).unwrap();
             set_validation_status(txn, hash.clone(), ValidationStatus::Valid).unwrap();
             set_when_integrated(txn, hash, Timestamp::now()).unwrap();
             DatabaseResult::Ok(())
@@ -237,7 +237,7 @@ pub fn fill_db_rejected(env: &DbWrite<DbKindDht>, op: DhtOpHashed) {
         .unwrap()
         .with_commit_sync(|txn| {
             let hash = op.as_hash().clone();
-            insert_op(txn, op, false).unwrap();
+            insert_op(txn, op).unwrap();
             set_validation_status(txn, hash.clone(), ValidationStatus::Rejected).unwrap();
             set_when_integrated(txn, hash, Timestamp::now()).unwrap();
             DatabaseResult::Ok(())
@@ -250,7 +250,7 @@ pub fn fill_db_pending(env: &DbWrite<DbKindDht>, op: DhtOpHashed) {
         .unwrap()
         .with_commit_sync(|txn| {
             let hash = op.as_hash().clone();
-            insert_op(txn, op, false).unwrap();
+            insert_op(txn, op).unwrap();
             set_validation_status(txn, hash, ValidationStatus::Valid).unwrap();
             DatabaseResult::Ok(())
         })
@@ -261,7 +261,7 @@ pub fn fill_db_as_author(env: &DbWrite<DbKindAuthored>, op: DhtOpHashed) {
     env.conn()
         .unwrap()
         .with_commit_sync(|txn| {
-            insert_op(txn, op, true).unwrap();
+            insert_op(txn, op).unwrap();
             DatabaseResult::Ok(())
         })
         .unwrap();

@@ -10,3 +10,7 @@ WHERE
   AND DhtOp.authored_timestamp < :to
   AND storage_center_loc >= :storage_start_loc
   AND storage_center_loc <= :storage_end_loc
+ORDER BY
+  authored_timestamp ASC
+LIMIT
+  :limit

@@ -130,11 +130,7 @@ pub fn insert_element_scratch(
 }
 
 /// Insert a [`DhtOp`] into the database.
-pub fn insert_op(
-    txn: &mut Transaction,
-    op: DhtOpHashed,
-    is_authored: bool,
-) -> StateMutationResult<()> {
+pub fn insert_op(txn: &mut Transaction, op: DhtOpHashed) -> StateMutationResult<()> {
     let (op, hash) = op.into_inner();
     let op_light = op.to_light();
     let header = op.header();
@@ -155,14 +151,7 @@ pub fn insert_op(
     let header_hashed = SignedHeaderHashed::with_presigned(header_hashed, signature);
     let op_order = OpOrder::new(op_light.get_type(), header_hashed.header().timestamp());
     insert_header(txn, header_hashed)?;
-    insert_op_lite(
-        txn,
-        op_light,
-        hash.clone(),
-        is_authored,
-        op_order,
-        timestamp,
-    )?;
+    insert_op_lite(txn, op_light, hash.clone(), op_order, timestamp)?;
     set_dependency(txn, hash, dependency)?;
     Ok(())
 }
@@ -172,7 +161,6 @@ pub fn insert_op_lite(
     txn: &mut Transaction,
     op_lite: DhtOpLight,
     hash: DhtOpHash,
-    is_authored: bool,
     order: OpOrder,
     timestamp: Timestamp,
 ) -> StateMutationResult<()> {
@@ -185,7 +173,6 @@ pub fn insert_op_lite(
         "authored_timestamp": timestamp,
         "basis_hash": basis,
         "header_hash": header_hash,
-        "is_authored": is_authored,
         "require_receipt": 0,
         "blob": to_blob(op_lite)?,
         "op_order": order,

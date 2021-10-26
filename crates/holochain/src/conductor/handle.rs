@@ -75,6 +75,7 @@ use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_p2p::DnaHashExt;
 use holochain_p2p::HolochainP2pDna;
 use holochain_p2p::HolochainP2pDnaT;
+use holochain_sqlite::conn::DbSyncStrategy;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::source_chain;
 use holochain_types::prelude::*;
@@ -409,7 +410,7 @@ pub struct ConductorHandleImpl<DS: DnaStore + 'static> {
         Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, DbWrite<DbKindP2pMetrics>>>>,
 
     /// Database sync level
-    pub(super) db_sync_level: DbSyncLevel,
+    pub(super) db_sync_strategy: DbSyncStrategy,
 
     /// The batch sender for writes to the p2p database.
     pub(super) p2p_batch_senders:
@@ -640,17 +641,58 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             }
             HolochainP2pEvent::CallRemote { .. }
             | CountersigningAuthorityResponse { .. }
-            | Publish { .. }
             | GetValidationPackage { .. }
             | Get { .. }
             | GetMeta { .. }
             | GetLinks { .. }
             | GetAgentActivity { .. }
-            | ValidationReceiptReceived { .. }
-            | FetchOpData { .. } => {
+            | ValidationReceiptReceived { .. } => {
                 let cell_id = CellId::new(event.dna_hash().clone(), event.target_agents().clone());
                 let cell = self.cell_by_id(&cell_id)?;
                 cell.handle_holochain_p2p_event(event).await?;
+            }
+            Publish {
+                dna_hash,
+                respond,
+                request_validation_receipt,
+                countersigning_session,
+                ops,
+                ..
+            } => {
+                async {
+                    let res = self
+                        .conductor
+                        .spaces
+                        .handle_publish(
+                            &dna_hash,
+                            request_validation_receipt,
+                            countersigning_session,
+                            ops,
+                        )
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::other);
+                    respond.respond(Ok(async move { res }.boxed().into()));
+                }
+                .instrument(debug_span!("handle_publish"))
+                .await;
+            }
+            FetchOpData {
+                respond,
+                op_hashes,
+                dna_hash,
+                ..
+            } => {
+                async {
+                    let res = self
+                        .conductor
+                        .spaces
+                        .handle_fetch_op_data(&dna_hash, op_hashes)
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::other);
+                    respond.respond(Ok(async move { res }.boxed().into()));
+                }
+                .instrument(debug_span!("handle_fetch_op_data"))
+                .await;
             }
 
             // This event does not have a single Cell as a target, so we handle
@@ -659,71 +701,21 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             //       is meant for a single Cell, i.e. allow batching in general
             HolochainP2pEvent::QueryOpHashes {
                 dna_hash,
-                to_agents,
                 window,
                 max_ops,
                 include_limbo,
+                arc_set,
                 respond,
                 ..
             } => {
-                let mut hashes_and_times = Vec::with_capacity(to_agents.len());
+                let res = self
+                    .conductor
+                    .spaces
+                    .handle_query_op_hashes(&dna_hash, arc_set, window, max_ops, include_limbo)
+                    .await
+                    .map_err(holochain_p2p::HolochainP2pError::other);
 
-                // For each cell collect the hashes and times that fit within the
-                // agents interval and time window.
-                for (agent, arc_set) in to_agents {
-                    let cell_id = CellId::new(dna_hash.clone(), agent);
-                    let cell = self.cell_by_id(&cell_id)?;
-                    match cell
-                        .handle_query_op_hashes(arc_set, window.clone(), include_limbo)
-                        .await
-                    {
-                        Ok(t) => hashes_and_times.extend(t),
-                        Err(e) => {
-                            // If there's an error for any cell we want to fail the whole call.
-                            respond.respond(Ok(async move {
-                                Err(holochain_p2p::HolochainP2pError::other(e))
-                            }
-                            .boxed()
-                            .into()));
-                            return Ok(());
-                        }
-                    }
-                }
-                // Remove any duplicate hashes.
-                // Note vec must be sorted to remove duplicates.
-                hashes_and_times.sort_unstable_by(|a, b| a.0.cmp(&b.0));
-                hashes_and_times.dedup_by(|a, b| a.0 == b.0);
-
-                // Now sort by time so we can take up to max_ops.
-                hashes_and_times.sort_unstable_by_key(|(_, t)| *t);
-
-                // The start time bound if there is one.
-                let start = hashes_and_times.first().map(|(_, t)| *t);
-
-                // The end time bound if there is one.
-                let end = hashes_and_times
-                    .get(max_ops)
-                    .or_else(|| hashes_and_times.last())
-                    .map(|(_, t)| *t);
-
-                // Extract the hashes.
-                let hashes: Vec<_> = hashes_and_times
-                    .into_iter()
-                    .take(max_ops)
-                    .map(|(h, _)| h)
-                    .collect();
-
-                // The range is exclusive so we add one to the end.
-                let range = start.and_then(|s| {
-                    end.map(|e| {
-                        (
-                            hashes,
-                            s..(e.saturating_add(&std::time::Duration::from_millis(1))),
-                        )
-                    })
-                });
-
-                respond.respond(Ok(async move { Ok(range) }.boxed().into()));
+                respond.respond(Ok(async move { res }.boxed().into()));
             }
         }
         Ok(())
@@ -1356,7 +1348,7 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
 
     pub(super) fn p2p_env(&self, space: Arc<KitsuneSpace>) -> DbWrite<DbKindP2pAgentStore> {
         let mut p2p_env = self.p2p_env.lock();
-        let db_sync_level = self.db_sync_level;
+        let db_sync_strategy = self.db_sync_strategy;
         p2p_env
             .entry(space.clone())
             .or_insert_with(move || {
@@ -1364,7 +1356,10 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
                 DbWrite::open_with_sync_level(
                     root_env_dir,
                     DbKindP2pAgentStore(space),
-                    db_sync_level,
+                    match db_sync_strategy {
+                        DbSyncStrategy::Fast => DbSyncLevel::Off,
+                        DbSyncStrategy::Resilient => DbSyncLevel::Normal,
+                    },
                 )
                 .expect("failed to open p2p_agent_store database")
             })
@@ -1389,13 +1384,20 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
 
     pub(super) fn p2p_metrics_env(&self, space: Arc<KitsuneSpace>) -> DbWrite<DbKindP2pMetrics> {
         let mut p2p_metrics_env = self.p2p_metrics_env.lock();
-        let db_sync_level = self.db_sync_level;
+        let db_sync_strategy = self.db_sync_strategy;
         p2p_metrics_env
             .entry(space.clone())
             .or_insert_with(move || {
                 let root_env_dir = self.root_env_dir.as_ref();
-                DbWrite::open_with_sync_level(root_env_dir, DbKindP2pMetrics(space), db_sync_level)
-                    .expect("failed to open p2p_metrics database")
+                DbWrite::open_with_sync_level(
+                    root_env_dir,
+                    DbKindP2pMetrics(space),
+                    match db_sync_strategy {
+                        DbSyncStrategy::Fast => DbSyncLevel::Off,
+                        DbSyncStrategy::Resilient => DbSyncLevel::Normal,
+                    },
+                )
+                .expect("failed to open p2p_metrics database")
             })
             .clone()
     }

@@ -7,12 +7,11 @@ use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
 use holochain_sqlite::db::{DbKindAuthored, DbKindDht};
 use holochain_sqlite::fresh_reader;
+use holochain_state::integrate::authored_ops_to_dht_db;
 use holochain_state::mutations;
 use holochain_state::prelude::{
-    current_countersigning_session, set_validation_stage, SourceChainResult, StateMutationResult,
-    Store,
+    current_countersigning_session, SourceChainResult, StateMutationResult, Store,
 };
-use holochain_state::validation_db::ValidationLimboStatus;
 use holochain_types::signal::{Signal, SystemSignal};
 use holochain_types::{dht_op::DhtOp, env::DbWrite};
 use holochain_zome_types::Timestamp;
@@ -139,7 +138,8 @@ pub(crate) async fn countersigning_workflow(
 
 /// An incoming countersigning session success.
 pub(crate) async fn countersigning_success(
-    vault: DbWrite<DbKindAuthored>,
+    authored_env: DbWrite<DbKindAuthored>,
+    dht_env: DbWrite<DbKindDht>,
     network: &HolochainP2pDna,
     author: AgentPubKey,
     signed_headers: Vec<SignedHeader>,
@@ -162,9 +162,8 @@ pub(crate) async fn countersigning_success(
     // Do a quick check to see if this entry hash matches
     // the current locked session so we don't check signatures
     // unless there is an active session.
-    let this_cell_headers_op_basis_hashes: Vec<(DhtOpHash, AnyDhtHash)> = fresh_reader!(
-        vault,
-        |txn| {
+    let this_cell_headers_op_basis_hashes: Vec<(DhtOpHash, AnyDhtHash)> =
+        fresh_reader!(authored_env, |txn| {
             if holochain_state::chain_lock::is_chain_locked(&txn, &[])? {
                 let transaction: holochain_state::prelude::Txn = (&txn).into();
                 if transaction.contains_entry(&entry_hash)? {
@@ -172,7 +171,7 @@ pub(crate) async fn countersigning_success(
                     // for this cells header so we can check if we need to self publish them.
                     let r: Result<_, _> = txn
                         .prepare(
-                            "SELECT basis_hash, hash FROM DhtOp WHERE header_hash = :header_hash AND is_authored = 1",
+                            "SELECT basis_hash, hash FROM DhtOp WHERE header_hash = :header_hash",
                         )?
                         .query_map(
                             named_params! {
@@ -189,8 +188,7 @@ pub(crate) async fn countersigning_success(
                 }
             }
             StateMutationResult::Ok(Vec::with_capacity(0))
-        }
-    )?;
+        })?;
 
     // If there is no active session then we can short circuit.
     if this_cell_headers_op_basis_hashes.is_empty() {
@@ -210,15 +208,7 @@ pub(crate) async fn countersigning_success(
         .map(|SignedHeader(h, _)| HeaderHash::with_data_sync(h))
         .collect();
 
-    let mut ops_to_self_publish = Vec::new();
-
-    // Check which ops we are the authority for and self publish if we are.
-    for (op_hash, basis) in this_cell_headers_op_basis_hashes {
-        if network.authority_for_hash(basis).await? {
-            ops_to_self_publish.push(op_hash);
-        }
-    }
-    let result = vault
+    let result = authored_env
         .async_commit({
             let author = author.clone();
             let entry_hash = entry_hash.clone();
@@ -241,14 +231,6 @@ pub(crate) async fn countersigning_success(
                                 ":header_hash": this_cells_header_hash,
                                 }
                             ).map_err(holochain_state::prelude::StateMutationError::from)?;
-                            // Self publish if we are an authority.
-                            for hash in ops_to_self_publish {
-                                set_validation_stage(
-                                    txn,
-                                    hash,
-                                    ValidationLimboStatus::AwaitingIntegration,
-                                )?;
-                            }
                             return Ok(true);
                         }
                     }
@@ -259,6 +241,13 @@ pub(crate) async fn countersigning_success(
         .await?;
 
     if result {
+        authored_ops_to_dht_db(
+            network,
+            this_cell_headers_op_basis_hashes.into_iter(),
+            &(authored_env.into()),
+            &dht_env,
+        )
+        .await?;
         // Publish other signers agent activity ops to their agent activity authorities.
         for SignedHeader(header, signature) in signed_headers {
             if *header.author() == author {

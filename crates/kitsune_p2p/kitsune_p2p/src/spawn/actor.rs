@@ -528,10 +528,9 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
     fn handle_gossip(
         &mut self,
         space: Arc<KitsuneSpace>,
-        to_agent: Arc<KitsuneAgent>,
         ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
     ) -> KitsuneP2pEventHandlerResult<()> {
-        Ok(self.evt_sender.gossip(space, to_agent, ops))
+        Ok(self.evt_sender.gossip(space, ops))
     }
 
     fn handle_fetch_op_data(

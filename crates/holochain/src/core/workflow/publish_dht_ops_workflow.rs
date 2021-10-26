@@ -159,7 +159,7 @@ mod tests {
                     let op = DhtOp::RegisterAddLink(sig.clone(), link_add.clone());
                     // Get the hash from the op
                     let op_hashed = DhtOpHashed::from_content_sync(op.clone());
-                    mutations::insert_op(txn, op_hashed, true)?;
+                    mutations::insert_op(txn, op_hashed)?;
                 }
                 StateMutationResult::Ok(())
             })
@@ -358,6 +358,7 @@ mod tests {
 
                 // Create test env
                 let test_env = test_authored_env();
+                let dht_env = test_dht_env();
                 let env = test_env.env();
 
                 let dna = fixt!(DnaHash);
@@ -398,9 +399,10 @@ mod tests {
                 let author = fake_agent_pubkey_1();
 
                 // Put data in elements
-                let source_chain = SourceChain::new(env.clone().into(), author.clone())
-                    .await
-                    .unwrap();
+                let source_chain =
+                    SourceChain::new(env.clone().into(), dht_env.env(), author.clone())
+                        .await
+                        .unwrap();
                 // Produces 3 ops but minus 1 for store entry so 2 ops.
                 let original_header_address = source_chain
                     .put(

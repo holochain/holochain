@@ -441,7 +441,7 @@ async fn consistency_envs_others(
 
 fn get_authored_ops(env: &DbReadOnly<DbKindAuthored>) -> Vec<DhtOpLight> {
     fresh_reader_test(env.clone(), |txn| {
-        txn.prepare("SELECT blob FROM DhtOp WHERE is_authored = 1")
+        txn.prepare("SELECT blob FROM DhtOp")
             .unwrap()
             .query_and_then([], |row| from_blob(row.get("blob")?))
             .unwrap()
@@ -460,8 +460,6 @@ fn get_published_ops(env: &DbReadOnly<DbKindAuthored>) -> Vec<DhtOpLight> {
             JOIN
             Header ON DhtOp.header_hash = Header.hash
             WHERE
-            DhtOp.is_authored = 1
-            AND
             (DhtOp.type != :store_entry OR Header.private_entry = 0)
         ",
         )
@@ -586,7 +584,7 @@ pub async fn wait_for_integration_with_others(
 pub fn show_authored(envs: &[&DbReadOnly<DbKindAuthored>]) {
     for (i, &env) in envs.iter().enumerate() {
         fresh_reader_test(env.clone(), |txn| {
-            txn.prepare("SELECT DISTINCT Header.seq, Header.type, Header.entry_hash FROM Header JOIN DhtOp ON Header.hash = DhtOp.hash WHERE is_authored = 1")
+            txn.prepare("SELECT DISTINCT Header.seq, Header.type, Header.entry_hash FROM Header JOIN DhtOp ON Header.hash = DhtOp.hash")
             .unwrap()
             .query_map([], |row| {
                 let header_type: String = row.get("type")?;

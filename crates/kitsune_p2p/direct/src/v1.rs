@@ -699,11 +699,10 @@ async fn handle_events(
                 event::KitsuneP2pEvent::Gossip {
                     respond,
                     space,
-                    to_agent,
                     ops,
                     ..
                 } => {
-                    respond.r(Ok(handle_gossip(kdirect.clone(), space, to_agent, ops)
+                    respond.r(Ok(handle_gossip(kdirect.clone(), space, ops)
                         .map_err(KitsuneP2pError::other)
                         .boxed()
                         .into()));
@@ -846,26 +845,26 @@ async fn handle_call(
 }
 
 async fn handle_gossip(
-    kdirect: Arc<Kd1>,
-    space: Arc<KitsuneSpace>,
-    to_agent: Arc<KitsuneAgent>,
-    ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
+    _kdirect: Arc<Kd1>,
+    _space: Arc<KitsuneSpace>,
+    _ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
 ) -> KdResult<()> {
-    for (op_hash, op_data) in ops {
-        let entry = KdEntrySigned::from_wire(op_data.into_boxed_slice())
-            .await
-            .map_err(KdError::other)?;
-        let op_hash = KdHash::from_kitsune_op_hash(&op_hash);
-        if &op_hash != entry.hash() {
-            return Err("data did not hash to given hash".into());
-        }
-        let root = KdHash::from_kitsune_space(&space);
-        let to_agent = KdHash::from_kitsune_agent(&to_agent);
+    // for (op_hash, op_data) in ops {
+    //     let entry = KdEntrySigned::from_wire(op_data.into_boxed_slice())
+    //         .await
+    //         .map_err(KdError::other)?;
+    //     let op_hash = KdHash::from_kitsune_op_hash(&op_hash);
+    //     if &op_hash != entry.hash() {
+    //         return Err("data did not hash to given hash".into());
+    //     }
+    //     let root = KdHash::from_kitsune_space(&space);
+    //     let to_agent = KdHash::from_kitsune_agent(&to_agent);
 
-        kdirect.persist.store_entry(root, to_agent, entry).await?;
-    }
+    //     kdirect.persist.store_entry(root, to_agent, entry).await?;
+    // }
 
-    Ok(())
+    // Ok(())
+    todo!()
 }
 
 #[allow(warnings)]
@@ -875,10 +874,10 @@ async fn handle_query_op_hashes(
 ) -> KdResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindow)>> {
     let QueryOpHashesEvt {
         space,
-        agents,
         window,
         max_ops,
         include_limbo: _,
+        ..
     } = input;
 
     let root = KdHash::from_kitsune_space(&space);
@@ -889,55 +888,56 @@ async fn handle_query_op_hashes(
     //        we'll want an api to just get the hashes
     let mut entries = vec![];
 
-    for (agent, arcset) in agents {
-        let agent = KdHash::from_kitsune_agent(&agent);
-        let es = kdirect
-            .persist
-            .query_entries(root.clone(), agent, window.clone(), arcset)
-            .await?;
-        entries.extend(es.into_iter());
-    }
+    let agents = todo!();
+    // for (agent, arcset) in agents {
+    //     let agent = KdHash::from_kitsune_agent(&agent);
+    //     let es = kdirect
+    //         .persist
+    //         .query_entries(root.clone(), agent, window.clone(), arcset)
+    //         .await?;
+    //     entries.extend(es.into_iter());
+    // }
 
-    let mut entries: Vec<_> = entries
-        .into_iter()
-        .map(|e| e.hash().clone().to_kitsune_op_hash())
-        .collect();
-    entries.sort();
-    entries.dedup();
+    // let mut entries: Vec<_> = entries
+    //     .into_iter()
+    //     .map(|e| e.hash().clone().to_kitsune_op_hash())
+    //     .collect();
+    // entries.sort();
+    // entries.dedup();
 
     // TODO: produce proper time window of actual data returned
     Ok(Some((entries, window)))
 }
 
 async fn handle_fetch_op_data(
-    kdirect: Arc<Kd1>,
-    input: FetchOpDataEvt,
+    _kdirect: Arc<Kd1>,
+    _input: FetchOpDataEvt,
 ) -> KdResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> {
-    let FetchOpDataEvt {
-        space,
-        agents,
-        op_hashes,
-        ..
-    } = input;
+    // let FetchOpDataEvt {
+    //     space,
+    //     op_hashes,
+    //     ..
+    // } = input;
+    todo!()
 
-    let mut out = Vec::new();
-    let root = KdHash::from_kitsune_space(&space);
+    // let mut out = Vec::new();
+    // let root = KdHash::from_kitsune_space(&space);
 
-    for op_hash in op_hashes {
-        for agent in agents.iter() {
-            let agent = KdHash::from_kitsune_agent(agent);
-            let hash = KdHash::from_kitsune_op_hash(&op_hash);
-            if let Ok(entry) = kdirect
-                .persist
-                .get_entry(root.clone(), agent.clone(), hash)
-                .await
-            {
-                out.push((op_hash.clone(), entry.as_wire_data_ref().to_vec()));
-            }
-        }
-    }
+    // for op_hash in op_hashes {
+    //     for agent in agents.iter() {
+    //         let agent = KdHash::from_kitsune_agent(agent);
+    //         let hash = KdHash::from_kitsune_op_hash(&op_hash);
+    //         if let Ok(entry) = kdirect
+    //             .persist
+    //             .get_entry(root.clone(), agent.clone(), hash)
+    //             .await
+    //         {
+    //             out.push((op_hash.clone(), entry.as_wire_data_ref().to_vec()));
+    //         }
+    //     }
+    // }
 
-    Ok(out)
+    // Ok(out)
 }
 
 async fn handle_sign_network_data(

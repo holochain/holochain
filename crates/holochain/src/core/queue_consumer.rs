@@ -50,6 +50,7 @@ use tokio::task::JoinHandle;
 use validation_receipt_consumer::*;
 mod validation_receipt_consumer;
 use crate::conductor::conductor::RwShare;
+use crate::conductor::space::Space;
 use crate::conductor::{error::ConductorError, manager::ManagedTaskResult};
 use crate::conductor::{manager::ManagedTaskAdd, ConductorHandle};
 use holochain_p2p::HolochainP2pDna;
@@ -63,7 +64,6 @@ use countersigning_consumer::*;
 mod tests;
 
 use super::workflow::app_validation_workflow::AppValidationWorkspace;
-use super::workflow::countersigning_workflow::CountersigningWorkspace;
 use super::workflow::error::WorkflowError;
 use super::workflow::sys_validation_workflow::SysValidationWorkspace;
 
@@ -75,15 +75,20 @@ use super::workflow::sys_validation_workflow::SysValidationWorkspace;
 #[allow(clippy::too_many_arguments)]
 pub async fn spawn_queue_consumer_tasks(
     cell_id: CellId,
-    authored_env: DbWrite<DbKindAuthored>,
-    dht_env: DbWrite<DbKindDht>,
-    cache: DbWrite<DbKindCache>,
     network: HolochainP2pDna,
+    space: &Space,
     conductor_handle: ConductorHandle,
     task_sender: sync::mpsc::Sender<ManagedTaskAdd>,
     stop: sync::broadcast::Sender<()>,
-    countersigning_workspace: CountersigningWorkspace,
 ) -> (QueueTriggers, InitialQueueTriggers) {
+    let Space {
+        authored_env,
+        dht_env,
+        cache,
+        countersigning_workspace,
+        ..
+    } = space;
+
     let keystore = conductor_handle.keystore().clone();
     let dna_hash = Arc::new(cell_id.dna_hash().clone());
     let queue_consumer_map = conductor_handle.get_queue_consumer_workflows();
@@ -214,7 +219,7 @@ pub async fn spawn_queue_consumer_tasks(
         spawn_countersigning_consumer(
             dht_env.clone(),
             stop.subscribe(),
-            countersigning_workspace,
+            countersigning_workspace.clone(),
             network.clone(),
             tx_sys.clone(),
         )
@@ -308,6 +313,35 @@ impl QueueConsumerMap {
         S: FnOnce() -> (TriggerSender, JoinHandle<ManagedTaskResult>),
     {
         self.spawn_once(QueueEntry(dna_hash, QueueType::Countersigning), spawn)
+    }
+
+    /// Get the validation receipt trigger for this dna hash.
+    pub fn validation_receipt_trigger(&self, dna_hash: Arc<DnaHash>) -> Option<TriggerSender> {
+        self.get_trigger(&QueueEntry(dna_hash, QueueType::Receipt))
+    }
+
+    /// Get the integration trigger for this dna hash.
+    pub fn integration_trigger(&self, dna_hash: Arc<DnaHash>) -> Option<TriggerSender> {
+        self.get_trigger(&QueueEntry(dna_hash, QueueType::Integration))
+    }
+
+    /// Get the sys validation trigger for this dna hash.
+    pub fn sys_validation_trigger(&self, dna_hash: Arc<DnaHash>) -> Option<TriggerSender> {
+        self.get_trigger(&QueueEntry(dna_hash, QueueType::SysValidation))
+    }
+
+    /// Get the app validation trigger for this dna hash.
+    pub fn app_validation_trigger(&self, dna_hash: Arc<DnaHash>) -> Option<TriggerSender> {
+        self.get_trigger(&QueueEntry(dna_hash, QueueType::AppValidation))
+    }
+
+    /// Get the countersigning trigger for this dna hash.
+    pub fn countersigning_trigger(&self, dna_hash: Arc<DnaHash>) -> Option<TriggerSender> {
+        self.get_trigger(&QueueEntry(dna_hash, QueueType::Countersigning))
+    }
+
+    fn get_trigger(&self, key: &QueueEntry) -> Option<TriggerSender> {
+        self.map.share_ref(|map| map.get(key).cloned())
     }
 
     fn spawn_once<S>(
