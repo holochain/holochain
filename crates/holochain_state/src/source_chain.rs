@@ -45,6 +45,7 @@ use holochain_zome_types::SignedHeader;
 use holochain_zome_types::SignedHeaderHashed;
 use holochain_zome_types::Timestamp;
 use holochain_zome_types::ValidationStatus;
+use holochain_zome_types::Zome;
 
 use crate::chain_lock::is_chain_locked;
 use crate::chain_lock::is_lock_expired;
@@ -133,23 +134,27 @@ impl SourceChain {
         Ok(self.scratch.apply(|scratch| scratch.elements().collect())?)
     }
 
+    /// Accessor for the chain head that will be used at flush time to check
+    /// the "as at" for ordering integrity etc.
+    pub fn persisted_chain_head(&self) -> (HeaderHash, u32, Timestamp) {
+        (
+            self.persisted_head.clone(),
+            self.persisted_seq,
+            self.persisted_timestamp,
+        )
+    }
+
     pub fn chain_head(&self) -> SourceChainResult<(HeaderHash, u32, Timestamp)> {
         // Check scratch for newer head.
         Ok(self.scratch.apply(|scratch| {
-            let chain_head = chain_head_scratch(&(*scratch), self.author.as_ref());
-            let (prev_header, header_seq, timestamp) = chain_head.unwrap_or_else(|| {
-                (
-                    self.persisted_head.clone(),
-                    self.persisted_seq,
-                    self.persisted_timestamp,
-                )
-            });
-            (prev_header, header_seq, timestamp)
+            chain_head_scratch(&(*scratch), self.author.as_ref())
+                .unwrap_or_else(|| self.persisted_chain_head())
         })?)
     }
 
     async fn put_with_header(
         &self,
+        zome: Option<Zome>,
         header: Header,
         maybe_entry: Option<Entry>,
         chain_top_ordering: ChainTopOrdering,
@@ -159,18 +164,20 @@ impl SourceChain {
         let header = SignedHeaderHashed::new(&self.vault.keystore(), header).await?;
         let element = Element::new(header, maybe_entry);
         self.scratch
-            .apply(|scratch| insert_element_scratch(scratch, element, chain_top_ordering))?;
+            .apply(|scratch| insert_element_scratch(scratch, zome, element, chain_top_ordering))?;
         Ok(hash)
     }
 
     pub async fn put_countersigned(
         &self,
+        zome: Option<Zome>,
         entry: Entry,
         chain_top_ordering: ChainTopOrdering,
     ) -> SourceChainResult<HeaderHash> {
         let entry_hash = EntryHash::with_data_sync(&entry);
         if let Entry::CounterSign(ref session_data, _) = entry {
             self.put_with_header(
+                zome,
                 Header::from_countersigning_data(entry_hash, session_data, (*self.author).clone())?,
                 Some(entry),
                 chain_top_ordering,
@@ -184,6 +191,7 @@ impl SourceChain {
 
     pub async fn put<H: HeaderInner, B: HeaderBuilder<H>>(
         &self,
+        zome: Option<Zome>,
         header_builder: B,
         maybe_entry: Option<Entry>,
         chain_top_ordering: ChainTopOrdering,
@@ -209,6 +217,7 @@ impl SourceChain {
             prev_header,
         };
         self.put_with_header(
+            zome,
             header_builder.build(common).into(),
             maybe_entry,
             chain_top_ordering,
@@ -485,7 +494,7 @@ impl SourceChain {
                 if is_chain_locked(txn, &hashed_preflight_request)? {
                     return Err(SourceChainError::ChainLocked);
                 }
-                let (persisted_head, persisted_seq, _) = chain_head_db(&txn, author)?;
+                let (persisted_head, persisted_seq, _) = chain_head_db(txn, author)?;
                 let countersigning_agent_state =
                     CounterSigningAgentState::new(agent_index, persisted_head, persisted_seq);
                 lock_chain(
@@ -540,20 +549,21 @@ impl SourceChain {
     pub async fn flush(
         &self,
         network: &(dyn HolochainP2pCellT + Send + Sync),
-    ) -> SourceChainResult<()> {
+    ) -> SourceChainResult<Vec<(Option<Zome>, SignedHeaderHashed)>> {
         // Nothing to write
         if self.scratch.apply(|s| s.is_empty())? {
-            return Ok(());
+            return Ok(Vec::new());
         }
-        let (scheduled_fns, headers, ops, entries) = self.scratch.apply_and_then(|scratch| {
-            let (headers, ops) =
-                build_ops_from_headers(scratch.drain_headers().collect::<Vec<_>>())?;
+        let (scheduled_fns, zomed_headers, ops, entries) =
+            self.scratch.apply_and_then(|scratch| {
+                let (zomed_headers, ops) =
+                    build_ops_from_headers(scratch.drain_zomed_headers().collect::<Vec<_>>())?;
 
-            // Drain out any entries.
-            let entries = scratch.drain_entries().collect::<Vec<_>>();
-            let scheduled_fns = scratch.drain_scheduled_fns().collect::<Vec<_>>();
-            SourceChainResult::Ok((scheduled_fns, headers, ops, entries))
-        })?;
+                // Drain out any entries.
+                let entries = scratch.drain_entries().collect::<Vec<_>>();
+                let scheduled_fns = scratch.drain_scheduled_fns().collect::<Vec<_>>();
+                SourceChainResult::Ok((scheduled_fns, zomed_headers, ops, entries))
+            })?;
         let mut ops_to_integrate = HashSet::with_capacity(ops.len());
         for op in &ops {
             if network.authority_for_hash(op.0.dht_basis().clone()).await? {
@@ -566,7 +576,8 @@ impl SourceChain {
             .map(|entry| entry.as_content())
             .find(|entry| matches!(entry, Entry::CounterSign(_, _)));
 
-        if matches!(maybe_countersigned_entry, Some(Entry::CounterSign(_, _))) && headers.len() != 1
+        if matches!(maybe_countersigned_entry, Some(Entry::CounterSign(_, _)))
+            && zomed_headers.len() != 1
         {
             return Err(SourceChainError::DirtyCounterSigningWrite);
         }
@@ -583,15 +594,14 @@ impl SourceChain {
                     schedule_fn(txn, scheduled_fn, None, now)?;
                 }
                 // As at check.
-                let (new_persisted_head, new_head_seq, new_timestamp) =
-                    chain_head_db(&txn, author)?;
-                if headers.last().is_none() {
+                let (new_persisted_head, new_head_seq, new_timestamp) = chain_head_db(txn, author)?;
+                if zomed_headers.last().is_none() {
                     // Nothing to write
-                    return Ok(());
+                    return Ok(Vec::new());
                 }
                 if persisted_head != new_persisted_head {
                     return Err(SourceChainError::HeadMoved(
-                        headers,
+                        zomed_headers,
                         entries,
                         Some(persisted_head),
                         Some((new_persisted_head, new_head_seq, new_timestamp)),
@@ -617,8 +627,8 @@ impl SourceChain {
                 for entry in entries {
                     insert_entry(txn, entry)?;
                 }
-                for header in headers {
-                    insert_header(txn, header)?;
+                for shh in zomed_headers.iter().map(|(_zome, shh)| shh) {
+                    insert_header(txn, shh.clone())?;
                 }
                 for (op, op_hash, op_order, timestamp, visibility, dependency) in ops {
                     let op_type = op.get_type();
@@ -650,12 +660,12 @@ impl SourceChain {
                         set_withhold_publish(txn, op_hash)?;
                     }
                 }
-                SourceChainResult::Ok(())
+                SourceChainResult::Ok(zomed_headers)
             })
             .await
         {
             Err(SourceChainError::HeadMoved(
-                headers,
+                zomed_headers,
                 entries,
                 old_head,
                 Some((new_persisted_head, new_head_seq, new_timestamp)),
@@ -670,17 +680,18 @@ impl SourceChain {
                     // A child chain is needed with a new as-at that matches
                     // the rebase.
                     let child_chain = Self::new(self.vault.clone(), (*self.author).clone()).await?;
-                    let rebased_headers: Vec<SignedHeaderHashed> = rebase_headers_on(
-                        &keystore,
-                        headers,
-                        new_persisted_head,
-                        new_head_seq,
-                        new_timestamp,
-                    )
-                    .await?;
-                    child_chain.scratch.apply(move |scratch| {
-                        for header in rebased_headers {
-                            scratch.add_header(header, ChainTopOrdering::Relaxed);
+                    let rebased_headers: Vec<(Option<Zome>, SignedHeaderHashed)> =
+                        rebase_headers_on(
+                            &keystore,
+                            zomed_headers,
+                            new_persisted_head,
+                            new_head_seq,
+                            new_timestamp,
+                        )
+                        .await?;
+                    child_chain.scratch.apply(|scratch| {
+                        for (zome, header) in rebased_headers {
+                            scratch.add_header(zome, header, ChainTopOrdering::Relaxed);
                         }
                         for entry in entries {
                             scratch.add_entry(entry, ChainTopOrdering::Relaxed);
@@ -689,7 +700,7 @@ impl SourceChain {
                     child_chain.flush(network).await
                 } else {
                     Err(SourceChainError::HeadMoved(
-                        headers,
+                        zomed_headers,
                         entries,
                         old_head,
                         Some((new_persisted_head, new_head_seq, new_timestamp)),
@@ -703,9 +714,9 @@ impl SourceChain {
 
 #[allow(clippy::complexity)]
 fn build_ops_from_headers(
-    signed_headers: Vec<SignedHeaderHashed>,
+    zomed_headers: Vec<(Option<Zome>, SignedHeaderHashed)>,
 ) -> SourceChainResult<(
-    Vec<SignedHeaderHashed>,
+    Vec<(Option<Zome>, SignedHeaderHashed)>,
     Vec<(
         DhtOpLight,
         DhtOpHash,
@@ -716,12 +727,12 @@ fn build_ops_from_headers(
     )>,
 )> {
     // Headers end up back in here.
-    let mut headers_output = Vec::with_capacity(signed_headers.len());
+    let mut headers_output = Vec::with_capacity(zomed_headers.len());
     // The op related data ends up here.
-    let mut ops = Vec::with_capacity(signed_headers.len());
+    let mut ops = Vec::with_capacity(zomed_headers.len());
 
     // Loop through each header and produce op related data.
-    for shh in signed_headers {
+    for (zome, shh) in zomed_headers {
         // &HeaderHash, &Header, EntryHash are needed to produce the ops.
         let entry_hash = shh.header().entry_hash().cloned();
         let item = (shh.as_hash(), shh.header(), entry_hash);
@@ -753,20 +764,20 @@ fn build_ops_from_headers(
             sig,
         );
         // Put the header back in the list.
-        headers_output.push(shh);
+        headers_output.push((zome, shh));
     }
     Ok((headers_output, ops))
 }
 
 async fn rebase_headers_on(
     keystore: &MetaLairClient,
-    mut headers: Vec<SignedHeaderHashed>,
+    mut zomed_headers: Vec<(Option<Zome>, SignedHeaderHashed)>,
     mut rebase_header: HeaderHash,
     mut rebase_seq: u32,
     mut rebase_timestamp: Timestamp,
-) -> Result<Vec<SignedHeaderHashed>, ScratchError> {
-    headers.sort_by_key(|a| a.header().header_seq());
-    for shh in headers.iter_mut() {
+) -> Result<Vec<(Option<Zome>, SignedHeaderHashed)>, ScratchError> {
+    zomed_headers.sort_by_key(|(_zome, shh)| shh.header().header_seq());
+    for (_zome, shh) in zomed_headers.iter_mut() {
         let mut header = shh.header().clone();
         header.rebase_on(rebase_header.clone(), rebase_seq, rebase_timestamp)?;
         rebase_seq = header.header_seq();
@@ -776,7 +787,7 @@ async fn rebase_headers_on(
         let new_shh = SignedHeaderHashed::new(keystore, hh).await?;
         *shh = new_shh;
     }
-    Ok(headers)
+    Ok(zomed_headers)
 }
 
 pub async fn genesis(
@@ -1008,7 +1019,9 @@ async fn _put_db<H: HeaderInner, B: HeaderBuilder<H>>(
                 _ => vec![],
             };
             return Err(SourceChainError::HeadMoved(
-                vec![header],
+                // Using None for the zome here because it is only used to run
+                // post commit callbacks, which isn't needed here.
+                vec![(None, header)],
                 entries,
                 Some(prev_header),
                 Some((new_head, new_seq, new_timestamp)),
@@ -1104,6 +1117,7 @@ pub mod tests {
         let test_env = test_cell_env();
         let env = test_env.env();
         let alice = fixt!(AgentPubKey, Predictable, 0);
+        let zome = fixt!(Zome);
 
         let mut mock = MockHolochainP2pCellT::new();
         mock.expect_authority_for_hash().returning(|_| Ok(false));
@@ -1119,13 +1133,28 @@ pub mod tests {
             new_dna_hash: fixt!(DnaHash),
         };
         chain_1
-            .put(header_builder.clone(), None, ChainTopOrdering::Strict)
+            .put(
+                Some(zome.clone()),
+                header_builder.clone(),
+                None,
+                ChainTopOrdering::Strict,
+            )
             .await?;
         chain_2
-            .put(header_builder.clone(), None, ChainTopOrdering::Strict)
+            .put(
+                Some(zome.clone()),
+                header_builder.clone(),
+                None,
+                ChainTopOrdering::Strict,
+            )
             .await?;
         chain_3
-            .put(header_builder, None, ChainTopOrdering::Relaxed)
+            .put(
+                Some(zome.clone()),
+                header_builder,
+                None,
+                ChainTopOrdering::Relaxed,
+            )
             .await?;
 
         let author = Arc::new(alice);
@@ -1179,7 +1208,12 @@ pub mod tests {
             entry_hash: eh1.clone(),
         };
         let h1 = chain_1
-            .put(create, Some(entry_1.clone()), ChainTopOrdering::Strict)
+            .put(
+                None,
+                create,
+                Some(entry_1.clone()),
+                ChainTopOrdering::Strict,
+            )
             .await
             .unwrap();
 
@@ -1190,7 +1224,12 @@ pub mod tests {
             entry_hash: entry_hash_err.clone(),
         };
         chain_2
-            .put(create, Some(entry_err.clone()), ChainTopOrdering::Strict)
+            .put(
+                None,
+                create,
+                Some(entry_err.clone()),
+                ChainTopOrdering::Strict,
+            )
             .await
             .unwrap();
 
@@ -1205,7 +1244,12 @@ pub mod tests {
             entry_hash: eh2.clone(),
         };
         let old_h2 = chain_3
-            .put(create, Some(entry_2.clone()), ChainTopOrdering::Relaxed)
+            .put(
+                None,
+                create,
+                Some(entry_2.clone()),
+                ChainTopOrdering::Relaxed,
+            )
             .await
             .unwrap();
 
@@ -1260,6 +1304,7 @@ pub mod tests {
         let env = test_env.env();
         let secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
         let access = CapAccess::from(secret.unwrap());
+        let zome = fixt!(Zome);
         let mut mock = MockHolochainP2pCellT::new();
         mock.expect_authority_for_hash().returning(|_| Ok(false));
 
@@ -1299,7 +1344,12 @@ pub mod tests {
                 entry_hash: entry_hash.clone(),
             };
             let header = chain
-                .put(header_builder, Some(entry), ChainTopOrdering::default())
+                .put(
+                    Some(zome.clone()),
+                    header_builder,
+                    Some(entry),
+                    ChainTopOrdering::default(),
+                )
                 .await?;
 
             chain.flush(&mock).await.unwrap();
@@ -1342,7 +1392,12 @@ pub mod tests {
                 original_entry_address,
             };
             let header = chain
-                .put(header_builder, Some(entry), ChainTopOrdering::default())
+                .put(
+                    Some(zome.clone()),
+                    header_builder,
+                    Some(entry),
+                    ChainTopOrdering::default(),
+                )
                 .await?;
 
             chain.flush(&mock).await.unwrap();
@@ -1381,7 +1436,12 @@ pub mod tests {
                 deletes_entry_address: updated_entry_hash,
             };
             chain
-                .put(header_builder, None, ChainTopOrdering::default())
+                .put(
+                    Some(zome),
+                    header_builder,
+                    None,
+                    ChainTopOrdering::default(),
+                )
                 .await?;
 
             chain.flush(&mock).await.unwrap();
@@ -1464,6 +1524,8 @@ pub mod tests {
         let mut mock = MockHolochainP2pCellT::new();
         mock.expect_authority_for_hash().returning(|_| Ok(false));
 
+        let zome = fixt!(Zome);
+
         let author = test_env.cell_id().unwrap().agent_pubkey().clone();
         let author = Arc::new(author);
 
@@ -1491,7 +1553,12 @@ pub mod tests {
             entry_hash: EntryHash::with_data_sync(&entry),
         };
         let h1 = source_chain
-            .put(create, Some(entry), ChainTopOrdering::default())
+            .put(
+                Some(zome.clone()),
+                create,
+                Some(entry),
+                ChainTopOrdering::default(),
+            )
             .await
             .unwrap();
         let entry = Entry::App(fixt!(AppEntryBytes));
@@ -1500,7 +1567,7 @@ pub mod tests {
             entry_hash: EntryHash::with_data_sync(&entry),
         };
         let h2 = source_chain
-            .put(create, Some(entry), ChainTopOrdering::default())
+            .put(Some(zome), create, Some(entry), ChainTopOrdering::default())
             .await
             .unwrap();
         source_chain.flush(&mock).await.unwrap();

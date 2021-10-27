@@ -32,7 +32,7 @@ fn delete_link(input: HeaderHash) -> ExternResult<HeaderHash> {
 }
 
 #[hdk_extern]
-fn get_links(_: ()) -> ExternResult<Links> {
+fn get_links(_: ()) -> ExternResult<Vec<Link>> {
     hdk::prelude::get_links(base()?, None)
 }
 
@@ -42,7 +42,7 @@ fn get_link_details(_: ()) -> ExternResult<LinkDetails> {
 }
 
 #[hdk_extern]
-fn get_back_links(_: ()) -> ExternResult<Links> {
+fn get_back_links(_: ()) -> ExternResult<Vec<Link>> {
     hdk::prelude::get_links(target()?, None)
 }
 
@@ -52,7 +52,7 @@ fn get_back_link_details(_: ()) -> ExternResult<LinkDetails> {
 }
 
 #[hdk_extern]
-fn get_links_bidi(_: ()) -> ExternResult<Vec<Links>> {
+fn get_links_bidi(_: ()) -> ExternResult<Vec<Vec<Link>>> {
     HDK.with(|h| h.borrow().get_links(vec![
         GetLinksInput::new(base()?, None),
         GetLinksInput::new(target()?, None),
@@ -69,7 +69,7 @@ fn get_link_details_bidi(_: ()) -> ExternResult<Vec<LinkDetails>> {
 
 #[hdk_extern]
 fn delete_all_links(_: ()) -> ExternResult<()> {
-    for link in hdk::prelude::get_links(base()?, None)?.into_inner() {
+    for link in hdk::prelude::get_links(base()?, None)? {
         hdk::prelude::delete_link(link.create_link_hash)?;
     }
     Ok(())
@@ -90,6 +90,6 @@ fn commit_existing_path(_: ()) -> ExternResult<()> {
 }
 
 #[hdk_extern]
-fn get_long_path(_: ()) -> ExternResult<Links> {
+fn get_long_path(_: ()) -> ExternResult<Vec<Link>> {
     Path::from("a").children()
 }

@@ -41,34 +41,10 @@ impl ShardedGossipLocal {
     /// incoming agents within their arcs.
     pub(super) async fn incoming_missing_agents(
         &self,
-        state: RoundState,
         agents: &[Arc<AgentInfoSigned>],
     ) -> KitsuneResult<()> {
-        // Unpack state, get any agent and get all local agents.
-        let RoundState { common_arc_set, .. } = state;
-        let local_agents = self
-            .inner
-            .share_mut(|inner, _| Ok(inner.local_agents.clone()))?;
-
-        // Get all the local agents that are relevant to this
-        // common arc set.
-        let agents_within_common_arc: HashSet<_> =
-            store::agents_within_arcset(&self.evt_sender, &self.space, common_arc_set)
-                .await?
-                .into_iter()
-                .map(|(a, _)| a)
-                .filter(|a| local_agents.contains(a))
-                .collect();
-
         // Add the agents to the stores.
-        store::put_agent_info(
-            &self.evt_sender,
-            &self.space,
-            agents_within_common_arc,
-            agents,
-        )
-        .await?;
-
+        store::put_agent_info(&self.evt_sender, &self.space, agents).await?;
         Ok(())
     }
 }
