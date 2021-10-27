@@ -1,6 +1,6 @@
 [package]
 name = "holo_hash"
-version = "0.0.11-dev.0"
+version = "0.0.11"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo", "hash", "blake", "blake2b" ]
 categories = [ "cryptography" ]
