@@ -78,7 +78,7 @@ struct TimedBloomFilter {
 
 /// Gossip has two distinct variants which share a lot of similarities but
 /// are fundamentally different and serve different purposes
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GossipType {
     /// The Recent gossip type is aimed at rapidly syncing the most recent
     /// data. It runs frequently and expects frequent diffs at each round.
@@ -199,32 +199,12 @@ impl ShardedGossip {
         // actually sending the gossip.
         self.bandwidth.outgoing_bytes(bytes).await;
         con.notify(&gossip, timeout).await?;
-        println!(
-            "
-GOSSIP OUT 
-{} ---> {:?} 
-{:#?}
-        ",
-            self.ep_hnd.uniq(),
-            how,
-            gossip,
-        );
         Ok(())
     }
 
     async fn process_incoming_outgoing(&self) -> KitsuneResult<()> {
         let (incoming, outgoing) = self.pop_queues()?;
         if let Some((con, remote_url, msg, bytes)) = incoming {
-            println!(
-                "
-GOSSIP IN 
-{} <--- {}: 
-{:#?}
-            ",
-                self.ep_hnd.uniq(),
-                remote_url,
-                msg
-            );
             self.bandwidth.incoming_bytes(bytes).await;
             let outgoing = match self.gossip.process_incoming(con.peer_cert(), msg).await {
                 Ok(r) => r,
@@ -898,12 +878,6 @@ impl AsGossipModule for ShardedGossip {
         use kitsune_p2p_types::codec::*;
         let (bytes, gossip) =
             ShardedGossipWire::decode_ref(&gossip_data).map_err(KitsuneError::other)?;
-        println!(
-            "gossip sanity check: {} <--- {}\n{:#?}",
-            self.ep_hnd.uniq(),
-            remote_url,
-            gossip
-        );
         self.inner.share_mut(move |i, _| {
             i.incoming
                 .push_back((con, remote_url, gossip, bytes as usize));

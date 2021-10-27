@@ -2,7 +2,7 @@ use gcollections::ops::*;
 use interval::{interval_set::*, IntervalSet};
 use std::{borrow::Borrow, collections::VecDeque, fmt::Debug};
 
-use crate::{loc8::Loc8, DhtLocation};
+use crate::{DhtArc, DhtLocation};
 
 // For u32, IntervalSet excludes MAX from its set of valid values due to its
 // need to be able to express the width of an interval using a u32.
@@ -299,22 +299,6 @@ impl ArcInterval<u32> {
     }
 }
 
-impl<L> ArcInterval<L>
-where
-    Loc8: From<L>,
-{
-    pub fn canonical(self) -> ArcInterval {
-        match self {
-            ArcInterval::Empty => ArcInterval::Empty,
-            ArcInterval::Full => ArcInterval::Full,
-            ArcInterval::Bounded(lo, hi) => ArcInterval::new(
-                DhtLocation::from(Loc8::from(lo)),
-                DhtLocation::from(Loc8::from(hi)),
-            ),
-        }
-    }
-}
-
 impl ArcInterval<DhtLocation> {
     /// Constructor
     pub fn new_empty() -> Self {
@@ -330,10 +314,18 @@ impl ArcInterval<DhtLocation> {
     /// a superset of the original
     pub fn quantized(&self) -> Self {
         if let Self::Bounded(lo, hi) = self {
-            if lo < hi && (*hi - *lo) % 2.into() == 1.into() {
-                Self::Bounded(*lo - 1.into(), *hi)
-            } else if lo > hi && (*lo - *hi) % 2.into() == 1.into() {
-                Self::Bounded(*lo, *hi + 1.into())
+            let lo = *lo;
+            let hi = *hi;
+            let gap = if lo > hi {
+                lo - hi
+            } else {
+                DhtLocation::from(u32::MAX) - hi + lo
+            };
+            if gap <= 2.into() {
+                // Because a halflen must be even, a small gap leads to full coverage
+                Self::Full
+            } else if (hi - lo) % 2.into() == 1.into() {
+                Self::Bounded(lo, hi + 1.into())
             } else {
                 self.clone()
             }
@@ -372,31 +364,63 @@ impl ArcInterval<DhtLocation> {
         c.size() as f64 / a.size() as f64
     }
 
+    pub fn center_loc(&self) -> DhtLocation {
+        DhtArc::from_interval(self.clone()).center_loc
+    }
+
     #[cfg(any(test, feature = "test_utils"))]
     pub fn to_ascii(&self, len: usize) -> String {
         match self {
-            Self::Full => "(FULL)".to_string(),
-            Self::Empty => "(EMPTY)".to_string(),
+            Self::Full => "-".repeat(len),
+            Self::Empty => " ".repeat(len),
             Self::Bounded(lo, hi) => {
-                let factor = len as f64 / u32::MAX as f64;
-                let lo = (factor * lo.as_u32() as f64) as usize;
-                let hi = (factor * hi.as_u32() as f64) as usize;
-                if lo <= hi {
+                let lo = loc_downscale(len, *lo);
+                let hi = loc_downscale(len, *hi);
+                let mut s = if lo <= hi {
                     vec![
                         " ".repeat(lo),
                         "-".repeat(hi - lo + 1),
-                        " ".repeat(usize::max(len - hi - 1, 0)),
+                        " ".repeat(len - hi - 1),
                     ]
                 } else {
                     vec![
                         "-".repeat(hi + 1),
-                        " ".repeat(usize::max(lo - hi - 1, 0)),
+                        " ".repeat(lo - hi - 1),
                         "-".repeat(len - lo),
                     ]
                 }
-                .join("")
+                .join("");
+                let center = loc_downscale(len, self.center_loc());
+                s.replace_range(center..center + 1, "@");
+                s
             }
         }
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    pub fn to_ascii_with_ops<L: Into<crate::loc8::Loc8>, I: IntoIterator<Item = L>>(
+        &self,
+        len: usize,
+        ops: I,
+    ) -> String {
+        use crate::loc8::Loc8;
+
+        let mut buf = vec![0; len];
+        let mut s = self.to_ascii(len);
+        for o in ops {
+            let o: Loc8 = o.into();
+            let o: DhtLocation = o.into();
+            let loc = loc_downscale(len, o);
+            buf[loc] += 1;
+        }
+        for (i, v) in buf.into_iter().enumerate() {
+            if v > 0 {
+                // add hex representation of number of ops in this bucket
+                let c = format!("{:x}", v.min(0xf));
+                s.replace_range(i..i + 1, &c);
+            }
+        }
+        s
     }
 
     pub fn canonical(self) -> ArcInterval {
@@ -409,9 +433,35 @@ fn is_full(start: u32, end: u32) -> bool {
     (start == MIN && end >= MAX) || end == start.wrapping_sub(1)
 }
 
+pub(crate) fn loc_upscale(len: usize, v: i32) -> u32 {
+    let max = 2f64.powi(32);
+    let lenf = len as f64;
+    let vf = v as f64;
+    (max / lenf * vf).round() as i64 as u32
+}
+
+pub(crate) fn loc_downscale(len: usize, d: DhtLocation) -> usize {
+    let max = 2f64.powi(32);
+    let lenf = len as f64;
+    ((lenf / max * (d.as_u32() as f64)).round() as usize) % len
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_loc_upscale() {
+        assert_eq!(loc_upscale(8, 0), DhtLocation::from(0).as_u32());
+        assert_eq!(
+            loc_upscale(8, 1),
+            DhtLocation::from(u32::MAX / 8 + 1).as_u32()
+        );
+        assert_eq!(
+            loc_upscale(3, 1),
+            DhtLocation::from(u32::MAX / 3 + 1).as_u32()
+        );
+    }
 
     #[test]
     fn arc_contains() {

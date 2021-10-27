@@ -308,7 +308,7 @@ checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
 
 [[package]]
 name = "hdk"
-version = "0.0.112-dev.0"
+version = "0.0.112"
 dependencies = [
  "hdk_derive",
  "holo_hash",
@@ -326,11 +326,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-<<<<<<< HEAD
-version = "0.0.13"
-=======
-version = "0.0.14-dev.0"
->>>>>>> origin/develop
+version = "0.0.14"
 dependencies = [
  "holochain_zome_types",
  "paste",
@@ -393,11 +389,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-<<<<<<< HEAD
-version = "0.0.11"
-=======
-version = "0.0.12-dev.0"
->>>>>>> origin/develop
+version = "0.0.12"
 dependencies = [
  "hdk",
  "serde",
@@ -430,11 +422,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-<<<<<<< HEAD
-version = "0.0.13"
-=======
-version = "0.0.14-dev.0"
->>>>>>> origin/develop
+version = "0.0.14"
 dependencies = [
  "chrono",
  "fixt",

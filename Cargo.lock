@@ -3221,6 +3221,7 @@ dependencies = [
  "arrayref",
  "base64",
  "bloomfilter",
+ "contrafact",
  "derive_more",
  "fixt",
  "futures",
@@ -3249,6 +3250,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
+ "tracing",
  "tracing-subscriber",
  "url2",
 ]
@@ -3282,6 +3284,7 @@ dependencies = [
  "gcollections",
  "intervallum",
  "num-traits",
+ "pretty_assertions 0.7.2",
  "rusqlite",
  "serde",
 ]

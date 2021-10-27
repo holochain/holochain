@@ -19,6 +19,9 @@ serde = {version = "1.0", features = ["derive"]}
 
 rusqlite = { version = "0.26", optional = true }
 
+[dev-dependencies]
+pretty_assertions = "0.7.2"
+
 [features]
 sqlite = ["rusqlite"]
 test_utils = []
