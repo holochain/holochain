@@ -1,5 +1,7 @@
 //! Gossip event handler which uses `SwitchboardState` as its underlying persisted store.
 
+#![allow(clippy::unit_arg)]
+
 use std::sync::Arc;
 
 use crate::event::*;

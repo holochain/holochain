@@ -68,7 +68,7 @@ impl Switchboard {
     //   multiple loops will be created internally.
     pub fn new(gossip_type: GossipType) -> Self {
         Self {
-            inner: Share::new(SwitchboardState::new()),
+            inner: Share::new(SwitchboardState::default()),
             gossip_type,
         }
     }
@@ -134,7 +134,7 @@ impl Switchboard {
             self.gossip_type,
             bandwidth,
         );
-        let gossip = GossipModule(gossip.clone());
+        let gossip = GossipModule(gossip);
         let gossip2 = gossip.clone();
 
         let ep_task = metric_task(async move {
@@ -198,9 +198,8 @@ pub struct SwitchboardState {
     handler_tasks: Vec<JoinHandle<ghost_actor::GhostResult<()>>>,
 }
 
-impl SwitchboardState {
-    /// Constructor, using the singleton "zero space"
-    pub fn new() -> Self {
+impl Default for SwitchboardState {
+    fn default() -> Self {
         Self {
             space: ZERO_SPACE.clone(),
             nodes: HashMap::new(),
@@ -209,7 +208,9 @@ impl SwitchboardState {
             handler_tasks: Vec::new(),
         }
     }
+}
 
+impl SwitchboardState {
     /// Add a local agent to the specified node.
     pub fn add_local_agent(&mut self, node_ep: &NodeEp, agent: &SwitchboardAgent) {
         let SwitchboardAgent {
@@ -223,24 +224,22 @@ impl SwitchboardState {
             agent.clone(),
             initial_arc.canonical(),
         );
-        self.local_agent_by_loc8(loc8).map(|existing| {
+        if let Some(existing) = self.local_agent_by_loc8(loc8) {
             panic!(
                 "Attempted to insert two agents at the same Loc8. Existing agent info: {:?}",
                 existing.info
-            )
-        });
+            );
+        }
         let node = self
             .nodes
             .get_mut(node_ep)
             .expect("Node must be added first");
-        node.local_agents
-            .insert(loc8, AgentEntry::new(info))
-            .map(|existing| {
-                panic!(
-                    "Attempted to insert two agents at the same Loc8. Existing agent info: {:?}",
-                    existing.info
-                )
-            });
+        if let Some(existing) = node.local_agents.insert(loc8, AgentEntry::new(info)) {
+            panic!(
+                "Attempted to insert two agents at the same Loc8. Existing agent info: {:?}",
+                existing.info
+            );
+        }
         node.gossip.local_agent_join(agent);
     }
 
@@ -323,9 +322,9 @@ impl SwitchboardState {
     ///
     /// This is used to set up arbitrary situations where not every peer
     /// knows about every other peer.
-    pub fn inject_peer_info<'n, L: AsRef<Loc8>, A: IntoIterator<Item = L>>(
+    pub fn inject_peer_info<L: AsRef<Loc8>, A: IntoIterator<Item = L>>(
         &mut self,
-        node: &'n NodeEp,
+        node: &NodeEp,
         agents: A,
     ) {
         let agents: Vec<_> = agents
@@ -549,7 +548,7 @@ impl SwitchboardState {
                                 return true;
                             }
                             arc_set.contains((**op_loc8).into()) &&
-                            self.local_agent_by_hash(&agent)
+                            self.local_agent_by_hash(agent)
                                 .and_then(|agent| {
                                     agent
                                         .ops
@@ -637,6 +636,7 @@ impl SwitchboardAgent {
 }
 
 /// The value of the Switchboard::spaces hashmap
+#[allow(clippy::type_complexity)]
 pub struct SpaceEntry {
     state: Share<SwitchboardState>,
     tasks: Vec<(
