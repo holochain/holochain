@@ -6,12 +6,15 @@ use crate::test_util::spawn_handler;
 use crate::types::gossip::*;
 use crate::types::wire;
 use futures::stream::StreamExt;
+use ghost_actor::dependencies::tracing;
 use ghost_actor::GhostResult;
 use itertools::Itertools;
 use kitsune_p2p_proxy::tx2::{tx2_proxy, ProxyConfig};
 use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_types::agent_info::agent_info_helper::{AgentInfoEncode, AgentMetaInfoEncode};
 use kitsune_p2p_types::agent_info::{AgentInfoInner, AgentInfoSigned};
 use kitsune_p2p_types::bin_types::*;
+use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::dht_arc::loc8::Loc8;
 use kitsune_p2p_types::dht_arc::{ArcInterval, DhtArc, DhtLocation};
 use kitsune_p2p_types::metrics::metric_task;
@@ -20,7 +23,7 @@ use kitsune_p2p_types::tx2::tx2_pool_promote::*;
 use kitsune_p2p_types::tx2::tx2_utils::Share;
 use kitsune_p2p_types::tx2::*;
 use kitsune_p2p_types::*;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
 use tokio::task::JoinHandle;
 
@@ -86,17 +89,20 @@ impl Switchboard {
     /// // no need to specify the number, the destructuring will deduce that.
     /// let [n1, n2, n3] = sb.add_nodes();
     /// ```
-    pub async fn add_nodes<const N: usize>(&self) -> [NodeEp; N] {
+    pub async fn add_nodes<const N: usize>(
+        &self,
+        tuning_params: KitsuneP2pTuningParams,
+    ) -> [NodeEp; N] {
         use std::convert::TryInto;
         let mut nodes = vec![];
         for _ in 0..N {
-            nodes.push(self.add_node().await);
+            nodes.push(self.add_node(tuning_params.clone()).await);
         }
         nodes.try_into().unwrap()
     }
 
     /// Set up state and handler tasks for a new node in the space
-    pub async fn add_node(&self) -> NodeEp {
+    pub async fn add_node(&self, tuning_params: KitsuneP2pTuningParams) -> NodeEp {
         let space = ZERO_SPACE.clone();
 
         let mem_config = MemConfig::default();
@@ -104,7 +110,7 @@ impl Switchboard {
         // proxy_config.allow_proxy_fwd = true;
 
         let f = tx2_mem_adapter(mem_config).await.unwrap();
-        let f = tx2_pool_promote(f, Default::default());
+        let f = tx2_pool_promote(f, tuning_params.clone());
         // Proxy wrapping is needed because sharded_gossip expects it
         let f = tx2_proxy(f, proxy_config).unwrap();
         let f = tx2_api(f, Default::default());
@@ -114,8 +120,6 @@ impl Switchboard {
             .await
             .unwrap();
         let ep_hnd = ep.handle().clone();
-
-        let tuning_params = Arc::new(Default::default());
 
         let evt_handler = SwitchboardEventHandler::new(ep_hnd.clone(), self.clone());
         let (evt_sender, handler_task) = spawn_handler(evt_handler.clone()).await;
@@ -206,21 +210,20 @@ impl SwitchboardState {
         }
     }
 
-    /// Add a local agent to the specified node. Specify the agent's location
-    /// and storage arc in terms of Loc8.
-    pub fn add_local_agent<L>(&mut self, node_ep: &NodeEp, agent_loc8: L, interval: ArcInterval<L>)
-    where
-        Loc8: From<L>,
-    {
-        let agent_loc8 = agent_loc8.into();
-        let agent = agent_from_loc(agent_loc8);
+    /// Add a local agent to the specified node.
+    pub fn add_local_agent(&mut self, node_ep: &NodeEp, agent: &SwitchboardAgent) {
+        let SwitchboardAgent {
+            loc: loc8,
+            initial_arc,
+        } = agent.clone();
+        let agent = agent_from_loc(loc8);
         let info = fake_agent_info(
             self.space.clone(),
             node_ep,
             agent.clone(),
-            interval.canonical(),
+            initial_arc.canonical(),
         );
-        self.local_agent_by_loc8(agent_loc8).map(|existing| {
+        self.local_agent_by_loc8(loc8).map(|existing| {
             panic!(
                 "Attempted to insert two agents at the same Loc8. Existing agent info: {:?}",
                 existing.info
@@ -231,7 +234,7 @@ impl SwitchboardState {
             .get_mut(node_ep)
             .expect("Node must be added first");
         node.local_agents
-            .insert(agent_loc8, AgentEntry::new(info))
+            .insert(loc8, AgentEntry::new(info))
             .map(|existing| {
                 panic!(
                     "Attempted to insert two agents at the same Loc8. Existing agent info: {:?}",
@@ -243,23 +246,76 @@ impl SwitchboardState {
 
     /// Helpful ascii visualization of each agent's storage arc coverage
     /// across all nodes.
-    pub fn print_ascii_arcs(&self, width: usize) {
-        println!("node agent .");
+    pub fn print_ascii_arcs(&self, width: usize, with_ops: bool) {
+        const NUM_TICKS: usize = 4;
+
+        // Add numbers at every quarter mark
+        let mut spaces = " ".repeat(width);
+        for i in 0..NUM_TICKS {
+            let n = i * 256 / NUM_TICKS;
+            let t = n * width / 256;
+            let s = n.to_string();
+            spaces.replace_range(t..t + s.len(), &s);
+        }
+
+        // Add dots at every eighth mark
+        let mut subticks = " ".repeat(width);
+        for i in 0..NUM_TICKS * 2 {
+            let t = i * width / (NUM_TICKS * 2);
+            subticks.replace_range(t..=t, ".");
+        }
+        subticks.replace_range(width - 1..width, ".");
+
+        println!("node agent  {}   mid bounds", spaces);
+        println!("            {}", subticks);
         let mut nodes: Vec<_> = self.nodes.iter().collect();
         nodes.sort_by_key(|(ep, _)| ep.uniq());
         for (ep, node) in nodes.into_iter() {
             let node_id = ep.uniq();
             for (agent_loc8, agent) in node.local_agents.iter() {
                 let interval = agent.info.storage_arc.interval();
+                let ascii = if with_ops {
+                    let ops = agent.ops.keys().copied();
+                    interval.to_ascii_with_ops(width, ops)
+                } else {
+                    interval.to_ascii(width)
+                };
                 println!(
-                    "{:>4} {:>+5} |{}| {:?}",
+                    "{:>4} {:>+5} |{:^width$}| {:>+4} {:?}",
                     node_id,
-                    agent_loc8.as_i8(),
-                    interval.to_ascii(width),
+                    agent_loc8,
+                    ascii,
+                    interval.center_loc().as_loc8(),
                     interval.map(|b| DhtLocation::as_loc8(&b)),
+                    width = width
                 );
             }
         }
+    }
+
+    /// Print the list of peers recorded in each node
+    pub fn print_peer_lists(&self) {
+        println!("node agents");
+        let mut nodes: Vec<_> = self.nodes.iter().collect();
+        nodes.sort_by_key(|(ep, _)| ep.uniq());
+        for (ep, node) in nodes.iter() {
+            let mut agent_locs: Vec<_> = node.all_agent_locs().into_iter().collect();
+            agent_locs.sort();
+            println!("{:>4} {:?}", ep.uniq(), agent_locs);
+        }
+    }
+
+    /// List all peer info (local and remote agents) that this node knows about.
+    pub fn all_peers(&mut self, node: &NodeEp) -> Vec<Loc8> {
+        let mut locs: Vec<_> = self
+            .nodes
+            .get(node)
+            .unwrap()
+            .all_agent_locs()
+            .into_iter()
+            .collect();
+        locs.sort();
+        locs
     }
 
     /// Inject the agent info from the specified agents into the specified
@@ -267,17 +323,15 @@ impl SwitchboardState {
     ///
     /// This is used to set up arbitrary situations where not every peer
     /// knows about every other peer.
-    pub fn inject_peer_info<'n, L, A: IntoIterator<Item = L>>(
+    pub fn inject_peer_info<'n, L: AsRef<Loc8>, A: IntoIterator<Item = L>>(
         &mut self,
         node: &'n NodeEp,
         agents: A,
-    ) where
-        Loc8: From<L>,
-    {
+    ) {
         let agents: Vec<_> = agents
             .into_iter()
-            .map(|loc8| {
-                let loc8: Loc8 = Loc8::from(loc8);
+            .map(|loc| {
+                let loc8 = *loc.as_ref();
                 (
                     loc8,
                     self.node_for_local_agent_loc8(loc8)
@@ -319,6 +373,8 @@ impl SwitchboardState {
                         .filter(|loc| !local.contains(**loc))
                         .copied()
                         .copied()
+                        // box it to satisfy AsRef<Loc8>
+                        .map(Box::new)
                         .collect(),
                 )
             })
@@ -332,11 +388,11 @@ impl SwitchboardState {
     /// Each Loc8 becomes a new Op added to an agent's op store.
     pub fn add_ops_timed<L: Into<Loc8>, O: IntoIterator<Item = (L, Timestamp)>>(
         &mut self,
-        agent_loc: L,
+        agent: &SwitchboardAgent,
         is_integrated: bool,
         ops: O,
     ) {
-        let agent = agent_from_loc(agent_loc.into());
+        let agent = agent_from_loc(agent.loc);
 
         // Do some pre-computation
         let ops: Vec<_> = ops
@@ -372,8 +428,8 @@ impl SwitchboardState {
                     timestamp,
                 },
             ) {
-                panic!(
-                    "inserted same op twice. remove this panic if it's not a big deal. {:?}",
+                tracing::warn!(
+                    "inserted same op twice. this could be significant if dealing with custom timestamps. {:?}",
                     existing
                 );
             }
@@ -390,27 +446,24 @@ impl SwitchboardState {
     /// at the current system time.
     pub fn add_ops_now<L: Into<Loc8>, O: IntoIterator<Item = L>>(
         &mut self,
-        agent_loc: L,
+        agent: &SwitchboardAgent,
         is_integrated: bool,
         ops: O,
     ) {
         let ops = ops.into_iter().map(|op| (op, Timestamp::now()));
-        self.add_ops_timed(agent_loc, is_integrated, ops)
+        self.add_ops_timed(agent, is_integrated, ops)
     }
 
     /// Get all ops held by a node in terms of their Loc8 location.
     ///
     /// Use this to make assertions about what ops are held after gossip has run.
-    pub fn get_ops_loc8(&mut self, node_ep: &NodeEp) -> Vec<Loc8> {
-        let mut ops: Vec<_> = self
-            .local_agents_for_node(node_ep)
+    pub fn get_ops_loc8(&mut self, node_ep: &NodeEp) -> BTreeSet<Loc8> {
+        self.local_agents_for_node(node_ep)
             .values()
             .map(|agent| agent.ops.keys())
             .flatten()
             .copied()
-            .collect();
-        ops.sort();
-        ops
+            .collect()
     }
 
     pub(super) fn node_for_local_agent_loc8(&self, loc8: Loc8) -> Option<&NodeEntry> {
@@ -449,7 +502,7 @@ impl SwitchboardState {
             .next()
     }
 
-    /// Get the agent map for a node. Just for minor boilerplate reduction.
+    /// Get the local agent map for a node. Just for minor boilerplate reduction.
     pub(super) fn local_agents_for_node(
         &mut self,
         node: &NodeEp,
@@ -459,6 +512,18 @@ impl SwitchboardState {
             .get_mut(node)
             .expect("Node not added")
             .local_agents
+    }
+
+    /// Get the remote agent map for a node. Just for minor boilerplate reduction.
+    pub(super) fn remote_agents_for_node(
+        &mut self,
+        node: &NodeEp,
+    ) -> &mut HashMap<Loc8, AgentInfoSigned> {
+        &mut self
+            .nodes
+            .get_mut(node)
+            .expect("Node not added")
+            .remote_agents
     }
 
     pub(super) fn query_op_hashes(
@@ -519,6 +584,58 @@ impl SwitchboardState {
     }
 }
 
+/// Representation of an agent on a Switchboard node.
+///
+/// The reason for this type is to reduce the redundancy
+/// of needing to specify both the agent's location and the
+/// storage arc. It is most convenient to specify arcs in terms
+/// of ArcInterval, but we use the agent's Loc8 location as their
+/// unique identifier. This allows specification of agents in
+/// terms of arcs.
+#[derive(Clone, derive_more::AsRef)]
+pub struct SwitchboardAgent {
+    pub(super) loc: Loc8,
+    initial_arc: ArcInterval<Loc8>,
+}
+
+impl SwitchboardAgent {
+    /// Construct an agent with a full arc at the specified location.
+    pub fn full<L: Into<Loc8>>(loc: L) -> Self {
+        Self {
+            loc: loc.into(),
+            initial_arc: ArcInterval::Full,
+        }
+    }
+
+    /// Construct an agent from arc bounds.
+    /// The agent's location is taken as the midpoint of the arc.
+    pub fn from_bounds<L: Into<Loc8>>(lo: L, hi: L) -> Self {
+        let lo: Loc8 = lo.into();
+        let hi: Loc8 = hi.into();
+        let initial_arc = ArcInterval::Bounded(lo, hi);
+        dbg!(&lo, &hi, &initial_arc);
+        let loc8 = initial_arc.clone().canonical().center_loc().as_loc8();
+
+        Self {
+            loc: loc8,
+            initial_arc,
+        }
+    }
+
+    /// Construct an agent from arc bounds.
+    /// The agent's location is taken as the midpoint of the arc.
+    pub fn from_center_and_half_len<L: Into<Loc8>>(center: L, half_len: u8) -> Self {
+        let center: Loc8 = center.into();
+        let half_len = Loc8::upscale(half_len as i32);
+        let initial_arc = DhtArc::new(center, half_len).interval().as_loc8();
+
+        Self {
+            loc: center,
+            initial_arc,
+        }
+    }
+}
+
 /// The value of the Switchboard::spaces hashmap
 pub struct SpaceEntry {
     state: Share<SwitchboardState>,
@@ -554,6 +671,21 @@ impl NodeEntry {
         hash: &KitsuneAgent,
     ) -> Option<&mut AgentEntry> {
         self.local_agent_by_loc8_mut(hash.get_loc().as_loc8())
+    }
+
+    pub(super) fn all_agent_infos(&self) -> HashSet<AgentInfoSigned> {
+        self.local_agents
+            .values()
+            .map(|a| a.info.clone())
+            .chain(self.remote_agents.values().cloned())
+            .collect()
+    }
+
+    pub(super) fn all_agent_locs(&self) -> HashSet<Loc8> {
+        self.all_agent_infos()
+            .into_iter()
+            .map(|info| info.to_agent_arc().0.get_loc().as_loc8())
+            .collect()
     }
 }
 
@@ -615,24 +747,47 @@ fn fake_agent_info(
     agent: KAgent,
     interval: ArcInterval,
 ) -> AgentInfoSigned {
-    let url = node.local_addr().unwrap();
+    use crate::fixt::*;
+    let url_list = vec![node.local_addr().unwrap()];
+    let meta_info = AgentMetaInfoEncode {
+        dht_storage_arc_half_length: 0,
+    };
+    let mut buf = Vec::new();
+    kitsune_p2p_types::codec::rmp_encode(&mut buf, meta_info).unwrap();
+    let meta_info = buf.into_boxed_slice();
+
+    let info = AgentInfoEncode {
+        space: space.clone(),
+        agent: agent.clone(),
+        urls: url_list.clone(),
+        signed_at_ms: 0,
+        expires_after_ms: u64::MAX,
+        meta_info,
+    };
+    let mut buf = Vec::new();
+    kitsune_p2p_types::codec::rmp_encode(&mut buf, info).unwrap();
+    let encoded_bytes = buf.into_boxed_slice();
     let state = AgentInfoInner {
         space,
         agent,
         storage_arc: DhtArc::from_interval(interval),
-        url_list: vec![url],
+        url_list,
         signed_at_ms: 0,
-        // Never expires
         expires_at_ms: u64::MAX,
-        signature: Arc::new(KitsuneSignature(vec![])),
-        encoded_bytes: Box::new([]),
+        signature: Arc::new(fixt::prelude::fixt!(KitsuneSignature)),
+        encoded_bytes,
     };
     AgentInfoSigned(Arc::new(state))
 }
 
 #[test]
 fn hash_from_loc8_roundtrip() {
-    for i in [0, 1, -1, i8::MIN, i8::MAX] {
+    for i in [0, 1, -1, -128, 127] {
+        let i: Loc8 = i.into();
+        assert_eq!(agent_from_loc(i).get_loc().as_loc8(), i);
+        assert_eq!(op_hash_from_loc(i).get_loc().as_loc8(), i);
+    }
+    for i in [0, 1, 254, 255, 127, 128] {
         let i: Loc8 = i.into();
         assert_eq!(agent_from_loc(i).get_loc().as_loc8(), i);
         assert_eq!(op_hash_from_loc(i).get_loc().as_loc8(), i);
