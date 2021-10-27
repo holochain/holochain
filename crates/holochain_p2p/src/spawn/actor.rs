@@ -814,19 +814,19 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         &mut self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
         to_agent: Arc<kitsune_p2p::KitsuneAgent>,
-        _from_agent: Arc<kitsune_p2p::KitsuneAgent>,
+        from_agent: Arc<kitsune_p2p::KitsuneAgent>,
         payload: Vec<u8>,
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<()> {
         let space = DnaHash::from_kitsune(&space);
         let to_agent = AgentPubKey::from_kitsune(&to_agent);
+        let from_agent = AgentPubKey::from_kitsune(&from_agent);
 
         let request =
             crate::wire::WireMessage::decode(payload.as_ref()).map_err(HolochainP2pError::from)?;
 
         match request {
             // error on these call type messages
-            crate::wire::WireMessage::CallRemote { .. }
-            | crate::wire::WireMessage::Get { .. }
+            crate::wire::WireMessage::Get { .. }
             | crate::wire::WireMessage::GetMeta { .. }
             | crate::wire::WireMessage::GetLinks { .. }
             | crate::wire::WireMessage::GetAgentActivity { .. }
@@ -835,6 +835,22 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                 Err(HolochainP2pError::invalid_p2p_message(
                     "invalid call type message in a notify".to_string(),
                 )
+                .into())
+            }
+            crate::wire::WireMessage::CallRemote {
+                zome_name,
+                fn_name,
+                cap,
+                data,
+            } => {
+                let fut = self.handle_incoming_call_remote(
+                    space, to_agent, from_agent, zome_name, fn_name, cap, data,
+                );
+                Ok(async move {
+                    let _ = fut?.await?;
+                    Ok(())
+                }
+                .boxed()
                 .into())
             }
             crate::wire::WireMessage::Publish {
@@ -1026,6 +1042,40 @@ impl HolochainP2pHandler for HolochainP2pActor {
                 .rpc_single(space, to_agent, from_agent, req, None)
                 .await?;
             Ok(UnsafeBytes::from(result).into())
+        }
+        .boxed()
+        .into())
+    }
+
+    #[tracing::instrument(skip(self), level = "trace")]
+    fn handle_remote_signal(
+        &mut self,
+        dna_hash: DnaHash,
+        from_agent: AgentPubKey,
+        to_agent_list: Vec<AgentPubKey>,
+        zome_name: ZomeName,
+        fn_name: FunctionName,
+        cap: Option<CapSecret>,
+        payload: ExternIO,
+    ) -> HolochainP2pHandlerResult<()> {
+        let space = dna_hash.into_kitsune();
+        let to_agent_list = to_agent_list
+            .into_iter()
+            .map(|a| a.into_kitsune())
+            .collect();
+        let from_agent = from_agent.into_kitsune();
+
+        let req =
+            crate::wire::WireMessage::call_remote(zome_name, fn_name, cap, payload).encode()?;
+
+        let timeout = self.tuning_params.implicit_timeout();
+
+        let kitsune_p2p = self.kitsune_p2p.clone();
+        Ok(async move {
+            kitsune_p2p
+                .targeted_broadcast(space, from_agent, to_agent_list, timeout, req, true)
+                .await?;
+            Ok(())
         }
         .boxed()
         .into())
@@ -1320,6 +1370,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
                 .into(),
         )
     }
+
     #[tracing::instrument(skip(self), level = "trace")]
     fn handle_countersigning_authority_response(
         &mut self,
@@ -1340,7 +1391,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
             kitsune_p2p
-                .targeted_broadcast(space, from_agent, agents, timeout, payload)
+                .targeted_broadcast(space, from_agent, agents, timeout, payload, false)
                 .await?;
             Ok(())
         }
