@@ -17,8 +17,10 @@ mod tests;
 mod test_ascii;
 
 mod dht_arc_set;
-pub(crate) use dht_arc_set::{loc_downscale, loc_upscale};
 pub use dht_arc_set::{ArcInterval, DhtArcSet};
+
+#[cfg(feature = "test_utils")]
+pub(crate) use dht_arc_set::{loc_downscale, loc_upscale};
 
 mod dht_arc_bucket;
 pub use dht_arc_bucket::*;
