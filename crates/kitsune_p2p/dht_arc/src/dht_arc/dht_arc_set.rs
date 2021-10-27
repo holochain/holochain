@@ -369,6 +369,8 @@ impl ArcInterval<DhtLocation> {
     }
 
     #[cfg(any(test, feature = "test_utils"))]
+    /// Handy ascii representation of an arc, especially useful when
+    /// looking at several arcs at once to get a sense of their overlap
     pub fn to_ascii(&self, len: usize) -> String {
         match self {
             Self::Full => "-".repeat(len),
@@ -398,6 +400,10 @@ impl ArcInterval<DhtLocation> {
     }
 
     #[cfg(any(test, feature = "test_utils"))]
+    /// Ascii representation of an arc, with a histogram of op locations superimposed.
+    /// Each character of the string, if an op falls in that "bucket", will be represented
+    /// by a hexadecimal digit representing the number of ops in that bucket,
+    /// with a max of 0xF (15)
     pub fn to_ascii_with_ops<L: Into<crate::loc8::Loc8>, I: IntoIterator<Item = L>>(
         &self,
         len: usize,
@@ -433,6 +439,8 @@ fn is_full(start: u32, end: u32) -> bool {
     (start == MIN && end >= MAX) || end == start.wrapping_sub(1)
 }
 
+/// Scale a number in a smaller space (specified by `len`) up into the `u32` space.
+/// The number to scale can be negative, which is wrapped to a positive value via modulo
 pub(crate) fn loc_upscale(len: usize, v: i32) -> u32 {
     let max = 2f64.powi(32);
     let lenf = len as f64;
@@ -440,6 +448,7 @@ pub(crate) fn loc_upscale(len: usize, v: i32) -> u32 {
     (max / lenf * vf).round() as i64 as u32
 }
 
+/// Scale a u32 DhtLocation down into a smaller space (specified by `len`)
 pub(crate) fn loc_downscale(len: usize, d: DhtLocation) -> usize {
     let max = 2f64.powi(32);
     let lenf = len as f64;

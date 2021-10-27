@@ -574,6 +574,7 @@ impl DhtArc {
 }
 
 #[test]
+/// Test the center_loc calculation for a variety of ArcIntervals
 fn arc_interval_center_loc() {
     use pretty_assertions::assert_eq;
 
@@ -613,6 +614,9 @@ fn arc_interval_center_loc() {
 }
 
 #[test]
+/// Test ArcInterval -> DhtArc -> ArcInterval roundtrips
+/// Note that the intervals must be "quantized" to have an odd length 
+/// to be representable as DhtArc, so true roundtrips are not possible in general
 fn interval_dht_arc_roundtrip() {
     use pretty_assertions::assert_eq;
 
@@ -668,6 +672,7 @@ fn interval_dht_arc_roundtrip() {
 }
 
 #[test]
+/// Test DhtArc -> ArcInterval -> DhtArc roundtrips
 fn dht_arc_interval_roundtrip() {
     use pretty_assertions::assert_eq;
 
