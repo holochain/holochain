@@ -615,7 +615,7 @@ fn arc_interval_center_loc() {
 
 #[test]
 /// Test ArcInterval -> DhtArc -> ArcInterval roundtrips
-/// Note that the intervals must be "quantized" to have an odd length 
+/// Note that the intervals must be "quantized" to have an odd length
 /// to be representable as DhtArc, so true roundtrips are not possible in general
 fn interval_dht_arc_roundtrip() {
     use pretty_assertions::assert_eq;
