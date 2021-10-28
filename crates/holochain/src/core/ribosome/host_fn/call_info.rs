@@ -29,7 +29,7 @@ pub fn call_info(
                             // It means that the host function calling into `call_info`
                             // is using a cap secret that never had authorization to call in the first place.
                             // The host must NEVER allow this so `None` is a critical bug.
-                            .unwrap();
+                            .expect("The host is using an unauthorized cap_secret, which should never happen");
                         (provenance, cap_grant)
                     },
                     InvocationAuth::LocalCallback => {
