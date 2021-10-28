@@ -9,25 +9,44 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - The `InstallApp` admin method now takes a `role_id` field instead of a `nick` field
   - In the return value for any admin method which lists installed apps, e.g. `ListEnabledApps`, any reference to `"slots"` is now named `"roles"`
   - See [\#1045](https://github.com/holochain/holochain/pull/1045)
+- Adds test utils for creating simulated networks. [#1037](https://github.com/holochain/holochain/pull/1037).
+- Conductor can take a mocked network for testing simulated networks. [#1036](https://github.com/holochain/holochain/pull/1036)
+- Batch peer store write so we use less transactions. [#1007](https://github.com/holochain/holochain/pull/1007/).
+
+## 0.0.113
+
+- Post commit is now infallible and expects no return value [PR1049](https://github.com/holochain/holochain/pull/1049)
+- Always depend on `itertools` to make `cargo build --no-default-features` work [\#1060](https://github.com/holochain/holochain/pull/1060)
+
+## 0.0.112
+
+- Always depend on `itertools` to make `cargo build --no-default-features` work [\#1060](https://github.com/holochain/holochain/pull/1060)
+
+## 0.0.111
+
 - `call_info` is now implemented [1047](https://github.com/holochain/holochain/pull/1047)
 - `dna_info` now returns `DnaInfo` correctly [\#1044](https://github.com/holochain/holochain/pull/1044)
+  
   - `ZomeInfo` no longer includes what is now on `DnaInfo`
   - `ZomeInfo` renames `zome_name` and `zome_id` to `name` and `id`
   - `DnaInfo` includes `name`, `hash`, `properties`
+
 - `post_commit` hook is implemented now [PR 1000](https://github.com/holochain/holochain/pull/1000)
 
-- Bump legacy lair version to 0.0.8 fixing a crash when error message was too long [#1046](https://github.com/holochain/holochain/pull/1046)
+- Bump legacy lair version to 0.0.8 fixing a crash when error message was too long [\#1046](https://github.com/holochain/holochain/pull/1046)
 
-- Options to use new lair keystore [#1040](https://github.com/holochain/holochain/pull/1040)
+- Options to use new lair keystore [\#1040](https://github.com/holochain/holochain/pull/1040)
 
-```yaml
+<!-- end list -->
+
+``` yaml
 keystore:
   type: danger_test_keystore
 ```
 
 or
 
-```yaml
+``` yaml
 keystore:
   type: lair_server
   connection_url: "unix:///my/path/socket?k=Foo"

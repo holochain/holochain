@@ -71,34 +71,6 @@ impl TryFrom<PostCommitInvocation> for ExternIO {
     }
 }
 
-#[derive(PartialEq, Debug)]
-pub enum PostCommitResult {
-    Success,
-    Fail(HeaderHashes, String),
-}
-
-impl From<Vec<(ZomeName, PostCommitCallbackResult)>> for PostCommitResult {
-    fn from(a: Vec<(ZomeName, PostCommitCallbackResult)>) -> Self {
-        a.into_iter().map(|(_, v)| v).collect::<Vec<_>>().into()
-    }
-}
-
-impl From<Vec<PostCommitCallbackResult>> for PostCommitResult {
-    fn from(callback_results: Vec<PostCommitCallbackResult>) -> Self {
-        // this is an optional callback so defaults to success
-        callback_results.into_iter().fold(Self::Success, |acc, x| {
-            match x {
-                // fail overrides everything
-                PostCommitCallbackResult::Fail(header_hashes, fail_string) => {
-                    Self::Fail(header_hashes, fail_string)
-                }
-                // success allows acc to continue
-                PostCommitCallbackResult::Success => acc,
-            }
-        })
-    }
-}
-
 pub async fn send_post_commit<C>(
     conductor_api: C,
     workspace: HostFnWorkspace,
@@ -150,59 +122,12 @@ pub struct PostCommitArgs {
 
 #[cfg(test)]
 mod test {
-    use super::PostCommitResult;
     use crate::core::ribosome::Invocation;
     use crate::core::ribosome::ZomesToInvoke;
-    use crate::fixt::HeaderHashesFixturator;
     use crate::fixt::PostCommitHostAccessFixturator;
     use crate::fixt::PostCommitInvocationFixturator;
-    use ::fixt::prelude::*;
     use holochain_types::prelude::*;
-    use holochain_zome_types::post_commit::PostCommitCallbackResult;
     use holochain_zome_types::ExternIO;
-
-    #[test]
-    fn post_commit_callback_result_fold() {
-        let mut rng = ::fixt::rng();
-
-        let result_success = || PostCommitResult::Success;
-        let result_fail = || {
-            PostCommitResult::Fail(
-                HeaderHashesFixturator::new(::fixt::Empty).next().unwrap(),
-                StringFixturator::new(::fixt::Empty).next().unwrap(),
-            )
-        };
-
-        let cb_success = || PostCommitCallbackResult::Success;
-        let cb_fail = || {
-            PostCommitCallbackResult::Fail(
-                HeaderHashesFixturator::new(::fixt::Empty).next().unwrap(),
-                StringFixturator::new(::fixt::Empty).next().unwrap(),
-            )
-        };
-
-        for (mut results, expected) in vec![
-            (vec![], result_success()),
-            (vec![cb_success()], result_success()),
-            (vec![cb_fail()], result_fail()),
-            (vec![cb_fail(), cb_success()], result_fail()),
-        ] {
-            // order of the results should not change the final result
-            results.shuffle(&mut rng);
-
-            // number of times a callback result appears should not change the final result
-            let number_of_extras = rng.gen_range(0, 5);
-            for _ in 0..number_of_extras {
-                let maybe_extra = results.choose(&mut rng).cloned();
-                match maybe_extra {
-                    Some(extra) => results.push(extra),
-                    _ => {}
-                };
-            }
-
-            assert_eq!(expected, results.into(),);
-        }
-    }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn post_commit_invocation_access() {
@@ -245,7 +170,7 @@ mod test {
 
         assert_eq!(
             host_input,
-            ExternIO::encode(HeaderHashesFixturator::new(::fixt::Empty).next().unwrap()).unwrap(),
+            ExternIO::encode(HeaderHashVecFixturator::new(::fixt::Empty).next().unwrap()).unwrap(),
         );
     }
 }
@@ -253,7 +178,6 @@ mod test {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
-    use super::PostCommitResult;
     use crate::conductor::ConductorBuilder;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
@@ -264,7 +188,6 @@ mod slow_tests {
     use crate::sweettest::SweetDnaFile;
     use ::fixt::prelude::*;
     use hdk::prelude::*;
-    use holo_hash::fixt::HeaderHashFixturator;
     use holochain_types::prelude::MockDnaStore;
     use holochain_wasm_test_utils::TestWasm;
 
@@ -284,7 +207,7 @@ mod slow_tests {
         let result = ribosome
             .run_post_commit(host_access, post_commit_invocation)
             .unwrap();
-        assert_eq!(result, PostCommitResult::Success,);
+        assert_eq!(result, ());
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -303,36 +226,7 @@ mod slow_tests {
         let result = ribosome
             .run_post_commit(host_access, post_commit_invocation)
             .unwrap();
-        assert_eq!(result, PostCommitResult::Success,);
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_post_commit_implemented_fail() {
-        let host_access = PostCommitHostAccessFixturator::new(::fixt::Unpredictable)
-            .next()
-            .unwrap();
-        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::PostCommitFail]))
-            .next()
-            .unwrap();
-        let mut post_commit_invocation = PostCommitInvocationFixturator::new(::fixt::Empty)
-            .next()
-            .unwrap();
-        post_commit_invocation.zome = TestWasm::PostCommitFail.into();
-
-        let result = ribosome
-            .run_post_commit(host_access, post_commit_invocation)
-            .unwrap();
-        assert_eq!(
-            result,
-            PostCommitResult::Fail(
-                vec![HeaderHashFixturator::new(::fixt::Empty)
-                    .next()
-                    .unwrap()
-                    .into()]
-                .into(),
-                "empty header fail".into()
-            ),
-        );
+        assert_eq!(result, ());
     }
 
     #[tokio::test(flavor = "multi_thread")]
