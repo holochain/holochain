@@ -60,12 +60,12 @@ async fn provisioning_1_create() {
 
     // Build the expected output.
     // NB: this relies heavily on the particulars of the `app_manifest_fixture`
-    let slot = AppSlot::new(cell_id, true, 50);
+    let role = AppRoleAssignment::new(cell_id, true, 50);
 
-    let expected = CellSlotResolution {
+    let expected = AppRoleResolution {
         agent,
         dnas_to_register: vec![(dna, None)],
-        slots: vec![("nick".into(), slot)],
+        role_assignments: vec![("role_id".into(), role)],
     };
     assert_eq!(resolution, expected);
 }

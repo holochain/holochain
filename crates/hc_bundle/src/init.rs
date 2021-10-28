@@ -2,7 +2,7 @@ use std::io::Write;
 use std::{io, path::PathBuf};
 
 use holochain_types::prelude::{
-    AppBundle, AppManifest, AppManifestCurrentBuilder, AppSlotManifest, DnaBundle, DnaManifest,
+    AppBundle, AppManifest, AppManifestCurrentBuilder, AppRoleManifest, DnaBundle, DnaManifest,
 };
 use holochain_types::web_app::{WebAppBundle, WebAppManifest};
 
@@ -52,11 +52,11 @@ fn prompt_dna_init(root_dir: PathBuf) -> anyhow::Result<DnaBundle> {
 fn prompt_app_init(root_dir: PathBuf) -> anyhow::Result<AppBundle> {
     let name = prompt_required("name:")?;
     let description = prompt_optional("description:")?;
-    let slot = AppSlotManifest::sample("sample-slot".into());
+    let role = AppRoleManifest::sample("sample-role".into());
     let manifest: AppManifest = AppManifestCurrentBuilder::default()
         .name(name)
         .description(description)
-        .slots(vec![slot])
+        .roles(vec![role])
         .build()
         .unwrap()
         .into();
