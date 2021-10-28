@@ -53,6 +53,7 @@ pub mod conductor_setup;
 pub mod consistency;
 pub mod host_fn_caller;
 pub mod inline_zomes;
+pub mod network_simulation;
 
 mod wait_for_any;
 pub use wait_for_any::*;
