@@ -4,7 +4,7 @@ use crate::dht_arc::{loc_downscale, loc_upscale, ArcInterval, DhtLocation};
 
 /// A representation of DhtLocation in the u8 space. Useful for writing tests
 /// that test the full range of possible locations while still working with small numbers.
-/// A Loc8 can be constructed `From<i8>` within `-128 <= n <= 255`.
+/// A Loc8 can be constructed `From<i32>` within `-128 <= n <= 255`.
 /// A negative number is wrapped to a positive number internally, and the `sign` is preserved
 /// for display purposes.
 ///

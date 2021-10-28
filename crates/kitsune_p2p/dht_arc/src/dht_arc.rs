@@ -560,9 +560,7 @@ impl DhtArc {
                 let start = start.as_u32();
                 let end = end.as_u32();
                 if start <= end {
-                    // this should be +2 instead of +3, but we want to round up
-                    // so that the arc covers the interval
-                    let half_length = ((end as f64 - start as f64 + 3f64) / 2f64) as u32;
+                    let half_length = ((end as f64 - start as f64 + 2f64) / 2f64).round() as u32;
                     let center = ((start as f64 + end as f64) / 2f64).round() as u32;
                     Self::new(center, half_length)
                 } else {
