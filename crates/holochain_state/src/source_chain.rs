@@ -403,6 +403,7 @@ impl SourceChain {
                 (:entry_type IS NULL OR Header.entry_type = :entry_type)
                 AND
                 (:header_type IS NULL OR Header.type = :header_type)
+                ORDER BY Header.seq ASC
                 ",
                     );
                     let mut stmt = txn.prepare(&sql)?;
@@ -439,7 +440,7 @@ impl SourceChain {
             })
             .await?;
         self.scratch.apply(|scratch| {
-            let scratch_iter = scratch
+            let mut scratch_elements: Vec<_> = scratch
                 .headers()
                 .filter(|shh| query.check(shh.header()))
                 .filter_map(|shh| {
@@ -448,8 +449,11 @@ impl SourceChain {
                         _ => None,
                     };
                     Some(Element::new(shh.clone(), entry))
-                });
-            elements.extend(scratch_iter);
+                })
+                .collect();
+            scratch_elements.sort_unstable_by_key(|e| e.header().header_seq());
+
+            elements.extend(scratch_elements);
         })?;
         Ok(elements)
     }
