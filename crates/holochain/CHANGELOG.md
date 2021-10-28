@@ -4,6 +4,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE**: The notion of "cell nicknames" ("nicks") and "app slots" has been unified into the notion of "app roles". This introduces several breaking changes. In general, you will need to rebuild any app bundles you are using, and potentially update some usages of the admin interface. In particular:
+  - The `slots` field in App manifests is now called `roles`
+  - The `InstallApp` admin method now takes a `role_id` field instead of a `nick` field
+  - In the return value for any admin method which lists installed apps, e.g. `ListEnabledApps`, any reference to `"slots"` is now named `"roles"`
+  - See [\#1045](https://github.com/holochain/holochain/pull/1045)
 - Adds test utils for creating simulated networks. [#1037](https://github.com/holochain/holochain/pull/1037).
 - Conductor can take a mocked network for testing simulated networks. [#1036](https://github.com/holochain/holochain/pull/1036)
 - Batch peer store write so we use less transactions. [#1007](https://github.com/holochain/holochain/pull/1007/).
@@ -22,7 +27,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## 0.0.111
 
 - `call_info` is now implemented [1047](https://github.com/holochain/holochain/pull/1047)
-
 - `dna_info` now returns `DnaInfo` correctly [\#1044](https://github.com/holochain/holochain/pull/1044)
 
   - `ZomeInfo` no longer includes what is now on `DnaInfo`

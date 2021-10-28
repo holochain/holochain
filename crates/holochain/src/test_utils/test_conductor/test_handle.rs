@@ -16,11 +16,11 @@ pub struct TestConductorHandle(pub(crate) ConductorHandle);
 impl TestConductorHandle {
     /// Opinionated app setup. Creates one app per agent, using the given DnaFiles.
     ///
-    /// All InstalledAppIds and CellNicks are auto-generated. In tests driven directly
+    /// All InstalledAppIds and AppRoleIds are auto-generated. In tests driven directly
     /// by Rust, you typically won't care what these values are set to, but in case you
     /// do, they are set as so:
     /// - InstalledAppId: {app_id_prefix}-{agent_pub_key}
-    /// - CellNick: {dna_hash}
+    /// - AppRoleId: {dna_hash}
     ///
     /// Returns the list of generated InstalledAppIds, in the same order as Agents passed in.
     pub async fn setup_app_for_agents_with_no_membrane_proof(
