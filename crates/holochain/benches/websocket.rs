@@ -76,10 +76,10 @@ pub fn websocket_concurrent_install(c: &mut Criterion) {
                                     debug!("[{}] Agent pub key generated: {}", g, agent_key);
 
                                     // Install Dna
-                                    let nick = format!("fake_dna_{}", g);
+                                    let name = format!("fake_dna_{}", g);
                                     let dna = fake_dna_zomes_named(
                                         &uuid::Uuid::new_v4().to_string(),
-                                        &nick,
+                                        &name,
                                         zomes,
                                     );
 
@@ -92,15 +92,15 @@ pub fn websocket_concurrent_install(c: &mut Criterion) {
                                         agent_key,
                                         fake_dna_path.clone(),
                                         None,
-                                        nick.clone(),
-                                        nick.clone(),
+                                        name.clone(),
+                                        name.clone(),
                                         REQ_TIMEOUT_MS,
                                     )
                                     .await;
 
                                     debug!(
                                         "[{}] installed dna with hash {} and name {}",
-                                        g, dna_hash, nick
+                                        g, dna_hash, name
                                     );
                                 })
                             }))
