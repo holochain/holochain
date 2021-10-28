@@ -577,7 +577,7 @@ pub(crate) fn loc_upscale(len: usize, v: i32) -> u32 {
     let max = 2f64.powi(32);
     let lenf = len as f64;
     let vf = v as f64;
-    (max / lenf * vf).round() as i64 as u32
+    (max / lenf * vf) as i64 as u32
 }
 
 /// Scale a u32 DhtLocation down into a smaller space (specified by `len`)
@@ -585,7 +585,7 @@ pub(crate) fn loc_upscale(len: usize, v: i32) -> u32 {
 pub(crate) fn loc_downscale(len: usize, d: DhtLocation) -> usize {
     let max = 2f64.powi(32);
     let lenf = len as f64;
-    ((lenf / max * (d.as_u32() as f64)).round() as usize) % len
+    ((lenf / max * (d.as_u32() as f64)) as usize) % len
 }
 
 #[test]
