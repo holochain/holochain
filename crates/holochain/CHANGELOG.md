@@ -4,9 +4,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Adds test utils for creating simulated networks. [#1037](https://github.com/holochain/holochain/pull/1037).
+- Conductor can take a mocked network for testing simulated networks. [#1036](https://github.com/holochain/holochain/pull/1036)
+- Batch peer store write so we use less transactions. [#1007](https://github.com/holochain/holochain/pull/1007/).
+
+## 0.0.113
+
 - Post commit is now infallible and expects no return value [PR1049](https://github.com/holochain/holochain/pull/1049)
 - Always depend on `itertools` to make `cargo build --no-default-features` work [#1060](https://github.com/holochain/holochain/pull/1060)
 - `call_info` includes provenance and cap grant information [PR1063](https://github.com/holochain/holochain/pull/1063)
+- Always depend on `itertools` to make `cargo build --no-default-features` work [\#1060](https://github.com/holochain/holochain/pull/1060)
 
 ## 0.0.112
 
@@ -15,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## 0.0.111
 
 - `call_info` is now implemented [1047](https://github.com/holochain/holochain/pull/1047)
+
 - `dna_info` now returns `DnaInfo` correctly [\#1044](https://github.com/holochain/holochain/pull/1044)
 
   - `ZomeInfo` no longer includes what is now on `DnaInfo`
