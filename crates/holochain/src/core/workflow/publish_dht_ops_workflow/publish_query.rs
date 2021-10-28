@@ -120,6 +120,7 @@ mod tests {
     use fixt::prelude::*;
     use holo_hash::EntryHash;
     use holo_hash::HasHash;
+    use holochain_sqlite::db::DbWrite;
     use holochain_sqlite::db::WriteManager;
     use holochain_sqlite::prelude::DatabaseResult;
     use holochain_state::prelude::insert_op;
@@ -158,14 +159,14 @@ mod tests {
         observability::test_run().ok();
         let env = test_authored_env();
         let expected = test_data(&env.env().into());
-        let r = get_ops_to_publish(&expected.agent, &env.env().into())
+        let r = get_ops_to_publish(expected.agent.clone(), &env.env().into())
             .await
             .unwrap();
         assert_eq!(r, expected.results);
     }
 
     fn create_and_insert_op(
-        env: &DbReadOnly,
+        env: &DbWrite<DbKindAuthored>,
         facts: Facts,
         consistent_data: &Consistent,
     ) -> DhtOpHashed {
@@ -229,7 +230,7 @@ mod tests {
         state
     }
 
-    fn test_data(env: &DbReadOnly) -> Expected {
+    fn test_data(env: &DbWrite<DbKindAuthored>) -> Expected {
         let mut results = Vec::new();
         let cd = Consistent {
             this_agent: fixt!(AgentPubKey),
@@ -283,7 +284,7 @@ mod tests {
         create_and_insert_op(env, f, &cd);
 
         // - IsAuthored: false.
-        let mut f = facts;
+        let f = facts;
         create_and_insert_op(env, f, &cd);
 
         Expected {

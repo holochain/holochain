@@ -128,8 +128,8 @@ impl HostFnCaller {
         let call_zome_handle =
             CellConductorApi::new(handle.clone(), cell_id.clone()).into_call_zome_handle();
         HostFnCaller {
-            dht_env,
             authored_env,
+            dht_env,
             cache,
             ribosome,
             zome_path,
@@ -165,7 +165,7 @@ impl HostFnCaller {
 
         let workspace_lock = HostFnWorkspace::new(
             authored_env,
-            dht_env.into(),
+            dht_env,
             cache,
             keystore.clone(),
             Some(cell_id.agent_pubkey().clone()),

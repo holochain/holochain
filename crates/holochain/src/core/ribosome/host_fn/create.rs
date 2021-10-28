@@ -176,7 +176,15 @@ pub mod wasm_test {
 
         // the chain head should be the committed entry header
         let chain_head = tokio_helper::block_forever_on(async move {
-            SourceChainResult::Ok(host_access_2.workspace.source_chain().chain_head()?.0)
+            SourceChainResult::Ok(
+                host_access_2
+                    .workspace
+                    .source_chain()
+                    .as_ref()
+                    .unwrap()
+                    .chain_head()?
+                    .0,
+            )
         })
         .unwrap();
 
@@ -195,7 +203,15 @@ pub mod wasm_test {
         // the chain head should be the committed entry header
         let host_access_2 = host_access.clone();
         let chain_head = tokio_helper::block_forever_on(async move {
-            SourceChainResult::Ok(host_access_2.workspace.source_chain().chain_head()?.0)
+            SourceChainResult::Ok(
+                host_access_2
+                    .workspace
+                    .source_chain()
+                    .as_ref()
+                    .unwrap()
+                    .chain_head()?
+                    .0,
+            )
         })
         .unwrap();
 

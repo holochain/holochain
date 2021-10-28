@@ -27,7 +27,7 @@ use matches::assert_matches;
 async fn can_update_state() {
     let envs = test_environments();
     let dna_store = MockDnaStore::new();
-    let keystore = envs.conductor().keystore().clone();
+    let keystore = envs.keystore().clone();
     let holochain_p2p = holochain_p2p::stub_network().await;
     let conductor = Conductor::new(
         envs.conductor(),
@@ -36,7 +36,7 @@ async fn can_update_state() {
         keystore,
         envs.path().to_path_buf().into(),
         holochain_p2p,
-        DbSyncLevel::default(),
+        DbSyncStrategy::default(),
     )
     .await
     .unwrap();
@@ -67,7 +67,7 @@ async fn can_update_state() {
 #[tokio::test(flavor = "multi_thread")]
 async fn can_add_clone_cell_to_app() {
     let envs = test_environments();
-    let keystore = envs.conductor().keystore().clone();
+    let keystore = envs.keystore().clone();
     let holochain_p2p = holochain_p2p::stub_network().await;
 
     let agent = fixt!(AgentPubKey);
@@ -83,7 +83,7 @@ async fn can_add_clone_cell_to_app() {
         keystore,
         envs.path().to_path_buf().into(),
         holochain_p2p,
-        DbSyncLevel::default(),
+        DbSyncStrategy::default(),
     )
     .await
     .unwrap();
@@ -155,7 +155,7 @@ async fn app_ids_are_unique() {
         environments.keystore().clone(),
         environments.path().to_path_buf().into(),
         holochain_p2p,
-        DbSyncLevel::default(),
+        DbSyncStrategy::default(),
     )
     .await
     .unwrap();

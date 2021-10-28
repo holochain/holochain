@@ -21,7 +21,7 @@ use holochain_state::{
     query::{row_blob_and_hash_to_header, QueryData},
 };
 use holochain_types::prelude::*;
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 
 #[derive(Debug, Clone)]
 pub struct DeterministicGetAgentActivityQuery {
@@ -136,7 +136,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn agent_activity_query() {
         observability::test_run().ok();
-        let test_env = test_authored_env();
+        let test_env = test_dht_env();
         let env = test_env.env();
         let entry_type_1 = fixt!(EntryType);
         let agents = [fixt!(AgentPubKey), fixt!(AgentPubKey), fixt!(AgentPubKey)];

@@ -159,6 +159,7 @@ mod tests {
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
 
+    use crate::HolochainP2pSender;
     use holochain_zome_types::ValidationStatus;
     use kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig;
     use kitsune_p2p::KitsuneP2pConfig;
@@ -245,7 +246,7 @@ mod tests {
     async fn test_send_validation_receipt_workflow() {
         let (dna, a1, a2, _) = test_setup();
 
-        let (p2p, mut evt) = spawn_holochain_p2p(
+        let (p2p, mut evt): (HolochainP2pRef, _) = spawn_holochain_p2p(
             KitsuneP2pConfig::default(),
             TlsConfig::new_ephemeral().await.unwrap(),
         )
@@ -278,14 +279,9 @@ mod tests {
         p2p.join(dna.clone(), a1.clone()).await.unwrap();
         p2p.join(dna.clone(), a2.clone()).await.unwrap();
 
-        p2p.send_validation_receipt(
-            dna,
-            a2,
-            a1,
-            UnsafeBytes::from(b"receipt-test".to_vec()).into(),
-        )
-        .await
-        .unwrap();
+        p2p.send_validation_receipt(dna, a1, UnsafeBytes::from(b"receipt-test".to_vec()).into())
+            .await
+            .unwrap();
 
         p2p.ghost_actor_shutdown().await.unwrap();
         r_task.await.unwrap();
@@ -340,7 +336,7 @@ mod tests {
         // this will fail because we can't reach any remote nodes
         // but, it still published locally, so our test will work
         let _ = p2p
-            .publish(dna, a1, true, false, header_hash, vec![], Some(200))
+            .publish(dna, true, false, header_hash, vec![], Some(200))
             .await;
 
         assert_eq!(3, recv_count.load(std::sync::atomic::Ordering::SeqCst));
@@ -419,7 +415,7 @@ mod tests {
 
         tracing::info!("test - get");
         let res = p2p
-            .get(dna, a1, hash, actor::GetOptions::default())
+            .get(dna, hash, actor::GetOptions::default())
             .await
             .unwrap();
 
@@ -496,7 +492,7 @@ mod tests {
         };
 
         let res = p2p
-            .get_links(dna, a1, link_key, actor::GetLinksOptions::default())
+            .get_links(dna, link_key, actor::GetLinksOptions::default())
             .await
             .unwrap();
 

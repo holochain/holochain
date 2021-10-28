@@ -59,7 +59,6 @@ pub mod prelude {
     pub use super::Txns;
     pub use holochain_sqlite::rusqlite::named_params;
     pub use holochain_sqlite::rusqlite::Row;
-    pub use std::sync::Arc;
 }
 
 /// Alias for the params required by rusqlite query execution

@@ -349,16 +349,19 @@ impl ShardedGossipLocalState {
             .as_ref()
             .map(|tgt| (tgt.0.cert().clone(), tgt.2))
         {
+            dbg!();
             // Check if no current round exists and we've timed out the initiate.
             let no_current_round_exist = !self.round_map.round_exists(&cert);
             match when_initiated {
                 Some(when_initiated)
                     if no_current_round_exist && when_initiated.elapsed() > ROUND_TIMEOUT =>
                 {
+                    dbg!();
                     self.metrics.record_error(cert);
                     self.initiate_tgt = None;
                 }
                 None if no_current_round_exist => {
+                    dbg!();
                     self.initiate_tgt = None;
                 }
                 _ => (),

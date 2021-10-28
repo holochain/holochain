@@ -46,6 +46,7 @@ use rusqlite::OptionalExtension;
 use rusqlite::Transaction;
 use std::hash::Hash;
 use std::hash::Hasher;
+use std::sync::Arc;
 use tokio::sync;
 use tracing::*;
 use tracing_futures::Instrument;
@@ -128,9 +129,8 @@ impl Cell {
         // check if genesis has been run
         let has_genesis = {
             // check if genesis ran.
-            // TODO: Genesis marks ops as valid but we need to also mark them as
-            // valid if any other local agents are an authority.
-            GenesisWorkspace::new(space.authored_env.clone())?.has_genesis(id.agent_pubkey())?
+            GenesisWorkspace::new(space.authored_env.clone(), space.dht_env.clone())?
+                .has_genesis(id.agent_pubkey())?
         };
 
         if has_genesis {
@@ -169,6 +169,7 @@ impl Cell {
         id: CellId,
         conductor_handle: ConductorHandle,
         authored_env: DbWrite<DbKindAuthored>,
+        dht_env: DbWrite<DbKindDht>,
         ribosome: Ribosome,
         membrane_proof: Option<SerializedBytes>,
     ) -> CellResult<()>
@@ -180,10 +181,10 @@ impl Cell {
             .get_dna(id.dna_hash())
             .ok_or_else(|| DnaError::DnaMissing(id.dna_hash().to_owned()))?;
 
-        let conductor_api = CellConductorApi::new(conductor_handle, id.clone());
+        let conductor_api = CellConductorApi::new(conductor_handle.clone(), id.clone());
 
         // run genesis
-        let workspace = GenesisWorkspace::new(authored_env.clone())
+        let workspace = GenesisWorkspace::new(authored_env, dht_env)
             .map_err(ConductorApiError::from)
             .map_err(Box::new)?;
 
@@ -199,6 +200,13 @@ impl Cell {
             .map_err(Box::new)
             .map_err(ConductorApiError::from)
             .map_err(Box::new)?;
+
+        if let Some(trigger) = conductor_handle
+            .get_queue_consumer_workflows()
+            .integration_trigger(Arc::new(id.dna_hash().clone()))
+        {
+            trigger.trigger();
+        }
         Ok(())
     }
 
@@ -515,7 +523,7 @@ impl Cell {
             &self.holochain_p2p_cell,
             self.id.agent_pubkey().clone(),
             signed_headers,
-            self.queue_triggers.publish_dht_ops.clone(),
+            self.queue_triggers.clone(),
             self.conductor_api.signal_broadcaster().await,
         )
         .await
@@ -781,7 +789,7 @@ impl Cell {
             None => {
                 SourceChainWorkspace::new(
                     self.authored_env().clone(),
-                    self.dht_env().clone().into(),
+                    self.dht_env().clone(),
                     self.cache().clone(),
                     keystore.clone(),
                     self.id.agent_pubkey().clone(),
@@ -834,7 +842,7 @@ impl Cell {
         // Create the workspace
         let workspace = SourceChainWorkspace::new(
             self.authored_env().clone(),
-            self.dht_env().clone().into(),
+            self.dht_env().clone(),
             self.cache().clone(),
             keystore.clone(),
             id.agent_pubkey().clone(),

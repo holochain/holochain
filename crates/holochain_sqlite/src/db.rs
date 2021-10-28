@@ -372,6 +372,8 @@ pub trait DbKindT: Clone + Send + Sync + 'static {
     fn if_corrupt_wipe(&self) -> bool;
 }
 
+pub trait DbKindOp {}
+
 /// Specifies the environment used by each Cell
 #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 pub struct DbKindAuthored(pub Arc<DnaHash>);
@@ -414,6 +416,8 @@ impl DbKindT for DbKindAuthored {
     }
 }
 
+impl DbKindOp for DbKindAuthored {}
+
 impl DbKindAuthored {
     pub fn dna_hash(&self) -> &DnaHash {
         &self.0
@@ -436,6 +440,8 @@ impl DbKindT for DbKindDht {
         true
     }
 }
+
+impl DbKindOp for DbKindDht {}
 
 impl DbKindDht {
     pub fn dna_hash(&self) -> &DnaHash {
@@ -468,6 +474,8 @@ impl DbKindCache {
         self.0.clone()
     }
 }
+
+impl DbKindOp for DbKindCache {}
 
 impl DbKindT for DbKindConductor {
     fn kind(&self) -> DbKind {
@@ -651,11 +659,11 @@ where
     }
 }
 
-impl<Kind> Into<DbReadOnly<Kind>> for DbWrite<Kind>
+impl<Kind> From<DbWrite<Kind>> for DbReadOnly<Kind>
 where
     Kind: DbKindT,
 {
-    fn into(self) -> DbReadOnly<Kind> {
-        self.0 .0
+    fn from(db: DbWrite<Kind>) -> Self {
+        db.0 .0
     }
 }

@@ -1086,9 +1086,12 @@ pub(super) async fn genesis_cells<DS: DnaStore + 'static>(
         let authored_env = conductor
             .get_or_create_authored_env(cell_id.dna_hash())
             .map_err(|e| CellError::FailedToCreateAuthoredDb(e.into()));
+        let dht_env = conductor
+            .get_or_create_dht_env(cell_id.dna_hash())
+            .map_err(|e| CellError::FailedToCreateDhtDb(e.into()));
         async {
             let authored_env = authored_env?;
-            let authored_env = authored_env.clone();
+            let dht_env = dht_env?;
             let conductor_handle = conductor_handle.clone();
             let cell_id_inner = cell_id.clone();
             let ribosome = conductor_handle
@@ -1099,6 +1102,7 @@ pub(super) async fn genesis_cells<DS: DnaStore + 'static>(
                     cell_id_inner,
                     conductor_handle,
                     authored_env,
+                    dht_env,
                     ribosome,
                     proof,
                 )

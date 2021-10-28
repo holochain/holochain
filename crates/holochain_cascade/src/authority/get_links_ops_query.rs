@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use holo_hash::EntryHash;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;

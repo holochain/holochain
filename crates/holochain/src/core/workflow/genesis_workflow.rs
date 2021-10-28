@@ -93,6 +93,7 @@ where
 
     source_chain::genesis(
         workspace.vault.clone(),
+        workspace.dht_env.clone(),
         api.keystore().clone(),
         dna_file.dna_hash().clone(),
         agent_pubkey,
@@ -106,12 +107,16 @@ where
 /// The workspace for Genesis
 pub struct GenesisWorkspace {
     vault: DbWrite<DbKindAuthored>,
+    dht_env: DbWrite<DbKindDht>,
 }
 
 impl GenesisWorkspace {
     /// Constructor
-    pub fn new(env: DbWrite<DbKindAuthored>) -> WorkspaceResult<Self> {
-        Ok(Self { vault: env })
+    pub fn new(env: DbWrite<DbKindAuthored>, dht_env: DbWrite<DbKindDht>) -> WorkspaceResult<Self> {
+        Ok(Self {
+            vault: env,
+            dht_env,
+        })
     }
 
     pub fn has_genesis(&self, author: &AgentPubKey) -> DatabaseResult<bool> {
@@ -156,12 +161,13 @@ pub mod tests {
         observability::test_run().unwrap();
         let test_env = test_authored_env();
         let dht_env = test_dht_env();
+        let keystore = test_keystore();
         let vault = test_env.env();
         let dna = fake_dna_file("a");
         let author = fake_agent_pubkey_1();
 
         {
-            let workspace = GenesisWorkspace::new(vault.clone().into()).unwrap();
+            let workspace = GenesisWorkspace::new(vault.clone().into(), dht_env.env()).unwrap();
             let mut api = MockCellConductorApi::new();
             api.expect_sync_dpki_request()
                 .returning(|_, _| Ok("mocked dpki request response".to_string()));
@@ -180,7 +186,7 @@ pub mod tests {
 
         {
             let source_chain =
-                SourceChain::new(vault.clone().into(), dht_env.env(), author.clone())
+                SourceChain::new(vault.clone(), dht_env.env(), keystore, author.clone())
                     .await
                     .unwrap();
             let headers = source_chain

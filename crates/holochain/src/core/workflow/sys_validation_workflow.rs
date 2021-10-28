@@ -23,6 +23,7 @@ use holochain_zome_types::Entry;
 use holochain_zome_types::ValidationStatus;
 use rusqlite::Transaction;
 use std::convert::TryInto;
+use std::sync::Arc;
 use tracing::*;
 use types::Outcome;
 
@@ -80,7 +81,7 @@ async fn sys_validation_workflow_inner(
     conductor_api: &dyn ConductorHandleT,
     sys_validation_trigger: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
-    let env = workspace.dht_env.clone().into();
+    let env = workspace.dht_env.clone();
     let sorted_ops = validation_query::get_ops_to_sys_validate(&env).await?;
 
     // Process each op
@@ -91,10 +92,8 @@ async fn sys_validation_workflow_inner(
         let incoming_dht_ops_sender =
             IncomingDhtOpSender::new(dht_env.clone(), sys_validation_trigger.clone());
         let network = network.clone();
-        let conductor_api = conductor_api.clone();
         let workspace = workspace.clone();
         async move {
-            let conductor_api = conductor_api.clone();
             let (op, op_hash) = so.into_inner();
             let r = validate_op(
                 &op,
@@ -823,7 +822,7 @@ impl SysValidationWorkspace {
     }
     /// Create a cascade with local data only
     pub fn local_cascade(&self) -> Cascade {
-        let cascade = Cascade::empty().with_dht(self.dht_env.clone().into());
+        let cascade = Cascade::empty().with_dht(self.dht_env.clone());
         match &self.scratch {
             Some(scratch) => cascade
                 .with_authored(self.authored_env.clone())
@@ -837,7 +836,7 @@ impl SysValidationWorkspace {
     ) -> Cascade<Network> {
         let cascade = Cascade::empty()
             .with_authored(self.authored_env.clone())
-            .with_dht(self.dht_env.clone().into())
+            .with_dht(self.dht_env.clone())
             .with_network(network, self.cache.clone());
         match &self.scratch {
             Some(scratch) => cascade.with_scratch(scratch.clone()),

@@ -155,7 +155,7 @@ enum Db {
 impl Db {
     /// Checks that the database is in a state
     #[instrument(skip(expects, env))]
-    async fn check(expects: Vec<Self>, env: DbWrite, here: String) {
+    async fn check(expects: Vec<Self>, env: DbWrite<DbKindDht>, here: String) {
         fresh_reader_test(env, |txn| {
             // print_stmts_test(env, |txn| {
             for expect in expects {
@@ -426,7 +426,7 @@ impl Db {
 
     // Sets the database to a certain state
     #[instrument(skip(pre_state, env))]
-    async fn set<'env>(pre_state: Vec<Self>, env: DbWrite) {
+    async fn set<'env>(pre_state: Vec<Self>, env: DbWrite<DbKindDht>) {
         env.conn()
             .unwrap()
             .with_commit_sync::<WorkspaceError, _, _>(|txn| {
@@ -435,7 +435,7 @@ impl Db {
                         Db::Integrated(op) => {
                             let op = DhtOpHashed::from_content_sync(op.clone());
                             let hash = op.as_hash().clone();
-                            mutations::insert_op(txn, op, false).unwrap();
+                            mutations::insert_op(txn, op).unwrap();
                             mutations::set_when_integrated(txn, hash.clone(), Timestamp::now())
                                 .unwrap();
                             mutations::set_validation_status(txn, hash, ValidationStatus::Valid)
@@ -444,7 +444,7 @@ impl Db {
                         Db::IntQueue(op) => {
                             let op = DhtOpHashed::from_content_sync(op.clone());
                             let hash = op.as_hash().clone();
-                            mutations::insert_op(txn, op, false).unwrap();
+                            mutations::insert_op(txn, op).unwrap();
                             mutations::set_validation_stage(
                                 txn,
                                 hash.clone(),
@@ -465,7 +465,7 @@ impl Db {
     }
 }
 
-async fn call_workflow<'env>(env: DbWrite) {
+async fn call_workflow<'env>(env: DbWrite<DbKindDht>) {
     let (qt, _rx) = TriggerSender::new();
     let test_network = test_network(None, None).await;
     let holochain_p2p_cell = test_network.cell_network();
@@ -475,7 +475,7 @@ async fn call_workflow<'env>(env: DbWrite) {
 }
 
 // Need to clear the data from the previous test
-fn clear_dbs(env: DbWrite) {
+fn clear_dbs(env: DbWrite<DbKindDht>) {
     env.conn()
         .unwrap()
         .with_commit_sync(|txn| {
@@ -673,7 +673,7 @@ fn register_delete_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static
 #[tokio::test(flavor = "multi_thread")]
 async fn test_ops_state() {
     observability::test_run().ok();
-    let test_env = test_authored_env();
+    let test_env = test_dht_env();
     let env = test_env.env();
 
     let tests = [

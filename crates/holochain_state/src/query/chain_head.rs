@@ -147,7 +147,6 @@ mod tests {
                 &mut txn,
                 op,
                 fixt!(DhtOpHash),
-                true,
                 op_order,
                 shh.header().timestamp(),
             )

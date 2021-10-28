@@ -6,6 +6,8 @@ use holochain_p2p::HolochainP2pDnaT;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::mutations::insert_op_scratch;
 use holochain_state::prelude::test_authored_env;
+use holochain_state::prelude::test_cache_env;
+use holochain_state::prelude::test_dht_env;
 use holochain_state::scratch::Scratch;
 use holochain_zome_types::ChainTopOrdering;
 use holochain_zome_types::Details;
@@ -229,8 +231,8 @@ async fn entry_not_authority_or_authoring() {
     observability::test_run().ok();
 
     // Environments
-    let cache = test_authored_env();
-    let authority = test_authored_env();
+    let cache = test_cache_env();
+    let authority = test_dht_env();
 
     // Data
     let td_entry = EntryTestData::create();
@@ -252,7 +254,7 @@ async fn entry_authoring() {
     observability::test_run().ok();
 
     // Environments
-    let cache = test_authored_env();
+    let cache = test_cache_env();
     let mut scratch = Scratch::new();
 
     // Data
@@ -290,7 +292,7 @@ async fn entry_authority() {
     observability::test_run().ok();
 
     // Environments
-    let cache = test_authored_env();
+    let cache = test_cache_env();
     let vault = test_authored_env();
 
     // Data
@@ -307,7 +309,7 @@ async fn entry_authority() {
 
     // Cascade
     let mut cascade = Cascade::empty()
-        .with_dht(vault.env().into())
+        .with_authored(vault.env().into())
         .with_network(mock, cache.env());
 
     assert_can_get(&td_entry, &td_element, &mut cascade, GetOptions::latest()).await;
@@ -318,7 +320,7 @@ async fn content_not_authority_or_authoring() {
     observability::test_run().ok();
 
     // Environments
-    let cache = test_authored_env();
+    let cache = test_cache_env();
     let vault = test_authored_env();
 
     // Data
@@ -335,7 +337,7 @@ async fn content_not_authority_or_authoring() {
 
     // Cascade
     let mut cascade = Cascade::empty()
-        .with_dht(vault.env().into())
+        .with_authored(vault.env().into())
         .with_network(mock, cache.env());
 
     assert_can_get(&td_entry, &td_element, &mut cascade, GetOptions::content()).await;
@@ -346,7 +348,7 @@ async fn content_authoring() {
     observability::test_run().ok();
 
     // Environments
-    let cache = test_authored_env();
+    let cache = test_cache_env();
     let mut scratch = Scratch::new();
 
     // Data
@@ -384,7 +386,7 @@ async fn content_authority() {
     observability::test_run().ok();
 
     // Environments
-    let cache = test_authored_env();
+    let cache = test_cache_env();
     let vault = test_authored_env();
 
     // Data
@@ -399,7 +401,7 @@ async fn content_authority() {
 
     // Cascade
     let mut cascade = Cascade::empty()
-        .with_dht(vault.env().into())
+        .with_authored(vault.env().into())
         .with_network(mock, cache.env());
 
     assert_is_none(&td_entry, &td_element, &mut cascade, GetOptions::content()).await;
@@ -410,8 +412,8 @@ async fn rejected_ops() {
     observability::test_run().ok();
 
     // Environments
-    let cache = test_authored_env();
-    let authority = test_authored_env();
+    let cache = test_cache_env();
+    let authority = test_dht_env();
 
     // Data
     let td_entry = EntryTestData::create();
@@ -432,8 +434,8 @@ async fn check_can_handle_rejected_ops_in_cache() {
     observability::test_run().ok();
 
     // Environments
-    let cache = test_authored_env();
-    let authority = test_authored_env();
+    let cache = test_cache_env();
+    let authority = test_dht_env();
 
     // Data
     let td_entry = EntryTestData::create();
@@ -476,8 +478,8 @@ async fn test_pending_data_isnt_returned() {
     observability::test_run().ok();
 
     // Environments
-    let cache = test_authored_env();
-    let authority = test_authored_env();
+    let cache = test_cache_env();
+    let authority = test_dht_env();
     let vault = test_authored_env();
 
     // Data

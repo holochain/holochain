@@ -175,7 +175,7 @@ mod tests {
         let test_op_hash = op.as_hash().clone();
         env.conn()
             .unwrap()
-            .with_commit_sync(|txn| mutations::insert_op(txn, op, true))
+            .with_commit_sync(|txn| mutations::insert_op(txn, op))
             .unwrap();
 
         let vr1 = fake_vr(&test_op_hash, &keystore).await;
@@ -199,17 +199,15 @@ mod tests {
 
             let mut list = list_receipts(&reader, &test_op_hash).unwrap();
             list.sort_by(|a, b| {
-                a.receipt
-                    .validator
-                    .partial_cmp(&b.receipt.validator)
+                a.receipt.validators[0]
+                    .partial_cmp(&b.receipt.validators[0])
                     .unwrap()
             });
 
             let mut expects = vec![vr1, vr2];
             expects.sort_by(|a, b| {
-                a.receipt
-                    .validator
-                    .partial_cmp(&b.receipt.validator)
+                a.receipt.validators[0]
+                    .partial_cmp(&b.receipt.validators[0])
                     .unwrap()
             });
 

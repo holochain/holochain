@@ -4,7 +4,7 @@ use holochain_keystore::AgentPubKeyExt;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn incoming_ops_to_limbo() {
-    let test_env = holochain_state::test_utils::test_authored_env();
+    let test_env = holochain_state::test_utils::test_dht_env();
     let env = test_env.env();
     let keystore = holochain_state::test_utils::test_keystore();
 

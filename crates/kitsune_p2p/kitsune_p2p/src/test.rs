@@ -21,12 +21,12 @@ mod tests {
         harness.magic_peer_info_exchange().await.unwrap();
 
         let r1 = p2p1
-            .rpc_single(space.clone(), a2.clone(), a1.clone(), b"m1".to_vec(), None)
+            .rpc_single(space.clone(), a1.clone(), b"m1".to_vec(), None)
             .await
             .unwrap();
         let s = std::time::Instant::now();
         let r2 = match p2p2
-            .rpc_single(space.clone(), a1, a2, b"m2".to_vec(), None)
+            .rpc_single(space.clone(), a2, b"m2".to_vec(), None)
             .await
         {
             Err(_) => {
@@ -58,7 +58,6 @@ mod tests {
         let mut input = actor::RpcMulti::new(
             &Default::default(),
             space,
-            a1.clone(),
             TestVal::test_val(),
             b"test-multi-request".to_vec(),
         );
@@ -146,9 +145,7 @@ mod tests {
         let a2: Arc<KitsuneAgent> = TestVal::test_val();
         p2p.join(space.clone(), a2.clone()).await?;
 
-        let res = p2p
-            .rpc_single(space, a2, a1, b"hello".to_vec(), None)
-            .await?;
+        let res = p2p.rpc_single(space, a1, b"hello".to_vec(), None).await?;
         assert_eq!(b"echo: hello".to_vec(), res);
 
         harness.ghost_actor_shutdown().await?;
@@ -173,7 +170,6 @@ mod tests {
         let mut input = actor::RpcMulti::new(
             &Default::default(),
             space,
-            a1.clone(),
             TestVal::test_val(),
             b"test-multi-request".to_vec(),
         );
@@ -205,7 +201,6 @@ mod tests {
         let mut input = actor::RpcMulti::new(
             &Default::default(),
             space,
-            a1.clone(),
             TestVal::test_val(),
             b"test-multi-request".to_vec(),
         );

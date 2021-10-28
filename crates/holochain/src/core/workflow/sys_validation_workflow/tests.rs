@@ -81,7 +81,7 @@ async fn run_test(
     // Init is not run because we aren't calling the zome.
     let expected_count = 9 + 14;
 
-    let alice_env = handle.get_cell_env(&alice_cell_id).unwrap();
+    let alice_env = handle.get_dht_env(alice_cell_id.dna_hash()).unwrap();
     wait_for_integration(
         &alice_env,
         expected_count,
@@ -130,7 +130,7 @@ async fn run_test(
     // Integration should have 13 ops in it
     let expected_count = 14 + expected_count;
 
-    let alice_env = handle.get_cell_env(&alice_cell_id).unwrap();
+    let alice_env = handle.get_dht_env(alice_cell_id.dna_hash()).unwrap();
     wait_for_integration(
         &alice_env,
         expected_count,
@@ -195,7 +195,7 @@ async fn run_test(
     // Integration should have new 4 ops in it
     let expected_count = 4 + expected_count;
 
-    let alice_env = handle.get_cell_env(&alice_cell_id).unwrap();
+    let alice_env = handle.get_dht_env(alice_cell_id.dna_hash()).unwrap();
     wait_for_integration(
         &alice_env,
         expected_count,

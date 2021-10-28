@@ -4,6 +4,8 @@ use holochain_cascade::Cascade;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::mutations::insert_op_scratch;
 use holochain_state::prelude::test_authored_env;
+use holochain_state::prelude::test_cache_env;
+use holochain_state::prelude::test_dht_env;
 use holochain_state::scratch::Scratch;
 use holochain_types::link::WireLinkOps;
 use holochain_zome_types::ChainTopOrdering;
@@ -13,8 +15,8 @@ async fn links_not_authority() {
     observability::test_run().ok();
 
     // Environments
-    let cache = test_authored_env();
-    let authority = test_authored_env();
+    let cache = test_cache_env();
+    let authority = test_dht_env();
 
     // Data
     let td = EntryTestData::create();
@@ -69,7 +71,7 @@ async fn links_authority() {
     observability::test_run().ok();
 
     // Environments
-    let cache = test_authored_env();
+    let cache = test_cache_env();
     let vault = test_authored_env();
 
     // Data
@@ -86,7 +88,7 @@ async fn links_authority() {
     // Cascade
     let mut cascade = Cascade::empty()
         .with_network(mock, cache.env())
-        .with_dht(vault.env().into());
+        .with_authored(vault.env().into());
 
     let r = cascade
         .dht_get_links(td.link_key_tag.clone(), Default::default())
@@ -110,7 +112,7 @@ async fn links_authoring() {
     observability::test_run().ok();
 
     // Environments
-    let cache = test_authored_env();
+    let cache = test_cache_env();
     let mut scratch = Scratch::new();
 
     // Data

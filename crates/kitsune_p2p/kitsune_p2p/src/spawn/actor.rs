@@ -773,7 +773,6 @@ mockall::mock! {
             &mut self,
             space: Arc<KitsuneSpace>,
             to_agent: Arc<KitsuneAgent>,
-            from_agent: Arc<KitsuneAgent>,
             payload: Vec<u8>,
         ) -> KitsuneP2pEventHandlerResult<Vec<u8>>;
 
@@ -781,14 +780,12 @@ mockall::mock! {
             &mut self,
             space: Arc<KitsuneSpace>,
             to_agent: Arc<KitsuneAgent>,
-            from_agent: Arc<KitsuneAgent>,
             payload: Vec<u8>,
         ) -> KitsuneP2pEventHandlerResult<()> ;
 
         fn handle_gossip(
             &mut self,
             space: Arc<KitsuneSpace>,
-            to_agent: Arc<KitsuneAgent>,
             ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
         ) -> KitsuneP2pEventHandlerResult<()>;
 

@@ -1,6 +1,6 @@
 use super::*;
 use crate::conductor::api::error::ConductorApiError;
-use crate::conductor::api::MockCellConductorApi;
+use crate::conductor::handle::MockConductorHandleT;
 use crate::test_utils::fake_genesis;
 use ::fixt::prelude::*;
 use error::SysValidationError;
@@ -9,6 +9,7 @@ use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::prelude::test_authored_env;
 use holochain_state::prelude::test_cache_env;
+use holochain_state::prelude::test_dht_env;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::Header;
 use matches::assert_matches;
@@ -59,14 +60,17 @@ async fn check_previous_header() {
 #[tokio::test(flavor = "multi_thread")]
 async fn check_valid_if_dna_test() {
     let tmp = test_authored_env();
+    let tmp_dht = test_dht_env();
     let tmp_cache = test_cache_env();
-    let env: DbReadOnly = tmp.env().into();
+    let keystore = test_keystore();
+    let env = tmp.env();
     // Test data
     let _activity_return = vec![fixt!(HeaderHash)];
 
     // Empty store not dna
     let header = fixt!(CreateLink);
-    let workspace = SysValidationWorkspace::new(env.clone().into(), tmp_cache.env());
+    let workspace =
+        SysValidationWorkspace::new(env.clone().into(), tmp_dht.env().into(), tmp_cache.env());
 
     assert_matches!(
         check_valid_if_dna(&header.clone().into(), &workspace).await,
@@ -78,7 +82,9 @@ async fn check_valid_if_dna_test() {
         Ok(())
     );
 
-    fake_genesis(env.clone().into()).await.unwrap();
+    fake_genesis(env.clone().into(), tmp_dht.env(), keystore)
+        .await
+        .unwrap();
     env.conn()
         .unwrap()
         .execute("UPDATE DhtOp SET when_integrated = 0", [])
@@ -299,19 +305,15 @@ async fn check_app_entry_type_test() {
     entry_def.visibility = EntryVisibility::Public;
 
     // Setup mock conductor
-    let mut conductor_api = MockCellConductorApi::new();
-    conductor_api.expect_cell_id().return_const(fixt!(CellId));
+    let mut conductor_api = MockConductorHandleT::new();
     // # No dna or entry def
-    conductor_api.expect_sync_get_entry_def().return_const(None);
-    conductor_api.expect_sync_get_dna().return_const(None);
-    conductor_api
-        .expect_sync_get_this_dna()
-        .returning(move || Err(ConductorApiError::DnaMissing(dna_hash.clone())));
+    conductor_api.expect_get_entry_def().return_const(None);
+    conductor_api.expect_get_dna().return_const(None);
 
     // ## Dna is missing
     let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_type(&aet, &conductor_api).await,
+        check_app_entry_type(&dna_hash, &aet, &conductor_api).await,
         Err(SysValidationError::ConductorApiError(e))
         if matches!(*e, ConductorApiError::DnaMissing(_))
     );
@@ -319,16 +321,13 @@ async fn check_app_entry_type_test() {
     // # Dna but no entry def in buffer
     // ## ZomeId out of range
     conductor_api.checkpoint();
-    conductor_api.expect_sync_get_entry_def().return_const(None);
+    conductor_api.expect_get_entry_def().return_const(None);
     conductor_api
-        .expect_sync_get_dna()
+        .expect_get_dna()
         .return_const(Some(dna_file.clone()));
-    conductor_api
-        .expect_sync_get_this_dna()
-        .returning(move || Ok(dna_file.clone()));
     let aet = AppEntryType::new(0.into(), 1.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_type(&aet, &conductor_api).await,
+        check_app_entry_type(&dna_hash, &aet, &conductor_api).await,
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::ZomeId(_)
         ))
@@ -337,7 +336,7 @@ async fn check_app_entry_type_test() {
     // ## EntryId is out of range
     let aet = AppEntryType::new(10.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_type(&aet, &conductor_api).await,
+        check_app_entry_type(&dna_hash, &aet, &conductor_api).await,
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::EntryDefId(_)
         ))
@@ -345,10 +344,13 @@ async fn check_app_entry_type_test() {
 
     // ## EntryId is in range for dna
     let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
-    assert_matches!(check_app_entry_type(&aet, &conductor_api).await, Ok(_));
+    assert_matches!(
+        check_app_entry_type(&dna_hash, &aet, &conductor_api).await,
+        Ok(_)
+    );
     let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Private);
     assert_matches!(
-        check_app_entry_type(&aet, &conductor_api).await,
+        check_app_entry_type(&dna_hash, &aet, &conductor_api).await,
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::EntryVisibility(_)
         ))
@@ -356,12 +358,15 @@ async fn check_app_entry_type_test() {
 
     // # Add an entry def to the buffer
     conductor_api
-        .expect_sync_get_entry_def()
+        .expect_get_entry_def()
         .return_const(Some(entry_def));
 
     // ## Can get the entry from the entry def
     let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
-    assert_matches!(check_app_entry_type(&aet, &conductor_api).await, Ok(_));
+    assert_matches!(
+        check_app_entry_type(&dna_hash, &aet, &conductor_api).await,
+        Ok(_)
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]

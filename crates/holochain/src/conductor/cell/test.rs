@@ -1,4 +1,5 @@
 use crate::conductor::manager::spawn_task_manager;
+use crate::conductor::space::TestSpaces;
 use crate::core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult;
 use crate::core::ribosome::MockRibosomeT;
 use crate::core::workflow::incoming_dht_ops_workflow::op_exists;
@@ -6,7 +7,6 @@ use crate::fixt::DnaFileFixturator;
 use crate::test_utils::test_network;
 use ::fixt::prelude::*;
 use holo_hash::HasHash;
-use holochain_state::prelude::*;
 use holochain_state::test_utils::test_keystore;
 use holochain_types::prelude::*;
 use holochain_zome_types::header;
@@ -15,14 +15,15 @@ use tokio::sync;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_cell_handle_publish() {
-    let cell_env = test_authored_env();
-    let cache_env = test_cache_env();
-    let env = cell_env.env();
-    let cache = cache_env.env();
-
     let cell_id = fake_cell_id(1);
     let dna = cell_id.dna_hash().clone();
     let agent = cell_id.agent_pubkey().clone();
+
+    let keystore = test_keystore();
+
+    let spaces = TestSpaces::new([dna.clone()]);
+    let env = spaces.test_spaces[&dna].authored.env();
+    let dht_env = spaces.test_spaces[&dna].dht.env();
 
     let test_network = test_network(Some(dna.clone()), Some(agent.clone())).await;
     let holochain_p2p_cell = test_network.cell_network();
@@ -31,6 +32,10 @@ async fn test_cell_handle_publish() {
     mock_handle
         .expect_get_dna()
         .returning(|_| Some(fixt!(DnaFile)));
+    mock_handle
+        .expect_get_queue_consumer_workflows()
+        .return_const(spaces.queue_consumer_map.clone());
+    mock_handle.expect_keystore().return_const(keystore.clone());
 
     let mock_handle: crate::conductor::handle::ConductorHandle = Arc::new(mock_handle);
     let mut mock_ribosome = MockRibosomeT::new();
@@ -42,6 +47,7 @@ async fn test_cell_handle_publish() {
         cell_id.clone(),
         mock_handle.clone(),
         env.clone(),
+        dht_env.clone(),
         mock_ribosome,
         None,
     )
@@ -51,11 +57,10 @@ async fn test_cell_handle_publish() {
     let (add_task_sender, shutdown) = spawn_task_manager(mock_handle.clone());
     let (stop_tx, _) = sync::broadcast::channel(1);
 
-    let (cell, _) = super::Cell::create(
+    let (_cell, _) = super::Cell::create(
         cell_id,
         mock_handle,
-        env.clone(),
-        cache.clone(),
+        spaces.test_spaces[&dna].space.clone(),
         holochain_p2p_cell,
         add_task_sender,
         stop_tx.clone(),
@@ -74,11 +79,13 @@ async fn test_cell_handle_publish() {
     let op = DhtOp::StoreElement(shh.signature().clone(), header.clone(), None);
     let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
 
-    cell.handle_publish(true, false, vec![(op_hash.clone(), op.clone())])
+    spaces
+        .spaces
+        .handle_publish(&dna, true, false, vec![(op_hash.clone(), op.clone())])
         .await
         .unwrap();
 
-    op_exists(&cell.env, &op_hash).unwrap();
+    op_exists(&dht_env, &op_hash).unwrap();
 
     stop_tx.send(()).unwrap();
     shutdown.await.unwrap().unwrap();

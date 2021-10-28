@@ -888,7 +888,7 @@ async fn handle_query_op_hashes(
     //        we'll want an api to just get the hashes
     let mut entries = vec![];
 
-    let agents = todo!();
+    // let agents = todo!();
     // for (agent, arcset) in agents {
     //     let agent = KdHash::from_kitsune_agent(&agent);
     //     let es = kdirect

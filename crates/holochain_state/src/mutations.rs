@@ -156,6 +156,22 @@ pub fn insert_op(txn: &mut Transaction, op: DhtOpHashed) -> StateMutationResult<
     Ok(())
 }
 
+/// Insert a [`DhtOpLight`] into an authored database.
+/// This sets the sql fields so the authored database
+/// can be used in queries with other databases.
+pub fn insert_op_lite_into_authored(
+    txn: &mut Transaction,
+    op_lite: DhtOpLight,
+    hash: DhtOpHash,
+    order: OpOrder,
+    timestamp: Timestamp,
+) -> StateMutationResult<()> {
+    insert_op_lite(txn, op_lite, hash.clone(), order, timestamp)?;
+    set_validation_status(txn, hash.clone(), ValidationStatus::Valid)?;
+    set_when_integrated(txn, hash, Timestamp::now())?;
+    Ok(())
+}
+
 /// Insert a [`DhtOpLight`] into the database.
 pub fn insert_op_lite(
     txn: &mut Transaction,

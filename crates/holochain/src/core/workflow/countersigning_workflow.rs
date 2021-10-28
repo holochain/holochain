@@ -20,7 +20,7 @@ use kitsune_p2p_types::tx2::tx2_utils::Share;
 use rusqlite::named_params;
 
 use crate::conductor::interface::SignalBroadcaster;
-use crate::core::queue_consumer::{TriggerSender, WorkComplete};
+use crate::core::queue_consumer::{QueueTriggers, TriggerSender, WorkComplete};
 
 use super::{error::WorkflowResult, incoming_dht_ops_workflow::incoming_dht_ops_workflow};
 
@@ -143,9 +143,14 @@ pub(crate) async fn countersigning_success(
     network: &HolochainP2pDna,
     author: AgentPubKey,
     signed_headers: Vec<SignedHeader>,
-    publish_trigger: TriggerSender,
+    trigger: QueueTriggers,
     mut signal: SignalBroadcaster,
 ) -> WorkflowResult<()> {
+    let QueueTriggers {
+        publish_dht_ops: publish_trigger,
+        integrate_dht_ops: integration_trigger,
+        ..
+    } = trigger;
     // Using iterators is fine in this function as there can only be a maximum of 8 headers.
     let (this_cells_header_hash, entry_hash) = match signed_headers
         .iter()
@@ -243,11 +248,12 @@ pub(crate) async fn countersigning_success(
     if result {
         authored_ops_to_dht_db(
             network,
-            this_cell_headers_op_basis_hashes.into_iter(),
+            this_cell_headers_op_basis_hashes,
             &(authored_env.into()),
             &dht_env,
         )
         .await?;
+        integration_trigger.trigger();
         // Publish other signers agent activity ops to their agent activity authorities.
         for SignedHeader(header, signature) in signed_headers {
             if *header.author() == author {

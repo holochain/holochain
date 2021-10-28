@@ -328,7 +328,7 @@ pub mod slow_tests {
         // Plus one length path for the commit existing.
         expected_count += WaitOps::ENTRY + WaitOps::LINK;
 
-        wait_for_integration_1m(&alice_call_data.env, expected_count).await;
+        wait_for_integration_1m(&alice_call_data.dht_env, expected_count).await;
 
         let invocation = new_zome_call(
             &alice_call_data.cell_id,

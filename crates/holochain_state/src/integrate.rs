@@ -8,22 +8,34 @@ use crate::{prelude::*, query::get_public_op_from_db};
 
 /// Insert any authored ops that have been locally validated
 /// into the dht database awaiting integration.
+/// This checks if ops are within the storage arc
+/// of any local agents.
 pub async fn authored_ops_to_dht_db(
     network: &(dyn HolochainP2pDnaT + Send + Sync),
-    hashes: impl Iterator<Item = (DhtOpHash, AnyDhtHash)>,
+    hashes: Vec<(DhtOpHash, AnyDhtHash)>,
     authored_env: &DbReadOnly<DbKindAuthored>,
     dht_env: &DbWrite<DbKindDht>,
 ) -> StateMutationResult<()> {
-    let mut should_hold_hashes = Vec::new();
+    let mut should_hold_hashes = Vec::with_capacity(hashes.len());
     for (op_hash, basis) in hashes {
         if network.authority_for_hash(basis).await? {
             should_hold_hashes.push(op_hash);
         }
     }
-    let mut ops = Vec::with_capacity(should_hold_hashes.len());
+    authored_ops_to_dht_db_without_check(should_hold_hashes, authored_env, dht_env).await
+}
+
+/// Insert any authored ops that have been locally validated
+/// into the dht database awaiting integration.
+pub async fn authored_ops_to_dht_db_without_check(
+    hashes: Vec<DhtOpHash>,
+    authored_env: &DbReadOnly<DbKindAuthored>,
+    dht_env: &DbWrite<DbKindDht>,
+) -> StateMutationResult<()> {
+    let mut ops = Vec::with_capacity(hashes.len());
     let ops = authored_env
         .async_reader(move |txn| {
-            for hash in should_hold_hashes {
+            for hash in hashes {
                 if let Some(op) = get_public_op_from_db(&txn, &hash)? {
                     ops.push(op);
                 }

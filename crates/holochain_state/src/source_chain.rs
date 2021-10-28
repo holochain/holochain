@@ -1,4 +1,7 @@
+use std::sync::Arc;
+
 use crate::integrate::authored_ops_to_dht_db;
+use crate::integrate::authored_ops_to_dht_db_without_check;
 use crate::scratch::ScratchError;
 use crate::scratch::SyncScratchError;
 use async_recursion::async_recursion;
@@ -14,7 +17,6 @@ use holochain_types::dht_op::produce_op_lights_from_elements;
 use holochain_types::dht_op::produce_op_lights_from_iter;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpLight;
-use holochain_types::dht_op::DhtOpType;
 use holochain_types::dht_op::OpOrder;
 use holochain_types::dht_op::UniqueForm;
 use holochain_types::element::SignedHeaderHashedExt;
@@ -43,7 +45,6 @@ use holochain_zome_types::Signature;
 use holochain_zome_types::SignedHeader;
 use holochain_zome_types::SignedHeaderHashed;
 use holochain_zome_types::Timestamp;
-use holochain_zome_types::ValidationStatus;
 
 use crate::chain_lock::is_chain_locked;
 use crate::chain_lock::is_lock_expired;
@@ -285,14 +286,8 @@ impl SourceChain {
                 for header in headers {
                     insert_header(txn, header)?;
                 }
-                for (op, op_hash, op_order, timestamp, dependency) in ops {
-                    insert_op_lite(txn, op, op_hash.clone(), op_order, timestamp)?;
-                    set_validation_status(
-                        txn,
-                        op_hash.clone(),
-                        holochain_zome_types::ValidationStatus::Valid,
-                    )?;
-                    set_dependency(txn, op_hash.clone(), dependency)?;
+                for (op, op_hash, op_order, timestamp, _) in ops {
+                    insert_op_lite_into_authored(txn, op, op_hash.clone(), op_order, timestamp)?;
                     // If this is a countersigning session we want to withhold
                     // publishing the ops until the session is successful.
                     if is_countersigning_session {
@@ -351,13 +346,12 @@ impl SourceChain {
                     ))
                 }
             }
-            Ok(()) => Ok(authored_ops_to_dht_db(
-                network,
-                ops_to_integrate.into_iter(),
-                &self.vault,
-                &self.dht_env,
-            )
-            .await?),
+            Ok(()) => {
+                Ok(
+                    authored_ops_to_dht_db(network, ops_to_integrate, &self.vault, &self.dht_env)
+                        .await?,
+                )
+            }
             result => result,
         }
     }
@@ -787,7 +781,8 @@ async fn rebase_headers_on(
 }
 
 pub async fn genesis(
-    vault: DbWrite<DbKindAuthored>,
+    authored: DbWrite<DbKindAuthored>,
+    dht_env: DbWrite<DbKindDht>,
     keystore: MetaLairClient,
     dna_hash: DnaHash,
     agent_pubkey: AgentPubKey,
@@ -837,32 +832,28 @@ pub async fn genesis(
     let (agent_header, agent_entry) = element.into_inner();
     let agent_entry = agent_entry.into_option();
 
-    vault
+    let mut ops_to_integrate = Vec::new();
+
+    let ops_to_integrate = authored
         .async_commit(move |txn| {
-            source_chain::put_raw(
-                txn,
-                dna_header,
-                dna_ops,
-                None,
-                Some(ValidationStatus::Valid),
-            )?;
-            source_chain::put_raw(
+            ops_to_integrate.extend(source_chain::put_raw(txn, dna_header, dna_ops, None)?);
+            ops_to_integrate.extend(source_chain::put_raw(
                 txn,
                 agent_validation_header,
                 avh_ops,
                 None,
-                Some(ValidationStatus::Valid),
-            )?;
-            source_chain::put_raw(
+            )?);
+            ops_to_integrate.extend(source_chain::put_raw(
                 txn,
                 agent_header,
                 agent_ops,
                 agent_entry,
-                Some(ValidationStatus::Valid),
-            )?;
-            SourceChainResult::Ok(())
+            )?);
+            SourceChainResult::Ok(ops_to_integrate)
         })
-        .await
+        .await?;
+    authored_ops_to_dht_db_without_check(ops_to_integrate, &authored, &dht_env).await?;
+    Ok(())
 }
 
 pub fn put_raw(
@@ -870,24 +861,21 @@ pub fn put_raw(
     shh: SignedHeaderHashed,
     ops: Vec<DhtOpLight>,
     entry: Option<Entry>,
-    validation_status: Option<ValidationStatus>,
-) -> StateMutationResult<()> {
+) -> StateMutationResult<Vec<DhtOpHash>> {
     let (header, signature) = shh.into_header_and_signature();
     let (header, hash) = header.into_inner();
     let mut header = Some(header);
     let mut hashes = Vec::with_capacity(ops.len());
+    let mut ops_to_integrate = Vec::with_capacity(ops.len());
     for op in &ops {
         let op_type = op.get_type();
         let (h, op_hash) =
             UniqueForm::op_hash(op_type, header.take().expect("This can't be empty"))?;
         let op_order = OpOrder::new(op_type, h.timestamp());
         let timestamp = h.timestamp();
-        let visibility = h.entry_type().map(|et| *et.visibility());
-        let dependency = get_dependency(op_type, &h);
         header = Some(h);
-        hashes.push((
-            op_hash, op_type, op_order, timestamp, visibility, dependency,
-        ));
+        hashes.push((op_hash.clone(), op_order, timestamp));
+        ops_to_integrate.push(op_hash);
     }
     let shh = SignedHeaderHashed::with_presigned(
         HeaderHashed::with_pre_hashed(header.expect("This can't be empty"), hash),
@@ -897,23 +885,10 @@ pub fn put_raw(
         insert_entry(txn, EntryHashed::from_content_sync(entry))?;
     }
     insert_header(txn, shh)?;
-    for (op, (op_hash, op_type, op_order, timestamp, visibility, dependency)) in
-        ops.into_iter().zip(hashes)
-    {
+    for (op, (op_hash, op_order, timestamp)) in ops.into_iter().zip(hashes) {
         insert_op_lite(txn, op, op_hash.clone(), op_order, timestamp)?;
-        set_dependency(txn, op_hash.clone(), dependency)?;
-        // TODO: SHARDING: Check if we are the authority here.
-        // StoreEntry ops with private entries are never gossiped or published
-        // so we don't need to integrate them.
-        // TODO: Can anything every depend on a private store entry op? I don't think so.
-        if let Some(status) = validation_status {
-            set_validation_status(txn, op_hash.clone(), status)?;
-        }
-        if !(op_type == DhtOpType::StoreEntry && visibility == Some(EntryVisibility::Private)) {
-            set_validation_stage(txn, op_hash, ValidationLimboStatus::AwaitingIntegration)?;
-        }
     }
-    Ok(())
+    Ok(ops_to_integrate)
 }
 
 fn chain_head_db(
@@ -982,7 +957,8 @@ pub fn current_countersigning_session(
 
 #[cfg(test)]
 async fn _put_db<H: HeaderInner, B: HeaderBuilder<H>>(
-    vault: holochain_types::env::DbWrite,
+    vault: holochain_types::env::DbWrite<DbKindAuthored>,
+    keystore: &MetaLairClient,
     author: Arc<AgentPubKey>,
     header_builder: B,
     maybe_entry: Option<Entry>,
@@ -999,7 +975,7 @@ async fn _put_db<H: HeaderInner, B: HeaderBuilder<H>>(
     };
     let header = header_builder.build(common).into();
     let header = HeaderHashed::from_content_sync(header);
-    let header = SignedHeaderHashed::new(&vault.keystore(), header).await?;
+    let header = SignedHeaderHashed::new(keystore, header).await?;
     let element = Element::new(header, maybe_entry);
     let ops = produce_op_lights_from_elements(vec![&element])?;
     let (header, entry) = element.into_inner();
@@ -1021,7 +997,7 @@ async fn _put_db<H: HeaderInner, B: HeaderBuilder<H>>(
                 Some((new_head, new_seq, new_timestamp)),
             ));
         }
-        SourceChainResult::Ok(put_raw(txn, header, ops, entry, None)?)
+        SourceChainResult::Ok(put_raw(txn, header, ops, entry)?)
     })?;
     Ok(hash)
 }
@@ -1121,18 +1097,45 @@ pub mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_relaxed_ordering() -> SourceChainResult<()> {
         let test_env = test_authored_env();
+        let dht_env = test_dht_env();
+        let keystore = test_keystore();
         let env = test_env.env();
         let alice = fixt!(AgentPubKey, Predictable, 0);
 
         let mut mock = MockHolochainP2pDnaT::new();
         mock.expect_authority_for_hash().returning(|_| Ok(false));
 
-        source_chain::genesis(env.clone(), fake_dna_hash(1), alice.clone(), None)
-            .await
-            .unwrap();
-        let chain_1 = SourceChain::new(env.clone().into(), alice.clone()).await?;
-        let chain_2 = SourceChain::new(env.clone().into(), alice.clone()).await?;
-        let chain_3 = SourceChain::new(env.clone().into(), alice.clone()).await?;
+        source_chain::genesis(
+            env.clone(),
+            dht_env.env(),
+            keystore.clone(),
+            fake_dna_hash(1),
+            alice.clone(),
+            None,
+        )
+        .await
+        .unwrap();
+        let chain_1 = SourceChain::new(
+            env.clone().into(),
+            dht_env.env(),
+            keystore.clone(),
+            alice.clone(),
+        )
+        .await?;
+        let chain_2 = SourceChain::new(
+            env.clone().into(),
+            dht_env.env(),
+            keystore.clone(),
+            alice.clone(),
+        )
+        .await?;
+        let chain_3 = SourceChain::new(
+            env.clone().into(),
+            dht_env.env(),
+            keystore.clone(),
+            alice.clone(),
+        )
+        .await?;
 
         let header_builder = builder::CloseChain {
             new_dna_hash: fixt!(DnaHash),
@@ -1177,19 +1180,46 @@ pub mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_relaxed_ordering_with_entry() -> SourceChainResult<()> {
         let test_env = test_authored_env();
+        let dht_env = test_dht_env();
+        let keystore = test_keystore();
         let env = test_env.env();
         let alice = fixt!(AgentPubKey, Predictable, 0);
 
         let mut mock = MockHolochainP2pDnaT::new();
         mock.expect_authority_for_hash().returning(|_| Ok(false));
 
-        source_chain::genesis(env.clone(), fake_dna_hash(1), alice.clone(), None)
-            .await
-            .unwrap();
+        source_chain::genesis(
+            env.clone(),
+            dht_env.env(),
+            keystore.clone(),
+            fake_dna_hash(1),
+            alice.clone(),
+            None,
+        )
+        .await
+        .unwrap();
 
-        let chain_1 = SourceChain::new(env.clone().into(), alice.clone()).await?;
-        let chain_2 = SourceChain::new(env.clone().into(), alice.clone()).await?;
-        let chain_3 = SourceChain::new(env.clone().into(), alice.clone()).await?;
+        let chain_1 = SourceChain::new(
+            env.clone().into(),
+            dht_env.env(),
+            keystore.clone(),
+            alice.clone(),
+        )
+        .await?;
+        let chain_2 = SourceChain::new(
+            env.clone().into(),
+            dht_env.env(),
+            keystore.clone(),
+            alice.clone(),
+        )
+        .await?;
+        let chain_3 = SourceChain::new(
+            env.clone().into(),
+            dht_env.env(),
+            keystore.clone(),
+            alice.clone(),
+        )
+        .await?;
 
         let entry_1 = Entry::App(fixt!(AppEntryBytes));
         let eh1 = EntryHash::with_data_sync(&entry_1);
@@ -1276,6 +1306,8 @@ pub mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_get_cap_grant() -> SourceChainResult<()> {
         let test_env = test_authored_env();
+        let dht_env = test_dht_env();
+        let keystore = test_keystore();
         let env = test_env.env();
         let secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
         let access = CapAccess::from(secret.unwrap());
@@ -1291,12 +1323,21 @@ pub mod tests {
         let mut agents = AgentPubKeyFixturator::new(Predictable);
         let alice = agents.next().unwrap();
         let bob = agents.next().unwrap();
-        source_chain::genesis(env.clone(), fake_dna_hash(1), alice.clone(), None)
-            .await
-            .unwrap();
+        source_chain::genesis(
+            env.clone(),
+            dht_env.env(),
+            keystore.clone(),
+            fake_dna_hash(1),
+            alice.clone(),
+            None,
+        )
+        .await
+        .unwrap();
 
         {
-            let chain = SourceChain::new(env.clone().into(), alice.clone()).await?;
+            let chain =
+                SourceChain::new(env.clone(), dht_env.env(), keystore.clone(), alice.clone())
+                    .await?;
             assert_eq!(
                 chain.valid_cap_grant(&function, &alice, secret.as_ref())?,
                 Some(CapGrant::ChainAuthor(alice.clone())),
@@ -1310,7 +1351,13 @@ pub mod tests {
         }
 
         let (original_header_address, original_entry_address) = {
-            let chain = SourceChain::new(env.clone().into(), alice.clone()).await?;
+            let chain = SourceChain::new(
+                env.clone().into(),
+                dht_env.env(),
+                keystore.clone(),
+                alice.clone(),
+            )
+            .await?;
             let (entry, entry_hash) =
                 EntryHashed::from_content_sync(Entry::CapGrant(grant.clone())).into_inner();
             let header_builder = builder::Create {
@@ -1327,7 +1374,9 @@ pub mod tests {
         };
 
         {
-            let chain = SourceChain::new(env.clone().into(), alice.clone()).await?;
+            let chain =
+                SourceChain::new(env.clone(), dht_env.env(), keystore.clone(), alice.clone())
+                    .await?;
             // alice should find her own authorship with higher priority than the committed grant
             // even if she passes in the secret
             assert_eq!(
@@ -1351,7 +1400,13 @@ pub mod tests {
         let updated_grant = ZomeCallCapGrant::new("tag".into(), updated_access.clone(), functions);
 
         let (updated_header_hash, updated_entry_hash) = {
-            let chain = SourceChain::new(env.clone().into(), alice.clone()).await?;
+            let chain = SourceChain::new(
+                env.clone().into(),
+                dht_env.env(),
+                keystore.clone(),
+                alice.clone(),
+            )
+            .await?;
             let (entry, entry_hash) =
                 EntryHashed::from_content_sync(Entry::CapGrant(updated_grant.clone())).into_inner();
             let header_builder = builder::Update {
@@ -1370,7 +1425,9 @@ pub mod tests {
         };
 
         {
-            let chain = SourceChain::new(env.clone().into(), alice.clone()).await?;
+            let chain =
+                SourceChain::new(env.clone(), dht_env.env(), keystore.clone(), alice.clone())
+                    .await?;
             // alice should find her own authorship with higher priority than the committed grant
             // even if she passes in the secret
             assert_eq!(
@@ -1394,7 +1451,13 @@ pub mod tests {
         }
 
         {
-            let chain = SourceChain::new(env.clone().into(), alice.clone()).await?;
+            let chain = SourceChain::new(
+                env.clone().into(),
+                dht_env.env(),
+                keystore.clone(),
+                alice.clone(),
+            )
+            .await?;
             let header_builder = builder::Delete {
                 deletes_address: updated_header_hash,
                 deletes_entry_address: updated_entry_hash,
@@ -1407,7 +1470,9 @@ pub mod tests {
         }
 
         {
-            let chain = SourceChain::new(env.clone().into(), alice.clone()).await?;
+            let chain =
+                SourceChain::new(env.clone(), dht_env.env(), keystore.clone(), alice.clone())
+                    .await?;
             // alice should find her own authorship
             assert_eq!(
                 chain.valid_cap_grant(&function, &alice, secret.as_ref())?,
@@ -1479,11 +1544,13 @@ pub mod tests {
     async fn source_chain_buffer_iter_back() -> SourceChainResult<()> {
         observability::test_run().ok();
         let test_env = test_authored_env();
+        let dht_env = test_dht_env();
+        let keystore = test_keystore();
         let vault = test_env.env();
         let mut mock = MockHolochainP2pDnaT::new();
         mock.expect_authority_for_hash().returning(|_| Ok(false));
 
-        let author = Arc::new(fixt!(AgentPubKey));
+        let author = Arc::new(keystore.new_sign_keypair_random().await.unwrap());
 
         fresh_reader_test!(vault, |txn| {
             assert_matches!(
@@ -1493,6 +1560,8 @@ pub mod tests {
         });
         genesis(
             vault.clone().into(),
+            dht_env.env(),
+            keystore.clone(),
             fixt!(DnaHash),
             (*author).clone(),
             None,
@@ -1500,9 +1569,14 @@ pub mod tests {
         .await
         .unwrap();
 
-        let source_chain = SourceChain::new(vault.clone().into(), (*author).clone())
-            .await
-            .unwrap();
+        let source_chain = SourceChain::new(
+            vault.clone().into(),
+            dht_env.env(),
+            keystore.clone(),
+            (*author).clone(),
+        )
+        .await
+        .unwrap();
         let entry = Entry::App(fixt!(AppEntryBytes));
         let create = builder::Create {
             entry_type: EntryType::App(fixt!(AppEntryType)),
@@ -1540,9 +1614,14 @@ pub mod tests {
         });
 
         // check that you can iterate on the chain
-        let source_chain = SourceChain::new(vault.clone().into(), (*author).clone())
-            .await
-            .unwrap();
+        let source_chain = SourceChain::new(
+            vault.clone(),
+            dht_env.env(),
+            keystore.clone(),
+            (*author).clone(),
+        )
+        .await
+        .unwrap();
         let res = source_chain.query(QueryFilter::new()).await.unwrap();
         assert_eq!(res.len(), 5);
         assert_eq!(*res[3].header_address(), h1);
@@ -1554,11 +1633,20 @@ pub mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn source_chain_buffer_dump_entries_json() -> SourceChainResult<()> {
         let test_env = test_authored_env();
+        let dht_env = test_dht_env();
+        let keystore = test_keystore();
         let vault = test_env.env();
-        let author = fixt!(AgentPubKey);
-        genesis(vault.clone().into(), fixt!(DnaHash), author.clone(), None)
-            .await
-            .unwrap();
+        let author = keystore.new_sign_keypair_random().await.unwrap();
+        genesis(
+            vault.clone().into(),
+            dht_env.env(),
+            keystore.clone(),
+            fixt!(DnaHash),
+            author.clone(),
+            None,
+        )
+        .await
+        .unwrap();
 
         let json = dump_state(vault.clone().into(), author.clone()).await?;
         let json = serde_json::to_string_pretty(&json)?;

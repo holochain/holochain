@@ -69,6 +69,20 @@ pub struct Space {
     pub incoming_op_hashes: IncomingOpHashes,
 }
 
+#[cfg(test)]
+pub struct TestSpaces {
+    pub spaces: Spaces,
+    pub test_spaces: HashMap<DnaHash, TestSpace>,
+    pub queue_consumer_map: QueueConsumerMap,
+}
+#[cfg(test)]
+pub struct TestSpace {
+    pub space: Space,
+    pub authored: holochain_state::prelude::TestEnv<DbKindAuthored>,
+    pub dht: holochain_state::prelude::TestEnv<DbKindDht>,
+    pub cache: holochain_state::prelude::TestEnv<DbKindCache>,
+}
+
 impl Spaces {
     /// Create a new empty set of [`DnaHash`] spaces.
     pub fn new(
@@ -376,5 +390,69 @@ impl Space {
             incoming_op_hashes,
         };
         Ok(r)
+    }
+}
+
+#[cfg(test)]
+impl TestSpaces {
+    pub fn new(dna_hashes: impl IntoIterator<Item = DnaHash>) -> Self {
+        let queue_consumer_map = QueueConsumerMap::new();
+        Self::with_queue_consumer(dna_hashes, queue_consumer_map)
+    }
+
+    pub fn with_queue_consumer(
+        dna_hashes: impl IntoIterator<Item = DnaHash>,
+        queue_consumer_map: QueueConsumerMap,
+    ) -> Self {
+        let mut test_spaces: HashMap<DnaHash, _> = HashMap::new();
+        for hash in dna_hashes.into_iter() {
+            test_spaces.insert(hash.clone(), TestSpace::new(hash));
+        }
+        let path = test_spaces
+            .values()
+            .next()
+            .unwrap()
+            .authored
+            .env()
+            .path()
+            .parent()
+            .unwrap()
+            .to_path_buf();
+        let spaces = Spaces::new(path.into(), Default::default(), queue_consumer_map.clone());
+        spaces.map.share_mut(|map| {
+            map.extend(
+                test_spaces
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.space.clone())),
+            );
+        });
+        Self {
+            queue_consumer_map,
+            spaces,
+            test_spaces,
+        }
+    }
+}
+
+#[cfg(test)]
+impl TestSpace {
+    pub fn new(dna_hash: DnaHash) -> Self {
+        use std::path::PathBuf;
+
+        use holochain_state::prelude::{
+            test_authored_env_with_dna_hash, test_cache_env_with_dna_hash,
+            test_dht_env_with_dna_hash,
+        };
+
+        let authored = test_authored_env_with_dna_hash(dna_hash.clone());
+        let dht = test_dht_env_with_dna_hash(dna_hash.clone());
+        let cache = test_cache_env_with_dna_hash(dna_hash.clone());
+        let path: PathBuf = authored.env().path().parent().unwrap().to_path_buf();
+        Self {
+            space: Space::new(Arc::new(dna_hash), &path.into(), Default::default()).unwrap(),
+            authored,
+            dht,
+            cache,
+        }
     }
 }

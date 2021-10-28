@@ -252,6 +252,12 @@ pub struct QueueConsumerMap {
     map: RwShare<HashMap<QueueEntry, TriggerSender>>,
 }
 
+impl Default for QueueConsumerMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl QueueConsumerMap {
     /// Create a new queue consumer map.
     pub fn new() -> Self {

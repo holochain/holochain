@@ -15,36 +15,30 @@ pub async fn spawn_handler<H: KitsuneP2pEventHandler + GhostControlHandler>(
 
 // TODO: integrate with `HandlerBuilder`
 async fn standard_responses(
-    agents_with_arcs: Vec<(Arc<KitsuneAgent>, ArcInterval)>,
+    agents: Vec<(Arc<KitsuneAgent>, AgentInfoSigned)>,
     with_data: bool,
 ) -> MockKitsuneP2pEventHandler {
     let mut evt_handler = MockKitsuneP2pEventHandler::new();
-    let agents: Vec<_> = agents_with_arcs.iter().map(|(a, _)| a.clone()).collect();
+    let infos = agents.iter().map(|(_, i)| i.clone()).collect::<Vec<_>>();
     evt_handler.expect_handle_query_agents().returning({
-        let agents = agents.clone();
+        let infos = infos.clone();
         move |_| {
-            let agents = agents.clone();
-            Ok(async move {
-                let mut infos = Vec::new();
-                for agent in agents {
-                    infos.push(agent_info(agent).await);
-                }
-                Ok(infos)
-            }
-            .boxed()
-            .into())
+            let infos = infos.clone();
+            Ok(async move { Ok(infos.clone()) }.boxed().into())
         }
     });
     evt_handler
         .expect_handle_get_agent_info_signed()
         .returning({
-            let agents = agents.clone();
+            let infos = infos.clone();
             move |input| {
-                let agents = agents.clone();
-                let agent = agents.iter().find(|a| **a == input.agent).unwrap().clone();
-                Ok(async move { Ok(Some(agent_info(agent).await)) }
-                    .boxed()
-                    .into())
+                let infos = infos.clone();
+                let agent = infos
+                    .iter()
+                    .find(|a| a.agent == input.agent)
+                    .unwrap()
+                    .clone();
+                Ok(async move { Ok(Some(agent)) }.boxed().into())
             }
         });
 
@@ -76,26 +70,32 @@ async fn standard_responses(
     }
     evt_handler
         .expect_handle_gossip()
-        .returning(|_, _, _| Ok(async { Ok(()) }.boxed().into()));
+        .returning(|_, _| Ok(async { Ok(()) }.boxed().into()));
     evt_handler
 }
 
 pub async fn setup_player(
     state: ShardedGossipLocalState,
-    num_agents: usize,
+    agents: Vec<(Arc<KitsuneAgent>, AgentInfoSigned)>,
     with_data: bool,
 ) -> ShardedGossipLocal {
-    let evt_handler = standard_responses(agents_with_full_arcs(num_agents), with_data).await;
+    let evt_handler = standard_responses(agents, with_data).await;
     let (evt_sender, _) = spawn_handler(evt_handler).await;
     ShardedGossipLocal::test(GossipType::Historical, evt_sender, state)
 }
 
-pub async fn setup_standard_player(state: ShardedGossipLocalState) -> ShardedGossipLocal {
-    setup_player(state, 2, true).await
+pub async fn setup_standard_player(
+    state: ShardedGossipLocalState,
+    agents: Vec<(Arc<KitsuneAgent>, AgentInfoSigned)>,
+) -> ShardedGossipLocal {
+    setup_player(state, agents, true).await
 }
 
-pub async fn setup_empty_player(state: ShardedGossipLocalState) -> ShardedGossipLocal {
-    let evt_handler = standard_responses(agents_with_full_arcs(2), false).await;
+pub async fn setup_empty_player(
+    state: ShardedGossipLocalState,
+    agents: Vec<(Arc<KitsuneAgent>, AgentInfoSigned)>,
+) -> ShardedGossipLocal {
+    let evt_handler = standard_responses(agents, false).await;
     let (evt_sender, _) = spawn_handler(evt_handler).await;
     ShardedGossipLocal::test(GossipType::Historical, evt_sender, state)
 }
@@ -106,12 +106,13 @@ pub fn agents(num_agents: usize) -> Vec<Arc<KitsuneAgent>> {
         .collect()
 }
 
-pub fn agents_with_full_arcs(num_agents: usize) -> Vec<(Arc<KitsuneAgent>, ArcInterval)> {
-    itertools::zip(
-        agents(num_agents).into_iter(),
-        std::iter::repeat(ArcInterval::Full),
-    )
-    .collect()
+pub async fn agents_with_infos(num_agents: usize) -> Vec<(Arc<KitsuneAgent>, AgentInfoSigned)> {
+    let mut out = Vec::with_capacity(num_agents);
+    for agent in std::iter::repeat_with(|| Arc::new(fixt!(KitsuneAgent))).take(num_agents) {
+        let info = agent_info(agent.clone()).await;
+        out.push((agent, info));
+    }
+    out
 }
 
 pub async fn agent_info(agent: Arc<KitsuneAgent>) -> AgentInfoSigned {
@@ -136,6 +137,14 @@ pub async fn agent_info(agent: Arc<KitsuneAgent>) -> AgentInfoSigned {
     )
     .await
     .unwrap()
+}
+
+/// Get an agents cert from their agent info
+pub fn cert_from_info(info: AgentInfoSigned) -> Tx2Cert {
+    let digest = kitsune_p2p_proxy::ProxyUrl::from_full(info.url_list[0].as_str())
+        .unwrap()
+        .digest();
+    Tx2Cert::from(digest)
 }
 
 /// Create an AgentInfoSigned with arbitrary agent and arc.

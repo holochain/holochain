@@ -130,8 +130,8 @@ mod tests {
     const RECV_TIMEOUT: Duration = Duration::from_millis(3000);
 
     /// publish ops setup
-    async fn setup<'env>(
-        env: DbWrite,
+    async fn setup(
+        env: DbWrite<DbKindAuthored>,
         num_agents: u32,
         num_hash: u32,
         panic_on_publish: bool,
@@ -224,9 +224,13 @@ mod tests {
     }
 
     /// Call the workflow
-    async fn call_workflow(env: DbWrite, cell_network: HolochainP2pDna, author: AgentPubKey) {
+    async fn call_workflow(
+        env: DbWrite<DbKindAuthored>,
+        cell_network: HolochainP2pDna,
+        author: AgentPubKey,
+    ) {
         let (trigger_sender, _) = TriggerSender::new();
-        publish_dht_ops_workflow(env.clone().into(), &cell_network, &trigger_sender, &author)
+        publish_dht_ops_workflow(env.clone().into(), &cell_network, &trigger_sender, author)
             .await
             .unwrap();
     }
@@ -358,6 +362,7 @@ mod tests {
 
                 // Create test env
                 let test_env = test_authored_env();
+                let keystore = holochain_state::test_utils::test_keystore();
                 let dht_env = test_dht_env();
                 let env = test_env.env();
 
@@ -391,7 +396,9 @@ mod tests {
                 let eu_entry_type = entry_type_fixt.next().unwrap();
 
                 // Genesis and produce ops to clear these from the chains
-                fake_genesis(env.clone()).await.unwrap();
+                fake_genesis(env.clone(), dht_env.env(), keystore.clone())
+                    .await
+                    .unwrap();
                 env.conn()
                     .unwrap()
                     .execute("UPDATE DhtOp SET receipts_complete = 1", [])
@@ -399,10 +406,14 @@ mod tests {
                 let author = fake_agent_pubkey_1();
 
                 // Put data in elements
-                let source_chain =
-                    SourceChain::new(env.clone().into(), dht_env.env(), author.clone())
-                        .await
-                        .unwrap();
+                let source_chain = SourceChain::new(
+                    env.clone().into(),
+                    dht_env.env(),
+                    keystore.clone(),
+                    author.clone(),
+                )
+                .await
+                .unwrap();
                 // Produces 3 ops but minus 1 for store entry so 2 ops.
                 let original_header_address = source_chain
                     .put(

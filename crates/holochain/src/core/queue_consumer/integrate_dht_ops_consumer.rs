@@ -29,13 +29,8 @@ pub fn spawn_integrate_dht_ops_consumer(
             }
 
             // Run the workflow
-            match integrate_dht_ops_workflow(
-                dna_hash.clone(),
-                env.clone(),
-                trigger_receipt.clone(),
-                network.clone(),
-            )
-            .await
+            match integrate_dht_ops_workflow(env.clone(), trigger_receipt.clone(), network.clone())
+                .await
             {
                 Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
                 Err(err) => handle_workflow_error(err)?,

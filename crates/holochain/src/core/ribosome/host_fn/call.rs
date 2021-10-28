@@ -182,7 +182,7 @@ pub mod wasm_test {
                 .unwrap();
 
         // Check alice's source chain contains the new value
-        let has_hash: bool = fresh_reader_test(alice_call_data.env.clone(), |txn| {
+        let has_hash: bool = fresh_reader_test(alice_call_data.authored_env.clone(), |txn| {
             txn.query_row(
                 "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE header_hash = :hash)",
                 named_params! {
@@ -231,7 +231,7 @@ pub mod wasm_test {
                 .unwrap();
 
         // Check alice's source chain contains the new value
-        let has_hash: bool = fresh_reader_test(alice_call_data.env.clone(), |txn| {
+        let has_hash: bool = fresh_reader_test(alice_call_data.authored_env.clone(), |txn| {
             txn.query_row(
                 "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE header_hash = :hash)",
                 named_params! {

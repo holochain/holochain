@@ -18,7 +18,6 @@ mod tests;
 
 #[instrument(skip(vault, trigger_receipt, network))]
 pub async fn integrate_dht_ops_workflow(
-    dna_hash: Arc<DnaHash>,
     vault: DbWrite<DbKindDht>,
     trigger_receipt: TriggerSender,
     network: HolochainP2pDna,

@@ -3,8 +3,7 @@ use holochain_sqlite::rusqlite::TransactionBehavior;
 use holochain_sqlite::schema::SCHEMA_CELL;
 
 use crate::mutations::insert_op_scratch;
-use crate::mutations::set_validation_status;
-use crate::prelude::mutations_helpers::insert_valid_authored_op;
+use crate::prelude::mutations_helpers::insert_valid_integrated_op;
 use crate::query::test_data::EntryTestData;
 
 use super::*;
@@ -23,13 +22,7 @@ async fn can_handle_update_in_scratch() {
     let td = EntryTestData::new();
 
     // - Create an entry on main db.
-    insert_valid_authored_op(&mut txn, td.update_store_entry_op.clone()).unwrap();
-    set_validation_status(
-        &mut txn,
-        td.update_store_entry_op.as_hash().clone(),
-        ValidationStatus::Valid,
-    )
-    .unwrap();
+    insert_valid_integrated_op(&mut txn, td.update_store_entry_op.clone()).unwrap();
     let r = td
         .query
         .run(Txn::from(&txn))

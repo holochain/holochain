@@ -106,7 +106,7 @@ where
 
     pub fn stores(&self) -> HostFnStores {
         HostFnStores {
-            authored: self.authored.clone().into(),
+            authored: self.authored.clone(),
             dht: self.dht.clone(),
             cache: self.cache.clone(),
             scratch: self.source_chain.as_ref().map(|sc| sc.scratch()),
@@ -120,11 +120,7 @@ where
         DbReadOnly<DbKindDht>,
         DbWrite<DbKindCache>,
     ) {
-        (
-            self.authored.clone().into(),
-            self.dht.clone(),
-            self.cache.clone(),
-        )
+        (self.authored.clone(), self.dht.clone(), self.cache.clone())
     }
 }
 
@@ -155,7 +151,7 @@ impl From<SourceChainWorkspace> for HostFnWorkspaceReadOnly {
     fn from(workspace: SourceChainWorkspace) -> Self {
         Self {
             source_chain: Some(workspace.source_chain.into()),
-            authored: workspace.inner.authored.into(),
+            authored: workspace.inner.authored,
             dht: workspace.inner.dht,
             cache: workspace.inner.cache,
         }

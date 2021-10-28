@@ -1,15 +1,17 @@
-use std::path::Path;
+use std::{path::Path, sync::Arc};
 
 use contrafact::arbitrary;
 use contrafact::arbitrary::Arbitrary;
-use holo_hash::{AgentPubKey, DnaHash};
+use holo_hash::DnaHash;
 use holochain_sqlite::rusqlite::Connection;
-use holochain_state::prelude::{fresh_reader_test, mutations_helpers, test_keystore, DbKind};
+use holochain_state::prelude::{
+    fresh_reader_test, mutations_helpers, DbKindAuthored, DbKindCache, DbKindT,
+};
 use holochain_types::{
     dht_op::{DhtOp, DhtOpHashed},
     env::DbWrite,
 };
-use holochain_zome_types::{CellId, Header, Signature};
+use holochain_zome_types::{Header, Signature};
 use tempdir::TempDir;
 
 #[tokio::test(flavor = "multi_thread")]
@@ -18,13 +20,13 @@ async fn corrupt_cache_creates_new_db() {
     let mut u = arbitrary::Unstructured::new(&holochain_zome_types::NOISE);
     observability::test_run().ok();
 
-    let kind = DbKind::Cache(DnaHash::arbitrary(&mut u).unwrap());
+    let kind = DbKindCache(Arc::new(DnaHash::arbitrary(&mut u).unwrap()));
 
     // - Create a corrupt cache db.
-    let testdir = create_corrupt_db(&kind, &mut u);
+    let testdir = create_corrupt_db(kind.clone(), &mut u);
 
     // - Try to open it.
-    let env = DbWrite::test(&testdir, kind, test_keystore()).unwrap();
+    let env = DbWrite::test(&testdir, kind).unwrap();
 
     // - It opens successfully but the data is wiped.
     let n: usize = fresh_reader_test(env, |txn| {
@@ -39,13 +41,13 @@ async fn corrupt_source_chain_panics() {
     let mut u = arbitrary::Unstructured::new(&holochain_zome_types::NOISE);
     observability::test_run().ok();
 
-    let kind = DbKind::Authored(DnaHash::arbitrary(&mut u).unwrap());
+    let kind = DbKindAuthored(Arc::new(DnaHash::arbitrary(&mut u).unwrap()));
 
     // - Create a corrupt cell db.
-    let testdir = create_corrupt_db(&kind, &mut u);
+    let testdir = create_corrupt_db(kind.clone(), &mut u);
 
     // - Try to open it.
-    let result = DbWrite::test(&testdir, kind, test_keystore());
+    let result = DbWrite::test(&testdir, kind);
 
     // - It cannot open.
     assert!(result.is_err());
@@ -64,13 +66,13 @@ fn corrupt_db(path: &Path) {
 }
 
 /// Creates a db with some data in it then corrupts the db.
-fn create_corrupt_db(kind: &DbKind, u: &mut arbitrary::Unstructured) -> TempDir {
+fn create_corrupt_db<Kind: DbKindT>(kind: Kind, u: &mut arbitrary::Unstructured) -> TempDir {
     let testdir = tempdir::TempDir::new("corrupt_source_chain").unwrap();
     let path = testdir.path().join(kind.filename());
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     let mut conn = Connection::open(&path).unwrap();
     holochain_sqlite::schema::SCHEMA_CELL
-        .initialize(&mut conn, Some(&kind))
+        .initialize(&mut conn, Some(kind.kind()))
         .unwrap();
     let op = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
         Signature::arbitrary(u).unwrap(),

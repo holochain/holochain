@@ -269,8 +269,8 @@ fixturator!(
         let cache = holochain_state::test_utils::test_cache_env();
         let keystore = holochain_state::test_utils::test_keystore();
         tokio_helper::block_forever_on(async {
-            fake_genesis(authored_env.env(), keystore.clone()).await.unwrap();
-            HostFnWorkspace::new(authored_env.env(), dht_env.env().into(), cache.env(), keystore, Some(fixt!(AgentPubKey, Predictable, get_fixt_index!()))).await.unwrap()
+            fake_genesis(authored_env.env(), dht_env.env(), keystore.clone()).await.unwrap();
+            HostFnWorkspace::new(authored_env.env(), dht_env.env(), cache.env(), keystore, Some(fixt!(AgentPubKey, Predictable, get_fixt_index!()))).await.unwrap()
         })
     };
     curve Unpredictable {
@@ -279,8 +279,8 @@ fixturator!(
         let cache = holochain_state::test_utils::test_cache_env();
         let keystore = holochain_state::test_utils::test_keystore();
         tokio_helper::block_forever_on(async {
-            fake_genesis(authored_env.env(), keystore.clone()).await.unwrap();
-            HostFnWorkspace::new(authored_env.env(), dht_env.env().into(), cache.env(), keystore, Some(fixt!(AgentPubKey, Predictable, get_fixt_index!()))).await.unwrap()
+            fake_genesis(authored_env.env(), dht_env.env(), keystore.clone()).await.unwrap();
+            HostFnWorkspace::new(authored_env.env(), dht_env.env(), cache.env(), keystore, Some(fixt!(AgentPubKey, Predictable, get_fixt_index!()))).await.unwrap()
         })
     };
     curve Predictable {
@@ -290,8 +290,8 @@ fixturator!(
         let agent = fixt!(AgentPubKey, Predictable, get_fixt_index!());
         let keystore = holochain_state::test_utils::test_keystore();
         tokio_helper::block_forever_on(async {
-            crate::test_utils::fake_genesis_for_agent(authored_env.env(), agent.clone(), keystore.clone()).await.unwrap();
-            HostFnWorkspace::new(authored_env.env(), dht_env.env().into(), cache.env(), keystore, Some(agent)).await.unwrap()
+            crate::test_utils::fake_genesis_for_agent(authored_env.env(), dht_env.env(), agent.clone(), keystore.clone()).await.unwrap();
+            HostFnWorkspace::new(authored_env.env(), dht_env.env(), cache.env(), keystore, Some(agent)).await.unwrap()
         })
     };
 );
@@ -304,7 +304,7 @@ fixturator!(
         let cache = holochain_state::test_utils::test_cache_env();
         let keystore = holochain_state::test_utils::test_keystore();
         tokio_helper::block_forever_on(async {
-            fake_genesis(authored_env.env(), keystore.clone()).await.unwrap();
+            fake_genesis(authored_env.env(), dht_env.env(), keystore.clone()).await.unwrap();
             HostFnWorkspaceReadOnly::new(authored_env.env().into(), dht_env.env().into(), cache.env(), keystore, Some(fixt!(AgentPubKey, Predictable, get_fixt_index!()))).await.unwrap()
         })
     };
@@ -314,7 +314,7 @@ fixturator!(
         let cache = holochain_state::test_utils::test_cache_env();
         let keystore = holochain_state::test_utils::test_keystore();
         tokio_helper::block_forever_on(async {
-            fake_genesis(authored_env.env(), keystore.clone()).await.unwrap();
+            fake_genesis(authored_env.env(), dht_env.env(), keystore.clone()).await.unwrap();
             HostFnWorkspaceReadOnly::new(authored_env.env().into(), dht_env.env().into(), cache.env(), keystore, Some(fixt!(AgentPubKey, Predictable, get_fixt_index!()))).await.unwrap()
         })
     };
@@ -325,7 +325,7 @@ fixturator!(
         let agent = fixt!(AgentPubKey, Predictable, get_fixt_index!());
         let keystore = holochain_state::test_utils::test_keystore();
         tokio_helper::block_forever_on(async {
-            crate::test_utils::fake_genesis_for_agent(authored_env.env(), agent.clone(), keystore.clone()).await.unwrap();
+            crate::test_utils::fake_genesis_for_agent(authored_env.env(), dht_env.env(), agent.clone(), keystore.clone()).await.unwrap();
             HostFnWorkspaceReadOnly::new(authored_env.env().into(), dht_env.env().into(), cache.env(), keystore, Some(agent)).await.unwrap()
         })
     };

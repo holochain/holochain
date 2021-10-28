@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDna;
 use holochain_state::prelude::*;
@@ -95,7 +97,13 @@ pub async fn validation_receipt_workflow(
         let op_hash = receipt.dht_op_hash.clone();
 
         // Sign on the dotted line.
-        let receipt = ValidationReceipt::sign(receipt, &keystore).await?;
+        let receipt = match ValidationReceipt::sign(receipt, &keystore).await {
+            Ok(r) => r,
+            Err(e) => {
+                info!(failed_to_sign_receipt = ?e);
+                return Ok(WorkComplete::Incomplete);
+            }
+        };
 
         // Send it and don't wait for response.
         // TODO: When networking has a send without response we can use that

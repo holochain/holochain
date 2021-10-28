@@ -85,7 +85,7 @@ pub mod tests {
             .unwrap();
 
         let cell_id = conductor.handle().list_cell_ids(None)[0].clone();
-        let cell_env = conductor.handle().get_authored_env(&cell_id).unwrap();
+        let cell_env = conductor.handle().get_authored_env(cell_id.dna_hash()).unwrap();
 
         cell_env
             .async_commit(move |txn: &mut Transaction| {

@@ -117,7 +117,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn sys_validation_query() {
         observability::test_run().ok();
-        let env = test_authored_env();
+        let env = test_dht_env();
         let expected = test_data(&env.env().into());
         let r = get_ops_to_validate(&env.env().into(), true).await.unwrap();
         let mut r_sorted = r.clone();
@@ -133,7 +133,7 @@ mod tests {
         }
     }
 
-    fn create_and_insert_op(env: &DbReadOnly, facts: Facts) -> DhtOpHashed {
+    fn create_and_insert_op(env: &DbWrite<DbKindDht>, facts: Facts) -> DhtOpHashed {
         let state = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
             fixt!(Signature),
             fixt!(Header),
@@ -143,7 +143,7 @@ mod tests {
             .unwrap()
             .with_commit_sync(|txn| {
                 let hash = state.as_hash().clone();
-                insert_op(txn, state.clone(), false).unwrap();
+                insert_op(txn, state.clone()).unwrap();
                 if facts.has_validation_status {
                     set_validation_status(txn, hash.clone(), ValidationStatus::Valid).unwrap();
                 }
@@ -163,7 +163,7 @@ mod tests {
         state
     }
 
-    fn test_data(env: &DbReadOnly) -> Expected {
+    fn test_data(env: &DbWrite<DbKindDht>) -> Expected {
         let mut results = Vec::new();
         // We **do** expect any of these in the results:
         let facts = Facts {

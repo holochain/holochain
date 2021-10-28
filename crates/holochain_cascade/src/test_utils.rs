@@ -9,6 +9,8 @@ use holochain_p2p::HolochainP2pError;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_sqlite::db::DbKindAuthored;
 use holochain_sqlite::db::DbKindDht;
+use holochain_sqlite::db::DbKindOp;
+use holochain_sqlite::db::DbKindT;
 use holochain_sqlite::db::WriteManager;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_state::mutations::insert_op;
@@ -219,7 +221,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
     }
 }
 
-pub fn fill_db(env: &DbWrite<DbKindDht>, op: DhtOpHashed) {
+pub fn fill_db<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
     env.conn()
         .unwrap()
         .with_commit_sync(|txn| {
@@ -232,7 +234,7 @@ pub fn fill_db(env: &DbWrite<DbKindDht>, op: DhtOpHashed) {
         .unwrap();
 }
 
-pub fn fill_db_rejected(env: &DbWrite<DbKindDht>, op: DhtOpHashed) {
+pub fn fill_db_rejected<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
     env.conn()
         .unwrap()
         .with_commit_sync(|txn| {
@@ -245,7 +247,7 @@ pub fn fill_db_rejected(env: &DbWrite<DbKindDht>, op: DhtOpHashed) {
         .unwrap();
 }
 
-pub fn fill_db_pending(env: &DbWrite<DbKindDht>, op: DhtOpHashed) {
+pub fn fill_db_pending<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
     env.conn()
         .unwrap()
         .with_commit_sync(|txn| {

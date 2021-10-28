@@ -4,8 +4,8 @@ use crate::core::workflow::publish_dht_ops_workflow::{
 
 use super::*;
 use arbitrary::Arbitrary;
-use holochain_sqlite::db::{DbKind, WriteManager};
-use holochain_state::{mutations, prelude::mutations_helpers};
+use holochain_sqlite::db::WriteManager;
+use holochain_state::mutations;
 
 #[tokio::test]
 async fn test_trigger() {
@@ -215,13 +215,7 @@ async fn test_concurrency() {
 #[tokio::test(flavor = "current_thread", start_paused = true)]
 async fn publish_loop() {
     let mut u = arbitrary::Unstructured::new(&[0; 1000]);
-    let keystore = holochain_keystore::test_keystore::spawn_test_keystore()
-        .await
-        .unwrap();
-    let kind = DbKind::Cell(CellId::new(
-        DnaHash::arbitrary(&mut u).unwrap(),
-        AgentPubKey::arbitrary(&mut u).unwrap(),
-    ));
+    let kind = DbKindAuthored(Arc::new(DnaHash::arbitrary(&mut u).unwrap()));
     let tmpdir = tempdir::TempDir::new("holochain-test-environments").unwrap();
     let env = DbWrite::test(&tmpdir, kind).expect("Couldn't create test database");
     let header = Header::arbitrary(&mut u).unwrap();
@@ -233,13 +227,10 @@ async fn publish_loop() {
     env.conn()
         .unwrap()
         .with_commit_test(|txn| {
-            mutations_helpers::insert_valid_authored_op(txn, op).unwrap();
+            mutations::insert_op(txn, op).unwrap();
         })
         .unwrap();
     let mut cell_network = MockHolochainP2pDnaT::new();
-    cell_network
-        .expect_from_agent()
-        .returning(move || author.clone());
     let (tx, mut op_published) = tokio::sync::mpsc::channel(100);
     cell_network
         .expect_publish()

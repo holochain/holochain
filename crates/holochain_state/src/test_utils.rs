@@ -55,6 +55,10 @@ pub fn test_cache_env_with_id(id: u8) -> TestEnv<DbKindCache> {
     test_env(DbKindCache(Arc::new(fake_cell_id(id).dna_hash().clone())))
 }
 
+pub fn test_cache_env_with_dna_hash(hash: DnaHash) -> TestEnv<DbKindCache> {
+    test_env(DbKindCache(Arc::new(hash)))
+}
+
 /// Create a [TestEnv] of [DbKindConductor], backed by a temp directory.
 pub fn test_conductor_env() -> TestEnv<DbKindConductor> {
     test_env(DbKindConductor)
@@ -160,7 +164,7 @@ impl<Kind: DbKindT> TestEnv<Kind> {
 
     pub fn dna_hash(&self) -> Option<Arc<DnaHash>> {
         match self.env.kind().kind() {
-            DbKind::Authored(hash) | DbKind::Cache(hash) | DbKind::Dht(hash) => Some(hash.clone()),
+            DbKind::Authored(hash) | DbKind::Cache(hash) | DbKind::Dht(hash) => Some(hash),
             _ => None,
         }
     }

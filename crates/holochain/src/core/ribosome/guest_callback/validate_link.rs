@@ -359,7 +359,15 @@ mod slow_tests {
 
         // the chain head should be the committed entry header
         let chain_head = tokio_helper::block_forever_on(async move {
-            SourceChainResult::Ok(host_access.workspace.source_chain().chain_head()?.0)
+            SourceChainResult::Ok(
+                host_access
+                    .workspace
+                    .source_chain()
+                    .as_ref()
+                    .unwrap()
+                    .chain_head()?
+                    .0,
+            )
         })
         .unwrap();
 
@@ -376,7 +384,15 @@ mod slow_tests {
 
         // the chain head should be the committed entry header
         let chain_head = tokio_helper::block_forever_on(async move {
-            SourceChainResult::Ok(host_access.workspace.source_chain().chain_head()?.0)
+            SourceChainResult::Ok(
+                host_access
+                    .workspace
+                    .source_chain()
+                    .as_ref()
+                    .unwrap()
+                    .chain_head()?
+                    .0,
+            )
         })
         .unwrap();
 

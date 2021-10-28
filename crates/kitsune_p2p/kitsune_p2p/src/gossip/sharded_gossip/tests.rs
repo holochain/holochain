@@ -10,7 +10,6 @@ use fixt::prelude::*;
 
 mod common;
 mod handler_builder;
-mod test_local_sync;
 mod test_two_nodes;
 
 impl ShardedGossipLocal {

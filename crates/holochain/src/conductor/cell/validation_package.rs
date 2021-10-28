@@ -81,7 +81,7 @@ pub(super) async fn get_as_author(
             Ok(Some(get_as_author_full(header_seq, &source_chain).await?).into())
         }
         RequiredValidationType::Custom => {
-            let cascade = Cascade::empty().with_authored(authored_env.clone().into());
+            let cascade = Cascade::empty().with_authored(authored_env.clone());
 
             if let Some(elements) =
                 cascade.get_validation_package_local(&header_hashed.as_hash())?
@@ -91,7 +91,7 @@ pub(super) async fn get_as_author(
 
             let workspace_lock = HostFnWorkspace::new(
                 authored_env.clone(),
-                dht_env.into(),
+                dht_env,
                 cache,
                 conductor_handle.keystore().clone(),
                 Some(header.author().clone()),

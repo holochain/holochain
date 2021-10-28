@@ -10,7 +10,10 @@ use holochain_state::prelude::*;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::prelude::*;
 use once_cell::sync::Lazy;
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 use tracing::instrument;
 
 #[cfg(test)]

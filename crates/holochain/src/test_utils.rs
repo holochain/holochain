@@ -386,11 +386,14 @@ pub async fn consistency(all_cells: &[&SweetCell], num_attempts: usize, delay: D
 }
 
 /// Wait for all cell envs to reach consistency
-pub async fn consistency_envs(
-    all_cell_envs: &[(&DbReadOnly<DbKindAuthored>, &DbReadOnly<DbKindDht>)],
+pub async fn consistency_envs<AuthorDb, DhtDb>(
+    all_cell_envs: &[(&AuthorDb, &DhtDb)],
     num_attempts: usize,
     delay: Duration,
-) {
+) where
+    AuthorDb: ReadAccess<DbKindAuthored>,
+    DhtDb: ReadAccess<DbKindDht>,
+{
     let mut expected_count = 0;
     for &env in all_cell_envs.iter().map(|(a, _)| a) {
         let count = get_published_ops(env).len();
@@ -420,11 +423,14 @@ pub async fn consistency_others(all_cells: &[&SweetCell], num_attempts: usize, d
     consistency_envs_others(&all_cell_envs[..], num_attempts, delay).await
 }
 
-async fn consistency_envs_others(
-    all_cell_envs: &[(&DbReadOnly<DbKindAuthored>, &DbReadOnly<DbKindDht>)],
+async fn consistency_envs_others<AuthorDb, DhtDb>(
+    all_cell_envs: &[(&AuthorDb, &DhtDb)],
     num_attempts: usize,
     delay: Duration,
-) {
+) where
+    AuthorDb: ReadAccess<DbKindAuthored>,
+    DhtDb: ReadAccess<DbKindDht>,
+{
     let mut expected_count = 0;
     for &env in all_cell_envs.iter().map(|(a, _)| a) {
         let count = get_published_ops(env).len();
@@ -439,7 +445,7 @@ async fn consistency_envs_others(
     }
 }
 
-fn get_authored_ops(env: &DbReadOnly<DbKindAuthored>) -> Vec<DhtOpLight> {
+fn get_authored_ops<Db: ReadAccess<DbKindAuthored>>(env: &Db) -> Vec<DhtOpLight> {
     fresh_reader_test(env.clone(), |txn| {
         txn.prepare("SELECT blob FROM DhtOp")
             .unwrap()
@@ -450,7 +456,7 @@ fn get_authored_ops(env: &DbReadOnly<DbKindAuthored>) -> Vec<DhtOpLight> {
     })
 }
 
-fn get_published_ops(env: &DbReadOnly<DbKindAuthored>) -> Vec<DhtOpLight> {
+fn get_published_ops<Db: ReadAccess<DbKindAuthored>>(env: &Db) -> Vec<DhtOpLight> {
     fresh_reader_test(env.clone(), |txn| {
         txn.prepare(
             "
@@ -478,7 +484,7 @@ fn get_published_ops(env: &DbReadOnly<DbKindAuthored>) -> Vec<DhtOpLight> {
 
 /// Same as wait_for_integration but with a default wait time of 10 seconds
 #[tracing::instrument(skip(env))]
-pub async fn wait_for_integration_1m(env: &DbReadOnly<DbKindDht>, expected_count: usize) {
+pub async fn wait_for_integration_1m<Db: ReadAccess<DbKindDht>>(env: &Db, expected_count: usize) {
     const NUM_ATTEMPTS: usize = 120;
     const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(500);
     wait_for_integration(env, expected_count, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
@@ -487,8 +493,8 @@ pub async fn wait_for_integration_1m(env: &DbReadOnly<DbKindDht>, expected_count
 /// Exit early if the expected number of ops
 /// have been integrated or wait for num_attempts * delay
 #[tracing::instrument(skip(env))]
-pub async fn wait_for_integration(
-    env: &DbReadOnly<DbKindDht>,
+pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
+    env: &Db,
     expected_count: usize,
     num_attempts: usize,
     delay: Duration,
@@ -506,9 +512,9 @@ pub async fn wait_for_integration(
 }
 
 /// Same as wait for integration but can print other states at the same time
-pub async fn wait_for_integration_with_others_10s(
-    env: &DbReadOnly<DbKindDht>,
-    others: &[&DbReadOnly<DbKindDht>],
+pub async fn wait_for_integration_with_others_10s<Db: ReadAccess<DbKindDht>>(
+    env: &Db,
+    others: &[&Db],
     expected_count: usize,
     start: Option<std::time::Instant>,
 ) {
@@ -527,9 +533,9 @@ pub async fn wait_for_integration_with_others_10s(
 
 #[tracing::instrument(skip(env, others, start))]
 /// Same as wait for integration but can print other states at the same time
-pub async fn wait_for_integration_with_others(
-    env: &DbReadOnly<DbKindDht>,
-    others: &[&DbReadOnly<DbKindDht>],
+pub async fn wait_for_integration_with_others<Db: ReadAccess<DbKindDht>>(
+    env: &Db,
+    others: &[&Db],
     expected_count: usize,
     num_attempts: usize,
     delay: Duration,
@@ -581,7 +587,7 @@ pub async fn wait_for_integration_with_others(
 
 #[tracing::instrument(skip(envs))]
 /// Show authored data for each cell environment
-pub fn show_authored(envs: &[&DbReadOnly<DbKindAuthored>]) {
+pub fn show_authored<Db: ReadAccess<DbKindAuthored>>(envs: &[&Db]) {
     for (i, &env) in envs.iter().enumerate() {
         fresh_reader_test(env.clone(), |txn| {
             txn.prepare("SELECT DISTINCT Header.seq, Header.type, Header.entry_hash FROM Header JOIN DhtOp ON Header.hash = DhtOp.hash")
@@ -603,10 +609,10 @@ pub fn show_authored(envs: &[&DbReadOnly<DbKindAuthored>]) {
 
 #[tracing::instrument(skip(envs))]
 /// Show authored op data for each cell environment
-pub async fn show_authored_ops(envs: &[&DbReadOnly<DbKindAuthored>]) {
+pub async fn show_authored_ops<Db: ReadAccess<DbKindAuthored>>(envs: &[&Db]) {
     let mut all_auth = Vec::new();
     for (i, env) in envs.iter().enumerate() {
-        let auth = get_authored_ops(env);
+        let auth = get_authored_ops(*env);
         all_auth.extend(auth.clone());
         for (j, op) in auth.iter().enumerate() {
             tracing::debug!(chain = %i, op_num = %j, ?op);
@@ -614,7 +620,7 @@ pub async fn show_authored_ops(envs: &[&DbReadOnly<DbKindAuthored>]) {
     }
 }
 
-async fn get_counts(envs: &[&DbReadOnly<DbKindDht>]) -> IntegrationStateDumps {
+async fn get_counts<Db: ReadAccess<DbKindDht>>(envs: &[&Db]) -> IntegrationStateDumps {
     let mut output = Vec::new();
     for env in envs {
         let env = *env;
@@ -623,13 +629,13 @@ async fn get_counts(envs: &[&DbReadOnly<DbKindDht>]) -> IntegrationStateDumps {
     IntegrationStateDumps(output)
 }
 
-async fn count_integration(env: &DbReadOnly<DbKindDht>) -> IntegrationStateDump {
+async fn count_integration<Db: ReadAccess<DbKindDht>>(env: &Db) -> IntegrationStateDump {
     crate::conductor::integration_dump(&env.clone().into())
         .await
         .unwrap()
 }
 
-async fn display_integration(env: &DbReadOnly<DbKindDht>) -> usize {
+async fn display_integration<Db: ReadAccess<DbKindDht>>(env: &Db) -> usize {
     fresh_reader_test(env.clone(), |txn| {
         txn.query_row(
             "SELECT COUNT(hash) FROM DhtOp WHERE DhtOp.when_integrated IS NOT NULL",
@@ -698,21 +704,23 @@ pub fn fake_valid_dna_file(uid: &str) -> DnaFile {
 /// Run genesis on the source chain for testing.
 pub async fn fake_genesis(
     vault: DbWrite<DbKindAuthored>,
+    dht_env: DbWrite<DbKindDht>,
     keystore: MetaLairClient,
 ) -> SourceChainResult<()> {
-    fake_genesis_for_agent(vault, fake_agent_pubkey_1(), keystore).await
+    fake_genesis_for_agent(vault, dht_env, fake_agent_pubkey_1(), keystore).await
 }
 
 /// Run genesis on the source chain for a specific agent for testing.
 pub async fn fake_genesis_for_agent(
     vault: DbWrite<DbKindAuthored>,
+    dht_env: DbWrite<DbKindDht>,
     agent: AgentPubKey,
     keystore: MetaLairClient,
 ) -> SourceChainResult<()> {
     let dna = fake_dna_file("cool dna");
     let dna_hash = dna.dna_hash().clone();
 
-    source_chain::genesis(vault, keystore, dna_hash, agent, None).await
+    source_chain::genesis(vault, dht_env, keystore, dna_hash, agent, None).await
 }
 
 /// Force all dht ops without enough validation receipts to be published.
