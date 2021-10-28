@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 - `remote_signal` has always been a fire-and-forget operation. Now it also uses the more efficient fire-and-forget "notify" low-level networking plumbing. [#1075](https://github.com/holochain/holochain/pull/1075)
+- Adds test utils for creating simulated networks. [#1037](https://github.com/holochain/holochain/pull/1037).
+- Conductor can take a mocked network for testing simulated networks. [#1036](https://github.com/holochain/holochain/pull/1036)
+- Batch peer store write so we use less transactions. [#1007](https://github.com/holochain/holochain/pull/1007/).
 
 ## 0.0.113
 

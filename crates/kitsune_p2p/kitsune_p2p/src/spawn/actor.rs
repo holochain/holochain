@@ -92,6 +92,8 @@ impl KitsuneP2pActor {
 
         let tx2_conf = config.to_tx2().map_err(KitsuneP2pError::other)?;
 
+        let mut is_mock = false;
+
         // set up our backend based on config
         let (f, bind_to) = match tx2_conf.backend {
             KitsuneP2pTx2Backend::Mem => {
@@ -116,15 +118,24 @@ impl KitsuneP2pActor {
                     bind_to,
                 )
             }
+            KitsuneP2pTx2Backend::Mock { mock_network } => {
+                is_mock = true;
+                (mock_network, "none:".into())
+            }
         };
 
         // convert to frontend
         let f = tx2_pool_promote(f, config.tuning_params.clone());
 
         // wrap in proxy
-        let mut conf = kitsune_p2p_proxy::tx2::ProxyConfig::default();
-        conf.tuning_params = Some(config.tuning_params.clone());
-        let f = tx2_proxy(f, conf)?;
+        let f = if !is_mock {
+            let mut conf = kitsune_p2p_proxy::tx2::ProxyConfig::default();
+            conf.tuning_params = Some(config.tuning_params.clone());
+            let f = tx2_proxy(f, conf)?;
+            f
+        } else {
+            f
+        };
 
         let metrics = Tx2ApiMetrics::default().set_write_len(|d, l| {
             let t = match d {
