@@ -1,4 +1,4 @@
-use crate::dht_arc::dht_arc_set::loc_upscale;
+use crate::dht_arc::loc_upscale;
 
 use super::*;
 use pretty_assertions::assert_eq;
