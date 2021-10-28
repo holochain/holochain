@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - `CallInfo` now has `as_at` on it [PR 1047](https://github.com/holochain/holochain/pull/1047)
 - Removed `Links` in favour of `Vec<Link>` [PR 1012](https://github.com/holochain/holochain/pull/1012)
+- Added zome names to `dna_info` [PR 1052](https://github.com/holochain/holochain/pull/1052)
 
 ## 0.0.12
 
