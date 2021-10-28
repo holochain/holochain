@@ -6,6 +6,90 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20211027.100746
+
+## [holochain-0.0.113](crates/holochain/CHANGELOG.md#0.0.113)
+
+- Post commit is now infallible and expects no return value [PR1049](https://github.com/holochain/holochain/pull/1049)
+- Always depend on `itertools` to make `cargo build --no-default-features` work [\#1060](https://github.com/holochain/holochain/pull/1060)
+
+## [holochain\_test\_wasm\_common-0.0.13](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.13)
+
+## [holochain\_cascade-0.0.13](crates/holochain_cascade/CHANGELOG.md#0.0.13)
+
+## [holochain\_cli-0.0.14](crates/holochain_cli/CHANGELOG.md#0.0.14)
+
+## [holochain\_cli\_sandbox-0.0.12](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.12)
+
+## [holochain\_websocket-0.0.13](crates/holochain_websocket/CHANGELOG.md#0.0.13)
+
+## [holochain\_conductor\_api-0.0.13](crates/holochain_conductor_api/CHANGELOG.md#0.0.13)
+
+## [holochain\_state-0.0.13](crates/holochain_state/CHANGELOG.md#0.0.13)
+
+## [holochain\_wasm\_test\_utils-0.0.13](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.13)
+
+## [holochain\_p2p-0.0.13](crates/holochain_p2p/CHANGELOG.md#0.0.13)
+
+## [holochain\_cli\_bundle-0.0.11](crates/holochain_cli_bundle/CHANGELOG.md#0.0.11)
+
+## [holochain\_types-0.0.13](crates/holochain_types/CHANGELOG.md#0.0.13)
+
+## [holochain\_keystore-0.0.13](crates/holochain_keystore/CHANGELOG.md#0.0.13)
+
+## [holochain\_sqlite-0.0.13](crates/holochain_sqlite/CHANGELOG.md#0.0.13)
+
+## [hdk-0.0.113](crates/hdk/CHANGELOG.md#0.0.113)
+
+## [hdk\_derive-0.0.15](crates/hdk_derive/CHANGELOG.md#0.0.15)
+
+- `#[hdk_extern(infallible)]` now supports leaving off the return type of a fn [PR1049](https://github.com/holochain/holochain/pull/1049)
+
+## [holochain\_zome\_types-0.0.15](crates/holochain_zome_types/CHANGELOG.md#0.0.15)
+
+- `HeaderHashes` no longer exists [PR1049](https://github.com/holochain/holochain/pull/1049)
+- `HeaderHashedVec` no longer exists [PR1049](https://github.com/holochain/holochain/pull/1049)
+
+## [holo\_hash-0.0.11](crates/holo_hash/CHANGELOG.md#0.0.11)
+
+# 20211021.140006
+
+## [holochain-0.0.112](crates/holochain/CHANGELOG.md#0.0.112)
+
+- Always depend on `itertools` to make `cargo build --no-default-features` work [\#1060](https://github.com/holochain/holochain/pull/1060)
+
+## [holochain\_test\_wasm\_common-0.0.12](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.12)
+
+## [holochain\_cascade-0.0.12](crates/holochain_cascade/CHANGELOG.md#0.0.12)
+
+## [holochain\_cli-0.0.13](crates/holochain_cli/CHANGELOG.md#0.0.13)
+
+## [holochain\_cli\_sandbox-0.0.11](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.11)
+
+## [holochain\_websocket-0.0.12](crates/holochain_websocket/CHANGELOG.md#0.0.12)
+
+## [holochain\_conductor\_api-0.0.12](crates/holochain_conductor_api/CHANGELOG.md#0.0.12)
+
+## [holochain\_state-0.0.12](crates/holochain_state/CHANGELOG.md#0.0.12)
+
+## [holochain\_wasm\_test\_utils-0.0.12](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.12)
+
+## [holochain\_p2p-0.0.12](crates/holochain_p2p/CHANGELOG.md#0.0.12)
+
+## [holochain\_cli\_bundle-0.0.10](crates/holochain_cli_bundle/CHANGELOG.md#0.0.10)
+
+## [holochain\_types-0.0.12](crates/holochain_types/CHANGELOG.md#0.0.12)
+
+## [holochain\_keystore-0.0.12](crates/holochain_keystore/CHANGELOG.md#0.0.12)
+
+## [holochain\_sqlite-0.0.12](crates/holochain_sqlite/CHANGELOG.md#0.0.12)
+
+## [hdk-0.0.112](crates/hdk/CHANGELOG.md#0.0.112)
+
+## [hdk\_derive-0.0.14](crates/hdk_derive/CHANGELOG.md#0.0.14)
+
+## [holochain\_zome\_types-0.0.14](crates/holochain_zome_types/CHANGELOG.md#0.0.14)
+
 # 20211020.171211
 
 ## [holochain-0.0.111](crates/holochain/CHANGELOG.md#0.0.111)

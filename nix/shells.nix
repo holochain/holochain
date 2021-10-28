@@ -58,7 +58,6 @@ rec {
     ];
     nativeBuildInputs = builtins.attrValues pkgs.happ
       ++ (with holonix.pkgs; [
-        lair-keystore
         sqlcipher
         binaryen
         gdb
