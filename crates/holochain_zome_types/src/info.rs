@@ -51,6 +51,8 @@ pub struct DnaInfo {
     pub name: String,
     pub hash: DnaHash,
     pub properties: SerializedBytes,
+    // In ZomeId order as to match corresponding `ZomeInfo` for each.
+    pub zome_names: Vec<ZomeName>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
