@@ -441,6 +441,7 @@ fn is_full(start: u32, end: u32) -> bool {
 
 /// Scale a number in a smaller space (specified by `len`) up into the `u32` space.
 /// The number to scale can be negative, which is wrapped to a positive value via modulo
+#[cfg(any(test, feature = "test_utils"))]
 pub(crate) fn loc_upscale(len: usize, v: i32) -> u32 {
     let max = 2f64.powi(32);
     let lenf = len as f64;
@@ -449,6 +450,7 @@ pub(crate) fn loc_upscale(len: usize, v: i32) -> u32 {
 }
 
 /// Scale a u32 DhtLocation down into a smaller space (specified by `len`)
+#[cfg(any(test, feature = "test_utils"))]
 pub(crate) fn loc_downscale(len: usize, d: DhtLocation) -> usize {
     let max = 2f64.powi(32);
     let lenf = len as f64;
