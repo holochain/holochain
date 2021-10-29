@@ -13,6 +13,13 @@ pub struct JsonDump {
     pub integration_dump: IntegrationStateDump,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct FullJsonDump {
+    pub peer_dump: P2pAgentsDump,
+    pub source_chain_dump: SourceChainJsonDump,
+    pub integration_dump: FullIntegrationStateDump,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 /// A collection of many cells dumps for easy viewing.
 /// Use display to see a nice printout.
@@ -26,6 +33,21 @@ pub struct IntegrationStateDumps(pub Vec<IntegrationStateDump>);
 pub struct IntegrationStateDump {
     /// Ops in validation limbo awaiting sys
     /// or app validation.
+    pub validation_limbo: usize,
+    /// Ops waiting to be integrated.
+    pub integration_limbo: usize,
+    /// Ops that are integrated.
+    /// This includes rejected.
+    pub integrated: usize,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+/// A full view of the DHT shard of the Cell.
+/// Ops start in the validation limbo then proceed
+/// to the integration limbo then finally are integrated.
+pub struct FullIntegrationStateDump {
+    /// Ops in validation limbo awaiting sys
+    /// or app validation.
     pub validation_limbo: Vec<DhtOp>,
 
     /// Ops waiting to be integrated.
@@ -34,6 +56,11 @@ pub struct IntegrationStateDump {
     /// Ops that are integrated.
     /// This includes rejected.
     pub integrated: Vec<DhtOp>,
+
+    /// RowId for the latest DhtOp that we have seen
+    /// Useful for subsequent calls to `FullStateDump`
+    /// to return only what they haven't seen
+    pub dht_ops_cursor: i64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

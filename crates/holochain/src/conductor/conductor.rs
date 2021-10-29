@@ -53,6 +53,7 @@ use futures::stream::StreamExt;
 use holo_hash::DnaHash;
 use holochain_conductor_api::conductor::KeystoreConfig;
 use holochain_conductor_api::AppStatusFilter;
+use holochain_conductor_api::FullIntegrationStateDump;
 use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
@@ -67,8 +68,7 @@ use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateMutationResult;
 use holochain_state::prelude::StateQueryResult;
 use holochain_types::prelude::*;
-use rusqlite::OptionalExtension;
-use rusqlite::Statement;
+use rusqlite::{OptionalExtension, Transaction};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
@@ -1156,62 +1156,29 @@ pub(super) async fn genesis_cells(
 pub async fn integration_dump(vault: &EnvRead) -> ConductorApiResult<IntegrationStateDump> {
     vault
         .async_reader(move |txn| {
-            let mut integrated_stmt = txn.prepare(
-                "
-                SELECT 
-                    Header.blob as header_blob,
-                    Entry.blob as entry_blob,
-                    DhtOp.type as dht_type,
-                    DhtOp.hash as dht_hash
-                FROM Header
-                JOIN
-                    DhtOp ON DhtOp.header_hash = Header.hash
-                LEFT JOIN
-                    Entry ON Header.entry_hash = Entry.hash
-                WHERE when_integrated IS NOT NULL
-            ",
+            let integrated = txn.query_row(
+                "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NOT NULL",
+                [],
+                |row| row.get(0),
             )?;
-            let integrated = query_dht_ops_from_statement(&mut integrated_stmt)?;
-
-            let mut validation_limbo_stmt = txn.prepare(
+            let integration_limbo = txn.query_row(
+            "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NULL AND validation_stage = 3",
+            [],
+            |row| row.get(0),
+        )?;
+            let validation_limbo = txn.query_row(
                 "
-                SELECT 
-                    Header.blob as header_blob,
-                    Entry.blob as entry_blob,
-                    DhtOp.type as dht_type,
-                    DhtOp.hash as dht_hash
-                FROM Header
-                JOIN
-                    DhtOp ON DhtOp.header_hash = Header.hash
-                LEFT JOIN
-                    Entry ON Header.entry_hash = Entry.hash
+                SELECT count(hash) FROM DhtOp
                 WHERE when_integrated IS NULL
                 AND (
                     (is_authored = 1 AND validation_stage IS NOT NULL AND validation_stage < 3)
                     OR
                     (is_authored = 0 AND (validation_stage IS NULL OR validation_stage < 3))
                 )
-            ",
+                ",
+                [],
+                |row| row.get(0),
             )?;
-            let validation_limbo = query_dht_ops_from_statement(&mut validation_limbo_stmt)?;
-
-            let mut integration_limbo_stmt = txn.prepare(
-                "
-                SELECT 
-                    Header.blob as header_blob,
-                    Entry.blob as entry_blob,
-                    DhtOp.type as dht_type,
-                    DhtOp.hash as dht_hash
-                FROM Header
-                JOIN
-                    DhtOp ON DhtOp.header_hash = Header.hash
-                LEFT JOIN
-                    Entry ON Header.entry_hash = Entry.hash
-                WHERE when_integrated IS NULL AND validation_stage = 3
-            ",
-            )?;
-            let integration_limbo = query_dht_ops_from_statement(&mut integration_limbo_stmt)?;
-
             ConductorApiResult::Ok(IntegrationStateDump {
                 validation_limbo,
                 integration_limbo,
@@ -1221,7 +1188,97 @@ pub async fn integration_dump(vault: &EnvRead) -> ConductorApiResult<Integration
         .await
 }
 
-fn query_dht_ops_from_statement(stmt: &mut Statement) -> ConductorApiResult<Vec<DhtOp>> {
+/// Dump the full integration json state.
+/// Careful! This will return a lot of data.
+pub async fn full_integration_dump(
+    vault: &EnvRead,
+    dht_ops_cursor: Option<i64>,
+) -> ConductorApiResult<FullIntegrationStateDump> {
+    vault
+        .async_reader(move |txn| {
+            let integrated = query_dht_ops_from_statement(
+                &txn,
+                "
+                    SELECT 
+                        Header.blob as header_blob,
+                        Entry.blob as entry_blob,
+                        DhtOp.type as dht_type,
+                        DhtOp.hash as dht_hash
+                    FROM Header
+                    JOIN
+                        DhtOp ON DhtOp.header_hash = Header.hash
+                    LEFT JOIN
+                        Entry ON Header.entry_hash = Entry.hash
+                    WHERE when_integrated IS NOT NULL
+                ",
+                dht_ops_cursor,
+            )?;
+
+            let validation_limbo = query_dht_ops_from_statement(
+                &txn,
+                "
+                    SELECT 
+                        Header.blob as header_blob,
+                        Entry.blob as entry_blob,
+                        DhtOp.type as dht_type,
+                        DhtOp.hash as dht_hash
+                    FROM Header
+                    JOIN
+                        DhtOp ON DhtOp.header_hash = Header.hash
+                    LEFT JOIN
+                        Entry ON Header.entry_hash = Entry.hash
+                    WHERE when_integrated IS NULL
+                    AND (
+                        (is_authored = 1 AND validation_stage IS NOT NULL AND validation_stage < 3)
+                        OR
+                        (is_authored = 0 AND (validation_stage IS NULL OR validation_stage < 3))
+                    )
+                ",
+                dht_ops_cursor,
+            )?;
+
+            let integration_limbo = query_dht_ops_from_statement(
+                &txn,
+                "
+                    SELECT 
+                        Header.blob as header_blob,
+                        Entry.blob as entry_blob,
+                        DhtOp.type as dht_type,
+                        DhtOp.hash as dht_hash
+                    FROM Header
+                    JOIN
+                        DhtOp ON DhtOp.header_hash = Header.hash
+                    LEFT JOIN
+                        Entry ON Header.entry_hash = Entry.hash
+                    WHERE when_integrated IS NULL AND validation_stage = 3
+                ",
+                dht_ops_cursor,
+            )?;
+
+            let dht_ops_cursor = txn.last_insert_rowid();
+
+            ConductorApiResult::Ok(FullIntegrationStateDump {
+                validation_limbo,
+                integration_limbo,
+                integrated,
+                dht_ops_cursor,
+            })
+        })
+        .await
+}
+
+fn query_dht_ops_from_statement(
+    txn: &Transaction,
+    stmt_str: &str,
+    dht_ops_cursor: Option<i64>,
+) -> ConductorApiResult<Vec<DhtOp>> {
+    let final_stmt_str = match dht_ops_cursor {
+        Some(cursor) => format!("{} {}", stmt_str, format!("AND rowid > {}", cursor)),
+        None => stmt_str.into(),
+    };
+
+    let mut stmt = txn.prepare(final_stmt_str.as_str())?;
+
     let r: Vec<DhtOp> = stmt
         .query_and_then([], |row| {
             let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;

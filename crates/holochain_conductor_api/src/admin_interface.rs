@@ -234,7 +234,7 @@ pub enum AdminRequest {
     /// List all the app interfaces currently attached with [`AttachAppInterface`].
     ListAppInterfaces,
 
-    /// Dump the full state of the `Cell` specified by argument `cell_id`,
+    /// Dump the state of the `Cell` specified by argument `cell_id`,
     /// including its chain, as a string containing JSON.
     ///
     /// Will be responded to with an [`AdminResponse::StateDumped`]
@@ -245,6 +245,28 @@ pub enum AdminRequest {
     DumpState {
         /// The `CellId` for which to dump state
         cell_id: Box<CellId>,
+    },
+
+    /// Dump the full state of the `Cell` specified by argument `cell_id`,
+    /// including its chain and DHT shard, as a string containing JSON.
+    ///
+    /// Warning: this API call is subject to change, and will not be available to hApps.
+    /// This is meant to be used by introspection tooling.
+    ///
+    /// Note that the response to this call can be very big, as it's requesting for
+    /// the full database of the Cell.
+    ///
+    /// Will be responded to with an [`AdminResponse::FullStateDumped`]
+    /// or an [`AdminResponse::Error`]
+    ///
+    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
+    /// [`AdminResponse::FullStateDumped`]: enum.AdminResponse.html#variant.FullStateDumped
+    DumpFullState {
+        /// The `CellId` for which to dump state
+        cell_id: Box<CellId>,
+        /// The last seen DhtOp RowId, returned in [`FullIntegrationDump`]
+        /// Only DhtOps with RowId greater than the cursor will be returned
+        dht_ops_cursor: Option<i64>,
     },
 
     /// Add a list [AgentInfoSigned] to this conductor's peer store.
@@ -446,6 +468,16 @@ pub enum AdminResponse {
     ///
     /// [`AdminRequest::DumpState`]: enum.AdminRequest.html#variant.DumpState
     StateDumped(String),
+
+    /// The succesful response to an [`AdminRequest::DumpFullState`].
+    ///
+    /// The result contains a string of serialized JSON data which can be deserialized to access the
+    /// full state dump, and inspect the source chain.
+    ///
+    /// Note that this result can be very big, as it's requesting for the full database of the Cell.
+    ///
+    /// [`AdminRequest::DumpFullState`]: enum.AdminRequest.html#variant.DumpFullState
+    FullStateDumped(String),
 
     /// The succesful response to an [`AdminRequest::AddAgentInfo`].
     ///

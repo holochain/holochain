@@ -489,7 +489,7 @@ pub async fn wait_for_integration(
             return;
         } else {
             let total_time_waited = delay * i as u32;
-            tracing::debug!(?count, ?total_time_waited, counts = ?query_integration(env).await.integrated.len());
+            tracing::debug!(?count, ?total_time_waited, counts = ?query_integration(env).await.integrated);
         }
         tokio::time::sleep(delay).await;
     }
@@ -541,12 +541,7 @@ pub async fn wait_for_integration_with_others(
     for _ in 0..num_attempts {
         let count = query_integration(env).await;
         let counts = get_integration_dumps(others).await;
-        let total: usize = counts
-            .0
-            .clone()
-            .into_iter()
-            .map(|i| i.integrated.len())
-            .sum();
+        let total: usize = counts.0.clone().into_iter().map(|i| i.integrated).sum();
         let num_conductors = counts.0.len() + 1;
         let total_expected = num_conductors * expected_count;
         let progress = if total_expected == 0 {
@@ -556,7 +551,7 @@ pub async fn wait_for_integration_with_others(
         };
         let change = total.checked_sub(last_total).expect("LOST A VALUE");
         last_total = total;
-        if count.integrated.len() == expected_count {
+        if count.integrated == expected_count {
             return;
         } else {
             let time_waited = this_start.elapsed().as_secs();
@@ -568,9 +563,9 @@ pub async fn wait_for_integration_with_others(
             };
             tracing::debug!(
                 "Count: {}, val: {}, int: {}\nTime waited: {}s (total {}s),\nCounts: {:?}\nTotal: {} out of {} {:.4}% change:{} {:.4}ops/s\n",
-                count.integrated.len(),
-                count.validation_limbo.len(),
-                count.integration_limbo.len(),
+                count.integrated,
+                count.validation_limbo,
+                count.integration_limbo,
                 time_waited,
                 total_time_waited,
                 counts,
