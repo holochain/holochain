@@ -570,7 +570,7 @@ async fn full_state_dump_cursor_works() {
 
     let all_dhts_ops_count =
         integrated_ops_count + validation_limbo_ops_count + integration_limbo_ops_count;
-    assert_eq!(7, new_all_dht_ops_count);
+    assert_eq!(7, all_dhts_ops_count);
 
     // We are assuming we have at least one DhtOp in the Cell
     let full_state = dump_full_state(
