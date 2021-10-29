@@ -1,5 +1,7 @@
 //! Gossip event handler which uses `SwitchboardState` as its underlying persisted store.
 
+#![allow(clippy::unit_arg)]
+
 use std::sync::Arc;
 
 use crate::event::*;
@@ -7,7 +9,6 @@ use crate::types::event::{KitsuneP2pEvent, KitsuneP2pEventHandler, KitsuneP2pEve
 use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::*;
 
-use super::switchboard_state::AgentEntry;
 use super::switchboard_state::{AgentOpEntry, NodeEp, OpEntry, Switchboard};
 
 type KSpace = Arc<KitsuneSpace>;
@@ -41,13 +42,17 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
         &mut self,
         PutAgentInfoSignedEvt { space, peer_data }: PutAgentInfoSignedEvt,
     ) -> KitsuneP2pEventHandlerResult<()> {
-        dbg!("handle_put_agent_info_signed");
         self.sb.share(|state| {
-            state.local_agents_for_node(&self.node).extend(
-                peer_data
-                    .into_iter()
-                    .map(|info| (info.agent.get_loc().as_loc8(), AgentEntry::new(info))),
-            );
+            state
+                .nodes
+                .get_mut(&self.node)
+                .unwrap()
+                .remote_agents
+                .extend(
+                    peer_data
+                        .into_iter()
+                        .map(|info| (info.agent.get_loc().as_loc8(), info)),
+                );
         });
         ok_fut(Ok(()))
     }
@@ -56,12 +61,13 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
         &mut self,
         GetAgentInfoSignedEvt { space, agent }: GetAgentInfoSignedEvt,
     ) -> KitsuneP2pEventHandlerResult<Option<crate::types::agent_store::AgentInfoSigned>> {
-        dbg!("handle_get_agent_info_signed");
         ok_fut(Ok(self.sb.share(|state| {
-            state
-                .local_agents_for_node(&self.node)
-                .get(&agent.get_loc().as_loc8())
+            let node = state.nodes.get_mut(&self.node).unwrap();
+            let loc = agent.get_loc().as_loc8();
+            node.local_agents
+                .get(&loc)
                 .map(|e| e.info.to_owned())
+                .or_else(|| node.remote_agents.get(&loc).cloned())
         })))
     }
 
@@ -78,18 +84,13 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
     ) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
         let result = self.sb.share(|state| {
             let node = &state.nodes.get(&self.node).expect("Node not added");
-            let all_agents = node
-                .local_agents
-                .values()
-                .map(|e| &e.info)
-                .chain(node.remote_agents.values());
+            let all_agents = node.all_agent_infos().into_iter();
             if let Some(agents) = agents {
                 all_agents
                     .filter(|info| agents.contains(&info.agent))
-                    .cloned()
                     .collect()
             } else {
-                all_agents.cloned().collect()
+                all_agents.collect()
             }
         });
         ok_fut(Ok(result))

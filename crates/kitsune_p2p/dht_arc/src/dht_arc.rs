@@ -17,7 +17,6 @@ mod tests;
 mod test_ascii;
 
 mod dht_arc_set;
-pub(crate) use dht_arc_set::{loc_downscale, loc_upscale};
 pub use dht_arc_set::{ArcInterval, DhtArcSet};
 
 mod dht_arc_bucket;
@@ -558,9 +557,7 @@ impl DhtArc {
                 let start = start.as_u32();
                 let end = end.as_u32();
                 if start <= end {
-                    // this should be +2 instead of +3, but we want to round up
-                    // so that the arc covers the interval
-                    let half_length = ((end as f64 - start as f64 + 3f64) / 2f64) as u32;
+                    let half_length = ((end as f64 - start as f64 + 2f64) / 2f64).round() as u32;
                     let center = ((start as f64 + end as f64) / 2f64).round() as u32;
                     Self::new(center, half_length)
                 } else {
@@ -571,6 +568,38 @@ impl DhtArc {
             }
         }
     }
+}
+
+/// Scale a number in a smaller space (specified by `len`) up into the `u32` space.
+/// The number to scale can be negative, which is wrapped to a positive value via modulo
+#[cfg(any(test, feature = "test_utils"))]
+pub(crate) fn loc_upscale(len: usize, v: i32) -> u32 {
+    let max = 2f64.powi(32);
+    let lenf = len as f64;
+    let vf = v as f64;
+    (max / lenf * vf) as i64 as u32
+}
+
+/// Scale a u32 DhtLocation down into a smaller space (specified by `len`)
+#[cfg(any(test, feature = "test_utils"))]
+pub(crate) fn loc_downscale(len: usize, d: DhtLocation) -> usize {
+    let max = 2f64.powi(32);
+    let lenf = len as f64;
+    ((lenf / max * (d.as_u32() as f64)) as usize) % len
+}
+
+#[test]
+fn test_loc_upscale() {
+    let m = 2f64.powi(32);
+    assert_eq!(loc_upscale(8, 0), DhtLocation::from(0).as_u32());
+    assert_eq!(
+        loc_upscale(8, 1),
+        DhtLocation::from((m / 8.0) as u32).as_u32()
+    );
+    assert_eq!(
+        loc_upscale(3, 1),
+        DhtLocation::from((m / 3.0) as u32).as_u32()
+    );
 }
 
 #[test]
@@ -615,7 +644,7 @@ fn arc_interval_center_loc() {
 
 #[test]
 /// Test ArcInterval -> DhtArc -> ArcInterval roundtrips
-/// Note that the intervals must be "quantized" to have an odd length 
+/// Note that the intervals must be "quantized" to have an odd length
 /// to be representable as DhtArc, so true roundtrips are not possible in general
 fn interval_dht_arc_roundtrip() {
     use pretty_assertions::assert_eq;

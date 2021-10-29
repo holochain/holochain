@@ -372,6 +372,8 @@ impl ArcInterval<DhtLocation> {
     /// Handy ascii representation of an arc, especially useful when
     /// looking at several arcs at once to get a sense of their overlap
     pub fn to_ascii(&self, len: usize) -> String {
+        use crate::loc_downscale;
+
         match self {
             Self::Full => "-".repeat(len),
             Self::Empty => " ".repeat(len),
@@ -409,7 +411,7 @@ impl ArcInterval<DhtLocation> {
         len: usize,
         ops: I,
     ) -> String {
-        use crate::loc8::Loc8;
+        use crate::{loc8::Loc8, loc_downscale};
 
         let mut buf = vec![0; len];
         let mut s = self.to_ascii(len);
@@ -439,38 +441,9 @@ fn is_full(start: u32, end: u32) -> bool {
     (start == MIN && end >= MAX) || end == start.wrapping_sub(1)
 }
 
-/// Scale a number in a smaller space (specified by `len`) up into the `u32` space.
-/// The number to scale can be negative, which is wrapped to a positive value via modulo
-pub(crate) fn loc_upscale(len: usize, v: i32) -> u32 {
-    let max = 2f64.powi(32);
-    let lenf = len as f64;
-    let vf = v as f64;
-    (max / lenf * vf).round() as i64 as u32
-}
-
-/// Scale a u32 DhtLocation down into a smaller space (specified by `len`)
-pub(crate) fn loc_downscale(len: usize, d: DhtLocation) -> usize {
-    let max = 2f64.powi(32);
-    let lenf = len as f64;
-    ((lenf / max * (d.as_u32() as f64)).round() as usize) % len
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_loc_upscale() {
-        assert_eq!(loc_upscale(8, 0), DhtLocation::from(0).as_u32());
-        assert_eq!(
-            loc_upscale(8, 1),
-            DhtLocation::from(u32::MAX / 8 + 1).as_u32()
-        );
-        assert_eq!(
-            loc_upscale(3, 1),
-            DhtLocation::from(u32::MAX / 3 + 1).as_u32()
-        );
-    }
 
     #[test]
     fn arc_contains() {
@@ -499,33 +472,33 @@ mod tests {
         let cent = u32::MAX / 100 + 1;
         assert_eq!(
             ArcInterval::new(cent * 30, cent * 60).to_ascii(10),
-            "   ----   ".to_string()
+            "   -@--   ".to_string()
         );
         assert_eq!(
             ArcInterval::new(cent * 33, cent * 63).to_ascii(10),
-            "   ----   ".to_string()
+            "   -@--   ".to_string()
         );
         assert_eq!(
             ArcInterval::new(cent * 29, cent * 59).to_ascii(10),
-            "  ----    ".to_string()
+            "  --@-    ".to_string()
         );
 
         assert_eq!(
             ArcInterval::new(cent * 60, cent * 30).to_ascii(10),
-            "----  ----".to_string()
+            "----  ---@".to_string()
         );
         assert_eq!(
             ArcInterval::new(cent * 63, cent * 33).to_ascii(10),
-            "----  ----".to_string()
+            "----  ---@".to_string()
         );
         assert_eq!(
             ArcInterval::new(cent * 59, cent * 29).to_ascii(10),
-            "---  -----".to_string()
+            "---  ----@".to_string()
         );
 
         assert_eq!(
             ArcInterval::new(cent * 99, cent * 0).to_ascii(10),
-            "-        -".to_string()
+            "-        @".to_string()
         );
     }
 }
