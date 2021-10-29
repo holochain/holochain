@@ -590,14 +590,15 @@ pub(crate) fn loc_downscale(len: usize, d: DhtLocation) -> usize {
 
 #[test]
 fn test_loc_upscale() {
+    let m = 2f64.powi(32);
     assert_eq!(loc_upscale(8, 0), DhtLocation::from(0).as_u32());
     assert_eq!(
         loc_upscale(8, 1),
-        DhtLocation::from(u32::MAX / 8 + 1).as_u32()
+        DhtLocation::from((m / 8.0) as u32).as_u32()
     );
     assert_eq!(
         loc_upscale(3, 1),
-        DhtLocation::from(u32::MAX / 3 + 1).as_u32()
+        DhtLocation::from((m / 3.0) as u32).as_u32()
     );
 }
 

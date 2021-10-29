@@ -472,33 +472,33 @@ mod tests {
         let cent = u32::MAX / 100 + 1;
         assert_eq!(
             ArcInterval::new(cent * 30, cent * 60).to_ascii(10),
-            "   ----   ".to_string()
+            "   -@--   ".to_string()
         );
         assert_eq!(
             ArcInterval::new(cent * 33, cent * 63).to_ascii(10),
-            "   ----   ".to_string()
+            "   -@--   ".to_string()
         );
         assert_eq!(
             ArcInterval::new(cent * 29, cent * 59).to_ascii(10),
-            "  ----    ".to_string()
+            "  --@-    ".to_string()
         );
 
         assert_eq!(
             ArcInterval::new(cent * 60, cent * 30).to_ascii(10),
-            "----  ----".to_string()
+            "----  ---@".to_string()
         );
         assert_eq!(
             ArcInterval::new(cent * 63, cent * 33).to_ascii(10),
-            "----  ----".to_string()
+            "----  ---@".to_string()
         );
         assert_eq!(
             ArcInterval::new(cent * 59, cent * 29).to_ascii(10),
-            "---  -----".to_string()
+            "---  ----@".to_string()
         );
 
         assert_eq!(
             ArcInterval::new(cent * 99, cent * 0).to_ascii(10),
-            "-        -".to_string()
+            "-        @".to_string()
         );
     }
 }
