@@ -104,7 +104,7 @@ pub const MIN_PEERS: usize = (REDUNDANCY_TARGET as f64 / DEFAULT_UPTIME) as usiz
 
 /// The minimum number of peers we can consider acceptable to see in our arc
 /// during testing.
-pub const MIN_REDUNDANCY: usize = (REDUNDANCY_FLOOR as f64 / DEFAULT_UPTIME) as usize;
+pub const MIN_REDUNDANCY: u32 = (REDUNDANCY_FLOOR as f64 / DEFAULT_UPTIME) as u32;
 
 /// The amount "change in arc" is scaled to prevent rapid changes.
 /// This also represents the maximum coverage change in a single update
@@ -529,26 +529,32 @@ impl RangeBounds<u32> for ArcRange {
 
 impl std::fmt::Display for DhtArc {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut out = ["_"; 100];
-        let half_cov = (self.coverage() * 50.0) as isize;
-        let center = self.center_loc.0 .0 as f64 / U32_LEN as f64;
-        let center = (center * 100.0) as isize;
-        for mut i in (center - half_cov)..(center + half_cov) {
-            if i >= 100 {
-                i -= 100;
-            }
-            if i < 0 {
-                i += 100;
-            }
-            out[i as usize] = "#";
-        }
-        out[center as usize] = "|";
-        let out: String = out.iter().map(|a| a.chars()).flatten().collect();
-        writeln!(f, "[{}]", out)
+        write!(f, "{}", self.to_ascii(100))
     }
 }
 
 impl DhtArc {
+    pub fn to_ascii(&self, len: usize) -> String {
+        let mut out = vec![" "; len];
+        let lenf = len as f64;
+        let len = len as isize;
+        let half_cov = (self.coverage() * lenf / 2.0) as isize;
+        let center = self.center_loc.0 .0 as f64 / U32_LEN as f64;
+        let center = (center * lenf) as isize;
+        for mut i in (center - half_cov)..(center + half_cov) {
+            if i >= len {
+                i -= len;
+            }
+            if i < 0 {
+                i += len;
+            }
+            out[i as usize] = "-";
+        }
+        out[center as usize] = "@";
+        let out: String = out.iter().map(|a| a.chars()).flatten().collect();
+        out
+    }
+
     pub fn from_interval(interval: ArcInterval) -> Self {
         match interval.quantized() {
             ArcInterval::Empty => Self::empty(0),

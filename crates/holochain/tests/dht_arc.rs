@@ -48,7 +48,7 @@ async fn test_arc_coverage() {
                 peers.clone(),
             );
             println!("{}", bucket);
-            std::thread::sleep(std::time::Duration::from_millis(200));
+            // std::thread::sleep(std::time::Duration::from_millis(200));
         }
     };
 

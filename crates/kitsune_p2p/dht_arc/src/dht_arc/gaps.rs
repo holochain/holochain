@@ -52,7 +52,7 @@ pub fn check_for_gaps(peers: Vec<DhtArc>) -> bool {
 /// Check a set of peers the actual redundancy across all peers.
 /// This can tell if there is bad distribution.
 /// Note this function is only used for verification in tests at this time.
-pub fn check_redundancy(peers: Vec<DhtArc>) -> usize {
+pub fn check_redundancy(peers: Vec<DhtArc>) -> u32 {
     use std::collections::HashSet;
     #[derive(Clone, Copy, Debug)]
     enum Side {
@@ -189,5 +189,5 @@ pub fn check_redundancy(peers: Vec<DhtArc>) -> usize {
         .fold((stack, usize::MAX, started, last_removed), stack_fold);
 
     // Our redundancy is whatever partial + any full redundancy
-    r + full_r
+    r as u32 + full_r
 }
