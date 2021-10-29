@@ -1,6 +1,7 @@
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
+use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
 use holo_hash::AnyDhtHash;
@@ -60,6 +61,9 @@ impl Invocation for ValidationPackageInvocation {
     }
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(self.app_entry_type)
+    }
+    fn auth(&self) -> InvocationAuth {
+        InvocationAuth::LocalCallback
     }
 }
 
