@@ -39,6 +39,7 @@ pub fn call_info(
                 }
             };
             Ok(CallInfo {
+                function_name: call_context.function_name.clone(),
                 as_at: call_context
                     .host_context
                     .workspace()
