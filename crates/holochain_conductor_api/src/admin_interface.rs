@@ -305,24 +305,24 @@ pub enum AdminResponse {
     /// The successful response to an [`AdminRequest::InstallApp`].
     ///
     /// The resulting [`InstalledAppInfo`] contains the App id,
-    /// the [`CellNick`]s and, most usefully, the new [`CellId`]s
+    /// the [`AppRoleId`]s and, most usefully, the new [`CellId`]s
     /// of the newly installed `Dna`s. See the [`InstalledAppInfo`] docs for details.
     ///
     /// [`AdminRequest::InstallApp`]: enum.AdminRequest.html#variant.InstallApp
     /// [`InstalledAppInfo`]: ../../../holochain_types/app/struct.InstalledAppInfo.html
-    /// [`CellNick`]: ../../../holochain_types/app/type.CellNick.html
+    /// [`AppRoleId`]: ../../../holochain_types/app/type.AppRoleId.html
     /// [`CellId`]: ../../../holochain_types/cell/struct.CellId.html
     AppInstalled(InstalledAppInfo),
 
     /// The successful response to an [`AdminRequest::InstallAppBundle`].
     ///
     /// The resulting [`InstalledAppInfo`] contains the App id,
-    /// the [`CellNick`]s and, most usefully, the new [`CellId`]s
+    /// the [`AppRoleId`]s and, most usefully, the new [`CellId`]s
     /// of the newly installed `Dna`s. See the [`InstalledAppInfo`] docs for details.
     ///
     /// [`AdminRequest::InstallApp`]: enum.AdminRequest.html#variant.InstallApp
     /// [`InstalledAppInfo`]: ../../../holochain_types/app/struct.InstalledAppInfo.html
-    /// [`CellNick`]: ../../../holochain_types/app/type.CellNick.html
+    /// [`AppRoleId`]: ../../../holochain_types/app/type.AppRoleId.html
     /// [`CellId`]: ../../../holochain_types/cell/struct.CellId.html
     AppBundleInstalled(InstalledAppInfo),
 

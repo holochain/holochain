@@ -21,7 +21,7 @@ pub fn app_info() -> ExternResult<AppInfo> {
 /// Get the DNA information.
 /// There are no inputs to [ `dna_info` ].
 ///
-/// DNA information includes dna name, hash and properties.
+/// DNA information includes dna name, hash, properties, and zome names.
 pub fn dna_info() -> ExternResult<DnaInfo> {
     HDK.with(|h| h.borrow().dna_info(()))
 }

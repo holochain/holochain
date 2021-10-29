@@ -17,7 +17,13 @@ pub fn dna_info(
             Ok(DnaInfo {
                 name: ribosome.dna_def().name.clone(),
                 hash: ribosome.dna_def().as_hash().clone(),
-                properties: ribosome.dna_def().properties.clone()
+                properties: ribosome.dna_def().properties.clone(),
+                zome_names: ribosome
+                    .dna_def()
+                    .zomes
+                    .iter()
+                    .map(|(zome_name, _zome_def)| zome_name.to_owned())
+                    .collect(),
             })
         },
         _ => unreachable!(),

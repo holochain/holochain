@@ -135,7 +135,7 @@ impl InstalledAppInfo {
         let status = app.status().clone().into();
         let cell_data = app
             .provisioned_cells()
-            .map(|(nick, id)| InstalledCell::new(id.clone(), nick.clone()))
+            .map(|(role_id, id)| InstalledCell::new(id.clone(), role_id.clone()))
             .collect();
         Self {
             installed_app_id,

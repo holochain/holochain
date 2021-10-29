@@ -161,8 +161,7 @@ impl std::fmt::Debug for AdapterFactoryMock {
 
 impl std::cmp::PartialEq for AdapterFactoryMock {
     fn eq(&self, _: &Self) -> bool {
-        // I don't think it matters if to mocks are compared.
-        true
+        unimplemented!()
     }
 }
 

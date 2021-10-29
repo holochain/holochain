@@ -668,8 +668,7 @@ async fn request_published_ops(
                     |row| {
                         let h: DhtOpHash = row.get("dht_op_hash")?;
                         let loc: u32 = row.get("loc")?;
-                        let loc = loc.into();
-                        Ok((loc, h.into_kitsune_raw()))
+                        Ok((loc.into(), h.into_kitsune_raw()))
                     },
                 )?
                 .collect::<Result<_, _>>()?;
