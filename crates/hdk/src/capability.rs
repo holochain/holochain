@@ -81,6 +81,7 @@ pub fn create_cap_claim(cap_claim_entry: CapClaimEntry) -> ExternResult<HeaderHa
 ///
 /// @todo this is more relevant when partial application exists in the future
 /// @todo predictably disambiguate multiple CapGrants of the same specificity
+///       (also potentially not needed when we enforce uniqueness - see below)
 ///
 /// [ `CapGrant` ] entries can be updated and deleted in the same way as standard app entries.
 /// The CRUD model for [ `CapGrant` ] is much simpler than app entries:
