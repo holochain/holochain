@@ -22,6 +22,11 @@ pub fn agent_info<'a>(
             Ok(AgentInfo {
                 agent_initial_pubkey: agent_pubkey.clone(),
                 agent_latest_pubkey: agent_pubkey,
+                chain_head: call_context
+                    .host_context
+                    .workspace()
+                    .source_chain()
+                    .chain_head().map_err(|e| WasmError::Host(e.to_string()))?
             })
         },
         _ => unreachable!(),
