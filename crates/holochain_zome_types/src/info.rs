@@ -1,6 +1,7 @@
 use crate::header::ZomeId;
 use crate::zome::ZomeName;
 use crate::EntryDefs;
+use crate::CapGrant;
 use crate::Timestamp;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
@@ -63,7 +64,9 @@ pub struct DnaInfo {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CallInfo {
+    pub provenance: AgentPubKey,
     /// Chain head as at the call start.
     /// This will not change within a call even if the chain is written to.
     pub as_at: (HeaderHash, u32, Timestamp),
+    pub cap_grant: CapGrant,
 }

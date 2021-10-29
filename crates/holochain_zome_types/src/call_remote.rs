@@ -9,7 +9,7 @@ pub struct CallRemote {
     pub target_agent: AgentPubKey,
     pub zome_name: ZomeName,
     pub fn_name: FunctionName,
-    pub cap: Option<CapSecret>,
+    pub cap_secret: Option<CapSecret>,
     pub payload: ExternIO,
 }
 
@@ -18,14 +18,14 @@ impl CallRemote {
         target_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: FunctionName,
-        cap: Option<CapSecret>,
+        cap_secret: Option<CapSecret>,
         payload: ExternIO,
     ) -> Self {
         Self {
             target_agent,
             zome_name,
             fn_name,
-            cap,
+            cap_secret,
             payload,
         }
     }
@@ -42,8 +42,8 @@ impl CallRemote {
         &self.fn_name
     }
 
-    pub fn cap(&self) -> &Option<CapSecret> {
-        &self.cap
+    pub fn cap_secret(&self) -> &Option<CapSecret> {
+        &self.cap_secret
     }
 
     pub fn payload(&self) -> &ExternIO {
