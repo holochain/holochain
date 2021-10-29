@@ -67,7 +67,7 @@ use futures::future::FutureExt;
 use futures::StreamExt;
 use holochain_conductor_api::conductor::EnvironmentRootPath;
 use holochain_conductor_api::AppStatusFilter;
-use holochain_conductor_api::FullJsonDump;
+use holochain_conductor_api::FullStateDump;
 use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::JsonDump;
 use holochain_keystore::MetaLairClient;
@@ -285,8 +285,8 @@ pub trait ConductorHandleT: Send + Sync {
     async fn dump_full_cell_state(
         &self,
         cell_id: &CellId,
-        dht_ops_cursor: Option<i64>,
-    ) -> ConductorApiResult<String>;
+        dht_ops_cursor: Option<u64>,
+    ) -> ConductorApiResult<FullStateDump>;
 
     /// Access the broadcast Sender which will send a Signal across every
     /// attached app interface
@@ -1092,8 +1092,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn dump_full_cell_state(
         &self,
         cell_id: &CellId,
-        dht_ops_cursor: Option<i64>,
-    ) -> ConductorApiResult<String> {
+        dht_ops_cursor: Option<u64>,
+    ) -> ConductorApiResult<FullStateDump> {
         let cell = self.conductor.cell_by_id(cell_id)?;
         let arc = cell.env();
         let space = cell_id.dna_hash().to_kitsune();
@@ -1108,12 +1108,12 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let source_chain_dump =
             source_chain::dump_state(arc.clone().into(), cell_id.agent_pubkey().clone()).await?;
 
-        let out = FullJsonDump {
+        let out = FullStateDump {
             peer_dump,
             source_chain_dump,
             integration_dump: full_integration_dump(&arc.clone().into(), dht_ops_cursor).await?,
         };
-        Ok(serde_json::to_string_pretty(&out)?)
+        Ok(out)
     }
 
     async fn signal_broadcaster(&self) -> SignalBroadcaster {

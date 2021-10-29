@@ -3,7 +3,7 @@ use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 
-use crate::InstalledAppInfo;
+use crate::{FullStateDump, InstalledAppInfo};
 
 /// Represents the available conductor functions to call over an Admin interface
 /// and will result in a corresponding [`AdminResponse`] message being sent back over the
@@ -266,7 +266,7 @@ pub enum AdminRequest {
         cell_id: Box<CellId>,
         /// The last seen DhtOp RowId, returned in [`FullIntegrationDump`]
         /// Only DhtOps with RowId greater than the cursor will be returned
-        dht_ops_cursor: Option<i64>,
+        dht_ops_cursor: Option<u64>,
     },
 
     /// Add a list [AgentInfoSigned] to this conductor's peer store.
@@ -477,7 +477,7 @@ pub enum AdminResponse {
     /// Note that this result can be very big, as it's requesting for the full database of the Cell.
     ///
     /// [`AdminRequest::DumpFullState`]: enum.AdminRequest.html#variant.DumpFullState
-    FullStateDumped(String),
+    FullStateDumped(FullStateDump),
 
     /// The succesful response to an [`AdminRequest::AddAgentInfo`].
     ///

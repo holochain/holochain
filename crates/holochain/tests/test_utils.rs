@@ -2,8 +2,7 @@
 
 use anyhow::Result;
 use holochain::conductor::ConductorHandle;
-use holochain_conductor_api::FullJsonDump;
-use holochain_conductor_api::JsonDump;
+use holochain_conductor_api::FullStateDump;
 use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
 
@@ -291,27 +290,11 @@ async fn check_timeout_named<T>(
     }
 }
 
-pub async fn dump_state(client: &mut WebsocketSender, cell_id: CellId) -> JsonDump {
-    let request = AdminRequest::DumpState {
-        cell_id: Box::new(cell_id),
-    };
-    let response = client.request(request);
-    let response = check_timeout(response, 3000).await;
-
-    let state = match response {
-        AdminResponse::StateDumped(state) => state,
-        _ => panic!("DumpState failed: {:?}", response),
-    };
-
-    let state: JsonDump = serde_json::from_str(state.as_str()).unwrap();
-    state
-}
-
 pub async fn dump_full_state(
     client: &mut WebsocketSender,
     cell_id: CellId,
-    dht_ops_cursor: Option<i64>,
-) -> FullJsonDump {
+    dht_ops_cursor: Option<u64>,
+) -> FullStateDump {
     let request = AdminRequest::DumpFullState {
         cell_id: Box::new(cell_id),
         dht_ops_cursor,
@@ -324,6 +307,5 @@ pub async fn dump_full_state(
         _ => panic!("DumpFullState failed: {:?}", response),
     };
 
-    let state: FullJsonDump = serde_json::from_str(full_state.as_str()).unwrap();
-    state
+    full_state
 }

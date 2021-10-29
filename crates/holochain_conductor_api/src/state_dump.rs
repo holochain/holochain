@@ -13,8 +13,8 @@ pub struct JsonDump {
     pub integration_dump: IntegrationStateDump,
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct FullJsonDump {
+#[derive(Serialize, Clone, Debug, Deserialize)]
+pub struct FullStateDump {
     pub peer_dump: P2pAgentsDump,
     pub source_chain_dump: SourceChainJsonDump,
     pub integration_dump: FullIntegrationStateDump,
@@ -60,7 +60,7 @@ pub struct FullIntegrationStateDump {
     /// RowId for the latest DhtOp that we have seen
     /// Useful for subsequent calls to `FullStateDump`
     /// to return only what they haven't seen
-    pub dht_ops_cursor: i64,
+    pub dht_ops_cursor: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

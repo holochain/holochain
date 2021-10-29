@@ -1192,7 +1192,7 @@ pub async fn integration_dump(vault: &EnvRead) -> ConductorApiResult<Integration
 /// Careful! This will return a lot of data.
 pub async fn full_integration_dump(
     vault: &EnvRead,
-    dht_ops_cursor: Option<i64>,
+    dht_ops_cursor: Option<u64>,
 ) -> ConductorApiResult<FullIntegrationStateDump> {
     vault
         .async_reader(move |txn| {
@@ -1203,7 +1203,8 @@ pub async fn full_integration_dump(
                         Header.blob as header_blob,
                         Entry.blob as entry_blob,
                         DhtOp.type as dht_type,
-                        DhtOp.hash as dht_hash
+                        DhtOp.hash as dht_hash,
+                        DhtOp.rowid as rowid
                     FROM Header
                     JOIN
                         DhtOp ON DhtOp.header_hash = Header.hash
@@ -1221,7 +1222,8 @@ pub async fn full_integration_dump(
                         Header.blob as header_blob,
                         Entry.blob as entry_blob,
                         DhtOp.type as dht_type,
-                        DhtOp.hash as dht_hash
+                        DhtOp.hash as dht_hash,
+                        DhtOp.rowid as rowid
                     FROM Header
                     JOIN
                         DhtOp ON DhtOp.header_hash = Header.hash
@@ -1244,7 +1246,8 @@ pub async fn full_integration_dump(
                         Header.blob as header_blob,
                         Entry.blob as entry_blob,
                         DhtOp.type as dht_type,
-                        DhtOp.hash as dht_hash
+                        DhtOp.hash as dht_hash,
+                        DhtOp.rowid as rowid
                     FROM Header
                     JOIN
                         DhtOp ON DhtOp.header_hash = Header.hash
@@ -1255,7 +1258,8 @@ pub async fn full_integration_dump(
                 dht_ops_cursor,
             )?;
 
-            let dht_ops_cursor = txn.last_insert_rowid();
+            let dht_ops_cursor =
+                txn.query_row("SELECT MAX(rowid) FROM DhtOp", [], |row| row.get(0))?;
 
             ConductorApiResult::Ok(FullIntegrationStateDump {
                 validation_limbo,
@@ -1270,10 +1274,10 @@ pub async fn full_integration_dump(
 fn query_dht_ops_from_statement(
     txn: &Transaction,
     stmt_str: &str,
-    dht_ops_cursor: Option<i64>,
+    dht_ops_cursor: Option<u64>,
 ) -> ConductorApiResult<Vec<DhtOp>> {
     let final_stmt_str = match dht_ops_cursor {
-        Some(cursor) => format!("{} {}", stmt_str, format!("AND rowid > {}", cursor)),
+        Some(cursor) => format!("{} AND rowid > {}", stmt_str, cursor),
         None => stmt_str.into(),
     };
 
