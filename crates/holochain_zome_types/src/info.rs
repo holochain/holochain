@@ -1,7 +1,7 @@
 use crate::header::ZomeId;
 use crate::zome::ZomeName;
-use crate::EntryDefs;
 use crate::CapGrant;
+use crate::EntryDefs;
 use crate::Timestamp;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
