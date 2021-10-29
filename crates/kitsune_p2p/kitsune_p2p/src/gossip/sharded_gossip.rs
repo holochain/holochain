@@ -115,6 +115,15 @@ struct Stats {
     count: u32,
 }
 
+impl std::fmt::Display for GossipType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GossipType::Recent => write!(f, "recent"),
+            GossipType::Historical => write!(f, "historical"),
+        }
+    }
+}
+
 impl Stats {
     /// Reset the stats.
     fn reset() -> Self {
@@ -274,27 +283,25 @@ impl ShardedGossip {
 
     /// Log the statistics for the gossip loop.
     fn stats(&self, stats: &mut Stats) {
-        if let GossipType::Recent = self.gossip.gossip_type {
-            if let Some(last) = stats.last {
-                let elapsed = last.elapsed();
-                stats.avg_processing_time += elapsed;
-                stats.max_processing_time = std::cmp::max(stats.max_processing_time, elapsed);
-            }
-            stats.last = Some(tokio::time::Instant::now());
-            stats.count += 1;
-            let elapsed = stats.start.elapsed();
-            if elapsed.as_secs() > 5 {
-                stats.avg_processing_time = stats
-                    .avg_processing_time
-                    .checked_div(stats.count)
-                    .unwrap_or_default();
-                let _ = self.gossip.inner.share_mut(|i, _| {
-                    let s = tracing::trace_span!("gossip_metrics");
+        if let Some(last) = stats.last {
+            let elapsed = last.elapsed();
+            stats.avg_processing_time += elapsed;
+            stats.max_processing_time = std::cmp::max(stats.max_processing_time, elapsed);
+        }
+        stats.last = Some(tokio::time::Instant::now());
+        stats.count += 1;
+        let elapsed = stats.start.elapsed();
+        if elapsed.as_secs() > 5 {
+            stats.avg_processing_time = stats
+                .avg_processing_time
+                .checked_div(stats.count)
+                .unwrap_or_default();
+            let _ = self.gossip.inner.share_mut(|i, _| {
+                    let s = tracing::trace_span!("gossip_metrics", gossip_type = %self.gossip.gossip_type);
                     s.in_scope(|| tracing::trace!("{}\nStats over last 5s:\n\tAverage processing time {:?}\n\tIteration count: {}\n\tMax gossip processing time: {:?}", i.metrics, stats.avg_processing_time, stats.count, stats.max_processing_time));
                     Ok(())
                 });
-                *stats = Stats::reset();
-            }
+            *stats = Stats::reset();
         }
     }
 }
@@ -620,6 +627,10 @@ impl ShardedGossipLocal {
                 self.remove_target(&cert, false).await?;
                 Vec::with_capacity(0)
             }
+            ShardedGossipWire::Busy(_) => {
+                self.remove_target(&cert, true).await?;
+                Vec::with_capacity(0)
+            }
             ShardedGossipWire::Error(Error { message }) => {
                 tracing::warn!("gossiping with: {:?} and got error: {}", cert, message);
                 self.remove_state(&cert, true).await?;
@@ -859,9 +870,15 @@ kitsune_p2p_types::write_codec_enum! {
         AlreadyInProgress(0x90) {
         },
 
+        /// The node currently is gossiping with too many
+        /// other nodes and is too busy to accept your initiate.
+        /// Please try again later.
+        Busy(0x11) {
+        },
+
         /// The node you are gossiping with has hit an error condition
         /// and failed to respond to a request.
-        Error(0x11) {
+        Error(0x12) {
             /// The error message.
             message.0: String,
         },
@@ -878,14 +895,25 @@ impl AsGossipModule for ShardedGossip {
         use kitsune_p2p_types::codec::*;
         let (bytes, gossip) =
             ShardedGossipWire::decode_ref(&gossip_data).map_err(KitsuneError::other)?;
+        let new_initiate = matches!(gossip, ShardedGossipWire::Initiate(_));
         self.inner.share_mut(move |i, _| {
-            i.incoming
-                .push_back((con, remote_url, gossip, bytes as usize));
-            if i.incoming.len() > 20 {
+            let overloaded = i.incoming.len() > 20;
+            if overloaded {
                 tracing::warn!(
                     "Overloaded with incoming gossip.. {} messages",
                     i.incoming.len()
                 );
+            }
+            // If we are overloaded then return busy to any new initiates.
+            if overloaded && new_initiate {
+                i.outgoing.push_back((
+                    GossipTgt::new(Vec::with_capacity(0), con.peer_cert()),
+                    HowToConnect::Con(con, remote_url),
+                    ShardedGossipWire::busy(),
+                ));
+            } else {
+                i.incoming
+                    .push_back((con, remote_url, gossip, bytes as usize));
             }
             Ok(())
         })
