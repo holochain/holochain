@@ -305,7 +305,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .conductor_handle
                     .dump_full_cell_state(&cell_id, dht_ops_cursor)
                     .await?;
-                Ok(AdminResponse::StateDumped(state))
+                Ok(AdminResponse::FullStateDumped(state))
             }
             AddAgentInfo { agent_infos } => {
                 self.conductor_handle.add_agent_infos(agent_infos).await?;
