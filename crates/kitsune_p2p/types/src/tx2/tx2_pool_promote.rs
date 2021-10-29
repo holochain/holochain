@@ -111,7 +111,8 @@ async fn in_chan_recv_logic(
                     }
                     Ok(c) => c,
                 };
-                tracing::debug!(?local_cert, ?peer_cert, "accepted incoming channel");
+                // TODO: ask david.b if it was ok to downgrade this from debug to trace
+                tracing::trace!(?local_cert, ?peer_cert, "accepted incoming channel");
                 loop {
                     let r = chan.read(tuning_params.implicit_timeout()).await;
 
@@ -197,7 +198,8 @@ async fn in_chan_recv_logic(
                 writer,
             });
 
-            tracing::debug!(?local_cert, ?peer_cert, "established outgoing channel");
+            // TODO: ask david.b if it was ok to downgrade this from debug to trace
+            tracing::trace!(?local_cert, ?peer_cert, "established outgoing channel");
         }
         tracing::debug!(?local_cert, ?peer_cert, "channel create loop end");
     };

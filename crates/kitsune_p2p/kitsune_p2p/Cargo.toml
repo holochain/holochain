@@ -47,10 +47,12 @@ maplit = { version = "1", optional = true }
 mockall = { version = "0.10.2", optional = true }
 
 [dev-dependencies]
+contrafact = { version = "0.1.0-dev.1" }
 maplit = "1"
 mockall = "0.10.2"
 pretty_assertions = "0.7"
 test-case = "1.0.0"
+tracing = "0.1"
 tracing-subscriber = "0.2"
 
 [features]
@@ -60,7 +62,8 @@ test_utils = [
   "kitsune_p2p_types/test_utils",
   "maplit",
   "mockall",
-  "kitsune_p2p_timestamp/now"
+  "kitsune_p2p_timestamp/now",
+  "kitsune_p2p_timestamp/arbitrary",
 ]
 mock_network = [
   "kitsune_p2p_types/test_utils",
