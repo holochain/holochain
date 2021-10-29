@@ -23,8 +23,16 @@ pub struct ProxyConfig {
     pub tuning_params: Option<KitsuneP2pTuningParams>,
 
     /// If enabled, allow forwarding of messages (proxying)
+    /// If you are a proxy server, set this to true.
+    /// If you are a client, leave this as the default false.
     /// Default: false.
     pub allow_proxy_fwd: bool,
+
+    /// If Some(addr), we will try to keep an open connection to addr.
+    /// The node at addr should forward messages intended for us,
+    /// and we will modify our local_addr() function to make that
+    /// endpoint our external address.
+    pub client_of_remote_proxy: Option<ProxyUrl>,
 }
 
 impl Default for ProxyConfig {
@@ -32,21 +40,23 @@ impl Default for ProxyConfig {
         Self {
             tuning_params: None,
             allow_proxy_fwd: false,
+            client_of_remote_proxy: None,
         }
     }
 }
 
 impl ProxyConfig {
     /// into inner contents with default application
-    pub fn split(self) -> KitsuneResult<(KitsuneP2pTuningParams, bool)> {
+    pub fn split(self) -> KitsuneResult<(KitsuneP2pTuningParams, bool, Option<ProxyUrl>)> {
         let ProxyConfig {
             tuning_params,
             allow_proxy_fwd,
+            client_of_remote_proxy,
         } = self;
 
         let tuning_params = tuning_params.unwrap_or_else(KitsuneP2pTuningParams::default);
 
-        Ok((tuning_params, allow_proxy_fwd))
+        Ok((tuning_params, allow_proxy_fwd, client_of_remote_proxy))
     }
 }
 
@@ -658,10 +668,11 @@ impl ProxyEp {
         sub_ep: Ep,
         tuning_params: KitsuneP2pTuningParams,
         allow_proxy_fwd: bool,
+        _client_of_remote_proxy: Option<ProxyUrl>,
     ) -> KitsuneResult<Ep> {
         // this isn't something that needs to be configurable,
         // because it's entirely dependent on the code written here
-        // we only ever capture a singe logic closure
+        // we only ever capture a single logic closure
         // so technically, it only really would need to be 1.
         const LOGIC_CHAN_LIMIT: usize = 32;
 
@@ -708,15 +719,17 @@ impl AsEp for ProxyEp {
 struct ProxyEpFactory {
     tuning_params: KitsuneP2pTuningParams,
     allow_proxy_fwd: bool,
+    client_of_remote_proxy: Option<ProxyUrl>,
     sub_fact: EpFactory,
 }
 
 impl ProxyEpFactory {
     pub fn new(sub_fact: EpFactory, config: ProxyConfig) -> KitsuneResult<EpFactory> {
-        let (tuning_params, allow_proxy_fwd) = config.split()?;
+        let (tuning_params, allow_proxy_fwd, client_of_remote_proxy) = config.split()?;
         let fact: EpFactory = Arc::new(ProxyEpFactory {
             tuning_params,
             allow_proxy_fwd,
+            client_of_remote_proxy,
             sub_fact,
         });
         Ok(fact)
@@ -732,9 +745,10 @@ impl AsEpFactory for ProxyEpFactory {
         let tuning_params = self.tuning_params.clone();
         let fut = self.sub_fact.bind(bind_spec, timeout);
         let allow_proxy_fwd = self.allow_proxy_fwd;
+        let client_of_remote_proxy = self.client_of_remote_proxy.clone();
         async move {
             let sub_ep = fut.await?;
-            ProxyEp::new(sub_ep, tuning_params, allow_proxy_fwd).await
+            ProxyEp::new(sub_ep, tuning_params, allow_proxy_fwd, client_of_remote_proxy).await
         }
         .boxed()
     }
