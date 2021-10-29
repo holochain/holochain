@@ -17,7 +17,7 @@ pub fn get_agent_activity(
     })
 }
 
-/// Walks the source chain in reverse (latest to oldest) filtering by header and/or entry type
+/// Walks the source chain in ascending order (oldest to latest) filtering by header and/or entry type
 ///
 /// Given a header and entry type, returns an [ `Vec<Element>` ]
 ///

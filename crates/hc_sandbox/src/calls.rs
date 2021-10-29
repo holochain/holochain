@@ -122,7 +122,7 @@ pub struct RegisterDna {
 ///
 /// Setting properties and membrane proofs is not
 /// yet supported.
-/// CellNicks are set to `my-app-0`, `my-app-1` etc.
+/// AppRoleIds are set to `my-app-0`, `my-app-1` etc.
 pub struct InstallApp {
     #[structopt(short, long, default_value = "test-app")]
     /// Sets the InstalledAppId.
@@ -143,7 +143,7 @@ pub struct InstallApp {
 ///
 /// Setting properties and membrane proofs is not
 /// yet supported.
-/// CellNicks are set to `my-app-0`, `my-app-1` etc.
+/// AppRoleIds are set to `my-app-0`, `my-app-1` etc.
 pub struct InstallAppBundle {
     #[structopt(short, long)]
     /// Sets the InstalledAppId.

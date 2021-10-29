@@ -32,8 +32,8 @@ pub async fn main() {
             println!("[{}] Agent pub key generated: {}", i, agent_key);
 
             // Install Dna
-            let nick = format!("fake_dna_{}", i);
-            let dna = fake_dna_zomes_named(&uuid::Uuid::new_v4().to_string(), &nick, zomes);
+            let name = format!("fake_dna_{}", i);
+            let dna = fake_dna_zomes_named(&uuid::Uuid::new_v4().to_string(), &name, zomes);
 
             let original_dna_hash = dna.dna_hash().clone();
             let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
@@ -43,15 +43,15 @@ pub async fn main() {
                 agent_key,
                 fake_dna_path.clone(),
                 None,
-                nick.clone(),
-                nick.clone(),
+                name.clone(),
+                name.clone(),
                 REQ_TIMEOUT_MS,
             )
             .await;
 
             println!(
                 "[{}] installed dna with hash {} and name {}",
-                i, dna_hash, nick
+                i, dna_hash, name
             );
         })
     }))

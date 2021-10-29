@@ -775,7 +775,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             dna_hash,
             installed_app_id,
             agent_key,
-            slot_id,
+            role_id,
             membrane_proof,
         } = payload;
         let cell_id = CellId::new(dna_hash, agent_key);
@@ -797,7 +797,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let properties = properties.unwrap_or_else(|| ().into());
         let cell_id = self
             .conductor
-            .add_clone_cell_to_app(installed_app_id, slot_id, properties)
+            .add_clone_cell_to_app(installed_app_id, role_id, properties)
             .await?;
         Ok(cell_id)
     }
@@ -884,8 +884,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         )
         .await?;
 
-        let slots = ops.slots;
-        let app = InstalledAppCommon::new(installed_app_id, agent_key, slots);
+        let roles = ops.role_assignments;
+        let app = InstalledAppCommon::new(installed_app_id, agent_key, roles);
 
         // Update the db
         let stopped_app = self.conductor.add_disabled_app_to_db(app).await?;

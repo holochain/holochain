@@ -161,7 +161,7 @@ pub async fn register_and_install_dna(
     agent_key: AgentPubKey,
     dna_path: PathBuf,
     properties: Option<YamlProperties>,
-    nick: String,
+    role_id: AppRoleId,
     timeout: u64,
 ) -> DnaHash {
     register_and_install_dna_named(
@@ -170,7 +170,7 @@ pub async fn register_and_install_dna(
         agent_key,
         dna_path,
         properties,
-        nick,
+        role_id,
         "test".to_string(),
         timeout,
     )
@@ -183,7 +183,7 @@ pub async fn register_and_install_dna_named(
     agent_key: AgentPubKey,
     dna_path: PathBuf,
     properties: Option<YamlProperties>,
-    nick: String,
+    role_id: AppRoleId,
     name: String,
     timeout: u64,
 ) -> DnaHash {
@@ -204,7 +204,7 @@ pub async fn register_and_install_dna_named(
 
     let dna_payload = InstallAppDnaPayload {
         hash: dna_hash.clone(),
-        nick,
+        role_id,
         membrane_proof: None,
     };
     let payload = InstallAppPayload {
