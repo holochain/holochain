@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Adds test utils for creating simulated networks. [#1037](https://github.com/holochain/holochain/pull/1037).
 - Conductor can take a mocked network for testing simulated networks. [#1036](https://github.com/holochain/holochain/pull/1036)
 - Batch peer store write so we use less transactions. [#1007](https://github.com/holochain/holochain/pull/1007/).
+-current chain head including recent writes available in agent info [#1079](https://github.com/holochain/holochain/pull/1079)
 
 ## 0.0.113
 
