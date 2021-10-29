@@ -35,7 +35,7 @@ impl HolochainP2pHandler for StubNetwork {
         to_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: FunctionName,
-        cap: Option<CapSecret>,
+        cap_secret: Option<CapSecret>,
         payload: ExternIO,
     ) -> HolochainP2pHandlerResult<SerializedBytes> {
         Err("stub".into())
