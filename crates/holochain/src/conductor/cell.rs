@@ -284,7 +284,7 @@ impl Cell {
                     let invocation = ZomeCall {
                         cell_id: self.id.clone(),
                         zome_name: scheduled_fn.zome_name().clone(),
-                        cap: None,
+                        cap_secret: None,
                         payload,
                         provenance: self.id.agent_pubkey().clone(),
                         fn_name: scheduled_fn.fn_name().clone(),
@@ -359,14 +359,14 @@ impl Cell {
                 from_agent,
                 zome_name,
                 fn_name,
-                cap,
+                cap_secret,
                 respond,
                 payload,
                 ..
             } => {
                 async {
                     let res = self
-                        .handle_call_remote(from_agent, zome_name, fn_name, cap, payload)
+                        .handle_call_remote(from_agent, zome_name, fn_name, cap_secret, payload)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
@@ -951,20 +951,20 @@ impl Cell {
         Ok([0; 64].into())
     }
 
-    #[instrument(skip(self, from_agent, fn_name, cap, payload))]
+    #[instrument(skip(self, from_agent, fn_name, cap_secret, payload))]
     /// a remote agent is attempting a "call_remote" on this cell.
     async fn handle_call_remote(
         &self,
         from_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: FunctionName,
-        cap: Option<CapSecret>,
+        cap_secret: Option<CapSecret>,
         payload: ExternIO,
     ) -> CellResult<SerializedBytes> {
         let invocation = ZomeCall {
             cell_id: self.id.clone(),
             zome_name,
-            cap,
+            cap_secret,
             payload,
             provenance: from_agent,
             fn_name,

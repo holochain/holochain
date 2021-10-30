@@ -288,7 +288,7 @@ pub mod wasm_test {
             .call_zome(ZomeCall {
                 cell_id: alice_cell_id.clone(),
                 zome_name: TestWasm::MultipleCalls.into(),
-                cap: None,
+                cap_secret: None,
                 fn_name: "create_entry_multiple".into(),
                 payload: ExternIO::encode(n).unwrap(),
                 provenance: alice_agent_id.clone(),
@@ -303,7 +303,7 @@ pub mod wasm_test {
             .call_zome(ZomeCall {
                 cell_id: alice_cell_id,
                 zome_name: TestWasm::MultipleCalls.into(),
-                cap: None,
+                cap_secret: None,
                 fn_name: "get_entry_multiple".into(),
                 payload: ExternIO::encode(n).unwrap(),
                 provenance: alice_agent_id,

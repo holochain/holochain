@@ -147,7 +147,7 @@ ghost_actor::ghost_chan! {
             from_agent: AgentPubKey,
             zome_name: ZomeName,
             fn_name: FunctionName,
-            cap: Option<CapSecret>,
+            cap_secret: Option<CapSecret>,
             payload: ExternIO,
         ) -> SerializedBytes;
 

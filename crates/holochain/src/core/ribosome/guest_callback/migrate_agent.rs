@@ -1,6 +1,7 @@
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
+use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
@@ -61,6 +62,9 @@ impl Invocation for MigrateAgentInvocation {
     }
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(self.migrate_agent)
+    }
+    fn auth(&self) -> InvocationAuth {
+        InvocationAuth::LocalCallback
     }
 }
 

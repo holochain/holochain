@@ -505,7 +505,7 @@ async fn make_signing_call(client: &mut WebsocketSender, cell: &SweetCell) -> Ap
             zome_name: "sign".into(),
             fn_name: "sign_ephemeral".into(),
             payload: ExternIO::encode(()).unwrap(),
-            cap: None,
+            cap_secret: None,
             provenance: cell.agent_pubkey().clone(),
         })))
         .await
