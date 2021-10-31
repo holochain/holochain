@@ -17,14 +17,21 @@ pub struct ZomeInfo {
     /// The position of this zome in the `dna.json`
     pub id: ZomeId,
     pub entry_defs: EntryDefs,
+    pub extern_fns: Vec<FunctionName>,
 }
 
 impl ZomeInfo {
-    pub fn new(name: ZomeName, id: ZomeId, entry_defs: EntryDefs) -> Self {
+    pub fn new(
+        name: ZomeName,
+        id: ZomeId,
+        entry_defs: EntryDefs,
+        extern_fns: Vec<FunctionName>,
+    ) -> Self {
         Self {
             name,
             id,
             entry_defs,
+            extern_fns,
         }
     }
 }

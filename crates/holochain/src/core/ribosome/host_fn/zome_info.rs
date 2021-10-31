@@ -4,9 +4,7 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
-use crate::core::ribosome::EntryDefsHostAccess;
-use crate::core::ribosome::EntryDefsInvocation;
-use crate::core::ribosome::EntryDefsResult;
+use crate::core::ribosome::error::RibosomeError;
 
 pub fn zome_info(
     ribosome: Arc<impl RibosomeT>,
@@ -15,22 +13,9 @@ pub fn zome_info(
 ) -> Result<ZomeInfo, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ bindings_deterministic: Permission::Allow, .. } => {
-            Ok(ZomeInfo {
-                name: call_context.zome.zome_name().clone(),
-                id: ribosome
-                    .zome_to_id(&call_context.zome)
-                    .expect("Failed to get ID for current zome"),
-                entry_defs: {
-                    match ribosome.run_entry_defs(EntryDefsHostAccess, EntryDefsInvocation).map_err(|e| WasmError::Host(e.to_string()))? {
-                        EntryDefsResult::Err(zome, error_string) => return Err(WasmError::Host(format!("{}: {}", zome, error_string))),
-                        EntryDefsResult::Defs(defs) => {
-                            match defs.get(call_context.zome.zome_name()) {
-                                Some(entry_defs) => entry_defs.clone(),
-                                None => Vec::new().into(),
-                            }
-                        },
-                    }
-                },
+            ribosome.zome_info(call_context.zome.clone()).map_err(|e| match e {
+                RibosomeError::WasmError(wasm_error) => wasm_error,
+                other_error => WasmError::Host(other_error.to_string()),
             })
         },
         _ => unreachable!(),

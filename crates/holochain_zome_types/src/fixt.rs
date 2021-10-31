@@ -148,6 +148,7 @@ fixturator!(
 );
 
 fixturator!(
+    with_vec 0 5;
     FunctionName;
     from String;
 );
@@ -174,7 +175,7 @@ fixturator!(
 
 fixturator!(
     ZomeInfo;
-    constructor fn new(ZomeName, ZomeId, EntryDefs);
+    constructor fn new(ZomeName, ZomeId, EntryDefs, FunctionNameVec);
 );
 
 fixturator!(
