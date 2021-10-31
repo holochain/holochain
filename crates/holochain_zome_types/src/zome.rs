@@ -177,6 +177,10 @@ impl ZomeName {
     pub fn unknown() -> Self {
         "UnknownZomeName".into()
     }
+
+    pub fn new<S: ToString>(s: S) -> Self {
+        ZomeName(s.to_string())
+    }
 }
 
 impl std::fmt::Display for ZomeName {

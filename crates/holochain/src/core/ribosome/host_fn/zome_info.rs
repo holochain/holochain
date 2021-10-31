@@ -39,9 +39,17 @@ pub mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn zome_info_entry_defs() {
+    async fn zome_info() {
         let host_access = fixt!(ZomeCallHostAccess, Predictable);
         let zome_info: ZomeInfo = crate::call_test_ribosome!(host_access, TestWasm::EntryDefs, "zome_info", ()).unwrap();
+        assert_eq!(
+            zome_info.name,
+            ZomeName::new("entry_defs"),
+        );
+        assert_eq!(
+            zome_info.id,
+            ZomeId::new(0)
+        );
         assert_eq!(
             zome_info.entry_defs,
             vec![
@@ -60,6 +68,19 @@ pub mod test {
                     required_validation_type: Default::default(),
                 }
             ].into(),
+        );
+        assert_eq!(
+            zome_info.extern_fns,
+            vec![
+                FunctionName::new("memory"),
+                FunctionName::new("assert_indexes"),
+                FunctionName::new("entry_defs"),
+                FunctionName::new("zome_info"),
+                FunctionName::new("__allocate"),
+                FunctionName::new("__deallocate"),
+                FunctionName::new("__data_end"),
+                FunctionName::new("__heap_base"),
+            ],
         );
     }
 }
