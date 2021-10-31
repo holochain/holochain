@@ -16,14 +16,21 @@ pub struct ZomeInfo {
     pub name: ZomeName,
     /// The position of this zome in the `dna.json`
     pub id: ZomeId,
+    pub properties: SerializedBytes,
     pub entry_defs: EntryDefs,
 }
 
 impl ZomeInfo {
-    pub fn new(name: ZomeName, id: ZomeId, entry_defs: EntryDefs) -> Self {
+    pub fn new(
+        name: ZomeName,
+        id: ZomeId,
+        properties: SerializedBytes,
+        entry_defs: EntryDefs,
+    ) -> Self {
         Self {
             name,
             id,
+            properties,
             entry_defs,
         }
     }

@@ -20,6 +20,8 @@ pub fn zome_info(
                 id: ribosome
                     .zome_to_id(&call_context.zome)
                     .expect("Failed to get ID for current zome"),
+                // @TODO implement properties for zomes.
+                properties: SerializedBytes::default(),
                 entry_defs: {
                     match ribosome.run_entry_defs(EntryDefsHostAccess, EntryDefsInvocation).map_err(|e| WasmError::Host(e.to_string()))? {
                         EntryDefsResult::Err(zome, error_string) => return Err(WasmError::Host(format!("{}: {}", zome, error_string))),
