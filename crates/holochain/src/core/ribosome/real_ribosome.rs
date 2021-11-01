@@ -488,7 +488,9 @@ impl RibosomeT for RealRibosome {
     ) -> Result<Option<ExternIO>, RibosomeError> {
         let call_context = CallContext {
             zome: zome.clone(),
+            function_name: to_call.clone(),
             host_context,
+            auth: invocation.auth(),
         };
 
         match zome.zome_def() {
@@ -705,7 +707,7 @@ pub mod wasm_test {
                 cell_id: alice.cell_id().clone(),
                 zome_name: alice.name().clone(),
                 fn_name: "infallible".into(),
-                cap: None,
+                cap_secret: None,
                 provenance: alice_pubkey.clone(),
                 payload: ExternIO::encode(()).unwrap(),
             })

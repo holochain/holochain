@@ -203,6 +203,12 @@ impl From<String> for ZomeName {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct FunctionName(pub String);
 
+impl FunctionName {
+    pub fn new<S: ToString>(s: S) -> Self {
+        FunctionName(s.to_string())
+    }
+}
+
 impl std::fmt::Display for FunctionName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
