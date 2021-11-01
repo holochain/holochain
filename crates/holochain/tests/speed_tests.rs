@@ -216,7 +216,7 @@ async fn speed_test(n: Option<usize>) -> TestEnvs {
         Ok(ZomeCall {
             cell_id: cell_id.clone(),
             zome_name: TestWasm::Anchor.into(),
-            cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
+            cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
             fn_name: func.into(),
             payload: ExternIO::encode(payload)?,
             provenance: cell_id.agent_pubkey().clone(),

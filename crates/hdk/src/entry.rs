@@ -726,8 +726,8 @@ macro_rules! entry_defs {
 #[macro_export]
 macro_rules! entry_def_index {
     ( $t:ty ) => {
-        match crate::entry_defs(()) {
-            Ok($crate::prelude::EntryDefsCallbackResult::Defs(entry_defs)) => {
+        match $crate::prelude::zome_info() {
+            Ok(ZomeInfo { entry_defs, .. }) => {
                 match entry_defs.entry_def_index_from_id(<$t>::entry_def_id()) {
                     Some(entry_def_index) => Ok::<
                         $crate::prelude::EntryDefIndex,
