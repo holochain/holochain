@@ -202,10 +202,18 @@ async fn in_chan_recv_logic(
         tracing::debug!(?local_cert, ?peer_cert, "channel create loop end");
     };
 
-    // We can ignore errors, as they only happen on shutdown of the endpoint.
-    let _ = futures::future::join(recv_fut, write_fut).await;
+    tokio::select! {
+        _ = recv_fut => {
+            // TODO - standardize codes?
+            con_item.close(500, "recv_fut closed").await;
+        }
+        _ = write_fut => {
+            // TODO - standardize codes?
+            con_item.close(500, "write_fut closed").await;
+        }
+    }
 
-    tracing::debug!(?local_cert, ?peer_cert, "channel logic end");
+    tracing::warn!(?local_cert, ?peer_cert, "channel logic end");
 
     Ok(())
 }
@@ -609,32 +617,9 @@ impl AsEpHnd for PromoteEpHnd {
     }
 
     fn close(&self, code: u32, reason: &str) -> BoxFuture<'static, ()> {
-        if let Ok((cons, ep_close_fut, logic_hnd)) = self.0.share_mut(|i, c| {
-            let local_cert = i.sub_ep.local_cert();
-
-            tracing::warn!(
-                ?local_cert,
-                %code,
-                %reason,
-                "closing endpoint (pool)",
-            );
-
-            *c = true;
-            i.con_limit.close();
-            let cons = i.cons.iter().map(|(_, c)| c.clone()).collect::<Vec<_>>();
-            let ep_close_fut = i.sub_ep.close(code, reason);
-            Ok((cons, ep_close_fut, i.logic_hnd.clone()))
-        }) {
-            let reason = reason.to_string();
-            async move {
-                futures::future::join_all(cons.into_iter().map(|c| c.close(code, &reason))).await;
-                ep_close_fut.await;
-                let _ = logic_hnd.emit(EpEvent::EndpointClosed).await;
-                logic_hnd.close();
-            }
-            .boxed()
-        } else {
-            async move {}.boxed()
+        match self.0.share_mut(|i, _| Ok(i.sub_ep.close(code, reason))) {
+            Ok(fut) => fut,
+            Err(_) => async move {}.boxed(),
         }
     }
 
@@ -658,6 +643,40 @@ impl AsEpHnd for PromoteEpHnd {
             Ok(con)
         }
         .boxed()
+    }
+}
+
+fn close_promote_ep_hnd(
+    inner: &Share<PromoteEpInner>,
+    code: u32,
+    reason: &str,
+) -> BoxFuture<'static, ()> {
+    if let Ok((cons, ep_close_fut, logic_hnd)) = inner.share_mut(|i, c| {
+        let local_cert = i.sub_ep.local_cert();
+
+        tracing::warn!(
+            ?local_cert,
+            %code,
+            %reason,
+            "closing endpoint (pool)",
+        );
+
+        *c = true;
+        i.con_limit.close();
+        let cons = i.cons.iter().map(|(_, c)| c.clone()).collect::<Vec<_>>();
+        let ep_close_fut = i.sub_ep.close(code, reason);
+        Ok((cons, ep_close_fut, i.logic_hnd.clone()))
+    }) {
+        let reason = reason.to_string();
+        async move {
+            futures::future::join_all(cons.into_iter().map(|c| c.close(code, &reason))).await;
+            ep_close_fut.await;
+            let _ = logic_hnd.emit(EpEvent::EndpointClosed).await;
+            logic_hnd.close();
+        }
+        .boxed()
+    } else {
+        async move {}.boxed()
     }
 }
 
@@ -747,6 +766,8 @@ async fn con_recv_logic(
         .await;
 
     tracing::warn!(?local_cert, "connection recv stream closed!");
+
+    close_promote_ep_hnd(inner, 500, "listener closed").await;
 }
 
 impl PromoteEp {

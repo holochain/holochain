@@ -1,13 +1,14 @@
 use futures::stream::StreamExt;
+use ghost_actor::dependencies::tracing;
 use kitsune_p2p_proxy::tx2::*;
 use kitsune_p2p_proxy::ProxyUrl;
 use kitsune_p2p_transport_quic::tx2::*;
+use kitsune_p2p_types::dependencies::*;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_pool_promote::*;
+use kitsune_p2p_types::tx2::tx2_restart_adapter::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::*;
-use kitsune_p2p_types::dependencies::*;
-use ghost_actor::dependencies::tracing;
 
 kitsune_p2p_types::write_codec_enum! {
     codec Wire {
@@ -23,6 +24,7 @@ kitsune_p2p_types::write_codec_enum! {
 async fn gen_node() -> Tx2EpHnd<Wire> {
     let conf = QuicConfig::default();
     let f = tx2_quic_adapter(conf).await.unwrap();
+    let f = tx2_restart_adapter(f);
     let f = tx2_pool_promote(f, Default::default());
     let mut conf = ProxyConfig::default();
     conf.allow_proxy_fwd = true;
@@ -55,9 +57,7 @@ async fn gen_node() -> Tx2EpHnd<Wire> {
                         panic!("unexpected: {:?}", data);
                     }
                 }
-                IncomingConnection(_)
-                    | OutgoingConnection(_)
-                    | Tick => (),
+                IncomingConnection(_) | OutgoingConnection(_) | Tick => (),
                 EndpointClosed => {
                     println!("got endpoint closed... let's see if we can still communicate : )");
                 }
@@ -106,17 +106,31 @@ async fn tx2_ep_rebind() {
 
     let node = gen_node().await;
     let _ = node.get_connection(proxy_addr.clone(), t).await.unwrap();
+
     let node_addr = node.local_addr().unwrap();
     let node_addr = proxify_addr(&proxy_addr, &node_addr);
-    println!("node: {}", node_addr);
+    println!("@@@ node @@@: {}", node_addr);
+
+    tracing::error!("-- test -- closing node");
 
     // shut down the whole endpoint.
     // this is simulating the endpoint shutting down,
     // e.g. iface down / cable unplugged / airplane mode.
     node.close(999, "noodle").await;
 
+    tracing::error!("-- test -- sleeping");
+
     // give the node some time to re-connect
     tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+
+    // TODO - DELETE THIS - should be handled with "client_of_remote_proxy"
+    let _ = node.get_connection(proxy_addr.clone(), t).await.unwrap();
+
+    let node_addr = node.local_addr().unwrap();
+    let node_addr = proxify_addr(&proxy_addr, &node_addr);
+    println!("@@@ node @@@: {}", node_addr);
+
+    tracing::error!("-- test -- making request");
 
     // make sure we can receive requests from someone else
     let mut data = PoolBuf::new();

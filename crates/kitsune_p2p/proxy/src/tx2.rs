@@ -748,7 +748,13 @@ impl AsEpFactory for ProxyEpFactory {
         let client_of_remote_proxy = self.client_of_remote_proxy.clone();
         async move {
             let sub_ep = fut.await?;
-            ProxyEp::new(sub_ep, tuning_params, allow_proxy_fwd, client_of_remote_proxy).await
+            ProxyEp::new(
+                sub_ep,
+                tuning_params,
+                allow_proxy_fwd,
+                client_of_remote_proxy,
+            )
+            .await
         }
         .boxed()
     }
