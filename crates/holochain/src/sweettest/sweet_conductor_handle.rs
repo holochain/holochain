@@ -46,7 +46,7 @@ impl SweetConductorHandle {
     pub async fn call_from<I, O, F>(
         &self,
         provenance: &AgentPubKey,
-        cap: Option<CapSecret>,
+        cap_secret: Option<CapSecret>,
         zome: &SweetZome,
         fn_name: F,
         payload: I,
@@ -56,7 +56,7 @@ impl SweetConductorHandle {
         I: Serialize + std::fmt::Debug,
         O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
-        self.call_from_fallible(provenance, cap, zome, fn_name, payload)
+        self.call_from_fallible(provenance, cap_secret, zome, fn_name, payload)
             .await
             .unwrap()
     }
@@ -65,7 +65,7 @@ impl SweetConductorHandle {
     pub async fn call_from_fallible<I, O, F>(
         &self,
         provenance: &AgentPubKey,
-        cap: Option<CapSecret>,
+        cap_secret: Option<CapSecret>,
         zome: &SweetZome,
         fn_name: F,
         payload: I,
@@ -80,7 +80,7 @@ impl SweetConductorHandle {
             cell_id: zome.cell_id().clone(),
             zome_name: zome.name().clone(),
             fn_name: fn_name.into(),
-            cap,
+            cap_secret,
             provenance: provenance.clone(),
             payload,
         };
