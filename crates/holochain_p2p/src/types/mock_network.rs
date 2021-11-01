@@ -140,7 +140,7 @@ pub struct HolochainP2pMockRespond {
 impl HolochainP2pMockRespond {
     /// Respond to a message request.
     pub fn respond(self, msg: HolochainP2pMockMsg) {
-        self.respond.respond(msg.to_wire_msg());
+        self.respond.respond(msg.into_wire_msg());
     }
 }
 
@@ -296,12 +296,15 @@ impl HolochainP2pMockChannel {
         let (cert, url) = self.address_map.get(&from).cloned().unwrap();
         let id = msg.to_id();
         let (msg, rx) = if id.is_notify() {
-            (KitsuneMock::notify(id, cert, url, msg.to_wire_msg()), None)
+            (
+                KitsuneMock::notify(id, cert, url, msg.into_wire_msg()),
+                None,
+            )
         } else {
             let (respond, rx) = tokio::sync::oneshot::channel();
 
             (
-                KitsuneMock::request(id, cert, url, msg.to_wire_msg(), respond),
+                KitsuneMock::request(id, cert, url, msg.into_wire_msg(), respond),
                 Some(rx),
             )
         };
@@ -349,7 +352,7 @@ impl HolochainP2pMockMsg {
     }
 
     /// Turn a mock message into a kitsune wire message.
-    fn to_wire_msg(self) -> kwire::Wire {
+    fn into_wire_msg(self) -> kwire::Wire {
         match self {
             HolochainP2pMockMsg::Wire {
                 to_agent,
