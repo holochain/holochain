@@ -62,6 +62,7 @@ use holochain_keystore::test_keystore::spawn_legacy_test_keystore;
 use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_keystore::MetaLairClient;
 use holochain_sqlite::db::DbKind;
+use holochain_sqlite::sql::sql_cell::state_dump;
 use holochain_sqlite::prelude::*;
 use holochain_state::mutations;
 use holochain_state::prelude::from_blob;
@@ -1198,63 +1199,19 @@ pub async fn full_integration_dump(
         .async_reader(move |txn| {
             let integrated = query_dht_ops_from_statement(
                 &txn,
-                "
-                    SELECT 
-                        Header.blob as header_blob,
-                        Entry.blob as entry_blob,
-                        DhtOp.type as dht_type,
-                        DhtOp.hash as dht_hash,
-                        DhtOp.rowid as rowid
-                    FROM Header
-                    JOIN
-                        DhtOp ON DhtOp.header_hash = Header.hash
-                    LEFT JOIN
-                        Entry ON Header.entry_hash = Entry.hash
-                    WHERE when_integrated IS NOT NULL
-                ",
+                state_dump::DHT_OPS_INTEGRATED,
                 dht_ops_cursor,
             )?;
 
             let validation_limbo = query_dht_ops_from_statement(
                 &txn,
-                "
-                    SELECT 
-                        Header.blob as header_blob,
-                        Entry.blob as entry_blob,
-                        DhtOp.type as dht_type,
-                        DhtOp.hash as dht_hash,
-                        DhtOp.rowid as rowid
-                    FROM Header
-                    JOIN
-                        DhtOp ON DhtOp.header_hash = Header.hash
-                    LEFT JOIN
-                        Entry ON Header.entry_hash = Entry.hash
-                    WHERE when_integrated IS NULL
-                    AND (
-                        (is_authored = 1 AND validation_stage IS NOT NULL AND validation_stage < 3)
-                        OR
-                        (is_authored = 0 AND (validation_stage IS NULL OR validation_stage < 3))
-                    )
-                ",
+                state_dump::DHT_OPS_IN_VALIDATION_LIMBO,
                 dht_ops_cursor,
             )?;
 
             let integration_limbo = query_dht_ops_from_statement(
                 &txn,
-                "
-                    SELECT 
-                        Header.blob as header_blob,
-                        Entry.blob as entry_blob,
-                        DhtOp.type as dht_type,
-                        DhtOp.hash as dht_hash,
-                        DhtOp.rowid as rowid
-                    FROM Header
-                    JOIN
-                        DhtOp ON DhtOp.header_hash = Header.hash
-                    LEFT JOIN
-                        Entry ON Header.entry_hash = Entry.hash
-                    WHERE when_integrated IS NULL AND validation_stage = 3
-                ",
+                state_dump::DHT_OPS_IN_INTEGRATION_LIMBO,
                 dht_ops_cursor,
             )?;
 
