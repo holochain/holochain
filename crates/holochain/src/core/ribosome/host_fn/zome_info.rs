@@ -73,8 +73,8 @@ pub mod test {
             zome_info.extern_fns,
             vec![
                 FunctionName::new("memory"),
-                FunctionName::new("assert_indexes"),
                 FunctionName::new("entry_defs"),
+                FunctionName::new("assert_indexes"),
                 FunctionName::new("zome_info"),
                 FunctionName::new("__allocate"),
                 FunctionName::new("__deallocate"),
