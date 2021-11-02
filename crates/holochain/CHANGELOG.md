@@ -23,7 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Conductor can take a mocked network for testing simulated networks. [#1036](https://github.com/holochain/holochain/pull/1036)
 - Batch peer store write so we use less transactions. [#1007](https://github.com/holochain/holochain/pull/1007/).
 
-- Cell `IntegratedStateDump` now returns the full `Vec<DhtOp>` instead of just their count, enabling more introspection of the state of the cell [#1065](https://github.com/holochain/holochain/pull/1065).
+- Added `DumpFullState` to the admin interface, as a more complete form of `DumpState` which returns full `Vec<DhtOp>` instead of just their count, enabling more introspection of the state of the cell [#1065](https://github.com/holochain/holochain/pull/1065).
 - Added function name to call info in HDK. [#1078](https://github.com/holochain/holochain/pull/1078). 
 
 ## 0.0.113
