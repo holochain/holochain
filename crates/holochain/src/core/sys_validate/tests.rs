@@ -1,5 +1,4 @@
 use super::*;
-use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::handle::MockConductorHandleT;
 use crate::test_utils::fake_genesis;
 use ::fixt::prelude::*;
@@ -85,7 +84,9 @@ async fn check_valid_if_dna_test() {
     fake_genesis(env.clone().into(), tmp_dht.env(), keystore)
         .await
         .unwrap();
-    env.conn()
+    tmp_dht
+        .env()
+        .conn()
         .unwrap()
         .execute("UPDATE DhtOp SET when_integrated = 0", [])
         .unwrap();
@@ -314,8 +315,7 @@ async fn check_app_entry_type_test() {
     let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
         check_app_entry_type(&dna_hash, &aet, &conductor_api).await,
-        Err(SysValidationError::ConductorApiError(e))
-        if matches!(*e, ConductorApiError::DnaMissing(_))
+        Err(SysValidationError::DnaMissing(_))
     );
 
     // # Dna but no entry def in buffer

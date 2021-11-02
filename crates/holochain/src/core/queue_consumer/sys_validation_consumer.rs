@@ -10,7 +10,7 @@ use tracing::*;
 /// Spawn the QueueConsumer for SysValidation workflow
 #[instrument(skip(
     workspace,
-    dht_env,
+    space,
     conductor_handle,
     stop,
     trigger_app_validation,
@@ -18,7 +18,7 @@ use tracing::*;
 ))]
 pub fn spawn_sys_validation_consumer(
     workspace: SysValidationWorkspace,
-    dht_env: DbWrite<DbKindDht>,
+    space: Space,
     conductor_handle: ConductorHandle,
     mut stop: sync::broadcast::Receiver<()>,
     trigger_app_validation: TriggerSender,
@@ -27,6 +27,7 @@ pub fn spawn_sys_validation_consumer(
     let (tx, mut rx) = TriggerSender::new();
     let trigger_self = tx.clone();
     let workspace = Arc::new(workspace);
+    let space = Arc::new(space);
     let handle = tokio::spawn(async move {
         loop {
             // Wait for next job
@@ -40,7 +41,7 @@ pub fn spawn_sys_validation_consumer(
             // Run the workflow
             match sys_validation_workflow(
                 workspace.clone(),
-                dht_env.clone(),
+                space.clone(),
                 trigger_app_validation.clone(),
                 trigger_self.clone(),
                 network.clone(),

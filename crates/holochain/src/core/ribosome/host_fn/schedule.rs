@@ -85,7 +85,11 @@ pub mod tests {
             .unwrap();
 
         let cell_id = conductor.handle().list_cell_ids(None)[0].clone();
-        let cell_env = conductor.handle().get_authored_env(cell_id.dna_hash()).unwrap();
+        let cell_env = conductor
+            .handle()
+            .get_authored_env(cell_id.dna_hash())
+            .unwrap();
+        let author = cell_id.agent_pubkey().clone();
 
         cell_env
             .async_commit(move |txn: &mut Transaction| {
@@ -100,46 +104,48 @@ pub mod tests {
 
                 schedule_fn(
                     txn,
+                    &author,
                     persisted_scheduled_fn.clone(),
                     Some(persisted_schedule.clone()),
                     now,
                 )
                 .unwrap();
-                schedule_fn(txn, ephemeral_scheduled_fn.clone(), None, now).unwrap();
+                schedule_fn(txn, &author, ephemeral_scheduled_fn.clone(), None, now).unwrap();
 
-                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone()).unwrap());
-                assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone()).unwrap());
+                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &author).unwrap());
+                assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &author).unwrap());
 
                 // Deleting live ephemeral scheduled fns from now should delete.
-                delete_live_ephemeral_scheduled_fns(txn, now).unwrap();
-                assert!(!fn_is_scheduled(txn, ephemeral_scheduled_fn.clone()).unwrap());
-                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone()).unwrap());
+                delete_live_ephemeral_scheduled_fns(txn, now, &author).unwrap();
+                assert!(!fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &author,).unwrap());
+                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &author,).unwrap());
 
-                schedule_fn(txn, ephemeral_scheduled_fn.clone(), None, now).unwrap();
-                assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone()).unwrap());
-                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone()).unwrap());
+                schedule_fn(txn, &author, ephemeral_scheduled_fn.clone(), None, now).unwrap();
+                assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &author,).unwrap());
+                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &author,).unwrap());
 
                 // Deleting live ephemeral fns from a past time should do nothing.
-                delete_live_ephemeral_scheduled_fns(txn, the_past).unwrap();
-                assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone()).unwrap());
-                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone()).unwrap());
+                delete_live_ephemeral_scheduled_fns(txn, the_past, &author).unwrap();
+                assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &author,).unwrap());
+                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &author,).unwrap());
 
                 // Deleting live ephemeral fns from the future should delete.
-                delete_live_ephemeral_scheduled_fns(txn, the_future).unwrap();
-                assert!(!fn_is_scheduled(txn, ephemeral_scheduled_fn.clone()).unwrap());
-                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone()).unwrap());
+                delete_live_ephemeral_scheduled_fns(txn, the_future, &author).unwrap();
+                assert!(!fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &author,).unwrap());
+                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &author,).unwrap());
 
                 // Deleting all ephemeral fns should delete.
-                schedule_fn(txn, ephemeral_scheduled_fn.clone(), None, now).unwrap();
-                assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone()).unwrap());
-                delete_all_ephemeral_scheduled_fns(txn).unwrap();
-                assert!(!fn_is_scheduled(txn, ephemeral_scheduled_fn.clone()).unwrap());
-                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone()).unwrap());
+                schedule_fn(txn, &author, ephemeral_scheduled_fn.clone(), None, now).unwrap();
+                assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &author,).unwrap());
+                delete_all_ephemeral_scheduled_fns(txn, &author).unwrap();
+                assert!(!fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &author,).unwrap());
+                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &author,).unwrap());
 
                 let ephemeral_future_schedule =
                     Schedule::Ephemeral(std::time::Duration::from_millis(1001));
                 schedule_fn(
                     txn,
+                    &author,
                     ephemeral_scheduled_fn.clone(),
                     Some(ephemeral_future_schedule.clone()),
                     now,
@@ -150,14 +156,14 @@ pub mod tests {
                         persisted_scheduled_fn.clone(),
                         Some(persisted_schedule.clone())
                     )],
-                    live_scheduled_fns(txn, the_future).unwrap(),
+                    live_scheduled_fns(txn, the_future, &author,).unwrap(),
                 );
                 assert_eq!(
                     vec![
                         (persisted_scheduled_fn, Some(persisted_schedule)),
                         (ephemeral_scheduled_fn, Some(ephemeral_future_schedule)),
                     ],
-                    live_scheduled_fns(txn, the_distant_future).unwrap(),
+                    live_scheduled_fns(txn, the_distant_future, &author,).unwrap(),
                 );
 
                 Result::<(), DatabaseError>::Ok(())

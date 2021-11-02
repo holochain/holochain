@@ -15,15 +15,17 @@ use tokio::sync;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_cell_handle_publish() {
-    let cell_id = fake_cell_id(1);
+    let keystore = test_keystore();
+
+    let agent_key = keystore.new_sign_keypair_random().await.unwrap();
+    let dna_file = fixt!(DnaFile);
+    let cell_id = CellId::new(dna_file.dna_hash().clone(), agent_key);
     let dna = cell_id.dna_hash().clone();
     let agent = cell_id.agent_pubkey().clone();
 
-    let keystore = test_keystore();
-
     let spaces = TestSpaces::new([dna.clone()]);
-    let env = spaces.test_spaces[&dna].authored.env();
-    let dht_env = spaces.test_spaces[&dna].dht.env();
+    let env = spaces.test_spaces[&dna].space.authored_env.clone();
+    let dht_env = spaces.test_spaces[&dna].space.dht_env.clone();
 
     let test_network = test_network(Some(dna.clone()), Some(agent.clone())).await;
     let holochain_p2p_cell = test_network.cell_network();
@@ -31,7 +33,7 @@ async fn test_cell_handle_publish() {
     let mut mock_handle = crate::conductor::handle::MockConductorHandleT::new();
     mock_handle
         .expect_get_dna()
-        .returning(|_| Some(fixt!(DnaFile)));
+        .return_const(Some(dna_file.clone()));
     mock_handle
         .expect_get_queue_consumer_workflows()
         .return_const(spaces.queue_consumer_map.clone());
@@ -68,7 +70,6 @@ async fn test_cell_handle_publish() {
     .await
     .unwrap();
 
-    let keystore = test_keystore();
     let header = header::Header::Dna(header::Dna {
         author: agent.clone(),
         timestamp: Timestamp::now().into(),

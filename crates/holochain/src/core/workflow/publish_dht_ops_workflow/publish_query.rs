@@ -240,7 +240,6 @@ mod tests {
         // - WithinMinPeriod: false.
         // - HasRequireReceipts: false.
         // - IsThisAgent: true.
-        // - IsAuthored: true.
         // - StoreEntry: true
         let facts = Facts {
             private: false,
@@ -281,10 +280,6 @@ mod tests {
         // - IsThisAgent: false.
         let mut f = facts;
         f.is_this_agent = false;
-        create_and_insert_op(env, f, &cd);
-
-        // - IsAuthored: false.
-        let f = facts;
         create_and_insert_op(env, f, &cd);
 
         Expected {

@@ -3,6 +3,7 @@
 
 use super::*;
 use crate::conductor::handle::ConductorHandleT;
+use crate::conductor::space::Space;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use crate::core::sys_validate::check_and_hold_store_element;
@@ -42,7 +43,7 @@ mod tests;
 
 #[instrument(skip(
     workspace,
-    dht_env,
+    space,
     trigger_app_validation,
     sys_validation_trigger,
     network,
@@ -50,7 +51,7 @@ mod tests;
 ))]
 pub async fn sys_validation_workflow(
     workspace: Arc<SysValidationWorkspace>,
-    dht_env: DbWrite<DbKindDht>,
+    space: Arc<Space>,
     trigger_app_validation: TriggerSender,
     sys_validation_trigger: TriggerSender,
     // TODO: Update HolochainP2p to reflect changes to pass through network.
@@ -59,7 +60,7 @@ pub async fn sys_validation_workflow(
 ) -> WorkflowResult<WorkComplete> {
     let complete = sys_validation_workflow_inner(
         workspace,
-        dht_env,
+        space,
         network,
         conductor_api,
         sys_validation_trigger,
@@ -76,7 +77,7 @@ pub async fn sys_validation_workflow(
 
 async fn sys_validation_workflow_inner(
     workspace: Arc<SysValidationWorkspace>,
-    dht_env: DbWrite<DbKindDht>,
+    space: Arc<Space>,
     network: HolochainP2pDna,
     conductor_api: &dyn ConductorHandleT,
     sys_validation_trigger: TriggerSender,
@@ -90,7 +91,7 @@ async fn sys_validation_workflow_inner(
         // that we are meant to be holding but aren't.
         // If we are not holding them they will be added to our incoming ops.
         let incoming_dht_ops_sender =
-            IncomingDhtOpSender::new(dht_env.clone(), sys_validation_trigger.clone());
+            IncomingDhtOpSender::new(space.clone(), sys_validation_trigger.clone());
         let network = network.clone();
         let workspace = workspace.clone();
         async move {
@@ -112,7 +113,8 @@ async fn sys_validation_workflow_inner(
         .ready_chunks(NUM_CONCURRENT_OPS);
 
     while let Some(chunk) = iter.next().await {
-        dht_env
+        space
+            .dht_env
             .async_commit(move |mut txn| {
                 for outcome in chunk {
                     let (op_hash, outcome) = outcome?;

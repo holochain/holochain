@@ -591,10 +591,14 @@ pub fn insert_entry(txn: &mut Transaction, entry: EntryHashed) -> StateMutationR
 pub fn lock_chain(
     txn: &mut Transaction,
     lock: &[u8],
+    author: &AgentPubKey,
     expires_at: &Timestamp,
 ) -> StateMutationResult<()> {
+    let mut lock = lock.to_vec();
+    lock.extend(author.get_raw_39());
     sql_insert!(txn, ChainLock, {
         "lock": lock,
+        "author": author,
         "expires_at_timestamp": expires_at,
     })?;
     Ok(())
@@ -603,15 +607,20 @@ pub fn lock_chain(
 /// Unlock the chain by dropping all records in the lock table.
 /// This should be done very carefully as it can e.g. invalidate a shared
 /// countersigning session that is inflight.
-pub fn unlock_chain(txn: &mut Transaction) -> StateMutationResult<()> {
-    txn.execute("DELETE FROM ChainLock", [])?;
+pub fn unlock_chain(txn: &mut Transaction, author: &AgentPubKey) -> StateMutationResult<()> {
+    txn.execute("DELETE FROM ChainLock WHERE author = ?", [author])?;
     Ok(())
 }
 
-pub fn delete_all_ephemeral_scheduled_fns(txn: &mut Transaction) -> StateMutationResult<()> {
+pub fn delete_all_ephemeral_scheduled_fns(
+    txn: &mut Transaction,
+    author: &AgentPubKey,
+) -> StateMutationResult<()> {
     txn.execute(
         holochain_sqlite::sql::sql_cell::schedule::DELETE_ALL_EPHEMERAL,
-        [],
+        named_params! {
+            ":author" : author,
+        },
     )?;
     Ok(())
 }
@@ -619,24 +628,38 @@ pub fn delete_all_ephemeral_scheduled_fns(txn: &mut Transaction) -> StateMutatio
 pub fn delete_live_ephemeral_scheduled_fns(
     txn: &mut Transaction,
     now: Timestamp,
+    author: &AgentPubKey,
 ) -> StateMutationResult<()> {
     txn.execute(
         holochain_sqlite::sql::sql_cell::schedule::DELETE_LIVE_EPHEMERAL,
-        [now],
+        named_params! {
+            ":now": now,
+            ":author" : author,
+        },
     )?;
     Ok(())
 }
 
-pub fn reschedule_expired(txn: &mut Transaction, now: Timestamp) -> StateMutationResult<()> {
+pub fn reschedule_expired(
+    txn: &mut Transaction,
+    now: Timestamp,
+    author: &AgentPubKey,
+) -> StateMutationResult<()> {
     let rows = {
         let mut stmt = txn.prepare(holochain_sqlite::sql::sql_cell::schedule::EXPIRED)?;
-        let rows = stmt.query_map([now], |row| {
-            Ok((
-                ZomeName(row.get(0)?),
-                FunctionName(row.get(1)?),
-                row.get(2)?,
-            ))
-        })?;
+        let rows = stmt.query_map(
+            named_params! {
+                ":now": now,
+                ":author" : author,
+            },
+            |row| {
+                Ok((
+                    ZomeName(row.get(0)?),
+                    FunctionName(row.get(1)?),
+                    row.get(2)?,
+                ))
+            },
+        )?;
         let mut ret = vec![];
         for row in rows {
             ret.push(row?);
@@ -646,6 +669,7 @@ pub fn reschedule_expired(txn: &mut Transaction, now: Timestamp) -> StateMutatio
     for (zome_name, scheduled_fn, maybe_schedule) in rows {
         schedule_fn(
             txn,
+            author,
             ScheduledFn::new(zome_name, scheduled_fn),
             from_blob(maybe_schedule)?,
             now,
@@ -656,6 +680,7 @@ pub fn reschedule_expired(txn: &mut Transaction, now: Timestamp) -> StateMutatio
 
 pub fn schedule_fn(
     txn: &mut Transaction,
+    author: &AgentPubKey,
     scheduled_fn: ScheduledFn,
     maybe_schedule: Option<Schedule>,
     now: Timestamp,
@@ -680,7 +705,8 @@ pub fn schedule_fn(
                     holochain_sqlite::sql::sql_cell::schedule::DELETE,
                     named_params! {
                         ":zome_name": scheduled_fn.zome_name().to_string(),
-                        ":scheduled_fn": scheduled_fn.fn_name().to_string()
+                        ":scheduled_fn": scheduled_fn.fn_name().to_string(),
+                        ":author" : author,
                     },
                 )?;
                 return Ok(());
@@ -697,7 +723,7 @@ pub fn schedule_fn(
         ),
         None => (now, Timestamp::max(), true),
     };
-    if fn_is_scheduled(txn, scheduled_fn.clone())? {
+    if fn_is_scheduled(txn, scheduled_fn.clone(), author)? {
         txn.execute(
             holochain_sqlite::sql::sql_cell::schedule::UPDATE,
             named_params! {
@@ -707,6 +733,7 @@ pub fn schedule_fn(
                 ":start": start,
                 ":end": end,
                 ":ephemeral": ephemeral,
+                ":author" : author,
             },
         )?;
     } else {
@@ -717,6 +744,7 @@ pub fn schedule_fn(
             "start": start,
             "end": end,
             "ephemeral": ephemeral,
+            "author" : author,
         })?;
     }
     Ok(())

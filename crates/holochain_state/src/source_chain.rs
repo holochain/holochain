@@ -94,8 +94,9 @@ pub struct SourceChainJsonElement {
 //       not the entire source chain!
 impl SourceChain {
     pub async fn unlock_chain(&self) -> SourceChainResult<()> {
+        let author = self.author.clone();
         self.vault
-            .async_commit(move |txn| unlock_chain(txn))
+            .async_commit(move |txn| unlock_chain(txn, &author))
             .await?;
         Ok(())
     }
@@ -119,15 +120,16 @@ impl SourceChain {
         let countersigning_agent_state = self
             .vault
             .async_commit(move |txn| {
-                if is_chain_locked(txn, &hashed_preflight_request)? {
+                if is_chain_locked(txn, &hashed_preflight_request, author.as_ref())? {
                     return Err(SourceChainError::ChainLocked);
                 }
-                let (persisted_head, persisted_seq, _) = chain_head_db(&txn, author)?;
+                let (persisted_head, persisted_seq, _) = chain_head_db(&txn, author.clone())?;
                 let countersigning_agent_state =
                     CounterSigningAgentState::new(agent_index, persisted_head, persisted_seq);
                 lock_chain(
                     txn,
                     &hashed_preflight_request,
+                    author.as_ref(),
                     preflight_request.session_times().end(),
                 )?;
                 SourceChainResult::Ok(countersigning_agent_state)
@@ -203,6 +205,7 @@ impl SourceChain {
         )
         .await
     }
+
     #[async_recursion]
     pub async fn flush(
         &self,
@@ -249,11 +252,11 @@ impl SourceChain {
             .async_commit(move |txn: &mut Transaction| {
                 let now = Timestamp::now();
                 for scheduled_fn in scheduled_fns {
-                    schedule_fn(txn, scheduled_fn, None, now)?;
+                    schedule_fn(txn, author.as_ref(), scheduled_fn, None, now)?;
                 }
                 // As at check.
                 let (new_persisted_head, new_head_seq, new_timestamp) =
-                    chain_head_db(&txn, author)?;
+                    chain_head_db(&txn, author.clone())?;
                 if headers.last().is_none() {
                     // Nothing to write
                     return Ok(());
@@ -267,7 +270,7 @@ impl SourceChain {
                     ));
                 }
 
-                if is_chain_locked(txn, &lock)? {
+                if is_chain_locked(txn, &lock, author.as_ref())? {
                     return Err(SourceChainError::ChainLocked);
                 }
                 // If this is a countersigning session, and the chain is NOT
@@ -275,7 +278,7 @@ impl SourceChain {
                 // entry being committed now is the correct one for the lock.
                 else if is_countersigning_session {
                     // If the lock is expired then we can't write this countersigning session.
-                    if is_lock_expired(txn, &lock)? {
+                    if is_lock_expired(txn, &lock, author.as_ref())? {
                         return Err(SourceChainError::LockExpired);
                     }
                 }
@@ -666,9 +669,10 @@ where
     }
 
     pub async fn is_chain_locked(&self, lock: Vec<u8>) -> SourceChainResult<bool> {
+        let author = self.author.clone();
         Ok(self
             .vault
-            .async_reader(move |txn| is_chain_locked(&txn, &lock))
+            .async_reader(move |txn| is_chain_locked(&txn, &lock, author.as_ref()))
             .await?)
     }
 
@@ -929,7 +933,7 @@ pub fn current_countersigning_session(
     author: Arc<AgentPubKey>,
 ) -> SourceChainResult<Option<(EntryHash, CounterSigningSessionData)>> {
     // The chain must be locked for a session to be active.
-    if is_chain_locked(txn, &[])? {
+    if is_chain_locked(txn, &[], author.as_ref())? {
         match chain_head_db(txn, author) {
             // We haven't done genesis so no session can be active.
             Err(SourceChainError::ChainEmpty) => Ok(None),

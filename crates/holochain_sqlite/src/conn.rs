@@ -73,9 +73,7 @@ impl Databases {
             .dbs
             .read()
             .get(&path)
-            .unwrap()
-            .downcast_ref::<DbWrite<Kind>>()
-            .cloned();
+            .and_then(|d| d.downcast_ref::<DbWrite<Kind>>().cloned());
         match ret {
             Some(ret) => Ok(ret),
             None => match self.dbs.write().entry(path) {

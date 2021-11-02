@@ -408,7 +408,9 @@ impl DbKindT for DbKindAuthored {
     }
 
     fn filename_inner(&self) -> PathBuf {
-        ["dht", &format!("authored-{}", self.0)].iter().collect()
+        ["authored", &format!("authored-{}", self.0)]
+            .iter()
+            .collect()
     }
 
     fn if_corrupt_wipe(&self) -> bool {

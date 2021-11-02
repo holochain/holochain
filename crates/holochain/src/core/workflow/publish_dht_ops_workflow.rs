@@ -42,7 +42,7 @@ pub async fn publish_dht_ops_workflow(
     let to_publish = publish_dht_ops_workflow_inner(env.clone().into(), agent).await?;
 
     // Commit to the network
-    tracing::info!("sending {} ops", to_publish.len());
+    tracing::info!("sending to {} basis locations", to_publish.len());
     let mut success = Vec::new();
     for (basis, ops) in to_publish {
         let hashes: Vec<_> = ops.iter().map(|(h, _)| h.clone()).collect();

@@ -234,27 +234,31 @@ impl Cell {
     }
 
     pub(super) async fn delete_all_ephemeral_scheduled_fns(self: Arc<Self>) -> CellResult<()> {
+        let author = self.id.agent_pubkey().clone();
         Ok(self
             .space
             .authored_env
-            .async_commit(move |txn: &mut Transaction| delete_all_ephemeral_scheduled_fns(txn))
+            .async_commit(move |txn: &mut Transaction| {
+                delete_all_ephemeral_scheduled_fns(txn, &author)
+            })
             .await?)
     }
 
     pub(super) async fn dispatch_scheduled_fns(self: Arc<Self>) {
         let now = Timestamp::now();
+        let author = self.id.agent_pubkey().clone();
         let lives = self
             .space
             .authored_env
             .async_commit(move |txn: &mut Transaction| {
                 // Rescheduling should not fail as the data in the database
                 // should be valid schedules only.
-                reschedule_expired(txn, now)?;
-                let lives = live_scheduled_fns(txn, now);
+                reschedule_expired(txn, now, &author)?;
+                let lives = live_scheduled_fns(txn, now, &author);
                 // We know what to run so we can delete the ephemerals.
                 if lives.is_ok() {
                     // Failing to delete should rollback this attempt.
-                    delete_live_ephemeral_scheduled_fns(txn, now)?;
+                    delete_live_ephemeral_scheduled_fns(txn, now, &author)?;
                 }
                 lives
             })
@@ -290,6 +294,7 @@ impl Cell {
                 let results: Vec<CellResult<ZomeCallResult>> =
                     futures::future::join_all(tasks).await;
 
+                let author = self.id.agent_pubkey().clone();
                 // We don't do anything with errors in here.
                 let _ = self
                     .space
@@ -313,6 +318,7 @@ impl Cell {
                                     // For example if a zome returns a bad cron.
                                     if let Err(e) = schedule_fn(
                                         txn,
+                                        &author,
                                         scheduled_fn.clone(),
                                         Some(next_schedule),
                                         now,

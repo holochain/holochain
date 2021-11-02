@@ -1,11 +1,14 @@
+use crate::conductor::space::TestSpace;
+
 use super::*;
 use ::fixt::prelude::*;
 use holochain_keystore::AgentPubKeyExt;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn incoming_ops_to_limbo() {
-    let test_env = holochain_state::test_utils::test_dht_env();
-    let env = test_env.env();
+    observability::test_run().unwrap();
+    let space = TestSpace::new(fixt!(DnaHash));
+    let env = space.space.dht_env.clone();
     let keystore = holochain_state::test_utils::test_keystore();
 
     let author = fake_agent_pubkey_1();
@@ -28,10 +31,10 @@ async fn incoming_ops_to_limbo() {
     let mut all = Vec::new();
     for op in op_list {
         let (sys_validation_trigger, _) = TriggerSender::new();
-        let env = env.clone();
+        let space = space.space.clone();
         all.push(tokio::task::spawn(async move {
             let start = std::time::Instant::now();
-            incoming_dht_ops_workflow(&env, None, sys_validation_trigger, vec![op], false)
+            incoming_dht_ops_workflow(&space, sys_validation_trigger, vec![op], false)
                 .await
                 .unwrap();
             println!("IN OP in {} s", start.elapsed().as_secs_f64());

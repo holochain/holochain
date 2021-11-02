@@ -23,7 +23,9 @@ use crate::core::{
     queue_consumer::QueueConsumerMap,
     workflow::{
         countersigning_workflow::{incoming_countersigning, CountersigningWorkspace},
-        incoming_dht_ops_workflow::{incoming_dht_ops_workflow, IncomingOpHashes},
+        incoming_dht_ops_workflow::{
+            incoming_dht_ops_workflow, IncomingOpHashes, IncomingOpsBatch,
+        },
     },
 };
 
@@ -67,6 +69,9 @@ pub struct Space {
 
     /// Incoming op hashes that are queued for processing.
     pub incoming_op_hashes: IncomingOpHashes,
+
+    /// Incoming ops batch for this space.
+    pub incoming_ops_batch: IncomingOpsBatch,
 }
 
 #[cfg(test)]
@@ -78,9 +83,7 @@ pub struct TestSpaces {
 #[cfg(test)]
 pub struct TestSpace {
     pub space: Space,
-    pub authored: holochain_state::prelude::TestEnv<DbKindAuthored>,
-    pub dht: holochain_state::prelude::TestEnv<DbKindDht>,
-    pub cache: holochain_state::prelude::TestEnv<DbKindCache>,
+    _temp_dir: tempdir::TempDir,
 }
 
 impl Spaces {
@@ -323,30 +326,17 @@ impl Spaces {
             };
             incoming_countersigning(ops, &workspace, trigger)?;
         } else {
-            let (env, incoming_ops, trigger) = self.get_or_create_space_ref(dna_hash, |space| {
-                let trigger = self
-                    .queue_consumer_map
-                    .sys_validation_trigger(space.dna_hash.clone());
-                (
-                    space.dht_env.clone(),
-                    space.incoming_op_hashes.clone(),
-                    trigger,
-                )
-            })?;
-            let trigger = match trigger {
+            let space = self.get_or_create_space(dna_hash)?;
+            let trigger = match self
+                .queue_consumer_map
+                .sys_validation_trigger(space.dna_hash.clone())
+            {
                 Some(t) => t,
                 // If the workflow has not been spawned yet we can't handle incoming messages.
                 // Not this is not an error because only a validation receipt is proof of a publish.
                 None => return Ok(()),
             };
-            incoming_dht_ops_workflow(
-                &env,
-                Some(&incoming_ops),
-                trigger,
-                ops,
-                request_validation_receipt,
-            )
-            .await?;
+            incoming_dht_ops_workflow(&space, trigger, ops, request_validation_receipt).await?;
         }
         Ok(())
     }
@@ -381,6 +371,7 @@ impl Space {
         )?;
         let countersigning_workspace = CountersigningWorkspace::new();
         let incoming_op_hashes = IncomingOpHashes::default();
+        let incoming_ops_batch = IncomingOpsBatch::default();
         let r = Self {
             dna_hash,
             cache,
@@ -388,6 +379,7 @@ impl Space {
             dht_env,
             countersigning_workspace,
             incoming_op_hashes,
+            incoming_ops_batch,
         };
         Ok(r)
     }
@@ -404,21 +396,17 @@ impl TestSpaces {
         dna_hashes: impl IntoIterator<Item = DnaHash>,
         queue_consumer_map: QueueConsumerMap,
     ) -> Self {
+        use tempdir::TempDir;
         let mut test_spaces: HashMap<DnaHash, _> = HashMap::new();
         for hash in dna_hashes.into_iter() {
             test_spaces.insert(hash.clone(), TestSpace::new(hash));
         }
-        let path = test_spaces
-            .values()
-            .next()
-            .unwrap()
-            .authored
-            .env()
-            .path()
-            .parent()
-            .unwrap()
-            .to_path_buf();
-        let spaces = Spaces::new(path.into(), Default::default(), queue_consumer_map.clone());
+        let temp_dir = TempDir::new("holochain-test-environments").unwrap();
+        let spaces = Spaces::new(
+            temp_dir.path().to_path_buf().into(),
+            Default::default(),
+            queue_consumer_map.clone(),
+        );
         spaces.map.share_mut(|map| {
             map.extend(
                 test_spaces
@@ -437,22 +425,18 @@ impl TestSpaces {
 #[cfg(test)]
 impl TestSpace {
     pub fn new(dna_hash: DnaHash) -> Self {
-        use std::path::PathBuf;
+        use tempdir::TempDir;
 
-        use holochain_state::prelude::{
-            test_authored_env_with_dna_hash, test_cache_env_with_dna_hash,
-            test_dht_env_with_dna_hash,
-        };
+        let temp_dir = TempDir::new("holochain-test-environments").unwrap();
 
-        let authored = test_authored_env_with_dna_hash(dna_hash.clone());
-        let dht = test_dht_env_with_dna_hash(dna_hash.clone());
-        let cache = test_cache_env_with_dna_hash(dna_hash.clone());
-        let path: PathBuf = authored.env().path().parent().unwrap().to_path_buf();
         Self {
-            space: Space::new(Arc::new(dna_hash), &path.into(), Default::default()).unwrap(),
-            authored,
-            dht,
-            cache,
+            space: Space::new(
+                Arc::new(dna_hash),
+                &temp_dir.path().to_path_buf().into(),
+                Default::default(),
+            )
+            .unwrap(),
+            _temp_dir: temp_dir,
         }
     }
 }

@@ -85,7 +85,6 @@ pub async fn spawn_queue_consumer_tasks(
         authored_env,
         dht_env,
         cache,
-        countersigning_workspace,
         ..
     } = space;
 
@@ -196,7 +195,7 @@ pub async fn spawn_queue_consumer_tasks(
                 dht_env.clone().into(),
                 cache.clone(),
             ),
-            dht_env.clone(),
+            space.clone(),
             conductor_handle.clone(),
             stop.subscribe(),
             tx_app.clone(),
@@ -217,9 +216,8 @@ pub async fn spawn_queue_consumer_tasks(
 
     let (tx_cs, handle) = queue_consumer_map.spawn_once_countersigning(dna_hash.clone(), || {
         spawn_countersigning_consumer(
-            dht_env.clone(),
+            space.clone(),
             stop.subscribe(),
-            countersigning_workspace.clone(),
             network.clone(),
             tx_sys.clone(),
         )

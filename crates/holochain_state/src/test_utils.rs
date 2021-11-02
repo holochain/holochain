@@ -189,6 +189,7 @@ pub fn dump_tmp<Kind: DbKindT>(env: &DbWrite<Kind>) {
     tmp.push("test_dbs");
     std::fs::create_dir(&tmp).ok();
     tmp.push("backup.sqlite");
+    println!("dumping db to {}", tmp.display());
     std::fs::write(&tmp, b"").unwrap();
     env.conn()
         .unwrap()

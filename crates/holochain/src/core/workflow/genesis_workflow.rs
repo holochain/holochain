@@ -171,6 +171,7 @@ pub mod tests {
             let mut api = MockCellConductorApi::new();
             api.expect_sync_dpki_request()
                 .returning(|_, _| Ok("mocked dpki request response".to_string()));
+            api.expect_mock_keystore().return_const(keystore.clone());
             let mut ribosome = MockRibosomeT::new();
             ribosome
                 .expect_run_genesis_self_check()

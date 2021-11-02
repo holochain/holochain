@@ -20,6 +20,7 @@ use kitsune_p2p_types::tx2::tx2_utils::Share;
 use rusqlite::named_params;
 
 use crate::conductor::interface::SignalBroadcaster;
+use crate::conductor::space::Space;
 use crate::core::queue_consumer::{QueueTriggers, TriggerSender, WorkComplete};
 
 use super::{error::WorkflowResult, incoming_dht_ops_workflow::incoming_dht_ops_workflow};
@@ -104,19 +105,17 @@ pub(crate) fn incoming_countersigning(
 /// Countersigning workflow that checks for complete sessions and
 /// pushes the complete ops to validation then messages the signers.
 pub(crate) async fn countersigning_workflow(
-    dht_env: &DbWrite<DbKindDht>,
-    workspace: &CountersigningWorkspace,
+    space: &Space,
     network: &(dyn HolochainP2pDnaT + Send + Sync),
     sys_validation_trigger: &TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     // Get any complete sessions.
-    let complete_sessions = workspace.get_complete_sessions();
+    let complete_sessions = space.countersigning_workspace.get_complete_sessions();
     let mut notify_agents = Vec::with_capacity(complete_sessions.len());
 
     // For each complete session send the ops to validation.
     for (agents, ops, headers) in complete_sessions {
-        incoming_dht_ops_workflow(&dht_env, None, sys_validation_trigger.clone(), ops, false)
-            .await?;
+        incoming_dht_ops_workflow(&space, sys_validation_trigger.clone(), ops, false).await?;
         notify_agents.push((agents, headers));
     }
 
@@ -169,7 +168,7 @@ pub(crate) async fn countersigning_success(
     // unless there is an active session.
     let this_cell_headers_op_basis_hashes: Vec<(DhtOpHash, AnyDhtHash)> =
         fresh_reader!(authored_env, |txn| {
-            if holochain_state::chain_lock::is_chain_locked(&txn, &[])? {
+            if holochain_state::chain_lock::is_chain_locked(&txn, &[], &author)? {
                 let transaction: holochain_state::prelude::Txn = (&txn).into();
                 if transaction.contains_entry(&entry_hash)? {
                     // If this is a countersigning session we can grab all the ops
@@ -218,7 +217,7 @@ pub(crate) async fn countersigning_success(
             let author = author.clone();
             let entry_hash = entry_hash.clone();
             move |txn| {
-            if let Some((cs_entry_hash, cs)) = current_countersigning_session(txn, Arc::new(author))? {
+            if let Some((cs_entry_hash, cs)) = current_countersigning_session(txn, Arc::new(author.clone()))? {
                 // Check we have the right session.
                 if cs_entry_hash == entry_hash {
                     let stored_headers = cs.build_header_set(entry_hash)?;
@@ -229,7 +228,7 @@ pub(crate) async fn countersigning_success(
                             incoming_headers.iter().any(|i| *i == h)
                         }) {
                             // All checks have passed so unlock the chain.
-                            mutations::unlock_chain(txn)?;
+                            mutations::unlock_chain(txn, &author)?;
                             // Update ops to publish.
                             txn.execute("UPDATE DhtOp SET withhold_publish = NULL WHERE header_hash = :header_hash",
                             named_params! {

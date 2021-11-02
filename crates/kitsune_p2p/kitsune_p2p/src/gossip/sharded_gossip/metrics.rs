@@ -89,11 +89,6 @@ impl Metrics {
 
     /// Is this node currently in an active round?
     pub(super) fn is_current_round(&self, key: &StateKey) -> bool {
-        dbg!(&self.map);
-        dbg!(key.as_str());
-        for k in self.map.keys() {
-            dbg!(k.as_str());
-        }
         self.map.get(key).map_or(false, |info| info.current_round)
     }
 
