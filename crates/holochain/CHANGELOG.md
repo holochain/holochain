@@ -4,6 +4,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 - Refactor conductor to use parking lot rw lock instead of tokio rw lock. (Faster and prevents deadlocks.)
+- Kitsune now attempts to rebind the network interface in the event of endpoint shutdown. Note, it's still recommended to bind to `0.0.0.0` as the OS provides additional resiliency for interfaces coming and going.
 
 ### Changed
 
