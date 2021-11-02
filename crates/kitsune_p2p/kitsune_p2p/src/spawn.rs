@@ -4,7 +4,7 @@ use crate::event::*;
 mod actor;
 use actor::*;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test_utils"))]
 pub use actor::MockKitsuneP2pEventHandler;
 
 /// Spawn a new KitsuneP2p actor.
