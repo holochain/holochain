@@ -6,7 +6,6 @@ use holochain_types::access::Permission;
 use holochain_wasmer_host::prelude::WasmError;
 use holochain_zome_types::signal::RemoteSignal;
 use holochain_zome_types::zome::FunctionName;
-use holochain_zome_types::zome::ZomeName;
 use std::sync::Arc;
 use tracing::Instrument;
 
@@ -26,33 +25,17 @@ pub fn remote_signal(
             // this is a send and forget operation.
             let network = call_context.host_context().network().clone();
             let RemoteSignal { agents, signal } = input;
-            let zome_name: &ZomeName = call_context.zome().zome_name();
+            let zome_name = call_context.zome().zome_name().clone();
             let fn_name: FunctionName = FN_NAME.into();
-            for agent in agents {
-                tokio::task::spawn(
-                    {
-                        let network = network.clone();
-                        let zome_name = zome_name.clone();
-                        let fn_name = fn_name.clone();
-                        let payload = signal.clone();
-                        async move {
-                            tracing::debug!("sending to {:?}", agent);
-                            let result = network
-                                .call_remote(agent.clone(), zome_name, fn_name, None, payload)
-                                .await;
-                            tracing::debug!("sent to {:?}", agent);
-                            if let Err(e) = result {
-                                tracing::info!(
-                                    "Failed to send remote signal to {:?} because of {:?}",
-                                    agent,
-                                    e
-                                );
-                            }
-                        }
-                    }
-                    .in_current_span(),
-                );
-            }
+            tokio::task::spawn(async move {
+                if let Err(e) = network
+                    .remote_signal(agents, zome_name, fn_name, None, signal).await {
+                    tracing::info!(
+                        "Failed to send remote signals because of {:?}",
+                        e
+                    );
+                }
+            }.in_current_span());
             Ok(())
         }
         _ => unreachable!(),

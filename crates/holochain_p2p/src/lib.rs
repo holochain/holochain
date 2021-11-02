@@ -53,6 +53,19 @@ pub trait HolochainP2pCellT {
         payload: ExternIO,
     ) -> actor::HolochainP2pResult<SerializedBytes>;
 
+    /// Invoke a zome function on a remote node (if you have been granted the capability).
+    /// This is a fire-and-forget operation, a best effort will be made
+    /// to forward the signal, but if the conductor network is overworked
+    /// it may decide not to deliver some of the signals.
+    async fn remote_signal(
+        &self,
+        to_agent_list: Vec<AgentPubKey>,
+        zome_name: ZomeName,
+        fn_name: FunctionName,
+        cap: Option<CapSecret>,
+        payload: ExternIO,
+    ) -> actor::HolochainP2pResult<()>;
+
     /// Publish data to the correct neighborhood.
     #[allow(clippy::ptr_arg)]
     async fn publish(
@@ -177,6 +190,31 @@ impl HolochainP2pCellT for HolochainP2pCell {
                 zome_name,
                 fn_name,
                 cap_secret,
+                payload,
+            )
+            .await
+    }
+
+    /// Invoke a zome function on a remote node (if you have been granted the capability).
+    /// This is a fire-and-forget operation, a best effort will be made
+    /// to forward the signal, but if the conductor network is overworked
+    /// it may decide not to deliver some of the signals.
+    async fn remote_signal(
+        &self,
+        to_agent_list: Vec<AgentPubKey>,
+        zome_name: ZomeName,
+        fn_name: FunctionName,
+        cap: Option<CapSecret>,
+        payload: ExternIO,
+    ) -> actor::HolochainP2pResult<()> {
+        self.sender
+            .remote_signal(
+                (*self.dna_hash).clone(),
+                (*self.from_agent).clone(),
+                to_agent_list,
+                zome_name,
+                fn_name,
+                cap,
                 payload,
             )
             .await

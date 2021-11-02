@@ -669,6 +669,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         agents: Vec<Arc<KitsuneAgent>>,
         timeout: KitsuneTimeout,
         payload: Vec<u8>,
+        drop_at_limit: bool,
     ) -> KitsuneP2pHandlerResult<()> {
         let space_sender = match self.spaces.get_mut(&space) {
             None => return Err(KitsuneP2pError::RoutingSpaceError(space)),
@@ -677,7 +678,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         Ok(async move {
             let (space_sender, _) = space_sender.await;
             space_sender
-                .targeted_broadcast(space, from_agent, agents, timeout, payload)
+                .targeted_broadcast(space, from_agent, agents, timeout, payload, drop_at_limit)
                 .await
         }
         .boxed()

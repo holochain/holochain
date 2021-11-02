@@ -4,6 +4,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 - Refactor conductor to use parking lot rw lock instead of tokio rw lock. (Faster and prevents deadlocks.)
+- `remote_signal` has always been a fire-and-forget operation. Now it also uses the more efficient fire-and-forget "notify" low-level networking plumbing. [#1075](https://github.com/holochain/holochain/pull/1075)
 - Kitsune now attempts to rebind the network interface in the event of endpoint shutdown. Note, it's still recommended to bind to `0.0.0.0` as the OS provides additional resiliency for interfaces coming and going.
 
 ### Changed

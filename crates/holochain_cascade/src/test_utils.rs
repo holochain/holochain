@@ -197,6 +197,17 @@ impl HolochainP2pCellT for PassThroughNetwork {
         todo!()
     }
 
+    async fn remote_signal(
+        &self,
+        _to_agent_list: Vec<AgentPubKey>,
+        _zome_name: holochain_zome_types::ZomeName,
+        _fn_name: holochain_zome_types::FunctionName,
+        _cap: Option<holochain_zome_types::CapSecret>,
+        _payload: holochain_zome_types::ExternIO,
+    ) -> actor::HolochainP2pResult<()> {
+        todo!()
+    }
+
     async fn publish(
         &self,
         _request_validation_receipt: bool,
@@ -359,6 +370,17 @@ impl HolochainP2pCellT for MockNetwork {
         _cap_secret: Option<holochain_zome_types::CapSecret>,
         _payload: holochain_zome_types::ExternIO,
     ) -> actor::HolochainP2pResult<holochain_serialized_bytes::SerializedBytes> {
+        todo!()
+    }
+
+    async fn remote_signal(
+        &self,
+        _to_agent_list: Vec<AgentPubKey>,
+        _zome_name: holochain_zome_types::ZomeName,
+        _fn_name: holochain_zome_types::FunctionName,
+        _cap: Option<holochain_zome_types::CapSecret>,
+        _payload: holochain_zome_types::ExternIO,
+    ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
 
