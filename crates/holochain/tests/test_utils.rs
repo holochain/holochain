@@ -2,6 +2,7 @@
 
 use anyhow::Result;
 use holochain::conductor::ConductorHandle;
+use holochain_conductor_api::FullStateDump;
 use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
 
@@ -287,4 +288,24 @@ async fn check_timeout_named<T>(
             );
         }
     }
+}
+
+pub async fn dump_full_state(
+    client: &mut WebsocketSender,
+    cell_id: CellId,
+    dht_ops_cursor: Option<u64>,
+) -> FullStateDump {
+    let request = AdminRequest::DumpFullState {
+        cell_id: Box::new(cell_id),
+        dht_ops_cursor,
+    };
+    let response = client.request(request);
+    let response = check_timeout(response, 3000).await;
+
+    let full_state = match response {
+        AdminResponse::FullStateDumped(state) => state,
+        _ => panic!("DumpFullState failed: {:?}", response),
+    };
+
+    full_state
 }

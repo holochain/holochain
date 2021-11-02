@@ -72,13 +72,13 @@ pub struct SourceChain {
 
 // TODO fix this.  We shouldn't really have nil values but this would
 // show if the database is corrupted and doesn't have an element
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Debug, Clone, Deserialize)]
 pub struct SourceChainJsonDump {
     pub elements: Vec<SourceChainJsonElement>,
     pub published_ops_count: usize,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Debug, Clone, Deserialize)]
 pub struct SourceChainJsonElement {
     pub signature: Signature,
     pub header_address: HeaderHash,
