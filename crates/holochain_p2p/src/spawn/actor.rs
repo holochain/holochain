@@ -175,13 +175,13 @@ impl WrapEvtSender {
         from_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: FunctionName,
-        cap: Option<CapSecret>,
+        cap_secret: Option<CapSecret>,
         payload: ExternIO,
     ) -> impl Future<Output = HolochainP2pResult<SerializedBytes>> + 'static + Send {
         timing_trace!(
             {
                 self.0.call_remote(
-                    dna_hash, to_agent, from_agent, zome_name, fn_name, cap, payload,
+                    dna_hash, to_agent, from_agent, zome_name, fn_name, cap_secret, payload,
                 )
             },
             "(hp2p:handle) call_remote",
@@ -394,7 +394,7 @@ impl HolochainP2pActor {
         from_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: FunctionName,
-        cap: Option<CapSecret>,
+        cap_secret: Option<CapSecret>,
         data: Vec<u8>,
     ) -> kitsune_p2p::actor::KitsuneP2pHandlerResult<Vec<u8>> {
         let evt_sender = self.evt_sender.clone();
@@ -406,7 +406,7 @@ impl HolochainP2pActor {
                     from_agent,
                     zome_name,
                     fn_name,
-                    cap,
+                    cap_secret,
                     ExternIO::from(data),
                 )
                 .await;
@@ -765,10 +765,10 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             crate::wire::WireMessage::CallRemote {
                 zome_name,
                 fn_name,
-                cap,
+                cap_secret,
                 data,
             } => self.handle_incoming_call_remote(
-                space, to_agent, from_agent, zome_name, fn_name, cap, data,
+                space, to_agent, from_agent, zome_name, fn_name, cap_secret, data,
             ),
             crate::wire::WireMessage::Get { dht_hash, options } => {
                 self.handle_incoming_get(space, to_agent, dht_hash, options)
@@ -1026,15 +1026,15 @@ impl HolochainP2pHandler for HolochainP2pActor {
         to_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: FunctionName,
-        cap: Option<CapSecret>,
+        cap_secret: Option<CapSecret>,
         payload: ExternIO,
     ) -> HolochainP2pHandlerResult<SerializedBytes> {
         let space = dna_hash.into_kitsune();
         let to_agent = to_agent.into_kitsune();
         let from_agent = from_agent.into_kitsune();
 
-        let req =
-            crate::wire::WireMessage::call_remote(zome_name, fn_name, cap, payload).encode()?;
+        let req = crate::wire::WireMessage::call_remote(zome_name, fn_name, cap_secret, payload)
+            .encode()?;
 
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {

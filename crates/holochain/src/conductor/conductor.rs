@@ -74,7 +74,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc::error::SendError;
 use tracing::*;
 
-#[cfg(any(test, feature = "test_utils"))]
+#[cfg(feature = "test_utils")]
 use super::handle::MockConductorHandleT;
 
 mod share;
@@ -777,21 +777,21 @@ where
     pub(super) async fn add_clone_cell_to_app(
         &self,
         app_id: InstalledAppId,
-        slot_id: SlotId,
+        role_id: AppRoleId,
         properties: YamlProperties,
     ) -> ConductorResult<CellId> {
         let dna_store = &self.dna_store;
         let (_, parent_dna_hash) = self
             .update_state_prime({
                 let app_id = app_id.clone();
-                let slot_id = slot_id.clone();
+                let role_id = role_id.clone();
                 move |mut state| {
                     if let Some(app) = state.installed_apps_mut().get_mut(&app_id) {
-                        let slot = app
-                            .slots()
-                            .get(&slot_id)
-                            .ok_or_else(|| AppError::SlotIdMissing(slot_id.to_owned()))?;
-                        let parent_dna_hash = slot.dna_hash().clone();
+                        let role = app
+                            .roles()
+                            .get(&role_id)
+                            .ok_or_else(|| AppError::AppRoleIdMissing(role_id.to_owned()))?;
+                        let parent_dna_hash = role.dna_hash().clone();
                         Ok((state, parent_dna_hash))
                     } else {
                         Err(ConductorError::AppNotRunning(app_id.clone()))
@@ -809,9 +809,9 @@ where
         let (_, cell_id) = self
             .update_state_prime(move |mut state| {
                 if let Some(app) = state.installed_apps_mut().get_mut(&app_id) {
-                    let agent_key = app.slot(&slot_id)?.agent_key().to_owned();
+                    let agent_key = app.role(&role_id)?.agent_key().to_owned();
                     let cell_id = CellId::new(child_dna_hash, agent_key);
-                    app.add_clone(&slot_id, cell_id.clone())?;
+                    app.add_clone(&role_id, cell_id.clone())?;
                     Ok((state, cell_id))
                 } else {
                     Err(ConductorError::AppNotRunning(app_id.clone()))
@@ -1298,6 +1298,7 @@ where
 mod builder {
     use super::*;
     use crate::conductor::dna_store::RealDnaStore;
+    use crate::conductor::handle::DevSettings;
     use crate::conductor::ConductorHandle;
     use holochain_sqlite::db::DbKind;
     #[cfg(any(test, feature = "test_utils"))]
@@ -1472,12 +1473,12 @@ mod builder {
                 keystore,
                 holochain_p2p,
                 db_sync_level: config.db_sync_level,
-
-                #[cfg(any(test, feature = "test_utils"))]
-                skip_publish: std::sync::atomic::AtomicBool::new(false),
                 p2p_env: Arc::new(parking_lot::Mutex::new(HashMap::new())),
                 p2p_batch_senders: Arc::new(parking_lot::Mutex::new(HashMap::new())),
                 p2p_metrics_env: Arc::new(parking_lot::Mutex::new(HashMap::new())),
+
+                #[cfg(any(test, feature = "test_utils"))]
+                dev_settings: parking_lot::RwLock::new(DevSettings::default()),
             });
 
             Self::finish(handle, config, p2p_evt, post_commit_receiver).await
@@ -1630,8 +1631,9 @@ mod builder {
                 p2p_batch_senders: Arc::new(parking_lot::Mutex::new(HashMap::new())),
                 p2p_metrics_env: envs.p2p_metrics(),
                 db_sync_level: self.config.db_sync_level,
+
                 #[cfg(any(test, feature = "test_utils"))]
-                skip_publish: std::sync::atomic::AtomicBool::new(false),
+                dev_settings: parking_lot::RwLock::new(DevSettings::default()),
             });
 
             // Install extra DNAs, in particular:

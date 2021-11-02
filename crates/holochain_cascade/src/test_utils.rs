@@ -191,7 +191,7 @@ impl HolochainP2pCellT for PassThroughNetwork {
         _to_agent: AgentPubKey,
         _zome_name: holochain_zome_types::ZomeName,
         _fn_name: holochain_zome_types::FunctionName,
-        _cap: Option<holochain_zome_types::CapSecret>,
+        _cap_secret: Option<holochain_zome_types::CapSecret>,
         _payload: holochain_zome_types::ExternIO,
     ) -> actor::HolochainP2pResult<holochain_serialized_bytes::SerializedBytes> {
         todo!()
@@ -367,7 +367,7 @@ impl HolochainP2pCellT for MockNetwork {
         _to_agent: AgentPubKey,
         _zome_name: holochain_zome_types::ZomeName,
         _fn_name: holochain_zome_types::FunctionName,
-        _cap: Option<holochain_zome_types::CapSecret>,
+        _cap_secret: Option<holochain_zome_types::CapSecret>,
         _payload: holochain_zome_types::ExternIO,
     ) -> actor::HolochainP2pResult<holochain_serialized_bytes::SerializedBytes> {
         todo!()

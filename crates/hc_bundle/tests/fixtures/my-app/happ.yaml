@@ -4,8 +4,8 @@ manifest_version: "1"
 name: fixture-app
 description: it's an app
 
-slots:
-  - id: slot-1
+roles:
+  - id: role-1
     provisioning:
       strategy: create
       deferred: false
@@ -14,7 +14,7 @@ slots:
       uid: 0123456
       properties: ~
       clone_limit: 0
-  - id: slot-2
+  - id: role-2
     provisioning:
       strategy: create
       deferred: true

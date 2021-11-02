@@ -1,5 +1,8 @@
 use crate::header::ZomeId;
 use crate::zome::ZomeName;
+use crate::CapGrant;
+use crate::EntryDefs;
+use crate::FunctionName;
 use crate::Timestamp;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
@@ -13,11 +16,16 @@ pub struct ZomeInfo {
     pub name: ZomeName,
     /// The position of this zome in the `dna.json`
     pub id: ZomeId,
+    pub entry_defs: EntryDefs,
 }
 
 impl ZomeInfo {
-    pub fn new(name: ZomeName, id: ZomeId) -> Self {
-        Self { name, id }
+    pub fn new(name: ZomeName, id: ZomeId, entry_defs: EntryDefs) -> Self {
+        Self {
+            name,
+            id,
+            entry_defs,
+        }
     }
 }
 
@@ -51,11 +59,16 @@ pub struct DnaInfo {
     pub name: String,
     pub hash: DnaHash,
     pub properties: SerializedBytes,
+    // In ZomeId order as to match corresponding `ZomeInfo` for each.
+    pub zome_names: Vec<ZomeName>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CallInfo {
+    pub provenance: AgentPubKey,
+    pub function_name: FunctionName,
     /// Chain head as at the call start.
     /// This will not change within a call even if the chain is written to.
     pub as_at: (HeaderHash, u32, Timestamp),
+    pub cap_grant: CapGrant,
 }
