@@ -13,6 +13,9 @@ use std::ops::RangeInclusive;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+mod test_ascii;
+
 mod dht_arc_set;
 pub use dht_arc_set::{ArcInterval, DhtArcSet};
 
@@ -22,6 +25,8 @@ pub use dht_arc_bucket::*;
 #[cfg(any(test, feature = "test_utils"))]
 pub mod gaps;
 
+/// Type for representing a location that can wrap around
+/// a u32 dht arc
 #[derive(
     Debug,
     Clone,
@@ -39,8 +44,6 @@ pub mod gaps;
     derive_more::Deref,
     derive_more::Display,
 )]
-/// Type for representing a location that can wrap around
-/// a u32 dht arc
 pub struct DhtLocation(pub Wrapping<u32>);
 
 impl DhtLocation {
@@ -51,14 +54,21 @@ impl DhtLocation {
     pub fn as_u32(&self) -> u32 {
         self.0 .0
     }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    pub fn as_i32(&self) -> i32 {
+        self.0 .0 as i32
+    }
 }
 
-// #[cfg(any(test, feature = "test_utils"))]
-// impl From<i32> for DhtLocation {
-//     fn from(i: i32) -> Self {
-//         (i as u32).into()
-//     }
-// }
+// This From impl exists to make it easier to construct DhtLocations near the
+// maximum value in tests
+#[cfg(any(test, feature = "test_utils"))]
+impl From<i32> for DhtLocation {
+    fn from(i: i32) -> Self {
+        (i as u32).into()
+    }
+}
 
 #[cfg(feature = "sqlite")]
 impl rusqlite::ToSql for DhtLocation {
@@ -271,7 +281,7 @@ impl DhtArc {
             }
         // In order to make sure the arc covers the full range we need some overlap at the
         // end to account for division rounding.
-        } else if self.half_length == MAX_HALF_LENGTH || self.half_length == MAX_HALF_LENGTH - 1 {
+        } else if self.half_length >= MAX_HALF_LENGTH - 1 {
             ArcRange {
                 start: Bound::Included(
                     (self.center_loc.0 - DhtLocation::from(MAX_HALF_LENGTH - 1).0).0,
@@ -538,20 +548,17 @@ impl std::fmt::Display for DhtArc {
     }
 }
 
-#[cfg(any(test, feature = "test_utils"))]
 impl DhtArc {
     pub fn from_interval(interval: ArcInterval) -> Self {
-        match interval {
-            ArcInterval::Empty => todo!(),
-            ArcInterval::Full => todo!(),
+        match interval.quantized() {
+            ArcInterval::Empty => Self::empty(0),
+            ArcInterval::Full => Self::full(0),
             ArcInterval::Bounded(start, end) => {
                 let start = start.as_u32();
                 let end = end.as_u32();
                 if start <= end {
-                    // this should be +2 instead of +3, but we want to round up
-                    // so that the arc covers the interval
-                    let half_length = ((end as f64 - start as f64 + 3f64) / 2f64) as u32;
-                    let center = ((start as f64 + end as f64) / 2f64) as u32;
+                    let half_length = ((end as f64 - start as f64 + 2f64) / 2f64).round() as u32;
+                    let center = ((start as f64 + end as f64) / 2f64).round() as u32;
                     Self::new(center, half_length)
                 } else {
                     let half_length = MAX_HALF_LENGTH - ((start - end) / 2);
@@ -563,8 +570,92 @@ impl DhtArc {
     }
 }
 
+/// Scale a number in a smaller space (specified by `len`) up into the `u32` space.
+/// The number to scale can be negative, which is wrapped to a positive value via modulo
+#[cfg(any(test, feature = "test_utils"))]
+pub(crate) fn loc_upscale(len: usize, v: i32) -> u32 {
+    let max = 2f64.powi(32);
+    let lenf = len as f64;
+    let vf = v as f64;
+    (max / lenf * vf) as i64 as u32
+}
+
+/// Scale a u32 DhtLocation down into a smaller space (specified by `len`)
+#[cfg(any(test, feature = "test_utils"))]
+pub(crate) fn loc_downscale(len: usize, d: DhtLocation) -> usize {
+    let max = 2f64.powi(32);
+    let lenf = len as f64;
+    ((lenf / max * (d.as_u32() as f64)) as usize) % len
+}
+
 #[test]
-fn dht_arc_interval_roundtrip() {
+fn test_loc_upscale() {
+    let m = 2f64.powi(32);
+    assert_eq!(loc_upscale(8, 0), DhtLocation::from(0).as_u32());
+    assert_eq!(
+        loc_upscale(8, 1),
+        DhtLocation::from((m / 8.0) as u32).as_u32()
+    );
+    assert_eq!(
+        loc_upscale(3, 1),
+        DhtLocation::from((m / 3.0) as u32).as_u32()
+    );
+}
+
+#[test]
+/// Test the center_loc calculation for a variety of ArcIntervals
+fn arc_interval_center_loc() {
+    use pretty_assertions::assert_eq;
+
+    let intervals = vec![
+        // singleton
+        (ArcInterval::<i32>::new(0, 0), 0),
+        (ArcInterval::<i32>::new(2, 2), 2),
+        (ArcInterval::<i32>::new(3, 3), 3),
+        // non-wrapping
+        (ArcInterval::<i32>::new(2, 4), 3),
+        (ArcInterval::<i32>::new(2, 5), 4),
+        (ArcInterval::<i32>::new(2, 6), 4),
+        (ArcInterval::<i32>::new(0, 8), 4),
+        (ArcInterval::<i32>::new(1, 8), 5),
+        (ArcInterval::<i32>::new(2, 8), 5),
+        (ArcInterval::<i32>::new(3, 5), 4),
+        (ArcInterval::<i32>::new(3, 6), 5),
+        (ArcInterval::<i32>::new(3, 7), 5),
+        // wrapping
+        (ArcInterval::<i32>::new(-3, 3), 0),
+        (ArcInterval::<i32>::new(-4, 3), 0),
+        (ArcInterval::<i32>::new(-4, 4), 0),
+        (ArcInterval::<i32>::new(-5, 4), 0),
+        (ArcInterval::<i32>::new(-4, 2), -1i32),
+        (ArcInterval::<i32>::new(-5, 2), -1i32),
+        (ArcInterval::<i32>::new(-5, 3), -1i32),
+    ];
+    let expected: Vec<_> = intervals
+        .iter()
+        .map(|(_, c)| DhtLocation::from(*c))
+        .collect();
+    let actual: Vec<_> = intervals
+        .into_iter()
+        .map(|(i, _)| i.canonical().center_loc())
+        .collect();
+    assert_eq!(expected, actual);
+}
+
+#[test]
+/// Test ArcInterval -> DhtArc -> ArcInterval roundtrips
+/// Note that the intervals must be "quantized" to have an odd length
+/// to be representable as DhtArc, so true roundtrips are not possible in general
+fn interval_dht_arc_roundtrip() {
+    use pretty_assertions::assert_eq;
+
+    // a big number: 1073741823
+    const A: u32 = u32::MAX / 4;
+    // another big number: 3221225469
+    const B: u32 = A * 3;
+    // the biggest number: 4294967295
+    const M: u32 = u32::MAX;
+
     let intervals = vec![
         ArcInterval::<u32>::new(0, 0).canonical(),
         ArcInterval::<u32>::new(2, 2).canonical(),
@@ -574,23 +665,68 @@ fn dht_arc_interval_roundtrip() {
         ArcInterval::<u32>::new(3, 6).canonical(),
         ArcInterval::<u32>::new(3, 7).canonical(),
         ArcInterval::<u32>::new(3, 8).canonical(),
-        // these wind up becoming FULL for some reason
-        // ArcInterval::<u32>::new(1, u32::MAX).canonical(),
-        // ArcInterval::<u32>::new(2, u32::MAX).canonical(),
-        // ArcInterval::<u32>::new(3, u32::MAX).canonical(),
-        // ArcInterval::<u32>::new(3, u32::MAX - 1).canonical(),
-        // ArcInterval::<u32>::new(3, u32::MAX - 2).canonical(),
-        ArcInterval::<u32>::new(u32::MAX, u32::MAX).canonical(),
-        ArcInterval::<u32>::new(u32::MAX / 4 * 3, u32::MAX / 4).canonical(),
-        ArcInterval::<u32>::new(u32::MAX / 4 * 3 + 1, u32::MAX / 4).canonical(),
-        ArcInterval::<u32>::new(u32::MAX / 4 * 3 - 1, u32::MAX / 4).canonical(),
-        ArcInterval::<u32>::new(u32::MAX / 4 * 3 - 1, u32::MAX / 4 + 1).canonical(),
-        ArcInterval::<u32>::new(u32::MAX / 4 * 3 + 1, u32::MAX / 4 - 1).canonical(),
+        ArcInterval::<u32>::new(M, M).canonical(),
+        ArcInterval::<u32>::new(A, B).canonical(),
+        ArcInterval::<u32>::new(B, A).canonical(),
+        ArcInterval::<u32>::new(B + 1, A).canonical(),
+        ArcInterval::<u32>::new(B - 1, A).canonical(),
+        ArcInterval::<u32>::new(B - 1, A + 1).canonical(),
+        ArcInterval::<u32>::new(B + 1, A - 1).canonical(),
+        ArcInterval::<u32>::new(1, M).canonical(),
+        ArcInterval::<u32>::new(2, M).canonical(),
+        ArcInterval::<u32>::new(3, M).canonical(),
+        ArcInterval::<u32>::new(3, M - 1).canonical(),
+        ArcInterval::<u32>::new(3, M - 2).canonical(),
     ];
+    // Show that roundtrips of quantized intervals produce no change
+    // (roundtrips of unquantized intervals only result in quantization)
     let quantized: Vec<_> = intervals.iter().map(|i| i.quantized()).collect();
     let roundtrips: Vec<_> = intervals
         .iter()
         .map(|i| DhtArc::from_interval(i.to_owned()).interval())
         .collect();
+
+    // Show that roundtrips don't alter the centerpoints at all
+    let original_centers: Vec<_> = intervals.iter().map(|i| i.center_loc()).collect();
+    let quantized_centers: Vec<_> = quantized.iter().map(|i| i.center_loc()).collect();
+    let roundtrip_centers: Vec<_> = roundtrips.iter().map(|i| i.center_loc()).collect();
+    let dht_arc_centers: Vec<_> = quantized
+        .iter()
+        .map(|i| DhtArc::from_interval(i.clone()).center_loc())
+        .collect();
     assert_eq!(quantized, roundtrips);
+    assert_eq!(original_centers, quantized_centers);
+    assert_eq!(original_centers, roundtrip_centers);
+    assert_eq!(original_centers, dht_arc_centers);
+}
+
+#[test]
+/// Test DhtArc -> ArcInterval -> DhtArc roundtrips
+fn dht_arc_interval_roundtrip() {
+    use pretty_assertions::assert_eq;
+
+    // ignore empty ArcIntervals, which can't map back to DhtArc
+    let arcs = vec![
+        // DhtArc::new(1, 0),
+        DhtArc::new(1, 1),
+        DhtArc::new(1, 2),
+        DhtArc::new(1, 3),
+        // DhtArc::new(0, 0),
+        DhtArc::new(0, 1),
+        DhtArc::new(0, 2),
+        DhtArc::new(0, 3),
+        // DhtArc::new(-1, 0),
+        DhtArc::new(-1, 1),
+        DhtArc::new(-1, 2),
+        DhtArc::new(-1, 3),
+        // DhtArc::new(-2, 0),
+        DhtArc::new(-2, 1),
+        DhtArc::new(-2, 2),
+        DhtArc::new(-2, 3),
+    ];
+    let roundtrips: Vec<_> = arcs
+        .iter()
+        .map(|arc| DhtArc::from_interval(arc.interval()))
+        .collect();
+    assert_eq!(arcs, roundtrips);
 }
