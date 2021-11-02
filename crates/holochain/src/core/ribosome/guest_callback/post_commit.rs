@@ -2,6 +2,7 @@ use crate::conductor::api::CellConductorApiT;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
+use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
 use holochain_keystore::MetaLairClient;
@@ -61,6 +62,9 @@ impl Invocation for PostCommitInvocation {
     }
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(self.headers)
+    }
+    fn auth(&self) -> InvocationAuth {
+        InvocationAuth::LocalCallback
     }
 }
 

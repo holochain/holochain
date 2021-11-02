@@ -22,7 +22,9 @@ struct AppString(String);
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
 async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
-    use holochain::test_utils::inline_zomes::simple_create_read_zome;
+    use holochain::{
+        conductor::handle::DevSettingsDelta, test_utils::inline_zomes::simple_create_read_zome,
+    };
 
     let _g = observability::test_run().ok();
     const NUM_CONDUCTORS: usize = 2;
@@ -43,7 +45,10 @@ async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
 
     let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
     for c in conductors.iter() {
-        c.set_skip_publish(true);
+        c.update_dev_settings(DevSettingsDelta {
+            publish: Some(false),
+            ..Default::default()
+        });
     }
 
     let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_create_read_zome())
@@ -81,7 +86,10 @@ async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
 async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
-    use holochain::{sweettest::SweetConductor, test_utils::inline_zomes::simple_create_read_zome};
+    use holochain::{
+        conductor::handle::DevSettingsDelta, sweettest::SweetConductor,
+        test_utils::inline_zomes::simple_create_read_zome,
+    };
 
     let _g = observability::test_run().ok();
 
@@ -100,7 +108,10 @@ async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
     config.network = Some(network);
 
     let mut conductor = SweetConductor::from_config(config).await;
-    conductor.set_skip_publish(true);
+    conductor.update_dev_settings(DevSettingsDelta {
+        publish: Some(false),
+        ..Default::default()
+    });
 
     let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_create_read_zome())
         .await

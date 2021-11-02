@@ -49,7 +49,7 @@ pub trait HolochainP2pCellT {
         to_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: FunctionName,
-        cap: Option<CapSecret>,
+        cap_secret: Option<CapSecret>,
         payload: ExternIO,
     ) -> actor::HolochainP2pResult<SerializedBytes>;
 
@@ -166,7 +166,7 @@ impl HolochainP2pCellT for HolochainP2pCell {
         to_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: FunctionName,
-        cap: Option<CapSecret>,
+        cap_secret: Option<CapSecret>,
         payload: ExternIO,
     ) -> actor::HolochainP2pResult<SerializedBytes> {
         self.sender
@@ -176,7 +176,7 @@ impl HolochainP2pCellT for HolochainP2pCell {
                 to_agent,
                 zome_name,
                 fn_name,
-                cap,
+                cap_secret,
                 payload,
             )
             .await

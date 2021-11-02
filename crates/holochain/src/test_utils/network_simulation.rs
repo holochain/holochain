@@ -25,6 +25,7 @@ use rand::distributions::Standard;
 use rand::Rng;
 use rusqlite::{params, Connection, OptionalExtension, Transaction};
 
+use crate::conductor::handle::DevSettingsDelta;
 use crate::sweettest::{SweetConductor, SweetDnaFile};
 
 #[derive(SerializedBytes, serde::Serialize, serde::Deserialize, Debug)]
@@ -361,7 +362,10 @@ async fn create_test_data(
         ..Default::default()
     };
     let mut conductor = SweetConductor::from_config(config).await;
-    conductor.set_skip_publish(true);
+    conductor.update_dev_settings(DevSettingsDelta {
+        publish: Some(false),
+        ..Default::default()
+    });
     let mut agents = Vec::new();
     dbg!("generating agents");
     for i in 0..num_agents {
