@@ -30,6 +30,7 @@ pub trait AsGossipModule: 'static + Send + Sync {
     fn new_integrated_data(&self) {}
 }
 
+#[derive(Clone)]
 pub struct GossipModule(pub Arc<dyn AsGossipModule>);
 
 impl GossipModule {
@@ -57,6 +58,12 @@ impl GossipModule {
     /// New data has been integrated and is ready for gossiping.
     pub fn new_integrated_data(&self) {
         self.0.new_integrated_data();
+    }
+}
+
+impl std::fmt::Debug for GossipModule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GossipModule").finish()
     }
 }
 

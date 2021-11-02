@@ -25,7 +25,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::time::Instant;
 
-use self::bandwidth::BandwidthThrottle;
+pub use self::bandwidth::BandwidthThrottle;
 use self::metrics::Metrics;
 use self::state_map::RoundStateMap;
 
@@ -50,7 +50,7 @@ mod metrics;
 mod next_target;
 
 #[cfg(all(test, feature = "test_utils"))]
-mod tests;
+pub(crate) mod tests;
 
 /// max send buffer size (keep it under 16384 with a little room for overhead)
 /// (this is not a tuning_param because it must be coordinated
@@ -78,7 +78,7 @@ struct TimedBloomFilter {
 
 /// Gossip has two distinct variants which share a lot of similarities but
 /// are fundamentally different and serve different purposes
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GossipType {
     /// The Recent gossip type is aimed at rapidly syncing the most recent
     /// data. It runs frequently and expects frequent diffs at each round.
@@ -185,7 +185,7 @@ impl ShardedGossip {
 
         let timeout = self.gossip.tuning_params.implicit_timeout();
 
-        let con = match how {
+        let con = match how.clone() {
             HowToConnect::Con(con, remote_url) => {
                 if con.is_closed() {
                     self.ep_hnd.get_connection(remote_url, timeout).await?
