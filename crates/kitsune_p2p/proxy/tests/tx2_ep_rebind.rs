@@ -71,16 +71,6 @@ async fn gen_node(maybe_proxy: Option<ProxyUrl>) -> Tx2EpHnd<Wire> {
     ep_hnd
 }
 
-fn proxify_addr(purl: &TxUrl, nurl: &TxUrl) -> TxUrl {
-    let digest = ProxyUrl::from(nurl.as_str());
-    let digest = digest.digest();
-    let purl = ProxyUrl::from(purl.as_str());
-    ProxyUrl::new(purl.as_base().as_str(), digest)
-        .unwrap()
-        .as_str()
-        .into()
-}
-
 fn init_tracing() {
     let _ = tracing::subscriber::set_global_default(
         tracing_subscriber::FmtSubscriber::builder()
@@ -102,16 +92,11 @@ async fn tx2_ep_rebind() {
     let tgt_hnd = gen_node(Some(ProxyUrl::from(proxy_addr.as_str()))).await;
     let _ = tgt_hnd.get_connection(proxy_addr.clone(), t).await.unwrap();
     let tgt_addr = tgt_hnd.local_addr().unwrap();
-    let tgt_addr = proxify_addr(&proxy_addr, &tgt_addr);
     println!("tgt: {}", tgt_addr);
 
     let node = gen_node(Some(ProxyUrl::from(proxy_addr.as_str()))).await;
 
-    // TODO - DELETE THIS - should be handled with "client_of_remote_proxy"
-    //let _ = node.get_connection(proxy_addr.clone(), t).await.unwrap();
-
     let node_addr = node.local_addr().unwrap();
-    let node_addr = proxify_addr(&proxy_addr, &node_addr);
     println!("@@@ node @@@: {}", node_addr);
 
     //tracing::error!("-- test -- closing node");
@@ -124,13 +109,9 @@ async fn tx2_ep_rebind() {
     //tracing::error!("-- test -- sleeping");
 
     // give the node some time to re-connect
-    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-
-    // TODO - DELETE THIS - should be handled with "client_of_remote_proxy"
-    //let _ = node.get_connection(proxy_addr.clone(), t).await.unwrap();
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
     let node_addr = node.local_addr().unwrap();
-    let node_addr = proxify_addr(&proxy_addr, &node_addr);
     println!("@@@ node @@@: {}", node_addr);
 
     //tracing::error!("-- test -- making request");

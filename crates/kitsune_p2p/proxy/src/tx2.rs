@@ -157,14 +157,14 @@ fn promote_addr(base_addr: &TxUrl, cert: &Tx2Cert) -> KitsuneResult<TxUrl> {
 }
 
 #[derive(Clone)]
-struct MyBo {
+struct Backoff {
     bo: Arc<AtomicUsize>,
     n: Arc<Notify>,
     init: usize,
     max: usize,
 }
 
-impl MyBo {
+impl Backoff {
     pub fn new(init: usize, max: usize) -> Self {
         Self {
             bo: Arc::new(AtomicUsize::new(init)),
@@ -221,7 +221,7 @@ struct ProxyEpInner {
     // these are both INCOMING and OUTGOING
     direct_to_final_peer_con_map: HashMap<Uniq, HashMap<Tx2Cert, ConHnd>>,
 
-    my_bo: MyBo,
+    backoff: Backoff,
 }
 
 impl ProxyEpInner {
@@ -256,6 +256,7 @@ struct ProxyEpHnd {
     local_cert: Tx2Cert,
     logic_hnd: LogicChanHandle<EpEvent>,
     inner: Share<ProxyEpInner>,
+    client_of_remote_proxy: Option<ProxyUrl>,
 }
 
 async fn get_con_hnd(
@@ -285,7 +286,8 @@ impl ProxyEpHnd {
     pub fn new(
         sub_ep_hnd: EpHnd,
         logic_hnd: LogicChanHandle<EpEvent>,
-        my_bo: MyBo,
+        backoff: Backoff,
+        client_of_remote_proxy: Option<ProxyUrl>,
     ) -> KitsuneResult<Arc<ProxyEpHnd>> {
         let local_cert = sub_ep_hnd.local_cert();
         Ok(Arc::new(ProxyEpHnd {
@@ -295,8 +297,9 @@ impl ProxyEpHnd {
             inner: Share::new(ProxyEpInner {
                 digest_to_sub_con_map: HashMap::new(),
                 direct_to_final_peer_con_map: HashMap::new(),
-                my_bo,
+                backoff,
             }),
+            client_of_remote_proxy,
         }))
     }
 }
@@ -332,13 +335,24 @@ impl AsEpHnd for ProxyEpHnd {
     }
 
     fn local_addr(&self) -> KitsuneResult<TxUrl> {
-        let local_addr = self.sub_ep_hnd.local_addr()?;
-        let proxy_addr: TxUrl =
-            ProxyUrl::new(local_addr.as_str(), self.local_cert.as_digest().clone())
-                .map_err(KitsuneError::other)?
-                .as_str()
-                .into();
-        Ok(proxy_addr)
+        if let Some(proxy_url) = &self.client_of_remote_proxy {
+            let proxy_addr: TxUrl = ProxyUrl::new(
+                proxy_url.as_base().as_str(),
+                self.local_cert.as_digest().clone(),
+            )
+            .map_err(KitsuneError::other)?
+            .as_str()
+            .into();
+            Ok(proxy_addr)
+        } else {
+            let local_addr = self.sub_ep_hnd.local_addr()?;
+            let proxy_addr: TxUrl =
+                ProxyUrl::new(local_addr.as_str(), self.local_cert.as_digest().clone())
+                    .map_err(KitsuneError::other)?
+                    .as_str()
+                    .into();
+            Ok(proxy_addr)
+        }
     }
 
     fn local_cert(&self) -> Tx2Cert {
@@ -755,19 +769,19 @@ async fn close_connection_inner(
 
         // remove all out cons associated with this exact connection
         Ok((
-            i.my_bo.clone(),
+            i.backoff.clone(),
             i.direct_to_final_peer_con_map.remove(&direct_peer),
         ))
     });
 
     let kill_cons = match inner_res {
-        Ok((my_bo, kill_cons)) => {
+        Ok((backoff, kill_cons)) => {
             if let Some(proxy_url) = client_of_remote_proxy {
                 let proxy_cert = Tx2Cert::from(proxy_url.digest());
                 if proxy_cert == peer_cert {
                     // reset our client proxy connection check timer
                     // so we'll try to reconnect
-                    my_bo.reset();
+                    backoff.reset();
                 }
             }
 
@@ -815,9 +829,14 @@ impl ProxyEp {
         let logic_chan = LogicChan::new(LOGIC_CHAN_LIMIT);
         let logic_hnd = logic_chan.handle().clone();
 
-        let my_bo = MyBo::new(10, 5000);
+        let backoff = Backoff::new(10, 5000);
 
-        let hnd = ProxyEpHnd::new(sub_ep.handle().clone(), logic_hnd.clone(), my_bo.clone())?;
+        let hnd = ProxyEpHnd::new(
+            sub_ep.handle().clone(),
+            logic_hnd.clone(),
+            backoff.clone(),
+            client_of_remote_proxy.clone(),
+        )?;
 
         let logic = incoming_evt_logic(
             tuning_params.clone(),
@@ -837,7 +856,7 @@ impl ProxyEp {
             l_hnd
                 .capture_logic(async move {
                     loop {
-                        if my_bo.wait().await.is_err() {
+                        if backoff.wait().await.is_err() {
                             break;
                         }
 
