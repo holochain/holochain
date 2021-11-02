@@ -40,6 +40,18 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<SerializedBytes> {
         Err("stub".into())
     }
+    fn handle_remote_signal(
+        &mut self,
+        dna_hash: DnaHash,
+        from_agent: AgentPubKey,
+        to_agent_list: Vec<AgentPubKey>,
+        zome_name: ZomeName,
+        fn_name: FunctionName,
+        cap: Option<CapSecret>,
+        payload: ExternIO,
+    ) -> HolochainP2pHandlerResult<()> {
+        Err("stub".into())
+    }
     fn handle_publish(
         &mut self,
         dna_hash: DnaHash,
