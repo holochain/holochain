@@ -62,8 +62,8 @@ use holochain_keystore::test_keystore::spawn_legacy_test_keystore;
 use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_keystore::MetaLairClient;
 use holochain_sqlite::db::DbKind;
-use holochain_sqlite::sql::sql_cell::state_dump;
 use holochain_sqlite::prelude::*;
+use holochain_sqlite::sql::sql_cell::state_dump;
 use holochain_state::mutations;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateMutationResult;
@@ -1197,11 +1197,8 @@ pub async fn full_integration_dump(
 ) -> ConductorApiResult<FullIntegrationStateDump> {
     vault
         .async_reader(move |txn| {
-            let integrated = query_dht_ops_from_statement(
-                &txn,
-                state_dump::DHT_OPS_INTEGRATED,
-                dht_ops_cursor,
-            )?;
+            let integrated =
+                query_dht_ops_from_statement(&txn, state_dump::DHT_OPS_INTEGRATED, dht_ops_cursor)?;
 
             let validation_limbo = query_dht_ops_from_statement(
                 &txn,
@@ -1215,8 +1212,7 @@ pub async fn full_integration_dump(
                 dht_ops_cursor,
             )?;
 
-            let dht_ops_cursor =
-                txn.query_row("SELECT MAX(rowid) FROM DhtOp", [], |row| row.get(0))?;
+            let dht_ops_cursor = txn.query_row(state_dump::DHT_OPS_ROW_ID, [], |row| row.get(0))?;
 
             ConductorApiResult::Ok(FullIntegrationStateDump {
                 validation_limbo,

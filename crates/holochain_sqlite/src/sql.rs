@@ -33,6 +33,7 @@ pub mod sql_cell {
             include_str!("sql/cell/state_dump/dht_ops_integrated.sql");
         pub const DHT_OPS_IN_VALIDATION_LIMBO: &str =
             include_str!("sql/cell/state_dump/dht_ops_in_validation_limbo.sql");
+        pub const DHT_OPS_ROW_ID: &str = include_str!("sql/cell/state_dump/dht_ops_row_id.sql");
     }
 }
 
