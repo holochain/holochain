@@ -337,6 +337,8 @@ impl SourceChain {
                                         Some(_) => acc,
                                         None => Some(grant),
                                     },
+                                    /// ChainAuthor should have short circuited.
+                                    CapAccess::Author => unreachable!(),
                                 }
                             }
                             // ChainAuthor should have short circuited and be filtered out already
