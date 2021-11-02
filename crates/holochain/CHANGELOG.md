@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 - `remote_signal` has always been a fire-and-forget operation. Now it also uses the more efficient fire-and-forget "notify" low-level networking plumbing. [#1075](https://github.com/holochain/holochain/pull/1075)
-- `entry_defs` added to `zome_info` and referenced by macros [PR1055](https://github.com/holochain/holochain/pull/1055)
+- **BREAKING CHANGE** `entry_defs` added to `zome_info` and referenced by macros [PR1055](https://github.com/holochain/holochain/pull/1055)
 - **BREAKING CHANGE**: The notion of "cell nicknames" ("nicks") and "app slots" has been unified into the notion of "app roles". This introduces several breaking changes. In general, you will need to rebuild any app bundles you are using, and potentially update some usages of the admin interface. In particular:
   - The `slots` field in App manifests is now called `roles`
   - The `InstallApp` admin method now takes a `role_id` field instead of a `nick` field
@@ -15,7 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Conductor can take a mocked network for testing simulated networks. [#1036](https://github.com/holochain/holochain/pull/1036)
 
 - Added `DumpFullState` to the admin interface, as a more complete form of `DumpState` which returns full `Vec<DhtOp>` instead of just their count, enabling more introspection of the state of the cell [#1065](https://github.com/holochain/holochain/pull/1065).
-- Added function name to call info in HDK. [#1078](https://github.com/holochain/holochain/pull/1078). 
+- **BREAKING CHANGE** Added function name to call info in HDK. [#1078](https://github.com/holochain/holochain/pull/1078). 
 
 ## 0.0.113
 
