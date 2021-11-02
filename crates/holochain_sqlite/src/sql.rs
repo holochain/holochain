@@ -26,6 +26,15 @@ pub mod sql_cell {
         pub const DELETE_LIVE_EPHEMERAL: &str =
             include_str!("sql/cell/schedule/delete_live_ephemeral.sql");
     }
+    pub mod state_dump {
+        pub const DHT_OPS_IN_INTEGRATION_LIMBO: &str =
+            include_str!("sql/cell/state_dump/dht_ops_in_integration_limbo.sql");
+        pub const DHT_OPS_INTEGRATED: &str =
+            include_str!("sql/cell/state_dump/dht_ops_integrated.sql");
+        pub const DHT_OPS_IN_VALIDATION_LIMBO: &str =
+            include_str!("sql/cell/state_dump/dht_ops_in_validation_limbo.sql");
+        pub const DHT_OPS_ROW_ID: &str = include_str!("sql/cell/state_dump/dht_ops_row_id.sql");
+    }
 }
 
 pub(crate) mod sql_conductor {
