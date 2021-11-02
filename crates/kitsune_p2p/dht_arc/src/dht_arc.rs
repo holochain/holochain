@@ -144,7 +144,7 @@ fn coverage_target(est_total_peers: usize) -> f64 {
 }
 
 /// Calculate the target arc length given a peer density.
-fn target(density: PeerDensity) -> f64 {
+fn target(density: PeerViewAlpha) -> f64 {
     // Get the estimated coverage gap based on our observed peer density.
     let est_gap = density.est_gap();
     // If we haven't observed at least our redundancy target number
@@ -172,7 +172,7 @@ fn target(density: PeerDensity) -> f64 {
 ///
 /// Note the rate of convergence is dependant of the rate
 /// that [`DhtArc::update_length`] is called.
-fn converge(current: f64, density: PeerDensity) -> f64 {
+fn converge(current: f64, density: PeerViewAlpha) -> f64 {
     let target = target(density);
     // The change in arc we'd need to make to get to the target.
     let delta = target - current;
@@ -237,12 +237,16 @@ impl DhtArc {
         Self::new(center_loc, (MAX_HALF_LENGTH as f64 * coverage) as u32)
     }
 
-    /// Update the half length based on a density reading.
+    /// Update the half length based on a PeerView reading.
     /// This will converge on a new target instead of jumping directly
     /// to the new target and is designed to be called at a given rate
-    /// with more recent peer density readings.
-    pub fn update_length(&mut self, density: PeerDensity) {
-        self.half_length = (MAX_HALF_LENGTH as f64 * converge(self.coverage(), density)) as u32;
+    /// with more recent peer views.
+    pub fn update_length<V: Into<PeerView>>(&mut self, view: V) {
+        self.half_length = match view.into() {
+            PeerView::Alpha(density) => {
+                (MAX_HALF_LENGTH as f64 * converge(self.coverage(), density)) as u32
+            }
+        }
     }
 
     /// Check if a location is contained in this arc

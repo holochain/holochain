@@ -1,5 +1,5 @@
+use crate::PeerViewParams;
 use crate::{gaps::check_redundancy, DhtArc, DhtArcBucket, MAX_HALF_LENGTH};
-use rand::seq::SliceRandom;
 use rand::thread_rng;
 use rand::Rng;
 use std::iter;
@@ -23,12 +23,14 @@ fn parameterized_stability_test() {
     let n = 500;
     let j = 1f64 / n as f64 / 3.0;
 
+    let kind = PeerViewParams::Alpha;
+
     let peers = simple_parameterized_generator(n, j, ArcLenStrategy::Constant(0.1));
-    report(peers);
+    report(peers, kind);
 }
 
-fn report(mut peers: Vec<DhtArc>) {
-    if let Some(mut stats) = seek_equilibrium(&mut peers) {
+fn report(mut peers: Vec<DhtArc>, kind: PeerViewParams) {
+    if let Some(mut stats) = seek_equilibrium(&mut peers, kind) {
         let total = stats.len();
         // print_arcs(&peers);
         println!("{:?}", stats.pop().unwrap());
@@ -42,7 +44,7 @@ fn report(mut peers: Vec<DhtArc>) {
 /// Run iterations until there is no movement of any arc
 /// TODO: this may be unreasonable, and we may need to just ensure that arcs
 /// settle down into a reasonable level of oscillation
-fn seek_equilibrium(peers: &mut Vec<DhtArc>) -> Option<Vec<EpochStats>> {
+fn seek_equilibrium(peers: &mut Vec<DhtArc>, kind: PeerViewParams) -> Option<Vec<EpochStats>> {
     let mut n_delta_count = 0;
     let mut stats_history = vec![];
     println!("{}", EpochStats::oneline_header());
@@ -53,7 +55,7 @@ fn seek_equilibrium(peers: &mut Vec<DhtArc>) -> Option<Vec<EpochStats>> {
         }
 
         // print_arcs(&peers);
-        let stats = run_one_epoch(peers, DETAIL);
+        let stats = run_one_epoch(peers, &kind, DETAIL);
         println!("{}", stats.oneline());
         // get_input();
         if stats.gross_delta_avg == 0.0 {
@@ -72,7 +74,7 @@ fn seek_equilibrium(peers: &mut Vec<DhtArc>) -> Option<Vec<EpochStats>> {
 }
 
 /// Resize every arc based on neighbors' arcs, and compute stats about this iteration
-fn run_one_epoch(peers: &mut Vec<DhtArc>, detail: u8) -> EpochStats {
+fn run_one_epoch(peers: &mut Vec<DhtArc>, kind: &PeerViewParams, detail: u8) -> EpochStats {
     let mut net = 0.0;
     let mut gross = 0.0;
     let mut delta_min = full_len() / 2.0;
@@ -83,7 +85,7 @@ fn run_one_epoch(peers: &mut Vec<DhtArc>, detail: u8) -> EpochStats {
         let p = peers.clone();
         let arc = peers.get_mut(i).unwrap();
         let bucket = DhtArcBucket::new(*arc, p.clone());
-        let density = bucket.density();
+        let density = bucket.peer_view(kind);
         let before = arc.absolute_length() as f64;
         arc.update_length(density);
         let after = arc.absolute_length() as f64;
@@ -183,6 +185,7 @@ impl EpochStats {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 enum ArcLenStrategy {
     Random,

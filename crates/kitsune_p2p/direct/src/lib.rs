@@ -2,6 +2,7 @@
 #![deny(warnings)]
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
+#![allow(deprecated)]
 
 pub use kitsune_p2p_direct_api::{KdError, KdResult};
 use kitsune_p2p_types::dependencies::ghost_actor::dependencies::tracing;

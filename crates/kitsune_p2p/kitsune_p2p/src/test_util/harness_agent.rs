@@ -196,7 +196,7 @@ impl KitsuneP2pEventHandler for AgentHarness {
         &mut self,
         _space: Arc<KitsuneSpace>,
         dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
-    ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht_arc::PeerDensity> {
+    ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht_arc::PeerViewAlpha> {
         let arcs = self
             .agent_store
             .values()
@@ -212,7 +212,7 @@ impl KitsuneP2pEventHandler for AgentHarness {
         // contains is already checked in the iterator
         let bucket = DhtArcBucket::new_unchecked(dht_arc, arcs);
 
-        Ok(async move { Ok(bucket.density()) }.boxed().into())
+        Ok(async move { Ok(bucket.peer_view_alpha()) }.boxed().into())
     }
 
     fn handle_put_metric_datum(&mut self, datum: MetricDatum) -> KitsuneP2pEventHandlerResult<()> {

@@ -1,8 +1,18 @@
 use super::{coverage_target, DhtArc, DEFAULT_UPTIME, MAX_HALF_LENGTH, NOISE_THRESHOLD};
 
+#[derive(Debug, Clone)]
+pub enum PeerViewParams {
+    Alpha,
+}
+
+#[derive(Debug, Clone, derive_more::From)]
+pub enum PeerView {
+    Alpha(PeerViewAlpha),
+}
+
 #[derive(Debug, Clone, Copy)]
 /// The average density of peers at a location in the u32 space.
-pub struct PeerDensity {
+pub struct PeerViewAlpha {
     /// The arc that filtered the bucket that generated this density.
     filter: DhtArc,
     /// The average coverage of peers in the bucket.
@@ -11,7 +21,7 @@ pub struct PeerDensity {
     count: usize,
 }
 
-impl PeerDensity {
+impl PeerViewAlpha {
     /// Create a new peer density reading from the:
     /// - The filter used to create the bucket.
     /// - Average coverage of all peers in the bucket.
@@ -93,8 +103,8 @@ impl DhtArcBucket {
         }
     }
 
-    /// Get the density of this bucket.
-    pub fn density(&self) -> PeerDensity {
+    #[deprecated = "use peer_view"]
+    pub fn peer_view_alpha(&self) -> PeerViewAlpha {
         let (total, count) = self
             .arcs
             .iter()
@@ -106,7 +116,27 @@ impl DhtArcBucket {
         } else {
             0.0
         };
-        PeerDensity::new(self.filter, average, count)
+        PeerViewAlpha::new(self.filter, average, count)
+    }
+
+    /// Get the density of this bucket.
+    pub fn peer_view(&self, params: &PeerViewParams) -> PeerView {
+        match params {
+            PeerViewParams::Alpha => {
+                let (total, count) = self
+                    .arcs
+                    .iter()
+                    .fold((0u64, 0usize), |(total, count), arc| {
+                        (total + arc.half_length as u64, count + 1)
+                    });
+                let average = if count > 0 {
+                    (total as f64 / count as f64) / MAX_HALF_LENGTH as f64
+                } else {
+                    0.0
+                };
+                PeerViewAlpha::new(self.filter, average, count).into()
+            }
+        }
     }
 }
 

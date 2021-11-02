@@ -40,7 +40,7 @@ async fn test_arc_coverage() {
                 let p = peers.clone();
                 let arc = peers.get_mut(i).unwrap();
                 let bucket = DhtArcBucket::new(*arc, p.clone());
-                let density = bucket.density();
+                let density = bucket.peer_view_alpha();
                 arc.update_length(density);
             }
             let bucket = DhtArcBucket::new(
@@ -89,7 +89,7 @@ async fn test_arc_redundancy() {
                 let p = peers.clone();
                 let arc = peers.get_mut(i).unwrap();
                 let bucket = DhtArcBucket::new(*arc, p.clone());
-                let density = bucket.density();
+                let density = bucket.peer_view_alpha();
                 arc.update_length(density);
             }
 
@@ -138,7 +138,7 @@ async fn test_arc_redundancy_all() {
                 let p = peers.clone();
                 let arc = peers.get_mut(i).unwrap();
                 let bucket = DhtArcBucket::new(*arc, p.clone());
-                let density = bucket.density();
+                let density = bucket.peer_view_alpha();
                 arc.update_length(density);
             }
 
@@ -204,7 +204,7 @@ async fn test_join_leave() {
             let p = peers.clone();
             let arc = peers.get_mut(i).unwrap();
             let bucket = DhtArcBucket::new(*arc, p.clone());
-            let density = bucket.density();
+            let density = bucket.peer_view_alpha();
             arc.update_length(density);
         }
     };
