@@ -165,6 +165,12 @@ impl std::cmp::PartialEq for AdapterFactoryMock {
     }
 }
 
+impl From<AdapterFactory> for AdapterFactoryMock {
+    fn from(adaptor_factory: AdapterFactory) -> Self {
+        Self(adaptor_factory)
+    }
+}
+
 /// Proxy configuration options
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
