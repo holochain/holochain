@@ -1,4 +1,5 @@
-use super::*;
+use crate::ArcInterval;
+
 use pretty_assertions::assert_eq;
 
 #[test]

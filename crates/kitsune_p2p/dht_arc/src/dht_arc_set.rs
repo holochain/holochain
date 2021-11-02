@@ -365,7 +365,7 @@ impl ArcInterval<DhtLocation> {
     }
 
     pub fn center_loc(&self) -> DhtLocation {
-        DhtArc::from_interval(self.clone()).center_loc
+        DhtArc::from_interval(self.clone()).center_loc()
     }
 
     #[cfg(any(test, feature = "test_utils"))]
