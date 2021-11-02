@@ -2,6 +2,7 @@ use crate::PeerStrat;
 use crate::*;
 use rand::thread_rng;
 use rand::Rng;
+use std::collections::HashSet;
 use std::iter;
 
 /// Maximum number of iterations. If we iterate this much, we assume the
@@ -19,33 +20,65 @@ fn full_len() -> f64 {
 }
 
 #[test]
-fn min_redundancy_is_maintained() {
-    todo!("Check that min redundancy is maintained at all times");
-}
+fn only_change_one() {
+    // 1000 agents
+    // all set to 0.1, the ideal target
+    // start alice at full sync, see if she converges to the ideal
 
-#[test]
-fn parameterized_stability_test() {
-    let n = 500;
-    let j = 1f64 / n as f64 / 3.0;
+    let n = 1000;
+    let j = 0.0;
+    // let j = 1f64 / n as f64 / 100.0;
 
     let strat = PeerStratAlpha {
-        // redundancy_target: 100,
+        redundancy_target: 50,
         ..Default::default()
     };
     let kind = PeerStrat::Alpha(strat);
 
-    let peers = simple_parameterized_generator(n, j, ArcLenStrategy::Constant(0.1));
-    report(peers, kind);
+    let mut peers = simple_parameterized_generator(n, j, ArcLenStrategy::Constant(0.1));
+    peers[0].half_length = MAX_HALF_LENGTH;
+    let dynamic = Some(maplit::hashset![0]);
+    let stats = seek_equilibrium(|| {
+        let stats = run_one_epoch(&kind, &mut peers, dynamic.as_ref(), DETAIL);
+        println!("{}", peers[0].coverage());
+        stats
+    });
+    report(stats);
 }
 
-fn report(mut peers: Vec<DhtArc>, kind: PeerStrat) {
-    if let Some(mut stats) = seek_equilibrium(&mut peers, kind) {
+#[test]
+fn parameterized_stability_test() {
+    let n = 1000;
+    let r = 50;
+    let j = 1f64 / n as f64 / 3.0;
+
+    let strat = PeerStratAlpha {
+        redundancy_target: r,
+        ..Default::default()
+    };
+    let kind = PeerStrat::Alpha(strat);
+
+    let mut peers = simple_parameterized_generator(n, j, ArcLenStrategy::Constant(0.1));
+    println!("{}", EpochStats::oneline_header());
+    let stats = seek_equilibrium(|| {
+        let stats = run_one_epoch(&kind, &mut peers, None, DETAIL);
+        println!("{}", stats.oneline());
+        stats
+    });
+    report(stats);
+}
+
+#[test]
+fn min_redundancy_is_maintained() {
+    todo!("Check that min redundancy is maintained at all times");
+}
+
+fn report(stats: Option<Vec<EpochStats>>) {
+    if let Some(mut stats) = stats {
         let total = stats.len();
-        // print_arcs(&peers);
         println!("{:?}", stats.pop().unwrap());
         println!("Reached equilibrium in {} iterations", total);
     } else {
-        // print_arcs(&peers);
         panic!("failed to reach equilibrium in {} iterations", MAX_ITERS);
     }
 }
@@ -53,20 +86,19 @@ fn report(mut peers: Vec<DhtArc>, kind: PeerStrat) {
 /// Run iterations until there is no movement of any arc
 /// TODO: this may be unreasonable, and we may need to just ensure that arcs
 /// settle down into a reasonable level of oscillation
-fn seek_equilibrium(peers: &mut Vec<DhtArc>, kind: PeerStrat) -> Option<Vec<EpochStats>> {
+fn seek_equilibrium<F>(mut step: F) -> Option<Vec<EpochStats>>
+where
+    F: FnMut() -> EpochStats,
+{
     let mut n_delta_count = 0;
     let mut stats_history = vec![];
-    println!("{}", EpochStats::oneline_header());
     for i in 1..=MAX_ITERS {
         if n_delta_count >= STEADY_WINDOW {
             println!("Converged in {} iterations", i - STEADY_WINDOW);
             break;
         }
 
-        // print_arcs(&peers);
-        let stats = run_one_epoch(peers, &kind, DETAIL);
-        println!("{}", stats.oneline());
-        // get_input();
+        let stats = step();
         if stats.gross_delta_avg == 0.0 {
             n_delta_count += 1;
         } else if n_delta_count > 0 {
@@ -83,7 +115,16 @@ fn seek_equilibrium(peers: &mut Vec<DhtArc>, kind: PeerStrat) -> Option<Vec<Epoc
 }
 
 /// Resize every arc based on neighbors' arcs, and compute stats about this iteration
-fn run_one_epoch(peers: &mut Vec<DhtArc>, kind: &PeerStrat, detail: u8) -> EpochStats {
+/// kind: The resizing strategy to use
+/// peers: The list of peers in this epoch
+/// dynamic_peer_indices: Indices of peers who should be updated. If None, all peers will be updated.
+/// detail: Level of output detail. More is more verbose. detail: u8,
+fn run_one_epoch(
+    kind: &PeerStrat,
+    peers: &mut Vec<DhtArc>,
+    dynamic_peer_indices: Option<&HashSet<usize>>,
+    detail: u8,
+) -> EpochStats {
     let mut net = 0.0;
     let mut gross = 0.0;
     let mut delta_min = full_len() / 2.0;
@@ -91,6 +132,11 @@ fn run_one_epoch(peers: &mut Vec<DhtArc>, kind: &PeerStrat, detail: u8) -> Epoch
     let mut index_min = peers.len();
     let mut index_max = peers.len();
     for i in 0..peers.len() {
+        if let Some(dynamic) = dynamic_peer_indices {
+            if !dynamic.contains(&i) {
+                continue;
+            }
+        }
         let p = peers.clone();
         let arc = peers.get_mut(i).unwrap();
         let bucket = DhtArcBucket::new(*arc, p.clone());
