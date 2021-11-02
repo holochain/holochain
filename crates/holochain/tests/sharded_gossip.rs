@@ -177,7 +177,7 @@ async fn mock_network_sharded_gossip() {
     use kitsune_p2p_types::tx2::tx2_adapter::AdapterFactory;
 
     // Get the env var settings for number of simulated agents and
-    // the minimum number of obs that should be held by each agent
+    // the minimum number of ops that should be held by each agent
     // if there are some or use defaults.
     let (num_agents, min_ops) = std::env::var_os("NUM_AGENTS")
         .and_then(|s| s.to_string_lossy().parse::<usize>().ok())
@@ -211,7 +211,7 @@ async fn mock_network_sharded_gossip() {
     let (from_kitsune_tx, to_kitsune_rx, mut channel) = HolochainP2pMockChannel::channel(
         // Pass in the generated simulated peer data.
         data.agent_info().cloned().collect(),
-        // We won't to buffer up to 1000 network messages.
+        // We want to buffer up to 1000 network messages.
         1000,
         MockScenario {
             // Don't drop any individual messages.
