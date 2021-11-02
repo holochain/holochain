@@ -53,6 +53,7 @@ use futures::stream::StreamExt;
 use holo_hash::DnaHash;
 use holochain_conductor_api::conductor::KeystoreConfig;
 use holochain_conductor_api::AppStatusFilter;
+use holochain_conductor_api::FullIntegrationStateDump;
 use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
@@ -62,11 +63,13 @@ use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_keystore::MetaLairClient;
 use holochain_sqlite::db::DbKind;
 use holochain_sqlite::prelude::*;
+use holochain_sqlite::sql::sql_cell::state_dump;
 use holochain_state::mutations;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateMutationResult;
+use holochain_state::prelude::StateQueryResult;
 use holochain_types::prelude::*;
-use rusqlite::OptionalExtension;
+use rusqlite::{OptionalExtension, Transaction};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
@@ -1184,6 +1187,73 @@ pub async fn integration_dump(vault: &EnvRead) -> ConductorApiResult<Integration
             })
         })
         .await
+}
+
+/// Dump the full integration json state.
+/// Careful! This will return a lot of data.
+pub async fn full_integration_dump(
+    vault: &EnvRead,
+    dht_ops_cursor: Option<u64>,
+) -> ConductorApiResult<FullIntegrationStateDump> {
+    vault
+        .async_reader(move |txn| {
+            let integrated =
+                query_dht_ops_from_statement(&txn, state_dump::DHT_OPS_INTEGRATED, dht_ops_cursor)?;
+
+            let validation_limbo = query_dht_ops_from_statement(
+                &txn,
+                state_dump::DHT_OPS_IN_VALIDATION_LIMBO,
+                dht_ops_cursor,
+            )?;
+
+            let integration_limbo = query_dht_ops_from_statement(
+                &txn,
+                state_dump::DHT_OPS_IN_INTEGRATION_LIMBO,
+                dht_ops_cursor,
+            )?;
+
+            let dht_ops_cursor = txn.query_row(state_dump::DHT_OPS_ROW_ID, [], |row| row.get(0))?;
+
+            ConductorApiResult::Ok(FullIntegrationStateDump {
+                validation_limbo,
+                integration_limbo,
+                integrated,
+                dht_ops_cursor,
+            })
+        })
+        .await
+}
+
+fn query_dht_ops_from_statement(
+    txn: &Transaction,
+    stmt_str: &str,
+    dht_ops_cursor: Option<u64>,
+) -> ConductorApiResult<Vec<DhtOp>> {
+    let final_stmt_str = match dht_ops_cursor {
+        Some(cursor) => format!("{} AND rowid > {}", stmt_str, cursor),
+        None => stmt_str.into(),
+    };
+
+    let mut stmt = txn.prepare(final_stmt_str.as_str())?;
+
+    let r: Vec<DhtOp> = stmt
+        .query_and_then([], |row| {
+            let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
+            let op_type: DhtOpType = row.get("dht_type")?;
+            let entry = match header.0.entry_type().map(|et| et.visibility()) {
+                Some(EntryVisibility::Public) => {
+                    let entry: Option<Vec<u8>> = row.get("entry_blob")?;
+                    match entry {
+                        Some(entry) => Some(from_blob::<Entry>(entry)?),
+                        None => None,
+                    }
+                }
+                _ => None,
+            };
+            Ok(DhtOp::from_type(op_type, header, entry)?)
+        })?
+        .collect::<StateQueryResult<Vec<_>>>()?;
+    Ok(r)
 }
 
 //-----------------------------------------------------------------------------
