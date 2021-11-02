@@ -840,11 +840,11 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             crate::wire::WireMessage::CallRemote {
                 zome_name,
                 fn_name,
-                cap,
+                cap_secret,
                 data,
             } => {
                 let fut = self.handle_incoming_call_remote(
-                    space, to_agent, from_agent, zome_name, fn_name, cap, data,
+                    space, to_agent, from_agent, zome_name, fn_name, cap_secret, data,
                 );
                 Ok(async move {
                     let _ = fut?.await?;

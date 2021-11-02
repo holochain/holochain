@@ -6,7 +6,6 @@ use holochain_types::access::Permission;
 use holochain_wasmer_host::prelude::WasmError;
 use holochain_zome_types::signal::RemoteSignal;
 use holochain_zome_types::zome::FunctionName;
-use holochain_zome_types::zome::ZomeName;
 use std::sync::Arc;
 use tracing::Instrument;
 
@@ -26,7 +25,7 @@ pub fn remote_signal(
             // this is a send and forget operation.
             let network = call_context.host_context().network().clone();
             let RemoteSignal { agents, signal } = input;
-            let zome_name: &ZomeName = call_context.zome().zome_name();
+            let zome_name = call_context.zome().zome_name().clone();
             let fn_name: FunctionName = FN_NAME.into();
             tokio::task::spawn(async move {
                 if let Err(e) = network
