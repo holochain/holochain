@@ -895,7 +895,7 @@ pub fn get_public_entry_from_db(
         "
         SELECT Entry.blob AS entry_blob FROM Entry
         JOIN Header ON Header.entry_hash = Entry.hash
-        WHERE hash = :entry_hash
+        WHERE Entry.hash = :entry_hash
         AND
         Header.private_entry = 0
         ",
