@@ -5,7 +5,7 @@ use holo_hash::DnaHash;
 use holochain_conductor_api::AgentInfoDump;
 use holochain_conductor_api::P2pAgentsDump;
 use holochain_p2p::dht_arc::DhtArc;
-use holochain_p2p::dht_arc::DhtArcBucket;
+use holochain_p2p::dht_arc::PeerStratAlpha;
 use holochain_p2p::dht_arc::PeerViewAlpha;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use holochain_p2p::AgentPubKeyExt;
@@ -163,7 +163,7 @@ pub fn query_peer_density(
 ) -> ConductorResult<PeerViewAlpha> {
     let now = now();
     let arcs = env.conn()?.p2p_list_agents()?;
-    let arcs = arcs
+    let arcs: Vec<_> = arcs
         .into_iter()
         .filter_map(|v| {
             if dht_arc.contains(v.agent.get_loc()) {
@@ -179,9 +179,7 @@ pub fn query_peer_density(
         .collect();
 
     // contains is already checked in the iterator
-    let bucket = DhtArcBucket::new_unchecked(dht_arc, arcs);
-
-    Ok(bucket.peer_view_default())
+    Ok(PeerStratAlpha::default().view_unchecked(dht_arc, arcs.as_slice()))
 }
 
 /// Put single agent info into store

@@ -1,11 +1,11 @@
 use holochain::sweettest::SweetAgents;
 use holochain::sweettest::SweetConductor;
 use holochain_keystore::MetaLairClient;
+use holochain_p2p::dht_arc::PeerStratAlpha;
 use holochain_p2p::dht_arc::DEFAULT_MIN_PEERS;
 use holochain_p2p::dht_arc::DEFAULT_MIN_REDUNDANCY;
 use holochain_p2p::dht_arc::MAX_HALF_LENGTH;
 use kitsune_p2p::dht_arc::DhtArc;
-use kitsune_p2p::dht_arc::DhtArcBucket;
 use kitsune_p2p::*;
 use kitsune_p2p_types::dht_arc::check_redundancy;
 use kitsune_p2p_types::dht_arc::gaps::check_for_gaps;
@@ -37,9 +37,8 @@ async fn test_arc_redundancy() {
             for i in 0..peers.len() {
                 let p = peers.clone();
                 let arc = peers.get_mut(i).unwrap();
-                let bucket = DhtArcBucket::new(*arc, p.clone());
-                let density = bucket.peer_view_default();
-                arc.update_length(density);
+                let view = PeerStratAlpha::default().view(*arc, p.as_slice());
+                arc.update_length(view);
             }
 
             assert!(!check_for_gaps(peers.clone()));
@@ -86,9 +85,8 @@ async fn test_arc_redundancy_all() {
             for i in 0..peers.len() {
                 let p = peers.clone();
                 let arc = peers.get_mut(i).unwrap();
-                let bucket = DhtArcBucket::new(*arc, p.clone());
-                let density = bucket.peer_view_default();
-                arc.update_length(density);
+                let view = PeerStratAlpha::default().view(*arc, p.as_slice());
+                arc.update_length(view);
             }
 
             let r = check_redundancy(peers.clone());
@@ -152,9 +150,8 @@ async fn test_join_leave() {
         for i in 0..peers.len() {
             let p = peers.clone();
             let arc = peers.get_mut(i).unwrap();
-            let bucket = DhtArcBucket::new(*arc, p.clone());
-            let density = bucket.peer_view_default();
-            arc.update_length(density);
+            let view = PeerStratAlpha::default().view(arc.clone(), p.as_slice());
+            arc.update_length(view);
         }
     };
     let mut peers = get_peers(num_peers, &coverages, keystore.clone()).await;

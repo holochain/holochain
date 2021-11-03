@@ -23,9 +23,22 @@ impl Default for PeerStratAlpha {
     }
 }
 
-#[derive(Debug, Clone, derive_more::From)]
-pub enum PeerView {
-    Alpha(PeerViewAlpha),
+impl PeerStratAlpha {
+    pub fn view(&self, arc: DhtArc, peers: &[DhtArc]) -> PeerViewAlpha {
+        todo!()
+    }
+
+    pub fn view_unchecked(&self, arc: DhtArc, peers: &[DhtArc]) -> PeerViewAlpha {
+        let (total, count) = peers.iter().fold((0u64, 0usize), |(total, count), arc| {
+            (total + arc.half_length as u64, count + 1)
+        });
+        let average = if count > 0 {
+            (total as f64 / count as f64) / MAX_HALF_LENGTH as f64
+        } else {
+            0.0
+        };
+        PeerViewAlpha::new(self.clone(), arc, average, count).into()
+    }
 }
 
 #[derive(Debug, Clone, Copy)]

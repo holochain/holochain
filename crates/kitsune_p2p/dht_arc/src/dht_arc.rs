@@ -72,7 +72,7 @@ impl rusqlite::ToSql for DhtLocation {
 pub const MAX_HALF_LENGTH: u32 = (u32::MAX / 2) + 1 + 1;
 
 /// Maximum number of values that a u32 can represent.
-const U32_LEN: u64 = u32::MAX as u64 + 1;
+pub(crate) const U32_LEN: u64 = u32::MAX as u64 + 1;
 
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 /// Represents how much of a dht arc is held
@@ -339,7 +339,7 @@ impl From<DhtLocation> for u32 {
 }
 
 /// Finds the shortest distance between two points on a circle
-fn shortest_arc_distance<A: Into<DhtLocation>, B: Into<DhtLocation>>(a: A, b: B) -> u32 {
+pub(crate) fn shortest_arc_distance<A: Into<DhtLocation>, B: Into<DhtLocation>>(a: A, b: B) -> u32 {
     // Turn into wrapped u32s
     let a = a.into().0;
     let b = b.into().0;
@@ -379,7 +379,7 @@ impl ArcRange {
     }
 
     #[cfg(test)]
-    fn into_inc(self: ArcRange) -> RangeInclusive<usize> {
+    pub(crate) fn into_inc(self: ArcRange) -> RangeInclusive<usize> {
         match self {
             ArcRange {
                 start: Bound::Included(a),

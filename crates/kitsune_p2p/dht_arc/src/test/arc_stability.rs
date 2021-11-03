@@ -256,12 +256,12 @@ where
 }
 
 /// Resize every arc based on neighbors' arcs, and compute stats about this iteration
-/// kind: The resizing strategy to use
+/// strat: The resizing strategy to use
 /// peers: The list of peers in this epoch
 /// dynamic_peer_indices: Indices of peers who should be updated. If None, all peers will be updated.
 /// detail: Level of output detail. More is more verbose. detail: u8,
 fn run_one_epoch(
-    kind: &PeerStrat,
+    strat: &PeerStrat,
     mut peers: Peers,
     dynamic_peer_indices: Option<&HashSet<usize>>,
     detail: u8,
@@ -280,8 +280,7 @@ fn run_one_epoch(
         }
         let p = peers.clone();
         let arc = peers.get_mut(i).unwrap();
-        let bucket = DhtArcBucket::new(*arc, p.clone());
-        let view = bucket.peer_view(kind);
+        let view = strat.view(*arc, p.as_slice());
         let before = arc.absolute_length() as f64;
         arc.update_length(view);
         let after = arc.absolute_length() as f64;
