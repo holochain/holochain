@@ -2,6 +2,7 @@ use crate::scratch::FilteredScratch;
 use crate::scratch::Scratch;
 use fallible_iterator::FallibleIterator;
 use holo_hash::hash_type::AnyDht;
+use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
 use holo_hash::DhtOpHash;
 use holo_hash::EntryHash;
@@ -139,11 +140,26 @@ pub trait Store {
     /// Get an [`Entry`] from this store.
     fn get_entry(&self, hash: &EntryHash) -> StateQueryResult<Option<Entry>>;
 
+    /// Get an [`Entry`] from this store.
+    fn get_public_or_authored_entry(
+        &self,
+        hash: &EntryHash,
+        author: Option<&AgentPubKey>,
+    ) -> StateQueryResult<Option<Entry>>;
+
     /// Get an [`SignedHeaderHashed`] from this store.
     fn get_header(&self, hash: &HeaderHash) -> StateQueryResult<Option<SignedHeaderHashed>>;
 
     /// Get an [`Element`] from this store.
     fn get_element(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Element>>;
+
+    /// Get an [`Element`] from this store that is either public or
+    /// authored by the given key.
+    fn get_public_or_authored_element(
+        &self,
+        hash: &AnyDhtHash,
+        author: Option<&AgentPubKey>,
+    ) -> StateQueryResult<Option<Element>>;
 
     /// Check if a hash is contained in the store
     fn contains_hash(&self, hash: &AnyDhtHash) -> StateQueryResult<bool> {
@@ -205,6 +221,25 @@ impl<'stmt, Q: Query> Stores<Q> for Txn<'stmt, '_> {
 impl<'stmt> Store for Txn<'stmt, '_> {
     fn get_entry(&self, hash: &EntryHash) -> StateQueryResult<Option<Entry>> {
         get_entry_from_db(&self.txn, hash)
+    }
+
+    fn get_public_or_authored_entry(
+        &self,
+        hash: &EntryHash,
+        author: Option<&AgentPubKey>,
+    ) -> StateQueryResult<Option<Entry>> {
+        // Try to get the entry if it's public.
+        match get_public_entry_from_db(&self.txn, hash)? {
+            Some(e) => Ok(Some(e)),
+            None => match author {
+                // If no public entry is found try to find
+                // any authored by this agent.
+                Some(author) => Ok(self
+                    .get_any_authored_element(hash, author)?
+                    .and_then(|el| el.into_inner().1.into_option())),
+                None => Ok(None),
+            },
+        }
     }
 
     fn contains_entry(&self, hash: &EntryHash) -> StateQueryResult<bool> {
@@ -299,6 +334,39 @@ impl<'stmt> Store for Txn<'stmt, '_> {
             AnyDht::Header => self.get_exact_element(&hash.clone().into()),
         }
     }
+
+    fn get_public_or_authored_element(
+        &self,
+        hash: &AnyDhtHash,
+        author: Option<&AgentPubKey>,
+    ) -> StateQueryResult<Option<Element>> {
+        match *hash.hash_type() {
+            // Try to get a public element.
+            AnyDht::Entry => match self.get_any_public_element(&hash.clone().into())? {
+                Some(el) => Ok(Some(el)),
+                None => match author {
+                    // If there are none try to get a private authored element.
+                    Some(author) => self.get_any_authored_element(&hash.clone().into(), author),
+                    // If there are no private authored elements then try to get any element and
+                    // remove the entry.
+                    None => Ok(self
+                        .get_any_element(&hash.clone().into())?
+                        .map(|el| Element::new(el.into_inner().0, None))),
+                },
+            },
+            AnyDht::Header => Ok(self.get_exact_element(&hash.clone().into())?.map(|el| {
+                // Filter out the entry if it's private.
+                let is_private_entry = el.header().entry_type().map_or(false, |et| {
+                    matches!(et.visibility(), EntryVisibility::Private)
+                });
+                if is_private_entry {
+                    Element::new(el.into_inner().0, None)
+                } else {
+                    el
+                }
+            })),
+        }
+    }
 }
 
 impl<'stmt> Txn<'stmt, '_> {
@@ -351,6 +419,91 @@ impl<'stmt> Txn<'stmt, '_> {
             ",
             named_params! {
                 ":hash": hash,
+            },
+            |row| {
+                let header =
+                    from_blob::<SignedHeader>(row.get(row.as_ref().column_index("header_blob")?)?);
+                Ok(header.and_then(|header| {
+                    let SignedHeader(header, signature) = header;
+                    let hash: HeaderHash = row.get(row.as_ref().column_index("hash")?)?;
+                    let header = HeaderHashed::with_pre_hashed(header, hash);
+                    let shh = SignedHeaderHashed::with_presigned(header, signature);
+                    let entry: Option<Vec<u8>> =
+                        row.get(row.as_ref().column_index("entry_blob")?)?;
+                    let entry = match entry {
+                        Some(entry) => Some(from_blob::<Entry>(entry)?),
+                        None => None,
+                    };
+                    Ok(Element::new(shh, entry))
+                }))
+            },
+        );
+        if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &element {
+            Ok(None)
+        } else {
+            Ok(Some(element??))
+        }
+    }
+
+    fn get_any_public_element(&self, hash: &EntryHash) -> StateQueryResult<Option<Element>> {
+        let element = self.txn.query_row_named(
+            "
+            SELECT
+            Header.blob AS header_blob, Header.hash, Entry.blob as entry_blob
+            FROM Header
+            JOIN Entry ON Header.entry_hash = Entry.hash
+            WHERE
+            Entry.hash = :hash
+            AND
+            Header.private_entry = 0
+            ",
+            named_params! {
+                ":hash": hash,
+            },
+            |row| {
+                let header =
+                    from_blob::<SignedHeader>(row.get(row.as_ref().column_index("header_blob")?)?);
+                Ok(header.and_then(|header| {
+                    let SignedHeader(header, signature) = header;
+                    let hash: HeaderHash = row.get(row.as_ref().column_index("hash")?)?;
+                    let header = HeaderHashed::with_pre_hashed(header, hash);
+                    let shh = SignedHeaderHashed::with_presigned(header, signature);
+                    let entry: Option<Vec<u8>> =
+                        row.get(row.as_ref().column_index("entry_blob")?)?;
+                    let entry = match entry {
+                        Some(entry) => Some(from_blob::<Entry>(entry)?),
+                        None => None,
+                    };
+                    Ok(Element::new(shh, entry))
+                }))
+            },
+        );
+        if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &element {
+            Ok(None)
+        } else {
+            Ok(Some(element??))
+        }
+    }
+
+    fn get_any_authored_element(
+        &self,
+        hash: &EntryHash,
+        author: &AgentPubKey,
+    ) -> StateQueryResult<Option<Element>> {
+        let element = self.txn.query_row_named(
+            "
+            SELECT
+            Header.blob AS header_blob, Header.hash, Entry.blob as entry_blob
+            FROM Header
+            JOIN Entry ON Header.entry_hash = Entry.hash
+            WHERE
+            Entry.hash = :hash
+            AND
+            Header.author = :author
+            ",
+            named_params! {
+                ":hash": hash,
+                ":author": author,
             },
             |row| {
                 let header =
@@ -448,6 +601,34 @@ impl<'stmt> Store for Txns<'stmt, '_> {
         }
         Ok(None)
     }
+
+    fn get_public_or_authored_entry(
+        &self,
+        hash: &EntryHash,
+        author: Option<&AgentPubKey>,
+    ) -> StateQueryResult<Option<Entry>> {
+        for txn in &self.txns {
+            let r = txn.get_public_or_authored_entry(hash, author)?;
+            if r.is_some() {
+                return Ok(r);
+            }
+        }
+        Ok(None)
+    }
+
+    fn get_public_or_authored_element(
+        &self,
+        hash: &AnyDhtHash,
+        author: Option<&AgentPubKey>,
+    ) -> StateQueryResult<Option<Element>> {
+        for txn in &self.txns {
+            let r = txn.get_public_or_authored_element(hash, author)?;
+            if r.is_some() {
+                return Ok(r);
+            }
+        }
+        Ok(None)
+    }
 }
 
 impl<'stmt, Q: Query> StoresIter<Q::Item> for QueryStmts<'stmt, Q> {
@@ -512,6 +693,34 @@ impl<'borrow, 'txn> Store for DbScratch<'borrow, 'txn> {
     fn get_element(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Element>> {
         let r = self.txns.get_element(hash)?;
         if r.is_none() {
+            self.scratch.get_element(hash)
+        } else {
+            Ok(r)
+        }
+    }
+
+    fn get_public_or_authored_entry(
+        &self,
+        hash: &EntryHash,
+        author: Option<&AgentPubKey>,
+    ) -> StateQueryResult<Option<Entry>> {
+        let r = self.txns.get_public_or_authored_entry(hash, author)?;
+        if r.is_none() {
+            // Entries in the scratch are authored by definition.
+            self.scratch.get_entry(hash)
+        } else {
+            Ok(r)
+        }
+    }
+
+    fn get_public_or_authored_element(
+        &self,
+        hash: &AnyDhtHash,
+        author: Option<&AgentPubKey>,
+    ) -> StateQueryResult<Option<Element>> {
+        let r = self.txns.get_public_or_authored_element(hash, author)?;
+        if r.is_none() {
+            // Elements in the scratch are authored by definition.
             self.scratch.get_element(hash)
         } else {
             Ok(r)
@@ -660,6 +869,35 @@ pub fn get_entry_from_db(
         "
         SELECT Entry.blob AS entry_blob FROM Entry
         WHERE hash = :entry_hash
+        ",
+        named_params! {
+            ":entry_hash": entry_hash,
+        },
+        |row| {
+            Ok(from_blob::<Entry>(
+                row.get(row.as_ref().column_index("entry_blob")?)?,
+            ))
+        },
+    );
+    if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &entry {
+        Ok(None)
+    } else {
+        Ok(Some(entry??))
+    }
+}
+
+/// Fetch a public Entry from a DB by its hash.
+pub fn get_public_entry_from_db(
+    txn: &Transaction,
+    entry_hash: &EntryHash,
+) -> StateQueryResult<Option<Entry>> {
+    let entry = txn.query_row_named(
+        "
+        SELECT Entry.blob AS entry_blob FROM Entry
+        JOIN Header ON Header.entry_hash = Entry.hash
+        WHERE hash = :entry_hash
+        AND
+        Header.private_entry = 0
         ",
         named_params! {
             ":entry_hash": entry_hash,

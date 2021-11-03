@@ -4,6 +4,8 @@
 //! where as retrieve only checks that where the data was found
 //! the appropriate validation has been run.
 
+use std::sync::Arc;
+
 use error::CascadeResult;
 use holo_hash::hash_type::AnyDht;
 use holo_hash::AgentPubKey;
@@ -71,6 +73,7 @@ pub struct Cascade<Network = HolochainP2pDna> {
     cache: Option<DbWrite<DbKindCache>>,
     scratch: Option<SyncScratch>,
     network: Option<Network>,
+    private_data: Option<Arc<AgentPubKey>>,
 }
 
 impl<Network> Cascade<Network>
@@ -81,6 +84,14 @@ where
     pub fn with_authored(self, authored: DbReadOnly<DbKindAuthored>) -> Self {
         Self {
             authored: Some(authored),
+            ..self
+        }
+    }
+
+    /// Add the ability to access private entries.
+    pub fn with_private_data(self, author: Arc<AgentPubKey>) -> Self {
+        Self {
+            private_data: Some(author),
             ..self
         }
     }
@@ -122,6 +133,7 @@ where
             authored: self.authored,
             dht: self.dht,
             scratch: self.scratch,
+            private_data: self.private_data,
             cache: Some(cache_env),
             network: Some(network),
         }
@@ -136,6 +148,7 @@ impl Cascade<HolochainP2pDna> {
             network: None,
             cache: None,
             scratch: None,
+            private_data: None,
         }
     }
 
@@ -154,15 +167,17 @@ impl Cascade<HolochainP2pDna> {
             cache,
             scratch,
         } = workspace.stores();
+        let private_data = workspace.author();
         Cascade::<N> {
             authored: Some(authored),
             dht: Some(dht),
             cache: Some(cache),
+            private_data,
             scratch,
             network: Some(network),
         }
     }
-    pub fn from_workspace(stores: HostFnStores) -> Self {
+    pub fn from_workspace(stores: HostFnStores, author: Option<Arc<AgentPubKey>>) -> Self {
         let HostFnStores {
             authored,
             dht,
@@ -175,6 +190,7 @@ impl Cascade<HolochainP2pDna> {
             cache: Some(cache),
             scratch,
             network: None,
+            private_data: author,
         }
     }
 }
@@ -364,7 +380,11 @@ where
         hash: EntryHash,
         mut options: NetworkGetOptions,
     ) -> CascadeResult<Option<EntryHashed>> {
-        let result = self.find_map(|store| Ok(store.get_entry(&hash)?))?;
+        let private_data = self.private_data.clone();
+        let result = self.find_map(|store| {
+            Ok(store
+                .get_public_or_authored_entry(&hash, private_data.as_ref().map(|a| a.as_ref()))?)
+        })?;
         if result.is_some() {
             return Ok(result.map(EntryHashed::from_content_sync));
         }
@@ -372,7 +392,11 @@ where
         self.fetch_element(hash.clone().into(), options).await?;
 
         // Check if we have the data now after the network call.
-        let result = self.find_map(|store| Ok(store.get_entry(&hash)?))?;
+        let private_data = self.private_data.clone();
+        let result = self.find_map(|store| {
+            Ok(store
+                .get_public_or_authored_entry(&hash, private_data.as_ref().map(|a| a.as_ref()))?)
+        })?;
         Ok(result.map(EntryHashed::from_content_sync))
     }
 
@@ -402,15 +426,23 @@ where
         hash: AnyDhtHash,
         mut options: NetworkGetOptions,
     ) -> CascadeResult<Option<Element>> {
-        let result = self.find_map(|store| Ok(store.get_element(&hash)?))?;
+        let private_data = self.private_data.clone();
+        let result = self.find_map(|store| {
+            Ok(store
+                .get_public_or_authored_element(&hash, private_data.as_ref().map(|a| a.as_ref()))?)
+        })?;
         if result.is_some() {
             return Ok(result);
         }
         options.request_type = holochain_p2p::event::GetRequest::Pending;
         self.fetch_element(hash.clone(), options).await?;
 
+        let private_data = self.private_data.clone();
         // Check if we have the data now after the network call.
-        let result = self.find_map(|store| Ok(store.get_element(&hash)?))?;
+        let result = self.find_map(|store| {
+            Ok(store
+                .get_public_or_authored_element(&hash, private_data.as_ref().map(|a| a.as_ref()))?)
+        })?;
         Ok(result)
     }
 
@@ -422,7 +454,12 @@ where
     ) -> CascadeResult<Option<EntryDetails>> {
         let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
         let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
-        let query = GetEntryDetailsQuery::new(entry_hash.clone());
+        let query = match self.private_data.clone() {
+            Some(author) => {
+                GetEntryDetailsQuery::with_private_data_access(entry_hash.clone(), author)
+            }
+            None => GetEntryDetailsQuery::new(entry_hash.clone()),
+        };
 
         // We don't need metadata and only need the content
         // so if we have it locally then we can avoid the network.
@@ -459,7 +496,12 @@ where
     ) -> CascadeResult<Option<ElementDetails>> {
         let authoring = self.am_i_authoring(&header_hash.clone().into())?;
         let authority = self.am_i_an_authority(header_hash.clone().into()).await?;
-        let query = GetElementDetailsQuery::new(header_hash.clone());
+        let query = match self.private_data.clone() {
+            Some(author) => {
+                GetElementDetailsQuery::with_private_data_access(header_hash.clone(), author)
+            }
+            None => GetElementDetailsQuery::new(header_hash.clone()),
+        };
 
         // TODO: we can short circuit if we have any local deletes on a header.
         // Is this bad because we will not go back to the network until our
@@ -504,7 +546,12 @@ where
     ) -> CascadeResult<Option<Element>> {
         let authoring = self.am_i_authoring(&header_hash.clone().into())?;
         let authority = self.am_i_an_authority(header_hash.clone().into()).await?;
-        let query = GetLiveElementQuery::new(header_hash.clone());
+        let query = match self.private_data.clone() {
+            Some(author) => {
+                GetLiveElementQuery::with_private_data_access(header_hash.clone(), author)
+            }
+            None => GetLiveElementQuery::new(header_hash.clone()),
+        };
 
         // TODO: we can short circuit if we have any local deletes on a header.
         // Is this bad because we will not go back to the network until our
@@ -547,7 +594,10 @@ where
     ) -> CascadeResult<Option<Element>> {
         let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
         let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
-        let query = GetLiveEntryQuery::new(entry_hash.clone());
+        let query = match self.private_data.clone() {
+            Some(author) => GetLiveEntryQuery::with_private_data_access(entry_hash.clone(), author),
+            None => GetLiveEntryQuery::new(entry_hash.clone()),
+        };
 
         // We don't need metadata and only need the content
         // so if we have it locally then we can avoid the network.

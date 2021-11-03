@@ -418,6 +418,10 @@ where
         self.author.as_ref()
     }
 
+    pub fn to_agent_pubkey(&self) -> Arc<AgentPubKey> {
+        self.author.clone()
+    }
+
     /// This has to clone all the data because we can't return
     /// references to constructed data.
     // TODO: Maybe we should store data as elements in the scratch?
@@ -478,9 +482,11 @@ where
             FROM Header AS H_REF
             JOIN DhtOp AS D_REF ON D_REF.header_hash = H_REF.hash
             WHERE
-            H_REF.original_header_hash = Header.hash
+            H_REF.author = :author
+            AND
+            (H_REF.original_header_hash = Header.hash
             OR
-            H_REF.deletes_header_hash = Header.hash
+            H_REF.deletes_header_hash = Header.hash)
             ";
             let sql = format!(
                 "
@@ -489,6 +495,8 @@ where
                 JOIN Header ON Header.entry_hash = Entry.hash
                 JOIN DhtOp ON Header.hash = DhtOp.header_hash
                 WHERE
+                Header.author = :author
+                AND
                 Entry.access_type IS NOT NULL
                 AND
                 ({}) = 0
@@ -496,7 +504,12 @@ where
                 not_referenced_header
             );
             txn.prepare(&sql)?
-                .query_and_then([], |row| from_blob(row.get("blob")?))?
+                .query_and_then(
+                    named_params! {
+                        ":author": self.author.as_ref(),
+                    },
+                    |row| from_blob(row.get("blob")?),
+                )?
                 .filter_map(|result: StateQueryResult<Entry>| match result {
                     Ok(entry) => entry
                         .as_cap_grant()

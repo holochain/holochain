@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use holo_hash::AgentPubKey;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDnaT;
@@ -102,6 +104,10 @@ where
     }
     pub fn source_chain(&self) -> &Option<SourceChain<SourceChainDb, SourceChainDht>> {
         &self.source_chain
+    }
+
+    pub fn author(&self) -> Option<Arc<AgentPubKey>> {
+        self.source_chain.as_ref().map(|s| s.to_agent_pubkey())
     }
 
     pub fn stores(&self) -> HostFnStores {

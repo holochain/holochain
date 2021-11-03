@@ -533,7 +533,8 @@ async fn get_validation_package_local(
         },
         RequiredValidationType::Custom => {
             {
-                let cascade = Cascade::from_workspace(workspace_lock.stores());
+                let cascade =
+                    Cascade::from_workspace(workspace_lock.stores(), workspace_lock.author());
                 if let Some(elements) =
                     cascade.get_validation_package_local(element.header_address())?
                 {

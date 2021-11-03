@@ -225,6 +225,30 @@ impl Store for Scratch {
             AnyDht::Header => self.get_exact_element(&hash.clone().into()),
         }
     }
+
+    /// It doesn't make sense to search for
+    /// a different authored entry in a scratch
+    /// then the scratches author so this is
+    /// the same as `get_entry`.
+    fn get_public_or_authored_entry(
+        &self,
+        hash: &EntryHash,
+        _author: Option<&AgentPubKey>,
+    ) -> StateQueryResult<Option<Entry>> {
+        self.get_entry(hash)
+    }
+
+    /// It doesn't make sense to search for
+    /// a different authored element in a scratch
+    /// then the scratches author so this is
+    /// the same as `get_element`.
+    fn get_public_or_authored_element(
+        &self,
+        hash: &AnyDhtHash,
+        _author: Option<&AgentPubKey>,
+    ) -> StateQueryResult<Option<Element>> {
+        self.get_element(hash)
+    }
 }
 
 impl FilteredScratch {
