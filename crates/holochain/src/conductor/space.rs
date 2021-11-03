@@ -30,6 +30,7 @@ use crate::core::{
 };
 
 use super::{conductor::RwShare, error::ConductorResult};
+use std::convert::TryInto;
 
 #[derive(Clone)]
 /// This is the set of all current
@@ -163,11 +164,12 @@ impl Spaces {
         // The exclusive window bounds.
         let start = window.start;
         let end = window.end;
+        let max_ops: u32 = max_ops.try_into().unwrap_or(u32::MAX);
 
         let env = self.dht_env(dna_hash)?;
         let include_limbo = include_limbo
-            .then(|| "")
-            .unwrap_or("AND DhtOp.when_integrated IS NOT NULL");
+            .then(|| "\n")
+            .unwrap_or("AND DhtOp.when_integrated IS NOT NULL\n");
 
         let intervals = dht_arc_set.intervals();
         let sql = if let Some(ArcInterval::Full) = intervals.first() {

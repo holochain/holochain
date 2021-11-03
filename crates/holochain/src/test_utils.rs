@@ -377,17 +377,27 @@ pub async fn consistency_10s(all_cells: &[&SweetCell]) {
 /// Wait for all cells to reach consistency
 #[tracing::instrument(skip(all_cells))]
 pub async fn consistency(all_cells: &[&SweetCell], num_attempts: usize, delay: Duration) {
-    let all_cell_envs: Vec<(DbReadOnly<DbKindAuthored>, DbReadOnly<DbKindDht>)> = all_cells
+    let all_cell_envs: Vec<(
+        AgentPubKey,
+        DbReadOnly<DbKindAuthored>,
+        DbReadOnly<DbKindDht>,
+    )> = all_cells
         .iter()
-        .map(|c| (c.authored_env().clone().into(), c.dht_env().clone().into()))
+        .map(|c| {
+            (
+                c.agent_pubkey().clone(),
+                c.authored_env().clone().into(),
+                c.dht_env().clone().into(),
+            )
+        })
         .collect();
-    let all_cell_envs: Vec<_> = all_cell_envs.iter().map(|c| (&c.0, &c.1)).collect();
+    let all_cell_envs: Vec<_> = all_cell_envs.iter().map(|c| (&c.0, &c.1, &c.2)).collect();
     consistency_envs(&all_cell_envs[..], num_attempts, delay).await
 }
 
 /// Wait for all cell envs to reach consistency
 pub async fn consistency_envs<AuthorDb, DhtDb>(
-    all_cell_envs: &[(&AuthorDb, &DhtDb)],
+    all_cell_envs: &[(&AgentPubKey, &AuthorDb, &DhtDb)],
     num_attempts: usize,
     delay: Duration,
 ) where
@@ -395,11 +405,11 @@ pub async fn consistency_envs<AuthorDb, DhtDb>(
     DhtDb: ReadAccess<DbKindDht>,
 {
     let mut expected_count = 0;
-    for &env in all_cell_envs.iter().map(|(a, _)| a) {
-        let count = get_published_ops(env).len();
+    for (author, env) in all_cell_envs.iter().map(|(author, a, _)| (author, a)) {
+        let count = get_published_ops(*env, *author).len();
         expected_count += count;
     }
-    for &env in all_cell_envs.iter().map(|(_, d)| d) {
+    for &env in all_cell_envs.iter().map(|(_, _, d)| d) {
         wait_for_integration(env, expected_count, num_attempts, delay).await
     }
 }
@@ -415,16 +425,26 @@ pub async fn consistency_10s_others(all_cells: &[&SweetCell]) {
 /// Wait for all cells to reach consistency
 #[tracing::instrument(skip(all_cells))]
 pub async fn consistency_others(all_cells: &[&SweetCell], num_attempts: usize, delay: Duration) {
-    let all_cell_envs: Vec<(DbReadOnly<DbKindAuthored>, DbReadOnly<DbKindDht>)> = all_cells
+    let all_cell_envs: Vec<(
+        AgentPubKey,
+        DbReadOnly<DbKindAuthored>,
+        DbReadOnly<DbKindDht>,
+    )> = all_cells
         .iter()
-        .map(|c| (c.authored_env().clone().into(), c.dht_env().clone().into()))
+        .map(|c| {
+            (
+                c.agent_pubkey().clone(),
+                c.authored_env().clone().into(),
+                c.dht_env().clone().into(),
+            )
+        })
         .collect();
-    let all_cell_envs: Vec<_> = all_cell_envs.iter().map(|c| (&c.0, &c.1)).collect();
+    let all_cell_envs: Vec<_> = all_cell_envs.iter().map(|c| (&c.0, &c.1, &c.2)).collect();
     consistency_envs_others(&all_cell_envs[..], num_attempts, delay).await
 }
 
 async fn consistency_envs_others<AuthorDb, DhtDb>(
-    all_cell_envs: &[(&AuthorDb, &DhtDb)],
+    all_cell_envs: &[(&AgentPubKey, &AuthorDb, &DhtDb)],
     num_attempts: usize,
     delay: Duration,
 ) where
@@ -432,31 +452,23 @@ async fn consistency_envs_others<AuthorDb, DhtDb>(
     DhtDb: ReadAccess<DbKindDht>,
 {
     let mut expected_count = 0;
-    for &env in all_cell_envs.iter().map(|(a, _)| a) {
-        let count = get_published_ops(env).len();
+    for (author, env) in all_cell_envs.iter().map(|(author, a, _)| (author, a)) {
+        let count = get_published_ops(*env, *author).len();
         expected_count += count;
     }
     let start = Some(std::time::Instant::now());
-    for (i, &env) in all_cell_envs.iter().map(|(_, d)| d).enumerate() {
-        let mut others: Vec<_> = all_cell_envs.iter().map(|(_, d)| *d).collect();
+    for (i, &env) in all_cell_envs.iter().map(|(_, _, d)| d).enumerate() {
+        let mut others: Vec<_> = all_cell_envs.iter().map(|(_, _, d)| *d).collect();
         others.remove(i);
         wait_for_integration_with_others(env, &others, expected_count, num_attempts, delay, start)
             .await
     }
 }
 
-fn get_authored_ops<Db: ReadAccess<DbKindAuthored>>(env: &Db) -> Vec<DhtOpLight> {
-    fresh_reader_test(env.clone(), |txn| {
-        txn.prepare("SELECT blob FROM DhtOp")
-            .unwrap()
-            .query_and_then([], |row| from_blob(row.get("blob")?))
-            .unwrap()
-            .collect::<StateQueryResult<_>>()
-            .unwrap()
-    })
-}
-
-fn get_published_ops<Db: ReadAccess<DbKindAuthored>>(env: &Db) -> Vec<DhtOpLight> {
+fn get_published_ops<Db: ReadAccess<DbKindAuthored>>(
+    env: &Db,
+    author: &AgentPubKey,
+) -> Vec<DhtOpLight> {
     fresh_reader_test(env.clone(), |txn| {
         txn.prepare(
             "
@@ -466,13 +478,15 @@ fn get_published_ops<Db: ReadAccess<DbKindAuthored>>(env: &Db) -> Vec<DhtOpLight
             JOIN
             Header ON DhtOp.header_hash = Header.hash
             WHERE
-            (DhtOp.type != :store_entry OR Header.private_entry = 0)
+            Header.author = :author
+            AND (DhtOp.type != :store_entry OR Header.private_entry = 0)
         ",
         )
         .unwrap()
         .query_and_then(
             named_params! {
                 ":store_entry": DhtOpType::StoreEntry,
+                ":author": author,
             },
             |row| from_blob(row.get("blob")?),
         )
@@ -604,19 +618,6 @@ pub fn show_authored<Db: ReadAccess<DbKindAuthored>>(envs: &[&Db]) {
                 tracing::debug!(chain = %i, %seq, ?header_type, ?entry);
             });
         });
-    }
-}
-
-#[tracing::instrument(skip(envs))]
-/// Show authored op data for each cell environment
-pub async fn show_authored_ops<Db: ReadAccess<DbKindAuthored>>(envs: &[&Db]) {
-    let mut all_auth = Vec::new();
-    for (i, env) in envs.iter().enumerate() {
-        let auth = get_authored_ops(*env);
-        all_auth.extend(auth.clone());
-        for (j, op) in auth.iter().enumerate() {
-            tracing::debug!(chain = %i, op_num = %j, ?op);
-        }
     }
 }
 

@@ -47,8 +47,13 @@ async fn gossip_test() {
     const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
 
     let all_cell_envs = vec![
-        (&bob_call_data.authored_env, &bob_call_data.dht_env),
         (
+            bob_call_data.cell_id.agent_pubkey(),
+            &bob_call_data.authored_env,
+            &bob_call_data.dht_env,
+        ),
+        (
+            conductor_test.alice_call_data().cell_id.agent_pubkey(),
             &conductor_test.alice_call_data().authored_env,
             &conductor_test.alice_call_data().dht_env,
         ),
