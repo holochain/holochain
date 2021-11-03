@@ -32,7 +32,7 @@ impl DhtArcBucket {
     }
 
     #[deprecated = "use peer_view"]
-    pub fn peer_view_alpha(&self) -> PeerViewAlpha {
+    pub fn peer_view_default(&self) -> PeerViewAlpha {
         let (total, count) = self
             .arcs
             .iter()

@@ -181,7 +181,7 @@ pub fn query_peer_density(
     // contains is already checked in the iterator
     let bucket = DhtArcBucket::new_unchecked(dht_arc, arcs);
 
-    Ok(bucket.peer_view_alpha())
+    Ok(bucket.peer_view_default())
 }
 
 /// Put single agent info into store

@@ -212,7 +212,7 @@ impl KitsuneP2pEventHandler for AgentHarness {
         // contains is already checked in the iterator
         let bucket = DhtArcBucket::new_unchecked(dht_arc, arcs);
 
-        Ok(async move { Ok(bucket.peer_view_alpha()) }.boxed().into())
+        Ok(async move { Ok(bucket.peer_view_default()) }.boxed().into())
     }
 
     fn handle_put_metric_datum(&mut self, datum: MetricDatum) -> KitsuneP2pEventHandlerResult<()> {
