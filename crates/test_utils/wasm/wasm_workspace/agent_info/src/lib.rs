@@ -1,7 +1,18 @@
 use hdk::prelude::*;
 
+#[hdk_entry(id = "thing")]
+struct Thing;
+
+entry_defs![Thing::entry_def()];
+
+#[hdk_extern]
+fn call_info(_: ()) -> ExternResult<CallInfo> {
+    hdk::prelude::call_info()
+}
+
 #[hdk_extern]
 fn agent_info(_: ()) -> ExternResult<AgentInfo> {
+    hdk::prelude::create_entry(Thing)?;
     hdk::prelude::agent_info()
 }
 
