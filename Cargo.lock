@@ -3285,10 +3285,12 @@ dependencies = [
  "intervallum",
  "maplit",
  "num-traits",
+ "observability",
  "pretty_assertions 0.7.2",
  "rand 0.8.4",
  "rusqlite",
  "serde",
+ "tracing",
 ]
 
 [[package]]

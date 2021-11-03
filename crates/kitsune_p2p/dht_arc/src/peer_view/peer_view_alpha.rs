@@ -2,6 +2,7 @@ use crate::*;
 
 #[derive(Debug, Clone, Copy)]
 pub struct PeerStratAlpha {
+    pub check_gaps: bool,
     pub redundancy_target: u16,
     pub default_uptime: f64,
     pub noise_threshold: f64,
@@ -12,6 +13,7 @@ pub struct PeerStratAlpha {
 impl Default for PeerStratAlpha {
     fn default() -> Self {
         Self {
+            check_gaps: true,
             redundancy_target: DEFAULT_REDUNDANCY_TARGET as u16,
             default_uptime: DEFAULT_UPTIME,
             noise_threshold: DEFAULT_NOISE_THRESHOLD,
@@ -61,6 +63,9 @@ impl PeerViewAlpha {
     /// Estimate the gap in coverage that needs to be filled.
     /// If the gap is negative that means we are over covered.
     pub fn est_gap(&self) -> f64 {
+        if !self.strat.check_gaps {
+            return 0.0;
+        }
         let est_total_peers = self.est_total_peers();
         let ideal_target = coverage_target(est_total_peers, self.strat.redundancy_target);
         let gap = ideal_target - self.average_coverage;

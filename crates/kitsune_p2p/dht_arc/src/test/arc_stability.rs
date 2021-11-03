@@ -6,13 +6,13 @@ use std::collections::HashSet;
 use std::iter;
 
 /// Maximum number of iterations. If we iterate this much, we assume the
-/// system will never converge on equilibrium.
+/// system is divergent (unable to reach equilibrium).
 const MAX_ITERS: usize = 80;
 
-/// Number of consecutive rounds of no movement before considering equilibrium
-/// achieved.
-const STEADY_WINDOW: usize = 3;
+/// Number of consecutive rounds of no movement before declaring convergence.
+const CONVERGENCE_WINDOW: usize = 3;
 
+/// Level of detail in reporting.
 const DETAIL: u8 = 0;
 
 fn full_len() -> f64 {
@@ -21,51 +21,59 @@ fn full_len() -> f64 {
 
 #[test]
 fn only_change_one() {
-    // 1000 agents
-    // all set to 0.1, the ideal target
-    // start alice at full sync, see if she converges to the ideal
-
+    observability::test_run().ok();
     let n = 1000;
     let j = 0.0;
     // let j = 1f64 / n as f64 / 100.0;
+    let s = ArcLenStrategy::Constant(0.1);
 
-    let strat = PeerStratAlpha {
-        redundancy_target: 50,
-        ..Default::default()
+    let run = |check_gaps| {
+        let strat = PeerStratAlpha {
+            check_gaps,
+            redundancy_target: 50,
+            ..Default::default()
+        }
+        .into();
+
+        let mut peers = simple_parameterized_generator(n, j, s);
+        peers[0].half_length = MAX_HALF_LENGTH;
+        let dynamic = Some(maplit::hashset![0]);
+        let vergence = determine_vergence(|| {
+            let stats = run_one_epoch(&strat, &mut peers, dynamic.as_ref(), DETAIL);
+            tracing::debug!("{}", peers[0].coverage());
+            stats
+        });
+        // print_arcs(&peers);
+        report(&vergence);
+        vergence
     };
-    let kind = PeerStrat::Alpha(strat);
 
-    let mut peers = simple_parameterized_generator(n, j, ArcLenStrategy::Constant(0.1));
-    peers[0].half_length = MAX_HALF_LENGTH;
-    let dynamic = Some(maplit::hashset![0]);
-    let stats = seek_equilibrium(|| {
-        let stats = run_one_epoch(&kind, &mut peers, dynamic.as_ref(), DETAIL);
-        println!("{}", peers[0].coverage());
-        stats
-    });
-    report(stats);
+    assert!(matches!(run(true), Vergence::Divergent(_)));
+    assert!(matches!(run(false), Vergence::Convergent(_)));
 }
 
 #[test]
 fn parameterized_stability_test() {
     let n = 1000;
-    let r = 50;
     let j = 1f64 / n as f64 / 3.0;
+    let s = ArcLenStrategy::Constant(0.1);
 
+    let r = 50;
     let strat = PeerStratAlpha {
         redundancy_target: r,
         ..Default::default()
     };
     let kind = PeerStrat::Alpha(strat);
 
-    let mut peers = simple_parameterized_generator(n, j, ArcLenStrategy::Constant(0.1));
-    println!("{}", EpochStats::oneline_header());
-    let stats = seek_equilibrium(|| {
+    let mut peers = simple_parameterized_generator(n, j, s);
+    tracing::info!("{}", EpochStats::oneline_header());
+    let vergence = determine_vergence(|| {
         let stats = run_one_epoch(&kind, &mut peers, None, DETAIL);
-        println!("{}", stats.oneline());
+        tracing::info!("{}", stats.oneline());
         stats
     });
-    report(stats);
+    report(&vergence);
+    vergence.assert_convergent();
 }
 
 #[test]
@@ -73,28 +81,27 @@ fn min_redundancy_is_maintained() {
     todo!("Check that min redundancy is maintained at all times");
 }
 
-fn report(stats: Option<Vec<EpochStats>>) {
-    if let Some(mut stats) = stats {
-        let total = stats.len();
-        println!("{:?}", stats.pop().unwrap());
-        println!("Reached equilibrium in {} iterations", total);
+fn report(stats: &Vergence) {
+    if let Vergence::Convergent(stats) = stats {
+        tracing::info!("{:?}", stats.last().unwrap());
+        tracing::info!("Reached equilibrium in {} iterations", stats.len());
     } else {
-        panic!("failed to reach equilibrium in {} iterations", MAX_ITERS);
+        tracing::error!("failed to reach equilibrium in {} iterations", MAX_ITERS);
     }
 }
 
 /// Run iterations until there is no movement of any arc
 /// TODO: this may be unreasonable, and we may need to just ensure that arcs
 /// settle down into a reasonable level of oscillation
-fn seek_equilibrium<F>(mut step: F) -> Option<Vec<EpochStats>>
+fn determine_vergence<F>(mut step: F) -> Vergence
 where
     F: FnMut() -> EpochStats,
 {
     let mut n_delta_count = 0;
-    let mut stats_history = vec![];
+    let mut history = vec![];
     for i in 1..=MAX_ITERS {
-        if n_delta_count >= STEADY_WINDOW {
-            println!("Converged in {} iterations", i - STEADY_WINDOW);
+        if n_delta_count >= CONVERGENCE_WINDOW {
+            tracing::info!("Converged in {} iterations", i - CONVERGENCE_WINDOW);
             break;
         }
 
@@ -104,13 +111,13 @@ where
         } else if n_delta_count > 0 {
             panic!("we don't expect a system in equilibirum to suddenly start moving again!")
         } else {
-            stats_history.push(stats);
+            history.push(stats);
         }
     }
     if n_delta_count == 0 {
-        None
+        Vergence::Divergent(history)
     } else {
-        Some(stats_history)
+        Vergence::Convergent(history)
     }
 }
 
@@ -158,9 +165,9 @@ fn run_one_epoch(
     }
 
     if detail == 1 {
-        println!("min: |{}| {}", peers[index_min].to_ascii(64), index_min);
-        println!("max: |{}| {}", peers[index_max].to_ascii(64), index_max);
-        println!("");
+        tracing::info!("min: |{}| {}", peers[index_min].to_ascii(64), index_min);
+        tracing::info!("max: |{}| {}", peers[index_max].to_ascii(64), index_max);
+        tracing::info!("");
     } else if detail == 2 {
         print_arcs(peers);
         get_input();
@@ -182,8 +189,8 @@ fn run_one_epoch(
 /// J: random jitter of peer locations
 /// S: strategy for generating arc lengths
 fn simple_parameterized_generator(n: usize, j: f64, s: ArcLenStrategy) -> Vec<DhtArc> {
-    println!("N = {}, J = {}", n, j);
-    println!("Arc len generation: {:?}", s);
+    tracing::info!("N = {}, J = {}", n, j);
+    tracing::info!("Arc len generation: {:?}", s);
     let halflens = s.gen(n);
     generate_evenly_spaced_with_half_lens_and_jitter(j, halflens)
 }
@@ -214,6 +221,29 @@ fn generate_evenly_spaced_with_half_lens_and_jitter<H: Iterator<Item = f64>>(
 }
 
 #[derive(Debug)]
+enum Vergence {
+    Convergent(Vec<EpochStats>),
+    Divergent(Vec<EpochStats>),
+}
+
+impl Vergence {
+    pub fn assert_convergent(&self) {
+        assert!(
+            matches!(self, Self::Convergent(_)),
+            "failed to reach equilibrium in {} iterations",
+            MAX_ITERS
+        )
+    }
+
+    pub fn assert_divergent(&self) {
+        assert!(
+            matches!(self, Self::Divergent(_)),
+            "sequence was expected to diverge, but converged",
+        )
+    }
+}
+
+#[derive(Debug)]
 struct EpochStats {
     net_delta_avg: f64,
     gross_delta_avg: f64,
@@ -241,7 +271,7 @@ impl EpochStats {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 enum ArcLenStrategy {
     Random,
     Constant(f64),

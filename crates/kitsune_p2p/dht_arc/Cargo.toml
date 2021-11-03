@@ -21,8 +21,10 @@ rusqlite = { version = "0.26", optional = true }
 
 [dev-dependencies]
 maplit = "1"
+observability = "0.1"
 pretty_assertions = "0.7.2"
 rand = "0.8"
+tracing = "0.1"
 
 [features]
 sqlite = ["rusqlite"]
