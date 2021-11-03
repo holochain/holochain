@@ -499,7 +499,7 @@ pub async fn wait_for_integration(
             return;
         } else {
             let total_time_waited = delay * i as u32;
-            tracing::debug!(?count, ?total_time_waited, counts = ?count_integration(env).await);
+            tracing::debug!(?count, ?total_time_waited, counts = ?query_integration(env).await.integrated);
         }
         tokio::time::sleep(delay).await;
     }
@@ -549,8 +549,8 @@ pub async fn wait_for_integration_with_others(
     let mut last_total = 0;
     let this_start = std::time::Instant::now();
     for _ in 0..num_attempts {
-        let count = count_integration(env).await;
-        let counts = get_counts(others).await;
+        let count = query_integration(env).await;
+        let counts = get_integration_dumps(others).await;
         let total: usize = counts.0.clone().into_iter().map(|i| i.integrated).sum();
         let num_conductors = counts.0.len() + 1;
         let total_expected = num_conductors * expected_count;
@@ -647,16 +647,16 @@ async fn show_data(env: &EnvWrite, op: &DhtOpLight) {
     }
 }
 
-async fn get_counts(envs: &[&EnvWrite]) -> IntegrationStateDumps {
+async fn get_integration_dumps(envs: &[&EnvWrite]) -> IntegrationStateDumps {
     let mut output = Vec::new();
     for env in envs {
         let env = *env;
-        output.push(count_integration(env).await);
+        output.push(query_integration(env).await);
     }
     IntegrationStateDumps(output)
 }
 
-async fn count_integration(env: &EnvWrite) -> IntegrationStateDump {
+async fn query_integration(env: &EnvWrite) -> IntegrationStateDump {
     crate::conductor::integration_dump(&env.clone().into())
         .await
         .unwrap()

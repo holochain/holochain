@@ -40,7 +40,6 @@ use super::api::ZomeCall;
 use super::conductor::CellStatus;
 use super::config::AdminInterfaceConfig;
 use super::error::ConductorResult;
-use super::integration_dump;
 use super::interface::SignalBroadcaster;
 use super::manager::spawn_task_manager;
 use super::manager::TaskManagerClient;
@@ -54,6 +53,7 @@ use super::p2p_agent_store::list_all_agent_info_signed_near_basis;
 use super::Cell;
 use super::CellError;
 use super::Conductor;
+use super::{full_integration_dump, integration_dump};
 use crate::conductor::p2p_agent_store::get_single_agent_info;
 use crate::conductor::p2p_agent_store::query_peer_density;
 use crate::conductor::p2p_agent_store::P2pBatch;
@@ -67,6 +67,7 @@ use futures::future::FutureExt;
 use futures::StreamExt;
 use holochain_conductor_api::conductor::EnvironmentRootPath;
 use holochain_conductor_api::AppStatusFilter;
+use holochain_conductor_api::FullStateDump;
 use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::JsonDump;
 use holochain_keystore::MetaLairClient;
@@ -279,6 +280,13 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Dump the cells state
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
+
+    /// Dump the full cells state
+    async fn dump_full_cell_state(
+        &self,
+        cell_id: &CellId,
+        dht_ops_cursor: Option<u64>,
+    ) -> ConductorApiResult<FullStateDump>;
 
     /// Access the broadcast Sender which will send a Signal across every
     /// attached app interface
@@ -1119,6 +1127,33 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let summary = out.to_string();
         let out = (out, summary);
         Ok(serde_json::to_string_pretty(&out)?)
+    }
+
+    async fn dump_full_cell_state(
+        &self,
+        cell_id: &CellId,
+        dht_ops_cursor: Option<u64>,
+    ) -> ConductorApiResult<FullStateDump> {
+        let cell = self.conductor.cell_by_id(cell_id)?;
+        let arc = cell.env();
+        let space = cell_id.dna_hash().to_kitsune();
+        let p2p_env = self
+            .p2p_env
+            .lock()
+            .get(&space)
+            .cloned()
+            .expect("invalid cell space");
+
+        let peer_dump = p2p_agent_store::dump_state(p2p_env.into(), Some(cell_id.clone()))?;
+        let source_chain_dump =
+            source_chain::dump_state(arc.clone().into(), cell_id.agent_pubkey().clone()).await?;
+
+        let out = FullStateDump {
+            peer_dump,
+            source_chain_dump,
+            integration_dump: full_integration_dump(&arc.clone().into(), dht_ops_cursor).await?,
+        };
+        Ok(out)
     }
 
     async fn signal_broadcaster(&self) -> SignalBroadcaster {
