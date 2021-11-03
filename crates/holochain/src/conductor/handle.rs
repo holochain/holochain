@@ -40,7 +40,6 @@ use super::api::ZomeCall;
 use super::conductor::CellStatus;
 use super::config::AdminInterfaceConfig;
 use super::error::ConductorResult;
-use super::integration_dump;
 use super::interface::SignalBroadcaster;
 use super::manager::spawn_task_manager;
 use super::manager::TaskManagerClient;
@@ -54,6 +53,7 @@ use super::p2p_agent_store::list_all_agent_info_signed_near_basis;
 use super::Cell;
 use super::CellError;
 use super::Conductor;
+use super::{full_integration_dump, integration_dump};
 use crate::conductor::p2p_agent_store::get_single_agent_info;
 use crate::conductor::p2p_agent_store::query_peer_density;
 use crate::conductor::p2p_agent_store::P2pBatch;
@@ -67,6 +67,7 @@ use futures::future::FutureExt;
 use futures::StreamExt;
 use holochain_conductor_api::conductor::EnvironmentRootPath;
 use holochain_conductor_api::AppStatusFilter;
+use holochain_conductor_api::FullStateDump;
 use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::JsonDump;
 use holochain_keystore::MetaLairClient;
@@ -280,6 +281,13 @@ pub trait ConductorHandleT: Send + Sync {
     /// Dump the cells state
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
 
+    /// Dump the full cells state
+    async fn dump_full_cell_state(
+        &self,
+        cell_id: &CellId,
+        dht_ops_cursor: Option<u64>,
+    ) -> ConductorApiResult<FullStateDump>;
+
     /// Access the broadcast Sender which will send a Signal across every
     /// attached app interface
     async fn signal_broadcaster(&self) -> SignalBroadcaster;
@@ -334,13 +342,13 @@ pub trait ConductorHandleT: Send + Sync {
     async fn add_test_app_interface(&self, id: super::state::AppInterfaceId)
         -> ConductorResult<()>;
 
+    /// Get the current dev settings
     #[cfg(any(test, feature = "test_utils"))]
-    /// Check whether this conductor should skip publish.
-    fn should_skip_publish(&self) -> bool;
+    fn dev_settings(&self) -> DevSettings;
 
+    /// Update the current dev settings
     #[cfg(any(test, feature = "test_utils"))]
-    /// For testing we can choose to skip publish.
-    fn set_skip_publish(&self, skip_publish: bool);
+    fn update_dev_settings(&self, delta: DevSettingsDelta);
 
     /// Manually coerce cells to a given CellStatus. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
@@ -355,7 +363,7 @@ pub trait ConductorHandleT: Send + Sync {
     ) -> ConductorResult<(InstalledApp, AppStatusFx)>;
 
     // TODO: would be nice to have methods for accessing the underlying Conductor,
-    // but this trait doesn't know the concrete type of Conductor underlying,
+    // but this trait doesn't know the concrete type of underlying Conductor,
     // and using generics seems problematic with mockall::automock.
     // Something like this would be desirable, but ultimately doesn't work.
     //
@@ -378,6 +386,46 @@ pub trait ConductorHandleT: Send + Sync {
     //     let mut c = self.conductor.write().await;
     //     f(&mut c)
     // }
+}
+
+/// Special switches for features to be used during development and testing
+#[derive(Clone)]
+pub struct DevSettings {
+    /// Determines whether publishing should be enabled
+    pub publish: bool,
+    /// Determines whether storage arc resizing should be enabled
+    pub _arc_resizing: bool,
+}
+
+/// Specify changes to be made to the Devsettings.
+/// None means no change, Some means make the specified change.
+#[derive(Default)]
+pub struct DevSettingsDelta {
+    /// Determines whether publishing should be enabled
+    pub publish: Option<bool>,
+    /// Determines whether storage arc resizing should be enabled
+    pub arc_resizing: Option<bool>,
+}
+
+impl Default for DevSettings {
+    fn default() -> Self {
+        Self {
+            publish: true,
+            _arc_resizing: true,
+        }
+    }
+}
+
+impl DevSettings {
+    fn apply(&mut self, delta: DevSettingsDelta) {
+        if let Some(v) = delta.publish {
+            self.publish = v;
+        }
+        if let Some(v) = delta.arc_resizing {
+            self._arc_resizing = v;
+            tracing::warn!("Arc resizing is not yet implemented, and can't be enabled/disabled.");
+        }
+    }
 }
 
 /// The current "production" implementation of a ConductorHandle.
@@ -409,11 +457,11 @@ pub struct ConductorHandleImpl<DS: DnaStore + 'static> {
     pub(super) p2p_batch_senders:
         Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, tokio::sync::mpsc::Sender<P2pBatch>>>>,
 
-    // Testing:
+    // This is only available in tests currently, but could be extended to
+    // normal usage.
     #[cfg(any(test, feature = "test_utils"))]
-    /// All conductors should skip publishing.
-    /// This is useful for testing gossip.
-    pub skip_publish: std::sync::atomic::AtomicBool,
+    /// Selectively enable/disable certain functionalities
+    pub dev_settings: parking_lot::RwLock<DevSettings>,
 }
 
 #[async_trait::async_trait]
@@ -1081,6 +1129,33 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(serde_json::to_string_pretty(&out)?)
     }
 
+    async fn dump_full_cell_state(
+        &self,
+        cell_id: &CellId,
+        dht_ops_cursor: Option<u64>,
+    ) -> ConductorApiResult<FullStateDump> {
+        let cell = self.conductor.cell_by_id(cell_id)?;
+        let arc = cell.env();
+        let space = cell_id.dna_hash().to_kitsune();
+        let p2p_env = self
+            .p2p_env
+            .lock()
+            .get(&space)
+            .cloned()
+            .expect("invalid cell space");
+
+        let peer_dump = p2p_agent_store::dump_state(p2p_env.into(), Some(cell_id.clone()))?;
+        let source_chain_dump =
+            source_chain::dump_state(arc.clone().into(), cell_id.agent_pubkey().clone()).await?;
+
+        let out = FullStateDump {
+            peer_dump,
+            source_chain_dump,
+            integration_dump: full_integration_dump(&arc.clone().into(), dht_ops_cursor).await?,
+        };
+        Ok(out)
+    }
+
     async fn signal_broadcaster(&self) -> SignalBroadcaster {
         self.conductor.signal_broadcaster()
     }
@@ -1187,14 +1262,13 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     #[cfg(any(test, feature = "test_utils"))]
-    fn should_skip_publish(&self) -> bool {
-        self.skip_publish.load(std::sync::atomic::Ordering::Relaxed)
+    fn dev_settings(&self) -> DevSettings {
+        self.dev_settings.read().clone()
     }
 
     #[cfg(any(test, feature = "test_utils"))]
-    fn set_skip_publish(&self, skip_publish: bool) {
-        self.skip_publish
-            .store(skip_publish, std::sync::atomic::Ordering::Relaxed);
+    fn update_dev_settings(&self, delta: DevSettingsDelta) {
+        self.dev_settings.write().apply(delta);
     }
 
     #[cfg(any(test, feature = "test_utils"))]

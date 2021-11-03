@@ -32,6 +32,7 @@ impl ShardedGossipLocal {
         let remote_agent = self
             .find_remote_agent_within_arcset(Arc::new(intervals.clone().into()), &local_agents)
             .await?;
+
         let id = rand::thread_rng().gen();
 
         let maybe_gossip = self.inner.share_mut(|inner, _| {

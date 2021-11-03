@@ -140,7 +140,7 @@ pub struct HolochainP2pMockRespond {
 impl HolochainP2pMockRespond {
     /// Respond to a message request.
     pub fn respond(self, msg: HolochainP2pMockMsg) {
-        self.respond.respond(to_wire_msg(msg));
+        self.respond.respond(msg.into_wire_msg());
     }
 }
 
@@ -280,7 +280,7 @@ impl HolochainP2pMockChannel {
 
                 let (msg, respond) = msg.into_msg_respond();
 
-                let msg = from_wire_msg(msg);
+                let msg = HolochainP2pMockMsg::from_wire_msg(msg);
 
                 let respond = respond.map(|respond| HolochainP2pMockRespond { respond });
                 Some((msg.addressed(to_agent), respond))
@@ -294,20 +294,26 @@ impl HolochainP2pMockChannel {
     pub async fn send(&self, msg: AddressedHolochainP2pMockMsg) -> Option<HolochainP2pMockMsg> {
         let AddressedHolochainP2pMockMsg { msg, agent: from } = msg;
         let (cert, url) = self.address_map.get(&from).cloned().unwrap();
-        let id = to_id(&msg);
+        let id = msg.to_id();
         let (msg, rx) = if id.is_notify() {
-            (KitsuneMock::notify(id, cert, url, to_wire_msg(msg)), None)
+            (
+                KitsuneMock::notify(id, cert, url, msg.into_wire_msg()),
+                None,
+            )
         } else {
             let (respond, rx) = tokio::sync::oneshot::channel();
 
             (
-                KitsuneMock::request(id, cert, url, to_wire_msg(msg), respond),
+                KitsuneMock::request(id, cert, url, msg.into_wire_msg(), respond),
                 Some(rx),
             )
         };
         let _ = self.to_kitsune.send(msg).await;
         match rx {
-            Some(rx) => rx.await.ok().map(|k| from_wire_msg(k.into_wire())),
+            Some(rx) => rx
+                .await
+                .ok()
+                .map(|k| HolochainP2pMockMsg::from_wire_msg(k.into_wire())),
             None => None,
         }
     }
@@ -346,7 +352,7 @@ impl HolochainP2pMockMsg {
     }
 
     /// Turn a mock message into a kitsune wire message.
-    fn to_wire_msg(self) -> kwire::Wire {
+    fn into_wire_msg(self) -> kwire::Wire {
         match self {
             HolochainP2pMockMsg::Wire {
                 to_agent,
