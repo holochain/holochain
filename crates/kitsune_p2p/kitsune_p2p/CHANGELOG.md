@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## \[Unreleased\]
 
 - BREAKING: Return `ShardedGossipWire::Busy` if we are overloaded with incoming gossip. [#1076](https://github.com/holochain/holochain/pull/1076)
-    - This breaks the current network protocol and will not be compatible with other older versions of holochain (no manual actual required).
+    - This breaks the current network protocol and will not be compatible with other older versions of holochain (no manual action required).
 
 ## 0.0.11
 
