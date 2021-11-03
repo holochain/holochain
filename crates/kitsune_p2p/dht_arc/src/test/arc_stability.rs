@@ -1,8 +1,10 @@
 use crate::PeerStrat;
 use crate::*;
 use pretty_assertions::assert_eq;
+use rand::prelude::StdRng;
 use rand::thread_rng;
 use rand::Rng;
+use rand::SeedableRng;
 use statrs::statistics::*;
 use std::collections::HashSet;
 use std::iter;
@@ -30,67 +32,124 @@ fn full_len() -> f64 {
     2f64.powi(32)
 }
 
+fn run_single_agent_convergence(
+    iters: usize,
+    n: usize,
+    redundancy: u16,
+    j: f64,
+    check_gaps: bool,
+) -> RunBatch {
+    tracing::info!("");
+    tracing::info!("------------------------");
+
+    // let seed = thread_rng().gen();
+    let seed = 7532095396949412554;
+
+    tracing::info!("RNG seed: {}", seed);
+    let mut rng = StdRng::seed_from_u64(seed);
+
+    let strat = PeerStratAlpha {
+        check_gaps,
+        redundancy_target: redundancy / 2,
+        ..Default::default()
+    }
+    .into();
+
+    let s = ArcLenStrategy::Constant(redundancy as f64 / n as f64);
+
+    let mut peers = simple_parameterized_generator(&mut rng, n, j, s);
+    peers[0].half_length = MAX_HALF_LENGTH;
+    let runs = determine_equilibrium(iters, peers, |peers| {
+        let dynamic = Some(maplit::hashset![0]);
+        let (peers, stats) = run_one_epoch(&strat, peers, dynamic.as_ref(), DETAIL);
+        tracing::debug!("{}", peers[0].coverage());
+        (peers, stats)
+    });
+    report(&runs);
+    runs
+}
+
 #[test]
-fn only_change_one() {
+fn single_agent_convergence_debug() {
+    std::env::set_var("RUST_LOG", "debug");
+    observability::test_run().ok();
+
+    let n = 50;
+    let j = 0.1;
+    let redundancy = 5;
+    let check_gaps = false;
+
+    // bad seeds:
+    // 7532095396949412554  (XXX)
+    // 5181023930453438019
+
+    // let seed = thread_rng().gen();
+    let seed = 5181023930453438019;
+
+    tracing::info!("RNG seed: {}", seed);
+    let mut rng = StdRng::seed_from_u64(seed);
+
+    let strat = PeerStratAlpha {
+        check_gaps,
+        redundancy_target: redundancy / 2,
+        ..Default::default()
+    }
+    .into();
+
+    let s = ArcLenStrategy::Constant(redundancy as f64 / n as f64);
+
+    let mut peers = simple_parameterized_generator(&mut rng, n, j, s);
+    peers[0].half_length = MAX_HALF_LENGTH;
+    let runs = determine_equilibrium(1, peers, |peers| {
+        let dynamic = Some(maplit::hashset![0]);
+        let (peers, stats) = run_one_epoch(&strat, peers, dynamic.as_ref(), DETAIL);
+        tracing::debug!("{}", peers[0].coverage());
+        (peers, stats)
+    });
+    print_arcs(&runs.0[0].peers);
+    report(&runs);
+}
+
+#[test]
+fn single_agent_convergence_battery() {
     std::env::set_var("RUST_LOG", "info");
     observability::test_run().ok();
     use Vergence::*;
 
-    let redundancy = 100;
-
-    let run = |iters, n, j, check_gaps| {
-        tracing::info!("");
-        tracing::info!("------------------------");
-        let strat = PeerStratAlpha {
-            check_gaps,
-            redundancy_target: redundancy / 2,
-            ..Default::default()
-        }
-        .into();
-
-        let s = ArcLenStrategy::Constant(redundancy as f64 / n as f64);
-        let mut peers = simple_parameterized_generator(n, j, s);
-        peers[0].half_length = MAX_HALF_LENGTH;
-        let equilibrium = determine_equilibrium(iters, peers, |peers| {
-            let dynamic = Some(maplit::hashset![0]);
-            let (peers, stats) = run_one_epoch(&strat, peers, dynamic.as_ref(), DETAIL);
-            tracing::debug!("{}", peers[0].coverage());
-            (peers, stats)
-        });
-        // print_arcs(&peers);
-        report(&equilibrium);
-        equilibrium
-    };
+    let n = 1000;
+    let r = 100;
 
     // These diverge only rarely
     let _borderline = vec![
-        run(16, 1000, 0.001, false).vergence(),
-        run(16, 1000, 0.01, false).vergence(),
+        run_single_agent_convergence(16, n, r, 0.001, false).vergence(),
+        run_single_agent_convergence(16, n, r, 0.01, false).vergence(),
     ];
 
     let divergent = vec![
-        run(8, 1000, 0.0, true).vergence(),
-        run(8, 1000, 0.0003, true).vergence(),
+        run_single_agent_convergence(8, n, r, 0.0, true).vergence(),
+        run_single_agent_convergence(8, n, r, 0.0003, true).vergence(),
     ];
 
     let convergent = vec![
-        run(16, 1000, 0.0, false).vergence(),
-        run(16, 1000, 0.0003, false).vergence(),
-        run(16, 1000, 0.0007, false).vergence(),
+        run_single_agent_convergence(16, n, r, 0.0, false).vergence(),
+        run_single_agent_convergence(16, n, r, 0.0003, false).vergence(),
+        run_single_agent_convergence(16, n, r, 0.0007, false).vergence(),
     ];
 
     // assert_eq!(borderline, vec![Divergent; borderline.len()]);
     assert_eq!(divergent, vec![Divergent; divergent.len()]);
     assert_eq!(convergent, vec![Convergent; convergent.len()]);
-
-    // assert!(matches!(run(true), Divergent(_)));
-    // assert!(matches!(run(false), Convergent(_)));
 }
 
 #[test]
 fn parameterized_stability_test() {
-    std::env::set_var("RUST_LOG", "info");
+    std::env::set_var("RUST_LOG", "debug");
     observability::test_run().ok();
+
+    let seed = thread_rng().gen();
+    tracing::info!("RNG seed: {}", seed);
+    let mut rng = StdRng::seed_from_u64(seed);
+
     let n = 1000;
     let j = 1f64 / n as f64 / 3.0;
     let s = ArcLenStrategy::Constant(0.1);
@@ -102,12 +161,12 @@ fn parameterized_stability_test() {
     }
     .into();
 
-    let peers = simple_parameterized_generator(n, j, s);
+    let peers = simple_parameterized_generator(&mut rng, n, j, s);
     tracing::info!("");
-    tracing::info!("{}", EpochStats::oneline_header());
+    tracing::debug!("{}", EpochStats::oneline_header());
     let eq = determine_equilibrium(8, peers, |peers| {
         let (peers, stats) = run_one_epoch(&strat, peers, None, DETAIL);
-        tracing::info!("{}", stats.oneline());
+        tracing::debug!("{}", stats.oneline());
         (peers, stats)
     });
     report(&eq);
@@ -189,7 +248,11 @@ where
     } else {
         Vergence::Divergent
     };
-    Run { vergence, history }
+    Run {
+        vergence,
+        history,
+        peers,
+    }
 }
 
 /// Resize every arc based on neighbors' arcs, and compute stats about this iteration
@@ -218,9 +281,9 @@ fn run_one_epoch(
         let p = peers.clone();
         let arc = peers.get_mut(i).unwrap();
         let bucket = DhtArcBucket::new(*arc, p.clone());
-        let density = bucket.peer_view(kind);
+        let view = bucket.peer_view(kind);
         let before = arc.absolute_length() as f64;
-        arc.update_length(density);
+        arc.update_length(view);
         let after = arc.absolute_length() as f64;
         let delta = after - before;
         net += delta;
@@ -260,11 +323,11 @@ fn run_one_epoch(
 /// N: total # of peers
 /// J: random jitter of peer locations
 /// S: strategy for generating arc lengths
-fn simple_parameterized_generator(n: usize, j: f64, s: ArcLenStrategy) -> Peers {
+fn simple_parameterized_generator(rng: &mut StdRng, n: usize, j: f64, s: ArcLenStrategy) -> Peers {
     tracing::info!("N = {}, J = {}", n, j);
     tracing::info!("Arc len generation: {:?}", s);
-    let halflens = s.gen(n);
-    generate_evenly_spaced_with_half_lens_and_jitter(j, halflens)
+    let halflens = s.gen(rng, n);
+    generate_evenly_spaced_with_half_lens_and_jitter(rng, j, halflens)
 }
 
 /// Define arcs by centerpoint and halflen in the unit interval [0.0, 1.0]
@@ -277,12 +340,11 @@ fn unit_arcs<H: Iterator<Item = (f64, f64)>>(arcs: H) -> Peers {
 
 /// Each agent is perfect evenly spaced around the DHT,
 /// with the halflens specified by the iterator.
-fn generate_evenly_spaced_with_half_lens_and_jitter<H: Iterator<Item = f64>>(
+fn generate_evenly_spaced_with_half_lens_and_jitter(
+    rng: &mut StdRng,
     jitter: f64,
-    hs: H,
+    hs: Vec<f64>,
 ) -> Peers {
-    let mut rng = thread_rng();
-    let hs: Vec<_> = hs.collect();
     let n = hs.len() as f64;
     unit_arcs(hs.into_iter().enumerate().map(|(i, h)| {
         (
@@ -330,6 +392,8 @@ impl RunBatch {
 struct Run {
     vergence: Vergence,
     history: Vec<EpochStats>,
+    /// the final state of the peers at the last iteration
+    peers: Peers,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -374,18 +438,14 @@ enum ArcLenStrategy {
 }
 
 impl ArcLenStrategy {
-    pub fn gen(&self, num: usize) -> Box<dyn Iterator<Item = f64>> {
+    pub fn gen(&self, rng: &mut StdRng, num: usize) -> Vec<f64> {
         match self {
-            Self::Random => {
-                let mut rng = thread_rng();
-                Box::new(iter::repeat_with(move || rng.gen()).take(num))
-            }
-            Self::Constant(v) => Box::new(iter::repeat(*v).take(num)),
-            Self::HalfAndHalf(a, b) => Box::new(
-                iter::repeat(*a)
-                    .take(num / 2)
-                    .chain(iter::repeat(*b).take(num / 2)),
-            ),
+            Self::Random => iter::repeat_with(|| rng.gen()).take(num).collect(),
+            Self::Constant(v) => iter::repeat(*v).take(num).collect(),
+            Self::HalfAndHalf(a, b) => iter::repeat(*a)
+                .take(num / 2)
+                .chain(iter::repeat(*b).take(num / 2))
+                .collect(),
         }
     }
 }
