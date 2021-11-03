@@ -1,13 +1,20 @@
 use crate::PeerStrat;
 use crate::*;
+use pretty_assertions::assert_eq;
 use rand::thread_rng;
 use rand::Rng;
+use statrs::statistics::*;
 use std::collections::HashSet;
 use std::iter;
 
 /// Maximum number of iterations. If we iterate this much, we assume the
 /// system is divergent (unable to reach equilibrium).
-const MAX_ITERS: usize = 80;
+const DIVERGENCE_ITERS: usize = 64;
+
+/// If a system converges this many times, consider it convergent.
+/// If it diverges once, consider it divergent.
+/// Increase this number if tests become flaky, decrease it if tests are too slow.
+const DETERMINATION_ITERS: usize = 8;
 
 /// Number of consecutive rounds of no movement before declaring convergence.
 const CONVERGENCE_WINDOW: usize = 3;
@@ -15,45 +22,75 @@ const CONVERGENCE_WINDOW: usize = 3;
 /// Level of detail in reporting.
 const DETAIL: u8 = 0;
 
+type DataVec = statrs::statistics::Data<Vec<f64>>;
+
+type Peers = Vec<DhtArc>;
+
 fn full_len() -> f64 {
     2f64.powi(32)
 }
 
 #[test]
 fn only_change_one() {
+    std::env::set_var("RUST_LOG", "info");
     observability::test_run().ok();
-    let n = 1000;
-    let j = 0.0;
-    // let j = 1f64 / n as f64 / 100.0;
-    let s = ArcLenStrategy::Constant(0.1);
+    use Vergence::*;
 
-    let run = |check_gaps| {
+    let redundancy = 100;
+
+    let run = |iters, n, j, check_gaps| {
+        tracing::info!("");
+        tracing::info!("------------------------");
         let strat = PeerStratAlpha {
             check_gaps,
-            redundancy_target: 50,
+            redundancy_target: redundancy / 2,
             ..Default::default()
         }
         .into();
 
+        let s = ArcLenStrategy::Constant(redundancy as f64 / n as f64);
         let mut peers = simple_parameterized_generator(n, j, s);
         peers[0].half_length = MAX_HALF_LENGTH;
-        let dynamic = Some(maplit::hashset![0]);
-        let vergence = determine_vergence(|| {
-            let stats = run_one_epoch(&strat, &mut peers, dynamic.as_ref(), DETAIL);
+        let equilibrium = determine_equilibrium(iters, peers, |peers| {
+            let dynamic = Some(maplit::hashset![0]);
+            let (peers, stats) = run_one_epoch(&strat, peers, dynamic.as_ref(), DETAIL);
             tracing::debug!("{}", peers[0].coverage());
-            stats
+            (peers, stats)
         });
         // print_arcs(&peers);
-        report(&vergence);
-        vergence
+        report(&equilibrium);
+        equilibrium
     };
 
-    assert!(matches!(run(true), Vergence::Divergent(_)));
-    assert!(matches!(run(false), Vergence::Convergent(_)));
+    // These diverge only rarely
+    let _borderline = vec![
+        run(16, 1000, 0.001, false).vergence(),
+        run(16, 1000, 0.01, false).vergence(),
+    ];
+
+    let divergent = vec![
+        run(8, 1000, 0.0, true).vergence(),
+        run(8, 1000, 0.0003, true).vergence(),
+    ];
+
+    let convergent = vec![
+        run(16, 1000, 0.0, false).vergence(),
+        run(16, 1000, 0.0003, false).vergence(),
+        run(16, 1000, 0.0007, false).vergence(),
+    ];
+
+    // assert_eq!(borderline, vec![Divergent; borderline.len()]);
+    assert_eq!(divergent, vec![Divergent; divergent.len()]);
+    assert_eq!(convergent, vec![Convergent; convergent.len()]);
+
+    // assert!(matches!(run(true), Divergent(_)));
+    // assert!(matches!(run(false), Convergent(_)));
 }
 
 #[test]
 fn parameterized_stability_test() {
+    std::env::set_var("RUST_LOG", "info");
+    observability::test_run().ok();
     let n = 1000;
     let j = 1f64 / n as f64 / 3.0;
     let s = ArcLenStrategy::Constant(0.1);
@@ -62,18 +99,19 @@ fn parameterized_stability_test() {
     let strat = PeerStratAlpha {
         redundancy_target: r,
         ..Default::default()
-    };
-    let kind = PeerStrat::Alpha(strat);
+    }
+    .into();
 
-    let mut peers = simple_parameterized_generator(n, j, s);
+    let peers = simple_parameterized_generator(n, j, s);
+    tracing::info!("");
     tracing::info!("{}", EpochStats::oneline_header());
-    let vergence = determine_vergence(|| {
-        let stats = run_one_epoch(&kind, &mut peers, None, DETAIL);
+    let eq = determine_equilibrium(8, peers, |peers| {
+        let (peers, stats) = run_one_epoch(&strat, peers, None, DETAIL);
         tracing::info!("{}", stats.oneline());
-        stats
+        (peers, stats)
     });
-    report(&vergence);
-    vergence.assert_convergent();
+    report(&eq);
+    eq.assert_convergent();
 }
 
 #[test]
@@ -81,44 +119,77 @@ fn min_redundancy_is_maintained() {
     todo!("Check that min redundancy is maintained at all times");
 }
 
-fn report(stats: &Vergence) {
-    if let Vergence::Convergent(stats) = stats {
-        tracing::info!("{:?}", stats.last().unwrap());
-        tracing::info!("Reached equilibrium in {} iterations", stats.len());
+fn report(e: &RunBatch) {
+    let counts = DataVec::new(e.histories().map(|h| h.len() as f64).collect());
+
+    if let Vergence::Convergent = e.vergence() {
+        tracing::info!(
+            "Reached equilibrium in {} mean iterations (variance {})",
+            counts.mean().unwrap(),
+            counts.variance().unwrap()
+        );
     } else {
-        tracing::error!("failed to reach equilibrium in {} iterations", MAX_ITERS);
+        tracing::warn!(
+            "Divergent run found on attempt #{}. Failed to reach equilibrium in {} iterations",
+            e.histories().count(),
+            DIVERGENCE_ITERS
+        );
     }
+}
+
+fn determine_equilibrium<'a, F>(iters: usize, peers: Peers, step: F) -> RunBatch
+where
+    F: 'a + Clone + Fn(Peers) -> (Peers, EpochStats),
+{
+    use Vergence::*;
+    let mut runs = vec![];
+    for i in 1..=iters {
+        let mut peers_clone = peers.clone();
+        let run = seek_convergence(peers.clone(), |peers| step(peers));
+        let vergence = run.vergence;
+        runs.push(run);
+        if vergence == Divergent {
+            break;
+        }
+    }
+    RunBatch(runs)
 }
 
 /// Run iterations until there is no movement of any arc
 /// TODO: this may be unreasonable, and we may need to just ensure that arcs
 /// settle down into a reasonable level of oscillation
-fn determine_vergence<F>(mut step: F) -> Vergence
+fn seek_convergence<'a, F>(peers: Peers, step: F) -> Run
 where
-    F: FnMut() -> EpochStats,
+    F: Fn(Peers) -> (Peers, EpochStats),
 {
-    let mut n_delta_count = 0;
-    let mut history = vec![];
-    for i in 1..=MAX_ITERS {
-        if n_delta_count >= CONVERGENCE_WINDOW {
-            tracing::info!("Converged in {} iterations", i - CONVERGENCE_WINDOW);
-            break;
-        }
+    let converged = |convergence| convergence >= CONVERGENCE_WINDOW;
+    let (peers, history, convergence) = (1..=DIVERGENCE_ITERS).fold(
+        (peers, vec![], 0),
+        |(peers, mut history, mut convergence), _i| {
+            if !converged(convergence) {
+                let (peers, stats) = step(peers);
+                if stats.gross_delta_avg == 0.0 {
+                    convergence += 1;
+                } else if convergence > 0 {
+                    panic!(
+                        "we don't expect a system in equilibirum to suddenly start moving again."
+                    )
+                } else {
+                    history.push(stats);
+                }
+                (peers, history, convergence)
+            } else {
+                (peers, history, convergence)
+            }
+        },
+    );
 
-        let stats = step();
-        if stats.gross_delta_avg == 0.0 {
-            n_delta_count += 1;
-        } else if n_delta_count > 0 {
-            panic!("we don't expect a system in equilibirum to suddenly start moving again!")
-        } else {
-            history.push(stats);
-        }
-    }
-    if n_delta_count == 0 {
-        Vergence::Divergent(history)
+    let vergence = if converged(convergence) {
+        Vergence::Convergent
     } else {
-        Vergence::Convergent(history)
-    }
+        Vergence::Divergent
+    };
+    Run { vergence, history }
 }
 
 /// Resize every arc based on neighbors' arcs, and compute stats about this iteration
@@ -128,10 +199,10 @@ where
 /// detail: Level of output detail. More is more verbose. detail: u8,
 fn run_one_epoch(
     kind: &PeerStrat,
-    peers: &mut Vec<DhtArc>,
+    mut peers: Peers,
     dynamic_peer_indices: Option<&HashSet<usize>>,
     detail: u8,
-) -> EpochStats {
+) -> (Peers, EpochStats) {
     let mut net = 0.0;
     let mut gross = 0.0;
     let mut delta_min = full_len() / 2.0;
@@ -169,26 +240,27 @@ fn run_one_epoch(
         tracing::info!("max: |{}| {}", peers[index_max].to_ascii(64), index_max);
         tracing::info!("");
     } else if detail == 2 {
-        print_arcs(peers);
+        print_arcs(&peers);
         get_input();
     }
 
     let tot = peers.len() as f64;
     let min_redundancy = check_redundancy(peers.clone());
-    EpochStats {
+    let stats = EpochStats {
         net_delta_avg: net / tot / full_len(),
         gross_delta_avg: gross / tot / full_len(),
         min_redundancy: min_redundancy,
         delta_min: delta_min / full_len(),
         delta_max: delta_max / full_len(),
-    }
+    };
+    (peers, stats)
 }
 
 /// Generate a list of DhtArcs based on 3 parameters:
 /// N: total # of peers
 /// J: random jitter of peer locations
 /// S: strategy for generating arc lengths
-fn simple_parameterized_generator(n: usize, j: f64, s: ArcLenStrategy) -> Vec<DhtArc> {
+fn simple_parameterized_generator(n: usize, j: f64, s: ArcLenStrategy) -> Peers {
     tracing::info!("N = {}, J = {}", n, j);
     tracing::info!("Arc len generation: {:?}", s);
     let halflens = s.gen(n);
@@ -196,7 +268,7 @@ fn simple_parameterized_generator(n: usize, j: f64, s: ArcLenStrategy) -> Vec<Dh
 }
 
 /// Define arcs by centerpoint and halflen in the unit interval [0.0, 1.0]
-fn unit_arcs<H: Iterator<Item = (f64, f64)>>(arcs: H) -> Vec<DhtArc> {
+fn unit_arcs<H: Iterator<Item = (f64, f64)>>(arcs: H) -> Peers {
     let fc = full_len();
     let fh = MAX_HALF_LENGTH as f64;
     arcs.map(|(c, h)| DhtArc::new((c * fc).min(u32::MAX as f64) as u32, (h * fh) as u32))
@@ -208,7 +280,7 @@ fn unit_arcs<H: Iterator<Item = (f64, f64)>>(arcs: H) -> Vec<DhtArc> {
 fn generate_evenly_spaced_with_half_lens_and_jitter<H: Iterator<Item = f64>>(
     jitter: f64,
     hs: H,
-) -> Vec<DhtArc> {
+) -> Peers {
     let mut rng = thread_rng();
     let hs: Vec<_> = hs.collect();
     let n = hs.len() as f64;
@@ -221,26 +293,49 @@ fn generate_evenly_spaced_with_half_lens_and_jitter<H: Iterator<Item = f64>>(
 }
 
 #[derive(Debug)]
-enum Vergence {
-    Convergent(Vec<EpochStats>),
-    Divergent(Vec<EpochStats>),
-}
+struct RunBatch(Vec<Run>);
 
-impl Vergence {
+impl RunBatch {
+    pub fn vergence(&self) -> Vergence {
+        if self.0.iter().all(|r| r.vergence == Vergence::Convergent) {
+            Vergence::Convergent
+        } else {
+            Vergence::Divergent
+        }
+    }
+
+    pub fn histories(&self) -> impl Iterator<Item = &Vec<EpochStats>> + '_ {
+        self.0.iter().map(|r| &r.history)
+    }
+
     pub fn assert_convergent(&self) {
-        assert!(
-            matches!(self, Self::Convergent(_)),
+        assert_eq!(
+            self.vergence(),
+            Vergence::Convergent,
             "failed to reach equilibrium in {} iterations",
-            MAX_ITERS
+            DIVERGENCE_ITERS
         )
     }
 
     pub fn assert_divergent(&self) {
-        assert!(
-            matches!(self, Self::Divergent(_)),
+        assert_eq!(
+            self.vergence(),
+            Vergence::Divergent,
             "sequence was expected to diverge, but converged",
         )
     }
+}
+
+#[derive(Debug)]
+struct Run {
+    vergence: Vergence,
+    history: Vec<EpochStats>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Vergence {
+    Convergent,
+    Divergent,
 }
 
 #[derive(Debug)]
@@ -296,7 +391,7 @@ impl ArcLenStrategy {
 }
 
 /// View ascii for all arcs
-fn print_arcs(arcs: &Vec<DhtArc>) {
+fn print_arcs(arcs: &Peers) {
     for (i, arc) in arcs.into_iter().enumerate() {
         println!("|{}| {}", arc.to_ascii(64), i);
     }
