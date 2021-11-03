@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - BREAKING: Added a placeholder for zome properties on zome info [#1080](https://github.com/holochain/holochain/pull/1080)
 
+## 0.0.16
+
 ## 0.0.15
 
 - `HeaderHashes` no longer exists [PR1049](https://github.com/holochain/holochain/pull/1049)
