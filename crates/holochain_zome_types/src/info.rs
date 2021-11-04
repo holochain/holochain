@@ -18,6 +18,8 @@ pub struct ZomeInfo {
     pub id: ZomeId,
     pub properties: SerializedBytes,
     pub entry_defs: EntryDefs,
+    // @todo make this include function signatures when they exist.
+    pub extern_fns: Vec<FunctionName>,
 }
 
 impl ZomeInfo {
@@ -26,12 +28,14 @@ impl ZomeInfo {
         id: ZomeId,
         properties: SerializedBytes,
         entry_defs: EntryDefs,
+        extern_fns: Vec<FunctionName>,
     ) -> Self {
         Self {
             name,
             id,
             properties,
             entry_defs,
+            extern_fns,
         }
     }
 }
@@ -47,13 +51,19 @@ pub struct AgentInfo {
     /// Same as the initial pubkey if it has never been changed.
     /// The agent can revoke an old key and replace it with a new one, the latest appears here.
     pub agent_latest_pubkey: AgentPubKey,
+    pub chain_head: (HeaderHash, u32, Timestamp),
 }
 
 impl AgentInfo {
-    pub fn new(agent_initial_pubkey: AgentPubKey, agent_latest_pubkey: AgentPubKey) -> Self {
+    pub fn new(
+        agent_initial_pubkey: AgentPubKey,
+        agent_latest_pubkey: AgentPubKey,
+        chain_head: (HeaderHash, u32, Timestamp),
+    ) -> Self {
         Self {
             agent_initial_pubkey,
             agent_latest_pubkey,
+            chain_head,
         }
     }
 }
