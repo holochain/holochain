@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- BREAKING: Wire message `Call` no longer takes `from_agent`. [#1091](https://github.com/holochain/holochain/pull/1091)
+
 ## 0.0.12
 
 - BREAKING: Return `ShardedGossipWire::Busy` if we are overloaded with incoming gossip. [\#1076](https://github.com/holochain/holochain/pull/1076)
