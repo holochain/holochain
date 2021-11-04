@@ -119,6 +119,9 @@ pub type EndpointFut = BoxFuture<'static, KitsuneResult<Endpoint>>;
 pub trait BindAdapt: 'static + Send + Sync + Unpin {
     /// Bind a local endpoint, given a url spec.
     fn bind(&self, url: TxUrl, timeout: KitsuneTimeout) -> EndpointFut;
+
+    /// Get the local certificate digest.
+    fn local_cert(&self) -> Tx2Cert;
 }
 
 /// Tx backend endpoint binding factory type.

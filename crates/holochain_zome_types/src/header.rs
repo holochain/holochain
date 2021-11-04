@@ -365,6 +365,12 @@ impl_hashable_content!(Header, Header);
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct ZomeId(u8);
 
+impl ZomeId {
+    pub fn new(u: u8) -> Self {
+        Self(u)
+    }
+}
+
 #[derive(
     Debug,
     Copy,
