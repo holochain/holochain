@@ -27,6 +27,9 @@ pub mod test {
 
         let agent_info = fixt!(AgentInfo);
         let closure_agent_info = agent_info.clone();
+        mock_hdk.expect_create()
+            .times(1)
+            .return_once(move |_| Ok(fixt!(HeaderHash)));
         mock_hdk.expect_agent_info()
             .with(hdk::prelude::mockall::predicate::eq(()))
             .times(1)
