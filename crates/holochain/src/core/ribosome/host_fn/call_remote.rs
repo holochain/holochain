@@ -172,11 +172,12 @@ pub mod wasm_test {
             ZomeCallResponse::Ok(guest_output) => {
                 let agent_info: AgentInfo = guest_output.decode().unwrap();
                 assert_eq!(
-                    agent_info,
-                    AgentInfo {
-                        agent_initial_pubkey: bob_agent_id.clone(),
-                        agent_latest_pubkey: bob_agent_id,
-                    },
+                    agent_info.agent_initial_pubkey,
+                    bob_agent_id
+                );
+                assert_eq!(
+                    agent_info.agent_latest_pubkey,
+                    bob_agent_id
                 );
             }
             _ => unreachable!(),
