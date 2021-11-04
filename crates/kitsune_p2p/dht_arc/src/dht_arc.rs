@@ -131,11 +131,8 @@ impl DhtArc {
     /// to the new target and is designed to be called at a given rate
     /// with more recent peer views.
     pub fn update_length<V: Into<PeerView>>(&mut self, view: V) {
-        self.half_length = match view.into() {
-            PeerView::Alpha(density) => {
-                (MAX_HALF_LENGTH as f64 * converge(self.coverage(), density)) as u32
-            }
-        }
+        self.half_length =
+            (MAX_HALF_LENGTH as f64 * view.into().next_coverage(self.coverage())) as u32;
     }
 
     /// Check if a location is contained in this arc

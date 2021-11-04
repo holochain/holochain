@@ -36,3 +36,13 @@ impl PeerStrat {
 pub enum PeerView {
     Alpha(PeerViewAlpha),
 }
+
+impl PeerView {
+    /// Given the current view of a peer and the peer's current coverage,
+    /// this returns the next step to take in reaching the ideal coverage.
+    pub fn next_coverage(&self, current: f64) -> f64 {
+        match self {
+            Self::Alpha(s) => s.next_coverage(current),
+        }
+    }
+}

@@ -68,6 +68,12 @@ impl PeerViewAlpha {
         }
     }
 
+    /// Given the current coverage, what is the next step to take in reaching
+    /// the ideal coverage?
+    pub fn next_coverage(&self, current: f64) -> f64 {
+        converge(current, *self)
+    }
+
     /// The expected number of peers for this arc over time.
     pub fn expected_count(&self) -> usize {
         (self.count as f64 * self.strat.default_uptime) as usize
