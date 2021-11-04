@@ -427,6 +427,10 @@ impl BindAdapt for MemBackendAdapt {
             })
             .boxed()
     }
+
+    fn local_cert(&self) -> Tx2Cert {
+        self.0.clone()
+    }
 }
 
 #[cfg(test)]
