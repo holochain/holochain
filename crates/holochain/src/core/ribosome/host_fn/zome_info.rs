@@ -70,16 +70,32 @@ pub mod test {
             ].into(),
         );
         assert_eq!(
-            zome_info.extern_fns,
+            zome_info.externs,
             vec![
-                FunctionName::new("__allocate"),
-                FunctionName::new("__data_end"),
-                FunctionName::new("__deallocate"),
-                FunctionName::new("__heap_base"),
-                FunctionName::new("assert_indexes"),
-                FunctionName::new("entry_defs"),
-                FunctionName::new("memory"),
-                FunctionName::new("zome_info"),
+                Extern::new(FunctionName::new("__allocate"), true),
+                Extern::new(FunctionName::new("__data_end"), true),
+                Extern::new(FunctionName::new("__deallocate"), true),
+                Extern::new(FunctionName::new("__heap_base"), true),
+                Extern::new(FunctionName::new("assert_indexes"), true),
+                Extern::new(FunctionName::new("entry_defs"), true),
+                Extern::new(FunctionName::new("memory"), true),
+                Extern::new(FunctionName::new("zome_info"), true),
+            ],
+        );
+
+        crate::call_test_ribosome!(host_access, TestWasm::EntryDefs, "set_access", ()).unwrap();
+        let zome_info_2: ZomeInfo = crate::call_test_ribosome!(host_access, TestWasm::EntryDefs, "zome_info", ()).unwrap();
+        assert_eq!(
+            zome_info_2.externs,
+            vec![
+                Extern::new(FunctionName::new("__allocate"), true),
+                Extern::new(FunctionName::new("__data_end"), true),
+                Extern::new(FunctionName::new("__deallocate"), true),
+                Extern::new(FunctionName::new("__heap_base"), true),
+                Extern::new(FunctionName::new("assert_indexes"), true),
+                Extern::new(FunctionName::new("entry_defs"), true),
+                Extern::new(FunctionName::new("memory"), true),
+                Extern::new(FunctionName::new("zome_info"), true),
             ],
         );
     }

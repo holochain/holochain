@@ -9,6 +9,19 @@ use holo_hash::DnaHash;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 
+// @todo make this include function signatures when they exist.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Extern {
+    name: FunctionName,
+    restricted: bool,
+}
+
+impl Extern {
+    pub fn new(name: FunctionName, restricted: bool) -> Self {
+        Self { name, restricted }
+    }
+}
+
 /// The properties of the current dna/zome being called.
 #[allow(missing_docs)]
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq)]
@@ -18,8 +31,7 @@ pub struct ZomeInfo {
     pub id: ZomeId,
     pub properties: SerializedBytes,
     pub entry_defs: EntryDefs,
-    // @todo make this include function signatures when they exist.
-    pub extern_fns: Vec<FunctionName>,
+    pub externs: Vec<Extern>,
 }
 
 impl ZomeInfo {
@@ -28,14 +40,14 @@ impl ZomeInfo {
         id: ZomeId,
         properties: SerializedBytes,
         entry_defs: EntryDefs,
-        extern_fns: Vec<FunctionName>,
+        externs: Vec<Extern>,
     ) -> Self {
         Self {
             name,
             id,
             properties,
             entry_defs,
-            extern_fns,
+            externs,
         }
     }
 }

@@ -174,8 +174,14 @@ fixturator!(
 );
 
 fixturator!(
+    with_vec 0 5;
+    Extern;
+    constructor fn new(FunctionName, bool);
+);
+
+fixturator!(
     ZomeInfo;
-    constructor fn new(ZomeName, ZomeId, SerializedBytes, EntryDefs, FunctionNameVec);
+    constructor fn new(ZomeName, ZomeId, SerializedBytes, EntryDefs, ExternVec);
 );
 
 fixturator!(

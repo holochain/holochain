@@ -501,7 +501,7 @@ impl RibosomeT for RealRibosome {
                     },
                 }
             },
-            extern_fns: {
+            externs: {
                 match zome.zome_def() {
                     ZomeDef::Wasm(_) => {
                         let module = self.module(zome.zome_name())?;
@@ -513,7 +513,11 @@ impl RibosomeT for RealRibosome {
                             .map(|(name, _index)| FunctionName::new(name))
                             .collect();
                         extern_fns.sort();
-                        extern_fns
+                        let externs: Vec<hdk::prelude::Extern> = extern_fns
+                            .into_iter()
+                            .map(|name| hdk::prelude::Extern::new(name, false))
+                            .collect();
+                        externs
                     }
                     ZomeDef::Inline(zome) => zome.callbacks(),
                 }
