@@ -4,6 +4,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Kitsune now attempts to rebind the network interface in the event of endpoint shutdown. Note, it's still recommended to bind to `0.0.0.0` as the OS provides additional resiliency for interfaces coming and going.
 - **BREAKING CHANGE** current chain head including recent writes available in agent info [#1079](https://github.com/holochain/holochain/pull/1079)
 
 ## 0.0.114
