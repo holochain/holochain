@@ -124,7 +124,7 @@ macro_rules! meta_mock {
 pub struct TestNetwork {
     network: Option<HolochainP2pRef>,
     respond_task: Option<tokio::task::JoinHandle<()>>,
-    cell_network: HolochainP2pDna,
+    dna_network: HolochainP2pDna,
 }
 
 impl TestNetwork {
@@ -132,12 +132,12 @@ impl TestNetwork {
     pub fn new(
         network: HolochainP2pRef,
         respond_task: tokio::task::JoinHandle<()>,
-        cell_network: HolochainP2pDna,
+        dna_network: HolochainP2pDna,
     ) -> Self {
         Self {
             network: Some(network),
             respond_task: Some(respond_task),
-            cell_network,
+            dna_network,
         }
     }
 
@@ -150,8 +150,8 @@ impl TestNetwork {
     }
 
     /// Get the cell network
-    pub fn cell_network(&self) -> HolochainP2pDna {
-        self.cell_network.clone()
+    pub fn dna_network(&self) -> HolochainP2pDna {
+        self.dna_network.clone()
     }
 }
 
@@ -240,9 +240,9 @@ where
     let dna = dna_hash.unwrap_or_else(|| fixt!(DnaHash));
     let mut key_fixt = AgentPubKeyFixturator::new(Predictable);
     let agent_key = agent_key.unwrap_or_else(|| key_fixt.next().unwrap());
-    let cell_network = network.to_dna(dna.clone());
+    let dna_network = network.to_dna(dna.clone());
     network.join(dna.clone(), agent_key).await.unwrap();
-    TestNetwork::new(network, respond_task, cell_network)
+    TestNetwork::new(network, respond_task, dna_network)
 }
 
 /// Do what's necessary to install an app

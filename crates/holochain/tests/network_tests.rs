@@ -481,7 +481,7 @@ async fn run_fixt_network(
     meta_fixt_store: BTreeMap<AnyDhtHash, TimedHeaderHash>,
 ) -> (HolochainP2pDna, Shutdown) {
     // Create the network
-    let (network, mut recv, cell_network) = test_network(None, None).await;
+    let (network, mut recv, dna_network) = test_network(None, None).await;
     let (kill, killed) = tokio::sync::oneshot::channel();
 
     // Return fixt store data to gets
@@ -545,7 +545,7 @@ async fn run_fixt_network(
         }
     });
     (
-        cell_network,
+        dna_network,
         Shutdown {
             handle,
             kill,

@@ -43,7 +43,7 @@ async fn integrate_query() {
     let (qt, _rx) = TriggerSender::new();
     // dump_tmp(&env.env());
     let test_network = test_network(None, None).await;
-    let holochain_p2p_cell = test_network.cell_network();
+    let holochain_p2p_cell = test_network.dna_network();
     integrate_dht_ops_workflow(env.env().into(), qt, holochain_p2p_cell)
         .await
         .unwrap();

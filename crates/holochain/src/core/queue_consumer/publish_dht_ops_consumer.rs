@@ -9,12 +9,12 @@ use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for Publish workflow
-#[instrument(skip(env, conductor_handle, stop, cell_network))]
+#[instrument(skip(env, conductor_handle, stop, dna_network))]
 pub fn spawn_publish_dht_ops_consumer(
     env: EnvWrite,
     conductor_handle: ConductorHandle,
     mut stop: sync::broadcast::Receiver<()>,
-    cell_network: Box<dyn HolochainP2pDnaT + Send + Sync>,
+    dna_network: Box<dyn HolochainP2pDnaT + Send + Sync>,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
     // Create a trigger with an exponential back off starting at 1 minute
     // and maxing out at 5 minutes.
@@ -30,7 +30,7 @@ pub fn spawn_publish_dht_ops_consumer(
         TriggerSender::new_with_loop(Duration::from_secs(60)..Duration::from_secs(60 * 5), true);
     let trigger_self = tx.clone();
     let handle = tokio::spawn(async move {
-        let cell_network = cell_network;
+        let dna_network = dna_network;
         loop {
             // Wait for next job
             if let Job::Shutdown = next_job_or_exit(&mut rx, &mut stop).await {
@@ -50,7 +50,7 @@ pub fn spawn_publish_dht_ops_consumer(
             // Run the workflow
             match publish_dht_ops_workflow(
                 env.clone(),
-                cell_network.as_ref(),
+                dna_network.as_ref(),
                 &trigger_self,
                 cell_id.agent_pubkey().clone(),
             )

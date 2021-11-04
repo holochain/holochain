@@ -25,7 +25,7 @@ async fn test_cell_handle_publish() {
     let agent = cell_id.agent_pubkey().clone();
 
     let test_network = test_network(Some(dna.clone()), Some(agent.clone())).await;
-    let holochain_p2p_cell = test_network.cell_network();
+    let holochain_p2p_cell = test_network.dna_network();
 
     let mut mock_handle = crate::conductor::handle::MockConductorHandleT::new();
     mock_handle

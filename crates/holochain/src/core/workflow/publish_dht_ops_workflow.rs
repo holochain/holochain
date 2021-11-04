@@ -181,7 +181,7 @@ mod tests {
             test_network_with_events(Some(dna.clone()), Some(author.clone()), filter_events, tx)
                 .await;
         let (tx_complete, rx_complete) = tokio::sync::oneshot::channel();
-        let cell_network = test_network.cell_network();
+        let dna_network = test_network.dna_network();
         let network = test_network.network();
         let mut recv_count: u32 = 0;
         let total_expected = num_agents * num_hash;
@@ -220,13 +220,13 @@ mod tests {
                 .unwrap();
         }
 
-        (test_network, cell_network, author, recv_task, rx_complete)
+        (test_network, dna_network, author, recv_task, rx_complete)
     }
 
     /// Call the workflow
-    async fn call_workflow(env: EnvWrite, cell_network: HolochainP2pDna, author: AgentPubKey) {
+    async fn call_workflow(env: EnvWrite, dna_network: HolochainP2pDna, author: AgentPubKey) {
         let (trigger_sender, _) = TriggerSender::new();
-        publish_dht_ops_workflow(env.clone().into(), &cell_network, &trigger_sender, author)
+        publish_dht_ops_workflow(env.clone().into(), &dna_network, &trigger_sender, author)
             .await
             .unwrap();
     }
@@ -250,10 +250,10 @@ mod tests {
             let env = test_env.env();
 
             // Setup
-            let (_network, cell_network, author, recv_task, rx_complete) =
+            let (_network, dna_network, author, recv_task, rx_complete) =
                 setup(env.clone(), num_agents, num_hash, false).await;
 
-            call_workflow(env.clone().into(), cell_network, author).await;
+            call_workflow(env.clone().into(), dna_network, author).await;
 
             // Wait for expected # of responses, or timeout
             tokio::select! {
@@ -304,7 +304,7 @@ mod tests {
             let env = test_env.env();
 
             // Setup
-            let (_network, cell_network, author, recv_task, _) =
+            let (_network, dna_network, author, recv_task, _) =
                 setup(env.clone(), num_agents, num_hash, true).await;
 
             // Update the authored to have complete receipts
@@ -317,7 +317,7 @@ mod tests {
                 .unwrap();
 
             // Call the workflow
-            call_workflow(env.clone().into(), cell_network, author).await;
+            call_workflow(env.clone().into(), dna_network, author).await;
 
             // If we can wait a while without receiving any publish, we have succeeded
             tokio::time::sleep(Duration::from_millis(
@@ -375,7 +375,7 @@ mod tests {
                     tx,
                 )
                 .await;
-                let cell_network = test_network.cell_network();
+                let dna_network = test_network.dna_network();
 
                 // Setup data
                 let original_entry = fixt!(Entry);
@@ -432,7 +432,7 @@ mod tests {
                     .await
                     .unwrap();
 
-                source_chain.flush(&cell_network).await.unwrap();
+                source_chain.flush(&dna_network).await.unwrap();
                 let (entry_create_header, entry_update_header) = env
                     .conn()
                     .unwrap()
@@ -582,7 +582,7 @@ mod tests {
                     }
                 }
 
-                call_workflow(env.clone().into(), cell_network, author).await;
+                call_workflow(env.clone().into(), dna_network, author).await;
 
                 // Wait for expected # of responses, or timeout
                 tokio::select! {

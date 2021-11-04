@@ -10,13 +10,13 @@ use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for countersigning workflow
-#[instrument(skip(env, stop, conductor_handle, workspace, cell_network, trigger_sys))]
+#[instrument(skip(env, stop, conductor_handle, workspace, dna_network, trigger_sys))]
 pub(crate) fn spawn_countersigning_consumer(
     env: EnvWrite,
     mut stop: sync::broadcast::Receiver<()>,
     conductor_handle: ConductorHandle,
     workspace: CountersigningWorkspace,
-    cell_network: HolochainP2pDna,
+    dna_network: HolochainP2pDna,
     trigger_sys: TriggerSender,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
     let (tx, mut rx) = TriggerSender::new();
@@ -38,7 +38,7 @@ pub(crate) fn spawn_countersigning_consumer(
             }
 
             // Run the workflow
-            match countersigning_workflow(&env, &workspace, &cell_network, &trigger_sys).await {
+            match countersigning_workflow(&env, &workspace, &dna_network, &trigger_sys).await {
                 Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
                 Err(err) => {
                     handle_workflow_error(

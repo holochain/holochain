@@ -8,12 +8,12 @@ use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for validation receipt workflow
-#[instrument(skip(env, conductor_handle, stop, cell_network))]
+#[instrument(skip(env, conductor_handle, stop, dna_network))]
 pub fn spawn_validation_receipt_consumer(
     env: EnvWrite,
     conductor_handle: ConductorHandle,
     mut stop: sync::broadcast::Receiver<()>,
-    cell_network: HolochainP2pDna,
+    dna_network: HolochainP2pDna,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
     let (tx, mut rx) = TriggerSender::new();
     let trigger_self = tx.clone();
@@ -34,7 +34,7 @@ pub fn spawn_validation_receipt_consumer(
             }
 
             // Run the workflow
-            match validation_receipt_workflow(env.clone(), &cell_network).await {
+            match validation_receipt_workflow(env.clone(), &dna_network).await {
                 Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
                 Err(err) => {
                     handle_workflow_error(

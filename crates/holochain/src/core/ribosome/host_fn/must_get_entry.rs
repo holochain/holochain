@@ -188,8 +188,8 @@ pub mod test {
             Some(author),
         )
         .await;
-        let cell_network = test_network.cell_network();
-        host_access.network = cell_network;
+        let dna_network = test_network.dna_network();
+        host_access.network = dna_network;
 
         let mut validate_invocation = fixt!(ValidateInvocation);
         validate_invocation.element = Arc::new(header_reference_element.clone());
