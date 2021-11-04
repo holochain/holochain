@@ -356,6 +356,13 @@ impl ArcInterval<DhtLocation> {
         matches!(self, Self::Empty)
     }
 
+    /// Check if arcs overlap
+    pub fn overlaps(&self, other: &Self) -> bool {
+        let a = DhtArcSet::from(self);
+        let b = DhtArcSet::from(other);
+        a.overlap(&b)
+    }
+
     /// Amount of intersection between two arcs
     pub fn overlap_coverage(&self, other: &Self) -> f64 {
         let a = DhtArcSet::from(self);

@@ -26,10 +26,16 @@ const DETAIL: u8 = 0;
 
 type DataVec = statrs::statistics::Data<Vec<f64>>;
 
-type Peers = Vec<DhtArc>;
+pub type Peers = Vec<DhtArc>;
 
 fn full_len() -> f64 {
     2f64.powi(32)
+}
+
+pub fn seeded_rng(seed: Option<u64>) -> StdRng {
+    let seed = seed.unwrap_or_else(|| thread_rng().gen());
+    tracing::info!("RNG seed: {}", seed);
+    StdRng::seed_from_u64(seed)
 }
 
 fn run_single_agent_convergence(
@@ -42,11 +48,9 @@ fn run_single_agent_convergence(
     tracing::info!("");
     tracing::info!("------------------------");
 
-    // let seed = thread_rng().gen();
-    let seed = 7532095396949412554;
-
-    tracing::info!("RNG seed: {}", seed);
-    let mut rng = StdRng::seed_from_u64(seed);
+    // let seed = None;
+    let seed = Some(7532095396949412554);
+    let mut rng = seeded_rng(seed);
 
     let strat = PeerStratAlpha {
         check_gaps,
@@ -322,7 +326,12 @@ fn run_one_epoch(
 /// N: total # of peers
 /// J: random jitter of peer locations
 /// S: strategy for generating arc lengths
-fn simple_parameterized_generator(rng: &mut StdRng, n: usize, j: f64, s: ArcLenStrategy) -> Peers {
+pub fn simple_parameterized_generator(
+    rng: &mut StdRng,
+    n: usize,
+    j: f64,
+    s: ArcLenStrategy,
+) -> Peers {
     tracing::info!("N = {}, J = {}", n, j);
     tracing::info!("Arc len generation: {:?}", s);
     let halflens = s.gen(rng, n);
@@ -330,7 +339,7 @@ fn simple_parameterized_generator(rng: &mut StdRng, n: usize, j: f64, s: ArcLenS
 }
 
 /// Define arcs by centerpoint and halflen in the unit interval [0.0, 1.0]
-fn unit_arcs<H: Iterator<Item = (f64, f64)>>(arcs: H) -> Peers {
+pub fn unit_arcs<H: Iterator<Item = (f64, f64)>>(arcs: H) -> Peers {
     let fc = full_len();
     let fh = MAX_HALF_LENGTH as f64;
     arcs.map(|(c, h)| DhtArc::new((c * fc).min(u32::MAX as f64) as u32, (h * fh) as u32))
@@ -339,7 +348,7 @@ fn unit_arcs<H: Iterator<Item = (f64, f64)>>(arcs: H) -> Peers {
 
 /// Each agent is perfect evenly spaced around the DHT,
 /// with the halflens specified by the iterator.
-fn generate_evenly_spaced_with_half_lens_and_jitter(
+pub fn generate_evenly_spaced_with_half_lens_and_jitter(
     rng: &mut StdRng,
     jitter: f64,
     hs: Vec<f64>,
@@ -430,7 +439,7 @@ impl EpochStats {
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
-enum ArcLenStrategy {
+pub enum ArcLenStrategy {
     Random,
     Constant(f64),
     HalfAndHalf(f64, f64),
