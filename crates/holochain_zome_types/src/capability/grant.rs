@@ -127,8 +127,6 @@ impl CapGrant {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum CapAccess {
-    /// Only callable by the author.
-    Author,
     /// No restriction: callable by anyone.
     Unrestricted,
     /// Callable by anyone who can provide the secret.

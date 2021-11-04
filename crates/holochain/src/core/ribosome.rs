@@ -438,7 +438,7 @@ impl From<&ZomeCallHostAccess> for HostFnAccess {
 pub trait RibosomeT: Sized + std::fmt::Debug {
     fn dna_def(&self) -> &DnaDefHashed;
 
-    fn zome_info(&self, zome: Zome) -> RibosomeResult<ZomeInfo>;
+    fn zome_info(&self, host_context: HostContext, zome: Zome) -> RibosomeResult<ZomeInfo>;
 
     fn zomes_to_invoke(&self, zomes_to_invoke: ZomesToInvoke) -> Vec<Zome> {
         match zomes_to_invoke {

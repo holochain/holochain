@@ -477,7 +477,7 @@ impl RibosomeT for RealRibosome {
         self.dna_file.dna()
     }
 
-    fn zome_info(&self, zome: Zome) -> RibosomeResult<ZomeInfo> {
+    fn zome_info(&self, host_context: HostContext, zome: Zome) -> RibosomeResult<ZomeInfo> {
         Ok(ZomeInfo {
             name: zome.zome_name().clone(),
             id: self
