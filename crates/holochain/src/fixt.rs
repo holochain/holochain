@@ -24,13 +24,13 @@ use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
+use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::ZomesToInvoke;
 use crate::test_utils::fake_genesis;
 use ::fixt::prelude::*;
 pub use holo_hash::fixt::*;
-use holo_hash::HeaderHash;
 use holo_hash::WasmHash;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDnaFixturator;
@@ -202,31 +202,6 @@ fixturator!(
 // }
 
 fixturator!(
-    HeaderHashes,
-    vec![].into(),
-    {
-        let mut rng = rand::thread_rng();
-        let number_of_hashes = rng.gen_range(0, 5);
-
-        let mut hashes: Vec<HeaderHash> = vec![];
-        let mut header_hash_fixturator = HeaderHashFixturator::new(Unpredictable);
-        for _ in 0..number_of_hashes {
-            hashes.push(header_hash_fixturator.next().unwrap());
-        }
-        hashes.into()
-    },
-    {
-        let mut hashes: Vec<HeaderHash> = vec![];
-        let mut header_hash_fixturator =
-            HeaderHashFixturator::new_indexed(Predictable, get_fixt_index!());
-        for _ in 0..3 {
-            hashes.push(header_hash_fixturator.next().unwrap());
-        }
-        hashes.into()
-    }
-);
-
-fixturator!(
     MetaLairClient;
     curve Empty {
         tokio_helper::block_forever_on(async {
@@ -378,7 +353,7 @@ fixturator!(
 
 fixturator!(
     PostCommitInvocation;
-    constructor fn new(Zome, HeaderHashes);
+    constructor fn new(Zome, SignedHeaderHashedVec);
 );
 
 fixturator!(
@@ -475,8 +450,13 @@ fixturator!(
 );
 
 fixturator!(
+    InvocationAuth;
+    constructor fn new(AgentPubKey, CapSecret);
+);
+
+fixturator!(
     CallContext;
-    constructor fn new(Zome, HostContext);
+    constructor fn new(Zome, FunctionName, HostContext, InvocationAuth);
 );
 
 fixturator!(
@@ -484,7 +464,7 @@ fixturator!(
     curve Empty ZomeCallInvocation {
         cell_id: CellIdFixturator::new(Empty).next().unwrap(),
         zome: ZomeFixturator::new(Empty).next().unwrap(),
-        cap: Some(CapSecretFixturator::new(Empty).next().unwrap()),
+        cap_secret: Some(CapSecretFixturator::new(Empty).next().unwrap()),
         fn_name: FunctionNameFixturator::new(Empty).next().unwrap(),
         payload: ExternIoFixturator::new(Empty).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Empty).next().unwrap(),
@@ -492,7 +472,7 @@ fixturator!(
     curve Unpredictable ZomeCallInvocation {
         cell_id: CellIdFixturator::new(Unpredictable).next().unwrap(),
         zome: ZomeFixturator::new(Unpredictable).next().unwrap(),
-        cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
+        cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: FunctionNameFixturator::new(Unpredictable).next().unwrap(),
         payload: ExternIoFixturator::new(Unpredictable).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
@@ -504,7 +484,7 @@ fixturator!(
         zome: ZomeFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
-        cap: Some(CapSecretFixturator::new_indexed(Predictable, get_fixt_index!())
+        cap_secret: Some(CapSecretFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap()),
         fn_name: FunctionNameFixturator::new_indexed(Predictable, get_fixt_index!())
@@ -536,7 +516,7 @@ impl Iterator for ZomeCallInvocationFixturator<NamedInvocation> {
 
         // simulate a local transaction by setting the cap to empty and matching the provenance of
         // the call to the cell id
-        ret.cap = None;
+        ret.cap_secret = None;
         ret.provenance = ret.cell_id.agent_pubkey().clone();
 
         Some(ret)

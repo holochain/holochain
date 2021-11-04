@@ -9,11 +9,13 @@ use holochain_sqlite::db::DbKindDht;
 use holochain_sqlite::db::ReadAccess;
 use holochain_types::env::DbReadOnly;
 use holochain_types::env::DbWrite;
+use holochain_zome_types::SignedHeaderHashed;
 
 use crate::prelude::SourceChain;
 use crate::prelude::SourceChainError;
 use crate::prelude::SourceChainResult;
 use crate::scratch::SyncScratch;
+use holochain_zome_types::Zome;
 
 #[derive(Clone)]
 pub struct HostFnWorkspace<
@@ -47,11 +49,11 @@ impl HostFnWorkspace {
     pub async fn flush(
         self,
         network: &(dyn HolochainP2pDnaT + Send + Sync),
-    ) -> SourceChainResult<()> {
-        if let Some(sc) = self.source_chain {
-            sc.flush(network).await?;
+    ) -> SourceChainResult<Vec<(Option<Zome>, SignedHeaderHashed)>> {
+        match self.source_chain {
+            Some(sc) => sc.flush(network).await,
+            None => Ok(Vec::with_capacity(0)),
         }
-        Ok(())
     }
 }
 

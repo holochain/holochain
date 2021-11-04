@@ -102,7 +102,7 @@ mod tests {
             return Ok(());
         }
 
-        panic!("Failed to receive agent_info_signed");
+        panic!("Failed to receive agent_info_signed")
     }
 
     #[tokio::test(flavor = "multi_thread")]

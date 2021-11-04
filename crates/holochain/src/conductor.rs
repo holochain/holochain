@@ -37,7 +37,7 @@ pub mod state;
 
 pub use cell::error::CellError;
 pub use cell::Cell;
-pub use conductor::integration_dump;
 pub use conductor::Conductor;
 pub use conductor::ConductorBuilder;
+pub use conductor::{full_integration_dump, integration_dump};
 pub use handle::ConductorHandle;

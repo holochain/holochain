@@ -17,12 +17,16 @@ pub fn get_agent_activity(
     })
 }
 
-/// Walks the source chain in reverse (latest to oldest) filtering by header and/or entry type
+/// Walks the source chain in ascending order (oldest to latest) filtering by header and/or entry type
 ///
 /// Given a header and entry type, returns an [ `Vec<Element>` ]
 ///
-/// @todo document this better with examples
+/// @todo document this better with examples after we make query do all the things we want.
 /// @todo implement cap grant/claim usage in terms of query
+/// @todo have ability to hash-bound query other agent's chains based on agent activity
+/// @todo tie query into validation so we track dependencies e.g. validation packages
+/// @todo decide which direction we want to iterate in (paramaterise query?)
+/// @todo more expresivity generally?
 pub fn query(filter: ChainQueryFilter) -> ExternResult<Vec<Element>> {
     HDK.with(|h| h.borrow().query(filter))
 }

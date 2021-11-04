@@ -7,7 +7,7 @@
 
 use super::error::{AppManifestError, AppManifestResult};
 use crate::app::app_manifest::current::{DnaLocation, DnaVersionSpec};
-use crate::prelude::{CellNick, YamlProperties};
+use crate::prelude::{AppRoleId, YamlProperties};
 use std::collections::HashMap;
 
 /// Normalized, validated representation of the App Manifest.
@@ -16,8 +16,8 @@ pub struct AppManifestValidated {
     /// Name of the App. This may be used as the installed_app_id.
     pub(in crate::app) name: String,
 
-    /// The slot descriptions that make up this app.
-    pub(in crate::app) slots: HashMap<CellNick, AppSlotManifestValidated>,
+    /// The role descriptions that make up this app.
+    pub(in crate::app) roles: HashMap<AppRoleId, AppRoleManifestValidated>,
 }
 
 impl AppManifestValidated {
@@ -27,23 +27,25 @@ impl AppManifestValidated {
     /// the only way to instantiate this type.
     pub(in crate::app) fn new(
         name: String,
-        slots: HashMap<CellNick, AppSlotManifestValidated>,
+        roles: HashMap<AppRoleId, AppRoleManifestValidated>,
     ) -> AppManifestResult<Self> {
-        for (nick, cell) in slots.iter() {
-            if let AppSlotManifestValidated::Disabled { clone_limit, .. } = cell {
+        for (role_id, role) in roles.iter() {
+            if let AppRoleManifestValidated::Disabled { clone_limit, .. } = role {
                 if *clone_limit == 0 {
-                    return Err(AppManifestError::InvalidStrategyDisabled(nick.to_owned()));
+                    return Err(AppManifestError::InvalidStrategyDisabled(
+                        role_id.to_owned(),
+                    ));
                 }
             }
         }
-        Ok(AppManifestValidated { name, slots })
+        Ok(AppManifestValidated { name, roles })
     }
 }
 
 /// Rules to determine if and how a Cell will be created for this Dna
 #[allow(missing_docs)]
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum AppSlotManifestValidated {
+pub enum AppRoleManifestValidated {
     /// Always create a new Cell when installing this App
     Create {
         clone_limit: u32,

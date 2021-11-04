@@ -33,6 +33,7 @@ async fn get_links() {
     observability::test_run().ok();
     let mut scratch = Scratch::new();
     let mut conn = Connection::open_in_memory().unwrap();
+    let zome = fixt!(Zome);
     SCHEMA_CELL.initialize(&mut conn, None).unwrap();
 
     let mut cache = Connection::open_in_memory().unwrap();
@@ -68,18 +69,21 @@ async fn get_links() {
     // - Add to the scratch
     insert_op_scratch(
         &mut scratch,
+        Some(zome.clone()),
         td.base_op.clone(),
         ChainTopOrdering::default(),
     )
     .unwrap();
     insert_op_scratch(
         &mut scratch,
+        Some(zome.clone()),
         td.target_op.clone(),
         ChainTopOrdering::default(),
     )
     .unwrap();
     insert_op_scratch(
         &mut scratch,
+        Some(zome.clone()),
         td.create_link_op.clone(),
         ChainTopOrdering::default(),
     )
@@ -114,6 +118,7 @@ async fn get_entry() {
     observability::test_run().ok();
     let mut scratch = Scratch::new();
     let mut conn = Connection::open_in_memory().unwrap();
+    let zome = fixt!(Zome);
     SCHEMA_CELL.initialize(&mut conn, None).unwrap();
 
     let mut cache = Connection::open_in_memory().unwrap();
@@ -144,6 +149,7 @@ async fn get_entry() {
     // - Add to the scratch
     insert_op_scratch(
         &mut scratch,
+        Some(zome.clone()),
         td.store_entry_op.clone(),
         ChainTopOrdering::default(),
     )

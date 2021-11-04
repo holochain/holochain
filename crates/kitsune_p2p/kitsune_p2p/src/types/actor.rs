@@ -107,7 +107,13 @@ ghost_actor::ghost_chan! {
             space: KSpace,
             agents: KAgents,
             timeout: KitsuneTimeout,
-            payload: Payload
+            payload: Payload,
+
+            // If we have reached the maximum concurrent notify requests limit
+            // (specified by tuning param `concurrent_limit_per_thread`)
+            // This message will be dropped / not sent, but still return an
+            // Ok() response.
+            drop_at_limit: bool,
         ) -> ();
 
         /// New data has been integrated and is ready for gossiping.

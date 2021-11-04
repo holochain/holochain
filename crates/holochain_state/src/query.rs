@@ -214,13 +214,13 @@ impl<'stmt, Q: Query> Stores<Q> for Txn<'stmt, '_> {
     type O = QueryStmt<'stmt, Q>;
 
     fn get_initial_data(&self, query: Q) -> StateQueryResult<Self::O> {
-        QueryStmt::new(&self.txn, query)
+        QueryStmt::new(self.txn, query)
     }
 }
 
 impl<'stmt> Store for Txn<'stmt, '_> {
     fn get_entry(&self, hash: &EntryHash) -> StateQueryResult<Option<Entry>> {
-        get_entry_from_db(&self.txn, hash)
+        get_entry_from_db(self.txn, hash)
     }
 
     fn get_public_or_authored_entry(

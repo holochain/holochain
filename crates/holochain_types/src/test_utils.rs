@@ -105,7 +105,7 @@ pub async fn fake_unique_element(
     });
 
     Ok((
-        SignedHeaderHashed::new(&keystore, header_1.into_hashed()).await?,
+        SignedHeaderHashed::new(keystore, header_1.into_hashed()).await?,
         entry,
     ))
 }
@@ -117,10 +117,6 @@ pub fn test_keystore() -> holochain_keystore::MetaLairClient {
             let keystore = holochain_keystore::test_keystore::spawn_test_keystore()
                 .await
                 .unwrap();
-
-            // pre-populate with our two fixture agent keypairs
-            keystore.new_sign_keypair_random().await.unwrap();
-            keystore.new_sign_keypair_random().await.unwrap();
 
             keystore
         },

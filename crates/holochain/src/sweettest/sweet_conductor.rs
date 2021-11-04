@@ -268,11 +268,11 @@ impl SweetConductor {
 
     /// Opinionated app setup. Creates one app per agent, using the given DnaFiles.
     ///
-    /// All InstalledAppIds and CellNicks are auto-generated. In tests driven directly
+    /// All InstalledAppIds and AppRoleIds are auto-generated. In tests driven directly
     /// by Rust, you typically won't care what these values are set to, but in case you
     /// do, they are set as so:
     /// - InstalledAppId: {app_id_prefix}-{agent_pub_key}
-    /// - CellNick: {dna_hash}
+    /// - AppRoleId: {dna_hash}
     ///
     /// Returns a batch of SweetApps, sorted in the same order as Agents passed in.
     pub async fn setup_app_for_agents<'a, A, D>(

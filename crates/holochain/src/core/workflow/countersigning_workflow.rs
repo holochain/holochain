@@ -356,7 +356,7 @@ impl CountersigningWorkspace {
                         if session.map.values().all(|(_, _, required_hashes)| {
                             required_hashes
                                 .iter()
-                                .all(|hash| session.map.contains_key(&hash))
+                                .all(|hash| session.map.contains_key(hash))
                         }) {
                             Some(entry_hash.clone())
                         } else {

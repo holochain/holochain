@@ -72,7 +72,7 @@ impl SimpleBloomMod {
 
             if let Some(incoming) = maybe_incoming.take() {
                 let (con, remote_url, gossip) = incoming;
-                if let Err(e) = step_4_com_loop_inner_incoming(&self, con, remote_url, gossip).await
+                if let Err(e) = step_4_com_loop_inner_incoming(self, con, remote_url, gossip).await
                 {
                     tracing::warn!("failed to process incoming: {:?}", e);
                 }

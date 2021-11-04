@@ -3,6 +3,7 @@ use crate::conductor::ConductorHandle;
 use crate::core::ribosome::guest_callback::init::InitHostAccess;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
+use crate::core::ribosome::guest_callback::post_commit::send_post_commit;
 use crate::core::ribosome::RibosomeT;
 use derive_more::Constructor;
 use holochain_keystore::MetaLairClient;
@@ -33,14 +34,26 @@ pub async fn initialize_zomes_workflow<Ribosome>(
 where
     Ribosome: RibosomeT + Send + 'static,
 {
+    let conductor_handle = args.conductor_handle.clone();
     let result =
-        initialize_zomes_workflow_inner(workspace.clone(), network.clone(), keystore, args).await?;
+        initialize_zomes_workflow_inner(workspace.clone(), network.clone(), keystore.clone(), args)
+            .await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // only commit if the result was successful
     if result == InitResult::Pass {
-        HostFnWorkspace::from(workspace).flush(&network).await?;
+        let flushed_headers = HostFnWorkspace::from(workspace.clone())
+            .flush(&network)
+            .await?;
+        send_post_commit(
+            conductor_handle,
+            workspace,
+            network,
+            keystore,
+            flushed_headers,
+        )
+        .await?;
     }
     Ok(result)
 }
@@ -73,6 +86,7 @@ where
     tokio::task::spawn(async move {
         ws.source_chain()
             .put(
+                None,
                 builder::InitZomesComplete {},
                 None,
                 ChainTopOrdering::Strict,

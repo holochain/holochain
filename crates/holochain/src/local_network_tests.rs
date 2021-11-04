@@ -32,7 +32,11 @@ use tracing::debug_span;
 const TIMEOUT_ERROR: &'static str = "inner function \'call_create_entry_remotely\' failed: ZomeCallNetworkError(\"Other: timeout\")";
 
 #[test_case(2)]
-#[test_case(5)]
+// More than 4 can cause hardware with less threads to hang and timeout the
+// test, especially when run in parallel with other tests.
+// This includes CI and many laptops.
+// @todo figure out why we can't have more than 4
+#[test_case(4)]
 // #[test_case(10)]
 fn conductors_call_remote(num_conductors: usize) {
     let f = async move {
@@ -81,7 +85,7 @@ fn conductors_call_remote(num_conductors: usize) {
         // Give a little longer timeout here because they must find each other to pass the test
         // This can require multiple round trips if the head of the source chain keeps moving.
         // Each time the chain head moves the call must be retried until a clean commit is made.
-        let results = call_each_other(&handles[..], 1000).await;
+        let results = call_each_other(&handles[..], 500).await;
         for (_, _, result) in results {
             self::assert_matches!(result, Some(Ok(ZomeCallResponse::Ok(_))));
         }

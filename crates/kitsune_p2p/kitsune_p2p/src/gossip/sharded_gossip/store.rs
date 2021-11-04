@@ -7,7 +7,7 @@ use crate::event::{PutAgentInfoSignedEvt, QueryAgentsEvt, QueryOpHashesEvt, Time
 use crate::types::event::KitsuneP2pEventSender;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
-    bin_types::{KitsuneAgent, KitsuneBinType, KitsuneOpHash, KitsuneSpace},
+    bin_types::{KitsuneAgent, KitsuneOpHash, KitsuneSpace},
     dht_arc::{ArcInterval, DhtArcSet},
     KitsuneError, KitsuneResult,
 };
@@ -121,31 +121,16 @@ pub(super) async fn all_op_hashes_within_arcset(
 pub(super) async fn put_agent_info(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
-    agents_within_common_arc: HashSet<Arc<KitsuneAgent>>,
     agents: &[Arc<AgentInfoSigned>],
 ) -> KitsuneResult<()> {
-    for this_agent_info in all_agent_info(evt_sender, space)
-        .await?
-        .into_iter()
-        .filter(|a| agents_within_common_arc.contains(a.agent.as_ref()))
-    {
-        let peer_data = agents
-            .iter()
-            .filter(|new_info| {
-                this_agent_info
-                    .storage_arc
-                    .contains(new_info.agent.get_loc())
-            })
-            .map(|i| (**i).clone())
-            .collect();
-        evt_sender
-            .put_agent_info_signed(PutAgentInfoSignedEvt {
-                space: space.clone(),
-                peer_data,
-            })
-            .await
-            .map_err(KitsuneError::other)?;
-    }
+    let peer_data = agents.iter().map(|i| (**i).clone()).collect();
+    evt_sender
+        .put_agent_info_signed(PutAgentInfoSignedEvt {
+            space: space.clone(),
+            peer_data,
+        })
+        .await
+        .map_err(KitsuneError::other)?;
     Ok(())
 }
 

@@ -96,6 +96,9 @@ pub enum WorkflowError {
     #[error("RecvError")]
     RecvError,
 
+    #[error(transparent)]
+    SendError(#[from] tokio::sync::mpsc::error::SendError<()>),
+
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),

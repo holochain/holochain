@@ -753,82 +753,87 @@ impl KitsuneP2pHandler for Space {
         agents: Vec<Arc<KitsuneAgent>>,
         timeout: KitsuneTimeout,
         payload: Vec<u8>,
+        drop_at_limit: bool,
     ) -> KitsuneP2pHandlerResult<()> {
         let evt_sender = self.evt_sender.clone();
         let ro_inner = self.ro_inner.clone();
-        let concurrent_limit_per_thread = self.config.tuning_params.concurrent_limit_per_thread;
         Ok(async move {
-            // limit spawns with semaphore.
-            let task_permit = ro_inner
-                .parallel_notify_permit
-                .clone()
-                .acquire_owned()
-                .await
-                .ok();
-            tokio::task::spawn(async move {
-                let mut futures = Vec::with_capacity(agents.len());
-                for agent in agents {
-                    let discover_fut = async {
-                        let result = discover::search_and_discover_peer_connect(
-                            ro_inner.clone(),
-                            agent.clone(),
-                            timeout,
-                        )
-                        .await;
-                        (result, agent)
-                    };
-                    futures.push(discover_fut);
-                }
-                let futures = futures::stream::iter(futures);
-                let futures = futures.buffer_unordered(concurrent_limit_per_thread);
-                futures
-                    .for_each_concurrent(concurrent_limit_per_thread, |(discover_result, agent)| {
-                        match discover_result {
-                            discover::PeerDiscoverResult::OkShortcut => {
-                                // reflect this request locally
-                                evt_sender
-                                    .notify(space.clone(), agent, payload.clone())
-                                    .map(|r| {
-                                        if let Err(e) = r {
-                                            tracing::error!(
-                                                "Failed to broadcast to local agent because: {:?}",
-                                                e
-                                            )
-                                        }
-                                    })
-                                    .boxed()
-                            }
-                            discover::PeerDiscoverResult::OkRemote { con_hnd, .. } => {
-                                let payload = wire::Wire::broadcast(
-                                    space.clone(),
-                                    agent,
-                                    payload.clone().into(),
-                                );
-                                con_hnd
-                                    .notify(&payload, timeout)
-                                    .map(|r| {
-                                        if let Err(e) = r {
-                                            tracing::info!(
-                                                "Failed to broadcast to remote agent because: {:?}",
-                                                e
-                                            )
-                                        }
-                                    })
-                                    .boxed()
-                            }
-                            discover::PeerDiscoverResult::Err(e) => async move {
+            for agent in agents {
+                let task_permit = if drop_at_limit {
+                    match ro_inner.parallel_notify_permit.clone().try_acquire_owned() {
+                        Ok(p) => Some(p),
+                        Err(_) => {
+                            tracing::debug!(
+                                "Too many outstanding notifies, dropping notify to {:?}",
+                                agent
+                            );
+                            continue;
+                        }
+                    }
+                } else {
+                    // limit spawns with semaphore.
+                    ro_inner
+                        .parallel_notify_permit
+                        .clone()
+                        .acquire_owned()
+                        .await
+                        .ok()
+                };
+                let space = space.clone();
+                let payload = payload.clone();
+                let evt_sender = evt_sender.clone();
+                let ro_inner = ro_inner.clone();
+                tokio::task::spawn(async move {
+                    let discover_result = discover::search_and_discover_peer_connect(
+                        ro_inner.clone(),
+                        agent.clone(),
+                        timeout,
+                    )
+                    .await;
+                    match discover_result {
+                        discover::PeerDiscoverResult::OkShortcut => {
+                            // reflect this request locally
+                            evt_sender
+                                .notify(space, agent, payload)
+                                .map(|r| {
+                                    if let Err(e) = r {
+                                        tracing::error!(
+                                            "Failed to broadcast to local agent because: {:?}",
+                                            e
+                                        )
+                                    }
+                                })
+                                .await;
+                        }
+                        discover::PeerDiscoverResult::OkRemote { con_hnd, .. } => {
+                            let payload = wire::Wire::broadcast(space, agent, payload.into());
+                            con_hnd
+                                .notify(&payload, timeout)
+                                .map(|r| {
+                                    if let Err(e) = r {
+                                        tracing::info!(
+                                            "Failed to broadcast to remote agent because: {:?}",
+                                            e
+                                        )
+                                    }
+                                })
+                                .await;
+                        }
+                        discover::PeerDiscoverResult::Err(e) => {
+                            async move {
                                 tracing::info!(
                                     "Failed to discover connection for {:?} because: {:?}",
                                     agent,
                                     e
                                 );
                             }
-                            .boxed(),
+                            .await
                         }
-                    })
-                    .await;
-                drop(task_permit)
-            });
+                    }
+
+                    drop(task_permit);
+                });
+            }
             Ok(())
         }
         .boxed()

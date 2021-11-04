@@ -4,12 +4,15 @@ use super::CellConductorApiT;
 use super::ZomeCall;
 use crate::conductor::api::error::ConductorApiResult;
 use crate::conductor::interface::SignalBroadcaster;
+use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
 use crate::core::workflow::ZomeCallResult;
 use async_trait::async_trait;
 use holo_hash::DnaHash;
 use holochain_keystore::MetaLairClient;
 use holochain_types::prelude::*;
 use mockall::mock;
+use tokio::sync::mpsc::error::SendError;
+use tokio::sync::mpsc::OwnedPermit;
 
 // Unfortunate workaround to get mockall to work with async_trait, due to the complexity of each.
 // The mock! expansion here creates mocks on a non-async version of the API, and then the actual trait is implemented
@@ -35,6 +38,7 @@ mock! {
         pub fn sync_get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome>;
         pub fn sync_get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
         pub fn into_call_zome_handle(self) -> super::CellConductorReadHandle;
+        pub async fn post_commit_permit(&self) -> Result<OwnedPermit<PostCommitArgs>, SendError<()>>;
     }
 
     trait Clone {
@@ -86,5 +90,9 @@ impl CellConductorApiT for MockCellConductorApi {
 
     fn into_call_zome_handle(self) -> super::CellConductorReadHandle {
         self.into_call_zome_handle()
+    }
+
+    async fn post_commit_permit(&self) -> Result<OwnedPermit<PostCommitArgs>, SendError<()>> {
+        self.post_commit_permit().await
     }
 }

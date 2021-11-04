@@ -74,16 +74,16 @@ pub type ThirtySixBytes = Vec<u8>;
 fixturator!(
     ThirtySixBytes;
     curve Empty [0; 36].to_vec();
-    curve Predictable {
-        let mut u8_fixturator = U8Fixturator::new(Predictable);
+    curve Unpredictable {
+        let mut u8_fixturator = U8Fixturator::new(Unpredictable);
         let mut bytes = vec![];
         for _ in 0..36 {
             bytes.push(u8_fixturator.next().unwrap());
         }
         bytes
     };
-    curve Unpredictable {
-        let mut u8_fixturator = U8Fixturator::new_indexed(Unpredictable, get_fixt_index!());
+    curve Predictable {
+        let mut u8_fixturator = U8Fixturator::new_indexed(Predictable, get_fixt_index!());
         let mut bytes = vec![];
         for _ in 0..36 {
             bytes.push(u8_fixturator.next().unwrap());

@@ -37,6 +37,8 @@ pub trait ReadAccess<Kind: DbKindT>: Clone + Into<DbReadOnly<Kind>> {
     where
         E: From<DatabaseError>,
         F: FnOnce(Transaction) -> Result<R, E>;
+
+    fn kind(&self) -> &Kind;
 }
 #[async_trait::async_trait]
 pub trait WriteAccess<Kind: DbKindT>: ReadAccess<Kind> {
@@ -79,6 +81,10 @@ impl<Kind: DbKindT> ReadAccess<Kind> for DbWrite<Kind> {
         let db: &DbReadOnly<Kind> = self.as_ref();
         db.sync_reader(f)
     }
+
+    fn kind(&self) -> &Kind {
+        self.0 .0.kind()
+    }
 }
 
 #[async_trait::async_trait]
@@ -98,6 +104,10 @@ impl<Kind: DbKindT> ReadAccess<Kind> for DbReadOnly<Kind> {
         F: FnOnce(Transaction) -> Result<R, E>,
     {
         self.conn()?.with_reader(f)
+    }
+
+    fn kind(&self) -> &Kind {
+        &self.kind
     }
 }
 

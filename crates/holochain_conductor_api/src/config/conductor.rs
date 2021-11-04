@@ -221,7 +221,7 @@ pub mod tests {
         );
     }
 
-    /* TODO uncomment when new_lair_api initialization is implemented
+    /* TODO uncomment when lair_keystore_api initialization is implemented
     #[test]
     fn test_config_new_lair_keystore() {
         let yaml = r#"---

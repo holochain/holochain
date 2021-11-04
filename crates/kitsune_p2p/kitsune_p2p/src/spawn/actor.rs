@@ -92,6 +92,8 @@ impl KitsuneP2pActor {
 
         let tx2_conf = config.to_tx2().map_err(KitsuneP2pError::other)?;
 
+        let mut is_mock = false;
+
         // set up our backend based on config
         let (f, bind_to) = match tx2_conf.backend {
             KitsuneP2pTx2Backend::Mem => {
@@ -116,15 +118,24 @@ impl KitsuneP2pActor {
                     bind_to,
                 )
             }
+            KitsuneP2pTx2Backend::Mock { mock_network } => {
+                is_mock = true;
+                (mock_network, "none:".into())
+            }
         };
 
         // convert to frontend
         let f = tx2_pool_promote(f, config.tuning_params.clone());
 
         // wrap in proxy
-        let mut conf = kitsune_p2p_proxy::tx2::ProxyConfig::default();
-        conf.tuning_params = Some(config.tuning_params.clone());
-        let f = tx2_proxy(f, conf)?;
+        let f = if !is_mock {
+            let mut conf = kitsune_p2p_proxy::tx2::ProxyConfig::default();
+            conf.tuning_params = Some(config.tuning_params.clone());
+            let f = tx2_proxy(f, conf)?;
+            f
+        } else {
+            f
+        };
 
         let metrics = Tx2ApiMetrics::default().set_write_len(|d, l| {
             let t = match d {
@@ -685,6 +696,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         agents: Vec<Arc<KitsuneAgent>>,
         timeout: KitsuneTimeout,
         payload: Vec<u8>,
+        drop_at_limit: bool,
     ) -> KitsuneP2pHandlerResult<()> {
         let space_sender = match self.spaces.get_mut(&space) {
             None => return Err(KitsuneP2pError::RoutingSpaceError(space)),
@@ -693,7 +705,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         Ok(async move {
             let (space_sender, _) = space_sender.await;
             space_sender
-                .targeted_broadcast(space, agents, timeout, payload)
+                .targeted_broadcast(space, agents, timeout, payload, drop_at_limit)
                 .await
         }
         .boxed()
@@ -735,7 +747,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test_utils"))]
 mockall::mock! {
 
     pub KitsuneP2pEventHandler {}
@@ -807,7 +819,7 @@ mockall::mock! {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test_utils"))]
 impl ghost_actor::GhostHandler<KitsuneP2pEvent> for MockKitsuneP2pEventHandler {}
-#[cfg(test)]
+#[cfg(any(test, feature = "test_utils"))]
 impl ghost_actor::GhostControlHandler for MockKitsuneP2pEventHandler {}

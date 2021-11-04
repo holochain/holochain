@@ -1,6 +1,7 @@
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
+use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
 use holo_hash::AnyDhtHash;
@@ -108,6 +109,9 @@ where
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         self.invocation.host_input()
     }
+    fn auth(&self) -> InvocationAuth {
+        InvocationAuth::LocalCallback
+    }
 }
 
 impl Invocation for ValidateCreateLinkInvocation {
@@ -123,6 +127,9 @@ impl Invocation for ValidateCreateLinkInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(ValidateCreateLinkData::from(self))
     }
+    fn auth(&self) -> InvocationAuth {
+        InvocationAuth::LocalCallback
+    }
 }
 
 impl Invocation for ValidateDeleteLinkInvocation {
@@ -137,6 +144,9 @@ impl Invocation for ValidateDeleteLinkInvocation {
     }
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(ValidateDeleteLinkData::from(self))
+    }
+    fn auth(&self) -> InvocationAuth {
+        InvocationAuth::LocalCallback
     }
 }
 

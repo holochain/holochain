@@ -1,17 +1,8 @@
 use kitsune_p2p_types::{agent_info::AgentInfoInner, dht_arc::DhtArc};
 
-use super::*;
+pub use crate::test_util::spawn_handler;
 
-/// Create a handler task and produce a Sender for interacting with it
-pub async fn spawn_handler<H: KitsuneP2pEventHandler + GhostControlHandler>(
-    h: H,
-) -> (EventSender, tokio::task::JoinHandle<GhostResult<()>>) {
-    let builder = ghost_actor::actor_builder::GhostActorBuilder::new();
-    let (tx, rx) = futures::channel::mpsc::channel(4096);
-    builder.channel_factory().attach_receiver(rx).await.unwrap();
-    let driver = builder.spawn(h);
-    (tx, tokio::task::spawn(driver))
-}
+use super::*;
 
 // TODO: integrate with `HandlerBuilder`
 async fn standard_responses(

@@ -31,9 +31,9 @@ impl Manifest for AppManifest {
     fn locations(&self) -> Vec<Location> {
         match self {
             AppManifest::V1(m) => m
-                .slots
+                .roles
                 .iter()
-                .filter_map(|slot| slot.dna.location.clone())
+                .filter_map(|role| role.dna.location.clone())
                 .collect(),
         }
     }
@@ -70,10 +70,10 @@ impl AppManifest {
         }
     }
 
-    /// Returns the list of app slots that this manifest declares
-    pub fn app_slots(&self) -> Vec<AppSlotManifest> {
+    /// Returns the list of app roles that this manifest declares
+    pub fn app_roles(&self) -> Vec<AppRoleManifest> {
         match self {
-            Self::V1(manifest) => manifest.slots.clone(),
+            Self::V1(manifest) => manifest.roles.clone(),
         }
     }
 }
@@ -83,29 +83,29 @@ pub mod tests {
 
     use mr_bundle::Manifest;
 
-    use crate::app::app_manifest::{AppManifest, AppManifestV1Builder, AppSlotManifest};
+    use crate::app::app_manifest::{AppManifest, AppManifestV1Builder, AppRoleManifest};
 
     #[test]
     /// Replicate this test for any new version of the manifest that gets created
     fn app_manifest_v1_helper_functions() {
         let app_name = String::from("sample-app");
 
-        let dna_slot = String::from("sample-dna");
-        let app_slot_manifest = AppSlotManifest::sample(dna_slot);
+        let role_id = String::from("sample-dna");
+        let role_manifest = AppRoleManifest::sample(role_id);
 
         let sample_app_manifest_v1 = AppManifestV1Builder::default()
             .name(app_name.clone())
             .description(Some(String::from("Some description")))
-            .slots(vec![app_slot_manifest.clone()])
+            .roles(vec![role_manifest.clone()])
             .build()
             .unwrap();
         let sample_app_manifest = AppManifest::V1(sample_app_manifest_v1.clone());
 
         assert_eq!(app_name, sample_app_manifest.app_name());
-        assert_eq!(vec![app_slot_manifest], sample_app_manifest.app_slots());
+        assert_eq!(vec![role_manifest], sample_app_manifest.app_roles());
         assert_eq!(
             vec![sample_app_manifest_v1
-                .slots
+                .roles
                 .get(0)
                 .unwrap()
                 .dna

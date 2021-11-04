@@ -2,7 +2,7 @@ use gcollections::ops::*;
 use interval::{interval_set::*, IntervalSet};
 use std::{borrow::Borrow, collections::VecDeque, fmt::Debug};
 
-use crate::DhtLocation;
+use crate::{DhtArc, DhtLocation};
 
 // For u32, IntervalSet excludes MAX from its set of valid values due to its
 // need to be able to express the width of an interval using a u32.
@@ -156,6 +156,13 @@ impl DhtArcSet {
             }
         }
     }
+
+    pub fn size(&self) -> u32 {
+        match self {
+            Self::Full => u32::MAX,
+            Self::Partial(intervals) => intervals.size(),
+        }
+    }
 }
 
 impl From<&ArcInterval> for DhtArcSet {
@@ -233,7 +240,34 @@ pub enum ArcInterval<T = DhtLocation> {
     Bounded(T, T),
 }
 
-impl<T: PartialOrd + num_traits::Num + num_traits::AsPrimitive<u32>> ArcInterval<T> {
+impl<T: PartialOrd + num_traits::Num> ArcInterval<T> {
+    pub fn contains<B: std::borrow::Borrow<T>>(&self, t: B) -> bool {
+        match self {
+            Self::Empty => false,
+            Self::Full => true,
+            Self::Bounded(lo, hi) => {
+                let t = t.borrow();
+                if lo <= hi {
+                    lo <= t && t <= hi
+                } else {
+                    lo <= t || t <= hi
+                }
+            }
+        }
+    }
+}
+
+impl<T> ArcInterval<T> {
+    pub fn map<U, F: Fn(T) -> U>(self, f: F) -> ArcInterval<U> {
+        match self {
+            Self::Empty => ArcInterval::Empty,
+            Self::Full => ArcInterval::Full,
+            Self::Bounded(lo, hi) => ArcInterval::Bounded(f(lo), f(hi)),
+        }
+    }
+}
+
+impl<T: num_traits::AsPrimitive<u32>> ArcInterval<T> {
     pub fn new(start: T, end: T) -> ArcInterval<DhtLocation> {
         let start = start.as_();
         let end = end.as_();
@@ -251,28 +285,15 @@ impl<T: PartialOrd + num_traits::Num + num_traits::AsPrimitive<u32>> ArcInterval
             Self::Bounded(start, end)
         }
     }
+}
 
+impl ArcInterval<u32> {
     pub fn canonical(self) -> ArcInterval {
         match self {
             ArcInterval::Empty => ArcInterval::Empty,
             ArcInterval::Full => ArcInterval::Full,
             ArcInterval::Bounded(lo, hi) => {
-                ArcInterval::new(DhtLocation::new(lo.as_()), DhtLocation::new(hi.as_()))
-            }
-        }
-    }
-
-    pub fn contains<B: std::borrow::Borrow<T>>(&self, t: B) -> bool {
-        match self {
-            Self::Empty => false,
-            Self::Full => true,
-            Self::Bounded(lo, hi) => {
-                let t = t.borrow();
-                if lo <= hi {
-                    lo <= t && t <= hi
-                } else {
-                    lo <= t || t <= hi
-                }
+                ArcInterval::new(DhtLocation::new(lo), DhtLocation::new(hi))
             }
         }
     }
@@ -293,10 +314,18 @@ impl ArcInterval<DhtLocation> {
     /// a superset of the original
     pub fn quantized(&self) -> Self {
         if let Self::Bounded(lo, hi) = self {
-            if lo < hi && (*hi - *lo) % 2.into() == 1.into() {
-                Self::Bounded(*lo - 1.into(), *hi)
-            } else if lo > hi && (*lo - *hi) % 2.into() == 1.into() {
-                Self::Bounded(*lo, *hi + 1.into())
+            let lo = *lo;
+            let hi = *hi;
+            let gap = if lo > hi {
+                lo - hi
+            } else {
+                DhtLocation::from(u32::MAX) - hi + lo
+            };
+            if gap <= 2.into() {
+                // Because a halflen must be even, a small gap leads to full coverage
+                Self::Full
+            } else if (hi - lo) % 2.into() == 1.into() {
+                Self::Bounded(lo, hi + 1.into())
             } else {
                 self.clone()
             }
@@ -327,31 +356,83 @@ impl ArcInterval<DhtLocation> {
         matches!(self, Self::Empty)
     }
 
+    /// Amount of intersection between two arcs
+    pub fn overlap_coverage(&self, other: &Self) -> f64 {
+        let a = DhtArcSet::from(self);
+        let b = DhtArcSet::from(other);
+        let c = a.intersection(&b);
+        c.size() as f64 / a.size() as f64
+    }
+
+    pub fn center_loc(&self) -> DhtLocation {
+        DhtArc::from_interval(self.clone()).center_loc
+    }
+
     #[cfg(any(test, feature = "test_utils"))]
+    /// Handy ascii representation of an arc, especially useful when
+    /// looking at several arcs at once to get a sense of their overlap
     pub fn to_ascii(&self, len: usize) -> String {
+        use crate::loc_downscale;
+
         match self {
-            Self::Full => "(FULL)".to_string(),
-            Self::Empty => "(EMPTY)".to_string(),
+            Self::Full => "-".repeat(len),
+            Self::Empty => " ".repeat(len),
             Self::Bounded(lo, hi) => {
-                let factor = len as f64 / u32::MAX as f64;
-                let lo = (factor * lo.as_u32() as f64) as usize;
-                let hi = (factor * hi.as_u32() as f64) as usize;
-                if lo <= hi {
+                let lo = loc_downscale(len, *lo);
+                let hi = loc_downscale(len, *hi);
+                let mut s = if lo <= hi {
                     vec![
                         " ".repeat(lo),
                         "-".repeat(hi - lo + 1),
-                        " ".repeat(usize::max(len - hi - 1, 0)),
+                        " ".repeat(len - hi - 1),
                     ]
                 } else {
                     vec![
                         "-".repeat(hi + 1),
-                        " ".repeat(usize::max(lo - hi - 1, 0)),
+                        " ".repeat(lo - hi - 1),
                         "-".repeat(len - lo),
                     ]
                 }
-                .join("")
+                .join("");
+                let center = loc_downscale(len, self.center_loc());
+                s.replace_range(center..center + 1, "@");
+                s
             }
         }
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    /// Ascii representation of an arc, with a histogram of op locations superimposed.
+    /// Each character of the string, if an op falls in that "bucket", will be represented
+    /// by a hexadecimal digit representing the number of ops in that bucket,
+    /// with a max of 0xF (15)
+    pub fn to_ascii_with_ops<L: Into<crate::loc8::Loc8>, I: IntoIterator<Item = L>>(
+        &self,
+        len: usize,
+        ops: I,
+    ) -> String {
+        use crate::{loc8::Loc8, loc_downscale};
+
+        let mut buf = vec![0; len];
+        let mut s = self.to_ascii(len);
+        for o in ops {
+            let o: Loc8 = o.into();
+            let o: DhtLocation = o.into();
+            let loc = loc_downscale(len, o);
+            buf[loc] += 1;
+        }
+        for (i, v) in buf.into_iter().enumerate() {
+            if v > 0 {
+                // add hex representation of number of ops in this bucket
+                let c = format!("{:x}", v.min(0xf));
+                s.replace_range(i..i + 1, &c);
+            }
+        }
+        s
+    }
+
+    pub fn canonical(self) -> ArcInterval {
+        self
     }
 }
 
@@ -391,33 +472,33 @@ mod tests {
         let cent = u32::MAX / 100 + 1;
         assert_eq!(
             ArcInterval::new(cent * 30, cent * 60).to_ascii(10),
-            "   ----   ".to_string()
+            "   -@--   ".to_string()
         );
         assert_eq!(
             ArcInterval::new(cent * 33, cent * 63).to_ascii(10),
-            "   ----   ".to_string()
+            "   -@--   ".to_string()
         );
         assert_eq!(
             ArcInterval::new(cent * 29, cent * 59).to_ascii(10),
-            "  ----    ".to_string()
+            "  --@-    ".to_string()
         );
 
         assert_eq!(
             ArcInterval::new(cent * 60, cent * 30).to_ascii(10),
-            "----  ----".to_string()
+            "----  ---@".to_string()
         );
         assert_eq!(
             ArcInterval::new(cent * 63, cent * 33).to_ascii(10),
-            "----  ----".to_string()
+            "----  ---@".to_string()
         );
         assert_eq!(
             ArcInterval::new(cent * 59, cent * 29).to_ascii(10),
-            "---  -----".to_string()
+            "---  ----@".to_string()
         );
 
         assert_eq!(
             ArcInterval::new(cent * 99, cent * 0).to_ascii(10),
-            "-        -".to_string()
+            "-        @".to_string()
         );
     }
 }

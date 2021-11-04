@@ -42,9 +42,23 @@ pub trait HolochainP2pDnaT {
         to_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: FunctionName,
-        cap: Option<CapSecret>,
+        cap_secret: Option<CapSecret>,
         payload: ExternIO,
     ) -> actor::HolochainP2pResult<SerializedBytes>;
+
+    /// Invoke a zome function on a remote node (if you have been granted the capability).
+    /// This is a fire-and-forget operation, a best effort will be made
+    /// to forward the signal, but if the conductor network is overworked
+    /// it may decide not to deliver some of the signals.
+    async fn remote_signal(
+        &self,
+        from_agent: AgentPubKey,
+        to_agent_list: Vec<AgentPubKey>,
+        zome_name: ZomeName,
+        fn_name: FunctionName,
+        cap: Option<CapSecret>,
+        payload: ExternIO,
+    ) -> actor::HolochainP2pResult<()>;
 
     /// Publish data to the correct neighborhood.
     #[allow(clippy::ptr_arg)]
@@ -150,7 +164,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         to_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: FunctionName,
-        cap: Option<CapSecret>,
+        cap_secret: Option<CapSecret>,
         payload: ExternIO,
     ) -> actor::HolochainP2pResult<SerializedBytes> {
         self.sender
@@ -158,6 +172,32 @@ impl HolochainP2pDnaT for HolochainP2pDna {
                 (*self.dna_hash).clone(),
                 from_agent,
                 to_agent,
+                zome_name,
+                fn_name,
+                cap_secret,
+                payload,
+            )
+            .await
+    }
+
+    /// Invoke a zome function on a remote node (if you have been granted the capability).
+    /// This is a fire-and-forget operation, a best effort will be made
+    /// to forward the signal, but if the conductor network is overworked
+    /// it may decide not to deliver some of the signals.
+    async fn remote_signal(
+        &self,
+        from_agent: AgentPubKey,
+        to_agent_list: Vec<AgentPubKey>,
+        zome_name: ZomeName,
+        fn_name: FunctionName,
+        cap: Option<CapSecret>,
+        payload: ExternIO,
+    ) -> actor::HolochainP2pResult<()> {
+        self.sender
+            .remote_signal(
+                (*self.dna_hash).clone(),
+                from_agent,
+                to_agent_list,
                 zome_name,
                 fn_name,
                 cap,

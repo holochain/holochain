@@ -6,7 +6,6 @@ use holochain_types::access::Permission;
 use holochain_wasmer_host::prelude::WasmError;
 use holochain_zome_types::signal::RemoteSignal;
 use holochain_zome_types::zome::FunctionName;
-use holochain_zome_types::zome::ZomeName;
 use std::sync::Arc;
 use tracing::Instrument;
 
@@ -23,47 +22,25 @@ pub fn remote_signal(
             ..
         } => {
             const FN_NAME: &str = "recv_remote_signal";
+            let from_agent = super::agent_info::agent_info(_ribosome, call_context.clone(), ())?
+                .agent_latest_pubkey;
             // Timeouts and errors are ignored,
             // this is a send and forget operation.
             let network = call_context.host_context().network().clone();
             let RemoteSignal { agents, signal } = input;
-            let zome_name: ZomeName = call_context.zome().into();
+            let zome_name = call_context.zome().zome_name().clone();
             let fn_name: FunctionName = FN_NAME.into();
-            let from_agent = super::agent_info::agent_info(_ribosome, call_context.clone(), ())?
-                .agent_latest_pubkey;
-            for agent in agents {
-                tokio::task::spawn(
+            tokio::task::spawn(
+                async move {
+                    if let Err(e) = network
+                        .remote_signal(from_agent, agents, zome_name, fn_name, None, signal)
+                        .await
                     {
-                        let network = network.clone();
-                        let zome_name = zome_name.clone();
-                        let fn_name = fn_name.clone();
-                        let payload = signal.clone();
-                        let from_agent = from_agent.clone();
-                        async move {
-                            tracing::debug!("sending to {:?}", agent);
-                            let result = network
-                                .call_remote(
-                                    from_agent,
-                                    agent.clone(),
-                                    zome_name,
-                                    fn_name,
-                                    None,
-                                    payload,
-                                )
-                                .await;
-                            tracing::debug!("sent to {:?}", agent);
-                            if let Err(e) = result {
-                                tracing::info!(
-                                    "Failed to send remote signal to {:?} because of {:?}",
-                                    agent,
-                                    e
-                                );
-                            }
-                        }
+                        tracing::info!("Failed to send remote signals because of {:?}", e);
                     }
-                    .in_current_span(),
-                );
-            }
+                }
+                .in_current_span(),
+            );
             Ok(())
         }
         _ => unreachable!(),
@@ -103,10 +80,7 @@ mod tests {
             })
             .callback("init", move |api, ()| {
                 let mut functions: GrantedFunctions = BTreeSet::new();
-                functions.insert((
-                    api.zome_info(()).unwrap().zome_name,
-                    "recv_remote_signal".into(),
-                ));
+                functions.insert((api.zome_info(()).unwrap().name, "recv_remote_signal".into()));
                 let cap_grant_entry = CapGrantEntry {
                     tag: "".into(),
                     // empty access converts to unrestricted

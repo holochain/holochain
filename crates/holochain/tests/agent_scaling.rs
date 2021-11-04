@@ -1,6 +1,5 @@
 #![cfg(feature = "test_utils")]
 
-use hdk::prelude::Links;
 use holochain::sweettest::SweetAgents;
 use holochain::sweettest::SweetConductor;
 use holochain::sweettest::SweetDnaFile;
@@ -26,7 +25,7 @@ fn links_zome() -> InlineZome {
         })
         .callback(
             "get_links",
-            move |api: BoxApi, base: EntryHash| -> InlineZomeResult<Vec<Links>> {
+            move |api: BoxApi, base: EntryHash| -> InlineZomeResult<Vec<Vec<Link>>> {
                 Ok(api.get_links(vec![GetLinksInput::new(base, None)])?)
             },
         )
@@ -74,11 +73,10 @@ async fn many_agents_can_reach_consistency_agent_links() {
     let mut seen = [0usize; NUM_AGENTS];
 
     for (i, cell) in cells.iter().enumerate() {
-        // let links: Links = conductor.call(&cell.zome(TestWasm::Link), "get_links", ()).await;
-        let links: Vec<Links> = conductor
+        let links: Vec<Vec<Link>> = conductor
             .call(&cell.zome("links"), "get_links", base.clone())
             .await;
-        seen[i] = links.into_iter().next().unwrap().into_inner().len();
+        seen[i] = links.into_iter().next().unwrap().len();
     }
 
     assert_eq!(seen.to_vec(), [1; NUM_AGENTS].to_vec());
@@ -114,10 +112,10 @@ async fn many_agents_can_reach_consistency_normal_links() {
     let mut num_seen = 0;
 
     for cell in &cells {
-        let links: Links = conductor
+        let links: Vec<Link> = conductor
             .call(&cell.zome(TestWasm::Link), "get_links", ())
             .await;
-        num_seen += links.into_inner().len();
+        num_seen += links.len();
     }
 
     assert_eq!(num_seen, NUM_AGENTS);

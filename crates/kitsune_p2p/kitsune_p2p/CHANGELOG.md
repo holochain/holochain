@@ -3,7 +3,12 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
-- Check local agents for basis when doing a RPCMulti call. [#1027](https://github.com/holochain/holochain/pull/1027).
+
+## 0.0.11
+
+## 0.0.10
+
+- Check local agents for basis when doing a RPCMulti call. [\#1009](https://github.com/holochain/holochain/pull/1009).
 
 ## 0.0.9
 

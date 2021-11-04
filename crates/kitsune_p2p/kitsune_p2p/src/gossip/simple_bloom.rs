@@ -63,7 +63,7 @@ impl MetaOpData {
 
 type KeySet = HashSet<Arc<MetaOpKey>>;
 type DataMap = HashMap<Arc<MetaOpKey>, Arc<MetaOpData>>;
-type BloomFilter = bloomfilter::Bloom<Arc<MetaOpKey>>;
+pub type BloomFilter = bloomfilter::Bloom<Arc<MetaOpKey>>;
 
 pub(crate) fn encode_bloom_filter(bloom: &BloomFilter) -> PoolBuf {
     let bitmap: Vec<u8> = bloom.bitmap();
@@ -141,6 +141,7 @@ struct NodeInfo {
     was_err: bool,
 }
 
+#[derive(Clone, Debug)]
 pub(crate) enum HowToConnect {
     /// The connection handle and the url that this handle has been connected to.
     /// If the connection handle closes the url can change so we need to track it.

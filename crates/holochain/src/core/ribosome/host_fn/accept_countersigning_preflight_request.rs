@@ -220,7 +220,7 @@ pub mod wasm_test {
                 cell_id: alice.cell_id().clone(),
                 zome_name: alice.name().clone(),
                 fn_name: "create_a_thing".into(),
-                cap: None,
+                cap_secret: None,
                 provenance: alice_pubkey.clone(),
                 payload: ExternIO::encode(()).unwrap(),
             })
@@ -236,7 +236,7 @@ pub mod wasm_test {
                 cell_id: alice.cell_id().clone(),
                 zome_name: alice.name().clone(),
                 fn_name: "create_an_invalid_countersigned_thing".into(),
-                cap: None,
+                cap_secret: None,
                 provenance: alice_pubkey.clone(),
                 payload: ExternIO::encode(vec![alice_response.clone(), bob_response.clone()])
                     .unwrap(),
@@ -334,7 +334,7 @@ pub mod wasm_test {
                 cell_id: alice.cell_id().clone(),
                 zome_name: alice.name().clone(),
                 fn_name: "accept_countersigning_preflight_request".into(),
-                cap: None,
+                cap_secret: None,
                 provenance: alice_pubkey.clone(),
                 payload: ExternIO::encode(&preflight_request_2).unwrap(),
             })
@@ -366,7 +366,7 @@ pub mod wasm_test {
                 cell_id: alice.cell_id().clone(),
                 zome_name: alice.name().clone(),
                 fn_name: "create_a_thing".into(),
-                cap: None,
+                cap_secret: None,
                 provenance: alice_pubkey.clone(),
                 payload: ExternIO::encode(()).unwrap(),
             })
@@ -379,7 +379,7 @@ pub mod wasm_test {
                 cell_id: bobbo.cell_id().clone(),
                 zome_name: bobbo.name().clone(),
                 fn_name: "create_a_thing".into(),
-                cap: None,
+                cap_secret: None,
                 provenance: bob_pubkey.clone(),
                 payload: ExternIO::encode(()).unwrap(),
             })
@@ -401,7 +401,7 @@ pub mod wasm_test {
                 cell_id: alice.cell_id().clone(),
                 zome_name: alice.name().clone(),
                 fn_name: "create_a_thing".into(),
-                cap: None,
+                cap_secret: None,
                 provenance: alice_pubkey.clone(),
                 payload: ExternIO::encode(()).unwrap(),
             })
@@ -431,7 +431,7 @@ pub mod wasm_test {
                 cell_id: bobbo.cell_id().clone(),
                 zome_name: bobbo.name().clone(),
                 fn_name: "create_a_thing".into(),
-                cap: None,
+                cap_secret: None,
                 provenance: bob_pubkey.clone(),
                 payload: ExternIO::encode(()).unwrap(),
             })

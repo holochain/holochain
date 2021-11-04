@@ -23,7 +23,7 @@ fn delete_link(delete_link: HeaderHash) -> ExternResult<HeaderHash> {
 }
 
 #[hdk_extern]
-fn children(path_string: String) -> ExternResult<Links> {
+fn children(path_string: String) -> ExternResult<Vec<Link>> {
     Path::from(path_string).children()
 }
 

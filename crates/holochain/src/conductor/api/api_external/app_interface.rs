@@ -89,7 +89,7 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                     Ok(ZomeCallResponse::Unauthorized(_, _, _, _)) => Ok(AppResponse::Error(
                         ExternalApiWireError::ZomeCallUnauthorized(format!(
                             "No capabilities grant has been committed that allows the CapSecret {:?} to call the function {} in zome {}",
-                            call.cap, call.fn_name, call.zome_name
+                            call.cap_secret, call.fn_name, call.zome_name
                         )),
                     )),
                     Ok(ZomeCallResponse::NetworkError(e)) => unreachable!(

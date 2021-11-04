@@ -3,7 +3,7 @@ use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 
-use crate::InstalledAppInfo;
+use crate::{FullStateDump, InstalledAppInfo};
 
 /// Represents the available conductor functions to call over an Admin interface
 /// and will result in a corresponding [`AdminResponse`] message being sent back over the
@@ -234,7 +234,7 @@ pub enum AdminRequest {
     /// List all the app interfaces currently attached with [`AttachAppInterface`].
     ListAppInterfaces,
 
-    /// Dump the full state of the `Cell` specified by argument `cell_id`,
+    /// Dump the state of the `Cell` specified by argument `cell_id`,
     /// including its chain, as a string containing JSON.
     ///
     /// Will be responded to with an [`AdminResponse::StateDumped`]
@@ -245,6 +245,31 @@ pub enum AdminRequest {
     DumpState {
         /// The `CellId` for which to dump state
         cell_id: Box<CellId>,
+    },
+
+    /// Dump the full state of the `Cell` specified by argument `cell_id`,
+    /// including its chain and DHT shard, as a string containing JSON.
+    ///
+    /// Warning: this API call is subject to change, and will not be available to hApps.
+    /// This is meant to be used by introspection tooling.
+    ///
+    /// Note that the response to this call can be very big, as it's requesting for
+    /// the full database of the Cell.
+    ///
+    /// Also note that while DHT Ops about private entries will be returned (like `StoreElement`),
+    /// the entry in itself will be missing, as it's not actually stored publicly in the DHT shard.
+    ///
+    /// Will be responded to with an [`AdminResponse::FullStateDumped`]
+    /// or an [`AdminResponse::Error`]
+    ///
+    /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
+    /// [`AdminResponse::FullStateDumped`]: enum.AdminResponse.html#variant.FullStateDumped
+    DumpFullState {
+        /// The `CellId` for which to dump state
+        cell_id: Box<CellId>,
+        /// The last seen DhtOp RowId, returned in [`FullIntegrationDump`]
+        /// Only DhtOps with RowId greater than the cursor will be returned
+        dht_ops_cursor: Option<u64>,
     },
 
     /// Add a list [AgentInfoSigned] to this conductor's peer store.
@@ -305,24 +330,24 @@ pub enum AdminResponse {
     /// The successful response to an [`AdminRequest::InstallApp`].
     ///
     /// The resulting [`InstalledAppInfo`] contains the App id,
-    /// the [`CellNick`]s and, most usefully, the new [`CellId`]s
+    /// the [`AppRoleId`]s and, most usefully, the new [`CellId`]s
     /// of the newly installed `Dna`s. See the [`InstalledAppInfo`] docs for details.
     ///
     /// [`AdminRequest::InstallApp`]: enum.AdminRequest.html#variant.InstallApp
     /// [`InstalledAppInfo`]: ../../../holochain_types/app/struct.InstalledAppInfo.html
-    /// [`CellNick`]: ../../../holochain_types/app/type.CellNick.html
+    /// [`AppRoleId`]: ../../../holochain_types/app/type.AppRoleId.html
     /// [`CellId`]: ../../../holochain_types/cell/struct.CellId.html
     AppInstalled(InstalledAppInfo),
 
     /// The successful response to an [`AdminRequest::InstallAppBundle`].
     ///
     /// The resulting [`InstalledAppInfo`] contains the App id,
-    /// the [`CellNick`]s and, most usefully, the new [`CellId`]s
+    /// the [`AppRoleId`]s and, most usefully, the new [`CellId`]s
     /// of the newly installed `Dna`s. See the [`InstalledAppInfo`] docs for details.
     ///
     /// [`AdminRequest::InstallApp`]: enum.AdminRequest.html#variant.InstallApp
     /// [`InstalledAppInfo`]: ../../../holochain_types/app/struct.InstalledAppInfo.html
-    /// [`CellNick`]: ../../../holochain_types/app/type.CellNick.html
+    /// [`AppRoleId`]: ../../../holochain_types/app/type.AppRoleId.html
     /// [`CellId`]: ../../../holochain_types/cell/struct.CellId.html
     AppBundleInstalled(InstalledAppInfo),
 
@@ -446,6 +471,16 @@ pub enum AdminResponse {
     ///
     /// [`AdminRequest::DumpState`]: enum.AdminRequest.html#variant.DumpState
     StateDumped(String),
+
+    /// The succesful response to an [`AdminRequest::DumpFullState`].
+    ///
+    /// The result contains a string of serialized JSON data which can be deserialized to access the
+    /// full state dump, and inspect the source chain.
+    ///
+    /// Note that this result can be very big, as it's requesting for the full database of the Cell.
+    ///
+    /// [`AdminRequest::DumpFullState`]: enum.AdminRequest.html#variant.DumpFullState
+    FullStateDumped(FullStateDump),
 
     /// The succesful response to an [`AdminRequest::AddAgentInfo`].
     ///

@@ -1,3 +1,4 @@
+use fixt::prelude::*;
 use ghost_actor::dependencies::observability;
 use holo_hash::HasHash;
 use holochain_cascade::test_utils::*;
@@ -16,6 +17,7 @@ use holochain_zome_types::EntryDetails;
 use holochain_zome_types::EntryDhtStatus;
 use holochain_zome_types::GetOptions;
 use holochain_zome_types::ValidationStatus;
+use holochain_zome_types::ZomeFixturator;
 
 async fn assert_can_get<N: HolochainP2pDnaT + Clone + Send + 'static>(
     td_entry: &EntryTestData,
@@ -256,18 +258,21 @@ async fn entry_authoring() {
     // Environments
     let cache = test_cache_env();
     let mut scratch = Scratch::new();
+    let zome = fixt!(Zome);
 
     // Data
     let td_entry = EntryTestData::create();
     let td_element = ElementTestData::create();
     insert_op_scratch(
         &mut scratch,
+        Some(zome.clone()),
         td_entry.store_entry_op.clone(),
         ChainTopOrdering::default(),
     )
     .unwrap();
     insert_op_scratch(
         &mut scratch,
+        Some(zome.clone()),
         td_element.any_store_element_op.clone(),
         ChainTopOrdering::default(),
     )
@@ -350,18 +355,21 @@ async fn content_authoring() {
     // Environments
     let cache = test_cache_env();
     let mut scratch = Scratch::new();
+    let zome = fixt!(Zome);
 
     // Data
     let td_entry = EntryTestData::create();
     let td_element = ElementTestData::create();
     insert_op_scratch(
         &mut scratch,
+        Some(zome.clone()),
         td_entry.store_entry_op.clone(),
         ChainTopOrdering::default(),
     )
     .unwrap();
     insert_op_scratch(
         &mut scratch,
+        Some(zome),
         td_element.any_store_element_op.clone(),
         ChainTopOrdering::default(),
     )

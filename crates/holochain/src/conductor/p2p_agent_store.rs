@@ -1,5 +1,4 @@
 //! Queries for the P2pAgentStore db
-use fallible_iterator::FallibleIterator;
 use futures::StreamExt;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
@@ -168,19 +167,20 @@ pub fn query_peer_density(
 ) -> ConductorResult<PeerDensity> {
     let now = now();
     let arcs = env.conn()?.p2p_list_agents()?;
-    let arcs = fallible_iterator::convert(arcs.into_iter().map(ConductorResult::Ok))
+    let arcs = arcs
+        .into_iter()
         .filter_map(|v| {
             if dht_arc.contains(v.agent.get_loc()) {
                 if v.space == kitsune_space && !is_expired(now, &v) {
-                    Ok(Some(v.storage_arc))
+                    Some(v.storage_arc)
                 } else {
-                    Ok(None)
+                    None
                 }
             } else {
-                Ok(None)
+                None
             }
         })
-        .collect()?;
+        .collect();
 
     // contains is already checked in the iterator
     let bucket = DhtArcBucket::new_unchecked(dht_arc, arcs);

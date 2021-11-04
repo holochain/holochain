@@ -726,8 +726,8 @@ macro_rules! entry_defs {
 #[macro_export]
 macro_rules! entry_def_index {
     ( $t:ty ) => {
-        match crate::entry_defs(()) {
-            Ok($crate::prelude::EntryDefsCallbackResult::Defs(entry_defs)) => {
+        match $crate::prelude::zome_info() {
+            Ok(ZomeInfo { entry_defs, .. }) => {
                 match entry_defs.entry_def_index_from_id(<$t>::entry_def_id()) {
                     Some(entry_def_index) => Ok::<
                         $crate::prelude::EntryDefIndex,
@@ -759,9 +759,9 @@ macro_rules! entry_def_index {
 macro_rules! entry_type {
     ( $t:ty ) => {
         match $crate::prelude::entry_def_index!($t) {
-            Ok(id) => match $crate::prelude::zome_info() {
-                Ok(ZomeInfo { zome_id, .. }) => Ok($crate::prelude::EntryType::App(
-                    $crate::prelude::AppEntryType::new(id, zome_id, <$t>::entry_visibility()),
+            Ok(e_id) => match $crate::prelude::zome_info() {
+                Ok(ZomeInfo { id, .. }) => Ok($crate::prelude::EntryType::App(
+                    $crate::prelude::AppEntryType::new(e_id, id, <$t>::entry_visibility()),
                 )),
                 Err(e) => Err(e),
                 _ => unreachable!(),

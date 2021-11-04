@@ -25,13 +25,17 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::time::Instant;
 
-use self::bandwidth::BandwidthThrottle;
+pub use self::bandwidth::BandwidthThrottle;
 use self::metrics::Metrics;
 use self::state_map::RoundStateMap;
 
 use super::simple_bloom::{HowToConnect, MetaOpKey};
 
 pub use bandwidth::BandwidthThrottles;
+
+#[cfg(feature = "test_utils")]
+#[allow(missing_docs)]
+pub mod test_utils;
 
 mod accept;
 mod agents;
@@ -46,7 +50,7 @@ mod metrics;
 mod next_target;
 
 #[cfg(all(test, feature = "test_utils"))]
-mod tests;
+pub(crate) mod tests;
 
 /// max send buffer size (keep it under 16384 with a little room for overhead)
 /// (this is not a tuning_param because it must be coordinated
@@ -74,7 +78,7 @@ struct TimedBloomFilter {
 
 /// Gossip has two distinct variants which share a lot of similarities but
 /// are fundamentally different and serve different purposes
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GossipType {
     /// The Recent gossip type is aimed at rapidly syncing the most recent
     /// data. It runs frequently and expects frequent diffs at each round.
@@ -105,6 +109,7 @@ pub struct ShardedGossip {
 /// Basic statistic for gossip loop processing performance.
 struct Stats {
     start: Instant,
+    last: Option<tokio::time::Instant>,
     avg_processing_time: std::time::Duration,
     max_processing_time: std::time::Duration,
     count: u32,
@@ -115,6 +120,7 @@ impl Stats {
     fn reset() -> Self {
         Stats {
             start: Instant::now(),
+            last: None,
             avg_processing_time: std::time::Duration::default(),
             max_processing_time: std::time::Duration::default(),
             count: 0,
@@ -179,7 +185,7 @@ impl ShardedGossip {
 
         let timeout = self.gossip.tuning_params.implicit_timeout();
 
-        let con = match how {
+        let con = match how.clone() {
             HowToConnect::Con(con, remote_url) => {
                 if con.is_closed() {
                     self.ep_hnd.get_connection(remote_url, timeout).await?
@@ -265,10 +271,14 @@ impl ShardedGossip {
     /// Log the statistics for the gossip loop.
     fn stats(&self, stats: &mut Stats) {
         if let GossipType::Recent = self.gossip.gossip_type {
-            let elapsed = stats.start.elapsed();
-            stats.avg_processing_time += elapsed;
-            stats.max_processing_time = std::cmp::max(stats.max_processing_time, elapsed);
+            if let Some(last) = stats.last {
+                let elapsed = last.elapsed();
+                stats.avg_processing_time += elapsed;
+                stats.max_processing_time = std::cmp::max(stats.max_processing_time, elapsed);
+            }
+            stats.last = Some(tokio::time::Instant::now());
             stats.count += 1;
+            let elapsed = stats.start.elapsed();
             if elapsed.as_secs() > 5 {
                 stats.avg_processing_time = stats
                     .avg_processing_time
@@ -543,9 +553,8 @@ impl ShardedGossipLocal {
                 }
             }
             ShardedGossipWire::MissingAgents(MissingAgents { agents }) => {
-                if let Some(state) = self.get_state(&cert).await? {
-                    self.incoming_missing_agents(state, agents.as_slice())
-                        .await?;
+                if self.get_state(&cert).await?.is_some() {
+                    self.incoming_missing_agents(agents.as_slice()).await?;
                 }
                 Vec::with_capacity(0)
             }
