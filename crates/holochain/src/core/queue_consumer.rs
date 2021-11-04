@@ -49,7 +49,7 @@ use validation_receipt_consumer::*;
 mod validation_receipt_consumer;
 use crate::conductor::{api::CellConductorApiT, error::ConductorError, manager::ManagedTaskResult};
 use crate::conductor::{manager::ManagedTaskAdd, ConductorHandle};
-use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pDna;
 use holochain_p2p::*;
 use publish_dht_ops_consumer::*;
 
@@ -69,9 +69,8 @@ use super::workflow::error::WorkflowError;
 /// a race condition by trying to run a workflow too soon after cell creation.
 #[allow(clippy::too_many_arguments)]
 pub async fn spawn_queue_consumer_tasks(
-    env: EnvWrite,
-    cache: EnvWrite,
-    cell_network: HolochainP2pCell,
+    cell_id: CellId,
+    network: HolochainP2pDna,
     conductor_handle: ConductorHandle,
     conductor_api: impl CellConductorApiT + 'static,
     task_sender: sync::mpsc::Sender<ManagedTaskAdd>,

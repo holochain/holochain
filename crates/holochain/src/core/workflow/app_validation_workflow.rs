@@ -33,8 +33,8 @@ pub use error::*;
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_p2p::actor::GetActivityOptions;
-use holochain_p2p::HolochainP2pCell;
-use holochain_p2p::HolochainP2pCellT;
+use holochain_p2p::HolochainP2pDna;
+use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
@@ -57,8 +57,7 @@ const NUM_CONCURRENT_OPS: usize = 50;
 pub async fn app_validation_workflow(
     workspace: AppValidationWorkspace,
     trigger_integration: TriggerSender,
-    conductor_api: impl CellConductorApiT,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
 ) -> WorkflowResult<WorkComplete> {
     let complete =
         app_validation_workflow_inner(Arc::new(workspace), conductor_api, &network).await?;
@@ -72,8 +71,7 @@ pub async fn app_validation_workflow(
 
 async fn app_validation_workflow_inner(
     workspace: Arc<AppValidationWorkspace>,
-    conductor_api: impl CellConductorApiT,
-    network: &HolochainP2pCell,
+    network: &HolochainP2pDna,
 ) -> WorkflowResult<WorkComplete> {
     let env = workspace.vault.clone().into();
     let sorted_ops = validation_query::get_ops_to_app_validate(&env).await?;
@@ -101,7 +99,6 @@ async fn app_validation_workflow_inner(
         .ready_chunks(NUM_CONCURRENT_OPS);
 
     while let Some(chunk) = iter.next().await {
-        let this_agent = this_agent.clone();
         workspace
             .vault
             .async_commit(move |mut txn| {
@@ -112,7 +109,6 @@ async fn app_validation_workflow_inner(
 
                     if let Outcome::AwaitingDeps(_) | Outcome::Rejected(_) = &outcome {
                         warn!(
-                            agent = %which_agent(&this_agent),
                             msg = "DhtOp has failed app validation",
                             outcome = ?outcome,
                         );
@@ -126,11 +122,7 @@ async fn app_validation_workflow_inner(
                             put_validation_limbo(&mut txn, op_hash, status)?;
                         }
                         Outcome::Rejected(_) => {
-                            if author == this_agent {
-                                tracing::warn!("Authored invalid op! If you didn't hack your node, this is a bug in Holochain.\nOp: {:?}", op_light);
-                            } else {
                                 tracing::warn!("Received invalid op! Warrants aren't implemented yet, so we can't do anything about this right now, but be warned that somebody on the network has maliciously hacked their node.\nOp: {:?}", op_light);
-                            }
                             put_integration_limbo(&mut txn, op_hash, ValidationStatus::Rejected)?;
                         }
                     }
@@ -153,7 +145,7 @@ async fn validate_op(
     op: DhtOp,
     conductor_api: &impl CellConductorApiT,
     workspace: &AppValidationWorkspace,
-    network: &HolochainP2pCell,
+    network: &HolochainP2pDna,
 ) -> AppValidationOutcome<Outcome> {
     // Get the workspace for the validation calls
     let workspace_lock = workspace.validation_workspace(network.from_agent()).await?;
@@ -467,8 +459,7 @@ async fn get_validation_package(
     // from_agent: Option<AgentPubKey>,
     workspace: Option<&AppValidationWorkspace>,
     ribosome: &impl RibosomeT,
-    workspace_lock: &HostFnWorkspace,
-    network: &HolochainP2pCell,
+    network: &HolochainP2pDna,
 ) -> AppValidationOutcome<Option<ValidationPackage>> {
     match entry_def {
         Some(entry_def) => match workspace {
@@ -506,8 +497,7 @@ async fn get_validation_package_local(
     element: &Element,
     required_validation_type: RequiredValidationType,
     ribosome: &impl RibosomeT,
-    workspace_lock: &HostFnWorkspace,
-    network: &HolochainP2pCell,
+    network: &HolochainP2pDna,
 ) -> AppValidationOutcome<Option<ValidationPackage>> {
     let header_seq = element.header().header_seq();
     match required_validation_type {
@@ -566,8 +556,7 @@ async fn get_validation_package_remote(
     // from_agent: Option<AgentPubKey>,
     workspace: &AppValidationWorkspace,
     ribosome: &impl RibosomeT,
-    workspace_lock: &HostFnWorkspace,
-    network: &HolochainP2pCell,
+    network: &HolochainP2pDna,
 ) -> AppValidationOutcome<Option<ValidationPackage>> {
     match entry_def.required_validation_type {
         // Only needs the element
@@ -721,9 +710,7 @@ pub async fn run_validation_callback_direct(
     zome: ZomesToInvoke,
     element: Element,
     ribosome: &impl RibosomeT,
-    workspace: HostFnWorkspace,
-    network: HolochainP2pCell,
-    conductor_api: &impl CellConductorApiT,
+    network: HolochainP2pDna,
 ) -> AppValidationResult<Outcome> {
     let outcome = {
         let mut cascade = Cascade::from_workspace_network(&workspace, network.clone());
@@ -769,8 +756,7 @@ fn run_validation_callback_inner(
     validation_package: Option<Arc<ValidationPackage>>,
     entry_def_id: Option<EntryDefId>,
     ribosome: &impl RibosomeT,
-    workspace_lock: HostFnWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
 ) -> AppValidationResult<Outcome> {
     let validate: ValidateResult = ribosome.run_validate(
         ValidateHostAccess::new(workspace_lock, network),
@@ -794,8 +780,7 @@ pub fn run_create_link_validation_callback(
     base: Arc<Entry>,
     target: Arc<Entry>,
     ribosome: &impl RibosomeT,
-    workspace_lock: HostFnWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
 ) -> AppValidationResult<Outcome> {
     let invocation = ValidateCreateLinkInvocation {
         zome,
@@ -811,8 +796,7 @@ pub fn run_delete_link_validation_callback(
     zome: Zome,
     delete_link: DeleteLink,
     ribosome: &impl RibosomeT,
-    workspace_lock: HostFnWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
 ) -> AppValidationResult<Outcome> {
     let invocation = ValidateDeleteLinkInvocation { zome, delete_link };
     let invocation = ValidateLinkInvocation::<ValidateDeleteLinkInvocation>::new(invocation);
@@ -822,8 +806,7 @@ pub fn run_delete_link_validation_callback(
 pub fn run_link_validation_callback<I: Invocation + 'static>(
     invocation: ValidateLinkInvocation<I>,
     ribosome: &impl RibosomeT,
-    workspace_lock: HostFnWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
 ) -> AppValidationResult<Outcome> {
     let access = ValidateLinkHostAccess::new(workspace_lock, network);
     let validate = ribosome.run_validate_link(access, invocation)?;
@@ -851,7 +834,7 @@ impl AppValidationWorkspace {
         Ok(HostFnWorkspace::new(self.vault.clone(), self.cache.clone(), author).await?)
     }
 
-    pub fn full_cascade<Network: HolochainP2pCellT + Clone + 'static + Send>(
+    pub fn full_cascade<Network: HolochainP2pDnaT + Clone + 'static + Send>(
         &self,
         network: Network,
     ) -> Cascade<Network> {

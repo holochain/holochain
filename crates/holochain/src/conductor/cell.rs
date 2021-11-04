@@ -98,10 +98,10 @@ impl PartialEq for Cell {
 /// The [Conductor] manages a collection of Cells, and will call functions
 /// on the Cell when a Conductor API method is called (either a
 /// [CellConductorApi] or an [AppInterfaceApi])
-pub struct Cell<Api = CellConductorApi, P2pCell = holochain_p2p::HolochainP2pCell>
+pub struct Cell<Api = CellConductorApi, P2pCell = holochain_p2p::HolochainP2pDna>
 where
     Api: CellConductorApiT,
-    P2pCell: holochain_p2p::HolochainP2pCellT,
+    P2pCell: holochain_p2p::HolochainP2pDnaT,
 {
     id: CellId,
     conductor_api: Api,
@@ -128,9 +128,7 @@ impl Cell {
     pub async fn create(
         id: CellId,
         conductor_handle: ConductorHandle,
-        env: EnvWrite,
-        cache: EnvWrite,
-        holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
+        holochain_p2p_cell: holochain_p2p::HolochainP2pDna,
         managed_task_add_sender: sync::mpsc::Sender<ManagedTaskAdd>,
         managed_task_stop_broadcaster: sync::broadcast::Sender<()>,
     ) -> CellResult<(Self, InitialQueueTriggers)> {
@@ -231,7 +229,7 @@ impl Cell {
     }
 
     /// Access a network sender that is partially applied to this cell's DnaHash/AgentPubKey
-    pub fn holochain_p2p_cell(&self) -> &holochain_p2p::HolochainP2pCell {
+    pub fn holochain_p2p_dna(&self) -> &holochain_p2p::HolochainP2pDna {
         &self.holochain_p2p_cell
     }
 
@@ -1095,8 +1093,10 @@ impl Cell {
     //        TaskManager can have these Cell TaskManagers as children.
     //        [ B-04176 ]
     pub async fn cleanup(&self) -> CellResult<()> {
-        use holochain_p2p::HolochainP2pCellT;
-        self.holochain_p2p_cell().leave().await?;
+        use holochain_p2p::HolochainP2pDnaT;
+        self.holochain_p2p_dna()
+            .leave(self.id.agent_pubkey().clone())
+            .await?;
         tracing::info!("Cell removed, but cleanup is not yet fully implemented.");
         Ok(())
     }

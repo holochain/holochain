@@ -18,12 +18,12 @@ use holo_hash::*;
 use holochain_cascade::Cascade;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::IntegrationStateDumps;
-use holochain_p2p::actor::HolochainP2pRefToCell;
+use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_p2p::dht_arc::DhtArc;
 use holochain_p2p::dht_arc::PeerDensity;
 use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::spawn_holochain_p2p;
-use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pDna;
 use holochain_p2p::HolochainP2pRef;
 use holochain_p2p::HolochainP2pSender;
 use holochain_serialized_bytes::SerializedBytes;
@@ -124,7 +124,7 @@ macro_rules! meta_mock {
 pub struct TestNetwork {
     network: Option<HolochainP2pRef>,
     respond_task: Option<tokio::task::JoinHandle<()>>,
-    cell_network: HolochainP2pCell,
+    cell_network: HolochainP2pDna,
 }
 
 impl TestNetwork {
@@ -132,7 +132,7 @@ impl TestNetwork {
     pub fn new(
         network: HolochainP2pRef,
         respond_task: tokio::task::JoinHandle<()>,
-        cell_network: HolochainP2pCell,
+        cell_network: HolochainP2pDna,
     ) -> Self {
         Self {
             network: Some(network),
@@ -150,7 +150,7 @@ impl TestNetwork {
     }
 
     /// Get the cell network
-    pub fn cell_network(&self) -> HolochainP2pCell {
+    pub fn cell_network(&self) -> HolochainP2pDna {
         self.cell_network.clone()
     }
 }
@@ -240,7 +240,7 @@ where
     let dna = dna_hash.unwrap_or_else(|| fixt!(DnaHash));
     let mut key_fixt = AgentPubKeyFixturator::new(Predictable);
     let agent_key = agent_key.unwrap_or_else(|| key_fixt.next().unwrap());
-    let cell_network = network.to_cell(dna.clone(), agent_key.clone());
+    let cell_network = network.to_dna(dna.clone());
     network.join(dna.clone(), agent_key).await.unwrap();
     TestNetwork::new(network, respond_task, cell_network)
 }

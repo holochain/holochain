@@ -393,7 +393,6 @@ async fn handle_ws_recv(
                 if let KdApi::MessageRecvEvt {
                     root,
                     to_agent,
-                    from_agent,
                     content,
                     binary,
                 } = api
@@ -402,7 +401,6 @@ async fn handle_ws_recv(
                         .emit(KdHndEvt::Message {
                             root,
                             to_agent,
-                            from_agent,
                             content,
                             binary,
                         })

@@ -11,9 +11,8 @@ use crate::core::validation::*;
 use error::WorkflowResult;
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
-use holochain_p2p::HolochainP2pCell;
-use holochain_p2p::HolochainP2pCellT;
-use holochain_sqlite::db::ReadManager;
+use holochain_p2p::HolochainP2pDna;
+use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::HostFnStores;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
@@ -52,8 +51,7 @@ pub async fn sys_validation_workflow(
     trigger_app_validation: TriggerSender,
     sys_validation_trigger: TriggerSender,
     // TODO: Update HolochainP2p to reflect changes to pass through network.
-    network: HolochainP2pCell,
-    conductor_api: impl CellConductorApiT,
+    network: HolochainP2pDna,
 ) -> WorkflowResult<WorkComplete> {
     let complete = sys_validation_workflow_inner(
         Arc::new(workspace),
@@ -73,8 +71,7 @@ pub async fn sys_validation_workflow(
 
 async fn sys_validation_workflow_inner(
     workspace: Arc<SysValidationWorkspace>,
-    network: HolochainP2pCell,
-    conductor_api: impl CellConductorApiT,
+    network: HolochainP2pDna,
     sys_validation_trigger: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     let env = workspace.vault.clone().into();
@@ -163,8 +160,7 @@ async fn sys_validation_workflow_inner(
 async fn validate_op(
     op: &DhtOp,
     workspace: &SysValidationWorkspace,
-    network: HolochainP2pCell,
-    conductor_api: &impl CellConductorApiT,
+    network: HolochainP2pDna,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> WorkflowResult<Outcome> {
     match validate_op_inner(
@@ -242,8 +238,7 @@ fn handle_failed(error: ValidationOutcome) -> Outcome {
 async fn validate_op_inner(
     op: &DhtOp,
     workspace: &SysValidationWorkspace,
-    network: HolochainP2pCell,
-    conductor_api: &impl CellConductorApiT,
+    network: HolochainP2pDna,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
     match op {
@@ -377,8 +372,7 @@ async fn validate_op_inner(
 pub async fn sys_validate_element(
     element: &Element,
     call_zome_workspace: &HostFnWorkspace,
-    network: HolochainP2pCell,
-    conductor_api: &impl CellConductorApiT,
+    network: HolochainP2pDna,
 ) -> SysValidationOutcome<()> {
     trace!(?element);
     // Create a SysValidationWorkspace with the scratches from the CallZomeWorkspace
@@ -396,21 +390,13 @@ pub async fn sys_validate_element(
         Err(e) => Err(OutcomeOrError::Err(e)),
     };
 
-    // TODO: This is probably fine to remove because cache is now
-    // a separate db but confirm that.
-    // Set the call zome workspace to the updated
-    // cache from the sys validation workspace
-    // call_zome_workspace.meta_cache = workspace.meta_cache;
-    // call_zome_workspace.element_cache = workspace.element_cache;
-
     result
 }
 
 async fn sys_validate_element_inner(
     element: &Element,
     workspace: &SysValidationWorkspace,
-    network: HolochainP2pCell,
-    conductor_api: &impl CellConductorApiT,
+    network: HolochainP2pDna,
 ) -> SysValidationResult<()> {
     let signature = element.signature();
     let header = element.header();
@@ -421,8 +407,7 @@ async fn sys_validate_element_inner(
         header: &Header,
         maybe_entry: Option<&Entry>,
         workspace: &SysValidationWorkspace,
-        network: HolochainP2pCell,
-        conductor_api: &impl CellConductorApiT,
+        network: HolochainP2pDna,
     ) -> SysValidationResult<()> {
         let incoming_dht_ops_sender = None;
         store_element(header, workspace, network.clone()).await?;
@@ -490,7 +475,7 @@ pub async fn counterfeit_check(signature: &Signature, header: &Header) -> SysVal
 async fn register_agent_activity(
     header: &Header,
     workspace: &SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
@@ -516,7 +501,7 @@ async fn register_agent_activity(
 async fn store_element(
     header: &Header,
     workspace: &SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let prev_header_hash = header.prev_header();
@@ -540,7 +525,7 @@ async fn store_entry(
     entry: &Entry,
     conductor_api: &impl CellConductorApiT,
     workspace: &SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let entry_type = header.entry_type();
@@ -580,7 +565,7 @@ async fn store_entry(
 async fn register_updated_content(
     entry_update: &Update,
     workspace: &SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
@@ -603,7 +588,7 @@ async fn register_updated_content(
 async fn register_updated_element(
     entry_update: &Update,
     workspace: &SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
@@ -626,7 +611,7 @@ async fn register_updated_element(
 async fn register_deleted_by(
     element_delete: &Delete,
     workspace: &SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
@@ -650,7 +635,7 @@ async fn register_deleted_by(
 async fn register_deleted_entry_header(
     element_delete: &Delete,
     workspace: &SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
@@ -674,7 +659,7 @@ async fn register_deleted_entry_header(
 async fn register_add_link(
     link_add: &CreateLink,
     workspace: &SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
@@ -704,7 +689,7 @@ async fn register_add_link(
 async fn register_delete_link(
     link_remove: &DeleteLink,
     workspace: &SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
@@ -831,7 +816,7 @@ impl SysValidationWorkspace {
             None => cascade,
         }
     }
-    pub fn full_cascade<Network: HolochainP2pCellT + Clone + 'static + Send>(
+    pub fn full_cascade<Network: HolochainP2pDnaT + Clone + 'static + Send>(
         &self,
         network: Network,
     ) -> Cascade<Network> {

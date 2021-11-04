@@ -3,8 +3,8 @@ use ghost_actor::dependencies::observability;
 use holo_hash::HasHash;
 use holochain_cascade::test_utils::*;
 use holochain_cascade::Cascade;
-use holochain_p2p::HolochainP2pCellT;
-use holochain_p2p::MockHolochainP2pCellT;
+use holochain_p2p::HolochainP2pDnaT;
+use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::mutations::insert_op_scratch;
 use holochain_state::prelude::test_cell_env;
 use holochain_state::scratch::Scratch;
@@ -17,7 +17,7 @@ use holochain_zome_types::GetOptions;
 use holochain_zome_types::ValidationStatus;
 use holochain_zome_types::ZomeFixturator;
 
-async fn assert_can_get<N: HolochainP2pCellT + Clone + Send + 'static>(
+async fn assert_can_get<N: HolochainP2pDnaT + Clone + Send + 'static>(
     td_entry: &EntryTestData,
     td_element: &ElementTestData,
     cascade: &mut Cascade<N>,
@@ -81,7 +81,7 @@ async fn assert_can_get<N: HolochainP2pCellT + Clone + Send + 'static>(
     assert_eq!(r, expected);
 }
 
-async fn assert_is_none<N: HolochainP2pCellT + Clone + Send + 'static>(
+async fn assert_is_none<N: HolochainP2pDnaT + Clone + Send + 'static>(
     td_entry: &EntryTestData,
     td_element: &ElementTestData,
     cascade: &mut Cascade<N>,
@@ -120,7 +120,7 @@ async fn assert_is_none<N: HolochainP2pCellT + Clone + Send + 'static>(
     assert!(r.is_none());
 }
 
-async fn assert_rejected<N: HolochainP2pCellT + Clone + Send + 'static>(
+async fn assert_rejected<N: HolochainP2pDnaT + Clone + Send + 'static>(
     td_entry: &EntryTestData,
     td_element: &ElementTestData,
     cascade: &mut Cascade<N>,
@@ -182,7 +182,7 @@ async fn assert_rejected<N: HolochainP2pCellT + Clone + Send + 'static>(
     assert_eq!(r, expected);
 }
 
-async fn assert_can_retrieve<N: HolochainP2pCellT + Clone + Send + 'static>(
+async fn assert_can_retrieve<N: HolochainP2pDnaT + Clone + Send + 'static>(
     td_entry: &EntryTestData,
     cascade: &mut Cascade<N>,
     options: GetOptions,
@@ -278,7 +278,7 @@ async fn entry_authoring() {
 
     // Network
     // - Not expecting any calls to the network.
-    let mut mock = MockHolochainP2pCellT::new();
+    let mut mock = MockHolochainP2pDnaT::new();
     mock.expect_authority_for_hash().returning(|_| Ok(false));
     let mock = MockNetwork::new(mock);
 
@@ -306,7 +306,7 @@ async fn entry_authority() {
 
     // Network
     // - Not expecting any calls to the network.
-    let mut mock = MockHolochainP2pCellT::new();
+    let mut mock = MockHolochainP2pDnaT::new();
     mock.expect_authority_for_hash().returning(|_| Ok(true));
     let mock = MockNetwork::new(mock);
 
@@ -334,7 +334,7 @@ async fn content_not_authority_or_authoring() {
 
     // Network
     // - Not expecting any calls to the network.
-    let mut mock = MockHolochainP2pCellT::new();
+    let mut mock = MockHolochainP2pDnaT::new();
     mock.expect_authority_for_hash().returning(|_| Ok(false));
     let mock = MockNetwork::new(mock);
 
@@ -375,7 +375,7 @@ async fn content_authoring() {
 
     // Network
     // - Not expecting any calls to the network.
-    let mut mock = MockHolochainP2pCellT::new();
+    let mut mock = MockHolochainP2pDnaT::new();
     mock.expect_authority_for_hash().returning(|_| Ok(false));
     let mock = MockNetwork::new(mock);
 
@@ -401,7 +401,7 @@ async fn content_authority() {
 
     // Network
     // - Not expecting any calls to the network.
-    let mut mock = MockHolochainP2pCellT::new();
+    let mut mock = MockHolochainP2pDnaT::new();
     mock.expect_authority_for_hash().returning(|_| Ok(true));
     let mock = MockNetwork::new(mock);
 

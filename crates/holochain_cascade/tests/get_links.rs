@@ -2,7 +2,7 @@ use fixt::prelude::*;
 use ghost_actor::dependencies::observability;
 use holochain_cascade::test_utils::*;
 use holochain_cascade::Cascade;
-use holochain_p2p::MockHolochainP2pCellT;
+use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::mutations::insert_op_scratch;
 use holochain_state::prelude::test_cell_env;
 use holochain_state::scratch::Scratch;
@@ -81,7 +81,7 @@ async fn links_authority() {
 
     // Network
     // - Not expecting any calls to the network.
-    let mut mock = MockHolochainP2pCellT::new();
+    let mut mock = MockHolochainP2pDnaT::new();
     mock.expect_authority_for_hash().returning(|_| Ok(true));
     let mock = MockNetwork::new(mock);
 
@@ -135,7 +135,7 @@ async fn links_authoring() {
 
     // Network
     // - Not expecting any calls to the network.
-    let mut mock = MockHolochainP2pCellT::new();
+    let mut mock = MockHolochainP2pDnaT::new();
     mock.expect_authority_for_hash().returning(|_| Ok(false));
     mock.expect_get_links().returning(|_, _| {
         Ok(vec![WireLinkOps {

@@ -13,8 +13,8 @@ use holo_hash::HeaderHash;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
-use holochain_p2p::HolochainP2pCell;
-use holochain_p2p::HolochainP2pCellT;
+use holochain_p2p::HolochainP2pDna;
+use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_state::host_fn_workspace::HostFnStores;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
@@ -65,16 +65,14 @@ macro_rules! ok_or_return {
 }
 
 #[derive(Clone)]
-pub struct Cascade<Network = HolochainP2pCell> {
-    vault: Option<EnvRead>,
-    cache: Option<EnvWrite>,
+pub struct Cascade<Network = HolochainP2pDna> {
     scratch: Option<SyncScratch>,
     network: Option<Network>,
 }
 
 impl<Network> Cascade<Network>
 where
-    Network: HolochainP2pCellT + Clone + 'static + Send,
+    Network: HolochainP2pDnaT + Clone + 'static + Send,
 {
     /// Add the vault to the cascade.
     pub fn with_vault(self, vault: EnvRead) -> Self {
@@ -104,7 +102,7 @@ where
     }
 
     /// Add the network and cache to the cascade.
-    pub fn with_network<N: HolochainP2pCellT + Clone>(
+    pub fn with_network<N: HolochainP2pDnaT + Clone>(
         self,
         network: N,
         cache_env: EnvWrite,
@@ -117,7 +115,7 @@ where
         }
     }
 }
-impl Cascade<HolochainP2pCell> {
+impl Cascade<HolochainP2pDna> {
     /// Constructs an empty [Cascade].
     pub fn empty() -> Self {
         Self {
@@ -131,7 +129,9 @@ impl Cascade<HolochainP2pCell> {
     pub fn from_workspace_network<N: HolochainP2pCellT + Clone>(
         workspace: &HostFnWorkspace,
         network: N,
-    ) -> Cascade<N> {
+    ) -> Cascade<N>
+    where
+        N: HolochainP2pDnaT + Clone,
         let HostFnStores {
             vault,
             cache,
@@ -161,7 +161,7 @@ impl Cascade<HolochainP2pCell> {
 
 impl<Network> Cascade<Network>
 where
-    Network: HolochainP2pCellT + Clone + 'static + Send,
+    Network: HolochainP2pDnaT + Clone + 'static + Send,
 {
     fn insert_rendered_op(txn: &mut Transaction, op: RenderedOp) -> CascadeResult<()> {
         let RenderedOp {

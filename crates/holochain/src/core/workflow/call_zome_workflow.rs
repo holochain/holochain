@@ -16,7 +16,7 @@ use crate::core::workflow::error::WorkflowError;
 use either::Either;
 use holochain_cascade::Cascade;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pDna;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::source_chain::SourceChain;
 use holochain_state::source_chain::SourceChainError;
@@ -53,9 +53,7 @@ where
     trigger_publish_dht_ops,
     trigger_integrate_dht_ops
 ))]
-pub async fn call_zome_workflow<Ribosome, C>(
-    workspace: HostFnWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
     keystore: MetaLairClient,
     args: CallZomeWorkflowArgs<Ribosome, C>,
     trigger_publish_dht_ops: TriggerSender,
@@ -101,9 +99,7 @@ where
     Ok(result)
 }
 
-async fn call_zome_workflow_inner<Ribosome, C>(
-    workspace: HostFnWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
     keystore: MetaLairClient,
     args: CallZomeWorkflowArgs<Ribosome, C>,
 ) -> WorkflowResult<ZomeCallResult>
@@ -178,10 +174,7 @@ where
 }
 
 /// Run validation inline and wait for the result.
-pub async fn inline_validation<C, Ribosome>(
-    workspace: HostFnWorkspace,
-    network: HolochainP2pCell,
-    conductor_api: C,
+    network: HolochainP2pDna,
     zome: Option<Zome>,
     ribosome: Ribosome,
 ) -> WorkflowResult<()>
@@ -330,8 +323,7 @@ fn map_outcome(outcome: Either<app_validation_workflow::Outcome, Outcome>) -> Wo
 }
 async fn get_zome(
     element: &Element,
-    workspace: &HostFnWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
     dna_def: &DnaDefHashed,
 ) -> WorkflowResult<crate::core::ribosome::ZomesToInvoke> {
     let mut cascade = Cascade::from_workspace_network(workspace, network);
@@ -361,8 +353,7 @@ pub mod tests {
     use crate::fixt::*;
     use ::fixt::prelude::*;
 
-    use holochain_p2p::HolochainP2pCellFixturator;
-    use holochain_state::prelude::test_cell_env;
+    use holochain_p2p::HolochainP2pDnaFixturator;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::cell::CellId;

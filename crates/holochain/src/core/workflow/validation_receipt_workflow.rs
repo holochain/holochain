@@ -1,5 +1,4 @@
-use holochain_p2p::HolochainP2pCell;
-use holochain_p2p::HolochainP2pCellT;
+use holochain_p2p::HolochainP2pDna;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 use holochain_zome_types::TryInto;
@@ -18,8 +17,7 @@ mod tests;
 /// TODO: Currently still waiting for responses because we don't have a network call
 /// that doesn't.
 pub async fn validation_receipt_workflow(
-    vault: EnvWrite,
-    network: &mut HolochainP2pCell,
+    network: &HolochainP2pDna,
 ) -> WorkflowResult<WorkComplete> {
     // Get the env and keystore
     let keystore = vault.keystore();
@@ -84,8 +82,11 @@ pub async fn validation_receipt_workflow(
         // Send it and don't wait for response.
         // TODO: When networking has a send without response we can use that
         // instead of waiting for response.
-        if let Err(e) = network
-            .send_validation_receipt(author, receipt.try_into()?)
+        if let Err(e) = holochain_p2p::HolochainP2pDnaT::send_validation_receipt(
+            network,
+            author,
+            receipt.try_into()?,
+        )
             .await
         {
             // No one home, they will need to publish again.

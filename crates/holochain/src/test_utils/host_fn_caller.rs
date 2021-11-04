@@ -20,8 +20,8 @@ use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::GetLinksOptions;
-use holochain_p2p::actor::HolochainP2pRefToCell;
-use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::actor::HolochainP2pRefToDna;
+use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
@@ -88,7 +88,7 @@ pub struct HostFnCaller {
     pub cache: EnvWrite,
     pub ribosome: RealRibosome,
     pub zome_path: ZomePath,
-    pub network: HolochainP2pCell,
+    pub network: HolochainP2pDna,
     pub keystore: MetaLairClient,
     pub signal_tx: SignalBroadcaster,
     pub call_zome_handle: CellConductorReadHandle,
@@ -114,10 +114,7 @@ impl HostFnCaller {
     ) -> HostFnCaller {
         let env = handle.get_cell_env(cell_id).unwrap();
         let cache = handle.get_cache_env(cell_id).unwrap();
-        let keystore = env.keystore().clone();
-        let network = handle
-            .holochain_p2p()
-            .to_cell(cell_id.dna_hash().clone(), cell_id.agent_pubkey().clone());
+        let network = handle.holochain_p2p().to_dna(cell_id.dna_hash().clone());
 
         let zome_path = (
             cell_id.clone(),

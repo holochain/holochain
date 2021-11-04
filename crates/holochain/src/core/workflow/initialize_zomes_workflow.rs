@@ -50,9 +50,7 @@ where
     Ok(result)
 }
 
-async fn initialize_zomes_workflow_inner<Ribosome, C>(
-    workspace: HostFnWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
     keystore: MetaLairClient,
     args: InitializeZomesWorkflowArgs<Ribosome, C>,
 ) -> WorkflowResult<InitResult>
@@ -108,8 +106,7 @@ pub mod tests {
     use crate::test_utils::fake_genesis;
     use ::fixt::prelude::*;
     use fixt::Unpredictable;
-    use holo_hash::DnaHash;
-    use holochain_p2p::HolochainP2pCellFixturator;
+    use holochain_p2p::HolochainP2pDnaFixturator;
     use holochain_state::prelude::test_cache_env;
     use holochain_state::prelude::test_cell_env;
     use holochain_state::prelude::SourceChain;
@@ -158,7 +155,7 @@ pub mod tests {
             conductor_api,
         };
         let keystore = fixt!(MetaLairClient);
-        let network = fixt!(HolochainP2pCell);
+        let network = fixt!(HolochainP2pDna);
 
         initialize_zomes_workflow_inner(workspace.clone(), network, keystore, args)
             .await
