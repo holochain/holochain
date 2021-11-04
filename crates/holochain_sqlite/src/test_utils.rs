@@ -75,17 +75,17 @@ impl TestDbs {
     /// Create all three non-cell environments at once
     pub fn new(tempdir: TempDir) -> Self {
         let conductor =
-            DbWrite::new(&tempdir.path(), DbKindConductor, DbSyncLevel::default()).unwrap();
-        let wasm = DbWrite::new(&tempdir.path(), DbKindWasm, DbSyncLevel::default()).unwrap();
+            DbWrite::new(tempdir.path(), DbKindConductor, DbSyncLevel::default()).unwrap();
+        let wasm = DbWrite::new(tempdir.path(), DbKindWasm, DbSyncLevel::default()).unwrap();
         let space = Arc::new(kitsune_p2p::KitsuneSpace(vec![0; 36]));
         let p2p_agent_store = DbWrite::new(
-            &tempdir.path(),
+            tempdir.path(),
             DbKindP2pAgentStore(space.clone()),
             DbSyncLevel::default(),
         )
         .unwrap();
         let p2p_metrics = DbWrite::new(
-            &tempdir.path(),
+            tempdir.path(),
             DbKindP2pMetrics(space),
             DbSyncLevel::default(),
         )

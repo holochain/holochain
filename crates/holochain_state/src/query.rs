@@ -229,7 +229,7 @@ impl<'stmt> Store for Txn<'stmt, '_> {
         author: Option<&AgentPubKey>,
     ) -> StateQueryResult<Option<Entry>> {
         // Try to get the entry if it's public.
-        match get_public_entry_from_db(&self.txn, hash)? {
+        match get_public_entry_from_db(self.txn, hash)? {
             Some(e) => Ok(Some(e)),
             None => match author {
                 // If no public entry is found try to find

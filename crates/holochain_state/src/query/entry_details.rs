@@ -159,7 +159,7 @@ impl Query for GetEntryDetailsQuery {
                     .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.header().clone()))?;
                 let author = self.1.as_ref().map(|a| a.as_ref());
                 let details = stores
-                    .get_public_or_authored_entry(&entry_hash, author)?
+                    .get_public_or_authored_entry(entry_hash, author)?
                     .map(|entry| {
                         let entry_dht_status = compute_entry_status(&state);
                         EntryDetails {

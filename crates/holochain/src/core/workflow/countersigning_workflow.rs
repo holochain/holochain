@@ -115,7 +115,7 @@ pub(crate) async fn countersigning_workflow(
 
     // For each complete session send the ops to validation.
     for (agents, ops, headers) in complete_sessions {
-        incoming_dht_ops_workflow(&space, sys_validation_trigger.clone(), ops, false).await?;
+        incoming_dht_ops_workflow(space, sys_validation_trigger.clone(), ops, false).await?;
         notify_agents.push((agents, headers));
     }
 
