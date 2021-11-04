@@ -128,6 +128,8 @@ impl Cell {
     pub async fn create(
         id: CellId,
         conductor_handle: ConductorHandle,
+        env: EnvWrite,
+        cache: EnvWrite,
         holochain_p2p_cell: holochain_p2p::HolochainP2pDna,
         managed_task_add_sender: sync::mpsc::Sender<ManagedTaskAdd>,
         managed_task_stop_broadcaster: sync::broadcast::Sender<()>,

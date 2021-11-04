@@ -14,7 +14,7 @@ pub fn spawn_integrate_dht_ops_consumer(
     cell_id: CellId,
     mut stop: sync::broadcast::Receiver<()>,
     trigger_receipt: TriggerSender,
-    cell_network: HolochainP2pCell,
+    cell_network: HolochainP2pDna,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
     let (tx, mut rx) = TriggerSender::new();
     let trigger_self = tx.clone();

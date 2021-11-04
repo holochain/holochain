@@ -66,6 +66,8 @@ macro_rules! ok_or_return {
 
 #[derive(Clone)]
 pub struct Cascade<Network = HolochainP2pDna> {
+    vault: Option<EnvRead>,
+    cache: Option<EnvWrite>,
     scratch: Option<SyncScratch>,
     network: Option<Network>,
 }
@@ -126,12 +128,10 @@ impl Cascade<HolochainP2pDna> {
         }
     }
 
-    pub fn from_workspace_network<N: HolochainP2pCellT + Clone>(
-        workspace: &HostFnWorkspace,
-        network: N,
-    ) -> Cascade<N>
+    pub fn from_workspace_network<N>(workspace: &HostFnWorkspace, network: N) -> Cascade<N>
     where
         N: HolochainP2pDnaT + Clone,
+    {
         let HostFnStores {
             vault,
             cache,
@@ -775,6 +775,14 @@ where
 
     async fn am_i_an_authority(&mut self, hash: AnyDhtHash) -> CascadeResult<bool> {
         let network = ok_or_return!(self.network.as_mut(), false);
-        Ok(network.authority_for_hash(hash).await?)
+
+        // Temporary workaround until we remove the need to pass the
+        // author to `authority_for_hash` in the next PR.
+        let env = ok_or_return!(self.vault.as_ref(), false);
+        let author = match env.kind() {
+            DbKind::Cell(id) => id.agent_pubkey().clone(),
+            _ => unreachable!(),
+        };
+        Ok(network.authority_for_hash(author, hash).await?)
     }
 }

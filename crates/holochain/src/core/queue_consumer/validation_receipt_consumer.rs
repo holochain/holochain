@@ -3,6 +3,7 @@
 use super::*;
 use crate::conductor::manager::ManagedTaskResult;
 use crate::core::workflow::validation_receipt_workflow::validation_receipt_workflow;
+use holochain_sqlite::db::DbKind;
 use tokio::task::JoinHandle;
 use tracing::*;
 
@@ -12,10 +13,16 @@ pub fn spawn_validation_receipt_consumer(
     env: EnvWrite,
     conductor_handle: ConductorHandle,
     mut stop: sync::broadcast::Receiver<()>,
-    mut cell_network: HolochainP2pCell,
+    cell_network: HolochainP2pDna,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
     let (tx, mut rx) = TriggerSender::new();
     let trigger_self = tx.clone();
+    // Temporary workaround until we remove the need for an
+    // cell id in the next PR.
+    let cell_id = match env.kind() {
+        DbKind::Cell(id) => id.clone(),
+        _ => unreachable!(),
+    };
     let handle = tokio::spawn(async move {
         loop {
             // Wait for next job
@@ -27,12 +34,12 @@ pub fn spawn_validation_receipt_consumer(
             }
 
             // Run the workflow
-            match validation_receipt_workflow(env.clone(), &mut cell_network).await {
+            match validation_receipt_workflow(env.clone(), &cell_network).await {
                 Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
                 Err(err) => {
                     handle_workflow_error(
                         conductor_handle.clone(),
-                        cell_network.cell_id(),
+                        cell_id.clone(),
                         err,
                         "validation_receipt_workflow failure",
                     )

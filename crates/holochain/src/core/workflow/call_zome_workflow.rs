@@ -53,6 +53,8 @@ where
     trigger_publish_dht_ops,
     trigger_integrate_dht_ops
 ))]
+pub async fn call_zome_workflow<Ribosome, C>(
+    workspace: HostFnWorkspace,
     network: HolochainP2pDna,
     keystore: MetaLairClient,
     args: CallZomeWorkflowArgs<Ribosome, C>,
@@ -99,6 +101,8 @@ where
     Ok(result)
 }
 
+async fn call_zome_workflow_inner<Ribosome, C>(
+    workspace: HostFnWorkspace,
     network: HolochainP2pDna,
     keystore: MetaLairClient,
     args: CallZomeWorkflowArgs<Ribosome, C>,
@@ -174,7 +178,10 @@ where
 }
 
 /// Run validation inline and wait for the result.
+pub async fn inline_validation<C, Ribosome>(
+    workspace: HostFnWorkspace,
     network: HolochainP2pDna,
+    conductor_api: C,
     zome: Option<Zome>,
     ribosome: Ribosome,
 ) -> WorkflowResult<()>
@@ -323,6 +330,7 @@ fn map_outcome(outcome: Either<app_validation_workflow::Outcome, Outcome>) -> Wo
 }
 async fn get_zome(
     element: &Element,
+    workspace: &HostFnWorkspace,
     network: HolochainP2pDna,
     dna_def: &DnaDefHashed,
 ) -> WorkflowResult<crate::core::ribosome::ZomesToInvoke> {
@@ -373,7 +381,7 @@ pub mod tests {
         invocation: ZomeCallInvocation,
     ) -> WorkflowResult<ZomeCallResult> {
         let keystore = fixt!(MetaLairClient);
-        let network = fixt!(HolochainP2pCell);
+        let network = fixt!(HolochainP2pDna);
         let cell_id = CellId::new(ribosome.dna_def().as_hash().clone(), fixt!(AgentPubKey));
         let conductor_api = Arc::new(MockConductorHandleT::new());
         let conductor_api = CellConductorApi::new(conductor_api, cell_id);

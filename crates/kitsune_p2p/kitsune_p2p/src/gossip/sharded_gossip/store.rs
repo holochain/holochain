@@ -172,7 +172,7 @@ pub(super) async fn put_ops(
     // If there's only a single agent in the space we
     // can avoid cloning the ops which could be large.
     if agent_arcs.len() == 1 {
-        let (agent, arc) = agent_arcs
+        let (_agent, arc) = agent_arcs
             .into_iter()
             .next()
             .expect("Can't be none due to len check");
@@ -180,14 +180,14 @@ pub(super) async fn put_ops(
             return Ok(());
         }
         evt_sender
-            .gossip(space.clone(), agent, ops)
+            .gossip(space.clone(), ops)
             .await
             .map_err(KitsuneError::other)?;
     } else {
-        for (agent, arc) in agent_arcs {
+        for (_agent, arc) in agent_arcs {
             if !arc.is_empty() {
                 evt_sender
-                    .gossip(space.clone(), agent, ops.clone())
+                    .gossip(space.clone(), ops.clone())
                     .await
                     .map_err(KitsuneError::other)?;
             }

@@ -940,17 +940,17 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         Ok(async move {
             let mut out = vec![];
             for agent in agents {
-            for (op_hash, dht_op) in evt_sender
+                for (op_hash, dht_op) in evt_sender
                     .fetch_op_data(space.clone(), agent.clone(), op_hashes.clone())
-                .await?
-            {
-                out.push((
-                    op_hash.into_kitsune(),
-                    crate::wire::WireDhtOpData { op_data: dht_op }
-                        .encode()
-                        .map_err(kitsune_p2p::KitsuneP2pError::other)?,
-                ));
-            }
+                    .await?
+                {
+                    out.push((
+                        op_hash.into_kitsune(),
+                        crate::wire::WireDhtOpData { op_data: dht_op }
+                            .encode()
+                            .map_err(kitsune_p2p::KitsuneP2pError::other)?,
+                    ));
+                }
             }
             Ok(out)
         }

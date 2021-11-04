@@ -40,6 +40,7 @@ impl CellHostFnCaller {
     pub async fn new(cell_id: &CellId, handle: &ConductorHandle, dna_file: &DnaFile) -> Self {
         let env = handle.get_cell_env(cell_id).unwrap();
         let cache = handle.get_cache_env(cell_id).unwrap();
+        let keystore = env.keystore().clone();
         let network = handle.holochain_p2p().to_dna(cell_id.dna_hash().clone());
         let triggers = handle.get_cell_triggers(cell_id).unwrap();
         let cell_conductor_api = CellConductorApi::new(handle.clone(), cell_id.clone());

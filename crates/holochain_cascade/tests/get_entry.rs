@@ -279,7 +279,7 @@ async fn entry_authoring() {
     // Network
     // - Not expecting any calls to the network.
     let mut mock = MockHolochainP2pDnaT::new();
-    mock.expect_authority_for_hash().returning(|_| Ok(false));
+    mock.expect_authority_for_hash().returning(|_, _| Ok(false));
     let mock = MockNetwork::new(mock);
 
     // Cascade
@@ -307,7 +307,7 @@ async fn entry_authority() {
     // Network
     // - Not expecting any calls to the network.
     let mut mock = MockHolochainP2pDnaT::new();
-    mock.expect_authority_for_hash().returning(|_| Ok(true));
+    mock.expect_authority_for_hash().returning(|_, _| Ok(true));
     let mock = MockNetwork::new(mock);
 
     // Cascade
@@ -335,7 +335,7 @@ async fn content_not_authority_or_authoring() {
     // Network
     // - Not expecting any calls to the network.
     let mut mock = MockHolochainP2pDnaT::new();
-    mock.expect_authority_for_hash().returning(|_| Ok(false));
+    mock.expect_authority_for_hash().returning(|_, _| Ok(false));
     let mock = MockNetwork::new(mock);
 
     // Cascade
@@ -376,7 +376,7 @@ async fn content_authoring() {
     // Network
     // - Not expecting any calls to the network.
     let mut mock = MockHolochainP2pDnaT::new();
-    mock.expect_authority_for_hash().returning(|_| Ok(false));
+    mock.expect_authority_for_hash().returning(|_, _| Ok(false));
     let mock = MockNetwork::new(mock);
 
     // Cascade
@@ -402,7 +402,7 @@ async fn content_authority() {
     // Network
     // - Not expecting any calls to the network.
     let mut mock = MockHolochainP2pDnaT::new();
-    mock.expect_authority_for_hash().returning(|_| Ok(true));
+    mock.expect_authority_for_hash().returning(|_, _| Ok(true));
     let mock = MockNetwork::new(mock);
 
     // Cascade

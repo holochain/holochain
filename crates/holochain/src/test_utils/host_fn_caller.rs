@@ -114,6 +114,7 @@ impl HostFnCaller {
     ) -> HostFnCaller {
         let env = handle.get_cell_env(cell_id).unwrap();
         let cache = handle.get_cache_env(cell_id).unwrap();
+        let keystore = env.keystore().clone();
         let network = handle.holochain_p2p().to_dna(cell_id.dna_hash().clone());
 
         let zome_path = (

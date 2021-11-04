@@ -33,6 +33,7 @@ pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(60 * 
 
 #[instrument(skip(env, network, trigger_self))]
 pub async fn publish_dht_ops_workflow(
+    env: EnvWrite,
     network: &(dyn HolochainP2pDnaT + Send + Sync),
     trigger_self: &TriggerSender,
     agent: AgentPubKey,
@@ -223,10 +224,7 @@ mod tests {
     }
 
     /// Call the workflow
-    async fn call_workflow(
-        cell_network: HolochainP2pDna,
-        author: AgentPubKey,
-    ) {
+    async fn call_workflow(env: EnvWrite, cell_network: HolochainP2pDna, author: AgentPubKey) {
         let (trigger_sender, _) = TriggerSender::new();
         publish_dht_ops_workflow(env.clone().into(), &cell_network, &trigger_sender, author)
             .await

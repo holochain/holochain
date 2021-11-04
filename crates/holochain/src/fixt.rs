@@ -377,12 +377,12 @@ fixturator!(
 
 fixturator!(
     ValidateLinkHostAccess;
-    constructor fn new(HostFnWorkspaceReadOnly, HolochainP2pDna);
+    constructor fn new(HostFnWorkspace, HolochainP2pDna);
 );
 
 fixturator!(
     ValidateHostAccess;
-    constructor fn new(HostFnWorkspaceReadOnly, HolochainP2pDna);
+    constructor fn new(HostFnWorkspace, HolochainP2pDna);
 );
 
 fixturator!(
@@ -392,7 +392,7 @@ fixturator!(
 
 fixturator!(
     ValidationPackageHostAccess;
-    constructor fn new(HostFnWorkspaceReadOnly, HolochainP2pDna);
+    constructor fn new(HostFnWorkspace, HolochainP2pDna);
 );
 
 fixturator!(

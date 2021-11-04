@@ -17,12 +17,19 @@ mod tests;
 /// TODO: Currently still waiting for responses because we don't have a network call
 /// that doesn't.
 pub async fn validation_receipt_workflow(
+    vault: EnvWrite,
     network: &HolochainP2pDna,
 ) -> WorkflowResult<WorkComplete> {
     // Get the env and keystore
     let keystore = vault.keystore();
     // Who we are.
-    let validator = network.from_agent();
+
+    // Temporary workaround until we remove the need for a
+    // single validator in the next PR.
+    let validator = match vault.kind() {
+        DbKind::Cell(id) => id.agent_pubkey().clone(),
+        _ => unreachable!(),
+    };
 
     // Get out all ops that are marked for sending receipt.
     // FIXME: Test this query.
@@ -87,7 +94,7 @@ pub async fn validation_receipt_workflow(
             author,
             receipt.try_into()?,
         )
-            .await
+        .await
         {
             // No one home, they will need to publish again.
             info!(failed_send_receipt = ?e);

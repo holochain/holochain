@@ -117,6 +117,7 @@ pub trait HolochainP2pDnaT {
     /// Check if an agent is an authority for a hash.
     async fn authority_for_hash(
         &self,
+        from_agent: AgentPubKey,
         dht_hash: holo_hash::AnyDhtHash,
     ) -> actor::HolochainP2pResult<bool>;
 
@@ -302,14 +303,11 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     /// Check if an agent is an authority for a hash.
     async fn authority_for_hash(
         &self,
+        from_agent: AgentPubKey,
         dht_hash: holo_hash::AnyDhtHash,
     ) -> actor::HolochainP2pResult<bool> {
         self.sender
-            .authority_for_hash(
-                (*self.dna_hash).clone(),
-                (*self.from_agent).clone(),
-                dht_hash,
-            )
+            .authority_for_hash((*self.dna_hash).clone(), from_agent, dht_hash)
             .await
     }
 

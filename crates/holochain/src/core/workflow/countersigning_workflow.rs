@@ -104,6 +104,8 @@ pub(crate) fn incoming_countersigning(
 /// Countersigning workflow that checks for complete sessions and
 /// pushes the complete ops to validation then messages the signers.
 pub(crate) async fn countersigning_workflow(
+    env: &EnvWrite,
+    workspace: &CountersigningWorkspace,
     network: &(dyn HolochainP2pDnaT + Send + Sync),
     sys_validation_trigger: &TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
@@ -135,6 +137,7 @@ pub(crate) async fn countersigning_workflow(
 
 /// An incoming countersigning session success.
 pub(crate) async fn countersigning_success(
+    vault: EnvWrite,
     network: &HolochainP2pDna,
     author: AgentPubKey,
     signed_headers: Vec<SignedHeader>,
@@ -209,7 +212,7 @@ pub(crate) async fn countersigning_success(
 
     // Check which ops we are the authority for and self publish if we are.
     for (op_hash, basis) in this_cell_headers_op_basis_hashes {
-        if network.authority_for_hash(basis).await? {
+        if network.authority_for_hash(author.clone(), basis).await? {
             ops_to_self_publish.push(op_hash);
         }
     }

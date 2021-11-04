@@ -152,7 +152,7 @@ fixturator!(
     curve Empty {
         tokio_helper::block_forever_on(async {
             let holochain_p2p = crate::test::stub_network().await;
-            holochain_p2p.to_cell(
+            holochain_p2p.to_dna(
                 DnaHashFixturator::new(Empty).next().unwrap(),
             )
         })

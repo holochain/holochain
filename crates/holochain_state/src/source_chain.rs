@@ -9,7 +9,7 @@ use holo_hash::DnaHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::HolochainP2pCellT;
+use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::dht_op::produce_op_lights_from_elements;
 use holochain_types::dht_op::produce_op_lights_from_iter;
@@ -548,7 +548,7 @@ impl SourceChain {
     #[async_recursion]
     pub async fn flush(
         &self,
-        network: &(dyn HolochainP2pCellT + Send + Sync),
+        network: &(dyn HolochainP2pDnaT + Send + Sync),
     ) -> SourceChainResult<Vec<(Option<Zome>, SignedHeaderHashed)>> {
         // Nothing to write
         if self.scratch.apply(|s| s.is_empty())? {
@@ -566,7 +566,10 @@ impl SourceChain {
             })?;
         let mut ops_to_integrate = HashSet::with_capacity(ops.len());
         for op in &ops {
-            if network.authority_for_hash(op.0.dht_basis().clone()).await? {
+            if network
+                .authority_for_hash((*self.author).clone(), op.0.dht_basis().clone())
+                .await?
+            {
                 ops_to_integrate.insert(op.1.clone());
             }
         }
@@ -1106,7 +1109,7 @@ pub mod tests {
     use crate::prelude::*;
     use ::fixt::prelude::*;
     use hdk::prelude::*;
-    use holochain_p2p::MockHolochainP2pCellT;
+    use holochain_p2p::MockHolochainP2pDnaT;
     use matches::assert_matches;
 
     use crate::source_chain::SourceChainResult;
@@ -1119,8 +1122,8 @@ pub mod tests {
         let alice = fixt!(AgentPubKey, Predictable, 0);
         let zome = fixt!(Zome);
 
-        let mut mock = MockHolochainP2pCellT::new();
-        mock.expect_authority_for_hash().returning(|_| Ok(false));
+        let mut mock = MockHolochainP2pDnaT::new();
+        mock.expect_authority_for_hash().returning(|_, _| Ok(false));
 
         source_chain::genesis(env.clone(), fake_dna_hash(1), alice.clone(), None)
             .await
@@ -1190,8 +1193,8 @@ pub mod tests {
         let env = test_env.env();
         let alice = fixt!(AgentPubKey, Predictable, 0);
 
-        let mut mock = MockHolochainP2pCellT::new();
-        mock.expect_authority_for_hash().returning(|_| Ok(false));
+        let mut mock = MockHolochainP2pDnaT::new();
+        mock.expect_authority_for_hash().returning(|_, _| Ok(false));
 
         source_chain::genesis(env.clone(), fake_dna_hash(1), alice.clone(), None)
             .await
@@ -1305,8 +1308,8 @@ pub mod tests {
         let secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
         let access = CapAccess::from(secret.unwrap());
         let zome = fixt!(Zome);
-        let mut mock = MockHolochainP2pCellT::new();
-        mock.expect_authority_for_hash().returning(|_| Ok(false));
+        let mut mock = MockHolochainP2pDnaT::new();
+        mock.expect_authority_for_hash().returning(|_, _| Ok(false));
 
         // @todo curry
         let _curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
@@ -1521,8 +1524,8 @@ pub mod tests {
         observability::test_run().ok();
         let test_env = test_cell_env();
         let vault = test_env.env();
-        let mut mock = MockHolochainP2pCellT::new();
-        mock.expect_authority_for_hash().returning(|_| Ok(false));
+        let mut mock = MockHolochainP2pDnaT::new();
+        mock.expect_authority_for_hash().returning(|_, _| Ok(false));
 
         let zome = fixt!(Zome);
 

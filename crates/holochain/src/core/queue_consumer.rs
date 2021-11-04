@@ -69,7 +69,8 @@ use super::workflow::error::WorkflowError;
 /// a race condition by trying to run a workflow too soon after cell creation.
 #[allow(clippy::too_many_arguments)]
 pub async fn spawn_queue_consumer_tasks(
-    cell_id: CellId,
+    env: EnvWrite,
+    cache: EnvWrite,
     network: HolochainP2pDna,
     conductor_handle: ConductorHandle,
     conductor_api: impl CellConductorApiT + 'static,
@@ -77,13 +78,13 @@ pub async fn spawn_queue_consumer_tasks(
     stop: sync::broadcast::Sender<()>,
     countersigning_workspace: CountersigningWorkspace,
 ) -> (QueueTriggers, InitialQueueTriggers) {
-    let cell_id = cell_network.cell_id();
+    let cell_id = conductor_api.cell_id().clone();
     // Publish
     let (tx_publish, handle) = spawn_publish_dht_ops_consumer(
         env.clone(),
         conductor_handle.clone(),
         stop.subscribe(),
-        Box::new(cell_network.clone()),
+        Box::new(network.clone()),
     );
     task_sender
         .send(ManagedTaskAdd::cell_critical(
@@ -99,7 +100,7 @@ pub async fn spawn_queue_consumer_tasks(
         env.clone(),
         conductor_handle.clone(),
         stop.subscribe(),
-        cell_network.clone(),
+        network.clone(),
     );
     task_sender
         .send(ManagedTaskAdd::cell_critical(
@@ -114,10 +115,10 @@ pub async fn spawn_queue_consumer_tasks(
     let (tx_integration, handle) = spawn_integrate_dht_ops_consumer(
         env.clone(),
         conductor_handle.clone(),
-        cell_network.cell_id(),
+        cell_id.clone(),
         stop.subscribe(),
         tx_receipt.clone(),
-        cell_network.clone(),
+        network.clone(),
     );
     task_sender
         .send(ManagedTaskAdd::cell_critical(
@@ -136,7 +137,7 @@ pub async fn spawn_queue_consumer_tasks(
         stop.subscribe(),
         tx_integration.clone(),
         conductor_api.clone(),
-        cell_network.clone(),
+        network.clone(),
     );
     task_sender
         .send(ManagedTaskAdd::cell_critical(
@@ -154,7 +155,7 @@ pub async fn spawn_queue_consumer_tasks(
         conductor_handle.clone(),
         stop.subscribe(),
         tx_app.clone(),
-        cell_network.clone(),
+        network.clone(),
         conductor_api,
     );
     task_sender
@@ -170,7 +171,7 @@ pub async fn spawn_queue_consumer_tasks(
         stop.subscribe(),
         conductor_handle.clone(),
         countersigning_workspace,
-        cell_network.clone(),
+        network.clone(),
         tx_sys.clone(),
     );
     task_sender

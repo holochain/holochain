@@ -165,6 +165,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
 
     async fn authority_for_hash(
         &self,
+        _agent: AgentPubKey,
         _dht_hash: holo_hash::AnyDhtHash,
     ) -> actor::HolochainP2pResult<bool> {
         Ok(self.authority)
@@ -219,7 +220,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
 
     async fn join(&self, _agent: AgentPubKey) -> actor::HolochainP2pResult<()> {
         todo!()
-}
+    }
 
     async fn leave(&self, _agent: AgentPubKey) -> actor::HolochainP2pResult<()> {
         todo!()
@@ -237,6 +238,8 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         todo!()
     }
 }
+
+pub fn fill_db(env: &EnvWrite, op: DhtOpHashed) {
     env.conn()
         .unwrap()
         .with_commit_sync(|txn| {
@@ -337,9 +340,14 @@ impl HolochainP2pDnaT for MockNetwork {
 
     async fn authority_for_hash(
         &self,
+        agent: AgentPubKey,
         dht_hash: holo_hash::AnyDhtHash,
     ) -> actor::HolochainP2pResult<bool> {
-        self.0.lock().await.authority_for_hash(dht_hash).await
+        self.0
+            .lock()
+            .await
+            .authority_for_hash(agent, dht_hash)
+            .await
     }
 
     fn dna_hash(&self) -> holo_hash::DnaHash {

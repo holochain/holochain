@@ -7,7 +7,7 @@ use crate::core::ribosome::guest_callback::post_commit::send_post_commit;
 use crate::core::ribosome::RibosomeT;
 use derive_more::Constructor;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pDna;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
 use holochain_zome_types::header::builder;
@@ -27,7 +27,7 @@ where
 #[instrument(skip(network, keystore, workspace, args))]
 pub async fn initialize_zomes_workflow<Ribosome, C>(
     workspace: HostFnWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
     keystore: MetaLairClient,
     args: InitializeZomesWorkflowArgs<Ribosome, C>,
 ) -> WorkflowResult<InitResult>
@@ -50,6 +50,8 @@ where
     Ok(result)
 }
 
+async fn initialize_zomes_workflow_inner<Ribosome, C>(
+    workspace: HostFnWorkspace,
     network: HolochainP2pDna,
     keystore: MetaLairClient,
     args: InitializeZomesWorkflowArgs<Ribosome, C>,
@@ -106,6 +108,7 @@ pub mod tests {
     use crate::test_utils::fake_genesis;
     use ::fixt::prelude::*;
     use fixt::Unpredictable;
+    use holo_hash::DnaHash;
     use holochain_p2p::HolochainP2pDnaFixturator;
     use holochain_state::prelude::test_cache_env;
     use holochain_state::prelude::test_cell_env;

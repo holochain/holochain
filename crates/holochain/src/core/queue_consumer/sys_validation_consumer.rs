@@ -23,7 +23,7 @@ pub fn spawn_sys_validation_consumer(
     conductor_handle: ConductorHandle,
     mut stop: sync::broadcast::Receiver<()>,
     trigger_app_validation: TriggerSender,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
     conductor_api: impl CellConductorApiT + 'static,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
     let (tx, mut rx) = TriggerSender::new();
@@ -53,7 +53,7 @@ pub fn spawn_sys_validation_consumer(
                 Err(err) => {
                     handle_workflow_error(
                         conductor_handle.clone(),
-                        network.cell_id(),
+                        conductor_api.cell_id().clone(),
                         err,
                         "sys_validation failure",
                     )

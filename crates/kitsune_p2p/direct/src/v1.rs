@@ -671,9 +671,9 @@ async fn handle_events(
                     ..
                 } => {
                     respond.r(Ok(handle_call(kdirect.clone(), space, to_agent, payload)
-                    .map_err(KitsuneP2pError::other)
-                    .boxed()
-                    .into()));
+                        .map_err(KitsuneP2pError::other)
+                        .boxed()
+                        .into()));
                 }
                 event::KitsuneP2pEvent::Notify {
                     respond,

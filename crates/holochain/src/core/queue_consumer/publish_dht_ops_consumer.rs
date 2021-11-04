@@ -4,6 +4,7 @@ use super::*;
 
 use crate::conductor::manager::ManagedTaskResult;
 use crate::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
+use holochain_sqlite::db::DbKind;
 use tokio::task::JoinHandle;
 use tracing::*;
 
@@ -13,11 +14,18 @@ pub fn spawn_publish_dht_ops_consumer(
     env: EnvWrite,
     conductor_handle: ConductorHandle,
     mut stop: sync::broadcast::Receiver<()>,
-    cell_network: Box<dyn HolochainP2pCellT + Send + Sync>,
+    cell_network: Box<dyn HolochainP2pDnaT + Send + Sync>,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
     // Create a trigger with an exponential back off starting at 1 minute
     // and maxing out at 5 minutes.
     // The back off is reset any time the trigger is called (when new data is committed)
+
+    // Temporary workaround until we remove the need for an
+    // cell id in the next PR.
+    let cell_id = match env.kind() {
+        DbKind::Cell(id) => id.clone(),
+        _ => unreachable!(),
+    };
     let (tx, mut rx) =
         TriggerSender::new_with_loop(Duration::from_secs(60)..Duration::from_secs(60 * 5), true);
     let trigger_self = tx.clone();
@@ -40,14 +48,19 @@ pub fn spawn_publish_dht_ops_consumer(
             }
 
             // Run the workflow
-            match publish_dht_ops_workflow(env.clone(), cell_network.as_ref(), &trigger_self).await
+            match publish_dht_ops_workflow(
+                env.clone(),
+                cell_network.as_ref(),
+                &trigger_self,
+                cell_id.agent_pubkey().clone(),
+            )
+            .await
             {
                 Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
                 Err(err) => {
-                    let cell_id = cell_network.cell_id();
                     handle_workflow_error(
                         conductor_handle.clone(),
-                        cell_id,
+                        cell_id.clone(),
                         err,
                         "publish_dht_ops failure",
                     )

@@ -419,11 +419,7 @@ impl HolochainP2pMockMsg {
                 let to_agent = holo_hash::AgentPubKey::from_kitsune(&to_agent);
                 let dna = holo_hash::DnaHash::from_kitsune(&space);
                 let msg = crate::wire::WireMessage::decode(data.as_ref()).unwrap();
-                HolochainP2pMockMsg::Wire {
-                    to_agent,
-                    msg,
-                    dna,
-                }
+                HolochainP2pMockMsg::Wire { to_agent, msg, dna }
             }
             kwire::Wire::Broadcast(kwire::Broadcast {
                 to_agent,
@@ -440,11 +436,7 @@ impl HolochainP2pMockMsg {
                 let to_agent = holo_hash::AgentPubKey::from_kitsune(&to_agent);
                 let dna = holo_hash::DnaHash::from_kitsune(&space);
                 let msg = crate::wire::WireMessage::decode(data.as_ref()).unwrap();
-                HolochainP2pMockMsg::Wire {
-                    to_agent,
-                    msg,
-                    dna,
-                }
+                HolochainP2pMockMsg::Wire { to_agent, msg, dna }
             }
             kwire::Wire::Gossip(kwire::Gossip {
                 data,

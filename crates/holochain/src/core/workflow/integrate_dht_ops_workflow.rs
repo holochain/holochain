@@ -16,7 +16,7 @@ mod query_tests;
 #[cfg(feature = "test_utils")]
 mod tests;
 
-#[instrument(skip(vault, trigger_receipt, cell_network))]
+#[instrument(skip(vault, trigger_receipt, network))]
 pub async fn integrate_dht_ops_workflow(
     vault: EnvWrite,
     trigger_receipt: TriggerSender,

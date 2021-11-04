@@ -67,7 +67,7 @@ async fn standard_responses(
     }
     evt_handler
         .expect_handle_gossip()
-        .returning(|_, _, _| Ok(async { Ok(()) }.boxed().into()));
+        .returning(|_, _| Ok(async { Ok(()) }.boxed().into()));
     evt_handler
 }
 

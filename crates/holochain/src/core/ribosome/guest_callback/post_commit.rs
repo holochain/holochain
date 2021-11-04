@@ -6,8 +6,8 @@ use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::HolochainP2pCell;
-use holochain_p2p::HolochainP2pCellT;
+use holochain_p2p::HolochainP2pDna;
+use holochain_p2p::HolochainP2pDnaT;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
@@ -32,7 +32,7 @@ impl PostCommitInvocation {
 pub struct PostCommitHostAccess {
     pub workspace: HostFnWorkspace,
     pub keystore: MetaLairClient,
-    pub network: HolochainP2pCell,
+    pub network: HolochainP2pDna,
 }
 
 impl From<PostCommitHostAccess> for HostContext {
@@ -78,7 +78,7 @@ impl TryFrom<PostCommitInvocation> for ExternIO {
 pub async fn send_post_commit<C>(
     conductor_api: C,
     workspace: HostFnWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
     keystore: MetaLairClient,
     zomed_headers: Vec<(Option<Zome>, SignedHeaderHashed)>,
 ) -> Result<(), tokio::sync::mpsc::error::SendError<()>>
@@ -110,7 +110,10 @@ where
                         network: network.clone(),
                     },
                     invocation: PostCommitInvocation::new(zome, headers),
-                    cell_id: CellId::new(network.dna_hash().clone(), network.from_agent().clone()),
+                    cell_id: CellId::new(
+                        network.dna_hash().clone(),
+                        conductor_api.cell_id().agent_pubkey().clone(),
+                    ),
                 });
         }
     }

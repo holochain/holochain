@@ -13,6 +13,7 @@ use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_p2p::HolochainP2pDna;
 use holochain_p2p::HolochainP2pDnaT;
+use holochain_sqlite::db::ReadManager;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::HostFnStores;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
@@ -52,6 +53,7 @@ pub async fn sys_validation_workflow(
     sys_validation_trigger: TriggerSender,
     // TODO: Update HolochainP2p to reflect changes to pass through network.
     network: HolochainP2pDna,
+    conductor_api: impl CellConductorApiT,
 ) -> WorkflowResult<WorkComplete> {
     let complete = sys_validation_workflow_inner(
         Arc::new(workspace),
@@ -72,6 +74,7 @@ pub async fn sys_validation_workflow(
 async fn sys_validation_workflow_inner(
     workspace: Arc<SysValidationWorkspace>,
     network: HolochainP2pDna,
+    conductor_api: impl CellConductorApiT,
     sys_validation_trigger: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     let env = workspace.vault.clone().into();
@@ -161,6 +164,7 @@ async fn validate_op(
     op: &DhtOp,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
+    conductor_api: &impl CellConductorApiT,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> WorkflowResult<Outcome> {
     match validate_op_inner(
@@ -239,6 +243,7 @@ async fn validate_op_inner(
     op: &DhtOp,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
+    conductor_api: &impl CellConductorApiT,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
     match op {
@@ -373,6 +378,7 @@ pub async fn sys_validate_element(
     element: &Element,
     call_zome_workspace: &HostFnWorkspace,
     network: HolochainP2pDna,
+    conductor_api: &impl CellConductorApiT,
 ) -> SysValidationOutcome<()> {
     trace!(?element);
     // Create a SysValidationWorkspace with the scratches from the CallZomeWorkspace
@@ -397,6 +403,7 @@ async fn sys_validate_element_inner(
     element: &Element,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
+    conductor_api: &impl CellConductorApiT,
 ) -> SysValidationResult<()> {
     let signature = element.signature();
     let header = element.header();
@@ -408,6 +415,7 @@ async fn sys_validate_element_inner(
         maybe_entry: Option<&Entry>,
         workspace: &SysValidationWorkspace,
         network: HolochainP2pDna,
+        conductor_api: &impl CellConductorApiT,
     ) -> SysValidationResult<()> {
         let incoming_dht_ops_sender = None;
         store_element(header, workspace, network.clone()).await?;

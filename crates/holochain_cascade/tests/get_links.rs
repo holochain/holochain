@@ -82,7 +82,7 @@ async fn links_authority() {
     // Network
     // - Not expecting any calls to the network.
     let mut mock = MockHolochainP2pDnaT::new();
-    mock.expect_authority_for_hash().returning(|_| Ok(true));
+    mock.expect_authority_for_hash().returning(|_, _| Ok(true));
     let mock = MockNetwork::new(mock);
 
     // Cascade
@@ -136,7 +136,7 @@ async fn links_authoring() {
     // Network
     // - Not expecting any calls to the network.
     let mut mock = MockHolochainP2pDnaT::new();
-    mock.expect_authority_for_hash().returning(|_| Ok(false));
+    mock.expect_authority_for_hash().returning(|_, _| Ok(false));
     mock.expect_get_links().returning(|_, _| {
         Ok(vec![WireLinkOps {
             creates: vec![],
