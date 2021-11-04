@@ -477,6 +477,50 @@ impl RibosomeT for RealRibosome {
         self.dna_file.dna()
     }
 
+    fn zome_info(&self, zome: Zome) -> RibosomeResult<ZomeInfo> {
+        Ok(ZomeInfo {
+            name: zome.zome_name().clone(),
+            id: self
+                .zome_to_id(&zome)
+                .expect("Failed to get ID for current zome"),
+            properties: SerializedBytes::default(),
+            entry_defs: {
+                match self
+                    .run_entry_defs(EntryDefsHostAccess, EntryDefsInvocation)
+                    .map_err(|e| WasmError::Host(e.to_string()))?
+                {
+                    EntryDefsResult::Err(zome, error_string) => {
+                        return Err(RibosomeError::WasmError(WasmError::Host(format!(
+                            "{}: {}",
+                            zome, error_string
+                        ))))
+                    }
+                    EntryDefsResult::Defs(defs) => match defs.get(zome.zome_name()) {
+                        Some(entry_defs) => entry_defs.clone(),
+                        None => Vec::new().into(),
+                    },
+                }
+            },
+            extern_fns: {
+                match zome.zome_def() {
+                    ZomeDef::Wasm(_) => {
+                        let module = self.module(zome.zome_name())?;
+
+                        let mut extern_fns: Vec<FunctionName> = module
+                            .info()
+                            .exports
+                            .iter()
+                            .map(|(name, _index)| FunctionName::new(name))
+                            .collect();
+                        extern_fns.sort();
+                        extern_fns
+                    }
+                    ZomeDef::Inline(zome) => zome.callbacks(),
+                }
+            },
+        })
+    }
+
     /// call a function in a zome for an invocation if it exists
     /// if it does not exist then return Ok(None)
     fn maybe_call<I: Invocation>(

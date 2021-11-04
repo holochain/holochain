@@ -18,6 +18,8 @@ pub struct ZomeInfo {
     pub id: ZomeId,
     pub properties: SerializedBytes,
     pub entry_defs: EntryDefs,
+    // @todo make this include function signatures when they exist.
+    pub extern_fns: Vec<FunctionName>,
 }
 
 impl ZomeInfo {
@@ -26,12 +28,14 @@ impl ZomeInfo {
         id: ZomeId,
         properties: SerializedBytes,
         entry_defs: EntryDefs,
+        extern_fns: Vec<FunctionName>,
     ) -> Self {
         Self {
             name,
             id,
             properties,
             entry_defs,
+            extern_fns,
         }
     }
 }

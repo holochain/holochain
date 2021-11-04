@@ -46,6 +46,12 @@ impl InlineZome {
         Self::new(nanoid::nanoid!(), entry_defs)
     }
 
+    pub fn callbacks(&self) -> Vec<FunctionName> {
+        let mut keys: Vec<FunctionName> = self.callbacks.keys().cloned().collect();
+        keys.sort();
+        keys
+    }
+
     /// Define a new zome function or callback with the given name
     pub fn callback<F, I, O>(mut self, name: &str, f: F) -> Self
     where
