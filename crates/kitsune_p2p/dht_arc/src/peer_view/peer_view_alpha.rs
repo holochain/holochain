@@ -25,7 +25,12 @@ impl Default for PeerStratAlpha {
 
 impl PeerStratAlpha {
     pub fn view(&self, arc: DhtArc, peers: &[DhtArc]) -> PeerViewAlpha {
-        todo!()
+        let peers: Vec<DhtArc> = peers
+            .into_iter()
+            .filter(|a| arc.contains(a.center_loc))
+            .copied()
+            .collect();
+        Self::view_unchecked(self, arc, peers.as_slice())
     }
 
     pub fn view_unchecked(&self, arc: DhtArc, peers: &[DhtArc]) -> PeerViewAlpha {
