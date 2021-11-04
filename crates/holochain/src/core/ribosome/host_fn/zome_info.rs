@@ -72,14 +72,14 @@ pub mod test {
         assert_eq!(
             zome_info.extern_fns,
             vec![
-                FunctionName::new("memory"),
-                FunctionName::new("entry_defs"),
-                FunctionName::new("assert_indexes"),
-                FunctionName::new("zome_info"),
                 FunctionName::new("__allocate"),
-                FunctionName::new("__deallocate"),
                 FunctionName::new("__data_end"),
+                FunctionName::new("__deallocate"),
                 FunctionName::new("__heap_base"),
+                FunctionName::new("assert_indexes"),
+                FunctionName::new("entry_defs"),
+                FunctionName::new("memory"),
+                FunctionName::new("zome_info"),
             ],
         );
     }

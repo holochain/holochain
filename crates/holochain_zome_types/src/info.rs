@@ -16,6 +16,7 @@ pub struct ZomeInfo {
     pub name: ZomeName,
     /// The position of this zome in the `dna.json`
     pub id: ZomeId,
+    pub properties: SerializedBytes,
     pub entry_defs: EntryDefs,
     // @todo make this include function signatures when they exist.
     pub extern_fns: Vec<FunctionName>,
@@ -25,12 +26,14 @@ impl ZomeInfo {
     pub fn new(
         name: ZomeName,
         id: ZomeId,
+        properties: SerializedBytes,
         entry_defs: EntryDefs,
         extern_fns: Vec<FunctionName>,
     ) -> Self {
         Self {
             name,
             id,
+            properties,
             entry_defs,
             extern_fns,
         }

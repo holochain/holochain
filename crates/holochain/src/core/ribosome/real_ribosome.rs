@@ -483,6 +483,7 @@ impl RibosomeT for RealRibosome {
             id: self
                 .zome_to_id(&zome)
                 .expect("Failed to get ID for current zome"),
+            properties: SerializedBytes::default(),
             entry_defs: {
                 match self
                     .run_entry_defs(EntryDefsHostAccess, EntryDefsInvocation)
@@ -505,12 +506,14 @@ impl RibosomeT for RealRibosome {
                     ZomeDef::Wasm(_) => {
                         let module = self.module(zome.zome_name())?;
 
-                        module
+                        let mut extern_fns: Vec<FunctionName> = module
                             .info()
                             .exports
                             .iter()
                             .map(|(name, _index)| FunctionName::new(name))
-                            .collect()
+                            .collect();
+                        extern_fns.sort();
+                        extern_fns
                     }
                     ZomeDef::Inline(zome) => zome.callbacks(),
                 }
