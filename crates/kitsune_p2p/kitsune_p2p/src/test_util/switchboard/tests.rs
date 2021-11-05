@@ -26,13 +26,13 @@ async fn fullsync_3way_recent() {
         sb.add_local_agent(&n2, &a2);
         sb.add_local_agent(&n3, &a3);
 
-        sb.add_ops_now(&a1, true, [10, 20, 30]);
-        sb.add_ops_now(&a2, true, [-10, -20, -30]);
-        sb.add_ops_now(&a3, true, [-15, 15]);
+        sb.add_ops_now(&n1, true, [10, 20, 30]);
+        sb.add_ops_now(&n2, true, [-10, -20, -30]);
+        sb.add_ops_now(&n3, true, [-15, 15]);
 
         // we wouldn't expect this op to be gossiped, since it's from 50+ years ago
         // and hardly "recent"
-        sb.add_ops_timed(&a3, true, [(40, Timestamp::from_micros(1))]);
+        sb.add_ops_timed(&n3, true, [(40, Timestamp::from_micros(1))]);
 
         sb.exchange_all_peer_info();
 
@@ -74,9 +74,9 @@ async fn sharded_3way_recent() {
 
         sb.print_ascii_arcs(128, true);
 
-        sb.add_ops_now(&a1, true, [10, 20, 30, 40, 50, 60, 70, 80]);
-        sb.add_ops_now(&a2, true, [-10, -20, -30, -40, -50, -60, -70, -80]);
-        sb.add_ops_now(&a3, true, [90, 120, -120, -90]);
+        sb.add_ops_now(&n1, true, [10, 20, 30, 40, 50, 60, 70, 80]);
+        sb.add_ops_now(&n2, true, [-10, -20, -30, -40, -50, -60, -70, -80]);
+        sb.add_ops_now(&n3, true, [90, 120, -120, -90]);
 
         sb.exchange_all_peer_info();
     });
@@ -156,7 +156,7 @@ async fn transitive_peer_gossip() {
 
         // Once 3 integrates a new op, it will trigger initialize with 4,
         // letting 4 know about 1.
-        sb.add_ops_now(&a3, true, [11]);
+        sb.add_ops_now(&n3, true, [11]);
     });
 
     tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
@@ -197,10 +197,10 @@ async fn sharded_4way_recent() {
         sb.add_local_agent(&n3, &a3);
         sb.add_local_agent(&n4, &a4);
 
-        sb.add_ops_now(&a1, true, ops[0..8].to_vec());
-        sb.add_ops_now(&a2, true, ops[8..16].to_vec());
-        sb.add_ops_now(&a3, true, ops[16..24].to_vec());
-        sb.add_ops_now(&a4, true, ops[24..32].to_vec());
+        sb.add_ops_now(&n1, true, ops[0..8].to_vec());
+        sb.add_ops_now(&n2, true, ops[8..16].to_vec());
+        sb.add_ops_now(&n3, true, ops[16..24].to_vec());
+        sb.add_ops_now(&n4, true, ops[24..32].to_vec());
 
         sb.inject_peer_info(&n1, [&a2]);
         sb.inject_peer_info(&n2, [&a3]);
@@ -281,10 +281,10 @@ async fn sharded_4way_historical() {
         sb.add_local_agent(&n3, &a3);
         sb.add_local_agent(&n4, &a4);
 
-        sb.add_ops_timed(&a1, true, ops_timed[0..8].to_vec());
-        sb.add_ops_timed(&a2, true, ops_timed[8..16].to_vec());
-        sb.add_ops_timed(&a3, true, ops_timed[16..24].to_vec());
-        sb.add_ops_timed(&a4, true, ops_timed[24..32].to_vec());
+        sb.add_ops_timed(&n1, true, ops_timed[0..8].to_vec());
+        sb.add_ops_timed(&n2, true, ops_timed[8..16].to_vec());
+        sb.add_ops_timed(&n3, true, ops_timed[16..24].to_vec());
+        sb.add_ops_timed(&n4, true, ops_timed[24..32].to_vec());
 
         sb.exchange_all_peer_info();
 
