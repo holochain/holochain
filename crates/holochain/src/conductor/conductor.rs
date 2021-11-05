@@ -1294,18 +1294,20 @@ where
     }
 
     pub(super) async fn get_state(&self) -> ConductorResult<ConductorState> {
-        self.conductor_env.conn()?.with_reader(|txn| {
-            let state = txn
-                .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
-                    row.get("blob")
-                })
-                .optional()?;
-            let state = match state {
-                Some(state) => from_blob(state)?,
-                None => ConductorState::default(),
-            };
-            Ok(state)
-        })
+        self.conductor_env
+            .async_reader(|txn| {
+                let state = txn
+                    .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
+                        row.get("blob")
+                    })
+                    .optional()?;
+                let state = match state {
+                    Some(state) => from_blob(state)?,
+                    None => ConductorState::default(),
+                };
+                Ok(state)
+            })
+            .await
     }
 
     /// Update the internal state with a pure function mapping old state to new

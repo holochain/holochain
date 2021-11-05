@@ -13,7 +13,6 @@ use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_p2p::HolochainP2pCell;
 use holochain_p2p::HolochainP2pCellT;
-use holochain_sqlite::db::ReadManager;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::HostFnStores;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
@@ -745,11 +744,12 @@ impl SysValidationWorkspace {
             scratch: None,
         }
     }
-    pub fn is_chain_empty(&self, author: &AgentPubKey) -> SourceChainResult<bool> {
-        let mut conn = self.vault.conn()?;
-        let chain_not_empty = conn.with_reader(|txn| {
-            let mut stmt = txn.prepare(
-                "
+    pub async fn is_chain_empty(&self, author: AgentPubKey) -> SourceChainResult<bool> {
+        let chain_not_empty = self
+            .vault
+            .async_reader(move |txn| {
+                let mut stmt = txn.prepare(
+                    "
                 SELECT
                 EXISTS (
                     SELECT
@@ -766,28 +766,33 @@ impl SysValidationWorkspace {
                     LIMIT 1
                 )
                 ",
-            )?;
-            DatabaseResult::Ok(stmt.query_row(
-                named_params! {
-                    ":author": author,
-                    ":activity": DhtOpType::RegisterAgentActivity,
-                },
-                |row| row.get(0),
-            )?)
-        })?;
+                )?;
+                DatabaseResult::Ok(stmt.query_row(
+                    named_params! {
+                        ":author": author,
+                        ":activity": DhtOpType::RegisterAgentActivity,
+                    },
+                    |row| row.get(0),
+                )?)
+            })
+            .await?;
         let chain_not_empty = match &self.scratch {
             Some(scratch) => scratch.apply(|scratch| !scratch.is_empty())? || chain_not_empty,
             None => chain_not_empty,
         };
         Ok(!chain_not_empty)
     }
-    pub fn header_seq_is_empty(&self, header: &Header) -> SourceChainResult<bool> {
-        let author = header.author();
+    pub async fn header_seq_is_empty(&self, header: &Header) -> SourceChainResult<bool> {
+        let author = header.author().clone();
         let seq = header.header_seq();
         let hash = HeaderHash::with_data_sync(header);
-        let header_seq_is_not_empty = self.vault.conn()?.with_reader(|txn| {
-            DatabaseResult::Ok(txn.query_row(
-                "
+        let header_seq_is_not_empty = self
+            .vault
+            .async_reader({
+                let hash = hash.clone();
+                move |txn| {
+                    DatabaseResult::Ok(txn.query_row(
+                        "
                 SELECT EXISTS(
                     SELECT
                     1
@@ -800,14 +805,16 @@ impl SysValidationWorkspace {
                     Header.hash != :hash
                 )
                 ",
-                named_params! {
-                    ":author": author,
-                    ":seq": seq,
-                    ":hash": hash,
-                },
-                |row| row.get(0),
-            )?)
-        })?;
+                        named_params! {
+                            ":author": author,
+                            ":seq": seq,
+                            ":hash": hash,
+                        },
+                        |row| row.get(0),
+                    )?)
+                }
+            })
+            .await?;
         let header_seq_is_not_empty = match &self.scratch {
             Some(scratch) => {
                 scratch.apply(|scratch| {
