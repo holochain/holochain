@@ -40,7 +40,7 @@ use guest_callback::validate::ValidateHostAccess;
 use guest_callback::validation_package::ValidationPackageHostAccess;
 use holo_hash::AgentPubKey;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
@@ -154,7 +154,7 @@ impl HostContext {
     }
 
     /// Get the network, panics if none was provided
-    pub fn network(&self) -> &HolochainP2pCell {
+    pub fn network(&self) -> &HolochainP2pDna {
         match self {
             Self::ZomeCall(ZomeCallHostAccess { network, .. })
             | Self::Init(InitHostAccess { network, .. })
@@ -411,7 +411,7 @@ impl From<ZomeCallInvocation> for ZomeCall {
 pub struct ZomeCallHostAccess {
     pub workspace: HostFnWorkspace,
     pub keystore: MetaLairClient,
-    pub network: HolochainP2pCell,
+    pub network: HolochainP2pDna,
     pub signal_tx: SignalBroadcaster,
     pub call_zome_handle: CellConductorReadHandle,
     // NB: this is kind of an odd place for this, since CellId is not really a special
@@ -573,7 +573,6 @@ pub mod wasm_test {
             let input = $input.clone();
             tokio::task::spawn(async move {
                 use holo_hash::*;
-                use holochain_p2p::HolochainP2pCellT;
                 use $crate::core::ribosome::RibosomeT;
 
                 let ribosome =
@@ -583,7 +582,8 @@ pub mod wasm_test {
                     .next()
                     .unwrap();
 
-                let author = host_access.cell_id.agent_pubkey().clone();
+                let cell_id = host_access.cell_id.clone();
+                let author = cell_id.agent_pubkey().clone();
 
                 // Required because otherwise the network will return routing errors
                 let test_network = crate::test_utils::test_network(
@@ -591,12 +591,8 @@ pub mod wasm_test {
                     Some(author),
                 )
                 .await;
-                let cell_network = test_network.cell_network();
-                let cell_id = holochain_zome_types::cell::CellId::new(
-                    cell_network.dna_hash(),
-                    cell_network.from_agent(),
-                );
-                host_access.network = cell_network;
+                let dna_network = test_network.dna_network();
+                host_access.network = dna_network;
 
                 let invocation =
                     $crate::fixt::ZomeCallInvocationFixturator::new($crate::fixt::NamedInvocation(

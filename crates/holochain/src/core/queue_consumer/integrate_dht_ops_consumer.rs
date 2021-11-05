@@ -7,14 +7,14 @@ use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for DhtOpIntegration workflow
-#[instrument(skip(env, conductor_handle, stop, trigger_receipt, cell_network))]
+#[instrument(skip(env, conductor_handle, stop, trigger_receipt, dna_network))]
 pub fn spawn_integrate_dht_ops_consumer(
     env: EnvWrite,
     conductor_handle: ConductorHandle,
     cell_id: CellId,
     mut stop: sync::broadcast::Receiver<()>,
     trigger_receipt: TriggerSender,
-    cell_network: HolochainP2pCell,
+    dna_network: HolochainP2pDna,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
     let (tx, mut rx) = TriggerSender::new();
     let trigger_self = tx.clone();
@@ -32,7 +32,7 @@ pub fn spawn_integrate_dht_ops_consumer(
             match integrate_dht_ops_workflow(
                 env.clone(),
                 trigger_receipt.clone(),
-                cell_network.clone(),
+                dna_network.clone(),
             )
             .await
             {

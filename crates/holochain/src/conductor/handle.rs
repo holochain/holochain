@@ -74,8 +74,7 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_p2p::DnaHashExt;
-
-use holochain_p2p::HolochainP2pCellT;
+use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::db::DbKind;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::source_chain;
@@ -1397,9 +1396,9 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
             .conductor
             .mark_pending_cells_as_joining()
             .into_iter()
-            .map(|(id, cell)| (id, cell.holochain_p2p_cell().clone()))
+            .map(|(id, cell)| (id, cell.holochain_p2p_dna().clone()))
             .map(|(cell_id, network)| async move {
-                match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join()).await {
+                match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join(cell_id.agent_pubkey().clone())).await {
                     Ok(Err(e)) => {
                         tracing::info!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");
                         Err(cell_id)

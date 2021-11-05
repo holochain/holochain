@@ -1,5 +1,4 @@
-use holochain_p2p::HolochainP2pCell;
-use holochain_p2p::HolochainP2pCellT;
+use holochain_p2p::HolochainP2pDna;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 use holochain_zome_types::TryInto;
@@ -19,12 +18,18 @@ mod tests;
 /// that doesn't.
 pub async fn validation_receipt_workflow(
     vault: EnvWrite,
-    network: &mut HolochainP2pCell,
+    network: &HolochainP2pDna,
 ) -> WorkflowResult<WorkComplete> {
     // Get the env and keystore
     let keystore = vault.keystore();
     // Who we are.
-    let validator = network.from_agent();
+
+    // Temporary workaround until we remove the need for a
+    // single validator in the next PR.
+    let validator = match vault.kind() {
+        DbKind::Cell(id) => id.agent_pubkey().clone(),
+        _ => unreachable!(),
+    };
 
     // Get out all ops that are marked for sending receipt.
     // FIXME: Test this query.
@@ -84,9 +89,12 @@ pub async fn validation_receipt_workflow(
         // Send it and don't wait for response.
         // TODO: When networking has a send without response we can use that
         // instead of waiting for response.
-        if let Err(e) = network
-            .send_validation_receipt(author, receipt.try_into()?)
-            .await
+        if let Err(e) = holochain_p2p::HolochainP2pDnaT::send_validation_receipt(
+            network,
+            author,
+            receipt.try_into()?,
+        )
+        .await
         {
             // No one home, they will need to publish again.
             info!(failed_send_receipt = ?e);

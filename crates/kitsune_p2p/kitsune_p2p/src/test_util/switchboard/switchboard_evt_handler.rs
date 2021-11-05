@@ -119,7 +119,6 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
         &mut self,
         space: Arc<KitsuneSpace>,
         to_agent: Arc<KitsuneAgent>,
-        from_agent: Arc<KitsuneAgent>,
         payload: Vec<u8>,
     ) -> KitsuneP2pEventHandlerResult<Vec<u8>> {
         todo!()
@@ -129,7 +128,6 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
         &mut self,
         space: Arc<KitsuneSpace>,
         to_agent: Arc<KitsuneAgent>,
-        from_agent: Arc<KitsuneAgent>,
         payload: Vec<u8>,
     ) -> KitsuneP2pEventHandlerResult<()> {
         todo!()
@@ -137,9 +135,8 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
 
     fn handle_gossip(
         &mut self,
-        space: Arc<KitsuneSpace>,
-        to_agent: Arc<KitsuneAgent>,
-        ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
+        _space: Arc<KitsuneSpace>,
+        _ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
     ) -> KitsuneP2pEventHandlerResult<()> {
         ok_fut(Ok(self.sb.share(|sb| {
             let node = sb.nodes.get_mut(&self.node).unwrap();

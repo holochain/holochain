@@ -40,7 +40,6 @@ async fn local_sync_scenario() {
     let delta = calculate_missing_ops(&data);
     let delta_counts = delta.iter().map(|(_, hs)| hs.len()).collect::<Vec<_>>();
 
-    let agent_arc_map: HashMap<_, _> = agent_arcs.clone().into_iter().collect();
     for (_, arc) in agent_arcs.iter() {
         println!("arc: |{}|", arc.to_ascii(64));
     }
@@ -52,18 +51,14 @@ async fn local_sync_scenario() {
 
     // Set up expectations to ensure that the proper data is gossiped to each agent,
     // while still also allowing flexibility for some extraneous gossip
-    for (agent, hashes) in delta {
-        let agent = agent.clone();
+    for (_agent, hashes) in delta {
         let hashes: HashSet<_> = hashes.iter().cloned().collect();
         // - Ensure that the agents with missing ops get gossiped those ops
-        let agent = agent.clone();
         evt_handler
             .expect_handle_gossip()
             .times(1)
-            .withf(move |_, to_agent, ops| {
-                *to_agent == agent && ops.iter().all(|op| hashes.contains(&*op.0))
-            })
-            .returning(move |_, _, _| unit_ok_fut());
+            .withf(move |_, ops| ops.iter().all(|op| hashes.contains(&*op.0)))
+            .returning(move |_, _| unit_ok_fut());
     }
 
     // - It's OK if other agents who already hold this hash get it gossiped again,
@@ -72,11 +67,7 @@ async fn local_sync_scenario() {
     evt_handler
         .expect_handle_gossip()
         .times(0..6)
-        .withf(move |_, to_agent, ops| {
-            let arc = agent_arc_map.get(to_agent).unwrap();
-            ops.iter().all(|op| arc.contains(op.0.get_loc()))
-        })
-        .returning(move |_, _, _| unit_ok_fut());
+        .returning(move |_, _| unit_ok_fut());
 
     let (evt_sender, task) = spawn_handler(evt_handler).await;
     let gossip = ShardedGossipLocal::test(

@@ -204,13 +204,12 @@ impl KitsuneP2pActor {
                                 match data {
                                     wire::Wire::Call(wire::Call {
                                         space,
-                                        from_agent,
                                         to_agent,
                                         data,
                                         ..
                                     }) => {
                                         let res = match evt_sender
-                                            .call(space, to_agent, from_agent, data.into())
+                                            .call(space, to_agent, data.into())
                                             .await
                                         {
                                             Err(err) => {
@@ -296,9 +295,8 @@ impl KitsuneP2pActor {
                                         data,
                                         ..
                                     }) => {
-                                        if let Err(err) = evt_sender
-                                            .notify(space, to_agent.clone(), to_agent, data.into())
-                                            .await
+                                        if let Err(err) =
+                                            evt_sender.notify(space, to_agent, data.into()).await
                                         {
                                             tracing::warn!(
                                                 ?err,
@@ -490,29 +488,26 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
         &mut self,
         space: Arc<KitsuneSpace>,
         to_agent: Arc<KitsuneAgent>,
-        from_agent: Arc<KitsuneAgent>,
         payload: Vec<u8>,
     ) -> KitsuneP2pEventHandlerResult<Vec<u8>> {
-        Ok(self.evt_sender.call(space, to_agent, from_agent, payload))
+        Ok(self.evt_sender.call(space, to_agent, payload))
     }
 
     fn handle_notify(
         &mut self,
         space: Arc<KitsuneSpace>,
         to_agent: Arc<KitsuneAgent>,
-        from_agent: Arc<KitsuneAgent>,
         payload: Vec<u8>,
     ) -> KitsuneP2pEventHandlerResult<()> {
-        Ok(self.evt_sender.notify(space, to_agent, from_agent, payload))
+        Ok(self.evt_sender.notify(space, to_agent, payload))
     }
 
     fn handle_gossip(
         &mut self,
         space: Arc<KitsuneSpace>,
-        to_agent: Arc<KitsuneAgent>,
         ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
     ) -> KitsuneP2pEventHandlerResult<()> {
-        Ok(self.evt_sender.gossip(space, to_agent, ops))
+        Ok(self.evt_sender.gossip(space, ops))
     }
 
     fn handle_fetch_op_data(
@@ -608,7 +603,6 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         &mut self,
         space: Arc<KitsuneSpace>,
         to_agent: Arc<KitsuneAgent>,
-        from_agent: Arc<KitsuneAgent>,
         payload: Vec<u8>,
         timeout_ms: Option<u64>,
     ) -> KitsuneP2pHandlerResult<Vec<u8>> {
@@ -619,7 +613,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         Ok(async move {
             let (space_sender, _) = space_sender.await;
             space_sender
-                .rpc_single(space, to_agent, from_agent, payload, timeout_ms)
+                .rpc_single(space, to_agent, payload, timeout_ms)
                 .await
         }
         .boxed()
@@ -665,7 +659,6 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
     fn handle_targeted_broadcast(
         &mut self,
         space: Arc<KitsuneSpace>,
-        from_agent: Arc<KitsuneAgent>,
         agents: Vec<Arc<KitsuneAgent>>,
         timeout: KitsuneTimeout,
         payload: Vec<u8>,
@@ -678,7 +671,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         Ok(async move {
             let (space_sender, _) = space_sender.await;
             space_sender
-                .targeted_broadcast(space, from_agent, agents, timeout, payload, drop_at_limit)
+                .targeted_broadcast(space, agents, timeout, payload, drop_at_limit)
                 .await
         }
         .boxed()
@@ -759,7 +752,6 @@ mockall::mock! {
             &mut self,
             space: Arc<KitsuneSpace>,
             to_agent: Arc<KitsuneAgent>,
-            from_agent: Arc<KitsuneAgent>,
             payload: Vec<u8>,
         ) -> KitsuneP2pEventHandlerResult<Vec<u8>>;
 
@@ -767,14 +759,12 @@ mockall::mock! {
             &mut self,
             space: Arc<KitsuneSpace>,
             to_agent: Arc<KitsuneAgent>,
-            from_agent: Arc<KitsuneAgent>,
             payload: Vec<u8>,
         ) -> KitsuneP2pEventHandlerResult<()> ;
 
         fn handle_gossip(
             &mut self,
             space: Arc<KitsuneSpace>,
-            to_agent: Arc<KitsuneAgent>,
             ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
         ) -> KitsuneP2pEventHandlerResult<()>;
 

@@ -33,7 +33,7 @@ use ::fixt::prelude::*;
 pub use holo_hash::fixt::*;
 use holo_hash::WasmHash;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::HolochainP2pCellFixturator;
+use holochain_p2p::HolochainP2pDnaFixturator;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::test_utils::test_keystore;
 use holochain_types::prelude::*;
@@ -277,7 +277,7 @@ fixturator!(
 
 fixturator!(
     ZomeCallHostAccess;
-    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pCell, SignalBroadcaster, CellConductorReadHandle, CellId);
+    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna, SignalBroadcaster, CellConductorReadHandle, CellId);
 );
 
 fixturator!(
@@ -297,7 +297,7 @@ fixturator!(
 
 fixturator!(
     InitHostAccess;
-    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pCell);
+    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna);
 );
 
 fixturator!(
@@ -317,7 +317,7 @@ fixturator!(
 
 fixturator!(
     PostCommitHostAccess;
-    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pCell);
+    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna);
 );
 
 fixturator!(
@@ -377,12 +377,12 @@ fixturator!(
 
 fixturator!(
     ValidateLinkHostAccess;
-    constructor fn new(HostFnWorkspace, HolochainP2pCell);
+    constructor fn new(HostFnWorkspace, HolochainP2pDna);
 );
 
 fixturator!(
     ValidateHostAccess;
-    constructor fn new(HostFnWorkspace, HolochainP2pCell);
+    constructor fn new(HostFnWorkspace, HolochainP2pDna);
 );
 
 fixturator!(
@@ -392,7 +392,7 @@ fixturator!(
 
 fixturator!(
     ValidationPackageHostAccess;
-    constructor fn new(HostFnWorkspace, HolochainP2pCell);
+    constructor fn new(HostFnWorkspace, HolochainP2pDna);
 );
 
 fixturator!(

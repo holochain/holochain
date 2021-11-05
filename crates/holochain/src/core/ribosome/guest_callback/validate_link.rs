@@ -5,7 +5,7 @@ use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
 use holo_hash::AnyDhtHash;
-use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
@@ -77,7 +77,7 @@ impl From<ValidateDeleteLinkInvocation> for ValidateDeleteLinkData {
 #[derive(Clone, Constructor)]
 pub struct ValidateLinkHostAccess {
     pub workspace: HostFnWorkspace,
-    pub network: HolochainP2pCell,
+    pub network: HolochainP2pDna,
 }
 
 impl From<ValidateLinkHostAccess> for HostContext {

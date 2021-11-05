@@ -7,7 +7,7 @@ use super::workflow::sys_validation_workflow::SysValidationWorkspace;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::entry_def_store::get_entry_def;
 use holochain_keystore::AgentPubKeyExt;
-use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pDna;
 use holochain_types::prelude::*;
 use holochain_zome_types::countersigning::CounterSigningSessionData;
 use std::convert::TryInto;
@@ -364,7 +364,7 @@ pub fn check_update_reference(
 pub async fn check_and_hold_register_add_link<F>(
     hash: &HeaderHash,
     workspace: &SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
@@ -394,7 +394,7 @@ where
 pub async fn check_and_hold_register_agent_activity<F>(
     hash: &HeaderHash,
     workspace: &SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
@@ -424,7 +424,7 @@ where
 pub async fn check_and_hold_store_entry<F>(
     hash: &HeaderHash,
     workspace: &SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
@@ -457,7 +457,7 @@ where
 pub async fn check_and_hold_any_store_entry<F>(
     hash: &EntryHash,
     workspace: &SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
@@ -485,7 +485,7 @@ where
 pub async fn check_and_hold_store_element<F>(
     hash: &HeaderHash,
     workspace: &SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
@@ -568,7 +568,7 @@ impl AsRef<Element> for Source {
 async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
     hash: &I,
     workspace: &SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
 ) -> SysValidationResult<Source> {
     let hash: AnyDhtHash = hash.clone().into();
     // Create a workspace with just the local stores

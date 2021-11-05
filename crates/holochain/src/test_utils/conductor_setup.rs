@@ -12,8 +12,8 @@ use crate::core::ribosome::real_ribosome::RealRibosome;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::actor::HolochainP2pRefToCell;
-use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::actor::HolochainP2pRefToDna;
+use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::{prelude::test_environments, test_utils::TestEnvs};
 use holochain_types::prelude::*;
@@ -29,7 +29,7 @@ pub struct CellHostFnCaller {
     pub env: EnvWrite,
     pub cache: EnvWrite,
     pub ribosome: RealRibosome,
-    pub network: HolochainP2pCell,
+    pub network: HolochainP2pDna,
     pub keystore: MetaLairClient,
     pub signal_tx: SignalBroadcaster,
     pub triggers: QueueTriggers,
@@ -41,9 +41,7 @@ impl CellHostFnCaller {
         let env = handle.get_cell_env(cell_id).unwrap();
         let cache = handle.get_cache_env(cell_id).unwrap();
         let keystore = env.keystore().clone();
-        let network = handle
-            .holochain_p2p()
-            .to_cell(cell_id.dna_hash().clone(), cell_id.agent_pubkey().clone());
+        let network = handle.holochain_p2p().to_dna(cell_id.dna_hash().clone());
         let triggers = handle.get_cell_triggers(cell_id).unwrap();
         let cell_conductor_api = CellConductorApi::new(handle.clone(), cell_id.clone());
 

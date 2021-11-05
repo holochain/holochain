@@ -239,12 +239,9 @@ async fn publish_loop() {
             mutations_helpers::insert_valid_authored_op(txn, op).unwrap();
         })
         .unwrap();
-    let mut cell_network = MockHolochainP2pCellT::new();
-    cell_network
-        .expect_from_agent()
-        .returning(move || author.clone());
+    let mut dna_network = MockHolochainP2pDnaT::new();
     let (tx, mut op_published) = tokio::sync::mpsc::channel(100);
-    cell_network
+    dna_network
         .expect_publish()
         .returning(move |_, _, _, _, _| {
             tx.try_send(()).unwrap();
@@ -261,7 +258,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60) && timer.elapsed() < Duration::from_secs(61)
     );
 
-    publish_dht_ops_workflow(env.clone(), &cell_network, &ts)
+    publish_dht_ops_workflow(env.clone(), &dna_network, &ts, author.clone())
         .await
         .unwrap();
 
@@ -275,7 +272,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60 * 2)
             && timer.elapsed() < Duration::from_secs(60 * 2 + 1)
     );
-    publish_dht_ops_workflow(env.clone(), &cell_network, &ts)
+    publish_dht_ops_workflow(env.clone(), &dna_network, &ts, author.clone())
         .await
         .unwrap();
 
@@ -291,7 +288,7 @@ async fn publish_loop() {
     let timer = tokio::time::Instant::now();
     trigger_recv.listen().await.unwrap();
     assert!(timer.elapsed() < Duration::from_secs(1));
-    publish_dht_ops_workflow(env.clone(), &cell_network, &ts)
+    publish_dht_ops_workflow(env.clone(), &dna_network, &ts, author.clone())
         .await
         .unwrap();
 
@@ -322,7 +319,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60) && timer.elapsed() < Duration::from_secs(61)
     );
 
-    publish_dht_ops_workflow(env.clone(), &cell_network, &ts)
+    publish_dht_ops_workflow(env.clone(), &dna_network, &ts, author.clone())
         .await
         .unwrap();
 
@@ -344,7 +341,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60 * 2)
             && timer.elapsed() < Duration::from_secs(60 * 2 + 1)
     );
-    publish_dht_ops_workflow(env.clone(), &cell_network, &ts)
+    publish_dht_ops_workflow(env.clone(), &dna_network, &ts, author.clone())
         .await
         .unwrap();
 
@@ -377,7 +374,7 @@ async fn publish_loop() {
     let timer = tokio::time::Instant::now();
     trigger_recv.listen().await.unwrap();
     assert!(timer.elapsed() < Duration::from_secs(1));
-    publish_dht_ops_workflow(env.clone(), &cell_network, &ts)
+    publish_dht_ops_workflow(env.clone(), &dna_network, &ts, author.clone())
         .await
         .unwrap();
 
@@ -391,7 +388,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60) && timer.elapsed() < Duration::from_secs(61)
     );
 
-    publish_dht_ops_workflow(env.clone(), &cell_network, &ts)
+    publish_dht_ops_workflow(env.clone(), &dna_network, &ts, author.clone())
         .await
         .unwrap();
     // - The op is not published because of the time interval.

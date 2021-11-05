@@ -657,10 +657,8 @@ where
             let managed_task_stop_broadcaster = managed_task_stop_broadcaster.clone();
             let db_sync_level = self.db_sync_level;
             async move {
-                use holochain_p2p::actor::HolochainP2pRefToCell;
-                let holochain_p2p_cell = self
-                    .holochain_p2p
-                    .to_cell(cell_id.dna_hash().clone(), cell_id.agent_pubkey().clone());
+                use holochain_p2p::actor::HolochainP2pRefToDna;
+                let holochain_p2p_cell = self.holochain_p2p.to_dna(cell_id.dna_hash().clone());
 
                 let env = EnvWrite::open_with_sync_level(
                     &root_env_dir,

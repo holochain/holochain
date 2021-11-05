@@ -14,7 +14,7 @@ use super::error::WorkflowResult;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use holo_hash::*;
-use holochain_p2p::HolochainP2pCellT;
+use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 use std::collections::HashMap;
@@ -34,15 +34,15 @@ pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(60 * 
 #[instrument(skip(env, network, trigger_self))]
 pub async fn publish_dht_ops_workflow(
     env: EnvWrite,
-    network: &(dyn HolochainP2pCellT + Send + Sync),
+    network: &(dyn HolochainP2pDnaT + Send + Sync),
     trigger_self: &TriggerSender,
+    agent: AgentPubKey,
 ) -> WorkflowResult<WorkComplete> {
     let mut complete = WorkComplete::Complete;
-    let to_publish =
-        publish_dht_ops_workflow_inner(env.clone().into(), network.from_agent()).await?;
+    let to_publish = publish_dht_ops_workflow_inner(env.clone().into(), agent).await?;
 
     // Commit to the network
-    tracing::info!("sending {} ops", to_publish.len());
+    tracing::info!("sending to {} basis locations", to_publish.len());
     let mut success = Vec::new();
     for (basis, ops) in to_publish {
         let hashes: Vec<_> = ops.iter().map(|(h, _)| h.clone()).collect();
@@ -89,7 +89,7 @@ pub async fn publish_dht_ops_workflow_inner(
     // Ops to publish by basis
     let mut to_publish = HashMap::new();
 
-    for op_hashed in publish_query::get_ops_to_publish(agent.clone(), &env).await? {
+    for op_hashed in publish_query::get_ops_to_publish(agent, &env).await? {
         let (op, op_hash) = op_hashed.into_inner();
         // For every op publish a request
         // Collect and sort ops by basis
@@ -113,7 +113,7 @@ mod tests {
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use holochain_p2p::actor::HolochainP2pSender;
-    use holochain_p2p::HolochainP2pCell;
+    use holochain_p2p::HolochainP2pDna;
     use holochain_p2p::HolochainP2pRef;
     use observability;
     use rusqlite::Transaction;
@@ -137,7 +137,8 @@ mod tests {
         panic_on_publish: bool,
     ) -> (
         TestNetwork,
-        HolochainP2pCell,
+        HolochainP2pDna,
+        AgentPubKey,
         JoinHandle<()>,
         tokio::sync::oneshot::Receiver<()>,
     ) {
@@ -180,7 +181,7 @@ mod tests {
             test_network_with_events(Some(dna.clone()), Some(author.clone()), filter_events, tx)
                 .await;
         let (tx_complete, rx_complete) = tokio::sync::oneshot::channel();
-        let cell_network = test_network.cell_network();
+        let dna_network = test_network.dna_network();
         let network = test_network.network();
         let mut recv_count: u32 = 0;
         let total_expected = num_agents * num_hash;
@@ -219,13 +220,13 @@ mod tests {
                 .unwrap();
         }
 
-        (test_network, cell_network, recv_task, rx_complete)
+        (test_network, dna_network, author, recv_task, rx_complete)
     }
 
     /// Call the workflow
-    async fn call_workflow(env: EnvWrite, cell_network: HolochainP2pCell) {
+    async fn call_workflow(env: EnvWrite, dna_network: HolochainP2pDna, author: AgentPubKey) {
         let (trigger_sender, _) = TriggerSender::new();
-        publish_dht_ops_workflow(env.clone().into(), &cell_network, &trigger_sender)
+        publish_dht_ops_workflow(env.clone().into(), &dna_network, &trigger_sender, author)
             .await
             .unwrap();
     }
@@ -249,10 +250,10 @@ mod tests {
             let env = test_env.env();
 
             // Setup
-            let (_network, cell_network, recv_task, rx_complete) =
+            let (_network, dna_network, author, recv_task, rx_complete) =
                 setup(env.clone(), num_agents, num_hash, false).await;
 
-            call_workflow(env.clone().into(), cell_network).await;
+            call_workflow(env.clone().into(), dna_network, author).await;
 
             // Wait for expected # of responses, or timeout
             tokio::select! {
@@ -303,7 +304,7 @@ mod tests {
             let env = test_env.env();
 
             // Setup
-            let (_network, cell_network, recv_task, _) =
+            let (_network, dna_network, author, recv_task, _) =
                 setup(env.clone(), num_agents, num_hash, true).await;
 
             // Update the authored to have complete receipts
@@ -316,7 +317,7 @@ mod tests {
                 .unwrap();
 
             // Call the workflow
-            call_workflow(env.clone().into(), cell_network).await;
+            call_workflow(env.clone().into(), dna_network, author).await;
 
             // If we can wait a while without receiving any publish, we have succeeded
             tokio::time::sleep(Duration::from_millis(
@@ -366,14 +367,15 @@ mod tests {
                     _ => false,
                 };
                 let (tx, mut recv) = tokio::sync::mpsc::channel(10);
+                let author = fake_agent_pubkey_1();
                 let test_network = test_network_with_events(
                     Some(dna.clone()),
-                    Some(fake_agent_pubkey_1()),
+                    Some(author.clone()),
                     filter_events,
                     tx,
                 )
                 .await;
-                let cell_network = test_network.cell_network();
+                let dna_network = test_network.dna_network();
 
                 // Setup data
                 let original_entry = fixt!(Entry);
@@ -430,7 +432,7 @@ mod tests {
                     .await
                     .unwrap();
 
-                source_chain.flush(&cell_network).await.unwrap();
+                source_chain.flush(&dna_network).await.unwrap();
                 let (entry_create_header, entry_update_header) = env
                     .conn()
                     .unwrap()
@@ -580,7 +582,7 @@ mod tests {
                     }
                 }
 
-                call_workflow(env.clone().into(), cell_network).await;
+                call_workflow(env.clone().into(), dna_network, author).await;
 
                 // Wait for expected # of responses, or timeout
                 tokio::select! {

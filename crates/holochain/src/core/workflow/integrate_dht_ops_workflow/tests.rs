@@ -468,7 +468,7 @@ impl Db {
 async fn call_workflow<'env>(env: EnvWrite) {
     let (qt, _rx) = TriggerSender::new();
     let test_network = test_network(None, None).await;
-    let holochain_p2p_cell = test_network.cell_network();
+    let holochain_p2p_cell = test_network.dna_network();
     integrate_dht_ops_workflow(env.clone(), qt, holochain_p2p_cell)
         .await
         .unwrap();
@@ -899,7 +899,7 @@ async fn get_links(
 
     let mut host_access = fixt!(ZomeCallHostAccess);
     host_access.workspace = workspace_lock;
-    host_access.network = test_network.cell_network();
+    host_access.network = test_network.dna_network();
     call_context.host_context = host_access.into();
     let ribosome = Arc::new(ribosome);
     let call_context = Arc::new(call_context);

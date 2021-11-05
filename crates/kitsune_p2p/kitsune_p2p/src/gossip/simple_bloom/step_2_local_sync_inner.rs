@@ -130,7 +130,7 @@ impl Inner {
                     }
                 }
                 evt_sender
-                    .gossip(space.clone(), new_agent.clone(), to_send)
+                    .gossip(space.clone(), to_send)
                     .await
                     .map_err(KitsuneError::other)?;
             }

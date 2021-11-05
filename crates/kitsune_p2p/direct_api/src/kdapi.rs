@@ -273,10 +273,6 @@ pub enum KdApi {
         #[serde(rename = "toAgent")]
         to_agent: KdHash,
 
-        /// the agent authoring this message
-        #[serde(rename = "fromAgent")]
-        from_agent: KdHash,
-
         /// the structured content for this message
         #[serde(rename = "content")]
         content: serde_json::Value,

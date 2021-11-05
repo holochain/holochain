@@ -20,9 +20,6 @@ pub enum KdHndEvt {
         /// the destination agent
         to_agent: KdHash,
 
-        /// the source agent
-        from_agent: KdHash,
-
         /// the structured content for this message
         content: serde_json::Value,
 

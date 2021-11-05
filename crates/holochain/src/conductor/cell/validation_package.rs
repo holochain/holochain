@@ -5,7 +5,7 @@ use crate::core::workflow::app_validation_workflow::validation_package::get_as_a
 use crate::core::workflow::app_validation_workflow::validation_package::get_as_author_full;
 use crate::core::workflow::app_validation_workflow::validation_package::get_as_author_sub_chain;
 use holochain_cascade::Cascade;
-use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pDna;
 use holochain_state::source_chain::SourceChain;
 use holochain_types::dna::DnaFile;
 use holochain_zome_types::HeaderHashed;
@@ -17,7 +17,7 @@ pub(super) async fn get_as_author(
     cache: EnvWrite,
     ribosome: &impl RibosomeT,
     conductor_api: &impl CellConductorApiT,
-    network: &HolochainP2pCell,
+    network: &HolochainP2pDna,
 ) -> CellResult<ValidationPackageResponse> {
     let header = header_hashed.as_content();
 
