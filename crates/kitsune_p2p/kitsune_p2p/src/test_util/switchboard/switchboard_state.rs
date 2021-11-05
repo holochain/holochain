@@ -278,12 +278,10 @@ impl SwitchboardState {
                 ArcInterval::Empty.to_ascii(width)
             };
             println!(
-                "{:>4} {:>+5} |{:^width$}| {:>+4} {:?}",
+                "{:>4} {:>+5} ({:^width$})",
                 node_id,
                 "",
                 ascii,
-                "",
-                "",
                 width = width
             );
             for (agent_loc8, agent) in node.local_agents.iter() {
