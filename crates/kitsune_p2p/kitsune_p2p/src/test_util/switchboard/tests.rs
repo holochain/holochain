@@ -138,20 +138,12 @@ async fn transitive_peer_gossip() {
     agent_locs.sort();
 
     sb.share(|sb| {
-        // All agent info is shared except for 4 knowing about 1.
+        sb.print_peer_lists();
+
+        // All agent info is shared except perhaps for 4 knowing about 1.
         assert_eq!(
-            (
-                &sb.all_peers(&n1),
-                &sb.all_peers(&n2),
-                &sb.all_peers(&n3),
-                &sb.all_peers(&n4)
-            ),
-            (
-                &agent_locs,
-                &agent_locs,
-                &agent_locs,
-                &vec![a2.loc.clone(), a3.loc.clone(), a4.loc.clone()]
-            )
+            (&sb.all_peers(&n1), &sb.all_peers(&n2), &sb.all_peers(&n3),),
+            (&agent_locs, &agent_locs, &agent_locs,)
         );
 
         // Once 3 integrates a new op, it will trigger initialize with 4,
