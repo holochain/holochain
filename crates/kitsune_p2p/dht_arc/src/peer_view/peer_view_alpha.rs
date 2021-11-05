@@ -4,6 +4,7 @@ use crate::*;
 pub struct PeerStratAlpha {
     pub check_gaps: bool,
     pub redundancy_target: u16,
+    pub coverage_buffer: f64,
     pub default_uptime: f64,
     pub noise_threshold: f64,
     pub delta_scale: f64,
@@ -13,8 +14,9 @@ pub struct PeerStratAlpha {
 impl Default for PeerStratAlpha {
     fn default() -> Self {
         Self {
-            check_gaps: true,
+            check_gaps: false,
             redundancy_target: DEFAULT_REDUNDANCY_TARGET as u16,
+            coverage_buffer: DEFAULT_COVERAGE_BUFFER,
             default_uptime: DEFAULT_UPTIME,
             noise_threshold: DEFAULT_NOISE_THRESHOLD,
             delta_scale: DEFAULT_DELTA_SCALE,
@@ -101,12 +103,26 @@ impl PeerViewAlpha {
     /// Given the current coverage, what is the next step to take in reaching
     /// the ideal coverage?
     pub fn next_coverage(&self, current: f64) -> f64 {
-        let target = self.target_coverage();
+        let target = {
+            let target_lo = self.target_coverage();
+            // let target_hi = target_lo;
+            let target_hi = (target_lo + self.strat.coverage_buffer).min(1.0);
+
+            if current < target_lo {
+                target_lo
+            } else if current > target_hi {
+                target_hi
+            } else {
+                current
+            }
+        };
+        dbg!(&target);
+
         // The change in arc we'd need to make to get to the target.
         let delta = target - current;
-        // If this is below our threshold then apply that delta.
+        // If this is below our threshold then go straight to the target.
         if delta.abs() < self.strat.delta_threshold {
-            current + delta
+            target
         // Other wise scale the delta to avoid rapid change.
         } else {
             current + (delta * self.strat.delta_scale)

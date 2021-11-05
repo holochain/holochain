@@ -107,10 +107,12 @@ fn single_agent_convergence_debug() {
     let runs = determine_equilibrium(1, peers, |peers| {
         let dynamic = Some(maplit::hashset![0]);
         let (peers, stats) = run_one_epoch(&strat, peers, dynamic.as_ref(), DETAIL);
-        tracing::debug!("{}", peers[0].coverage());
+
+        tracing::debug!("{}", stats.oneline());
+        // tracing::debug!("{}", peers[0].coverage());
         (peers, stats)
     });
-    print_arcs(&runs.0[0].peers);
+    // print_arcs(&runs.0[0].peers);
     report(&runs);
 }
 
@@ -231,7 +233,7 @@ where
         |(peers, mut history, mut convergence), _i| {
             if !converged(convergence) {
                 let (peers, stats) = step(peers);
-                if stats.gross_delta_avg == 0.0 {
+                if dbg!(stats.gross_delta_avg) == 0.0 {
                     convergence += 1;
                 } else if convergence > 0 {
                     panic!(

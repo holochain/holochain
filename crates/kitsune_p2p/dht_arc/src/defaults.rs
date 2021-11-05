@@ -9,6 +9,9 @@ pub const DEFAULT_MIN_REDUNDANCY: u32 = (REDUNDANCY_FLOOR as f64 / DEFAULT_UPTIM
 /// Number of copies of a given hash available at any given time.
 pub(crate) const DEFAULT_REDUNDANCY_TARGET: usize = 50;
 
+/// Establish an upper target, this much higher than the lower target of coverage.
+pub(crate) const DEFAULT_COVERAGE_BUFFER: f64 = 0.05;
+
 /// Default assumed up time for nodes.
 pub(crate) const DEFAULT_UPTIME: f64 = 0.5;
 
