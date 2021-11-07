@@ -72,13 +72,13 @@ pub struct SourceChain {
 
 // TODO fix this.  We shouldn't really have nil values but this would
 // show if the database is corrupted and doesn't have an element
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Debug, Clone, Deserialize)]
 pub struct SourceChainJsonDump {
     pub elements: Vec<SourceChainJsonElement>,
     pub published_ops_count: usize,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Debug, Clone, Deserialize)]
 pub struct SourceChainJsonElement {
     pub signature: Signature,
     pub header_address: HeaderHash,
@@ -134,18 +134,21 @@ impl SourceChain {
         Ok(self.scratch.apply(|scratch| scratch.elements().collect())?)
     }
 
+    /// Accessor for the chain head that will be used at flush time to check
+    /// the "as at" for ordering integrity etc.
+    pub fn persisted_chain_head(&self) -> (HeaderHash, u32, Timestamp) {
+        (
+            self.persisted_head.clone(),
+            self.persisted_seq,
+            self.persisted_timestamp,
+        )
+    }
+
     pub fn chain_head(&self) -> SourceChainResult<(HeaderHash, u32, Timestamp)> {
         // Check scratch for newer head.
         Ok(self.scratch.apply(|scratch| {
-            let chain_head = chain_head_scratch(&(*scratch), self.author.as_ref());
-            let (prev_header, header_seq, timestamp) = chain_head.unwrap_or_else(|| {
-                (
-                    self.persisted_head.clone(),
-                    self.persisted_seq,
-                    self.persisted_timestamp,
-                )
-            });
-            (prev_header, header_seq, timestamp)
+            chain_head_scratch(&(*scratch), self.author.as_ref())
+                .unwrap_or_else(|| self.persisted_chain_head())
         })?)
     }
 
@@ -400,6 +403,7 @@ impl SourceChain {
                 (:entry_type IS NULL OR Header.entry_type = :entry_type)
                 AND
                 (:header_type IS NULL OR Header.type = :header_type)
+                ORDER BY Header.seq ASC
                 ",
                     );
                     let mut stmt = txn.prepare(&sql)?;
@@ -436,7 +440,7 @@ impl SourceChain {
             })
             .await?;
         self.scratch.apply(|scratch| {
-            let scratch_iter = scratch
+            let mut scratch_elements: Vec<_> = scratch
                 .headers()
                 .filter(|shh| query.check(shh.header()))
                 .filter_map(|shh| {
@@ -445,8 +449,11 @@ impl SourceChain {
                         _ => None,
                     };
                     Some(Element::new(shh.clone(), entry))
-                });
-            elements.extend(scratch_iter);
+                })
+                .collect();
+            scratch_elements.sort_unstable_by_key(|e| e.header().header_seq());
+
+            elements.extend(scratch_elements);
         })?;
         Ok(elements)
     }

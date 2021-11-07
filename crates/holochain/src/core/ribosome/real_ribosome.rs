@@ -20,7 +20,6 @@ use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation;
 use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
-use crate::core::ribosome::guest_callback::post_commit::PostCommitResult;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::guest_callback::validate_link::ValidateLinkHostAccess;
@@ -478,6 +477,50 @@ impl RibosomeT for RealRibosome {
         self.dna_file.dna()
     }
 
+    fn zome_info(&self, zome: Zome) -> RibosomeResult<ZomeInfo> {
+        Ok(ZomeInfo {
+            name: zome.zome_name().clone(),
+            id: self
+                .zome_to_id(&zome)
+                .expect("Failed to get ID for current zome"),
+            properties: SerializedBytes::default(),
+            entry_defs: {
+                match self
+                    .run_entry_defs(EntryDefsHostAccess, EntryDefsInvocation)
+                    .map_err(|e| WasmError::Host(e.to_string()))?
+                {
+                    EntryDefsResult::Err(zome, error_string) => {
+                        return Err(RibosomeError::WasmError(WasmError::Host(format!(
+                            "{}: {}",
+                            zome, error_string
+                        ))))
+                    }
+                    EntryDefsResult::Defs(defs) => match defs.get(zome.zome_name()) {
+                        Some(entry_defs) => entry_defs.clone(),
+                        None => Vec::new().into(),
+                    },
+                }
+            },
+            extern_fns: {
+                match zome.zome_def() {
+                    ZomeDef::Wasm(_) => {
+                        let module = self.module(zome.zome_name())?;
+
+                        let mut extern_fns: Vec<FunctionName> = module
+                            .info()
+                            .exports
+                            .iter()
+                            .map(|(name, _index)| FunctionName::new(name))
+                            .collect();
+                        extern_fns.sort();
+                        extern_fns
+                    }
+                    ZomeDef::Inline(zome) => zome.callbacks(),
+                }
+            },
+        })
+    }
+
     /// call a function in a zome for an invocation if it exists
     /// if it does not exist then return Ok(None)
     fn maybe_call<I: Invocation>(
@@ -489,7 +532,9 @@ impl RibosomeT for RealRibosome {
     ) -> Result<Option<ExternIO>, RibosomeError> {
         let call_context = CallContext {
             zome: zome.clone(),
+            function_name: to_call.clone(),
             host_context,
+            auth: invocation.auth(),
         };
 
         match zome.zome_def() {
@@ -568,68 +613,79 @@ impl RibosomeT for RealRibosome {
         })
     }
 
+    /// Post commit works a bit different to the other callbacks.
+    /// As it is dispatched from a spawned task there is nothing to handle any
+    /// result, good or bad, other than to maybe log some error.
+    fn run_post_commit(
+        &self,
+        host_access: PostCommitHostAccess,
+        invocation: PostCommitInvocation,
+    ) -> RibosomeResult<()> {
+        match self.call_iterator(host_access.into(), invocation).next() {
+            Ok(_) => Ok(()),
+            Err((_zome, ribosome_error)) => Err(ribosome_error),
+        }
+    }
+
     fn run_genesis_self_check(
         &self,
-        access: GenesisSelfCheckHostAccess,
+        host_access: GenesisSelfCheckHostAccess,
         invocation: GenesisSelfCheckInvocation,
     ) -> RibosomeResult<GenesisSelfCheckResult> {
-        do_callback!(self, access, invocation, ValidateCallbackResult)
+        do_callback!(self, host_access, invocation, ValidateCallbackResult)
     }
 
     fn run_validate(
         &self,
-        access: ValidateHostAccess,
+        host_access: ValidateHostAccess,
         invocation: ValidateInvocation,
     ) -> RibosomeResult<ValidateResult> {
-        do_callback!(self, access, invocation, ValidateCallbackResult)
+        do_callback!(self, host_access, invocation, ValidateCallbackResult)
     }
 
     fn run_validate_link<I: Invocation + 'static>(
         &self,
-        access: ValidateLinkHostAccess,
+        host_access: ValidateLinkHostAccess,
         invocation: ValidateLinkInvocation<I>,
     ) -> RibosomeResult<ValidateLinkResult> {
-        do_callback!(self, access, invocation, ValidateLinkCallbackResult)
+        do_callback!(self, host_access, invocation, ValidateLinkCallbackResult)
     }
 
     fn run_init(
         &self,
-        access: InitHostAccess,
+        host_access: InitHostAccess,
         invocation: InitInvocation,
     ) -> RibosomeResult<InitResult> {
-        do_callback!(self, access, invocation, InitCallbackResult)
+        do_callback!(self, host_access, invocation, InitCallbackResult)
     }
 
     fn run_entry_defs(
         &self,
-        access: EntryDefsHostAccess,
+        host_access: EntryDefsHostAccess,
         invocation: EntryDefsInvocation,
     ) -> RibosomeResult<EntryDefsResult> {
-        do_callback!(self, access, invocation, EntryDefsCallbackResult)
+        do_callback!(self, host_access, invocation, EntryDefsCallbackResult)
     }
 
     fn run_migrate_agent(
         &self,
-        access: MigrateAgentHostAccess,
+        host_access: MigrateAgentHostAccess,
         invocation: MigrateAgentInvocation,
     ) -> RibosomeResult<MigrateAgentResult> {
-        do_callback!(self, access, invocation, MigrateAgentCallbackResult)
+        do_callback!(self, host_access, invocation, MigrateAgentCallbackResult)
     }
 
     fn run_validation_package(
         &self,
-        access: ValidationPackageHostAccess,
+        host_access: ValidationPackageHostAccess,
         invocation: ValidationPackageInvocation,
     ) -> RibosomeResult<ValidationPackageResult> {
-        do_callback!(self, access, invocation, ValidationPackageCallbackResult)
-    }
-
-    fn run_post_commit(
-        &self,
-        access: PostCommitHostAccess,
-        invocation: PostCommitInvocation,
-    ) -> RibosomeResult<PostCommitResult> {
-        do_callback!(self, access, invocation, PostCommitCallbackResult)
+        do_callback!(
+            self,
+            host_access,
+            invocation,
+            ValidationPackageCallbackResult
+        )
     }
 }
 
@@ -695,7 +751,7 @@ pub mod wasm_test {
                 cell_id: alice.cell_id().clone(),
                 zome_name: alice.name().clone(),
                 fn_name: "infallible".into(),
-                cap: None,
+                cap_secret: None,
                 provenance: alice_pubkey.clone(),
                 payload: ExternIO::encode(()).unwrap(),
             })

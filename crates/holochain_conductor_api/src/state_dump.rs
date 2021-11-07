@@ -1,6 +1,7 @@
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_state::source_chain::SourceChainJsonDump;
+use holochain_types::dht_op::DhtOp;
 use serde::Deserialize;
 use serde::Serialize;
 use std::sync::Arc;
@@ -10,6 +11,13 @@ pub struct JsonDump {
     pub peer_dump: P2pAgentsDump,
     pub source_chain_dump: SourceChainJsonDump,
     pub integration_dump: IntegrationStateDump,
+}
+
+#[derive(Serialize, Clone, Debug, Deserialize)]
+pub struct FullStateDump {
+    pub peer_dump: P2pAgentsDump,
+    pub source_chain_dump: SourceChainJsonDump,
+    pub integration_dump: FullIntegrationStateDump,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -31,6 +39,28 @@ pub struct IntegrationStateDump {
     /// Ops that are integrated.
     /// This includes rejected.
     pub integrated: usize,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+/// A full view of the DHT shard of the Cell.
+/// Ops start in the validation limbo then proceed
+/// to the integration limbo then finally are integrated.
+pub struct FullIntegrationStateDump {
+    /// Ops in validation limbo awaiting sys
+    /// or app validation.
+    pub validation_limbo: Vec<DhtOp>,
+
+    /// Ops waiting to be integrated.
+    pub integration_limbo: Vec<DhtOp>,
+
+    /// Ops that are integrated.
+    /// This includes rejected.
+    pub integrated: Vec<DhtOp>,
+
+    /// RowId for the latest DhtOp that we have seen
+    /// Useful for subsequent calls to `FullStateDump`
+    /// to return only what they haven't seen
+    pub dht_ops_cursor: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -89,7 +119,7 @@ impl std::fmt::Display for IntegrationStateDump {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
-            "({},{},{})",
+            "({:?},{:?},{:?})",
             self.validation_limbo, self.integration_limbo, self.integrated
         )
     }

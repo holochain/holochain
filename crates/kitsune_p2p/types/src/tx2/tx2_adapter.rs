@@ -10,7 +10,7 @@ use std::sync::atomic;
 static UNIQ: atomic::AtomicUsize = atomic::AtomicUsize::new(1);
 
 /// Opaque identifier, allows Eq/Hash through trait-object types.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, derive_more::Display)]
 pub struct Uniq(usize);
 
 impl Default for Uniq {
@@ -119,6 +119,9 @@ pub type EndpointFut = BoxFuture<'static, KitsuneResult<Endpoint>>;
 pub trait BindAdapt: 'static + Send + Sync + Unpin {
     /// Bind a local endpoint, given a url spec.
     fn bind(&self, url: TxUrl, timeout: KitsuneTimeout) -> EndpointFut;
+
+    /// Get the local certificate digest.
+    fn local_cert(&self) -> Tx2Cert;
 }
 
 /// Tx backend endpoint binding factory type.

@@ -1,6 +1,6 @@
 [package]
 name = "holochain_wasm_test_utils"
-version = "0.0.10"
+version = "0.0.14"
 authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
 edition = "2018"
 description = "Utilities for Wasm testing for Holochain"
@@ -20,9 +20,9 @@ only_check = []
 
 [dependencies]
 fixt = { path = "../../fixt", version = "0.0.7"}
-holo_hash = { path = "../../holo_hash", version = "0.0.9"}
-holochain_types = { path = "../../holochain_types", version = "0.0.10"}
-holochain_zome_types = { path = "../../holochain_zome_types", version = "0.0.12"}
+holo_hash = { path = "../../holo_hash", version = "0.0.12"}
+holochain_types = { path = "../../holochain_types", version = "0.0.14"}
+holochain_zome_types = { path = "../../holochain_zome_types", version = "0.0.16"}
 rand = "0.7"
 strum = "0.18.0"
 strum_macros = "0.18.0"

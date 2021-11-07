@@ -20,10 +20,10 @@ pub use get_entry_ops_query::WireDhtOp;
 #[cfg(test)]
 mod test;
 
-mod get_agent_activity_query;
-mod get_element_query;
-mod get_entry_ops_query;
-mod get_links_ops_query;
+pub(crate) mod get_agent_activity_query;
+pub(crate) mod get_element_query;
+pub(crate) mod get_entry_ops_query;
+pub(crate) mod get_links_ops_query;
 
 #[instrument(skip(state_env))]
 pub async fn handle_get_entry(

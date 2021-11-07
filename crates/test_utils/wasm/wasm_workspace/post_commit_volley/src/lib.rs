@@ -10,7 +10,7 @@ entry_defs![Ping::entry_def()];
 #[hdk_extern]
 fn set_access(_: ()) -> ExternResult<()> {
     let mut functions: GrantedFunctions = BTreeSet::new();
-    functions.insert((zome_info()?.zome_name, "ping".into()));
+    functions.insert((zome_info()?.name, "ping".into()));
     create_cap_grant(CapGrantEntry {
         tag: "".into(),
         // empty access converts to unrestricted
@@ -26,20 +26,19 @@ fn ping(agent: AgentPubKey) -> ExternResult<HeaderHash> {
     create_entry(Ping(agent))
 }
 
-#[hdk_extern]
-fn post_commit(shhs: Vec<SignedHeaderHashed>) -> ExternResult<PostCommitCallbackResult> {
-    if let Ok(ping) = Ping::try_from(must_get_entry(shhs[0].header().entry_hash().unwrap().clone())?) {
+#[hdk_extern(infallible)]
+fn post_commit(shhs: Vec<SignedHeaderHashed>) {
+    if let Ok(ping) = Ping::try_from(must_get_entry(shhs[0].header().entry_hash().unwrap().clone()).unwrap()) {
         if hdk::prelude::query(ChainQueryFilter::default().entry_type(entry_type!(Ping).unwrap())).unwrap().len() < PINGS {
             call_remote(
                 ping.0,
-                zome_info()?.zome_name,
+                zome_info().unwrap().name,
                 "ping".to_string().into(),
                 None,
-                &agent_info()?.agent_latest_pubkey,
-            )?;
+                &agent_info().unwrap().agent_latest_pubkey,
+            ).unwrap();
         }
     }
-    Ok(PostCommitCallbackResult::Success)
 }
 
 #[hdk_extern]
