@@ -142,7 +142,7 @@ pub enum DbSyncLevel {
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
 /// The strategy for database file system synchronization.
-/// Some databases like the cache can be safety rebuilt if
+/// Some databases like the cache can be safely rebuilt if
 /// corruption occurs due to using the faster [`DbSyncLevel::Off`].
 pub enum DbSyncStrategy {
     /// Allows databases that can be wiped and rebuilt to

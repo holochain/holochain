@@ -349,6 +349,8 @@ pub trait DbKindT: Clone + Send + Sync + 'static {
         path.set_extension("sqlite3");
         path
     }
+    /// The above provided `filename` method attaches the .sqlite3 extension.
+    /// Implement this to provide the front part of the database filename.
     fn filename_inner(&self) -> PathBuf;
     /// Whether to wipe the database if it is corrupt.
     /// Some database it's safe to wipe them if they are corrupt because
