@@ -283,41 +283,6 @@ fn test_peer_density() {
 }
 
 #[test]
-fn test_converge() {
-    let strat = PeerStratAlpha::default();
-    let min_online_peers = DEFAULT_MIN_PEERS;
-    let bucket = DhtArc::new(0, MAX_HALF_LENGTH);
-    assert_eq!(
-        (PeerViewAlpha::new(strat, bucket, 1.0, 1).next_coverage(1.0)),
-        1.0
-    );
-    assert_eq!(
-        (PeerViewAlpha::new(strat, bucket, 1.0, min_online_peers).next_coverage(1.0)),
-        1.0
-    );
-    assert_eq!(
-        (PeerViewAlpha::new(strat, bucket, 1.0, min_online_peers * 2).next_coverage(1.0)),
-        0.9
-    );
-    assert_eq!(
-        (PeerViewAlpha::new(strat, bucket, 1.0, min_online_peers).next_coverage(0.5)),
-        0.6
-    );
-    let mut coverage = 0.5;
-    for _ in 0..20 {
-        coverage = PeerViewAlpha::new(strat, bucket, 1.0, 1).next_coverage(coverage);
-    }
-    assert_eq!(coverage, 1.0);
-
-    let mut coverage = 1.0;
-    for _ in 0..20 {
-        coverage =
-            PeerViewAlpha::new(strat, bucket, 1.0, min_online_peers * 2).next_coverage(coverage);
-    }
-    assert_eq!(coverage, 0.5);
-}
-
-#[test]
 fn test_multiple() {
     let strat: PeerStrat = PeerStratAlpha::default().into();
     let converge = |peers: &mut Vec<DhtArc>| {
