@@ -531,7 +531,13 @@ impl IncomingDhtOpSender {
         self.send_op(element, make_store_element).await
     }
     async fn send_store_entry(self, element: Element) -> SysValidationResult<()> {
-        self.send_op(element, make_store_entry).await
+        let is_public_entry = element.header().entry_type().map_or(false, |et| {
+            matches!(et.visibility(), EntryVisibility::Public)
+        });
+        if is_public_entry {
+            self.send_op(element, make_store_entry).await?;
+        }
+        Ok(())
     }
     async fn send_register_add_link(self, element: Element) -> SysValidationResult<()> {
         self.send_op(element, make_register_add_link).await
@@ -605,7 +611,12 @@ fn make_store_element(element: Element) -> Option<(DhtOpHash, DhtOp)> {
 
     // Check the entry
     let maybe_entry_box = match element_entry {
-        ElementEntry::Present(e) => Some(e.into()),
+        ElementEntry::Present(e) => header
+            .entry_type()
+            .map_or(false, |et| {
+                matches!(et.visibility(), EntryVisibility::Public)
+            })
+            .then(|| e.into()),
         // This is ok because we weren't expecting an entry
         ElementEntry::NotApplicable | ElementEntry::Hidden => None,
         // The element is expected to have an entry but it wasn't
