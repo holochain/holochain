@@ -9,14 +9,10 @@ use statrs::statistics::*;
 use std::collections::HashSet;
 use std::iter;
 
-/// Maximum number of iterations. If we iterate this much, we assume the
-/// system is divergent (unable to reach equilibrium).
-const DIVERGENCE_ITERS: usize = 64;
-
-/// If a system converges this many times, consider it convergent.
-/// If it diverges once, consider it divergent.
-/// Increase this number if tests become flaky, decrease it if tests are too slow.
-const DETERMINATION_ITERS: usize = 8;
+/// Maximum number of iterations when calculating vergence.
+/// If we iterate this much, we assume the system is divergent
+/// (unable to reach equilibrium).
+const VERGENCE_ITERS: usize = 64;
 
 /// Number of consecutive rounds of no movement before declaring convergence.
 const CONVERGENCE_WINDOW: usize = 3;
@@ -50,13 +46,11 @@ fn single_agent_convergence_debug() {
     let n = 50;
     let j = 0.1;
     let redundancy = 5;
-    let check_gaps = false;
 
     let mut rng = seeded_rng(None);
     // let mut rng = seeded_rng(Some(5181023930453438019));
 
     let strat = PeerStratAlpha {
-        check_gaps,
         redundancy_target: redundancy / 2,
         ..Default::default()
     }
@@ -80,13 +74,7 @@ fn single_agent_convergence_debug() {
 }
 
 #[allow(dead_code)]
-fn run_single_agent_convergence(
-    iters: usize,
-    n: usize,
-    redundancy: u16,
-    j: f64,
-    check_gaps: bool,
-) -> RunBatch {
+fn run_single_agent_convergence(iters: usize, n: usize, redundancy: u16, j: f64) -> RunBatch {
     tracing::info!("");
     tracing::info!("------------------------");
 
@@ -95,7 +83,6 @@ fn run_single_agent_convergence(
     let mut rng = seeded_rng(seed);
 
     let strat = PeerStratAlpha {
-        check_gaps,
         redundancy_target: redundancy / 2,
         ..Default::default()
     }
@@ -191,7 +178,7 @@ fn report(e: &RunBatch) {
         tracing::warn!(
             "Divergent run found on attempt #{}. Failed to reach equilibrium in {} iterations",
             e.histories().count(),
-            DIVERGENCE_ITERS
+            VERGENCE_ITERS
         );
     }
 }
@@ -222,7 +209,7 @@ where
     F: Fn(Peers) -> (Peers, EpochStats),
 {
     let converged = |convergence| convergence >= CONVERGENCE_WINDOW;
-    let (peers, history, convergence) = (1..=DIVERGENCE_ITERS).fold(
+    let (peers, history, convergence) = (1..=VERGENCE_ITERS).fold(
         (peers, vec![], 0),
         |(peers, mut history, mut convergence), _i| {
             if !converged(convergence) {
@@ -362,6 +349,7 @@ pub fn generate_evenly_spaced_with_half_lens_and_jitter(
 #[derive(Debug)]
 struct RunBatch(Vec<Run>);
 
+#[allow(dead_code)]
 impl RunBatch {
     pub fn vergence(&self) -> Vergence {
         if self.0.iter().all(|r| r.vergence == Vergence::Convergent) {
@@ -380,7 +368,7 @@ impl RunBatch {
             self.vergence(),
             Vergence::Convergent,
             "failed to reach equilibrium in {} iterations",
-            DIVERGENCE_ITERS
+            VERGENCE_ITERS
         )
     }
 
