@@ -394,12 +394,10 @@ impl ArcInterval<DhtLocation> {
                 } else {
                     full()
                 }
+            } else if lo.as_u32() - hi.as_u32() < mid {
+                full()
             } else {
-                if lo.as_u32() - hi.as_u32() < mid {
-                    full()
-                } else {
-                    empty()
-                }
+                empty()
             }
         };
 
@@ -419,16 +417,14 @@ impl ArcInterval<DhtLocation> {
                             " ".repeat((len - hi).saturating_sub(1)),
                         ]
                     }
+                } else if lo <= hi {
+                    vec![decide(lo0, hi0)]
                 } else {
-                    if lo <= hi {
-                        vec![decide(lo0, hi0)]
-                    } else {
-                        vec![
-                            "-".repeat(hi + 1),
-                            " ".repeat((lo - hi).saturating_sub(1)),
-                            "-".repeat(len - lo),
-                        ]
-                    }
+                    vec![
+                        "-".repeat(hi + 1),
+                        " ".repeat((lo - hi).saturating_sub(1)),
+                        "-".repeat(len - lo),
+                    ]
                 }
                 .join("");
                 let center = loc_downscale(len, self.center_loc());

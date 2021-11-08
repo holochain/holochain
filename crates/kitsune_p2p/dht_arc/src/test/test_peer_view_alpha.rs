@@ -288,42 +288,31 @@ fn test_converge() {
     let min_online_peers = DEFAULT_MIN_PEERS;
     let bucket = DhtArc::new(0, MAX_HALF_LENGTH);
     assert_eq!(
-        converge(1.0, PeerViewAlpha::new(strat, bucket, 1.0, 1)),
+        (PeerViewAlpha::new(strat, bucket, 1.0, 1).next_coverage(1.0)),
         1.0
     );
     assert_eq!(
-        converge(
-            1.0,
-            PeerViewAlpha::new(strat, bucket, 1.0, min_online_peers)
-        ),
+        (PeerViewAlpha::new(strat, bucket, 1.0, min_online_peers).next_coverage(1.0)),
         1.0
     );
     assert_eq!(
-        converge(
-            1.0,
-            PeerViewAlpha::new(strat, bucket, 1.0, min_online_peers * 2)
-        ),
+        (PeerViewAlpha::new(strat, bucket, 1.0, min_online_peers * 2).next_coverage(1.0)),
         0.9
     );
     assert_eq!(
-        converge(
-            0.5,
-            PeerViewAlpha::new(strat, bucket, 1.0, min_online_peers)
-        ),
+        (PeerViewAlpha::new(strat, bucket, 1.0, min_online_peers).next_coverage(0.5)),
         0.6
     );
     let mut coverage = 0.5;
     for _ in 0..20 {
-        coverage = converge(coverage, PeerViewAlpha::new(strat, bucket, 1.0, 1));
+        coverage = PeerViewAlpha::new(strat, bucket, 1.0, 1).next_coverage(coverage);
     }
     assert_eq!(coverage, 1.0);
 
     let mut coverage = 1.0;
     for _ in 0..20 {
-        coverage = converge(
-            coverage,
-            PeerViewAlpha::new(strat, bucket, 1.0, min_online_peers * 2),
-        );
+        coverage =
+            PeerViewAlpha::new(strat, bucket, 1.0, min_online_peers * 2).next_coverage(coverage);
     }
     assert_eq!(coverage, 0.5);
 }

@@ -27,7 +27,7 @@ impl Default for PeerStratAlpha {
 impl PeerStratAlpha {
     pub fn view(&self, arc: DhtArc, peers: &[DhtArc]) -> PeerViewAlpha {
         let peers: Vec<DhtArc> = peers
-            .into_iter()
+            .iter()
             .filter(|a| arc.contains(a.center_loc))
             .copied()
             .collect();
@@ -43,7 +43,7 @@ impl PeerStratAlpha {
         } else {
             0.0
         };
-        PeerViewAlpha::new(self.clone(), arc, average, count).into()
+        PeerViewAlpha::new(*self, arc, average, count)
     }
 }
 
@@ -161,20 +161,4 @@ pub(crate) fn coverage_target(est_total_peers: usize, redundancy_target: u16) ->
     } else {
         redundancy_target as f64 / est_total_peers as f64
     }
-}
-
-/// Calculate the target arc length given a peer view.
-#[deprecated = "use PeerViewAlpha::target_coverage"]
-pub(crate) fn target(view: PeerViewAlpha) -> f64 {
-    view.target_coverage()
-}
-
-/// The convergence algorithm that moves an arc towards
-/// our estimated target.
-///
-/// Note the rate of convergence is dependant of the rate
-/// that [`DhtArc::update_length`] is called.
-#[deprecated = "use PeerViewAlpha::next_coverage"]
-pub(crate) fn converge(current: f64, view: PeerViewAlpha) -> f64 {
-    view.next_coverage(current)
 }
