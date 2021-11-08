@@ -292,21 +292,20 @@ impl Path {
 
     /// Touch and list all the links from this anchor to anchors below it.
     /// Only returns links between anchors, not to other entries that might have their own links.
-    pub fn children(&self) -> ExternResult<holochain_zome_types::link::Links> {
-        Self::ensure(&self)?;
-        let links = get_links(
+    pub fn children(&self) -> ExternResult<Vec<holochain_zome_types::link::Link>> {
+        Self::ensure(self)?;
+        let mut unwrapped = get_links(
             self.hash()?,
             Some(holochain_zome_types::link::LinkTag::new(NAME)),
         )?;
         // Only need one of each hash to build the tree.
-        let mut unwrapped: Vec<holochain_zome_types::link::Link> = links.into_inner();
         unwrapped.sort_unstable_by(|a, b| a.tag.cmp(&b.tag));
         unwrapped.dedup_by(|a, b| a.tag.eq(&b.tag));
-        Ok(holochain_zome_types::link::Links::from(unwrapped))
+        Ok(unwrapped)
     }
 
     pub fn children_details(&self) -> ExternResult<holochain_zome_types::link::LinkDetails> {
-        Self::ensure(&self)?;
+        Self::ensure(self)?;
         get_link_details(
             self.hash()?,
             Some(holochain_zome_types::link::LinkTag::new(NAME)),

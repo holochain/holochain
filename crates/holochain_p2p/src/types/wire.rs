@@ -2,15 +2,19 @@ use crate::*;
 use holochain_zome_types::zome::FunctionName;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-pub(crate) struct WireDhtOpData {
+/// Struct for encoding DhtOp as bytes.
+pub struct WireDhtOpData {
+    /// The dht op.
     pub op_data: holochain_types::dht_op::DhtOp,
 }
 
 impl WireDhtOpData {
+    /// Encode as bytes.
     pub fn encode(self) -> Result<Vec<u8>, SerializedBytesError> {
         Ok(UnsafeBytes::from(SerializedBytes::try_from(self)?).into())
     }
 
+    /// Decode from bytes.
     pub fn decode(data: Vec<u8>) -> Result<Self, SerializedBytesError> {
         let request: SerializedBytes = UnsafeBytes::from(data).into();
         request.try_into()
@@ -19,11 +23,12 @@ impl WireDhtOpData {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "content")]
-pub(crate) enum WireMessage {
+#[allow(missing_docs)]
+pub enum WireMessage {
     CallRemote {
         zome_name: ZomeName,
         fn_name: FunctionName,
-        cap: Option<CapSecret>,
+        cap_secret: Option<CapSecret>,
         #[serde(with = "serde_bytes")]
         data: Vec<u8>,
     },
@@ -62,6 +67,7 @@ pub(crate) enum WireMessage {
     },
 }
 
+#[allow(missing_docs)]
 impl WireMessage {
     pub fn encode(&self) -> Result<Vec<u8>, SerializedBytesError> {
         holochain_serialized_bytes::encode(&self)
@@ -74,13 +80,13 @@ impl WireMessage {
     pub fn call_remote(
         zome_name: ZomeName,
         fn_name: FunctionName,
-        cap: Option<CapSecret>,
+        cap_secret: Option<CapSecret>,
         payload: ExternIO,
     ) -> WireMessage {
         Self::CallRemote {
             zome_name,
             fn_name,
-            cap,
+            cap_secret,
             data: payload.into_vec(),
         }
     }

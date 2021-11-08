@@ -4,6 +4,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.0.14
+
+## 0.0.13
+
+## 0.0.12
+
+## 0.0.11
+
+## 0.0.10
+
 ## 0.0.9
 
 - Update to rusqlite 0.26.0 [\#1023](https://github.com/holochain/holochain/pull/1023)

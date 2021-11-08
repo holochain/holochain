@@ -74,24 +74,6 @@ impl Default for ChainTopOrdering {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub struct HeaderHashes(pub Vec<HeaderHash>);
-
-impl From<Vec<HeaderHash>> for HeaderHashes {
-    fn from(vs: Vec<HeaderHash>) -> Self {
-        Self(vs)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub struct HeaderHashedVec(pub Vec<HeaderHashed>);
-
-impl From<Vec<HeaderHashed>> for HeaderHashedVec {
-    fn from(vs: Vec<HeaderHashed>) -> Self {
-        Self(vs)
-    }
-}
-
 /// Header contains variants for each type of header.
 ///
 /// This struct really defines a local source chain, in the sense that it
@@ -383,6 +365,12 @@ impl_hashable_content!(Header, Header);
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct ZomeId(u8);
 
+impl ZomeId {
+    pub fn new(u: u8) -> Self {
+        Self(u)
+    }
+}
+
 #[derive(
     Debug,
     Copy,
@@ -598,7 +586,7 @@ impl EntryType {
     pub fn visibility(&self) -> &EntryVisibility {
         match self {
             EntryType::AgentPubKey => &EntryVisibility::Public,
-            EntryType::App(t) => &t.visibility(),
+            EntryType::App(t) => t.visibility(),
             EntryType::CapClaim => &EntryVisibility::Private,
             EntryType::CapGrant => &EntryVisibility::Private,
         }

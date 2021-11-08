@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 
-use crate::legacy_lair_api::{actor::*, internal::*, *};
+use crate::lair_keystore_api_0_0::{actor::*, internal::*, *};
 
 use crate::MetaLairClient;
 

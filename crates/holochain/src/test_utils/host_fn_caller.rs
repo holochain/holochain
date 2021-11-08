@@ -9,6 +9,7 @@ use crate::core::ribosome::host_fn;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostContext;
+use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
@@ -174,11 +175,17 @@ impl HostFnCaller {
             network,
             signal_tx,
             call_zome_handle,
-            cell_id,
+            cell_id.clone(),
         );
         let ribosome = Arc::new(ribosome);
         let zome = ribosome.dna_def().get_zome(&zome_name).unwrap();
-        let call_context = Arc::new(CallContext::new(zome, host_access.into()));
+        let call_context = Arc::new(CallContext::new(
+            zome,
+            FunctionName::new("not_sure_what_should_be_here"),
+            host_access.into(),
+            // Auth as the author.
+            InvocationAuth::Cap(cell_id.agent_pubkey().clone(), None),
+        ));
         (env, ribosome, call_context, workspace_lock)
     }
 }
@@ -303,7 +310,7 @@ impl HostFnCaller {
         // Write
         workspace_lock.flush(&self.network).await.unwrap();
 
-        output.into()
+        output
     }
 
     pub async fn get_link_details<'env>(

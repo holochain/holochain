@@ -1,115 +1,148 @@
 //! DANGER! This is a mock keystore for testing, DO NOT USE THIS IN PRODUCTION!
 
 use crate::*;
+use kitsune_p2p_types::dependencies::lair_keystore_api;
+use lair_keystore_api::prelude::*;
+use std::sync::Arc;
 
-const PUB1: &[u8] = &[
-    154, 185, 40, 0, 115, 213, 127, 247, 174, 124, 110, 222, 11, 151, 230, 233, 2, 171, 91, 154,
-    79, 50, 137, 45, 188, 110, 75, 56, 45, 18, 156, 158,
-];
-const SEC1: &[u8] = &[
-    207, 84, 35, 155, 191, 10, 211, 240, 254, 92, 222, 153, 125, 241, 80, 102, 189, 217, 201, 140,
-    112, 159, 21, 148, 138, 41, 85, 90, 169, 56, 174, 72,
-];
-const PUB2: &[u8] = &[
-    123, 88, 252, 103, 102, 190, 254, 104, 167, 210, 29, 41, 26, 225, 12, 113, 137, 104, 253, 93,
-    101, 214, 107, 125, 58, 208, 110, 203, 2, 166, 30, 88,
-];
-const SEC2: &[u8] = &[
-    59, 31, 135, 117, 115, 107, 84, 52, 95, 216, 51, 180, 79, 81, 14, 169, 163, 149, 166, 174, 167,
-    143, 3, 211, 123, 224, 24, 25, 201, 40, 81, 188,
-];
+/// First Test Agent Pub Key
+pub const TEST_AGENT_PK_1: &str = "uhCAkJCuynkgVdMn_bzZ2ZYaVfygkn0WCuzfFspczxFnZM1QAyXoo";
+const SEED_1: &str = "m-U7gdxW1A647O-4wkuCWOvtGGVfHEsxNScFKiL8-k8";
+const ED_PK_1: &str = "JCuynkgVdMn_bzZ2ZYaVfygkn0WCuzfFspczxFnZM1Q";
+//const ED_SK_1: &str =
+//    "m-U7gdxW1A647O-4wkuCWOvtGGVfHEsxNScFKiL8-k8kK7KeSBV0yf9vNnZlhpV_KCSfRYK7N8WylzPEWdkzVA";
+const X_PK_1: &str = "7RkNzL1Eu9ynrUT9NsqdLFNoGqQVcuOAHBOgzT550BY";
+const X_SK_1: &str = "j3qOevzDNH0EPOZVqgq_a3WLU3REJHwtk_N1wSoT900";
 
-const X25519_SEC1: [u8; 32] = [
-    253, 12, 117, 61, 12, 47, 207, 107, 110, 116, 6, 194, 214, 88, 61, 161, 220, 6, 53, 190, 225,
-    254, 230, 143, 130, 70, 25, 160, 15, 168, 42, 37,
-];
-const X25519_PUB1: [u8; 32] = [
-    65, 17, 71, 31, 48, 10, 48, 208, 3, 220, 71, 246, 83, 246, 74, 221, 3, 123, 54, 48, 160, 192,
-    179, 207, 115, 6, 19, 53, 233, 231, 167, 75,
-];
+/// Second Test Agent Pub Key
+pub const TEST_AGENT_PK_2: &str = "uhCAk39SDf7rynCg5bYgzroGaOJKGKrloI1o57Xao6S-U5KNZ0dUH";
+const SEED_2: &str = "v9I5GT3xVKPcaa4uyd2pcuJromf5zv1-OaahYOLBAWY";
+const ED_PK_2: &str = "39SDf7rynCg5bYgzroGaOJKGKrloI1o57Xao6S-U5KM";
+//const ED_SK_2: &str =
+//    "v9I5GT3xVKPcaa4uyd2pcuJromf5zv1-OaahYOLBAWbf1IN_uvKcKDltiDOugZo4koYquWgjWjntdqjpL5Tkow";
+const X_PK_2: &str = "rrp3HzChuX7ySxFrrwZ-1C91Lz1ygiBMpug1lxd162c";
+const X_SK_2: &str = "6AyYjh1sPqiyhgWDToMHbsPNtNZdvPD81QkSDiLQEvg";
 
-const X25519_SEC2: [u8; 32] = [
-    19, 195, 209, 22, 152, 172, 136, 179, 66, 40, 251, 5, 43, 170, 48, 164, 199, 79, 46, 241, 70,
-    51, 70, 218, 21, 43, 220, 65, 117, 102, 224, 133,
-];
-const X25519_PUB2: [u8; 32] = [
-    139, 250, 5, 51, 172, 9, 244, 251, 44, 226, 178, 145, 1, 252, 128, 237, 27, 225, 11, 171, 153,
-    205, 115, 228, 72, 211, 110, 41, 115, 48, 251, 98,
-];
+/// Third Test Agent Pub Key
+pub const TEST_AGENT_PK_3: &str = "uhCAkwfTgZ5eDJwI6ZV5vGt-kg8cVgXvcf35XKj6HnMv4PBH8noYB";
+const SEED_3: &str = "NE_0oUEATrsTR0o7JM1H8I6X6dtXg51iZvtCHAw6Fgg";
+const ED_PK_3: &str = "wfTgZ5eDJwI6ZV5vGt-kg8cVgXvcf35XKj6HnMv4PBE";
+//const ED_SK_3: &str =
+//    "NE_0oUEATrsTR0o7JM1H8I6X6dtXg51iZvtCHAw6FgjB9OBnl4MnAjplXm8a36SDxxWBe9x_flcqPoecy_g8EQ";
+const X_PK_3: &str = "0j2y0hMh1ka-DIMSqHsEvefwowMxE0pmIyIYL1xSnVE";
+const X_SK_3: &str = "fZqDBKw6nQoj7Zn-B9ebFiBs-nY54F6kGdXEFoHnsIg";
 
-const X25519_SEC3: [u8; 32] = [
-    229, 85, 118, 86, 0, 47, 249, 160, 87, 152, 212, 133, 41, 244, 102, 240, 175, 147, 71, 212,
-    107, 100, 148, 173, 27, 189, 83, 63, 162, 97, 248, 133,
-];
-const X25519_PUB3: [u8; 32] = [
-    211, 158, 23, 148, 162, 67, 112, 72, 185, 58, 136, 103, 76, 164, 39, 200, 83, 124, 57, 64, 234,
-    36, 102, 209, 80, 32, 77, 68, 108, 242, 71, 41,
-];
+/// Fourth Test Agent Pub Key
+pub const TEST_AGENT_PK_4: &str = "uhCAkQHMlYam1PRiYJCzAwQ0AUxIMwOoOvxgXS67N_YPOMj-fGx6X";
+const SEED_4: &str = "2o79pTXHaK1FTPZeBiJo2lCgXW_P0ULjX_5Div_2qxU";
+const ED_PK_4: &str = "QHMlYam1PRiYJCzAwQ0AUxIMwOoOvxgXS67N_YPOMj8";
+//const ED_SK_4: &str =
+//    "2o79pTXHaK1FTPZeBiJo2lCgXW_P0ULjX_5Div_2qxVAcyVhqbU9GJgkLMDBDQBTEgzA6g6_GBdLrs39g84yPw";
+const X_PK_4: &str = "Phplq-vA6Mfs_883RxMeGB_EqWQKkBvNK1atNl7QTnU";
+const X_SK_4: &str = "wu4uqLjHoY5RKqRpkKFkskCwdvhp4n91D0tIwzodoX8";
+
+fn r(s: &str) -> Vec<u8> {
+    base64::decode_config(s, base64::URL_SAFE_NO_PAD).unwrap()
+}
+
+fn s(s: &str) -> [u8; 32] {
+    let r_ = r(s);
+    let mut o = [0; 32];
+    o.copy_from_slice(&r_);
+    o
+}
 
 /// Construct a new TestKeystore.
 /// DANGER! This is a mock keystore for testing, DO NOT USE THIS IN PRODUCTION!
-pub async fn spawn_test_keystore() -> KeystoreApiResult<MetaLairClient> {
-    use legacy_lair_api::test::*;
+pub async fn spawn_legacy_test_keystore() -> KeystoreApiResult<MetaLairClient> {
+    use lair_keystore_api_0_0::test::*;
     let (api, _evt) = spawn_test_keystore(
         vec![
             FixtureSignEd25519Keypair {
-                pub_key: PUB1.to_vec(),
-                priv_key: SEC1.to_vec(),
+                pub_key: r(ED_PK_1),
+                priv_key: r(SEED_1),
             },
             FixtureSignEd25519Keypair {
-                pub_key: PUB2.to_vec(),
-                priv_key: SEC2.to_vec(),
+                pub_key: r(ED_PK_2),
+                priv_key: r(SEED_2),
+            },
+            FixtureSignEd25519Keypair {
+                pub_key: r(ED_PK_3),
+                priv_key: r(SEED_3),
+            },
+            FixtureSignEd25519Keypair {
+                pub_key: r(ED_PK_4),
+                priv_key: r(SEED_4),
             },
         ],
         vec![],
         vec![
             FixtureX25519Keypair {
-                pub_key: X25519_PUB1.into(),
-                priv_key: X25519_SEC1.into(),
+                pub_key: s(X_PK_1).into(),
+                priv_key: s(X_SK_1).into(),
             },
             FixtureX25519Keypair {
-                pub_key: X25519_PUB2.into(),
-                priv_key: X25519_SEC2.into(),
+                pub_key: s(X_PK_2).into(),
+                priv_key: s(X_SK_2).into(),
             },
             FixtureX25519Keypair {
-                pub_key: X25519_PUB3.into(),
-                priv_key: X25519_SEC3.into(),
+                pub_key: s(X_PK_3).into(),
+                priv_key: s(X_SK_3).into(),
+            },
+            FixtureX25519Keypair {
+                pub_key: s(X_PK_4).into(),
+                priv_key: s(X_SK_4).into(),
             },
         ],
     )
     .await?;
-    Ok(MetaLairClient::Legacy(api))
+    let keystore = MetaLairClient::Legacy(api);
+    keystore.new_sign_keypair_random().await.unwrap();
+    keystore.new_sign_keypair_random().await.unwrap();
+    keystore.new_sign_keypair_random().await.unwrap();
+    keystore.new_sign_keypair_random().await.unwrap();
+    Ok(keystore)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// Construct a new TestKeystore with the new lair api.
+pub async fn spawn_test_keystore() -> LairResult<MetaLairClient> {
+    // in-memory secure random passphrase
+    let passphrase = sodoken::BufWrite::new_mem_locked(32)?;
+    sodoken::random::bytes_buf(passphrase.clone()).await?;
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_test_keystore() {
-        tokio::task::spawn(async move {
-            let keystore = spawn_test_keystore().await.unwrap();
-            let agent_pubkey1 = holo_hash::AgentPubKey::new_random(&keystore).await.unwrap();
-            assert_eq!(
-                "uhCAkmrkoAHPVf_eufG7eC5fm6QKrW5pPMoktvG5LOC0SnJ4vV1Uv",
-                &agent_pubkey1.to_string()
-            );
-            let agent_pubkey2 = holo_hash::AgentPubKey::new_random(&keystore).await.unwrap();
-            assert_eq!(
-                "uhCAke1j8Z2a-_min0h0pGuEMcYlo_V1l1mt9OtBuywKmHlg4L_R-",
-                &agent_pubkey2.to_string()
-            );
+    // in-mem / in-proc config
+    let config = Arc::new(
+        PwHashLimits::Minimum
+            .with_exec(|| {
+                lair_keystore_api::config::LairServerConfigInner::new("/", passphrase.to_read())
+            })
+            .await?,
+    );
 
-            #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-            struct MyData(Vec<u8>);
+    // the keystore
+    let keystore = lair_keystore_api::in_proc_keystore::InProcKeystore::new(
+        config,
+        lair_keystore_api::mem_store::create_mem_store_factory(),
+        passphrase.to_read(),
+    )
+    .await?;
 
-            let my_data_1 = MyData(b"signature test data 1".to_vec());
+    // get the store and inject test seeds
+    let store = keystore.store().await?;
+    store
+        .insert_seed(s(SEED_1).into(), TEST_AGENT_PK_1.into())
+        .await?;
+    store
+        .insert_seed(s(SEED_2).into(), TEST_AGENT_PK_2.into())
+        .await?;
+    store
+        .insert_seed(s(SEED_3).into(), TEST_AGENT_PK_3.into())
+        .await?;
+    store
+        .insert_seed(s(SEED_4).into(), TEST_AGENT_PK_4.into())
+        .await?;
 
-            let signature = agent_pubkey1.sign(&keystore, &my_data_1).await.unwrap();
-
-            assert!(agent_pubkey1.verify_signature(&signature, &my_data_1).await);
-        })
-        .await
-        .unwrap();
-    }
+    // return the client
+    let client = keystore.new_client().await?;
+    Ok(MetaLairClient::NewLair(client))
 }

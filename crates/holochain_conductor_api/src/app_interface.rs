@@ -100,7 +100,7 @@ pub struct ZomeCall {
     /// This can be `None` and still succeed in the case where the function
     /// in the zome being called has been given an Unrestricted status
     /// via a `CapGrant`. Otherwise, it will be necessary to provide a `CapSecret` for every call.
-    pub cap: Option<CapSecret>,
+    pub cap_secret: Option<CapSecret>,
     /// The provenance (source) of the call.
     ///
     /// NB: **This will go away** as soon as Holochain has a way of determining who
@@ -135,7 +135,7 @@ impl InstalledAppInfo {
         let status = app.status().clone().into();
         let cell_data = app
             .provisioned_cells()
-            .map(|(nick, id)| InstalledCell::new(id.clone(), nick.clone()))
+            .map(|(role_id, id)| InstalledCell::new(id.clone(), role_id.clone()))
             .collect();
         Self {
             installed_app_id,

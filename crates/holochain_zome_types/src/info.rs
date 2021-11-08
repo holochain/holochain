@@ -1,35 +1,41 @@
 use crate::header::ZomeId;
 use crate::zome::ZomeName;
+use crate::CapGrant;
+use crate::EntryDefs;
+use crate::FunctionName;
+use crate::Timestamp;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
+use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 
 /// The properties of the current dna/zome being called.
 #[allow(missing_docs)]
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq)]
 pub struct ZomeInfo {
-    pub dna_name: String,
-    pub dna_hash: DnaHash,
-    pub zome_name: ZomeName,
+    pub name: ZomeName,
     /// The position of this zome in the `dna.json`
-    pub zome_id: ZomeId,
+    pub id: ZomeId,
     pub properties: SerializedBytes,
+    pub entry_defs: EntryDefs,
+    // @todo make this include function signatures when they exist.
+    pub extern_fns: Vec<FunctionName>,
 }
 
 impl ZomeInfo {
     pub fn new(
-        dna_name: String,
-        dna_hash: DnaHash,
-        zome_name: ZomeName,
-        zome_id: ZomeId,
+        name: ZomeName,
+        id: ZomeId,
         properties: SerializedBytes,
+        entry_defs: EntryDefs,
+        extern_fns: Vec<FunctionName>,
     ) -> Self {
         Self {
-            dna_name,
-            dna_hash,
-            zome_name,
-            zome_id,
+            name,
+            id,
             properties,
+            entry_defs,
+            extern_fns,
         }
     }
 }
@@ -45,13 +51,19 @@ pub struct AgentInfo {
     /// Same as the initial pubkey if it has never been changed.
     /// The agent can revoke an old key and replace it with a new one, the latest appears here.
     pub agent_latest_pubkey: AgentPubKey,
+    pub chain_head: (HeaderHash, u32, Timestamp),
 }
 
 impl AgentInfo {
-    pub fn new(agent_initial_pubkey: AgentPubKey, agent_latest_pubkey: AgentPubKey) -> Self {
+    pub fn new(
+        agent_initial_pubkey: AgentPubKey,
+        agent_latest_pubkey: AgentPubKey,
+        chain_head: (HeaderHash, u32, Timestamp),
+    ) -> Self {
         Self {
             agent_initial_pubkey,
             agent_latest_pubkey,
+            chain_head,
         }
     }
 }
@@ -60,7 +72,20 @@ impl AgentInfo {
 pub struct AppInfo;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct DnaInfo;
+pub struct DnaInfo {
+    pub name: String,
+    pub hash: DnaHash,
+    pub properties: SerializedBytes,
+    // In ZomeId order as to match corresponding `ZomeInfo` for each.
+    pub zome_names: Vec<ZomeName>,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct CallInfo;
+pub struct CallInfo {
+    pub provenance: AgentPubKey,
+    pub function_name: FunctionName,
+    /// Chain head as at the call start.
+    /// This will not change within a call even if the chain is written to.
+    pub as_at: (HeaderHash, u32, Timestamp),
+    pub cap_grant: CapGrant,
+}

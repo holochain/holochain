@@ -219,7 +219,7 @@ pub fn hdk_extern(attrs: TokenStream, item: TokenStream) -> TokenStream {
     let output_type = if let syn::ReturnType::Type(_, ref ty) = item_fn.sig.output {
         ty.clone()
     } else {
-        unreachable!();
+        Box::new(syn::Type::Verbatim(quote::quote! { () }))
     };
 
     let internal_fn_ident = external_fn_ident.clone();

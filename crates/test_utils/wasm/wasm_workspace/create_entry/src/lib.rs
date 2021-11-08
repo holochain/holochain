@@ -38,7 +38,17 @@ fn priv_msg() -> PrivMsg {
 
 #[hdk_extern]
 fn create_entry(_: ()) -> ExternResult<HeaderHash> {
-    hdk::prelude::create_entry(&post())
+    let post = post();
+    HDK.with(|h| {
+        h.borrow().create(CreateInput::new(
+            (&post).into(),
+            post.try_into().unwrap(),
+            // This is used to test many conductors thrashing creates between
+            // each other so we want to avoid retries that make the test take
+            // a long time.
+            ChainTopOrdering::Relaxed,
+        ))
+    })
 }
 
 #[hdk_extern]
@@ -104,7 +114,7 @@ fn get_activity(
 fn init(_: ()) -> ExternResult<InitCallbackResult> {
     // grant unrestricted access to accept_cap_claim so other agents can send us claims
     let mut functions: GrantedFunctions = BTreeSet::new();
-    functions.insert((zome_info()?.zome_name, "create_entry".into()));
+    functions.insert((zome_info()?.name, "create_entry".into()));
     create_cap_grant(CapGrantEntry {
         tag: "".into(),
         // empty access converts to unrestricted

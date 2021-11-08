@@ -31,7 +31,7 @@ pub fn create<'a>(
                         .host_context
                         .workspace()
                         .source_chain()
-                        .put_countersigned(input.into_entry(), chain_top_ordering)
+                        .put_countersigned(Some(call_context.zome.clone()), input.into_entry(), chain_top_ordering)
                         .await
                         .map_err(|source_chain_error| {
                             WasmError::Host(source_chain_error.to_string())
@@ -81,7 +81,7 @@ pub fn create<'a>(
                             .host_context
                             .workspace()
                             .source_chain()
-                            .put(header_builder, Some(input.into_entry()), chain_top_ordering)
+                            .put(Some(call_context.zome.clone()), header_builder, Some(input.into_entry()), chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| {
                                 WasmError::Host(source_chain_error.to_string())
@@ -288,7 +288,7 @@ pub mod wasm_test {
             .call_zome(ZomeCall {
                 cell_id: alice_cell_id.clone(),
                 zome_name: TestWasm::MultipleCalls.into(),
-                cap: None,
+                cap_secret: None,
                 fn_name: "create_entry_multiple".into(),
                 payload: ExternIO::encode(n).unwrap(),
                 provenance: alice_agent_id.clone(),
@@ -303,7 +303,7 @@ pub mod wasm_test {
             .call_zome(ZomeCall {
                 cell_id: alice_cell_id,
                 zome_name: TestWasm::MultipleCalls.into(),
-                cap: None,
+                cap_secret: None,
                 fn_name: "get_entry_multiple".into(),
                 payload: ExternIO::encode(n).unwrap(),
                 provenance: alice_agent_id,

@@ -1,6 +1,4 @@
 use hdk::prelude::*;
 
-#[hdk_extern]
-fn post_commit(_: HeaderHashes) -> ExternResult<PostCommitCallbackResult> {
-    Ok(PostCommitCallbackResult::Success)
-}
+#[hdk_extern(infallible)]
+fn post_commit(_: Vec<SignedHeaderHashed>) { }

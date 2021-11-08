@@ -3,8 +3,18 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
-- Check local agents for basis when doing a RPCMulti call. [#1009](https://github.com/holochain/holochain/pull/1009).
 - Gossip all agent info within the common arc set even in they are empty. [#1042](https://github.com/holochain/holochain/pull/1042).
+
+## 0.0.12
+
+- BREAKING: Return `ShardedGossipWire::Busy` if we are overloaded with incoming gossip. [\#1076](https://github.com/holochain/holochain/pull/1076)
+  - This breaks the current network protocol and will not be compatible with other older versions of holochain (no manual action required).
+
+## 0.0.11
+
+## 0.0.10
+
+- Check local agents for basis when doing a RPCMulti call. [\#1009](https://github.com/holochain/holochain/pull/1009).
 
 ## 0.0.9
 
