@@ -283,6 +283,42 @@ fn test_peer_density() {
 }
 
 #[test]
+fn test_converge() {
+    let strat = PeerStratAlpha::default();
+    let min_online_peers = DEFAULT_MIN_PEERS;
+    let bucket = DhtArc::new(0, MAX_HALF_LENGTH);
+    assert_eq!(
+        (PeerViewAlpha::new(strat, bucket, 1.0, 1).next_coverage(1.0)),
+        1.0
+    );
+    assert_eq!(
+        (PeerViewAlpha::new(strat, bucket, 1.0, min_online_peers).next_coverage(1.0)),
+        1.0
+    );
+    assert_between(
+        PeerViewAlpha::new(strat, bucket, 1.0, min_online_peers * 2).next_coverage(1.0),
+        0.9,
+        0.91,
+    );
+    assert_eq!(
+        (PeerViewAlpha::new(strat, bucket, 1.0, min_online_peers).next_coverage(0.5)),
+        0.6
+    );
+    let mut coverage = 0.5;
+    for _ in 0..20 {
+        coverage = PeerViewAlpha::new(strat, bucket, 1.0, 1).next_coverage(coverage);
+    }
+    assert_eq!(coverage, 1.0);
+
+    let mut coverage = 1.0;
+    for _ in 0..20 {
+        coverage =
+            PeerViewAlpha::new(strat, bucket, 1.0, min_online_peers * 2).next_coverage(coverage);
+    }
+    assert_between(coverage, 0.5, 0.55);
+}
+
+#[test]
 fn test_multiple() {
     let strat: PeerStrat = PeerStratAlpha::default().into();
     let converge = |peers: &mut Vec<DhtArc>| {
@@ -321,13 +357,17 @@ fn test_multiple() {
     let mut peers = even_dist_peers(DEFAULT_MIN_PEERS * 4, &[20]);
     converge(&mut peers);
     for arc in peers {
-        assert_eq!((arc.coverage() * 100.0).round() / 100.0, 0.25);
+        let cov = (arc.coverage() * 100.0).round() / 100.0;
+        assert!(cov >= 0.25);
+        assert!(cov <= 0.3);
     }
 
     let mut peers = even_dist_peers(DEFAULT_MIN_PEERS * 4, &[MAX_HALF_LENGTH]);
     converge(&mut peers);
     for arc in peers {
-        assert_eq!((arc.coverage() * 100.0).round() / 100.0, 0.25);
+        let cov = (arc.coverage() * 100.0).round() / 100.0;
+        assert!(cov >= 0.25);
+        assert!(cov <= 0.3);
     }
 }
 
@@ -357,7 +397,6 @@ fn test_check_for_gaps() {
 
     // No Gaps
     assert!(!check_for_gaps(vec![DhtArc::new(0, MAX_HALF_LENGTH)]));
-    assert!(!check_for_gaps(vec![DhtArc::new(0, MAX_HALF_LENGTH - 1)]));
     assert!(!check_for_gaps(vec![
         DhtArc::new(0, MAX_HALF_LENGTH / 2 + 1),
         DhtArc::new(MAX_HALF_LENGTH, MAX_HALF_LENGTH / 2 + 1)
@@ -467,7 +506,7 @@ fn test_peer_gaps() {
     let mut peers = even_dist_peers(DEFAULT_MIN_PEERS * 10, &[MAX_HALF_LENGTH / 4]);
     converge(&mut peers);
     for arc in peers {
-        assert_eq!((arc.coverage() * 100.0).round() / 100.0, 0.1);
+        assert_between((arc.coverage() * 100.0).round() / 100.0, 0.1, 0.15);
     }
 
     let mut peers = even_dist_peers(DEFAULT_MIN_PEERS, &[20]);
@@ -487,4 +526,8 @@ fn even_dist_peers(num: usize, half_lens: &[u32]) -> Vec<DhtArc> {
             DhtArc::new(dist as u32, *half_len)
         })
         .collect()
+}
+
+fn assert_between(v: f64, lo: f64, hi: f64) {
+    assert!(lo <= v && v <= hi);
 }
