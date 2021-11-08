@@ -210,15 +210,10 @@ impl DhtArc {
             .unwrap_or_default()
     }
 
-    /// The absolute length that this arc will hold.
-    pub fn absolute_length(&self) -> u64 {
-        self.range().len()
-    }
-
     /// The percentage of the full circle that is covered
     /// by this arc.
     pub fn coverage(&self) -> f64 {
-        self.absolute_length() as f64 / U32_LEN as f64
+        self.half_length as f64 / MAX_HALF_LENGTH as f64
     }
 
     /// Get the half length of this arc.

@@ -28,6 +28,10 @@ type DataVec = statrs::statistics::Data<Vec<f64>>;
 
 pub type Peers = Vec<DhtArc>;
 
+fn max_halflen() -> f64 {
+    MAX_HALF_LENGTH as f64
+}
+
 fn full_len() -> f64 {
     2f64.powi(32)
 }
@@ -38,6 +42,44 @@ pub fn seeded_rng(seed: Option<u64>) -> StdRng {
     StdRng::seed_from_u64(seed)
 }
 
+#[test]
+fn single_agent_convergence_debug() {
+    std::env::set_var("RUST_LOG", "debug");
+    observability::test_run().ok();
+
+    let n = 50;
+    let j = 0.1;
+    let redundancy = 5;
+    let check_gaps = false;
+
+    let mut rng = seeded_rng(None);
+    // let mut rng = seeded_rng(Some(5181023930453438019));
+
+    let strat = PeerStratAlpha {
+        check_gaps,
+        redundancy_target: redundancy / 2,
+        ..Default::default()
+    }
+    .into();
+
+    let s = ArcLenStrategy::Constant(redundancy as f64 / n as f64);
+
+    let mut peers = simple_parameterized_generator(&mut rng, n, j, s);
+    peers[0].half_length = MAX_HALF_LENGTH;
+    tracing::debug!("{}", EpochStats::oneline_header());
+    let runs = determine_equilibrium(1, peers, |peers| {
+        let dynamic = Some(maplit::hashset![0]);
+        let (peers, stats) = run_one_epoch(&strat, peers, dynamic.as_ref(), DETAIL);
+
+        tracing::debug!("{}", stats.oneline());
+        // tracing::debug!("{}", peers[0].coverage());
+        (peers, stats)
+    });
+    print_arcs(&runs.0[0].peers);
+    report(&runs);
+}
+
+#[allow(dead_code)]
 fn run_single_agent_convergence(
     iters: usize,
     n: usize,
@@ -73,50 +115,9 @@ fn run_single_agent_convergence(
     runs
 }
 
+/// Test if various distributions of agents can converge
 #[test]
-fn single_agent_convergence_debug() {
-    std::env::set_var("RUST_LOG", "debug");
-    observability::test_run().ok();
-
-    let n = 50;
-    let j = 0.1;
-    let redundancy = 5;
-    let check_gaps = false;
-
-    // bad seeds:
-    // 7532095396949412554  (XXX)
-    // 5181023930453438019
-
-    // let seed = thread_rng().gen();
-    let seed = 5181023930453438019;
-
-    tracing::info!("RNG seed: {}", seed);
-    let mut rng = StdRng::seed_from_u64(seed);
-
-    let strat = PeerStratAlpha {
-        check_gaps,
-        redundancy_target: redundancy / 2,
-        ..Default::default()
-    }
-    .into();
-
-    let s = ArcLenStrategy::Constant(redundancy as f64 / n as f64);
-
-    let mut peers = simple_parameterized_generator(&mut rng, n, j, s);
-    peers[0].half_length = MAX_HALF_LENGTH;
-    let runs = determine_equilibrium(1, peers, |peers| {
-        let dynamic = Some(maplit::hashset![0]);
-        let (peers, stats) = run_one_epoch(&strat, peers, dynamic.as_ref(), DETAIL);
-
-        tracing::debug!("{}", stats.oneline());
-        // tracing::debug!("{}", peers[0].coverage());
-        (peers, stats)
-    });
-    // print_arcs(&runs.0[0].peers);
-    report(&runs);
-}
-
-#[test]
+#[cfg(feature = "slow_tests")]
 fn single_agent_convergence_battery() {
     std::env::set_var("RUST_LOG", "info");
     observability::test_run().ok();
@@ -125,39 +126,34 @@ fn single_agent_convergence_battery() {
     let n = 1000;
     let r = 100;
 
-    // These diverge only rarely
-    let _borderline = vec![
-        run_single_agent_convergence(16, n, r, 0.001, false).vergence(),
-        run_single_agent_convergence(16, n, r, 0.01, false).vergence(),
-    ];
-
     let divergent = vec![
-        run_single_agent_convergence(8, n, r, 0.0, true).vergence(),
-        run_single_agent_convergence(8, n, r, 0.0003, true).vergence(),
+        run_single_agent_convergence(8, n, r, 0.1, true).vergence(),
+        run_single_agent_convergence(8, n, r, 0.5, true).vergence(),
     ];
 
     let convergent = vec![
-        run_single_agent_convergence(16, n, r, 0.0, false).vergence(),
-        run_single_agent_convergence(16, n, r, 0.0003, false).vergence(),
-        run_single_agent_convergence(16, n, r, 0.0007, false).vergence(),
+        run_single_agent_convergence(8, n, r, 0.0, false).vergence(),
+        run_single_agent_convergence(8, n, r, 0.001, false).vergence(),
+        run_single_agent_convergence(8, n, r, 0.01, false).vergence(),
+        run_single_agent_convergence(8, n, r, 0.1, false).vergence(),
+        run_single_agent_convergence(8, n, r, 0.5, false).vergence(),
+        run_single_agent_convergence(8, n, r, 1.0, false).vergence(),
     ];
 
-    // assert_eq!(borderline, vec![Divergent; borderline.len()]);
     assert_eq!(divergent, vec![Divergent; divergent.len()]);
     assert_eq!(convergent, vec![Convergent; convergent.len()]);
 }
 
+/// Equilibrium test for a single distribution
 #[test]
 fn parameterized_stability_test() {
     std::env::set_var("RUST_LOG", "debug");
     observability::test_run().ok();
 
-    let seed = thread_rng().gen();
-    tracing::info!("RNG seed: {}", seed);
-    let mut rng = StdRng::seed_from_u64(seed);
+    let mut rng = seeded_rng(None);
 
     let n = 1000;
-    let j = 1f64 / n as f64 / 3.0;
+    let j = 10.0 / n as f64;
     let s = ArcLenStrategy::Constant(0.1);
 
     let r = 50;
@@ -170,18 +166,16 @@ fn parameterized_stability_test() {
     let peers = simple_parameterized_generator(&mut rng, n, j, s);
     tracing::info!("");
     tracing::debug!("{}", EpochStats::oneline_header());
-    let eq = determine_equilibrium(8, peers, |peers| {
+    let eq = determine_equilibrium(2, peers, |peers| {
         let (peers, stats) = run_one_epoch(&strat, peers, None, DETAIL);
         tracing::debug!("{}", stats.oneline());
         (peers, stats)
     });
     report(&eq);
     eq.assert_convergent();
-}
-
-#[test]
-fn min_redundancy_is_maintained() {
-    todo!("Check that min redundancy is maintained at all times");
+    // TODO: the min redundancy is never exactly 100.
+    //       would be good to look at the *average* redundancy, and other stats.
+    eq.assert_min_redundancy(95);
 }
 
 fn report(e: &RunBatch) {
@@ -209,7 +203,7 @@ where
     use Vergence::*;
     let mut runs = vec![];
     for i in 1..=iters {
-        let mut peers_clone = peers.clone();
+        tracing::debug!("----- Running equilibrium iteration {} -----", i);
         let run = seek_convergence(peers.clone(), |peers| step(peers));
         let vergence = run.vergence;
         runs.push(run);
@@ -233,7 +227,7 @@ where
         |(peers, mut history, mut convergence), _i| {
             if !converged(convergence) {
                 let (peers, stats) = step(peers);
-                if dbg!(stats.gross_delta_avg) == 0.0 {
+                if stats.gross_delta_avg == 0.0 {
                     convergence += 1;
                 } else if convergence > 0 {
                     panic!(
@@ -274,8 +268,8 @@ fn run_one_epoch(
 ) -> (Peers, EpochStats) {
     let mut net = 0.0;
     let mut gross = 0.0;
-    let mut delta_min = full_len() / 2.0;
-    let mut delta_max = -full_len() / 2.0;
+    let mut delta_min = max_halflen();
+    let mut delta_max = -max_halflen();
     let mut index_min = peers.len();
     let mut index_max = peers.len();
     for i in 0..peers.len() {
@@ -287,10 +281,11 @@ fn run_one_epoch(
         let p = peers.clone();
         let arc = peers.get_mut(i).unwrap();
         let view = strat.view(*arc, p.as_slice());
-        let before = arc.absolute_length() as f64;
+        let before = arc.half_length() as f64;
         arc.update_length(view);
-        let after = arc.absolute_length() as f64;
+        let after = arc.half_length() as f64;
         let delta = after - before;
+        // dbg!(&before, &after, &delta);
         net += delta;
         gross += delta.abs();
         if delta < delta_min {
@@ -315,11 +310,11 @@ fn run_one_epoch(
     let tot = peers.len() as f64;
     let min_redundancy = check_redundancy(peers.clone());
     let stats = EpochStats {
-        net_delta_avg: net / tot / full_len(),
-        gross_delta_avg: gross / tot / full_len(),
+        net_delta_avg: net / tot / max_halflen(),
+        gross_delta_avg: gross / tot / max_halflen(),
         min_redundancy: min_redundancy,
-        delta_min: delta_min / full_len(),
-        delta_max: delta_max / full_len(),
+        delta_min: delta_min / max_halflen(),
+        delta_max: delta_max / max_halflen(),
     };
     (peers, stats)
 }
@@ -386,6 +381,14 @@ impl RunBatch {
             Vergence::Convergent,
             "failed to reach equilibrium in {} iterations",
             DIVERGENCE_ITERS
+        )
+    }
+
+    pub fn assert_min_redundancy(&self, r: u32) {
+        assert!(
+            self.histories().flatten().all(|s| s.min_redundancy >= r),
+            "redundancy fell below {}",
+            r
         )
     }
 

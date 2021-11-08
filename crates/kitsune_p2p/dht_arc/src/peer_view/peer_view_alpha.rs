@@ -113,10 +113,10 @@ impl PeerViewAlpha {
             } else if current > target_hi {
                 target_hi
             } else {
+                // dbg!(&current);
                 current
             }
         };
-        dbg!(&target);
 
         // The change in arc we'd need to make to get to the target.
         let delta = target - current;

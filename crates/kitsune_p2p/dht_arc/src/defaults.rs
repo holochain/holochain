@@ -10,7 +10,7 @@ pub const DEFAULT_MIN_REDUNDANCY: u32 = (REDUNDANCY_FLOOR as f64 / DEFAULT_UPTIM
 pub(crate) const DEFAULT_REDUNDANCY_TARGET: usize = 50;
 
 /// Establish an upper target, this much higher than the lower target of coverage.
-pub(crate) const DEFAULT_COVERAGE_BUFFER: f64 = 0.05;
+pub(crate) const DEFAULT_COVERAGE_BUFFER: f64 = 0.05; // 5%
 
 /// Default assumed up time for nodes.
 pub(crate) const DEFAULT_UPTIME: f64 = 0.5;
