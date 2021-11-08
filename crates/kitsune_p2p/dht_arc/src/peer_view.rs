@@ -1,12 +1,12 @@
 mod peer_view_alpha;
 pub use peer_view_alpha::*;
-// mod peer_view_beta;
-// pub use peer_view_beta::*;
 
 use crate::DhtArc;
 
 pub mod gaps;
 
+/// A Strategy for generating PeerViews.
+/// The enum allows us to add new strategies over time.
 #[derive(Debug, Clone, derive_more::From)]
 pub enum PeerStrat {
     Alpha(PeerStratAlpha),
@@ -32,6 +32,13 @@ impl PeerStrat {
     }
 }
 
+/// A "view" of the peers in a neighborhood. The view consists of a few
+/// observations about the distribution of peers within a particular arc, used
+/// to make inferences about the rest of the (out-of-view) DHT, ultimately
+/// enabling the calculation of the target arc size for the agent who has this View.
+///
+/// The enum allows us to add different views (and different calculations of
+/// target arc length) over time.
 #[derive(Debug, Clone, derive_more::From)]
 pub enum PeerView {
     Alpha(PeerViewAlpha),

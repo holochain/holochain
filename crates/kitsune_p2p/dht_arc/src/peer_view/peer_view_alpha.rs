@@ -1,5 +1,6 @@
 use crate::*;
 
+/// The default, and only, strategy for generating a PeerView
 #[derive(Debug, Clone, Copy)]
 pub struct PeerStratAlpha {
     pub check_gaps: bool,
@@ -48,8 +49,8 @@ impl PeerStratAlpha {
     }
 }
 
+/// The default, and only, PeerView.
 #[derive(Debug, Clone, Copy)]
-/// The average density of peers at a location in the u32 space.
 pub struct PeerViewAlpha {
     /// The strategy params that generated this view.
     strat: PeerStratAlpha,
