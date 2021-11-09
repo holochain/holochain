@@ -175,7 +175,7 @@ fn parameterized_stability_test() {
     eq.assert_convergent();
     // TODO: the min redundancy is never exactly 100.
     //       would be good to look at the *average* redundancy, and other stats.
-    eq.assert_min_redundancy(95);
+    eq.assert_min_redundancy(96);
 }
 
 fn report(e: &RunBatch) {

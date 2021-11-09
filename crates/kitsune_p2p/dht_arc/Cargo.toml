@@ -29,4 +29,5 @@ tracing = "0.1"
 
 [features]
 sqlite = ["rusqlite"]
+slow_tests = []
 test_utils = []

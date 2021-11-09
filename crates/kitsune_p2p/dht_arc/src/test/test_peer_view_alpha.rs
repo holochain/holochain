@@ -265,7 +265,7 @@ fn test_peer_density() {
     let peers = even_dist_peers(DEFAULT_MIN_PEERS * 2, &[MAX_HALF_LENGTH]);
     converge(&mut arc, &peers);
     // - Converge to half coverage
-    assert_eq!((arc.coverage() * 10.0).round() / 10.0, 0.5);
+    assert_between((arc.coverage() * 10.0).round() / 10.0, 0.5, 0.6);
 
     // - Start with full coverage and low density
     let mut arc = DhtArc::new(u32::MAX / 2, MAX_HALF_LENGTH);

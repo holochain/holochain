@@ -15,7 +15,7 @@ pub struct PeerStratAlpha {
 impl Default for PeerStratAlpha {
     fn default() -> Self {
         Self {
-            check_gaps: false,
+            check_gaps: true,
             redundancy_target: DEFAULT_REDUNDANCY_TARGET as u16,
             coverage_buffer: DEFAULT_COVERAGE_BUFFER,
             default_uptime: DEFAULT_UPTIME,
@@ -106,7 +106,6 @@ impl PeerViewAlpha {
     pub fn next_coverage(&self, current: f64) -> f64 {
         let target = {
             let target_lo = self.target_coverage();
-            // let target_hi = target_lo;
             let target_hi = (target_lo + self.strat.coverage_buffer).min(1.0);
 
             if current < target_lo {
@@ -114,7 +113,6 @@ impl PeerViewAlpha {
             } else if current > target_hi {
                 target_hi
             } else {
-                // dbg!(&current);
                 current
             }
         };
