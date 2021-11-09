@@ -13,11 +13,6 @@ use std::iter;
 /// system is divergent (unable to reach equilibrium).
 const DIVERGENCE_ITERS: usize = 64;
 
-/// If a system converges this many times, consider it convergent.
-/// If it diverges once, consider it divergent.
-/// Increase this number if tests become flaky, decrease it if tests are too slow.
-const DETERMINATION_ITERS: usize = 8;
-
 /// Number of consecutive rounds of no movement before declaring convergence.
 const CONVERGENCE_WINDOW: usize = 3;
 
@@ -369,6 +364,7 @@ pub fn generate_evenly_spaced_with_half_lens_and_jitter(
 #[derive(Debug)]
 struct RunBatch(Vec<Run>);
 
+#[allow(dead_code)]
 impl RunBatch {
     pub fn vergence(&self) -> Vergence {
         if self.0.iter().all(|r| r.vergence == Vergence::Convergent) {
