@@ -36,6 +36,7 @@ impl Query for GetElementDetailsQuery {
         JOIN Header On DhtOp.header_hash = Header.hash
         WHERE DhtOp.type IN (:create_type, :delete_type, :update_type)
         AND DhtOp.basis_hash = :header_hash
+        AND DhtOp.validation_status IS NOT NULL
         AND (DhtOp.when_integrated IS NOT NULL OR DhtOp.is_authored = 1)
         "
         .into()
