@@ -30,7 +30,6 @@ use crate::core::ribosome::guest_callback::validation_package::ValidationPackage
 use crate::core::ribosome::guest_callback::CallIterator;
 use crate::core::ribosome::host_fn::accept_countersigning_preflight_request::accept_countersigning_preflight_request;
 use crate::core::ribosome::host_fn::agent_info::agent_info;
-use crate::core::ribosome::host_fn::app_info::app_info;
 use crate::core::ribosome::host_fn::call::call;
 use crate::core::ribosome::host_fn::call_info::call_info;
 use crate::core::ribosome::host_fn::call_remote::call_remote;
@@ -401,7 +400,6 @@ impl RealRibosome {
                 x_25519_x_salsa20_poly1305_decrypt,
             )
             .with_host_function(&mut ns, "__zome_info", zome_info)
-            .with_host_function(&mut ns, "__app_info", app_info)
             .with_host_function(&mut ns, "__dna_info", dna_info)
             .with_host_function(&mut ns, "__call_info", call_info)
             .with_host_function(&mut ns, "__random_bytes", random_bytes)
