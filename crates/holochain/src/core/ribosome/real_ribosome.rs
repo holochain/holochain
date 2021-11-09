@@ -483,7 +483,8 @@ impl RibosomeT for RealRibosome {
             id: self
                 .zome_to_id(&zome)
                 .expect("Failed to get ID for current zome"),
-            properties: SerializedBytes::default(),
+            // @todo support zome level property overrides.
+            properties: self.dna_def().properties.clone(),
             entry_defs: {
                 match self
                     .run_entry_defs(EntryDefsHostAccess, EntryDefsInvocation)
