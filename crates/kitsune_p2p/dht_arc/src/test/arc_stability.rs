@@ -129,12 +129,19 @@ fn single_agent_convergence_battery() {
     let divergent = vec![
         run_single_agent_convergence(8, n, r, 0.1, true).vergence(),
         run_single_agent_convergence(8, n, r, 0.5, true).vergence(),
+        run_single_agent_convergence(8, n, r, 1.0, true).vergence(),
     ];
 
     let convergent = vec![
+        // gap_check == true
+        run_single_agent_convergence(8, n, r, 0.0, true).vergence(),
+        run_single_agent_convergence(8, n, r, 0.001, true).vergence(),
+        run_single_agent_convergence(8, n, r, 0.01, true).vergence(),
+        // gap_check == false
         run_single_agent_convergence(8, n, r, 0.0, false).vergence(),
         run_single_agent_convergence(8, n, r, 0.001, false).vergence(),
         run_single_agent_convergence(8, n, r, 0.01, false).vergence(),
+        // Note that these same scenarios fail to converge with gap_check
         run_single_agent_convergence(8, n, r, 0.1, false).vergence(),
         run_single_agent_convergence(8, n, r, 0.5, false).vergence(),
         run_single_agent_convergence(8, n, r, 1.0, false).vergence(),
