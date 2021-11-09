@@ -1,6 +1,9 @@
 use element_details::GetElementDetailsQuery;
 
-use crate::query::entry_details::GetEntryDetailsQuery;
+use crate::{
+    prelude::mutations_helpers::insert_valid_integrated_op,
+    query::entry_details::GetEntryDetailsQuery,
+};
 
 use super::*;
 
@@ -25,13 +28,7 @@ async fn entry_scratch_same_as_sql() {
         ChainTopOrdering::default(),
     )
     .unwrap();
-    insert_op(&mut txn, td.store_entry_op.clone(), true).unwrap();
-    set_validation_status(
-        &mut txn,
-        td.store_entry_op.as_hash().clone(),
-        ValidationStatus::Valid,
-    )
-    .unwrap();
+    insert_valid_integrated_op(&mut txn, td.store_entry_op.clone()).unwrap();
     let r1 = query
         .run(Txn::from(&txn))
         .unwrap()
@@ -64,13 +61,7 @@ async fn element_scratch_same_as_sql() {
         ChainTopOrdering::default(),
     )
     .unwrap();
-    insert_op(&mut txn, td.store_element_op.clone(), true).unwrap();
-    set_validation_status(
-        &mut txn,
-        td.store_element_op.as_hash().clone(),
-        ValidationStatus::Valid,
-    )
-    .unwrap();
+    insert_valid_integrated_op(&mut txn, td.store_element_op.clone()).unwrap();
     let r1 = query
         .run(Txn::from(&txn))
         .unwrap()

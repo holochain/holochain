@@ -11,11 +11,15 @@ use super::*;
 mod test;
 
 #[derive(Debug, Clone)]
-pub struct GetLiveEntryQuery(EntryHash);
+pub struct GetLiveEntryQuery(EntryHash, Option<Arc<AgentPubKey>>);
 
 impl GetLiveEntryQuery {
     pub fn new(hash: EntryHash) -> Self {
-        Self(hash)
+        Self(hash, None)
+    }
+
+    pub fn with_private_data_access(hash: EntryHash, author: Arc<AgentPubKey>) -> Self {
+        Self(hash, Some(author))
     }
 }
 
@@ -32,7 +36,8 @@ impl Query for GetLiveEntryQuery {
         WHERE DhtOp.type IN (:create_type, :delete_type, :update_type)
         AND DhtOp.basis_hash = :entry_hash
         AND DhtOp.validation_status = :status
-        AND (DhtOp.when_integrated IS NOT NULL OR DhtOp.is_authored = 1)
+        AND DhtOp.when_integrated IS NOT NULL
+        AND (Header.private_entry = 0 OR Header.author = :author)
         "
         .into()
     }
@@ -43,6 +48,7 @@ impl Query for GetLiveEntryQuery {
             ":update_type": DhtOpType::RegisterUpdatedContent,
             ":status": ValidationStatus::Valid,
             ":entry_hash": self.0,
+            ":author": self.1,
         };
         params.to_vec()
     }
@@ -120,8 +126,9 @@ impl Query for GetLiveEntryQuery {
                     .header()
                     .entry_hash()
                     .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.header().clone()))?;
+                let author = self.1.as_ref().map(|a| a.as_ref());
                 let element = stores
-                    .get_entry(entry_hash)?
+                    .get_public_or_authored_entry(entry_hash, author)?
                     .map(|entry| Element::new(header, Some(entry)));
                 Ok(element)
             }

@@ -9,11 +9,15 @@ use std::fmt::Debug;
 use super::*;
 
 #[derive(Debug, Clone)]
-pub struct GetEntryDetailsQuery(EntryHash);
+pub struct GetEntryDetailsQuery(EntryHash, Option<Arc<AgentPubKey>>);
 
 impl GetEntryDetailsQuery {
     pub fn new(hash: EntryHash) -> Self {
-        Self(hash)
+        Self(hash, None)
+    }
+
+    pub fn with_private_data_access(hash: EntryHash, author: Arc<AgentPubKey>) -> Self {
+        Self(hash, Some(author))
     }
 }
 
@@ -36,7 +40,8 @@ impl Query for GetEntryDetailsQuery {
         JOIN Header On DhtOp.header_hash = Header.hash
         WHERE DhtOp.type IN (:create_type, :delete_type, :update_type)
         AND DhtOp.basis_hash = :entry_hash
-        AND (DhtOp.when_integrated IS NOT NULL OR DhtOp.is_authored = 1)
+        AND DhtOp.when_integrated IS NOT NULL
+        AND (Header.private_entry = 0 OR Header.author = :author)
         "
         .into()
     }
@@ -46,6 +51,7 @@ impl Query for GetEntryDetailsQuery {
             ":delete_type": DhtOpType::RegisterDeletedEntryHeader,
             ":update_type": DhtOpType::RegisterUpdatedContent,
             ":entry_hash": self.0,
+            ":author": self.1,
         };
         params.to_vec()
     }
@@ -151,17 +157,20 @@ impl Query for GetEntryDetailsQuery {
                     .header()
                     .entry_hash()
                     .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.header().clone()))?;
-                let details = stores.get_entry(entry_hash)?.map(|entry| {
-                    let entry_dht_status = compute_entry_status(&state);
-                    EntryDetails {
-                        entry,
-                        headers: state.headers.into_iter().collect(),
-                        rejected_headers: state.rejected_headers.into_iter().collect(),
-                        deletes: state.deletes.into_iter().map(|(_, v)| v).collect(),
-                        updates: state.updates.into_iter().collect(),
-                        entry_dht_status,
-                    }
-                });
+                let author = self.1.as_ref().map(|a| a.as_ref());
+                let details = stores
+                    .get_public_or_authored_entry(entry_hash, author)?
+                    .map(|entry| {
+                        let entry_dht_status = compute_entry_status(&state);
+                        EntryDetails {
+                            entry,
+                            headers: state.headers.into_iter().collect(),
+                            rejected_headers: state.rejected_headers.into_iter().collect(),
+                            deletes: state.deletes.into_iter().map(|(_, v)| v).collect(),
+                            updates: state.updates.into_iter().collect(),
+                            entry_dht_status,
+                        }
+                    });
                 Ok(details)
             }
             None => Ok(None),
