@@ -98,6 +98,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "test_utils")]
+    #[ignore = "Test is flaky and sometimes never finishes"]
     async fn remote_signal_test() -> anyhow::Result<()> {
         observability::test_run().ok();
         const NUM_CONDUCTORS: usize = 5;
