@@ -277,7 +277,7 @@ fixturator!(
 
 fixturator!(
     ZomeCallHostAccess;
-    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pCell, SignalBroadcaster, CellConductorReadHandle, CellId);
+    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pCell, SignalBroadcaster, CellConductorReadHandle);
 );
 
 fixturator!(

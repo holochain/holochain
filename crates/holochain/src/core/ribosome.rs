@@ -178,14 +178,6 @@ impl HostContext {
         }
     }
 
-    /// Get the associated CellId, panics if not applicable
-    pub fn cell_id(&self) -> &CellId {
-        match self {
-            Self::ZomeCall(ZomeCallHostAccess { cell_id, .. }) => cell_id,
-            _ => panic!("Gave access to a host function that references a CellId"),
-        }
-    }
-
     /// Get the call zome handle, panics if none was provided
     pub fn call_zome_handle(&self) -> &CellConductorReadHandle {
         match self {
@@ -414,10 +406,6 @@ pub struct ZomeCallHostAccess {
     pub network: HolochainP2pCell,
     pub signal_tx: SignalBroadcaster,
     pub call_zome_handle: CellConductorReadHandle,
-    // NB: this is kind of an odd place for this, since CellId is not really a special
-    // "resource" to give access to, but rather it's a bit of data that makes sense in
-    // the context of zome calls, but not every CallContext
-    pub cell_id: CellId,
 }
 
 impl From<ZomeCallHostAccess> for HostContext {
@@ -583,7 +571,7 @@ pub mod wasm_test {
                     .next()
                     .unwrap();
 
-                let author = host_access.cell_id.agent_pubkey().clone();
+                let author = host_access.workspace.source_chain().agent_pubkey().clone();
 
                 // Required because otherwise the network will return routing errors
                 let test_network = crate::test_utils::test_network(

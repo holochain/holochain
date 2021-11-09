@@ -128,14 +128,8 @@ where
         let workspace = workspace.clone();
         let network = network.clone();
         move || {
-            let host_access = ZomeCallHostAccess::new(
-                workspace,
-                keystore,
-                network,
-                signal_tx,
-                call_zome_handle,
-                invocation.cell_id.clone(),
-            );
+            let host_access =
+                ZomeCallHostAccess::new(workspace, keystore, network, signal_tx, call_zome_handle);
             let result = ribosome.call_zome_function(host_access, invocation);
             (ribosome, result)
         }
