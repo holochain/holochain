@@ -26,6 +26,9 @@ pub use p2p_agent_store::*;
 mod p2p_metrics;
 pub use p2p_metrics::*;
 
+#[cfg(test)]
+mod tests;
+
 /// A read-only version of [DbWrite].
 /// This environment can only generate read-only transactions, never read-write.
 #[derive(Clone)]
@@ -314,7 +317,7 @@ pub trait WriteManager<'e> {
     }
 }
 
-impl<'e> ReadManager<'e> for PConn {
+impl<'e> PConn {
     fn with_reader<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
@@ -325,7 +328,7 @@ impl<'e> ReadManager<'e> for PConn {
     }
 
     #[cfg(feature = "test_utils")]
-    fn with_reader_test<R, F>(&'e mut self, f: F) -> R
+    pub fn with_reader_test<R, F>(&'e mut self, f: F) -> R
     where
         F: 'e + FnOnce(Transaction) -> R,
     {

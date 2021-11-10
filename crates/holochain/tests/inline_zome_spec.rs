@@ -243,7 +243,7 @@ async fn invalid_cell() -> anyhow::Result<()> {
     tracing::debug!(cell_ids = ?conductor.list_cell_ids(None));
     tracing::debug!(apps = ?conductor.list_running_apps().await.unwrap());
 
-    display_agent_infos(&conductor);
+    display_agent_infos(&conductor).await;
 
     // Can't finish this test because there's no way to construct HolochainP2pEvents
     // and I can't directly call query on the conductor because it's private.

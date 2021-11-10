@@ -149,7 +149,7 @@ pub async fn incoming_dht_ops_workflow(
     for (hash, op) in ops {
         // It's cheaper to check if the op exists before trying
         // to check the signature or open a write transaction.
-        if !op_exists(vault, &hash)? {
+        if !op_exists(vault, hash.clone()).await? {
             match should_keep(&op).await {
                 Ok(()) => filter_ops.push((hash, op)),
                 Err(e) => {
@@ -260,8 +260,10 @@ fn op_exists_inner(txn: &rusqlite::Transaction<'_>, hash: &DhtOpHash) -> Databas
     )?)
 }
 
-pub fn op_exists(vault: &EnvWrite, hash: &DhtOpHash) -> DatabaseResult<bool> {
-    vault.conn()?.with_reader(|txn| op_exists_inner(&txn, hash))
+pub async fn op_exists(vault: &EnvWrite, hash: DhtOpHash) -> DatabaseResult<bool> {
+    vault
+        .async_reader(move |txn| op_exists_inner(&txn, &hash))
+        .await
 }
 
 fn set_send_receipt(

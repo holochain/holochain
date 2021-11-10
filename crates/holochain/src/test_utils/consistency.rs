@@ -142,7 +142,7 @@ pub async fn local_machine_session_with_hashes(
         agent_env_map.extend(agents.iter().cloned().map(|(e, a)| (a, e)));
         agent_p2p_map.extend(agents.iter().cloned().map(|(_, a)| (a, p2p_env.clone())));
         for (_, agent) in &agents {
-            if let Some(storage_arc) = request_arc(&p2p_env, agent).await.unwrap() {
+            if let Some(storage_arc) = request_arc(&p2p_env, (**agent).clone()).await.unwrap() {
                 all_agents.push((agent.clone(), storage_arc));
             }
         }
@@ -625,7 +625,7 @@ async fn gather_published_data(
     use futures::stream::TryStreamExt;
     let iter = iter.map(|stores| async move {
         let published_hashes = request_published_ops(&stores.cell_env).await?;
-        let storage_arc = request_arc(&stores.p2p_env, &stores.agent).await?;
+        let storage_arc = request_arc(&stores.p2p_env, (*stores.agent).clone()).await?;
         Ok(storage_arc.map(|storage_arc| PublishedData {
             agent: stores.agent,
             storage_arc,
@@ -678,8 +678,7 @@ async fn request_published_ops(
 }
 
 /// Request the storage arc for the given agent.
-async fn request_arc(env: &EnvRead, agent: &KitsuneAgent) -> StateQueryResult<Option<DhtArc>> {
-    use holochain_sqlite::db::ReadManager;
-    env.conn()?
-        .with_reader(|txn| Ok(txn.p2p_get_agent(agent)?.map(|info| info.storage_arc)))
+async fn request_arc(env: &EnvRead, agent: KitsuneAgent) -> StateQueryResult<Option<DhtArc>> {
+    env.async_reader(move |txn| Ok(txn.p2p_get_agent(&agent)?.map(|info| info.storage_arc)))
+        .await
 }
