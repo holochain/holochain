@@ -61,7 +61,7 @@ where
         ribosome,
     } = args;
 
-    if workspace.has_genesis(&agent_pubkey)? {
+    if workspace.has_genesis(agent_pubkey.clone()).await? {
         return Ok(());
     }
 
@@ -113,10 +113,12 @@ impl GenesisWorkspace {
         Ok(Self { vault: env })
     }
 
-    pub fn has_genesis(&self, author: &AgentPubKey) -> DatabaseResult<bool> {
-        let count = self.vault.conn()?.with_reader(|txn| {
-            let count: u32 = txn.query_row(
-                "
+    pub async fn has_genesis(&self, author: AgentPubKey) -> DatabaseResult<bool> {
+        let count = self
+            .vault
+            .async_reader(move |txn| {
+                let count: u32 = txn.query_row(
+                    "
                 SELECT
                 COUNT(Header.hash)
                 FROM Header
@@ -127,13 +129,14 @@ impl GenesisWorkspace {
                 Header.author = :author
                 LIMIT 3
                 ",
-                named_params! {
-                    ":author": author,
-                },
-                |row| row.get(0),
-            )?;
-            DatabaseResult::Ok(count)
-        })?;
+                    named_params! {
+                        ":author": author,
+                    },
+                    |row| row.get(0),
+                )?;
+                DatabaseResult::Ok(count)
+            })
+            .await?;
         Ok(count >= 3)
     }
 }
