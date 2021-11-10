@@ -499,7 +499,6 @@ impl Cell {
                 // and should reset the publish back off loop to its minimum.
                 self.queue_triggers.publish_dht_ops.reset_back_off();
             }
-
             FetchOpData {
                 span_context: _,
                 respond,
