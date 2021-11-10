@@ -177,7 +177,7 @@ pub async fn check_valid_if_dna(
 ) -> SysValidationResult<()> {
     match header {
         Header::Dna(_) => {
-            if workspace.is_chain_empty(header.author())? {
+            if workspace.is_chain_empty(header.author().clone()).await? {
                 Ok(())
             } else {
                 Err(PrevHeaderError::InvalidRoot).map_err(|e| ValidationOutcome::from(e).into())
@@ -193,7 +193,7 @@ pub async fn check_chain_rollback(
     header: &Header,
     workspace: &SysValidationWorkspace,
 ) -> SysValidationResult<()> {
-    let empty = workspace.header_seq_is_empty(header)?;
+    let empty = workspace.header_seq_is_empty(header).await?;
 
     // Ok or log warning
     if empty {

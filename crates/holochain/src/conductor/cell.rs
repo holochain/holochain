@@ -139,7 +139,9 @@ impl Cell {
         // check if genesis has been run
         let has_genesis = {
             // check if genesis ran.
-            GenesisWorkspace::new(env.clone())?.has_genesis(id.agent_pubkey())?
+            GenesisWorkspace::new(env.clone())?
+                .has_genesis(id.agent_pubkey().clone())
+                .await?
         };
 
         if has_genesis {
@@ -742,24 +744,28 @@ impl Cell {
         tracing::debug!(from = ?receipt.receipt.validator, to = ?self.id.agent_pubkey(), hash = ?receipt.receipt.dht_op_hash);
 
         // Get the header for this op so we can check the entry type.
-        let header: Option<SignedHeader> = fresh_reader!(self.env, |txn| {
-            let h: Option<Vec<u8>> = txn
-                .query_row(
-                    "SELECT Header.blob as header_blob
+        let hash = receipt.receipt.dht_op_hash.clone();
+        let header: Option<SignedHeader> = self
+            .env
+            .async_reader(move |txn| {
+                let h: Option<Vec<u8>> = txn
+                    .query_row(
+                        "SELECT Header.blob as header_blob
                     FROM DhtOp
                     JOIN Header ON Header.hash = DhtOp.header_hash
                     WHERE DhtOp.hash = :hash",
-                    named_params! {
-                        ":hash": receipt.receipt.dht_op_hash,
-                    },
-                    |row| row.get("header_blob"),
-                )
-                .optional()?;
-            match h {
-                Some(h) => from_blob(h),
-                None => Ok(None),
-            }
-        })?;
+                        named_params! {
+                            ":hash": hash,
+                        },
+                        |row| row.get("header_blob"),
+                    )
+                    .optional()?;
+                match h {
+                    Some(h) => from_blob(h),
+                    None => Ok(None),
+                }
+            })
+            .await?;
 
         // If the header has an app entry type get the entry def
         // from the conductor.

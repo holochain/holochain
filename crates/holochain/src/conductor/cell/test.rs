@@ -78,7 +78,7 @@ async fn test_cell_handle_publish() {
         .await
         .unwrap();
 
-    op_exists(&cell.env, &op_hash).unwrap();
+    op_exists(&cell.env, op_hash.clone()).await.unwrap();
 
     stop_tx.send(()).unwrap();
     shutdown.await.unwrap().unwrap();
