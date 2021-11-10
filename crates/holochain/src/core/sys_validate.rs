@@ -591,7 +591,7 @@ async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
         .retrieve(hash.clone(), Default::default())
         .await?
     {
-        Some(el) => Ok(Source::Network(el)),
+        Some(el) => Ok(Source::Network(el.privatized())),
         None => Err(ValidationOutcome::NotHoldingDep(hash).into()),
     }
 }
@@ -605,24 +605,12 @@ async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
 /// to return an error.
 fn make_store_element(element: Element) -> Option<(DhtOpHash, DhtOp)> {
     // Extract the data
-    let (shh, element_entry) = element.into_inner();
+    let (shh, element_entry) = element.privatized().into_inner();
     let (header, signature) = shh.into_header_and_signature();
     let header = header.into_content();
 
     // Check the entry
-    let maybe_entry_box = match element_entry {
-        ElementEntry::Present(e) => header
-            .entry_type()
-            .map_or(false, |et| {
-                matches!(et.visibility(), EntryVisibility::Public)
-            })
-            .then(|| e.into()),
-        // This is ok because we weren't expecting an entry
-        ElementEntry::NotApplicable | ElementEntry::Hidden => None,
-        // The element is expected to have an entry but it wasn't
-        // stored so we can't add this to incoming ops
-        ElementEntry::NotStored => return None,
-    };
+    let maybe_entry_box = element_entry.into_option().map(Box::new);
 
     // Create the hash and op
     let op = DhtOp::StoreElement(signature, header, maybe_entry_box);
