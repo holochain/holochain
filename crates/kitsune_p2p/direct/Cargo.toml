@@ -19,10 +19,10 @@ hyper = { version = "0.14", features = ["server","http1","http2","tcp"] }
 if-addrs = "0.6"
 kitsune_p2p_bootstrap = { version = "0.0.1", path = "../bootstrap" }
 kitsune_p2p_direct_api = { version = "0.0.1", path = "../direct_api" }
-kitsune_p2p_types = { version = "0.0.11", path = "../types" }
-kitsune_p2p = { version = "0.0.12", path = "../kitsune_p2p" }
-kitsune_p2p_transport_quic = { version = "0.0.11", path = "../transport_quic" }
-kitsune_p2p_proxy = { version = "0.0.11", path = "../proxy" }
+kitsune_p2p_types = { version = "0.0.12-dev.0", path = "../types" }
+kitsune_p2p = { version = "0.0.13-dev.0", path = "../kitsune_p2p" }
+kitsune_p2p_transport_quic = { version = "0.0.12-dev.0", path = "../transport_quic" }
+kitsune_p2p_proxy = { version = "0.0.12-dev.0", path = "../proxy" }
 rand = "0.8.3"
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = { version = "1", features = ["preserve_order"] }
