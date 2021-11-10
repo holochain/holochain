@@ -35,9 +35,19 @@ impl ShardedGossipLocal {
 
         let id = rand::thread_rng().gen();
 
+        let mut agent_list = Vec::new();
+        for agent in local_agents.iter() {
+            if let Ok(Some(info)) = self.evt_sender.get_agent_info_signed(GetAgentInfoSignedEvt {
+                space: self.space.clone(),
+                agent: agent.clone(),
+            }).await {
+                agent_list.push(info);
+            }
+        }
+
         let maybe_gossip = self.inner.share_mut(|inner, _| {
             Ok(if let Some((endpoint, url)) = remote_agent {
-                let gossip = ShardedGossipWire::initiate(intervals, id);
+                let gossip = ShardedGossipWire::initiate(intervals, id, agent_list);
                 inner.initiate_tgt = Some((endpoint.clone(), id, Some(Instant::now())));
                 Some((endpoint, HowToConnect::Url(url), gossip))
             } else {
@@ -55,6 +65,7 @@ impl ShardedGossipLocal {
         peer_cert: Tx2Cert,
         remote_arc_set: Vec<ArcInterval>,
         remote_id: u32,
+        _remote_agent_list: Vec<AgentInfoSigned>,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let (local_agents, same_as_target, already_in_progress) =
             self.inner.share_mut(|i, _| {
@@ -108,8 +119,18 @@ impl ShardedGossipLocal {
 
         let mut gossip = Vec::with_capacity(3);
 
+        let mut agent_list = Vec::new();
+        for agent in local_agents.iter() {
+            if let Ok(Some(info)) = self.evt_sender.get_agent_info_signed(GetAgentInfoSignedEvt {
+                space: self.space.clone(),
+                agent: agent.clone(),
+            }).await {
+                agent_list.push(info);
+            }
+        }
+
         // Send the intervals back as the accept message.
-        gossip.push(ShardedGossipWire::accept(local_arcs));
+        gossip.push(ShardedGossipWire::accept(local_arcs, agent_list));
 
         // Generate the bloom filters and new state.
         let state = self

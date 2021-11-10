@@ -555,11 +555,11 @@ impl ShardedGossipLocal {
         s.in_scope(|| self.log_state());
         // If we don't have the state for a message then the other node will need to timeout.
         Ok(match msg {
-            ShardedGossipWire::Initiate(Initiate { intervals, id }) => {
-                self.incoming_initiate(cert, intervals, id).await?
+            ShardedGossipWire::Initiate(Initiate { intervals, id, agent_list }) => {
+                self.incoming_initiate(cert, intervals, id, agent_list).await?
             }
-            ShardedGossipWire::Accept(Accept { intervals }) => {
-                self.incoming_accept(cert, intervals).await?
+            ShardedGossipWire::Accept(Accept { intervals, agent_list }) => {
+                self.incoming_accept(cert, intervals, agent_list).await?
             }
             ShardedGossipWire::Agents(Agents { filter }) => {
                 if let Some(state) = self.get_state(&cert).await? {
@@ -823,6 +823,8 @@ kitsune_p2p_types::write_codec_enum! {
             intervals.0: Vec<ArcInterval>,
             /// A random number to resolve concurrent initiates.
             id.1: u32,
+            /// List of active local agents represented by this node.
+            agent_list.2: Vec<AgentInfoSigned>,
         },
 
         /// Accept an incoming round of gossip from a remote node
@@ -830,6 +832,8 @@ kitsune_p2p_types::write_codec_enum! {
             /// The list of arc intervals (equivalent to a [`DhtArcSet`])
             /// for all local agents
             intervals.0: Vec<ArcInterval>,
+            /// List of active local agents represented by this node.
+            agent_list.1: Vec<AgentInfoSigned>,
         },
 
         /// Send Agent Info Bloom

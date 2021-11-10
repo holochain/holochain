@@ -8,6 +8,7 @@ impl ShardedGossipLocal {
         &self,
         peer_cert: Tx2Cert,
         remote_arc_set: Vec<ArcInterval>,
+        _remote_agent_list: Vec<AgentInfoSigned>,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let (local_agents, accept_is_from_target) = self.inner.share_mut(|i, _| {
             let accept_is_from_target = i
