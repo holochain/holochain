@@ -5,7 +5,6 @@ use holo_hash::{AgentPubKey, DhtOpHash, HeaderHash};
 use holo_hash::{AnyDhtHash, EntryHash};
 use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::{HolochainP2pCell, HolochainP2pCellT};
-use holochain_sqlite::fresh_reader;
 use holochain_state::mutations;
 use holochain_state::prelude::{
     current_countersigning_session, set_validation_stage, SourceChainResult, StateMutationResult,
@@ -17,7 +16,7 @@ use holochain_types::{dht_op::DhtOp, env::EnvWrite};
 use holochain_zome_types::Timestamp;
 use holochain_zome_types::{Entry, SignedHeader, ZomeCallResponse};
 use kitsune_p2p_types::tx2::tx2_utils::Share;
-use rusqlite::named_params;
+use rusqlite::{named_params, Transaction};
 
 use crate::conductor::interface::SignalBroadcaster;
 use crate::core::queue_consumer::{TriggerSender, WorkComplete};
@@ -160,9 +159,10 @@ pub(crate) async fn countersigning_success(
     // Do a quick check to see if this entry hash matches
     // the current locked session so we don't check signatures
     // unless there is an active session.
-    let this_cell_headers_op_basis_hashes: Vec<(DhtOpHash, AnyDhtHash)> = fresh_reader!(
-        vault,
-        |txn| {
+    let reader_closure = {
+        let entry_hash = entry_hash.clone();
+        let this_cells_header_hash = this_cells_header_hash.clone();
+        move |txn: Transaction| {
             if holochain_state::chain_lock::is_chain_locked(&txn, &[])? {
                 let transaction: holochain_state::prelude::Txn = (&txn).into();
                 if transaction.contains_entry(&entry_hash)? {
@@ -188,7 +188,9 @@ pub(crate) async fn countersigning_success(
             }
             StateMutationResult::Ok(Vec::with_capacity(0))
         }
-    )?;
+    };
+    let this_cell_headers_op_basis_hashes: Vec<(DhtOpHash, AnyDhtHash)> =
+        vault.async_reader(reader_closure).await?;
 
     // If there is no active session then we can short circuit.
     if this_cell_headers_op_basis_hashes.is_empty() {

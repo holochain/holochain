@@ -478,9 +478,9 @@ async fn check_gossip(
 }
 
 #[tracing::instrument(skip(envs))]
-fn check_peers(envs: Vec<EnvWrite>) {
+async fn check_peers(envs: Vec<EnvWrite>) {
     for (i, a) in envs.iter().enumerate() {
-        let peers = all_agent_infos(a.clone().into()).unwrap();
+        let peers = all_agent_infos(a.clone().into()).await.unwrap();
         let num_peers = peers.len();
         let peers = peers
             .into_iter()
