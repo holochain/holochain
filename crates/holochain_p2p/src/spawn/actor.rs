@@ -4,6 +4,7 @@ use crate::event::*;
 use crate::*;
 
 use futures::future::FutureExt;
+use kitsune_p2p::actor::BroadcastTo;
 use kitsune_p2p::event::full_time_window;
 use kitsune_p2p::event::MetricDatum;
 use kitsune_p2p::event::MetricKind;
@@ -1112,7 +1113,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
             kitsune_p2p
-                .broadcast(space, basis, timeout, payload)
+                .broadcast(space, basis, timeout, BroadcastTo::Notify, payload)
                 .await?;
             Ok(())
         }

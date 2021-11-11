@@ -360,4 +360,32 @@ mod tests {
         harness.ghost_actor_shutdown().await?;
         Ok(())
     }
+    
+    /// Test that we can gossip across a in memory transport layer.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_publish_agent_info() {
+        observability::test_run().ok();
+        let (harness, _evt) = spawn_test_harness_mem().await.unwrap();
+
+        harness.add_space().await.unwrap();
+
+        // - Add the first agent
+        let (a1, _) = harness.add_direct_agent("one".into()).await.unwrap();
+
+
+        // - Add the second agent
+        let (a2, _) = harness.add_direct_agent("two".into()).await.unwrap();
+
+        // TODO: remove when we have bootstrapping for tests
+        // needed until we have some way of bootstrapping
+        harness.magic_peer_info_exchange().await.unwrap();
+        
+        // - Add the second agent
+        let (a3, _) = harness.add_direct_agent("three".into()).await.unwrap();
+
+        // TODO - a better way to await gossip??
+        tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+
+        // harness.ghost_actor_shutdown().await.unwrap();
+    }
 }

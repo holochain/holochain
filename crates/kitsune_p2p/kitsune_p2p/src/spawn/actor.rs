@@ -12,6 +12,7 @@ use futures::stream::StreamExt;
 use kitsune_p2p_proxy::tx2::*;
 use kitsune_p2p_proxy::ProxyUrl;
 use kitsune_p2p_transport_quic::tx2::*;
+use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::async_lazy::AsyncLazy;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_pool_promote::*;
@@ -54,6 +55,7 @@ ghost_actor::ghost_chan! {
             to_agent: KAgent,
             mod_idx: u32,
             mod_cnt: u32,
+            destination: BroadcastTo,
             data: crate::wire::WireData,
         ) -> ();
 
@@ -272,6 +274,7 @@ impl KitsuneP2pActor {
                                         mod_idx,
                                         mod_cnt,
                                         data,
+                                        destination,
                                     }) => {
                                         // one might be tempted to notify here
                                         // as in Broadcast below... but we
@@ -280,7 +283,13 @@ impl KitsuneP2pActor {
                                         // handler.
                                         if let Err(err) = i_s
                                             .incoming_delegate_broadcast(
-                                                space, basis, to_agent, mod_idx, mod_cnt, data,
+                                                space,
+                                                basis,
+                                                to_agent,
+                                                mod_idx,
+                                                mod_cnt,
+                                                destination,
+                                                data,
                                             )
                                             .await
                                         {
@@ -294,18 +303,56 @@ impl KitsuneP2pActor {
                                         space,
                                         to_agent,
                                         data,
+                                        destination,
                                         ..
-                                    }) => {
-                                        if let Err(err) = evt_sender
-                                            .notify(space, to_agent.clone(), to_agent, data.into())
-                                            .await
-                                        {
-                                            tracing::warn!(
-                                                ?err,
-                                                "error processing incoming broadcast"
-                                            );
+                                    }) => match destination {
+                                        BroadcastTo::Notify => {
+                                            // TODO: Should we check if the basis is
+                                            // held before calling notify?
+                                            if let Err(err) = evt_sender
+                                                .notify(
+                                                    space,
+                                                    to_agent.clone(),
+                                                    to_agent,
+                                                    data.into(),
+                                                )
+                                                .await
+                                            {
+                                                tracing::warn!(
+                                                    ?err,
+                                                    "error processing incoming broadcast"
+                                                );
+                                            }
                                         }
-                                    }
+                                        BroadcastTo::PublishAgentInfo => {
+                                            // TODO: Should we check if the basis is
+                                            // held before calling put_agent_info_signed?
+                                            match AgentInfoSigned::decode(&data[..]) {
+                                                Ok(info) => {
+                                                    if let Err(err) = evt_sender 
+                                                        .put_agent_info_signed(
+                                                            PutAgentInfoSignedEvt {
+                                                                space,
+                                                                peer_data: vec![info],
+                                                            },
+                                                        )
+                                                        .await
+                                                    {
+                                                        tracing::warn!(
+                                                            ?err,
+                                                            "error processing incoming agent info broadcast"
+                                                        );
+                                                    }
+                                                }
+                                                Err(err) => {
+                                                    tracing::warn!(
+                                                        ?err,
+                                                        "error processing incoming agent info broadcast"
+                                                    );
+                                                }
+                                            }
+                                        }
+                                    },
                                     wire::Wire::Gossip(wire::Gossip {
                                         space,
                                         data,
@@ -395,6 +442,7 @@ impl InternalHandler for KitsuneP2pActor {
         to_agent: Arc<KitsuneAgent>,
         mod_idx: u32,
         mod_cnt: u32,
+        destination: BroadcastTo,
         data: crate::wire::WireData,
     ) -> InternalHandlerResult<()> {
         let space_sender = match self.spaces.get_mut(&space) {
@@ -410,7 +458,15 @@ impl InternalHandler for KitsuneP2pActor {
         Ok(async move {
             let (_, space_inner) = space_sender.await;
             space_inner
-                .incoming_delegate_broadcast(space, basis, to_agent, mod_idx, mod_cnt, data)
+                .incoming_delegate_broadcast(
+                    space,
+                    basis,
+                    to_agent,
+                    mod_idx,
+                    mod_cnt,
+                    destination,
+                    data,
+                )
                 .await
         }
         .boxed()
@@ -648,6 +704,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         space: Arc<KitsuneSpace>,
         basis: Arc<KitsuneBasis>,
         timeout: KitsuneTimeout,
+        destination: BroadcastTo,
         payload: Vec<u8>,
     ) -> KitsuneP2pHandlerResult<()> {
         let space_sender = match self.spaces.get_mut(&space) {
@@ -656,7 +713,9 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         };
         Ok(async move {
             let (space_sender, _) = space_sender.await;
-            space_sender.broadcast(space, basis, timeout, payload).await
+            space_sender
+                .broadcast(space, basis, timeout, destination, payload)
+                .await
         }
         .boxed()
         .into())

@@ -93,7 +93,7 @@ impl ShardedGossipLocal {
 
             // Create the bloom from the op hashes.
             let mut bloom =
-                bloomfilter::Bloom::new_for_fp_rate(ops_within_common_arc.len(), Self::TGT_FP);
+                bloomfilter::Bloom::new_for_fp_rate(std::cmp::max(ops_within_common_arc.len(), 1), Self::TGT_FP);
 
             for hash in ops_within_common_arc {
                 bloom.set(&Arc::new(MetaOpKey::Op(hash)));

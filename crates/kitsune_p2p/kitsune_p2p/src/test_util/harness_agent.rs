@@ -143,6 +143,7 @@ impl KitsuneP2pEventHandler for AgentHarness {
         input: PutAgentInfoSignedEvt,
     ) -> KitsuneP2pEventHandlerResult<()> {
         for info in input.peer_data {
+            eprintln!("to: {:?}, got: {:?}", self.agent, info.agent);
             let info = Arc::new(info);
             self.agent_store.insert(info.agent.clone(), info.clone());
             self.harness_chan.publish(HarnessEventType::StoreAgentInfo {
