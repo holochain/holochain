@@ -100,16 +100,14 @@ impl Default for DbSyncLevel {
 
 impl r2d2::CustomizeConnection<Connection, rusqlite::Error> for ConnCustomizer {
     fn on_acquire(&self, conn: &mut Connection) -> Result<(), rusqlite::Error> {
-        initialize_connection(conn, &self.kind, self.synchronous_level, true)?;
+        initialize_connection(conn, self.synchronous_level)?;
         Ok(())
     }
 }
 
-fn initialize_connection(
+pub fn initialize_connection(
     conn: &mut Connection,
-    _kind: &DbKind,
     synchronous_level: DbSyncLevel,
-    _is_first: bool,
 ) -> rusqlite::Result<()> {
     // tell SQLite to wait this long during write contention
     conn.busy_timeout(SQLITE_BUSY_TIMEOUT)?;

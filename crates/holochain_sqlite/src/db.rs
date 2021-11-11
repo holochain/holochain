@@ -1,7 +1,10 @@
 //! Functions dealing with obtaining and referencing singleton databases
 
 use crate::{
-    conn::{new_connection_pool, ConnectionPool, DbSyncLevel, PConn, DATABASE_HANDLES},
+    conn::{
+        initialize_connection, new_connection_pool, ConnectionPool, DbSyncLevel, PConn,
+        DATABASE_HANDLES,
+    },
     prelude::*,
 };
 use derive_more::Into;
@@ -119,8 +122,10 @@ impl DbWrite {
         // action if it isn't.
         match Connection::open(&path)
             // For some reason calling pragma_update is necessary to prove the database file is valid.
-            .and_then(|c| c.pragma_update(None, "synchronous", &"0".to_string()))
-        {
+            .and_then(|mut c| {
+                initialize_connection(&mut c, sync_level)?;
+                c.pragma_update(None, "synchronous", &"0".to_string())
+            }) {
             Ok(_) => (),
             // These are the two errors that can
             // occur if the database is not valid.
