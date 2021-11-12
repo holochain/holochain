@@ -423,6 +423,8 @@ pub struct ShardedGossipState {
 /// remote node
 #[derive(Debug, Clone)]
 pub struct RoundState {
+    /// The remote agents hosted by the remote node, used for metrics tracking
+    remote_agent_list: Vec<AgentInfoSigned>,
     /// The common ground with our gossip partner for the purposes of this round
     common_arc_set: Arc<DhtArcSet>,
     /// Number of ops blooms we have sent for this round, which is also the
@@ -468,8 +470,13 @@ impl ShardedGossipLocal {
         }
     }
 
-    fn new_state(&self, common_arc_set: Arc<DhtArcSet>) -> KitsuneResult<RoundState> {
+    fn new_state(
+        &self,
+        remote_agent_list: Vec<AgentInfoSigned>,
+        common_arc_set: Arc<DhtArcSet>,
+    ) -> KitsuneResult<RoundState> {
         Ok(RoundState {
+            remote_agent_list,
             common_arc_set,
             num_sent_ops_blooms: 0,
             received_all_incoming_ops_blooms: false,
@@ -555,12 +562,18 @@ impl ShardedGossipLocal {
         s.in_scope(|| self.log_state());
         // If we don't have the state for a message then the other node will need to timeout.
         Ok(match msg {
-            ShardedGossipWire::Initiate(Initiate { intervals, id, agent_list }) => {
-                self.incoming_initiate(cert, intervals, id, agent_list).await?
+            ShardedGossipWire::Initiate(Initiate {
+                intervals,
+                id,
+                agent_list,
+            }) => {
+                self.incoming_initiate(cert, intervals, id, agent_list)
+                    .await?
             }
-            ShardedGossipWire::Accept(Accept { intervals, agent_list }) => {
-                self.incoming_accept(cert, intervals, agent_list).await?
-            }
+            ShardedGossipWire::Accept(Accept {
+                intervals,
+                agent_list,
+            }) => self.incoming_accept(cert, intervals, agent_list).await?,
             ShardedGossipWire::Agents(Agents { filter }) => {
                 if let Some(state) = self.get_state(&cert).await? {
                     let filter = decode_bloom_filter(&filter);

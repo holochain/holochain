@@ -8,7 +8,7 @@ impl ShardedGossipLocal {
         &self,
         peer_cert: Tx2Cert,
         remote_arc_set: Vec<ArcInterval>,
-        _remote_agent_list: Vec<AgentInfoSigned>,
+        remote_agent_list: Vec<AgentInfoSigned>,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let (local_agents, accept_is_from_target) = self.inner.share_mut(|i, _| {
             let accept_is_from_target = i
@@ -39,7 +39,12 @@ impl ShardedGossipLocal {
 
         // Generate the bloom filters and new state.
         let state = self
-            .generate_blooms(local_agent_arcs, remote_arc_set, &mut gossip)
+            .generate_blooms(
+                remote_agent_list,
+                local_agent_arcs,
+                remote_arc_set,
+                &mut gossip,
+            )
             .await?;
 
         self.inner.share_mut(|inner, _| {

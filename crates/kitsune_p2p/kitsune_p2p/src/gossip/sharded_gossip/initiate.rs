@@ -37,10 +37,14 @@ impl ShardedGossipLocal {
 
         let mut agent_list = Vec::new();
         for agent in local_agents.iter() {
-            if let Ok(Some(info)) = self.evt_sender.get_agent_info_signed(GetAgentInfoSignedEvt {
-                space: self.space.clone(),
-                agent: agent.clone(),
-            }).await {
+            if let Ok(Some(info)) = self
+                .evt_sender
+                .get_agent_info_signed(GetAgentInfoSignedEvt {
+                    space: self.space.clone(),
+                    agent: agent.clone(),
+                })
+                .await
+            {
                 agent_list.push(info);
             }
         }
@@ -65,7 +69,7 @@ impl ShardedGossipLocal {
         peer_cert: Tx2Cert,
         remote_arc_set: Vec<ArcInterval>,
         remote_id: u32,
-        _remote_agent_list: Vec<AgentInfoSigned>,
+        remote_agent_list: Vec<AgentInfoSigned>,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let (local_agents, same_as_target, already_in_progress) =
             self.inner.share_mut(|i, _| {
@@ -121,10 +125,14 @@ impl ShardedGossipLocal {
 
         let mut agent_list = Vec::new();
         for agent in local_agents.iter() {
-            if let Ok(Some(info)) = self.evt_sender.get_agent_info_signed(GetAgentInfoSignedEvt {
-                space: self.space.clone(),
-                agent: agent.clone(),
-            }).await {
+            if let Ok(Some(info)) = self
+                .evt_sender
+                .get_agent_info_signed(GetAgentInfoSignedEvt {
+                    space: self.space.clone(),
+                    agent: agent.clone(),
+                })
+                .await
+            {
                 agent_list.push(info);
             }
         }
@@ -134,7 +142,12 @@ impl ShardedGossipLocal {
 
         // Generate the bloom filters and new state.
         let state = self
-            .generate_blooms(local_agent_arcs, remote_arc_set, &mut gossip)
+            .generate_blooms(
+                remote_agent_list,
+                local_agent_arcs,
+                remote_arc_set,
+                &mut gossip,
+            )
             .await?;
 
         self.inner.share_mut(|inner, _| {
@@ -165,6 +178,7 @@ impl ShardedGossipLocal {
     /// - A new state is created for this round.
     pub(super) async fn generate_blooms(
         &self,
+        remote_agent_list: Vec<AgentInfoSigned>,
         local_agent_arcs: Vec<(Arc<KitsuneAgent>, ArcInterval)>,
         remote_arc_set: Vec<ArcInterval>,
         gossip: &mut Vec<ShardedGossipWire>,
@@ -176,7 +190,7 @@ impl ShardedGossipLocal {
         let common_arc_set = Arc::new(arc_set.intersection(&remote_arc_set));
 
         // Generate the new state.
-        let mut state = self.new_state(common_arc_set)?;
+        let mut state = self.new_state(remote_agent_list, common_arc_set)?;
 
         // Generate the agent bloom.
         if let GossipType::Recent = self.gossip_type {
