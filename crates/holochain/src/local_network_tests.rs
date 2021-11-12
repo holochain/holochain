@@ -38,6 +38,7 @@ const TIMEOUT_ERROR: &'static str = "inner function \'call_create_entry_remotely
 // @todo figure out why we can't have more than 4
 #[test_case(4)]
 // #[test_case(10)]
+#[ignore = "Ignoring this test as it's flaky on CI and either needs to be redesigned or the problem debugged"]
 fn conductors_call_remote(num_conductors: usize) {
     let f = async move {
         observability::test_run().ok();
