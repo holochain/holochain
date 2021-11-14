@@ -20,7 +20,7 @@ pub async fn authored_ops_to_dht_db(
     dht_env: &DbWrite<DbKindDht>,
 ) -> StateMutationResult<()> {
     // Check if any agents in this space are an authority for these hashes.
-    let mut should_hold_hashes = Vec::with_capacity(hashes.len());
+    let mut should_hold_hashes = Vec::new();
     for (op_hash, basis) in hashes {
         if network.authority_for_hash(basis).await? {
             should_hold_hashes.push(op_hash);

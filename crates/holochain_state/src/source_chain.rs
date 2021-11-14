@@ -442,7 +442,7 @@ where
     /// This has to clone all the data because we can't return
     /// references to constructed data.
     // TODO: Maybe we should store data as elements in the scratch?
-    // TODO: document that this is only the elemnts in the SCRATCH, not the
+    // TODO: document that this is only the elements in the SCRATCH, not the
     //       entire source chain!
     pub fn scratch_elements(&self) -> SourceChainResult<Vec<Element>> {
         Ok(self.scratch.apply(|scratch| scratch.elements().collect())?)

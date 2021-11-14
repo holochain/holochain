@@ -2682,6 +2682,7 @@ dependencies = [
  "either",
  "fallible-iterator",
  "fixt",
+ "futures",
  "hdk",
  "holo_hash",
  "holochain_keystore",
