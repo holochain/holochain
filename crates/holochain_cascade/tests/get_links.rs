@@ -4,7 +4,9 @@ use holochain_cascade::test_utils::*;
 use holochain_cascade::Cascade;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::mutations::insert_op_scratch;
-use holochain_state::prelude::test_cell_env;
+use holochain_state::prelude::test_authored_env;
+use holochain_state::prelude::test_cache_env;
+use holochain_state::prelude::test_dht_env;
 use holochain_state::scratch::Scratch;
 use holochain_types::link::WireLinkOps;
 use holochain_zome_types::ChainTopOrdering;
@@ -15,8 +17,8 @@ async fn links_not_authority() {
     observability::test_run().ok();
 
     // Environments
-    let cache = test_cell_env();
-    let authority = test_cell_env();
+    let cache = test_cache_env();
+    let authority = test_dht_env();
 
     // Data
     let td = EntryTestData::create();
@@ -71,8 +73,8 @@ async fn links_authority() {
     observability::test_run().ok();
 
     // Environments
-    let cache = test_cell_env();
-    let vault = test_cell_env();
+    let cache = test_cache_env();
+    let vault = test_authored_env();
 
     // Data
     let td = EntryTestData::create();
@@ -82,13 +84,13 @@ async fn links_authority() {
     // Network
     // - Not expecting any calls to the network.
     let mut mock = MockHolochainP2pDnaT::new();
-    mock.expect_authority_for_hash().returning(|_, _| Ok(true));
+    mock.expect_authority_for_hash().returning(|_| Ok(true));
     let mock = MockNetwork::new(mock);
 
     // Cascade
     let mut cascade = Cascade::empty()
         .with_network(mock, cache.env())
-        .with_vault(vault.env().into());
+        .with_authored(vault.env().into());
 
     let r = cascade
         .dht_get_links(td.link_key_tag.clone(), Default::default())
@@ -112,7 +114,7 @@ async fn links_authoring() {
     observability::test_run().ok();
 
     // Environments
-    let cache = test_cell_env();
+    let cache = test_cache_env();
     let mut scratch = Scratch::new();
     let zome = fixt!(Zome);
 
@@ -136,7 +138,7 @@ async fn links_authoring() {
     // Network
     // - Not expecting any calls to the network.
     let mut mock = MockHolochainP2pDnaT::new();
-    mock.expect_authority_for_hash().returning(|_, _| Ok(false));
+    mock.expect_authority_for_hash().returning(|_| Ok(false));
     mock.expect_get_links().returning(|_, _| {
         Ok(vec![WireLinkOps {
             creates: vec![],
