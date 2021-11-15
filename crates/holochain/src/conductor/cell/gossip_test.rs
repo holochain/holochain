@@ -46,10 +46,19 @@ async fn gossip_test() {
     const NUM_ATTEMPTS: usize = 200;
     const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
 
-    let all_cell_envs = vec![&bob_call_data.env, &conductor_test.alice_call_data().env];
+    let all_cell_envs = vec![
+        (
+            bob_call_data.cell_id.agent_pubkey(),
+            &bob_call_data.authored_env,
+            &bob_call_data.dht_env,
+        ),
+        (
+            conductor_test.alice_call_data().cell_id.agent_pubkey(),
+            &conductor_test.alice_call_data().authored_env,
+            &conductor_test.alice_call_data().dht_env,
+        ),
+    ];
     consistency_envs(&all_cell_envs, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await;
-
-    dump_tmp(&bob_call_data.env);
 
     // Bob list anchors
     let invocation = new_zome_call(
