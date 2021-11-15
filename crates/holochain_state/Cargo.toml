@@ -21,7 +21,6 @@ holochain_serialized_bytes = "=0.0.51"
 holochain_p2p = { version = "0.0.15", path = "../holochain_p2p" }
 holochain_types = { version = "0.0.15", path = "../holochain_types" }
 holochain_util = { version = "0.0.4", path = "../holochain_util" }
-holochain_wasm_test_utils = { path = "../test_utils/wasm", optional = true, version = "0.0.15"}
 holochain_zome_types = { version = "0.0.17", path = "../holochain_zome_types", features = [ "full" ] }
 kitsune_p2p = { version = "0.0.13", path = "../kitsune_p2p/kitsune_p2p" }
 mockall = "0.10.2"
@@ -60,7 +59,6 @@ default = ["test_utils"]
 test_utils = [
     "holochain_types/test_utils",
     "holochain_zome_types/test_utils",
-    "holochain_wasm_test_utils",
     "base64",
     "contrafact",
     "tempdir",
