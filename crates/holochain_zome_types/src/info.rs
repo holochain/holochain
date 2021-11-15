@@ -75,7 +75,7 @@ pub struct AppInfo;
 pub struct DnaInfo {
     pub name: String,
     pub hash: DnaHash,
-    pub properties: SerializedBytes,
+    pub properties: serde_yaml::Value,
     // In ZomeId order as to match corresponding `ZomeInfo` for each.
     pub zome_names: Vec<ZomeName>,
 }

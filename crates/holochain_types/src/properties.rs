@@ -14,6 +14,7 @@ use holochain_serialized_bytes::prelude::*;
     serde::Deserialize,
     SerializedBytes,
 )]
+#[serde(transparent)]
 pub struct YamlProperties(serde_yaml::Value);
 
 impl YamlProperties {
@@ -25,6 +26,11 @@ impl YamlProperties {
     /// Create a null set of properties
     pub fn empty() -> Self {
         Self(serde_yaml::Value::Null)
+    }
+
+    /// Consumes Self into inner.
+    pub fn into_inner(self) -> serde_yaml::Value {
+        self.0
     }
 }
 

@@ -39,14 +39,14 @@ impl DnaManifest {
     pub fn current(
         name: String,
         uid: Option<String>,
-        properties: Option<YamlProperties>,
+        properties: serde_yaml::Value,
         zomes: Vec<ZomeManifest>,
     ) -> Self {
         DnaManifestCurrent::new(name, uid, properties, zomes).into()
     }
 
     /// Getter for properties
-    pub fn properties(&self) -> Option<YamlProperties> {
+    pub fn properties(&self) -> serde_yaml::Value {
         match self {
             DnaManifest::V1(manifest) => manifest.properties.clone(),
         }

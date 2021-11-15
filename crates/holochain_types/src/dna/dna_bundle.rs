@@ -35,7 +35,7 @@ impl DnaBundle {
     pub async fn into_dna_file(
         self,
         uid: Option<Uid>,
-        properties: Option<YamlProperties>,
+        properties: serde_yaml::Value,
     ) -> DnaResult<(DnaFile, DnaHash)> {
         let (zomes, wasms) = self.inner_maps().await?;
         let (dna_def, original_hash) = self.to_dna_def(zomes, uid, properties)?;
@@ -117,20 +117,18 @@ impl DnaBundle {
         &self,
         zomes: Zomes,
         uid: Option<Uid>,
-        properties: Option<YamlProperties>,
+        properties: serde_yaml::Value,
     ) -> DnaResult<(DnaDefHashed, DnaHash)> {
         match self.manifest() {
             DnaManifest::V1(manifest) => {
                 let mut dna_def = DnaDef {
                     name: manifest.name.clone(),
                     uid: manifest.uid.clone().unwrap_or_default(),
-                    properties: SerializedBytes::try_from(
-                        manifest.properties.clone().unwrap_or_default(),
-                    )?,
+                    properties: manifest.properties.clone(),
                     zomes,
                 };
 
-                if uid.is_none() && properties.is_none() {
+                if uid.is_none() && properties == serde_yaml::Value::Null {
                     // If no phenotype overrides, then the original hash is the same as the current hash
                     let ddh = DnaDefHashed::from_content_sync(dna_def);
                     let original_hash = ddh.as_hash().clone();
@@ -139,11 +137,6 @@ impl DnaBundle {
                     // Otherwise, record the original hash first, for version comparisons.
                     let original_hash = DnaHash::with_data_sync(&dna_def);
 
-                    let properties: SerializedBytes = properties
-                        .as_ref()
-                        .or_else(|| manifest.properties.as_ref())
-                        .map(SerializedBytes::try_from)
-                        .unwrap_or_else(|| SerializedBytes::try_from(()))?;
                     let uid = uid.or_else(|| manifest.uid.clone()).unwrap_or_default();
 
                     dna_def.uid = uid;

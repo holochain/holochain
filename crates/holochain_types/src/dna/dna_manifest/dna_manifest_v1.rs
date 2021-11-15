@@ -24,7 +24,7 @@ pub struct DnaManifestV1 {
     pub(crate) uid: Option<String>,
 
     /// Any arbitrary application properties can be included in this object.
-    pub(crate) properties: Option<YamlProperties>,
+    pub(crate) properties: serde_yaml::Value,
 
     /// An array of zomes associated with your DNA.
     /// The order is significant: it determines initialization order.

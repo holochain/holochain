@@ -43,6 +43,7 @@ pub use x_salsa20_poly1305::encrypted_data::*;
 pub use x_salsa20_poly1305::key_ref::*;
 pub use x_salsa20_poly1305::x25519::*;
 pub use x_salsa20_poly1305::*;
+pub use serde_yaml;
 
 #[cfg(feature = "full-dna-def")]
 pub use crate::zome::inline_zome::error::*;

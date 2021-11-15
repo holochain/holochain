@@ -133,7 +133,7 @@ impl DnaFile {
 
     /// Transform this DnaFile into a new DnaFile with different properties
     /// and, hence, a different DnaHash.
-    pub async fn with_properties(self, properties: SerializedBytes) -> Result<Self, DnaError> {
+    pub async fn with_properties(self, properties: serde_yaml::Value) -> Result<Self, DnaError> {
         let (mut dna, wasm): (DnaDef, Vec<wasm::DnaWasm>) = self.into();
         dna.properties = properties;
         DnaFile::new(dna, wasm).await

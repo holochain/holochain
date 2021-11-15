@@ -690,9 +690,7 @@ fixturator!(
         uid: StringFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
-        properties: SerializedBytesFixturator::new_indexed(Empty, get_fixt_index!())
-            .next()
-            .unwrap(),
+        properties: serde_yaml::Value::Null,
         zomes: ZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
@@ -705,9 +703,11 @@ fixturator!(
         uid: StringFixturator::new_indexed(Unpredictable, get_fixt_index!())
             .next()
             .unwrap(),
-        properties: SerializedBytesFixturator::new_indexed(Unpredictable, get_fixt_index!())
-            .next()
-            .unwrap(),
+        properties: {
+            let mut mapping = serde_yaml::Mapping::new();
+            mapping.insert(serde_yaml::Value::String(fixt!(String, Unpredictable)), serde_yaml::Value::String(fixt!(String, Unpredictable)));
+            serde_yaml::Value::Mapping(mapping)
+        },
         zomes: ZomesFixturator::new_indexed(Unpredictable, get_fixt_index!())
             .next()
             .unwrap(),
@@ -720,9 +720,11 @@ fixturator!(
         uid: StringFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
-        properties: SerializedBytesFixturator::new_indexed(Predictable, get_fixt_index!())
-            .next()
-            .unwrap(),
+        properties: {
+            let mut mapping = serde_yaml::Mapping::new();
+            mapping.insert(serde_yaml::Value::String("foo".into()), serde_yaml::Value::String("bar".into()));
+            serde_yaml::Value::Mapping(mapping)
+        },
         zomes: ZomesFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),

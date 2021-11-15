@@ -72,6 +72,11 @@ fn dna_info(_: ()) -> ExternResult<DnaInfo> {
     hdk::prelude::dna_info()
 }
 
+#[hdk_extern]
+fn dna_info_foo(_: ()) -> ExternResult<serde_yaml::Value> {
+    Ok(hdk::prelude::dna_info()?.properties["foo"].clone())
+}
+
 #[cfg(test)]
 pub mod tests {
     use hdk::prelude::*;
