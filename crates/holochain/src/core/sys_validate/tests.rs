@@ -7,6 +7,7 @@ use error::SysValidationError;
 
 use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
+use holochain_state::prelude::fresh_reader_test;
 use holochain_state::prelude::test_cache_env;
 use holochain_state::prelude::test_cell_env;
 use holochain_wasm_test_utils::TestWasm;
@@ -377,4 +378,50 @@ async fn check_entry_not_private_test() {
             ValidationOutcome::PrivateEntry
         ))
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn incoming_ops_filters_private_entry() {
+    let vault = test_cell_env();
+    let (tx, _rx) = TriggerSender::new();
+
+    let private_entry = fixt!(Entry);
+    let mut create = fixt!(Create);
+    let author = vault
+        .env()
+        .keystore()
+        .new_sign_keypair_random()
+        .await
+        .unwrap();
+    let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Private);
+    create.entry_type = EntryType::App(aet);
+    create.entry_hash = EntryHash::with_data_sync(&private_entry);
+    create.author = author.clone();
+    let header = Header::Create(create);
+    let signature = author.sign(&vault.env().keystore(), &header).await.unwrap();
+
+    let shh =
+        SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(header), signature);
+    let el = Element::new(shh, Some(private_entry));
+
+    let ops_sender = IncomingDhtOpSender::new(vault.env(), tx.clone());
+    ops_sender.send_store_entry(el.clone()).await.unwrap();
+    let num_ops: usize = fresh_reader_test(vault.env(), |txn| {
+        txn.query_row("SELECT COUNT(rowid) FROM DhtOp", [], |row| row.get(0))
+            .unwrap()
+    });
+    assert_eq!(num_ops, 0);
+
+    let ops_sender = IncomingDhtOpSender::new(vault.env(), tx.clone());
+    ops_sender.send_store_element(el.clone()).await.unwrap();
+    let num_ops: usize = fresh_reader_test(vault.env(), |txn| {
+        txn.query_row("SELECT COUNT(rowid) FROM DhtOp", [], |row| row.get(0))
+            .unwrap()
+    });
+    assert_eq!(num_ops, 1);
+    let num_entries: usize = fresh_reader_test(vault.env(), |txn| {
+        txn.query_row("SELECT COUNT(rowid) FROM Entry", [], |row| row.get(0))
+            .unwrap()
+    });
+    assert_eq!(num_entries, 0);
 }

@@ -123,18 +123,16 @@ where
     let zome = invocation.zome.clone();
 
     tracing::trace!("Before zome call");
-    // Create the unsafe sourcechain for use with wasm closure
-    let (ribosome, result) = tokio::task::spawn_blocking({
-        let workspace = workspace.clone();
-        let network = network.clone();
-        move || {
-            let host_access =
-                ZomeCallHostAccess::new(workspace, keystore, network, signal_tx, call_zome_handle);
-            let result = ribosome.call_zome_function(host_access, invocation);
-            (ribosome, result)
-        }
-    })
-    .await?;
+    let host_access = ZomeCallHostAccess::new(
+        workspace.clone(),
+        keystore,
+        network.clone(),
+        signal_tx,
+        call_zome_handle,
+        invocation.cell_id.clone(),
+    );
+    let (ribosome, result) =
+        call_zome_function_authorized(ribosome, host_access, invocation).await?;
     tracing::trace!("After zome call");
 
     let validation_result = inline_validation(
@@ -171,6 +169,36 @@ where
     Ok(result)
 }
 
+/// First check if we are authorized to call
+/// the zome function.
+/// Then send to a background thread and
+/// call the zome function.
+pub async fn call_zome_function_authorized<R>(
+    ribosome: R,
+    host_access: ZomeCallHostAccess,
+    invocation: ZomeCallInvocation,
+) -> WorkflowResult<(R, RibosomeResult<ZomeCallResponse>)>
+where
+    R: RibosomeT + Send + 'static,
+{
+    if invocation.is_authorized(&host_access).await? {
+        tokio::task::spawn_blocking(|| {
+            let r = ribosome.call_zome_function(host_access, invocation);
+            Ok((ribosome, r))
+        })
+        .await?
+    } else {
+        Ok((
+            ribosome,
+            Ok(ZomeCallResponse::Unauthorized(
+                invocation.cell_id.clone(),
+                invocation.zome.zome_name().clone(),
+                invocation.fn_name.clone(),
+                invocation.provenance.clone(),
+            )),
+        ))
+    }
+}
 /// Run validation inline and wait for the result.
 pub async fn inline_validation<C, Ribosome>(
     workspace: HostFnWorkspace,

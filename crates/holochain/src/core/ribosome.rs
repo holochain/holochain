@@ -288,16 +288,19 @@ impl ZomeCallInvocation {
     /// - if the live cap grant is for the current author the call is ALWAYS authorized ELSE
     /// - the live cap grant needs to include the invocation's provenance AND zome/function name
     #[allow(clippy::extra_unused_lifetimes)]
-    pub fn is_authorized<'a>(&self, host_access: &ZomeCallHostAccess) -> RibosomeResult<bool> {
+    pub async fn is_authorized<'a>(
+        &self,
+        host_access: &ZomeCallHostAccess,
+    ) -> RibosomeResult<bool> {
         let check_function = (self.zome.zome_name().clone(), self.fn_name.clone());
         let check_agent = self.provenance.clone();
         let check_secret = self.cap_secret;
 
-        let maybe_grant: Option<CapGrant> = host_access.workspace.source_chain().valid_cap_grant(
-            &check_function,
-            &check_agent,
-            check_secret.as_ref(),
-        )?;
+        let maybe_grant: Option<CapGrant> = host_access
+            .workspace
+            .source_chain()
+            .valid_cap_grant(check_function, check_agent, check_secret)
+            .await?;
 
         Ok(maybe_grant.is_some())
     }
