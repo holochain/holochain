@@ -18,7 +18,7 @@ mod tests;
 
 #[instrument(skip(vault, trigger_receipt, network))]
 pub async fn integrate_dht_ops_workflow(
-    vault: EnvWrite,
+    vault: DbWrite<DbKindDht>,
     trigger_receipt: TriggerSender,
     network: HolochainP2pDna,
 ) -> WorkflowResult<WorkComplete> {

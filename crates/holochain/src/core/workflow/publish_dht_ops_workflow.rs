@@ -33,7 +33,7 @@ pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(60 * 
 
 #[instrument(skip(env, network, trigger_self))]
 pub async fn publish_dht_ops_workflow(
-    env: EnvWrite,
+    env: DbWrite<DbKindAuthored>,
     network: &(dyn HolochainP2pDnaT + Send + Sync),
     trigger_self: &TriggerSender,
     agent: AgentPubKey,
@@ -83,7 +83,7 @@ pub async fn publish_dht_ops_workflow(
 
 /// Read the authored for ops with receipt count < R
 pub async fn publish_dht_ops_workflow_inner(
-    env: EnvRead,
+    env: DbRead<DbKindAuthored>,
     agent: AgentPubKey,
 ) -> WorkflowResult<HashMap<AnyDhtHash, Vec<(DhtOpHash, DhtOp)>>> {
     // Ops to publish by basis
@@ -130,8 +130,8 @@ mod tests {
     const RECV_TIMEOUT: Duration = Duration::from_millis(3000);
 
     /// publish ops setup
-    async fn setup<'env>(
-        env: EnvWrite,
+    async fn setup(
+        env: DbWrite<DbKindAuthored>,
         num_agents: u32,
         num_hash: u32,
         panic_on_publish: bool,
@@ -159,7 +159,7 @@ mod tests {
                     let op = DhtOp::RegisterAddLink(sig.clone(), link_add.clone());
                     // Get the hash from the op
                     let op_hashed = DhtOpHashed::from_content_sync(op.clone());
-                    mutations::insert_op(txn, op_hashed, true)?;
+                    mutations::insert_op(txn, op_hashed)?;
                 }
                 StateMutationResult::Ok(())
             })
@@ -224,7 +224,11 @@ mod tests {
     }
 
     /// Call the workflow
-    async fn call_workflow(env: EnvWrite, dna_network: HolochainP2pDna, author: AgentPubKey) {
+    async fn call_workflow(
+        env: DbWrite<DbKindAuthored>,
+        dna_network: HolochainP2pDna,
+        author: AgentPubKey,
+    ) {
         let (trigger_sender, _) = TriggerSender::new();
         publish_dht_ops_workflow(env.clone().into(), &dna_network, &trigger_sender, author)
             .await
@@ -246,7 +250,7 @@ mod tests {
             observability::test_run().ok();
 
             // Create test env
-            let test_env = test_cell_env();
+            let test_env = test_authored_env();
             let env = test_env.env();
 
             // Setup
@@ -300,7 +304,7 @@ mod tests {
             observability::test_run().ok();
 
             // Create test env
-            let test_env = test_cell_env();
+            let test_env = test_authored_env();
             let env = test_env.env();
 
             // Setup
@@ -357,7 +361,9 @@ mod tests {
                 observability::test_run().ok();
 
                 // Create test env
-                let test_env = test_cell_env();
+                let test_env = test_authored_env();
+                let keystore = holochain_state::test_utils::test_keystore();
+                let dht_env = test_dht_env();
                 let env = test_env.env();
                 let zome = fixt!(Zome);
 
@@ -391,7 +397,9 @@ mod tests {
                 let eu_entry_type = entry_type_fixt.next().unwrap();
 
                 // Genesis and produce ops to clear these from the chains
-                fake_genesis(env.clone()).await.unwrap();
+                fake_genesis(env.clone(), dht_env.env(), keystore.clone())
+                    .await
+                    .unwrap();
                 env.conn()
                     .unwrap()
                     .execute("UPDATE DhtOp SET receipts_complete = 1", [])
@@ -399,9 +407,14 @@ mod tests {
                 let author = fake_agent_pubkey_1();
 
                 // Put data in elements
-                let source_chain = SourceChain::new(env.clone().into(), author.clone())
-                    .await
-                    .unwrap();
+                let source_chain = SourceChain::new(
+                    env.clone().into(),
+                    dht_env.env(),
+                    keystore.clone(),
+                    author.clone(),
+                )
+                .await
+                .unwrap();
                 // Produces 3 ops but minus 1 for store entry so 2 ops.
                 let original_header_address = source_chain
                     .put(

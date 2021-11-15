@@ -32,7 +32,7 @@ async fn test_validation_receipt() {
     consistency_10s(&[&alice, &bobbo, &carol]).await;
 
     // Get op hashes
-    let vault: EnvRead = alice.env().clone().into();
+    let vault = alice.dht_env().clone().into();
     let element = fresh_store_test(&vault, |store| {
         store.get_element(&hash.clone().into()).unwrap().unwrap()
     });
@@ -63,11 +63,11 @@ async fn test_validation_receipt() {
         for receipt in receipts {
             let SignedValidationReceipt {
                 receipt,
-                validator_signature: sig,
+                validators_signatures: sigs,
             } = receipt;
-            let validator = receipt.validator.clone();
+            let validator = receipt.validators[0].clone();
             assert!(validator == *bobbo.agent_pubkey() || validator == *carol.agent_pubkey());
-            assert!(validator.verify_signature(&sig, receipt).await);
+            assert!(validator.verify_signature(&sigs[0], receipt).await);
         }
     }
 

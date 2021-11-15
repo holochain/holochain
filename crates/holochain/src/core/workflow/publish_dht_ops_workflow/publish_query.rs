@@ -3,11 +3,12 @@ use std::time::UNIX_EPOCH;
 
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
+use holochain_sqlite::db::DbKindAuthored;
 use holochain_state::query::prelude::*;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::DhtOpType;
-use holochain_types::env::EnvRead;
+use holochain_types::env::DbRead;
 use holochain_zome_types::Entry;
 use holochain_zome_types::EntryVisibility;
 use holochain_zome_types::SignedHeader;
@@ -24,7 +25,7 @@ use super::MIN_PUBLISH_INTERVAL;
 /// - Only get ops that have less then the RECEIPT_BUNDLE_SIZE
 pub async fn get_ops_to_publish(
     agent: AgentPubKey,
-    env: &EnvRead,
+    env: &DbRead<DbKindAuthored>,
 ) -> WorkflowResult<Vec<DhtOpHashed>> {
     let recency_threshold = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -48,8 +49,6 @@ pub async fn get_ops_to_publish(
             LEFT JOIN
             Entry ON Header.entry_hash = Entry.hash
             WHERE
-            DhtOp.is_authored = 1
-            AND
             Header.author = :author
             AND
             (DhtOp.type != :store_entry OR Header.private_entry = 0)
@@ -104,8 +103,6 @@ pub fn num_still_needing_publish(txn: &Transaction) -> WorkflowResult<usize> {
         JOIN
         DhtOp ON DhtOp.header_hash = Header.hash
         WHERE
-        DhtOp.is_authored = 1
-        AND
         DhtOp.receipts_complete IS NULL 
         AND
         (DhtOp.type != :store_entry OR Header.private_entry = 0)
@@ -123,12 +120,13 @@ mod tests {
     use fixt::prelude::*;
     use holo_hash::EntryHash;
     use holo_hash::HasHash;
+    use holochain_sqlite::db::DbWrite;
     use holochain_sqlite::db::WriteManager;
     use holochain_sqlite::prelude::DatabaseResult;
     use holochain_state::prelude::insert_op;
     use holochain_state::prelude::set_last_publish_time;
     use holochain_state::prelude::set_receipts_complete;
-    use holochain_state::prelude::test_cell_env;
+    use holochain_state::prelude::test_authored_env;
     use holochain_types::dht_op::DhtOpHashed;
     use holochain_types::header::NewEntryHeader;
     use holochain_zome_types::fixt::*;
@@ -144,7 +142,6 @@ mod tests {
         within_min_period: bool,
         has_required_receipts: bool,
         is_this_agent: bool,
-        is_authored: bool,
         store_entry: bool,
     }
 
@@ -160,16 +157,16 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn publish_query() {
         observability::test_run().ok();
-        let env = test_cell_env();
+        let env = test_authored_env();
         let expected = test_data(&env.env().into());
-        let r = get_ops_to_publish(expected.agent, &env.env().into())
+        let r = get_ops_to_publish(expected.agent.clone(), &env.env().into())
             .await
             .unwrap();
         assert_eq!(r, expected.results);
     }
 
     fn create_and_insert_op(
-        env: &EnvRead,
+        env: &DbWrite<DbKindAuthored>,
         facts: Facts,
         consistent_data: &Consistent,
     ) -> DhtOpHashed {
@@ -224,7 +221,7 @@ mod tests {
             .unwrap()
             .with_commit_sync(|txn| {
                 let hash = state.as_hash().clone();
-                insert_op(txn, state.clone(), facts.is_authored).unwrap();
+                insert_op(txn, state.clone()).unwrap();
                 set_last_publish_time(txn, hash.clone(), last_publish).unwrap();
                 set_receipts_complete(txn, &hash, facts.has_required_receipts).unwrap();
                 DatabaseResult::Ok(())
@@ -233,7 +230,7 @@ mod tests {
         state
     }
 
-    fn test_data(env: &EnvRead) -> Expected {
+    fn test_data(env: &DbWrite<DbKindAuthored>) -> Expected {
         let mut results = Vec::new();
         let cd = Consistent {
             this_agent: fixt!(AgentPubKey),
@@ -243,14 +240,12 @@ mod tests {
         // - WithinMinPeriod: false.
         // - HasRequireReceipts: false.
         // - IsThisAgent: true.
-        // - IsAuthored: true.
         // - StoreEntry: true
         let facts = Facts {
             private: false,
             within_min_period: false,
             has_required_receipts: false,
             is_this_agent: true,
-            is_authored: true,
             store_entry: true,
         };
         let op = create_and_insert_op(env, facts, &cd);
@@ -285,11 +280,6 @@ mod tests {
         // - IsThisAgent: false.
         let mut f = facts;
         f.is_this_agent = false;
-        create_and_insert_op(env, f, &cd);
-
-        // - IsAuthored: false.
-        let mut f = facts;
-        f.is_authored = false;
         create_and_insert_op(env, f, &cd);
 
         Expected {

@@ -2,7 +2,8 @@
 #![allow(deprecated)]
 
 use super::*;
-use crate::conductor::api::CellConductorApiT;
+use crate::conductor::handle::ConductorHandleT;
+use crate::conductor::space::Space;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use crate::core::sys_validate::check_and_hold_store_element;
@@ -13,7 +14,6 @@ use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_p2p::HolochainP2pDna;
 use holochain_p2p::HolochainP2pDnaT;
-use holochain_sqlite::db::ReadManager;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::HostFnStores;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
@@ -24,6 +24,7 @@ use holochain_zome_types::Entry;
 use holochain_zome_types::ValidationStatus;
 use rusqlite::Transaction;
 use std::convert::TryInto;
+use std::sync::Arc;
 use tracing::*;
 use types::Outcome;
 
@@ -42,21 +43,24 @@ mod tests;
 
 #[instrument(skip(
     workspace,
+    space,
     trigger_app_validation,
     sys_validation_trigger,
     network,
     conductor_api
 ))]
 pub async fn sys_validation_workflow(
-    workspace: SysValidationWorkspace,
+    workspace: Arc<SysValidationWorkspace>,
+    space: Arc<Space>,
     trigger_app_validation: TriggerSender,
     sys_validation_trigger: TriggerSender,
     // TODO: Update HolochainP2p to reflect changes to pass through network.
     network: HolochainP2pDna,
-    conductor_api: impl CellConductorApiT,
+    conductor_api: &dyn ConductorHandleT,
 ) -> WorkflowResult<WorkComplete> {
     let complete = sys_validation_workflow_inner(
-        Arc::new(workspace),
+        workspace,
+        space,
         network,
         conductor_api,
         sys_validation_trigger,
@@ -73,13 +77,13 @@ pub async fn sys_validation_workflow(
 
 async fn sys_validation_workflow_inner(
     workspace: Arc<SysValidationWorkspace>,
+    space: Arc<Space>,
     network: HolochainP2pDna,
-    conductor_api: impl CellConductorApiT,
+    conductor_api: &dyn ConductorHandleT,
     sys_validation_trigger: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
-    let env = workspace.vault.clone().into();
+    let env = workspace.dht_env.clone();
     let sorted_ops = validation_query::get_ops_to_sys_validate(&env).await?;
-    let conductor_api = Arc::new(conductor_api);
 
     // Process each op
     let iter = sorted_ops.into_iter().map(|so| {
@@ -87,18 +91,16 @@ async fn sys_validation_workflow_inner(
         // that we are meant to be holding but aren't.
         // If we are not holding them they will be added to our incoming ops.
         let incoming_dht_ops_sender =
-            IncomingDhtOpSender::new(workspace.vault.clone(), sys_validation_trigger.clone());
+            IncomingDhtOpSender::new(space.clone(), sys_validation_trigger.clone());
         let network = network.clone();
-        let conductor_api = conductor_api.clone();
         let workspace = workspace.clone();
         async move {
-            let conductor_api = conductor_api.clone();
             let (op, op_hash) = so.into_inner();
             let r = validate_op(
                 &op,
                 &(*workspace),
                 network,
-                &(*conductor_api),
+                conductor_api,
                 Some(incoming_dht_ops_sender),
             )
             .await;
@@ -111,8 +113,8 @@ async fn sys_validation_workflow_inner(
         .ready_chunks(NUM_CONCURRENT_OPS);
 
     while let Some(chunk) = iter.next().await {
-        workspace
-            .vault
+        space
+            .dht_env
             .async_commit(move |mut txn| {
                 for outcome in chunk {
                     let (op_hash, outcome) = outcome?;
@@ -164,7 +166,7 @@ async fn validate_op(
     op: &DhtOp,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
-    conductor_api: &impl CellConductorApiT,
+    conductor_api: &dyn ConductorHandleT,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> WorkflowResult<Outcome> {
     match validate_op_inner(
@@ -185,7 +187,7 @@ async fn validate_op(
         // Handle the errors that result in pending or awaiting deps
         Err(SysValidationError::ValidationOutcome(e)) => {
             info!(
-                agent = %which_agent(conductor_api.cell_id().agent_pubkey()),
+                dna = %workspace.dna_hash(),
                 msg = "DhtOp did not pass system validation. (If rejected, a warning will follow.)",
                 ?op,
                 error = ?e,
@@ -194,7 +196,7 @@ async fn validate_op(
             let outcome = handle_failed(e);
             if let Outcome::Rejected = outcome {
                 warn!(
-                    agent = %which_agent(conductor_api.cell_id().agent_pubkey()),
+                    dna = %workspace.dna_hash(),
                     msg = "DhtOp was rejected during system validation.",
                     ?op,
                 )
@@ -243,7 +245,7 @@ async fn validate_op_inner(
     op: &DhtOp,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
-    conductor_api: &impl CellConductorApiT,
+    conductor_api: &dyn ConductorHandleT,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
     match op {
@@ -378,7 +380,7 @@ pub async fn sys_validate_element(
     element: &Element,
     call_zome_workspace: &HostFnWorkspace,
     network: HolochainP2pDna,
-    conductor_api: &impl CellConductorApiT,
+    conductor_api: &dyn ConductorHandleT,
 ) -> SysValidationOutcome<()> {
     trace!(?element);
     // Create a SysValidationWorkspace with the scratches from the CallZomeWorkspace
@@ -403,7 +405,7 @@ async fn sys_validate_element_inner(
     element: &Element,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
-    conductor_api: &impl CellConductorApiT,
+    conductor_api: &dyn ConductorHandleT,
 ) -> SysValidationResult<()> {
     let signature = element.signature();
     let header = element.header();
@@ -415,7 +417,7 @@ async fn sys_validate_element_inner(
         maybe_entry: Option<&Entry>,
         workspace: &SysValidationWorkspace,
         network: HolochainP2pDna,
-        conductor_api: &impl CellConductorApiT,
+        conductor_api: &dyn ConductorHandleT,
     ) -> SysValidationResult<()> {
         let incoming_dht_ops_sender = None;
         store_element(header, workspace, network.clone()).await?;
@@ -531,7 +533,7 @@ async fn store_element(
 async fn store_entry(
     header: NewEntryHeaderRef<'_>,
     entry: &Entry,
-    conductor_api: &impl CellConductorApiT,
+    conductor_api: &dyn ConductorHandleT,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
 ) -> SysValidationResult<()> {
@@ -542,7 +544,8 @@ async fn store_entry(
     // Checks
     check_entry_type(entry_type, entry)?;
     if let EntryType::App(app_entry_type) = entry_type {
-        let entry_def = check_app_entry_type(app_entry_type, conductor_api).await?;
+        let entry_def =
+            check_app_entry_type(workspace.dna_hash(), app_entry_type, conductor_api).await?;
         check_not_private(&entry_def)?;
     }
 
@@ -726,21 +729,27 @@ fn update_check(entry_update: &Update, original_header: &Header) -> SysValidatio
 
 pub struct SysValidationWorkspace {
     scratch: Option<SyncScratch>,
-    vault: EnvWrite,
-    cache: EnvWrite,
+    authored_env: DbRead<DbKindAuthored>,
+    dht_env: DbRead<DbKindDht>,
+    cache: DbWrite<DbKindCache>,
 }
 
 impl SysValidationWorkspace {
-    pub fn new(vault: EnvWrite, cache: EnvWrite) -> Self {
+    pub fn new(
+        authored_env: DbRead<DbKindAuthored>,
+        dht_env: DbRead<DbKindDht>,
+        cache: DbWrite<DbKindCache>,
+    ) -> Self {
         Self {
-            vault,
+            authored_env,
+            dht_env,
             cache,
             scratch: None,
         }
     }
+
     pub fn is_chain_empty(&self, author: &AgentPubKey) -> SourceChainResult<bool> {
-        let mut conn = self.vault.conn()?;
-        let chain_not_empty = conn.with_reader(|txn| {
+        let chain_not_empty = self.dht_env.sync_reader(|txn| {
             let mut stmt = txn.prepare(
                 "
                 SELECT
@@ -778,7 +787,7 @@ impl SysValidationWorkspace {
         let author = header.author();
         let seq = header.header_seq();
         let hash = HeaderHash::with_data_sync(header);
-        let header_seq_is_not_empty = self.vault.conn()?.with_reader(|txn| {
+        let header_seq_is_not_empty = self.dht_env.sync_reader(|txn| {
             DatabaseResult::Ok(txn.query_row(
                 "
                 SELECT EXISTS(
@@ -815,12 +824,11 @@ impl SysValidationWorkspace {
     }
     /// Create a cascade with local data only
     pub fn local_cascade(&self) -> Cascade {
-        let cascade = Cascade::empty()
-            .with_vault(self.vault.clone().into())
-            // TODO: Does the cache count as local?
-            .with_cache(self.cache.clone());
+        let cascade = Cascade::empty().with_dht(self.dht_env.clone());
         match &self.scratch {
-            Some(scratch) => cascade.with_scratch(scratch.clone()),
+            Some(scratch) => cascade
+                .with_authored(self.authored_env.clone())
+                .with_scratch(scratch.clone()),
             None => cascade,
         }
     }
@@ -829,12 +837,17 @@ impl SysValidationWorkspace {
         network: Network,
     ) -> Cascade<Network> {
         let cascade = Cascade::empty()
-            .with_vault(self.vault.clone().into())
+            .with_authored(self.authored_env.clone())
+            .with_dht(self.dht_env.clone())
             .with_network(network, self.cache.clone());
         match &self.scratch {
             Some(scratch) => cascade.with_scratch(scratch.clone()),
             None => cascade,
         }
+    }
+
+    fn dna_hash(&self) -> &DnaHash {
+        self.dht_env.kind().dna_hash()
     }
 }
 
@@ -860,13 +873,15 @@ fn put_integration_limbo(
 impl From<&HostFnWorkspace> for SysValidationWorkspace {
     fn from(h: &HostFnWorkspace) -> Self {
         let HostFnStores {
-            vault,
             cache,
             scratch,
+            authored,
+            dht,
         } = h.stores();
         Self {
-            scratch: Some(scratch),
-            vault: vault.into(),
+            scratch,
+            authored_env: authored,
+            dht_env: dht,
             cache,
         }
     }
