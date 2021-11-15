@@ -7,14 +7,14 @@ use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for DhtOpIntegration workflow
-#[instrument(skip(env, conductor_handle, stop, trigger_receipt, dna_network))]
+#[instrument(skip(env, stop, trigger_receipt, network))]
 pub fn spawn_integrate_dht_ops_consumer(
-    env: EnvWrite,
-    conductor_handle: ConductorHandle,
+    dna_hash: Arc<DnaHash>,
+    env: DbWrite<DbKindDht>,
     cell_id: CellId,
     mut stop: sync::broadcast::Receiver<()>,
     trigger_receipt: TriggerSender,
-    dna_network: HolochainP2pDna,
+    network: HolochainP2pDna,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
     let (tx, mut rx) = TriggerSender::new();
     let trigger_self = tx.clone();
@@ -29,23 +29,11 @@ pub fn spawn_integrate_dht_ops_consumer(
             }
 
             // Run the workflow
-            match integrate_dht_ops_workflow(
-                env.clone(),
-                trigger_receipt.clone(),
-                dna_network.clone(),
-            )
-            .await
+            match integrate_dht_ops_workflow(env.clone(), trigger_receipt.clone(), network.clone())
+                .await
             {
                 Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
-                Err(err) => {
-                    handle_workflow_error(
-                        conductor_handle.clone(),
-                        cell_id.clone(),
-                        err,
-                        "integrate_dht_ops failure",
-                    )
-                    .await?
-                }
+                Err(err) => handle_workflow_error(err)?,
                 _ => (),
             };
         }
