@@ -698,7 +698,6 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
     fn handle_authority_for_hash(
         &mut self,
         space: Arc<KitsuneSpace>,
-        agent: Arc<KitsuneAgent>,
         basis: Arc<KitsuneBasis>,
     ) -> KitsuneP2pHandlerResult<bool> {
         let space_sender = match self.spaces.get_mut(&space) {
@@ -707,7 +706,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         };
         Ok(async move {
             let (space_sender, _) = space_sender.await;
-            space_sender.authority_for_hash(space, agent, basis).await
+            space_sender.authority_for_hash(space, basis).await
         }
         .boxed()
         .into())

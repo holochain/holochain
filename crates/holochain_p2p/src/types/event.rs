@@ -214,7 +214,7 @@ ghost_actor::ghost_chan! {
         /// Returns the actual time window of returned ops as well.
         fn query_op_hashes(
             dna_hash: DnaHash,
-            to_agents: Vec<(AgentPubKey, kitsune_p2p::dht_arc::DhtArcSet)>,
+            arc_set: kitsune_p2p::dht_arc::DhtArcSet,
             window: TimeWindow,
             max_ops: usize,
             include_limbo: bool,
@@ -223,7 +223,6 @@ ghost_actor::ghost_chan! {
         /// The p2p module needs access to the content for a given set of DhtOpHashes.
         fn fetch_op_data(
             dna_hash: DnaHash,
-            to_agent: AgentPubKey,
             op_hashes: Vec<holo_hash::DhtOpHash>,
         ) -> Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>;
 
@@ -258,7 +257,6 @@ macro_rules! match_p2p_evt {
             HolochainP2pEvent::GetLinks { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetAgentActivity { $i, .. } => { $($t)* }
             HolochainP2pEvent::ValidationReceiptReceived { $i, .. } => { $($t)* }
-            HolochainP2pEvent::FetchOpData { $i, .. } => { $($t)* }
             HolochainP2pEvent::SignNetworkData { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetAgentInfoSigned { $i, .. } => { $($t)* }
             HolochainP2pEvent::PutMetricDatum { $i, .. } => { $($t)* }
@@ -274,6 +272,7 @@ impl HolochainP2pEvent {
     pub fn dna_hash(&self) -> &DnaHash {
         match_p2p_evt!(self => |dna_hash| { dna_hash }, {
             HolochainP2pEvent::Publish { dna_hash, .. } => { dna_hash }
+            HolochainP2pEvent::FetchOpData { dna_hash, .. } => { dna_hash }
             HolochainP2pEvent::QueryOpHashes { dna_hash, .. } => { dna_hash }
             HolochainP2pEvent::QueryAgentInfoSigned { dna_hash, .. } => { dna_hash }
             HolochainP2pEvent::QueryAgentInfoSignedNearBasis { dna_hash, .. } => { dna_hash }
@@ -287,6 +286,7 @@ impl HolochainP2pEvent {
     pub fn target_agents(&self) -> &AgentPubKey {
         match_p2p_evt!(self => |to_agent| { to_agent }, {
             HolochainP2pEvent::Publish { .. } => { unimplemented!("There is no single agent target for Publish") }
+            HolochainP2pEvent::FetchOpData { .. } => { unimplemented!("There is no single agent target for FetchOpData") }
             HolochainP2pEvent::QueryOpHashes { .. } => { unimplemented!("There is no single agent target for QueryOpHashes") }
             HolochainP2pEvent::QueryAgentInfoSigned { .. } => { unimplemented!("There is no single agent target for QueryAgentInfoSigned") },
             HolochainP2pEvent::QueryAgentInfoSignedNearBasis { .. } => { unimplemented!("There is no single agent target for QueryAgentInfoSignedNearBasis") },

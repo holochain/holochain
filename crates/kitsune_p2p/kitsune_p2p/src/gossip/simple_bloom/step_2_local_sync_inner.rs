@@ -48,7 +48,7 @@ impl Inner {
             if let Ok(Some((ops, _))) = evt_sender
                 .query_op_hashes(QueryOpHashesEvt {
                     space: space.clone(),
-                    agents: vec![(agent.clone(), ArcInterval::Full.into())],
+                    arc_set: ArcInterval::Full.into(),
                     window: full_time_window(),
                     max_ops: usize::MAX,
                     include_limbo: false,
@@ -182,7 +182,7 @@ impl Inner {
 async fn data_map_get(
     evt_sender: &mut futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
     space: &Arc<KitsuneSpace>,
-    agent: &Arc<KitsuneAgent>,
+    _agent: &Arc<KitsuneAgent>,
     map: &mut DataMap,
     key: &Arc<MetaOpKey>,
 ) -> KitsuneResult<Arc<MetaOpData>> {
@@ -195,7 +195,6 @@ async fn data_map_get(
             let mut op = evt_sender
                 .fetch_op_data(FetchOpDataEvt {
                     space: space.clone(),
-                    agents: vec![agent.clone()],
                     op_hashes: vec![key.clone()],
                 })
                 .await

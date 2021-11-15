@@ -850,13 +850,13 @@ impl KitsuneP2pHandler for Space {
     fn handle_authority_for_hash(
         &mut self,
         _space: Arc<KitsuneSpace>,
-        agent: Arc<KitsuneAgent>,
         basis: Arc<KitsuneBasis>,
     ) -> KitsuneP2pHandlerResult<bool> {
-        let r = match self.agent_arcs.get(&agent) {
-            Some(agent_arc) => agent_arc.contains(basis.get_loc()),
-            None => false,
-        };
+        let loc = basis.get_loc();
+        let r = self
+            .agent_arcs
+            .values()
+            .any(|agent_arc| agent_arc.contains(loc));
         Ok(async move { Ok(r) }.boxed().into())
     }
 }

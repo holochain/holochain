@@ -167,11 +167,7 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
 
     fn handle_fetch_op_data(
         &mut self,
-        FetchOpDataEvt {
-            space,
-            agents,
-            op_hashes,
-        }: FetchOpDataEvt,
+        FetchOpDataEvt { space, op_hashes }: FetchOpDataEvt,
     ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> {
         ok_fut(Ok(self.sb.share(|sb| {
             op_hashes

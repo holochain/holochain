@@ -12,8 +12,8 @@ use std::{collections::HashSet, sync::Arc, time::SystemTime};
 pub struct QueryOpHashesEvt {
     /// The "space" context.
     pub space: KSpace,
-    /// The agents from which to fetch, along with a DhtArcSet to filter by.
-    pub agents: Vec<(KAgent, DhtArcSet)>,
+    /// The DhtArcSet to filter by.
+    pub arc_set: DhtArcSet,
     /// The time window to search within.
     pub window: TimeWindow,
     /// Maximum number of ops to return.
@@ -27,8 +27,6 @@ pub struct QueryOpHashesEvt {
 pub struct FetchOpDataEvt {
     /// The "space" context.
     pub space: KSpace,
-    /// The "agent" context.
-    pub agents: Vec<KAgent>,
     /// The op-hashes to fetch
     pub op_hashes: Vec<KOpHash>,
 }

@@ -115,7 +115,6 @@ impl HolochainP2pHandler for StubNetwork {
     fn handle_authority_for_hash(
         &mut self,
         dna_hash: DnaHash,
-        agent: AgentPubKey,
         dht_hash: AnyDhtHash,
     ) -> HolochainP2pHandlerResult<bool> {
         Err("stub".into())

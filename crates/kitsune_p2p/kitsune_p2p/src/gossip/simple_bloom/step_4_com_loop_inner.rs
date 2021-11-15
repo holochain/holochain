@@ -388,7 +388,7 @@ async fn data_map_get(
     use crate::event::*;
 
     // first, see if we already have the data
-    let (space, agent, maybe_data) = bloom.inner.share_mut(|i, _| {
+    let (space, _agent, maybe_data) = bloom.inner.share_mut(|i, _| {
         // erm, just using a random agent??
         Ok((
             bloom.space.clone(),
@@ -413,7 +413,6 @@ async fn data_map_get(
         .evt_sender
         .fetch_op_data(FetchOpDataEvt {
             space,
-            agents: vec![agent],
             op_hashes: vec![op_key],
         })
         .await

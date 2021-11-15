@@ -274,8 +274,8 @@ ghost_actor::ghost_chan! {
         /// New data has been integrated and is ready for gossiping.
         fn new_integrated_data(dna_hash: DnaHash) -> ();
 
-        /// Check if an agent is an authority for a hash.
-        fn authority_for_hash(dna_hash: DnaHash, from_agent: AgentPubKey, dht_hash: AnyDhtHash) -> bool;
+        /// Check if any local agent in this space is an authority for a hash.
+        fn authority_for_hash(dna_hash: DnaHash, dht_hash: AnyDhtHash) -> bool;
 
         /// Response from an authority to agents that are
         /// part of a session.

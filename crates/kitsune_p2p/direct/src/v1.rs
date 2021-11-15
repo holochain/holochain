@@ -456,16 +456,14 @@ async fn handle_srv_events(
                             KdApi::IsAuthorityReq {
                                 msg_id,
                                 root,
-                                agent,
                                 basis,
                                 ..
                             } => {
                                 exec(msg_id.clone(), async {
                                     let space = root.to_kitsune_space();
-                                    let agent = agent.to_kitsune_agent();
                                     let basis = basis.to_kitsune_basis();
                                     let is_authority = kdirect.inner.share_mut(move |i, _| {
-                                        Ok(i.p2p.authority_for_hash(space, agent, basis))
+                                        Ok(i.p2p.authority_for_hash(space, basis))
                                     }).map_err(KdError::other)?.await.map_err(KdError::other)?;
                                     Ok(KdApi::IsAuthorityRes {
                                         msg_id,
@@ -885,10 +883,10 @@ async fn handle_query_op_hashes(
 ) -> KdResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindow)>> {
     let QueryOpHashesEvt {
         space,
-        agents,
         window,
         max_ops,
         include_limbo: _,
+        ..
     } = input;
 
     let root = KdHash::from_kitsune_space(&space);
@@ -899,55 +897,56 @@ async fn handle_query_op_hashes(
     //        we'll want an api to just get the hashes
     let mut entries = vec![];
 
-    for (agent, arcset) in agents {
-        let agent = KdHash::from_kitsune_agent(&agent);
-        let es = kdirect
-            .persist
-            .query_entries(root.clone(), agent, window.clone(), arcset)
-            .await?;
-        entries.extend(es.into_iter());
-    }
+    // let agents = todo!();
+    // for (agent, arcset) in agents {
+    //     let agent = KdHash::from_kitsune_agent(&agent);
+    //     let es = kdirect
+    //         .persist
+    //         .query_entries(root.clone(), agent, window.clone(), arcset)
+    //         .await?;
+    //     entries.extend(es.into_iter());
+    // }
 
-    let mut entries: Vec<_> = entries
-        .into_iter()
-        .map(|e| e.hash().clone().to_kitsune_op_hash())
-        .collect();
-    entries.sort();
-    entries.dedup();
+    // let mut entries: Vec<_> = entries
+    //     .into_iter()
+    //     .map(|e| e.hash().clone().to_kitsune_op_hash())
+    //     .collect();
+    // entries.sort();
+    // entries.dedup();
 
     // TODO: produce proper time window of actual data returned
     Ok(Some((entries, window)))
 }
 
 async fn handle_fetch_op_data(
-    kdirect: Arc<Kd1>,
-    input: FetchOpDataEvt,
+    _kdirect: Arc<Kd1>,
+    _input: FetchOpDataEvt,
 ) -> KdResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> {
-    let FetchOpDataEvt {
-        space,
-        agents,
-        op_hashes,
-        ..
-    } = input;
+    // let FetchOpDataEvt {
+    //     space,
+    //     op_hashes,
+    //     ..
+    // } = input;
+    todo!()
 
-    let mut out = Vec::new();
-    let root = KdHash::from_kitsune_space(&space);
+    // let mut out = Vec::new();
+    // let root = KdHash::from_kitsune_space(&space);
 
-    for op_hash in op_hashes {
-        for agent in agents.iter() {
-            let agent = KdHash::from_kitsune_agent(agent);
-            let hash = KdHash::from_kitsune_op_hash(&op_hash);
-            if let Ok(entry) = kdirect
-                .persist
-                .get_entry(root.clone(), agent.clone(), hash)
-                .await
-            {
-                out.push((op_hash.clone(), entry.as_wire_data_ref().to_vec()));
-            }
-        }
-    }
+    // for op_hash in op_hashes {
+    //     for agent in agents.iter() {
+    //         let agent = KdHash::from_kitsune_agent(agent);
+    //         let hash = KdHash::from_kitsune_op_hash(&op_hash);
+    //         if let Ok(entry) = kdirect
+    //             .persist
+    //             .get_entry(root.clone(), agent.clone(), hash)
+    //             .await
+    //         {
+    //             out.push((op_hash.clone(), entry.as_wire_data_ref().to_vec()));
+    //         }
+    //     }
+    // }
 
-    Ok(out)
+    // Ok(out)
 }
 
 async fn handle_sign_network_data(
