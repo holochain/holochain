@@ -448,13 +448,13 @@ async fn check_gossip(
 
     let mut others = Vec::with_capacity(all_handles.len());
     for other in all_handles {
-        let other = other.get_cell_env(&other.cell_id).unwrap();
+        let other = other.get_dht_env(other.cell_id.dna_hash()).unwrap().into();
         others.push(other);
     }
     let others_ref = others.iter().collect::<Vec<_>>();
 
     wait_for_integration_with_others(
-        &handle.get_cell_env(&handle.cell_id).unwrap(),
+        &handle.get_dht_env(handle.cell_id.dna_hash()).unwrap(),
         &others_ref,
         expected_count,
         NUM_ATTEMPTS,
@@ -478,7 +478,7 @@ async fn check_gossip(
 }
 
 #[tracing::instrument(skip(envs))]
-fn check_peers(envs: Vec<EnvWrite>) {
+fn check_peers(envs: Vec<DbWrite<DbKindP2pAgentStore>>) {
     for (i, a) in envs.iter().enumerate() {
         let peers = all_agent_infos(a.clone().into()).unwrap();
         let num_peers = peers.len();
