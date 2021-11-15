@@ -178,7 +178,7 @@ impl AppBundle {
         version: Option<&DnaVersionSpec>,
         clone_limit: u32,
         uid: Option<Uid>,
-        properties: serde_yaml::Value,
+        properties: Option<SerializedBytes>,
     ) -> AppBundleResult<CellProvisioningOp> {
         let bytes = self.resolve(location).await?;
         let dna_bundle: DnaBundle = mr_bundle::Bundle::decode(&bytes)?.into();

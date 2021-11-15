@@ -39,8 +39,8 @@ pub struct DnaDef {
     pub uid: String,
 
     /// Any arbitrary application properties can be included in this object.
-    #[cfg_attr(feature = "full-dna-def", builder(default = "serde_yaml::Value::Null"))]
-    pub properties: serde_yaml::Value,
+    #[cfg_attr(feature = "full-dna-def", builder(default = "().try_into().unwrap()"))]
+    pub properties: SerializedBytes,
 
     /// A vector of zomes associated with your DNA.
     pub zomes: Zomes,
@@ -89,7 +89,7 @@ impl DnaDef {
 
     /// Change the "phenotype" of this DNA -- the UID and properties -- while
     /// leaving the "genotype" of actual DNA code intact
-    pub fn modify_phenotype(&self, uid: Uid, properties: serde_yaml::Value) -> Self {
+    pub fn modify_phenotype(&self, uid: Uid, properties: SerializedBytes) -> Self {
         let mut clone = self.clone();
         clone.properties = properties;
         clone.uid = uid;
