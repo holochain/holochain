@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - BREAKING CHANGE: Add all function names in a wasm to the zome info [#1081](https://github.com/holochain/holochain/pull/1081)
 - BREAKING CHANGE: Added a placeholder for zome properties on zome info [#1080](https://github.com/holochain/holochain/pull/1080)
+- BREAKING CHANGE: `DnaInfo` properties are now `serde_yaml::Value` instead of `SerializedBytes` [#1131](https://github.com/holochain/holochain/pull/1131)
 
 ## 0.0.16
 
