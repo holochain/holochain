@@ -27,7 +27,7 @@ pub(crate) mod get_links_ops_query;
 
 #[instrument(skip(state_env))]
 pub async fn handle_get_entry(
-    state_env: EnvRead,
+    state_env: DbRead<DbKindDht>,
     hash: EntryHash,
     _options: holochain_p2p::event::GetOptions,
 ) -> CascadeResult<WireEntryOps> {
@@ -40,7 +40,7 @@ pub async fn handle_get_entry(
 
 #[tracing::instrument(skip(env))]
 pub async fn handle_get_element(
-    env: EnvRead,
+    env: DbRead<DbKindDht>,
     hash: HeaderHash,
     options: holochain_p2p::event::GetOptions,
 ) -> CascadeResult<WireElementOps> {
@@ -53,7 +53,7 @@ pub async fn handle_get_element(
 
 #[instrument(skip(env))]
 pub async fn handle_get_agent_activity(
-    env: EnvRead,
+    env: DbRead<DbKindDht>,
     agent: AgentPubKey,
     query: ChainQueryFilter,
     options: holochain_p2p::event::GetActivityOptions,
@@ -67,7 +67,7 @@ pub async fn handle_get_agent_activity(
 
 #[instrument(skip(env))]
 pub async fn handle_get_agent_activity_deterministic(
-    env: EnvRead,
+    env: DbRead<DbKindDht>,
     agent: AgentPubKey,
     filter: DeterministicGetAgentActivityFilter,
     options: holochain_p2p::event::GetActivityOptions,
@@ -81,7 +81,7 @@ pub async fn handle_get_agent_activity_deterministic(
 
 #[instrument(skip(env, _options))]
 pub async fn handle_get_links(
-    env: EnvRead,
+    env: DbRead<DbKindDht>,
     link_key: WireLinkKey,
     _options: holochain_p2p::event::GetLinksOptions,
 ) -> CascadeResult<WireLinkOps> {

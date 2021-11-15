@@ -1,9 +1,10 @@
 use holo_hash::DhtOpHash;
+use holochain_sqlite::db::DbKindDht;
 use holochain_state::query::prelude::*;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::DhtOpType;
-use holochain_types::env::EnvRead;
+use holochain_types::env::DbRead;
 use holochain_zome_types::Entry;
 use holochain_zome_types::SignedHeader;
 
@@ -12,18 +13,21 @@ use crate::core::workflow::error::WorkflowResult;
 /// Get all ops that need to sys or app validated in order.
 /// - Sys validated or awaiting app dependencies.
 /// - Ordered by type then timestamp (See [`DhtOpOrder`])
-pub async fn get_ops_to_app_validate(env: &EnvRead) -> WorkflowResult<Vec<DhtOpHashed>> {
+pub async fn get_ops_to_app_validate(env: &DbRead<DbKindDht>) -> WorkflowResult<Vec<DhtOpHashed>> {
     get_ops_to_validate(env, false).await
 }
 
 /// Get all ops that need to sys or app validated in order.
 /// - Pending or awaiting sys dependencies.
 /// - Ordered by type then timestamp (See [`DhtOpOrder`])
-pub async fn get_ops_to_sys_validate(env: &EnvRead) -> WorkflowResult<Vec<DhtOpHashed>> {
+pub async fn get_ops_to_sys_validate(env: &DbRead<DbKindDht>) -> WorkflowResult<Vec<DhtOpHashed>> {
     get_ops_to_validate(env, true).await
 }
 
-async fn get_ops_to_validate(env: &EnvRead, system: bool) -> WorkflowResult<Vec<DhtOpHashed>> {
+async fn get_ops_to_validate(
+    env: &DbRead<DbKindDht>,
+    system: bool,
+) -> WorkflowResult<Vec<DhtOpHashed>> {
     let mut sql = "
         SELECT 
         Header.blob as header_blob,
@@ -109,7 +113,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn sys_validation_query() {
         observability::test_run().ok();
-        let env = test_cell_env();
+        let env = test_dht_env();
         let expected = test_data(&env.env().into());
         let r = get_ops_to_validate(&env.env().into(), true).await.unwrap();
         let mut r_sorted = r.clone();
@@ -125,7 +129,7 @@ mod tests {
         }
     }
 
-    fn create_and_insert_op(env: &EnvRead, facts: Facts) -> DhtOpHashed {
+    fn create_and_insert_op(env: &DbWrite<DbKindDht>, facts: Facts) -> DhtOpHashed {
         let state = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
             fixt!(Signature),
             fixt!(Header),
@@ -135,7 +139,7 @@ mod tests {
             .unwrap()
             .with_commit_sync(|txn| {
                 let hash = state.as_hash().clone();
-                insert_op(txn, state.clone(), false).unwrap();
+                insert_op(txn, state.clone()).unwrap();
                 if facts.has_validation_status {
                     set_validation_status(txn, hash.clone(), ValidationStatus::Valid).unwrap();
                 }
@@ -155,7 +159,7 @@ mod tests {
         state
     }
 
-    fn test_data(env: &EnvRead) -> Expected {
+    fn test_data(env: &DbWrite<DbKindDht>) -> Expected {
         let mut results = Vec::new();
         // We **do** expect any of these in the results:
         let facts = Facts {

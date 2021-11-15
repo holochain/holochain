@@ -87,7 +87,6 @@ CREATE TABLE IF NOT EXISTS DhtOp (
     type             TEXT           NOT NULL,
     basis_hash       BLOB           NOT NULL,
     header_hash      BLOB           NOT NULL,
-    is_authored      INTEGER        NOT NULL,      -- BOOLEAN
     require_receipt  INTEGER        NOT NULL,      -- BOOLEAN
 
     storage_center_loc          INTEGER   NOT NULL,
@@ -156,17 +155,19 @@ CREATE TABLE IF NOT EXISTS ValidationReceipt (
 
 CREATE TABLE IF NOT EXISTS ChainLock (
     lock BLOB PRIMARY KEY ON CONFLICT ROLLBACK,
+    author BLOB NOT NULL,
     -- The expiration time of the lock as a Timestamp (microseconds)
     expires_at_timestamp INTEGER NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS ScheduledFunctions (
+    author BLOB NOT NULL,
     zome_name TEXT NOT NULL,
     scheduled_fn TEXT NOT NULL,
     maybe_schedule BLOB NOT NULL,
     start INTEGER NOT NULL,
     end INTEGER NOT NULL,
     ephemeral BOOLEAN NOT NULL,
-    PRIMARY KEY (zome_name, scheduled_fn) ON CONFLICT ROLLBACK
+    PRIMARY KEY (zome_name, scheduled_fn, author) ON CONFLICT ROLLBACK
 );
 

@@ -4,22 +4,23 @@ use std::sync::Arc;
 use holo_hash::{AgentPubKey, DhtOpHash, HeaderHash};
 use holo_hash::{AnyDhtHash, EntryHash};
 use holochain_keystore::AgentPubKeyExt;
-use holochain_p2p::{HolochainP2pCell, HolochainP2pCellT};
+use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
+use holochain_sqlite::db::{DbKindAuthored, DbKindDht};
+use holochain_state::integrate::authored_ops_to_dht_db;
 use holochain_state::mutations;
 use holochain_state::prelude::{
-    current_countersigning_session, set_validation_stage, SourceChainResult, StateMutationResult,
-    Store,
+    current_countersigning_session, SourceChainResult, StateMutationResult, Store,
 };
-use holochain_state::validation_db::ValidationLimboStatus;
 use holochain_types::signal::{Signal, SystemSignal};
-use holochain_types::{dht_op::DhtOp, env::EnvWrite};
+use holochain_types::{dht_op::DhtOp, env::DbWrite};
 use holochain_zome_types::Timestamp;
 use holochain_zome_types::{Entry, SignedHeader, ZomeCallResponse};
 use kitsune_p2p_types::tx2::tx2_utils::Share;
 use rusqlite::{named_params, Transaction};
 
 use crate::conductor::interface::SignalBroadcaster;
-use crate::core::queue_consumer::{TriggerSender, WorkComplete};
+use crate::conductor::space::Space;
+use crate::core::queue_consumer::{QueueTriggers, TriggerSender, WorkComplete};
 
 use super::{error::WorkflowResult, incoming_dht_ops_workflow::incoming_dht_ops_workflow};
 
@@ -103,18 +104,17 @@ pub(crate) fn incoming_countersigning(
 /// Countersigning workflow that checks for complete sessions and
 /// pushes the complete ops to validation then messages the signers.
 pub(crate) async fn countersigning_workflow(
-    env: &EnvWrite,
-    workspace: &CountersigningWorkspace,
-    network: &(dyn HolochainP2pCellT + Send + Sync),
+    space: &Space,
+    network: &(dyn HolochainP2pDnaT + Send + Sync),
     sys_validation_trigger: &TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     // Get any complete sessions.
-    let complete_sessions = workspace.get_complete_sessions();
+    let complete_sessions = space.countersigning_workspace.get_complete_sessions();
     let mut notify_agents = Vec::with_capacity(complete_sessions.len());
 
     // For each complete session send the ops to validation.
     for (agents, ops, headers) in complete_sessions {
-        incoming_dht_ops_workflow(env, None, sys_validation_trigger.clone(), ops, false).await?;
+        incoming_dht_ops_workflow(space, sys_validation_trigger.clone(), ops, false).await?;
         notify_agents.push((agents, headers));
     }
 
@@ -136,13 +136,19 @@ pub(crate) async fn countersigning_workflow(
 
 /// An incoming countersigning session success.
 pub(crate) async fn countersigning_success(
-    vault: EnvWrite,
-    network: &HolochainP2pCell,
+    authored_env: DbWrite<DbKindAuthored>,
+    dht_env: DbWrite<DbKindDht>,
+    network: &HolochainP2pDna,
     author: AgentPubKey,
     signed_headers: Vec<SignedHeader>,
-    publish_trigger: TriggerSender,
+    trigger: QueueTriggers,
     mut signal: SignalBroadcaster,
 ) -> WorkflowResult<()> {
+    let QueueTriggers {
+        publish_dht_ops: publish_trigger,
+        integrate_dht_ops: integration_trigger,
+        ..
+    } = trigger;
     // Using iterators is fine in this function as there can only be a maximum of 8 headers.
     let (this_cells_header_hash, entry_hash) = match signed_headers
         .iter()
@@ -162,15 +168,16 @@ pub(crate) async fn countersigning_success(
     let reader_closure = {
         let entry_hash = entry_hash.clone();
         let this_cells_header_hash = this_cells_header_hash.clone();
+        let author = author.clone();
         move |txn: Transaction| {
-            if holochain_state::chain_lock::is_chain_locked(&txn, &[])? {
+            if holochain_state::chain_lock::is_chain_locked(&txn, &[], &author)? {
                 let transaction: holochain_state::prelude::Txn = (&txn).into();
                 if transaction.contains_entry(&entry_hash)? {
                     // If this is a countersigning session we can grab all the ops
                     // for this cells header so we can check if we need to self publish them.
                     let r: Result<_, _> = txn
                         .prepare(
-                            "SELECT basis_hash, hash FROM DhtOp WHERE header_hash = :header_hash AND is_authored = 1",
+                            "SELECT basis_hash, hash FROM DhtOp WHERE header_hash = :header_hash",
                         )?
                         .query_map(
                             named_params! {
@@ -190,7 +197,7 @@ pub(crate) async fn countersigning_success(
         }
     };
     let this_cell_headers_op_basis_hashes: Vec<(DhtOpHash, AnyDhtHash)> =
-        vault.async_reader(reader_closure).await?;
+        authored_env.async_reader(reader_closure).await?;
 
     // If there is no active session then we can short circuit.
     if this_cell_headers_op_basis_hashes.is_empty() {
@@ -210,20 +217,12 @@ pub(crate) async fn countersigning_success(
         .map(|SignedHeader(h, _)| HeaderHash::with_data_sync(h))
         .collect();
 
-    let mut ops_to_self_publish = Vec::new();
-
-    // Check which ops we are the authority for and self publish if we are.
-    for (op_hash, basis) in this_cell_headers_op_basis_hashes {
-        if network.authority_for_hash(basis).await? {
-            ops_to_self_publish.push(op_hash);
-        }
-    }
-    let result = vault
+    let result = authored_env
         .async_commit({
             let author = author.clone();
             let entry_hash = entry_hash.clone();
             move |txn| {
-            if let Some((cs_entry_hash, cs)) = current_countersigning_session(txn, Arc::new(author))? {
+            if let Some((cs_entry_hash, cs)) = current_countersigning_session(txn, Arc::new(author.clone()))? {
                 // Check we have the right session.
                 if cs_entry_hash == entry_hash {
                     let stored_headers = cs.build_header_set(entry_hash)?;
@@ -234,21 +233,13 @@ pub(crate) async fn countersigning_success(
                             incoming_headers.iter().any(|i| *i == h)
                         }) {
                             // All checks have passed so unlock the chain.
-                            mutations::unlock_chain(txn)?;
+                            mutations::unlock_chain(txn, &author)?;
                             // Update ops to publish.
                             txn.execute("UPDATE DhtOp SET withhold_publish = NULL WHERE header_hash = :header_hash",
                             named_params! {
                                 ":header_hash": this_cells_header_hash,
                                 }
                             ).map_err(holochain_state::prelude::StateMutationError::from)?;
-                            // Self publish if we are an authority.
-                            for hash in ops_to_self_publish {
-                                set_validation_stage(
-                                    txn,
-                                    hash,
-                                    ValidationLimboStatus::AwaitingIntegration,
-                                )?;
-                            }
                             return Ok(true);
                         }
                     }
@@ -259,6 +250,14 @@ pub(crate) async fn countersigning_success(
         .await?;
 
     if result {
+        authored_ops_to_dht_db(
+            network,
+            this_cell_headers_op_basis_hashes,
+            &(authored_env.into()),
+            &dht_env,
+        )
+        .await?;
+        integration_trigger.trigger();
         // Publish other signers agent activity ops to their agent activity authorities.
         for SignedHeader(header, signature) in signed_headers {
             if *header.author() == author {
@@ -287,7 +286,7 @@ pub(crate) async fn countersigning_success(
 /// Publish to entry authorities so they can gather all the signed
 /// headers for this session and respond with a session complete.
 pub async fn countersigning_publish(
-    network: &HolochainP2pCell,
+    network: &HolochainP2pDna,
     op: DhtOp,
 ) -> Result<(), ZomeCallResponse> {
     let basis = op.dht_basis();

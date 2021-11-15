@@ -4,8 +4,8 @@ use crate::core::workflow::publish_dht_ops_workflow::{
 
 use super::*;
 use arbitrary::Arbitrary;
-use holochain_sqlite::db::{DbKind, WriteManager};
-use holochain_state::{mutations, prelude::mutations_helpers};
+use holochain_sqlite::db::WriteManager;
+use holochain_state::mutations;
 
 #[tokio::test]
 async fn test_trigger() {
@@ -215,18 +215,9 @@ async fn test_concurrency() {
 #[tokio::test(flavor = "current_thread", start_paused = true)]
 async fn publish_loop() {
     let mut u = arbitrary::Unstructured::new(&[0; 1000]);
-    // HNNRGG... new lair keystore is multi_thread...
-    //           it won't work for this test...
-    //           we may have to make a dummy mock keystore here
-    let keystore = holochain_keystore::test_keystore::spawn_legacy_test_keystore()
-        .await
-        .unwrap();
-    let kind = DbKind::Cell(CellId::new(
-        DnaHash::arbitrary(&mut u).unwrap(),
-        AgentPubKey::arbitrary(&mut u).unwrap(),
-    ));
+    let kind = DbKindAuthored(Arc::new(DnaHash::arbitrary(&mut u).unwrap()));
     let tmpdir = tempdir::TempDir::new("holochain-test-environments").unwrap();
-    let env = EnvWrite::test(&tmpdir, kind, keystore).expect("Couldn't create test database");
+    let env = DbWrite::test(&tmpdir, kind).expect("Couldn't create test database");
     let header = Header::arbitrary(&mut u).unwrap();
     let author = header.author().clone();
     let signature = Signature::arbitrary(&mut u).unwrap();
@@ -236,15 +227,12 @@ async fn publish_loop() {
     env.conn()
         .unwrap()
         .with_commit_test(|txn| {
-            mutations_helpers::insert_valid_authored_op(txn, op).unwrap();
+            mutations::insert_op(txn, op).unwrap();
         })
         .unwrap();
-    let mut cell_network = MockHolochainP2pCellT::new();
-    cell_network
-        .expect_from_agent()
-        .returning(move || author.clone());
+    let mut dna_network = MockHolochainP2pDnaT::new();
     let (tx, mut op_published) = tokio::sync::mpsc::channel(100);
-    cell_network
+    dna_network
         .expect_publish()
         .returning(move |_, _, _, _, _| {
             tx.try_send(()).unwrap();
@@ -261,7 +249,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60) && timer.elapsed() < Duration::from_secs(61)
     );
 
-    publish_dht_ops_workflow(env.clone(), &cell_network, &ts)
+    publish_dht_ops_workflow(env.clone(), &dna_network, &ts, author.clone())
         .await
         .unwrap();
 
@@ -275,7 +263,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60 * 2)
             && timer.elapsed() < Duration::from_secs(60 * 2 + 1)
     );
-    publish_dht_ops_workflow(env.clone(), &cell_network, &ts)
+    publish_dht_ops_workflow(env.clone(), &dna_network, &ts, author.clone())
         .await
         .unwrap();
 
@@ -291,7 +279,7 @@ async fn publish_loop() {
     let timer = tokio::time::Instant::now();
     trigger_recv.listen().await.unwrap();
     assert!(timer.elapsed() < Duration::from_secs(1));
-    publish_dht_ops_workflow(env.clone(), &cell_network, &ts)
+    publish_dht_ops_workflow(env.clone(), &dna_network, &ts, author.clone())
         .await
         .unwrap();
 
@@ -322,7 +310,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60) && timer.elapsed() < Duration::from_secs(61)
     );
 
-    publish_dht_ops_workflow(env.clone(), &cell_network, &ts)
+    publish_dht_ops_workflow(env.clone(), &dna_network, &ts, author.clone())
         .await
         .unwrap();
 
@@ -344,7 +332,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60 * 2)
             && timer.elapsed() < Duration::from_secs(60 * 2 + 1)
     );
-    publish_dht_ops_workflow(env.clone(), &cell_network, &ts)
+    publish_dht_ops_workflow(env.clone(), &dna_network, &ts, author.clone())
         .await
         .unwrap();
 
@@ -377,7 +365,7 @@ async fn publish_loop() {
     let timer = tokio::time::Instant::now();
     trigger_recv.listen().await.unwrap();
     assert!(timer.elapsed() < Duration::from_secs(1));
-    publish_dht_ops_workflow(env.clone(), &cell_network, &ts)
+    publish_dht_ops_workflow(env.clone(), &dna_network, &ts, author.clone())
         .await
         .unwrap();
 
@@ -391,7 +379,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60) && timer.elapsed() < Duration::from_secs(61)
     );
 
-    publish_dht_ops_workflow(env.clone(), &cell_network, &ts)
+    publish_dht_ops_workflow(env.clone(), &dna_network, &ts, author.clone())
         .await
         .unwrap();
     // - The op is not published because of the time interval.

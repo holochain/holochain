@@ -3,7 +3,6 @@ use holochain::conductor::config::ConductorConfig;
 use holochain::sweettest::SweetNetwork;
 use holochain::sweettest::{SweetConductorBatch, SweetDnaFile};
 use holochain::test_utils::host_fn_caller::Post;
-use holochain::test_utils::show_authored;
 use holochain::test_utils::wait_for_integration_1m;
 use holochain::test_utils::wait_for_integration_with_others_10s;
 use holochain::test_utils::WaitOps;
@@ -109,7 +108,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
 
     // Wait long enough for Bob to receive gossip
     wait_for_integration_1m(
-        bobbo.env(),
+        bobbo.dht_env(),
         WaitOps::start() * 1 + WaitOps::cold_start() * 2 + WaitOps::ENTRY * 1,
     )
     .await;
@@ -152,9 +151,9 @@ async fn invalid_cell() -> anyhow::Result<()> {
     conductors.exchange_peer_info().await;
 
     let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
-    let alice_env = alice.env();
-    let bob_env = bobbo.env();
-    let carol_env = carol.env();
+    let alice_env = alice.dht_env();
+    let bob_env = bobbo.dht_env();
+    let carol_env = carol.dht_env();
     let envs = vec![alice_env, bob_env, carol_env];
 
     conductors[1].shutdown().await;
@@ -211,8 +210,7 @@ async fn invalid_cell() -> anyhow::Result<()> {
         .await;
 
     let expected_count = WaitOps::start() * 3 + WaitOps::ENTRY * 5;
-    show_authored(&envs);
-    wait_for_integration_with_others_10s(&alice_env, &envs, expected_count, None).await;
+    wait_for_integration_with_others_10s(alice_env, &envs[..], expected_count, None).await;
     let r: Option<Element> = conductors[0]
         .call(&alice.zome("zome1"), "read", hash.clone())
         .await;

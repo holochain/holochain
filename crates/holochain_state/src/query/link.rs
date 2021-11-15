@@ -67,7 +67,7 @@ impl LinksQuery {
             Header.zome_id = :zome_id
             AND
             DhtOp.validation_status = :status
-            AND (DhtOp.when_integrated IS NOT NULL OR DhtOp.is_authored = 1)
+            AND DhtOp.when_integrated IS NOT NULL
         "
     }
     fn create_query_string(tag: Option<String>) -> String {
@@ -111,7 +111,7 @@ impl LinksQuery {
             AND
             DhtOp.validation_status = :status
             AND 
-            (DhtOp.when_integrated IS NOT NULL OR DhtOp.is_authored = 1)
+            DhtOp.when_integrated IS NOT NULL
             ",
             sub_create_query
         );

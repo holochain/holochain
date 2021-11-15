@@ -5,7 +5,7 @@ mod tests {
     use holo_hash::*;
     use holochain_types::fixt::HeaderBuilderCommonFixturator;
     use holochain_types::header::NewEntryHeader;
-    use holochain_types::{env::EnvWrite, fixt::AppEntryTypeFixturator};
+    use holochain_types::{env::DbWrite, fixt::AppEntryTypeFixturator};
     use holochain_zome_types::header;
     use holochain_zome_types::header::builder;
     use holochain_zome_types::header::Delete;
@@ -521,7 +521,7 @@ mod tests {
         update_entries: &[NewEntryHeader],
         delete_updates: &[Delete],
         _entry_hash: &EntryHash,
-        env: EnvWrite,
+        env: DbWrite,
     ) {
         // let mut meta_buf = MetadataBuf::vault(env.clone().into()).unwrap();
         // for e in new_entries.iter().chain(update_entries.iter()) {

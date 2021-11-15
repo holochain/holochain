@@ -8,11 +8,14 @@ use std::fmt::Debug;
 use super::*;
 
 #[derive(Debug, Clone)]
-pub struct GetElementDetailsQuery(HeaderHash);
+pub struct GetElementDetailsQuery(HeaderHash, Option<Arc<AgentPubKey>>);
 
 impl GetElementDetailsQuery {
     pub fn new(hash: HeaderHash) -> Self {
-        Self(hash)
+        Self(hash, None)
+    }
+    pub fn with_private_data_access(hash: HeaderHash, author: Arc<AgentPubKey>) -> Self {
+        Self(hash, Some(author))
     }
 }
 
@@ -36,8 +39,8 @@ impl Query for GetElementDetailsQuery {
         JOIN Header On DhtOp.header_hash = Header.hash
         WHERE DhtOp.type IN (:create_type, :delete_type, :update_type)
         AND DhtOp.basis_hash = :header_hash
+        AND DhtOp.when_integrated IS NOT NULL
         AND DhtOp.validation_status IS NOT NULL
-        AND (DhtOp.when_integrated IS NOT NULL OR DhtOp.is_authored = 1)
         "
         .into()
     }
@@ -154,7 +157,8 @@ impl Query for GetElementDetailsQuery {
 
         let mut entry = None;
         if let Some(entry_hash) = header.header().entry_hash() {
-            entry = stores.get_entry(entry_hash)?;
+            let author = self.1.as_ref().map(|a| a.as_ref());
+            entry = stores.get_public_or_authored_entry(entry_hash, author)?;
         }
         let element = Element::new(header, entry);
         let details = ElementDetails {

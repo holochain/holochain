@@ -23,9 +23,8 @@ kitsune_p2p_types::write_codec_enum! {
         /// "Call" to the remote.
         Call(0x010) {
             space.0: Arc<KitsuneSpace>,
-            from_agent.1: Arc<KitsuneAgent>,
-            to_agent.2: Arc<KitsuneAgent>,
-            data.3: WireData,
+            to_agent.1: Arc<KitsuneAgent>,
+            data.2: WireData,
         },
 
         /// "Call" response from the remote.

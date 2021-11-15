@@ -62,7 +62,7 @@ strum = "0.18.0"
 tempdir = "0.3.7"
 thiserror = "1.0.22"
 tokio = { version = "1.11", features = [ "full"] }
-tokio-stream = { version = "0.1", features = [ "sync", "net" ] }
+tokio-stream = "0.1"
 holochain_util = { version = "0.0.4", path = "../holochain_util" }
 toml = "0.5.6"
 tracing = "0.1.26"
@@ -70,6 +70,7 @@ tracing-futures = "0.2.5"
 tracing-subscriber = "0.2.19"
 url = "1.7.2"
 url2 = "0.0.6"
+url_serde = "0.2.0"
 uuid = { version = "0.7", features = [ "serde", "v4" ] }
 xsalsa20poly1305 = "0.6.0"
 holochain_wasm_test_utils = { version = "0.0.14", path = "../test_utils/wasm" }
@@ -77,6 +78,7 @@ holochain_wasm_test_utils = { version = "0.0.14", path = "../test_utils/wasm" }
 # Dependencies for test_utils: keep in sync with below
 hdk = { version = "0.0.114", path = "../hdk", optional = true }
 matches = {version = "0.1.8", optional = true }
+holochain_test_wasm_common = { version = "0.0.14", path = "../test_utils/wasm_common", optional = true  }
 unwrap_to = { version = "0.1.0", optional = true }
 itertools = { version = "0.10", optional = false }
 
@@ -132,6 +134,7 @@ test_utils = [
   "kitsune_p2p/test_utils",
   "holochain_p2p/mock_network",
   "matches",
+  "holochain_test_wasm_common",
   "unwrap_to"
 ]
 

@@ -23,7 +23,7 @@ pub fn must_get_header<'a>(
             // timeouts must be handled by the network
             tokio_helper::block_forever_on(async move {
                 let workspace = call_context.host_context.workspace();
-                let mut cascade = Cascade::from_workspace_network(workspace, network);
+                let mut cascade = Cascade::from_workspace_network(&workspace, network);
                 match cascade
                     .retrieve_header(header_hash.clone(),
                     // Set every GetOptions manually here.

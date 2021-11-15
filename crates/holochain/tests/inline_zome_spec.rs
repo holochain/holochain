@@ -115,7 +115,7 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
 
     // Wait long enough for Bob to receive gossip
     wait_for_integration_1m(
-        bobbo.env(),
+        bobbo.dht_env(),
         WaitOps::start() + WaitOps::cold_start() + WaitOps::ENTRY,
     )
     .await;
@@ -176,9 +176,9 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     assert_ne!(hash_foo, hash_bar);
 
     // Wait long enough for others to receive gossip
-    for env in [bobbo_foo.env(), carol_bar.env()].iter() {
+    for env in [bobbo_foo.dht_env(), carol_bar.dht_env()].iter() {
         wait_for_integration_1m(
-            env,
+            *env,
             WaitOps::start() * 1 + WaitOps::cold_start() * 2 + WaitOps::ENTRY * 1,
         )
         .await;
@@ -278,7 +278,7 @@ async fn get_deleted() -> anyhow::Result<()> {
         .await;
     let mut expected_count = WaitOps::start() + WaitOps::ENTRY;
 
-    wait_for_integration_1m(alice.env(), expected_count).await;
+    wait_for_integration_1m(alice.dht_env(), expected_count).await;
 
     let elements: Vec<Option<Element>> = conductor
         .call(&alice.zome("zome1"), "read", hash.clone())
@@ -301,7 +301,7 @@ async fn get_deleted() -> anyhow::Result<()> {
         .await;
 
     expected_count += WaitOps::DELETE;
-    wait_for_integration_1m(alice.env(), expected_count).await;
+    wait_for_integration_1m(alice.dht_env(), expected_count).await;
 
     let elements: Vec<Option<Element>> = conductor
         .call(&alice.zome("zome1"), "read_entry", entry_hash)
