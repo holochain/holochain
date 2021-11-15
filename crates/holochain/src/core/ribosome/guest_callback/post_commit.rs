@@ -1,4 +1,4 @@
-use crate::conductor::api::CellConductorApiT;
+use crate::conductor::ConductorHandle;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
@@ -7,9 +7,9 @@ use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDna;
-use holochain_p2p::HolochainP2pDnaT;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
+use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_types::prelude::*;
 use itertools::Itertools;
 
@@ -75,16 +75,14 @@ impl TryFrom<PostCommitInvocation> for ExternIO {
     }
 }
 
-pub async fn send_post_commit<C>(
-    conductor_api: C,
-    workspace: HostFnWorkspace,
+pub async fn send_post_commit(
+    conductor_api: ConductorHandle,
+    workspace: SourceChainWorkspace,
     network: HolochainP2pDna,
     keystore: MetaLairClient,
     zomed_headers: Vec<(Option<Zome>, SignedHeaderHashed)>,
-) -> Result<(), tokio::sync::mpsc::error::SendError<()>>
-where
-    C: CellConductorApiT,
-{
+) -> Result<(), tokio::sync::mpsc::error::SendError<()>> {
+    let cell_id = workspace.source_chain().cell_id();
     let groups = zomed_headers
         .iter()
         .group_by(|(zome, _shh)| zome.clone())
@@ -105,15 +103,12 @@ where
                 .await?
                 .send(PostCommitArgs {
                     host_access: PostCommitHostAccess {
-                        workspace: workspace.clone(),
+                        workspace: workspace.clone().into(),
                         keystore: keystore.clone(),
                         network: network.clone(),
                     },
                     invocation: PostCommitInvocation::new(zome, headers),
-                    cell_id: CellId::new(
-                        network.dna_hash().clone(),
-                        conductor_api.cell_id().agent_pubkey().clone(),
-                    ),
+                    cell_id: cell_id.clone(),
                 });
         }
     }

@@ -7,7 +7,7 @@ use derive_more::Constructor;
 use holo_hash::AnyDhtHash;
 use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
-use holochain_state::host_fn_workspace::HostFnWorkspace;
+use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_types::prelude::*;
 use std::sync::Arc;
 
@@ -76,7 +76,7 @@ impl From<ValidateDeleteLinkInvocation> for ValidateDeleteLinkData {
 }
 #[derive(Clone, Constructor)]
 pub struct ValidateLinkHostAccess {
-    pub workspace: HostFnWorkspace,
+    pub workspace: HostFnWorkspaceRead,
     pub network: HolochainP2pDna,
 }
 
@@ -369,7 +369,15 @@ mod slow_tests {
 
         // the chain head should be the committed entry header
         let chain_head = tokio_helper::block_forever_on(async move {
-            SourceChainResult::Ok(host_access.workspace.source_chain().chain_head()?.0)
+            SourceChainResult::Ok(
+                host_access
+                    .workspace
+                    .source_chain()
+                    .as_ref()
+                    .unwrap()
+                    .chain_head()?
+                    .0,
+            )
         })
         .unwrap();
 
@@ -386,7 +394,15 @@ mod slow_tests {
 
         // the chain head should be the committed entry header
         let chain_head = tokio_helper::block_forever_on(async move {
-            SourceChainResult::Ok(host_access.workspace.source_chain().chain_head()?.0)
+            SourceChainResult::Ok(
+                host_access
+                    .workspace
+                    .source_chain()
+                    .as_ref()
+                    .unwrap()
+                    .chain_head()?
+                    .0,
+            )
         })
         .unwrap();
 

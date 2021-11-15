@@ -34,14 +34,7 @@ pub fn call_remote(
                         call_context
                             .host_context()
                             .network()
-                            .call_remote(
-                                from_agent.clone(),
-                                target_agent,
-                                zome_name,
-                                fn_name,
-                                cap_secret,
-                                payload,
-                            )
+                            .call_remote(from_agent.clone(), target_agent, zome_name, fn_name, cap_secret, payload)
                             .await
                     }))
                     .await

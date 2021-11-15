@@ -7,7 +7,7 @@ use derive_more::Constructor;
 use holo_hash::AnyDhtHash;
 use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
-use holochain_state::host_fn_workspace::HostFnWorkspace;
+use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_types::prelude::*;
 
 #[derive(Clone)]
@@ -27,7 +27,7 @@ impl ValidationPackageInvocation {
 
 #[derive(Clone, Constructor)]
 pub struct ValidationPackageHostAccess {
-    pub workspace: HostFnWorkspace,
+    pub workspace: HostFnWorkspaceRead,
     pub network: HolochainP2pDna,
 }
 

@@ -29,8 +29,10 @@ pub fn create<'a>(
                 Entry::CounterSign(_, _) => tokio_helper::block_forever_on(async move {
                     call_context
                         .host_context
-                        .workspace()
+                        .workspace_write()
                         .source_chain()
+                        .as_ref()
+                        .expect("Must have source chain if write_workspace access is given")
                         .put_countersigned(Some(call_context.zome.clone()), input.into_entry(), chain_top_ordering)
                         .await
                         .map_err(|source_chain_error| {
@@ -79,8 +81,10 @@ pub fn create<'a>(
                         // push the header and the entry into the source chain
                         call_context
                             .host_context
-                            .workspace()
+                            .workspace_write()
                             .source_chain()
+                            .as_ref()
+                            .expect("Must have source chain if write_workspace access is given")
                             .put(Some(call_context.zome.clone()), header_builder, Some(input.into_entry()), chain_top_ordering)
                             .await
                             .map_err(|source_chain_error| {
@@ -172,7 +176,15 @@ pub mod wasm_test {
 
         // the chain head should be the committed entry header
         let chain_head = tokio_helper::block_forever_on(async move {
-            SourceChainResult::Ok(host_access_2.workspace.source_chain().chain_head()?.0)
+            SourceChainResult::Ok(
+                host_access_2
+                    .workspace
+                    .source_chain()
+                    .as_ref()
+                    .unwrap()
+                    .chain_head()?
+                    .0,
+            )
         })
         .unwrap();
 
@@ -191,7 +203,15 @@ pub mod wasm_test {
         // the chain head should be the committed entry header
         let host_access_2 = host_access.clone();
         let chain_head = tokio_helper::block_forever_on(async move {
-            SourceChainResult::Ok(host_access_2.workspace.source_chain().chain_head()?.0)
+            SourceChainResult::Ok(
+                host_access_2
+                    .workspace
+                    .source_chain()
+                    .as_ref()
+                    .unwrap()
+                    .chain_head()?
+                    .0,
+            )
         })
         .unwrap();
 
