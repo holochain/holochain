@@ -38,7 +38,7 @@ impl SweetDnaFile {
         uid: String,
         zomes: Vec<(ZomeName, ZomeDef)>,
         wasms: Vec<wasm::DnaWasm>,
-        properties: serde_yaml::Value,
+        properties: SerializedBytes,
     ) -> DnaResult<(DnaFile, Vec<Zome>)> {
         let dna_def = DnaDefBuilder::default()
             .uid(uid)
@@ -65,7 +65,7 @@ impl SweetDnaFile {
     pub async fn from_test_wasms<W>(
         uid: String,
         test_wasms: Vec<W>,
-        properties: serde_yaml::Value,
+        properties: SerializedBytes,
     ) -> DnaResult<(DnaFile, Vec<Zome>)>
     where
         W: Into<(ZomeName, ZomeDef)> + Into<wasm::DnaWasm> + Clone,
@@ -81,7 +81,7 @@ impl SweetDnaFile {
     where
         W: Into<(ZomeName, ZomeDef)> + Into<wasm::DnaWasm> + Clone,
     {
-        Self::from_test_wasms(random_uid(), test_wasms).await
+        Self::from_test_wasms(random_uid(), test_wasms, SerializedBytes::default()).await
     }
 
     /// Create a DnaFile from a collection of InlineZomes (no Wasm)

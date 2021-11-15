@@ -125,7 +125,7 @@ impl DnaBundle {
                     name: manifest.name.clone(),
                     uid: manifest.uid.clone().unwrap_or_default(),
                     properties: SerializedBytes::try_from(
-                        manifest.properties.clone().unwrap_or_default()
+                        manifest.properties.clone().unwrap_or_default(),
                     )?,
                     zomes,
                 };
