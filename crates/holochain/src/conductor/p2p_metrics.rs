@@ -11,7 +11,7 @@ use std::time::SystemTime;
 
 /// Record a p2p metric datum
 pub async fn put_metric_datum(
-    env: EnvWrite,
+    env: DbWrite<DbKindP2pMetrics>,
     agent: AgentPubKey,
     metric: MetricKind,
     timestamp: SystemTime,
@@ -25,7 +25,7 @@ pub async fn put_metric_datum(
 
 /// Query the p2p_metrics database in a variety of ways
 pub async fn query_metrics(
-    env: EnvWrite,
+    env: DbWrite<DbKindP2pMetrics>,
     query: MetricQuery,
 ) -> ConductorResult<MetricQueryAnswer> {
     Ok(env
