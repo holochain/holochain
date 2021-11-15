@@ -389,7 +389,7 @@ async fn check_entry_not_private_test() {
 #[tokio::test(flavor = "multi_thread")]
 async fn incoming_ops_filters_private_entry() {
     let dna = fixt!(DnaHash);
-    let spaces = TestSpaces::new([]);
+    let spaces = TestSpaces::new([dna.clone()]);
     let space = Arc::new(spaces.test_spaces[&dna].space.clone());
     let vault = space.dht_env.clone();
     let keystore = test_keystore();
