@@ -11,6 +11,10 @@ use holochain_p2p::actor;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_p2p::HolochainP2pError;
 use holochain_p2p::MockHolochainP2pDnaT;
+use holochain_sqlite::db::DbKindAuthored;
+use holochain_sqlite::db::DbKindDht;
+use holochain_sqlite::db::DbKindOp;
+use holochain_sqlite::db::DbKindT;
 use holochain_sqlite::db::WriteManager;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_sqlite::rusqlite::Transaction;
@@ -23,8 +27,8 @@ use holochain_types::activity::AgentActivityResponse;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::WireOps;
 use holochain_types::element::WireElementOps;
-use holochain_types::env::EnvRead;
-use holochain_types::env::EnvWrite;
+use holochain_types::env::DbRead;
+use holochain_types::env::DbWrite;
 use holochain_types::link::WireLinkKey;
 use holochain_types::link::WireLinkOps;
 use holochain_types::metadata::MetadataSet;
@@ -48,19 +52,19 @@ mod entry_test_data;
 
 #[derive(Clone)]
 pub struct PassThroughNetwork {
-    envs: Vec<EnvRead>,
+    envs: Vec<DbRead<DbKindDht>>,
     authority: bool,
 }
 
 impl PassThroughNetwork {
-    pub fn authority_for_all(envs: Vec<EnvRead>) -> Self {
+    pub fn authority_for_all(envs: Vec<DbRead<DbKindDht>>) -> Self {
         Self {
             envs,
             authority: true,
         }
     }
 
-    pub fn authority_for_nothing(envs: Vec<EnvRead>) -> Self {
+    pub fn authority_for_nothing(envs: Vec<DbRead<DbKindDht>>) -> Self {
         Self {
             envs,
             authority: false,
@@ -165,7 +169,6 @@ impl HolochainP2pDnaT for PassThroughNetwork {
 
     async fn authority_for_hash(
         &self,
-        _agent: AgentPubKey,
         _dht_hash: holo_hash::AnyDhtHash,
     ) -> actor::HolochainP2pResult<bool> {
         Ok(self.authority)
@@ -239,12 +242,12 @@ impl HolochainP2pDnaT for PassThroughNetwork {
     }
 }
 
-pub fn fill_db(env: &EnvWrite, op: DhtOpHashed) {
+pub fn fill_db<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
     env.conn()
         .unwrap()
         .with_commit_sync(|txn| {
             let hash = op.as_hash().clone();
-            insert_op(txn, op, false).unwrap();
+            insert_op(txn, op).unwrap();
             set_validation_status(txn, hash.clone(), ValidationStatus::Valid).unwrap();
             set_when_integrated(txn, hash, Timestamp::now()).unwrap();
             DatabaseResult::Ok(())
@@ -252,12 +255,12 @@ pub fn fill_db(env: &EnvWrite, op: DhtOpHashed) {
         .unwrap();
 }
 
-pub fn fill_db_rejected(env: &EnvWrite, op: DhtOpHashed) {
+pub fn fill_db_rejected<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
     env.conn()
         .unwrap()
         .with_commit_sync(|txn| {
             let hash = op.as_hash().clone();
-            insert_op(txn, op, false).unwrap();
+            insert_op(txn, op).unwrap();
             set_validation_status(txn, hash.clone(), ValidationStatus::Rejected).unwrap();
             set_when_integrated(txn, hash, Timestamp::now()).unwrap();
             DatabaseResult::Ok(())
@@ -265,23 +268,23 @@ pub fn fill_db_rejected(env: &EnvWrite, op: DhtOpHashed) {
         .unwrap();
 }
 
-pub fn fill_db_pending(env: &EnvWrite, op: DhtOpHashed) {
+pub fn fill_db_pending<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
     env.conn()
         .unwrap()
         .with_commit_sync(|txn| {
             let hash = op.as_hash().clone();
-            insert_op(txn, op, false).unwrap();
+            insert_op(txn, op).unwrap();
             set_validation_status(txn, hash, ValidationStatus::Valid).unwrap();
             DatabaseResult::Ok(())
         })
         .unwrap();
 }
 
-pub fn fill_db_as_author(env: &EnvWrite, op: DhtOpHashed) {
+pub fn fill_db_as_author(env: &DbWrite<DbKindAuthored>, op: DhtOpHashed) {
     env.conn()
         .unwrap()
         .with_commit_sync(|txn| {
-            insert_op(txn, op, true).unwrap();
+            insert_op(txn, op).unwrap();
             DatabaseResult::Ok(())
         })
         .unwrap();
@@ -340,14 +343,9 @@ impl HolochainP2pDnaT for MockNetwork {
 
     async fn authority_for_hash(
         &self,
-        agent: AgentPubKey,
         dht_hash: holo_hash::AnyDhtHash,
     ) -> actor::HolochainP2pResult<bool> {
-        self.0
-            .lock()
-            .await
-            .authority_for_hash(agent, dht_hash)
-            .await
+        self.0.lock().await.authority_for_hash(dht_hash).await
     }
 
     fn dna_hash(&self) -> holo_hash::DnaHash {
