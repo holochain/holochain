@@ -43,6 +43,7 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
+use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_types::prelude::*;
 use mockall::automock;
 use std::iter::Iterator;
@@ -126,17 +127,30 @@ impl From<&HostContext> for HostFnAccess {
 
 impl HostContext {
     /// Get the workspace, panics if none was provided
-    pub fn workspace(&self) -> &HostFnWorkspace {
-        match self {
+    pub fn workspace(&self) -> HostFnWorkspaceRead {
+        match self.clone() {
             Self::ZomeCall(ZomeCallHostAccess { workspace, .. })
             | Self::Init(InitHostAccess { workspace, .. })
             | Self::MigrateAgent(MigrateAgentHostAccess { workspace, .. })
-            | Self::ValidationPackage(ValidationPackageHostAccess { workspace, .. })
-            | Self::PostCommit(PostCommitHostAccess { workspace, .. })
+            | Self::PostCommit(PostCommitHostAccess { workspace, .. }) => workspace.into(),
+            Self::ValidationPackage(ValidationPackageHostAccess { workspace, .. })
             | Self::Validate(ValidateHostAccess { workspace, .. })
             | Self::ValidateCreateLink(ValidateLinkHostAccess { workspace, .. }) => workspace,
             _ => panic!(
                 "Gave access to a host function that uses the workspace without providing a workspace"
+            ),
+        }
+    }
+
+    /// Get the workspace, panics if none was provided
+    pub fn workspace_write(&self) -> &HostFnWorkspace {
+        match self {
+            Self::ZomeCall(ZomeCallHostAccess { workspace, .. })
+            | Self::Init(InitHostAccess { workspace, .. })
+            | Self::MigrateAgent(MigrateAgentHostAccess { workspace, .. })
+            | Self::PostCommit(PostCommitHostAccess { workspace, .. }) => workspace,
+            _ => panic!(
+                "Gave access to a host function that writes to the workspace without providing a workspace"
             ),
         }
     }
@@ -301,11 +315,12 @@ impl ZomeCallInvocation {
         let check_agent = self.provenance.clone();
         let check_secret = self.cap_secret;
 
-        let maybe_grant: Option<CapGrant> = host_access.workspace.source_chain().valid_cap_grant(
-            &check_function,
-            &check_agent,
-            check_secret.as_ref(),
-        )?;
+        let maybe_grant: Option<CapGrant> = host_access
+            .workspace
+            .source_chain()
+            .as_ref()
+            .expect("Must have source chain to make zome calls")
+            .valid_cap_grant(&check_function, &check_agent, check_secret.as_ref())?;
 
         Ok(maybe_grant.is_some())
     }

@@ -550,7 +550,7 @@ async fn get_custom_package_test() {
         .unwrap();
 
     {
-        let env: EnvRead = bob_call_data.env.clone().into();
+        let env: DbRead = bob_call_data.env.clone().into();
         let element_integrated = ElementBuf::vault(env.clone(), false).unwrap();
         let meta_integrated = MetadataBuf::vault(env.clone()).unwrap();
         let mut element_cache = ElementBuf::cache(env.clone()).unwrap();
