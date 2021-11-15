@@ -129,7 +129,6 @@ where
         network.clone(),
         signal_tx,
         call_zome_handle,
-        invocation.cell_id.clone(),
     );
     let (ribosome, result) =
         call_zome_function_authorized(ribosome, host_access, invocation).await?;
