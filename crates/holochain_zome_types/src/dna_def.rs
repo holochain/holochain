@@ -39,6 +39,8 @@ pub struct DnaDef {
     pub uid: String,
 
     /// Any arbitrary application properties can be included in this object.
+    /// Uses `SerializedBytes` to ensure a canonical serialized representation
+    /// which is needed for consistent crypto.
     #[cfg_attr(feature = "full-dna-def", builder(default = "().try_into().unwrap()"))]
     pub properties: SerializedBytes,
 
