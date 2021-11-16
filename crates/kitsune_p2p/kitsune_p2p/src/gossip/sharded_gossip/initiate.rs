@@ -176,7 +176,7 @@ impl ShardedGossipLocal {
                 .as_ref()
                 .map_or(true, |tgt| tgt.cert != peer_cert)
             {
-                inner.metrics.record_remote_round(peer_cert.clone());
+                inner.metrics.record_remote_round(&remote_agent_list);
             }
             // If this is the target then we should clear the when initiated timeout.
             if let Some(tgt) = inner.initiate_tgt.as_mut() {

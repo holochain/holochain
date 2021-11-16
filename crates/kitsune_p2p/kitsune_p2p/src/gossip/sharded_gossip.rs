@@ -363,27 +363,30 @@ impl ShardedGossipLocalState {
             .as_ref()
             .map(|tgt| &tgt.cert == state_key)
             .unwrap_or(false);
-        if init_tgt {
-            self.initiate_tgt = None;
-        }
+        let remote_agent_list = if init_tgt {
+            let initiate_tgt = self.initiate_tgt.take().unwrap();
+            initiate_tgt.remote_agent_list
+        } else {
+            vec![]
+        };
         let r = self.round_map.remove(state_key);
-        if r.is_some() {
+        if let Some(r) = &r {
             if error {
-                self.metrics.record_error(state_key.clone());
+                self.metrics.record_error(&r.remote_agent_list);
             } else {
-                self.metrics.record_success(state_key.clone());
+                self.metrics.record_success(&r.remote_agent_list);
             }
         } else if init_tgt && error {
-            self.metrics.record_error(state_key.clone());
+            self.metrics.record_error(&remote_agent_list);
         }
         r
     }
 
     fn check_tgt_expired(&mut self) {
-        if let Some((cert, when_initiated)) = self
+        if let Some((remote_agent_list, cert, when_initiated)) = self
             .initiate_tgt
             .as_ref()
-            .map(|tgt| (tgt.cert.clone(), tgt.when_initiated))
+            .map(|tgt| (&tgt.remote_agent_list, tgt.cert.clone(), tgt.when_initiated))
         {
             // Check if no current round exists and we've timed out the initiate.
             let no_current_round_exist = !self.round_map.round_exists(&cert);
@@ -391,7 +394,7 @@ impl ShardedGossipLocalState {
                 Some(when_initiated)
                     if no_current_round_exist && when_initiated.elapsed() > ROUND_TIMEOUT =>
                 {
-                    self.metrics.record_error(cert);
+                    self.metrics.record_error(remote_agent_list);
                     self.initiate_tgt = None;
                 }
                 None if no_current_round_exist => {
@@ -512,11 +515,11 @@ impl ShardedGossipLocal {
                 .map(|tgt| &tgt.cert == id)
                 .unwrap_or(false)
             {
-                i.initiate_tgt = None;
+                let initiate_tgt = i.initiate_tgt.take().unwrap();
                 if error {
-                    i.metrics.record_error(id.clone());
+                    i.metrics.record_error(&initiate_tgt.remote_agent_list);
                 } else {
-                    i.metrics.record_success(id.clone());
+                    i.metrics.record_success(&initiate_tgt.remote_agent_list);
                 }
             }
             Ok(())
@@ -736,8 +739,8 @@ impl ShardedGossipLocal {
     fn record_timeouts(&self) {
         self.inner
             .share_mut(|i, _| {
-                for cert in i.round_map.take_timed_out_rounds() {
-                    i.metrics.record_error(cert);
+                for (_cert, r) in i.round_map.take_timed_out_rounds() {
+                    i.metrics.record_error(&r.remote_agent_list);
                 }
                 Ok(())
             })
