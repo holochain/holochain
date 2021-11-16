@@ -148,6 +148,7 @@ fixturator!(
 );
 
 fixturator!(
+    with_vec 0 5;
     FunctionName;
     from String;
 );
@@ -174,12 +175,26 @@ fixturator!(
 
 fixturator!(
     ZomeInfo;
-    constructor fn new(ZomeName, ZomeId, EntryDefs);
+    constructor fn new(ZomeName, ZomeId, SerializedBytes, EntryDefs, FunctionNameVec);
 );
 
 fixturator!(
     AgentInfo;
-    constructor fn new(AgentPubKey, AgentPubKey);
+    curve Empty AgentInfo {
+        agent_initial_pubkey: fixt!(AgentPubKey, Empty),
+        agent_latest_pubkey: fixt!(AgentPubKey, Empty),
+        chain_head: (fixt!(HeaderHash, Empty), fixt!(u32, Empty), fixt!(Timestamp, Empty)),
+    };
+    curve Unpredictable AgentInfo {
+        agent_initial_pubkey: fixt!(AgentPubKey, Unpredictable),
+        agent_latest_pubkey: fixt!(AgentPubKey, Unpredictable),
+        chain_head: (fixt!(HeaderHash, Unpredictable), fixt!(u32, Unpredictable), fixt!(Timestamp, Unpredictable)),
+    };
+    curve Predictable AgentInfo {
+        agent_initial_pubkey: fixt!(AgentPubKey, Predictable),
+        agent_latest_pubkey: fixt!(AgentPubKey, Predictable),
+        chain_head: (fixt!(HeaderHash, Predictable), fixt!(u32, Predictable), fixt!(Timestamp, Predictable)),
+    };
 );
 
 fixturator!(

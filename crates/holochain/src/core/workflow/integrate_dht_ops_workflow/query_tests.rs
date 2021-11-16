@@ -50,7 +50,7 @@ async fn integrate_query() {
     let hashes = env
         .conn()
         .unwrap()
-        .with_reader(|txn| {
+        .with_reader_test(|txn| {
             let mut stmt =
                 txn.prepare("SELECT hash FROM DhtOp WHERE when_integrated IS NOT NULL")?;
             let hashes: HashSet<DhtOpHash> = stmt

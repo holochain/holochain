@@ -118,10 +118,7 @@ impl TestDbs {
 macro_rules! fresh_reader_test {
     ($env: expr, $f: expr) => {{
         let mut conn = $env.conn().unwrap();
-        $crate::db::ReadManager::with_reader(&mut conn, |r| {
-            $crate::error::DatabaseResult::Ok($f(r))
-        })
-        .unwrap()
+        conn.with_reader_test($f)
     }};
 }
 
@@ -132,10 +129,7 @@ macro_rules! print_stmts_test {
     ($env: expr, $f: expr) => {{
         let mut conn = $env.conn().unwrap();
         conn.trace(Some(|s| println!("{}", s)));
-        let r = $crate::db::ReadManager::with_reader(&mut conn, |r| {
-            $crate::error::DatabaseResult::Ok($f(r))
-        })
-        .unwrap();
+        let r = conn.with_reader_test($f);
         conn.trace(None);
         r
     }};

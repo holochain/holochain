@@ -115,7 +115,6 @@ impl Query for GetLiveEntryQuery {
         let header = state.creates.into_iter().map(|(_, v)| v).next();
         match header {
             Some(header) => {
-                // TODO: Handle error where header doesn't have entry hash.
                 let entry_hash = header
                     .header()
                     .entry_hash()

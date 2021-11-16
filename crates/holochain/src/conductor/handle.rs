@@ -1114,7 +1114,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .cloned()
             .expect("invalid cell space");
 
-        let peer_dump = p2p_agent_store::dump_state(p2p_env.into(), Some(cell_id.clone()))?;
+        let peer_dump = p2p_agent_store::dump_state(p2p_env.into(), Some(cell_id.clone())).await?;
         let source_chain_dump =
             source_chain::dump_state(arc.clone().into(), cell_id.agent_pubkey().clone()).await?;
 
@@ -1144,7 +1144,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .cloned()
             .expect("invalid cell space");
 
-        let peer_dump = p2p_agent_store::dump_state(p2p_env.into(), Some(cell_id.clone()))?;
+        let peer_dump = p2p_agent_store::dump_state(p2p_env.into(), Some(cell_id.clone())).await?;
         let source_chain_dump =
             source_chain::dump_state(arc.clone().into(), cell_id.agent_pubkey().clone()).await?;
 
@@ -1196,7 +1196,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 let (d, a) = c.into_dna_and_agent();
                 let space = d.to_kitsune();
                 let env = self.p2p_env(space);
-                Ok(get_single_agent_info(env.into(), d, a)?
+                Ok(get_single_agent_info(env.into(), d, a)
+                    .await?
                     .map(|a| vec![a])
                     .unwrap_or_default())
             }
@@ -1205,7 +1206,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 // collecting so the mutex lock can close
                 let envs = self.p2p_env.lock().values().cloned().collect::<Vec<_>>();
                 for env in envs {
-                    out.append(&mut all_agent_infos(env.into())?);
+                    out.append(&mut all_agent_infos(env.into()).await?);
                 }
                 Ok(out)
             }

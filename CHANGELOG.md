@@ -6,6 +6,135 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20211110.083530
+
+## [holochain-0.0.115](crates/holochain/CHANGELOG.md#0.0.115)
+
+- Fix [issue](https://github.com/holochain/holochain/issues/1100) where private dht ops were being leaked through the incoming ops sender. [1104](https://github.com/holochain/holochain/pull/1104).
+- Kitsune now attempts to rebind the network interface in the event of endpoint shutdown. Note, it’s still recommended to bind to `0.0.0.0` as the OS provides additional resiliency for interfaces coming and going. [\#1083](https://github.com/holochain/holochain/pull/1083)
+- **BREAKING CHANGE** current chain head including recent writes available in agent info [\#1079](https://github.com/holochain/holochain/pull/1079)
+- **BREAKING (If using new lair)** If you are using the new (non-legacy) `lair_server` keystore, you will need to rebuild your keystore, we now pre-hash the passphrase used to access it to mitigate some information leakage. [\#1094](https://github.com/holochain/holochain/pull/1094)
+- Better lair signature fallback child process management. The child process will now be properly restarted if it exits. (Note this can take a few millis on Windows, and may result in some signature errors.) [\#1094](https://github.com/holochain/holochain/pull/1094)
+
+## [holochain\_test\_wasm\_common-0.0.15](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.15)
+
+## [holochain\_cascade-0.0.15](crates/holochain_cascade/CHANGELOG.md#0.0.15)
+
+## [holochain\_cli-0.0.16](crates/holochain_cli/CHANGELOG.md#0.0.16)
+
+## [holochain\_cli\_sandbox-0.0.14](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.14)
+
+## [holochain\_websocket-0.0.15](crates/holochain_websocket/CHANGELOG.md#0.0.15)
+
+## [holochain\_conductor\_api-0.0.15](crates/holochain_conductor_api/CHANGELOG.md#0.0.15)
+
+## [holochain\_state-0.0.15](crates/holochain_state/CHANGELOG.md#0.0.15)
+
+## [holochain\_wasm\_test\_utils-0.0.15](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.15)
+
+## [holochain\_p2p-0.0.15](crates/holochain_p2p/CHANGELOG.md#0.0.15)
+
+## [holochain\_cli\_bundle-0.0.13](crates/holochain_cli_bundle/CHANGELOG.md#0.0.13)
+
+## [holochain\_types-0.0.15](crates/holochain_types/CHANGELOG.md#0.0.15)
+
+- FIX: [Bug](https://github.com/holochain/holochain/issues/1101) that was allowing `HeaderWithoutEntry` to shutdown apps. [\#1105](https://github.com/holochain/holochain/pull/1105)
+
+## [holochain\_keystore-0.0.15](crates/holochain_keystore/CHANGELOG.md#0.0.15)
+
+## [holochain\_sqlite-0.0.15](crates/holochain_sqlite/CHANGELOG.md#0.0.15)
+
+- Fixes: Bug where database connections would timeout and return `DatabaseError(DbConnectionPoolError(Error(None)))`. [\#1097](https://github.com/holochain/holochain/pull/1097).
+
+## [kitsune\_p2p-0.0.13](crates/kitsune_p2p/CHANGELOG.md#0.0.13)
+
+## [kitsune\_p2p\_proxy-0.0.12](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.12)
+
+## [kitsune\_p2p\_transport\_quic-0.0.12](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.12)
+
+## [kitsune\_p2p\_types-0.0.12](crates/kitsune_p2p_types/CHANGELOG.md#0.0.12)
+
+## [hdk-0.0.115](crates/hdk/CHANGELOG.md#0.0.115)
+
+## [hdk\_derive-0.0.17](crates/hdk_derive/CHANGELOG.md#0.0.17)
+
+## [holochain\_zome\_types-0.0.17](crates/holochain_zome_types/CHANGELOG.md#0.0.17)
+
+- BREAKING CHANGE: Add all function names in a wasm to the zome info [\#1081](https://github.com/holochain/holochain/pull/1081)
+- BREAKING CHANGE: Added a placeholder for zome properties on zome info [\#1080](https://github.com/holochain/holochain/pull/1080)
+
+# 20211103.094627
+
+## [holochain-0.0.114](crates/holochain/CHANGELOG.md#0.0.114)
+
+- `remote_signal` has always been a fire-and-forget operation. Now it also uses the more efficient fire-and-forget “notify” low-level networking plumbing. [\#1075](https://github.com/holochain/holochain/pull/1075)
+
+- **BREAKING CHANGE** `entry_defs` added to `zome_info` and referenced by macros [PR1055](https://github.com/holochain/holochain/pull/1055)
+
+- **BREAKING CHANGE**: The notion of “cell nicknames” (“nicks”) and “app slots” has been unified into the notion of “app roles”. This introduces several breaking changes. In general, you will need to rebuild any app bundles you are using, and potentially update some usages of the admin interface. In particular:
+  
+  - The `slots` field in App manifests is now called `roles`
+  - The `InstallApp` admin method now takes a `role_id` field instead of a `nick` field
+  - In the return value for any admin method which lists installed apps, e.g. `ListEnabledApps`, any reference to `"slots"` is now named `"roles"`
+  - See [\#1045](https://github.com/holochain/holochain/pull/1045)
+
+- Adds test utils for creating simulated networks. [\#1037](https://github.com/holochain/holochain/pull/1037).
+
+- Conductor can take a mocked network for testing simulated networks. [\#1036](https://github.com/holochain/holochain/pull/1036)
+
+- Added `DumpFullState` to the admin interface, as a more complete form of `DumpState` which returns full `Vec<DhtOp>` instead of just their count, enabling more introspection of the state of the cell [\#1065](https://github.com/holochain/holochain/pull/1065).
+
+- **BREAKING CHANGE** Added function name to call info in HDK. [\#1078](https://github.com/holochain/holochain/pull/1078).
+
+## [holochain\_test\_wasm\_common-0.0.14](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.14)
+
+## [holochain\_cascade-0.0.14](crates/holochain_cascade/CHANGELOG.md#0.0.14)
+
+## [holochain\_cli-0.0.15](crates/holochain_cli/CHANGELOG.md#0.0.15)
+
+## [holochain\_cli\_sandbox-0.0.13](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.13)
+
+## [holochain\_websocket-0.0.14](crates/holochain_websocket/CHANGELOG.md#0.0.14)
+
+## [holochain\_conductor\_api-0.0.14](crates/holochain_conductor_api/CHANGELOG.md#0.0.14)
+
+## [holochain\_state-0.0.14](crates/holochain_state/CHANGELOG.md#0.0.14)
+
+- BREAKING CHANGE. Source chain `query` will now return results in header sequence order ascending.
+
+## [holochain\_wasm\_test\_utils-0.0.14](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.14)
+
+## [holochain\_p2p-0.0.14](crates/holochain_p2p/CHANGELOG.md#0.0.14)
+
+## [holochain\_cli\_bundle-0.0.12](crates/holochain_cli_bundle/CHANGELOG.md#0.0.12)
+
+## [holochain\_types-0.0.14](crates/holochain_types/CHANGELOG.md#0.0.14)
+
+## [holochain\_keystore-0.0.14](crates/holochain_keystore/CHANGELOG.md#0.0.14)
+
+## [holochain\_sqlite-0.0.14](crates/holochain_sqlite/CHANGELOG.md#0.0.14)
+
+## [kitsune\_p2p-0.0.12](crates/kitsune_p2p/CHANGELOG.md#0.0.12)
+
+- BREAKING: Return `ShardedGossipWire::Busy` if we are overloaded with incoming gossip. [\#1076](https://github.com/holochain/holochain/pull/1076)
+  - This breaks the current network protocol and will not be compatible with other older versions of holochain (no manual action required).
+
+## [kitsune\_p2p\_proxy-0.0.11](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.11)
+
+## [kitsune\_p2p\_transport\_quic-0.0.11](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.11)
+
+## [kitsune\_p2p\_types-0.0.11](crates/kitsune_p2p_types/CHANGELOG.md#0.0.11)
+
+## [hdk-0.0.114](crates/hdk/CHANGELOG.md#0.0.114)
+
+## [hdk\_derive-0.0.16](crates/hdk_derive/CHANGELOG.md#0.0.16)
+
+## [holochain\_zome\_types-0.0.16](crates/holochain_zome_types/CHANGELOG.md#0.0.16)
+
+## [holo\_hash-0.0.12](crates/holo_hash/CHANGELOG.md#0.0.12)
+
+## [kitsune\_p2p\_dht\_arc-0.0.7](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.0.7)
+
 # 20211027.100746
 
 ## [holochain-0.0.113](crates/holochain/CHANGELOG.md#0.0.113)
