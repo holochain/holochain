@@ -50,13 +50,30 @@ impl ShardedGossipLocal {
         }
 
         let maybe_gossip = self.inner.share_mut(|inner, _| {
-            Ok(if let Some((endpoint, url)) = remote_agent {
-                let gossip = ShardedGossipWire::initiate(intervals, id, agent_list);
-                inner.initiate_tgt = Some((endpoint.clone(), id, Some(Instant::now())));
-                Some((endpoint, HowToConnect::Url(url), gossip))
-            } else {
-                None
-            })
+            Ok(
+                if let Some(next_target::Node {
+                    agent_info_list,
+                    cert,
+                    url,
+                }) = remote_agent
+                {
+                    let gossip = ShardedGossipWire::initiate(intervals, id, agent_list);
+
+                    let tgt = ShardedGossipTarget {
+                        remote_agent_list: agent_info_list,
+                        cert: cert.clone(),
+                        tie_break: id,
+                        when_initiated: Some(Instant::now()),
+                        url: url.clone(),
+                    };
+
+                    inner.initiate_tgt = Some(tgt);
+
+                    Some((cert, HowToConnect::Url(url), gossip))
+                } else {
+                    None
+                },
+            )
         })?;
         Ok(maybe_gossip)
     }
@@ -77,8 +94,8 @@ impl ShardedGossipLocal {
                 let same_as_target = i
                     .initiate_tgt
                     .as_ref()
-                    .filter(|tgt| *tgt.0.cert() == peer_cert)
-                    .map(|tgt| tgt.1);
+                    .filter(|tgt| tgt.cert == peer_cert)
+                    .map(|tgt| tgt.tie_break);
                 Ok((i.local_agents.clone(), same_as_target, already_in_progress))
             })?;
 
@@ -143,7 +160,7 @@ impl ShardedGossipLocal {
         // Generate the bloom filters and new state.
         let state = self
             .generate_blooms(
-                remote_agent_list,
+                remote_agent_list.clone(),
                 local_agent_arcs,
                 remote_arc_set,
                 &mut gossip,
@@ -157,14 +174,17 @@ impl ShardedGossipLocal {
             if inner
                 .initiate_tgt
                 .as_ref()
-                .map_or(true, |tgt| *tgt.0.cert() != peer_cert)
+                .map_or(true, |tgt| tgt.cert != peer_cert)
             {
                 inner.metrics.record_remote_round(peer_cert.clone());
             }
             // If this is the target then we should clear the when initiated timeout.
-            if let Some((tgt, _, when_initiated)) = inner.initiate_tgt.as_mut() {
-                if *tgt.cert() == peer_cert {
-                    *when_initiated = None;
+            if let Some(tgt) = inner.initiate_tgt.as_mut() {
+                if tgt.cert == peer_cert {
+                    tgt.when_initiated = None;
+                    // we also want to update the agent list
+                    // with that reported by the remote end
+                    tgt.remote_agent_list = remote_agent_list;
                 }
             }
             Ok(())

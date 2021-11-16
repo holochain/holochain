@@ -14,7 +14,7 @@ impl ShardedGossipLocal {
             let accept_is_from_target = i
                 .initiate_tgt
                 .as_ref()
-                .map(|tgt| *tgt.0.cert() == peer_cert)
+                .map(|tgt| tgt.cert == peer_cert)
                 .unwrap_or(false);
             Ok((i.local_agents.clone(), accept_is_from_target))
         })?;
@@ -40,7 +40,7 @@ impl ShardedGossipLocal {
         // Generate the bloom filters and new state.
         let state = self
             .generate_blooms(
-                remote_agent_list,
+                remote_agent_list.clone(),
                 local_agent_arcs,
                 remote_arc_set,
                 &mut gossip,

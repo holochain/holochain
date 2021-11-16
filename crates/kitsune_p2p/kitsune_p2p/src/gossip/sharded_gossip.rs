@@ -181,8 +181,8 @@ impl ShardedGossip {
     }
 
     async fn process_outgoing(&self, outgoing: Outgoing) -> KitsuneResult<()> {
-        let (_endpoint, how, gossip) = outgoing;
-        let s = tracing::trace_span!("process_outgoing", cert = ?_endpoint.cert(), agents = ?self.gossip.show_local_agents());
+        let (cert, how, gossip) = outgoing;
+        let s = tracing::trace_span!("process_outgoing", ?cert, agents = ?self.gossip.show_local_agents());
         s.in_scope(|| tracing::trace!(?gossip));
         let gossip = gossip.encode_vec().map_err(KitsuneError::other)?;
         let bytes = gossip.len();
@@ -225,7 +225,7 @@ impl ShardedGossip {
             self.inner.share_mut(|i, _| {
                 i.outgoing.extend(outgoing.into_iter().map(|msg| {
                     (
-                        GossipTgt::new(Vec::with_capacity(0), con.peer_cert()),
+                        con.peer_cert(),
                         HowToConnect::Con(con.clone(), remote_url.clone()),
                         msg,
                     )
@@ -234,7 +234,7 @@ impl ShardedGossip {
             })?;
         }
         if let Some(outgoing) = outgoing {
-            let cert = outgoing.0.cert().clone();
+            let cert = outgoing.0.clone();
             if let Err(err) = self.process_outgoing(outgoing).await {
                 self.gossip.remove_state(&cert, true).await?;
                 tracing::error!(
@@ -323,9 +323,19 @@ pub struct ShardedGossipLocal {
 /// Incoming gossip.
 type Incoming = (Tx2ConHnd<wire::Wire>, TxUrl, ShardedGossipWire, usize);
 /// Outgoing gossip.
-type Outgoing = (GossipTgt, HowToConnect, ShardedGossipWire);
+type Outgoing = (Tx2Cert, HowToConnect, ShardedGossipWire);
 
 type StateKey = Tx2Cert;
+
+/// Info associated with an outgoing gossip target
+#[derive(Debug)]
+pub(crate) struct ShardedGossipTarget {
+    pub(crate) remote_agent_list: Vec<AgentInfoSigned>,
+    pub(crate) cert: Tx2Cert,
+    pub(crate) tie_break: u32,
+    pub(crate) when_initiated: Option<tokio::time::Instant>,
+    pub(crate) url: TxUrl,
+}
 
 /// The internal mutable state for [`ShardedGossipLocal`]
 #[derive(Default)]
@@ -333,7 +343,7 @@ pub struct ShardedGossipLocalState {
     /// The list of agents on this node
     local_agents: HashSet<Arc<KitsuneAgent>>,
     /// If Some, we are in the process of trying to initiate gossip with this target.
-    initiate_tgt: Option<(GossipTgt, u32, Option<tokio::time::Instant>)>,
+    initiate_tgt: Option<ShardedGossipTarget>,
     round_map: RoundStateMap,
     /// Metrics that track remote node states and help guide
     /// the next node to gossip with.
@@ -351,7 +361,7 @@ impl ShardedGossipLocalState {
         let init_tgt = self
             .initiate_tgt
             .as_ref()
-            .map(|tgt| tgt.0.cert() == state_key)
+            .map(|tgt| &tgt.cert == state_key)
             .unwrap_or(false);
         if init_tgt {
             self.initiate_tgt = None;
@@ -373,7 +383,7 @@ impl ShardedGossipLocalState {
         if let Some((cert, when_initiated)) = self
             .initiate_tgt
             .as_ref()
-            .map(|tgt| (tgt.0.cert().clone(), tgt.2))
+            .map(|tgt| (tgt.cert.clone(), tgt.when_initiated))
         {
             // Check if no current round exists and we've timed out the initiate.
             let no_current_round_exist = !self.round_map.round_exists(&cert);
@@ -499,7 +509,7 @@ impl ShardedGossipLocal {
         self.inner.share_mut(|i, _| {
             if i.initiate_tgt
                 .as_ref()
-                .map(|tgt| tgt.0.cert() == id)
+                .map(|tgt| &tgt.cert == id)
                 .unwrap_or(false)
             {
                 i.initiate_tgt = None;
@@ -924,7 +934,7 @@ impl AsGossipModule for ShardedGossip {
             // If we are overloaded then return busy to any new initiates.
             if overloaded && new_initiate {
                 i.outgoing.push_back((
-                    GossipTgt::new(Vec::with_capacity(0), con.peer_cert()),
+                    con.peer_cert(),
                     HowToConnect::Con(con, remote_url),
                     ShardedGossipWire::busy(),
                 ));

@@ -6,9 +6,10 @@ use super::*;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// A remote node we can connect to.
 /// Note that a node can contain many agents.
-struct Node {
-    target: GossipTgt,
-    url: TxUrl,
+pub(crate) struct Node {
+    pub(crate) agent_info_list: Vec<AgentInfoSigned>,
+    pub(crate) cert: Tx2Cert,
+    pub(crate) url: TxUrl,
 }
 
 impl ShardedGossipLocal {
@@ -17,7 +18,7 @@ impl ShardedGossipLocal {
         &self,
         arc_set: Arc<DhtArcSet>,
         local_agents: &HashSet<Arc<KitsuneAgent>>,
-    ) -> KitsuneResult<Option<(GossipTgt, TxUrl)>> {
+    ) -> KitsuneResult<Option<Node>> {
         let mut remote_nodes: HashMap<Tx2Cert, Node> = HashMap::new();
 
         // Get all the remote nodes in this arc set.
@@ -52,7 +53,7 @@ impl ShardedGossipLocal {
                         .ok()
                         .map(|purl| {
                             (
-                                info.agent.clone(),
+                                info.clone(),
                                 Tx2Cert::from(purl.digest()),
                                 TxUrl::from(url.as_str()),
                             )
@@ -64,19 +65,17 @@ impl ShardedGossipLocal {
 
             // If we found a remote address add this agent to the node
             // or create the node if it doesn't exist.
-            if let Some((agent, cert, url)) = info {
+            if let Some((info, cert, url)) = info {
                 match remote_nodes.get_mut(&cert) {
                     // Add the agent to the node.
-                    Some(node) => node.target.agents.push(agent),
+                    Some(node) => node.agent_info_list.push(info),
                     None => {
                         // This is a new node.
                         remote_nodes.insert(
                             cert.clone(),
                             Node {
-                                target: GossipTgt {
-                                    agents: vec![agent],
-                                    cert,
-                                },
+                                agent_info_list: vec![info],
+                                cert,
                                 url,
                             },
                         );
@@ -90,8 +89,7 @@ impl ShardedGossipLocal {
         // We could clone the metrics store out of the lock here but I don't think
         // the next_remote_node will be that slow so we can just choose the next node inline.
         self.inner.share_mut(|i, _| {
-            let node = next_remote_node(remote_nodes, &i.metrics, tuning_params)
-                .map(|n| (n.target, n.url));
+            let node = next_remote_node(remote_nodes, &i.metrics, tuning_params);
             Ok(node)
         })
     }
@@ -157,7 +155,7 @@ fn next_remote_node(
 impl Node {
     /// Get the cert for this node.
     fn cert(&self) -> &Tx2Cert {
-        self.target.cert()
+        &self.cert
     }
 }
 
@@ -209,8 +207,11 @@ mod tests {
                 let url = random_url(&mut rng);
                 let url = TxUrl::from(url.as_str());
                 let purl = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()).unwrap();
-                let target = GossipTgt::new(vec![], Tx2Cert::from(purl.digest()));
-                Node { target, url }
+                Node {
+                    agent_info_list: vec![],
+                    cert: Tx2Cert::from(purl.digest()),
+                    url,
+                }
             })
             .collect()
     }
