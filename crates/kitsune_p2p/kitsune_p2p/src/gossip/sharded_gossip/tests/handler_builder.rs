@@ -4,9 +4,10 @@ use kitsune_p2p_types::dht_arc::DhtArc;
 use crate::gossip::sharded_gossip::tests::common::dangerous_fake_agent_info_with_arc;
 
 use super::common::agent_info;
-use super::common::spawn_handler;
 use super::test_local_sync::three_way_sharded_ownership;
 use super::*;
+use crate::test_util::{scenario_def_local::*, spawn_handler};
+use crate::NOISE;
 
 /// Data which represents the agent store of a backend.
 /// Specifies a list of agents along with their arc and timestamped op hashes held.
@@ -134,53 +135,6 @@ impl HandlerBuilder {
     }
 }
 
-/// Concise representation of data held by various agents in a sharded scenario,
-/// without having to refer to explicit op hashes or locations.
-///
-/// This type is intended to be used to easily define arbitrary sharded network scenarios,
-/// to test various cases of local sync and gossip. It's expected that we'll eventually have a
-/// small library of such scenarios, defined in terms of this type.
-///
-/// See [`generate_ops_for_overlapping_arcs`] for usage detail.
-pub struct OwnershipData {
-    /// Total number of op hashes to be generated
-    total_ops: usize,
-    /// Declares arcs and ownership in terms of indices into a vec of generated op hashes.
-    agents: Vec<OwnershipDataAgent>,
-}
-
-impl OwnershipData {
-    /// Construct `OwnershipData` from a more compact "untagged" format using
-    /// tuples instead of structs. This is intended to be the canonical constructor.
-    pub fn from_compact(total_ops: usize, v: Vec<OwnershipDataAgentCompact>) -> Self {
-        Self {
-            total_ops,
-            agents: v
-                .into_iter()
-                .map(|(agent, arc_indices, hash_indices)| OwnershipDataAgent {
-                    agent,
-                    arc_indices,
-                    hash_indices,
-                })
-                .collect(),
-        }
-    }
-}
-
-/// Declares arcs and ownership in terms of indices into a vec of generated op hashes.
-pub struct OwnershipDataAgent {
-    /// The agent in question
-    agent: Arc<KitsuneAgent>,
-    /// The start and end indices of the arc for this agent
-    arc_indices: (usize, usize),
-    /// The indices of ops to consider as owned
-    hash_indices: Vec<usize>,
-}
-
-/// Same as [`OwnershipDataAgent`], but using a tuple instead of a struct.
-/// It's just more compact.
-pub type OwnershipDataAgentCompact = (Arc<KitsuneAgent>, (usize, usize), Vec<usize>);
-
 /// Given a list of ownership requirements, returns a list of triples, each
 /// item of which consists of:
 /// - an agent
@@ -203,7 +157,7 @@ pub type OwnershipDataAgentCompact = (Arc<KitsuneAgent>, (usize, usize), Vec<usi
 /// See the test below for a thorough example.
 pub fn mock_agent_persistence<'a>(
     entropy: &mut arbitrary::Unstructured<'a>,
-    ownership: OwnershipData,
+    ownership: LocalScenarioDef,
 ) -> (MockAgentPersistence, Vec<KitsuneOpHash>) {
     // create one op per "ownership" item
     let mut hashes: Vec<KitsuneOpHash> = (0..ownership.total_ops)
@@ -219,7 +173,7 @@ pub fn mock_agent_persistence<'a>(
         .agents
         .iter()
         .map(|data| {
-            let OwnershipDataAgent {
+            let LocalScenarioDefAgent {
                 agent,
                 arc_indices: (arc_idx_lo, arc_idx_hi),
                 hash_indices,

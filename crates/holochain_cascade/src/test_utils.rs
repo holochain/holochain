@@ -1,6 +1,10 @@
 use crate::authority;
+use crate::authority::get_element_query::GetElementOpsQuery;
+use crate::authority::get_entry_ops_query::GetEntryOpsQuery;
 use holo_hash::hash_type::AnyDht;
 use holo_hash::AgentPubKey;
+use holo_hash::AnyDhtHash;
+use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
 use holochain_p2p::actor;
@@ -9,18 +13,23 @@ use holochain_p2p::HolochainP2pError;
 use holochain_p2p::MockHolochainP2pCellT;
 use holochain_sqlite::db::WriteManager;
 use holochain_sqlite::prelude::DatabaseResult;
+use holochain_sqlite::rusqlite::Transaction;
 use holochain_state::mutations::insert_op;
 use holochain_state::mutations::set_validation_status;
 use holochain_state::mutations::set_when_integrated;
+use holochain_state::prelude::Query;
+use holochain_state::prelude::Txn;
 use holochain_types::activity::AgentActivityResponse;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::WireOps;
+use holochain_types::element::WireElementOps;
 use holochain_types::env::EnvRead;
 use holochain_types::env::EnvWrite;
 use holochain_types::link::WireLinkKey;
 use holochain_types::link::WireLinkOps;
 use holochain_types::metadata::MetadataSet;
 use holochain_types::prelude::ValidationPackageResponse;
+use holochain_types::prelude::WireEntryOps;
 use holochain_zome_types::HeaderHashed;
 use holochain_zome_types::QueryFilter;
 use holochain_zome_types::SignedHeader;
@@ -182,9 +191,20 @@ impl HolochainP2pCellT for PassThroughNetwork {
         _to_agent: AgentPubKey,
         _zome_name: holochain_zome_types::ZomeName,
         _fn_name: holochain_zome_types::FunctionName,
-        _cap: Option<holochain_zome_types::CapSecret>,
+        _cap_secret: Option<holochain_zome_types::CapSecret>,
         _payload: holochain_zome_types::ExternIO,
     ) -> actor::HolochainP2pResult<holochain_serialized_bytes::SerializedBytes> {
+        todo!()
+    }
+
+    async fn remote_signal(
+        &self,
+        _to_agent_list: Vec<AgentPubKey>,
+        _zome_name: holochain_zome_types::ZomeName,
+        _fn_name: holochain_zome_types::FunctionName,
+        _cap: Option<holochain_zome_types::CapSecret>,
+        _payload: holochain_zome_types::ExternIO,
+    ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
 
@@ -347,9 +367,20 @@ impl HolochainP2pCellT for MockNetwork {
         _to_agent: AgentPubKey,
         _zome_name: holochain_zome_types::ZomeName,
         _fn_name: holochain_zome_types::FunctionName,
-        _cap: Option<holochain_zome_types::CapSecret>,
+        _cap_secret: Option<holochain_zome_types::CapSecret>,
         _payload: holochain_zome_types::ExternIO,
     ) -> actor::HolochainP2pResult<holochain_serialized_bytes::SerializedBytes> {
+        todo!()
+    }
+
+    async fn remote_signal(
+        &self,
+        _to_agent_list: Vec<AgentPubKey>,
+        _zome_name: holochain_zome_types::ZomeName,
+        _fn_name: holochain_zome_types::FunctionName,
+        _cap: Option<holochain_zome_types::CapSecret>,
+        _payload: holochain_zome_types::ExternIO,
+    ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
 
@@ -392,5 +423,37 @@ pub fn wire_to_shh<T: TryInto<SignedHeader> + Clone>(op: &T) -> SignedHeaderHash
             SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(header), signature)
         }
         Err(_) => unreachable!(),
+    }
+}
+
+/// Utility for network simulation response to get entry.
+pub fn handle_get_entry_txn(
+    txn: &Transaction<'_>,
+    hash: EntryHash,
+    _options: holochain_p2p::event::GetOptions,
+) -> WireEntryOps {
+    let query = GetEntryOpsQuery::new(hash);
+    query.run(Txn::from(txn)).unwrap()
+}
+
+/// Utility for network simulation response to get element.
+pub fn handle_get_element_txn(
+    txn: &Transaction<'_>,
+    hash: HeaderHash,
+    options: holochain_p2p::event::GetOptions,
+) -> WireElementOps {
+    let query = GetElementOpsQuery::new(hash, options);
+    query.run(Txn::from(txn)).unwrap()
+}
+
+/// Utility for network simulation response to get.
+pub fn handle_get_txn(
+    txn: &Transaction<'_>,
+    hash: AnyDhtHash,
+    options: holochain_p2p::event::GetOptions,
+) -> WireOps {
+    match *hash.hash_type() {
+        AnyDht::Entry => WireOps::Entry(handle_get_entry_txn(txn, hash.into(), options)),
+        AnyDht::Header => WireOps::Element(handle_get_element_txn(txn, hash.into(), options)),
     }
 }

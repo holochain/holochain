@@ -21,7 +21,7 @@ pub fn call(
                             to_cell,
                             zome_name,
                             fn_name,
-                            cap,
+                            cap_secret,
                             payload,
                             provenance,
                         } = input;
@@ -31,7 +31,7 @@ pub fn call(
                             zome_name,
                             fn_name,
                             payload,
-                            cap,
+                            cap_secret,
                             provenance,
                         };
                         call_context.host_context().call_zome_handle().call_zome(
@@ -95,7 +95,7 @@ pub mod wasm_test {
             .call_zome(ZomeCall {
                 cell_id: bob_cell_id.clone(),
                 zome_name: TestWasm::WhoAmI.into(),
-                cap: None,
+                cap_secret: None,
                 fn_name: "set_access".into(),
                 payload: ExternIO::encode(()).unwrap(),
                 provenance: bob_agent_id.clone(),
@@ -109,7 +109,7 @@ pub mod wasm_test {
             .call_zome(ZomeCall {
                 cell_id: alice_cell_id.clone(),
                 zome_name: TestWasm::WhoAmI.into(),
-                cap: None,
+                cap_secret: None,
                 fn_name: "who_are_they_local".into(),
                 payload: ExternIO::encode(&bob_cell_id).unwrap(),
                 provenance: alice_agent_id.clone(),
@@ -122,11 +122,12 @@ pub mod wasm_test {
             ZomeCallResponse::Ok(guest_output) => {
                 let agent_info: AgentInfo = guest_output.decode().unwrap();
                 assert_eq!(
-                    agent_info,
-                    AgentInfo {
-                        agent_initial_pubkey: bob_agent_id.clone(),
-                        agent_latest_pubkey: bob_agent_id.clone(),
-                    },
+                    &agent_info.agent_initial_pubkey,
+                    bob_agent_id
+                );
+                assert_eq!(
+                    &agent_info.agent_latest_pubkey,
+                    bob_agent_id
                 );
             }
             _ => unreachable!(),

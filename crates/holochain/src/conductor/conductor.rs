@@ -53,6 +53,7 @@ use futures::stream::StreamExt;
 use holo_hash::DnaHash;
 use holochain_conductor_api::conductor::KeystoreConfig;
 use holochain_conductor_api::AppStatusFilter;
+use holochain_conductor_api::FullIntegrationStateDump;
 use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
@@ -62,11 +63,13 @@ use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_keystore::MetaLairClient;
 use holochain_sqlite::db::DbKind;
 use holochain_sqlite::prelude::*;
+use holochain_sqlite::sql::sql_cell::state_dump;
 use holochain_state::mutations;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateMutationResult;
+use holochain_state::prelude::StateQueryResult;
 use holochain_types::prelude::*;
-use rusqlite::OptionalExtension;
+use rusqlite::{OptionalExtension, Transaction};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
@@ -74,7 +77,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc::error::SendError;
 use tracing::*;
 
-#[cfg(any(test, feature = "test_utils"))]
+#[cfg(feature = "test_utils")]
 use super::handle::MockConductorHandleT;
 
 mod share;
@@ -777,21 +780,21 @@ where
     pub(super) async fn add_clone_cell_to_app(
         &self,
         app_id: InstalledAppId,
-        slot_id: SlotId,
+        role_id: AppRoleId,
         properties: YamlProperties,
     ) -> ConductorResult<CellId> {
         let dna_store = &self.dna_store;
         let (_, parent_dna_hash) = self
             .update_state_prime({
                 let app_id = app_id.clone();
-                let slot_id = slot_id.clone();
+                let role_id = role_id.clone();
                 move |mut state| {
                     if let Some(app) = state.installed_apps_mut().get_mut(&app_id) {
-                        let slot = app
-                            .slots()
-                            .get(&slot_id)
-                            .ok_or_else(|| AppError::SlotIdMissing(slot_id.to_owned()))?;
-                        let parent_dna_hash = slot.dna_hash().clone();
+                        let role = app
+                            .roles()
+                            .get(&role_id)
+                            .ok_or_else(|| AppError::AppRoleIdMissing(role_id.to_owned()))?;
+                        let parent_dna_hash = role.dna_hash().clone();
                         Ok((state, parent_dna_hash))
                     } else {
                         Err(ConductorError::AppNotRunning(app_id.clone()))
@@ -809,9 +812,9 @@ where
         let (_, cell_id) = self
             .update_state_prime(move |mut state| {
                 if let Some(app) = state.installed_apps_mut().get_mut(&app_id) {
-                    let agent_key = app.slot(&slot_id)?.agent_key().to_owned();
+                    let agent_key = app.role(&role_id)?.agent_key().to_owned();
                     let cell_id = CellId::new(child_dna_hash, agent_key);
-                    app.add_clone(&slot_id, cell_id.clone())?;
+                    app.add_clone(&role_id, cell_id.clone())?;
                     Ok((state, cell_id))
                 } else {
                     Err(ConductorError::AppNotRunning(app_id.clone()))
@@ -1186,6 +1189,73 @@ pub async fn integration_dump(vault: &EnvRead) -> ConductorApiResult<Integration
         .await
 }
 
+/// Dump the full integration json state.
+/// Careful! This will return a lot of data.
+pub async fn full_integration_dump(
+    vault: &EnvRead,
+    dht_ops_cursor: Option<u64>,
+) -> ConductorApiResult<FullIntegrationStateDump> {
+    vault
+        .async_reader(move |txn| {
+            let integrated =
+                query_dht_ops_from_statement(&txn, state_dump::DHT_OPS_INTEGRATED, dht_ops_cursor)?;
+
+            let validation_limbo = query_dht_ops_from_statement(
+                &txn,
+                state_dump::DHT_OPS_IN_VALIDATION_LIMBO,
+                dht_ops_cursor,
+            )?;
+
+            let integration_limbo = query_dht_ops_from_statement(
+                &txn,
+                state_dump::DHT_OPS_IN_INTEGRATION_LIMBO,
+                dht_ops_cursor,
+            )?;
+
+            let dht_ops_cursor = txn.query_row(state_dump::DHT_OPS_ROW_ID, [], |row| row.get(0))?;
+
+            ConductorApiResult::Ok(FullIntegrationStateDump {
+                validation_limbo,
+                integration_limbo,
+                integrated,
+                dht_ops_cursor,
+            })
+        })
+        .await
+}
+
+fn query_dht_ops_from_statement(
+    txn: &Transaction,
+    stmt_str: &str,
+    dht_ops_cursor: Option<u64>,
+) -> ConductorApiResult<Vec<DhtOp>> {
+    let final_stmt_str = match dht_ops_cursor {
+        Some(cursor) => format!("{} AND rowid > {}", stmt_str, cursor),
+        None => stmt_str.into(),
+    };
+
+    let mut stmt = txn.prepare(final_stmt_str.as_str())?;
+
+    let r: Vec<DhtOp> = stmt
+        .query_and_then([], |row| {
+            let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
+            let op_type: DhtOpType = row.get("dht_type")?;
+            let entry = match header.0.entry_type().map(|et| et.visibility()) {
+                Some(EntryVisibility::Public) => {
+                    let entry: Option<Vec<u8>> = row.get("entry_blob")?;
+                    match entry {
+                        Some(entry) => Some(from_blob::<Entry>(entry)?),
+                        None => None,
+                    }
+                }
+                _ => None,
+            };
+            Ok(DhtOp::from_type(op_type, header, entry)?)
+        })?
+        .collect::<StateQueryResult<Vec<_>>>()?;
+    Ok(r)
+}
+
 //-----------------------------------------------------------------------------
 // Private methods
 //-----------------------------------------------------------------------------
@@ -1224,18 +1294,20 @@ where
     }
 
     pub(super) async fn get_state(&self) -> ConductorResult<ConductorState> {
-        self.conductor_env.conn()?.with_reader(|txn| {
-            let state = txn
-                .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
-                    row.get("blob")
-                })
-                .optional()?;
-            let state = match state {
-                Some(state) => from_blob(state)?,
-                None => ConductorState::default(),
-            };
-            Ok(state)
-        })
+        self.conductor_env
+            .async_reader(|txn| {
+                let state = txn
+                    .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
+                        row.get("blob")
+                    })
+                    .optional()?;
+                let state = match state {
+                    Some(state) => from_blob(state)?,
+                    None => ConductorState::default(),
+                };
+                Ok(state)
+            })
+            .await
     }
 
     /// Update the internal state with a pure function mapping old state to new
@@ -1298,6 +1370,7 @@ where
 mod builder {
     use super::*;
     use crate::conductor::dna_store::RealDnaStore;
+    use crate::conductor::handle::DevSettings;
     use crate::conductor::ConductorHandle;
     use holochain_sqlite::db::DbKind;
     #[cfg(any(test, feature = "test_utils"))]
@@ -1472,12 +1545,12 @@ mod builder {
                 keystore,
                 holochain_p2p,
                 db_sync_level: config.db_sync_level,
-
-                #[cfg(any(test, feature = "test_utils"))]
-                skip_publish: std::sync::atomic::AtomicBool::new(false),
                 p2p_env: Arc::new(parking_lot::Mutex::new(HashMap::new())),
                 p2p_batch_senders: Arc::new(parking_lot::Mutex::new(HashMap::new())),
                 p2p_metrics_env: Arc::new(parking_lot::Mutex::new(HashMap::new())),
+
+                #[cfg(any(test, feature = "test_utils"))]
+                dev_settings: parking_lot::RwLock::new(DevSettings::default()),
             });
 
             Self::finish(handle, config, p2p_evt, post_commit_receiver).await
@@ -1630,8 +1703,9 @@ mod builder {
                 p2p_batch_senders: Arc::new(parking_lot::Mutex::new(HashMap::new())),
                 p2p_metrics_env: envs.p2p_metrics(),
                 db_sync_level: self.config.db_sync_level,
+
                 #[cfg(any(test, feature = "test_utils"))]
-                skip_publish: std::sync::atomic::AtomicBool::new(false),
+                dev_settings: parking_lot::RwLock::new(DevSettings::default()),
             });
 
             // Install extra DNAs, in particular:

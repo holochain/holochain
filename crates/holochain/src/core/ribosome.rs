@@ -58,20 +58,40 @@ use self::{
 #[derive(Clone)]
 pub struct CallContext {
     pub(crate) zome: Zome,
+    pub(crate) function_name: FunctionName,
+    pub(crate) auth: InvocationAuth,
     pub(crate) host_context: HostContext,
 }
 
 impl CallContext {
-    pub fn new(zome: Zome, host_context: HostContext) -> Self {
-        Self { zome, host_context }
+    pub fn new(
+        zome: Zome,
+        function_name: FunctionName,
+        host_context: HostContext,
+        auth: InvocationAuth,
+    ) -> Self {
+        Self {
+            zome,
+            function_name,
+            host_context,
+            auth,
+        }
     }
 
-    pub fn zome(&self) -> Zome {
-        self.zome.clone()
+    pub fn zome(&self) -> &Zome {
+        &self.zome
+    }
+
+    pub fn function_name(&self) -> &FunctionName {
+        &self.function_name
     }
 
     pub fn host_context(&self) -> HostContext {
         self.host_context.clone()
+    }
+
+    pub fn auth(&self) -> InvocationAuth {
+        self.auth.clone()
     }
 }
 
@@ -228,6 +248,18 @@ impl ZomesToInvoke {
     }
 }
 
+#[derive(Clone, Debug)]
+pub enum InvocationAuth {
+    LocalCallback,
+    Cap(AgentPubKey, Option<CapSecret>),
+}
+
+impl InvocationAuth {
+    pub fn new(agent_pubkey: AgentPubKey, cap_secret: Option<CapSecret>) -> Self {
+        Self::Cap(agent_pubkey, cap_secret)
+    }
+}
+
 pub trait Invocation: Clone {
     /// Some invocations call into a single zome and some call into many or all zomes.
     /// An example of an invocation that calls across all zomes is init. Init must pass for every
@@ -255,6 +287,7 @@ pub trait Invocation: Clone {
     /// this is intentionally NOT a reference to self because ExternIO may be huge we want to be
     /// careful about cloning invocations
     fn host_input(self) -> Result<ExternIO, SerializedBytesError>;
+    fn auth(&self) -> InvocationAuth;
 }
 
 impl ZomeCallInvocation {
@@ -263,16 +296,19 @@ impl ZomeCallInvocation {
     /// - if the live cap grant is for the current author the call is ALWAYS authorized ELSE
     /// - the live cap grant needs to include the invocation's provenance AND zome/function name
     #[allow(clippy::extra_unused_lifetimes)]
-    pub fn is_authorized<'a>(&self, host_access: &ZomeCallHostAccess) -> RibosomeResult<bool> {
+    pub async fn is_authorized<'a>(
+        &self,
+        host_access: &ZomeCallHostAccess,
+    ) -> RibosomeResult<bool> {
         let check_function = (self.zome.zome_name().clone(), self.fn_name.clone());
         let check_agent = self.provenance.clone();
-        let check_secret = self.cap;
+        let check_secret = self.cap_secret;
 
-        let maybe_grant: Option<CapGrant> = host_access.workspace.source_chain().valid_cap_grant(
-            &check_function,
-            &check_agent,
-            check_secret.as_ref(),
-        )?;
+        let maybe_grant: Option<CapGrant> = host_access
+            .workspace
+            .source_chain()
+            .valid_cap_grant(check_function, check_agent, check_secret)
+            .await?;
 
         Ok(maybe_grant.is_some())
     }
@@ -284,6 +320,7 @@ mockall::mock! {
         fn zomes(&self) -> ZomesToInvoke;
         fn fn_components(&self) -> FnComponents;
         fn host_input(self) -> Result<ExternIO, SerializedBytesError>;
+        fn auth(&self) -> InvocationAuth;
     }
     trait Clone {
         fn clone(&self) -> Self;
@@ -302,7 +339,7 @@ pub struct ZomeCallInvocation {
     /// This can be `None` and still succeed in the case where the function
     /// in the zome being called has been given an Unrestricted status
     /// via a `CapGrant`. Otherwise, it will be necessary to provide a `CapSecret` for every call.
-    pub cap: Option<CapSecret>,
+    pub cap_secret: Option<CapSecret>,
     /// The name of the Zome function to call
     pub fn_name: FunctionName,
     /// The serialized data to pass as an argument to the Zome call
@@ -322,6 +359,9 @@ impl Invocation for ZomeCallInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         Ok(self.payload)
     }
+    fn auth(&self) -> InvocationAuth {
+        InvocationAuth::Cap(self.provenance.clone(), self.cap_secret)
+    }
 }
 
 impl ZomeCallInvocation {
@@ -331,7 +371,7 @@ impl ZomeCallInvocation {
             cell_id,
             zome_name,
             fn_name,
-            cap,
+            cap_secret,
             payload,
             provenance,
         } = call;
@@ -341,7 +381,7 @@ impl ZomeCallInvocation {
         Self {
             cell_id,
             zome,
-            cap,
+            cap_secret,
             fn_name,
             payload,
             provenance,
@@ -355,7 +395,7 @@ impl From<ZomeCallInvocation> for ZomeCall {
             cell_id,
             zome,
             fn_name,
-            cap,
+            cap_secret,
             payload,
             provenance,
         } = inv;
@@ -363,7 +403,7 @@ impl From<ZomeCallInvocation> for ZomeCall {
             cell_id,
             zome_name: zome.zome_name().clone(),
             fn_name,
-            cap,
+            cap_secret,
             payload,
             provenance,
         }
@@ -400,6 +440,8 @@ impl From<&ZomeCallHostAccess> for HostFnAccess {
 #[automock]
 pub trait RibosomeT: Sized + std::fmt::Debug {
     fn dna_def(&self) -> &DnaDefHashed;
+
+    fn zome_info(&self, zome: Zome) -> RibosomeResult<ZomeInfo>;
 
     fn zomes_to_invoke(&self, zomes_to_invoke: ZomesToInvoke) -> Vec<Zome> {
         match zomes_to_invoke {

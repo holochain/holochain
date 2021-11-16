@@ -47,7 +47,7 @@ async fn can_update_state() {
     assert_eq!(state, ConductorState::default());
 
     let cell_id = fake_cell_id(1);
-    let installed_cell = InstalledCell::new(cell_id.clone(), "nick".to_string());
+    let installed_cell = InstalledCell::new(cell_id.clone(), "role_id".to_string());
     let app = InstalledAppCommon::new_legacy("fake app", vec![installed_cell]).unwrap();
 
     conductor
@@ -93,17 +93,17 @@ async fn can_add_clone_cell_to_app() {
     .await
     .unwrap();
 
-    let installed_cell = InstalledCell::new(cell_id.clone(), "nick".to_string());
-    let slot = AppSlot::new(cell_id.clone(), true, 1);
+    let installed_cell = InstalledCell::new(cell_id.clone(), "role_id".to_string());
+    let role = AppRoleAssignment::new(cell_id.clone(), true, 1);
     let app1 = InstalledAppCommon::new_legacy("no clone", vec![installed_cell.clone()]).unwrap();
-    let app2 = InstalledAppCommon::new("yes clone", agent, vec![("nick".into(), slot.clone())]);
+    let app2 = InstalledAppCommon::new("yes clone", agent, vec![("role_id".into(), role.clone())]);
     assert_eq!(
-        app1.slots().keys().collect::<Vec<_>>(),
-        vec![&"nick".to_string()]
+        app1.roles().keys().collect::<Vec<_>>(),
+        vec![&"role_id".to_string()]
     );
     assert_eq!(
-        app2.slots().keys().collect::<Vec<_>>(),
-        vec![&"nick".to_string()]
+        app2.roles().keys().collect::<Vec<_>>(),
+        vec![&"role_id".to_string()]
     );
 
     conductor.register_phenotype(dna);
@@ -122,13 +122,13 @@ async fn can_add_clone_cell_to_app() {
 
     matches::assert_matches!(
         conductor
-            .add_clone_cell_to_app("no clone".to_string(), "nick".to_string(), ().into())
+            .add_clone_cell_to_app("no clone".to_string(), "role_id".to_string(), ().into())
             .await,
         Err(ConductorError::AppError(AppError::CloneLimitExceeded(0, _)))
     );
 
     let cloned_cell_id = conductor
-        .add_clone_cell_to_app("yes clone".to_string(), "nick".to_string(), ().into())
+        .add_clone_cell_to_app("yes clone".to_string(), "role_id".to_string(), ().into())
         .await
         .unwrap();
 
@@ -197,9 +197,9 @@ async fn app_ids_are_unique() {
     );
 }
 
-/// App can't be installed if it contains duplicate CellNicks
+/// App can't be installed if it contains duplicate AppRoleIds
 #[tokio::test(flavor = "multi_thread")]
-async fn cell_nicks_are_unique() {
+async fn app_role_ids_are_unique() {
     let cells = vec![
         InstalledCell::new(fixt!(CellId), "1".into()),
         InstalledCell::new(fixt!(CellId), "1".into()),
@@ -208,7 +208,7 @@ async fn cell_nicks_are_unique() {
     let result = InstalledAppCommon::new_legacy("id", cells.into_iter());
     matches::assert_matches!(
         result,
-        Err(AppError::DuplicateSlotIds(_, nicks)) if nicks == vec!["1".to_string()]
+        Err(AppError::DuplicateAppRoleIds(_, role_ids)) if role_ids == vec!["1".to_string()]
     );
 }
 
@@ -505,7 +505,7 @@ async fn make_signing_call(client: &mut WebsocketSender, cell: &SweetCell) -> Ap
             zome_name: "sign".into(),
             fn_name: "sign_ephemeral".into(),
             payload: ExternIO::encode(()).unwrap(),
-            cap: None,
+            cap_secret: None,
             provenance: cell.agent_pubkey().clone(),
         })))
         .await
@@ -573,7 +573,7 @@ async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
             installed_app_id: "app3".into(),
             agent_key: agent3.clone(),
             dnas: vec![InstallAppDnaPayload {
-                nick: "whatever".into(),
+                role_id: "whatever".into(),
                 hash: dna.dna_hash().clone(),
                 membrane_proof: None,
             }],

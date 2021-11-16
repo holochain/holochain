@@ -139,7 +139,9 @@ impl Cell {
         // check if genesis has been run
         let has_genesis = {
             // check if genesis ran.
-            GenesisWorkspace::new(env.clone())?.has_genesis(id.agent_pubkey())?
+            GenesisWorkspace::new(env.clone())?
+                .has_genesis(id.agent_pubkey().clone())
+                .await?
         };
 
         if has_genesis {
@@ -284,7 +286,7 @@ impl Cell {
                     let invocation = ZomeCall {
                         cell_id: self.id.clone(),
                         zome_name: scheduled_fn.zome_name().clone(),
-                        cap: None,
+                        cap_secret: None,
                         payload,
                         provenance: self.id.agent_pubkey().clone(),
                         fn_name: scheduled_fn.fn_name().clone(),
@@ -359,14 +361,14 @@ impl Cell {
                 from_agent,
                 zome_name,
                 fn_name,
-                cap,
+                cap_secret,
                 respond,
                 payload,
                 ..
             } => {
                 async {
                     let res = self
-                        .handle_call_remote(from_agent, zome_name, fn_name, cap, payload)
+                        .handle_call_remote(from_agent, zome_name, fn_name, cap_secret, payload)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
@@ -497,7 +499,6 @@ impl Cell {
                 // and should reset the publish back off loop to its minimum.
                 self.queue_triggers.publish_dht_ops.reset_back_off();
             }
-
             FetchOpData {
                 span_context: _,
                 respond,
@@ -743,24 +744,28 @@ impl Cell {
         tracing::debug!(from = ?receipt.receipt.validator, to = ?self.id.agent_pubkey(), hash = ?receipt.receipt.dht_op_hash);
 
         // Get the header for this op so we can check the entry type.
-        let header: Option<SignedHeader> = fresh_reader!(self.env, |txn| {
-            let h: Option<Vec<u8>> = txn
-                .query_row(
-                    "SELECT Header.blob as header_blob
+        let hash = receipt.receipt.dht_op_hash.clone();
+        let header: Option<SignedHeader> = self
+            .env
+            .async_reader(move |txn| {
+                let h: Option<Vec<u8>> = txn
+                    .query_row(
+                        "SELECT Header.blob as header_blob
                     FROM DhtOp
                     JOIN Header ON Header.hash = DhtOp.header_hash
                     WHERE DhtOp.hash = :hash",
-                    named_params! {
-                        ":hash": receipt.receipt.dht_op_hash,
-                    },
-                    |row| row.get("header_blob"),
-                )
-                .optional()?;
-            match h {
-                Some(h) => from_blob(h),
-                None => Ok(None),
-            }
-        })?;
+                        named_params! {
+                            ":hash": hash,
+                        },
+                        |row| row.get("header_blob"),
+                    )
+                    .optional()?;
+                match h {
+                    Some(h) => from_blob(h),
+                    None => Ok(None),
+                }
+            })
+            .await?;
 
         // If the header has an app entry type get the entry def
         // from the conductor.
@@ -951,20 +956,20 @@ impl Cell {
         Ok([0; 64].into())
     }
 
-    #[instrument(skip(self, from_agent, fn_name, cap, payload))]
+    #[instrument(skip(self, from_agent, fn_name, cap_secret, payload))]
     /// a remote agent is attempting a "call_remote" on this cell.
     async fn handle_call_remote(
         &self,
         from_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: FunctionName,
-        cap: Option<CapSecret>,
+        cap_secret: Option<CapSecret>,
         payload: ExternIO,
     ) -> CellResult<SerializedBytes> {
         let invocation = ZomeCall {
             cell_id: self.id.clone(),
             zome_name,
-            cap,
+            cap_secret,
             payload,
             provenance: from_agent,
             fn_name,

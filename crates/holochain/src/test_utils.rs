@@ -19,6 +19,8 @@ use holochain_cascade::Cascade;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::IntegrationStateDumps;
 use holochain_p2p::actor::HolochainP2pRefToCell;
+use holochain_p2p::dht_arc::DhtArc;
+use holochain_p2p::dht_arc::PeerDensity;
 use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::spawn_holochain_p2p;
 use holochain_p2p::HolochainP2pCell;
@@ -51,6 +53,7 @@ pub mod conductor_setup;
 pub mod consistency;
 pub mod host_fn_caller;
 pub mod inline_zomes;
+pub mod network_simulation;
 
 mod wait_for_any;
 pub use wait_for_any::*;
@@ -222,6 +225,13 @@ where
                 }
                 QueryAgentInfoSigned { respond, .. } => {
                     respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                }
+                QueryPeerDensity { respond, .. } => {
+                    respond.r(Ok(
+                        async move { Ok(PeerDensity::new(DhtArc::full(0), 1.0, 1)) }
+                            .boxed()
+                            .into(),
+                    ));
                 }
                 _ => {}
             }
@@ -489,7 +499,7 @@ pub async fn wait_for_integration(
             return;
         } else {
             let total_time_waited = delay * i as u32;
-            tracing::debug!(?count, ?total_time_waited, counts = ?count_integration(env).await);
+            tracing::debug!(?count, ?total_time_waited, counts = ?query_integration(env).await.integrated);
         }
         tokio::time::sleep(delay).await;
     }
@@ -539,8 +549,8 @@ pub async fn wait_for_integration_with_others(
     let mut last_total = 0;
     let this_start = std::time::Instant::now();
     for _ in 0..num_attempts {
-        let count = count_integration(env).await;
-        let counts = get_counts(others).await;
+        let count = query_integration(env).await;
+        let counts = get_integration_dumps(others).await;
         let total: usize = counts.0.clone().into_iter().map(|i| i.integrated).sum();
         let num_conductors = counts.0.len() + 1;
         let total_expected = num_conductors * expected_count;
@@ -637,16 +647,16 @@ async fn show_data(env: &EnvWrite, op: &DhtOpLight) {
     }
 }
 
-async fn get_counts(envs: &[&EnvWrite]) -> IntegrationStateDumps {
+async fn get_integration_dumps(envs: &[&EnvWrite]) -> IntegrationStateDumps {
     let mut output = Vec::new();
     for env in envs {
         let env = *env;
-        output.push(count_integration(env).await);
+        output.push(query_integration(env).await);
     }
     IntegrationStateDumps(output)
 }
 
-async fn count_integration(env: &EnvWrite) -> IntegrationStateDump {
+async fn query_integration(env: &EnvWrite) -> IntegrationStateDump {
     crate::conductor::integration_dump(&env.clone().into())
         .await
         .unwrap()
@@ -664,11 +674,13 @@ async fn display_integration(env: &EnvWrite) -> usize {
 }
 
 /// Helper for displaying agent infos stored on a conductor
-pub fn display_agent_infos(conductor: &ConductorHandle) {
+pub async fn display_agent_infos(conductor: &ConductorHandle) {
     for cell_id in conductor.list_cell_ids(Some(CellStatus::Joined)) {
         let space = cell_id.dna_hash().to_kitsune();
         let env = conductor.get_p2p_env(space);
-        let info = p2p_agent_store::dump_state(env.into(), Some(cell_id)).unwrap();
+        let info = p2p_agent_store::dump_state(env.into(), Some(cell_id))
+            .await
+            .unwrap();
         tracing::debug!(%info);
     }
 }
@@ -686,7 +698,7 @@ where
     Ok(ZomeCall {
         cell_id: cell_id.clone(),
         zome_name: zome.into(),
-        cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
+        cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: func.into(),
         payload: ExternIO::encode(payload)?,
         provenance: cell_id.agent_pubkey().clone(),
@@ -706,7 +718,7 @@ where
     Ok(ZomeCallInvocation {
         cell_id: cell_id.clone(),
         zome: zome.into(),
-        cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
+        cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: func.into(),
         payload: ExternIO::encode(payload)?,
         provenance: cell_id.agent_pubkey().clone(),

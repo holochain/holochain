@@ -477,6 +477,50 @@ impl RibosomeT for RealRibosome {
         self.dna_file.dna()
     }
 
+    fn zome_info(&self, zome: Zome) -> RibosomeResult<ZomeInfo> {
+        Ok(ZomeInfo {
+            name: zome.zome_name().clone(),
+            id: self
+                .zome_to_id(&zome)
+                .expect("Failed to get ID for current zome"),
+            properties: SerializedBytes::default(),
+            entry_defs: {
+                match self
+                    .run_entry_defs(EntryDefsHostAccess, EntryDefsInvocation)
+                    .map_err(|e| WasmError::Host(e.to_string()))?
+                {
+                    EntryDefsResult::Err(zome, error_string) => {
+                        return Err(RibosomeError::WasmError(WasmError::Host(format!(
+                            "{}: {}",
+                            zome, error_string
+                        ))))
+                    }
+                    EntryDefsResult::Defs(defs) => match defs.get(zome.zome_name()) {
+                        Some(entry_defs) => entry_defs.clone(),
+                        None => Vec::new().into(),
+                    },
+                }
+            },
+            extern_fns: {
+                match zome.zome_def() {
+                    ZomeDef::Wasm(_) => {
+                        let module = self.module(zome.zome_name())?;
+
+                        let mut extern_fns: Vec<FunctionName> = module
+                            .info()
+                            .exports
+                            .iter()
+                            .map(|(name, _index)| FunctionName::new(name))
+                            .collect();
+                        extern_fns.sort();
+                        extern_fns
+                    }
+                    ZomeDef::Inline(zome) => zome.callbacks(),
+                }
+            },
+        })
+    }
+
     /// call a function in a zome for an invocation if it exists
     /// if it does not exist then return Ok(None)
     fn maybe_call<I: Invocation>(
@@ -488,7 +532,9 @@ impl RibosomeT for RealRibosome {
     ) -> Result<Option<ExternIO>, RibosomeError> {
         let call_context = CallContext {
             zome: zome.clone(),
+            function_name: to_call.clone(),
             host_context,
+            auth: invocation.auth(),
         };
 
         match zome.zome_def() {
@@ -544,27 +590,18 @@ impl RibosomeT for RealRibosome {
         host_access: ZomeCallHostAccess,
         invocation: ZomeCallInvocation,
     ) -> RibosomeResult<ZomeCallResponse> {
-        Ok(if invocation.is_authorized(&host_access)? {
-            // make a copy of these for the error handling below
-            let zome_name = invocation.zome.zome_name().clone();
-            let fn_name = invocation.fn_name.clone();
+        // make a copy of these for the error handling below
+        let zome_name = invocation.zome.zome_name().clone();
+        let fn_name = invocation.fn_name.clone();
 
-            let guest_output: ExternIO =
-                match self.call_iterator(host_access.into(), invocation).next() {
-                    Ok(Some((_zome, extern_io))) => extern_io,
-                    Ok(None) => return Err(RibosomeError::ZomeFnNotExists(zome_name, fn_name)),
-                    Err((_zome, ribosome_error)) => return Err(ribosome_error),
-                };
+        let guest_output: ExternIO = match self.call_iterator(host_access.into(), invocation).next()
+        {
+            Ok(Some((_zome, extern_io))) => extern_io,
+            Ok(None) => return Err(RibosomeError::ZomeFnNotExists(zome_name, fn_name)),
+            Err((_zome, ribosome_error)) => return Err(ribosome_error),
+        };
 
-            ZomeCallResponse::Ok(guest_output)
-        } else {
-            ZomeCallResponse::Unauthorized(
-                invocation.cell_id.clone(),
-                invocation.zome.zome_name().clone(),
-                invocation.fn_name.clone(),
-                invocation.provenance.clone(),
-            )
-        })
+        Ok(ZomeCallResponse::Ok(guest_output))
     }
 
     /// Post commit works a bit different to the other callbacks.
@@ -705,7 +742,7 @@ pub mod wasm_test {
                 cell_id: alice.cell_id().clone(),
                 zome_name: alice.name().clone(),
                 fn_name: "infallible".into(),
-                cap: None,
+                cap_secret: None,
                 provenance: alice_pubkey.clone(),
                 payload: ExternIO::encode(()).unwrap(),
             })

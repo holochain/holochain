@@ -15,6 +15,7 @@ use kitsune_p2p_transport_quic::tx2::*;
 use kitsune_p2p_types::async_lazy::AsyncLazy;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_pool_promote::*;
+use kitsune_p2p_types::tx2::tx2_restart_adapter::*;
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use kitsune_p2p_types::tx2::*;
 use kitsune_p2p_types::*;
@@ -92,6 +93,8 @@ impl KitsuneP2pActor {
 
         let tx2_conf = config.to_tx2().map_err(KitsuneP2pError::other)?;
 
+        let mut is_mock = false;
+
         // set up our backend based on config
         let (f, bind_to) = match tx2_conf.backend {
             KitsuneP2pTx2Backend::Mem => {
@@ -116,15 +119,31 @@ impl KitsuneP2pActor {
                     bind_to,
                 )
             }
+            KitsuneP2pTx2Backend::Mock { mock_network } => {
+                is_mock = true;
+                (mock_network, "none:".into())
+            }
         };
+
+        // wrap in restart logic
+        let f = tx2_restart_adapter(f);
 
         // convert to frontend
         let f = tx2_pool_promote(f, config.tuning_params.clone());
 
         // wrap in proxy
-        let mut conf = kitsune_p2p_proxy::tx2::ProxyConfig::default();
-        conf.tuning_params = Some(config.tuning_params.clone());
-        let f = tx2_proxy(f, conf)?;
+        let f = if !is_mock {
+            let mut conf = kitsune_p2p_proxy::tx2::ProxyConfig::default();
+            conf.tuning_params = Some(config.tuning_params.clone());
+            if let Some(use_proxy) = &tx2_conf.use_proxy {
+                let proxy_url = ProxyUrl::from(use_proxy.as_str());
+                conf.client_of_remote_proxy = Some(proxy_url);
+            }
+            let f = tx2_proxy(f, conf)?;
+            f
+        } else {
+            f
+        };
 
         let metrics = Tx2ApiMetrics::default().set_write_len(|d, l| {
             let t = match d {
@@ -155,49 +174,7 @@ impl KitsuneP2pActor {
         // capture endpoint handle
         let ep_hnd = ep.handle().clone();
 
-        // if we should be proxying - set up the proxy connect retry / proxy addr
-        let this_addr = if let Some(use_proxy) = tx2_conf.use_proxy {
-            let local = ep_hnd.local_addr().map_err(KitsuneP2pError::other)?;
-            let this_digest = ProxyUrl::from(local.as_str()).digest();
-            let proxy_url = ProxyUrl::from(use_proxy.as_str());
-
-            // spawn logic that will attempt to keep us connected to the proxy
-            let ep_hnd = ep_hnd.clone();
-            let tuning_params = config.tuning_params.clone();
-            tokio::task::spawn(async move {
-                let mut con: Option<Tx2ConHnd<wire::Wire>> = None;
-                loop {
-                    // see if we need a new connection to the proxy
-                    if con.is_none() || con.as_ref().unwrap().is_closed() {
-                        if ep_hnd.is_closed() {
-                            break;
-                        }
-                        match ep_hnd
-                            .get_connection(use_proxy.clone(), tuning_params.implicit_timeout())
-                            .await
-                        {
-                            Ok(c) => {
-                                con = Some(c);
-                            }
-                            Err(e) => {
-                                tracing::warn!("failure to establish proxy connection: {:?}", e);
-                            }
-                        }
-                    }
-
-                    // this is very naive... just running every 5 seconds
-                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-                }
-                tracing::warn!("proxy con refresh loop shutdown");
-            });
-
-            ProxyUrl::new(proxy_url.as_base().as_str(), this_digest)
-                .unwrap()
-                .as_str()
-                .into()
-        } else {
-            ep_hnd.local_addr().map_err(KitsuneP2pError::other)?
-        };
+        let this_addr = ep_hnd.local_addr().map_err(KitsuneP2pError::other)?;
 
         tracing::info!("this_addr: {}", this_addr);
 
@@ -692,6 +669,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         agents: Vec<Arc<KitsuneAgent>>,
         timeout: KitsuneTimeout,
         payload: Vec<u8>,
+        drop_at_limit: bool,
     ) -> KitsuneP2pHandlerResult<()> {
         let space_sender = match self.spaces.get_mut(&space) {
             None => return Err(KitsuneP2pError::RoutingSpaceError(space)),
@@ -700,7 +678,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         Ok(async move {
             let (space_sender, _) = space_sender.await;
             space_sender
-                .targeted_broadcast(space, from_agent, agents, timeout, payload)
+                .targeted_broadcast(space, from_agent, agents, timeout, payload, drop_at_limit)
                 .await
         }
         .boxed()
@@ -743,7 +721,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test_utils"))]
 mockall::mock! {
 
     pub KitsuneP2pEventHandler {}
@@ -818,7 +796,7 @@ mockall::mock! {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test_utils"))]
 impl ghost_actor::GhostHandler<KitsuneP2pEvent> for MockKitsuneP2pEventHandler {}
-#[cfg(test)]
+#[cfg(any(test, feature = "test_utils"))]
 impl ghost_actor::GhostControlHandler for MockKitsuneP2pEventHandler {}

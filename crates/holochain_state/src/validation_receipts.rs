@@ -124,7 +124,6 @@ mod tests {
     use super::*;
     use fixt::prelude::*;
     use holo_hash::HasHash;
-    use holochain_sqlite::db::ReadManager;
     use holochain_types::dht_op::DhtOp;
     use holochain_types::dht_op::DhtOpHashed;
     use holochain_zome_types::fixt::*;

@@ -3,6 +3,7 @@ use anyhow::Result;
 use futures::future;
 use hdk::prelude::RemoteSignal;
 use holochain::sweettest::SweetAgents;
+use holochain::sweettest::SweetConductor;
 use holochain::sweettest::SweetConductorBatch;
 use holochain::sweettest::SweetDnaFile;
 use holochain::{
@@ -81,7 +82,7 @@ how_many: 42
         fake_agent_pubkey_1(),
         fake_dna_path,
         Some(properties.clone()),
-        "nick".into(),
+        "role_id".into(),
         6000,
     )
     .await;
@@ -529,10 +530,10 @@ async fn concurrent_install_dna() {
         let zomes = vec![(TestWasm::Foo.into(), TestWasm::Foo.into())];
         let mut client = client.clone();
         tokio::spawn(async move {
-            let nick = format!("fake_dna_{}", i);
+            let name = format!("fake_dna_{}", i);
 
             // Install Dna
-            let dna = fake_dna_zomes_named(&uuid::Uuid::new_v4().to_string(), &nick, zomes.clone());
+            let dna = fake_dna_zomes_named(&uuid::Uuid::new_v4().to_string(), &name, zomes.clone());
             let original_dna_hash = dna.dna_hash().clone();
             let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
             let agent_key = generate_agent_pubkey(&mut client, REQ_TIMEOUT_MS).await;
@@ -544,15 +545,15 @@ async fn concurrent_install_dna() {
                 agent_key,
                 fake_dna_path.clone(),
                 None,
-                nick.clone(),
-                nick.clone(),
+                name.clone(),
+                name.clone(),
                 REQ_TIMEOUT_MS,
             )
             .await;
 
             println!(
                 "[{}] installed dna with hash {} and name {}",
-                i, dna_hash, nick
+                i, dna_hash, name
             );
         })
     }))
@@ -569,4 +570,54 @@ async fn concurrent_install_dna() {
         NUM_CONCURRENT_INSTALLS,
         before.elapsed()
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn full_state_dump_cursor_works() {
+    observability::test_run().ok();
+
+    let mut conductor = SweetConductor::from_standard_config().await;
+
+    let agent = SweetAgents::one(conductor.keystore()).await;
+
+    let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
+        .await
+        .unwrap()
+        .0;
+
+    let app = conductor
+        .setup_app_for_agent("app", agent, &[dna_file])
+        .await
+        .unwrap();
+
+    let cell_id = app.into_cells()[0].cell_id().clone();
+
+    let (mut client, _) = conductor.admin_ws_client().await;
+
+    let full_state = dump_full_state(&mut client, cell_id.clone(), None).await;
+
+    let integrated_ops_count = full_state.integration_dump.integrated.len();
+    let validation_limbo_ops_count = full_state.integration_dump.validation_limbo.len();
+    let integration_limbo_ops_count = full_state.integration_dump.integration_limbo.len();
+
+    let all_dhts_ops_count =
+        integrated_ops_count + validation_limbo_ops_count + integration_limbo_ops_count;
+    assert_eq!(7, all_dhts_ops_count);
+
+    // We are assuming we have at least one DhtOp in the Cell
+    let full_state = dump_full_state(
+        &mut client,
+        cell_id,
+        Some(full_state.integration_dump.dht_ops_cursor - 1),
+    )
+    .await;
+
+    let integrated_ops_count = full_state.integration_dump.integrated.len();
+    let validation_limbo_ops_count = full_state.integration_dump.validation_limbo.len();
+    let integration_limbo_ops_count = full_state.integration_dump.integration_limbo.len();
+
+    let new_all_dht_ops_count =
+        integrated_ops_count + validation_limbo_ops_count + integration_limbo_ops_count;
+
+    assert_eq!(1, new_all_dht_ops_count);
 }

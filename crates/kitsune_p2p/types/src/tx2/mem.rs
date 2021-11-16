@@ -307,19 +307,19 @@ impl EndpointAdapt for MemEndpointAdapt {
         async move {
             let con_id = NEXT_MEM_ID.fetch_add(1, atomic::Ordering::Relaxed);
 
-            let bad_url = || Err(format!("invalid url: {}", url).into());
+            let bad_url = |reason: &str| Err(format!("invalid url {} : {}", url, reason).into());
 
             if url.scheme() != "kitsune-mem" {
-                return bad_url();
+                return bad_url("scheme must be kitsune-mem");
             }
 
             let id = match url.host_str() {
-                None => return bad_url(),
+                None => return bad_url("no host specified"),
                 Some(id) => id,
             };
 
             let id = match id.parse::<u64>() {
-                Err(_) => return bad_url(),
+                Err(_) => return bad_url("unable to parse id"),
                 Ok(id) => id,
             };
 
@@ -426,6 +426,10 @@ impl BindAdapt for MemBackendAdapt {
                 Ok((ep, rc))
             })
             .boxed()
+    }
+
+    fn local_cert(&self) -> Tx2Cert {
+        self.0.clone()
     }
 }
 

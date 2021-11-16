@@ -77,7 +77,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
                 let i = ZomeCallInvocation {
                     cell_id: CELL_ID.lock().unwrap().clone(),
                     zome: zome.clone(),
-                    cap: Some(CAP.lock().unwrap().clone()),
+                    cap_secret: Some(CAP.lock().unwrap().clone()),
                     fn_name: "echo_bytes".into(),
                     payload: ExternIO::encode(&bytes).unwrap(),
                     provenance: AGENT_KEY.lock().unwrap().clone(),
