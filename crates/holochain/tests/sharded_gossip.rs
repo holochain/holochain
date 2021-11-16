@@ -217,7 +217,7 @@ async fn mock_network_sharded_gossip() {
             // Don't drop any individual messages.
             percent_drop_msg: 0.0,
             // A random 10% of simulated agents will never be online.
-            percent_offline: 0.1,
+            percent_offline: 0.0,
             // Simulated agents will receive messages from within 50 to 100 ms.
             inbound_delay_range: std::time::Duration::from_millis(50)
                 ..std::time::Duration::from_millis(150),
@@ -581,6 +581,9 @@ async fn mock_network_sharded_gossip() {
                     .p2p_get_agent(&alice_kit)
                     .unwrap();
                 {
+                    if let Some(info) = &info {
+                        println!("Alice coverage {:.2}", info.storage_arc.coverage());
+                    }
                     *alice_info.lock() = info;
                 }
                 tokio::time::sleep(std::time::Duration::from_secs(5)).await;
@@ -599,27 +602,27 @@ async fn mock_network_sharded_gossip() {
         HashSet<Arc<AgentPubKey>>,
     ) = loop {
         if let Some(alice) = alice_info.lock().clone() {
-            if (alice.storage_arc.coverage() - data.coverage()).abs() < 0.01 {
-                let hashes_to_be_held = data
-                    .ops
-                    .iter()
-                    .filter_map(|(hash, op)| {
-                        let loc = op.dht_basis().get_loc();
-                        alice.storage_arc.contains(loc).then(|| (loc, hash.clone()))
-                    })
-                    .collect::<Vec<_>>();
-                let agents_that_should_be_initiated_with = data
-                    .agents()
-                    .filter(|h| alice.storage_arc.contains(h.get_loc()))
-                    .cloned()
-                    .collect::<HashSet<_>>();
-                num_hashes_alice_should_hold.store(
-                    hashes_to_be_held.len(),
-                    std::sync::atomic::Ordering::Relaxed,
-                );
-                debug!("Alice covers {} and the target coverage is {}. She should hold {} out of {} ops. She should gossip with {} agents", alice.storage_arc.coverage(), data.coverage(), hashes_to_be_held.len(), data.ops.len(), agents_that_should_be_initiated_with.len());
-                break (hashes_to_be_held, agents_that_should_be_initiated_with);
-            }
+            // if (alice.storage_arc.coverage() - data.coverage()).abs() < 0.01 {
+            let hashes_to_be_held = data
+                .ops
+                .iter()
+                .filter_map(|(hash, op)| {
+                    let loc = op.dht_basis().get_loc();
+                    alice.storage_arc.contains(loc).then(|| (loc, hash.clone()))
+                })
+                .collect::<Vec<_>>();
+            let agents_that_should_be_initiated_with = data
+                .agents()
+                .filter(|h| alice.storage_arc.contains(h.get_loc()))
+                .cloned()
+                .collect::<HashSet<_>>();
+            num_hashes_alice_should_hold.store(
+                hashes_to_be_held.len(),
+                std::sync::atomic::Ordering::Relaxed,
+            );
+            debug!("Alice covers {} and the target coverage is {}. She should hold {} out of {} ops. She should gossip with {} agents", alice.storage_arc.coverage(), data.coverage(), hashes_to_be_held.len(), data.ops.len(), agents_that_should_be_initiated_with.len());
+            break (hashes_to_be_held, agents_that_should_be_initiated_with);
+            // }
         }
         tokio::time::sleep(std::time::Duration::from_secs(5)).await;
     };
