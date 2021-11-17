@@ -35,19 +35,13 @@ impl ShardedGossipLocal {
 
         let id = rand::thread_rng().gen();
 
-        let mut agent_list = Vec::with_capacity(local_agents.len());
-        for agent in local_agents.iter() {
-            if let Ok(Some(info)) = self
-                .evt_sender
-                .get_agent_info_signed(GetAgentInfoSignedEvt {
-                    space: self.space.clone(),
-                    agent: agent.clone(),
-                })
-                .await
-            {
-                agent_list.push(info);
-            }
-        }
+        let agent_list = self
+            .evt_sender
+            .query_agents(
+                QueryAgentsEvt::new(self.space.clone()).by_agents(local_agents.iter().cloned()),
+            )
+            .await
+            .map_err(KitsuneError::other)?;
 
         let maybe_gossip = self.inner.share_mut(|inner, _| {
             Ok(
@@ -140,19 +134,13 @@ impl ShardedGossipLocal {
 
         let mut gossip = Vec::with_capacity(3);
 
-        let mut agent_list = Vec::with_capacity(local_agents.len());
-        for agent in local_agents.iter() {
-            if let Ok(Some(info)) = self
-                .evt_sender
-                .get_agent_info_signed(GetAgentInfoSignedEvt {
-                    space: self.space.clone(),
-                    agent: agent.clone(),
-                })
-                .await
-            {
-                agent_list.push(info);
-            }
-        }
+        let agent_list = self
+            .evt_sender
+            .query_agents(
+                QueryAgentsEvt::new(self.space.clone()).by_agents(local_agents.iter().cloned()),
+            )
+            .await
+            .map_err(KitsuneError::other)?;
 
         // Send the intervals back as the accept message.
         gossip.push(ShardedGossipWire::accept(local_arcs, agent_list));
