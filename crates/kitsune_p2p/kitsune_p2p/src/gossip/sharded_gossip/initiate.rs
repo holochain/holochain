@@ -35,7 +35,7 @@ impl ShardedGossipLocal {
 
         let id = rand::thread_rng().gen();
 
-        let mut agent_list = Vec::new();
+        let mut agent_list = Vec::with_capacity(local_agents.len());
         for agent in local_agents.iter() {
             if let Ok(Some(info)) = self
                 .evt_sender
