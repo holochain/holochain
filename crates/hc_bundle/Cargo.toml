@@ -20,10 +20,10 @@ path = "src/bin/hc-dna.rs"
 
 [dependencies]
 anyhow = "1.0"
-holochain_util = { path = "../holochain_util", features = ["backtrace"], version = "0.0.4"}
+holochain_util = { path = "../holochain_util", features = ["backtrace"], version = "0.0.5"}
 holochain_serialized_bytes = "=0.0.51"
-holochain_types = { version = "0.0.15", path = "../holochain_types" }
-mr_bundle = {version = "0.0.4", path = "../mr_bundle"}
+holochain_types = { version = "0.0.16", path = "../holochain_types" }
+mr_bundle = {version = "0.0.5", path = "../mr_bundle"}
 serde = { version = "1.0", features = [ "derive" ] }
 serde_bytes = "0.11"
 serde_yaml = "0.8"

@@ -6,6 +6,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20211117.094411
+
+## [holochain-0.0.116](crates/holochain/CHANGELOG.md#0.0.116)
+
+## [holochain\_cascade-0.0.16](crates/holochain_cascade/CHANGELOG.md#0.0.16)
+
+## [holochain\_cli-0.0.17](crates/holochain_cli/CHANGELOG.md#0.0.17)
+
+## [holochain\_websocket-0.0.16](crates/holochain_websocket/CHANGELOG.md#0.0.16)
+
+## [holochain\_conductor\_api-0.0.16](crates/holochain_conductor_api/CHANGELOG.md#0.0.16)
+
+## [holochain\_state-0.0.16](crates/holochain_state/CHANGELOG.md#0.0.16)
+
+## [holochain\_wasm\_test\_utils-0.0.16](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.16)
+
+## [holochain\_p2p-0.0.16](crates/holochain_p2p/CHANGELOG.md#0.0.16)
+
+## [holochain\_types-0.0.16](crates/holochain_types/CHANGELOG.md#0.0.16)
+
+## [holochain\_keystore-0.0.16](crates/holochain_keystore/CHANGELOG.md#0.0.16)
+
+## [holochain\_sqlite-0.0.16](crates/holochain_sqlite/CHANGELOG.md#0.0.16)
+
+## [kitsune\_p2p-0.0.14](crates/kitsune_p2p/CHANGELOG.md#0.0.14)
+
+## [kitsune\_p2p\_proxy-0.0.13](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.13)
+
+## [kitsune\_p2p\_transport\_quic-0.0.13](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.13)
+
+## [kitsune\_p2p\_types-0.0.13](crates/kitsune_p2p_types/CHANGELOG.md#0.0.13)
+
+## [mr\_bundle-0.0.5](crates/mr_bundle/CHANGELOG.md#0.0.5)
+
+## [holochain\_util-0.0.5](crates/holochain_util/CHANGELOG.md#0.0.5)
+
 # 20211110.083530
 
 ## [holochain-0.0.115](crates/holochain/CHANGELOG.md#0.0.115)
