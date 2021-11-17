@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - **BREAKING CHANGE** - Gossip now exchanges local peer info with `initiate` and `accept` request types. [#1114](https://github.com/holochain/holochain/pull/1114).
 
+## 0.0.116
+
 ## 0.0.115
 
 - Fix [issue](https://github.com/holochain/holochain/issues/1100) where private dht ops were being leaked through the incoming ops sender. [1104](https://github.com/holochain/holochain/pull/1104).
