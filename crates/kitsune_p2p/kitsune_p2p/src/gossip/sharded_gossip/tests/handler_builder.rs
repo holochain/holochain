@@ -283,7 +283,6 @@ async fn test_three_way_sharded_ownership() {
         let evt_sender = evt_sender.clone();
         let space = space.clone();
         let arc = agent_arcs[a].1.clone();
-        dbg!(&arc);
         async move {
             store::all_op_hashes_within_arcset(
                 &evt_sender,

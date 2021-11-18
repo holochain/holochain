@@ -886,6 +886,7 @@ async fn handle_query_op_hashes(
         window,
         max_ops,
         include_limbo: _,
+        arc_set,
         ..
     } = input;
 
@@ -897,56 +898,63 @@ async fn handle_query_op_hashes(
     //        we'll want an api to just get the hashes
     let mut entries = vec![];
 
-    // let agents = todo!();
-    // for (agent, arcset) in agents {
-    //     let agent = KdHash::from_kitsune_agent(&agent);
-    //     let es = kdirect
-    //         .persist
-    //         .query_entries(root.clone(), agent, window.clone(), arcset)
-    //         .await?;
-    //     entries.extend(es.into_iter());
-    // }
+    let agent_info_list = kdirect
+        .persist
+        .query_agent_info(root.clone())
+        .await
+        .map_err(KdError::other)?;
+    for info in agent_info_list {
+        let agent = info.agent();
+        let es = kdirect
+            .persist
+            .query_entries(root.clone(), agent.clone(), window.clone(), arc_set.clone())
+            .await?;
+        entries.extend(es.into_iter());
+    }
 
-    // let mut entries: Vec<_> = entries
-    //     .into_iter()
-    //     .map(|e| e.hash().clone().to_kitsune_op_hash())
-    //     .collect();
-    // entries.sort();
-    // entries.dedup();
+    let mut entries: Vec<_> = entries
+        .into_iter()
+        .map(|e| e.hash().clone().to_kitsune_op_hash())
+        .collect();
+    entries.sort();
+    entries.dedup();
 
     // TODO: produce proper time window of actual data returned
     Ok(Some((entries, window)))
 }
 
 async fn handle_fetch_op_data(
-    _kdirect: Arc<Kd1>,
-    _input: FetchOpDataEvt,
+    kdirect: Arc<Kd1>,
+    input: FetchOpDataEvt,
 ) -> KdResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> {
-    // let FetchOpDataEvt {
-    //     space,
-    //     op_hashes,
-    //     ..
-    // } = input;
-    todo!()
+    let FetchOpDataEvt {
+        space, op_hashes, ..
+    } = input;
 
-    // let mut out = Vec::new();
-    // let root = KdHash::from_kitsune_space(&space);
+    let mut out = Vec::new();
+    let root = KdHash::from_kitsune_space(&space);
 
-    // for op_hash in op_hashes {
-    //     for agent in agents.iter() {
-    //         let agent = KdHash::from_kitsune_agent(agent);
-    //         let hash = KdHash::from_kitsune_op_hash(&op_hash);
-    //         if let Ok(entry) = kdirect
-    //             .persist
-    //             .get_entry(root.clone(), agent.clone(), hash)
-    //             .await
-    //         {
-    //             out.push((op_hash.clone(), entry.as_wire_data_ref().to_vec()));
-    //         }
-    //     }
-    // }
+    let agent_info_list = kdirect
+        .persist
+        .query_agent_info(root.clone())
+        .await
+        .map_err(KdError::other)?;
 
-    // Ok(out)
+    for op_hash in op_hashes {
+        for info in &agent_info_list {
+            let agent = info.agent().clone();
+            let hash = KdHash::from_kitsune_op_hash(&op_hash);
+            if let Ok(entry) = kdirect
+                .persist
+                .get_entry(root.clone(), agent.clone(), hash)
+                .await
+            {
+                out.push((op_hash.clone(), entry.as_wire_data_ref().to_vec()));
+            }
+        }
+    }
+
+    Ok(out)
 }
 
 async fn handle_sign_network_data(
