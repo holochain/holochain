@@ -14,9 +14,6 @@ impl GetElementDetailsQuery {
     pub fn new(hash: HeaderHash) -> Self {
         Self(hash, None)
     }
-    pub fn with_private_data_access(hash: HeaderHash, author: Arc<AgentPubKey>) -> Self {
-        Self(hash, Some(author))
-    }
 }
 
 #[derive(Debug)]
@@ -168,5 +165,17 @@ impl Query for GetElementDetailsQuery {
             updates: updates.into_iter().collect(),
         };
         Ok(Some(details))
+    }
+}
+
+impl PrivateDataQuery for GetElementDetailsQuery {
+    type Hash = HeaderHash;
+
+    fn with_private_data_access(hash: Self::Hash, author: Arc<AgentPubKey>) -> Self {
+        Self(hash, Some(author))
+    }
+
+    fn without_private_data_access(hash: Self::Hash) -> Self {
+        Self::new(hash)
     }
 }

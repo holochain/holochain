@@ -29,6 +29,7 @@ use holochain_state::query::link_details::GetLinkDetailsQuery;
 use holochain_state::query::live_element::GetLiveElementQuery;
 use holochain_state::query::live_entry::GetLiveEntryQuery;
 use holochain_state::query::DbScratch;
+use holochain_state::query::PrivateDataQuery;
 use holochain_state::query::StateQueryError;
 use holochain_state::scratch::SyncScratch;
 use holochain_types::prelude::*;
@@ -454,12 +455,7 @@ where
     ) -> CascadeResult<Option<EntryDetails>> {
         let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
         let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
-        let query = match self.private_data.clone() {
-            Some(author) => {
-                GetEntryDetailsQuery::with_private_data_access(entry_hash.clone(), author)
-            }
-            None => GetEntryDetailsQuery::new(entry_hash.clone()),
-        };
+        let query: GetEntryDetailsQuery = self.construct_query_with_data_access(entry_hash.clone());
 
         // We don't need metadata and only need the content
         // so if we have it locally then we can avoid the network.
@@ -496,12 +492,8 @@ where
     ) -> CascadeResult<Option<ElementDetails>> {
         let authoring = self.am_i_authoring(&header_hash.clone().into())?;
         let authority = self.am_i_an_authority(header_hash.clone().into()).await?;
-        let query = match self.private_data.clone() {
-            Some(author) => {
-                GetElementDetailsQuery::with_private_data_access(header_hash.clone(), author)
-            }
-            None => GetElementDetailsQuery::new(header_hash.clone()),
-        };
+        let query: GetElementDetailsQuery =
+            self.construct_query_with_data_access(header_hash.clone());
 
         // TODO: we can short circuit if we have any local deletes on a header.
         // Is this bad because we will not go back to the network until our
@@ -546,12 +538,7 @@ where
     ) -> CascadeResult<Option<Element>> {
         let authoring = self.am_i_authoring(&header_hash.clone().into())?;
         let authority = self.am_i_an_authority(header_hash.clone().into()).await?;
-        let query = match self.private_data.clone() {
-            Some(author) => {
-                GetLiveElementQuery::with_private_data_access(header_hash.clone(), author)
-            }
-            None => GetLiveElementQuery::new(header_hash.clone()),
-        };
+        let query: GetLiveElementQuery = self.construct_query_with_data_access(header_hash.clone());
 
         // TODO: we can short circuit if we have any local deletes on a header.
         // Is this bad because we will not go back to the network until our
@@ -594,10 +581,7 @@ where
     ) -> CascadeResult<Option<Element>> {
         let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
         let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
-        let query = match self.private_data.clone() {
-            Some(author) => GetLiveEntryQuery::with_private_data_access(entry_hash.clone(), author),
-            None => GetLiveEntryQuery::new(entry_hash.clone()),
-        };
+        let query: GetLiveEntryQuery = self.construct_query_with_data_access(entry_hash.clone());
 
         // We don't need metadata and only need the content
         // so if we have it locally then we can avoid the network.
@@ -859,5 +843,14 @@ where
         let network = ok_or_return!(self.network.as_mut(), false);
 
         Ok(network.authority_for_hash(hash).await?)
+    }
+
+    /// Construct a query with private data access if this cascade has been
+    /// constructed with private data access.
+    fn construct_query_with_data_access<H, Q: PrivateDataQuery<Hash = H>>(&self, hash: H) -> Q {
+        match self.private_data.clone() {
+            Some(author) => Q::with_private_data_access(hash, author),
+            None => Q::without_private_data_access(hash),
+        }
     }
 }

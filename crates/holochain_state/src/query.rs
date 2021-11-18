@@ -136,6 +136,18 @@ pub trait Stores<Q: Query> {
     fn get_initial_data(&self, query: Q) -> StateQueryResult<Self::O>;
 }
 
+/// Queries that can have access to private data will
+/// implement this trait.
+pub trait PrivateDataQuery {
+    type Hash;
+
+    /// Construct the query with access to private data for this agent.
+    fn with_private_data_access(hash: Self::Hash, author: Arc<AgentPubKey>) -> Self;
+
+    /// Construct the query without access to private data.
+    fn without_private_data_access(hash: Self::Hash) -> Self;
+}
+
 pub trait Store {
     /// Get an [`Entry`] from this store.
     fn get_entry(&self, hash: &EntryHash) -> StateQueryResult<Option<Entry>>;

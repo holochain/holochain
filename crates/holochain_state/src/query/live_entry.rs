@@ -17,10 +17,6 @@ impl GetLiveEntryQuery {
     pub fn new(hash: EntryHash) -> Self {
         Self(hash, None)
     }
-
-    pub fn with_private_data_access(hash: EntryHash, author: Arc<AgentPubKey>) -> Self {
-        Self(hash, Some(author))
-    }
 }
 
 impl Query for GetLiveEntryQuery {
@@ -139,4 +135,16 @@ impl Query for GetLiveEntryQuery {
 fn follow_update_chain(_state: &Maps<SignedHeaderHashed>, _shh: &SignedHeaderHashed) {
     // TODO: This is where update chains will be followed
     // when we add that functionality.
+}
+
+impl PrivateDataQuery for GetLiveEntryQuery {
+    type Hash = EntryHash;
+
+    fn with_private_data_access(hash: Self::Hash, author: Arc<AgentPubKey>) -> Self {
+        Self(hash, Some(author))
+    }
+
+    fn without_private_data_access(hash: Self::Hash) -> Self {
+        Self::new(hash)
+    }
 }

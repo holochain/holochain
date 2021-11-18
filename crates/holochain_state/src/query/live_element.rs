@@ -16,10 +16,6 @@ impl GetLiveElementQuery {
     pub fn new(hash: HeaderHash) -> Self {
         Self(hash, None)
     }
-
-    pub fn with_private_data_access(hash: HeaderHash, author: Arc<AgentPubKey>) -> Self {
-        Self(hash, Some(author))
-    }
 }
 
 impl Query for GetLiveElementQuery {
@@ -111,5 +107,17 @@ impl Query for GetLiveElementQuery {
             }
             None => Ok(None),
         }
+    }
+}
+
+impl PrivateDataQuery for GetLiveElementQuery {
+    type Hash = HeaderHash;
+
+    fn with_private_data_access(hash: Self::Hash, author: Arc<AgentPubKey>) -> Self {
+        Self(hash, Some(author))
+    }
+
+    fn without_private_data_access(hash: Self::Hash) -> Self {
+        Self::new(hash)
     }
 }

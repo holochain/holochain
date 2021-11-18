@@ -15,10 +15,6 @@ impl GetEntryDetailsQuery {
     pub fn new(hash: EntryHash) -> Self {
         Self(hash, None)
     }
-
-    pub fn with_private_data_access(hash: EntryHash, author: Arc<AgentPubKey>) -> Self {
-        Self(hash, Some(author))
-    }
 }
 
 pub struct State {
@@ -189,5 +185,17 @@ fn compute_entry_status(state: &State) -> EntryDhtStatus {
         EntryDhtStatus::Live
     } else {
         EntryDhtStatus::Dead
+    }
+}
+
+impl PrivateDataQuery for GetEntryDetailsQuery {
+    type Hash = EntryHash;
+
+    fn with_private_data_access(hash: Self::Hash, author: Arc<AgentPubKey>) -> Self {
+        Self(hash, Some(author))
+    }
+
+    fn without_private_data_access(hash: Self::Hash) -> Self {
+        Self::new(hash)
     }
 }
