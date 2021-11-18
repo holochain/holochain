@@ -308,28 +308,28 @@ async fn check_app_entry_type_test() {
     entry_def.visibility = EntryVisibility::Public;
 
     // Setup mock conductor
-    let mut conductor_api = MockConductorHandleT::new();
+    let mut conductor_handle = MockConductorHandleT::new();
     // # No dna or entry def
-    conductor_api.expect_get_entry_def().return_const(None);
-    conductor_api.expect_get_dna().return_const(None);
+    conductor_handle.expect_get_entry_def().return_const(None);
+    conductor_handle.expect_get_dna().return_const(None);
 
     // ## Dna is missing
     let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_type(&dna_hash, &aet, &conductor_api).await,
+        check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
         Err(SysValidationError::DnaMissing(_))
     );
 
     // # Dna but no entry def in buffer
     // ## ZomeId out of range
-    conductor_api.checkpoint();
-    conductor_api.expect_get_entry_def().return_const(None);
-    conductor_api
+    conductor_handle.checkpoint();
+    conductor_handle.expect_get_entry_def().return_const(None);
+    conductor_handle
         .expect_get_dna()
         .return_const(Some(dna_file.clone()));
     let aet = AppEntryType::new(0.into(), 1.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_type(&dna_hash, &aet, &conductor_api).await,
+        check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::ZomeId(_)
         ))
@@ -338,7 +338,7 @@ async fn check_app_entry_type_test() {
     // ## EntryId is out of range
     let aet = AppEntryType::new(10.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_type(&dna_hash, &aet, &conductor_api).await,
+        check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::EntryDefId(_)
         ))
@@ -347,26 +347,26 @@ async fn check_app_entry_type_test() {
     // ## EntryId is in range for dna
     let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_type(&dna_hash, &aet, &conductor_api).await,
+        check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
         Ok(_)
     );
     let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Private);
     assert_matches!(
-        check_app_entry_type(&dna_hash, &aet, &conductor_api).await,
+        check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::EntryVisibility(_)
         ))
     );
 
     // # Add an entry def to the buffer
-    conductor_api
+    conductor_handle
         .expect_get_entry_def()
         .return_const(Some(entry_def));
 
     // ## Can get the entry from the entry def
     let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_type(&dna_hash, &aet, &conductor_api).await,
+        check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
         Ok(_)
     );
 }

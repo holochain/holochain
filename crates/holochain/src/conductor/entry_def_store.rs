@@ -23,13 +23,13 @@ pub(crate) async fn get_entry_def(
     entry_def_index: EntryDefIndex,
     zome: ZomeDef,
     dna_def: &DnaDefHashed,
-    conductor_api: &dyn ConductorHandleT,
+    conductor_handle: &dyn ConductorHandleT,
 ) -> EntryDefStoreResult<Option<EntryDef>> {
     // Try to get the entry def from the entry def store
     let key = EntryDefBufferKey::new(zome, entry_def_index);
-    let entry_def = conductor_api.get_entry_def(&key);
+    let entry_def = conductor_handle.get_entry_def(&key);
     let dna_hash = dna_def.as_hash();
-    let dna_file = conductor_api
+    let dna_file = conductor_handle
         .get_dna(dna_hash)
         .ok_or_else(|| EntryDefStoreError::DnaFileMissing(dna_hash.clone()))?;
 
@@ -46,11 +46,11 @@ pub(crate) async fn get_entry_def_from_ids(
     zome_id: ZomeId,
     entry_def_index: EntryDefIndex,
     dna_def: &DnaDefHashed,
-    conductor_api: &dyn ConductorHandleT,
+    conductor_handle: &dyn ConductorHandleT,
 ) -> EntryDefStoreResult<Option<EntryDef>> {
     match dna_def.zomes.get(zome_id.index()) {
         Some((_, zome)) => {
-            get_entry_def(entry_def_index, zome.clone(), dna_def, conductor_api).await
+            get_entry_def(entry_def_index, zome.clone(), dna_def, conductor_handle).await
         }
         None => Ok(None),
     }

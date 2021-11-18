@@ -138,7 +138,7 @@ pub(super) async fn get_as_authority(
     header: HeaderHashed,
     env: DbRead<DbKindDht>,
     dna_file: &DnaFile,
-    conductor_api: &dyn ConductorHandleT,
+    conductor_handle: &dyn ConductorHandleT,
 ) -> CellResult<ValidationPackageResponse> {
     // Get author and hash
     let (header, header_hash) = header.into_inner();
@@ -158,7 +158,7 @@ pub(super) async fn get_as_authority(
         app_entry_type.zome_id(),
         app_entry_type.id(),
         dna_file.dna(),
-        conductor_api,
+        conductor_handle,
     )
     .await?;
 

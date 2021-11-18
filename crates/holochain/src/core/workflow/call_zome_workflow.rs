@@ -215,7 +215,7 @@ where
 pub async fn inline_validation<Ribosome>(
     workspace: SourceChainWorkspace,
     network: HolochainP2pDna,
-    conductor_api: ConductorHandle,
+    conductor_handle: ConductorHandle,
     zome: Option<Zome>,
     ribosome: Ribosome,
 ) -> WorkflowResult<()>
@@ -228,7 +228,7 @@ where
         let mut to_app_validate: Vec<Element> = Vec::with_capacity(scratch_elements.len());
         // Loop forwards through all the new elements
         for element in scratch_elements {
-            sys_validate_element(&element, &workspace, network.clone(), &(*conductor_api))
+            sys_validate_element(&element, &workspace, network.clone(), &(*conductor_handle))
                 .await
                 // If the was en error exit
                 // If the validation failed, exit with an InvalidCommit
@@ -320,7 +320,7 @@ where
                         &ribosome,
                         workspace.clone(),
                         network.clone(),
-                        &conductor_api,
+                        &conductor_handle,
                     )
                     .await?,
                 ),
@@ -417,13 +417,13 @@ pub mod tests {
         let keystore = fixt!(MetaLairClient);
         let network = fixt!(HolochainP2pDna);
         let cell_id = CellId::new(ribosome.dna_def().as_hash().clone(), fixt!(AgentPubKey));
-        let conductor_api = Arc::new(MockConductorHandleT::new());
-        let conductor_api = CellConductorApi::new(conductor_api, cell_id);
+        let conductor_handle = Arc::new(MockConductorHandleT::new());
+        let conductor_handle = CellConductorApi::new(conductor_handle, cell_id);
         let args = CallZomeWorkflowArgs {
             invocation,
             ribosome,
             signal_tx: SignalBroadcaster::noop(),
-            conductor_api,
+            conductor_handle,
             is_root_zome_call: true,
         };
         call_zome_workflow_inner(workspace.into(), network, keystore, args).await

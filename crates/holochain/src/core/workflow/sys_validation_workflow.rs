@@ -47,7 +47,7 @@ mod tests;
     trigger_app_validation,
     sys_validation_trigger,
     network,
-    conductor_api
+    conductor_handle
 ))]
 pub async fn sys_validation_workflow(
     workspace: Arc<SysValidationWorkspace>,
@@ -56,13 +56,13 @@ pub async fn sys_validation_workflow(
     sys_validation_trigger: TriggerSender,
     // TODO: Update HolochainP2p to reflect changes to pass through network.
     network: HolochainP2pDna,
-    conductor_api: &dyn ConductorHandleT,
+    conductor_handle: &dyn ConductorHandleT,
 ) -> WorkflowResult<WorkComplete> {
     let complete = sys_validation_workflow_inner(
         workspace,
         space,
         network,
-        conductor_api,
+        conductor_handle,
         sys_validation_trigger,
     )
     .await?;
@@ -79,7 +79,7 @@ async fn sys_validation_workflow_inner(
     workspace: Arc<SysValidationWorkspace>,
     space: Arc<Space>,
     network: HolochainP2pDna,
-    conductor_api: &dyn ConductorHandleT,
+    conductor_handle: &dyn ConductorHandleT,
     sys_validation_trigger: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     let env = workspace.dht_env.clone();
@@ -100,7 +100,7 @@ async fn sys_validation_workflow_inner(
                 &op,
                 &(*workspace),
                 network,
-                conductor_api,
+                conductor_handle,
                 Some(incoming_dht_ops_sender),
             )
             .await;
@@ -166,14 +166,14 @@ async fn validate_op(
     op: &DhtOp,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
-    conductor_api: &dyn ConductorHandleT,
+    conductor_handle: &dyn ConductorHandleT,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> WorkflowResult<Outcome> {
     match validate_op_inner(
         op,
         workspace,
         network,
-        conductor_api,
+        conductor_handle,
         incoming_dht_ops_sender,
     )
     .await
@@ -245,7 +245,7 @@ async fn validate_op_inner(
     op: &DhtOp,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
-    conductor_api: &dyn ConductorHandleT,
+    conductor_handle: &dyn ConductorHandleT,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
     match op {
@@ -274,7 +274,7 @@ async fn validate_op_inner(
                         .try_into()
                         .map_err(|_| ValidationOutcome::NotNewEntry(header.clone()))?,
                     entry.as_ref(),
-                    conductor_api,
+                    conductor_handle,
                     workspace,
                     network,
                 )
@@ -302,7 +302,7 @@ async fn validate_op_inner(
             store_entry(
                 (header).into(),
                 entry.as_ref(),
-                conductor_api,
+                conductor_handle,
                 workspace,
                 network.clone(),
             )
@@ -325,7 +325,7 @@ async fn validate_op_inner(
                 store_entry(
                     NewEntryHeaderRef::Update(header),
                     entry.as_ref(),
-                    conductor_api,
+                    conductor_handle,
                     workspace,
                     network.clone(),
                 )
@@ -341,7 +341,7 @@ async fn validate_op_inner(
                 store_entry(
                     NewEntryHeaderRef::Update(header),
                     entry.as_ref(),
-                    conductor_api,
+                    conductor_handle,
                     workspace,
                     network.clone(),
                 )
@@ -370,7 +370,7 @@ async fn validate_op_inner(
     }
 }
 
-#[instrument(skip(element, call_zome_workspace, network, conductor_api))]
+#[instrument(skip(element, call_zome_workspace, network, conductor_handle))]
 /// Direct system validation call that takes
 /// an Element instead of an op.
 /// Does not require holding dependencies.
@@ -380,23 +380,23 @@ pub async fn sys_validate_element(
     element: &Element,
     call_zome_workspace: &HostFnWorkspace,
     network: HolochainP2pDna,
-    conductor_api: &dyn ConductorHandleT,
+    conductor_handle: &dyn ConductorHandleT,
 ) -> SysValidationOutcome<()> {
     trace!(?element);
     // Create a SysValidationWorkspace with the scratches from the CallZomeWorkspace
     let workspace = SysValidationWorkspace::from(call_zome_workspace);
-    let result = match sys_validate_element_inner(element, &workspace, network, conductor_api).await
-    {
-        // Validation succeeded
-        Ok(_) => Ok(()),
-        // Validation failed so exit with that outcome
-        Err(SysValidationError::ValidationOutcome(validation_outcome)) => {
-            error!(msg = "Direct validation failed", ?element);
-            validation_outcome.into_outcome()
-        }
-        // An error occurred so return it
-        Err(e) => Err(OutcomeOrError::Err(e)),
-    };
+    let result =
+        match sys_validate_element_inner(element, &workspace, network, conductor_handle).await {
+            // Validation succeeded
+            Ok(_) => Ok(()),
+            // Validation failed so exit with that outcome
+            Err(SysValidationError::ValidationOutcome(validation_outcome)) => {
+                error!(msg = "Direct validation failed", ?element);
+                validation_outcome.into_outcome()
+            }
+            // An error occurred so return it
+            Err(e) => Err(OutcomeOrError::Err(e)),
+        };
 
     result
 }
@@ -405,7 +405,7 @@ async fn sys_validate_element_inner(
     element: &Element,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
-    conductor_api: &dyn ConductorHandleT,
+    conductor_handle: &dyn ConductorHandleT,
 ) -> SysValidationResult<()> {
     let signature = element.signature();
     let header = element.header();
@@ -417,7 +417,7 @@ async fn sys_validate_element_inner(
         maybe_entry: Option<&Entry>,
         workspace: &SysValidationWorkspace,
         network: HolochainP2pDna,
-        conductor_api: &dyn ConductorHandleT,
+        conductor_handle: &dyn ConductorHandleT,
     ) -> SysValidationResult<()> {
         let incoming_dht_ops_sender = None;
         store_element(header, workspace, network.clone()).await?;
@@ -429,7 +429,7 @@ async fn sys_validate_element_inner(
                     .try_into()
                     .map_err(|_| ValidationOutcome::NotNewEntry(header.clone()))?,
                 maybe_entry,
-                conductor_api,
+                conductor_handle,
                 workspace,
                 network.clone(),
             )
@@ -464,13 +464,13 @@ async fn sys_validate_element_inner(
                     maybe_entry,
                     workspace,
                     network.clone(),
-                    conductor_api,
+                    conductor_handle,
                 )
                 .await?;
             }
             Ok(())
         }
-        _ => validate(header, maybe_entry, workspace, network, conductor_api).await,
+        _ => validate(header, maybe_entry, workspace, network, conductor_handle).await,
     }
 }
 
@@ -533,7 +533,7 @@ async fn store_element(
 async fn store_entry(
     header: NewEntryHeaderRef<'_>,
     entry: &Entry,
-    conductor_api: &dyn ConductorHandleT,
+    conductor_handle: &dyn ConductorHandleT,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
 ) -> SysValidationResult<()> {
@@ -545,7 +545,7 @@ async fn store_entry(
     check_entry_type(entry_type, entry)?;
     if let EntryType::App(app_entry_type) = entry_type {
         let entry_def =
-            check_app_entry_type(workspace.dna_hash(), app_entry_type, conductor_api).await?;
+            check_app_entry_type(workspace.dna_hash(), app_entry_type, conductor_handle).await?;
         check_not_private(&entry_def)?;
     }
 

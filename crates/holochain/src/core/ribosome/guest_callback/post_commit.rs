@@ -76,7 +76,7 @@ impl TryFrom<PostCommitInvocation> for ExternIO {
 }
 
 pub async fn send_post_commit(
-    conductor_api: ConductorHandle,
+    conductor_handle: ConductorHandle,
     workspace: SourceChainWorkspace,
     network: HolochainP2pDna,
     keystore: MetaLairClient,
@@ -98,7 +98,7 @@ pub async fn send_post_commit(
     for (maybe_zome, headers) in groups {
         if let Some(zome) = maybe_zome {
             let zome = zome.clone();
-            conductor_api
+            conductor_handle
                 .post_commit_permit()
                 .await?
                 .send(PostCommitArgs {
