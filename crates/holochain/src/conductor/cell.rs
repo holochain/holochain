@@ -913,23 +913,6 @@ impl Cell {
         Ok(())
     }
 
-    /// Delete all data associated with this Cell by DELETING the associated
-    /// LMDB environment. Completely reverses Cell creation.
-    /// NB: This is NOT meant to be a Drop impl! This destroys all data
-    ///     associated with a Cell, i.e. this Cell can never be instantiated again!
-    #[tracing::instrument(skip(self))]
-    pub async fn destroy(self) -> CellResult<()> {
-        self.cleanup().await?;
-        //TODO "This will need to be reference counted if we really want to delete it"
-        // let path = self.authored_env.path().clone();
-        // // Delete directory
-        // self.authored_env
-        //     .remove()
-        //     .await
-        //     .map_err(|e| CellError::Cleanup(e.to_string(), path))?;
-        Ok(())
-    }
-
     /// Instantiate a Ribosome for use by this Cell's workflows
     // TODO: reevaluate once Workflows are fully implemented (after B-01567)
     pub(crate) async fn get_ribosome(&self) -> CellResult<RealRibosome> {
