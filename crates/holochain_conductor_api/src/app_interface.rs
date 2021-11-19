@@ -182,8 +182,6 @@ impl From<InstalledAppInfoStatus> for AppStatus {
 
 #[test]
 fn status_serialization() {
-    use kitsune_p2p::dependencies::kitsune_p2p_types::dependencies::serde_json;
-
     let status: InstalledAppInfoStatus =
         AppStatus::Disabled(DisabledAppReason::Error("because".into())).into();
 

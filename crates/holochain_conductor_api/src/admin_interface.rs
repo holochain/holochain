@@ -1,7 +1,7 @@
 use holo_hash::*;
 use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
-use kitsune_p2p::agent_store::AgentInfoSigned;
+use kitsune_p2p_types::agent_info::AgentInfoSigned;
 
 use crate::{FullStateDump, InstalledAppInfo};
 
