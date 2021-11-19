@@ -195,8 +195,10 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         // action if it isn't.
         match Connection::open(&path)
             // For some reason calling pragma_update is necessary to prove the database file is valid.
-            .and_then(|c| c.pragma_update(None, "synchronous", &"0".to_string()))
-        {
+            .and_then(|mut c| {
+                crate::conn::initialize_connection(&mut c, sync_level)?;
+                c.pragma_update(None, "synchronous", &"0".to_string())
+            }) {
             Ok(_) => (),
             // These are the two errors that can
             // occur if the database is not valid.

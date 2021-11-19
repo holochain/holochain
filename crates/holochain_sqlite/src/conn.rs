@@ -175,7 +175,7 @@ impl r2d2::CustomizeConnection<Connection, rusqlite::Error> for ConnCustomizer {
     }
 }
 
-fn initialize_connection(
+pub(crate) fn initialize_connection(
     conn: &mut Connection,
     synchronous_level: DbSyncLevel,
 ) -> rusqlite::Result<()> {
