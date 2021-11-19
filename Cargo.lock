@@ -2508,6 +2508,7 @@ dependencies = [
  "holochain_state",
  "holochain_types",
  "holochain_zome_types",
+ "kitsune_p2p",
  "kitsune_p2p_types",
  "matches",
  "observability",

@@ -5,6 +5,7 @@ use holochain_types::env::DbSyncLevel;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 
 mod admin_interface_config;
 mod dpki_config;
@@ -44,7 +45,7 @@ pub struct ConductorConfig {
     pub admin_interfaces: Option<Vec<AdminInterfaceConfig>>,
 
     /// Config options for the network module. Optional.
-    pub network: Option<holochain_p2p::kitsune_p2p::KitsuneP2pConfig>,
+    pub network: Option<KitsuneP2pConfig>,
 
     #[serde(default)]
     /// Override the default database synchronous level.
@@ -173,7 +174,7 @@ pub mod tests {
     db_sync_level: Off
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
-        use holochain_p2p::kitsune_p2p::*;
+        use kitsune_p2p::*;
         let mut network_config = KitsuneP2pConfig::default();
         network_config.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host"));
         network_config.transport_pool.push(TransportConfig::Proxy {

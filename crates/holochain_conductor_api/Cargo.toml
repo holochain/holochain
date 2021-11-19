@@ -12,8 +12,7 @@ edition = "2018"
 directories = "2.0.2"
 derive_more = "0.99.3"
 kitsune_p2p_types = { version = "0.0.13", path = "../kitsune_p2p/types" }
-holo_hash = { version = "0.0.12", path = "../holo_hash", features = ["full"] }
-holochain_p2p = { version = "0.0.16", path = "../holochain_p2p" }
+holo_hash = { version = "0.0.12", path = "../holo_hash" }
 holochain_state = { version = "0.0.16", path = "../holochain_state" }
 holochain_serialized_bytes = "=0.0.51"
 holochain_types = { version = "0.0.16", path = "../holochain_types" }
@@ -26,6 +25,7 @@ thiserror = "1.0.22"
 url2 = "0.0.6"
 
 [dev-dependencies]
+kitsune_p2p = { version = "0.0.14", path = "../kitsune_p2p/kitsune_p2p" }
 serde_json = "1.0.68"
 matches = {version = "0.1.8"}
 observability = "0.1.3"
