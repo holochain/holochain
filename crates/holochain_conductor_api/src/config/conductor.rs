@@ -2,10 +2,10 @@
 //! This module is used to configure the conductor
 
 use holochain_types::env::DbSyncLevel;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
-use kitsune_p2p_types::config::KitsuneP2pConfig;
 
 mod admin_interface_config;
 mod dpki_config;

@@ -1,9 +1,9 @@
 //! Kitsune Config Params
 
 use crate::tx2::tx2_adapter::AdapterFactory;
-use url2::Url2;
-use crate::KitsuneResult;
 use crate::tx2::tx2_utils::TxUrl;
+use crate::KitsuneResult;
+use url2::Url2;
 
 /// TODO - FIXME - holochain bootstrap should not be encoded in kitsune
 /// The default production bootstrap service url.
@@ -213,7 +213,6 @@ pub enum NetworkType {
     /// Via MDNS to the LAN
     QuicMdns,
 }
-
 
 /// How long kitsune should wait before timing out when joining the network.
 pub const JOIN_NETWORK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
