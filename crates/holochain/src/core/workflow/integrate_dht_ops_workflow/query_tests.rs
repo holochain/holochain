@@ -38,12 +38,12 @@ struct Facts {
 #[tokio::test(flavor = "multi_thread")]
 async fn integrate_query() {
     observability::test_run().ok();
-    let env = test_cell_env();
+    let env = test_dht_env();
     let expected = test_data(&env.env().into());
     let (qt, _rx) = TriggerSender::new();
     // dump_tmp(&env.env());
     let test_network = test_network(None, None).await;
-    let holochain_p2p_cell = test_network.cell_network();
+    let holochain_p2p_cell = test_network.dna_network();
     integrate_dht_ops_workflow(env.env().into(), qt, holochain_p2p_cell)
         .await
         .unwrap();
@@ -71,7 +71,11 @@ async fn integrate_query() {
     assert_eq!(hashes, expected.hashes);
 }
 
-fn create_and_insert_op(env: &EnvRead, facts: Facts, data: &mut SharedData) -> DhtOpHashed {
+fn create_and_insert_op(
+    env: &DbRead<DbKindDht>,
+    facts: Facts,
+    data: &mut SharedData,
+) -> DhtOpHashed {
     let mut update = fixt!(Update);
     if facts.original_header && facts.update_element {
         update.original_header_address = data.original_header.clone();
@@ -107,7 +111,7 @@ fn create_and_insert_op(env: &EnvRead, facts: Facts, data: &mut SharedData) -> D
         .unwrap()
         .with_commit_sync(|txn| {
             let hash = state.as_hash().clone();
-            insert_op(txn, state.clone(), false).unwrap();
+            insert_op(txn, state.clone()).unwrap();
             set_validation_status(txn, hash.clone(), ValidationStatus::Valid).unwrap();
             if facts.integrated {
                 set_when_integrated(txn, hash.clone(), holochain_zome_types::Timestamp::now())
@@ -127,7 +131,7 @@ fn create_and_insert_op(env: &EnvRead, facts: Facts, data: &mut SharedData) -> D
     state
 }
 
-fn test_data(env: &EnvRead) -> Expected {
+fn test_data(env: &DbRead<DbKindDht>) -> Expected {
     let mut hashes = HashSet::new();
     let mut ops = HashMap::new();
 

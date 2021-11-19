@@ -1,4 +1,4 @@
-use crate::conductor::api::CellConductorApiT;
+use crate::conductor::ConductorHandle;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
@@ -6,10 +6,10 @@ use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::HolochainP2pCell;
-use holochain_p2p::HolochainP2pCellT;
+use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
+use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_types::prelude::*;
 use itertools::Itertools;
 
@@ -32,7 +32,7 @@ impl PostCommitInvocation {
 pub struct PostCommitHostAccess {
     pub workspace: HostFnWorkspace,
     pub keystore: MetaLairClient,
-    pub network: HolochainP2pCell,
+    pub network: HolochainP2pDna,
 }
 
 impl From<PostCommitHostAccess> for HostContext {
@@ -75,16 +75,14 @@ impl TryFrom<PostCommitInvocation> for ExternIO {
     }
 }
 
-pub async fn send_post_commit<C>(
-    conductor_api: C,
-    workspace: HostFnWorkspace,
-    network: HolochainP2pCell,
+pub async fn send_post_commit(
+    conductor_handle: ConductorHandle,
+    workspace: SourceChainWorkspace,
+    network: HolochainP2pDna,
     keystore: MetaLairClient,
     zomed_headers: Vec<(Option<Zome>, SignedHeaderHashed)>,
-) -> Result<(), tokio::sync::mpsc::error::SendError<()>>
-where
-    C: CellConductorApiT,
-{
+) -> Result<(), tokio::sync::mpsc::error::SendError<()>> {
+    let cell_id = workspace.source_chain().cell_id();
     let groups = zomed_headers
         .iter()
         .group_by(|(zome, _shh)| zome.clone())
@@ -100,17 +98,17 @@ where
     for (maybe_zome, headers) in groups {
         if let Some(zome) = maybe_zome {
             let zome = zome.clone();
-            conductor_api
+            conductor_handle
                 .post_commit_permit()
                 .await?
                 .send(PostCommitArgs {
                     host_access: PostCommitHostAccess {
-                        workspace: workspace.clone(),
+                        workspace: workspace.clone().into(),
                         keystore: keystore.clone(),
                         network: network.clone(),
                     },
                     invocation: PostCommitInvocation::new(zome, headers),
-                    cell_id: CellId::new(network.dna_hash().clone(), network.from_agent().clone()),
+                    cell_id: cell_id.clone(),
                 });
         }
     }

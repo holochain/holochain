@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use holo_hash::HeaderHash;
 use holochain_p2p::event::GetOptions;
 use holochain_sqlite::rusqlite::named_params;

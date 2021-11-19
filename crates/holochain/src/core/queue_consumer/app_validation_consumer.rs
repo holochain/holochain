@@ -9,26 +9,18 @@ use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for AppValidation workflow
-#[instrument(skip(
-    env,
-    cache,
-    conductor_handle,
-    stop,
-    trigger_integration,
-    conductor_api,
-    network
-))]
+#[instrument(skip(workspace, conductor_handle, stop, trigger_integration, network))]
 pub fn spawn_app_validation_consumer(
-    env: EnvWrite,
-    cache: EnvWrite,
+    dna_hash: Arc<DnaHash>,
+    workspace: AppValidationWorkspace,
     conductor_handle: ConductorHandle,
     mut stop: sync::broadcast::Receiver<()>,
     trigger_integration: TriggerSender,
-    conductor_api: impl CellConductorApiT + 'static,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
     let (tx, mut rx) = TriggerSender::new();
     let trigger_self = tx.clone();
+    let workspace = Arc::new(workspace);
     let handle = tokio::spawn(async move {
         loop {
             // Wait for next job
@@ -40,25 +32,17 @@ pub fn spawn_app_validation_consumer(
             }
 
             // Run the workflow
-            let workspace = AppValidationWorkspace::new(env.clone(), cache.clone());
             let result = app_validation_workflow(
-                workspace,
+                dna_hash.clone(),
+                workspace.clone(),
                 trigger_integration.clone(),
-                conductor_api.clone(),
+                conductor_handle.clone(),
                 network.clone(),
             )
             .await;
             match result {
                 Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
-                Err(err) => {
-                    handle_workflow_error(
-                        conductor_handle.clone(),
-                        network.cell_id(),
-                        err,
-                        "app_validation failure",
-                    )
-                    .await?
-                }
+                Err(err) => handle_workflow_error(err)?,
                 _ => (),
             };
         }
