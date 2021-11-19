@@ -3,7 +3,7 @@ use criterion::{/*black_box,*/ criterion_group, criterion_main, Criterion};
 use futures::stream::StreamExt;
 use kitsune_p2p_proxy::*;
 use kitsune_p2p_transport_quic::*;
-use kitsune_p2p_types::config::*;
+use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::dependencies::{ghost_actor, url2::Url2};
 use kitsune_p2p_types::transport::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
