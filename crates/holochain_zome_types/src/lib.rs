@@ -59,6 +59,7 @@ pub mod version;
 pub mod warrant;
 #[allow(missing_docs)]
 pub mod x_salsa20_poly1305;
+pub mod yaml;
 #[allow(missing_docs)]
 pub mod zome;
 #[allow(missing_docs)]

@@ -1,4 +1,5 @@
 use crate::header::ZomeId;
+use crate::yaml::Value;
 use crate::zome::ZomeName;
 use crate::CapGrant;
 use crate::EntryDefs;
@@ -75,7 +76,7 @@ pub struct AppInfo;
 pub struct DnaInfo {
     pub name: String,
     pub hash: DnaHash,
-    pub properties: serde_yaml::Value,
+    pub properties: Value,
     // In ZomeId order as to match corresponding `ZomeInfo` for each.
     pub zome_names: Vec<ZomeName>,
 }
