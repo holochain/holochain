@@ -13,7 +13,6 @@ directories = "2.0.2"
 derive_more = "0.99.3"
 kitsune_p2p_types = { version = "0.0.13", path = "../kitsune_p2p/types" }
 holo_hash = { version = "0.0.12", path = "../holo_hash" }
-holochain_state = { version = "0.0.16", path = "../holochain_state" }
 holochain_serialized_bytes = "=0.0.51"
 holochain_types = { version = "0.0.16", path = "../holochain_types" }
 holochain_zome_types = { version = "0.0.17", path = "../holochain_zome_types" }
