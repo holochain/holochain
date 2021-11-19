@@ -2503,7 +2503,6 @@ dependencies = [
  "derive_more",
  "directories 2.0.2",
  "holo_hash",
- "holochain_p2p",
  "holochain_serialized_bytes",
  "holochain_state",
  "holochain_types",

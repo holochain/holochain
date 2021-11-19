@@ -40,7 +40,6 @@ use holochain_zome_types::HeaderHashed;
 use holochain_zome_types::HeaderInner;
 use holochain_zome_types::PreflightRequest;
 use holochain_zome_types::QueryFilter;
-use holochain_zome_types::Signature;
 use holochain_zome_types::SignedHeader;
 use holochain_zome_types::SignedHeaderHashed;
 use holochain_zome_types::Timestamp;
@@ -57,6 +56,7 @@ use holo_hash::EntryHash;
 use holochain_serialized_bytes::prelude::*;
 
 pub use error::*;
+pub use holochain_types::source_chain_json::{SourceChainJsonDump, SourceChainJsonElement};
 
 mod error;
 #[derive(Clone)]
@@ -68,22 +68,6 @@ pub struct SourceChain {
     persisted_head: HeaderHash,
     persisted_timestamp: Timestamp,
     public_only: bool,
-}
-
-// TODO fix this.  We shouldn't really have nil values but this would
-// show if the database is corrupted and doesn't have an element
-#[derive(Serialize, Debug, Clone, Deserialize)]
-pub struct SourceChainJsonDump {
-    pub elements: Vec<SourceChainJsonElement>,
-    pub published_ops_count: usize,
-}
-
-#[derive(Serialize, Debug, Clone, Deserialize)]
-pub struct SourceChainJsonElement {
-    pub signature: Signature,
-    pub header_address: HeaderHash,
-    pub header: Header,
-    pub entry: Option<Entry>,
 }
 
 // TODO: document that many functions here are only reading from the scratch,

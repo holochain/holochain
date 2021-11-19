@@ -32,6 +32,7 @@ pub mod metadata;
 pub mod prelude;
 pub mod properties;
 pub mod signal;
+pub mod source_chain_json;
 pub mod validate;
 pub mod web_app;
 
