@@ -2529,6 +2529,7 @@ dependencies = [
  "directories 2.0.2",
  "holo_hash",
  "holochain_serialized_bytes",
+ "holochain_sqlite",
  "holochain_types",
  "holochain_zome_types",
  "kitsune_p2p",
