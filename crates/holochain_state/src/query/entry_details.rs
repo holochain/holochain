@@ -38,7 +38,7 @@ impl Query for GetEntryDetailsQuery {
         AND DhtOp.basis_hash = :entry_hash
         AND DhtOp.when_integrated IS NOT NULL
         AND DhtOp.validation_status IS NOT NULL
-        AND (Header.private_entry = 0 OR Header.author = :author)
+        AND (Header.private_entry = 0 OR Header.private_entry IS NULL OR Header.author = :author)
         "
         .into()
     }

@@ -20,7 +20,10 @@ async fn entry_scratch_same_as_sql() {
         .unwrap();
 
     let td = EntryTestData::new();
-    let query = GetEntryDetailsQuery::new(td.hash.clone());
+    let query = GetEntryDetailsQuery::with_private_data_access(
+        td.hash.clone(),
+        Arc::new(td.store_entry_op.header().author().clone()),
+    );
     insert_op_scratch(
         &mut scratch,
         Some(zome),
@@ -53,7 +56,10 @@ async fn element_scratch_same_as_sql() {
         .unwrap();
 
     let td = ElementTestData::new();
-    let query = GetElementDetailsQuery::new(td.header.as_hash().clone());
+    let query = GetElementDetailsQuery::with_private_data_access(
+        td.header.as_hash().clone(),
+        Arc::new(td.store_element_op.header().author().clone()),
+    );
     insert_op_scratch(
         &mut scratch,
         Some(zome),

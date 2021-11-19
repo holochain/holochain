@@ -22,7 +22,10 @@ async fn can_handle_update_in_scratch() {
         .unwrap();
 
     let td = ElementTestData::new();
-    let query = GetLiveElementQuery::new(td.update_hash);
+    let query = GetLiveElementQuery::with_private_data_access(
+        td.update_hash,
+        Arc::new(td.update_store_element_op.header().author().clone()),
+    );
 
     // - Create an entry on main db.
     insert_valid_integrated_op(&mut txn, td.update_store_element_op.clone()).unwrap();
