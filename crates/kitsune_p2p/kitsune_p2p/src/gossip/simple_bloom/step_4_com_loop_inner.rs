@@ -157,54 +157,49 @@ pub(crate) async fn step_4_com_loop_inner_incoming(
             );
 
             // parse/integrate the chunks
-            let futs =
-                bloom.inner.share_mut(move |i, _| {
-                    if let Some(endpoint) = i.initiate_tgt.clone() {
-                        if finished && con.peer_cert() == *endpoint.cert() {
-                            i.initiate_tgt = None;
+            let futs = bloom.inner.share_mut(move |i, _| {
+                if let Some(endpoint) = i.initiate_tgt.clone() {
+                    if finished && con.peer_cert() == *endpoint.cert() {
+                        i.initiate_tgt = None;
+                    }
+                }
+
+                let mut futs = Vec::new();
+
+                // Locally sync the newly received data
+                let mut to_send_ops = Vec::new();
+                let mut to_send_peer_data = Vec::new();
+                for chunk in &chunks {
+                    match &**chunk {
+                        MetaOpData::Op(key, data) => {
+                            to_send_ops.push((key.clone(), data.clone()));
+                        }
+                        MetaOpData::Agent(agent_info_signed) => {
+                            // TODO - we actually only need to do this
+                            // once, since the agent store is shared...
+                            to_send_peer_data.push(agent_info_signed.clone());
                         }
                     }
+                    let key = chunk.key();
+                    i.local_bloom.set(&key);
+                    i.local_data_map.insert(key, chunk.clone());
+                }
+                if !to_send_ops.is_empty() {
+                    futs.push(bloom.evt_sender.gossip(bloom.space.clone(), to_send_ops));
+                }
+                if !to_send_peer_data.is_empty() {
+                    futs.push(
+                        bloom
+                            .evt_sender
+                            .put_agent_info_signed(PutAgentInfoSignedEvt {
+                                space: bloom.space.clone(),
+                                peer_data: to_send_peer_data,
+                            }),
+                    );
+                }
 
-                    let mut futs = Vec::new();
-
-                    // Locally sync the newly received data
-                    for agent in i.local_agents.iter() {
-                        let mut to_send_ops = Vec::new();
-                        let mut to_send_peer_data = Vec::new();
-                        for chunk in &chunks {
-                            match &**chunk {
-                                MetaOpData::Op(key, data) => {
-                                    to_send_ops.push((key.clone(), data.clone()));
-                                }
-                                MetaOpData::Agent(agent_info_signed) => {
-                                    // TODO - we actually only need to do this
-                                    // once, since the agent store is shared...
-                                    to_send_peer_data.push(agent_info_signed.clone());
-                                }
-                            }
-                            let key = chunk.key();
-                            i.local_bloom.set(&key);
-                            i.local_data_map.insert(key, chunk.clone());
-                        }
-                        if !to_send_ops.is_empty() {
-                            futs.push(bloom.evt_sender.gossip(
-                                bloom.space.clone(),
-                                agent.clone(),
-                                to_send_ops,
-                            ));
-                        }
-                        if !to_send_peer_data.is_empty() {
-                            futs.push(bloom.evt_sender.put_agent_info_signed(
-                                PutAgentInfoSignedEvt {
-                                    space: bloom.space.clone(),
-                                    peer_data: to_send_peer_data,
-                                },
-                            ));
-                        }
-                    }
-
-                    Ok(futs)
-                })?;
+                Ok(futs)
+            })?;
 
             if !futs.is_empty() {
                 futures::future::try_join_all(futs)
@@ -393,7 +388,7 @@ async fn data_map_get(
     use crate::event::*;
 
     // first, see if we already have the data
-    let (space, agent, maybe_data) = bloom.inner.share_mut(|i, _| {
+    let (space, _agent, maybe_data) = bloom.inner.share_mut(|i, _| {
         // erm, just using a random agent??
         Ok((
             bloom.space.clone(),
@@ -418,7 +413,6 @@ async fn data_map_get(
         .evt_sender
         .fetch_op_data(FetchOpDataEvt {
             space,
-            agents: vec![agent],
             op_hashes: vec![op_key],
         })
         .await

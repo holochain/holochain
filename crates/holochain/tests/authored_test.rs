@@ -45,13 +45,15 @@ async fn authored_test() {
     triggers.publish_dht_ops.trigger();
 
     // Alice commits the entry
-    fresh_reader_test(alice_call_data.env.clone(), |txn| {
+    fresh_reader_test(alice_call_data.authored_env.clone(), |txn| {
         let basis: AnyDhtHash = entry_hash.clone().into();
         let has_authored_entry: bool = txn
             .query_row(
-                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE basis_hash = :hash AND is_authored = 1 AND when_integrated IS NULL)",
+                "SELECT EXISTS(SELECT 1 FROM DhtOp JOIN Header ON DhtOp.header_hash = Header.hash
+                    WHERE basis_hash = :hash AND Header.author = :author)",
                 named_params! {
                     ":hash": basis,
+                    ":author": alice_call_data.cell_id.agent_pubkey(),
                 },
                 |row| row.get(0),
             )
@@ -65,29 +67,34 @@ async fn authored_test() {
     let expected_count = 3 + 14;
 
     wait_for_integration(
-        &bob_call_data.env,
+        &bob_call_data.dht_env,
         expected_count,
         num_attempts,
         delay_per_attempt.clone(),
     )
     .await;
 
-    fresh_reader_test(bob_call_data.env.clone(), |txn| {
+    fresh_reader_test(bob_call_data.authored_env.clone(), |txn| {
         let basis: AnyDhtHash = entry_hash.clone().into();
         let has_authored_entry: bool = txn
             .query_row(
-                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE basis_hash = :hash AND is_authored = 1 AND when_integrated IS NULL)",
+                "SELECT EXISTS(SELECT 1 FROM DhtOp JOIN Header ON DhtOp.header_hash = Header.hash
+                    WHERE basis_hash = :hash AND Header.author = :author)",
                 named_params! {
                     ":hash": basis,
+                    ":author": bob_call_data.cell_id.agent_pubkey(),
                 },
                 |row| row.get(0),
             )
             .unwrap();
         // Bob Should not have the entry in their authored table
         assert!(!has_authored_entry);
+    });
+    fresh_reader_test(bob_call_data.dht_env.clone(), |txn| {
+        let basis: AnyDhtHash = entry_hash.clone().into();
         let has_integrated_entry: bool = txn
             .query_row(
-                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE basis_hash = :hash AND when_integrated IS NOT NULL)",
+                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE basis_hash = :hash)",
                 named_params! {
                     ":hash": basis,
                 },
@@ -107,13 +114,15 @@ async fn authored_test() {
     let triggers = handle.get_cell_triggers(&bob_call_data.cell_id).unwrap();
     triggers.publish_dht_ops.trigger();
 
-    fresh_reader_test(bob_call_data.env.clone(), |txn| {
+    fresh_reader_test(bob_call_data.authored_env.clone(), |txn| {
         let basis: AnyDhtHash = entry_hash.clone().into();
         let has_authored_entry: bool = txn
             .query_row(
-                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE basis_hash = :hash AND is_authored = 1)",
+                "SELECT EXISTS(SELECT 1 FROM DhtOp JOIN Header ON DhtOp.header_hash = Header.hash
+                    WHERE basis_hash = :hash AND Header.author = :author)",
                 named_params! {
                     ":hash": basis,
+                    ":author": bob_call_data.cell_id.agent_pubkey(),
                 },
                 |row| row.get(0),
             )

@@ -58,13 +58,11 @@ pub enum HarnessEventType {
     Call {
         space: Slug,
         to_agent: Slug,
-        from_agent: Slug,
         payload: String,
     },
     Notify {
         space: Slug,
         to_agent: Slug,
-        from_agent: Slug,
         payload: String,
     },
     Gossip {

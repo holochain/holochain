@@ -1,6 +1,9 @@
 use element_details::GetElementDetailsQuery;
 
-use crate::query::entry_details::GetEntryDetailsQuery;
+use crate::{
+    prelude::mutations_helpers::insert_valid_integrated_op,
+    query::entry_details::GetEntryDetailsQuery,
+};
 
 use super::*;
 
@@ -17,7 +20,10 @@ async fn entry_scratch_same_as_sql() {
         .unwrap();
 
     let td = EntryTestData::new();
-    let query = GetEntryDetailsQuery::new(td.hash.clone());
+    let query = GetEntryDetailsQuery::with_private_data_access(
+        td.hash.clone(),
+        Arc::new(td.store_entry_op.header().author().clone()),
+    );
     insert_op_scratch(
         &mut scratch,
         Some(zome),
@@ -25,13 +31,7 @@ async fn entry_scratch_same_as_sql() {
         ChainTopOrdering::default(),
     )
     .unwrap();
-    insert_op(&mut txn, td.store_entry_op.clone(), true).unwrap();
-    set_validation_status(
-        &mut txn,
-        td.store_entry_op.as_hash().clone(),
-        ValidationStatus::Valid,
-    )
-    .unwrap();
+    insert_valid_integrated_op(&mut txn, td.store_entry_op.clone()).unwrap();
     let r1 = query
         .run(Txn::from(&txn))
         .unwrap()
@@ -56,7 +56,10 @@ async fn element_scratch_same_as_sql() {
         .unwrap();
 
     let td = ElementTestData::new();
-    let query = GetElementDetailsQuery::new(td.header.as_hash().clone());
+    let query = GetElementDetailsQuery::with_private_data_access(
+        td.header.as_hash().clone(),
+        Arc::new(td.store_element_op.header().author().clone()),
+    );
     insert_op_scratch(
         &mut scratch,
         Some(zome),
@@ -64,13 +67,7 @@ async fn element_scratch_same_as_sql() {
         ChainTopOrdering::default(),
     )
     .unwrap();
-    insert_op(&mut txn, td.store_element_op.clone(), true).unwrap();
-    set_validation_status(
-        &mut txn,
-        td.store_element_op.as_hash().clone(),
-        ValidationStatus::Valid,
-    )
-    .unwrap();
+    insert_valid_integrated_op(&mut txn, td.store_element_op.clone()).unwrap();
     let r1 = query
         .run(Txn::from(&txn))
         .unwrap()

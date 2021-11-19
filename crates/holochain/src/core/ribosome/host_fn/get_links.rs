@@ -32,7 +32,7 @@ pub fn get_links<'a>(
                             tag: tag_prefix,
                         };
                         Cascade::from_workspace_network(
-                            call_context.host_context.workspace(),
+                            &call_context.host_context.workspace(),
                             call_context.host_context.network().to_owned(),
                         ).dht_get_links(key, GetLinksOptions::default()).await
                     }
@@ -327,7 +327,7 @@ pub mod slow_tests {
         // Plus one length path for the commit existing.
         expected_count += WaitOps::ENTRY + WaitOps::LINK;
 
-        wait_for_integration_1m(&alice_call_data.env, expected_count).await;
+        wait_for_integration_1m(&alice_call_data.dht_env, expected_count).await;
 
         let invocation = new_zome_call(
             &alice_call_data.cell_id,
