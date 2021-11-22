@@ -59,6 +59,8 @@ pub mod version;
 pub mod warrant;
 #[allow(missing_docs)]
 pub mod x_salsa20_poly1305;
+/// Types to work with yaml data without `serde_yaml` as a dependency.
+pub mod yaml;
 #[allow(missing_docs)]
 pub mod zome;
 #[allow(missing_docs)]

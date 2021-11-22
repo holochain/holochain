@@ -1,5 +1,4 @@
 use hdk::prelude::*;
-use std::collections::HashMap;
 
 #[hdk_entry(id = "thing")]
 struct Thing;
@@ -75,7 +74,13 @@ fn dna_info(_: ()) -> ExternResult<DnaInfo> {
 
 #[hdk_extern]
 fn dna_info_foo(_: ()) -> ExternResult<Option<String>> {
-    Ok(Value::try_from(hdk::prelude::dna_info()?.properties)?.0.and_then(|m| m.get("foo").cloned()))
+    Ok(match yaml::Value::try_from(hdk::prelude::dna_info()?.properties)? {
+        yaml::Value::Mapping(mapping) => match mapping.get(&yaml::Value::String("foo".into())) {
+            yaml::Value::String(string) => Some(string),
+            _ => None,
+        },
+        _ => None,
+    })
 }
 
 #[derive(Deserialize, Serialize, Debug, SerializedBytes)]
