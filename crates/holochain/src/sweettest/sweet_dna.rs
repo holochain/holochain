@@ -96,7 +96,7 @@ impl SweetDnaFile {
                 .map(|(n, z)| (n.into(), z.into()))
                 .collect(),
             Vec::new(),
-SerializedBytes::default(),
+            SerializedBytes::default(),
         )
         .await
     }
