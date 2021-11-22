@@ -33,16 +33,98 @@ pub fn dna_info(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod test {
-    use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::prelude::*;
+    use crate::sweettest::SweetConductor;
+    use crate::sweettest::SweetZome;
+    use crate::sweettest::SweetDnaFile;
+    use holochain_types::prelude::MockDnaStore;
+    use crate::conductor::ConductorBuilder;
+    use holochain_types::properties::YamlProperties;
+
+    async fn test_conductor(properties: SerializedBytes) -> (SweetConductor, SweetZome) {
+        let (dna_file, _) = SweetDnaFile::from_test_wasms(random_uid(), vec![TestWasm::ZomeInfo], properties)
+            .await
+            .unwrap();
+
+        let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
+        let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
+
+        let mut dna_store = MockDnaStore::new();
+        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
+        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
+        dna_store.expect_add_dna().return_const(());
+        dna_store
+            .expect_get()
+            .return_const(Some(dna_file.clone().into()));
+        dna_store
+            .expect_get_entry_def()
+            .return_const(EntryDef::default_with_id("thing"));
+
+        let mut conductor =
+            SweetConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
+        let apps = conductor
+            .setup_app_for_agents(
+                "app-",
+                &[alice_pubkey.clone(), bob_pubkey.clone()],
+                &[dna_file.into()],
+            )
+            .await
+            .unwrap();
+
+        let ((alice,), (bobbo,)) = apps.into_tuples();
+        let alice = alice.zome(TestWasm::ZomeInfo);
+        let _bobbo = bobbo.zome(TestWasm::ZomeInfo);
+        (conductor, alice)
+    }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn invoke_import_dna_info_test() {
-        let host_access = fixt!(ZomeCallHostAccess, Predictable);
-        let dna_info: DnaInfo =
-            crate::call_test_ribosome!(host_access, TestWasm::ZomeInfo, "dna_info", ()).unwrap();
-        assert_eq!(dna_info.name, String::from("test"));
+    async fn dna_info_test() {
+        observability::test_run().ok();
+
+        let (conductor, alice) = test_conductor(SerializedBytes::default()).await;
+
+        let dna_info: DnaInfo = conductor.call(&alice, "dna_info", ()).await;
+        assert_eq!(dna_info.name, String::from("Generated DnaDef"));
+
+        let dna_info_foo: Option<String> = conductor.call(&alice, "dna_info_value", "foo").await;
+        assert_eq!(dna_info_foo, None);
+        let dna_info_foo_direct: Option<String> = conductor.call(&alice, "dna_info_foo_direct", ()).await;
+        assert_eq!(dna_info_foo_direct, None);
+
+        let dna_info_bar: Option<String> = conductor.call(&alice, "dna_info_value", "bar").await;
+        assert_eq!(dna_info_bar, None);
+        let dna_info_bar_direct: Option<String> = conductor.call(&alice, "dna_info_bar_direct", ()).await;
+        assert_eq!(dna_info_bar_direct, None);
+
+        let yaml = "foo: bar";
+        let (conductor, alice) = test_conductor(YamlProperties::new(serde_yaml::from_str(yaml).unwrap()).try_into().unwrap()).await;
+        let dna_info_foo: Option<String> = conductor.call(&alice, "dna_info_value", "foo").await;
+        assert_eq!(dna_info_foo, Some("bar".into()));
+        let dna_info_foo_direct: Option<String> = conductor.call(&alice, "dna_info_foo_direct", ()).await;
+        assert_eq!(dna_info_foo_direct, Some("bar".into()));
+
+        let dna_info_bar: Option<String> = conductor.call(&alice, "dna_info_value", "bar").await;
+        assert_eq!(dna_info_bar, None);
+        let dna_info_bar_direct: Option<String> = conductor.call(&alice, "dna_info_bar_direct", ()).await;
+        assert_eq!(dna_info_bar_direct, None);
+
+        let yaml = "foo: 1\nbar: bing";
+        let (conductor, alice) = test_conductor(YamlProperties::new(serde_yaml::from_str(yaml).unwrap()).try_into().unwrap()).await;
+        let dna_info_foo: Option<u64> = conductor.call(&alice, "dna_info_value", "foo").await;
+        assert_eq!(dna_info_foo, Some(1));
+        let dna_info_foo_direct: Option<u64> = conductor.call(&alice, "dna_info_foo_direct", ()).await;
+        assert_eq!(dna_info_foo_direct, Some(1));
+
+        let dna_info_bar: Option<String> = conductor.call(&alice, "dna_info_value", "bar").await;
+        assert_eq!(dna_info_bar, Some("bing".into()));
+        let dna_info_bar_direct: Option<String> = conductor.call(&alice, "dna_info_bar_direct", ()).await;
+        assert_eq!(dna_info_bar_direct, Some("bing".into()));
+
+        let yaml = "baz: \n  foo: \n   bar: 1";
+        let (conductor, alice) = test_conductor(YamlProperties::new(serde_yaml::from_str(yaml).unwrap()).try_into().unwrap()).await;
+        let nested: Option<i64> = conductor.call(&alice, "dna_info_nested", ()).await;
+        assert_eq!(nested, Some(1));
     }
 }

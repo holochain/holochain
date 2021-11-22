@@ -11,6 +11,7 @@ crate-type = [ "cdylib", "rlib" ]
 [dependencies]
 hdk = { path = "../../../../hdk", features = ["fixturators"] }
 serde = "1.0"
+serde_yaml = "0.8"
 
 [dev-dependencies]
 fixt = { path = "../../../../fixt" }
