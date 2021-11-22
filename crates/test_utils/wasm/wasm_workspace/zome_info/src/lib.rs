@@ -1,4 +1,5 @@
 use hdk::prelude::*;
+use std::collections::HashMap;
 
 #[hdk_entry(id = "thing")]
 struct Thing;
@@ -70,6 +71,24 @@ fn remote_remote_call_info(agent: AgentPubKey) -> ExternResult<CallInfo> {
 #[hdk_extern]
 fn dna_info(_: ()) -> ExternResult<DnaInfo> {
     hdk::prelude::dna_info()
+}
+
+#[derive(Deserialize, Serialize, Debug, SerializedBytes)]
+struct FooProperties(Option<HashMap<String, String>>);
+
+#[hdk_extern]
+fn dna_info_foo(_: ()) -> ExternResult<Option<String>> {
+    Ok(FooProperties::try_from(hdk::prelude::dna_info()?.properties)?.0.and_then(|m| m.get("foo").cloned()))
+}
+
+#[derive(Deserialize, Serialize, Debug, SerializedBytes)]
+struct FooPropertiesDirect {
+    foo: Option<String>
+}
+
+#[hdk_extern]
+fn dna_info_foo_direct(_: ()) -> ExternResult<Option<String>> {
+    Ok(FooPropertiesDirect::try_from(hdk::prelude::dna_info()?.properties)?.foo)
 }
 
 #[cfg(test)]
