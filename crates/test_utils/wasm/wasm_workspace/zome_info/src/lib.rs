@@ -73,12 +73,9 @@ fn dna_info(_: ()) -> ExternResult<DnaInfo> {
     hdk::prelude::dna_info()
 }
 
-#[derive(Deserialize, Serialize, Debug, SerializedBytes)]
-struct FooProperties(Option<HashMap<String, String>>);
-
 #[hdk_extern]
 fn dna_info_foo(_: ()) -> ExternResult<Option<String>> {
-    Ok(FooProperties::try_from(hdk::prelude::dna_info()?.properties)?.0.and_then(|m| m.get("foo").cloned()))
+    Ok(Value::try_from(hdk::prelude::dna_info()?.properties)?.0.and_then(|m| m.get("foo").cloned()))
 }
 
 #[derive(Deserialize, Serialize, Debug, SerializedBytes)]
