@@ -37,7 +37,7 @@ pub mod test {
     use ::fixt::prelude::*;
     use holochain_types::{prelude::MockDnaStore, properties::YamlProperties};
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::prelude::*;
+    use hdk::prelude::*;
 
     async fn test_conductor(properties: SerializedBytes) -> (SweetConductor, SweetZome) {
         let (dna_file, _) = SweetDnaFile::from_test_wasms(random_uid(), vec![TestWasm::ZomeInfo], properties)
@@ -86,8 +86,8 @@ pub mod test {
 
         let dna_info_foo: Option<String> = conductor.call(&alice, "dna_info_foo", ()).await;
         assert_eq!(dna_info_foo, None);
-        let dna_info_foo_direct: ExternResult<Option<String>> = conductor.call_fallible(&alice, "dna_info_foo_direct", ()).await;
-        assert_eq!(dna_info_foo_direct.to_string(), "invalid type: unit value, expected struct FooPropertiesDirect".to_string());
+        let dna_info_foo_direct: Option<String> = conductor.call(&alice, "dna_info_foo_direct", ()).await;
+        assert_eq!(dna_info_foo_direct, None);
 
         let (conductor, alice) = test_conductor(YamlProperties::new(serde_yaml::from_str("foo: bar").unwrap()).try_into().unwrap()).await;
         let dna_info_foo: Option<String> = conductor.call(&alice, "dna_info_foo", ()).await;

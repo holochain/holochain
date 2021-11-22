@@ -83,12 +83,15 @@ fn dna_info_foo(_: ()) -> ExternResult<Option<String>> {
 
 #[derive(Deserialize, Serialize, Debug, SerializedBytes)]
 struct FooPropertiesDirect {
+    #[serde(default)]
     foo: Option<String>
 }
+#[derive(Deserialize, Serialize, Debug, SerializedBytes)]
+struct MaybeFooPropertiesDirect(Option<FooPropertiesDirect>);
 
 #[hdk_extern]
 fn dna_info_foo_direct(_: ()) -> ExternResult<Option<String>> {
-    Ok(FooPropertiesDirect::try_from(hdk::prelude::dna_info()?.properties)?.foo)
+    Ok(MaybeFooPropertiesDirect::try_from(hdk::prelude::dna_info()?.properties)?.0.and_then(|foo_properties_direct| foo_properties_direct.foo))
 }
 
 #[cfg(test)]
