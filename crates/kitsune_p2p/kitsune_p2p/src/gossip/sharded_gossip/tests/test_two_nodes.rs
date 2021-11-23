@@ -531,10 +531,7 @@ async fn initiate_after_target_is_set() {
     dbg!(&cert);
     dbg!(&agents);
     // - Bob accepts the round.
-    let bob_outgoing = bob
-        .process_incoming(cert, alice_initiate)
-        .await
-        .unwrap();
+    let bob_outgoing = bob.process_incoming(cert, alice_initiate).await.unwrap();
     assert_eq!(bob_outgoing.len(), 5);
 
     bob.inner

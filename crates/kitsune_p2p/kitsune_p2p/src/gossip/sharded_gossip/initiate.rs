@@ -141,7 +141,7 @@ impl ShardedGossipLocal {
             .map_err(KitsuneError::other)?;
 
         // Send the intervals back as the accept message.
-        gossip.push(ShardedGossipWire::accept(local_arcs, agent_list));
+        gossip.push(ShardedGossipWire::accept(local_arcs.clone(), agent_list));
 
         // Generate the bloom filters and new state.
         let state = self
