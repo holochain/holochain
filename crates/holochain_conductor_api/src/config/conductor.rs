@@ -1,7 +1,7 @@
 #![deny(missing_docs)]
 //! This module is used to configure the conductor
 
-use holochain_types::env::DbSyncLevel;
+use holochain_types::env::DbSyncStrategy;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
@@ -47,10 +47,13 @@ pub struct ConductorConfig {
     pub network: Option<holochain_p2p::kitsune_p2p::KitsuneP2pConfig>,
 
     #[serde(default)]
-    /// Override the default database synchronous level.
-    /// See [sqlite documentation](https://www.sqlite.org/pragma.html#pragma_synchronous).
-    /// Warning: Using `Off` level could result in database corruption that cannot be recovered from.
-    pub db_sync_level: DbSyncLevel,
+    /// Override the default database synchronous strategy.
+    /// See [sqlite documentation](https://www.sqlite.org/pragma.html#pragma_synchronous)
+    /// for information about database sync levels.
+    /// See [`DbSyncStrategy`] for details.
+    /// This is best left at it's default value unless you know what you
+    /// are doing.
+    pub db_sync_strategy: DbSyncStrategy,
     //
     //
     // /// Which signals to emit
@@ -121,7 +124,7 @@ pub mod tests {
                 dpki: None,
                 keystore: KeystoreConfig::DangerTestKeystoreLegacyDeprecated,
                 admin_interfaces: None,
-                db_sync_level: DbSyncLevel::default(),
+                db_sync_strategy: DbSyncStrategy::default(),
             }
         );
     }
@@ -170,7 +173,7 @@ pub mod tests {
         proxy_to_expire_ms: 42
       network_type: quic_bootstrap
 
-    db_sync_level: Off
+    db_sync_strategy: Fast
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
         use holochain_p2p::kitsune_p2p::*;
@@ -213,7 +216,7 @@ pub mod tests {
                     driver: InterfaceDriver::Websocket { port: 1234 }
                 }]),
                 network: Some(network_config),
-                db_sync_level: DbSyncLevel::Off,
+                db_sync_strategy: DbSyncStrategy::Fast,
             }
         );
     }

@@ -12,9 +12,12 @@ use holochain_p2p::{
     dht_arc::{DhtArc, DhtLocation},
     AgentPubKeyExt, DhtOpHashExt, DnaHashExt,
 };
-use holochain_sqlite::{db::AsP2pStateTxExt, prelude::DatabaseResult};
+use holochain_sqlite::{
+    db::{AsP2pStateTxExt, DbKindAuthored, DbKindDht, DbKindP2pAgentStore},
+    prelude::DatabaseResult,
+};
 use holochain_state::prelude::StateQueryResult;
-use holochain_types::{dht_op::DhtOpType, env::EnvRead};
+use holochain_types::{dht_op::DhtOpType, env::DbRead};
 use kitsune_p2p::{KitsuneAgent, KitsuneOpHash};
 use kitsune_p2p_types::consistency::*;
 use rusqlite::named_params;
@@ -23,8 +26,8 @@ use crate::conductor::ConductorHandle;
 
 struct Stores {
     agent: Arc<KitsuneAgent>,
-    cell_env: EnvRead,
-    p2p_env: EnvRead,
+    authored_env: DbRead<DbKindAuthored>,
+    p2p_env: DbRead<DbKindP2pAgentStore>,
 }
 
 #[derive(Clone)]
@@ -43,11 +46,13 @@ pub async fn local_machine_session(conductors: &[ConductorHandle], timeout: Dura
                 .entry(cell_id.dna_hash().clone())
                 .or_insert_with(|| vec![None; conductors.len()]);
             if space[i].is_none() {
-                let p2p_env: EnvRead = c.get_p2p_env(cell_id.dna_hash().to_kitsune()).into();
+                let p2p_env: DbRead<DbKindP2pAgentStore> =
+                    c.get_p2p_env(cell_id.dna_hash().to_kitsune()).into();
                 space[i] = Some((p2p_env, Vec::new()));
             }
             space[i].as_mut().unwrap().1.push((
-                c.get_cell_env_readonly(&cell_id).unwrap(),
+                c.get_authored_env(cell_id.dna_hash()).unwrap().into(),
+                c.get_dht_env(cell_id.dna_hash()).unwrap().into(),
                 cell_id.agent_pubkey().to_kitsune(),
             ));
         }
@@ -70,9 +75,9 @@ pub async fn local_machine_session(conductors: &[ConductorHandle], timeout: Dura
 
         // Gather the expected agents and op hashes from each conductor.
         for (p2p_env, agents) in conductors.into_iter().flatten() {
-            wait_for_agents.extend(agents.iter().map(|(_, agent)| agent.clone()));
-            agent_env_map.extend(agents.iter().cloned().map(|(e, a)| (a, e)));
-            agent_p2p_map.extend(agents.iter().cloned().map(|(_, a)| (a, p2p_env.clone())));
+            wait_for_agents.extend(agents.iter().map(|(_, _, agent)| agent.clone()));
+            agent_env_map.extend(agents.iter().cloned().map(|(_, dht, agent)| (agent, dht)));
+            agent_p2p_map.extend(agents.iter().cloned().map(|(_, _, a)| (a, p2p_env.clone())));
             let (a, h) = gather_conductor_data(p2p_env, agents).await;
             all_agents.extend(a);
             all_hashes.extend(h);
@@ -110,11 +115,12 @@ pub async fn local_machine_session_with_hashes(
                 continue;
             }
             if conductors[i].is_none() {
-                let p2p_env: EnvRead = c.get_p2p_env(cell_id.dna_hash().to_kitsune()).into();
+                let p2p_env: DbRead<DbKindP2pAgentStore> =
+                    c.get_p2p_env(cell_id.dna_hash().to_kitsune()).into();
                 conductors[i] = Some((p2p_env, Vec::new()));
             }
             conductors[i].as_mut().unwrap().1.push((
-                c.get_cell_env_readonly(&cell_id).unwrap(),
+                c.get_dht_env(cell_id.dna_hash()).unwrap().into(),
                 cell_id.agent_pubkey().to_kitsune(),
             ));
         }
@@ -329,18 +335,21 @@ Average hashes held: {}%.
 
 /// Gather all the published op hashes and agents from a conductor.
 async fn gather_conductor_data(
-    p2p_env: EnvRead,
-    agents: Vec<(EnvRead, Arc<KitsuneAgent>)>,
+    p2p_env: DbRead<DbKindP2pAgentStore>,
+    agents: Vec<(DbRead<DbKindAuthored>, DbRead<DbKindDht>, Arc<KitsuneAgent>)>,
 ) -> (
     Vec<(Arc<KitsuneAgent>, DhtArc)>,
     Vec<(DhtLocation, KitsuneOpHash)>,
 ) {
     // Create the stores iterator with the environments to search.
-    let stores = agents.iter().cloned().map(|(cell_env, agent)| Stores {
-        agent,
-        cell_env,
-        p2p_env: p2p_env.clone(),
-    });
+    let stores = agents
+        .iter()
+        .cloned()
+        .map(|(authored_env, _, agent)| Stores {
+            agent,
+            authored_env,
+            p2p_env: p2p_env.clone(),
+        });
     let all_published_data = gather_published_data(stores, CONCURRENCY)
         .await
         .expect("Failed to gather published data from conductor");
@@ -366,8 +375,8 @@ async fn expect_all(
     timeout: Duration,
     all_agents: Vec<(Arc<KitsuneAgent>, DhtArc)>,
     all_hashes: Vec<(DhtLocation, KitsuneOpHash)>,
-    agent_env_map: HashMap<Arc<KitsuneAgent>, EnvRead>,
-    agent_p2p_map: HashMap<Arc<KitsuneAgent>, EnvRead>,
+    agent_env_map: HashMap<Arc<KitsuneAgent>, DbRead<DbKindDht>>,
+    agent_p2p_map: HashMap<Arc<KitsuneAgent>, DbRead<DbKindP2pAgentStore>>,
 ) {
     let iter = generate_session(&all_agents, &all_hashes, timeout, agent_env_map);
     check_all(iter, tx, agent_p2p_map).await;
@@ -379,8 +388,8 @@ fn generate_session<'iter>(
     all_agents: &'iter Vec<(Arc<KitsuneAgent>, DhtArc)>,
     all_hashes: &'iter Vec<(DhtLocation, KitsuneOpHash)>,
     timeout: Duration,
-    agent_env_map: HashMap<Arc<KitsuneAgent>, EnvRead>,
-) -> impl Iterator<Item = (Arc<KitsuneAgent>, ConsistencySession, EnvRead)> + 'iter {
+    agent_env_map: HashMap<Arc<KitsuneAgent>, DbRead<DbKindDht>>,
+) -> impl Iterator<Item = (Arc<KitsuneAgent>, ConsistencySession, DbRead<DbKindDht>)> + 'iter {
     all_agents
         .iter()
         .map(move |(agent, arc)| {
@@ -427,19 +436,19 @@ fn generate_session<'iter>(
 /// Report back the results on the channel.
 /// Checks will report timeouts and failures.
 async fn check_all(
-    iter: impl Iterator<Item = (Arc<KitsuneAgent>, ConsistencySession, EnvRead)>,
+    iter: impl Iterator<Item = (Arc<KitsuneAgent>, ConsistencySession, DbRead<DbKindDht>)>,
     tx: tokio::sync::mpsc::Sender<SessionMessage>,
-    agent_p2p_map: HashMap<Arc<KitsuneAgent>, EnvRead>,
+    agent_p2p_map: HashMap<Arc<KitsuneAgent>, DbRead<DbKindP2pAgentStore>>,
 ) {
     futures::stream::iter(iter)
-        .for_each_concurrent(CONCURRENCY, |(agent, expected_session, cell_env)| {
+        .for_each_concurrent(CONCURRENCY, |(agent, expected_session, dht_env)| {
             let tx = tx.clone();
             let p2p_env = agent_p2p_map
                 .get(&agent)
                 .cloned()
                 .expect("Must contain all p2p envs, this is a bug.");
             let reporter = Reporter(tx, agent);
-            check_expected_data(reporter, expected_session, cell_env, p2p_env)
+            check_expected_data(reporter, expected_session, dht_env, p2p_env)
         })
         .await;
 }
@@ -448,10 +457,10 @@ async fn check_all(
 async fn check_expected_data(
     reporter: Reporter,
     session: ConsistencySession,
-    vault: EnvRead,
-    p2p_env: EnvRead,
+    dht_env: DbRead<DbKindDht>,
+    p2p_env: DbRead<DbKindP2pAgentStore>,
 ) {
-    if let Err(e) = check_expected_data_inner(reporter.clone(), session, vault, p2p_env).await {
+    if let Err(e) = check_expected_data_inner(reporter.clone(), session, dht_env, p2p_env).await {
         reporter
             .send_report(SessionReport::Error {
                 error: e.to_string(),
@@ -466,8 +475,8 @@ async fn check_expected_data(
 async fn check_expected_data_inner(
     reporter: Reporter,
     session: ConsistencySession,
-    vault: EnvRead,
-    p2p_env: EnvRead,
+    dht_env: DbRead<DbKindDht>,
+    p2p_env: DbRead<DbKindP2pAgentStore>,
 ) -> DatabaseResult<()> {
     // Unpack the session.
     let ConsistencySession {
@@ -510,7 +519,7 @@ async fn check_expected_data_inner(
         missing_agents = check_agents(&p2p_env, &expected_agents).await?.collect();
 
         // Check the hashes.
-        check_hashes(&vault, &mut expected_hashes, &mut missing_hashes).await?;
+        check_hashes(&dht_env, &mut expected_hashes, &mut missing_hashes).await?;
 
         // If both are now empty we report success.
         if missing_agents.is_empty() && missing_hashes.is_empty() {
@@ -552,7 +561,7 @@ async fn check_expected_data_inner(
 // Seems these lifetimes are actually needed.
 #[allow(clippy::needless_lifetimes)]
 async fn check_agents<'iter>(
-    p2p_env: &EnvRead,
+    p2p_env: &DbRead<DbKindP2pAgentStore>,
     expected_agents: &'iter [Arc<KitsuneAgent>],
 ) -> DatabaseResult<impl Iterator<Item = &'iter Arc<KitsuneAgent>> + 'iter> {
     // Poll the peer database for the currently held agents.
@@ -575,7 +584,7 @@ async fn check_agents<'iter>(
 
 /// Check the op hashes we are meant to be holding.
 async fn check_hashes(
-    vault: &EnvRead,
+    dht_env: &DbRead<DbKindDht>,
     expected_hashes: &mut Vec<KitsuneOpHash>,
     missing_hashes: &mut Vec<KitsuneOpHash>,
 ) -> DatabaseResult<()> {
@@ -588,7 +597,7 @@ async fn check_hashes(
     let mut missing = std::mem::replace(missing_hashes, Vec::with_capacity(0));
 
     // Poll the vault database for each expected hashes existence.
-    let mut r = vault
+    let mut r = dht_env
                 .async_reader(move |txn| {
                     for hash in &expected {
                         // TODO: This might be too slow, could instead save the holochain hash versions.
@@ -624,7 +633,7 @@ async fn gather_published_data(
 ) -> StateQueryResult<Vec<PublishedData>> {
     use futures::stream::TryStreamExt;
     let iter = iter.map(|stores| async move {
-        let published_hashes = request_published_ops(&stores.cell_env).await?;
+        let published_hashes = request_published_ops(&stores.authored_env).await?;
         let storage_arc = request_arc(&stores.p2p_env, (*stores.agent).clone()).await?;
         Ok(storage_arc.map(|storage_arc| PublishedData {
             agent: stores.agent,
@@ -641,7 +650,7 @@ async fn gather_published_data(
 
 /// Request the published hashes for the given agent.
 async fn request_published_ops(
-    env: &EnvRead,
+    env: &DbRead<DbKindAuthored>,
 ) -> StateQueryResult<Vec<(DhtLocation, KitsuneOpHash)>> {
     Ok(env
         .async_reader(|txn| {
@@ -656,8 +665,6 @@ async fn request_published_ops(
                     JOIN
                     Header ON DhtOp.header_hash = Header.hash
                     WHERE
-                    DhtOp.is_authored = 1
-                    AND
                     (DhtOp.type != :store_entry OR Header.private_entry = 0)
                 ",
                 )?
@@ -678,7 +685,10 @@ async fn request_published_ops(
 }
 
 /// Request the storage arc for the given agent.
-async fn request_arc(env: &EnvRead, agent: KitsuneAgent) -> StateQueryResult<Option<DhtArc>> {
+async fn request_arc(
+    env: &DbRead<DbKindP2pAgentStore>,
+    agent: KitsuneAgent,
+) -> StateQueryResult<Option<DhtArc>> {
     env.async_reader(move |txn| Ok(txn.p2p_get_agent(&agent)?.map(|info| info.storage_arc)))
         .await
 }

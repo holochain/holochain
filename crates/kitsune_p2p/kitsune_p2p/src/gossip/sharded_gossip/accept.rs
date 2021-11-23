@@ -33,7 +33,11 @@ impl ShardedGossipLocal {
 
         // Get the local intervals.
         let local_agent_arcs =
-            store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents).await?;
+            store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents)
+                .await?
+                .into_iter()
+                .map(|(_, a)| a)
+                .collect();
 
         let mut gossip = Vec::with_capacity(2);
 

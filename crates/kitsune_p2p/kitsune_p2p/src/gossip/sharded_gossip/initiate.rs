@@ -127,10 +127,8 @@ impl ShardedGossipLocal {
         // Get the local intervals.
         let local_agent_arcs =
             store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents).await?;
-        let local_arcs = local_agent_arcs
-            .iter()
-            .map(|(_, arc)| arc.clone())
-            .collect();
+        let local_arcs: Vec<ArcInterval> =
+            local_agent_arcs.into_iter().map(|(_, arc)| arc).collect();
 
         let mut gossip = Vec::with_capacity(3);
 
@@ -149,7 +147,7 @@ impl ShardedGossipLocal {
         let state = self
             .generate_blooms(
                 remote_agent_list.clone(),
-                local_agent_arcs,
+                local_arcs,
                 remote_arc_set,
                 &mut gossip,
             )
@@ -187,12 +185,11 @@ impl ShardedGossipLocal {
     pub(super) async fn generate_blooms(
         &self,
         remote_agent_list: Vec<AgentInfoSigned>,
-        local_agent_arcs: Vec<(Arc<KitsuneAgent>, ArcInterval)>,
+        local_arcs: Vec<ArcInterval>,
         remote_arc_set: Vec<ArcInterval>,
         gossip: &mut Vec<ShardedGossipWire>,
     ) -> KitsuneResult<RoundState> {
         // Create the common arc set from the remote and local arcs.
-        let (local_agents, local_arcs): (HashSet<_>, Vec<_>) = local_agent_arcs.into_iter().unzip();
         let arc_set: DhtArcSet = local_arcs.into();
         let remote_arc_set: DhtArcSet = remote_arc_set.into();
         let common_arc_set = Arc::new(arc_set.intersection(&remote_arc_set));
@@ -214,7 +211,7 @@ impl ShardedGossipLocal {
         // Generate the ops bloom for all local agents within the common arc.
         for (i, window) in windows.into_iter().enumerate() {
             let blooms = self
-                .generate_ops_blooms_for_time_window(&local_agents, &state.common_arc_set, window)
+                .generate_ops_blooms_for_time_window(&state.common_arc_set, window)
                 .await?;
 
             // If no blooms were found for this time window then return a no overlap.

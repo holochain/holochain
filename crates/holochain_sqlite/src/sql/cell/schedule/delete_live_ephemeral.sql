@@ -2,4 +2,5 @@ DELETE FROM
   ScheduledFunctions
 WHERE
   ephemeral = TRUE
-  AND START <= ?
+  AND START <= :now
+  AND author = :author
