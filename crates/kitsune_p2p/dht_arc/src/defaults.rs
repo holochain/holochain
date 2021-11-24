@@ -1,6 +1,7 @@
 /// The minimum number of peers before sharding can begin.
 /// This factors in the expected uptime to reach the redundancy target.
-pub const DEFAULT_MIN_PEERS: usize = (DEFAULT_REDUNDANCY_TARGET as f64 / DEFAULT_UPTIME) as usize;
+// pub const DEFAULT_MIN_PEERS: usize = (DEFAULT_REDUNDANCY_TARGET as f64 / DEFAULT_UPTIME) as usize;
+pub const DEFAULT_MIN_PEERS: usize = DEFAULT_REDUNDANCY_TARGET;
 
 /// The minimum number of peers we can consider acceptable to see in our arc
 /// during testing.
@@ -13,6 +14,11 @@ pub(crate) const DEFAULT_REDUNDANCY_TARGET: usize = 50;
 /// This creates a target range rather than a single target value, and when an arc
 /// reaches any value in this range, it will stop resizing. This lends stability to the system.
 pub(crate) const DEFAULT_COVERAGE_BUFFER: f64 = 0.05; // 5%
+
+/// The percentage of the total network redundancy coverage we allow 
+/// as a buffer before considering there to be not enough coverage.
+/// This helps allow for errors in extrapolation. 
+pub(crate) const DEFAULT_TOTAL_COVERAGE_BUFFER: f64 = 0.1; // 10%
 
 /// Default assumed up time for nodes.
 pub(crate) const DEFAULT_UPTIME: f64 = 0.5;

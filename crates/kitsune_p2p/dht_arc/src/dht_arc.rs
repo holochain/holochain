@@ -41,6 +41,10 @@ impl DhtLocation {
     pub fn as_u32(&self) -> u32 {
         self.0 .0
     }
+    
+    pub fn as_i64(&self) -> i64 {
+        self.0 .0 as i64
+    }
 
     #[cfg(any(test, feature = "test_utils"))]
     pub fn as_i32(&self) -> i32 {

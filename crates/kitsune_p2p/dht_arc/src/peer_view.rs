@@ -1,5 +1,7 @@
 mod peer_view_alpha;
+mod peer_view_beta;
 pub use peer_view_alpha::*;
+pub use peer_view_beta::*;
 
 use crate::DhtArc;
 
@@ -10,11 +12,12 @@ pub mod gaps;
 #[derive(Debug, Clone, derive_more::From)]
 pub enum PeerStrat {
     Alpha(PeerStratAlpha),
+    Beta(PeerStratBeta),
 }
 
 impl Default for PeerStrat {
     fn default() -> Self {
-        PeerStratAlpha::default().into()
+        PeerStratBeta::default().into()
     }
 }
 
@@ -22,12 +25,14 @@ impl PeerStrat {
     pub fn view(&self, arc: DhtArc, peers: &[DhtArc]) -> PeerView {
         match self {
             Self::Alpha(s) => s.view(arc, peers).into(),
+            Self::Beta(s) => s.view(arc, peers).into(),
         }
     }
 
     pub fn view_unchecked(&self, arc: DhtArc, peers: &[DhtArc]) -> PeerView {
         match self {
             Self::Alpha(s) => s.view_unchecked(arc, peers).into(),
+            Self::Beta(s) => s.view_unchecked(arc, peers).into(),
         }
     }
 }
@@ -42,6 +47,7 @@ impl PeerStrat {
 #[derive(Debug, Clone, derive_more::From)]
 pub enum PeerView {
     Alpha(PeerViewAlpha),
+    Beta(PeerViewBeta),
 }
 
 impl PeerView {
@@ -50,6 +56,7 @@ impl PeerView {
     pub fn next_coverage(&self, current: f64) -> f64 {
         match self {
             Self::Alpha(s) => s.next_coverage(current),
+            Self::Beta(s) => s.next_coverage(current),
         }
     }
 }

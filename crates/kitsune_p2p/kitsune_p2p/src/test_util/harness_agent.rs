@@ -60,7 +60,7 @@ pub(crate) async fn spawn_test_agent(
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::dependencies::lair_keystore_api_0_0;
 use kitsune_p2p_types::dht_arc::DhtArcSet;
-use kitsune_p2p_types::dht_arc::PeerStratAlpha;
+use kitsune_p2p_types::dht_arc::PeerStratBeta;
 use lair_keystore_api_0_0::entry::EntrySignEd25519;
 use lair_keystore_api_0_0::internal::sign_ed25519::*;
 
@@ -196,8 +196,8 @@ impl KitsuneP2pEventHandler for AgentHarness {
         &mut self,
         _space: Arc<KitsuneSpace>,
         dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
-    ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht_arc::PeerViewAlpha> {
-        let strat = PeerStratAlpha::default();
+    ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht_arc::PeerViewBeta> {
+        let strat = PeerStratBeta::default();
         let arcs: Vec<_> = self
             .agent_store
             .values()

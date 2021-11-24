@@ -360,6 +360,7 @@ async fn update_arc_length(
     arc: &mut DhtArc,
 ) -> KitsuneP2pResult<()> {
     let density = evt_sender.query_peer_density(space.clone(), *arc).await?;
+    dbg!(density.expected_count());
     arc.update_length(density);
     Ok(())
 }
@@ -1148,6 +1149,7 @@ impl Space {
                 .get(agent)
                 .cloned()
                 .unwrap_or_else(|| DhtArc::full(agent.get_loc()))
+                // .unwrap_or_else(|| DhtArc::with_coverage(agent.get_loc(), 0.1))
         }
     }
 }

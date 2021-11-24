@@ -516,7 +516,7 @@ fn test_peer_gaps() {
     }
 }
 
-fn even_dist_peers(num: usize, half_lens: &[u32]) -> Vec<DhtArc> {
+pub(crate) fn even_dist_peers(num: usize, half_lens: &[u32]) -> Vec<DhtArc> {
     let mut hl = half_lens.iter();
     let iter = std::iter::repeat_with(|| hl.next().unwrap_or(&half_lens[0]));
     (0..num)
@@ -528,6 +528,6 @@ fn even_dist_peers(num: usize, half_lens: &[u32]) -> Vec<DhtArc> {
         .collect()
 }
 
-fn assert_between(v: f64, lo: f64, hi: f64) {
-    assert!(lo <= v && v <= hi);
+pub(crate) fn assert_between(v: f64, lo: f64, hi: f64) {
+    assert!(lo <= v && v <= hi, "{} <= {} <= {}", lo, v, hi);
 }

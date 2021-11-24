@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
-    bin_types::{KitsuneBinType, KitsuneOpHash},
+    bin_types::{KitsuneAgent, KitsuneBinType, KitsuneOpHash},
     tx2::tx2_utils::PoolBuf,
 };
 
@@ -21,7 +21,7 @@ pub fn create_agent_bloom<'a>(
             .collect(),
         None => agents.collect(),
     };
-    let mut bloom = bloomfilter::Bloom::new_for_fp_rate(agents.len(), 0.0001);
+    let mut bloom = bloomfilter::Bloom::new_for_fp_rate(agents.len(), 0.01);
     let empty = agents.is_empty();
     for info in agents {
         let signed_at_ms = info.signed_at_ms;
@@ -73,4 +73,21 @@ pub fn check_ops_boom<'a>(
                 .collect()
         }
     }
+}
+
+/// Check an ops bloom for testing.
+pub fn check_agent_boom<'a>(
+    agents: impl Iterator<Item = (&'a Arc<KitsuneAgent>, &'a AgentInfoSigned)>,
+    bloom: &[u8],
+) -> Vec<&'a Arc<KitsuneAgent>> {
+    let filter = decode_bloom_filter(bloom);
+    agents
+        .filter(|(agent, info)| {
+            !filter.check(&Arc::new(MetaOpKey::Agent(
+                (*agent).clone(),
+                info.signed_at_ms,
+            )))
+        })
+        .map(|(a, _)| a)
+        .collect()
 }

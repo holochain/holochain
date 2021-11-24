@@ -135,7 +135,7 @@ pub(super) async fn put_agent_info(
     space: &Arc<KitsuneSpace>,
     agents: &[Arc<AgentInfoSigned>],
 ) -> KitsuneResult<()> {
-    let peer_data = agents.iter().map(|i| (**i).clone()).collect();
+    let peer_data: Vec<_> = agents.iter().map(|i| (**i).clone()).collect();
     evt_sender
         .put_agent_info_signed(PutAgentInfoSignedEvt {
             space: space.clone(),

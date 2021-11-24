@@ -11,7 +11,7 @@ use std::iter;
 
 /// Maximum number of iterations. If we iterate this much, we assume the
 /// system is divergent (unable to reach equilibrium).
-const DIVERGENCE_ITERS: usize = 64;
+const DIVERGENCE_ITERS: usize = 20;
 
 /// Number of consecutive rounds of no movement before declaring convergence.
 const CONVERGENCE_WINDOW: usize = 3;
@@ -180,6 +180,86 @@ fn parameterized_stability_test() {
     eq.assert_min_redundancy(96);
 }
 
+/// Equilibrium test for a single distribution
+#[test]
+fn test_peer_view_beta() {
+    observability::test_run().ok();
+
+    let mut rng = seeded_rng(None);
+
+    let n = 1000;
+    let j = 10.0 / n as f64;
+    let s = ArcLenStrategy::Constant(0.1);
+
+    let r = 50;
+    let strat = PeerStratBeta {
+        min_sample_size: r,
+        ..Default::default()
+    }
+    .into();
+
+    let target_redundancy = r as f64 / DEFAULT_UPTIME;
+    let error_buffer = target_redundancy as f64 * DEFAULT_TOTAL_COVERAGE_BUFFER;
+    let min_r = target_redundancy - error_buffer;
+
+    let peers = simple_parameterized_generator(&mut rng, n, j, s);
+    tracing::debug!("{}", EpochStats::oneline_header());
+    let report = determine_oscillations(
+        2,
+        peers,
+        |peers| {
+            let (peers, stats) = run_one_epoch(&strat, peers, None, DETAIL);
+            tracing::debug!("{}", stats.oneline());
+            (peers, stats)
+        },
+        |EpochStats {
+             net_delta_avg: _,
+             gross_delta_avg: _,
+             delta_max: _,
+             delta_min: _,
+             min_redundancy,
+         }| { (min_redundancy as f64) < min_r },
+    );
+    for run in report.0 {
+        for peer in &run.peers {
+            let view = strat.view(*peer, run.peers.as_slice());
+            match view {
+                PeerView::Beta(view) => {
+                        dbg!(view.count);
+                    if view.target_coverage() > 0.9 {
+                        dbg!(view.est_total_coverage());
+                        dbg!(view.strat.target_network_coverage() - view.est_total_coverage());
+                        dbg!(view.count);
+                    }
+                    // dbg!(view.est_total_coverage());
+                }
+                _ => (),
+            }
+        }
+        for &EpochStats {
+            net_delta_avg: _,
+            gross_delta_avg: _,
+            delta_max: _,
+            delta_min: _,
+            min_redundancy,
+        } in &run.history
+        {
+            assert!(
+                min_redundancy as f64 >= min_r,
+                "{} >= {}",
+                min_redundancy,
+                min_r
+            );
+        }
+    }
+    // dbg!(report);
+    // report(&eq);
+    // eq.assert_convergent();
+    // // TODO: the min redundancy is never exactly 100.
+    // //       would be good to look at the *average* redundancy, and other stats.
+    // eq.assert_min_redundancy(96);
+}
+
 fn report(e: &RunBatch) {
     let counts = DataVec::new(e.histories().map(|h| h.len() as f64).collect());
 
@@ -255,6 +335,48 @@ where
         history,
         peers,
     }
+}
+
+fn determine_oscillations<'a, F, T>(
+    iters: usize,
+    peers: Peers,
+    step: F,
+    mut targets: T,
+) -> OscillationsBatch
+where
+    F: 'a + Clone + Fn(Peers) -> (Peers, EpochStats),
+    T: 'a + Clone + FnMut(EpochStats) -> bool,
+{
+    let mut runs = vec![];
+    for i in 1..=iters {
+        tracing::debug!("----- Running movement iteration {} -----", i);
+        let run = record_oscillations(peers.clone(), |peers| step(peers), &mut targets);
+        runs.push(run);
+    }
+    OscillationsBatch(runs)
+}
+
+/// Run iterations until there is no movement of any arc
+fn record_oscillations<'a, F, T>(mut peers: Peers, step: F, targets: &mut T) -> Oscillations
+where
+    F: Fn(Peers) -> (Peers, EpochStats),
+    T: FnMut(EpochStats) -> bool,
+{
+    let mut history = Vec::with_capacity(DIVERGENCE_ITERS);
+    let mut num_missed = 0;
+    for _ in 0..DIVERGENCE_ITERS {
+        let (p, stats) = step(peers);
+        peers = p;
+        history.push(stats.clone());
+        if targets(stats) {
+            num_missed += 1;
+            if num_missed > CONVERGENCE_WINDOW {
+                return Oscillations { history, peers };
+            }
+        }
+    }
+
+    Oscillations { history, peers }
 }
 
 /// Resize every arc based on neighbors' arcs, and compute stats about this iteration
@@ -364,6 +486,9 @@ pub fn generate_evenly_spaced_with_half_lens_and_jitter(
 #[derive(Debug)]
 struct RunBatch(Vec<Run>);
 
+#[derive(Debug)]
+struct OscillationsBatch(Vec<Oscillations>);
+
 #[allow(dead_code)]
 impl RunBatch {
     pub fn vergence(&self) -> Vergence {
@@ -412,13 +537,20 @@ struct Run {
     peers: Peers,
 }
 
+#[derive(Debug)]
+struct Oscillations {
+    history: Vec<EpochStats>,
+    /// the final state of the peers at the last iteration
+    peers: Peers,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Vergence {
     Convergent,
     Divergent,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct EpochStats {
     net_delta_avg: f64,
     gross_delta_avg: f64,
