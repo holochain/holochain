@@ -149,6 +149,7 @@ struct PropertiesDirect {
     #[serde(default)]
     baz: Value,
 }
+
 /// To support an empty properties file the entire properties struct must be
 /// wrapped in an `Option` with a newtype that implements `SerializedBytes`.
 #[derive(Deserialize, Serialize, Debug, SerializedBytes)]
