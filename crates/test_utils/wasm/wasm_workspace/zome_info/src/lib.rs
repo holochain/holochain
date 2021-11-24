@@ -118,7 +118,7 @@ fn dna_info_value(k: String) -> ExternResult<serde_yaml::Value> {
     )
 }
 
-/// Yaml doesnt enforce the type of any value.
+/// Yaml doesn't enforce the type of any value.
 /// Rust can support multiple options for the type of a value as an enum.
 /// Serialization will fail unless `#[serde(untagged)]` is applied to the enum
 /// so that variant names are ignored.
