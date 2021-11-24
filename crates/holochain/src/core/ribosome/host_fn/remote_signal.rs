@@ -8,6 +8,7 @@ use holochain_zome_types::signal::RemoteSignal;
 use holochain_zome_types::zome::FunctionName;
 use std::sync::Arc;
 use tracing::Instrument;
+use crate::core::ribosome::RibosomeError;
 
 #[tracing::instrument(skip(_ribosome, call_context, input))]
 pub fn remote_signal(
@@ -43,7 +44,11 @@ pub fn remote_signal(
             );
             Ok(())
         }
-        _ => unreachable!(),
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "remote_signal".into()
+        ).to_string()))
     }
 }
 
