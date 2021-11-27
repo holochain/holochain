@@ -1,11 +1,47 @@
 //! Types for source chain queries
 
+use std::collections::HashMap;
+use std::collections::HashSet;
+
+use crate::Element;
+use crate::HeaderHashed;
 use crate::header::EntryType;
-use crate::header::Header;
 use crate::header::HeaderType;
 use crate::warrant::Warrant;
+use holo_hash::EntryHash;
+use holo_hash::HasHash;
 use holo_hash::HeaderHash;
 pub use holochain_serialized_bytes::prelude::*;
+
+/// Defines several ways that queries can be restricted to a range.
+/// Notably hash bounded ranges disambiguate forks whereas sequence indexes do
+/// not as the same position can be found in many forks.
+#[derive(serde::Serialize, serde::Deserialize, PartialEq, Clone, Debug)]
+pub enum ChainQueryFilterSequenceRange {
+    /// Do NOT apply any range filtering for this query.
+    Unbounded,
+    /// A range over source chain sequence numbers.
+    /// This is ambiguous over forking histories and so should NOT be used in
+    /// validation logic.
+    /// Inclusive start, exclusive end.
+    /// TODO: can we generalize this over RangeBounds to allow unbounded ranges?
+    HeaderSeqRange(std::ops::Range<u32>),
+    /// A range over source chain header hashes.
+    /// This CAN be used in validation logic as forks are disambiguated.
+    /// Inclusive start and end (unlike std::ops::Range).
+    HeaderHashRange(HeaderHash, HeaderHash),
+    /// The terminating header hash and N preceeding elements.
+    /// N = 0 returns only the element with this `HeaderHash`.
+    /// This CAN be used in validation logic as forks are not possible when
+    /// "looking up" towards genesis from some `HeaderHash`.
+    HeaderHashTerminated(HeaderHash, u32),
+}
+
+impl Default for ChainQueryFilterSequenceRange {
+    fn default() -> Self {
+        Self::Unbounded
+    }
+}
 
 /// Query arguments
 #[derive(
@@ -13,14 +49,14 @@ pub use holochain_serialized_bytes::prelude::*;
 )]
 #[non_exhaustive]
 pub struct ChainQueryFilter {
-    /// The range of source chain sequence numbers to match.
-    /// Inclusive start, exclusive end.
-    // TODO: can we generalize this over RangeBounds to allow unbounded ranges?
-    pub sequence_range: Option<std::ops::Range<u32>>,
+    /// Limit the results to a range of elements according to their headers.
+    pub sequence_range: ChainQueryFilterSequenceRange,
     /// Filter by EntryType
     // NB: if this filter is set, you can't verify the results, so don't
     //     use this in validation
     pub entry_type: Option<EntryType>,
+    /// Filter by a list of `EntryHash`.
+    pub entry_hashes: Option<HashSet<EntryHash>>,
     /// Filter by HeaderType
     // NB: if this filter is set, you can't verify the results, so don't
     //     use this in validation
@@ -128,7 +164,7 @@ impl ChainQueryFilter {
 
     /// Filter on sequence range
     pub fn sequence_range(mut self, sequence_range: std::ops::Range<u32>) -> Self {
-        self.sequence_range = Some(sequence_range);
+        self.sequence_range = ChainQueryFilterSequenceRange::HeaderSeqRange(sequence_range);
         self
     }
 
@@ -150,29 +186,65 @@ impl ChainQueryFilter {
         self
     }
 
-    /// Perform the boolean check which this filter represents
-    pub fn check(&self, header: &Header) -> bool {
-        let check_range = self
-            .sequence_range
-            .as_ref()
-            .map(|range| range.contains(&header.header_seq()))
-            .unwrap_or(true);
-        let check_header_type = self
-            .header_type
-            .as_ref()
-            .map(|header_type| header.header_type() == *header_type)
-            .unwrap_or(true);
-        let check_entry_type = self
-            .entry_type
-            .as_ref()
-            .map(|entry_type| {
-                header
-                    .entry_type()
-                    .map(|header_entry_type| *header_entry_type == *entry_type)
-                    .unwrap_or(false)
-            })
-            .unwrap_or(true);
-        check_range && check_header_type && check_entry_type
+    /// If the sequence range supports fork disambiguation, apply it to remove
+    /// headers that are not in the correct branch.
+    pub fn headers_without_forks(&self, headers: Vec<HeaderHashed>) -> Vec<HeaderHashed> {
+        match &self.sequence_range {
+            ChainQueryFilterSequenceRange::Unbounded => headers,
+            ChainQueryFilterSequenceRange::HeaderSeqRange(range) => headers
+            .into_iter()
+            .filter(|header| range.contains(&header.header_seq()))
+            .collect(),
+            ChainQueryFilterSequenceRange::HeaderHashRange(start, end) => {
+                let mut header_hashmap = headers.iter().map(|header| (header.as_hash().clone(), header)).collect::<HashMap<HeaderHash, &HeaderHashed>>();
+                let mut filtered_headers = Vec::new();
+                let mut maybe_next_header = header_hashmap.remove(&end);
+                while let Some(next_header) = maybe_next_header {
+                    maybe_next_header = header_hashmap.remove(next_header.as_hash());
+                    filtered_headers.push(next_header.clone());
+                    // This comes after the push to make the range inclusive.
+                    if next_header.as_hash() == start {
+                        break;
+                    }
+                }
+                filtered_headers
+            },
+            ChainQueryFilterSequenceRange::HeaderHashTerminated(end, n) => {
+                let mut header_hashmap = headers.iter().map(|header| (header.as_hash().clone(), header)).collect::<HashMap<HeaderHash, &HeaderHashed>>();
+                let mut filtered_headers = Vec::new();
+                let mut maybe_next_header = header_hashmap.remove(&end);
+                let mut i = 0;
+                while let Some(next_header) = maybe_next_header {
+                    maybe_next_header = header_hashmap.remove(next_header.as_hash());
+                    filtered_headers.push(next_header.clone());
+                    // This comes after the push to make the range inclusive.
+                    if i == *n {
+                        break;
+                    }
+                    i = i + 1;
+                }
+                filtered_headers
+            }
+        }
+    }
+
+    /// Filter a vector of hashed headers according to the query.
+    pub fn filter_headers(&self, headers: Vec<HeaderHashed>) -> Vec<HeaderHashed> {
+        self.headers_without_forks(headers).into_iter().filter(|header| {
+            self.header_type.as_ref().map(|header_type| header.header_type() == *header_type).unwrap_or(true)
+            && self.entry_type.as_ref().map(|entry_type| header.entry_type() == Some(&entry_type)).unwrap_or(true)
+            && self.entry_hashes.as_ref().map(|entry_hashes| match header.entry_hash() {
+                Some(entry_hash) => entry_hashes.contains(entry_hash),
+                None => false,
+            }).unwrap_or(true)
+        }).collect()
+    }
+
+    /// Filter a vector of elements according to the query.
+    pub fn filter_elements(&self, elements: Vec<Element>) -> Vec<Element> {
+        let headers = self.filter_headers(elements.iter().map(|element| element.header_hashed()).cloned().collect());
+        let header_hashset = headers.iter().map(|header| header.as_hash().clone()).collect::<HashSet<HeaderHash>>();
+        elements.into_iter().filter(|element| header_hashset.contains(element.header_hashed().as_hash())).collect()
     }
 }
 
@@ -182,14 +254,14 @@ mod tests {
     use crate::fixt::AppEntryTypeFixturator;
     use crate::fixt::*;
     use crate::header::EntryType;
-    use crate::Header;
     use ::fixt::prelude::*;
+    use crate::HeaderHashed;
 
     use super::ChainQueryFilter;
 
     /// Create three Headers with various properties.
     /// Also return the EntryTypes used to construct the first two headers.
-    fn fixtures() -> [Header; 6] {
+    fn fixtures() -> [HeaderHashed; 6] {
         let entry_type_1 = EntryType::App(fixt!(AppEntryType));
         let entry_type_2 = EntryType::AgentPubKey;
 
@@ -216,18 +288,19 @@ mod tests {
         h6.header_seq = 5;
 
         let headers = [
-            h1.into(),
-            h2.into(),
-            h3.into(),
-            h4.into(),
-            h5.into(),
-            h6.into(),
+            HeaderHashed::from_content_sync(h1.into()),
+            HeaderHashed::from_content_sync(h2.into()),
+            HeaderHashed::from_content_sync(h3.into()),
+            HeaderHashed::from_content_sync(h4.into()),
+            HeaderHashed::from_content_sync(h5.into()),
+            HeaderHashed::from_content_sync(h6.into()),
         ];
         headers
     }
 
-    fn map_query(query: &ChainQueryFilter, headers: &[Header]) -> Vec<bool> {
-        headers.iter().map(|h| query.check(h)).collect::<Vec<_>>()
+    fn map_query(query: &ChainQueryFilter, headers: &[HeaderHashed]) -> Vec<bool> {
+        let filtered = query.filter_headers(headers.to_vec());
+        headers.iter().map(|h| filtered.contains(h)).collect::<Vec<_>>()
     }
 
     #[test]
