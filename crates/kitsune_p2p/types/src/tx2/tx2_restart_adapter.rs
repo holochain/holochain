@@ -89,6 +89,7 @@ impl RestartConRecvAdapt {
                     match state.con_recv.as_mut().unwrap().next().await {
                         Some(item) => break item,
                         None => {
+                            tokio::task::yield_now().await;
                             state.con_recv = None;
                             continue;
                         }

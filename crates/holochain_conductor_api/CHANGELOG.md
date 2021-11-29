@@ -4,6 +4,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- **BREAKING CHANGES**: db_sync_level changes to db_sync_strategy. Options are now `Fast` and `Resilient`. Default is `Fast` and should be the standard choice for most use cases. [#1130](https://github.com/holochain/holochain/pull/1130)
+
+## 0.0.16
+
+## 0.0.15
+
 ## 0.0.14
 
 ## 0.0.13

@@ -40,9 +40,10 @@ use guest_callback::validate::ValidateHostAccess;
 use guest_callback::validation_package::ValidationPackageHostAccess;
 use holo_hash::AgentPubKey;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
+use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_types::prelude::*;
 use mockall::automock;
 use std::iter::Iterator;
@@ -126,17 +127,30 @@ impl From<&HostContext> for HostFnAccess {
 
 impl HostContext {
     /// Get the workspace, panics if none was provided
-    pub fn workspace(&self) -> &HostFnWorkspace {
-        match self {
+    pub fn workspace(&self) -> HostFnWorkspaceRead {
+        match self.clone() {
             Self::ZomeCall(ZomeCallHostAccess { workspace, .. })
             | Self::Init(InitHostAccess { workspace, .. })
             | Self::MigrateAgent(MigrateAgentHostAccess { workspace, .. })
-            | Self::ValidationPackage(ValidationPackageHostAccess { workspace, .. })
-            | Self::PostCommit(PostCommitHostAccess { workspace, .. })
+            | Self::PostCommit(PostCommitHostAccess { workspace, .. }) => workspace.into(),
+            Self::ValidationPackage(ValidationPackageHostAccess { workspace, .. })
             | Self::Validate(ValidateHostAccess { workspace, .. })
             | Self::ValidateCreateLink(ValidateLinkHostAccess { workspace, .. }) => workspace,
             _ => panic!(
                 "Gave access to a host function that uses the workspace without providing a workspace"
+            ),
+        }
+    }
+
+    /// Get the workspace, panics if none was provided
+    pub fn workspace_write(&self) -> &HostFnWorkspace {
+        match self {
+            Self::ZomeCall(ZomeCallHostAccess { workspace, .. })
+            | Self::Init(InitHostAccess { workspace, .. })
+            | Self::MigrateAgent(MigrateAgentHostAccess { workspace, .. })
+            | Self::PostCommit(PostCommitHostAccess { workspace, .. }) => workspace,
+            _ => panic!(
+                "Gave access to a host function that writes to the workspace without providing a workspace"
             ),
         }
     }
@@ -154,7 +168,7 @@ impl HostContext {
     }
 
     /// Get the network, panics if none was provided
-    pub fn network(&self) -> &HolochainP2pCell {
+    pub fn network(&self) -> &HolochainP2pDna {
         match self {
             Self::ZomeCall(ZomeCallHostAccess { network, .. })
             | Self::Init(InitHostAccess { network, .. })
@@ -296,16 +310,21 @@ impl ZomeCallInvocation {
     /// - if the live cap grant is for the current author the call is ALWAYS authorized ELSE
     /// - the live cap grant needs to include the invocation's provenance AND zome/function name
     #[allow(clippy::extra_unused_lifetimes)]
-    pub fn is_authorized<'a>(&self, host_access: &ZomeCallHostAccess) -> RibosomeResult<bool> {
+    pub async fn is_authorized<'a>(
+        &self,
+        host_access: &ZomeCallHostAccess,
+    ) -> RibosomeResult<bool> {
         let check_function = (self.zome.zome_name().clone(), self.fn_name.clone());
         let check_agent = self.provenance.clone();
         let check_secret = self.cap_secret;
 
-        let maybe_grant: Option<CapGrant> = host_access.workspace.source_chain().valid_cap_grant(
-            &check_function,
-            &check_agent,
-            check_secret.as_ref(),
-        )?;
+        let maybe_grant: Option<CapGrant> = host_access
+            .workspace
+            .source_chain()
+            .as_ref()
+            .expect("Must have source chain to make zome calls")
+            .valid_cap_grant(check_function, check_agent, check_secret)
+            .await?;
 
         Ok(maybe_grant.is_some())
     }
@@ -411,7 +430,7 @@ impl From<ZomeCallInvocation> for ZomeCall {
 pub struct ZomeCallHostAccess {
     pub workspace: HostFnWorkspace,
     pub keystore: MetaLairClient,
-    pub network: HolochainP2pCell,
+    pub network: HolochainP2pDna,
     pub signal_tx: SignalBroadcaster,
     pub call_zome_handle: CellConductorReadHandle,
     // NB: this is kind of an odd place for this, since CellId is not really a special
@@ -573,7 +592,6 @@ pub mod wasm_test {
             let input = $input.clone();
             tokio::task::spawn(async move {
                 use holo_hash::*;
-                use holochain_p2p::HolochainP2pCellT;
                 use $crate::core::ribosome::RibosomeT;
 
                 let ribosome =
@@ -583,7 +601,8 @@ pub mod wasm_test {
                     .next()
                     .unwrap();
 
-                let author = host_access.cell_id.agent_pubkey().clone();
+                let cell_id = host_access.cell_id.clone();
+                let author = cell_id.agent_pubkey().clone();
 
                 // Required because otherwise the network will return routing errors
                 let test_network = crate::test_utils::test_network(
@@ -591,12 +610,8 @@ pub mod wasm_test {
                     Some(author),
                 )
                 .await;
-                let cell_network = test_network.cell_network();
-                let cell_id = holochain_zome_types::cell::CellId::new(
-                    cell_network.dna_hash(),
-                    cell_network.from_agent(),
-                );
-                host_access.network = cell_network;
+                let dna_network = test_network.dna_network();
+                host_access.network = dna_network;
 
                 let invocation =
                     $crate::fixt::ZomeCallInvocationFixturator::new($crate::fixt::NamedInvocation(

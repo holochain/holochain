@@ -4,7 +4,6 @@ use kitsune_p2p_types::dht_arc::DhtArc;
 use crate::gossip::sharded_gossip::tests::common::dangerous_fake_agent_info_with_arc;
 
 use super::common::agent_info;
-use super::test_local_sync::three_way_sharded_ownership;
 use super::*;
 use crate::test_util::{scenario_def_local::*, spawn_handler};
 use crate::NOISE;
@@ -12,6 +11,31 @@ use crate::NOISE;
 /// Data which represents the agent store of a backend.
 /// Specifies a list of agents along with their arc and timestamped op hashes held.
 pub type MockAgentPersistence = Vec<(AgentInfoSigned, Vec<(KitsuneOpHash, Timestamp)>)>;
+
+/// Defines a sharded scenario where:
+/// - There are 3 agents and 6 distinct ops between them.
+/// - Each agent has an arc that covers 3 of the ops.
+/// - The start of each arc overlaps with the end of one other arc,
+///     so that all 3 arcs cover the entire space
+/// - Each agent holds an op at the start of their arc, as well as one in the middle,
+///     but is missing the one at the end of their arc.
+///
+/// When syncing, we expect the missing op at the end of each arc to be received
+/// from the agent whose arc start intersects our arc end.
+pub(super) fn three_way_sharded_ownership() -> (Vec<Arc<KitsuneAgent>>, LocalScenarioDef) {
+    let agents = super::common::agents(3);
+    let alice = agents[0].clone();
+    let bobbo = agents[1].clone();
+    let carol = agents[2].clone();
+    let ownership = vec![
+        // NB: each agent has an arc that covers 3 ops, but the op at the endpoint
+        //     of the arc is intentionally missing
+        (alice.clone(), (5, 1), vec![5, 0]),
+        (bobbo.clone(), (1, 3), vec![1, 2]),
+        (carol.clone(), (3, 5), vec![3, 4]),
+    ];
+    (agents, LocalScenarioDef::from_compact(6, ownership))
+}
 
 /// Build up the functionality of a mock event handler a la carte with these
 /// provided methods
@@ -33,7 +57,7 @@ impl HandlerBuilder {
     pub fn with_noop_gossip(mut self, agent_data: MockAgentPersistence) -> Self {
         self.0
             .expect_handle_gossip()
-            .returning(|_, _, _| Ok(async { Ok(()) }.boxed().into()));
+            .returning(|_, _| Ok(async { Ok(()) }.boxed().into()));
 
         self
     }
@@ -73,28 +97,21 @@ impl HandlerBuilder {
                 // Return ops for agent, correctly filtered by arc but not by time window
                 let QueryOpHashesEvt {
                     space: _,
-                    agents,
+                    arc_set,
                     window,
                     max_ops,
                     include_limbo: _,
                 } = arg;
 
-                let agent_arcsets: HashMap<_, _> = agents.into_iter().collect();
-
                 let mut ops: Vec<&(KitsuneOpHash, Timestamp)> = agent_data
                     .iter()
-                    .filter_map(|(info, ops)| {
-                        if let Some(arcset) = agent_arcsets.get(&info.agent) {
-                            Some(
-                                ops.into_iter()
-                                    .filter(|(op, time)| {
-                                        window.contains(time) && arcset.contains(op.get_loc())
-                                    })
-                                    .collect::<Vec<_>>(),
-                            )
-                        } else {
-                            None
-                        }
+                    .map(|(_, ops)| {
+                        ops.into_iter()
+                            .filter(|(hash, time)| {
+                                // This is wrong because we don't have the basis hashes.
+                                window.contains(time) && arc_set.contains(hash.get_loc())
+                            })
+                            .collect::<Vec<_>>()
                     })
                     .flatten()
                     .collect();
@@ -121,8 +138,8 @@ impl HandlerBuilder {
                 // Return dummy data for each op
                 let FetchOpDataEvt {
                     space: _,
-                    agents: _,
                     op_hashes,
+                    ..
                 } = arg;
                 Ok(async {
                     Ok(itertools::zip(op_hashes.into_iter(), std::iter::repeat(vec![0])).collect())
@@ -228,6 +245,7 @@ pub fn calculate_missing_ops(
 /// Test that the above functions work as expected in one specific case:
 /// Out of 6 ops total, all 3 agents hold 3 ops each.
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "This test doesn't make sense anymore because it's using the event sender as if there were separate databases"]
 async fn test_three_way_sharded_ownership() {
     let mut u = arbitrary::Unstructured::new(&NOISE);
     let space = Arc::new(KitsuneSpace::arbitrary(&mut u).unwrap());
@@ -264,13 +282,13 @@ async fn test_three_way_sharded_ownership() {
     let get_op_hashes = |a: usize| {
         let evt_sender = evt_sender.clone();
         let space = space.clone();
+        let arc = agent_arcs[a].1.clone();
         async move {
             store::all_op_hashes_within_arcset(
                 &evt_sender,
                 &space,
                 // Only look at one agent at a time
-                &agent_arcs[a..a + 1],
-                &DhtArcSet::Full,
+                arc.into(),
                 full_time_window(),
                 usize::MAX,
                 false,
@@ -292,30 +310,27 @@ async fn test_three_way_sharded_ownership() {
     );
 
     // - All hashes point to an actual retrievable op
-    let ops_0 = store::fetch_ops(
-        &evt_sender,
-        &space,
-        agents.iter().skip(0).take(1),
-        op_hashes_0,
-    )
-    .await
-    .unwrap();
-    let ops_1 = store::fetch_ops(
-        &evt_sender,
-        &space,
-        agents.iter().skip(1).take(1),
-        op_hashes_1,
-    )
-    .await
-    .unwrap();
-    let ops_2 = store::fetch_ops(
-        &evt_sender,
-        &space,
-        agents.iter().skip(2).take(1),
-        op_hashes_2,
-    )
-    .await
-    .unwrap();
+    let ops_0 = &evt_sender
+        .fetch_op_data(FetchOpDataEvt {
+            space: space.clone(),
+            op_hashes: op_hashes_0,
+        })
+        .await
+        .unwrap();
+    let ops_1 = &evt_sender
+        .fetch_op_data(FetchOpDataEvt {
+            space: space.clone(),
+            op_hashes: op_hashes_1,
+        })
+        .await
+        .unwrap();
+    let ops_2 = &evt_sender
+        .fetch_op_data(FetchOpDataEvt {
+            space: space.clone(),
+            op_hashes: op_hashes_2,
+        })
+        .await
+        .unwrap();
     assert_eq!((ops_0.len(), ops_1.len(), ops_2.len()), (2, 2, 2));
 
     // - There are only 6 distinct ops

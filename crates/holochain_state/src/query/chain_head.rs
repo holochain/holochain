@@ -26,7 +26,7 @@ impl Query for ChainHeadQuery {
             SELECT Header.blob, Header.hash, MAX(header.seq)
             FROM Header
             JOIN DhtOp ON DhtOp.header_hash = Header.hash
-            WHERE Header.author = :author AND DhtOp.is_authored = 1
+            WHERE Header.author = :author
         ) WHERE hash IS NOT NULL
         "
         .into()
@@ -148,7 +148,6 @@ mod tests {
                 &mut txn,
                 op,
                 fixt!(DhtOpHash),
-                true,
                 op_order,
                 shh.header().timestamp(),
             )

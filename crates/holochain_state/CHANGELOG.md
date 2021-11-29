@@ -3,6 +3,11 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
+- Some databases can handle corruption by wiping the db file and starting again. [#1039](https://github.com/holochain/holochain/pull/1039).
+
+## 0.0.16
+
+## 0.0.15
 
 ## 0.0.14
 

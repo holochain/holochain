@@ -1,5 +1,6 @@
+use crate::sweettest::SweetConductorBatch;
+use crate::sweettest::SweetDnaFile;
 use crate::test_utils::host_fn_caller::*;
-use crate::test_utils::setup_app;
 use crate::test_utils::wait_for_integration;
 use crate::{conductor::ConductorHandle, core::MAX_TAG_SIZE};
 use ::fixt::prelude::*;
@@ -7,7 +8,6 @@ use hdk::prelude::LinkTag;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
-use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::prelude::fresh_reader_test;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateQueryResult;
@@ -26,46 +26,28 @@ use std::time::Duration;
 async fn sys_validation_workflow_test() {
     observability::test_run().ok();
 
-    let dna_file = DnaFile::new(
-        DnaDef {
-            name: "sys_validation_workflow_test".to_string(),
-            uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
-            properties: SerializedBytes::try_from(()).unwrap(),
-            zomes: vec![TestWasm::Create.into()].into(),
-        },
-        vec![TestWasm::Create.into()],
-    )
-    .await
-    .unwrap();
+    let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
+        .await
+        .unwrap();
 
-    let alice_agent_id = fake_agent_pubkey_1();
-    let alice_cell_id = CellId::new(dna_file.dna_hash().to_owned(), alice_agent_id.clone());
-    let alice_installed_cell = InstalledCell::new(alice_cell_id.clone(), "alice_handle".into());
+    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    let apps = conductors
+        .setup_app(&"test_app", &[dna_file.clone()])
+        .await
+        .unwrap();
+    let ((alice,), (bob,)) = apps.into_tuples();
+    let alice_cell_id = alice.cell_id().clone();
+    let bob_cell_id = bob.cell_id().clone();
 
-    let bob_agent_id = fake_agent_pubkey_2();
-    let bob_cell_id = CellId::new(dna_file.dna_hash().to_owned(), bob_agent_id.clone());
-    let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
+    conductors.exchange_peer_info().await;
 
-    let (_tmpdir, _app_api, handle) = setup_app(
-        vec![(
-            "test_app",
-            vec![(alice_installed_cell, None), (bob_installed_cell, None)],
-        )],
-        vec![dna_file.clone()],
-    )
-    .await;
-
-    run_test(alice_cell_id, bob_cell_id, handle.clone(), dna_file).await;
-
-    let shutdown = handle.take_shutdown_handle().unwrap();
-    handle.shutdown();
-    shutdown.await.unwrap().unwrap();
+    run_test(alice_cell_id, bob_cell_id, conductors, dna_file).await;
 }
 
 async fn run_test(
     alice_cell_id: CellId,
     bob_cell_id: CellId,
-    handle: ConductorHandle,
+    conductors: SweetConductorBatch,
     dna_file: DnaFile,
 ) {
     // Check if the correct number of ops are integrated
@@ -74,16 +56,16 @@ async fn run_test(
     let num_attempts = 100;
     let delay_per_attempt = Duration::from_millis(100);
 
-    bob_links_in_a_legit_way(&bob_cell_id, &handle, &dna_file).await;
+    bob_links_in_a_legit_way(&bob_cell_id, &conductors[1].handle(), &dna_file).await;
 
     // Integration should have 9 ops in it.
     // Plus another 14 for genesis.
     // Init is not run because we aren't calling the zome.
     let expected_count = 9 + 14;
 
-    let alice_env = handle.get_cell_env(&alice_cell_id).unwrap();
+    let alice_dht_env = conductors[0].get_dht_env(alice_cell_id.dna_hash()).unwrap();
     wait_for_integration(
-        &alice_env,
+        &alice_dht_env,
         expected_count,
         num_attempts,
         delay_per_attempt.clone(),
@@ -110,7 +92,7 @@ async fn run_test(
     };
 
     // Validation should be empty
-    fresh_reader_test(alice_env, |txn| {
+    fresh_reader_test(alice_dht_env, |txn| {
         let limbo = show_limbo(&txn);
         assert!(limbo_is_empty(&txn), "{:?}", limbo);
 
@@ -125,12 +107,12 @@ async fn run_test(
     });
 
     let (bad_update_header, bad_update_entry_hash, link_add_hash) =
-        bob_makes_a_large_link(&bob_cell_id, &handle, &dna_file).await;
+        bob_makes_a_large_link(&bob_cell_id, &conductors[1].handle(), &dna_file).await;
 
     // Integration should have 13 ops in it
     let expected_count = 14 + expected_count;
 
-    let alice_env = handle.get_cell_env(&alice_cell_id).unwrap();
+    let alice_env = conductors[0].get_dht_env(alice_cell_id.dna_hash()).unwrap();
     wait_for_integration(
         &alice_env,
         expected_count,
@@ -190,12 +172,12 @@ async fn run_test(
         assert_eq!(valid_ops, expected_count);
     });
 
-    dodgy_bob(&bob_cell_id, &handle, &dna_file).await;
+    dodgy_bob(&bob_cell_id, &conductors[1].handle(), &dna_file).await;
 
     // Integration should have new 4 ops in it
     let expected_count = 4 + expected_count;
 
-    let alice_env = handle.get_cell_env(&alice_cell_id).unwrap();
+    let alice_env = conductors[0].get_dht_env(alice_cell_id.dna_hash()).unwrap();
     wait_for_integration(
         &alice_env,
         expected_count,

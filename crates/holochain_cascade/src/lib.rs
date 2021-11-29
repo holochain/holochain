@@ -4,6 +4,8 @@
 //! where as retrieve only checks that where the data was found
 //! the appropriate validation has been run.
 
+use std::sync::Arc;
+
 use error::CascadeResult;
 use holo_hash::hash_type::AnyDht;
 use holo_hash::AgentPubKey;
@@ -13,8 +15,8 @@ use holo_hash::HeaderHash;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
-use holochain_p2p::HolochainP2pCell;
-use holochain_p2p::HolochainP2pCellT;
+use holochain_p2p::HolochainP2pDna;
+use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_state::host_fn_workspace::HostFnStores;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
@@ -27,6 +29,7 @@ use holochain_state::query::link_details::GetLinkDetailsQuery;
 use holochain_state::query::live_element::GetLiveElementQuery;
 use holochain_state::query::live_entry::GetLiveEntryQuery;
 use holochain_state::query::DbScratch;
+use holochain_state::query::PrivateDataQuery;
 use holochain_state::query::StateQueryError;
 use holochain_state::scratch::SyncScratch;
 use holochain_types::prelude::*;
@@ -65,21 +68,39 @@ macro_rules! ok_or_return {
 }
 
 #[derive(Clone)]
-pub struct Cascade<Network = HolochainP2pCell> {
-    vault: Option<EnvRead>,
-    cache: Option<EnvWrite>,
+pub struct Cascade<Network = HolochainP2pDna> {
+    authored: Option<DbRead<DbKindAuthored>>,
+    dht: Option<DbRead<DbKindDht>>,
+    cache: Option<DbWrite<DbKindCache>>,
     scratch: Option<SyncScratch>,
     network: Option<Network>,
+    private_data: Option<Arc<AgentPubKey>>,
 }
 
 impl<Network> Cascade<Network>
 where
-    Network: HolochainP2pCellT + Clone + 'static + Send,
+    Network: HolochainP2pDnaT + Clone + 'static + Send,
 {
-    /// Add the vault to the cascade.
-    pub fn with_vault(self, vault: EnvRead) -> Self {
+    /// Add the authored env to the cascade.
+    pub fn with_authored(self, authored: DbRead<DbKindAuthored>) -> Self {
         Self {
-            vault: Some(vault),
+            authored: Some(authored),
+            ..self
+        }
+    }
+
+    /// Add the ability to access private entries for this agent.
+    pub fn with_private_data(self, author: Arc<AgentPubKey>) -> Self {
+        Self {
+            private_data: Some(author),
+            ..self
+        }
+    }
+
+    /// Add the dht env to the cascade.
+    pub fn with_dht(self, dht: DbRead<DbKindDht>) -> Self {
+        Self {
+            dht: Some(dht),
             ..self
         }
     }
@@ -88,7 +109,7 @@ where
     // TODO: We do want to be able to use the cache without
     // the network but we always need a cache when we have a
     // network. Perhaps this can be proven at the type level?
-    pub fn with_cache(self, cache: EnvWrite) -> Self {
+    pub fn with_cache(self, cache: DbWrite<DbKindCache>) -> Self {
         Self {
             cache: Some(cache),
             ..self
@@ -104,64 +125,80 @@ where
     }
 
     /// Add the network and cache to the cascade.
-    pub fn with_network<N: HolochainP2pCellT + Clone>(
+    pub fn with_network<N: HolochainP2pDnaT + Clone>(
         self,
         network: N,
-        cache_env: EnvWrite,
+        cache_env: DbWrite<DbKindCache>,
     ) -> Cascade<N> {
         Cascade {
-            vault: self.vault,
+            authored: self.authored,
+            dht: self.dht,
             scratch: self.scratch,
+            private_data: self.private_data,
             cache: Some(cache_env),
             network: Some(network),
         }
     }
 }
-impl Cascade<HolochainP2pCell> {
+impl Cascade<HolochainP2pDna> {
     /// Constructs an empty [Cascade].
     pub fn empty() -> Self {
         Self {
-            vault: None,
+            authored: None,
+            dht: None,
             network: None,
             cache: None,
             scratch: None,
+            private_data: None,
         }
     }
 
-    pub fn from_workspace_network<N: HolochainP2pCellT + Clone>(
-        workspace: &HostFnWorkspace,
+    pub fn from_workspace_network<N, AuthorDb, DhtDb>(
+        workspace: &HostFnWorkspace<AuthorDb, DhtDb>,
         network: N,
-    ) -> Cascade<N> {
+    ) -> Cascade<N>
+    where
+        N: HolochainP2pDnaT + Clone,
+        AuthorDb: ReadAccess<DbKindAuthored>,
+        DhtDb: ReadAccess<DbKindDht>,
+    {
         let HostFnStores {
-            vault,
+            authored,
+            dht,
             cache,
             scratch,
         } = workspace.stores();
+        let private_data = workspace.author();
         Cascade::<N> {
-            vault: Some(vault),
+            authored: Some(authored),
+            dht: Some(dht),
             cache: Some(cache),
-            scratch: Some(scratch),
+            private_data,
+            scratch,
             network: Some(network),
         }
     }
-    pub fn from_workspace(workspace: &HostFnWorkspace) -> Self {
+    pub fn from_workspace(stores: HostFnStores, author: Option<Arc<AgentPubKey>>) -> Self {
         let HostFnStores {
-            vault,
+            authored,
+            dht,
             cache,
             scratch,
-        } = workspace.stores();
+        } = stores;
         Self {
-            vault: Some(vault),
+            authored: Some(authored),
+            dht: Some(dht),
             cache: Some(cache),
-            scratch: Some(scratch),
+            scratch,
             network: None,
+            private_data: author,
         }
     }
 }
 
 impl<Network> Cascade<Network>
 where
-    Network: HolochainP2pCellT + Clone + 'static + Send,
+    Network: HolochainP2pDnaT + Clone + 'static + Send,
 {
     fn insert_rendered_op(txn: &mut Transaction, op: RenderedOp) -> CascadeResult<()> {
         let RenderedOp {
@@ -173,7 +210,7 @@ where
         let op_order = OpOrder::new(op_light.get_type(), header.header().timestamp());
         let timestamp = header.header().timestamp();
         insert_header(txn, header)?;
-        insert_op_lite(txn, op_light, op_hash.clone(), false, op_order, timestamp)?;
+        insert_op_lite(txn, op_light, op_hash.clone(), op_order, timestamp)?;
         if let Some(status) = validation_status {
             set_validation_status(txn, op_hash.clone(), status)?;
         }
@@ -276,8 +313,11 @@ where
         if let Some(cache) = &mut self.cache {
             conns.push(cache.conn()?);
         }
-        if let Some(vault) = &mut self.vault {
-            conns.push(vault.conn()?);
+        if let Some(dht) = &mut self.dht {
+            conns.push(dht.conn()?);
+        }
+        if let Some(authored) = &mut self.authored {
+            conns.push(authored.conn()?);
         }
         for conn in &mut conns {
             let txn = conn.transaction().map_err(StateQueryError::from)?;
@@ -307,8 +347,17 @@ where
                 return Ok(r);
             }
         }
-        if let Some(vault) = &mut self.vault {
-            let mut conn = vault.conn()?;
+        if let Some(dht) = &mut self.dht {
+            let mut conn = dht.conn()?;
+            let txn = conn.transaction().map_err(StateQueryError::from)?;
+            let txn = Txn::from(&txn);
+            let r = f(&txn)?;
+            if r.is_some() {
+                return Ok(r);
+            }
+        }
+        if let Some(authored) = &mut self.authored {
+            let mut conn = authored.conn()?;
             let txn = conn.transaction().map_err(StateQueryError::from)?;
             let txn = Txn::from(&txn);
             let r = f(&txn)?;
@@ -332,7 +381,11 @@ where
         hash: EntryHash,
         mut options: NetworkGetOptions,
     ) -> CascadeResult<Option<EntryHashed>> {
-        let result = self.find_map(|store| Ok(store.get_entry(&hash)?))?;
+        let private_data = self.private_data.clone();
+        let result = self.find_map(|store| {
+            Ok(store
+                .get_public_or_authored_entry(&hash, private_data.as_ref().map(|a| a.as_ref()))?)
+        })?;
         if result.is_some() {
             return Ok(result.map(EntryHashed::from_content_sync));
         }
@@ -340,7 +393,11 @@ where
         self.fetch_element(hash.clone().into(), options).await?;
 
         // Check if we have the data now after the network call.
-        let result = self.find_map(|store| Ok(store.get_entry(&hash)?))?;
+        let private_data = self.private_data.clone();
+        let result = self.find_map(|store| {
+            Ok(store
+                .get_public_or_authored_entry(&hash, private_data.as_ref().map(|a| a.as_ref()))?)
+        })?;
         Ok(result.map(EntryHashed::from_content_sync))
     }
 
@@ -370,15 +427,23 @@ where
         hash: AnyDhtHash,
         mut options: NetworkGetOptions,
     ) -> CascadeResult<Option<Element>> {
-        let result = self.find_map(|store| Ok(store.get_element(&hash)?))?;
+        let private_data = self.private_data.clone();
+        let result = self.find_map(|store| {
+            Ok(store
+                .get_public_or_authored_element(&hash, private_data.as_ref().map(|a| a.as_ref()))?)
+        })?;
         if result.is_some() {
             return Ok(result);
         }
         options.request_type = holochain_p2p::event::GetRequest::Pending;
         self.fetch_element(hash.clone(), options).await?;
 
+        let private_data = self.private_data.clone();
         // Check if we have the data now after the network call.
-        let result = self.find_map(|store| Ok(store.get_element(&hash)?))?;
+        let result = self.find_map(|store| {
+            Ok(store
+                .get_public_or_authored_element(&hash, private_data.as_ref().map(|a| a.as_ref()))?)
+        })?;
         Ok(result)
     }
 
@@ -390,7 +455,7 @@ where
     ) -> CascadeResult<Option<EntryDetails>> {
         let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
         let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
-        let query = GetEntryDetailsQuery::new(entry_hash.clone());
+        let query: GetEntryDetailsQuery = self.construct_query_with_data_access(entry_hash.clone());
 
         // We don't need metadata and only need the content
         // so if we have it locally then we can avoid the network.
@@ -427,7 +492,8 @@ where
     ) -> CascadeResult<Option<ElementDetails>> {
         let authoring = self.am_i_authoring(&header_hash.clone().into())?;
         let authority = self.am_i_an_authority(header_hash.clone().into()).await?;
-        let query = GetElementDetailsQuery::new(header_hash.clone());
+        let query: GetElementDetailsQuery =
+            self.construct_query_with_data_access(header_hash.clone());
 
         // TODO: we can short circuit if we have any local deletes on a header.
         // Is this bad because we will not go back to the network until our
@@ -472,7 +538,7 @@ where
     ) -> CascadeResult<Option<Element>> {
         let authoring = self.am_i_authoring(&header_hash.clone().into())?;
         let authority = self.am_i_an_authority(header_hash.clone().into()).await?;
-        let query = GetLiveElementQuery::new(header_hash.clone());
+        let query: GetLiveElementQuery = self.construct_query_with_data_access(header_hash.clone());
 
         // TODO: we can short circuit if we have any local deletes on a header.
         // Is this bad because we will not go back to the network until our
@@ -515,7 +581,7 @@ where
     ) -> CascadeResult<Option<Element>> {
         let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
         let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
-        let query = GetLiveEntryQuery::new(entry_hash.clone());
+        let query: GetLiveEntryQuery = self.construct_query_with_data_access(entry_hash.clone());
 
         // We don't need metadata and only need the content
         // so if we have it locally then we can avoid the network.
@@ -660,7 +726,7 @@ where
                 agent_activity::merge_activities(agent.clone(), &options, results)?;
             merged_response
         } else {
-            match self.vault.clone() {
+            match self.dht.clone() {
                 Some(vault) => {
                     authority::handle_get_agent_activity(
                         vault,
@@ -775,6 +841,16 @@ where
 
     async fn am_i_an_authority(&mut self, hash: AnyDhtHash) -> CascadeResult<bool> {
         let network = ok_or_return!(self.network.as_mut(), false);
+
         Ok(network.authority_for_hash(hash).await?)
+    }
+
+    /// Construct a query with private data access if this cascade has been
+    /// constructed with private data access.
+    fn construct_query_with_data_access<H, Q: PrivateDataQuery<Hash = H>>(&self, hash: H) -> Q {
+        match self.private_data.clone() {
+            Some(author) => Q::with_private_data_access(hash, author),
+            None => Q::without_private_data_access(hash),
+        }
     }
 }
