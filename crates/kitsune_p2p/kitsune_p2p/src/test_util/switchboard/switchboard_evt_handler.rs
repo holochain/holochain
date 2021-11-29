@@ -9,7 +9,7 @@ use crate::types::event::{KitsuneP2pEvent, KitsuneP2pEventHandler, KitsuneP2pEve
 use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::*;
 
-use super::switchboard_state::{NodeEp, OpEntry, Switchboard};
+use super::switchboard_state::{NodeEp, NodeOpEntry, OpEntry, Switchboard};
 
 type KSpace = Arc<KitsuneSpace>;
 type KAgent = Arc<KitsuneAgent>;
@@ -136,33 +136,71 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
     fn handle_gossip(
         &mut self,
         _space: Arc<KitsuneSpace>,
-        _ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
+        ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
     ) -> KitsuneP2pEventHandlerResult<()> {
-        todo!()
-        // ok_fut(Ok(self.sb.share(|sb| {
-        //     let agent = sb
-        //         .node_for_local_agent_hash_mut(&*to_agent)
-        //         .unwrap()
-        //         .local_agent_by_hash_mut(&*to_agent)
-        //         .unwrap();
-        //     for (hash, op_data) in ops {
-        //         let loc8 = hash.get_loc().as_loc8();
-        //         // TODO: allow setting integration status
-        //         agent.ops.insert(
-        //             loc8,
-        //             AgentOpEntry {
-        //                 is_integrated: true,
-        //             },
-        //         );
-        //     }
-        // })))
+        ok_fut(Ok(self.sb.share(|sb| {
+            let node = sb.nodes.get_mut(&self.node).unwrap();
+            for (hash, op_data) in ops {
+                let loc8 = hash.get_loc().as_loc8();
+                // TODO: allow setting integration status
+                node.ops.insert(
+                    loc8,
+                    NodeOpEntry {
+                        is_integrated: true,
+                    },
+                );
+            }
+        })))
     }
 
     fn handle_query_op_hashes(
         &mut self,
-        query: QueryOpHashesEvt,
+        QueryOpHashesEvt {
+            space: _,
+            arc_set,
+            window,
+            max_ops,
+            include_limbo,
+        }: QueryOpHashesEvt,
     ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindow)>> {
-        ok_fut(Ok(self.sb.share(|sb| sb.query_op_hashes(query))))
+        ok_fut(Ok(self.sb.share(|sb| {
+            let (ops, timestamps): (Vec<_>, Vec<_>) = sb
+                .ops
+                .iter()
+                .filter(|(op_loc8, op)| {
+                    // Does the op fall within the time window?
+                    window.contains(&op.timestamp)
+
+                    // Is the op held and integrated by this node?
+                    && sb.nodes.get(&self.node).unwrap().ops
+                    .get(op_loc8)
+                    .map(|op| include_limbo || op.is_integrated)
+                    .unwrap_or(false)
+
+                    // Does the op fall within the specified arcset?
+                    && arc_set.contains((**op_loc8).into())
+                })
+                .map(|(_, op)| (op.hash.clone(), op.timestamp))
+                .take(max_ops)
+                .unzip();
+
+            if ops.is_empty() {
+                None
+            } else {
+                let window = timestamps
+                    .into_iter()
+                    .fold(window, |mut window, timestamp| {
+                        if timestamp < window.start {
+                            window.start = timestamp;
+                        }
+                        if timestamp > window.end {
+                            window.end = timestamp;
+                        }
+                        window
+                    });
+                Some((ops, window))
+            }
+        })))
     }
 
     fn handle_fetch_op_data(

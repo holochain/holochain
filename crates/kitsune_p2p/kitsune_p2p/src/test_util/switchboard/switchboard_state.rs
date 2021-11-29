@@ -1,6 +1,5 @@
 //! An in-memory network for sharded kitsune tests.
 
-use crate::event::{QueryOpHashesEvt, TimeWindow};
 use crate::gossip::sharded_gossip::{BandwidthThrottle, GossipType, ShardedGossip};
 use crate::test_util::spawn_handler;
 use crate::types::gossip::*;
@@ -176,6 +175,7 @@ impl Switchboard {
                 NodeEntry {
                     local_agents: HashMap::new(),
                     remote_agents: HashMap::new(),
+                    ops: HashMap::new(),
                     gossip,
                 },
             );
@@ -271,17 +271,25 @@ impl SwitchboardState {
         nodes.sort_by_key(|(ep, _)| ep.uniq());
         for (ep, node) in nodes.into_iter() {
             let node_id = ep.uniq();
+            let ascii = if with_ops {
+                let ops = node.ops.keys().copied();
+                ArcInterval::Empty.to_ascii_with_ops(width, ops)
+            } else {
+                ArcInterval::Empty.to_ascii(width)
+            };
+            println!(
+                "{:>4} {:>+5} ({:^width$})",
+                node_id,
+                "",
+                ascii,
+                width = width
+            );
             for (agent_loc8, agent) in node.local_agents.iter() {
                 let interval = agent.info.storage_arc.interval();
-                let ascii = if with_ops {
-                    let ops = agent.ops.keys().copied();
-                    interval.to_ascii_with_ops(width, ops)
-                } else {
-                    interval.to_ascii(width)
-                };
+                let ascii = interval.to_ascii(width);
                 println!(
                     "{:>4} {:>+5} |{:^width$}| {:>+4} {:?}",
-                    node_id,
+                    "",
                     agent_loc8,
                     ascii,
                     interval.center_loc().as_loc8(),
@@ -387,12 +395,10 @@ impl SwitchboardState {
     /// Each Loc8 becomes a new Op added to an agent's op store.
     pub fn add_ops_timed<L: Into<Loc8>, O: IntoIterator<Item = (L, Timestamp)>>(
         &mut self,
-        agent: &SwitchboardAgent,
+        node_ep: &NodeEp,
         is_integrated: bool,
         ops: O,
     ) {
-        let agent = agent_from_loc(agent.loc);
-
         // Do some pre-computation
         let ops: Vec<_> = ops
             .into_iter()
@@ -403,18 +409,9 @@ impl SwitchboardState {
             })
             .collect();
 
-        {
-            // Update the agent op state, dropping the mutable ref immediately after
-            let node = self
-                .node_for_local_agent_hash_mut(&*agent)
-                .expect("No agent at this loc8 for node");
-            let agent_loc8 = agent.get_loc().as_loc8();
-            let agent_entry = node.local_agents.get_mut(&agent_loc8).unwrap();
-            for (loc8, _, _) in ops.iter() {
-                agent_entry
-                    .ops
-                    .insert(*loc8, AgentOpEntry { is_integrated });
-            }
+        let node = self.nodes.get_mut(node_ep).expect("No node");
+        for (loc8, _, _) in ops.iter() {
+            node.ops.insert(*loc8, NodeOpEntry { is_integrated });
         }
 
         // Update node-wide op store with data and timestamp
@@ -435,32 +432,30 @@ impl SwitchboardState {
         }
 
         // Let gossip module know there's new integrated data now.
-        self.node_for_local_agent_hash_mut(&*agent)
-            .expect("No agent at this loc8 for node")
-            .gossip
-            .new_integrated_data();
+        node.gossip.new_integrated_data();
     }
 
     /// Convenient counterpart to `add_ops_timed`, causes each op to be added
     /// at the current system time.
     pub fn add_ops_now<L: Into<Loc8>, O: IntoIterator<Item = L>>(
         &mut self,
-        agent: &SwitchboardAgent,
+        node_ep: &NodeEp,
         is_integrated: bool,
         ops: O,
     ) {
         let ops = ops.into_iter().map(|op| (op, Timestamp::now()));
-        self.add_ops_timed(agent, is_integrated, ops)
+        self.add_ops_timed(node_ep, is_integrated, ops)
     }
 
     /// Get all ops held by a node in terms of their Loc8 location.
     ///
     /// Use this to make assertions about what ops are held after gossip has run.
     pub fn get_ops_loc8(&mut self, node_ep: &NodeEp) -> BTreeSet<Loc8> {
-        self.local_agents_for_node(node_ep)
-            .values()
-            .map(|agent| agent.ops.keys())
-            .flatten()
+        self.nodes
+            .get(node_ep)
+            .unwrap()
+            .ops
+            .keys()
             .copied()
             .collect()
     }
@@ -523,48 +518,6 @@ impl SwitchboardState {
             .get_mut(node)
             .expect("Node not added")
             .remote_agents
-    }
-
-    pub(super) fn query_op_hashes(
-        &mut self,
-        QueryOpHashesEvt {
-            space: _,
-            arc_set,
-            window,
-            max_ops,
-            include_limbo: _,
-        }: QueryOpHashesEvt,
-    ) -> Option<(Vec<Arc<KitsuneOpHash>>, TimeWindow)> {
-        let (ops, timestamps): (Vec<_>, Vec<_>) = self
-            .ops
-            .iter()
-            .filter(|(op_loc8, op)| {
-                // Does the op fall within the time window?
-                window.contains(&op.timestamp)
-                    // Does the op fall within one of the specified arcsets
-                    // with the correct integration/limbo criteria?
-                        && arc_set.contains((**op_loc8).into())
-            })
-            .map(|(_, op)| (op.hash.clone(), op.timestamp))
-            .take(max_ops)
-            .unzip();
-
-        if ops.is_empty() {
-            None
-        } else {
-            let window = timestamps
-                .into_iter()
-                .fold(window, |mut window, timestamp| {
-                    if timestamp < window.start {
-                        window.start = timestamp;
-                    }
-                    if timestamp > window.end {
-                        window.end = timestamp;
-                    }
-                    window
-                });
-            Some((ops, window))
-        }
     }
 }
 
@@ -635,6 +588,9 @@ pub struct SpaceEntry {
 pub struct NodeEntry {
     pub(super) local_agents: HashMap<Loc8, AgentEntry>,
     pub(super) remote_agents: HashMap<Loc8, AgentInfoSigned>,
+    /// The ops held by this node.
+    /// Other data for this op can be found in SwitchboardSpace::ops
+    pub(super) ops: HashMap<Loc8, NodeOpEntry>,
     pub(super) gossip: GossipModule,
 }
 
@@ -679,24 +635,18 @@ impl NodeEntry {
 pub struct AgentEntry {
     /// The AgentInfoSigned for this agent
     pub info: AgentInfoSigned,
-    /// The ops held by this agent.
-    /// Other data for this op can be found in SwitchboardSpace::ops
-    pub ops: HashMap<Loc8, AgentOpEntry>,
 }
 
 impl AgentEntry {
     /// Constructor, initialized with empty op list
     pub fn new(info: AgentInfoSigned) -> Self {
-        Self {
-            info,
-            ops: Default::default(),
-        }
+        Self { info }
     }
 }
 
 /// The value of the AgentEntry::ops HashMap
 #[derive(Debug, Clone)]
-pub struct AgentOpEntry {
+pub struct NodeOpEntry {
     /// Whether the op should be treated as "integrated".
     /// NB: this is a new concept to kitsune, only implicitly hinted at by the
     /// `include_limbo` option for op fetches. "Limbo" implies "not integrated".
