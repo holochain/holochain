@@ -608,10 +608,12 @@ async fn get_validation_package_remote(
             // if the data really isn't available.
             // TODO: Another solution is to up the timeout for parallel gets.
             const NUM_RETRY_GETS: u8 = 3;
-            let range = 0..element.header().header_seq().saturating_sub(1);
 
             let mut query = holochain_zome_types::query::ChainQueryFilter::new()
-                .sequence_range(range)
+                .sequence_range(ChainQueryFilterSequenceRange::HeaderSeqRange(
+                    0,
+                    element.header().header_seq().saturating_sub(1),
+                ))
                 .include_entries(true);
             if let (RequiredValidationType::SubChain, Some(et)) = (
                 entry_def.required_validation_type,

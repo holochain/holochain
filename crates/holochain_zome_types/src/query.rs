@@ -3,11 +3,11 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-use crate::Element;
-use crate::HeaderHashed;
 use crate::header::EntryType;
 use crate::header::HeaderType;
 use crate::warrant::Warrant;
+use crate::Element;
+use crate::HeaderHashed;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
@@ -16,6 +16,21 @@ pub use holochain_serialized_bytes::prelude::*;
 /// Defines several ways that queries can be restricted to a range.
 /// Notably hash bounded ranges disambiguate forks whereas sequence indexes do
 /// not as the same position can be found in many forks.
+/// The reason that this does NOT use native rust range traits is that the hash
+/// bounded queries MUST be inclusive otherwise the integrity and fork
+/// disambiguation logic is impossible. An exclusive range bound that does not
+/// include the final header tells us nothing about which fork to select
+/// between N forks of equal length that proceed it. With an inclusive hash
+/// bounded range the final header always points unambiguously at the "correct"
+/// fork that the range is over. Start hashes are not needed to provide this
+/// property so ranges can be hash terminted with a length of proceeding
+/// elements to return only. Technically the seq bounded ranges do not imply
+/// any fork disambiguation and so could be a range but for simplicity we left
+/// the API symmetrical in boundedness across all enum variants.
+/// @TODO It may be possible to provide/implement RangeBounds in the case that
+/// a full sequence of elements/headers is provided but it would need to be
+/// handled as inclusive first, to enforce the integrity of the query, then the
+/// exclusiveness achieved by simply removing the final element after the fact.
 #[derive(serde::Serialize, serde::Deserialize, PartialEq, Clone, Debug)]
 pub enum ChainQueryFilterSequenceRange {
     /// Do NOT apply any range filtering for this query.
@@ -23,9 +38,8 @@ pub enum ChainQueryFilterSequenceRange {
     /// A range over source chain sequence numbers.
     /// This is ambiguous over forking histories and so should NOT be used in
     /// validation logic.
-    /// Inclusive start, exclusive end.
-    /// TODO: can we generalize this over RangeBounds to allow unbounded ranges?
-    HeaderSeqRange(std::ops::Range<u32>),
+    /// Inclusive start, inclusive end.
+    HeaderSeqRange(u32, u32),
     /// A range over source chain header hashes.
     /// This CAN be used in validation logic as forks are disambiguated.
     /// Inclusive start and end (unlike std::ops::Range).
@@ -163,8 +177,8 @@ impl ChainQueryFilter {
     }
 
     /// Filter on sequence range
-    pub fn sequence_range(mut self, sequence_range: std::ops::Range<u32>) -> Self {
-        self.sequence_range = ChainQueryFilterSequenceRange::HeaderSeqRange(sequence_range);
+    pub fn sequence_range(mut self, sequence_range: ChainQueryFilterSequenceRange) -> Self {
+        self.sequence_range = sequence_range;
         self
     }
 
@@ -191,12 +205,15 @@ impl ChainQueryFilter {
     pub fn headers_without_forks(&self, headers: Vec<HeaderHashed>) -> Vec<HeaderHashed> {
         match &self.sequence_range {
             ChainQueryFilterSequenceRange::Unbounded => headers,
-            ChainQueryFilterSequenceRange::HeaderSeqRange(range) => headers
-            .into_iter()
-            .filter(|header| range.contains(&header.header_seq()))
-            .collect(),
+            ChainQueryFilterSequenceRange::HeaderSeqRange(start, end) => headers
+                .into_iter()
+                .filter(|header| *start <= header.header_seq() && header.header_seq() <= *end)
+                .collect(),
             ChainQueryFilterSequenceRange::HeaderHashRange(start, end) => {
-                let mut header_hashmap = headers.iter().map(|header| (header.as_hash().clone(), header)).collect::<HashMap<HeaderHash, &HeaderHashed>>();
+                let mut header_hashmap = headers
+                    .iter()
+                    .map(|header| (header.as_hash().clone(), header))
+                    .collect::<HashMap<HeaderHash, &HeaderHashed>>();
                 let mut filtered_headers = Vec::new();
                 let mut maybe_next_header = header_hashmap.remove(&end);
                 while let Some(next_header) = maybe_next_header {
@@ -208,9 +225,12 @@ impl ChainQueryFilter {
                     }
                 }
                 filtered_headers
-            },
+            }
             ChainQueryFilterSequenceRange::HeaderHashTerminated(end, n) => {
-                let mut header_hashmap = headers.iter().map(|header| (header.as_hash().clone(), header)).collect::<HashMap<HeaderHash, &HeaderHashed>>();
+                let mut header_hashmap = headers
+                    .iter()
+                    .map(|header| (header.as_hash().clone(), header))
+                    .collect::<HashMap<HeaderHash, &HeaderHashed>>();
                 let mut filtered_headers = Vec::new();
                 let mut maybe_next_header = header_hashmap.remove(&end);
                 let mut i = 0;
@@ -230,21 +250,47 @@ impl ChainQueryFilter {
 
     /// Filter a vector of hashed headers according to the query.
     pub fn filter_headers(&self, headers: Vec<HeaderHashed>) -> Vec<HeaderHashed> {
-        self.headers_without_forks(headers).into_iter().filter(|header| {
-            self.header_type.as_ref().map(|header_type| header.header_type() == *header_type).unwrap_or(true)
-            && self.entry_type.as_ref().map(|entry_type| header.entry_type() == Some(&entry_type)).unwrap_or(true)
-            && self.entry_hashes.as_ref().map(|entry_hashes| match header.entry_hash() {
-                Some(entry_hash) => entry_hashes.contains(entry_hash),
-                None => false,
-            }).unwrap_or(true)
-        }).collect()
+        self.headers_without_forks(headers)
+            .into_iter()
+            .filter(|header| {
+                self.header_type
+                    .as_ref()
+                    .map(|header_type| header.header_type() == *header_type)
+                    .unwrap_or(true)
+                    && self
+                        .entry_type
+                        .as_ref()
+                        .map(|entry_type| header.entry_type() == Some(&entry_type))
+                        .unwrap_or(true)
+                    && self
+                        .entry_hashes
+                        .as_ref()
+                        .map(|entry_hashes| match header.entry_hash() {
+                            Some(entry_hash) => entry_hashes.contains(entry_hash),
+                            None => false,
+                        })
+                        .unwrap_or(true)
+            })
+            .collect()
     }
 
     /// Filter a vector of elements according to the query.
     pub fn filter_elements(&self, elements: Vec<Element>) -> Vec<Element> {
-        let headers = self.filter_headers(elements.iter().map(|element| element.header_hashed()).cloned().collect());
-        let header_hashset = headers.iter().map(|header| header.as_hash().clone()).collect::<HashSet<HeaderHash>>();
-        elements.into_iter().filter(|element| header_hashset.contains(element.header_hashed().as_hash())).collect()
+        let headers = self.filter_headers(
+            elements
+                .iter()
+                .map(|element| element.header_hashed())
+                .cloned()
+                .collect(),
+        );
+        let header_hashset = headers
+            .iter()
+            .map(|header| header.as_hash().clone())
+            .collect::<HashSet<HeaderHash>>();
+        elements
+            .into_iter()
+            .filter(|element| header_hashset.contains(element.header_hashed().as_hash()))
+            .collect()
     }
 }
 
@@ -254,14 +300,14 @@ mod tests {
     use crate::fixt::AppEntryTypeFixturator;
     use crate::fixt::*;
     use crate::header::EntryType;
-    use ::fixt::prelude::*;
     use crate::HeaderHashed;
-
+    use ::fixt::prelude::*;
+    use crate::ChainQueryFilterSequenceRange;
     use super::ChainQueryFilter;
 
     /// Create three Headers with various properties.
     /// Also return the EntryTypes used to construct the first two headers.
-    fn fixtures() -> [HeaderHashed; 6] {
+    fn fixtures() -> [HeaderHashed; 7] {
         let entry_type_1 = EntryType::App(fixt!(AppEntryType));
         let entry_type_2 = EntryType::AgentPubKey;
 
@@ -280,6 +326,11 @@ mod tests {
         h4.entry_type = entry_type_2.clone();
         h4.header_seq = 3;
 
+        // Cheeky forker!
+        let mut h4a = fixt!(Create);
+        h4a.entry_type = entry_type_1.clone();
+        h4a.header_seq = 3;
+
         let mut h5 = fixt!(Update);
         h5.entry_type = entry_type_1.clone();
         h5.header_seq = 4;
@@ -292,6 +343,7 @@ mod tests {
             HeaderHashed::from_content_sync(h2.into()),
             HeaderHashed::from_content_sync(h3.into()),
             HeaderHashed::from_content_sync(h4.into()),
+            HeaderHashed::from_content_sync(h4a.into()),
             HeaderHashed::from_content_sync(h5.into()),
             HeaderHashed::from_content_sync(h6.into()),
         ];
@@ -300,7 +352,10 @@ mod tests {
 
     fn map_query(query: &ChainQueryFilter, headers: &[HeaderHashed]) -> Vec<bool> {
         let filtered = query.filter_headers(headers.to_vec());
-        headers.iter().map(|h| filtered.contains(h)).collect::<Vec<_>>()
+        headers
+            .iter()
+            .map(|h| filtered.contains(h))
+            .collect::<Vec<_>>()
     }
 
     #[test]
@@ -348,26 +403,32 @@ mod tests {
     fn filter_by_chain_sequence() {
         let headers = fixtures();
 
-        let query_1 = ChainQueryFilter::new().sequence_range(0..1);
-        let query_2 = ChainQueryFilter::new().sequence_range(0..2);
-        let query_3 = ChainQueryFilter::new().sequence_range(1..3);
-        let query_4 = ChainQueryFilter::new().sequence_range(2..1000);
+        dbg!(&headers);
+
+        let query_1 = ChainQueryFilter::new()
+            .sequence_range(ChainQueryFilterSequenceRange::HeaderSeqRange(0, 0));
+        let query_2 = ChainQueryFilter::new()
+            .sequence_range(ChainQueryFilterSequenceRange::HeaderSeqRange(0, 1));
+        let query_3 = ChainQueryFilter::new()
+            .sequence_range(ChainQueryFilterSequenceRange::HeaderSeqRange(1, 2));
+        let query_4 = ChainQueryFilter::new()
+            .sequence_range(ChainQueryFilterSequenceRange::HeaderSeqRange(2, 999));
 
         assert_eq!(
             map_query(&query_1, &headers),
-            [true, false, false, false, false, false].to_vec()
+            [true, false, false, false, false, false, false].to_vec()
         );
         assert_eq!(
             map_query(&query_2, &headers),
-            [true, true, false, false, false, false].to_vec()
+            [true, true, false, false, false, false, false].to_vec()
         );
         assert_eq!(
             map_query(&query_3, &headers),
-            [false, true, true, false, false, false].to_vec()
+            [false, true, true, false, false, false, false].to_vec()
         );
         assert_eq!(
             map_query(&query_4, &headers),
-            [false, false, true, true, true, true].to_vec()
+            [false, false, true, true, true, true, true].to_vec()
         );
     }
 
@@ -380,7 +441,7 @@ mod tests {
                 &ChainQueryFilter::new()
                     .header_type(headers[0].header_type())
                     .entry_type(headers[0].entry_type().unwrap().clone())
-                    .sequence_range(0..1),
+                    .sequence_range(ChainQueryFilterSequenceRange::HeaderSeqRange(0, 0)),
                 &headers
             ),
             [true, false, false, false, false, false].to_vec()
@@ -391,7 +452,7 @@ mod tests {
                 &ChainQueryFilter::new()
                     .header_type(headers[1].header_type())
                     .entry_type(headers[0].entry_type().unwrap().clone())
-                    .sequence_range(0..1000),
+                    .sequence_range(ChainQueryFilterSequenceRange::HeaderSeqRange(0, 999)),
                 &headers
             ),
             [false, false, false, false, true, false].to_vec()
@@ -401,7 +462,7 @@ mod tests {
             map_query(
                 &ChainQueryFilter::new()
                     .entry_type(headers[0].entry_type().unwrap().clone())
-                    .sequence_range(0..1000),
+                    .sequence_range(ChainQueryFilterSequenceRange::HeaderSeqRange(0, 999)),
                 &headers
             ),
             [true, false, false, false, true, false].to_vec()

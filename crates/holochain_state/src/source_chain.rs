@@ -24,6 +24,7 @@ use holochain_types::env::DbRead;
 use holochain_types::env::DbWrite;
 use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::header;
+use holochain_zome_types::query::ChainQueryFilterSequenceRange;
 use holochain_zome_types::CapAccess;
 use holochain_zome_types::CapGrant;
 use holochain_zome_types::CapSecret;
@@ -47,7 +48,6 @@ use holochain_zome_types::SignedHeader;
 use holochain_zome_types::SignedHeaderHashed;
 use holochain_zome_types::Timestamp;
 use holochain_zome_types::Zome;
-use holochain_zome_types::query::ChainQueryFilterSequenceRange;
 
 use crate::chain_lock::is_chain_locked;
 use crate::chain_lock::is_lock_expired;
@@ -646,35 +646,52 @@ where
                 WHERE
                 Header.author = :author
                 AND
-                ");
-                match query.sequence_range {
-                    ChainQueryFilterSequenceRange::Unbounded => { },
-                    ChainQueryFilterSequenceRange::HeaderSeqRange(ref range) => {
-                        sql.push_str(&format!("
-                        Header.seq >= {0}
+                ",
+                    );
+                    match query.sequence_range {
+                        ChainQueryFilterSequenceRange::Unbounded => {}
+                        ChainQueryFilterSequenceRange::HeaderSeqRange(range_min, range_max) => {
+                            sql.push_str(&format!(
+                                "
+                        Header.seq BETWEEN {0} AND {1}
                         AND
-                        Header.seq < {1}
+                        ",
+                                range_min, range_max
+                            ));
+                        }
+                        ChainQueryFilterSequenceRange::HeaderHashRange(
+                            ref range_min_hash,
+                            ref range_max_hash,
+                        ) => {
+                            sql.push_str(&format!(
+                                "
+                        Header.seq BETWEEN
+                        (SELECT Header.seq WHERE Header.hash = {0})
                         AND
-                        ", range.start, range.end));
-                    },
-                    ChainQueryFilterSequenceRange::HeaderHashRange(ref range_min_hash, ref range_max_hash) => {
-                        sql.push_str(&format!("
-                        Header.seq >= (SELECT Header.seq WHERE Header.hash = {0})
+                        (SELECT Header.seq WHERE Header.hash = {1})
                         AND
-                        Header.seq <= (SELECT Header.seq WHERE Header.hash = {1})
+                        ",
+                                range_min_hash, range_max_hash
+                            ));
+                        }
+                        ChainQueryFilterSequenceRange::HeaderHashTerminated(
+                            ref range_max_hash,
+                            length,
+                        ) => {
+                            sql.push_str(&format!(
+                                "
+                        Header.seq BETWEEN
+                        (SELECT Header.seq WHERE Header.hash = {0}) - {1}
                         AND
-                        ", range_min_hash, range_max_hash));
-                    },
-                    ChainQueryFilterSequenceRange::HeaderHashTerminated(ref range_max_hash, length) => {
-                        sql.push_str(&format!("
-                        Header.seq >= (SELECT Header.seq WHERE Header.hash = {0}) - {1}
+                        (SELECT Header.seq WHERE Header.hash = {0})
                         AND
-                        Header.seq <= (SELECT Header.seq WHERE Header.hash = {0})
-                        AND
-                        ", range_max_hash, length));
-                    },
-                }
-                sql.push_str("
+                        ",
+                                range_max_hash, length
+                            ));
+                        }
+                    }
+                    sql.push_str(
+                        "
                 (:entry_type IS NULL OR Header.entry_type = :entry_type)
                 AND
                 (:header_type IS NULL OR Header.type = :header_type)
