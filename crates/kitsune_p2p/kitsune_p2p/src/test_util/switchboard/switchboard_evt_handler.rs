@@ -136,7 +136,7 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
     fn handle_gossip(
         &mut self,
         _space: Arc<KitsuneSpace>,
-        _ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
+        ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
     ) -> KitsuneP2pEventHandlerResult<()> {
         ok_fut(Ok(self.sb.share(|sb| {
             let node = sb.nodes.get_mut(&self.node).unwrap();
@@ -157,7 +157,7 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
         &mut self,
         QueryOpHashesEvt {
             space: _,
-            agents,
+            arc_set,
             window,
             max_ops,
             include_limbo,
@@ -177,15 +177,8 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
                     .map(|op| include_limbo || op.is_integrated)
                     .unwrap_or(false)
 
-                    // Does the op fall within one of the specified arcsets
-                    // with the correct integration/limbo criteria?
-                    && agents.iter().fold(false, |yes, (agent, arc_set)| {
-                        if yes {
-                            return true;
-                        }
-                        arc_set.contains((**op_loc8).into())
-
-                    })
+                    // Does the op fall within the specified arcset?
+                    && arc_set.contains((**op_loc8).into())
                 })
                 .map(|(_, op)| (op.hash.clone(), op.timestamp))
                 .take(max_ops)
