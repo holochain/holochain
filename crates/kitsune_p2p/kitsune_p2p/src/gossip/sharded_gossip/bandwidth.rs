@@ -71,8 +71,27 @@ impl BandwidthThrottle {
     pub async fn outgoing_bytes(&self, bytes: usize) {
         if let Some(bits) = NonZeroU32::new(bytes as u32 * 8) {
             if let Some(outbound) = &self.outbound {
-                if outbound.until_n_ready(bits).await.is_err() {
-                    tracing::error!("Tried to send a message larger than the max message size");
+                while let Err(e) = outbound.check_n(bits) {
+                    match e {
+                        governor::NegativeMultiDecision::BatchNonConforming(_, n) => {
+                            let clock = governor::clock::QuantaClock::default();
+                            let dur = n.wait_time_from(governor::clock::Clock::now(&clock));
+                            if dur.as_secs() > 1 {
+                                tracing::info!(
+                                    "Waiting {:?} to send {} bits, {} bytes",
+                                    dur,
+                                    bits,
+                                    bytes
+                                );
+                            }
+                            tokio::time::sleep(dur).await;
+                        }
+                        governor::NegativeMultiDecision::InsufficientCapacity(_) => {
+                            tracing::error!(
+                                "Tried to send a message larger than the max message size"
+                            );
+                        }
+                    }
                 }
             }
         }
@@ -82,8 +101,27 @@ impl BandwidthThrottle {
     pub async fn incoming_bytes(&self, bytes: usize) {
         if let Some(bits) = NonZeroU32::new(bytes as u32 * 8) {
             if let Some(inbound) = &self.inbound {
-                if inbound.until_n_ready(bits).await.is_err() {
-                    tracing::error!("Tried to receive a message larger than the max message size");
+                while let Err(e) = inbound.check_n(bits) {
+                    match e {
+                        governor::NegativeMultiDecision::BatchNonConforming(_, n) => {
+                            let clock = governor::clock::QuantaClock::default();
+                            let dur = n.wait_time_from(governor::clock::Clock::now(&clock));
+                            if dur.as_secs() > 1 {
+                                tracing::info!(
+                                    "Waiting {:?} to receive {} bits, {} bytes",
+                                    dur,
+                                    bits,
+                                    bytes
+                                );
+                            }
+                            tokio::time::sleep(dur).await;
+                        }
+                        governor::NegativeMultiDecision::InsufficientCapacity(_) => {
+                            tracing::error!(
+                                "Tried to receive a message larger than the max message size"
+                            );
+                        }
+                    }
                 }
             }
         }

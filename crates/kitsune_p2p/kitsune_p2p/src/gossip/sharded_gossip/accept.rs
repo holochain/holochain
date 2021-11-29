@@ -38,7 +38,7 @@ impl ShardedGossipLocal {
                 .map(|(_, a)| a)
                 .collect();
 
-        let mut gossip = Vec::with_capacity(2);
+        let mut gossip = Vec::new();
 
         // Generate the bloom filters and new state.
         let state = self

@@ -146,6 +146,8 @@ async fn partial_missing_doesnt_finish() {
                     created_at: Instant::now(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
+                    bloom_batch_cursor: None,
+                    ops_batch_queue: OpsBatchQueue::new(),
                 }
             }
             .into(),
@@ -158,7 +160,7 @@ async fn partial_missing_doesnt_finish() {
     // - Send a missing ops message that isn't marked as finished.
     let incoming = ShardedGossipWire::MissingOps(MissingOps {
         ops: vec![],
-        finished: false,
+        finished: MissingOpsStatus::ChunkComplete as u8,
     });
 
     let outgoing = bob.process_incoming(cert.clone(), incoming).await.unwrap();
@@ -192,6 +194,8 @@ async fn missing_ops_finishes() {
                     created_at: Instant::now(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
+                    bloom_batch_cursor: None,
+                    ops_batch_queue: OpsBatchQueue::new(),
                 }
             }
             .into(),
@@ -204,7 +208,7 @@ async fn missing_ops_finishes() {
     // Send a message marked as finished.
     let incoming = ShardedGossipWire::MissingOps(MissingOps {
         ops: vec![],
-        finished: true,
+        finished: MissingOpsStatus::AllComplete as u8,
     });
 
     let outgoing = bob.process_incoming(cert.clone(), incoming).await.unwrap();
@@ -239,6 +243,8 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
                     created_at: Instant::now(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
+                    bloom_batch_cursor: None,
+                    ops_batch_queue: OpsBatchQueue::new(),
                 }
             }
             .into(),
@@ -251,7 +257,7 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
     // - Send a message marked as finished.
     let incoming = ShardedGossipWire::MissingOps(MissingOps {
         ops: vec![],
-        finished: true,
+        finished: MissingOpsStatus::AllComplete as u8,
     });
 
     let outgoing = bob.process_incoming(cert.clone(), incoming).await.unwrap();
@@ -286,6 +292,8 @@ async fn bloom_response_finishes() {
                     created_at: Instant::now(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
+                    bloom_batch_cursor: None,
+                    ops_batch_queue: OpsBatchQueue::new(),
                 }
             }
             .into(),
@@ -333,6 +341,8 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
                     created_at: Instant::now(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
+                    bloom_batch_cursor: None,
+                    ops_batch_queue: OpsBatchQueue::new(),
                 }
             }
             .into(),
@@ -383,6 +393,8 @@ async fn no_data_still_finishes() {
                     created_at: Instant::now(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
+                    bloom_batch_cursor: None,
+                    ops_batch_queue: OpsBatchQueue::new(),
                 }
             }
             .into(),
@@ -404,6 +416,8 @@ async fn no_data_still_finishes() {
                     created_at: Instant::now(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
+                    bloom_batch_cursor: None,
+                    ops_batch_queue: OpsBatchQueue::new(),
                 }
             }
             .into(),

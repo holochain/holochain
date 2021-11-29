@@ -504,7 +504,10 @@ async fn mock_network_sharded_gossip() {
                                             dna,
                                             module,
                                             gossip: GossipProtocol::Sharded(
-                                                ShardedGossipWire::missing_ops(missing_ops, true),
+                                                ShardedGossipWire::missing_ops(
+                                                    missing_ops,
+                                                    MissingOpsStatus::AllComplete as u8,
+                                                ),
                                             ),
                                         };
                                         channel.send(msg.addressed((*agent).clone())).await;

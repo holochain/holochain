@@ -104,7 +104,7 @@ impl ShardedGossipLocal {
         let local_arcs: Vec<ArcInterval> =
             local_agent_arcs.into_iter().map(|(_, arc)| arc).collect();
 
-        let mut gossip = Vec::with_capacity(3);
+        let mut gossip = Vec::new();
 
         // Send the intervals back as the accept message.
         gossip.push(ShardedGossipWire::accept(local_arcs.clone()));
@@ -152,7 +152,7 @@ impl ShardedGossipLocal {
         let common_arc_set = Arc::new(arc_set.intersection(&remote_arc_set));
 
         // Generate the new state.
-        let mut state = self.new_state(common_arc_set)?;
+        let state = self.new_state(common_arc_set)?;
 
         // Generate the agent bloom.
         if let GossipType::Recent = self.gossip_type {
@@ -163,56 +163,74 @@ impl ShardedGossipLocal {
             }
         }
 
-        let windows = self.calculate_time_ranges();
-        let len = windows.len();
-        // Generate the ops bloom for all local agents within the common arc.
-        for (i, window) in windows.into_iter().enumerate() {
-            let blooms = self
-                .generate_ops_blooms_for_time_window(&state.common_arc_set, window)
-                .await?;
+        self.next_bloom_batch(state, gossip).await
+    }
 
-            // If no blooms were found for this time window then return a no overlap.
-            if blooms.is_empty() {
-                // Check if this is the final time window.
-                if i == len - 1 {
-                    gossip.push(ShardedGossipWire::ops(
-                        EncodedTimedBloomFilter::NoOverlap,
-                        true,
-                    ));
-                } else {
-                    gossip.push(ShardedGossipWire::ops(
-                        EncodedTimedBloomFilter::NoOverlap,
-                        false,
-                    ));
-                }
+    /// Generate the next batch of blooms from this state.
+    /// If there is a saved cursor from a previous partial
+    /// batch then this will pick up from their.
+    /// Otherwise blooms a bloom for the entire search window
+    /// will be attempted (if this is too many hashes then it will
+    /// create a new partial batch of blooms.)
+    pub(super) async fn next_bloom_batch(
+        &self,
+        mut state: RoundState,
+        gossip: &mut Vec<ShardedGossipWire>,
+    ) -> KitsuneResult<RoundState> {
+        // Get the default window for this gossip loop.
+        let mut window = self.calculate_time_range();
+
+        // If there is a previously saved cursor then start from their.
+        if let Some(cursor) = state.bloom_batch_cursor.take() {
+            window.start = cursor;
+        }
+        let blooms = self
+            .generate_ops_blooms_for_time_window(&state.common_arc_set, window)
+            .await?;
+
+        let blooms = match blooms {
+            bloom::Batch::Complete(blooms) => blooms,
+            bloom::Batch::Partial { cursor, data } => {
+                // This batch of blooms is partial so save the cursor in this rounds state.
+                state.bloom_batch_cursor = Some(cursor);
+                data
             }
+        };
 
-            let inner_len = blooms.len();
+        // If no blooms were found for this time window then return a no overlap.
+        if blooms.is_empty() {
+            // Check if this is the final time window.
+            gossip.push(ShardedGossipWire::ops(
+                EncodedTimedBloomFilter::NoOverlap,
+                true,
+            ));
+        }
 
-            // Encode each bloom found for this time window.
-            for (j, bloom) in blooms.into_iter().enumerate() {
-                let time_window = bloom.time;
-                let bloom = match bloom.bloom {
-                    // We have some hashes so request all missing from the bloom.
-                    Some(bloom) => {
-                        let bytes = encode_bloom_filter(&bloom);
-                        EncodedTimedBloomFilter::HaveHashes {
-                            filter: bytes,
-                            time_window,
-                        }
+        let len = blooms.len();
+
+        // Encode each bloom found for this time window.
+        for (i, bloom) in blooms.into_iter().enumerate() {
+            let time_window = bloom.time;
+            let bloom = match bloom.bloom {
+                // We have some hashes so request all missing from the bloom.
+                Some(bloom) => {
+                    let bytes = encode_bloom_filter(&bloom);
+                    EncodedTimedBloomFilter::HaveHashes {
+                        filter: bytes,
+                        time_window,
                     }
-                    // We have no hashes for this time window but we do have agents
-                    // that hold the arc so request all the ops the remote holds.
-                    None => EncodedTimedBloomFilter::MissingAllHashes { time_window },
-                };
-                state.increment_sent_ops_blooms();
-
-                // Check if this is the final time window and the final bloom for this window.
-                if i == len - 1 && j == inner_len - 1 {
-                    gossip.push(ShardedGossipWire::ops(bloom, true));
-                } else {
-                    gossip.push(ShardedGossipWire::ops(bloom, false));
                 }
+                // We have no hashes for this time window but we do have agents
+                // that hold the arc so request all the ops the remote holds.
+                None => EncodedTimedBloomFilter::MissingAllHashes { time_window },
+            };
+            state.increment_sent_ops_blooms();
+
+            // Check if this is the final time window and the final bloom for this window.
+            if i == len - 1 && state.bloom_batch_cursor.is_none() {
+                gossip.push(ShardedGossipWire::ops(bloom, true));
+            } else {
+                gossip.push(ShardedGossipWire::ops(bloom, false));
             }
         }
 

@@ -39,12 +39,18 @@ pub(super) fn three_way_sharded_ownership() -> (Vec<Arc<KitsuneAgent>>, LocalSce
 
 /// Build up the functionality of a mock event handler a la carte with these
 /// provided methods
-pub struct HandlerBuilder(MockKitsuneP2pEventHandler);
+pub struct HandlerBuilder(MockKitsuneP2pEventHandler, Option<std::time::Duration>);
 
 impl HandlerBuilder {
     /// Constructor
     pub fn new() -> Self {
-        Self(MockKitsuneP2pEventHandler::new())
+        Self(MockKitsuneP2pEventHandler::new(), None)
+    }
+
+    pub fn with_delay(delay: std::time::Duration) -> Self {
+        let mut s = Self::new();
+        s.1 = Some(delay);
+        s
     }
 
     /// Make the mock available
@@ -71,6 +77,7 @@ impl HandlerBuilder {
     pub fn with_agent_persistence(mut self, agent_data: MockAgentPersistence) -> Self {
         let info_only: Vec<_> = agent_data.iter().map(|(info, _)| info.clone()).collect();
         let agents_only: Vec<_> = info_only.iter().map(|info| info.agent.clone()).collect();
+        let delay = self.1;
 
         self.0.expect_handle_query_agents().returning({
             let info_only = info_only.clone();
@@ -91,6 +98,7 @@ impl HandlerBuilder {
             }
         });
 
+        let d = delay.clone();
         self.0
             .expect_handle_query_op_hashes()
             .returning(move |arg: QueryOpHashesEvt| {
@@ -118,36 +126,49 @@ impl HandlerBuilder {
 
                 ops.sort_by_key(|(_, time)| time);
                 ops.dedup();
-                let result: Option<(Vec<Arc<KitsuneOpHash>>, TimeWindow)> =
+                let result: Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowInclusive)> =
                     if let (Some((_, first)), Some((_, last))) = (ops.first(), ops.last()) {
                         let ops = ops
                             .into_iter()
                             .map(|(op, _)| Arc::new(op.clone()))
                             .take(max_ops)
                             .collect();
-                        Some((ops, *first..*last))
+                        Some((ops, *first..=*last))
                     } else {
                         None
                     };
-                Ok(async { Ok(result) }.boxed().into())
+                Ok(async move {
+                    if let Some(delay) = d {
+                        tokio::time::sleep(delay).await;
+                    }
+                    Ok(result)
+                }
+                .boxed()
+                .into())
             });
 
         self.0
             .expect_handle_fetch_op_data()
-            .returning(|arg: FetchOpDataEvt| {
+            .returning(move |arg: FetchOpDataEvt| {
                 // Return dummy data for each op
                 let FetchOpDataEvt {
                     space: _,
                     op_hashes,
                     ..
                 } = arg;
-                Ok(async {
+                Ok(async move {
+                    if let Some(delay) = delay {
+                        tokio::time::sleep(delay).await;
+                    }
                     Ok(itertools::zip(op_hashes.into_iter(), std::iter::repeat(vec![0])).collect())
                 }
                 .boxed()
                 .into())
             });
 
+        self.0
+            .expect_handle_gossip()
+            .returning(move |_, _| Ok(async { Ok(()) }.boxed().into()));
         self
     }
 }
