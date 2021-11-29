@@ -1,20 +1,24 @@
 use crate::prelude::*;
-use chashmap::CHashMap;
 use holochain_serialized_bytes::prelude::*;
 use once_cell::sync::Lazy;
 use rusqlite::*;
 use scheduled_thread_pool::ScheduledThreadPool;
 use std::{
+    any::Any,
+    collections::HashMap,
     path::{Path, PathBuf},
     sync::Arc,
     time::Duration,
 };
 
-mod singleton_conn;
-
 const SQLITE_BUSY_TIMEOUT: Duration = Duration::from_secs(30);
 
-pub(crate) static DATABASE_HANDLES: Lazy<CHashMap<PathBuf, DbWrite>> = Lazy::new(|| {
+/// A map over any database type key'd by the full path to the database.
+pub(crate) struct Databases {
+    dbs: parking_lot::RwLock<HashMap<PathBuf, Box<dyn Any + Send + Sync>>>,
+}
+
+pub(crate) static DATABASE_HANDLES: Lazy<Databases> = Lazy::new(|| {
     // This is just a convenient place that we know gets initialized
     // both in the final binary holochain && in all relevant tests
     //
@@ -36,7 +40,7 @@ pub(crate) static DATABASE_HANDLES: Lazy<CHashMap<PathBuf, DbWrite>> = Lazy::new
         // std::process::abort();
     }));
 
-    CHashMap::new()
+    Databases::new()
 });
 
 static R2D2_THREADPOOL: Lazy<Arc<ScheduledThreadPool>> = Lazy::new(|| {
@@ -47,17 +51,62 @@ static R2D2_THREADPOOL: Lazy<Arc<ScheduledThreadPool>> = Lazy::new(|| {
 pub type ConnectionPool = r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>;
 pub type PConnInner = r2d2::PooledConnection<r2d2_sqlite::SqliteConnectionManager>;
 
-pub(crate) fn new_connection_pool(
-    path: &Path,
-    kind: DbKind,
-    synchronous_level: DbSyncLevel,
-) -> ConnectionPool {
+impl Databases {
+    /// Create a new database map.
+    pub fn new() -> Self {
+        Databases {
+            dbs: parking_lot::RwLock::new(HashMap::new()),
+        }
+    }
+
+    /// Get a database if it exists or
+    /// create it.
+    pub fn get_or_insert<Kind, F>(
+        &self,
+        kind: &Kind,
+        path_prefix: &Path,
+        insert: F,
+    ) -> DatabaseResult<DbWrite<Kind>>
+    where
+        Kind: DbKindT + Send + Sync + 'static,
+        F: FnOnce(Kind) -> DatabaseResult<DbWrite<Kind>>,
+    {
+        // Create the full path from the prefix and the kind.
+        let path = path_prefix.join(kind.filename());
+
+        // First try a quick read lock because for the majority of calls
+        // the database will already exist.
+        let ret = self
+            .dbs
+            .read()
+            .get(&path)
+            .and_then(|d| d.downcast_ref::<DbWrite<Kind>>().cloned());
+        match ret {
+            Some(ret) => Ok(ret),
+            None => match self.dbs.write().entry(path) {
+                // Note that this downcast is safe because the path is created
+                // from the kind so will always be the correct type.
+                std::collections::hash_map::Entry::Occupied(o) => Ok(o
+                    .get()
+                    .downcast_ref::<DbWrite<Kind>>()
+                    .expect("Downcast to db kind failed. This is a bug")
+                    .clone()),
+                std::collections::hash_map::Entry::Vacant(v) => {
+                    // If the db is missing we run the closure to create it.
+                    // Note the `Kind` is enforced by the closure return type.
+                    let db = insert(kind.clone())?;
+                    v.insert(Box::new(db.clone()));
+                    Ok(db)
+                }
+            },
+        }
+    }
+}
+
+pub(crate) fn new_connection_pool(path: &Path, synchronous_level: DbSyncLevel) -> ConnectionPool {
     use r2d2_sqlite::SqliteConnectionManager;
     let manager = SqliteConnectionManager::file(path);
-    let customizer = Box::new(ConnCustomizer {
-        kind,
-        synchronous_level,
-    });
+    let customizer = Box::new(ConnCustomizer { synchronous_level });
     // We need the same amount of connections as reader threads plus one for the writer thread.
     let max_cons = num_read_threads() + 1;
     r2d2::Pool::builder()
@@ -75,7 +124,6 @@ pub(crate) fn new_connection_pool(
 
 #[derive(Debug)]
 struct ConnCustomizer {
-    kind: DbKind,
     synchronous_level: DbSyncLevel,
 }
 
@@ -92,24 +140,44 @@ pub enum DbSyncLevel {
     Off,
 }
 
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
+/// The strategy for database file system synchronization.
+/// Some databases like the cache can be safely rebuilt if
+/// corruption occurs due to using the faster [`DbSyncLevel::Off`].
+pub enum DbSyncStrategy {
+    /// Allows databases that can be wiped and rebuilt to
+    /// use the faster [`DbSyncLevel::Off`].
+    /// This is the default.
+    Fast,
+    /// Makes all databases use at least [`DbSyncLevel::Normal`].
+    /// This is probably not needed unless you have an SSD and
+    /// would prefer to lower the chances of databases needing to
+    /// be rebuilt.
+    Resilient,
+}
+
 impl Default for DbSyncLevel {
     fn default() -> Self {
         DbSyncLevel::Normal
     }
 }
 
+impl Default for DbSyncStrategy {
+    fn default() -> Self {
+        DbSyncStrategy::Fast
+    }
+}
+
 impl r2d2::CustomizeConnection<Connection, rusqlite::Error> for ConnCustomizer {
     fn on_acquire(&self, conn: &mut Connection) -> Result<(), rusqlite::Error> {
-        initialize_connection(conn, &self.kind, self.synchronous_level, true)?;
+        initialize_connection(conn, self.synchronous_level)?;
         Ok(())
     }
 }
 
-fn initialize_connection(
+pub(crate) fn initialize_connection(
     conn: &mut Connection,
-    _kind: &DbKind,
     synchronous_level: DbSyncLevel,
-    _is_first: bool,
 ) -> rusqlite::Result<()> {
     // tell SQLite to wait this long during write contention
     conn.busy_timeout(SQLITE_BUSY_TIMEOUT)?;
@@ -161,11 +229,10 @@ fn get_encryption_key_shim() -> [u8; 32] {
 pub struct PConn {
     #[shrinkwrap(main_field)]
     inner: PConnInner,
-    _kind: DbKind,
 }
 
 impl PConn {
-    pub(crate) fn new(inner: PConnInner, _kind: DbKind) -> Self {
-        Self { inner, _kind }
+    pub(crate) fn new(inner: PConnInner) -> Self {
+        Self { inner }
     }
 }

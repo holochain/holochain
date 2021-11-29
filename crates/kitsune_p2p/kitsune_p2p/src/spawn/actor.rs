@@ -15,6 +15,7 @@ use kitsune_p2p_transport_quic::tx2::*;
 use kitsune_p2p_types::async_lazy::AsyncLazy;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_pool_promote::*;
+use kitsune_p2p_types::tx2::tx2_restart_adapter::*;
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use kitsune_p2p_types::tx2::*;
 use kitsune_p2p_types::*;
@@ -124,6 +125,9 @@ impl KitsuneP2pActor {
             }
         };
 
+        // wrap in restart logic
+        let f = tx2_restart_adapter(f);
+
         // convert to frontend
         let f = tx2_pool_promote(f, config.tuning_params.clone());
 
@@ -131,6 +135,10 @@ impl KitsuneP2pActor {
         let f = if !is_mock {
             let mut conf = kitsune_p2p_proxy::tx2::ProxyConfig::default();
             conf.tuning_params = Some(config.tuning_params.clone());
+            if let Some(use_proxy) = &tx2_conf.use_proxy {
+                let proxy_url = ProxyUrl::from(use_proxy.as_str());
+                conf.client_of_remote_proxy = Some(proxy_url);
+            }
             let f = tx2_proxy(f, conf)?;
             f
         } else {
@@ -166,49 +174,7 @@ impl KitsuneP2pActor {
         // capture endpoint handle
         let ep_hnd = ep.handle().clone();
 
-        // if we should be proxying - set up the proxy connect retry / proxy addr
-        let this_addr = if let Some(use_proxy) = tx2_conf.use_proxy {
-            let local = ep_hnd.local_addr().map_err(KitsuneP2pError::other)?;
-            let this_digest = ProxyUrl::from(local.as_str()).digest();
-            let proxy_url = ProxyUrl::from(use_proxy.as_str());
-
-            // spawn logic that will attempt to keep us connected to the proxy
-            let ep_hnd = ep_hnd.clone();
-            let tuning_params = config.tuning_params.clone();
-            tokio::task::spawn(async move {
-                let mut con: Option<Tx2ConHnd<wire::Wire>> = None;
-                loop {
-                    // see if we need a new connection to the proxy
-                    if con.is_none() || con.as_ref().unwrap().is_closed() {
-                        if ep_hnd.is_closed() {
-                            break;
-                        }
-                        match ep_hnd
-                            .get_connection(use_proxy.clone(), tuning_params.implicit_timeout())
-                            .await
-                        {
-                            Ok(c) => {
-                                con = Some(c);
-                            }
-                            Err(e) => {
-                                tracing::warn!("failure to establish proxy connection: {:?}", e);
-                            }
-                        }
-                    }
-
-                    // this is very naive... just running every 5 seconds
-                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-                }
-                tracing::warn!("proxy con refresh loop shutdown");
-            });
-
-            ProxyUrl::new(proxy_url.as_base().as_str(), this_digest)
-                .unwrap()
-                .as_str()
-                .into()
-        } else {
-            ep_hnd.local_addr().map_err(KitsuneP2pError::other)?
-        };
+        let this_addr = ep_hnd.local_addr().map_err(KitsuneP2pError::other)?;
 
         tracing::info!("this_addr: {}", this_addr);
 
@@ -238,13 +204,12 @@ impl KitsuneP2pActor {
                                 match data {
                                     wire::Wire::Call(wire::Call {
                                         space,
-                                        from_agent,
                                         to_agent,
                                         data,
                                         ..
                                     }) => {
                                         let res = match evt_sender
-                                            .call(space, to_agent, from_agent, data.into())
+                                            .call(space, to_agent, data.into())
                                             .await
                                         {
                                             Err(err) => {
@@ -330,9 +295,8 @@ impl KitsuneP2pActor {
                                         data,
                                         ..
                                     }) => {
-                                        if let Err(err) = evt_sender
-                                            .notify(space, to_agent.clone(), to_agent, data.into())
-                                            .await
+                                        if let Err(err) =
+                                            evt_sender.notify(space, to_agent, data.into()).await
                                         {
                                             tracing::warn!(
                                                 ?err,
@@ -524,29 +488,26 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
         &mut self,
         space: Arc<KitsuneSpace>,
         to_agent: Arc<KitsuneAgent>,
-        from_agent: Arc<KitsuneAgent>,
         payload: Vec<u8>,
     ) -> KitsuneP2pEventHandlerResult<Vec<u8>> {
-        Ok(self.evt_sender.call(space, to_agent, from_agent, payload))
+        Ok(self.evt_sender.call(space, to_agent, payload))
     }
 
     fn handle_notify(
         &mut self,
         space: Arc<KitsuneSpace>,
         to_agent: Arc<KitsuneAgent>,
-        from_agent: Arc<KitsuneAgent>,
         payload: Vec<u8>,
     ) -> KitsuneP2pEventHandlerResult<()> {
-        Ok(self.evt_sender.notify(space, to_agent, from_agent, payload))
+        Ok(self.evt_sender.notify(space, to_agent, payload))
     }
 
     fn handle_gossip(
         &mut self,
         space: Arc<KitsuneSpace>,
-        to_agent: Arc<KitsuneAgent>,
         ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
     ) -> KitsuneP2pEventHandlerResult<()> {
-        Ok(self.evt_sender.gossip(space, to_agent, ops))
+        Ok(self.evt_sender.gossip(space, ops))
     }
 
     fn handle_fetch_op_data(
@@ -642,7 +603,6 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         &mut self,
         space: Arc<KitsuneSpace>,
         to_agent: Arc<KitsuneAgent>,
-        from_agent: Arc<KitsuneAgent>,
         payload: Vec<u8>,
         timeout_ms: Option<u64>,
     ) -> KitsuneP2pHandlerResult<Vec<u8>> {
@@ -653,7 +613,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         Ok(async move {
             let (space_sender, _) = space_sender.await;
             space_sender
-                .rpc_single(space, to_agent, from_agent, payload, timeout_ms)
+                .rpc_single(space, to_agent, payload, timeout_ms)
                 .await
         }
         .boxed()
@@ -699,7 +659,6 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
     fn handle_targeted_broadcast(
         &mut self,
         space: Arc<KitsuneSpace>,
-        from_agent: Arc<KitsuneAgent>,
         agents: Vec<Arc<KitsuneAgent>>,
         timeout: KitsuneTimeout,
         payload: Vec<u8>,
@@ -712,7 +671,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         Ok(async move {
             let (space_sender, _) = space_sender.await;
             space_sender
-                .targeted_broadcast(space, from_agent, agents, timeout, payload, drop_at_limit)
+                .targeted_broadcast(space, agents, timeout, payload, drop_at_limit)
                 .await
         }
         .boxed()
@@ -739,7 +698,6 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
     fn handle_authority_for_hash(
         &mut self,
         space: Arc<KitsuneSpace>,
-        agent: Arc<KitsuneAgent>,
         basis: Arc<KitsuneBasis>,
     ) -> KitsuneP2pHandlerResult<bool> {
         let space_sender = match self.spaces.get_mut(&space) {
@@ -748,7 +706,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         };
         Ok(async move {
             let (space_sender, _) = space_sender.await;
-            space_sender.authority_for_hash(space, agent, basis).await
+            space_sender.authority_for_hash(space, basis).await
         }
         .boxed()
         .into())
@@ -793,7 +751,6 @@ mockall::mock! {
             &mut self,
             space: Arc<KitsuneSpace>,
             to_agent: Arc<KitsuneAgent>,
-            from_agent: Arc<KitsuneAgent>,
             payload: Vec<u8>,
         ) -> KitsuneP2pEventHandlerResult<Vec<u8>>;
 
@@ -801,14 +758,12 @@ mockall::mock! {
             &mut self,
             space: Arc<KitsuneSpace>,
             to_agent: Arc<KitsuneAgent>,
-            from_agent: Arc<KitsuneAgent>,
             payload: Vec<u8>,
         ) -> KitsuneP2pEventHandlerResult<()> ;
 
         fn handle_gossip(
             &mut self,
             space: Arc<KitsuneSpace>,
-            to_agent: Arc<KitsuneAgent>,
             ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
         ) -> KitsuneP2pEventHandlerResult<()>;
 

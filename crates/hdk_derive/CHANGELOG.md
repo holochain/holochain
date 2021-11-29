@@ -4,6 +4,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.0.17
+
+## 0.0.16
+
 ## 0.0.15
 
 - `#[hdk_extern(infallible)]` now supports leaving off the return type of a fn [PR1049](https://github.com/holochain/holochain/pull/1049)

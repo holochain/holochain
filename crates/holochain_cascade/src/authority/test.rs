@@ -4,7 +4,7 @@ use crate::test_utils::*;
 use ghost_actor::dependencies::observability;
 use holochain_p2p::actor;
 use holochain_p2p::event::GetRequest;
-use holochain_state::prelude::test_cell_env;
+use holochain_state::prelude::test_dht_env;
 use holochain_types::activity::ChainItems;
 
 fn options() -> holochain_p2p::event::GetOptions {
@@ -19,7 +19,7 @@ fn options() -> holochain_p2p::event::GetOptions {
 #[tokio::test(flavor = "multi_thread")]
 async fn get_entry() {
     observability::test_run().ok();
-    let env = test_cell_env();
+    let env = test_dht_env();
 
     let td = EntryTestData::create();
 
@@ -67,7 +67,7 @@ async fn get_entry() {
 #[tokio::test(flavor = "multi_thread")]
 async fn get_element() {
     observability::test_run().ok();
-    let env = test_cell_env();
+    let env = test_dht_env();
 
     let td = ElementTestData::create();
 
@@ -133,7 +133,7 @@ async fn get_element() {
 #[tokio::test(flavor = "multi_thread")]
 async fn retrieve_element() {
     observability::test_run().ok();
-    let env = test_cell_env();
+    let env = test_dht_env();
 
     let td = ElementTestData::create();
 
@@ -157,7 +157,7 @@ async fn retrieve_element() {
 #[tokio::test(flavor = "multi_thread")]
 async fn get_links() {
     observability::test_run().ok();
-    let env = test_cell_env();
+    let env = test_dht_env();
 
     let td = EntryTestData::create();
 
@@ -189,7 +189,7 @@ async fn get_links() {
 #[tokio::test(flavor = "multi_thread")]
 async fn get_agent_activity() {
     observability::test_run().ok();
-    let env = test_cell_env();
+    let env = test_dht_env();
 
     let td = ActivityTestData::valid_chain_scenario();
 

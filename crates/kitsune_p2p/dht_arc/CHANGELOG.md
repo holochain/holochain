@@ -4,9 +4,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-- Slight modifications to the arc resizing algorithm to improve stability.
-  - Instead of aiming for the ideal target arc size, aim for an ideal range. This slack in the system allows all agents to converge on their target instead of endlessly oscillating.
-  - No longer take "gap detection" into consideration, as it was seen to have a negative effect on stability.
+- In the arc resizing algorithm, instead of aiming for the ideal target arc size, aim for an ideal range. This slack in the system allows all agents to converge on their target more stably, with less oscillation.
 
 ## 0.0.6
 

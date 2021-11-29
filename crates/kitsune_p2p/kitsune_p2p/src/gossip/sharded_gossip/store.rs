@@ -3,9 +3,7 @@
 
 use std::{collections::HashSet, sync::Arc};
 
-use crate::event::{
-    FetchOpDataEvt, PutAgentInfoSignedEvt, QueryAgentsEvt, QueryOpHashesEvt, TimeWindow,
-};
+use crate::event::{PutAgentInfoSignedEvt, QueryAgentsEvt, QueryOpHashesEvt, TimeWindow};
 use crate::types::event::KitsuneP2pEventSender;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
@@ -102,25 +100,15 @@ pub(super) async fn agents_within_arcset(
 pub(super) async fn all_op_hashes_within_arcset(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
-    agents: &[(Arc<KitsuneAgent>, ArcInterval)],
-    common_arc_set: &DhtArcSet,
+    common_arc_set: DhtArcSet,
     window: TimeWindow,
     max_ops: usize,
     include_limbo: bool,
 ) -> KitsuneResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindow)>> {
-    let agents: Vec<_> = agents
-        .iter()
-        .map(|(a, i)| {
-            // Intersect this agent's arc with the arcset to find the minimal
-            // arcset relevant to this agent
-            let intersection = common_arc_set.intersection(&DhtArcSet::from_interval(i));
-            (a.clone(), intersection)
-        })
-        .collect();
     Ok(evt_sender
         .query_op_hashes(QueryOpHashesEvt {
             space: space.clone(),
-            agents,
+            arc_set: common_arc_set,
             window,
             max_ops,
             include_limbo,
@@ -146,53 +134,16 @@ pub(super) async fn put_agent_info(
     Ok(())
 }
 
-pub(super) async fn fetch_ops(
-    evt_sender: &EventSender,
-    space: &Arc<KitsuneSpace>,
-    agents: impl Iterator<Item = &Arc<KitsuneAgent>>,
-    op_hashes: Vec<Arc<KitsuneOpHash>>,
-) -> KitsuneResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> {
-    evt_sender
-        .fetch_op_data(FetchOpDataEvt {
-            space: space.clone(),
-            agents: agents.cloned().collect(),
-            op_hashes,
-        })
-        .await
-        .map_err(KitsuneError::other)
-}
-
 /// Put new ops into agents that should hold them.
 pub(super) async fn put_ops(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
-    agent_arcs: Vec<(Arc<KitsuneAgent>, ArcInterval)>,
     ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
 ) -> KitsuneResult<()> {
-    // If there's only a single agent in the space we
-    // can avoid cloning the ops which could be large.
-    if agent_arcs.len() == 1 {
-        let (agent, arc) = agent_arcs
-            .into_iter()
-            .next()
-            .expect("Can't be none due to len check");
-        if arc.is_empty() {
-            return Ok(());
-        }
-        evt_sender
-            .gossip(space.clone(), agent, ops)
-            .await
-            .map_err(KitsuneError::other)?;
-    } else {
-        for (agent, arc) in agent_arcs {
-            if !arc.is_empty() {
-                evt_sender
-                    .gossip(space.clone(), agent, ops.clone())
-                    .await
-                    .map_err(KitsuneError::other)?;
-            }
-        }
-    }
+    evt_sender
+        .gossip(space.clone(), ops)
+        .await
+        .map_err(KitsuneError::other)?;
 
     Ok(())
 }

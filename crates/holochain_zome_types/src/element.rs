@@ -71,6 +71,28 @@ impl Element {
         }
     }
 
+    /// If the Element contains private entry data, set the ElementEntry
+    /// to Hidden so that it cannot be leaked
+    pub fn privatized(self) -> Self {
+        let entry = if let Some(EntryVisibility::Private) = self
+            .signed_header
+            .header()
+            .entry_data()
+            .map(|(_, entry_type)| entry_type.visibility())
+        {
+            match self.entry {
+                ElementEntry::Present(_) => ElementEntry::Hidden,
+                other => other,
+            }
+        } else {
+            self.entry
+        };
+        Self {
+            signed_header: self.signed_header,
+            entry,
+        }
+    }
+
     /// Break this element into its components
     pub fn into_inner(self) -> (SignedHeaderHashed, ElementEntry) {
         (self.signed_header, self.entry)

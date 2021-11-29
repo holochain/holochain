@@ -10,20 +10,27 @@ async fn sharded_sanity_test() {
     let mut u = arbitrary::Unstructured::new(&NOISE);
     let bob_cert = Tx2Cert::arbitrary(&mut u).unwrap();
 
-    let mut agents = agents(2).into_iter();
-    let alice_agent = agents.next().unwrap();
-    let bob_agent = agents.next().unwrap();
+    let agents = agents_with_infos(2).await;
+    let mut iter = agents.clone().into_iter();
+    let alice_agent = iter.next().unwrap().0;
+    let bob_agent = iter.next().unwrap().0;
 
-    let alice = setup_standard_player(ShardedGossipLocalState {
-        local_agents: maplit::hashset! { alice_agent.clone() },
-        ..Default::default()
-    })
+    let alice = setup_standard_player(
+        ShardedGossipLocalState {
+            local_agents: maplit::hashset! { alice_agent.clone() },
+            ..Default::default()
+        },
+        agents.clone(),
+    )
     .await;
 
-    let bob = setup_standard_player(ShardedGossipLocalState {
-        local_agents: maplit::hashset! { bob_agent.clone() },
-        ..Default::default()
-    })
+    let bob = setup_standard_player(
+        ShardedGossipLocalState {
+            local_agents: maplit::hashset! { bob_agent.clone() },
+            ..Default::default()
+        },
+        agents.clone(),
+    )
     .await;
 
     // - Bob try's to initiate.
@@ -129,20 +136,23 @@ async fn partial_missing_doesnt_finish() {
 
     // - Set bob up with a current round that expects one
     // response to a sent bloom.
-    let bob = setup_standard_player(ShardedGossipLocalState {
-        round_map: maplit::hashmap! {
-            cert.clone() => RoundState {
-                common_arc_set: Arc::new(ArcInterval::Full.into()),
-                num_sent_ops_blooms: 1,
-                received_all_incoming_ops_blooms: true,
-                created_at: Instant::now(),
-                last_touch: Instant::now(),
-                round_timeout: std::time::Duration::MAX,
+    let bob = setup_standard_player(
+        ShardedGossipLocalState {
+            round_map: maplit::hashmap! {
+                cert.clone() => RoundState {
+                    common_arc_set: Arc::new(ArcInterval::Full.into()),
+                    num_sent_ops_blooms: 1,
+                    received_all_incoming_ops_blooms: true,
+                    created_at: Instant::now(),
+                    last_touch: Instant::now(),
+                    round_timeout: std::time::Duration::MAX,
+                }
             }
-        }
-        .into(),
-        ..Default::default()
-    })
+            .into(),
+            ..Default::default()
+        },
+        vec![],
+    )
     .await;
 
     // - Send a missing ops message that isn't marked as finished.
@@ -172,20 +182,23 @@ async fn missing_ops_finishes() {
     let cert = Tx2Cert::arbitrary(&mut u).unwrap();
 
     // - Set bob up the same as the test above.
-    let bob = setup_standard_player(ShardedGossipLocalState {
-        round_map: maplit::hashmap! {
-            cert.clone() => RoundState {
-                common_arc_set: Arc::new(ArcInterval::Full.into()),
-                num_sent_ops_blooms: 1,
-                received_all_incoming_ops_blooms: true,
-                created_at: Instant::now(),
-                last_touch: Instant::now(),
-                round_timeout: std::time::Duration::MAX,
+    let bob = setup_standard_player(
+        ShardedGossipLocalState {
+            round_map: maplit::hashmap! {
+                cert.clone() => RoundState {
+                    common_arc_set: Arc::new(ArcInterval::Full.into()),
+                    num_sent_ops_blooms: 1,
+                    received_all_incoming_ops_blooms: true,
+                    created_at: Instant::now(),
+                    last_touch: Instant::now(),
+                    round_timeout: std::time::Duration::MAX,
+                }
             }
-        }
-        .into(),
-        ..Default::default()
-    })
+            .into(),
+            ..Default::default()
+        },
+        vec![],
+    )
     .await;
 
     // Send a message marked as finished.
@@ -216,20 +229,23 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
     let cert = Tx2Cert::arbitrary(&mut u).unwrap();
 
     // - Set bob up awaiting incoming blooms and one response.
-    let bob = setup_standard_player(ShardedGossipLocalState {
-        round_map: maplit::hashmap! {
-            cert.clone() => RoundState {
-                common_arc_set: Arc::new(ArcInterval::Full.into()),
-                num_sent_ops_blooms: 1,
-                received_all_incoming_ops_blooms: false,
-                created_at: Instant::now(),
-                last_touch: Instant::now(),
-                round_timeout: std::time::Duration::MAX,
+    let bob = setup_standard_player(
+        ShardedGossipLocalState {
+            round_map: maplit::hashmap! {
+                cert.clone() => RoundState {
+                    common_arc_set: Arc::new(ArcInterval::Full.into()),
+                    num_sent_ops_blooms: 1,
+                    received_all_incoming_ops_blooms: false,
+                    created_at: Instant::now(),
+                    last_touch: Instant::now(),
+                    round_timeout: std::time::Duration::MAX,
+                }
             }
-        }
-        .into(),
-        ..Default::default()
-    })
+            .into(),
+            ..Default::default()
+        },
+        vec![],
+    )
     .await;
 
     // - Send a message marked as finished.
@@ -260,20 +276,23 @@ async fn bloom_response_finishes() {
 
     // - Set bob up with a current round that expects no responses
     // and has not received all blooms.
-    let bob = setup_standard_player(ShardedGossipLocalState {
-        round_map: maplit::hashmap! {
-            cert.clone() => RoundState {
-                common_arc_set: Arc::new(ArcInterval::Full.into()),
-                num_sent_ops_blooms: 0,
-                received_all_incoming_ops_blooms: false,
-                created_at: Instant::now(),
-                last_touch: Instant::now(),
-                round_timeout: std::time::Duration::MAX,
+    let bob = setup_standard_player(
+        ShardedGossipLocalState {
+            round_map: maplit::hashmap! {
+                cert.clone() => RoundState {
+                    common_arc_set: Arc::new(ArcInterval::Full.into()),
+                    num_sent_ops_blooms: 0,
+                    received_all_incoming_ops_blooms: false,
+                    created_at: Instant::now(),
+                    last_touch: Instant::now(),
+                    round_timeout: std::time::Duration::MAX,
+                }
             }
-        }
-        .into(),
-        ..Default::default()
-    })
+            .into(),
+            ..Default::default()
+        },
+        vec![],
+    )
     .await;
 
     // - Send the final ops bloom message.
@@ -304,20 +323,23 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
 
     // - Set bob up with a current round that expects one response
     // and has not received all blooms.
-    let bob = setup_standard_player(ShardedGossipLocalState {
-        round_map: maplit::hashmap! {
-            cert.clone() => RoundState {
-                common_arc_set: Arc::new(ArcInterval::Full.into()),
-                num_sent_ops_blooms: 1,
-                received_all_incoming_ops_blooms: false,
-                created_at: Instant::now(),
-                last_touch: Instant::now(),
-                round_timeout: std::time::Duration::MAX,
+    let bob = setup_standard_player(
+        ShardedGossipLocalState {
+            round_map: maplit::hashmap! {
+                cert.clone() => RoundState {
+                    common_arc_set: Arc::new(ArcInterval::Full.into()),
+                    num_sent_ops_blooms: 1,
+                    received_all_incoming_ops_blooms: false,
+                    created_at: Instant::now(),
+                    last_touch: Instant::now(),
+                    round_timeout: std::time::Duration::MAX,
+                }
             }
-        }
-        .into(),
-        ..Default::default()
-    })
+            .into(),
+            ..Default::default()
+        },
+        vec![],
+    )
     .await;
 
     // - Send the final ops bloom message.
@@ -348,41 +370,47 @@ async fn no_data_still_finishes() {
     let alice_cert = Tx2Cert::arbitrary(&mut u).unwrap();
     let bob_cert = Tx2Cert::arbitrary(&mut u).unwrap();
 
-    let agents = agents(2);
+    let agents = agents_with_infos(2).await;
     // - Alice is expecting no responses and is expecting blooms.
-    let alice = setup_empty_player(ShardedGossipLocalState {
-        local_agents: maplit::hashset!(agents[0].clone()),
-        round_map: maplit::hashmap! {
-            bob_cert.clone() => RoundState {
-                common_arc_set: Arc::new(ArcInterval::Full.into()),
-                num_sent_ops_blooms: 0,
-                received_all_incoming_ops_blooms: false,
-                created_at: Instant::now(),
-                last_touch: Instant::now(),
-                round_timeout: std::time::Duration::MAX,
+    let alice = setup_empty_player(
+        ShardedGossipLocalState {
+            local_agents: maplit::hashset!(agents[0].0.clone()),
+            round_map: maplit::hashmap! {
+                bob_cert.clone() => RoundState {
+                    common_arc_set: Arc::new(ArcInterval::Full.into()),
+                    num_sent_ops_blooms: 0,
+                    received_all_incoming_ops_blooms: false,
+                    created_at: Instant::now(),
+                    last_touch: Instant::now(),
+                    round_timeout: std::time::Duration::MAX,
+                }
             }
-        }
-        .into(),
-        ..Default::default()
-    })
+            .into(),
+            ..Default::default()
+        },
+        agents.clone(),
+    )
     .await;
 
     // - Bob is expecting one responses and is expecting no blooms.
-    let bob = setup_empty_player(ShardedGossipLocalState {
-        local_agents: maplit::hashset!(agents[1].clone()),
-        round_map: maplit::hashmap! {
-            alice_cert.clone() => RoundState {
-                common_arc_set: Arc::new(ArcInterval::Full.into()),
-                num_sent_ops_blooms: 1,
-                received_all_incoming_ops_blooms: true,
-                created_at: Instant::now(),
-                last_touch: Instant::now(),
-                round_timeout: std::time::Duration::MAX,
+    let bob = setup_empty_player(
+        ShardedGossipLocalState {
+            local_agents: maplit::hashset!(agents[1].0.clone()),
+            round_map: maplit::hashmap! {
+                alice_cert.clone() => RoundState {
+                    common_arc_set: Arc::new(ArcInterval::Full.into()),
+                    num_sent_ops_blooms: 1,
+                    received_all_incoming_ops_blooms: true,
+                    created_at: Instant::now(),
+                    last_touch: Instant::now(),
+                    round_timeout: std::time::Duration::MAX,
+                }
             }
-        }
-        .into(),
-        ..Default::default()
-    })
+            .into(),
+            ..Default::default()
+        },
+        agents.clone(),
+    )
     .await;
 
     // - Send the final ops bloom message to alice.
@@ -430,18 +458,24 @@ async fn no_data_still_finishes() {
 /// This test checks that when two players concurrently
 /// initiate a round it is handle correctly.
 async fn double_initiate_is_handled() {
-    let agents = agents(2);
+    let agents = agents_with_infos(2).await;
     // - Set up two players with themselves as local agents.
-    let alice = setup_empty_player(ShardedGossipLocalState {
-        local_agents: maplit::hashset!(agents[0].clone()),
-        ..Default::default()
-    })
+    let alice = setup_empty_player(
+        ShardedGossipLocalState {
+            local_agents: maplit::hashset!(agents[0].0.clone()),
+            ..Default::default()
+        },
+        agents.clone(),
+    )
     .await;
 
-    let bob = setup_empty_player(ShardedGossipLocalState {
-        local_agents: maplit::hashset!(agents[1].clone()),
-        ..Default::default()
-    })
+    let bob = setup_empty_player(
+        ShardedGossipLocalState {
+            local_agents: maplit::hashset!(agents[1].0.clone()),
+            ..Default::default()
+        },
+        agents.clone(),
+    )
     .await;
 
     // - Both players try to initiate and only have the other as a remote agent.
@@ -468,31 +502,53 @@ async fn double_initiate_is_handled() {
 /// This test checks that trying to initiate after a round with
 /// a node is already in progress does not initiate a new round.
 async fn initiate_after_target_is_set() {
-    let agents = agents(2);
-    let alice = setup_empty_player(ShardedGossipLocalState {
-        local_agents: maplit::hashset!(agents[0].clone()),
-        ..Default::default()
-    })
+    let agents = agents_with_infos(2).await;
+    let alice = setup_empty_player(
+        ShardedGossipLocalState {
+            local_agents: maplit::hashset!(agents[0].0.clone()),
+            ..Default::default()
+        },
+        agents.clone(),
+    )
     .await;
 
-    let bob = setup_empty_player(ShardedGossipLocalState {
-        local_agents: maplit::hashset!(agents[1].clone()),
-        ..Default::default()
-    })
+    let bob = setup_empty_player(
+        ShardedGossipLocalState {
+            local_agents: maplit::hashset!(agents[1].0.clone()),
+            ..Default::default()
+        },
+        agents.clone(),
+    )
     .await;
 
     // - Alice successfully initiates a round with bob.
     let (tgt, _, alice_initiate) = alice.try_initiate().await.unwrap().unwrap();
-    let cert = tgt.cert();
+    let alice_cert = cert_from_info(agents[0].1.clone());
+    dbg!(&tgt);
+    dbg!(&agents);
     // - Bob accepts the round.
     let bob_outgoing = bob
-        .process_incoming(cert.clone(), alice_initiate)
+        .process_incoming(alice_cert.clone(), alice_initiate)
         .await
         .unwrap();
     assert_eq!(bob_outgoing.len(), 5);
 
+    bob.inner
+        .share_mut(|i, _| {
+            dbg!(&i.initiate_tgt);
+            dbg!(i.round_map.current_rounds().len());
+            Ok(())
+        })
+        .unwrap();
     // - Bob tries to initiate a round with alice.
     let bob_initiate = bob.try_initiate().await.unwrap();
+    bob.inner
+        .share_mut(|i, _| {
+            dbg!(&i.initiate_tgt);
+            dbg!(i.round_map.current_rounds().len());
+            Ok(())
+        })
+        .unwrap();
     // - Bob cannot initiate a round with anyone because he
     // already has a round with the only other player.
     assert!(bob_initiate.is_none());
@@ -501,19 +557,23 @@ async fn initiate_after_target_is_set() {
 #[tokio::test(flavor = "current_thread", start_paused = true)]
 /// Test the initiates timeout after the round timeout has elapsed.
 async fn initiate_times_out() {
-    let mut u = arbitrary::Unstructured::new(&NOISE);
-    let alice_cert = Tx2Cert::arbitrary(&mut u).unwrap();
-
-    let agents = agents(2);
-    let alice = setup_empty_player(ShardedGossipLocalState {
-        local_agents: maplit::hashset!(agents[0].clone()),
-        ..Default::default()
-    })
+    let agents = agents_with_infos(3).await;
+    let alice_cert = cert_from_info(agents[0].1.clone());
+    let alice = setup_empty_player(
+        ShardedGossipLocalState {
+            local_agents: maplit::hashset!(agents[0].0.clone()),
+            ..Default::default()
+        },
+        agents.clone(),
+    )
     .await;
-    let bob = setup_empty_player(ShardedGossipLocalState {
-        local_agents: maplit::hashset!(agents[1].clone()),
-        ..Default::default()
-    })
+    let bob = setup_empty_player(
+        ShardedGossipLocalState {
+            local_agents: maplit::hashset!(agents[1].0.clone()),
+            ..Default::default()
+        },
+        agents.clone(),
+    )
     .await;
 
     // Trying to initiate a round should succeed.

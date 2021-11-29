@@ -12,8 +12,8 @@ use crate::core::ribosome::real_ribosome::RealRibosome;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::actor::HolochainP2pRefToCell;
-use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::actor::HolochainP2pRefToDna;
+use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::{prelude::test_environments, test_utils::TestEnvs};
 use holochain_types::prelude::*;
@@ -26,10 +26,11 @@ use std::convert::TryFrom;
 /// A "factory" for HostFnCaller, which will produce them when given a ZomeName
 pub struct CellHostFnCaller {
     pub cell_id: CellId,
-    pub env: EnvWrite,
-    pub cache: EnvWrite,
+    pub authored_env: DbWrite<DbKindAuthored>,
+    pub dht_env: DbWrite<DbKindDht>,
+    pub cache: DbWrite<DbKindCache>,
     pub ribosome: RealRibosome,
-    pub network: HolochainP2pCell,
+    pub network: HolochainP2pDna,
     pub keystore: MetaLairClient,
     pub signal_tx: SignalBroadcaster,
     pub triggers: QueueTriggers,
@@ -38,12 +39,11 @@ pub struct CellHostFnCaller {
 
 impl CellHostFnCaller {
     pub async fn new(cell_id: &CellId, handle: &ConductorHandle, dna_file: &DnaFile) -> Self {
-        let env = handle.get_cell_env(cell_id).unwrap();
+        let authored_env = handle.get_authored_env(cell_id.dna_hash()).unwrap();
+        let dht_env = handle.get_dht_env(cell_id.dna_hash()).unwrap();
         let cache = handle.get_cache_env(cell_id).unwrap();
-        let keystore = env.keystore().clone();
-        let network = handle
-            .holochain_p2p()
-            .to_cell(cell_id.dna_hash().clone(), cell_id.agent_pubkey().clone());
+        let keystore = handle.keystore().clone();
+        let network = handle.holochain_p2p().to_dna(cell_id.dna_hash().clone());
         let triggers = handle.get_cell_triggers(cell_id).unwrap();
         let cell_conductor_api = CellConductorApi::new(handle.clone(), cell_id.clone());
 
@@ -51,7 +51,8 @@ impl CellHostFnCaller {
         let signal_tx = handle.signal_broadcaster().await;
         CellHostFnCaller {
             cell_id: cell_id.clone(),
-            env,
+            authored_env,
+            dht_env,
             cache,
             ribosome,
             network,
@@ -68,7 +69,8 @@ impl CellHostFnCaller {
         let zome_path = (self.cell_id.clone(), zome_name).into();
         let call_zome_handle = self.cell_conductor_api.clone().into_call_zome_handle();
         HostFnCaller {
-            env: self.env.clone(),
+            authored_env: self.authored_env.clone(),
+            dht_env: self.dht_env.clone(),
             cache: self.cache.clone(),
             ribosome: self.ribosome.clone(),
             zome_path,
