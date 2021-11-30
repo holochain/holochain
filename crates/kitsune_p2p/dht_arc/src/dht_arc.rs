@@ -41,7 +41,7 @@ impl DhtLocation {
     pub fn as_u32(&self) -> u32 {
         self.0 .0
     }
-    
+
     pub fn as_i64(&self) -> i64 {
         self.0 .0 as i64
     }
@@ -223,6 +223,11 @@ impl DhtArc {
     /// Get the half length of this arc.
     pub fn half_length(&self) -> u32 {
         self.half_length
+    }
+
+    /// Get the half length of this arc.
+    pub fn half_length_mut(&mut self) -> &mut u32 {
+        &mut self.half_length
     }
 
     /// Get the center location of this arc.

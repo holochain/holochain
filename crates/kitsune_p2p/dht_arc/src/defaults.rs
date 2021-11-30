@@ -15,9 +15,9 @@ pub(crate) const DEFAULT_REDUNDANCY_TARGET: usize = 50;
 /// reaches any value in this range, it will stop resizing. This lends stability to the system.
 pub(crate) const DEFAULT_COVERAGE_BUFFER: f64 = 0.05; // 5%
 
-/// The percentage of the total network redundancy coverage we allow 
+/// The percentage of the total network redundancy coverage we allow
 /// as a buffer before considering there to be not enough coverage.
-/// This helps allow for errors in extrapolation. 
+/// This helps allow for errors in extrapolation.
 pub(crate) const DEFAULT_TOTAL_COVERAGE_BUFFER: f64 = 0.1; // 10%
 
 /// Default assumed up time for nodes.

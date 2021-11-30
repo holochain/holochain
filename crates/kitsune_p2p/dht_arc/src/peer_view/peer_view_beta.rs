@@ -112,7 +112,7 @@ impl PeerStratBeta {
 
     /// The target coverage of the network so that it
     /// has enough redundancy.
-    pub(crate) fn target_network_coverage(&self) -> f64 {
+    pub fn target_network_coverage(&self) -> f64 {
         // For this strategy we are aiming to have the
         // same amount as coverage as a network with our
         // minimum sample size if all peers had a coverage of
@@ -128,11 +128,11 @@ impl PeerStratBeta {
 #[derive(Debug, Clone, Copy)]
 pub struct PeerViewBeta {
     /// The strategy params that generated this view.
-    pub(crate) strat: PeerStratBeta,
+    pub strat: PeerStratBeta,
     /// The arc that filtered the bucket that generated this view.
     filter: DhtArc,
     /// The number of peers in the bucket.
-    pub(crate) count: usize,
+    pub count: usize,
     /// An optional more focused view's target
     /// coverage for this view.
     focused_view_target: Option<f64>,
@@ -156,7 +156,7 @@ impl PeerViewBeta {
     }
 
     /// Calculate the target arc length based on this view.
-    pub(crate) fn target_coverage(&self) -> f64 {
+    pub fn target_coverage(&self) -> f64 {
         // If we haven't observed at least our minimum sample size
         // of peers then we know that the data then we can't make
         // good extrapolations of the network so need to grow
@@ -176,8 +176,7 @@ impl PeerViewBeta {
             // 0.0 means we have too much coverage.
             // let target =
             //     (self.strat.target_network_coverage() - self.est_total_coverage()).max(0.0);
-            let target =
-                self.strat.target_network_coverage() - self.est_total_coverage();
+            let target = self.strat.target_network_coverage() - self.est_total_coverage();
 
             // A buffer to allow for estimation errors.
             let estimation_error_buffer =
