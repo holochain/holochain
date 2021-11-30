@@ -67,26 +67,7 @@ pub fn run_single_agent_convergence(
         tracing::debug!("{}", peers[0].coverage());
         (peers, stats)
     });
-    report(&runs);
     runs
-}
-
-pub fn report(e: &RunBatch) {
-    let counts = DataVec::new(e.histories().map(|h| h.len() as f64).collect());
-
-    if let Vergence::Convergent = e.vergence() {
-        tracing::info!(
-            "Reached equilibrium in {} mean iterations (variance {})",
-            counts.mean().unwrap(),
-            counts.variance().unwrap()
-        );
-    } else {
-        tracing::warn!(
-            "Divergent run found on attempt #{}. Failed to reach equilibrium in {} iterations",
-            e.histories().count(),
-            DIVERGENCE_ITERS
-        );
-    }
 }
 
 pub fn determine_equilibrium<'a, F>(iters: usize, peers: Peers, step: F) -> RunBatch
@@ -300,8 +281,96 @@ pub struct RunBatch(Vec<Run>);
 #[derive(Debug)]
 pub struct OscillationsBatch(pub Vec<Oscillations>);
 
+#[derive(Clone, Debug)]
+pub struct Stats {
+    pub min: f64,
+    pub max: f64,
+    pub mean: f64,
+    pub median: f64,
+    pub variance: f64,
+}
+
+impl Stats {
+    pub fn new(xs: DataVec) -> Self {
+        Self {
+            min: xs.min(),
+            max: xs.max(),
+            mean: xs.mean().unwrap(),
+            median: xs.median(),
+            variance: xs.variance().unwrap(),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct RunReport {
+    pub iteration_stats: Stats,
+    pub redundancy_stats: Stats,
+    pub outcome: RunReportOutcome,
+    pub total_runs: usize,
+}
+
+impl RunReport {
+    pub fn is_convergent(&self) -> bool {
+        match self.outcome {
+            RunReportOutcome::Convergent { .. } => true,
+            RunReportOutcome::Divergent => false,
+        }
+    }
+
+    pub fn log(&self) -> &Self {
+        tracing::info!("{:#?}", self);
+        if self.is_convergent() {
+            tracing::info!(
+                "Reached equilibrium in {} mean iterations (variance {})",
+                self.iteration_stats.mean,
+                self.iteration_stats.variance
+            );
+        } else {
+            tracing::warn!(
+                "Divergent run found on attempt #{}. Failed to reach equilibrium in {} iterations",
+                self.total_runs,
+                DIVERGENCE_ITERS
+            );
+        }
+        self
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum RunReportOutcome {
+    Convergent { redundancy_stats: Stats },
+    Divergent,
+}
+
 #[allow(dead_code)]
 impl RunBatch {
+    pub fn report(&self) -> RunReport {
+        let iterations = DataVec::new(self.histories().map(|h| h.len() as f64).collect());
+        let redundancies = DataVec::new(
+            self.histories()
+                .flatten()
+                .map(|h| h.min_redundancy as f64)
+                .collect(),
+        );
+        let outcome = match self.vergence() {
+            Vergence::Convergent => RunReportOutcome::Convergent {
+                redundancy_stats: Stats::new(DataVec::new(
+                    self.histories()
+                        .map(|h| h.last().unwrap().min_redundancy as f64)
+                        .collect(),
+                )),
+            },
+            Vergence::Divergent => RunReportOutcome::Divergent,
+        };
+        RunReport {
+            iteration_stats: Stats::new(iterations),
+            redundancy_stats: Stats::new(redundancies),
+            outcome,
+            total_runs: self.histories().count(),
+        }
+    }
+
     pub fn vergence(&self) -> Vergence {
         if self.0.iter().all(|r| r.vergence == Vergence::Convergent) {
             Vergence::Convergent
@@ -317,31 +386,6 @@ impl RunBatch {
     pub fn histories(&self) -> impl Iterator<Item = &Vec<EpochStats>> + '_ {
         self.0.iter().map(|r| &r.history)
     }
-
-    pub fn assert_convergent(&self) {
-        assert_eq!(
-            self.vergence(),
-            Vergence::Convergent,
-            "failed to reach equilibrium in {} iterations",
-            DIVERGENCE_ITERS
-        )
-    }
-
-    pub fn assert_min_redundancy(&self, r: u32) {
-        assert!(
-            self.histories().flatten().all(|s| s.min_redundancy >= r),
-            "redundancy fell below {}",
-            r
-        )
-    }
-
-    pub fn assert_divergent(&self) {
-        assert_eq!(
-            self.vergence(),
-            Vergence::Divergent,
-            "sequence was expected to diverge, but converged",
-        )
-    }
 }
 
 #[derive(Debug)]
@@ -350,6 +394,16 @@ pub struct Run {
     pub history: Vec<EpochStats>,
     /// the final state of the peers at the last iteration
     pub peers: Peers,
+}
+
+impl Run {
+    pub fn vergence(&self) -> Vergence {
+        self.vergence
+    }
+
+    pub fn min_redundancy(&self) -> usize {
+        todo!()
+    }
 }
 
 #[derive(Debug)]
@@ -363,6 +417,29 @@ pub struct Oscillations {
 pub enum Vergence {
     Convergent,
     Divergent,
+}
+
+impl Vergence {
+    pub fn is_convergent(&self) -> bool {
+        *self == Vergence::Convergent
+    }
+}
+
+impl PartialOrd for Vergence {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Vergence {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        use Vergence::*;
+        match (self, other) {
+            (Divergent, Convergent) => std::cmp::Ordering::Less,
+            (Convergent, Divergent) => std::cmp::Ordering::Greater,
+            _ => std::cmp::Ordering::Equal,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

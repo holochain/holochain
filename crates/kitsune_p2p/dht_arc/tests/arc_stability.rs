@@ -5,6 +5,27 @@ use kitsune_p2p_dht_arc::*;
 
 use pretty_assertions::assert_eq;
 
+fn pass_report(report: &RunReport, redundancy_target: u16) -> bool {
+    match &report.outcome {
+        RunReportOutcome::Convergent { redundancy_stats } => {
+            pass_redundancy(redundancy_stats, redundancy_target)
+        }
+        RunReportOutcome::Divergent => pass_redundancy(&report.redundancy_stats, redundancy_target),
+    }
+}
+
+/// Check if the redundancy is close to the target for the entire duration
+/// of all runs.
+/// - Min redundancy must never dip below 95% of the target
+/// - Median redundancy must be within 1% of target
+fn pass_redundancy(stats: &Stats, redundancy_target: u16) -> bool {
+    let rf = redundancy_target as f64;
+    stats.median >= rf * 0.99
+        && stats.median <= rf * 1.01
+        && stats.min >= rf * 0.9
+        && stats.variance < 1.0
+}
+
 #[test]
 fn single_agent_convergence_debug() {
     std::env::set_var("RUST_LOG", "debug");
@@ -38,8 +59,10 @@ fn single_agent_convergence_debug() {
         // tracing::debug!("{}", peers[0].coverage());
         (peers, stats)
     });
-    print_arcs(&runs.runs()[0].peers);
-    report(&runs);
+    // print_arcs(&runs.runs()[0].peers);
+    let report = runs.report();
+    report.log();
+    assert!(report.is_convergent());
 }
 
 /// Test if various distributions of agents can converge
@@ -53,29 +76,34 @@ fn single_agent_convergence_battery() {
     let n = 1000;
     let r = 100;
 
-    let divergent = vec![
-        run_single_agent_convergence(8, n, r, 0.1, true).vergence(),
-        run_single_agent_convergence(8, n, r, 0.5, true).vergence(),
-        run_single_agent_convergence(8, n, r, 1.0, true).vergence(),
-    ];
+    let pass_convergent =
+        |report: RunReport| report.log().is_convergent() && pass_report(&report, r);
+    let pass_divergent =
+        |report: RunReport| !report.log().is_convergent() && pass_report(&report, r);
+
+    // let divergent = vec![
+    //     pass_divergent(run_single_agent_convergence(8, n, r, 0.1, true).report()),
+    //     pass_divergent(run_single_agent_convergence(8, n, r, 0.5, true).report()),
+    //     pass_divergent(run_single_agent_convergence(8, n, r, 1.0, true).report()),
+    // ];
+    // assert_eq!(divergent, vec![true; divergent.len()]);
 
     let convergent = vec![
         // gap_check == true
-        run_single_agent_convergence(8, n, r, 0.0, true).vergence(),
-        run_single_agent_convergence(8, n, r, 0.001, true).vergence(),
-        run_single_agent_convergence(8, n, r, 0.01, true).vergence(),
+        pass_convergent(run_single_agent_convergence(8, n, r, 0.0, true).report()),
+        pass_convergent(run_single_agent_convergence(8, n, r, 0.001, true).report()),
+        pass_convergent(run_single_agent_convergence(8, n, r, 0.01, true).report()),
         // gap_check == false
-        run_single_agent_convergence(8, n, r, 0.0, false).vergence(),
-        run_single_agent_convergence(8, n, r, 0.001, false).vergence(),
-        run_single_agent_convergence(8, n, r, 0.01, false).vergence(),
+        pass_convergent(run_single_agent_convergence(8, n, r, 0.0, false).report()),
+        pass_convergent(run_single_agent_convergence(8, n, r, 0.001, false).report()),
+        pass_convergent(run_single_agent_convergence(8, n, r, 0.01, false).report()),
         // Note that these same scenarios fail to converge with gap_check
-        run_single_agent_convergence(8, n, r, 0.1, false).vergence(),
-        run_single_agent_convergence(8, n, r, 0.5, false).vergence(),
-        run_single_agent_convergence(8, n, r, 1.0, false).vergence(),
+        pass_convergent(run_single_agent_convergence(8, n, r, 0.1, false).report()),
+        pass_convergent(run_single_agent_convergence(8, n, r, 0.5, false).report()),
+        pass_convergent(run_single_agent_convergence(8, n, r, 1.0, false).report()),
     ];
 
-    assert_eq!(divergent, vec![Divergent; divergent.len()]);
-    assert_eq!(convergent, vec![Convergent; convergent.len()]);
+    assert_eq!(convergent, vec![true; convergent.len()]);
 }
 
 /// Equilibrium test for a single distribution
@@ -105,11 +133,9 @@ fn parameterized_stability_test() {
         tracing::debug!("{}", stats.oneline());
         (peers, stats)
     });
-    report(&eq);
-    eq.assert_convergent();
-    // TODO: the min redundancy is never exactly 100.
-    //       would be good to look at the *average* redundancy, and other stats.
-    eq.assert_min_redundancy(96);
+    let report = eq.report();
+    report.log();
+    assert!(pass_report(&report, r * 2));
 }
 
 /// Equilibrium test for a single distribution
