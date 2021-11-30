@@ -42,9 +42,9 @@ fn single_agent_convergence_debug() {
     std::env::set_var("RUST_LOG", "debug");
     observability::test_run().ok();
 
-    let n = 50;
+    let n = 1000;
+    let redundancy = 100;
     let j = 0.1;
-    let redundancy = 5;
     let check_gaps = false;
 
     let mut rng = seeded_rng(None);
@@ -225,7 +225,7 @@ fn test_peer_view_beta() {
             let view = strat.view(*peer, run.peers.as_slice());
             match view {
                 PeerView::Beta(view) => {
-                        dbg!(view.count);
+                    dbg!(view.count);
                     if view.target_coverage() > 0.9 {
                         dbg!(view.est_total_coverage());
                         dbg!(view.strat.target_network_coverage() - view.est_total_coverage());
