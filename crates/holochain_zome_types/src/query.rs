@@ -392,11 +392,11 @@ mod tests {
 
         assert_eq!(
             map_query(&query_1, &headers),
-            [true, false, false, false, true, false].to_vec()
+            [true, false, false, false, true, true, false].to_vec()
         );
         assert_eq!(
             map_query(&query_2, &headers),
-            [false, true, false, true, false, false].to_vec()
+            [false, true, false, true, false, false, false].to_vec()
         );
     }
 
@@ -430,15 +430,15 @@ mod tests {
 
         assert_eq!(
             map_query(&query_1, &headers),
-            [true, false, false, true, false, false].to_vec()
+            [true, false, false, true, true, false, false].to_vec()
         );
         assert_eq!(
             map_query(&query_2, &headers),
-            [false, true, false, false, true, false].to_vec()
+            [false, true, false, false, false, true, false].to_vec()
         );
         assert_eq!(
             map_query(&query_3, &headers),
-            [false, false, true, false, false, true].to_vec()
+            [false, false, true, false, false, false, true].to_vec()
         );
     }
 
@@ -546,7 +546,7 @@ mod tests {
                     .sequence_range(ChainQueryFilterSequenceRange::HeaderSeqRange(0, 0)),
                 &headers
             ),
-            [true, false, false, false, false, false].to_vec()
+            [true, false, false, false, false, false, false].to_vec()
         );
 
         assert_eq!(
@@ -557,7 +557,7 @@ mod tests {
                     .sequence_range(ChainQueryFilterSequenceRange::HeaderSeqRange(0, 999)),
                 &headers
             ),
-            [false, false, false, false, true, false].to_vec()
+            [false, false, false, false, false, true, false].to_vec()
         );
 
         assert_eq!(
@@ -567,7 +567,7 @@ mod tests {
                     .sequence_range(ChainQueryFilterSequenceRange::HeaderSeqRange(0, 999)),
                 &headers
             ),
-            [true, false, false, false, true, false].to_vec()
+            [true, false, false, false, true, true, false].to_vec()
         );
     }
 }
