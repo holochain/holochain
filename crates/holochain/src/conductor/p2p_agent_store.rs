@@ -6,7 +6,7 @@ use holochain_conductor_api::AgentInfoDump;
 use holochain_conductor_api::P2pAgentsDump;
 use holochain_p2p::dht_arc::DhtArc;
 use holochain_p2p::dht_arc::DhtArcBucket;
-use holochain_p2p::dht_arc::PeerDensity;
+use holochain_p2p::dht_arc::PeerViewAlpha;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use holochain_p2p::AgentPubKeyExt;
 use holochain_sqlite::prelude::*;
@@ -160,7 +160,7 @@ pub fn query_peer_density(
     env: EnvWrite,
     kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     dht_arc: DhtArc,
-) -> ConductorResult<PeerDensity> {
+) -> ConductorResult<PeerViewAlpha> {
     let now = now();
     let arcs = env.conn()?.p2p_list_agents()?;
     let arcs = arcs
@@ -181,7 +181,7 @@ pub fn query_peer_density(
     // contains is already checked in the iterator
     let bucket = DhtArcBucket::new_unchecked(dht_arc, arcs);
 
-    Ok(bucket.density())
+    Ok(bucket.peer_view_alpha())
 }
 
 /// Put single agent info into store

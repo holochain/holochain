@@ -391,7 +391,7 @@ impl AsKdPersist for PersistMem {
         &self,
         root: KdHash,
         dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
-    ) -> BoxFuture<'static, KdResult<kitsune_p2p_types::dht_arc::PeerDensity>> {
+    ) -> BoxFuture<'static, KdResult<kitsune_p2p_types::dht_arc::PeerViewAlpha>> {
         let store = self.0.share_mut(move |i, _| match i.agent_info.get(&root) {
             Some(store) => Ok(store.clone()),
             None => Err("root not found".into()),
@@ -416,7 +416,7 @@ impl AsKdPersist for PersistMem {
             // contains is already checked in the iterator
             let bucket = kitsune_p2p::dht_arc::DhtArcBucket::new_unchecked(dht_arc, arcs);
 
-            Ok(bucket.density())
+            Ok(bucket.peer_view_alpha())
         }
         .boxed()
     }

@@ -104,7 +104,7 @@ pub const MIN_PEERS: usize = (REDUNDANCY_TARGET as f64 / DEFAULT_UPTIME) as usiz
 
 /// The minimum number of peers we can consider acceptable to see in our arc
 /// during testing.
-pub const MIN_REDUNDANCY: usize = (REDUNDANCY_FLOOR as f64 / DEFAULT_UPTIME) as usize;
+pub const MIN_REDUNDANCY: u32 = (REDUNDANCY_FLOOR as f64 / DEFAULT_UPTIME) as u32;
 
 /// The amount "change in arc" is scaled to prevent rapid changes.
 /// This also represents the maximum coverage change in a single update
@@ -144,7 +144,7 @@ fn coverage_target(est_total_peers: usize) -> f64 {
 }
 
 /// Calculate the target arc length given a peer density.
-fn target(density: PeerDensity) -> f64 {
+fn target(density: PeerViewAlpha) -> f64 {
     // Get the estimated coverage gap based on our observed peer density.
     let est_gap = density.est_gap();
     // If we haven't observed at least our redundancy target number
@@ -172,7 +172,7 @@ fn target(density: PeerDensity) -> f64 {
 ///
 /// Note the rate of convergence is dependant of the rate
 /// that [`DhtArc::update_length`] is called.
-fn converge(current: f64, density: PeerDensity) -> f64 {
+fn converge(current: f64, density: PeerViewAlpha) -> f64 {
     let target = target(density);
     // The change in arc we'd need to make to get to the target.
     let delta = target - current;
@@ -237,12 +237,16 @@ impl DhtArc {
         Self::new(center_loc, (MAX_HALF_LENGTH as f64 * coverage) as u32)
     }
 
-    /// Update the half length based on a density reading.
+    /// Update the half length based on a PeerView reading.
     /// This will converge on a new target instead of jumping directly
     /// to the new target and is designed to be called at a given rate
-    /// with more recent peer density readings.
-    pub fn update_length(&mut self, density: PeerDensity) {
-        self.half_length = (MAX_HALF_LENGTH as f64 * converge(self.coverage(), density)) as u32;
+    /// with more recent peer views.
+    pub fn update_length<V: Into<PeerView>>(&mut self, view: V) {
+        self.half_length = match view.into() {
+            PeerView::Alpha(density) => {
+                (MAX_HALF_LENGTH as f64 * converge(self.coverage(), density)) as u32
+            }
+        }
     }
 
     /// Check if a location is contained in this arc
@@ -529,26 +533,32 @@ impl RangeBounds<u32> for ArcRange {
 
 impl std::fmt::Display for DhtArc {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut out = ["_"; 100];
-        let half_cov = (self.coverage() * 50.0) as isize;
-        let center = self.center_loc.0 .0 as f64 / U32_LEN as f64;
-        let center = (center * 100.0) as isize;
-        for mut i in (center - half_cov)..(center + half_cov) {
-            if i >= 100 {
-                i -= 100;
-            }
-            if i < 0 {
-                i += 100;
-            }
-            out[i as usize] = "#";
-        }
-        out[center as usize] = "|";
-        let out: String = out.iter().map(|a| a.chars()).flatten().collect();
-        writeln!(f, "[{}]", out)
+        write!(f, "{}", self.to_ascii(100))
     }
 }
 
 impl DhtArc {
+    pub fn to_ascii(&self, len: usize) -> String {
+        let mut out = vec![" "; len];
+        let lenf = len as f64;
+        let len = len as isize;
+        let half_cov = (self.coverage() * lenf / 2.0) as isize;
+        let center = self.center_loc.0 .0 as f64 / U32_LEN as f64;
+        let center = (center * lenf) as isize;
+        for mut i in (center - half_cov)..(center + half_cov) {
+            if i >= len {
+                i -= len;
+            }
+            if i < 0 {
+                i += len;
+            }
+            out[i as usize] = "-";
+        }
+        out[center as usize] = "@";
+        let out: String = out.iter().map(|a| a.chars()).flatten().collect();
+        out
+    }
+
     pub fn from_interval(interval: ArcInterval) -> Self {
         match interval.quantized() {
             ArcInterval::Empty => Self::empty(0),

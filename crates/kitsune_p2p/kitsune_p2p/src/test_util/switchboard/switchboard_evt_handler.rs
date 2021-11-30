@@ -100,7 +100,7 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
         &mut self,
         space: Arc<KitsuneSpace>,
         dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
-    ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht_arc::PeerDensity> {
+    ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht_arc::PeerViewAlpha> {
         todo!()
     }
 

@@ -233,14 +233,14 @@ fn test_arc_len() {
 fn test_peer_density() {
     let arc = |c, n, h| {
         let mut arc = DhtArc::new(0, h);
-        arc.update_length(PeerDensity::new(arc, c, n));
+        arc.update_length(PeerViewAlpha::new(arc, c, n));
         (arc.coverage() * 10000.0).round() / 10000.0
     };
 
     let converge = |arc: &mut DhtArc, peers: &Vec<DhtArc>| {
         for _ in 0..40 {
             let bucket = DhtArcBucket::new(*arc, peers.clone());
-            let density = bucket.density();
+            let density = bucket.peer_view_alpha();
             arc.update_length(density);
         }
     };
@@ -284,22 +284,22 @@ fn test_peer_density() {
 fn test_converge() {
     let min_online_peers = MIN_PEERS;
     let bucket = DhtArc::new(0, MAX_HALF_LENGTH);
-    assert_eq!(converge(1.0, PeerDensity::new(bucket, 1.0, 1)), 1.0);
+    assert_eq!(converge(1.0, PeerViewAlpha::new(bucket, 1.0, 1)), 1.0);
     assert_eq!(
-        converge(1.0, PeerDensity::new(bucket, 1.0, min_online_peers)),
+        converge(1.0, PeerViewAlpha::new(bucket, 1.0, min_online_peers)),
         1.0
     );
     assert_eq!(
-        converge(1.0, PeerDensity::new(bucket, 1.0, min_online_peers * 2)),
+        converge(1.0, PeerViewAlpha::new(bucket, 1.0, min_online_peers * 2)),
         0.9
     );
     assert_eq!(
-        converge(0.5, PeerDensity::new(bucket, 1.0, min_online_peers)),
+        converge(0.5, PeerViewAlpha::new(bucket, 1.0, min_online_peers)),
         0.6
     );
     let mut coverage = 0.5;
     for _ in 0..20 {
-        coverage = converge(coverage, PeerDensity::new(bucket, 1.0, 1));
+        coverage = converge(coverage, PeerViewAlpha::new(bucket, 1.0, 1));
     }
     assert_eq!(coverage, 1.0);
 
@@ -307,7 +307,7 @@ fn test_converge() {
     for _ in 0..20 {
         coverage = converge(
             coverage,
-            PeerDensity::new(bucket, 1.0, min_online_peers * 2),
+            PeerViewAlpha::new(bucket, 1.0, min_online_peers * 2),
         );
     }
     assert_eq!(coverage, 0.5);
@@ -322,7 +322,7 @@ fn test_multiple() {
                 let p = peers.clone();
                 let arc = peers.get_mut(i).unwrap();
                 let bucket = DhtArcBucket::new(*arc, p.clone());
-                let density = bucket.density();
+                let density = bucket.peer_view_alpha();
                 arc.update_length(density);
             }
             let r = check_redundancy(peers.clone());
@@ -484,7 +484,7 @@ fn test_peer_gaps() {
                 let p = peers.clone();
                 let arc = peers.get_mut(i).unwrap();
                 let bucket = DhtArcBucket::new(*arc, p.clone());
-                let density = bucket.density();
+                let density = bucket.peer_view_alpha();
                 arc.update_length(density);
             }
             if gaps {
