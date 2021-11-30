@@ -221,7 +221,7 @@ impl ChainQueryFilter {
                     .map(|header| (header.as_hash().clone(), header))
                     .collect::<HashMap<HeaderHash, &HeaderHashed>>();
                 let mut filtered_headers = Vec::new();
-                let mut maybe_next_header = header_hashmap.remove(&end);
+                let mut maybe_next_header = header_hashmap.remove(end);
                 while let Some(next_header) = maybe_next_header {
                     maybe_next_header = next_header
                         .as_content()
@@ -241,7 +241,7 @@ impl ChainQueryFilter {
                     .map(|header| (header.as_hash().clone(), header))
                     .collect::<HashMap<HeaderHash, &HeaderHashed>>();
                 let mut filtered_headers = Vec::new();
-                let mut maybe_next_header = header_hashmap.remove(&end);
+                let mut maybe_next_header = header_hashmap.remove(end);
                 let mut i = 0;
                 while let Some(next_header) = maybe_next_header {
                     maybe_next_header = next_header
@@ -253,7 +253,7 @@ impl ChainQueryFilter {
                     if i == *n {
                         break;
                     }
-                    i = i + 1;
+                    i += 1;
                 }
                 filtered_headers
             }
@@ -272,7 +272,7 @@ impl ChainQueryFilter {
                     && self
                         .entry_type
                         .as_ref()
-                        .map(|entry_type| header.entry_type() == Some(&entry_type))
+                        .map(|entry_type| header.entry_type() == Some(entry_type))
                         .unwrap_or(true)
                     && self
                         .entry_hashes
