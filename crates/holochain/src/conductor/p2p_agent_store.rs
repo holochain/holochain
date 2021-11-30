@@ -138,42 +138,62 @@ pub async fn exchange_peer_info(envs: Vec<DbWrite<DbKindP2pAgentStore>>) {
     }
 }
 
+async fn run_query<F, R>(db: DbWrite<DbKindP2pAgentStore>, f: F) -> ConductorResult<R>
+where
+    R: Send + 'static,
+    F: FnOnce(PConnGuard) -> ConductorResult<R> + Send + 'static,
+{
+    let permit = db.conn_permit().await;
+    let r = tokio::task::spawn_blocking(move || {
+        let conn = db.from_permit(permit)?;
+        f(conn)
+    })
+    .await??;
+    Ok(r)
+}
+
 /// Get agent info for a single agent
-pub fn get_agent_info_signed(
+pub async fn get_agent_info_signed(
     environ: DbWrite<DbKindP2pAgentStore>,
     _kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>,
 ) -> ConductorResult<Option<AgentInfoSigned>> {
-    Ok(environ.conn()?.p2p_get_agent(&kitsune_agent)?)
+    run_query(environ, move |mut conn| {
+        Ok(conn.p2p_get_agent(&kitsune_agent)?)
+    })
+    .await
 }
 
 /// Get all agent info for a single space
-pub fn list_all_agent_info(
+pub async fn list_all_agent_info(
     environ: DbWrite<DbKindP2pAgentStore>,
     _kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
 ) -> ConductorResult<Vec<AgentInfoSigned>> {
-    Ok(environ.conn()?.p2p_list_agents()?)
+    run_query(environ, move |mut conn| Ok(conn.p2p_list_agents()?)).await
 }
 
 /// Get all agent info for a single space near a basis loc
-pub fn list_all_agent_info_signed_near_basis(
+pub async fn list_all_agent_info_signed_near_basis(
     environ: DbWrite<DbKindP2pAgentStore>,
     _kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     basis_loc: u32,
     limit: u32,
 ) -> ConductorResult<Vec<AgentInfoSigned>> {
-    Ok(environ.conn()?.p2p_query_near_basis(basis_loc, limit)?)
+    run_query(environ, move |mut conn| {
+        Ok(conn.p2p_query_near_basis(basis_loc, limit)?)
+    })
+    .await
 }
 
 /// Get the peer density an agent is currently seeing within
 /// a given [`DhtArc`]
-pub fn query_peer_density(
+pub async fn query_peer_density(
     env: DbWrite<DbKindP2pAgentStore>,
     kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     dht_arc: DhtArc,
 ) -> ConductorResult<PeerDensity> {
     let now = now();
-    let arcs = env.conn()?.p2p_list_agents()?;
+    let arcs = run_query(env, move |mut conn| Ok(conn.p2p_list_agents()?)).await?;
     let arcs = arcs
         .into_iter()
         .filter_map(|v| {
@@ -296,7 +316,7 @@ mod tests {
         p2p_put(&env, &agent_info_signed).await.unwrap();
 
         let ret = env
-            .conn()
+            .from_permit(env.conn_permit().await)
             .unwrap()
             .p2p_get_agent(&agent_info_signed.agent)
             .unwrap();
@@ -311,7 +331,12 @@ mod tests {
         let env = t_env.env();
 
         // - Check no data in the store to start
-        let count = env.conn().unwrap().p2p_list_agents().unwrap().len();
+        let count = env
+            .from_permit(env.conn_permit().await)
+            .unwrap()
+            .p2p_list_agents()
+            .unwrap()
+            .len();
 
         assert_eq!(count, 0);
 
