@@ -47,6 +47,7 @@ impl HandlerBuilder {
         Self(MockKitsuneP2pEventHandler::new(), None)
     }
 
+    #[allow(dead_code)]
     pub fn with_delay(delay: std::time::Duration) -> Self {
         let mut s = Self::new();
         s.1 = Some(delay);
