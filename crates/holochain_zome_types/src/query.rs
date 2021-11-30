@@ -324,9 +324,12 @@ mod tests {
         let entry_type_1 = EntryType::App(fixt!(AppEntryType));
         let entry_type_2 = EntryType::AgentPubKey;
 
+        let entry_hash_0 = fixt!(EntryHash);
+
         let mut h0 = fixt!(Create);
         h0.entry_type = entry_type_1.clone();
         h0.header_seq = 0;
+        h0.entry_hash = entry_hash_0.clone();
         let hh0 = HeaderHashed::from_content_sync(h0.into());
 
         let mut h1 = fixt!(Update);
@@ -355,6 +358,8 @@ mod tests {
 
         let mut h4 = fixt!(Update);
         h4.entry_type = entry_type_1.clone();
+        // same entry content as h0
+        h4.entry_hash = entry_hash_0;
         h4.header_seq = 4;
         h4.prev_header = hh3.as_hash().clone();
         let hh4 = HeaderHashed::from_content_sync(h4.into());
@@ -402,7 +407,8 @@ mod tests {
         let query = ChainQueryFilter::new().entry_hashes(
             vec![
                 headers[3].entry_hash().unwrap().clone(),
-                headers[4].entry_hash().unwrap().clone(),
+                // headers[5] has same entry hash as headers[0]
+                headers[5].entry_hash().unwrap().clone(),
             ]
             .into_iter()
             .collect(),
@@ -410,7 +416,7 @@ mod tests {
 
         assert_eq!(
             map_query(&query, &headers),
-            vec![false, false, false, true, true, false, false]
+            vec![true, false, false, true, false, true, false]
         );
     }
 
