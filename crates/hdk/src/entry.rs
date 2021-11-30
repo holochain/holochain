@@ -210,6 +210,19 @@ where
 ///       contacts on their current network partition, there could always be an older live entry
 ///       on another partition, and of course the oldest live entry could be deleted and no longer
 ///       be live.
+///
+/// e.g.
+/// ```ignore
+/// #[hdk_entry(id = "foo")]
+/// pub struct Foo(u32);
+///
+/// let header_hash = create_entry(Foo(50))?;
+/// let element: Element = get(header_hash, GetOptions::latest())?
+///     .ok_or(WasmError::Guest(String::from("Entry not found")))?;
+/// let foo_option: Option<Foo> = element.entry().to_app_option()?;
+/// let foo: Foo = foo_option.ok_or(WasmError::Guest("Entry is not type Foo".into()))?;
+/// assert_eq!(foo.0, 50);
+/// ```
 pub fn get<H>(hash: H, options: GetOptions) -> ExternResult<Option<Element>>
 where
     AnyDhtHash: From<H>,
