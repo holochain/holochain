@@ -9,7 +9,7 @@ use std::iter;
 
 /// Maximum number of iterations. If we iterate this much, we assume the
 /// system is divergent (unable to reach equilibrium).
-const DIVERGENCE_ITERS: usize = 20;
+const DIVERGENCE_ITERS: usize = 30;
 
 /// Number of consecutive rounds of no movement before declaring convergence.
 const CONVERGENCE_WINDOW: usize = 3;
