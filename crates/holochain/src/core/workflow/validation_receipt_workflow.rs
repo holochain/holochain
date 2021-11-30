@@ -103,7 +103,10 @@ pub async fn validation_receipt_workflow(
 
         // Sign on the dotted line.
         let receipt = match ValidationReceipt::sign(receipt, &keystore).await {
-            Ok(r) => r,
+            Ok(Some(r)) => r,
+            Ok(None) => {
+                return Ok(WorkComplete::Incomplete);
+            }
             Err(e) => {
                 info!(failed_to_sign_receipt = ?e);
                 return Ok(WorkComplete::Incomplete);
