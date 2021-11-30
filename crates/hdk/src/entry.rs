@@ -210,6 +210,28 @@ where
 ///       contacts on their current network partition, there could always be an older live entry
 ///       on another partition, and of course the oldest live entry could be deleted and no longer
 ///       be live.
+///
+/// e.g.
+/// ```ignore
+/// #[hdk_entry(id = "foo")]
+/// pub struct Foo(u32);
+/// let header_hash = create_entry(Foo(50))?;
+///
+/// // example 1: unfolded code to fetch element
+/// let element_result: Result<Option<Element>,WasmError> = get(header_hash, GetOptions::latest());
+/// let unwrapped: Option<Element> = element_result?;
+/// let option_convert: Result<Element,WasmError> = unwrapped.ok_or(WasmError::Guest(String::from("Entry not found")));
+/// let element: Element = option_convert?;
+///
+/// // example 2: one line version of example 1
+/// let element: Element = get(header_hash, GetOptions::latest())?.ok_or(WasmError::Guest(String::from("Entry not found")))?;
+///
+/// // convert element to native object. Foo is defined as struct
+/// let entry_option: Option<Foo> = element.entry().to_app_option()?;
+///
+/// let native_object: Foo = entry_option.ok_or(WasmError::Guest("Entry is not type Foo".into()))?;
+/// assert_eq!(native_object.0, 50);
+/// ```
 pub fn get<H>(hash: H, options: GetOptions) -> ExternResult<Option<Element>>
 where
     AnyDhtHash: From<H>,
