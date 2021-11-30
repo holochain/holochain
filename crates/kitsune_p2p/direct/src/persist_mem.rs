@@ -416,7 +416,7 @@ impl AsKdPersist for PersistMem {
             // contains is already checked in the iterator
             let bucket = kitsune_p2p::dht_arc::DhtArcBucket::new_unchecked(dht_arc, arcs);
 
-            Ok(bucket.peer_view_alpha())
+            Ok(bucket.peer_view_default())
         }
         .boxed()
     }

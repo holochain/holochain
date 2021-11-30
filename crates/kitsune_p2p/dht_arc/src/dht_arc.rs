@@ -10,20 +10,7 @@ use std::ops::RangeBounds;
 #[cfg(test)]
 use std::ops::RangeInclusive;
 
-#[cfg(test)]
-mod tests;
-
-#[cfg(test)]
-mod test_ascii;
-
-mod dht_arc_set;
-pub use dht_arc_set::{ArcInterval, DhtArcSet};
-
-mod dht_arc_bucket;
-pub use dht_arc_bucket::*;
-
-#[cfg(any(test, feature = "test_utils"))]
-pub mod gaps;
+use crate::*;
 
 /// Type for representing a location that can wrap around
 /// a u32 dht arc
@@ -87,104 +74,6 @@ pub const MAX_HALF_LENGTH: u32 = (u32::MAX / 2) + 1 + 1;
 /// Maximum number of values that a u32 can represent.
 const U32_LEN: u64 = u32::MAX as u64 + 1;
 
-/// Number of copies of a given hash available at any given time.
-const REDUNDANCY_TARGET: usize = 50;
-
-/// If the redundancy drops due to inaccurate estimation we can't
-/// go lower then this level of redundancy.
-/// Note this can only be tested and not proved.
-const REDUNDANCY_FLOOR: usize = 20;
-
-/// Default assumed up time for nodes.
-const DEFAULT_UPTIME: f64 = 0.5;
-
-/// The minimum number of peers before sharding can begin.
-/// This factors in the expected uptime to reach the redundancy target.
-pub const MIN_PEERS: usize = (REDUNDANCY_TARGET as f64 / DEFAULT_UPTIME) as usize;
-
-/// The minimum number of peers we can consider acceptable to see in our arc
-/// during testing.
-pub const MIN_REDUNDANCY: u32 = (REDUNDANCY_FLOOR as f64 / DEFAULT_UPTIME) as u32;
-
-/// The amount "change in arc" is scaled to prevent rapid changes.
-/// This also represents the maximum coverage change in a single update
-/// as a difference of 1.0 would scale to 0.2.
-const DELTA_SCALE: f64 = 0.2;
-
-/// The minimal "change in arc" before we stop scaling.
-/// This prevents never reaching the target arc coverage.
-const DELTA_THRESHOLD: f64 = 0.01;
-
-/// Due to estimation noise we don't want a very small difference
-/// between observed coverage and estimated coverage to
-/// amplify when scaled to by the estimated total peers.
-/// This threshold must be reached before an estimated coverage gap
-/// is calculated.
-const NOISE_THRESHOLD: f64 = 0.01;
-
-// TODO: Use the [`f64::clamp`] when we switch to rustc 1.50
-fn clamp(min: f64, max: f64, mut x: f64) -> f64 {
-    if x < min {
-        x = min;
-    }
-    if x > max {
-        x = max;
-    }
-    x
-}
-
-/// The ideal coverage if all peers were holding the same sized
-/// arcs and our estimated total peers is close.
-fn coverage_target(est_total_peers: usize) -> f64 {
-    if est_total_peers <= REDUNDANCY_TARGET {
-        1.0
-    } else {
-        REDUNDANCY_TARGET as f64 / est_total_peers as f64
-    }
-}
-
-/// Calculate the target arc length given a peer density.
-fn target(density: PeerViewAlpha) -> f64 {
-    // Get the estimated coverage gap based on our observed peer density.
-    let est_gap = density.est_gap();
-    // If we haven't observed at least our redundancy target number
-    // of peers (adjusted for expected uptime) then we know that the data
-    // in our arc is under replicated and we should start aiming for full coverage.
-    if density.expected_count() < REDUNDANCY_TARGET {
-        1.0
-    } else {
-        // Get the estimated gap. We don't care about negative gaps
-        // or gaps we can't fill (> 1.0)
-        let est_gap = clamp(0.0, 1.0, est_gap);
-        // Get the ideal coverage target for the size of that we estimate
-        // the network to be.
-        let ideal_target = coverage_target(density.est_total_peers());
-        // Take whichever is larger. We prefer nodes to target the ideal
-        // coverage but if there is a larger gap then it needs to be filled.
-        let target = est_gap.max(ideal_target);
-
-        clamp(0.0, 1.0, target)
-    }
-}
-
-/// The convergence algorithm that moves an arc towards
-/// our estimated target.
-///
-/// Note the rate of convergence is dependant of the rate
-/// that [`DhtArc::update_length`] is called.
-fn converge(current: f64, density: PeerViewAlpha) -> f64 {
-    let target = target(density);
-    // The change in arc we'd need to make to get to the target.
-    let delta = target - current;
-    // If this is below our threshold then apply that delta.
-    if delta.abs() < DELTA_THRESHOLD {
-        current + delta
-    // Other wise scale the delta to avoid rapid change.
-    } else {
-        current + (delta * DELTA_SCALE)
-    }
-}
-
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 /// Represents how much of a dht arc is held
 /// center_loc is where the hash is.
@@ -204,10 +93,10 @@ fn converge(current: f64, density: PeerViewAlpha) -> f64 {
 /// ```
 pub struct DhtArc {
     /// The center location of this dht arc
-    center_loc: DhtLocation,
+    pub(crate) center_loc: DhtLocation,
 
     /// The "half-length" of this dht arc
-    half_length: u32,
+    pub(crate) half_length: u32,
 }
 
 impl DhtArc {

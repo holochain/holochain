@@ -1,5 +1,5 @@
-use crate::PeerViewParams;
-use crate::{gaps::check_redundancy, DhtArc, DhtArcBucket, MAX_HALF_LENGTH};
+use crate::PeerStrat;
+use crate::*;
 use rand::thread_rng;
 use rand::Rng;
 use std::iter;
@@ -19,17 +19,26 @@ fn full_len() -> f64 {
 }
 
 #[test]
+fn min_redundancy_is_maintained() {
+    todo!("Check that min redundancy is maintained at all times");
+}
+
+#[test]
 fn parameterized_stability_test() {
     let n = 500;
     let j = 1f64 / n as f64 / 3.0;
 
-    let kind = PeerViewParams::Alpha;
+    let strat = PeerStratAlpha {
+        // redundancy_target: 100,
+        ..Default::default()
+    };
+    let kind = PeerStrat::Alpha(strat);
 
     let peers = simple_parameterized_generator(n, j, ArcLenStrategy::Constant(0.1));
     report(peers, kind);
 }
 
-fn report(mut peers: Vec<DhtArc>, kind: PeerViewParams) {
+fn report(mut peers: Vec<DhtArc>, kind: PeerStrat) {
     if let Some(mut stats) = seek_equilibrium(&mut peers, kind) {
         let total = stats.len();
         // print_arcs(&peers);
@@ -44,7 +53,7 @@ fn report(mut peers: Vec<DhtArc>, kind: PeerViewParams) {
 /// Run iterations until there is no movement of any arc
 /// TODO: this may be unreasonable, and we may need to just ensure that arcs
 /// settle down into a reasonable level of oscillation
-fn seek_equilibrium(peers: &mut Vec<DhtArc>, kind: PeerViewParams) -> Option<Vec<EpochStats>> {
+fn seek_equilibrium(peers: &mut Vec<DhtArc>, kind: PeerStrat) -> Option<Vec<EpochStats>> {
     let mut n_delta_count = 0;
     let mut stats_history = vec![];
     println!("{}", EpochStats::oneline_header());
@@ -74,7 +83,7 @@ fn seek_equilibrium(peers: &mut Vec<DhtArc>, kind: PeerViewParams) -> Option<Vec
 }
 
 /// Resize every arc based on neighbors' arcs, and compute stats about this iteration
-fn run_one_epoch(peers: &mut Vec<DhtArc>, kind: &PeerViewParams, detail: u8) -> EpochStats {
+fn run_one_epoch(peers: &mut Vec<DhtArc>, kind: &PeerStrat, detail: u8) -> EpochStats {
     let mut net = 0.0;
     let mut gross = 0.0;
     let mut delta_min = full_len() / 2.0;

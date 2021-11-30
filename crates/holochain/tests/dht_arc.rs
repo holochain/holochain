@@ -1,14 +1,14 @@
 use holochain::sweettest::SweetAgents;
 use holochain::sweettest::SweetConductor;
 use holochain_keystore::MetaLairClient;
+use holochain_p2p::dht_arc::DEFAULT_MIN_PEERS;
+use holochain_p2p::dht_arc::DEFAULT_MIN_REDUNDANCY;
 use holochain_p2p::dht_arc::MAX_HALF_LENGTH;
-use holochain_p2p::dht_arc::MIN_PEERS;
-use holochain_p2p::dht_arc::MIN_REDUNDANCY;
 use kitsune_p2p::dht_arc::DhtArc;
 use kitsune_p2p::dht_arc::DhtArcBucket;
 use kitsune_p2p::*;
+use kitsune_p2p_types::dht_arc::check_redundancy;
 use kitsune_p2p_types::dht_arc::gaps::check_for_gaps;
-use kitsune_p2p_types::dht_arc::gaps::check_redundancy;
 
 async fn get_peers(num: usize, half_lens: &[u32], keystore: MetaLairClient) -> Vec<DhtArc> {
     let mut half_lens = half_lens.iter().cycle();
@@ -21,57 +21,6 @@ async fn get_peers(num: usize, half_lens: &[u32], keystore: MetaLairClient) -> V
         out.push(arc);
     }
     out
-}
-
-#[tokio::test(flavor = "multi_thread")]
-#[ignore = "Too unstable"]
-// Unfortunately I can't get nodes to "settle".
-// As a node shrinks their arc they may drop below the redundancy
-// target. This is because all nodes are changing their arcs concurrently.
-// TODO: Figure out some way to stabilize convergence so a network can become
-// stable given no new nodes.
-async fn test_arc_coverage() {
-    let conductor = SweetConductor::from_config(Default::default()).await;
-    let keystore = conductor.keystore();
-
-    let converge = |peers: &mut Vec<DhtArc>| {
-        for _ in 0..10000 {
-            for i in 0..peers.len() {
-                let p = peers.clone();
-                let arc = peers.get_mut(i).unwrap();
-                let bucket = DhtArcBucket::new(*arc, p.clone());
-                let density = bucket.peer_view_alpha();
-                arc.update_length(density);
-            }
-            let bucket = DhtArcBucket::new(
-                DhtArc::new(MAX_HALF_LENGTH / 2, MAX_HALF_LENGTH),
-                peers.clone(),
-            );
-            println!("{}", bucket);
-            // std::thread::sleep(std::time::Duration::from_millis(200));
-        }
-    };
-
-    let mut peers = get_peers(MIN_PEERS * 4, &[20], keystore.clone()).await;
-    converge(&mut peers);
-    // - Converge to half coverage
-    for arc in peers {
-        assert_eq!((arc.coverage() * 10.0).round() / 10.0, 0.25);
-    }
-
-    let mut peers = get_peers(MIN_PEERS, &[20], keystore.clone()).await;
-    converge(&mut peers);
-    // - Converge to half coverage
-    for arc in peers {
-        assert_eq!((arc.coverage() * 10.0).round() / 10.0, 0.5);
-    }
-
-    let mut peers = get_peers(MIN_PEERS * 2, &[20], keystore.clone()).await;
-    converge(&mut peers);
-    // - Converge to half coverage
-    for arc in peers {
-        assert_eq!((arc.coverage() * 10.0).round() / 10.0, 0.5);
-    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -89,16 +38,16 @@ async fn test_arc_redundancy() {
                 let p = peers.clone();
                 let arc = peers.get_mut(i).unwrap();
                 let bucket = DhtArcBucket::new(*arc, p.clone());
-                let density = bucket.peer_view_alpha();
+                let density = bucket.peer_view_default();
                 arc.update_length(density);
             }
 
             assert!(!check_for_gaps(peers.clone()));
             let r = check_redundancy(peers.clone());
             if mature {
-                assert!(r >= MIN_REDUNDANCY);
+                assert!(r >= DEFAULT_MIN_REDUNDANCY);
             } else {
-                if r >= MIN_REDUNDANCY {
+                if r >= DEFAULT_MIN_REDUNDANCY {
                     mature = true;
                 }
             }
@@ -111,7 +60,7 @@ async fn test_arc_redundancy() {
             let keystore = keystore.clone();
             async move {
                 let mut peers = get_peers(
-                    (MIN_PEERS as f64 * 1.1) as usize,
+                    (DEFAULT_MIN_PEERS as f64 * 1.1) as usize,
                     &[(MAX_HALF_LENGTH as f64 * 0.2) as u32],
                     keystore,
                 )
@@ -138,15 +87,15 @@ async fn test_arc_redundancy_all() {
                 let p = peers.clone();
                 let arc = peers.get_mut(i).unwrap();
                 let bucket = DhtArcBucket::new(*arc, p.clone());
-                let density = bucket.peer_view_alpha();
+                let density = bucket.peer_view_default();
                 arc.update_length(density);
             }
 
             let r = check_redundancy(peers.clone());
             if mature {
-                assert!(r >= MIN_REDUNDANCY);
+                assert!(r >= DEFAULT_MIN_REDUNDANCY);
             } else {
-                if r >= MIN_REDUNDANCY {
+                if r >= DEFAULT_MIN_REDUNDANCY {
                     mature = true;
                 }
             }
@@ -155,7 +104,7 @@ async fn test_arc_redundancy_all() {
     };
     let test = |scale_peers: f64, coverage, additional_coverage, keystore| async move {
         let mut peers = get_peers(
-            (MIN_PEERS as f64 * scale_peers) as usize,
+            (DEFAULT_MIN_PEERS as f64 * scale_peers) as usize,
             &[(MAX_HALF_LENGTH as f64 * coverage) as u32 + additional_coverage],
             keystore,
         )
@@ -179,7 +128,7 @@ async fn test_arc_redundancy_all() {
                     "Test: {} scale_peers {} peers {} scale {} additional_coverage {}",
                     i,
                     scale_peers,
-                    scale_peers * MIN_PEERS as f64,
+                    scale_peers * DEFAULT_MIN_PEERS as f64,
                     coverage,
                     additional_coverage
                 );
@@ -196,7 +145,7 @@ async fn test_join_leave() {
     let conductor = SweetConductor::from_config(Default::default()).await;
     let keystore = conductor.keystore();
 
-    let num_peers = MIN_PEERS;
+    let num_peers = DEFAULT_MIN_PEERS;
 
     let coverages = vec![MAX_HALF_LENGTH];
     let converge = |peers: &mut Vec<DhtArc>| {
@@ -204,7 +153,7 @@ async fn test_join_leave() {
             let p = peers.clone();
             let arc = peers.get_mut(i).unwrap();
             let bucket = DhtArcBucket::new(*arc, p.clone());
-            let density = bucket.peer_view_alpha();
+            let density = bucket.peer_view_default();
             arc.update_length(density);
         }
     };
@@ -220,9 +169,9 @@ async fn test_join_leave() {
         let r = check_redundancy(peers.clone());
 
         if mature {
-            assert!(r >= MIN_REDUNDANCY);
+            assert!(r >= DEFAULT_MIN_REDUNDANCY);
         } else {
-            if r >= MIN_REDUNDANCY {
+            if r >= DEFAULT_MIN_REDUNDANCY {
                 mature = true;
             }
         }
