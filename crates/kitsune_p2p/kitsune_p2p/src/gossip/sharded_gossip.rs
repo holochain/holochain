@@ -256,7 +256,7 @@ impl ShardedGossip {
         if let Some(outgoing) = outgoing {
             let cert = outgoing.0.cert().clone();
             if let Err(err) = self.process_outgoing(outgoing).await {
-                self.gossip.remove_state(&cert, true).await?;
+                self.gossip.remove_state(&cert, true)?;
                 tracing::error!(
                     "Gossip failed to send outgoing message because of: {:?}",
                     err
@@ -709,7 +709,7 @@ impl ShardedGossipLocal {
                         state
                     }
                 };
-                if state.is_some() {
+                if state.is_some() && !ops.is_empty() {
                     self.incoming_missing_ops(ops).await?;
                 }
                 gossip

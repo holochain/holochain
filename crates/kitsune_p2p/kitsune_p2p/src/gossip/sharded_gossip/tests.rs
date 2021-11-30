@@ -7,10 +7,10 @@ use super::*;
 use crate::fixt::*;
 use fixt::prelude::*;
 
+mod bloom;
 mod common;
 mod handler_builder;
 mod test_two_nodes;
-mod bloom;
 
 impl ShardedGossipLocal {
     pub fn test(
