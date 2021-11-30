@@ -168,7 +168,7 @@ pub struct ChainFork {
 }
 
 impl ChainQueryFilter {
-    /// Create a no-op ChainQueryFilter which returns everything
+    /// Create a no-op ChainQueryFilter which returns everything.
     pub fn new() -> Self {
         Self {
             include_entries: false,
@@ -176,25 +176,31 @@ impl ChainQueryFilter {
         }
     }
 
-    /// Filter on sequence range
+    /// Filter on sequence range.
     pub fn sequence_range(mut self, sequence_range: ChainQueryFilterSequenceRange) -> Self {
         self.sequence_range = sequence_range;
         self
     }
 
-    /// Filter on entry type
+    /// Filter on entry type.
     pub fn entry_type(mut self, entry_type: EntryType) -> Self {
         self.entry_type = Some(entry_type);
         self
     }
 
-    /// Filter on header type
+    /// Filter on entry hashes.
+    pub fn entry_hashes(mut self, entry_hashes: HashSet<EntryHash>) -> Self {
+        self.entry_hashes = Some(entry_hashes);
+        self
+    }
+
+    /// Filter on header type.
     pub fn header_type(mut self, header_type: HeaderType) -> Self {
         self.header_type = Some(header_type);
         self
     }
 
-    /// Include the entries in the ElementsVec that is returned
+    /// Include the entries in the ElementsVec that is returned.
     pub fn include_entries(mut self, include_entries: bool) -> Self {
         self.include_entries = include_entries;
         self
@@ -217,7 +223,10 @@ impl ChainQueryFilter {
                 let mut filtered_headers = Vec::new();
                 let mut maybe_next_header = header_hashmap.remove(&end);
                 while let Some(next_header) = maybe_next_header {
-                    maybe_next_header = header_hashmap.remove(next_header.as_hash());
+                    maybe_next_header = next_header
+                        .as_content()
+                        .prev_header()
+                        .and_then(|prev_header| header_hashmap.remove(prev_header));
                     filtered_headers.push(next_header.clone());
                     // This comes after the push to make the range inclusive.
                     if next_header.as_hash() == start {
@@ -235,7 +244,10 @@ impl ChainQueryFilter {
                 let mut maybe_next_header = header_hashmap.remove(&end);
                 let mut i = 0;
                 while let Some(next_header) = maybe_next_header {
-                    maybe_next_header = header_hashmap.remove(next_header.as_hash());
+                    maybe_next_header = next_header
+                        .as_content()
+                        .prev_header()
+                        .and_then(|prev_header| header_hashmap.remove(prev_header));
                     filtered_headers.push(next_header.clone());
                     // This comes after the push to make the range inclusive.
                     if i == *n {
@@ -297,13 +309,14 @@ impl ChainQueryFilter {
 #[cfg(test)]
 #[cfg(feature = "fixturators")]
 mod tests {
+    use super::ChainQueryFilter;
     use crate::fixt::AppEntryTypeFixturator;
     use crate::fixt::*;
     use crate::header::EntryType;
+    use crate::ChainQueryFilterSequenceRange;
     use crate::HeaderHashed;
     use ::fixt::prelude::*;
-    use crate::ChainQueryFilterSequenceRange;
-    use super::ChainQueryFilter;
+    use holo_hash::HasHash;
 
     /// Create three Headers with various properties.
     /// Also return the EntryTypes used to construct the first two headers.
@@ -311,42 +324,47 @@ mod tests {
         let entry_type_1 = EntryType::App(fixt!(AppEntryType));
         let entry_type_2 = EntryType::AgentPubKey;
 
-        let mut h1 = fixt!(Create);
-        h1.entry_type = entry_type_1.clone();
-        h1.header_seq = 0;
+        let mut h0 = fixt!(Create);
+        h0.entry_type = entry_type_1.clone();
+        h0.header_seq = 0;
+        let hh0 = HeaderHashed::from_content_sync(h0.into());
 
-        let mut h2 = fixt!(Update);
-        h2.entry_type = entry_type_2.clone();
-        h2.header_seq = 1;
+        let mut h1 = fixt!(Update);
+        h1.entry_type = entry_type_2.clone();
+        h1.header_seq = 1;
+        h1.prev_header = hh0.as_hash().clone();
+        let hh1 = HeaderHashed::from_content_sync(h1.into());
 
-        let mut h3 = fixt!(CreateLink);
-        h3.header_seq = 2;
+        let mut h2 = fixt!(CreateLink);
+        h2.header_seq = 2;
+        h2.prev_header = hh1.as_hash().clone();
+        let hh2 = HeaderHashed::from_content_sync(h2.into());
 
-        let mut h4 = fixt!(Create);
-        h4.entry_type = entry_type_2.clone();
-        h4.header_seq = 3;
+        let mut h3 = fixt!(Create);
+        h3.entry_type = entry_type_2.clone();
+        h3.header_seq = 3;
+        h3.prev_header = hh2.as_hash().clone();
+        let hh3 = HeaderHashed::from_content_sync(h3.into());
 
         // Cheeky forker!
-        let mut h4a = fixt!(Create);
-        h4a.entry_type = entry_type_1.clone();
-        h4a.header_seq = 3;
+        let mut h3a = fixt!(Create);
+        h3a.entry_type = entry_type_1.clone();
+        h3a.header_seq = 3;
+        h3a.prev_header = hh2.as_hash().clone();
+        let hh3a = HeaderHashed::from_content_sync(h3a.into());
 
-        let mut h5 = fixt!(Update);
-        h5.entry_type = entry_type_1.clone();
-        h5.header_seq = 4;
+        let mut h4 = fixt!(Update);
+        h4.entry_type = entry_type_1.clone();
+        h4.header_seq = 4;
+        h4.prev_header = hh3.as_hash().clone();
+        let hh4 = HeaderHashed::from_content_sync(h4.into());
 
-        let mut h6 = fixt!(CreateLink);
-        h6.header_seq = 5;
+        let mut h5 = fixt!(CreateLink);
+        h5.header_seq = 5;
+        h5.prev_header = hh4.as_hash().clone();
+        let hh5 = HeaderHashed::from_content_sync(h5.into());
 
-        let headers = [
-            HeaderHashed::from_content_sync(h1.into()),
-            HeaderHashed::from_content_sync(h2.into()),
-            HeaderHashed::from_content_sync(h3.into()),
-            HeaderHashed::from_content_sync(h4.into()),
-            HeaderHashed::from_content_sync(h4a.into()),
-            HeaderHashed::from_content_sync(h5.into()),
-            HeaderHashed::from_content_sync(h6.into()),
-        ];
+        let headers = [hh0, hh1, hh2, hh3, hh3a, hh4, hh5];
         headers
     }
 
@@ -378,6 +396,25 @@ mod tests {
     }
 
     #[test]
+    fn filter_by_entry_hash() {
+        let headers = fixtures();
+
+        let query = ChainQueryFilter::new().entry_hashes(
+            vec![
+                headers[3].entry_hash().unwrap().clone(),
+                headers[4].entry_hash().unwrap().clone(),
+            ]
+            .into_iter()
+            .collect(),
+        );
+
+        assert_eq!(
+            map_query(&query, &headers),
+            vec![false, false, false, true, true, false, false]
+        );
+    }
+
+    #[test]
     fn filter_by_header_type() {
         let headers = fixtures();
 
@@ -403,33 +440,92 @@ mod tests {
     fn filter_by_chain_sequence() {
         let headers = fixtures();
 
-        dbg!(&headers);
-
-        let query_1 = ChainQueryFilter::new()
-            .sequence_range(ChainQueryFilterSequenceRange::HeaderSeqRange(0, 0));
-        let query_2 = ChainQueryFilter::new()
-            .sequence_range(ChainQueryFilterSequenceRange::HeaderSeqRange(0, 1));
-        let query_3 = ChainQueryFilter::new()
-            .sequence_range(ChainQueryFilterSequenceRange::HeaderSeqRange(1, 2));
-        let query_4 = ChainQueryFilter::new()
-            .sequence_range(ChainQueryFilterSequenceRange::HeaderSeqRange(2, 999));
-
-        assert_eq!(
-            map_query(&query_1, &headers),
-            [true, false, false, false, false, false, false].to_vec()
-        );
-        assert_eq!(
-            map_query(&query_2, &headers),
-            [true, true, false, false, false, false, false].to_vec()
-        );
-        assert_eq!(
-            map_query(&query_3, &headers),
-            [false, true, true, false, false, false, false].to_vec()
-        );
-        assert_eq!(
-            map_query(&query_4, &headers),
-            [false, false, true, true, true, true, true].to_vec()
-        );
+        for (sequence_range, expected, name) in vec![
+            (
+                ChainQueryFilterSequenceRange::Unbounded,
+                vec![true, true, true, true, true, true, true],
+                "unbounded",
+            ),
+            (
+                ChainQueryFilterSequenceRange::HeaderSeqRange(0, 0),
+                vec![true, false, false, false, false, false, false],
+                "first only",
+            ),
+            (
+                ChainQueryFilterSequenceRange::HeaderSeqRange(0, 1),
+                vec![true, true, false, false, false, false, false],
+                "several from start",
+            ),
+            (
+                ChainQueryFilterSequenceRange::HeaderSeqRange(1, 2),
+                vec![false, true, true, false, false, false, false],
+                "several not start",
+            ),
+            (
+                ChainQueryFilterSequenceRange::HeaderSeqRange(2, 999),
+                vec![false, false, true, true, true, true, true],
+                "exceeds chain length, not start",
+            ),
+            (
+                ChainQueryFilterSequenceRange::HeaderHashRange(
+                    headers[2].as_hash().clone(),
+                    headers[6].as_hash().clone(),
+                ),
+                vec![false, false, true, true, false, true, true],
+                "hash bounded not 3a",
+            ),
+            (
+                ChainQueryFilterSequenceRange::HeaderHashRange(
+                    headers[2].as_hash().clone(),
+                    headers[4].as_hash().clone(),
+                ),
+                vec![false, false, true, false, true, false, false],
+                "hash bounded 3a",
+            ),
+            (
+                ChainQueryFilterSequenceRange::HeaderHashTerminated(
+                    headers[2].as_hash().clone(),
+                    1,
+                ),
+                vec![false, true, true, false, false, false, false],
+                "hash terminated not start",
+            ),
+            (
+                ChainQueryFilterSequenceRange::HeaderHashTerminated(
+                    headers[2].as_hash().clone(),
+                    0,
+                ),
+                vec![false, false, true, false, false, false, false],
+                "hash terminated not start 0 prior",
+            ),
+            (
+                ChainQueryFilterSequenceRange::HeaderHashTerminated(
+                    headers[5].as_hash().clone(),
+                    7,
+                ),
+                vec![true, true, true, true, false, true, false],
+                "hash terminated main chain before chain start",
+            ),
+            (
+                ChainQueryFilterSequenceRange::HeaderHashTerminated(
+                    headers[4].as_hash().clone(),
+                    7,
+                ),
+                vec![true, true, true, false, true, false, false],
+                "hash terminated 3a chain before chain start",
+            ),
+        ] {
+            assert_eq!(
+                (
+                    map_query(
+                        &ChainQueryFilter::new().sequence_range(sequence_range),
+                        &headers,
+                    ),
+                    name
+                ),
+                (expected, name),
+            );
+        }
     }
 
     #[test]
