@@ -22,6 +22,7 @@ pub use dpki_config::DpkiConfig;
 pub use error::*;
 pub use keystore_config::KeystoreConfig;
 //pub use signal_config::SignalConfig;
+pub use holochain_types::prelude::DbSyncStrategy;
 use std::path::Path;
 
 // TODO change types from "stringly typed" to Url2
