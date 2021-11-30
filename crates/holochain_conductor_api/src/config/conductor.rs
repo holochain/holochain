@@ -22,7 +22,6 @@ pub use dpki_config::DpkiConfig;
 pub use error::*;
 pub use keystore_config::KeystoreConfig;
 //pub use signal_config::SignalConfig;
-use holochain_sqlite::conn::DbSyncStrategy;
 use std::path::Path;
 
 // TODO change types from "stringly typed" to Url2
