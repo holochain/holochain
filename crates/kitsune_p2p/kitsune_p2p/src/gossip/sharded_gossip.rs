@@ -316,7 +316,7 @@ impl ShardedGossip {
                 .inner
                 .share_mut(|i, _| Ok((i.incoming.len(), i.outgoing.len())))
                 .map(|(i, o)| format!("Queues: Incoming: {}, Outgoing {}", i, o))
-                .unwrap_or("Queues empty".to_string());
+                .unwrap_or_else(|_| "Queues empty".to_string());
             let _ = self.gossip.inner.share_mut(|i, _| {
                     let s = tracing::trace_span!("gossip_metrics", gossip_type = %self.gossip.gossip_type);
                     s.in_scope(|| tracing::trace!("{}\nStats over last 5s:\n\tAverage processing time {:?}\n\tIteration count: {}\n\tMax gossip processing time: {:?}\n\t{}", i.metrics, stats.avg_processing_time, stats.count, stats.max_processing_time, lens));

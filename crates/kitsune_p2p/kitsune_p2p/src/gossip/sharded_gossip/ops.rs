@@ -253,7 +253,7 @@ impl OpsBatchQueueInner {
             id
         });
         {
-            let queue = self.queues.entry(id).or_insert_with(|| VecDeque::new());
+            let queue = self.queues.entry(id).or_insert_with(VecDeque::new);
             queue.push_back(queued);
         }
         self.queues.retain(|_, q| !q.is_empty());

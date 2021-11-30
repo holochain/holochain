@@ -104,10 +104,8 @@ impl ShardedGossipLocal {
         let local_arcs: Vec<ArcInterval> =
             local_agent_arcs.into_iter().map(|(_, arc)| arc).collect();
 
-        let mut gossip = Vec::new();
-
         // Send the intervals back as the accept message.
-        gossip.push(ShardedGossipWire::accept(local_arcs.clone()));
+        let mut gossip = vec![ShardedGossipWire::accept(local_arcs.clone())];
 
         // Generate the bloom filters and new state.
         let state = self
