@@ -646,52 +646,31 @@ where
                 WHERE
                 Header.author = :author
                 AND
+                (:range_start IS NULL AND :range_end IS NULL AND :range_start_hash IS NULL AND :range_end_hash IS NULL AND :range_prior_count IS NULL)
                 ",
                     );
-                    match query.sequence_range {
-                        ChainQueryFilterSequenceRange::Unbounded => {}
-                        ChainQueryFilterSequenceRange::HeaderSeqRange(range_min, range_max) => {
-                            sql.push_str(&format!(
-                                "
-                        Header.seq BETWEEN {0} AND {1}
-                        AND
-                        ",
-                                range_min, range_max
-                            ));
-                        }
-                        ChainQueryFilterSequenceRange::HeaderHashRange(
-                            ref range_min_hash,
-                            ref range_max_hash,
-                        ) => {
-                            sql.push_str(&format!(
-                                "
-                        Header.seq BETWEEN
-                        (SELECT Header.seq WHERE Header.hash = {0})
-                        AND
-                        (SELECT Header.seq WHERE Header.hash = {1})
-                        AND
-                        ",
-                                range_min_hash, range_max_hash
-                            ));
-                        }
-                        ChainQueryFilterSequenceRange::HeaderHashTerminated(
-                            ref range_max_hash,
-                            length,
-                        ) => {
-                            sql.push_str(&format!(
-                                "
-                        Header.seq BETWEEN
-                        (SELECT Header.seq WHERE Header.hash = {0}) - {1}
-                        AND
-                        (SELECT Header.seq WHERE Header.hash = {0})
-                        AND
-                        ",
-                                range_max_hash, length
-                            ));
-                        }
-                    }
+                    sql.push_str(match query.sequence_range {
+                        ChainQueryFilterSequenceRange::Unbounded => "",
+                        ChainQueryFilterSequenceRange::HeaderSeqRange(_, _) => "
+                        OR (Header.seq BETWEEN :range_start AND :range_end)",
+                        ChainQueryFilterSequenceRange::HeaderHashRange(_, _) => "
+                        OR (
+                            Header.seq BETWEEN
+                            (SELECT Header.seq WHERE Header.hash = :range_start_hash)
+                            AND
+                            (SELECT Header.seq WHERE Header.hash = :range_end_hash)
+                        )",
+                        ChainQueryFilterSequenceRange::HeaderHashTerminated(_, _) => "
+                        OR (
+                            Header.seq BETWEEN
+                            (SELECT Header.seq WHERE Header.hash = :range_end_hash) - :range_prior_count
+                            AND
+                            (SELECT Header.seq WHERE Header.hash = :range_end_hash)
+                        )",
+                    });
                     sql.push_str(
                         "
+                AND
                 (:entry_type IS NULL OR Header.entry_type = :entry_type)
                 AND
                 (:header_type IS NULL OR Header.type = :header_type)
@@ -701,10 +680,31 @@ where
                     let mut stmt = txn.prepare(&sql)?;
                     let elements = stmt
                         .query_and_then(
-                            named_params! {
+                        named_params! {
                                 ":author": author.as_ref(),
                                 ":entry_type": query.entry_type,
                                 ":header_type": query.header_type,
+                                ":range_start": match query.sequence_range {
+                                    ChainQueryFilterSequenceRange::HeaderSeqRange(start, _) => Some(start),
+                                    _ => None,
+                                },
+                                ":range_end": match query.sequence_range {
+                                    ChainQueryFilterSequenceRange::HeaderSeqRange(_, end) => Some(end),
+                                    _ => None,
+                                },
+                                ":range_start_hash": match &query.sequence_range {
+                                    ChainQueryFilterSequenceRange::HeaderHashRange(start_hash, _) => Some(start_hash.clone()),
+                                    _ => None,
+                                },
+                                ":range_end_hash": match &query.sequence_range {
+                                    ChainQueryFilterSequenceRange::HeaderHashRange(_, end_hash)
+                                    | ChainQueryFilterSequenceRange::HeaderHashTerminated(end_hash, _) => Some(end_hash.clone()),
+                                    _ => None,
+                                },
+                                ":range_prior_count": match query.sequence_range {
+                                    ChainQueryFilterSequenceRange::HeaderHashTerminated(_, prior_count) => Some(prior_count),
+                                    _ => None,
+                                },
                             },
                             |row| {
                                 let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
