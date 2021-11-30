@@ -1,4 +1,5 @@
 use super::common::*;
+use super::handler_builder::HandlerBuilder;
 use super::*;
 use crate::NOISE;
 use arbitrary::Arbitrary;
@@ -684,4 +685,117 @@ async fn initiate_times_out() {
             Ok(())
         })
         .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn large_historical_gossip() {
+    use std::time::Duration;
+    const NUM_OPS: usize = 400_000;
+    const NUM_NODES: usize = 2;
+    const HOUR: Duration = Duration::from_secs(60 * 60);
+    let rng = rand::thread_rng();
+    let entropy: Vec<u8> = rng
+        .sample_iter(rand::distributions::Standard)
+        .take(NUM_NODES * NUM_OPS * 100)
+        .collect();
+    let mut entropy = arbitrary::Unstructured::new(&entropy);
+    let start_of_time = std::time::UNIX_EPOCH.elapsed().unwrap();
+    let time = time_range(start_of_time, HOUR);
+    let len: Duration = start_of_time - HOUR;
+    let step = len / NUM_OPS as u32;
+    let times = (0..NUM_OPS)
+        .scan(time.start, |time, _| {
+            *time = (*time + step).unwrap();
+            Some(*time)
+        })
+        .collect::<Vec<_>>();
+    let agents = agents_with_infos(NUM_NODES).await;
+    let agent_data = agents
+        .iter()
+        .map(|(_, a)| {
+            (
+                a.clone(),
+                (0..NUM_OPS)
+                    .into_iter()
+                    .map(|_| KitsuneOpHash::arbitrary(&mut entropy).unwrap())
+                    .zip(times.clone())
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .collect::<Vec<_>>();
+    let mut nodes = Vec::with_capacity(NUM_NODES);
+    for agent_data in agent_data {
+        let agent = agent_data.0.agent.clone();
+        let mut agent_data = vec![agent_data];
+        agent_data.extend(
+            agents
+                .iter()
+                .filter(|(a, _)| *a != agent)
+                .map(|(_, a)| (a.clone(), Vec::with_capacity(0))),
+        );
+
+        let evt_handler = HandlerBuilder::with_delay(Duration::from_millis(10))
+            .with_agent_persistence(agent_data)
+            .build();
+        let (evt_sender, _) = spawn_handler(evt_handler).await;
+        let state = ShardedGossipLocalState {
+            local_agents: maplit::hashset!(agent.clone()),
+            ..Default::default()
+        };
+        let node = ShardedGossipLocal::test(GossipType::Historical, evt_sender, state);
+        nodes.push(node);
+    }
+
+    let (_, _, initiate) = nodes[0]
+        .try_initiate()
+        .await
+        .unwrap()
+        .expect("Failed to initiate");
+
+    let msgs = gossip(0, 1, vec![initiate], &nodes, &agents).await;
+    let msgs = gossip(1, 0, msgs, &nodes, &agents).await;
+    nodes[0]
+        .inner
+        .share_mut(|i, _| {
+            eprintln!("{:?}", i.round_map);
+            eprintln!("{:?}", i.initiate_tgt);
+            Ok(())
+        })
+        .unwrap();
+    nodes[1]
+        .inner
+        .share_mut(|i, _| {
+            eprintln!("{:?}", i.round_map);
+            eprintln!("{:?}", i.initiate_tgt);
+            Ok(())
+        })
+        .unwrap();
+    let msgs = gossip(0, 1, msgs, &nodes, &agents).await;
+}
+
+async fn gossip(
+    from: usize,
+    to: usize,
+    msgs: Vec<ShardedGossipWire>,
+    nodes: &Vec<ShardedGossipLocal>,
+    agents: &Vec<(Arc<KitsuneAgent>, AgentInfoSigned)>,
+) -> Vec<ShardedGossipWire> {
+    let mut out = Vec::new();
+    let cert = cert_from_info(agents[from].1.clone());
+    let s = std::time::Instant::now();
+    let sent_len = msgs.len();
+    for msg in msgs {
+        let outgoing = nodes[to].process_incoming(cert.clone(), msg).await.unwrap();
+        out.extend(outgoing);
+    }
+    let recv_len = out.len();
+    eprintln!(
+        "{}:{} -> {}:{} in {:?}",
+        from,
+        sent_len,
+        to,
+        recv_len,
+        s.elapsed()
+    );
+    out
 }
