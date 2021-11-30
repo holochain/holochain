@@ -72,7 +72,7 @@ impl rusqlite::ToSql for DhtLocation {
 pub const MAX_HALF_LENGTH: u32 = (u32::MAX / 2) + 1 + 1;
 
 /// Maximum number of values that a u32 can represent.
-const U32_LEN: u64 = u32::MAX as u64 + 1;
+pub(crate) const U32_LEN: u64 = u32::MAX as u64 + 1;
 
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 /// Represents how much of a dht arc is held
@@ -131,11 +131,8 @@ impl DhtArc {
     /// to the new target and is designed to be called at a given rate
     /// with more recent peer views.
     pub fn update_length<V: Into<PeerView>>(&mut self, view: V) {
-        self.half_length = match view.into() {
-            PeerView::Alpha(density) => {
-                (MAX_HALF_LENGTH as f64 * converge(self.coverage(), density)) as u32
-            }
-        }
+        self.half_length =
+            (MAX_HALF_LENGTH as f64 * view.into().next_coverage(self.coverage())) as u32;
     }
 
     /// Check if a location is contained in this arc
@@ -213,15 +210,10 @@ impl DhtArc {
             .unwrap_or_default()
     }
 
-    /// The absolute length that this arc will hold.
-    pub fn absolute_length(&self) -> u64 {
-        self.range().len()
-    }
-
     /// The percentage of the full circle that is covered
     /// by this arc.
     pub fn coverage(&self) -> f64 {
-        self.absolute_length() as f64 / U32_LEN as f64
+        self.half_length as f64 / MAX_HALF_LENGTH as f64
     }
 
     /// Get the half length of this arc.
@@ -339,7 +331,7 @@ impl From<DhtLocation> for u32 {
 }
 
 /// Finds the shortest distance between two points on a circle
-fn shortest_arc_distance<A: Into<DhtLocation>, B: Into<DhtLocation>>(a: A, b: B) -> u32 {
+pub(crate) fn shortest_arc_distance<A: Into<DhtLocation>, B: Into<DhtLocation>>(a: A, b: B) -> u32 {
     // Turn into wrapped u32s
     let a = a.into().0;
     let b = b.into().0;
@@ -379,7 +371,7 @@ impl ArcRange {
     }
 
     #[cfg(test)]
-    fn into_inc(self: ArcRange) -> RangeInclusive<usize> {
+    pub(crate) fn into_inc(self: ArcRange) -> RangeInclusive<usize> {
         match self {
             ArcRange {
                 start: Bound::Included(a),

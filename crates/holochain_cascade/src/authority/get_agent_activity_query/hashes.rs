@@ -5,6 +5,7 @@ use holochain_state::{prelude::*, query::QueryData};
 use holochain_zome_types::Judged;
 use holochain_zome_types::*;
 use std::fmt::Debug;
+use std::sync::Arc;
 
 use crate::authority::*;
 

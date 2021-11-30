@@ -2,7 +2,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeT;
 use futures::future::join_all;
-use holochain_p2p::HolochainP2pCellT;
+use holochain_p2p::HolochainP2pDnaT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
@@ -15,8 +15,11 @@ pub fn call_remote(
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             write_network: Permission::Allow,
+            agent_info: Permission::Allow,
             ..
         } => {
+            let from_agent = super::agent_info::agent_info(_ribosome, call_context.clone(), ())?
+                .agent_latest_pubkey;
             // it is the network's responsibility to handle timeouts and return an Err result in that case
             let results: Vec<Result<SerializedBytes, _>> =
                 tokio_helper::block_forever_on(async move {
@@ -31,7 +34,7 @@ pub fn call_remote(
                         call_context
                             .host_context()
                             .network()
-                            .call_remote(target_agent, zome_name, fn_name, cap_secret, payload)
+                            .call_remote(from_agent.clone(), target_agent, zome_name, fn_name, cap_secret, payload)
                             .await
                     }))
                     .await
@@ -172,11 +175,12 @@ pub mod wasm_test {
             ZomeCallResponse::Ok(guest_output) => {
                 let agent_info: AgentInfo = guest_output.decode().unwrap();
                 assert_eq!(
-                    agent_info,
-                    AgentInfo {
-                        agent_initial_pubkey: bob_agent_id.clone(),
-                        agent_latest_pubkey: bob_agent_id,
-                    },
+                    agent_info.agent_initial_pubkey,
+                    bob_agent_id
+                );
+                assert_eq!(
+                    agent_info.agent_latest_pubkey,
+                    bob_agent_id
                 );
             }
             _ => unreachable!(),

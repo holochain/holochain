@@ -23,7 +23,7 @@ pub fn get<'a>(
                             get_options,
                         } = input;
                         Cascade::from_workspace_network(
-                            call_context.host_context.workspace(),
+                            &call_context.host_context.workspace(),
                             call_context.host_context.network().clone()
                         )
                         .dht_get(any_dht_hash, get_options).await

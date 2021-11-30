@@ -1,7 +1,7 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeT;
-use holochain_p2p::HolochainP2pCellT;
+use holochain_p2p::HolochainP2pDnaT;
 use holochain_types::access::Permission;
 use holochain_wasmer_host::prelude::WasmError;
 use holochain_zome_types::signal::RemoteSignal;
@@ -18,24 +18,29 @@ pub fn remote_signal(
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             write_network: Permission::Allow,
+            agent_info: Permission::Allow,
             ..
         } => {
             const FN_NAME: &str = "recv_remote_signal";
+            let from_agent = super::agent_info::agent_info(_ribosome, call_context.clone(), ())?
+                .agent_latest_pubkey;
             // Timeouts and errors are ignored,
             // this is a send and forget operation.
             let network = call_context.host_context().network().clone();
             let RemoteSignal { agents, signal } = input;
             let zome_name = call_context.zome().zome_name().clone();
             let fn_name: FunctionName = FN_NAME.into();
-            tokio::task::spawn(async move {
-                if let Err(e) = network
-                    .remote_signal(agents, zome_name, fn_name, None, signal).await {
-                    tracing::info!(
-                        "Failed to send remote signals because of {:?}",
-                        e
-                    );
+            tokio::task::spawn(
+                async move {
+                    if let Err(e) = network
+                        .remote_signal(from_agent, agents, zome_name, fn_name, None, signal)
+                        .await
+                    {
+                        tracing::info!("Failed to send remote signals because of {:?}", e);
+                    }
                 }
-            }.in_current_span());
+                .in_current_span(),
+            );
             Ok(())
         }
         _ => unreachable!(),
@@ -75,10 +80,7 @@ mod tests {
             })
             .callback("init", move |api, ()| {
                 let mut functions: GrantedFunctions = BTreeSet::new();
-                functions.insert((
-                    api.zome_info(()).unwrap().name,
-                    "recv_remote_signal".into(),
-                ));
+                functions.insert((api.zome_info(()).unwrap().name, "recv_remote_signal".into()));
                 let cap_grant_entry = CapGrantEntry {
                     tag: "".into(),
                     // empty access converts to unrestricted

@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_dht_arc"
-version = "0.0.6"
+version = "0.0.7"
 description = "Kitsune P2p Dht Arc Utils"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -20,9 +20,14 @@ serde = {version = "1.0", features = ["derive"]}
 rusqlite = { version = "0.26", optional = true }
 
 [dev-dependencies]
+maplit = "1"
+observability = "0.1"
 pretty_assertions = "0.7.2"
 rand = "0.8"
+statrs = "0.15"
+tracing = "0.1"
 
 [features]
 sqlite = ["rusqlite"]
+slow_tests = []
 test_utils = []

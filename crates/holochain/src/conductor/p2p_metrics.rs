@@ -4,14 +4,13 @@
 
 use super::error::ConductorResult;
 use holochain_p2p::AgentPubKeyExt;
-use holochain_sqlite::prelude::*;
 use holochain_types::prelude::*;
 use kitsune_p2p::event::{MetricKind, MetricQuery, MetricQueryAnswer};
 use std::time::SystemTime;
 
 /// Record a p2p metric datum
 pub async fn put_metric_datum(
-    env: EnvWrite,
+    env: DbWrite<DbKindP2pMetrics>,
     agent: AgentPubKey,
     metric: MetricKind,
     timestamp: SystemTime,
@@ -25,12 +24,12 @@ pub async fn put_metric_datum(
 
 /// Query the p2p_metrics database in a variety of ways
 pub async fn query_metrics(
-    env: EnvWrite,
+    env: DbWrite<DbKindP2pMetrics>,
     query: MetricQuery,
 ) -> ConductorResult<MetricQueryAnswer> {
     Ok(env
-        .conn()?
-        .with_reader(move |mut txn| holochain_sqlite::db::query_metrics(&mut txn, query))?)
+        .async_reader(move |mut txn| holochain_sqlite::db::query_metrics(&mut txn, query))
+        .await?)
 }
 
 #[cfg(test)]

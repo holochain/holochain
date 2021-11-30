@@ -59,8 +59,8 @@ pub(crate) async fn spawn_test_agent(
 
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::dependencies::lair_keystore_api_0_0;
-use kitsune_p2p_types::dht_arc::DhtArcBucket;
 use kitsune_p2p_types::dht_arc::DhtArcSet;
+use kitsune_p2p_types::dht_arc::PeerStratAlpha;
 use lair_keystore_api_0_0::entry::EntrySignEd25519;
 use lair_keystore_api_0_0::internal::sign_ed25519::*;
 
@@ -197,7 +197,8 @@ impl KitsuneP2pEventHandler for AgentHarness {
         _space: Arc<KitsuneSpace>,
         dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
     ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht_arc::PeerViewAlpha> {
-        let arcs = self
+        let strat = PeerStratAlpha::default();
+        let arcs: Vec<_> = self
             .agent_store
             .values()
             .filter_map(|v| {
@@ -210,9 +211,9 @@ impl KitsuneP2pEventHandler for AgentHarness {
             .collect();
 
         // contains is already checked in the iterator
-        let bucket = DhtArcBucket::new_unchecked(dht_arc, arcs);
+        let view = strat.view_unchecked(dht_arc, arcs.as_slice());
 
-        Ok(async move { Ok(bucket.peer_view_default()) }.boxed().into())
+        Ok(async move { Ok(view) }.boxed().into())
     }
 
     fn handle_put_metric_datum(&mut self, datum: MetricDatum) -> KitsuneP2pEventHandlerResult<()> {
@@ -232,14 +233,12 @@ impl KitsuneP2pEventHandler for AgentHarness {
         &mut self,
         space: Arc<super::KitsuneSpace>,
         to_agent: Arc<super::KitsuneAgent>,
-        from_agent: Arc<super::KitsuneAgent>,
         payload: Vec<u8>,
     ) -> KitsuneP2pEventHandlerResult<Vec<u8>> {
         let data = String::from_utf8_lossy(&payload);
         self.harness_chan.publish(HarnessEventType::Call {
             space: space.into(),
             to_agent: to_agent.into(),
-            from_agent: from_agent.into(),
             payload: data.to_string(),
         });
         let data = format!("echo: {}", data);
@@ -251,14 +250,12 @@ impl KitsuneP2pEventHandler for AgentHarness {
         &mut self,
         space: Arc<super::KitsuneSpace>,
         to_agent: Arc<super::KitsuneAgent>,
-        from_agent: Arc<super::KitsuneAgent>,
         payload: Vec<u8>,
     ) -> KitsuneP2pEventHandlerResult<()> {
         let data = String::from_utf8_lossy(&payload);
         self.harness_chan.publish(HarnessEventType::Notify {
             space: space.into(),
             to_agent: to_agent.into(),
-            from_agent: from_agent.into(),
             payload: data.to_string(),
         });
         Ok(async move { Ok(()) }.boxed().into())
@@ -267,7 +264,6 @@ impl KitsuneP2pEventHandler for AgentHarness {
     fn handle_gossip(
         &mut self,
         _space: Arc<super::KitsuneSpace>,
-        _to_agent: Arc<super::KitsuneAgent>,
         ops: Vec<(Arc<super::KitsuneOpHash>, Vec<u8>)>,
     ) -> KitsuneP2pEventHandlerResult<()> {
         for (op_hash, op_data) in ops {

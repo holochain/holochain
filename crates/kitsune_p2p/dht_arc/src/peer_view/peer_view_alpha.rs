@@ -1,8 +1,11 @@
 use crate::*;
 
+/// The default, and only, strategy for generating a PeerView
 #[derive(Debug, Clone, Copy)]
 pub struct PeerStratAlpha {
+    pub check_gaps: bool,
     pub redundancy_target: u16,
+    pub coverage_buffer: f64,
     pub default_uptime: f64,
     pub noise_threshold: f64,
     pub delta_scale: f64,
@@ -12,7 +15,9 @@ pub struct PeerStratAlpha {
 impl Default for PeerStratAlpha {
     fn default() -> Self {
         Self {
+            check_gaps: true,
             redundancy_target: DEFAULT_REDUNDANCY_TARGET as u16,
+            coverage_buffer: DEFAULT_COVERAGE_BUFFER,
             default_uptime: DEFAULT_UPTIME,
             noise_threshold: DEFAULT_NOISE_THRESHOLD,
             delta_scale: DEFAULT_DELTA_SCALE,
@@ -21,13 +26,31 @@ impl Default for PeerStratAlpha {
     }
 }
 
-#[derive(Debug, Clone, derive_more::From)]
-pub enum PeerView {
-    Alpha(PeerViewAlpha),
+impl PeerStratAlpha {
+    pub fn view(&self, arc: DhtArc, peers: &[DhtArc]) -> PeerViewAlpha {
+        let peers: Vec<DhtArc> = peers
+            .iter()
+            .filter(|a| arc.contains(a.center_loc))
+            .copied()
+            .collect();
+        Self::view_unchecked(self, arc, peers.as_slice())
+    }
+
+    pub fn view_unchecked(&self, arc: DhtArc, peers: &[DhtArc]) -> PeerViewAlpha {
+        let (total, count) = peers.iter().fold((0u64, 0usize), |(total, count), arc| {
+            (total + arc.half_length as u64, count + 1)
+        });
+        let average = if count > 0 {
+            (total as f64 / count as f64) / MAX_HALF_LENGTH as f64
+        } else {
+            0.0
+        };
+        PeerViewAlpha::new(*self, arc, average, count)
+    }
 }
 
+/// The default, and only, PeerView.
 #[derive(Debug, Clone, Copy)]
-/// The average density of peers at a location in the u32 space.
 pub struct PeerViewAlpha {
     /// The strategy params that generated this view.
     strat: PeerStratAlpha,
@@ -53,6 +76,58 @@ impl PeerViewAlpha {
         }
     }
 
+    /// Calculate the target arc length based on this view.
+    pub(crate) fn target_coverage(&self) -> f64 {
+        // Get the estimated coverage gap based on our observed peer view.
+        let est_gap = self.est_gap();
+        // If we haven't observed at least our redundancy target number
+        // of peers (adjusted for expected uptime) then we know that the data
+        // in our arc is under replicated and we should start aiming for full coverage.
+        if self.expected_count() < self.strat.redundancy_target as usize {
+            1.0
+        } else {
+            // Get the estimated gap. We don't care about negative gaps
+            // or gaps we can't fill (> 1.0)
+            let est_gap = clamp(0.0, 1.0, est_gap);
+            // Get the ideal coverage target for the size of that we estimate
+            // the network to be.
+            let ideal_target =
+                coverage_target(self.est_total_peers(), self.strat.redundancy_target);
+            // Take whichever is larger. We prefer nodes to target the ideal
+            // coverage but if there is a larger gap then it needs to be filled.
+            let target = est_gap.max(ideal_target);
+
+            clamp(0.0, 1.0, target)
+        }
+    }
+
+    /// Given the current coverage, what is the next step to take in reaching
+    /// the ideal coverage?
+    pub fn next_coverage(&self, current: f64) -> f64 {
+        let target = {
+            let target_lo = self.target_coverage();
+            let target_hi = (target_lo + self.strat.coverage_buffer).min(1.0);
+
+            if current < target_lo {
+                target_lo
+            } else if current > target_hi {
+                target_hi
+            } else {
+                current
+            }
+        };
+
+        // The change in arc we'd need to make to get to the target.
+        let delta = target - current;
+        // If this is below our threshold then go straight to the target.
+        if delta.abs() < self.strat.delta_threshold {
+            target
+        // Other wise scale the delta to avoid rapid change.
+        } else {
+            current + (delta * self.strat.delta_scale)
+        }
+    }
+
     /// The expected number of peers for this arc over time.
     pub fn expected_count(&self) -> usize {
         (self.count as f64 * self.strat.default_uptime) as usize
@@ -61,6 +136,9 @@ impl PeerViewAlpha {
     /// Estimate the gap in coverage that needs to be filled.
     /// If the gap is negative that means we are over covered.
     pub fn est_gap(&self) -> f64 {
+        if !self.strat.check_gaps {
+            return 0.0;
+        }
         let est_total_peers = self.est_total_peers();
         let ideal_target = coverage_target(est_total_peers, self.strat.redundancy_target);
         let gap = ideal_target - self.average_coverage;
@@ -110,47 +188,5 @@ pub(crate) fn coverage_target(est_total_peers: usize, redundancy_target: u16) ->
         1.0
     } else {
         redundancy_target as f64 / est_total_peers as f64
-    }
-}
-
-/// Calculate the target arc length given a peer view.
-pub(crate) fn target(view: PeerViewAlpha) -> f64 {
-    // Get the estimated coverage gap based on our observed peer view.
-    let est_gap = view.est_gap();
-    // If we haven't observed at least our redundancy target number
-    // of peers (adjusted for expected uptime) then we know that the data
-    // in our arc is under replicated and we should start aiming for full coverage.
-    if view.expected_count() < view.strat.redundancy_target as usize {
-        1.0
-    } else {
-        // Get the estimated gap. We don't care about negative gaps
-        // or gaps we can't fill (> 1.0)
-        let est_gap = clamp(0.0, 1.0, est_gap);
-        // Get the ideal coverage target for the size of that we estimate
-        // the network to be.
-        let ideal_target = coverage_target(view.est_total_peers(), view.strat.redundancy_target);
-        // Take whichever is larger. We prefer nodes to target the ideal
-        // coverage but if there is a larger gap then it needs to be filled.
-        let target = est_gap.max(ideal_target);
-
-        clamp(0.0, 1.0, target)
-    }
-}
-
-/// The convergence algorithm that moves an arc towards
-/// our estimated target.
-///
-/// Note the rate of convergence is dependant of the rate
-/// that [`DhtArc::update_length`] is called.
-pub(crate) fn converge(current: f64, view: PeerViewAlpha) -> f64 {
-    let target = target(view);
-    // The change in arc we'd need to make to get to the target.
-    let delta = target - current;
-    // If this is below our threshold then apply that delta.
-    if delta.abs() < view.strat.delta_threshold {
-        current + delta
-    // Other wise scale the delta to avoid rapid change.
-    } else {
-        current + (delta * view.strat.delta_scale)
     }
 }

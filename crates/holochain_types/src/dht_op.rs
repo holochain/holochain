@@ -393,7 +393,7 @@ impl DhtOp {
             }
             DhtOpType::RegisterDeletedBy => DhtOp::RegisterDeletedBy(signature, header.try_into()?),
             DhtOpType::RegisterDeletedEntryHeader => {
-                DhtOp::RegisterDeletedBy(signature, header.try_into()?)
+                DhtOp::RegisterDeletedEntryHeader(signature, header.try_into()?)
             }
             DhtOpType::RegisterAddLink => DhtOp::RegisterAddLink(signature, header.try_into()?),
             DhtOpType::RegisterRemoveLink => {
@@ -493,14 +493,18 @@ impl DhtOpLight {
                 Self::RegisterUpdatedElement(header_hash, entry_hash, basis.into())
             }
             DhtOpType::RegisterDeletedBy => {
-                Self::RegisterDeletedBy(header_hash.clone(), header_hash.into())
+                let basis = match header {
+                    Header::Delete(delete) => delete.deletes_address.clone(),
+                    _ => return Err(DhtOpError::OpHeaderMismatch(op_type, header.header_type())),
+                };
+                Self::RegisterDeletedBy(header_hash, basis.into())
             }
             DhtOpType::RegisterDeletedEntryHeader => {
-                let basis = header
-                    .entry_hash()
-                    .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone()))?
-                    .clone();
-                Self::RegisterDeletedBy(header_hash, basis.into())
+                let basis = match header {
+                    Header::Delete(delete) => delete.deletes_entry_address.clone(),
+                    _ => return Err(DhtOpError::OpHeaderMismatch(op_type, header.header_type())),
+                };
+                Self::RegisterDeletedEntryHeader(header_hash, basis.into())
             }
             DhtOpType::RegisterAddLink => {
                 let basis = match header {

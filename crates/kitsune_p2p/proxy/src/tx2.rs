@@ -14,6 +14,8 @@ use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::tx2::*;
 use kitsune_p2p_types::*;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use tokio::sync::Notify;
 
 /// Configuration for MemBackendAdapt
 #[non_exhaustive]
@@ -23,8 +25,16 @@ pub struct ProxyConfig {
     pub tuning_params: Option<KitsuneP2pTuningParams>,
 
     /// If enabled, allow forwarding of messages (proxying)
+    /// If you are a proxy server, set this to true.
+    /// If you are a client, leave this as the default false.
     /// Default: false.
     pub allow_proxy_fwd: bool,
+
+    /// If Some(addr), we will try to keep an open connection to addr.
+    /// The node at addr should forward messages intended for us,
+    /// and we will modify our local_addr() function to make that
+    /// endpoint our external address.
+    pub client_of_remote_proxy: Option<ProxyUrl>,
 }
 
 impl Default for ProxyConfig {
@@ -32,21 +42,23 @@ impl Default for ProxyConfig {
         Self {
             tuning_params: None,
             allow_proxy_fwd: false,
+            client_of_remote_proxy: None,
         }
     }
 }
 
 impl ProxyConfig {
     /// into inner contents with default application
-    pub fn split(self) -> KitsuneResult<(KitsuneP2pTuningParams, bool)> {
+    pub fn split(self) -> KitsuneResult<(KitsuneP2pTuningParams, bool, Option<ProxyUrl>)> {
         let ProxyConfig {
             tuning_params,
             allow_proxy_fwd,
+            client_of_remote_proxy,
         } = self;
 
         let tuning_params = tuning_params.unwrap_or_else(KitsuneP2pTuningParams::default);
 
-        Ok((tuning_params, allow_proxy_fwd))
+        Ok((tuning_params, allow_proxy_fwd, client_of_remote_proxy))
     }
 }
 
@@ -144,7 +156,57 @@ fn promote_addr(base_addr: &TxUrl, cert: &Tx2Cert) -> KitsuneResult<TxUrl> {
         .into())
 }
 
-#[allow(dead_code)]
+#[derive(Clone)]
+struct Backoff {
+    bo: Arc<AtomicUsize>,
+    n: Arc<Notify>,
+    init: usize,
+    max: usize,
+}
+
+impl Backoff {
+    pub fn new(init: usize, max: usize) -> Self {
+        Self {
+            bo: Arc::new(AtomicUsize::new(init)),
+            n: Arc::new(Notify::new()),
+            init,
+            max,
+        }
+    }
+
+    pub fn reset(&self) {
+        self.bo.store(self.init, Ordering::SeqCst);
+        self.n.notify_waiters();
+    }
+
+    pub fn wait(&self) -> impl std::future::Future<Output = Result<(), ()>> + 'static + Send {
+        let bo = self.bo.clone();
+        let n = self.n.clone();
+        let max = self.max;
+        async move {
+            // prioritize responsiveness over false positives
+            // by capturing the notified future first
+            let n_fut = n.notified();
+            let bo = bo.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |mut x| {
+                x *= 2;
+                if x > max {
+                    x = max
+                }
+                Some(x)
+            });
+            let bo = match bo {
+                Err(_) => return Err(()),
+                Ok(bo) => bo as u64,
+            };
+            tokio::select! {
+                _ = n_fut => (),
+                _ = tokio::time::sleep(std::time::Duration::from_millis(bo)) => (),
+            };
+            Ok(())
+        }
+    }
+}
+
 struct ProxyEpInner {
     // map peer certs to connection handles
     // so on proxy requests we know who to send to
@@ -158,6 +220,8 @@ struct ProxyEpInner {
     // these are !OUT CONS! they are returned from api requests / events.
     // these are both INCOMING and OUTGOING
     direct_to_final_peer_con_map: HashMap<Uniq, HashMap<Tx2Cert, ConHnd>>,
+
+    backoff: Backoff,
 }
 
 impl ProxyEpInner {
@@ -192,6 +256,7 @@ struct ProxyEpHnd {
     local_cert: Tx2Cert,
     logic_hnd: LogicChanHandle<EpEvent>,
     inner: Share<ProxyEpInner>,
+    client_of_remote_proxy: Option<ProxyUrl>,
 }
 
 async fn get_con_hnd(
@@ -221,6 +286,8 @@ impl ProxyEpHnd {
     pub fn new(
         sub_ep_hnd: EpHnd,
         logic_hnd: LogicChanHandle<EpEvent>,
+        backoff: Backoff,
+        client_of_remote_proxy: Option<ProxyUrl>,
     ) -> KitsuneResult<Arc<ProxyEpHnd>> {
         let local_cert = sub_ep_hnd.local_cert();
         Ok(Arc::new(ProxyEpHnd {
@@ -230,7 +297,9 @@ impl ProxyEpHnd {
             inner: Share::new(ProxyEpInner {
                 digest_to_sub_con_map: HashMap::new(),
                 direct_to_final_peer_con_map: HashMap::new(),
+                backoff,
             }),
+            client_of_remote_proxy,
         }))
     }
 }
@@ -266,13 +335,24 @@ impl AsEpHnd for ProxyEpHnd {
     }
 
     fn local_addr(&self) -> KitsuneResult<TxUrl> {
-        let local_addr = self.sub_ep_hnd.local_addr()?;
-        let proxy_addr: TxUrl =
-            ProxyUrl::new(local_addr.as_str(), self.local_cert.as_digest().clone())
-                .map_err(KitsuneError::other)?
-                .as_str()
-                .into();
-        Ok(proxy_addr)
+        if let Some(proxy_url) = &self.client_of_remote_proxy {
+            let proxy_addr: TxUrl = ProxyUrl::new(
+                proxy_url.as_base().as_str(),
+                self.local_cert.as_digest().clone(),
+            )
+            .map_err(KitsuneError::other)?
+            .as_str()
+            .into();
+            Ok(proxy_addr)
+        } else {
+            let local_addr = self.sub_ep_hnd.local_addr()?;
+            let proxy_addr: TxUrl =
+                ProxyUrl::new(local_addr.as_str(), self.local_cert.as_digest().clone())
+                    .map_err(KitsuneError::other)?
+                    .as_str()
+                    .into();
+            Ok(proxy_addr)
+        }
     }
 
     fn local_cert(&self) -> Tx2Cert {
@@ -343,10 +423,12 @@ async fn incoming_evt_logic(
     sub_ep: Ep,
     hnd: Arc<ProxyEpHnd>,
     logic_hnd: LogicChanHandle<EpEvent>,
+    client_of_remote_proxy: Option<ProxyUrl>,
 ) {
     let local_cert = sub_ep.handle().local_cert();
     let local_cert = &local_cert;
     let tuning_params = &tuning_params;
+    let client_of_remote_proxy = &client_of_remote_proxy;
 
     // Benchmarks showed a slight slowdown when using semaphore count tasks
     // instead of for_each_concurrent... but maybe other problems caused that?
@@ -359,6 +441,7 @@ async fn incoming_evt_logic(
                 local_cert.clone(),
                 &hnd,
                 &logic_hnd,
+                client_of_remote_proxy,
             )
             .await;
         })
@@ -372,6 +455,7 @@ async fn ensure_proxy_register(
     logic_hnd: &LogicChanHandle<EpEvent>,
     local_cert: &Tx2Cert,
     sub_con: ConHnd,
+    client_of_remote_proxy: &Option<ProxyUrl>,
 ) -> KitsuneResult<()> {
     // first make sure we are not connecting to ourselves
     // (or some node that somehow insecurely is using the same cert)
@@ -383,6 +467,7 @@ async fn ensure_proxy_register(
             sub_con,
             500,
             "refusing connection with matching cert",
+            client_of_remote_proxy,
         )
         .await;
         tracing::warn!("refusing connection with matching cert");
@@ -419,15 +504,30 @@ async fn incoming_evt_handle(
     local_cert: Tx2Cert,
     hnd: &Arc<ProxyEpHnd>,
     logic_hnd: &LogicChanHandle<EpEvent>,
+    client_of_remote_proxy: &Option<ProxyUrl>,
 ) {
     //println!("EVT: {:?}", evt);
     use EpEvent::*;
     match evt {
         OutgoingConnection(EpConnection { con: sub_con, .. }) => {
-            let _ = ensure_proxy_register(&hnd.inner, logic_hnd, &local_cert, sub_con).await;
+            let _ = ensure_proxy_register(
+                &hnd.inner,
+                logic_hnd,
+                &local_cert,
+                sub_con,
+                client_of_remote_proxy,
+            )
+            .await;
         }
         IncomingConnection(EpConnection { con: sub_con, .. }) => {
-            let _ = ensure_proxy_register(&hnd.inner, logic_hnd, &local_cert, sub_con).await;
+            let _ = ensure_proxy_register(
+                &hnd.inner,
+                logic_hnd,
+                &local_cert,
+                sub_con,
+                client_of_remote_proxy,
+            )
+            .await;
         }
         IncomingError(_) => unreachable!(), // currently no lower layers invoke this
         IncomingData(EpIncomingData {
@@ -440,9 +540,15 @@ async fn incoming_evt_handle(
                 tracing::error!("Invalid EMPTY PROXY FRAME!");
                 return;
             }
-            if ensure_proxy_register(&hnd.inner, logic_hnd, &local_cert, sub_con.clone())
-                .await
-                .is_err()
+            if ensure_proxy_register(
+                &hnd.inner,
+                logic_hnd,
+                &local_cert,
+                sub_con.clone(),
+                client_of_remote_proxy,
+            )
+            .await
+            .is_err()
             {
                 return;
             };
@@ -497,6 +603,7 @@ async fn incoming_evt_handle(
                                     d_sub_con,
                                     msg_id,
                                     data,
+                                    client_of_remote_proxy,
                                 )
                                 .await
                             }
@@ -522,6 +629,7 @@ async fn incoming_evt_handle(
                                 sub_con,
                                 new_msg_id,
                                 data,
+                                client_of_remote_proxy,
                             )
                             .await;
                         }
@@ -560,14 +668,30 @@ async fn incoming_evt_handle(
                 b => {
                     let reason = format!("Invalid Proxy Byte: {}, closing connection", b);
                     tracing::warn!("{}", reason);
-                    close_connection(&hnd.inner, logic_hnd, sub_con, 500, &reason).await;
+                    close_connection(
+                        &hnd.inner,
+                        logic_hnd,
+                        sub_con,
+                        500,
+                        &reason,
+                        client_of_remote_proxy,
+                    )
+                    .await;
                 }
             }
         }
         ConnectionClosed(EpConnectionClosed {
             con, code, reason, ..
         }) => {
-            close_connection_inner(&hnd.inner, logic_hnd, con, code, &reason).await;
+            close_connection_inner(
+                &hnd.inner,
+                logic_hnd,
+                con,
+                code,
+                &reason,
+                client_of_remote_proxy,
+            )
+            .await;
         }
         Error(e) => {
             let _ = logic_hnd.emit(Error(e)).await;
@@ -585,11 +709,20 @@ async fn write_to_sub_con(
     sub_con: ConHnd,
     msg_id: MsgId,
     data: PoolBuf,
+    client_of_remote_proxy: &Option<ProxyUrl>,
 ) -> KitsuneResult<()> {
     let t = tuning_params.implicit_timeout();
     if let Err(e) = sub_con.write(msg_id, data, t).await {
         let reason = format!("{:?}", e);
-        close_connection(inner, logic_hnd, sub_con, 500, &reason).await;
+        close_connection(
+            inner,
+            logic_hnd,
+            sub_con,
+            500,
+            &reason,
+            client_of_remote_proxy,
+        )
+        .await;
         return Err(e);
     }
     Ok(())
@@ -601,9 +734,18 @@ async fn close_connection(
     sub_con: ConHnd,
     code: u32,
     reason: &str,
+    client_of_remote_proxy: &Option<ProxyUrl>,
 ) {
     let c_fut = sub_con.close(code, reason);
-    close_connection_inner(inner, logic_hnd, sub_con, code, reason).await;
+    close_connection_inner(
+        inner,
+        logic_hnd,
+        sub_con,
+        code,
+        reason,
+        client_of_remote_proxy,
+    )
+    .await;
     c_fut.await;
 }
 
@@ -613,23 +755,41 @@ async fn close_connection_inner(
     sub_con: ConHnd,
     code: u32,
     reason: &str,
+    client_of_remote_proxy: &Option<ProxyUrl>,
 ) {
     let peer_dir = sub_con.dir();
     let peer_cert = sub_con.peer_cert();
     let direct_peer = sub_con.uniq();
 
-    let kill_cons = inner.share_mut(|i, _| {
+    let inner_res = inner.share_mut(|i, _| {
         // if this is an INCOMING connection, remove it from our proxy list
         if let Tx2ConDir::Incoming = peer_dir {
             i.digest_to_sub_con_map.remove(&peer_cert);
         }
 
         // remove all out cons associated with this exact connection
-        Ok(i.direct_to_final_peer_con_map.remove(&direct_peer))
+        Ok((
+            i.backoff.clone(),
+            i.direct_to_final_peer_con_map.remove(&direct_peer),
+        ))
     });
 
-    let kill_cons = match kill_cons {
-        Ok(Some(c)) => c,
+    let kill_cons = match inner_res {
+        Ok((backoff, kill_cons)) => {
+            if let Some(proxy_url) = client_of_remote_proxy {
+                let proxy_cert = Tx2Cert::from(proxy_url.digest());
+                if proxy_cert == peer_cert {
+                    // reset our client proxy connection check timer
+                    // so we'll try to reconnect
+                    backoff.reset();
+                }
+            }
+
+            match kill_cons {
+                Some(kill_cons) => kill_cons,
+                None => return,
+            }
+        }
         _ => return,
     };
 
@@ -658,28 +818,54 @@ impl ProxyEp {
         sub_ep: Ep,
         tuning_params: KitsuneP2pTuningParams,
         allow_proxy_fwd: bool,
+        client_of_remote_proxy: Option<ProxyUrl>,
     ) -> KitsuneResult<Ep> {
         // this isn't something that needs to be configurable,
         // because it's entirely dependent on the code written here
-        // we only ever capture a singe logic closure
-        // so technically, it only really would need to be 1.
+        // we only ever capture two logic closures
+        // so technically, it only really would need to be 2.
         const LOGIC_CHAN_LIMIT: usize = 32;
 
         let logic_chan = LogicChan::new(LOGIC_CHAN_LIMIT);
         let logic_hnd = logic_chan.handle().clone();
 
-        let hnd = ProxyEpHnd::new(sub_ep.handle().clone(), logic_hnd.clone())?;
+        let backoff = Backoff::new(10, 5000);
+
+        let hnd = ProxyEpHnd::new(
+            sub_ep.handle().clone(),
+            logic_hnd.clone(),
+            backoff.clone(),
+            client_of_remote_proxy.clone(),
+        )?;
 
         let logic = incoming_evt_logic(
-            tuning_params,
+            tuning_params.clone(),
             allow_proxy_fwd,
             sub_ep,
             hnd.clone(),
             logic_hnd,
+            client_of_remote_proxy.clone(),
         );
 
         let l_hnd = logic_chan.handle().clone();
         l_hnd.capture_logic(logic).await?;
+
+        if let Some(proxy_url) = client_of_remote_proxy {
+            let proxy_url = TxUrl::from(proxy_url.as_str());
+            let hnd = hnd.clone();
+            l_hnd
+                .capture_logic(async move {
+                    loop {
+                        if backoff.wait().await.is_err() {
+                            break;
+                        }
+
+                        let timeout = tuning_params.implicit_timeout();
+                        let _ = hnd.get_connection(proxy_url.clone(), timeout).await;
+                    }
+                })
+                .await?;
+        }
 
         let ep: Ep = Box::new(ProxyEp { logic_chan, hnd });
         Ok(ep)
@@ -708,15 +894,17 @@ impl AsEp for ProxyEp {
 struct ProxyEpFactory {
     tuning_params: KitsuneP2pTuningParams,
     allow_proxy_fwd: bool,
+    client_of_remote_proxy: Option<ProxyUrl>,
     sub_fact: EpFactory,
 }
 
 impl ProxyEpFactory {
     pub fn new(sub_fact: EpFactory, config: ProxyConfig) -> KitsuneResult<EpFactory> {
-        let (tuning_params, allow_proxy_fwd) = config.split()?;
+        let (tuning_params, allow_proxy_fwd, client_of_remote_proxy) = config.split()?;
         let fact: EpFactory = Arc::new(ProxyEpFactory {
             tuning_params,
             allow_proxy_fwd,
+            client_of_remote_proxy,
             sub_fact,
         });
         Ok(fact)
@@ -732,9 +920,16 @@ impl AsEpFactory for ProxyEpFactory {
         let tuning_params = self.tuning_params.clone();
         let fut = self.sub_fact.bind(bind_spec, timeout);
         let allow_proxy_fwd = self.allow_proxy_fwd;
+        let client_of_remote_proxy = self.client_of_remote_proxy.clone();
         async move {
             let sub_ep = fut.await?;
-            ProxyEp::new(sub_ep, tuning_params, allow_proxy_fwd).await
+            ProxyEp::new(
+                sub_ep,
+                tuning_params,
+                allow_proxy_fwd,
+                client_of_remote_proxy,
+            )
+            .await
         }
         .boxed()
     }

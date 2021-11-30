@@ -92,7 +92,7 @@ impl ElementTest {
         (entry_update, element)
     }
 
-    fn entry_create(mut self) -> (Element, Vec<DhtOp>) {
+    fn entry_create(&mut self) -> (Element, Vec<DhtOp>) {
         let (entry_create, element) = self.create_element();
         let header: Header = entry_create.clone().into();
 
@@ -112,7 +112,7 @@ impl ElementTest {
         (element, ops)
     }
 
-    fn entry_update(mut self) -> (Element, Vec<DhtOp>) {
+    fn entry_update(&mut self) -> (Element, Vec<DhtOp>) {
         let (entry_update, element) = self.update_element();
         let header: Header = entry_update.clone().into();
 
@@ -142,7 +142,7 @@ impl ElementTest {
         (element, ops)
     }
 
-    fn entry_delete(mut self) -> (Element, Vec<DhtOp>) {
+    fn entry_delete(&mut self) -> (Element, Vec<DhtOp>) {
         let entry_delete = builder::Delete {
             deletes_address: self.header_hash.clone(),
             deletes_entry_address: self.entry_hash.clone(),
@@ -155,12 +155,12 @@ impl ElementTest {
             DhtOp::StoreElement(self.sig.clone(), header.clone(), None),
             DhtOp::RegisterAgentActivity(self.sig.clone(), header.clone()),
             DhtOp::RegisterDeletedBy(self.sig.clone(), entry_delete.clone()),
-            DhtOp::RegisterDeletedEntryHeader(self.sig, entry_delete),
+            DhtOp::RegisterDeletedEntryHeader(self.sig.clone(), entry_delete),
         ];
         (element, ops)
     }
 
-    fn link_add(mut self) -> (Element, Vec<DhtOp>) {
+    fn link_add(&mut self) -> (Element, Vec<DhtOp>) {
         let element = self.to_element(self.link_add.clone().into(), None);
         let header: Header = self.link_add.clone().into();
 
@@ -172,7 +172,7 @@ impl ElementTest {
         (element, ops)
     }
 
-    fn link_remove(mut self) -> (Element, Vec<DhtOp>) {
+    fn link_remove(&mut self) -> (Element, Vec<DhtOp>) {
         let element = self.to_element(self.link_remove.clone().into(), None);
         let header: Header = self.link_remove.clone().into();
 
@@ -184,7 +184,7 @@ impl ElementTest {
         (element, ops)
     }
 
-    fn others(mut self) -> Vec<(Element, Vec<DhtOp>)> {
+    fn others(&self) -> Vec<(Element, Vec<DhtOp>)> {
         let mut elements = Vec::new();
         elements.push(self.to_element(self.dna.clone().into(), None));
         elements.push(self.to_element(self.chain_open.clone().into(), None));
@@ -204,8 +204,8 @@ impl ElementTest {
         chain_elements
     }
 
-    fn to_element(&mut self, header: Header, entry: Option<Entry>) -> Element {
-        let h = HeaderHashed::with_pre_hashed(header.clone(), self.header_hash.clone());
+    fn to_element(&self, header: Header, entry: Option<Entry>) -> Element {
+        let h = HeaderHashed::from_content_sync(header.clone());
         let h = SignedHeaderHashed::with_presigned(h, self.sig.clone());
         Element::new(h, entry.clone())
     }
@@ -214,27 +214,22 @@ impl ElementTest {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_all_ops() {
     observability::test_run().ok();
-    let builder = ElementTest::new();
+    let mut builder = ElementTest::new();
     let (element, expected) = builder.entry_create();
     let result = produce_ops_from_element(&element).unwrap();
     assert_eq!(result, expected);
-    let builder = ElementTest::new();
     let (element, expected) = builder.entry_update();
     let result = produce_ops_from_element(&element).unwrap();
     assert_eq!(result, expected);
-    let builder = ElementTest::new();
     let (element, expected) = builder.entry_delete();
     let result = produce_ops_from_element(&element).unwrap();
     assert_eq!(result, expected);
-    let builder = ElementTest::new();
     let (element, expected) = builder.link_add();
     let result = produce_ops_from_element(&element).unwrap();
     assert_eq!(result, expected);
-    let builder = ElementTest::new();
     let (element, expected) = builder.link_remove();
     let result = produce_ops_from_element(&element).unwrap();
     assert_eq!(result, expected);
-    let builder = ElementTest::new();
     let elements = builder.others();
     for (element, expected) in elements {
         debug!(?element);
@@ -271,4 +266,194 @@ async fn test_dht_basis() {
 
     // Check the hash matches
     assert_eq!(expected_entry_hash, result);
+}
+
+fn all_elements() -> Vec<Element> {
+    let mut out = Vec::with_capacity(5);
+    let mut builder = ElementTest::new();
+    let (element, _) = builder.entry_create();
+    out.push(element);
+    let (element, _) = builder.entry_update();
+    out.push(element);
+    let (element, _) = builder.entry_delete();
+    out.push(element);
+    let (element, _) = builder.link_add();
+    out.push(element);
+    let (element, _) = builder.link_remove();
+    out.push(element);
+    out
+}
+
+#[test]
+fn get_type_op() {
+    let check_all_ops = |element| {
+        let ops = produce_ops_from_element(&element).unwrap();
+        let check_type = |op: DhtOp| {
+            let op_type = op.get_type();
+            assert_eq!(op.to_light().get_type(), op_type);
+            match op {
+                DhtOp::StoreElement(_, _, _) => assert_eq!(op_type, DhtOpType::StoreElement),
+                DhtOp::StoreEntry(_, _, _) => assert_eq!(op_type, DhtOpType::StoreEntry),
+                DhtOp::RegisterAgentActivity(_, _) => {
+                    assert_eq!(op_type, DhtOpType::RegisterAgentActivity)
+                }
+                DhtOp::RegisterUpdatedContent(_, _, _) => {
+                    assert_eq!(op_type, DhtOpType::RegisterUpdatedContent)
+                }
+                DhtOp::RegisterUpdatedElement(_, _, _) => {
+                    assert_eq!(op_type, DhtOpType::RegisterUpdatedElement)
+                }
+                DhtOp::RegisterDeletedBy(_, _) => assert_eq!(op_type, DhtOpType::RegisterDeletedBy),
+                DhtOp::RegisterDeletedEntryHeader(_, _) => {
+                    assert_eq!(op_type, DhtOpType::RegisterDeletedEntryHeader)
+                }
+                DhtOp::RegisterAddLink(_, _) => assert_eq!(op_type, DhtOpType::RegisterAddLink),
+                DhtOp::RegisterRemoveLink(_, _) => {
+                    assert_eq!(op_type, DhtOpType::RegisterRemoveLink)
+                }
+            }
+        };
+        for op in ops {
+            check_type(op);
+        }
+    };
+
+    for element in all_elements() {
+        check_all_ops(element);
+    }
+}
+
+#[test]
+fn from_type_op() {
+    let check_all_ops = |element| {
+        let ops = produce_ops_from_element(&element).unwrap();
+        let check_identity = |op: DhtOp, header, entry| {
+            assert_eq!(DhtOp::from_type(op.get_type(), header, entry).unwrap(), op)
+        };
+        for op in ops {
+            check_identity(
+                op,
+                element.signed_header().clone().into_inner().0,
+                element.entry().clone().into_option(),
+            );
+        }
+    };
+
+    for element in all_elements() {
+        check_all_ops(element);
+    }
+}
+
+#[test]
+fn from_type_op_light() {
+    let check_all_ops = |element| {
+        let ops = produce_op_lights_from_elements(vec![&element]).unwrap();
+        let check_identity = |light: DhtOpLight, header| {
+            let header_hash = HeaderHash::with_data_sync(header);
+            assert_eq!(
+                DhtOpLight::from_type(light.get_type(), header_hash, header).unwrap(),
+                light
+            )
+        };
+        for op in ops {
+            check_identity(op, element.header());
+        }
+    };
+    for element in all_elements() {
+        check_all_ops(element);
+    }
+}
+
+#[test]
+fn test_all_ops_basis() {
+    let check_all_ops = |element| {
+        let ops = produce_ops_from_element(&element).unwrap();
+        let check_basis = |op: DhtOp| match (op.get_type(), op.dht_basis()) {
+            (DhtOpType::StoreElement, basis) => {
+                assert_eq!(basis, AnyDhtHash::from(element.header_address().clone()))
+            }
+            (DhtOpType::StoreEntry, basis) => {
+                assert_eq!(
+                    basis,
+                    AnyDhtHash::from(element.header().entry_hash().unwrap().clone())
+                )
+            }
+            (DhtOpType::RegisterAgentActivity, basis) => {
+                assert_eq!(basis, AnyDhtHash::from(element.header().author().clone()))
+            }
+            (DhtOpType::RegisterUpdatedContent, basis) => {
+                assert_eq!(
+                    basis,
+                    AnyDhtHash::from(
+                        Update::try_from(element.header().clone())
+                            .unwrap()
+                            .original_entry_address
+                            .clone()
+                    )
+                )
+            }
+            (DhtOpType::RegisterUpdatedElement, basis) => {
+                assert_eq!(
+                    basis,
+                    AnyDhtHash::from(
+                        Update::try_from(element.header().clone())
+                            .unwrap()
+                            .original_header_address
+                            .clone()
+                    )
+                )
+            }
+            (DhtOpType::RegisterDeletedBy, basis) => {
+                assert_eq!(
+                    basis,
+                    AnyDhtHash::from(
+                        Delete::try_from(element.header().clone())
+                            .unwrap()
+                            .deletes_address
+                            .clone()
+                    )
+                )
+            }
+            (DhtOpType::RegisterDeletedEntryHeader, basis) => {
+                assert_eq!(
+                    basis,
+                    AnyDhtHash::from(
+                        Delete::try_from(element.header().clone())
+                            .unwrap()
+                            .deletes_entry_address
+                            .clone()
+                    )
+                )
+            }
+            (DhtOpType::RegisterAddLink, basis) => {
+                assert_eq!(
+                    basis,
+                    AnyDhtHash::from(
+                        CreateLink::try_from(element.header().clone())
+                            .unwrap()
+                            .base_address
+                            .clone()
+                    )
+                )
+            }
+            (DhtOpType::RegisterRemoveLink, basis) => {
+                assert_eq!(
+                    basis,
+                    AnyDhtHash::from(
+                        DeleteLink::try_from(element.header().clone())
+                            .unwrap()
+                            .base_address
+                            .clone()
+                    )
+                )
+            }
+        };
+        for op in ops {
+            assert_eq!(*op.to_light().dht_basis(), op.dht_basis());
+            check_basis(op);
+        }
+    };
+    for element in all_elements() {
+        check_all_ops(element);
+    }
 }

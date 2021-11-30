@@ -220,15 +220,28 @@ fn connecting(con_fut: quinn::Connecting, local_cert: Tx2Cert, dir: Tx2ConDir) -
 struct QuicConRecvAdapt(BoxStream<'static, ConFut>);
 
 impl QuicConRecvAdapt {
-    pub fn new(recv: quinn::Incoming, local_cert: Tx2Cert) -> Self {
+    pub fn new(recv: quinn::Incoming, local_cert: Tx2Cert, ep: Arc<dyn EndpointAdapt>) -> Self {
+        struct OnDrop(Arc<dyn EndpointAdapt>);
+
+        impl Drop for OnDrop {
+            fn drop(&mut self) {
+                let f = self.0.close(500, "listener closed");
+                tokio::task::spawn(async move {
+                    let _ = f.await;
+                });
+            }
+        }
+
+        let on_drop = OnDrop(ep);
+
         Self(
             futures::stream::unfold(
-                (recv, local_cert),
-                move |(mut recv, local_cert)| async move {
+                (recv, local_cert, on_drop),
+                move |(mut recv, local_cert, on_drop)| async move {
                     recv.next().await.map(|con| {
                         (
                             connecting(con, local_cert.clone(), Tx2ConDir::Incoming),
-                            (recv, local_cert),
+                            (recv, local_cert, on_drop),
                         )
                     })
                 },
@@ -447,7 +460,7 @@ impl BindAdapt for QuicBackendAdapt {
                 let ep: Arc<dyn EndpointAdapt> =
                     Arc::new(QuicEndpointAdapt::new(ep, local_cert.clone()));
                 let con_recv: Box<dyn ConRecvAdapt> =
-                    Box::new(QuicConRecvAdapt::new(inc, local_cert.clone()));
+                    Box::new(QuicConRecvAdapt::new(inc, local_cert.clone(), ep.clone()));
 
                 let url = ep.local_addr()?;
 
@@ -456,6 +469,10 @@ impl BindAdapt for QuicBackendAdapt {
                 Ok((ep, con_recv))
             })
             .boxed()
+    }
+
+    fn local_cert(&self) -> Tx2Cert {
+        self.local_cert.clone()
     }
 }
 

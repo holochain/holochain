@@ -161,6 +161,16 @@ impl EntryTestData {
         let entry_hash = EntryHash::with_data_sync(&entry);
         create.entry_hash = entry_hash.clone();
         update.entry_hash = entry_hash.clone();
+        create.entry_type = EntryType::App(AppEntryType::new(
+            0.into(),
+            0.into(),
+            EntryVisibility::Public,
+        ));
+        update.entry_type = EntryType::App(AppEntryType::new(
+            0.into(),
+            0.into(),
+            EntryVisibility::Public,
+        ));
 
         let create_hash = HeaderHash::with_data_sync(&Header::Create(create.clone()));
 

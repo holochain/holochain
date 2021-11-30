@@ -154,7 +154,6 @@ async fn test_rpc_multi_logic_mocked() {
                                 let resp = match wire {
                                     wire::Wire::Call(wire::Call {
                                         space: _,
-                                        from_agent: _,
                                         to_agent: _,
                                         data,
                                     }) => {
@@ -243,14 +242,12 @@ async fn test_rpc_multi_logic_mocked() {
         config,
     });
 
-    let agent = Arc::new(KitsuneAgent(vec![0; 36]));
     let basis = Arc::new(KitsuneBasis(vec![0; 36]));
 
     // excercise the rpc multi logic
     let res = handle_rpc_multi(
         actor::RpcMulti {
             space,
-            from_agent: agent.clone(),
             basis,
             payload: b"test".to_vec(),
             max_remote_agent_count: 3,
