@@ -1,6 +1,6 @@
 [package]
 name = "holochain_types"
-version = "0.0.18-dev.0"
+version = "0.0.18"
 description = "Holochain common types"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -25,9 +25,9 @@ fixt = { path = "../fixt", version = "0.0.7"}
 flate2 = "1.0.14"
 futures = "0.3"
 holo_hash = { version = "0.0.12", path = "../holo_hash", features = ["encoding"] }
-holochain_keystore = { version = "0.0.18-dev.0", path = "../holochain_keystore" }
+holochain_keystore = { version = "0.0.18", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.51"
-holochain_sqlite = { path = "../holochain_sqlite", version = "0.0.18-dev.0"}
+holochain_sqlite = { path = "../holochain_sqlite", version = "0.0.18"}
 holochain_zome_types = { path = "../holochain_zome_types", version = "0.0.17", features = ["full"] }
 itertools = { version = "0.10" }
 lazy_static = "1.4.0"
