@@ -5,7 +5,7 @@ use kitsune_p2p_dht_arc::*;
 
 use pretty_assertions::assert_eq;
 
-fn pass_report(report: &RunReport, redundancy_target: u16) -> bool {
+fn pass_report(report: &RunReport, redundancy_target: f64) -> bool {
     match &report.outcome {
         RunReportOutcome::Convergent { redundancy_stats } => {
             pass_redundancy(redundancy_stats, redundancy_target)
@@ -18,12 +18,14 @@ fn pass_report(report: &RunReport, redundancy_target: u16) -> bool {
 /// of all runs.
 /// - Min redundancy must never dip below 95% of the target
 /// - Median redundancy must be within 1% of target
-fn pass_redundancy(stats: &Stats, redundancy_target: u16) -> bool {
+fn pass_redundancy(stats: &Stats, redundancy_target: f64) -> bool {
     let rf = redundancy_target as f64;
-    stats.median >= rf * 0.99
-        && stats.median <= rf * 1.01
-        && stats.min >= rf * 0.9
-        && stats.variance < 1.0
+    let min_buffer = 0.1;
+    let median_buffer_lo = 0.05;
+    let median_buffer_hi = 0.15;
+    stats.median >= rf * (1.0 - median_buffer_lo)
+        && stats.median <= rf * (1.0 + median_buffer_hi)
+        && stats.min >= rf * (1.0 - min_buffer)
 }
 
 #[test]
@@ -75,11 +77,12 @@ fn single_agent_convergence_battery() {
 
     let n = 1000;
     let r = 100;
+    let rf = r as f64;
 
     let pass_convergent =
-        |report: RunReport| report.log().is_convergent() && pass_report(&report, r);
+        |report: RunReport| report.log().is_convergent() && pass_report(&report, rf);
     let pass_divergent =
-        |report: RunReport| !report.log().is_convergent() && pass_report(&report, r);
+        |report: RunReport| !report.log().is_convergent() && pass_report(&report, rf);
 
     // let divergent = vec![
     //     pass_divergent(run_single_agent_convergence(8, n, r, 0.1, true).report()),
@@ -119,6 +122,8 @@ fn parameterized_stability_test() {
     let s = ArcLenStrategy::Constant(0.1);
 
     let r = 50;
+    let rf = r as f64;
+
     let strat = PeerStratAlpha {
         redundancy_target: r,
         ..Default::default()
@@ -135,7 +140,7 @@ fn parameterized_stability_test() {
     });
     let report = eq.report();
     report.log();
-    assert!(pass_report(&report, r * 2));
+    assert!(pass_report(&report, rf * 2.0));
 }
 
 /// Equilibrium test for a single distribution
@@ -161,54 +166,11 @@ fn test_peer_view_beta() {
 
     let peers = simple_parameterized_generator(&mut rng, n, j, s);
     tracing::debug!("{}", EpochStats::oneline_header());
-    let report = determine_oscillations(
-        2,
-        peers,
-        |peers| {
-            let (peers, stats) = run_one_epoch(&strat.into(), peers, None, DETAIL);
-            tracing::debug!("{}", stats.oneline());
-            (peers, stats)
-        },
-        |EpochStats {
-             net_delta_avg: _,
-             gross_delta_avg: _,
-             delta_max: _,
-             delta_min: _,
-             min_redundancy,
-         }| { (min_redundancy as f64) < min_r },
-    );
-    for run in report.0 {
-        for peer in &run.peers {
-            let view = strat.view(*peer, run.peers.as_slice());
-
-            dbg!(view.count);
-            if view.target_coverage() > 0.9 {
-                dbg!(view.est_total_coverage());
-                dbg!(view.strat.target_network_coverage() - view.est_total_coverage());
-                dbg!(view.count);
-            }
-            // dbg!(view.est_total_coverage());
-        }
-        for &EpochStats {
-            net_delta_avg: _,
-            gross_delta_avg: _,
-            delta_max: _,
-            delta_min: _,
-            min_redundancy,
-        } in &run.history
-        {
-            assert!(
-                min_redundancy as f64 >= min_r,
-                "{} >= {}",
-                min_redundancy,
-                min_r
-            );
-        }
-    }
-    // dbg!(report);
-    // report(&eq);
-    // eq.assert_convergent();
-    // // TODO: the min redundancy is never exactly 100.
-    // //       would be good to look at the *average* redundancy, and other stats.
-    // eq.assert_min_redundancy(96);
+    let runs = determine_equilibrium(2, peers, |peers| {
+        let (peers, stats) = run_one_epoch(&strat.into(), peers, None, DETAIL);
+        tracing::debug!("{}", stats.oneline());
+        (peers, stats)
+    });
+    dbg!(min_r);
+    assert!(pass_report(runs.report().log(), min_r));
 }

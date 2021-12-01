@@ -129,48 +129,6 @@ where
     }
 }
 
-pub fn determine_oscillations<'a, F, T>(
-    iters: usize,
-    peers: Peers,
-    step: F,
-    mut targets: T,
-) -> OscillationsBatch
-where
-    F: 'a + Clone + Fn(Peers) -> (Peers, EpochStats),
-    T: 'a + Clone + FnMut(EpochStats) -> bool,
-{
-    let mut runs = vec![];
-    for i in 1..=iters {
-        tracing::debug!("----- Running movement iteration {} -----", i);
-        let run = record_oscillations(peers.clone(), |peers| step(peers), &mut targets);
-        runs.push(run);
-    }
-    OscillationsBatch(runs)
-}
-
-/// Run iterations until there is no movement of any arc
-pub fn record_oscillations<'a, F, T>(mut peers: Peers, step: F, targets: &mut T) -> Oscillations
-where
-    F: Fn(Peers) -> (Peers, EpochStats),
-    T: FnMut(EpochStats) -> bool,
-{
-    let mut history = Vec::with_capacity(DIVERGENCE_ITERS);
-    let mut num_missed = 0;
-    for _ in 0..DIVERGENCE_ITERS {
-        let (p, stats) = step(peers);
-        peers = p;
-        history.push(stats.clone());
-        if targets(stats) {
-            num_missed += 1;
-            if num_missed > CONVERGENCE_WINDOW {
-                return Oscillations { history, peers };
-            }
-        }
-    }
-
-    Oscillations { history, peers }
-}
-
 /// Resize every arc based on neighbors' arcs, and compute stats about this iteration
 /// strat: The resizing strategy to use
 /// peers: The list of peers in this epoch
@@ -277,9 +235,6 @@ pub fn generate_evenly_spaced_with_half_lens_and_jitter(
 
 #[derive(Debug)]
 pub struct RunBatch(Vec<Run>);
-
-#[derive(Debug)]
-pub struct OscillationsBatch(pub Vec<Oscillations>);
 
 #[derive(Clone, Debug)]
 pub struct Stats {
@@ -404,13 +359,6 @@ impl Run {
     pub fn min_redundancy(&self) -> usize {
         todo!()
     }
-}
-
-#[derive(Debug)]
-pub struct Oscillations {
-    pub history: Vec<EpochStats>,
-    /// the final state of the peers at the last iteration
-    pub peers: Peers,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
