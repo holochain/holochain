@@ -334,6 +334,7 @@ async fn mock_network_sharded_gossip() {
                                         // agent at a time.
                                         last_intervals = Some(intervals);
                                         let arc = data.agent_to_arc[&agent];
+                                        let agent_info = data.agent_to_info[&agent].clone();
                                         let interval = arc.interval();
 
                                         // If we have info for alice check the overlap.
@@ -359,7 +360,10 @@ async fn mock_network_sharded_gossip() {
                                             dna: dna.clone(),
                                             module: module.clone(),
                                             gossip: GossipProtocol::Sharded(
-                                                ShardedGossipWire::accept(vec![interval]),
+                                                ShardedGossipWire::accept(
+                                                    vec![interval],
+                                                    vec![agent_info],
+                                                ),
                                             ),
                                         };
                                         channel.send(msg.addressed((*agent).clone())).await;
