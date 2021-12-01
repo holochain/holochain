@@ -166,8 +166,8 @@ impl ShardedGossipLocal {
 
     /// Generate the next batch of blooms from this state.
     /// If there is a saved cursor from a previous partial
-    /// batch then this will pick up from their.
-    /// Otherwise blooms a bloom for the entire search window
+    /// batch then this will pick up from there.
+    /// Otherwise s batch of blooms for the entire search window
     /// will be attempted (if this is too many hashes then it will
     /// create a new partial batch of blooms.)
     pub(super) async fn next_bloom_batch(
@@ -178,7 +178,7 @@ impl ShardedGossipLocal {
         // Get the default window for this gossip loop.
         let mut window = self.calculate_time_range();
 
-        // If there is a previously saved cursor then start from their.
+        // If there is a previously saved cursor then start from there.
         if let Some(cursor) = state.bloom_batch_cursor.take() {
             window.start = cursor;
         }
