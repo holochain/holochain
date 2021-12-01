@@ -61,7 +61,7 @@ where
         ribosome,
     } = args;
 
-    if workspace.has_genesis(&agent_pubkey)? {
+    if workspace.has_genesis(agent_pubkey.clone()).await? {
         return Ok(());
     }
 
@@ -93,6 +93,8 @@ where
 
     source_chain::genesis(
         workspace.vault.clone(),
+        workspace.dht_env.clone(),
+        api.keystore().clone(),
         dna_file.dna_hash().clone(),
         agent_pubkey,
         membrane_proof,
@@ -104,36 +106,41 @@ where
 
 /// The workspace for Genesis
 pub struct GenesisWorkspace {
-    vault: EnvWrite,
+    vault: DbWrite<DbKindAuthored>,
+    dht_env: DbWrite<DbKindDht>,
 }
 
 impl GenesisWorkspace {
     /// Constructor
-    pub fn new(env: EnvWrite) -> WorkspaceResult<Self> {
-        Ok(Self { vault: env })
+    pub fn new(env: DbWrite<DbKindAuthored>, dht_env: DbWrite<DbKindDht>) -> WorkspaceResult<Self> {
+        Ok(Self {
+            vault: env,
+            dht_env,
+        })
     }
 
-    pub fn has_genesis(&self, author: &AgentPubKey) -> DatabaseResult<bool> {
-        let count = self.vault.conn()?.with_reader(|txn| {
-            let count: u32 = txn.query_row(
-                "
+    pub async fn has_genesis(&self, author: AgentPubKey) -> DatabaseResult<bool> {
+        let count = self
+            .vault
+            .async_reader(move |txn| {
+                let count: u32 = txn.query_row(
+                    "
                 SELECT
                 COUNT(Header.hash)
                 FROM Header
                 JOIN DhtOp ON DhtOp.header_hash = Header.hash
                 WHERE
-                DhtOp.is_authored = 1
-                AND
                 Header.author = :author
                 LIMIT 3
                 ",
-                named_params! {
-                    ":author": author,
-                },
-                |row| row.get(0),
-            )?;
-            DatabaseResult::Ok(count)
-        })?;
+                    named_params! {
+                        ":author": author,
+                    },
+                    |row| row.get(0),
+                )?;
+                DatabaseResult::Ok(count)
+            })
+            .await?;
         Ok(count >= 3)
     }
 }
@@ -144,7 +151,8 @@ pub mod tests {
 
     use crate::conductor::api::MockCellConductorApi;
     use crate::core::ribosome::MockRibosomeT;
-    use holochain_state::{prelude::test_cell_env, source_chain::SourceChain};
+    use holochain_state::prelude::test_dht_env;
+    use holochain_state::{prelude::test_authored_env, source_chain::SourceChain};
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
     use holochain_zome_types::Header;
@@ -154,16 +162,19 @@ pub mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn genesis_initializes_source_chain() {
         observability::test_run().unwrap();
-        let test_env = test_cell_env();
+        let test_env = test_authored_env();
+        let dht_env = test_dht_env();
+        let keystore = test_keystore();
         let vault = test_env.env();
         let dna = fake_dna_file("a");
         let author = fake_agent_pubkey_1();
 
         {
-            let workspace = GenesisWorkspace::new(vault.clone().into()).unwrap();
+            let workspace = GenesisWorkspace::new(vault.clone().into(), dht_env.env()).unwrap();
             let mut api = MockCellConductorApi::new();
             api.expect_sync_dpki_request()
                 .returning(|_, _| Ok("mocked dpki request response".to_string()));
+            api.expect_mock_keystore().return_const(keystore.clone());
             let mut ribosome = MockRibosomeT::new();
             ribosome
                 .expect_run_genesis_self_check()
@@ -178,9 +189,10 @@ pub mod tests {
         }
 
         {
-            let source_chain = SourceChain::new(vault.clone().into(), author.clone())
-                .await
-                .unwrap();
+            let source_chain =
+                SourceChain::new(vault.clone(), dht_env.env(), keystore, author.clone())
+                    .await
+                    .unwrap();
             let headers = source_chain
                 .query(Default::default())
                 .await

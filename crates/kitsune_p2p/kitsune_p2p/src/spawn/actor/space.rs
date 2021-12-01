@@ -291,7 +291,6 @@ impl SpaceInternalHandler for Space {
                             let fut = self.evt_sender.notify(
                                 space.clone(),
                                 agent.clone(),
-                                agent.clone(),
                                 data.clone().into(),
                             );
                             local_notify_events.push(async move {
@@ -621,7 +620,6 @@ impl KitsuneP2pHandler for Space {
         &mut self,
         space: Arc<KitsuneSpace>,
         to_agent: Arc<KitsuneAgent>,
-        from_agent: Arc<KitsuneAgent>,
         payload: Vec<u8>,
         timeout_ms: Option<u64>,
     ) -> KitsuneP2pHandlerResult<Vec<u8>> {
@@ -643,15 +641,10 @@ impl KitsuneP2pHandler for Space {
             match discover_fut.await {
                 discover::PeerDiscoverResult::OkShortcut => {
                     // reflect this request locally
-                    evt_sender.call(space, to_agent, from_agent, payload).await
+                    evt_sender.call(space, to_agent, payload).await
                 }
                 discover::PeerDiscoverResult::OkRemote { con_hnd, .. } => {
-                    let payload = wire::Wire::call(
-                        space.clone(),
-                        from_agent.clone(),
-                        to_agent.clone(),
-                        payload.into(),
-                    );
+                    let payload = wire::Wire::call(space.clone(), to_agent.clone(), payload.into());
                     let res = con_hnd.request(&payload, timeout).await?;
                     match res {
                         wire::Wire::Failure(wire::Failure { reason }) => Err(reason.into()),
@@ -707,7 +700,6 @@ impl KitsuneP2pHandler for Space {
                         if arc.contains(basis.get_loc()) {
                             let fut = self.evt_sender.notify(
                                 space.clone(),
-                                agent.clone(),
                                 agent.clone(),
                                 payload.clone(),
                             );
@@ -851,7 +843,6 @@ impl KitsuneP2pHandler for Space {
     fn handle_targeted_broadcast(
         &mut self,
         space: Arc<KitsuneSpace>,
-        from_agent: Arc<KitsuneAgent>,
         agents: Vec<Arc<KitsuneAgent>>,
         timeout: KitsuneTimeout,
         payload: Vec<u8>,
@@ -882,7 +873,6 @@ impl KitsuneP2pHandler for Space {
                         .ok()
                 };
                 let space = space.clone();
-                let from_agent = from_agent.clone();
                 let payload = payload.clone();
                 let evt_sender = evt_sender.clone();
                 let ro_inner = ro_inner.clone();
@@ -897,7 +887,7 @@ impl KitsuneP2pHandler for Space {
                         discover::PeerDiscoverResult::OkShortcut => {
                             // reflect this request locally
                             evt_sender
-                                .notify(space, agent, from_agent, payload)
+                                .notify(space, agent, payload)
                                 .map(|r| {
                                     if let Err(e) = r {
                                         tracing::error!(
@@ -958,13 +948,13 @@ impl KitsuneP2pHandler for Space {
     fn handle_authority_for_hash(
         &mut self,
         _space: Arc<KitsuneSpace>,
-        agent: Arc<KitsuneAgent>,
         basis: Arc<KitsuneBasis>,
     ) -> KitsuneP2pHandlerResult<bool> {
-        let r = match self.agent_arcs.get(&agent) {
-            Some(agent_arc) => agent_arc.contains(basis.get_loc()),
-            None => false,
-        };
+        let loc = basis.get_loc();
+        let r = self
+            .agent_arcs
+            .values()
+            .any(|agent_arc| agent_arc.contains(loc));
         Ok(async move { Ok(r) }.boxed().into())
     }
 }

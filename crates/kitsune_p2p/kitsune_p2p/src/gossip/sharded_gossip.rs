@@ -181,8 +181,8 @@ impl ShardedGossip {
     }
 
     async fn process_outgoing(&self, outgoing: Outgoing) -> KitsuneResult<()> {
-        let (_endpoint, how, gossip) = outgoing;
-        let s = tracing::trace_span!("process_outgoing", cert = ?_endpoint.cert(), agents = ?self.gossip.show_local_agents());
+        let (cert, how, gossip) = outgoing;
+        let s = tracing::trace_span!("process_outgoing", ?cert, agents = ?self.gossip.show_local_agents());
         s.in_scope(|| tracing::trace!(?gossip));
         let gossip = gossip.encode_vec().map_err(KitsuneError::other)?;
         let bytes = gossip.len();
@@ -225,7 +225,7 @@ impl ShardedGossip {
             self.inner.share_mut(|i, _| {
                 i.outgoing.extend(outgoing.into_iter().map(|msg| {
                     (
-                        GossipTgt::new(Vec::with_capacity(0), con.peer_cert()),
+                        con.peer_cert(),
                         HowToConnect::Con(con.clone(), remote_url.clone()),
                         msg,
                     )
@@ -234,7 +234,7 @@ impl ShardedGossip {
             })?;
         }
         if let Some(outgoing) = outgoing {
-            let cert = outgoing.0.cert().clone();
+            let cert = outgoing.0.clone();
             if let Err(err) = self.process_outgoing(outgoing).await {
                 self.gossip.remove_state(&cert, true).await?;
                 tracing::error!(
@@ -242,10 +242,6 @@ impl ShardedGossip {
                     err
                 );
             }
-        }
-
-        if self.gossip.should_local_sync()? {
-            self.gossip.local_sync().await?;
         }
 
         Ok(())
@@ -323,9 +319,19 @@ pub struct ShardedGossipLocal {
 /// Incoming gossip.
 type Incoming = (Tx2ConHnd<wire::Wire>, TxUrl, ShardedGossipWire, usize);
 /// Outgoing gossip.
-type Outgoing = (GossipTgt, HowToConnect, ShardedGossipWire);
+type Outgoing = (Tx2Cert, HowToConnect, ShardedGossipWire);
 
 type StateKey = Tx2Cert;
+
+/// Info associated with an outgoing gossip target
+#[derive(Debug)]
+pub(crate) struct ShardedGossipTarget {
+    pub(crate) remote_agent_list: Vec<AgentInfoSigned>,
+    pub(crate) cert: Tx2Cert,
+    pub(crate) tie_break: u32,
+    pub(crate) when_initiated: Option<tokio::time::Instant>,
+    pub(crate) url: TxUrl,
+}
 
 /// The internal mutable state for [`ShardedGossipLocal`]
 #[derive(Default)]
@@ -333,16 +339,11 @@ pub struct ShardedGossipLocalState {
     /// The list of agents on this node
     local_agents: HashSet<Arc<KitsuneAgent>>,
     /// If Some, we are in the process of trying to initiate gossip with this target.
-    initiate_tgt: Option<(GossipTgt, u32, Option<tokio::time::Instant>)>,
+    initiate_tgt: Option<ShardedGossipTarget>,
     round_map: RoundStateMap,
     /// Metrics that track remote node states and help guide
     /// the next node to gossip with.
     metrics: Metrics,
-    #[allow(dead_code)]
-    /// Last moment we locally synced.
-    last_local_sync: Option<Instant>,
-    /// Trigger local sync to run on the next iteration.
-    trigger_local_sync: bool,
 }
 
 impl ShardedGossipLocalState {
@@ -351,29 +352,32 @@ impl ShardedGossipLocalState {
         let init_tgt = self
             .initiate_tgt
             .as_ref()
-            .map(|tgt| tgt.0.cert() == state_key)
+            .map(|tgt| &tgt.cert == state_key)
             .unwrap_or(false);
-        if init_tgt {
-            self.initiate_tgt = None;
-        }
+        let remote_agent_list = if init_tgt {
+            let initiate_tgt = self.initiate_tgt.take().unwrap();
+            initiate_tgt.remote_agent_list
+        } else {
+            vec![]
+        };
         let r = self.round_map.remove(state_key);
-        if r.is_some() {
+        if let Some(r) = &r {
             if error {
-                self.metrics.record_error(state_key.clone());
+                self.metrics.record_error(&r.remote_agent_list);
             } else {
-                self.metrics.record_success(state_key.clone());
+                self.metrics.record_success(&r.remote_agent_list);
             }
         } else if init_tgt && error {
-            self.metrics.record_error(state_key.clone());
+            self.metrics.record_error(&remote_agent_list);
         }
         r
     }
 
     fn check_tgt_expired(&mut self) {
-        if let Some((cert, when_initiated)) = self
+        if let Some((remote_agent_list, cert, when_initiated)) = self
             .initiate_tgt
             .as_ref()
-            .map(|tgt| (tgt.0.cert().clone(), tgt.2))
+            .map(|tgt| (&tgt.remote_agent_list, tgt.cert.clone(), tgt.when_initiated))
         {
             // Check if no current round exists and we've timed out the initiate.
             let no_current_round_exist = !self.round_map.round_exists(&cert);
@@ -381,7 +385,7 @@ impl ShardedGossipLocalState {
                 Some(when_initiated)
                     if no_current_round_exist && when_initiated.elapsed() > ROUND_TIMEOUT =>
                 {
-                    self.metrics.record_error(cert);
+                    self.metrics.record_error(remote_agent_list);
                     self.initiate_tgt = None;
                 }
                 None if no_current_round_exist => {
@@ -396,7 +400,6 @@ impl ShardedGossipLocalState {
         let s = tracing::trace_span!("gossip_trigger", agents = ?self.show_local_agents());
         s.in_scope(|| self.log_state());
         self.metrics.record_force_initiate();
-        self.trigger_local_sync = true;
         Ok(())
     }
 
@@ -423,6 +426,8 @@ pub struct ShardedGossipState {
 /// remote node
 #[derive(Debug, Clone)]
 pub struct RoundState {
+    /// The remote agents hosted by the remote node, used for metrics tracking
+    remote_agent_list: Vec<AgentInfoSigned>,
     /// The common ground with our gossip partner for the purposes of this round
     common_arc_set: Arc<DhtArcSet>,
     /// Number of ops blooms we have sent for this round, which is also the
@@ -468,8 +473,13 @@ impl ShardedGossipLocal {
         }
     }
 
-    fn new_state(&self, common_arc_set: Arc<DhtArcSet>) -> KitsuneResult<RoundState> {
+    fn new_state(
+        &self,
+        remote_agent_list: Vec<AgentInfoSigned>,
+        common_arc_set: Arc<DhtArcSet>,
+    ) -> KitsuneResult<RoundState> {
         Ok(RoundState {
+            remote_agent_list,
             common_arc_set,
             num_sent_ops_blooms: 0,
             received_all_incoming_ops_blooms: false,
@@ -492,14 +502,14 @@ impl ShardedGossipLocal {
         self.inner.share_mut(|i, _| {
             if i.initiate_tgt
                 .as_ref()
-                .map(|tgt| tgt.0.cert() == id)
+                .map(|tgt| &tgt.cert == id)
                 .unwrap_or(false)
             {
-                i.initiate_tgt = None;
+                let initiate_tgt = i.initiate_tgt.take().unwrap();
                 if error {
-                    i.metrics.record_error(id.clone());
+                    i.metrics.record_error(&initiate_tgt.remote_agent_list);
                 } else {
-                    i.metrics.record_success(id.clone());
+                    i.metrics.record_success(&initiate_tgt.remote_agent_list);
                 }
             }
             Ok(())
@@ -555,12 +565,18 @@ impl ShardedGossipLocal {
         s.in_scope(|| self.log_state());
         // If we don't have the state for a message then the other node will need to timeout.
         Ok(match msg {
-            ShardedGossipWire::Initiate(Initiate { intervals, id }) => {
-                self.incoming_initiate(cert, intervals, id).await?
+            ShardedGossipWire::Initiate(Initiate {
+                intervals,
+                id,
+                agent_list,
+            }) => {
+                self.incoming_initiate(cert, intervals, id, agent_list)
+                    .await?
             }
-            ShardedGossipWire::Accept(Accept { intervals }) => {
-                self.incoming_accept(cert, intervals).await?
-            }
+            ShardedGossipWire::Accept(Accept {
+                intervals,
+                agent_list,
+            }) => self.incoming_accept(cert, intervals, agent_list).await?,
             ShardedGossipWire::Agents(Agents { filter }) => {
                 if let Some(state) = self.get_state(&cert).await? {
                     let filter = decode_bloom_filter(&filter);
@@ -614,8 +630,8 @@ impl ShardedGossipLocal {
                 } else {
                     self.get_state(&cert).await?
                 };
-                if let Some(state) = state {
-                    self.incoming_missing_ops(state, ops).await?;
+                if state.is_some() {
+                    self.incoming_missing_ops(ops).await?;
                 }
                 Vec::with_capacity(0)
             }
@@ -639,82 +655,12 @@ impl ShardedGossipLocal {
         })
     }
 
-    async fn local_sync(&self) -> KitsuneResult<()> {
-        let local_agents = self.inner.share_mut(|i, _| Ok(i.local_agents.clone()))?;
-        let agent_arcs =
-            store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents).await?;
-        let arcs: Vec<_> = agent_arcs.iter().map(|(_, arc)| arc.clone()).collect();
-        let arcset = local_sync_arcset(arcs.as_slice());
-        let op_hashes = store::all_op_hashes_within_arcset(
-            &self.evt_sender,
-            &self.space,
-            agent_arcs.as_slice(),
-            &arcset,
-            full_time_window(),
-            usize::MAX,
-            true,
-        )
-        .await?
-        .map(|(ops, _window)| ops)
-        .unwrap_or_default();
-
-        let ops: Vec<_> = store::fetch_ops(
-            &self.evt_sender,
-            &self.space,
-            local_agents.iter(),
-            op_hashes,
-        )
-        .await?
-        .into_iter()
-        .collect();
-
-        store::put_ops(&self.evt_sender, &self.space, agent_arcs, ops).await?;
-        Ok(())
-    }
-
-    /// Check if we should locally sync
-    fn should_local_sync(&self) -> KitsuneResult<bool> {
-        // Historical gossip should not locally sync.
-        if matches!(self.gossip_type, GossipType::Historical)
-            || self.tuning_params.gossip_single_storage_arc_per_space
-        {
-            return Ok(false);
-        }
-        let update_last_sync = |i: &mut ShardedGossipLocalState, _: &mut bool| {
-            if i.local_agents.len() < 2 {
-                Ok(false)
-            } else if i.trigger_local_sync {
-                // We are force triggering a local sync.
-                i.trigger_local_sync = false;
-                i.last_local_sync = Some(Instant::now());
-                let s = tracing::trace_span!("trigger",agents = ?i.show_local_agents(), i.trigger_local_sync);
-                s.in_scope(|| tracing::trace!("Force local sync"));
-                Ok(true)
-            } else if i
-                .last_local_sync
-                .as_ref()
-                .map(|s| s.elapsed().as_millis() as u32)
-                .unwrap_or(u32::MAX)
-                >= self.tuning_params.gossip_local_sync_delay_ms
-            {
-                // It's been long enough since the last local sync.
-                i.last_local_sync = Some(Instant::now());
-                Ok(true)
-            } else {
-                // Otherwise it's not time to sync.
-                Ok(false)
-            }
-        };
-
-        self.inner.share_mut(update_last_sync)
-    }
-
     /// Record all timed out rounds into metrics
     fn record_timeouts(&self) {
         self.inner
             .share_mut(|i, _| {
-                for cert in i.round_map.take_timed_out_rounds() {
-                    i.metrics.record_error(cert);
+                for (_cert, r) in i.round_map.take_timed_out_rounds() {
+                    i.metrics.record_error(&r.remote_agent_list);
                 }
                 Ok(())
             })
@@ -735,33 +681,6 @@ impl ShardedGossipLocal {
             })
             .ok();
     }
-}
-
-/// Calculates the arcset used during local sync. This arcset determines the
-/// minimum set of ops to be spread across all local agents in order to reach
-/// local consistency
-fn local_sync_arcset(arcs: &[ArcInterval]) -> DhtArcSet {
-    arcs.iter()
-        .enumerate()
-        // For each agent's arc,
-        .map(|(i, arc_i)| {
-            // find the union of all arcs *other* than this one,
-            let other_arcset = arcs
-                .iter()
-                .enumerate()
-                .filter_map(|(j, arc_j)| {
-                    if i == j {
-                        None
-                    } else {
-                        Some(DhtArcSet::from(arc_j))
-                    }
-                })
-                .fold(DhtArcSet::new_empty(), |a, b| DhtArcSet::union(&a, &b));
-            // and return the intersection of this arc with the union of the others.
-            DhtArcSet::from(arc_i).intersection(&other_arcset)
-        })
-        // and take the union of all of the intersections
-        .fold(DhtArcSet::new_empty(), |a, b| DhtArcSet::union(&a, &b))
 }
 
 impl RoundState {
@@ -823,6 +742,8 @@ kitsune_p2p_types::write_codec_enum! {
             intervals.0: Vec<ArcInterval>,
             /// A random number to resolve concurrent initiates.
             id.1: u32,
+            /// List of active local agents represented by this node.
+            agent_list.2: Vec<AgentInfoSigned>,
         },
 
         /// Accept an incoming round of gossip from a remote node
@@ -830,6 +751,8 @@ kitsune_p2p_types::write_codec_enum! {
             /// The list of arc intervals (equivalent to a [`DhtArcSet`])
             /// for all local agents
             intervals.0: Vec<ArcInterval>,
+            /// List of active local agents represented by this node.
+            agent_list.1: Vec<AgentInfoSigned>,
         },
 
         /// Send Agent Info Bloom
@@ -907,7 +830,7 @@ impl AsGossipModule for ShardedGossip {
             // If we are overloaded then return busy to any new initiates.
             if overloaded && new_initiate {
                 i.outgoing.push_back((
-                    GossipTgt::new(Vec::with_capacity(0), con.peer_cert()),
+                    con.peer_cert(),
                     HowToConnect::Con(con, remote_url),
                     ShardedGossipWire::busy(),
                 ));

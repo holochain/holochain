@@ -14,8 +14,8 @@ use super::types::Outcome;
 pub enum AppValidationError {
     #[error(transparent)]
     CascadeError(#[from] holochain_cascade::error::CascadeError),
-    #[error("Dna is missing for this cell {0:?}. Cannot validate without dna.")]
-    DnaMissing(CellId),
+    #[error("Dna is missing {0:?}. Cannot validate without dna.")]
+    DnaMissing(DnaHash),
     #[error(transparent)]
     EntryDefStoreError(#[from] EntryDefStoreError),
     #[error(transparent)]

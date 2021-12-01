@@ -62,10 +62,11 @@ impl Schema {
     pub fn initialize(
         &self,
         conn: &mut Connection,
-        db_kind: Option<&DbKind>,
+        db_kind: Option<DbKind>,
     ) -> rusqlite::Result<()> {
         let user_version: u16 = conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
         let db_kind = db_kind
+            .as_ref()
             .map(ToString::to_string)
             .unwrap_or_else(|| "<no name>".to_string());
 

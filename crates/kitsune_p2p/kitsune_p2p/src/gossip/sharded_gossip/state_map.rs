@@ -4,7 +4,7 @@ use super::*;
 #[derive(Default, Debug)]
 pub(super) struct RoundStateMap {
     map: HashMap<StateKey, RoundState>,
-    timed_out: Vec<StateKey>,
+    timed_out: Vec<(StateKey, RoundState)>,
 }
 
 impl RoundStateMap {
@@ -13,8 +13,9 @@ impl RoundStateMap {
         let mut timed_out = false;
         if let Some(state) = self.map.get(key) {
             if state.last_touch.elapsed() > state.round_timeout {
-                self.map.remove(key);
-                self.timed_out.push(key.clone());
+                if let Some(v) = self.map.remove(key) {
+                    self.timed_out.push((key.clone(), v));
+                }
                 timed_out = true;
             }
         }
@@ -45,16 +46,13 @@ impl RoundStateMap {
 
     /// Get the set of current rounds and remove any expired rounds.
     pub(super) fn current_rounds(&mut self) -> HashSet<Tx2Cert> {
-        let mut timed_out = Vec::new();
-        self.map.retain(|k, v| {
+        for (k, v) in std::mem::take(&mut self.map) {
             if v.last_touch.elapsed() < v.round_timeout {
-                true
+                self.map.insert(k, v);
             } else {
-                timed_out.push(k.clone());
-                false
+                self.timed_out.push((k, v));
             }
-        });
-        self.timed_out.extend(timed_out);
+        }
         self.map.keys().cloned().collect::<HashSet<_>>()
     }
 
@@ -65,7 +63,7 @@ impl RoundStateMap {
     }
 
     /// Get all timed out rounds.
-    pub(super) fn take_timed_out_rounds(&mut self) -> Vec<StateKey> {
+    pub(super) fn take_timed_out_rounds(&mut self) -> Vec<(StateKey, RoundState)> {
         std::mem::take(&mut self.timed_out)
     }
 

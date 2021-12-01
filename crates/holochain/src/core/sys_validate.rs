@@ -4,13 +4,15 @@
 use super::queue_consumer::TriggerSender;
 use super::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
 use super::workflow::sys_validation_workflow::SysValidationWorkspace;
-use crate::conductor::api::CellConductorApiT;
 use crate::conductor::entry_def_store::get_entry_def;
+use crate::conductor::handle::ConductorHandleT;
+use crate::conductor::space::Space;
 use holochain_keystore::AgentPubKeyExt;
-use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pDna;
 use holochain_types::prelude::*;
 use holochain_zome_types::countersigning::CounterSigningSessionData;
 use std::convert::TryInto;
+use std::sync::Arc;
 
 pub(super) use error::*;
 pub use holo_hash::*;
@@ -177,7 +179,7 @@ pub async fn check_valid_if_dna(
 ) -> SysValidationResult<()> {
     match header {
         Header::Dna(_) => {
-            if workspace.is_chain_empty(header.author())? {
+            if workspace.is_chain_empty(header.author().clone()).await? {
                 Ok(())
             } else {
                 Err(PrevHeaderError::InvalidRoot).map_err(|e| ValidationOutcome::from(e).into())
@@ -193,7 +195,7 @@ pub async fn check_chain_rollback(
     header: &Header,
     workspace: &SysValidationWorkspace,
 ) -> SysValidationResult<()> {
-    let empty = workspace.header_seq_is_empty(header)?;
+    let empty = workspace.header_seq_is_empty(header).await?;
 
     // Ok or log warning
     if empty {
@@ -252,13 +254,16 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
 /// Check the AppEntryType is valid for the zome.
 /// Check the EntryDefId and ZomeId are in range.
 pub async fn check_app_entry_type(
+    dna_hash: &DnaHash,
     entry_type: &AppEntryType,
-    conductor_api: &impl CellConductorApiT,
+    conductor: &dyn ConductorHandleT,
 ) -> SysValidationResult<EntryDef> {
     let zome_index = u8::from(entry_type.zome_id()) as usize;
     // We want to be careful about holding locks open to the conductor api
     // so calls are made in blocks
-    let dna_file = conductor_api.get_this_dna().map_err(Box::new)?;
+    let dna_file = conductor
+        .get_dna(dna_hash)
+        .ok_or_else(|| SysValidationError::DnaMissing(dna_hash.clone()))?;
 
     // Check if the zome is found
     let zome = dna_file
@@ -269,7 +274,7 @@ pub async fn check_app_entry_type(
         .clone()
         .1;
 
-    let entry_def = get_entry_def(entry_type.id(), zome, dna_file.dna(), conductor_api).await?;
+    let entry_def = get_entry_def(entry_type.id(), zome, dna_file.dna(), conductor).await?;
 
     // Check the visibility and return
     match entry_def {
@@ -364,7 +369,7 @@ pub fn check_update_reference(
 pub async fn check_and_hold_register_add_link<F>(
     hash: &HeaderHash,
     workspace: &SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
@@ -394,7 +399,7 @@ where
 pub async fn check_and_hold_register_agent_activity<F>(
     hash: &HeaderHash,
     workspace: &SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
@@ -424,7 +429,7 @@ where
 pub async fn check_and_hold_store_entry<F>(
     hash: &HeaderHash,
     workspace: &SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
@@ -457,7 +462,7 @@ where
 pub async fn check_and_hold_any_store_entry<F>(
     hash: &EntryHash,
     workspace: &SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
@@ -485,7 +490,7 @@ where
 pub async fn check_and_hold_store_element<F>(
     hash: &HeaderHash,
     workspace: &SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
@@ -508,7 +513,7 @@ where
 /// to be holding it.
 #[derive(derive_more::Constructor, Clone)]
 pub struct IncomingDhtOpSender {
-    env: EnvWrite,
+    space: Arc<Space>,
     sys_validation_trigger: TriggerSender,
 }
 
@@ -521,7 +526,7 @@ impl IncomingDhtOpSender {
     ) -> SysValidationResult<()> {
         if let Some(op) = make_op(element) {
             let ops = vec![op];
-            incoming_dht_ops_workflow(&self.env, None, self.sys_validation_trigger, ops, false)
+            incoming_dht_ops_workflow(self.space.as_ref(), self.sys_validation_trigger, ops, false)
                 .await
                 .map_err(Box::new)?;
         }
@@ -531,7 +536,13 @@ impl IncomingDhtOpSender {
         self.send_op(element, make_store_element).await
     }
     async fn send_store_entry(self, element: Element) -> SysValidationResult<()> {
-        self.send_op(element, make_store_entry).await
+        let is_public_entry = element.header().entry_type().map_or(false, |et| {
+            matches!(et.visibility(), EntryVisibility::Public)
+        });
+        if is_public_entry {
+            self.send_op(element, make_store_entry).await?;
+        }
+        Ok(())
     }
     async fn send_register_add_link(self, element: Element) -> SysValidationResult<()> {
         self.send_op(element, make_register_add_link).await
@@ -568,7 +579,7 @@ impl AsRef<Element> for Source {
 async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
     hash: &I,
     workspace: &SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
 ) -> SysValidationResult<Source> {
     let hash: AnyDhtHash = hash.clone().into();
     // Create a workspace with just the local stores
@@ -585,7 +596,7 @@ async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
         .retrieve(hash.clone(), Default::default())
         .await?
     {
-        Some(el) => Ok(Source::Network(el)),
+        Some(el) => Ok(Source::Network(el.privatized())),
         None => Err(ValidationOutcome::NotHoldingDep(hash).into()),
     }
 }
@@ -599,19 +610,12 @@ async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
 /// to return an error.
 fn make_store_element(element: Element) -> Option<(DhtOpHash, DhtOp)> {
     // Extract the data
-    let (shh, element_entry) = element.into_inner();
+    let (shh, element_entry) = element.privatized().into_inner();
     let (header, signature) = shh.into_header_and_signature();
     let header = header.into_content();
 
     // Check the entry
-    let maybe_entry_box = match element_entry {
-        ElementEntry::Present(e) => Some(e.into()),
-        // This is ok because we weren't expecting an entry
-        ElementEntry::NotApplicable | ElementEntry::Hidden => None,
-        // The element is expected to have an entry but it wasn't
-        // stored so we can't add this to incoming ops
-        ElementEntry::NotStored => return None,
-    };
+    let maybe_entry_box = element_entry.into_option().map(Box::new);
 
     // Create the hash and op
     let op = DhtOp::StoreElement(signature, header, maybe_entry_box);
