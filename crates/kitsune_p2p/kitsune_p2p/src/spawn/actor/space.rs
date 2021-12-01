@@ -1,4 +1,5 @@
 use super::*;
+use crate::metrics::*;
 use crate::types::gossip::GossipModule;
 use ghost_actor::dependencies::tracing;
 use kitsune_p2p_mdns::*;
@@ -936,6 +937,7 @@ impl Space {
                         space.clone(),
                         ep_hnd.clone(),
                         evt_sender.clone(),
+                        Metrics::default(),
                     ),
                 )
             })
