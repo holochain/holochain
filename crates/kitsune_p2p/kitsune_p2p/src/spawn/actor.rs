@@ -40,6 +40,7 @@ type WireConHnd = Tx2ConHnd<wire::Wire>;
 type Payload = Box<[u8]>;
 
 ghost_actor::ghost_chan! {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) chan Internal<crate::KitsuneP2pError> {
         /// Register space event handler
         fn register_space_event_handler(recv: EvtRcv) -> ();

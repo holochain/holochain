@@ -19,6 +19,7 @@ type WireConHnd = Tx2ConHnd<wire::Wire>;
 type Payload = Box<[u8]>;
 
 ghost_actor::ghost_chan! {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) chan SpaceInternal<crate::KitsuneP2pError> {
         /// List online agents that claim to be covering a basis hash
         fn list_online_agents_for_basis_hash(space: KSpace, from_agent: KAgent, basis: KBasis) -> HashSet<KAgent>;
@@ -236,7 +237,7 @@ impl SpaceInternalHandler for Space {
                 self.handle_broadcast(
                     self.space.clone(),
                     Arc::new(KitsuneBasis::new(agent_info.agent.0.clone())),
-                    timeout.clone(),
+                    timeout,
                     BroadcastTo::PublishAgentInfo,
                     data.into(),
                 )
