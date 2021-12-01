@@ -3,6 +3,7 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
+- Adds `basis_hash` index to `DhtOp` table. This makes get queries faster.
 
 - **BREAKING CHANGES**: All DHT data for the same DNA space is now shared in the same database. 
 All authored data for the same DNA space is also now shared in another database. This requires no changes 
