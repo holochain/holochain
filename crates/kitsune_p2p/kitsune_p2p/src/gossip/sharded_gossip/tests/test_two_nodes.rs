@@ -46,8 +46,8 @@ async fn sharded_sanity_test() {
         .await
         .unwrap();
 
-    // - Alice responds to the initiate with 1 accept and 4 blooms.
-    assert_eq!(alice_outgoing.len(), 5);
+    // - Alice responds to the initiate with 1 accept and 1 blooms.
+    assert_eq!(alice_outgoing.len(), 2);
     alice
         .inner
         .share_mut(|i, _| {
@@ -68,8 +68,8 @@ async fn sharded_sanity_test() {
         bob_outgoing.extend(outgoing);
     }
 
-    // - Bob responds with 4 blooms and 4 responses to alice's blooms.
-    assert_eq!(bob_outgoing.len(), 8);
+    // - Bob responds with 1 blooms and 1 responses to alice's blooms.
+    assert_eq!(bob_outgoing.len(), 2);
     bob.inner
         .share_mut(|i, _| {
             // - Check bob has one current round.
@@ -88,8 +88,8 @@ async fn sharded_sanity_test() {
             .unwrap();
         alice_outgoing.extend(outgoing);
     }
-    // - Alice responds with 4 responses to bob's blooms.
-    assert_eq!(alice_outgoing.len(), 4);
+    // - Alice responds with 1 responses to bob's blooms.
+    assert_eq!(alice_outgoing.len(), 1);
 
     alice
         .inner
@@ -545,7 +545,7 @@ async fn initiate_after_target_is_set() {
         .process_incoming(alice_cert.clone(), alice_initiate)
         .await
         .unwrap();
-    assert_eq!(bob_outgoing.len(), 5);
+    assert_eq!(bob_outgoing.len(), 2);
 
     bob.inner
         .share_mut(|i, _| {
