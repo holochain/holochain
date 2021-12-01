@@ -57,6 +57,9 @@ pub(crate) mod tests;
 /// max send buffer size (keep it under 16384 with a little room for overhead)
 /// (this is not a tuning_param because it must be coordinated
 /// with the constant in PoolBuf which cannot be set at runtime)
+/// ^^ obviously we're no longer following the above advice..
+///    in the case of the pool buf management, any gossips larger than
+///    16000 will now be shrunk resulting in additional memory thrashing
 const MAX_SEND_BUF_BYTES: usize = 16_000_000;
 
 /// The maximum number of different nodes that will be
@@ -467,7 +470,7 @@ impl ShardedGossipLocal {
     /// Based on a compression of 75%.
     const UPPER_HASHES_BOUND: usize = 20_000;
 
-    /// The amount of blooms we want to send in a single gossip iteration.
+    /// The number of bloom filters we want to send in a single gossip iteration.
     const UPPER_BLOOM_BOUND: usize = 10;
 
     /// Calculate the time range for a gossip round.
@@ -847,13 +850,13 @@ pub enum EncodedTimedBloomFilter {
 /// Note this is not sent over the wire and is instead
 /// converted to a u8 to save bandwidth.
 pub enum MissingOpsStatus {
-    /// There is more chunks in this batch to come. No reply is needed.
+    /// There are more chunks in this batch to come. No reply is needed.
     ChunkComplete = 0,
-    /// This chunk is done but there is more batches
+    /// This chunk is done but there are more batches
     /// to come and you should reply with [`OpsBatchReceived`]
     /// when you are ready to get the next batch.
     BatchComplete = 1,
-    /// This is the final missing ops and there
+    /// This is the final batch of missing ops and there
     /// are no more ops to come. No reply is needed.
     AllComplete = 2,
 }
