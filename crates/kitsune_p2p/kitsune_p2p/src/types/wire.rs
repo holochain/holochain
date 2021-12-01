@@ -1,11 +1,11 @@
 //! KitsuneP2p Wire Protocol Encoding Decoding
 
+use crate::actor::BroadcastTo;
 use crate::agent_store::AgentInfoSigned;
 use crate::types::*;
 use derive_more::*;
 use kitsune_p2p_types::dht_arc::DhtLocation;
 use std::sync::Arc;
-use crate::actor::BroadcastTo;
 
 /// Type used for content data of wire messages.
 #[derive(
@@ -51,7 +51,7 @@ kitsune_p2p_types::write_codec_enum! {
             mod_cnt.4: u32,
 
             destination.5: BroadcastTo,
-            
+
             data.6: WireData,
         },
 

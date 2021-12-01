@@ -3,6 +3,7 @@
 
 use fixt::prelude::Distribution;
 use futures::stream::Stream;
+use kitsune_p2p::actor::BroadcastTo;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::ops::Range;
@@ -387,6 +388,7 @@ impl HolochainP2pMockMsg {
                         space,
                         to_agent,
                         data,
+                        destination: BroadcastTo::Notify,
                     })
                 }
             }

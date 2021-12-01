@@ -329,7 +329,7 @@ impl KitsuneP2pActor {
                                             // held before calling put_agent_info_signed?
                                             match AgentInfoSigned::decode(&data[..]) {
                                                 Ok(info) => {
-                                                    if let Err(err) = evt_sender 
+                                                    if let Err(err) = evt_sender
                                                         .put_agent_info_signed(
                                                             PutAgentInfoSignedEvt {
                                                                 space,
