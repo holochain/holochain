@@ -9,13 +9,13 @@ use std::iter;
 
 /// Maximum number of iterations. If we iterate this much, we assume the
 /// system is divergent (unable to reach equilibrium).
-const DIVERGENCE_ITERS: usize = 30;
+const DIVERGENCE_ITERS: usize = 40;
 
 /// Number of consecutive rounds of no movement before declaring convergence.
 const CONVERGENCE_WINDOW: usize = 3;
 
 /// Level of detail in reporting.
-pub const DETAIL: u8 = 0;
+pub const DETAIL: u8 = 1;
 
 type DataVec = statrs::statistics::Data<Vec<f64>>;
 
@@ -33,41 +33,6 @@ pub fn seeded_rng(seed: Option<u64>) -> StdRng {
     let seed = seed.unwrap_or_else(|| thread_rng().gen());
     tracing::info!("RNG seed: {}", seed);
     StdRng::seed_from_u64(seed)
-}
-
-#[allow(dead_code)]
-pub fn run_single_agent_convergence(
-    iters: usize,
-    n: usize,
-    redundancy: u16,
-    j: f64,
-    check_gaps: bool,
-) -> RunBatch {
-    tracing::info!("");
-    tracing::info!("------------------------");
-
-    // let seed = None;
-    let seed = Some(7532095396949412554);
-    let mut rng = seeded_rng(seed);
-
-    let strat = PeerStratAlpha {
-        check_gaps,
-        redundancy_target: redundancy / 2,
-        ..Default::default()
-    }
-    .into();
-
-    let s = ArcLenStrategy::Constant(redundancy as f64 / n as f64);
-
-    let mut peers = simple_parameterized_generator(&mut rng, n, j, s);
-    *peers[0].half_length_mut() = MAX_HALF_LENGTH;
-    let runs = determine_equilibrium(iters, peers, |peers| {
-        let dynamic = Some(maplit::hashset![0]);
-        let (peers, stats) = run_one_epoch(&strat, peers, dynamic.as_ref(), DETAIL);
-        tracing::debug!("{}", peers[0].coverage());
-        (peers, stats)
-    });
-    runs
 }
 
 pub fn determine_equilibrium<'a, F>(iters: usize, peers: Peers, step: F) -> RunBatch
@@ -172,11 +137,11 @@ pub fn run_one_epoch(
         }
     }
 
-    if detail == 1 {
+    if detail >= 2 {
         tracing::info!("min: |{}| {}", peers[index_min].to_ascii(64), index_min);
         tracing::info!("max: |{}| {}", peers[index_max].to_ascii(64), index_max);
         tracing::info!("");
-    } else if detail == 2 {
+    } else if detail >= 3 {
         print_arcs(&peers);
         get_input();
     }
@@ -260,7 +225,7 @@ impl Stats {
 #[derive(Clone, Debug)]
 pub struct RunReport {
     pub iteration_stats: Stats,
-    pub redundancy_stats: Stats,
+    pub overall_redundancy_stats: Stats,
     pub outcome: RunReportOutcome,
     pub total_runs: usize,
 }
@@ -269,7 +234,7 @@ impl RunReport {
     pub fn is_convergent(&self) -> bool {
         match self.outcome {
             RunReportOutcome::Convergent { .. } => true,
-            RunReportOutcome::Divergent => false,
+            RunReportOutcome::Divergent { .. } => false,
         }
     }
 
@@ -294,13 +259,19 @@ impl RunReport {
 
 #[derive(Clone, Debug)]
 pub enum RunReportOutcome {
+    /// The redundancy stats across just the last epoch of each run
     Convergent { redundancy_stats: Stats },
-    Divergent,
+    /// The redundancy stats across the last N epochs of each run, all combined
+    Divergent {
+        redundancy_stats: Stats,
+        num_epochs: usize,
+    },
 }
 
 #[allow(dead_code)]
 impl RunBatch {
     pub fn report(&self) -> RunReport {
+        let num_epochs = 10;
         let iterations = DataVec::new(self.histories().map(|h| h.len() as f64).collect());
         let redundancies = DataVec::new(
             self.histories()
@@ -312,22 +283,37 @@ impl RunBatch {
             Vergence::Convergent => RunReportOutcome::Convergent {
                 redundancy_stats: Stats::new(DataVec::new(
                     self.histories()
-                        .map(|h| h.last().unwrap().min_redundancy as f64)
+                        .map(|hs| hs.last().unwrap().min_redundancy as f64)
                         .collect(),
                 )),
             },
-            Vergence::Divergent => RunReportOutcome::Divergent,
+            Vergence::Divergent => RunReportOutcome::Divergent {
+                num_epochs,
+                redundancy_stats: Stats::new(DataVec::new(
+                    self.histories()
+                        .map(|hs| {
+                            let mut hs = hs.clone();
+                            hs.reverse();
+                            hs.into_iter()
+                                .take(num_epochs)
+                                .map(|e| e.min_redundancy as f64)
+                                .collect::<Vec<_>>()
+                        })
+                        .flatten()
+                        .collect(),
+                )),
+            },
         };
         RunReport {
             iteration_stats: Stats::new(iterations),
-            redundancy_stats: Stats::new(redundancies),
+            overall_redundancy_stats: Stats::new(redundancies),
             outcome,
             total_runs: self.histories().count(),
         }
     }
 
     pub fn vergence(&self) -> Vergence {
-        if self.0.iter().all(|r| r.vergence == Vergence::Convergent) {
+        if self.0.iter().all(|r| r.vergence.is_convergent()) {
             Vergence::Convergent
         } else {
             Vergence::Divergent
@@ -349,16 +335,6 @@ pub struct Run {
     pub history: Vec<EpochStats>,
     /// the final state of the peers at the last iteration
     pub peers: Peers,
-}
-
-impl Run {
-    pub fn vergence(&self) -> Vergence {
-        self.vergence
-    }
-
-    pub fn min_redundancy(&self) -> usize {
-        todo!()
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
