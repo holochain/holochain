@@ -138,7 +138,7 @@ pub async fn exchange_peer_info(envs: Vec<DbWrite<DbKindP2pAgentStore>>) {
     }
 }
 
-async fn run_query<F, R>(db: DbWrite<DbKindP2pAgentStore>, f: F) -> ConductorResult<R>
+async fn run_query<F, R>(db: DbRead<DbKindP2pAgentStore>, f: F) -> ConductorResult<R>
 where
     R: Send + 'static,
     F: FnOnce(PConnGuard) -> ConductorResult<R> + Send + 'static,
@@ -154,7 +154,7 @@ where
 
 /// Get agent info for a single agent
 pub async fn get_agent_info_signed(
-    environ: DbWrite<DbKindP2pAgentStore>,
+    environ: DbRead<DbKindP2pAgentStore>,
     _kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>,
 ) -> ConductorResult<Option<AgentInfoSigned>> {
@@ -166,7 +166,7 @@ pub async fn get_agent_info_signed(
 
 /// Get all agent info for a single space
 pub async fn list_all_agent_info(
-    environ: DbWrite<DbKindP2pAgentStore>,
+    environ: DbRead<DbKindP2pAgentStore>,
     _kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
 ) -> ConductorResult<Vec<AgentInfoSigned>> {
     run_query(environ, move |mut conn| Ok(conn.p2p_list_agents()?)).await
@@ -174,7 +174,7 @@ pub async fn list_all_agent_info(
 
 /// Get all agent info for a single space near a basis loc
 pub async fn list_all_agent_info_signed_near_basis(
-    environ: DbWrite<DbKindP2pAgentStore>,
+    environ: DbRead<DbKindP2pAgentStore>,
     _kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     basis_loc: u32,
     limit: u32,
@@ -188,7 +188,7 @@ pub async fn list_all_agent_info_signed_near_basis(
 /// Get the peer density an agent is currently seeing within
 /// a given [`DhtArc`]
 pub async fn query_peer_density(
-    env: DbWrite<DbKindP2pAgentStore>,
+    env: DbRead<DbKindP2pAgentStore>,
     kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     dht_arc: DhtArc,
 ) -> ConductorResult<PeerDensity> {

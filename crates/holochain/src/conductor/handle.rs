@@ -602,7 +602,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 ..
             } => {
                 let env = { self.p2p_env(space) };
-                let res = get_agent_info_signed(env, kitsune_space, kitsune_agent)
+                let res = get_agent_info_signed(env.into(), kitsune_space, kitsune_agent)
                     .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
@@ -614,7 +614,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 ..
             } => {
                 let env = { self.p2p_env(space) };
-                let res = list_all_agent_info(env, kitsune_space)
+                let res = list_all_agent_info(env.into(), kitsune_space)
                     .await
                     .map(|infos| match agents {
                         Some(agents) => infos
@@ -654,10 +654,14 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 ..
             } => {
                 let env = { self.p2p_env(space) };
-                let res =
-                    list_all_agent_info_signed_near_basis(env, kitsune_space, basis_loc, limit)
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other);
+                let res = list_all_agent_info_signed_near_basis(
+                    env.into(),
+                    kitsune_space,
+                    basis_loc,
+                    limit,
+                )
+                .await
+                .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
             QueryPeerDensity {
@@ -667,7 +671,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 ..
             } => {
                 let env = { self.p2p_env(space) };
-                let res = query_peer_density(env, kitsune_space, dht_arc)
+                let res = query_peer_density(env.into(), kitsune_space, dht_arc)
                     .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));

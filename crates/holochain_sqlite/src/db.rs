@@ -195,7 +195,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         Self::open_with_sync_level(path_prefix, kind, DbSyncLevel::default())
     }
 
-    pub async fn conn_permit(&self) -> PConnPermit {
+    pub async fn conn_write_permit(&self) -> PConnPermit {
         let g = self.acquire_writer_permit().await;
         PConnPermit(g)
     }

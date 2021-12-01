@@ -96,6 +96,7 @@ fn batch_check_end(batch: &IncomingOpsBatch) -> Option<Vec<InOpBatchEntry>> {
     })
 }
 
+#[instrument(skip(txn, ops))]
 fn batch_process_entry(
     txn: &mut rusqlite::Transaction<'_>,
     request_validation_receipt: bool,
@@ -115,6 +116,7 @@ fn batch_process_entry(
         }
     }
 
+    tracing::debug!("Inserting {} ops", to_pending.len());
     add_to_pending(txn, to_pending, request_validation_receipt)?;
 
     Ok(())
