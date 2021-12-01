@@ -21,11 +21,13 @@ pub const DELIMITER: &str = ".";
 ///
 /// @todo - revisit whether there is a need/use-case for different link tags or entries
 /// See anchors implementation.
-pub const NAME: [u8; 8] = [0x68, 0x64, 0x6b, 0x2e, 0x70, 0x61, 0x74, 0x68];
+pub const NAME: [u8; 2] = [0x00, 0x00];
 
 /// Each path component is arbitrary bytes to be hashed together in a predictable way when the path
 /// is hashed to create something that can be linked and discovered by all DHT participants.
-#[derive(Clone, PartialEq, Debug, Default, serde::Deserialize, serde::Serialize)]
+#[derive(
+    Clone, PartialEq, Debug, Default, serde::Deserialize, serde::Serialize, SerializedBytes,
+)]
 #[repr(transparent)]
 pub struct Component(#[serde(with = "serde_bytes")] Vec<u8>);
 
@@ -233,29 +235,63 @@ impl From<String> for Path {
     }
 }
 
-impl TryFrom<&Path> for LinkTag {
-    type Error = SerializedBytesError;
-    fn try_from(path: &Path) -> Result<Self, Self::Error> {
-        // Link tag is:
-        //
-        // - the name of all anchor links to disambiguate against other links
-        // - the literal serialized bytes of the path
-        //
-        // This allows the value of the target to be read/dereferenced straight from the
-        // link without needing additional network calls.
-        let path_bytes: Vec<u8> = UnsafeBytes::from(SerializedBytes::try_from(path)?).into();
-        let link_tag_bytes: Vec<u8> = NAME.iter().chain(path_bytes.iter()).cloned().collect();
-        Ok(LinkTag::new(link_tag_bytes))
-    }
-}
+// impl TryFrom<&Component> for LinkTag {
+//     type Error = WasmError;
+//     fn try_from(component: &Component) -> Result<Self, Self::Error> {
+//         // Link tag is:
+//         //
+//         // - the name of all anchor links to disambiguate against other links
+//         // - the literal serialized bytes of the path
+//         //
+//         // This allows the value of the target to be read/dereferenced straight from the
+//         // link without needing additional network calls.
+//         let component_bytes: Vec<u8> = UnsafeBytes::from(SerializedBytes::try_from(component)?).into();
+//         let link_tag_bytes: Vec<u8> = NAME.iter().chain(component_bytes.iter()).cloned().collect();
+//         Ok(LinkTag::new(link_tag_bytes))
+//     }
+// }
 
-impl TryFrom<&LinkTag> for Path {
-    type Error = SerializedBytesError;
-    fn try_from(link_tag: &LinkTag) -> Result<Self, Self::Error> {
-        let sb = SerializedBytes::from(UnsafeBytes::from(link_tag.as_ref()[NAME.len()..].to_vec()));
-        Self::try_from(sb)
-    }
-}
+// impl TryFrom<Option<Component>> for LinkTag {
+//     type Error = WasmError;
+//     fn try_from(maybe_component: Option<Component>) -> Result<Self, Self::Error> {
+//         Ok(
+//             LinkTag::new(
+//                 NAME.iter().chain(
+//                     holochain_serialized_bytes::encode(maybe_component)?.iter()
+//                 )
+//                 .cloned()
+//                 .collect()
+//             )
+//         )
+//     }
+// }
+
+// impl TryFrom<&LinkTag> for Path {
+//     type Error = SerializedBytesError;
+//     fn try_from(link_tag: &LinkTag) -> Result<Self, Self::Error> {
+//         let sb = SerializedBytes::from(UnsafeBytes::from(link_tag.as_ref()[NAME.len()..].to_vec()));
+//         Self::try_from(sb)
+//     }
+// }
+
+// impl TryFrom<&LinkTag> for Component {
+//     type Error = WasmError;
+//     fn try_from(link_tag: &LinkTag) -> Result<Self, Self::Error> {
+//         let sb = SerializedBytes::from(UnsafeBytes::from(link_tag.as_ref()[NAME.len()..].to_vec()));
+//         Ok(Self::try_from(sb)?)
+//     }
+// }
+
+// impl TryFrom<&Link> for Path {
+//     type Error = WasmError;
+//     fn try_from(link: &Link) -> Result<Self, Self::Error> {
+//         let component = Component::try_from(&link.tag)?;
+//         let base_path = Path::try_from(must_get_entry(link.base)?)?;
+
+//         base_path.append_component(component);
+//         Ok(base_path)
+//     }
+// }
 
 impl Path {
     /// What is the hash for the current [ `Path` ]?
@@ -274,7 +310,19 @@ impl Path {
             create_entry(self)?;
             if let Some(parent) = self.parent() {
                 parent.ensure()?;
-                create_link(parent.hash()?, self.hash()?, LinkTag::try_from(self)?)?;
+                create_link(
+                    parent.hash()?,
+                    self.hash()?,
+                    dbg!(LinkTag::new(
+                        NAME.iter()
+                            .chain(match self.0.last() {
+                                None => <Vec<u8>>::new(),
+                                Some(component) => UnsafeBytes::from(SerializedBytes::try_from(component)?).into(),
+                            }.iter())
+                            .cloned()
+                            .collect::<Vec<u8>>(),
+                    )),
+                )?;
             }
         }
         Ok(())
@@ -304,6 +352,33 @@ impl Path {
         Ok(unwrapped)
     }
 
+    pub fn children_paths(&self) -> ExternResult<Vec<Self>> {
+        let children = self.children()?;
+        let components: ExternResult<Vec<Option<Component>>> = children
+            .into_iter()
+            .map(|link| {
+                let component_bytes = &link.tag.0[NAME.len()..];
+                if component_bytes.is_empty() {
+                    Ok(None)
+                } else {
+                    Ok(Some(SerializedBytes::from(UnsafeBytes::from(component_bytes.to_vec())).try_into()
+                    .map_err(WasmError::Serialize)?))
+
+                }
+            })
+            .collect();
+        Ok(components?
+            .into_iter()
+            .map(|maybe_component| {
+                let mut new_path = self.clone();
+                if let Some(component) = maybe_component {
+                    new_path.append_component(component);
+                }
+                new_path
+            })
+            .collect())
+    }
+
     pub fn children_details(&self) -> ExternResult<holochain_zome_types::link::LinkDetails> {
         Self::ensure(self)?;
         get_link_details(
@@ -311,32 +386,16 @@ impl Path {
             Some(holochain_zome_types::link::LinkTag::new(NAME)),
         )
     }
+
+    pub fn append_component(&mut self, component: Component) {
+        self.0.push(component);
+    }
 }
 
 #[test]
 #[cfg(test)]
 fn hash_path_delimiter() {
     assert_eq!(".", DELIMITER,);
-}
-
-#[test]
-#[cfg(test)]
-fn hash_path_linktag() {
-    assert_eq!("hdk.path".as_bytes(), NAME);
-
-    let path = Path::from("foo.bar");
-
-    let link_tag = LinkTag::try_from(&path).unwrap();
-
-    assert_eq!(
-        &vec![
-            104, 100, 107, 46, 112, 97, 116, 104, 146, 196, 12, 102, 0, 0, 0, 111, 0, 0, 0, 111, 0,
-            0, 0, 196, 12, 98, 0, 0, 0, 97, 0, 0, 0, 114, 0, 0, 0
-        ],
-        link_tag.as_ref(),
-    );
-
-    assert_eq!(Path::try_from(&link_tag).unwrap(), path,);
 }
 
 #[test]

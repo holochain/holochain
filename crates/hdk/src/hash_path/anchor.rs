@@ -47,7 +47,7 @@ impl From<&Anchor> for Path {
 /// The obvious example would be a path of binary data that is not valid utf-8 strings or a path
 /// that is more than 2 levels deep.
 impl TryFrom<&Path> for Anchor {
-    type Error = SerializedBytesError;
+    type Error = WasmError;
     fn try_from(path: &Path) -> Result<Self, Self::Error> {
         let components: Vec<Component> = path.as_ref().to_owned();
         if components.len() == 2 || components.len() == 3 {
@@ -62,16 +62,17 @@ impl TryFrom<&Path> for Anchor {
                     },
                 })
             } else {
-                Err(SerializedBytesError::Deserialize(format!(
-                    "Bad anchor path root {:0?} should be {:1?}",
-                    components[0].as_ref(),
-                    ROOT.as_bytes(),
+                Err(WasmError::Serialize(SerializedBytesError::Deserialize(
+                    format!(
+                        "Bad anchor path root {:0?} should be {:1?}",
+                        components[0].as_ref(),
+                        ROOT.as_bytes(),
+                    ),
                 )))
             }
         } else {
-            Err(SerializedBytesError::Deserialize(format!(
-                "Bad anchor path length {}",
-                components.len()
+            Err(WasmError::Serialize(SerializedBytesError::Deserialize(
+                format!("Bad anchor path length {}", components.len()),
             )))
         }
     }
@@ -144,18 +145,15 @@ pub fn list_anchor_tags(anchor_type: String) -> ExternResult<Vec<String>> {
     })
         .into();
     path.ensure()?;
-    let hopefully_anchor_tags: Result<Vec<String>, SerializedBytesError> = path
-        .children()?
+    let hopefully_anchor_tags: Result<Vec<String>, WasmError> = path
+        .children_paths()?
         .into_iter()
-        .map(|link| match Path::try_from(&link.tag) {
-            Ok(path) => match Anchor::try_from(&path) {
-                Ok(anchor) => match anchor.anchor_text {
-                    Some(text) => Ok(text),
-                    None => Err(SerializedBytesError::Deserialize(
-                        "missing anchor text".into(),
-                    )),
-                },
-                Err(e) => Err(e),
+        .map(|path| match Anchor::try_from(&path) {
+            Ok(anchor) => match anchor.anchor_text {
+                Some(text) => Ok(text),
+                None => Err(WasmError::Serialize(SerializedBytesError::Deserialize(
+                    "missing anchor text".into(),
+                ))),
             },
             Err(e) => Err(e),
         })
