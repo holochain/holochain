@@ -651,7 +651,7 @@ impl KitsuneP2pHandler for Space {
         Ok(async move {
             futures::future::join_all(local_events).await;
 
-            // TODO - FIXME
+            // NOTE
             // Holochain currently does all its testing without any remote nodes
             // if we do this inline, it takes us to the 30 second timeout
             // on every one of those... so spawning for now, which means
