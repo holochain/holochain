@@ -1,22 +1,14 @@
 pub mod sql_cell {
     pub(crate) const SCHEMA: &str = include_str!("sql/cell/schema.sql");
     pub const UPDATE_INTEGRATE_OPS: &str = include_str!("sql/cell/update_integrate_ops.sql");
-    pub mod any {
-        pub const FETCH_OP_HASHES_FULL: &str =
-            include_str!("sql/cell/fetch_hashes/any/fetch_op_hashes_full.sql");
-        pub const FETCH_OP_HASHES_CONTINUOUS: &str =
-            include_str!("sql/cell/fetch_hashes/any/fetch_op_hashes_continuous.sql");
-        pub const FETCH_OP_HASHES_WRAPPED: &str =
-            include_str!("sql/cell/fetch_hashes/any/fetch_op_hashes_wrapped_v1.sql");
-    }
-    pub mod integrated {
-        pub const FETCH_OP_HASHES_FULL: &str =
-            include_str!("sql/cell/fetch_hashes/integrated/fetch_op_hashes_full.sql");
-        pub const FETCH_OP_HASHES_CONTINUOUS: &str =
-            include_str!("sql/cell/fetch_hashes/integrated/fetch_op_hashes_continuous.sql");
-        pub const FETCH_OP_HASHES_WRAPPED: &str =
-            include_str!("sql/cell/fetch_hashes/integrated/fetch_op_hashes_wrapped_v1.sql");
-    }
+
+    pub const FETCH_OP_HASHES_P1: &str =
+        include_str!("sql/cell/fetch_hashes/fetch_op_hashes_p1.sql");
+    pub const FETCH_OP_HASHES_P2: &str =
+        include_str!("sql/cell/fetch_hashes/fetch_op_hashes_p2.sql");
+
+    pub const FETCH_OP: &str = include_str!("sql/cell/fetch_op.sql");
+
     pub mod schedule {
         pub const UPDATE: &str = include_str!("sql/cell/schedule/update.sql");
         pub const DELETE: &str = include_str!("sql/cell/schedule/delete.sql");

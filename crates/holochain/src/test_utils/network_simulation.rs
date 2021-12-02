@@ -11,7 +11,6 @@ use holo_hash::{DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_p2p::dht_arc::{ArcInterval, DhtArc, DhtLocation};
 use holochain_p2p::{AgentPubKeyExt, DhtOpHashExt, DnaHashExt};
-use holochain_sqlite::conn::DbSyncLevel;
 use holochain_sqlite::db::{p2p_put_single, AsP2pStateTxExt};
 use holochain_state::prelude::from_blob;
 use holochain_state::test_utils::fresh_reader_test;
@@ -361,7 +360,6 @@ async fn create_test_data(
     let mut network = KitsuneP2pConfig::default();
     network.tuning_params = Arc::new(tuning);
     let config = ConductorConfig {
-        db_sync_level: DbSyncLevel::Off,
         network: Some(network),
         ..Default::default()
     };
@@ -402,8 +400,10 @@ async fn create_test_data(
     let mut ops = HashMap::new();
     for (i, cell) in cells.iter().enumerate() {
         eprintln!("Extracting data {}", i);
-        let env = cell.env().clone();
-        let data = fresh_reader_test(env, |mut txn| get_ops(&mut txn));
+        let env = cell.authored_env().clone();
+        let data = fresh_reader_test(env, |mut txn| {
+            get_authored_ops(&mut txn, cell.agent_pubkey())
+        });
         let hashes = data.keys().cloned().collect::<Vec<_>>();
         authored.insert(Arc::new(cell.agent_pubkey().clone()), hashes);
         ops.extend(data);
@@ -462,6 +462,38 @@ fn get_ops(txn: &mut Transaction<'_>) -> HashMap<Arc<DhtOpHash>, DhtOpHashed> {
     )
     .unwrap()
     .query_map([], |row| {
+        let header = from_blob::<SignedHeader>(row.get("header_blob")?).unwrap();
+        let op_type: DhtOpType = row.get("dht_type")?;
+        let hash: DhtOpHash = row.get("hash")?;
+        // Check the entry isn't private before gossiping it.
+        let e: Option<Vec<u8>> = row.get("entry_blob")?;
+        let entry = e.map(|entry| from_blob::<Entry>(entry).unwrap());
+        let op = DhtOp::from_type(op_type, header, entry).unwrap();
+        let op = DhtOpHashed::with_pre_hashed(op, hash.clone());
+        Ok((Arc::new(hash), op))
+    })
+    .unwrap()
+    .collect::<Result<HashMap<_, _>, _>>()
+    .unwrap()
+}
+
+fn get_authored_ops(
+    txn: &mut Transaction<'_>,
+    author: &AgentPubKey,
+) -> HashMap<Arc<DhtOpHash>, DhtOpHashed> {
+    txn.prepare(
+        "
+                SELECT DhtOp.hash, DhtOp.type AS dht_type,
+                Header.blob AS header_blob, Entry.blob AS entry_blob
+                FROM DHtOp
+                JOIN Header ON DhtOp.header_hash = Header.hash
+                LEFT JOIN Entry ON Header.entry_hash = Entry.hash
+                WHERE
+                Header.author = ?
+            ",
+    )
+    .unwrap()
+    .query_map([author], |row| {
         let header = from_blob::<SignedHeader>(row.get("header_blob")?).unwrap();
         let op_type: DhtOpType = row.get("dht_type")?;
         let hash: DhtOpHash = row.get("hash")?;

@@ -6,5 +6,6 @@ FROM
   ScheduledFunctions
 WHERE
   NOT ephemeral
+  AND author = :author
   AND
-END < ?
+END < :now

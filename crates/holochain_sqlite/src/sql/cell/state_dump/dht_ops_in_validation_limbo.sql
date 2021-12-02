@@ -12,16 +12,6 @@ FROM
 WHERE
   when_integrated IS NULL
   AND (
-    (
-      is_authored = 1
-      AND validation_stage IS NOT NULL
-      AND validation_stage < 3
-    )
-    OR (
-      is_authored = 0
-      AND (
-        validation_stage IS NULL
-        OR validation_stage < 3
-      )
-    )
+    validation_stage IS NULL
+    OR validation_stage < 3
   )

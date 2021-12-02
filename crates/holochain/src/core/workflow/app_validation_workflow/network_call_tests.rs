@@ -4,7 +4,7 @@ use hdk::prelude::EntryType;
 use hdk::prelude::ValidationPackage;
 use holo_hash::HeaderHash;
 use holochain_p2p::actor::GetActivityOptions;
-use holochain_p2p::HolochainP2pCellT;
+use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::fresh_reader_test;
 use holochain_test_wasm_common::AgentActivitySearch;
 use holochain_types::prelude::*;
@@ -550,7 +550,7 @@ async fn get_custom_package_test() {
         .unwrap();
 
     {
-        let env: EnvRead = bob_call_data.env.clone().into();
+        let env: DbRead = bob_call_data.env.clone().into();
         let element_integrated = ElementBuf::vault(env.clone(), false).unwrap();
         let meta_integrated = MetadataBuf::vault(env.clone()).unwrap();
         let mut element_cache = ElementBuf::cache(env.clone()).unwrap();

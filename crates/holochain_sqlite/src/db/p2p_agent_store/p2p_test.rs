@@ -32,7 +32,11 @@ fn rand_signed_at_ms() -> u64 {
     now - rng.gen_range(1000, 2000)
 }
 
-async fn rand_insert(db: &DbWrite, space: &Arc<KitsuneSpace>, agent: &Arc<KitsuneAgent>) {
+async fn rand_insert(
+    db: &DbWrite<DbKindP2pAgentStore>,
+    space: &Arc<KitsuneSpace>,
+    agent: &Arc<KitsuneAgent>,
+) {
     let mut rng = rand::thread_rng();
 
     let signed_at_ms = rand_signed_at_ms();
@@ -66,7 +70,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
 
     let space = rand_space();
 
-    let db = DbWrite::test(&tmp_dir, DbKind::P2pAgentStore(space.clone())).unwrap();
+    let db = DbWrite::test(&tmp_dir, DbKindP2pAgentStore(space.clone())).unwrap();
 
     let mut example_agent = rand_agent();
 

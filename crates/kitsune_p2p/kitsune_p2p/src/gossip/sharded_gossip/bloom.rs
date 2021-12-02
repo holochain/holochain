@@ -46,27 +46,16 @@ impl ShardedGossipLocal {
     /// - Expect this function to complete in an average of 10 ms and worst case 100 ms.
     pub(super) async fn generate_ops_blooms_for_time_window(
         &self,
-        local_agents: &HashSet<Arc<KitsuneAgent>>,
         common_arc_set: &Arc<DhtArcSet>,
         mut search_time_window: TimeWindow,
     ) -> KitsuneResult<Vec<TimedBloomFilter>> {
         let mut results = Vec::new();
         loop {
-            // Get the local agents within the arc set.
-            let local_agents_within_arc_set: Vec<_> =
-                store::agents_within_arcset(&self.evt_sender, &self.space, common_arc_set.clone())
-                    .await?
-                    .into_iter()
-                    .filter(|(a, _)| local_agents.contains(a))
-                    .filter(|(_, i)| !i.is_empty())
-                    .collect();
-
             // Get the op hashes which fit within the common arc set from these local agents.
             let result = store::all_op_hashes_within_arcset(
                 &self.evt_sender,
                 &self.space,
-                local_agents_within_arc_set.as_slice(),
-                common_arc_set,
+                (**common_arc_set).clone(),
                 search_time_window.clone(),
                 Self::UPPER_HASHES_BOUND,
                 true,
@@ -77,7 +66,7 @@ impl ShardedGossipLocal {
             let (ops_within_common_arc, found_time_window) = match result {
                 Some(r) => r,
                 None => {
-                    if !local_agents_within_arc_set.is_empty() {
+                    if !common_arc_set.is_empty() {
                         // We have local agents within the arc but no hashes.
                         let bloom = TimedBloomFilter {
                             bloom: None,
@@ -140,7 +129,6 @@ impl ShardedGossipLocal {
     /// - The expected performance per op is average 10ms and worst 100 ms.
     pub(super) async fn check_ops_bloom(
         &self,
-        local_agents_within_arc_set: Vec<(Arc<KitsuneAgent>, ArcInterval)>,
         state: RoundState,
         remote_bloom: TimedBloomFilter,
     ) -> KitsuneResult<HashMap<Arc<KitsuneOpHash>, Vec<u8>>> {
@@ -152,8 +140,7 @@ impl ShardedGossipLocal {
         if let Some((hashes, _)) = store::all_op_hashes_within_arcset(
             &self.evt_sender,
             &self.space,
-            local_agents_within_arc_set.as_slice(),
-            &common_arc_set,
+            (*common_arc_set).clone(),
             time,
             // TOOD: This means we will pull all hashes we have for this
             // time window into memory. Is that ok?
@@ -170,16 +157,10 @@ impl ShardedGossipLocal {
                 // No remote bloom so they are missing everything.
                 None => hashes,
             };
-            let agents = local_agents_within_arc_set
-                .iter()
-                .map(|(a, _)| a)
-                .cloned()
-                .collect();
             let missing_ops = self
                 .evt_sender
                 .fetch_op_data(FetchOpDataEvt {
                     space: self.space.clone(),
-                    agents,
                     op_hashes: missing_hashes,
                 })
                 .await

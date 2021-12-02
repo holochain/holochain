@@ -35,14 +35,39 @@ impl ShardedGossipLocal {
 
         let id = rand::thread_rng().gen();
 
+        let agent_list = self
+            .evt_sender
+            .query_agents(
+                QueryAgentsEvt::new(self.space.clone()).by_agents(local_agents.iter().cloned()),
+            )
+            .await
+            .map_err(KitsuneError::other)?;
+
         let maybe_gossip = self.inner.share_mut(|inner, _| {
-            Ok(if let Some((endpoint, url)) = remote_agent {
-                let gossip = ShardedGossipWire::initiate(intervals, id);
-                inner.initiate_tgt = Some((endpoint.clone(), id, Some(Instant::now())));
-                Some((endpoint, HowToConnect::Url(url), gossip))
-            } else {
-                None
-            })
+            Ok(
+                if let Some(next_target::Node {
+                    agent_info_list,
+                    cert,
+                    url,
+                }) = remote_agent
+                {
+                    let gossip = ShardedGossipWire::initiate(intervals, id, agent_list);
+
+                    let tgt = ShardedGossipTarget {
+                        remote_agent_list: agent_info_list,
+                        cert: cert.clone(),
+                        tie_break: id,
+                        when_initiated: Some(Instant::now()),
+                        url: url.clone(),
+                    };
+
+                    inner.initiate_tgt = Some(tgt);
+
+                    Some((cert, HowToConnect::Url(url), gossip))
+                } else {
+                    None
+                },
+            )
         })?;
         Ok(maybe_gossip)
     }
@@ -55,6 +80,7 @@ impl ShardedGossipLocal {
         peer_cert: Tx2Cert,
         remote_arc_set: Vec<ArcInterval>,
         remote_id: u32,
+        remote_agent_list: Vec<AgentInfoSigned>,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let (local_agents, same_as_target, already_in_progress) =
             self.inner.share_mut(|i, _| {
@@ -62,8 +88,8 @@ impl ShardedGossipLocal {
                 let same_as_target = i
                     .initiate_tgt
                     .as_ref()
-                    .filter(|tgt| *tgt.0.cert() == peer_cert)
-                    .map(|tgt| tgt.1);
+                    .filter(|tgt| tgt.cert == peer_cert)
+                    .map(|tgt| tgt.tie_break);
                 Ok((i.local_agents.clone(), same_as_target, already_in_progress))
             })?;
 
@@ -101,19 +127,30 @@ impl ShardedGossipLocal {
         // Get the local intervals.
         let local_agent_arcs =
             store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents).await?;
-        let local_arcs = local_agent_arcs
-            .iter()
-            .map(|(_, arc)| arc.clone())
-            .collect();
+        let local_arcs: Vec<ArcInterval> =
+            local_agent_arcs.into_iter().map(|(_, arc)| arc).collect();
 
         let mut gossip = Vec::with_capacity(3);
 
+        let agent_list = self
+            .evt_sender
+            .query_agents(
+                QueryAgentsEvt::new(self.space.clone()).by_agents(local_agents.iter().cloned()),
+            )
+            .await
+            .map_err(KitsuneError::other)?;
+
         // Send the intervals back as the accept message.
-        gossip.push(ShardedGossipWire::accept(local_arcs));
+        gossip.push(ShardedGossipWire::accept(local_arcs.clone(), agent_list));
 
         // Generate the bloom filters and new state.
         let state = self
-            .generate_blooms(local_agent_arcs, remote_arc_set, &mut gossip)
+            .generate_blooms(
+                remote_agent_list.clone(),
+                local_arcs,
+                remote_arc_set,
+                &mut gossip,
+            )
             .await?;
 
         self.inner.share_mut(|inner, _| {
@@ -123,14 +160,17 @@ impl ShardedGossipLocal {
             if inner
                 .initiate_tgt
                 .as_ref()
-                .map_or(true, |tgt| *tgt.0.cert() != peer_cert)
+                .map_or(true, |tgt| tgt.cert != peer_cert)
             {
-                inner.metrics.record_remote_round(peer_cert.clone());
+                inner.metrics.record_remote_round(&remote_agent_list);
             }
             // If this is the target then we should clear the when initiated timeout.
-            if let Some((tgt, _, when_initiated)) = inner.initiate_tgt.as_mut() {
-                if *tgt.cert() == peer_cert {
-                    *when_initiated = None;
+            if let Some(tgt) = inner.initiate_tgt.as_mut() {
+                if tgt.cert == peer_cert {
+                    tgt.when_initiated = None;
+                    // we also want to update the agent list
+                    // with that reported by the remote end
+                    tgt.remote_agent_list = remote_agent_list;
                 }
             }
             Ok(())
@@ -144,18 +184,18 @@ impl ShardedGossipLocal {
     /// - A new state is created for this round.
     pub(super) async fn generate_blooms(
         &self,
-        local_agent_arcs: Vec<(Arc<KitsuneAgent>, ArcInterval)>,
+        remote_agent_list: Vec<AgentInfoSigned>,
+        local_arcs: Vec<ArcInterval>,
         remote_arc_set: Vec<ArcInterval>,
         gossip: &mut Vec<ShardedGossipWire>,
     ) -> KitsuneResult<RoundState> {
         // Create the common arc set from the remote and local arcs.
-        let (local_agents, local_arcs): (HashSet<_>, Vec<_>) = local_agent_arcs.into_iter().unzip();
         let arc_set: DhtArcSet = local_arcs.into();
         let remote_arc_set: DhtArcSet = remote_arc_set.into();
         let common_arc_set = Arc::new(arc_set.intersection(&remote_arc_set));
 
         // Generate the new state.
-        let mut state = self.new_state(common_arc_set)?;
+        let mut state = self.new_state(remote_agent_list, common_arc_set)?;
 
         // Generate the agent bloom.
         if let GossipType::Recent = self.gossip_type {
@@ -171,7 +211,7 @@ impl ShardedGossipLocal {
         // Generate the ops bloom for all local agents within the common arc.
         for (i, window) in windows.into_iter().enumerate() {
             let blooms = self
-                .generate_ops_blooms_for_time_window(&local_agents, &state.common_arc_set, window)
+                .generate_ops_blooms_for_time_window(&state.common_arc_set, window)
                 .await?;
 
             // If no blooms were found for this time window then return a no overlap.

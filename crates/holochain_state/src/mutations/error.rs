@@ -17,6 +17,8 @@ pub enum StateMutationError {
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
     #[error(transparent)]
     ScheduleError(#[from] holochain_zome_types::schedule::ScheduleError),
+    #[error(transparent)]
+    HolochainP2pError(#[from] holochain_p2p::HolochainP2pError),
 }
 
 pub type StateMutationResult<T> = Result<T, StateMutationError>;
