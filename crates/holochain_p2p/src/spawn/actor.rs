@@ -1201,7 +1201,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         Ok(async move {
             let mut input =
                 kitsune_p2p::actor::RpcMulti::new(&tuning_params, space, basis, payload);
-            // TODO - We're just targeting a single remote node for now
+            // NOTE - We're just targeting a single remote node for now
             //        without doing any pagination / etc...
             //        Setting up RpcMulti to act like RpcSingle
             input.max_remote_agent_count = 1;
