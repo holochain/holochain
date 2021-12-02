@@ -95,13 +95,4 @@ mod tests {
 
     // TODO: make these functions able to take an arbitrary stream so that
     //       they can be tested
-
-    // use super::*;
-
-    // #[tokio::test]
-    // async fn can_init_dna() {
-    //     let tmpdir = tempdir::TempDir::new("hc_bundle").unwrap();
-    //     init_dna(tmpdir.path().join("app")).await.unwrap();
-    //     init_dna(tmpdir.path().join("app/n")).await.unwrap();
-    // }
 }

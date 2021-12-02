@@ -372,7 +372,7 @@ pub trait ConductorHandleT: Send + Sync {
         transition: AppStatusTransition,
     ) -> ConductorResult<(InstalledApp, AppStatusFx)>;
 
-    // TODO: would be nice to have methods for accessing the underlying Conductor,
+    // MAYBE: would be nice to have methods for accessing the underlying Conductor,
     // but this trait doesn't know the concrete type of underlying Conductor,
     // and using generics seems problematic with mockall::automock.
     // Something like this would be desirable, but ultimately doesn't work.
@@ -748,10 +748,6 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 .await;
             }
 
-            // This event does not have a single Cell as a target, so we handle
-            // it at the conductor level.
-            // TODO: perhaps we can do away with the assumption that each event
-            //       is meant for a single Cell, i.e. allow batching in general
             HolochainP2pEvent::QueryOpHashes {
                 dna_hash,
                 window,
