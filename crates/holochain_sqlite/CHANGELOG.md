@@ -5,9 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## \[Unreleased\]
 - Adds `basis_hash` index to `DhtOp` table. This makes get queries faster.
 
-- **BREAKING CHANGES**: All DHT data for the same DNA space is now shared in the same database. 
-All authored data for the same DNA space is also now shared in another database. This requires no changes 
-however data must be manually migrated from the old databases to the new databases. [#1130](https://github.com/holochain/holochain/pull/1130)
+## 0.0.17
+
+- **BREAKING CHANGES**: All DHT data for the same DNA space is now shared in the same database. All authored data for the same DNA space is also now shared in another database. This requires no changes however data must be manually migrated from the old databases to the new databases. [\#1130](https://github.com/holochain/holochain/pull/1130)
 
 ## 0.0.16
 
