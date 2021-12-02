@@ -1,8 +1,9 @@
-use crate::*;
 use crate::test::test_peer_view_alpha::assert_between;
 use crate::test::test_peer_view_alpha::even_dist_peers;
+use crate::*;
 
 #[test]
+#[ignore = "test was never completed"]
 fn test_peer_coverage() {
     let strat = PeerStratBeta::default();
     let arc = |c, n, h| {
