@@ -143,7 +143,7 @@ pub struct TimeChunk {
 /// fit into a single chunk then this will return one chunk.
 ///
 /// Otherwise a chunk will be returned with the window for the hashes
-/// the fit into a single chunk and the following chunk will attempt to
+/// that fit into a single chunk and the following chunk will attempt to
 /// be produced from the remaining time window.
 ///
 /// This process will continue until the time window is small enough that
