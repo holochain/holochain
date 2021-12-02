@@ -137,7 +137,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
             DhtArc::new(0, u32::MAX / 4).interval().into(),
         )
         .unwrap();
-    // TODO - not sure this is right with <= num_nonzero... but it breaks
+    // NOTE - not sure this is right with <= num_nonzero... but it breaks
     //        sometimes if we just use '<'
     assert!(all.len() > 0 && all.len() <= num_nonzero);
 
