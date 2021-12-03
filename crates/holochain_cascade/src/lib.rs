@@ -106,9 +106,6 @@ where
     }
 
     /// Add the cache to the cascade.
-    // TODO: We do want to be able to use the cache without
-    // the network but we always need a cache when we have a
-    // network. Perhaps this can be proven at the type level?
     pub fn with_cache(self, cache: DbWrite<DbKindCache>) -> Self {
         Self {
             cache: Some(cache),
@@ -473,7 +470,6 @@ where
 
         // If we are not in the process of authoring this hash or its
         // authority we need a network call.
-        // TODO: do we want to put this behind an option, to allow cache-only queries?
         if !(authoring || authority) {
             self.fetch_element(entry_hash.into(), options.into())
                 .await?;
@@ -495,7 +491,7 @@ where
         let query: GetElementDetailsQuery =
             self.construct_query_with_data_access(header_hash.clone());
 
-        // TODO: we can short circuit if we have any local deletes on a header.
+        // DESIGN: we can short circuit if we have any local deletes on a header.
         // Is this bad because we will not go back to the network until our
         // cache is cleared. Could someone create an attack based on this fact?
 
@@ -515,7 +511,6 @@ where
 
         // If we are not in the process of authoring this hash or its
         // authority we need a network call.
-        // TODO: do we want to put this behind an option, to allow cache-only queries?
         if !(authoring || authority) {
             self.fetch_element(header_hash.into(), options.into())
                 .await?;
@@ -540,7 +535,7 @@ where
         let authority = self.am_i_an_authority(header_hash.clone().into()).await?;
         let query: GetLiveElementQuery = self.construct_query_with_data_access(header_hash.clone());
 
-        // TODO: we can short circuit if we have any local deletes on a header.
+        // DESIGN: we can short circuit if we have any local deletes on a header.
         // Is this bad because we will not go back to the network until our
         // cache is cleared. Could someone create an attack based on this fact?
 
@@ -560,7 +555,6 @@ where
 
         // If we are not in the process of authoring this hash or its
         // authority we need a network call.
-        // TODO: do we want to put this behind an option, to allow cache-only queries?
         if !(authoring || authority) {
             self.fetch_element(header_hash.into(), options.into())
                 .await?;
@@ -599,7 +593,6 @@ where
 
         // If we are not in the process of authoring this hash or its
         // authority we need a network call.
-        // TODO: do we want to put this behind an option, to allow cache-only queries?
         if !(authoring || authority) {
             self.fetch_element(entry_hash.into(), options.into())
                 .await?;
@@ -716,7 +709,7 @@ where
         options: GetActivityOptions,
     ) -> CascadeResult<AgentActivityResponse<Element>> {
         let status_only = !options.include_rejected_activity && !options.include_valid_activity;
-        // TODO: Evaluate if it's ok to **not** go to another authority for agent activity?
+        // DESIGN: Evaluate if it's ok to **not** go to another authority for agent activity?
         let authority = self.am_i_an_authority(agent.clone().into()).await?;
         let merged_response = if !authority {
             let results = self
@@ -770,7 +763,7 @@ where
         let valid_activity = match valid_activity {
             ChainItems::Hashes(hashes) => {
                 // If we can't get one of the headers then don't return any.
-                // TODO: Is this the correct choice?
+                // DESIGN: Is this the correct choice?
                 let maybe_chain: Option<Vec<_>> = self
                     .get_concurrent(
                         hashes.into_iter().map(|(_, h)| h.into()),
@@ -790,7 +783,7 @@ where
         let rejected_activity = match rejected_activity {
             ChainItems::Hashes(hashes) => {
                 // If we can't get one of the headers then don't return any.
-                // TODO: Is this the correct choice?
+                // DESIGN: Is this the correct choice?
                 let maybe_chain: Option<Vec<_>> = self
                     .get_concurrent(
                         hashes.into_iter().map(|(_, h)| h.into()),
