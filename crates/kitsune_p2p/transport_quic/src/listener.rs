@@ -358,7 +358,6 @@ pub async fn spawn_transport_listener_quic(
     Ok((sender, receiver))
 }
 
-// TODO - modernize all this taking hints from TLS code in proxy crate.
 mod danger {
     use crate::lair_keystore_api_0_0;
     use kitsune_p2p_types::transport::TransportError;
@@ -374,7 +373,6 @@ mod danger {
     use quinn::TransportConfig;
     use std::sync::Arc;
 
-    // TODO: make this a prop error type
     static TRANSPORT: Lazy<Result<Arc<quinn::TransportConfig>, String>> = Lazy::new(|| {
         let mut transport = quinn::TransportConfig::default();
 

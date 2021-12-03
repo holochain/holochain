@@ -186,7 +186,7 @@ impl TransportListenerHandler for Inner {
         url: url2::Url2,
     ) -> TransportListenerHandlerResult<(url2::Url2, TransportChannelWrite, TransportChannelRead)>
     {
-        // TODO - right now requiring sub transport scheme to create channel
+        // NOTE - right now requiring sub transport scheme to create channel
         //        would be nice to also accept a pool url && prioritize the
         //        sub-scheme.
         let scheme = url.scheme().to_string();

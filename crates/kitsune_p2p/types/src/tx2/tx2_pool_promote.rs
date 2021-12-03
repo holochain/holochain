@@ -3,6 +3,8 @@
 #![allow(clippy::too_many_arguments)]
 //! Promote a tx2 transport adapter to a tx2 transport frontend.
 
+const INTERNAL_ERR: u32 = 500;
+
 use crate::tx2::tx2_adapter::*;
 use crate::tx2::tx2_pool::*;
 use crate::tx2::tx2_utils::*;
@@ -103,15 +105,13 @@ async fn in_chan_recv_logic(
 
                         let reason = format!("{:?}", e);
 
-                        // TODO - standardize codes?
-                        con_item.close(500, &reason).await;
+                        con_item.close(INTERNAL_ERR, &reason).await;
 
                         // exit the loop
                         return;
                     }
                     Ok(c) => c,
                 };
-                // TODO: ask david.b if it was ok to downgrade this from debug to trace
                 tracing::trace!(?local_cert, ?peer_cert, "accepted incoming channel");
                 loop {
                     let r = chan.read(tuning_params.implicit_timeout()).await;
@@ -127,8 +127,7 @@ async fn in_chan_recv_logic(
 
                             let reason = format!("{:?}", e);
 
-                            // TODO - standardize codes?
-                            con_item.close(500, &reason).await;
+                            con_item.close(INTERNAL_ERR, &reason).await;
 
                             // exit the loop
                             break;
@@ -184,8 +183,7 @@ async fn in_chan_recv_logic(
 
                     let reason = format!("{:?}", e);
 
-                    // TODO - standardize codes?
-                    con_item.close(500, &reason).await;
+                    con_item.close(INTERNAL_ERR, &reason).await;
 
                     // exit the loop
                     break;
@@ -198,7 +196,6 @@ async fn in_chan_recv_logic(
                 writer,
             });
 
-            // TODO: ask david.b if it was ok to downgrade this from debug to trace
             tracing::trace!(?local_cert, ?peer_cert, "established outgoing channel");
         }
         tracing::debug!(?local_cert, ?peer_cert, "channel create loop end");
@@ -206,12 +203,10 @@ async fn in_chan_recv_logic(
 
     tokio::select! {
         _ = recv_fut => {
-            // TODO - standardize codes?
-            con_item.close(500, "recv_fut closed").await;
+            con_item.close(INTERNAL_ERR, "recv_fut closed").await;
         }
         _ = write_fut => {
-            // TODO - standardize codes?
-            con_item.close(500, "write_fut closed").await;
+            con_item.close(INTERNAL_ERR, "write_fut closed").await;
         }
     }
 
@@ -323,8 +318,7 @@ impl AsConHnd for ConItem {
 
             if let Err(e) = logic().await {
                 let reason = format!("{:?}", e);
-                // TODO - standardize codes?
-                this.close(500, &reason).await;
+                this.close(INTERNAL_ERR, &reason).await;
                 return Err(e);
             }
 
@@ -769,7 +763,7 @@ async fn con_recv_logic(
 
     tracing::warn!(?local_cert, "connection recv stream closed!");
 
-    close_promote_ep_hnd(inner, 500, "listener closed").await;
+    close_promote_ep_hnd(inner, INTERNAL_ERR, "listener closed").await;
 }
 
 impl PromoteEp {

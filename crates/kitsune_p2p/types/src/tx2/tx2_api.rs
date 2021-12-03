@@ -720,7 +720,6 @@ impl<C: Codec + 'static + Send + Unpin> Stream for Tx2Ep<C> {
                         let len = data.len();
                         let (_, c) = match C::decode_ref(&data) {
                             Err(e) => {
-                                // TODO - close connection?
                                 return std::task::Poll::Ready(Some(Tx2EpEvent::Error(
                                     KitsuneError::other(e),
                                 )));
@@ -779,7 +778,7 @@ impl<C: Codec + 'static + Send + Unpin> Stream for Tx2Ep<C> {
                             Tx2EpEvent::Tick
                         }
                         _ => {
-                            // TODO - should this be a connection-specific
+                            // MAYBE - should this be a connection-specific
                             // error type, so we can give the con handle?
                             Tx2EpEvent::Error(err)
                         }
