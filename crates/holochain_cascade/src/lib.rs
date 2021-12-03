@@ -830,7 +830,10 @@ where
                     .into_iter()
                     .collect();
                 match maybe_chain {
-                    Some(chain) => ChainItems::Full(chain),
+                    Some(mut chain) => {
+                        chain.sort_unstable_by_key(|el| el.header().header_seq());
+                        ChainItems::Full(chain)
+                    }
                     None => ChainItems::Full(Vec::with_capacity(0)),
                 }
             }
@@ -850,7 +853,10 @@ where
                     .into_iter()
                     .collect();
                 match maybe_chain {
-                    Some(chain) => ChainItems::Full(chain),
+                    Some(mut chain) => {
+                        chain.sort_unstable_by_key(|el| el.header().header_seq());
+                        ChainItems::Full(chain)
+                    }
                     None => ChainItems::Full(Vec::with_capacity(0)),
                 }
             }
