@@ -875,6 +875,7 @@ async fn mock_network_sharding() {
                                         // agent at a time.
                                         last_intervals = Some(intervals);
                                         let arc = data.agent_to_arc[&agent];
+                                        let agent_info = data.agent_to_info[&agent].clone();
                                         let interval = arc.interval();
 
                                         // Accept the initiate.
@@ -882,7 +883,10 @@ async fn mock_network_sharding() {
                                             dna: dna.clone(),
                                             module: module.clone(),
                                             gossip: GossipProtocol::Sharded(
-                                                ShardedGossipWire::accept(vec![interval]),
+                                                ShardedGossipWire::accept(
+                                                    vec![interval],
+                                                    vec![agent_info],
+                                                ),
                                             ),
                                         };
                                         channel.send(msg.addressed((*agent).clone())).await;
