@@ -30,6 +30,7 @@ impl RoundStateMap {
 
     /// Get the mutable state if it hasn't timed out.
     pub(super) fn get_mut(&mut self, key: &StateKey) -> Option<&mut RoundState> {
+        self.touch(key);
         self.check_timeout(key);
         self.map.get_mut(key)
     }
