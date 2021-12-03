@@ -880,7 +880,7 @@ async fn handle_gossip(
 async fn handle_query_op_hashes(
     kdirect: Arc<Kd1>,
     input: QueryOpHashesEvt,
-) -> KdResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindow)>> {
+) -> KdResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowInclusive)>> {
     let QueryOpHashesEvt {
         space,
         window,
@@ -920,7 +920,7 @@ async fn handle_query_op_hashes(
     entries.dedup();
 
     // TODO: produce proper time window of actual data returned
-    Ok(Some((entries, window)))
+    Ok(Some((entries, window.start..=window.end)))
 }
 
 async fn handle_fetch_op_data(
