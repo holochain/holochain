@@ -144,7 +144,7 @@ CREATE INDEX IF NOT EXISTS DhtOp_validation_status_idx ON DhtOp ( validation_sta
 CREATE INDEX IF NOT EXISTS DhtOp_authored_timestamp_idx ON DhtOp ( authored_timestamp );
 CREATE INDEX IF NOT EXISTS DhtOp_storage_center_loc_idx ON DhtOp ( storage_center_loc );
 CREATE INDEX IF NOT EXISTS DhtOp_header_hash_idx ON DhtOp ( header_hash );
--- CREATE INDEX DhtOp_basis_hash_idx ON DhtOp ( basis_hash );
+CREATE INDEX IF NOT EXISTS DhtOp_basis_hash_idx ON DhtOp ( basis_hash );
 
 CREATE TABLE IF NOT EXISTS ValidationReceipt (
     hash            BLOB           PRIMARY KEY ON CONFLICT IGNORE,

@@ -51,7 +51,10 @@ impl ValidationReceipt {
     pub async fn sign(
         self,
         keystore: &MetaLairClient,
-    ) -> holochain_keystore::LairResult<SignedValidationReceipt> {
+    ) -> holochain_keystore::LairResult<Option<SignedValidationReceipt>> {
+        if self.validators.is_empty() {
+            return Ok(None);
+        }
         let this = self.clone();
         // Try to sign with all validators but silently fail on
         // any that cannot sign.
@@ -79,10 +82,10 @@ impl ValidationReceipt {
                 .next()
                 .expect("Must contain at least one error if there is no success"));
         };
-        Ok(SignedValidationReceipt {
+        Ok(Some(SignedValidationReceipt {
             receipt: self,
             validators_signatures: signatures,
-        })
+        }))
     }
 }
 
@@ -166,7 +169,7 @@ mod tests {
             validators: vec![agent],
             when_integrated: Timestamp::now(),
         };
-        receipt.sign(keystore).await.unwrap()
+        receipt.sign(keystore).await.unwrap().unwrap()
     }
 
     #[tokio::test(flavor = "multi_thread")]

@@ -46,8 +46,8 @@ async fn sharded_sanity_test() {
         .await
         .unwrap();
 
-    // - Alice responds to the initiate with 1 accept and 4 blooms.
-    assert_eq!(alice_outgoing.len(), 5);
+    // - Alice responds to the initiate with 1 accept and 1 blooms.
+    assert_eq!(alice_outgoing.len(), 2);
     alice
         .inner
         .share_mut(|i, _| {
@@ -68,8 +68,8 @@ async fn sharded_sanity_test() {
         bob_outgoing.extend(outgoing);
     }
 
-    // - Bob responds with 4 blooms and 4 responses to alice's blooms.
-    assert_eq!(bob_outgoing.len(), 8);
+    // - Bob responds with 1 blooms and 1 responses to alice's blooms.
+    assert_eq!(bob_outgoing.len(), 2);
     bob.inner
         .share_mut(|i, _| {
             // - Check bob has one current round.
@@ -88,8 +88,8 @@ async fn sharded_sanity_test() {
             .unwrap();
         alice_outgoing.extend(outgoing);
     }
-    // - Alice responds with 4 responses to bob's blooms.
-    assert_eq!(alice_outgoing.len(), 4);
+    // - Alice responds with 1 responses to bob's blooms.
+    assert_eq!(alice_outgoing.len(), 1);
 
     alice
         .inner
@@ -147,6 +147,8 @@ async fn partial_missing_doesnt_finish() {
                     created_at: Instant::now(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
+                    bloom_batch_cursor: None,
+                    ops_batch_queue: OpsBatchQueue::new(),
                 }
             }
             .into(),
@@ -159,7 +161,7 @@ async fn partial_missing_doesnt_finish() {
     // - Send a missing ops message that isn't marked as finished.
     let incoming = ShardedGossipWire::MissingOps(MissingOps {
         ops: vec![],
-        finished: false,
+        finished: MissingOpsStatus::ChunkComplete as u8,
     });
 
     let outgoing = bob.process_incoming(cert.clone(), incoming).await.unwrap();
@@ -194,6 +196,8 @@ async fn missing_ops_finishes() {
                     created_at: Instant::now(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
+                    bloom_batch_cursor: None,
+                    ops_batch_queue: OpsBatchQueue::new(),
                 }
             }
             .into(),
@@ -206,7 +210,7 @@ async fn missing_ops_finishes() {
     // Send a message marked as finished.
     let incoming = ShardedGossipWire::MissingOps(MissingOps {
         ops: vec![],
-        finished: true,
+        finished: MissingOpsStatus::AllComplete as u8,
     });
 
     let outgoing = bob.process_incoming(cert.clone(), incoming).await.unwrap();
@@ -242,6 +246,8 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
                     created_at: Instant::now(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
+                    bloom_batch_cursor: None,
+                    ops_batch_queue: OpsBatchQueue::new(),
                 }
             }
             .into(),
@@ -254,7 +260,7 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
     // - Send a message marked as finished.
     let incoming = ShardedGossipWire::MissingOps(MissingOps {
         ops: vec![],
-        finished: true,
+        finished: MissingOpsStatus::AllComplete as u8,
     });
 
     let outgoing = bob.process_incoming(cert.clone(), incoming).await.unwrap();
@@ -290,6 +296,8 @@ async fn bloom_response_finishes() {
                     created_at: Instant::now(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
+                    bloom_batch_cursor: None,
+                    ops_batch_queue: OpsBatchQueue::new(),
                 }
             }
             .into(),
@@ -338,6 +346,8 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
                     created_at: Instant::now(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
+                    bloom_batch_cursor: None,
+                    ops_batch_queue: OpsBatchQueue::new(),
                 }
             }
             .into(),
@@ -389,6 +399,8 @@ async fn no_data_still_finishes() {
                     created_at: Instant::now(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
+                    bloom_batch_cursor: None,
+                    ops_batch_queue: OpsBatchQueue::new(),
                 }
             }
             .into(),
@@ -411,6 +423,8 @@ async fn no_data_still_finishes() {
                     created_at: Instant::now(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
+                    bloom_batch_cursor: None,
+                    ops_batch_queue: OpsBatchQueue::new(),
                 }
             }
             .into(),
@@ -531,8 +545,11 @@ async fn initiate_after_target_is_set() {
     dbg!(&cert);
     dbg!(&agents);
     // - Bob accepts the round.
-    let bob_outgoing = bob.process_incoming(cert, alice_initiate).await.unwrap();
-    assert_eq!(bob_outgoing.len(), 5);
+    let bob_outgoing = bob
+        .process_incoming(cert.clone(), alice_initiate)
+        .await
+        .unwrap();
+    assert_eq!(bob_outgoing.len(), 2);
 
     bob.inner
         .share_mut(|i, _| {
