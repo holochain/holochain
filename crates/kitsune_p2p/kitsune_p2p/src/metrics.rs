@@ -1,3 +1,5 @@
+//! metrics tracked by kitsune_p2p spaces
+
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -6,6 +8,87 @@ use tokio::time::Instant;
 
 use crate::types::*;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
+
+use num_traits::*;
+
+/// Running average that prioritizes memory and cpu efficiency
+/// over strict accuracy.
+#[derive(Clone, Copy)]
+pub struct RunAvg(f32, u8);
+
+impl Default for RunAvg {
+    fn default() -> Self {
+        Self(0.0, 0)
+    }
+}
+
+impl RunAvg {
+    /// Push a new data point onto the running average
+    pub fn push<V: AsPrimitive<f32>>(&mut self, v: V) {
+        self.push_n(v, 1);
+    }
+
+    /// Push multiple entries (up to 255) of the same value onto the average
+    pub fn push_n<V: AsPrimitive<f32>>(&mut self, v: V, count: u8) {
+        self.1 = self.1.saturating_add(count);
+        self.0 = (self.0 * (self.1 - count) as f32 + (v.as_() * count as f32)) / self.1 as f32;
+    }
+}
+
+macro_rules! mk_from {
+    ($($t:ty,)*) => {$(
+        impl From<$t> for RunAvg {
+            fn from(o: $t) -> Self {
+                Self(o as f32, 1)
+            }
+        }
+    )*};
+}
+
+mk_from! {
+    i8,
+    u8,
+    i16,
+    u16,
+    i32,
+    u32,
+    i64,
+    u64,
+    f32,
+    f64,
+}
+
+impl std::ops::Deref for RunAvg {
+    type Target = f32;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl AsRef<f32> for RunAvg {
+    fn as_ref(&self) -> &f32 {
+        &self.0
+    }
+}
+
+impl std::borrow::Borrow<f32> for RunAvg {
+    fn borrow(&self) -> &f32 {
+        &self.0
+    }
+}
+
+impl std::fmt::Debug for RunAvg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl std::fmt::Display for RunAvg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
 
 /// The maximum number of different nodes that will be
 /// gossiped with if gossip is triggered.
@@ -45,12 +128,17 @@ pub struct Metrics {
 /// Outcome of a gossip round.
 #[derive(PartialOrd, Ord, PartialEq, Eq)]
 pub enum RoundOutcome {
+    /// Success outcome
     Success(Instant),
+    /// Error outcome
     Error(Instant),
 }
 
+/// Accept differing key types
 pub enum AgentLike<'lt> {
+    /// An agent info
     Info(&'lt AgentInfoSigned),
+    /// A raw agent pubkey
     PubKey(&'lt Arc<KitsuneAgent>),
 }
 
@@ -67,6 +155,7 @@ impl<'lt> From<&'lt Arc<KitsuneAgent>> for AgentLike<'lt> {
 }
 
 impl<'lt> AgentLike<'lt> {
+    /// Get a raw agent pubkey from any variant type
     pub fn agent(&self) -> &Arc<KitsuneAgent> {
         match self {
             Self::Info(i) => &i.agent,
