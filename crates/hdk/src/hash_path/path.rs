@@ -315,10 +315,15 @@ impl Path {
                     self.hash()?,
                     dbg!(LinkTag::new(
                         NAME.iter()
-                            .chain(match self.0.last() {
-                                None => <Vec<u8>>::new(),
-                                Some(component) => UnsafeBytes::from(SerializedBytes::try_from(component)?).into(),
-                            }.iter())
+                            .chain(
+                                match self.leaf() {
+                                    None => <Vec<u8>>::new(),
+                                    Some(component) =>
+                                        UnsafeBytes::from(SerializedBytes::try_from(component)?)
+                                            .into(),
+                                }
+                                .iter()
+                            )
                             .cloned()
                             .collect::<Vec<u8>>(),
                     )),
@@ -361,9 +366,11 @@ impl Path {
                 if component_bytes.is_empty() {
                     Ok(None)
                 } else {
-                    Ok(Some(SerializedBytes::from(UnsafeBytes::from(component_bytes.to_vec())).try_into()
-                    .map_err(WasmError::Serialize)?))
-
+                    Ok(Some(
+                        SerializedBytes::from(UnsafeBytes::from(component_bytes.to_vec()))
+                            .try_into()
+                            .map_err(WasmError::Serialize)?,
+                    ))
                 }
             })
             .collect();
@@ -389,6 +396,10 @@ impl Path {
 
     pub fn append_component(&mut self, component: Component) {
         self.0.push(component);
+    }
+
+    pub fn leaf(&self) -> Option<&Component> {
+        self.0.last()
     }
 }
 

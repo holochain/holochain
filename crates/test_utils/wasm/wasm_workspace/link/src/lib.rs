@@ -1,4 +1,5 @@
 use hdk::prelude::*;
+use hdk::hash_path::path::NAME;
 
 entry_defs![Path::entry_def()];
 
@@ -77,14 +78,22 @@ fn delete_all_links(_: ()) -> ExternResult<()> {
 
 /// Same as path.ensure() but doesn't check for
 /// exists. This can happen when ensuring paths
-/// in partitions.
+/// in partitions so this test just shows that it's safe to do so.
 #[hdk_extern]
 fn commit_existing_path(_: ()) -> ExternResult<()> {
     let path = Path::from("a.c");
     create_entry(&path)?;
     if let Some(parent) = path.parent() {
         parent.ensure()?;
-        hdk::prelude::create_link(parent.hash()?, path.hash()?, LinkTag::try_from(&path)?)?;
+        hdk::prelude::create_link(parent.hash()?, path.hash()?, LinkTag::new(
+            NAME.iter()
+                .chain(match path.leaf() {
+                    None => <Vec<u8>>::new(),
+                    Some(component) => UnsafeBytes::from(SerializedBytes::try_from(component)?).into(),
+                }.iter())
+                .cloned()
+                .collect::<Vec<u8>>(),
+        ))?;
     }
     Ok(())
 }
