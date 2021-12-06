@@ -16,7 +16,7 @@ use num_traits::*;
 /// For metrics where we can't afford the memory of tracking samples
 /// for every remote we might talk to, this running average is
 /// accurate enough and uses only 5 bytes of memory.
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct RunAvg(f32, u8);
 
 impl Default for RunAvg {
@@ -81,12 +81,6 @@ impl std::borrow::Borrow<f32> for RunAvg {
     }
 }
 
-impl std::fmt::Debug for RunAvg {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
 impl std::fmt::Display for RunAvg {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
@@ -109,6 +103,9 @@ struct NodeInfo {
     /// between 1 (or 0 if empty) and 100. Errors are weighted
     /// heavier because we retry less frequently.
     reachability_quotient: RunAvg,
+    /// Running average for latency microseconds for any direct
+    /// request/response calls to remote agent.
+    latency_micros: RunAvg,
     /// Times we recorded errors for this node.
     errors: VecDeque<Instant>,
     /// Times we recorded initiates to this node.
@@ -195,6 +192,22 @@ impl Metrics {
             } else {
                 info.reachability_quotient.push_n(1, 5);
             }
+        }
+    }
+
+    /// Running average for latency microseconds for any direct
+    /// request/response calls to remote agent.
+    pub fn record_latency_micros<'a, T, I>(&mut self, micros: u64, remote_agent_list: I)
+    where
+        T: Into<AgentLike<'a>>,
+        I: IntoIterator<Item = T>,
+    {
+        for agent_info in remote_agent_list {
+            let info = self
+                .map
+                .entry(agent_info.into().agent().clone())
+                .or_default();
+            info.latency_micros.push(micros);
         }
     }
 
@@ -343,6 +356,25 @@ impl Metrics {
             .into_iter()
             .filter_map(|agent_info| self.map.get(agent_info.into().agent()))
             .map(|info| *info.reachability_quotient)
+            .fold((0.0, 0.0), |acc, x| (acc.0 + x, acc.1 + 1.0));
+        if cnt <= 0.0 {
+            0.0
+        } else {
+            sum / cnt
+        }
+    }
+
+    /// Return the average (mean) latency microseconds for the
+    /// supplied remote agents.
+    pub fn latency_micros<'a, T, I>(&self, remote_agent_list: I) -> f32
+    where
+        T: Into<AgentLike<'a>>,
+        I: IntoIterator<Item = T>,
+    {
+        let (sum, cnt) = remote_agent_list
+            .into_iter()
+            .filter_map(|agent_info| self.map.get(agent_info.into().agent()))
+            .map(|info| *info.latency_micros)
             .fold((0.0, 0.0), |acc, x| (acc.0 + x, acc.1 + 1.0));
         if cnt <= 0.0 {
             0.0
