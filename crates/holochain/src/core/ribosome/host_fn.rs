@@ -45,7 +45,7 @@ host_fn_api_impls! {
     // ------------------------------------------------------------------
     // These definitions are copy-pasted from
     // holochain_zome_types::zome_io
-    // TODO: is there a way to unhygienically import this code in both places?
+    // MAYBE: is there a way to unhygienically import this code in both places?
 
     // Info about the calling agent.
     fn agent_info (()) -> zt::info::AgentInfo;

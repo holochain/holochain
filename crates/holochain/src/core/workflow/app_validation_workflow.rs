@@ -81,6 +81,7 @@ async fn app_validation_workflow_inner(
 ) -> WorkflowResult<WorkComplete> {
     let env = workspace.dht_env.clone().into();
     let sorted_ops = validation_query::get_ops_to_app_validate(&env).await?;
+    tracing::debug!("app validating {} ops", sorted_ops.len());
 
     // Validate all the ops
     let iter = sorted_ops.into_iter().map(|so| {
@@ -103,10 +104,12 @@ async fn app_validation_workflow_inner(
         .buffer_unordered(NUM_CONCURRENT_OPS)
         .ready_chunks(NUM_CONCURRENT_OPS);
 
+    let mut total = 0;
     while let Some(chunk) = iter.next().await {
-        workspace
+        let t = workspace
             .dht_env
             .async_commit(move |mut txn| {
+                let mut total = 0;
                 for outcome in chunk {
                     let (op_hash, _, op_light, outcome) = outcome;
                     // Get the outcome or return the error
@@ -120,6 +123,7 @@ async fn app_validation_workflow_inner(
                     }
                     match outcome {
                         Outcome::Accepted => {
+                            total += 1;
                             put_integration_limbo(&mut txn, op_hash, ValidationStatus::Valid)?;
                         }
                         Outcome::AwaitingDeps(deps) => {
@@ -132,10 +136,12 @@ async fn app_validation_workflow_inner(
                         }
                     }
                 }
-                WorkflowResult::Ok(())
+                WorkflowResult::Ok(total)
             })
             .await?;
+        total += t;
     }
+    tracing::debug!("accepted {} ops", total);
     Ok(WorkComplete::Complete)
 }
 
