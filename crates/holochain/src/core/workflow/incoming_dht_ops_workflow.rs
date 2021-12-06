@@ -96,6 +96,7 @@ fn batch_check_end(batch: &IncomingOpsBatch) -> Option<Vec<InOpBatchEntry>> {
     })
 }
 
+#[instrument(skip(txn, ops))]
 fn batch_process_entry(
     txn: &mut rusqlite::Transaction<'_>,
     request_validation_receipt: bool,
@@ -115,6 +116,7 @@ fn batch_process_entry(
         }
     }
 
+    tracing::debug!("Inserting {} ops", to_pending.len());
     add_to_pending(txn, to_pending, request_validation_receipt)?;
 
     Ok(())
@@ -157,19 +159,21 @@ pub async fn incoming_dht_ops_workflow(
         return Ok(());
     }
 
+    if !request_validation_receipt {
+        ops = filter_existing_ops(dht_env, ops).await?;
+    }
+
     for (hash, op) in ops {
         // It's cheaper to check if the op exists before trying
         // to check the signature or open a write transaction.
-        if !op_exists(dht_env, hash.clone()).await? {
-            match should_keep(&op).await {
-                Ok(()) => filter_ops.push((hash, op)),
-                Err(e) => {
-                    tracing::warn!(
-                        msg = "Dropping op because it failed counterfeit checks",
-                        ?op
-                    );
-                    return Err(e);
-                }
+        match should_keep(&op).await {
+            Ok(()) => filter_ops.push((hash, op)),
+            Err(e) => {
+                tracing::warn!(
+                    msg = "Dropping op because it failed counterfeit checks",
+                    ?op
+                );
+                return Err(e);
             }
         }
     }
@@ -274,6 +278,18 @@ fn op_exists_inner(txn: &rusqlite::Transaction<'_>, hash: &DhtOpHash) -> Databas
 pub async fn op_exists(vault: &DbWrite<DbKindDht>, hash: DhtOpHash) -> DatabaseResult<bool> {
     vault
         .async_reader(move |txn| op_exists_inner(&txn, &hash))
+        .await
+}
+
+pub async fn filter_existing_ops(
+    vault: &DbWrite<DbKindDht>,
+    mut ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+) -> DatabaseResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
+    vault
+        .async_reader(move |txn| {
+            ops.retain(|(hash, _)| !op_exists_inner(&txn, hash).unwrap_or(true));
+            Ok(ops)
+        })
         .await
 }
 

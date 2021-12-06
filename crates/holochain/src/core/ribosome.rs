@@ -102,7 +102,7 @@ pub enum HostContext {
     GenesisSelfCheck(GenesisSelfCheckHostAccess),
     Init(InitHostAccess),
     MigrateAgent(MigrateAgentHostAccess),
-    PostCommit(PostCommitHostAccess), // TODO: add emit_signal access here?
+    PostCommit(PostCommitHostAccess), // MAYBE: add emit_signal access here?
     ValidateCreateLink(ValidateLinkHostAccess),
     Validate(ValidateHostAccess),
     ValidationPackage(ValidationPackageHostAccess),
