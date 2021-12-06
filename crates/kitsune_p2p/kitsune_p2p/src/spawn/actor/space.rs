@@ -937,7 +937,7 @@ impl Space {
                         space.clone(),
                         ep_hnd.clone(),
                         evt_sender.clone(),
-                        Metrics::default(),
+                        MetricsSync::default(),
                     ),
                 )
             })
