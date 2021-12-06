@@ -31,11 +31,14 @@ entry_def!(Anchor PathEntry::entry_def());
 /// We simply format the anchor structure into a string that works with the path string handling.
 impl From<&Anchor> for Path {
     fn from(anchor: &Anchor) -> Self {
-        Self::from(vec![
+        let mut components = vec![
             Component::new(ROOT.to_vec()),
             Component::from(anchor.anchor_type.clone()),
-            Component::from(anchor.anchor_text.as_ref().unwrap_or(&String::default())),
-        ])
+        ];
+        if let Some(text) = anchor.anchor_text.as_ref() {
+            components.push(Component::from(text));
+        }
+        components.into()
     }
 }
 

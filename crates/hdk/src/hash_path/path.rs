@@ -161,6 +161,12 @@ entry_def!(Path EntryDef {
 #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize, SerializedBytes)]
 pub struct PathEntry([u8; 1], EntryHash);
 
+impl PathEntry {
+    pub fn new(entry_hash: EntryHash) -> Self {
+        Self(DHT_PREFIX, entry_hash)
+    }
+}
+
 entry_def!(PathEntry EntryDef {
     id: "hdk.path_entry".into(),
     crdt_type: CrdtType,
@@ -254,7 +260,7 @@ impl From<String> for Path {
 
 impl Path {
     pub fn path_entry(&self) -> ExternResult<PathEntry> {
-        Ok(PathEntry(DHT_PREFIX, hash_entry(self)?))
+        Ok(PathEntry::new(hash_entry(self)?))
     }
 
     /// What is the hash for the current [ `Path` ]?

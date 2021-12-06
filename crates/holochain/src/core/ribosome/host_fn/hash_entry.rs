@@ -28,8 +28,9 @@ pub mod wasm_test {
     use ::fixt::prelude::*;
     use holo_hash::EntryHash;
     use holochain_wasm_test_utils::TestWasm;
-    use std::convert::TryInto;
     use std::sync::Arc;
+    use hdk::hash_path::path::Component;
+    use hdk::prelude::*;
 
     #[tokio::test(flavor = "multi_thread")]
     /// we can get an entry hash out of the fn directly
@@ -82,13 +83,21 @@ pub mod wasm_test {
         let output: EntryHash =
             crate::call_test_ribosome!(host_access, TestWasm::HashPath, "path_entry_hash", input).unwrap();
 
-        let expected_path = hdk::hash_path::path::Path::from("foo.bar");
+        let expected_path = hdk::hash_path::path::Path::from(vec![
+            Component::from("foo"),
+            Component::from("bar")
+        ]);
 
-        let expected_hash = holochain_zome_types::entry::EntryHashed::from_content_sync(
-            Entry::app((&expected_path).try_into().unwrap()).unwrap(),
+        let path_hash = holochain_zome_types::entry::EntryHashed::from_content_sync(
+            Entry::try_from(expected_path).unwrap(),
         )
         .into_hash();
 
-        assert_eq!(expected_hash.into_inner(), output.into_inner(),);
+        let path_entry_hash = holochain_zome_types::entry::EntryHashed::from_content_sync(
+            Entry::try_from(PathEntry::new(path_hash)).unwrap(),
+        )
+        .into_hash();
+
+        assert_eq!(path_entry_hash.into_inner(), output.into_inner(),);
     }
 }

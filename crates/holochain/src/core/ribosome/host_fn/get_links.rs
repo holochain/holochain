@@ -64,6 +64,10 @@ pub mod slow_tests {
     use holochain_test_wasm_common::*;
     use holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
+    use crate::sweettest::SweetDnaFile;
+    use crate::core::ribosome::MockDnaStore;
+    use crate::sweettest::SweetConductor;
+    use crate::conductor::ConductorBuilder;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_entry_hash_path_children() {
@@ -129,15 +133,47 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn hash_path_anchor_list_anchors() {
-        let host_access = fixt!(ZomeCallHostAccess, Predictable);
+        observability::test_run().ok();
+        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Anchor]).await.unwrap();
+
+        let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
+        let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
+
+        let mut dna_store = MockDnaStore::new();
+        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
+        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
+        dna_store.expect_add_dna().return_const(());
+        dna_store
+            .expect_get()
+            .return_const(Some(dna_file.clone().into()));
+        dna_store
+            .expect_get_entry_def()
+            .return_const(EntryDef::default_with_id("thing"));
+
+        let mut conductor =
+            SweetConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
+
+        let apps = conductor
+            .setup_app_for_agents(
+                "app-",
+                &[alice_pubkey.clone(), bob_pubkey.clone()],
+                &[dna_file.into()],
+            )
+            .await
+            .unwrap();
+
+        let ((alice,), (bobbo,)) = apps.into_tuples();
+        let alice = alice.zome(TestWasm::Anchor);
+        let _bobbo = bobbo.zome(TestWasm::Anchor);
 
         // anchor foo bar
-        let anchor_address_one: EntryHash = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::Anchor,
-            "anchor",
-            AnchorInput("foo".to_string(), "bar".to_string())
-        ).unwrap();
+        let anchor_address_one: EntryHash = conductor
+            .call(
+                &alice,
+                "anchor",
+                AnchorInput("foo".to_string(), "bar".to_string()),
+            )
+            .await;
 
         assert_eq!(
             anchor_address_one.get_raw_32().to_vec(),
@@ -145,24 +181,25 @@ pub mod slow_tests {
         );
 
         // anchor foo baz
-        let anchor_address_two: EntryHash = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::Anchor,
-            "anchor",
-            AnchorInput("foo".to_string(), "baz".to_string())
-        ).unwrap();
+        let anchor_address_two: EntryHash = conductor
+            .call(
+                &alice,
+                "anchor",
+                AnchorInput("foo".to_string(), "baz".to_string()),
+            )
+            .await;
 
         assert_eq!(
             anchor_address_two.get_raw_32().to_vec(),
             vec![226, 71, 207, 86, 156, 8, 237, 130, 243, 100, 50, 189, 142, 138, 215, 112, 202, 178, 166, 180, 92, 31, 117, 240, 81, 75, 91, 172, 31, 228, 194, 236],
         );
 
-        let list_anchor_type_addresses_output: EntryHashes = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::Anchor,
-            "list_anchor_type_addresses",
-            ()
-        ).unwrap();
+        let list_anchor_type_addresses_output: EntryHashes = conductor
+            .call(
+                &alice,
+                "list_anchor_type_addresses",
+                ()
+            ).await;
 
         // should be 1 anchor type, "foo"
         assert_eq!(list_anchor_type_addresses_output.0.len(), 1,);
@@ -173,14 +210,12 @@ pub mod slow_tests {
             vec![101, 28, 236, 91, 142, 197, 197, 191, 220, 103, 111, 116, 52, 198, 7, 87, 253, 189, 34, 138, 231, 117, 134, 208, 247, 165, 190, 228, 249, 20, 96, 24],
         );
 
-        let list_anchor_addresses_output: EntryHashes = {
-            crate::call_test_ribosome!(
-                host_access,
-                TestWasm::Anchor,
+        let list_anchor_addresses_output: EntryHashes = conductor
+            .call(
+                &alice,
                 "list_anchor_addresses",
                 "foo".to_string()
-            ).unwrap()
-        };
+            ).await;
 
         // should be 2 anchors under "foo" sorted by hash
         assert_eq!(list_anchor_addresses_output.0.len(), 2,);
@@ -193,12 +228,13 @@ pub mod slow_tests {
             anchor_address_two.get_raw_32().to_vec(),
         );
 
-        let list_anchor_tags_output: Vec<String> = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::Anchor,
-            "list_anchor_tags",
-            "foo".to_string()
-        ).unwrap();
+        let list_anchor_tags_output: Vec<String> = conductor
+            .call(
+                &alice,
+                "list_anchor_tags",
+                "foo".to_string()
+            )
+            .await;
 
         assert_eq!(
             vec!["bar".to_string(), "baz".to_string()],
