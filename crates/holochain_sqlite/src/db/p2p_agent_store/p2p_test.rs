@@ -83,7 +83,8 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
         }
     }
 
-    let mut con = db.connection_pooled().unwrap();
+    let permit = db.conn_permit().await;
+    let mut con = db.from_permit(permit).unwrap();
 
     // check that we only get 20 results
     let all = con.p2p_list_agents().unwrap();

@@ -110,6 +110,9 @@ pub enum ConductorError {
     StateMutationError(#[from] holochain_state::mutations::StateMutationError),
 
     #[error(transparent)]
+    JoinError(#[from] tokio::task::JoinError),
+
+    #[error(transparent)]
     RusqliteError(#[from] rusqlite::Error),
 
     /// Other
