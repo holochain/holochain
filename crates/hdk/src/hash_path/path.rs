@@ -21,7 +21,7 @@ pub const DELIMITER: &str = ".";
 ///
 /// @todo - revisit whether there is a need/use-case for different link tags or entries
 /// See anchors implementation.
-pub const NAME: [u8; 2] = [0x00, 0x00];
+pub const DHT_PREFIX: [u8; 1] = [0x00];
 
 /// Each path component is arbitrary bytes to be hashed together in a predictable way when the path
 /// is hashed to create something that can be linked and discovered by all DHT participants.
@@ -30,6 +30,12 @@ pub const NAME: [u8; 2] = [0x00, 0x00];
 )]
 #[repr(transparent)]
 pub struct Component(#[serde(with = "serde_bytes")] Vec<u8>);
+
+impl Component {
+    pub fn new(v: Vec<u8>) -> Self {
+        Self(v)
+    }
+}
 
 /// Wrap bytes.
 impl From<Vec<u8>> for Component {
@@ -145,7 +151,18 @@ impl TryFrom<&Component> for String {
 pub struct Path(Vec<Component>);
 
 entry_def!(Path EntryDef {
-    id: core::str::from_utf8(&NAME).unwrap().into(),
+    id: "hdk.path".into(),
+    crdt_type: CrdtType,
+    required_validations: RequiredValidations::default(),
+    visibility: EntryVisibility::Public,
+    required_validation_type: RequiredValidationType::default(),
+});
+
+#[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize, SerializedBytes)]
+pub struct PathEntry([u8; 1], EntryHash);
+
+entry_def!(PathEntry EntryDef {
+    id: "hdk.path_entry".into(),
     crdt_type: CrdtType,
     required_validations: RequiredValidations::default(),
     visibility: EntryVisibility::Public,
@@ -235,98 +252,46 @@ impl From<String> for Path {
     }
 }
 
-// impl TryFrom<&Component> for LinkTag {
-//     type Error = WasmError;
-//     fn try_from(component: &Component) -> Result<Self, Self::Error> {
-//         // Link tag is:
-//         //
-//         // - the name of all anchor links to disambiguate against other links
-//         // - the literal serialized bytes of the path
-//         //
-//         // This allows the value of the target to be read/dereferenced straight from the
-//         // link without needing additional network calls.
-//         let component_bytes: Vec<u8> = UnsafeBytes::from(SerializedBytes::try_from(component)?).into();
-//         let link_tag_bytes: Vec<u8> = NAME.iter().chain(component_bytes.iter()).cloned().collect();
-//         Ok(LinkTag::new(link_tag_bytes))
-//     }
-// }
-
-// impl TryFrom<Option<Component>> for LinkTag {
-//     type Error = WasmError;
-//     fn try_from(maybe_component: Option<Component>) -> Result<Self, Self::Error> {
-//         Ok(
-//             LinkTag::new(
-//                 NAME.iter().chain(
-//                     holochain_serialized_bytes::encode(maybe_component)?.iter()
-//                 )
-//                 .cloned()
-//                 .collect()
-//             )
-//         )
-//     }
-// }
-
-// impl TryFrom<&LinkTag> for Path {
-//     type Error = SerializedBytesError;
-//     fn try_from(link_tag: &LinkTag) -> Result<Self, Self::Error> {
-//         let sb = SerializedBytes::from(UnsafeBytes::from(link_tag.as_ref()[NAME.len()..].to_vec()));
-//         Self::try_from(sb)
-//     }
-// }
-
-// impl TryFrom<&LinkTag> for Component {
-//     type Error = WasmError;
-//     fn try_from(link_tag: &LinkTag) -> Result<Self, Self::Error> {
-//         let sb = SerializedBytes::from(UnsafeBytes::from(link_tag.as_ref()[NAME.len()..].to_vec()));
-//         Ok(Self::try_from(sb)?)
-//     }
-// }
-
-// impl TryFrom<&Link> for Path {
-//     type Error = WasmError;
-//     fn try_from(link: &Link) -> Result<Self, Self::Error> {
-//         let component = Component::try_from(&link.tag)?;
-//         let base_path = Path::try_from(must_get_entry(link.base)?)?;
-
-//         base_path.append_component(component);
-//         Ok(base_path)
-//     }
-// }
-
 impl Path {
+    pub fn path_entry(&self) -> ExternResult<PathEntry> {
+        Ok(PathEntry(DHT_PREFIX, hash_entry(self)?))
+    }
+
     /// What is the hash for the current [ `Path` ]?
-    pub fn hash(&self) -> ExternResult<holo_hash::EntryHash> {
-        hash_entry(Entry::try_from(self)?)
+    pub fn path_entry_hash(&self) -> ExternResult<holo_hash::EntryHash> {
+        hash_entry(self.path_entry()?)
     }
 
     /// Does an entry exist at the hash we expect?
     pub fn exists(&self) -> ExternResult<bool> {
-        Ok(get(self.hash()?, GetOptions::content())?.is_some())
+        Ok(get(self.path_entry_hash()?, GetOptions::content())?.is_some())
     }
 
     /// Recursively touch this and every parent that doesn't exist yet.
     pub fn ensure(&self) -> ExternResult<()> {
         if !self.exists()? {
-            create_entry(self)?;
+            create_entry(self.path_entry()?)?;
             if let Some(parent) = self.parent() {
                 parent.ensure()?;
                 create_link(
-                    parent.hash()?,
-                    self.hash()?,
-                    dbg!(LinkTag::new(
-                        NAME.iter()
+                    parent.path_entry_hash()?,
+                    self.path_entry_hash()?,
+                    LinkTag::new(
+                        DHT_PREFIX
+                            .iter()
                             .chain(
                                 match self.leaf() {
                                     None => <Vec<u8>>::new(),
-                                    Some(component) =>
+                                    Some(component) => {
                                         UnsafeBytes::from(SerializedBytes::try_from(component)?)
-                                            .into(),
+                                            .into()
+                                    }
                                 }
-                                .iter()
+                                .iter(),
                             )
                             .cloned()
                             .collect::<Vec<u8>>(),
-                    )),
+                    ),
                 )?;
             }
         }
@@ -344,12 +309,12 @@ impl Path {
     }
 
     /// Touch and list all the links from this anchor to anchors below it.
-    /// Only returns links between anchors, not to other entries that might have their own links.
+    /// Only returns links between paths, not to other entries that might have their own links.
     pub fn children(&self) -> ExternResult<Vec<holochain_zome_types::link::Link>> {
         Self::ensure(self)?;
         let mut unwrapped = get_links(
-            self.hash()?,
-            Some(holochain_zome_types::link::LinkTag::new(NAME)),
+            self.path_entry_hash()?,
+            Some(holochain_zome_types::link::LinkTag::new(DHT_PREFIX)),
         )?;
         // Only need one of each hash to build the tree.
         unwrapped.sort_unstable_by(|a, b| a.tag.cmp(&b.tag));
@@ -362,7 +327,7 @@ impl Path {
         let components: ExternResult<Vec<Option<Component>>> = children
             .into_iter()
             .map(|link| {
-                let component_bytes = &link.tag.0[NAME.len()..];
+                let component_bytes = &link.tag.0[DHT_PREFIX.len()..];
                 if component_bytes.is_empty() {
                     Ok(None)
                 } else {
@@ -389,8 +354,8 @@ impl Path {
     pub fn children_details(&self) -> ExternResult<holochain_zome_types::link::LinkDetails> {
         Self::ensure(self)?;
         get_link_details(
-            self.hash()?,
-            Some(holochain_zome_types::link::LinkTag::new(NAME)),
+            self.path_entry_hash()?,
+            Some(holochain_zome_types::link::LinkTag::new(DHT_PREFIX)),
         )
     }
 

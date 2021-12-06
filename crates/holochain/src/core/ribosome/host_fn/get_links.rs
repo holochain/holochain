@@ -104,14 +104,14 @@ pub mod slow_tests {
         let foo_bar: holo_hash::EntryHash = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
-            "hash",
+            "path_entry_hash",
             "foo.bar".to_string()
         ).unwrap();
 
         let foo_baz: holo_hash::EntryHash = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
-            "hash",
+            "path_entry_hash",
             "foo.baz".to_string()
         ).unwrap();
 
@@ -128,7 +128,7 @@ pub mod slow_tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn hash_path_anchor_get_anchor() {
+    async fn hash_path_anchor_list_anchors() {
         let host_access = fixt!(ZomeCallHostAccess, Predictable);
 
         // anchor foo bar
@@ -141,10 +141,7 @@ pub mod slow_tests {
 
         assert_eq!(
             anchor_address_one.get_raw_32().to_vec(),
-            vec![
-                25, 68, 104, 205, 38, 19, 71, 158, 115, 188, 249, 175, 248, 71, 83, 86, 126, 131,
-                246, 20, 10, 222, 185, 123, 219, 175, 209, 66, 12, 140, 83, 215
-            ],
+            vec![236, 15, 89, 5, 163, 142, 2, 223, 75, 66, 42, 163, 4, 81, 36, 149, 124, 183, 12, 248, 111, 12, 23, 44, 9, 5, 86, 223, 29, 132, 243, 71],
         );
 
         // anchor foo baz
@@ -157,25 +154,7 @@ pub mod slow_tests {
 
         assert_eq!(
             anchor_address_two.get_raw_32().to_vec(),
-            vec![
-                130, 158, 169, 16, 161, 104, 109, 116, 108, 147, 130, 214, 150, 32, 57, 52, 27, 39,
-                35, 209, 47, 120, 63, 220, 122, 13, 21, 204, 51, 209, 241, 31
-            ],
-        );
-
-        let get_output: Option<Anchor> = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::Anchor,
-            "get_anchor",
-            anchor_address_one
-        ).unwrap();
-
-        assert_eq!(
-            Some(Anchor {
-                anchor_type: "foo".into(),
-                anchor_text: Some("bar".into()),
-            }),
-            get_output,
+            vec![226, 71, 207, 86, 156, 8, 237, 130, 243, 100, 50, 189, 142, 138, 215, 112, 202, 178, 166, 180, 92, 31, 117, 240, 81, 75, 91, 172, 31, 228, 194, 236],
         );
 
         let list_anchor_type_addresses_output: EntryHashes = crate::call_test_ribosome!(
@@ -191,10 +170,7 @@ pub mod slow_tests {
             (list_anchor_type_addresses_output.0)[0]
                 .get_raw_32()
                 .to_vec(),
-            vec![
-                36, 198, 140, 31, 125, 166, 8, 15, 167, 149, 247, 118, 206, 134, 173, 221, 96, 215,
-                1, 227, 209, 230, 139, 169, 117, 216, 143, 92, 107, 122, 183, 189
-            ],
+            vec![101, 28, 236, 91, 142, 197, 197, 191, 220, 103, 111, 116, 52, 198, 7, 87, 253, 189, 34, 138, 231, 117, 134, 208, 247, 165, 190, 228, 249, 20, 96, 24],
         );
 
         let list_anchor_addresses_output: EntryHashes = {

@@ -625,7 +625,6 @@ pub mod wasm_test {
 
                 match ribosome.call_zome_function(host_access, invocation.clone()) {
                     Ok(crate::core::ribosome::ZomeCallResponse::Ok(guest_output)) => {
-                        dbg!($fn_name, &guest_output);
                         Ok(guest_output.decode().unwrap())
                     }
                     Ok(crate::core::ribosome::ZomeCallResponse::Unauthorized(_, _, _, _)) => {
@@ -635,10 +634,7 @@ pub mod wasm_test {
                     Ok(crate::core::ribosome::ZomeCallResponse::CountersigningSession(e)) => {
                         panic!("Failed a countersigning session {}", e)
                     }
-                    Err(e) => {
-                        dbg!($fn_name, &e);
-                        Err(e)
-                    }
+                    Err(e) => Err(e),
                 }
             })
             .await

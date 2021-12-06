@@ -97,14 +97,14 @@ pub mod slow_tests {
         let _foo_bar: holo_hash::EntryHash = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
-            "hash",
+            "path_entry_hash",
             "foo.bar".to_string()
         ).unwrap();
 
         let _foo_baz: holo_hash::EntryHash = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
-            "hash",
+            "path_entry_hash",
             "foo.baz".to_string()
         ).unwrap();
 

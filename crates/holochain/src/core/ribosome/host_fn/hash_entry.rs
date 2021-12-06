@@ -80,7 +80,7 @@ pub mod wasm_test {
         let host_access = fixt!(ZomeCallHostAccess, Predictable);
         let input = "foo.bar".to_string();
         let output: EntryHash =
-            crate::call_test_ribosome!(host_access, TestWasm::HashPath, "hash", input).unwrap();
+            crate::call_test_ribosome!(host_access, TestWasm::HashPath, "path_entry_hash", input).unwrap();
 
         let expected_path = hdk::hash_path::path::Path::from("foo.bar");
 

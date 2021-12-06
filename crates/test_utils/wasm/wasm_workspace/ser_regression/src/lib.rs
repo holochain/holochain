@@ -20,7 +20,7 @@ pub struct ChannelMessage {
 }
 
 entry_defs![
-    Path::entry_def(),
+    PathEntry::entry_def(),
     Channel::entry_def(),
     ChannelMessage::entry_def()
 ];

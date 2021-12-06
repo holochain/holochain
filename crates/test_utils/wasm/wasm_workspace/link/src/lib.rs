@@ -1,12 +1,15 @@
 use hdk::prelude::*;
-use hdk::hash_path::path::NAME;
+use hdk::hash_path::path::DHT_PREFIX;
 
-entry_defs![Path::entry_def()];
+entry_defs![
+    Path::entry_def(),
+    PathEntry::entry_def()
+];
 
 fn path(s: &str) -> ExternResult<EntryHash> {
     let path = Path::from(s);
     path.ensure()?;
-    path.hash()
+    path.path_entry_hash()
 }
 
 fn base() -> ExternResult<EntryHash> {
@@ -82,11 +85,11 @@ fn delete_all_links(_: ()) -> ExternResult<()> {
 #[hdk_extern]
 fn commit_existing_path(_: ()) -> ExternResult<()> {
     let path = Path::from("a.c");
-    create_entry(&path)?;
+    create_entry(&path.path_entry()?)?;
     if let Some(parent) = path.parent() {
         parent.ensure()?;
-        hdk::prelude::create_link(parent.hash()?, path.hash()?, LinkTag::new(
-            NAME.iter()
+        hdk::prelude::create_link(parent.path_entry_hash()?, path.path_entry_hash()?, LinkTag::new(
+            DHT_PREFIX.iter()
                 .chain(match path.leaf() {
                     None => <Vec<u8>>::new(),
                     Some(component) => UnsafeBytes::from(SerializedBytes::try_from(component)?).into(),
