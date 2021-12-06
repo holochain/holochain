@@ -80,7 +80,6 @@ fn simple_crud_zome() -> InlineZome {
             api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
                 .map_err(Into::into)
         })
-        // TODO: let this accept a usize, once the hdk refactor is merged
         .callback("emit_signal", |api, ()| {
             api.emit_signal(AppSignal::new(ExternIO::encode(()).unwrap()))
                 .map_err(Into::into)

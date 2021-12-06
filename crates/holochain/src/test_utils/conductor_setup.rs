@@ -83,7 +83,7 @@ impl CellHostFnCaller {
 }
 
 /// Everything you need to run a test that uses the conductor
-// TODO: refactor this to be the "Test Conductor" wrapper
+// TODO: rewrite as sweettests if possible
 pub struct ConductorTestData {
     _envs: TestEnvs,
     handle: ConductorHandle,

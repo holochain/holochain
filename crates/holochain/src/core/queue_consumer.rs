@@ -38,7 +38,7 @@ use holochain_types::prelude::*;
 use holochain_zome_types::CellId;
 use tokio::sync::{self, broadcast};
 
-// TODO: move these to workflow mod
+// MAYBE: move these to workflow mod
 mod integrate_dht_ops_consumer;
 use integrate_dht_ops_consumer::*;
 mod sys_validation_consumer;

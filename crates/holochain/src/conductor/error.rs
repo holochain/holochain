@@ -48,9 +48,6 @@ pub enum ConductorError {
     #[error("Attempted to call into the conductor while it is shutting down")]
     ShuttingDown,
 
-    #[error("Miscellaneous error: {0}")]
-    Todo(String),
-
     #[error("Error while performing IO for the Conductor: {0}")]
     IoError(#[from] std::io::Error),
 
@@ -127,13 +124,6 @@ impl ConductorError {
     /// promote a custom error type to a ConductorError
     pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
         Self::Other(e.into())
-    }
-}
-
-// TODO: can this be removed?
-impl From<String> for ConductorError {
-    fn from(s: String) -> Self {
-        ConductorError::Todo(s)
     }
 }
 
