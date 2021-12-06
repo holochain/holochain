@@ -84,6 +84,7 @@ async fn sys_validation_workflow_inner(
 ) -> WorkflowResult<WorkComplete> {
     let env = workspace.dht_env.clone();
     let sorted_ops = validation_query::get_ops_to_sys_validate(&env).await?;
+    tracing::debug!("sys validating {} ops", sorted_ops.len());
 
     // Process each op
     let iter = sorted_ops.into_iter().map(|so| {
@@ -112,14 +113,17 @@ async fn sys_validation_workflow_inner(
         .buffer_unordered(NUM_CONCURRENT_OPS)
         .ready_chunks(NUM_CONCURRENT_OPS);
 
+    let mut total = 0;
     while let Some(chunk) = iter.next().await {
-        space
+        let t = space
             .dht_env
             .async_commit(move |mut txn| {
+                let mut total = 0;
                 for outcome in chunk {
                     let (op_hash, outcome) = outcome?;
                     match outcome {
                         Outcome::Accepted => {
+                            total += 1;
                             put_validation_limbo(
                                 &mut txn,
                                 op_hash,
@@ -155,10 +159,12 @@ async fn sys_validation_workflow_inner(
                         }
                     }
                 }
-                WorkflowResult::Ok(())
+                WorkflowResult::Ok(total)
             })
             .await?;
+        total += t;
     }
+    tracing::debug!("accepted {} ops", total);
     Ok(WorkComplete::Complete)
 }
 

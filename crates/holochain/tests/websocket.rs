@@ -40,7 +40,7 @@ async fn call_admin() {
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
-    // TODO: B-01453: can we make this port 0 and find out the dynamic port later?
+    // MAYBE: B-01453: can we make this port 0 and find out the dynamic port later?
     let port = 9909;
 
     let tmp_dir = TempDir::new("conductor_cfg").unwrap();
@@ -112,7 +112,7 @@ async fn call_zome() {
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
-    // TODO: B-01453: can we make this port 0 and find out the dynamic port later?
+    // MAYBE: B-01453: can we make this port 0 and find out the dynamic port later?
     let admin_port = 9910;
     let app_port = 9913;
 
@@ -204,7 +204,7 @@ async fn remote_signals() -> anyhow::Result<()> {
 
     let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
 
-    // TODO: write helper for agents across conductors
+    // MAYBE: write helper for agents across conductors
     let all_agents: Vec<HoloHash<hash_type::Agent>> =
         future::join_all(conductors.iter().map(|c| SweetAgents::one(c.keystore()))).await;
 
@@ -260,7 +260,7 @@ async fn emit_signals() {
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
-    // TODO: B-01453: can we make this port 0 and find out the dynamic port later?
+    // MAYBE: B-01453: can we make this port 0 and find out the dynamic port later?
     let admin_port = 9911;
 
     let tmp_dir = TempDir::new("conductor_cfg_emit_signals").unwrap();
@@ -478,7 +478,7 @@ async fn concurrent_install_dna() {
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
-    // TODO: B-01453: can we make this port 0 and find out the dynamic port later?
+    // MAYBE: B-01453: can we make this port 0 and find out the dynamic port later?
     let admin_port = 9912;
     // let app_port = 9914;
 

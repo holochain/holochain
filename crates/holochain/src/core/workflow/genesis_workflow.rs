@@ -4,9 +4,6 @@
 //! - AgentId
 //!
 
-// FIXME: understand the details of actually getting the DNA
-// FIXME: creating entries in the config db
-
 use super::error::WorkflowError;
 use super::error::WorkflowResult;
 use crate::core::ribosome::guest_callback::genesis_self_check::{
@@ -81,7 +78,7 @@ where
         return Err(WorkflowError::GenesisFailure(reason));
     }
 
-    // TODO: this is a placeholder for a real DPKI request to show intent
+    // NB: this is just a placeholder for a real DPKI request to show intent
     if api
         .dpki_request("is_agent_pubkey_valid".into(), agent_pubkey.to_string())
         .await
@@ -213,7 +210,7 @@ pub mod tests {
     }
 }
 
-/* TODO: make doc-able
+/* TODO: update and rewrite as proper rust docs
 
 Called from:
 
