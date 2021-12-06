@@ -33,10 +33,10 @@ impl From<&Anchor> for Path {
     fn from(anchor: &Anchor) -> Self {
         let mut components = vec![
             Component::new(ROOT.to_vec()),
-            Component::from(anchor.anchor_type.clone()),
+            Component::from(anchor.anchor_type.as_bytes().to_vec()),
         ];
         if let Some(text) = anchor.anchor_text.as_ref() {
-            components.push(Component::from(text));
+            components.push(Component::from(text.as_bytes().to_vec()));
         }
         components.into()
     }
@@ -52,10 +52,16 @@ impl TryFrom<&Path> for Anchor {
         if components.len() == 2 || components.len() == 3 {
             if components[0] == Component::new(ROOT.to_vec()) {
                 Ok(Anchor {
-                    anchor_type: (&components[1]).try_into()?,
+                    anchor_type: std::str::from_utf8(components[1].as_ref())
+                        .map_err(|e| SerializedBytesError::Deserialize(e.to_string()))?
+                        .to_string(),
                     anchor_text: {
                         match components.get(2) {
-                            Some(component) => Some(component.try_into()?),
+                            Some(component) => Some(
+                                std::str::from_utf8(component.as_ref())
+                                    .map_err(|e| SerializedBytesError::Deserialize(e.to_string()))?
+                                    .to_string(),
+                            ),
                             None => None,
                         }
                     },
