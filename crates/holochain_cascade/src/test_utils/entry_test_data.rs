@@ -1,5 +1,6 @@
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
+use holochain_serialized_bytes::UnsafeBytes;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::header::NewEntryHeader;
@@ -11,6 +12,7 @@ use holochain_types::link::WireDeleteLink;
 use holochain_types::link::WireLinkKey;
 use holochain_types::prelude::EntryData;
 use holochain_zome_types::fixt::*;
+use holochain_zome_types::AppEntryBytes;
 use holochain_zome_types::Entry;
 use holochain_zome_types::EntryType;
 use holochain_zome_types::EntryVisibility;
@@ -18,6 +20,7 @@ use holochain_zome_types::Header;
 use holochain_zome_types::HeaderHashed;
 use holochain_zome_types::Judged;
 use holochain_zome_types::Link;
+use holochain_zome_types::SerializedBytes;
 use holochain_zome_types::SignedHeader;
 use holochain_zome_types::SignedHeaderHashed;
 use holochain_zome_types::ValidationStatus;
@@ -59,10 +62,14 @@ impl EntryTestData {
         let mut create_link = fixt!(CreateLink);
         let mut delete_link = fixt!(DeleteLink);
 
-        let entry = fixt!(AppEntryBytes);
+        let entry: AppEntryBytes = SerializedBytes::from(UnsafeBytes::from(vec![3u8]))
+            .try_into()
+            .unwrap();
         let entry = Entry::App(entry);
         let entry_hash = EntryHash::with_data_sync(&entry);
-        let update_entry = fixt!(AppEntryBytes);
+        let update_entry: AppEntryBytes = SerializedBytes::from(UnsafeBytes::from(vec![4u8]))
+            .try_into()
+            .unwrap();
         let update_entry = Entry::App(update_entry);
         let update_entry_hash = EntryHash::with_data_sync(&update_entry);
 
