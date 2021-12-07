@@ -1,6 +1,7 @@
 use super::*;
 
 type KAgent = Arc<KitsuneAgent>;
+type KInfo = Arc<AgentInfoSigned>;
 
 ghost_actor::ghost_chan! {
     /// The api for the test harness controller
@@ -23,6 +24,13 @@ ghost_actor::ghost_chan! {
             ghost_actor::GhostSender<KitsuneP2p>,
         );
 
+        /// Create a new directly addressable agent that will
+        /// reject any proxy requests.
+        fn add_publish_only_agent(nick: String) -> (
+            Arc<KitsuneAgent>,
+            ghost_actor::GhostSender<KitsuneP2p>,
+        );
+
         /// Create a new agent that will connect via proxy.
         fn add_nat_agent(nick: String, proxy_url: url2::Url2) -> (
             Arc<KitsuneAgent>,
@@ -34,6 +42,9 @@ ghost_actor::ghost_chan! {
 
         /// Inject data for one specific agent to gossip to others
         fn inject_gossip_data(agent: KAgent, data: String) -> Arc<KitsuneOpHash>;
+
+        /// Inject agent info for one agent.
+        fn inject_peer_info(agent: KAgent, info: KInfo) -> ();
 
         /// Dump all local gossip data from a specific agent
         fn dump_local_gossip_data(agent: KAgent) -> HashMap<Arc<KitsuneOpHash>, String>;
@@ -263,6 +274,41 @@ impl HarnessControlApiHandler for HarnessActor {
         .into())
     }
 
+    fn handle_add_publish_only_agent(
+        &mut self,
+        nick: String,
+    ) -> HarnessControlApiHandlerResult<(Arc<KitsuneAgent>, ghost_actor::GhostSender<KitsuneP2p>)>
+    {
+        let mut tp =
+            kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+        tp.gossip_strategy = "none".to_string();
+        let tp = Arc::new(tp);
+        let mut direct_agent_config = KitsuneP2pConfig {
+            tuning_params: tp,
+            ..Default::default()
+        };
+        direct_agent_config
+            .transport_pool
+            .push(TransportConfig::Proxy {
+                sub_transport: Box::new(self.sub_config.clone()),
+                proxy_config: ProxyConfig::LocalProxyServer {
+                    proxy_accept_config: Some(ProxyAcceptConfig::RejectAll),
+                },
+            });
+
+        let sub_harness = self.harness_chan.sub_clone(nick);
+        let i_s = self.i_s.clone();
+        Ok(async move {
+            let (agent, p2p, ctrl) = spawn_test_agent(sub_harness, direct_agent_config).await?;
+
+            i_s.finish_agent(agent.clone(), p2p.clone(), ctrl).await?;
+
+            Ok((agent, p2p))
+        }
+        .boxed()
+        .into())
+    }
+
     fn handle_add_nat_agent(
         &mut self,
         nick: String,
@@ -324,6 +370,22 @@ impl HarnessControlApiHandler for HarnessActor {
             .get(&agent)
             .ok_or_else(|| KitsuneP2pError::from("invalid agent"))?;
         let fut = ctrl.inject_gossip_data(data);
+        Ok(async move { fut.await }.boxed().into())
+    }
+
+    fn handle_inject_peer_info(
+        &mut self,
+        agent: KAgent,
+        info: KInfo,
+    ) -> HarnessControlApiHandlerResult<()> {
+        let (_, ctrl) = self
+            .agents
+            .get(&agent)
+            .ok_or_else(|| KitsuneP2pError::from("invalid agent"))?;
+        let map = maplit::hashmap! {
+            info.agent.clone() => info
+        };
+        let fut = ctrl.inject_agent_info(map);
         Ok(async move { fut.await }.boxed().into())
     }
 

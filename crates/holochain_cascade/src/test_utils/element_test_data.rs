@@ -1,10 +1,13 @@
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
+use holochain_serialized_bytes::SerializedBytes;
+use holochain_serialized_bytes::UnsafeBytes;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::header::WireDelete;
 use holochain_types::header::WireUpdateRelationship;
 use holochain_zome_types::fixt::*;
+use holochain_zome_types::AppEntryBytes;
 use holochain_zome_types::Create;
 use holochain_zome_types::Element;
 use holochain_zome_types::Entry;
@@ -46,7 +49,9 @@ impl ElementTestData {
         let mut update = fixt!(Update);
         let mut delete = fixt!(Delete);
         let mut any_header = fixt!(Header);
-        let entry = fixt!(AppEntryBytes);
+        let entry: AppEntryBytes = SerializedBytes::from(UnsafeBytes::from(vec![0u8]))
+            .try_into()
+            .unwrap();
         let entry = Entry::App(entry);
         let entry_hash = EntryHash::with_data_sync(&entry);
         let update_entry = fixt!(AppEntryBytes);
@@ -112,7 +117,9 @@ impl ElementTestData {
                     entry_type,
                     ..
                 }) => {
-                    let entry = fixt!(AppEntryBytes);
+                    let entry: AppEntryBytes = SerializedBytes::from(UnsafeBytes::from(vec![1u8]))
+                        .try_into()
+                        .unwrap();
                     let entry = Entry::App(entry);
                     *entry_type = entry_type_fixt.next().unwrap();
                     *eh = EntryHash::with_data_sync(&entry);
