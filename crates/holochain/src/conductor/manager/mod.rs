@@ -47,7 +47,7 @@ pub enum TaskKind {
     /// but continue running the rest of the conductor and other managed tasks.
     DnaCritical(Arc<DnaHash>),
     /// A generic callback for handling the result
-    // TODO: B-01455: reevaluate whether this should be a callback
+    // MAYBE: B-01455: reevaluate whether this should be a callback
     Generic(OnDeath),
 }
 
@@ -219,7 +219,7 @@ async fn run(
                             context
                         );
 
-                        // TODO: it could be helpful to modify this function so that when providing Some(app_ids),
+                        // MAYBE: it could be helpful to modify this function so that when providing Some(app_ids),
                         //   you can also pass in a PausedAppReason override, so that the reason for the apps being paused
                         //   can be set to the specific error message encountered here, rather than having to read it from
                         //   the logs.
@@ -258,7 +258,7 @@ async fn run(
                             context
                         );
 
-                        // TODO: it could be helpful to modify this function so that when providing Some(app_ids),
+                        // MAYBE: it could be helpful to modify this function so that when providing Some(app_ids),
                         //   you can also pass in a PausedAppReason override, so that the reason for the apps being paused
                         //   can be set to the specific error message encountered here, rather than having to read it from
                         //   the logs.
@@ -395,13 +395,13 @@ mod test {
         let mock_handle = MockConductorHandleT::new();
         let (send_task_handle, main_task) = spawn_task_manager(Arc::new(mock_handle));
         let handle = tokio::spawn(async {
-            Err(ConductorError::Todo("This task gotta die".to_string()).into())
+            Err(ConductorError::Other(anyhow::anyhow!("This task gotta die").into()).into())
         });
         let handle = ManagedTaskAdd::generic(
             handle,
             Box::new(|result| match result {
                 Ok(_) => panic!("Task should have died"),
-                Err(ManagedTaskError::Conductor(ConductorError::Todo(_))) => {
+                Err(ManagedTaskError::Conductor(ConductorError::Other(_))) => {
                     let handle = tokio::spawn(async { Ok(()) });
                     let handle = ManagedTaskAdd::ignore(handle, "respawned task");
                     TaskOutcome::NewTask(handle)
@@ -441,7 +441,10 @@ mod test {
             .send(ManagedTaskAdd::unrecoverable(
                 tokio::spawn(async {
                     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                    Err(ConductorError::Todo("Unrecoverable task failed".to_string()).into())
+                    Err(
+                        ConductorError::Other(anyhow::anyhow!("Unrecoverable task failed").into())
+                            .into(),
+                    )
                 }),
                 "",
             ))
