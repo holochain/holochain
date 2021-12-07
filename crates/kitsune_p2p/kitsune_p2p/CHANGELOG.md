@@ -4,7 +4,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-- BREAKING: Wire message `Call` no longer takes `from_agent`. [#1091](https://github.com/holochain/holochain/pull/1091)
+
+- BREAKING: Network wire message has changed format so will not be compatible with older versions. [1143](https://github.com/holochain/holochain/pull/1143).
+- Fixes to gossip that allows batching of large amounts of data. [1143](https://github.com/holochain/holochain/pull/1143).
+
+## 0.0.16
+
+
+## 0.0.15
+
+- BREAKING: Wire message `Call` no longer takes `from_agent`. [\#1091](https://github.com/holochain/holochain/pull/1091)
+
 ## 0.0.14
 
 ## 0.0.13

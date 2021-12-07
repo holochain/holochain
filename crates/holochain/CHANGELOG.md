@@ -4,7 +4,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- **BREAKING CHANGE** - Gossip now exchanges local peer info with `initiate` and `accept` request types. [#1114](https://github.com/holochain/holochain/pull/1114).
+## 0.0.118
+
+- **BREAKING CHANGE** - Gossip now exchanges local peer info with `initiate` and `accept` request types. [\#1114](https://github.com/holochain/holochain/pull/1114).
+
+## 0.0.117
 
 ## 0.0.116
 

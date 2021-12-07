@@ -43,7 +43,12 @@ pub fn delete<'a>(
                     deletes_entry_address,
                 };
                 let header_hash = source_chain
-                    .put(Some(call_context.zome.clone()), header_builder, None, chain_top_ordering)
+                    .put(
+                        Some(call_context.zome.clone()),
+                        header_builder,
+                        None,
+                        chain_top_ordering,
+                    )
                     .await
                     .map_err(|source_chain_error| {
                         WasmError::Host(source_chain_error.to_string())
@@ -65,7 +70,6 @@ pub(crate) fn get_original_address<'a>(
 
     tokio_helper::block_forever_on(async move {
         let mut cascade = Cascade::from_workspace_network(&workspace, network);
-        // TODO: Think about what options to use here
         let maybe_original_element: Option<SignedHeaderHashed> = cascade
             .get_details(address.clone().into(), GetOptions::content())
             .await?

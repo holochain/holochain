@@ -11,7 +11,7 @@
 
 #![deny(missing_docs)]
 
-// TODO: clean up allows once parent is fully documented
+// TODO: clean up allow(missing_docs) once parent is fully documented
 
 pub mod api;
 mod cell;
