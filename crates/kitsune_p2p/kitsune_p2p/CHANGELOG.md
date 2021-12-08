@@ -4,12 +4,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-- Agent info is now published as well as gossiped. [#1115](https://github.com/holochain/holochain/pull/1115)
+## 0.0.17
+
+- Agent info is now published as well as gossiped. [\#1115](https://github.com/holochain/holochain/pull/1115)
 - BREAKING: Network wire message has changed format so will not be compatible with older versions. [1143](https://github.com/holochain/holochain/pull/1143).
 - Fixes to gossip that allows batching of large amounts of data. [1143](https://github.com/holochain/holochain/pull/1143).
 
 ## 0.0.16
-
 
 ## 0.0.15
 
