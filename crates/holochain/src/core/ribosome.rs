@@ -381,7 +381,10 @@ impl Invocation for ZomeCallInvocation {
 }
 
 impl ZomeCallInvocation {
-    pub async fn try_from_interface_call(conductor_api: CellConductorApi, call: ZomeCall) -> RibosomeResult<Self> {
+    pub async fn try_from_interface_call(
+        conductor_api: CellConductorApi,
+        call: ZomeCall,
+    ) -> RibosomeResult<Self> {
         use crate::conductor::api::CellConductorApiT;
         let ZomeCall {
             cell_id,
@@ -392,7 +395,8 @@ impl ZomeCallInvocation {
             provenance,
         } = call;
         let zome = conductor_api
-            .get_zome(cell_id.dna_hash(), &zome_name).map_err(|conductor_api_error| RibosomeError::from(Box::new(conductor_api_error)))?;
+            .get_zome(cell_id.dna_hash(), &zome_name)
+            .map_err(|conductor_api_error| RibosomeError::from(Box::new(conductor_api_error)))?;
         Ok(Self {
             cell_id,
             zome,
