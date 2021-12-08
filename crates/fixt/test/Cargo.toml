@@ -11,5 +11,5 @@ categories = [ "fixtures" ]
 edition = "2018"
 
 [dependencies]
-fixt = { path = ".." ,version = "0.0.7"}
+fixt = { path = ".." ,version = "0.0.8-dev.0"}
 paste = "1.0.5"
