@@ -359,16 +359,34 @@ impl Outer {
 
                     let msg = wire::Wire::call(space, info.agent.clone(), payload.into());
 
+                    let start = tokio::time::Instant::now();
+
                     let res = con_hnd.request(&msg, max_timeout).await;
 
                     match res {
                         Ok(wire::Wire::CallResp(c)) => {
+                            ro_inner
+                                .metrics
+                                .write()
+                                .record_reachability_event(true, [&info.agent]);
+                            ro_inner
+                                .metrics
+                                .write()
+                                .record_latency_micros(start.elapsed().as_micros(), [&info.agent]);
                             report_results(RpcMultiResponse {
                                 agent: info.agent.clone(),
                                 response: c.data.into(),
                             });
                         }
                         oth => {
+                            ro_inner
+                                .metrics
+                                .write()
+                                .record_reachability_event(false, [&info.agent]);
+                            ro_inner
+                                .metrics
+                                .write()
+                                .record_latency_micros(start.elapsed().as_micros(), [&info.agent]);
                             tracing::warn!(?oth, "unexpected remote call result");
                         }
                     }

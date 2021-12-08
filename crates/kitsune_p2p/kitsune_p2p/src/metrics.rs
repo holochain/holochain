@@ -197,10 +197,11 @@ impl Metrics {
 
     /// Running average for latency microseconds for any direct
     /// request/response calls to remote agent.
-    pub fn record_latency_micros<'a, T, I>(&mut self, micros: u64, remote_agent_list: I)
+    pub fn record_latency_micros<'a, T, I, V>(&mut self, micros: V, remote_agent_list: I)
     where
         T: Into<AgentLike<'a>>,
         I: IntoIterator<Item = T>,
+        V: AsPrimitive<f32>,
     {
         for agent_info in remote_agent_list {
             let info = self
