@@ -170,8 +170,8 @@ pub mod tuning_params_struct {
         tx2_pool_max_connection_count: usize = 4096,
 
         /// tx2 channel count per connection
-        /// [Default: 16]
-        tx2_channel_count_per_connection: usize = 16,
+        /// [Default: 2]
+        tx2_channel_count_per_connection: usize = 2,
 
         /// tx2 timeout used for passive background operations
         /// like reads / responds.

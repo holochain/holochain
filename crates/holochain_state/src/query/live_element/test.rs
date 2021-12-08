@@ -4,8 +4,7 @@ use holochain_sqlite::schema::SCHEMA_CELL;
 use test_data::ElementTestData;
 
 use crate::mutations::insert_op_scratch;
-use crate::mutations::set_validation_status;
-use crate::prelude::mutations_helpers::insert_valid_authored_op;
+use crate::prelude::mutations_helpers::insert_valid_integrated_op;
 use ::fixt::prelude::*;
 
 use super::*;
@@ -23,16 +22,13 @@ async fn can_handle_update_in_scratch() {
         .unwrap();
 
     let td = ElementTestData::new();
-    let query = GetLiveElementQuery::new(td.update_hash);
+    let query = GetLiveElementQuery::with_private_data_access(
+        td.update_hash,
+        Arc::new(td.update_store_element_op.header().author().clone()),
+    );
 
     // - Create an entry on main db.
-    insert_valid_authored_op(&mut txn, td.update_store_element_op.clone()).unwrap();
-    set_validation_status(
-        &mut txn,
-        td.update_store_element_op.as_hash().clone(),
-        ValidationStatus::Valid,
-    )
-    .unwrap();
+    insert_valid_integrated_op(&mut txn, td.update_store_element_op.clone()).unwrap();
     let r = query
         .run(Txn::from(&txn))
         .unwrap()

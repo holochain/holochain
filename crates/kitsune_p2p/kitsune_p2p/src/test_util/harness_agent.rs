@@ -232,14 +232,12 @@ impl KitsuneP2pEventHandler for AgentHarness {
         &mut self,
         space: Arc<super::KitsuneSpace>,
         to_agent: Arc<super::KitsuneAgent>,
-        from_agent: Arc<super::KitsuneAgent>,
         payload: Vec<u8>,
     ) -> KitsuneP2pEventHandlerResult<Vec<u8>> {
         let data = String::from_utf8_lossy(&payload);
         self.harness_chan.publish(HarnessEventType::Call {
             space: space.into(),
             to_agent: to_agent.into(),
-            from_agent: from_agent.into(),
             payload: data.to_string(),
         });
         let data = format!("echo: {}", data);
@@ -251,14 +249,12 @@ impl KitsuneP2pEventHandler for AgentHarness {
         &mut self,
         space: Arc<super::KitsuneSpace>,
         to_agent: Arc<super::KitsuneAgent>,
-        from_agent: Arc<super::KitsuneAgent>,
         payload: Vec<u8>,
     ) -> KitsuneP2pEventHandlerResult<()> {
         let data = String::from_utf8_lossy(&payload);
         self.harness_chan.publish(HarnessEventType::Notify {
             space: space.into(),
             to_agent: to_agent.into(),
-            from_agent: from_agent.into(),
             payload: data.to_string(),
         });
         Ok(async move { Ok(()) }.boxed().into())
@@ -267,7 +263,6 @@ impl KitsuneP2pEventHandler for AgentHarness {
     fn handle_gossip(
         &mut self,
         _space: Arc<super::KitsuneSpace>,
-        _to_agent: Arc<super::KitsuneAgent>,
         ops: Vec<(Arc<super::KitsuneOpHash>, Vec<u8>)>,
     ) -> KitsuneP2pEventHandlerResult<()> {
         for (op_hash, op_data) in ops {
@@ -284,13 +279,16 @@ impl KitsuneP2pEventHandler for AgentHarness {
     fn handle_query_op_hashes(
         &mut self,
         _input: QueryOpHashesEvt,
-    ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<super::KitsuneOpHash>>, TimeWindow)>> {
+    ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<super::KitsuneOpHash>>, TimeWindowInclusive)>>
+    {
         let hashes: Vec<Arc<super::KitsuneOpHash>> = self.gossip_store.keys().cloned().collect();
         let slug_hashes: Vec<Slug> = hashes.iter().map(|h| h.into()).collect();
         tracing::trace!(?slug_hashes, "FETCH_OP_HASHES");
-        Ok(async move { Ok(Some((hashes, full_time_window()))) }
-            .boxed()
-            .into())
+        Ok(
+            async move { Ok(Some((hashes, full_time_window_inclusive()))) }
+                .boxed()
+                .into(),
+        )
     }
 
     fn handle_fetch_op_data(

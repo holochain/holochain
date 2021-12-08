@@ -1,6 +1,6 @@
 //! An in-memory network for sharded kitsune tests.
 
-use crate::event::{QueryOpHashesEvt, TimeWindow};
+use crate::event::{QueryOpHashesEvt, TimeWindowInclusive};
 use crate::gossip::sharded_gossip::{BandwidthThrottle, GossipType, ShardedGossip};
 use crate::test_util::spawn_handler;
 use crate::types::gossip::*;
@@ -529,12 +529,12 @@ impl SwitchboardState {
         &mut self,
         QueryOpHashesEvt {
             space: _,
-            agents,
+            arc_set,
             window,
             max_ops,
-            include_limbo,
+            include_limbo: _,
         }: QueryOpHashesEvt,
-    ) -> Option<(Vec<Arc<KitsuneOpHash>>, TimeWindow)> {
+    ) -> Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowInclusive)> {
         let (ops, timestamps): (Vec<_>, Vec<_>) = self
             .ops
             .iter()
@@ -543,22 +543,7 @@ impl SwitchboardState {
                 window.contains(&op.timestamp)
                     // Does the op fall within one of the specified arcsets
                     // with the correct integration/limbo criteria?
-                        && agents.iter().fold(false, |yes, (agent, arc_set)| {
-                            if yes {
-                                return true;
-                            }
-                            arc_set.contains((**op_loc8).into()) &&
-                            self.local_agent_by_hash(agent)
-                                .and_then(|agent| {
-                                    agent
-                                        .ops
-                                        // Does agent hold this op?
-                                        .get(op_loc8)
-                                        // Does it meet the limbo criteria of the query?
-                                        .map(|op| include_limbo || op.is_integrated)
-                                })
-                                .unwrap_or(false)
-                        })
+                        && arc_set.contains((**op_loc8).into())
             })
             .map(|(_, op)| (op.hash.clone(), op.timestamp))
             .take(max_ops)
@@ -567,17 +552,18 @@ impl SwitchboardState {
         if ops.is_empty() {
             None
         } else {
-            let window = timestamps
-                .into_iter()
-                .fold(window, |mut window, timestamp| {
-                    if timestamp < window.start {
-                        window.start = timestamp;
-                    }
-                    if timestamp > window.end {
-                        window.end = timestamp;
-                    }
-                    window
-                });
+            let window =
+                timestamps
+                    .into_iter()
+                    .fold(window.start..=window.end, |mut window, timestamp| {
+                        if timestamp < *window.start() {
+                            window = timestamp..=*window.end();
+                        }
+                        if timestamp > *window.end() {
+                            window = *window.start()..=timestamp;
+                        }
+                        window
+                    });
             Some((ops, window))
         }
     }

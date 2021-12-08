@@ -7,9 +7,9 @@ use super::*;
 use crate::fixt::*;
 use fixt::prelude::*;
 
+mod bloom;
 mod common;
 mod handler_builder;
-mod test_local_sync;
 mod test_two_nodes;
 
 impl ShardedGossipLocal {

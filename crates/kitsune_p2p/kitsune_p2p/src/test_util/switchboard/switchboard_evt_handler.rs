@@ -9,7 +9,7 @@ use crate::types::event::{KitsuneP2pEvent, KitsuneP2pEventHandler, KitsuneP2pEve
 use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::*;
 
-use super::switchboard_state::{AgentOpEntry, NodeEp, OpEntry, Switchboard};
+use super::switchboard_state::{NodeEp, OpEntry, Switchboard};
 
 type KSpace = Arc<KitsuneSpace>;
 type KAgent = Arc<KitsuneAgent>;
@@ -119,7 +119,6 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
         &mut self,
         space: Arc<KitsuneSpace>,
         to_agent: Arc<KitsuneAgent>,
-        from_agent: Arc<KitsuneAgent>,
         payload: Vec<u8>,
     ) -> KitsuneP2pEventHandlerResult<Vec<u8>> {
         todo!()
@@ -129,7 +128,6 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
         &mut self,
         space: Arc<KitsuneSpace>,
         to_agent: Arc<KitsuneAgent>,
-        from_agent: Arc<KitsuneAgent>,
         payload: Vec<u8>,
     ) -> KitsuneP2pEventHandlerResult<()> {
         todo!()
@@ -137,43 +135,39 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
 
     fn handle_gossip(
         &mut self,
-        space: Arc<KitsuneSpace>,
-        to_agent: Arc<KitsuneAgent>,
-        ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
+        _space: Arc<KitsuneSpace>,
+        _ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
     ) -> KitsuneP2pEventHandlerResult<()> {
-        ok_fut(Ok(self.sb.share(|sb| {
-            let agent = sb
-                .node_for_local_agent_hash_mut(&*to_agent)
-                .unwrap()
-                .local_agent_by_hash_mut(&*to_agent)
-                .unwrap();
-            for (hash, op_data) in ops {
-                let loc8 = hash.get_loc().as_loc8();
-                // TODO: allow setting integration status
-                agent.ops.insert(
-                    loc8,
-                    AgentOpEntry {
-                        is_integrated: true,
-                    },
-                );
-            }
-        })))
+        todo!()
+        // ok_fut(Ok(self.sb.share(|sb| {
+        //     let agent = sb
+        //         .node_for_local_agent_hash_mut(&*to_agent)
+        //         .unwrap()
+        //         .local_agent_by_hash_mut(&*to_agent)
+        //         .unwrap();
+        //     for (hash, op_data) in ops {
+        //         let loc8 = hash.get_loc().as_loc8();
+        //         // TODO: allow setting integration status
+        //         agent.ops.insert(
+        //             loc8,
+        //             AgentOpEntry {
+        //                 is_integrated: true,
+        //             },
+        //         );
+        //     }
+        // })))
     }
 
     fn handle_query_op_hashes(
         &mut self,
         query: QueryOpHashesEvt,
-    ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindow)>> {
+    ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowInclusive)>> {
         ok_fut(Ok(self.sb.share(|sb| sb.query_op_hashes(query))))
     }
 
     fn handle_fetch_op_data(
         &mut self,
-        FetchOpDataEvt {
-            space,
-            agents,
-            op_hashes,
-        }: FetchOpDataEvt,
+        FetchOpDataEvt { space, op_hashes }: FetchOpDataEvt,
     ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> {
         ok_fut(Ok(self.sb.share(|sb| {
             op_hashes

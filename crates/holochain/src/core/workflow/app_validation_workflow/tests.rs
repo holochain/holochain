@@ -1,14 +1,14 @@
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::ZomeCallInvocation;
+use crate::sweettest::SweetConductorBatch;
+use crate::sweettest::SweetDnaFile;
 use crate::test_utils::host_fn_caller::*;
 use crate::test_utils::new_invocation;
 use crate::test_utils::new_zome_call;
-use crate::test_utils::setup_app;
 use crate::test_utils::wait_for_integration;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
-use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::prelude::fresh_reader_test;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateQueryResult;
@@ -27,63 +27,40 @@ use std::time::Duration;
 async fn app_validation_workflow_test() {
     observability::test_run_open().ok();
 
-    let dna_file = DnaFile::new(
-        DnaDef {
-            name: "app_validation_workflow_test".to_string(),
-            uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
-            properties: SerializedBytes::try_from(()).unwrap(),
-            zomes: vec![
-                TestWasm::Validate.into(),
-                TestWasm::ValidateLink.into(),
-                TestWasm::Create.into(),
-            ]
-            .into(),
-        },
-        vec![
-            TestWasm::Validate.into(),
-            TestWasm::ValidateLink.into(),
-            TestWasm::Create.into(),
-        ],
-    )
+    let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![
+        TestWasm::Validate,
+        TestWasm::ValidateLink,
+        TestWasm::Create,
+    ])
     .await
     .unwrap();
 
-    let alice_agent_id = fake_agent_pubkey_1();
-    let alice_cell_id = CellId::new(dna_file.dna_hash().to_owned(), alice_agent_id.clone());
-    let alice_installed_cell = InstalledCell::new(alice_cell_id.clone(), "alice_handle".into());
+    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    let apps = conductors
+        .setup_app(&"test_app", &[dna_file.clone()])
+        .await
+        .unwrap();
+    let ((alice,), (bob,)) = apps.into_tuples();
+    let alice_cell_id = alice.cell_id().clone();
+    let bob_cell_id = bob.cell_id().clone();
 
-    let bob_agent_id = fake_agent_pubkey_2();
-    let bob_cell_id = CellId::new(dna_file.dna_hash().to_owned(), bob_agent_id.clone());
-    let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
-
-    let (_tmpdir, _app_api, handle) = setup_app(
-        vec![(
-            "test_app",
-            vec![(alice_installed_cell, None), (bob_installed_cell, None)],
-        )],
-        vec![dna_file.clone()],
-    )
-    .await;
+    conductors.exchange_peer_info().await;
 
     let expected_count = run_test(
         alice_cell_id.clone(),
         bob_cell_id.clone(),
-        handle.clone(),
+        &conductors,
         &dna_file,
     )
     .await;
     run_test_entry_def_id(
         alice_cell_id,
         bob_cell_id,
-        handle.clone(),
+        &conductors,
         &dna_file,
         expected_count,
     )
     .await;
-
-    let shutdown = handle.take_shutdown_handle().unwrap();
-    handle.shutdown();
-    shutdown.await.unwrap().unwrap();
 }
 
 const SELECT: &'static str = "SELECT count(hash) FROM DhtOp WHERE";
@@ -219,7 +196,7 @@ fn num_valid(txn: &Transaction) -> usize {
 async fn run_test(
     alice_cell_id: CellId,
     bob_cell_id: CellId,
-    handle: ConductorHandle,
+    conductors: &SweetConductorBatch,
     dna_file: &DnaFile,
 ) -> usize {
     // Check if the correct number of ops are integrated
@@ -230,17 +207,20 @@ async fn run_test(
 
     let invocation =
         new_zome_call(&bob_cell_id, "always_validates", (), TestWasm::Validate).unwrap();
-    handle.call_zome(invocation).await.unwrap().unwrap();
+    conductors[1].call_zome(invocation).await.unwrap().unwrap();
 
     // Integration should have 3 ops in it
     // Plus another 16 for genesis + init
     // Plus 2 for Cap Grant
     let expected_count = 3 + 16 + 2;
-    let alice_env = handle.get_cell_env(&alice_cell_id).unwrap();
+    let alice_env = conductors[0]
+        .get_dht_env(&alice_cell_id.dna_hash())
+        .unwrap();
     wait_for_integration(&alice_env, expected_count, num_attempts, delay_per_attempt).await;
-    holochain_state::prelude::dump_tmp(&alice_env);
 
-    let alice_env = handle.get_cell_env(&alice_cell_id).unwrap();
+    let alice_env = conductors[0]
+        .get_dht_env(&alice_cell_id.dna_hash())
+        .unwrap();
 
     fresh_reader_test(alice_env, |txn| {
         // Validation should be empty
@@ -251,7 +231,7 @@ async fn run_test(
     });
 
     let (invalid_header_hash, invalid_entry_hash) =
-        commit_invalid(&bob_cell_id, &handle, dna_file).await;
+        commit_invalid(&bob_cell_id, &conductors[1].handle(), dna_file).await;
     let invalid_entry_hash: AnyDhtHash = invalid_entry_hash.into();
 
     // Integration should have 3 ops in it
@@ -259,7 +239,9 @@ async fn run_test(
     // RegisterAgentActivity doesn't run app validation
     // So they will be valid.
     let expected_count = 3 + expected_count;
-    let alice_env = handle.get_cell_env(&alice_cell_id).unwrap();
+    let alice_env = conductors[0]
+        .get_dht_env(&alice_cell_id.dna_hash())
+        .unwrap();
     wait_for_integration(&alice_env, expected_count, num_attempts, delay_per_attempt).await;
 
     fresh_reader_test(alice_env, |txn| {
@@ -277,11 +259,13 @@ async fn run_test(
 
     let invocation =
         new_zome_call(&bob_cell_id, "add_valid_link", (), TestWasm::ValidateLink).unwrap();
-    handle.call_zome(invocation).await.unwrap().unwrap();
+    conductors[1].call_zome(invocation).await.unwrap().unwrap();
 
     // Integration should have 6 ops in it
     let expected_count = 6 + expected_count;
-    let alice_env = handle.get_cell_env(&alice_cell_id).unwrap();
+    let alice_env = conductors[0]
+        .get_dht_env(&alice_cell_id.dna_hash())
+        .unwrap();
     wait_for_integration(&alice_env, expected_count, num_attempts, delay_per_attempt).await;
 
     fresh_reader_test(alice_env, |txn| {
@@ -300,14 +284,16 @@ async fn run_test(
     let invocation =
         new_invocation(&bob_cell_id, "add_invalid_link", (), TestWasm::ValidateLink).unwrap();
     let invalid_link_hash: HeaderHash =
-        call_zome_directly(&bob_cell_id, &handle, dna_file, invocation)
+        call_zome_directly(&bob_cell_id, &conductors[1].handle(), dna_file, invocation)
             .await
             .decode()
             .unwrap();
 
     // Integration should have 9 ops in it
     let expected_count = 9 + expected_count;
-    let alice_env = handle.get_cell_env(&alice_cell_id).unwrap();
+    let alice_env = conductors[0]
+        .get_dht_env(&alice_cell_id.dna_hash())
+        .unwrap();
     wait_for_integration(&alice_env, expected_count, num_attempts, delay_per_attempt).await;
 
     fresh_reader_test(alice_env, |txn| {
@@ -331,11 +317,13 @@ async fn run_test(
         TestWasm::ValidateLink,
     )
     .unwrap();
-    call_zome_directly(&bob_cell_id, &handle, dna_file, invocation).await;
+    call_zome_directly(&bob_cell_id, &conductors[1].handle(), dna_file, invocation).await;
 
     // Integration should have 9 ops in it
     let expected_count = 9 + expected_count;
-    let alice_env = handle.get_cell_env(&alice_cell_id).unwrap();
+    let alice_env = conductors[0]
+        .get_dht_env(&alice_cell_id.dna_hash())
+        .unwrap();
     wait_for_integration(&alice_env, expected_count, num_attempts, delay_per_attempt).await;
 
     fresh_reader_test(alice_env, |txn| {
@@ -360,14 +348,16 @@ async fn run_test(
     )
     .unwrap();
     let invalid_remove_hash: HeaderHash =
-        call_zome_directly(&bob_cell_id, &handle, dna_file, invocation)
+        call_zome_directly(&bob_cell_id, &conductors[1].handle(), dna_file, invocation)
             .await
             .decode()
             .unwrap();
 
     // Integration should have 12 ops in it
     let expected_count = 12 + expected_count;
-    let alice_env = handle.get_cell_env(&alice_cell_id).unwrap();
+    let alice_env = conductors[0]
+        .get_dht_env(&alice_cell_id.dna_hash())
+        .unwrap();
     wait_for_integration(&alice_env, expected_count, num_attempts, delay_per_attempt).await;
 
     fresh_reader_test(alice_env, |txn| {
@@ -395,7 +385,7 @@ async fn run_test(
 async fn run_test_entry_def_id(
     alice_cell_id: CellId,
     bob_cell_id: CellId,
-    handle: ConductorHandle,
+    conductors: &SweetConductorBatch,
     dna_file: &DnaFile,
     expected_count: usize,
 ) {
@@ -406,13 +396,15 @@ async fn run_test_entry_def_id(
     let delay_per_attempt = Duration::from_millis(100);
 
     let (invalid_header_hash, invalid_entry_hash) =
-        commit_invalid_post(&bob_cell_id, &handle, dna_file).await;
+        commit_invalid_post(&bob_cell_id, &conductors[1].handle(), dna_file).await;
     let invalid_entry_hash: AnyDhtHash = invalid_entry_hash.into();
 
     // Integration should have 3 ops in it
     // StoreEntry and StoreElement should be invalid.
     let expected_count = 3 + expected_count;
-    let alice_env = handle.get_cell_env(&alice_cell_id).unwrap();
+    let alice_env = conductors[0]
+        .get_dht_env(&alice_cell_id.dna_hash())
+        .unwrap();
     wait_for_integration(&alice_env, expected_count, num_attempts, delay_per_attempt).await;
 
     fresh_reader_test(alice_env, |txn| {

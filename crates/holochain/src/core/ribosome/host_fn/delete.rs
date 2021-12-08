@@ -5,11 +5,11 @@ use holochain_cascade::error::CascadeError;
 use holochain_cascade::Cascade;
 use holochain_wasmer_host::prelude::WasmError;
 
+use crate::core::ribosome::HostFnAccess;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_types::prelude::*;
 use std::sync::Arc;
-use crate::core::ribosome::HostFnAccess;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn delete<'a>(
@@ -18,26 +18,44 @@ pub fn delete<'a>(
     input: DeleteInput,
 ) -> Result<HeaderHash, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
-        HostFnAccess{ write_workspace: Permission::Allow, .. } => {
-            let DeleteInput { deletes_header_address, chain_top_ordering } = input;
-            let deletes_entry_address = get_original_address(call_context.clone(), deletes_header_address.clone())?;
+        HostFnAccess {
+            write_workspace: Permission::Allow,
+            ..
+        } => {
+            let DeleteInput {
+                deletes_header_address,
+                chain_top_ordering,
+            } = input;
+            let deletes_entry_address =
+                get_original_address(call_context.clone(), deletes_header_address.clone())?;
 
             let host_access = call_context.host_context();
 
             // handle timeouts at the source chain layer
             tokio_helper::block_forever_on(async move {
-                let source_chain = host_access.workspace().source_chain();
+                let source_chain = host_access
+                    .workspace_write()
+                    .source_chain()
+                    .as_ref()
+                    .expect("Must have source chain if write_workspace access is given");
                 let header_builder = builder::Delete {
                     deletes_address: deletes_header_address,
                     deletes_entry_address,
                 };
                 let header_hash = source_chain
-                    .put(Some(call_context.zome.clone()), header_builder, None, chain_top_ordering)
+                    .put(
+                        Some(call_context.zome.clone()),
+                        header_builder,
+                        None,
+                        chain_top_ordering,
+                    )
                     .await
-                    .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
+                    .map_err(|source_chain_error| {
+                        WasmError::Host(source_chain_error.to_string())
+                    })?;
                 Ok(header_hash)
             })
-        },
+        }
         _ => unreachable!(),
     }
 }
@@ -51,8 +69,7 @@ pub(crate) fn get_original_address<'a>(
     let workspace = call_context.host_context.workspace();
 
     tokio_helper::block_forever_on(async move {
-        let mut cascade = Cascade::from_workspace_network(workspace, network);
-        // TODO: Think about what options to use here
+        let mut cascade = Cascade::from_workspace_network(&workspace, network);
         let maybe_original_element: Option<SignedHeaderHashed> = cascade
             .get_details(address.clone().into(), GetOptions::content())
             .await?

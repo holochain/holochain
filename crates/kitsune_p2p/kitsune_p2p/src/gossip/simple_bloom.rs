@@ -16,6 +16,37 @@ use std::collections::{HashMap, HashSet};
 use std::sync::atomic;
 use std::sync::Arc;
 
+/// The specific provenance/destination of gossip is a particular Agent on
+/// a connection specified by a Tx2Cert
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, derive_more::Constructor)]
+pub struct GossipTgt {
+    /// The agents on the remote node for whom this gossip is intended.
+    /// In the current full-sync case, it makes sense to address gossip to all
+    /// known agents on a node, but after sharding, we may make this a single
+    /// agent target.
+    pub agents: Vec<Arc<KitsuneAgent>>,
+    /// The cert which represents the remote node to talk to.
+    pub cert: Tx2Cert,
+}
+
+impl GossipTgt {
+    /// Accessor
+    pub fn agents(&self) -> &Vec<Arc<KitsuneAgent>> {
+        &self.agents
+    }
+
+    /// Accessor
+    pub fn cert(&self) -> &Tx2Cert {
+        self.as_ref()
+    }
+}
+
+impl AsRef<Tx2Cert> for GossipTgt {
+    fn as_ref(&self) -> &Tx2Cert {
+        &self.cert
+    }
+}
+
 /// max send buffer size (keep it under 16384 with a little room for overhead)
 /// (this is not a tuning_param because it must be coordinated
 /// with the constant in PoolBuf which cannot be set at runtime)

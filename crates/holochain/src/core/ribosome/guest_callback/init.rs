@@ -6,7 +6,7 @@ use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
 use holo_hash::AnyDhtHash;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
@@ -26,7 +26,7 @@ impl InitInvocation {
 pub struct InitHostAccess {
     pub workspace: HostFnWorkspace,
     pub keystore: MetaLairClient,
-    pub network: HolochainP2pCell,
+    pub network: HolochainP2pDna,
 }
 
 impl From<InitHostAccess> for HostContext {
@@ -75,7 +75,6 @@ pub enum InitResult {
     /// no init failed but some zome has unresolved dependencies
     /// ZomeName is the first zome that has unresolved dependencies
     /// Vec<EntryHash> is the list of all missing dependency addresses
-    // TODO: MD: this is probably unnecessary
     UnresolvedDependencies(ZomeName, Vec<AnyDhtHash>),
 }
 

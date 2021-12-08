@@ -4,20 +4,12 @@ use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_zome_types::Timestamp;
 
-pub fn insert_valid_authored_op(txn: &mut Transaction, op: DhtOpHashed) -> StateMutationResult<()> {
-    let hash = op.as_hash().clone();
-    insert_op(txn, op, true)?;
-    set_validation_status(txn, hash, holochain_zome_types::ValidationStatus::Valid)?;
-
-    Ok(())
-}
-
 pub fn insert_valid_integrated_op(
     txn: &mut Transaction,
     op: DhtOpHashed,
 ) -> StateMutationResult<()> {
     let hash = op.as_hash().clone();
-    insert_op(txn, op, false)?;
+    insert_op(txn, op)?;
     set_validation_status(
         txn,
         hash.clone(),
