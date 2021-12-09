@@ -6,6 +6,7 @@ use crate::event::*;
 use crate::gossip::sharded_gossip::BandwidthThrottles;
 use crate::types::gossip::GossipModuleType;
 use crate::types::metrics::KitsuneMetrics;
+use crate::wire::MetricExchangeMsg;
 use crate::*;
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
@@ -36,6 +37,7 @@ type EvtRcv = futures::channel::mpsc::Receiver<KitsuneP2pEvent>;
 type KSpace = Arc<KitsuneSpace>;
 type KAgent = Arc<KitsuneAgent>;
 type KBasis = Arc<KitsuneBasis>;
+type VecMXM = Vec<MetricExchangeMsg>;
 type WireConHnd = Tx2ConHnd<wire::Wire>;
 type Payload = Box<[u8]>;
 
@@ -62,6 +64,9 @@ ghost_actor::ghost_chan! {
 
         /// Incoming Gossip
         fn incoming_gossip(space: KSpace, con: WireConHnd, remote_url: kitsune_p2p_types::tx2::tx2_utils::TxUrl, data: Payload, module_type: crate::types::gossip::GossipModuleType) -> ();
+
+        /// Incoming Metric Exchange
+        fn incoming_metric_exchange(space: KSpace, msgs: VecMXM) -> ();
     }
 }
 
@@ -203,6 +208,23 @@ impl KitsuneP2pActor {
                         use tx2_api::Tx2EpEvent::*;
                         #[allow(clippy::single_match)]
                         match event {
+                            OutgoingConnection(Tx2EpConnection {
+                                con: _,
+                                url: _,
+                            }) => {
+                            }
+                            IncomingConnection(Tx2EpConnection {
+                                con: _,
+                                url: _,
+                            }) => {
+                            }
+                            ConnectionClosed(Tx2EpConnectionClosed {
+                                con: _,
+                                url: _,
+                                code: _,
+                                reason: _,
+                            }) => {
+                            }
                             IncomingRequest(Tx2EpIncomingRequest { data, respond, .. }) => {
                                 match data {
                                     wire::Wire::Call(wire::Call {
@@ -368,6 +390,12 @@ impl KitsuneP2pActor {
                                             );
                                         }
                                     }
+                                    wire::Wire::MetricExchange(wire::MetricExchange {
+                                        space,
+                                        msgs,
+                                    }) => {
+                                        let _ = i_s.incoming_metric_exchange(space, msgs).await;
+                                    }
                                     data => unimplemented!("{:?}", data),
                                 }
                             }
@@ -492,6 +520,25 @@ impl InternalHandler for KitsuneP2pActor {
             space_inner
                 .incoming_gossip(space, con, remote_url, data, module_type)
                 .await
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_incoming_metric_exchange(
+        &mut self,
+        space: Arc<KitsuneSpace>,
+        msgs: Vec<MetricExchangeMsg>,
+    ) -> InternalHandlerResult<()> {
+        let space_sender = match self.spaces.get_mut(&space) {
+            None => {
+                return unit_ok_fut();
+            }
+            Some(space) => space.get(),
+        };
+        Ok(async move {
+            let (_, space_inner) = space_sender.await;
+            space_inner.incoming_metric_exchange(space, msgs).await
         }
         .boxed()
         .into())

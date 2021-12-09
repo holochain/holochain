@@ -13,6 +13,13 @@ use std::sync::Arc;
 )]
 pub struct WireData(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum MetricExchangeMsg {
+    #[serde(other)]
+    UnknownMessage,
+}
+
 kitsune_p2p_types::write_codec_enum! {
     /// KitsuneP2p Wire Protocol Top-Level Enum.
     codec Wire {
@@ -93,6 +100,12 @@ kitsune_p2p_types::write_codec_enum! {
         /// Response to a peer query
         PeerQueryResp(0x53) {
             peer_list.0: Vec<AgentInfoSigned>,
+        },
+
+        /// MetricsExchangeMessage
+        MetricExchange(0xa0) {
+            space.0: Arc<KitsuneSpace>,
+            msgs.1: Vec<MetricExchangeMsg>,
         },
     }
 }

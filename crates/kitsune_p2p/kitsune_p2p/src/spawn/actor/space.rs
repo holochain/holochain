@@ -11,11 +11,15 @@ use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
 use url2::Url2;
 
+mod metric_exchange;
+use metric_exchange::*;
+
 mod rpc_multi_logic;
 
 type KSpace = Arc<KitsuneSpace>;
 type KAgent = Arc<KitsuneAgent>;
 type KBasis = Arc<KitsuneBasis>;
+type VecMXM = Vec<MetricExchangeMsg>;
 type WireConHnd = Tx2ConHnd<wire::Wire>;
 type Payload = Box<[u8]>;
 
@@ -57,6 +61,9 @@ ghost_actor::ghost_chan! {
 
         /// Incoming Gossip
         fn incoming_gossip(space: KSpace, con: WireConHnd, remote_url: TxUrl, data: Payload, module_type: crate::types::gossip::GossipModuleType) -> ();
+
+        /// Incoming Metric Exchange
+        fn incoming_metric_exchange(space: KSpace, msgs: VecMXM) -> ();
     }
 }
 
@@ -399,6 +406,15 @@ impl SpaceInternalHandler for Space {
         }
         unit_ok_fut()
     }
+
+    fn handle_incoming_metric_exchange(
+        &mut self,
+        _space: Arc<KitsuneSpace>,
+        msgs: Vec<MetricExchangeMsg>,
+    ) -> InternalHandlerResult<()> {
+        self.ro_inner.metric_exchange.write().ingest_msgs(msgs);
+        unit_ok_fut()
+    }
 }
 
 struct UpdateAgentInfoInput<'borrow> {
@@ -523,6 +539,8 @@ use ghost_actor::dependencies::must_future::MustBoxFuture;
 impl ghost_actor::GhostControlHandler for Space {
     fn handle_ghost_actor_shutdown(mut self) -> MustBoxFuture<'static, ()> {
         async move {
+            self.ro_inner.metric_exchange.write().shutdown();
+
             use futures::sink::SinkExt;
             // this is a curtesy, ok if fails
             let _ = self.evt_sender.close().await;
@@ -998,6 +1016,7 @@ pub(crate) struct SpaceReadOnlyInner {
     pub(crate) config: Arc<KitsuneP2pConfig>,
     pub(crate) parallel_notify_permit: Arc<tokio::sync::Semaphore>,
     pub(crate) metrics: MetricsSync,
+    pub(crate) metric_exchange: MetricExchangeSync,
 }
 
 /// A Kitsune P2p Node can track multiple "spaces" -- Non-interacting namespaced
@@ -1030,6 +1049,7 @@ impl Space {
         parallel_notify_permit: Arc<tokio::sync::Semaphore>,
     ) -> Self {
         let metrics = MetricsSync::default();
+        let metric_exchange = MetricExchangeSync::spawn(metrics.clone());
 
         let gossip_mod = config
             .tuning_params
@@ -1158,6 +1178,7 @@ impl Space {
             config: config.clone(),
             parallel_notify_permit,
             metrics,
+            metric_exchange,
         });
 
         Self {
