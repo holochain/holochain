@@ -65,6 +65,41 @@ async fn rand_insert(
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[allow(unused_assignments)]
+async fn test_p2p_agent_store_extrapolated_coverage() {
+    let tmp_dir = tempdir::TempDir::new("p2p_agent_store_extrapolated_coverage").unwrap();
+
+    let space = rand_space();
+
+    let db = DbWrite::test(&tmp_dir, DbKindP2pAgentStore(space.clone())).unwrap();
+
+    let mut example_agent = rand_agent();
+
+    for _ in 0..20 {
+        example_agent = rand_agent();
+
+        rand_insert(&db, &space, &example_agent).await;
+    }
+
+    let permit = db.conn_permit().await;
+    let mut con = db.from_permit(permit).unwrap();
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
+
+    println!("{:#?}", con.p2p_extrapolated_coverage(
+        now,
+        0,
+        u32::MAX,
+    ));
+
+    // clean up temp dir
+    tmp_dir.close().unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_p2p_agent_store_gossip_query_sanity() {
     let tmp_dir = tempdir::TempDir::new("p2p_agent_store_gossip_query_sanity").unwrap();
 

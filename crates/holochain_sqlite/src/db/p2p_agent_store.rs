@@ -31,6 +31,14 @@ pub trait AsP2pAgentStoreConExt {
         basis: u32,
         limit: u32,
     ) -> DatabaseResult<Vec<AgentInfoSigned>>;
+
+    /// Extrapolate coverage from agents within our own storage arc
+    fn p2p_extrapolated_coverage(
+        &mut self,
+        now_ms: u64,
+        start_loc: u32,
+        end_loc: u32,
+    ) -> DatabaseResult<Vec<u64>>;
 }
 
 /// Extension trait to treat transaction instances
@@ -52,6 +60,14 @@ pub trait AsP2pStateTxExt {
 
     /// Query agents sorted by nearness to basis loc
     fn p2p_query_near_basis(&self, basis: u32, limit: u32) -> DatabaseResult<Vec<AgentInfoSigned>>;
+
+    /// Extrapolate coverage from agents within our own storage arc
+    fn p2p_extrapolated_coverage(
+        &self,
+        now_ms: u64,
+        start_loc: u32,
+        end_loc: u32,
+    ) -> DatabaseResult<Vec<u64>>;
 }
 
 impl AsP2pAgentStoreConExt for crate::db::PConnGuard {
@@ -78,6 +94,15 @@ impl AsP2pAgentStoreConExt for crate::db::PConnGuard {
         limit: u32,
     ) -> DatabaseResult<Vec<AgentInfoSigned>> {
         self.with_reader(move |reader| reader.p2p_query_near_basis(basis, limit))
+    }
+
+    fn p2p_extrapolated_coverage(
+        &mut self,
+        now_ms: u64,
+        start_loc: u32,
+        end_loc: u32,
+    ) -> DatabaseResult<Vec<u64>> {
+        self.with_reader(move |reader| reader.p2p_extrapolated_coverage(now_ms, start_loc, end_loc))
     }
 }
 
@@ -237,6 +262,30 @@ impl AsP2pStateTxExt for Transaction<'_> {
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
 
             Ok(signed)
+        })? {
+            out.push(r?);
+        }
+        Ok(out)
+    }
+
+    fn p2p_extrapolated_coverage(
+        &self,
+        now_ms: u64,
+        start_loc: u32,
+        end_loc: u32,
+    ) -> DatabaseResult<Vec<u64>> {
+        let mut stmt = self
+            .prepare(sql_p2p_agent_store::EXTRAPOLATED_COVERAGE)
+            .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
+
+        let mut out = Vec::new();
+        for r in stmt.query_map(named_params! {
+            ":now": now_ms,
+            ":start_loc": start_loc,
+            ":end_loc": end_loc,
+        }, |r| {
+            let tmp: i64 = r.get(0)?;
+            Ok(tmp as u64)
         })? {
             out.push(r?);
         }
