@@ -3,7 +3,7 @@
 use crate::prelude::*;
 use crate::sql::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use kitsune_p2p::dht_arc::DhtArcSet;
+use kitsune_p2p::dht_arc::{ArcInterval, DhtArcSet};
 use kitsune_p2p::KitsuneAgent;
 use rusqlite::*;
 use std::sync::Arc;
@@ -36,8 +36,7 @@ pub trait AsP2pAgentStoreConExt {
     fn p2p_extrapolated_coverage(
         &mut self,
         now_ms: u64,
-        start_loc: u32,
-        end_loc: u32,
+        dht_arc_set: DhtArcSet,
     ) -> DatabaseResult<Vec<f64>>;
 }
 
@@ -65,8 +64,7 @@ pub trait AsP2pStateTxExt {
     fn p2p_extrapolated_coverage(
         &self,
         now_ms: u64,
-        start_loc: u32,
-        end_loc: u32,
+        dht_arc_set: DhtArcSet,
     ) -> DatabaseResult<Vec<f64>>;
 }
 
@@ -99,10 +97,9 @@ impl AsP2pAgentStoreConExt for crate::db::PConnGuard {
     fn p2p_extrapolated_coverage(
         &mut self,
         now_ms: u64,
-        start_loc: u32,
-        end_loc: u32,
+        dht_arc_set: DhtArcSet,
     ) -> DatabaseResult<Vec<f64>> {
-        self.with_reader(move |reader| reader.p2p_extrapolated_coverage(now_ms, start_loc, end_loc))
+        self.with_reader(move |reader| reader.p2p_extrapolated_coverage(now_ms, dht_arc_set))
     }
 }
 
@@ -271,24 +268,40 @@ impl AsP2pStateTxExt for Transaction<'_> {
     fn p2p_extrapolated_coverage(
         &self,
         now_ms: u64,
-        start_loc: u32,
-        end_loc: u32,
+        dht_arc_set: DhtArcSet,
     ) -> DatabaseResult<Vec<f64>> {
         let mut stmt = self
             .prepare(sql_p2p_agent_store::EXTRAPOLATED_COVERAGE)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
 
         let mut out = Vec::new();
-        for r in stmt.query_map(
-            named_params! {
-                ":now": now_ms,
-                ":start_loc": start_loc,
-                ":end_loc": end_loc,
-            },
-            |r| r.get(0),
-        )? {
-            out.push(r?);
+
+        for interval in dht_arc_set.intervals() {
+            match interval {
+                ArcInterval::Full => {
+                    out.push(stmt.query_row(
+                        named_params! {
+                            ":now": now_ms,
+                            ":start_loc": 0,
+                            ":end_loc": u32::MAX,
+                        },
+                        |r| r.get(0),
+                    )?);
+                }
+                ArcInterval::Bounded(start, end) => {
+                    out.push(stmt.query_row(
+                        named_params! {
+                            ":now": now_ms,
+                            ":start_loc": (*start).0,
+                            ":end_loc": (*end).0,
+                        },
+                        |r| r.get(0),
+                    )?);
+                }
+                _ => (),
+            }
         }
+
         Ok(out)
     }
 }
