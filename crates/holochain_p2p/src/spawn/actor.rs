@@ -4,6 +4,7 @@ use crate::event::*;
 use crate::*;
 
 use futures::future::FutureExt;
+use kitsune_p2p::actor::BroadcastTo;
 use kitsune_p2p::event::full_time_window;
 use kitsune_p2p::event::MetricDatum;
 use kitsune_p2p::event::MetricKind;
@@ -1093,7 +1094,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
             kitsune_p2p
-                .broadcast(space, basis, timeout, payload)
+                .broadcast(space, basis, timeout, BroadcastTo::Notify, payload)
                 .await?;
             Ok(())
         }
@@ -1204,7 +1205,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         Ok(async move {
             let mut input =
                 kitsune_p2p::actor::RpcMulti::new(&tuning_params, space, basis, payload);
-            // TODO - We're just targeting a single remote node for now
+            // NOTE - We're just targeting a single remote node for now
             //        without doing any pagination / etc...
             //        Setting up RpcMulti to act like RpcSingle
             input.max_remote_agent_count = 1;

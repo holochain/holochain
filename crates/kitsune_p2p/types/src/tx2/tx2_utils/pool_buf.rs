@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 
-// TODO - expirement with these values for efficiency.
+// MAYBE - expirement with these values for efficiency.
 
 /// The max capacity of in-pool stored PoolBufs per thread.
 /// See how this affects max mem usage in doc of POOL_BUF_SHRINK_TO_CAPACITY.

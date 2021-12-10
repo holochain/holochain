@@ -133,6 +133,7 @@ impl Switchboard {
             evt_sender,
             self.gossip_type,
             bandwidth,
+            Default::default(),
         );
         let gossip = GossipModule(gossip);
         let gossip2 = gossip.clone();

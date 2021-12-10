@@ -17,8 +17,8 @@ pub fn capability_grants(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
+    use crate::sweettest::SweetDnaFile;
     use crate::{conductor::ConductorBuilder, sweettest::SweetConductor};
-    use crate::{sweettest::SweetDnaFile};
     use ::fixt::prelude::*;
     use hdk::prelude::*;
     use holochain_types::fixt::CapSecretFixturator;
@@ -35,7 +35,8 @@ pub mod wasm_test {
         let host_access = fixt!(ZomeCallHostAccess, Predictable);
 
         let _: CapSecret =
-            crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ()).unwrap();
+            crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ())
+                .unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -44,15 +45,18 @@ pub mod wasm_test {
         let host_access = fixt!(ZomeCallHostAccess, Predictable);
 
         let secret: CapSecret =
-            crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ()).unwrap();
+            crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ())
+                .unwrap();
         let header: HeaderHash = crate::call_test_ribosome!(
             host_access,
             TestWasm::Capability,
             "transferable_cap_grant",
             secret
-        ).unwrap();
+        )
+        .unwrap();
         let maybe_element: Option<Element> =
-            crate::call_test_ribosome!(host_access, TestWasm::Capability, "get_entry", header).unwrap();
+            crate::call_test_ribosome!(host_access, TestWasm::Capability, "get_entry", header)
+                .unwrap();
 
         let entry_secret: CapSecret = match maybe_element {
             Some(element) => {
@@ -67,7 +71,7 @@ pub mod wasm_test {
         assert_eq!(entry_secret, secret,);
     }
 
-    // TODO: [ B-03669 ] can move this to an integration test (may need to switch to using a RealDnaStore)
+    // MAYBE: [ B-03669 ] can move this to an integration test (may need to switch to using a RealDnaStore)
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_authorized_call() -> anyhow::Result<()> {
         observability::test_run().ok();

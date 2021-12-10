@@ -1,8 +1,7 @@
 #![allow(missing_docs)]
 
 use crate::agent_store::AgentInfoSigned;
-use crate::event::MetricQuery;
-use crate::event::MetricQueryAnswer;
+use crate::metrics::*;
 use crate::types::event::*;
 use crate::types::gossip::*;
 use crate::types::*;
@@ -15,6 +14,37 @@ use kitsune_p2p_types::*;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic;
 use std::sync::Arc;
+
+/// The specific provenance/destination of gossip is a particular Agent on
+/// a connection specified by a Tx2Cert
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, derive_more::Constructor)]
+pub struct GossipTgt {
+    /// The agents on the remote node for whom this gossip is intended.
+    /// In the current full-sync case, it makes sense to address gossip to all
+    /// known agents on a node, but after sharding, we may make this a single
+    /// agent target.
+    pub agents: Vec<Arc<KitsuneAgent>>,
+    /// The cert which represents the remote node to talk to.
+    pub cert: Tx2Cert,
+}
+
+impl GossipTgt {
+    /// Accessor
+    pub fn agents(&self) -> &Vec<Arc<KitsuneAgent>> {
+        &self.agents
+    }
+
+    /// Accessor
+    pub fn cert(&self) -> &Tx2Cert {
+        self.as_ref()
+    }
+}
+
+impl AsRef<Tx2Cert> for GossipTgt {
+    fn as_ref(&self) -> &Tx2Cert {
+        &self.cert
+    }
+}
 
 /// max send buffer size (keep it under 16384 with a little room for overhead)
 /// (this is not a tuning_param because it must be coordinated
@@ -137,7 +167,7 @@ kitsune_p2p_types::write_codec_enum! {
 }
 
 struct NodeInfo {
-    last_touch: std::time::SystemTime,
+    last_touch: tokio::time::Instant,
     was_err: bool,
 }
 
@@ -155,6 +185,8 @@ pub(crate) struct SimpleBloomModInner {
     local_data_map: DataMap,
     local_key_set: KeySet,
 
+    metrics: Metrics,
+
     /// Metrics to be recorded at the end of this round of gossip
     pending_metrics: Vec<(Vec<Arc<KitsuneAgent>>, NodeInfo)>,
 
@@ -168,7 +200,7 @@ pub(crate) struct SimpleBloomModInner {
 }
 
 impl SimpleBloomModInner {
-    pub fn new() -> Self {
+    pub fn new(metrics: Metrics) -> Self {
         // pick an old instant for initialization
         const ONE_DAY_MICROS: i64 = 1000 * 1000 * 60 * 60 * 24;
         let old_us = proc_count_now_us() - ONE_DAY_MICROS;
@@ -178,6 +210,8 @@ impl SimpleBloomModInner {
             local_bloom: bloomfilter::Bloom::new(1, 1),
             local_data_map: HashMap::new(),
             local_key_set: HashSet::new(),
+
+            metrics,
 
             pending_metrics: Vec::new(),
 
@@ -192,10 +226,9 @@ impl SimpleBloomModInner {
     }
 
     /// Record a metric to be recorded at the end of this gossip round
-    // TODO: remove NodeInfo
     fn record_pending_metric(&mut self, agents: Vec<Arc<KitsuneAgent>>, was_err: bool) {
         let info = NodeInfo {
-            last_touch: std::time::SystemTime::now(),
+            last_touch: tokio::time::Instant::now(),
             was_err,
         };
         self.pending_metrics.push((agents, info))
@@ -230,8 +263,9 @@ impl SimpleBloomMod {
         space: Arc<KitsuneSpace>,
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
+        metrics: Metrics,
     ) -> Arc<Self> {
-        let inner = SimpleBloomModInner::new();
+        let inner = SimpleBloomModInner::new(metrics);
 
         let send_interval_ms: u64 = (
             // !*)&^$# cargo fmt...
@@ -283,62 +317,42 @@ impl SimpleBloomMod {
     }
 
     /// Get metrics data via event channel in the form of NodeInfo
-    // TODO: remove NodeInfo
     async fn get_metric_info(
         &self,
         agents: Vec<Arc<KitsuneAgent>>,
     ) -> KitsuneP2pResult<Option<NodeInfo>> {
-        // We pick an arbitrary agent for now, since in a full-sync situation,
-        // any agent should have the same data as any other agent.
-        // TODO: this will naturally change after sharding.
-        let arbitrary_agent = agents
-            .first()
-            .expect("Gossip must have a least one from_agent")
-            .clone();
-        let last_touch = match self
-            .evt_sender
-            .query_metrics(MetricQuery::LastSync {
-                agent: arbitrary_agent,
-            })
-            .await?
-        {
-            MetricQueryAnswer::LastSync(time) => time,
-            _ => unreachable!(),
-        };
-        Ok(last_touch.map(|last_touch| NodeInfo {
-            last_touch,
-            was_err: false,
-        }))
+        Ok(
+            match self
+                .inner
+                .share_mut(|i, _| Ok(i.metrics.last_outcome(&agents)))?
+            {
+                Some(RoundOutcome::Success(last_touch)) => Some(NodeInfo {
+                    last_touch,
+                    was_err: false,
+                }),
+                Some(RoundOutcome::Error(last_touch)) => Some(NodeInfo {
+                    last_touch,
+                    was_err: true,
+                }),
+                None => None,
+            },
+        )
     }
 
     /// Record a metric via event channel
-    // TODO: remove NodeInfo
     async fn record_metric(
         &self,
         agents: Vec<Arc<KitsuneAgent>>,
         info: NodeInfo,
     ) -> KitsuneP2pResult<()> {
-        if info.was_err {
-            for agent in agents {
-                self.evt_sender
-                    .put_metric_datum(MetricDatum {
-                        agent,
-                        kind: MetricKind::ConnectError,
-                        timestamp: info.last_touch,
-                    })
-                    .await?;
+        self.inner.share_mut(|i, _| {
+            if info.was_err {
+                i.metrics.record_error(&agents);
+            } else {
+                i.metrics.record_success(&agents);
             }
-        } else {
-            for agent in agents {
-                self.evt_sender
-                    .put_metric_datum(MetricDatum {
-                        agent,
-                        kind: MetricKind::QuickGossip,
-                        timestamp: info.last_touch,
-                    })
-                    .await?;
-            }
-        }
+            Ok(())
+        })?;
         Ok(())
     }
 
@@ -495,12 +509,14 @@ impl AsGossipModuleFactory for SimpleBloomModFactory {
         space: Arc<KitsuneSpace>,
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
+        metrics: Metrics,
     ) -> GossipModule {
         GossipModule(SimpleBloomMod::new(
             tuning_params,
             space,
             ep_hnd,
             evt_sender,
+            metrics,
         ))
     }
 }

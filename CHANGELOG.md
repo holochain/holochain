@@ -6,6 +6,144 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20211208.091009
+
+## [holochain-0.0.119](crates/holochain/CHANGELOG.md#0.0.119)
+
+## [holochain\_test\_wasm\_common-0.0.16](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.16)
+
+## [holochain\_cascade-0.0.19](crates/holochain_cascade/CHANGELOG.md#0.0.19)
+
+- Fixes database queries that were running on the runtime thread instead of the background thread. Makes the connections wait for a permit before taking a database connection from the pool. [\#1145](https://github.com/holochain/holochain/pull/1145)
+
+## [holochain\_cli-0.0.20](crates/holochain_cli/CHANGELOG.md#0.0.20)
+
+## [holochain\_cli\_sandbox-0.0.17](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.17)
+
+## [holochain\_websocket-0.0.19](crates/holochain_websocket/CHANGELOG.md#0.0.19)
+
+## [holochain\_conductor\_api-0.0.19](crates/holochain_conductor_api/CHANGELOG.md#0.0.19)
+
+## [holochain\_state-0.0.19](crates/holochain_state/CHANGELOG.md#0.0.19)
+
+## [holochain\_wasm\_test\_utils-0.0.19](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.19)
+
+## [holochain\_p2p-0.0.19](crates/holochain_p2p/CHANGELOG.md#0.0.19)
+
+## [holochain\_cli\_bundle-0.0.16](crates/holochain_cli_bundle/CHANGELOG.md#0.0.16)
+
+## [holochain\_types-0.0.19](crates/holochain_types/CHANGELOG.md#0.0.19)
+
+## [holochain\_keystore-0.0.19](crates/holochain_keystore/CHANGELOG.md#0.0.19)
+
+## [holochain\_sqlite-0.0.19](crates/holochain_sqlite/CHANGELOG.md#0.0.19)
+
+- Adds `basis_hash` index to `DhtOp` table. This makes get queries faster. [\#1143](https://github.com/holochain/holochain/pull/1143)
+
+## [kitsune\_p2p-0.0.17](crates/kitsune_p2p/CHANGELOG.md#0.0.17)
+
+- Agent info is now published as well as gossiped. [\#1115](https://github.com/holochain/holochain/pull/1115)
+- BREAKING: Network wire message has changed format so will not be compatible with older versions. [1143](https://github.com/holochain/holochain/pull/1143).
+- Fixes to gossip that allows batching of large amounts of data. [1143](https://github.com/holochain/holochain/pull/1143).
+
+## [kitsune\_p2p\_proxy-0.0.15](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.15)
+
+## [kitsune\_p2p\_transport\_quic-0.0.15](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.15)
+
+## [kitsune\_p2p\_types-0.0.15](crates/kitsune_p2p_types/CHANGELOG.md#0.0.15)
+
+## [hdk-0.0.116](crates/hdk/CHANGELOG.md#0.0.116)
+
+## [hdk\_derive-0.0.18](crates/hdk_derive/CHANGELOG.md#0.0.18)
+
+## [holochain\_zome\_types-0.0.18](crates/holochain_zome_types/CHANGELOG.md#0.0.18)
+
+## [holo\_hash-0.0.13](crates/holo_hash/CHANGELOG.md#0.0.13)
+
+## [fixt-0.0.8](crates/fixt/CHANGELOG.md#0.0.8)
+
+# 20211201.111024
+
+## [holochain-0.0.118](crates/holochain/CHANGELOG.md#0.0.118)
+
+- **BREAKING CHANGE** - Gossip now exchanges local peer info with `initiate` and `accept` request types. [\#1114](https://github.com/holochain/holochain/pull/1114).
+
+## [holochain\_cascade-0.0.18](crates/holochain_cascade/CHANGELOG.md#0.0.18)
+
+## [holochain\_cli-0.0.19](crates/holochain_cli/CHANGELOG.md#0.0.19)
+
+## [holochain\_cli\_sandbox-0.0.16](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.16)
+
+## [holochain\_websocket-0.0.18](crates/holochain_websocket/CHANGELOG.md#0.0.18)
+
+## [holochain\_conductor\_api-0.0.18](crates/holochain_conductor_api/CHANGELOG.md#0.0.18)
+
+## [holochain\_state-0.0.18](crates/holochain_state/CHANGELOG.md#0.0.18)
+
+## [holochain\_wasm\_test\_utils-0.0.18](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.18)
+
+## [holochain\_p2p-0.0.18](crates/holochain_p2p/CHANGELOG.md#0.0.18)
+
+## [holochain\_cli\_bundle-0.0.15](crates/holochain_cli_bundle/CHANGELOG.md#0.0.15)
+
+## [holochain\_types-0.0.18](crates/holochain_types/CHANGELOG.md#0.0.18)
+
+## [holochain\_keystore-0.0.18](crates/holochain_keystore/CHANGELOG.md#0.0.18)
+
+## [holochain\_sqlite-0.0.18](crates/holochain_sqlite/CHANGELOG.md#0.0.18)
+
+## [kitsune\_p2p-0.0.16](crates/kitsune_p2p/CHANGELOG.md#0.0.16)
+
+# 20211124.093220
+
+## [holochain-0.0.117](crates/holochain/CHANGELOG.md#0.0.117)
+
+## [holochain\_cascade-0.0.17](crates/holochain_cascade/CHANGELOG.md#0.0.17)
+
+## [holochain\_cli-0.0.18](crates/holochain_cli/CHANGELOG.md#0.0.18)
+
+## [holochain\_cli\_sandbox-0.0.15](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.15)
+
+## [holochain\_websocket-0.0.17](crates/holochain_websocket/CHANGELOG.md#0.0.17)
+
+## [holochain\_conductor\_api-0.0.17](crates/holochain_conductor_api/CHANGELOG.md#0.0.17)
+
+- **BREAKING CHANGES**: db\_sync\_level changes to db\_sync\_strategy. Options are now `Fast` and `Resilient`. Default is `Fast` and should be the standard choice for most use cases. [\#1130](https://github.com/holochain/holochain/pull/1130)
+
+## [holochain\_state-0.0.17](crates/holochain_state/CHANGELOG.md#0.0.17)
+
+- Some databases can handle corruption by wiping the db file and starting again. [\#1039](https://github.com/holochain/holochain/pull/1039).
+
+## [holochain\_wasm\_test\_utils-0.0.17](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.17)
+
+## [holochain\_p2p-0.0.17](crates/holochain_p2p/CHANGELOG.md#0.0.17)
+
+- BREAKING: Wire message `CallRemote` Takes `from_agent`. [\#1091](https://github.com/holochain/holochain/pull/1091)
+
+## [holochain\_cli\_bundle-0.0.14](crates/holochain_cli_bundle/CHANGELOG.md#0.0.14)
+
+## [holochain\_types-0.0.17](crates/holochain_types/CHANGELOG.md#0.0.17)
+
+## [holochain\_keystore-0.0.17](crates/holochain_keystore/CHANGELOG.md#0.0.17)
+
+## [holochain\_sqlite-0.0.17](crates/holochain_sqlite/CHANGELOG.md#0.0.17)
+
+- **BREAKING CHANGES**: All DHT data for the same DNA space is now shared in the same database. All authored data for the same DNA space is also now shared in another database. This requires no changes however data must be manually migrated from the old databases to the new databases. [\#1130](https://github.com/holochain/holochain/pull/1130)
+
+## [kitsune\_p2p-0.0.15](crates/kitsune_p2p/CHANGELOG.md#0.0.15)
+
+- BREAKING: Wire message `Call` no longer takes `from_agent`. [\#1091](https://github.com/holochain/holochain/pull/1091)
+
+## [kitsune\_p2p\_proxy-0.0.14](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.14)
+
+## [kitsune\_p2p\_transport\_quic-0.0.14](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.14)
+
+## [kitsune\_p2p\_types-0.0.14](crates/kitsune_p2p_types/CHANGELOG.md#0.0.14)
+
+## [mr\_bundle-0.0.6](crates/mr_bundle/CHANGELOG.md#0.0.6)
+
+## [holochain\_util-0.0.6](crates/holochain_util/CHANGELOG.md#0.0.6)
+
 # 20211117.094411
 
 ## [holochain-0.0.116](crates/holochain/CHANGELOG.md#0.0.116)

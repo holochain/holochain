@@ -35,14 +35,39 @@ impl ShardedGossipLocal {
 
         let id = rand::thread_rng().gen();
 
+        let agent_list = self
+            .evt_sender
+            .query_agents(
+                QueryAgentsEvt::new(self.space.clone()).by_agents(local_agents.iter().cloned()),
+            )
+            .await
+            .map_err(KitsuneError::other)?;
+
         let maybe_gossip = self.inner.share_mut(|inner, _| {
-            Ok(if let Some((endpoint, url)) = remote_agent {
-                let gossip = ShardedGossipWire::initiate(intervals, id);
-                inner.initiate_tgt = Some((endpoint.clone(), id, Some(Instant::now())));
-                Some((endpoint, HowToConnect::Url(url), gossip))
-            } else {
-                None
-            })
+            Ok(
+                if let Some(next_target::Node {
+                    agent_info_list,
+                    cert,
+                    url,
+                }) = remote_agent
+                {
+                    let gossip = ShardedGossipWire::initiate(intervals, id, agent_list);
+
+                    let tgt = ShardedGossipTarget {
+                        remote_agent_list: agent_info_list,
+                        cert: cert.clone(),
+                        tie_break: id,
+                        when_initiated: Some(Instant::now()),
+                        url: url.clone(),
+                    };
+
+                    inner.initiate_tgt = Some(tgt);
+
+                    Some((cert, HowToConnect::Url(url), gossip))
+                } else {
+                    None
+                },
+            )
         })?;
         Ok(maybe_gossip)
     }
@@ -55,6 +80,7 @@ impl ShardedGossipLocal {
         peer_cert: Tx2Cert,
         remote_arc_set: Vec<ArcInterval>,
         remote_id: u32,
+        remote_agent_list: Vec<AgentInfoSigned>,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let (local_agents, same_as_target, already_in_progress) =
             self.inner.share_mut(|i, _| {
@@ -62,8 +88,8 @@ impl ShardedGossipLocal {
                 let same_as_target = i
                     .initiate_tgt
                     .as_ref()
-                    .filter(|tgt| *tgt.0.cert() == peer_cert)
-                    .map(|tgt| tgt.1);
+                    .filter(|tgt| tgt.cert == peer_cert)
+                    .map(|tgt| tgt.tie_break);
                 Ok((i.local_agents.clone(), same_as_target, already_in_progress))
             })?;
 
@@ -104,14 +130,25 @@ impl ShardedGossipLocal {
         let local_arcs: Vec<ArcInterval> =
             local_agent_arcs.into_iter().map(|(_, arc)| arc).collect();
 
-        let mut gossip = Vec::new();
+        let agent_list = self
+            .evt_sender
+            .query_agents(
+                QueryAgentsEvt::new(self.space.clone()).by_agents(local_agents.iter().cloned()),
+            )
+            .await
+            .map_err(KitsuneError::other)?;
 
         // Send the intervals back as the accept message.
-        gossip.push(ShardedGossipWire::accept(local_arcs.clone()));
+        let mut gossip = vec![ShardedGossipWire::accept(local_arcs.clone(), agent_list)];
 
         // Generate the bloom filters and new state.
         let state = self
-            .generate_blooms(local_arcs, remote_arc_set, &mut gossip)
+            .generate_blooms(
+                remote_agent_list.clone(),
+                local_arcs,
+                remote_arc_set,
+                &mut gossip,
+            )
             .await?;
 
         self.inner.share_mut(|inner, _| {
@@ -121,14 +158,17 @@ impl ShardedGossipLocal {
             if inner
                 .initiate_tgt
                 .as_ref()
-                .map_or(true, |tgt| *tgt.0.cert() != peer_cert)
+                .map_or(true, |tgt| tgt.cert != peer_cert)
             {
-                inner.metrics.record_remote_round(peer_cert.clone());
+                inner.metrics.record_remote_round(&remote_agent_list);
             }
             // If this is the target then we should clear the when initiated timeout.
-            if let Some((tgt, _, when_initiated)) = inner.initiate_tgt.as_mut() {
-                if *tgt.cert() == peer_cert {
-                    *when_initiated = None;
+            if let Some(tgt) = inner.initiate_tgt.as_mut() {
+                if tgt.cert == peer_cert {
+                    tgt.when_initiated = None;
+                    // we also want to update the agent list
+                    // with that reported by the remote end
+                    tgt.remote_agent_list = remote_agent_list;
                 }
             }
             Ok(())
@@ -142,6 +182,7 @@ impl ShardedGossipLocal {
     /// - A new state is created for this round.
     pub(super) async fn generate_blooms(
         &self,
+        remote_agent_list: Vec<AgentInfoSigned>,
         local_arcs: Vec<ArcInterval>,
         remote_arc_set: Vec<ArcInterval>,
         gossip: &mut Vec<ShardedGossipWire>,
@@ -152,7 +193,7 @@ impl ShardedGossipLocal {
         let common_arc_set = Arc::new(arc_set.intersection(&remote_arc_set));
 
         // Generate the new state.
-        let state = self.new_state(common_arc_set)?;
+        let state = self.new_state(remote_agent_list, common_arc_set)?;
 
         // Generate the agent bloom.
         if let GossipType::Recent = self.gossip_type {
@@ -168,8 +209,8 @@ impl ShardedGossipLocal {
 
     /// Generate the next batch of blooms from this state.
     /// If there is a saved cursor from a previous partial
-    /// batch then this will pick up from their.
-    /// Otherwise blooms a bloom for the entire search window
+    /// batch then this will pick up from there.
+    /// Otherwise s batch of blooms for the entire search window
     /// will be attempted (if this is too many hashes then it will
     /// create a new partial batch of blooms.)
     pub(super) async fn next_bloom_batch(
@@ -180,7 +221,7 @@ impl ShardedGossipLocal {
         // Get the default window for this gossip loop.
         let mut window = self.calculate_time_range();
 
-        // If there is a previously saved cursor then start from their.
+        // If there is a previously saved cursor then start from there.
         if let Some(cursor) = state.bloom_batch_cursor.take() {
             window.start = cursor;
         }
