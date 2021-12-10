@@ -345,7 +345,8 @@ impl Cell {
     ) -> CellResult<()> {
         use holochain_p2p::event::HolochainP2pEvent::*;
         match evt {
-            PutAgentInfoSigned { .. }
+            KGenReq { .. }
+            | PutAgentInfoSigned { .. }
             | GetAgentInfoSigned { .. }
             | QueryAgentInfoSigned { .. }
             | QueryGossipAgents { .. }

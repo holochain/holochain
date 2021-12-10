@@ -33,11 +33,7 @@ pub trait AsP2pAgentStoreConExt {
     ) -> DatabaseResult<Vec<AgentInfoSigned>>;
 
     /// Extrapolate coverage from agents within our own storage arc
-    fn p2p_extrapolated_coverage(
-        &mut self,
-        now_ms: u64,
-        dht_arc_set: DhtArcSet,
-    ) -> DatabaseResult<Vec<f64>>;
+    fn p2p_extrapolated_coverage(&mut self, dht_arc_set: DhtArcSet) -> DatabaseResult<Vec<f64>>;
 }
 
 /// Extension trait to treat transaction instances
@@ -61,11 +57,7 @@ pub trait AsP2pStateTxExt {
     fn p2p_query_near_basis(&self, basis: u32, limit: u32) -> DatabaseResult<Vec<AgentInfoSigned>>;
 
     /// Extrapolate coverage from agents within our own storage arc
-    fn p2p_extrapolated_coverage(
-        &self,
-        now_ms: u64,
-        dht_arc_set: DhtArcSet,
-    ) -> DatabaseResult<Vec<f64>>;
+    fn p2p_extrapolated_coverage(&self, dht_arc_set: DhtArcSet) -> DatabaseResult<Vec<f64>>;
 }
 
 impl AsP2pAgentStoreConExt for crate::db::PConnGuard {
@@ -94,12 +86,8 @@ impl AsP2pAgentStoreConExt for crate::db::PConnGuard {
         self.with_reader(move |reader| reader.p2p_query_near_basis(basis, limit))
     }
 
-    fn p2p_extrapolated_coverage(
-        &mut self,
-        now_ms: u64,
-        dht_arc_set: DhtArcSet,
-    ) -> DatabaseResult<Vec<f64>> {
-        self.with_reader(move |reader| reader.p2p_extrapolated_coverage(now_ms, dht_arc_set))
+    fn p2p_extrapolated_coverage(&mut self, dht_arc_set: DhtArcSet) -> DatabaseResult<Vec<f64>> {
+        self.with_reader(move |reader| reader.p2p_extrapolated_coverage(dht_arc_set))
     }
 }
 
@@ -265,23 +253,24 @@ impl AsP2pStateTxExt for Transaction<'_> {
         Ok(out)
     }
 
-    fn p2p_extrapolated_coverage(
-        &self,
-        now_ms: u64,
-        dht_arc_set: DhtArcSet,
-    ) -> DatabaseResult<Vec<f64>> {
+    fn p2p_extrapolated_coverage(&self, dht_arc_set: DhtArcSet) -> DatabaseResult<Vec<f64>> {
         let mut stmt = self
             .prepare(sql_p2p_agent_store::EXTRAPOLATED_COVERAGE)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
 
         let mut out = Vec::new();
 
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
         for interval in dht_arc_set.intervals() {
             match interval {
                 ArcInterval::Full => {
                     out.push(stmt.query_row(
                         named_params! {
-                            ":now": now_ms,
+                            ":now": now,
                             ":start_loc": 0,
                             ":end_loc": u32::MAX,
                         },
@@ -291,7 +280,7 @@ impl AsP2pStateTxExt for Transaction<'_> {
                 ArcInterval::Bounded(start, end) => {
                     out.push(stmt.query_row(
                         named_params! {
-                            ":now": now_ms,
+                            ":now": now,
                             ":start_loc": (*start).0,
                             ":end_loc": (*end).0,
                         },

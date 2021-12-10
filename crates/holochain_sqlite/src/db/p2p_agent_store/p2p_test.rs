@@ -90,25 +90,17 @@ async fn test_p2p_agent_store_extrapolated_coverage() {
     let permit = db.conn_permit().await;
     let mut con = db.from_permit(permit).unwrap();
 
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::SystemTime::UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as u64;
-
-    let res = con.p2p_extrapolated_coverage(now, DhtArcSet::Full).unwrap();
+    let res = con.p2p_extrapolated_coverage(DhtArcSet::Full).unwrap();
     println!("{:?}", res);
     assert_eq!(1, res.len());
 
     let res = con
-        .p2p_extrapolated_coverage(
-            now,
-            DhtArcSet::from(
-                &[
-                    ArcInterval::from_bounds((1.into(), (u32::MAX / 2 - 1).into())),
-                    ArcInterval::from_bounds(((u32::MAX / 2 + 1).into(), (u32::MAX - 1).into())),
-                ][..],
-            ),
-        )
+        .p2p_extrapolated_coverage(DhtArcSet::from(
+            &[
+                ArcInterval::from_bounds((1.into(), (u32::MAX / 2 - 1).into())),
+                ArcInterval::from_bounds(((u32::MAX / 2 + 1).into(), (u32::MAX - 1).into())),
+            ][..],
+        ))
         .unwrap();
     println!("{:?}", res);
     assert_eq!(2, res.len());
