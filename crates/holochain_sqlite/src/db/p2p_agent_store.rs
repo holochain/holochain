@@ -38,7 +38,7 @@ pub trait AsP2pAgentStoreConExt {
         now_ms: u64,
         start_loc: u32,
         end_loc: u32,
-    ) -> DatabaseResult<Vec<u64>>;
+    ) -> DatabaseResult<Vec<f64>>;
 }
 
 /// Extension trait to treat transaction instances
@@ -67,7 +67,7 @@ pub trait AsP2pStateTxExt {
         now_ms: u64,
         start_loc: u32,
         end_loc: u32,
-    ) -> DatabaseResult<Vec<u64>>;
+    ) -> DatabaseResult<Vec<f64>>;
 }
 
 impl AsP2pAgentStoreConExt for crate::db::PConnGuard {
@@ -101,7 +101,7 @@ impl AsP2pAgentStoreConExt for crate::db::PConnGuard {
         now_ms: u64,
         start_loc: u32,
         end_loc: u32,
-    ) -> DatabaseResult<Vec<u64>> {
+    ) -> DatabaseResult<Vec<f64>> {
         self.with_reader(move |reader| reader.p2p_extrapolated_coverage(now_ms, start_loc, end_loc))
     }
 }
@@ -273,20 +273,20 @@ impl AsP2pStateTxExt for Transaction<'_> {
         now_ms: u64,
         start_loc: u32,
         end_loc: u32,
-    ) -> DatabaseResult<Vec<u64>> {
+    ) -> DatabaseResult<Vec<f64>> {
         let mut stmt = self
             .prepare(sql_p2p_agent_store::EXTRAPOLATED_COVERAGE)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
 
         let mut out = Vec::new();
-        for r in stmt.query_map(named_params! {
-            ":now": now_ms,
-            ":start_loc": start_loc,
-            ":end_loc": end_loc,
-        }, |r| {
-            let tmp: i64 = r.get(0)?;
-            Ok(tmp as u64)
-        })? {
+        for r in stmt.query_map(
+            named_params! {
+                ":now": now_ms,
+                ":start_loc": start_loc,
+                ":end_loc": end_loc,
+            },
+            |r| r.get(0),
+        )? {
             out.push(r?);
         }
         Ok(out)

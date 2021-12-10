@@ -36,11 +36,17 @@ async fn rand_insert(
     db: &DbWrite<DbKindP2pAgentStore>,
     space: &Arc<KitsuneSpace>,
     agent: &Arc<KitsuneAgent>,
+    long: bool,
 ) {
     let mut rng = rand::thread_rng();
 
     let signed_at_ms = rand_signed_at_ms();
-    let expires_at_ms = signed_at_ms + rng.gen_range(100, 200);
+
+    let expires_at_ms = if long {
+        signed_at_ms + rng.gen_range(10000, 20000)
+    } else {
+        signed_at_ms + rng.gen_range(100, 200)
+    };
 
     let half_len = match rng.gen_range(0_u8, 9_u8) {
         0 => 0,
@@ -78,7 +84,7 @@ async fn test_p2p_agent_store_extrapolated_coverage() {
     for _ in 0..20 {
         example_agent = rand_agent();
 
-        rand_insert(&db, &space, &example_agent).await;
+        rand_insert(&db, &space, &example_agent, true).await;
     }
 
     let permit = db.conn_permit().await;
@@ -89,11 +95,7 @@ async fn test_p2p_agent_store_extrapolated_coverage() {
         .unwrap()
         .as_millis() as u64;
 
-    println!("{:#?}", con.p2p_extrapolated_coverage(
-        now,
-        0,
-        u32::MAX,
-    ));
+    println!("{:#?}", con.p2p_extrapolated_coverage(now, 0, u32::MAX,));
 
     // clean up temp dir
     tmp_dir.close().unwrap();
@@ -114,7 +116,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
 
         // insert multiple times to test idempotence of "upsert"
         for _ in 0..3 {
-            rand_insert(&db, &space, &example_agent).await;
+            rand_insert(&db, &space, &example_agent, false).await;
         }
     }
 
