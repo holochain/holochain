@@ -32,6 +32,11 @@ pub async fn validation_receipt_workflow(
     // TODO: I think this is right but maybe we need to make sure these cells are in
     // running apps?.
     let cell_ids = conductor.list_cell_ids(Some(CellStatus::Joined));
+
+    if cell_ids.is_empty() {
+        return Ok(WorkComplete::Incomplete);
+    }
+
     let validators = cell_ids
         .into_iter()
         .filter_map(|id| {
@@ -98,7 +103,10 @@ pub async fn validation_receipt_workflow(
 
         // Sign on the dotted line.
         let receipt = match ValidationReceipt::sign(receipt, &keystore).await {
-            Ok(r) => r,
+            Ok(Some(r)) => r,
+            Ok(None) => {
+                return Ok(WorkComplete::Incomplete);
+            }
             Err(e) => {
                 info!(failed_to_sign_receipt = ?e);
                 return Ok(WorkComplete::Incomplete);

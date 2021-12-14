@@ -162,7 +162,7 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
             max_ops,
             include_limbo,
         }: QueryOpHashesEvt,
-    ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindow)>> {
+    ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowInclusive)>> {
         ok_fut(Ok(self.sb.share(|sb| {
             let (ops, timestamps): (Vec<_>, Vec<_>) = sb
                 .ops
@@ -170,15 +170,9 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
                 .filter(|(op_loc8, op)| {
                     // Does the op fall within the time window?
                     window.contains(&op.timestamp)
-
-                    // Is the op held and integrated by this node?
-                    && sb.nodes.get(&self.node).unwrap().ops
-                    .get(op_loc8)
-                    .map(|op| include_limbo || op.is_integrated)
-                    .unwrap_or(false)
-
-                    // Does the op fall within the specified arcset?
-                    && arc_set.contains((**op_loc8).into())
+                    // Does the op fall within one of the specified arcsets
+                    // with the correct integration/limbo criteria?
+                        && arc_set.contains((**op_loc8).into())
                 })
                 .map(|(_, op)| (op.hash.clone(), op.timestamp))
                 .take(max_ops)
@@ -187,17 +181,18 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
             if ops.is_empty() {
                 None
             } else {
-                let window = timestamps
-                    .into_iter()
-                    .fold(window, |mut window, timestamp| {
-                        if timestamp < window.start {
-                            window.start = timestamp;
+                let window = timestamps.into_iter().fold(
+                    window.start..=window.end,
+                    |mut window, timestamp| {
+                        if timestamp < *window.start() {
+                            window = timestamp..=*window.end();
                         }
-                        if timestamp > window.end {
-                            window.end = timestamp;
+                        if timestamp > *window.end() {
+                            window = *window.start()..=timestamp;
                         }
                         window
-                    });
+                    },
+                );
                 Some((ops, window))
             }
         })))

@@ -7,7 +7,7 @@ use futures::stream::StreamExt;
 use ghost_actor::GhostControlSender;
 //use ghost_actor::dependencies::tracing;
 use crate::types::direct::*;
-use kitsune_p2p::actor::KitsuneP2pSender;
+use kitsune_p2p::actor::{BroadcastTo, KitsuneP2pSender};
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::event::*;
 use kitsune_p2p::*;
@@ -534,6 +534,7 @@ async fn handle_srv_events(
                                             root.to_kitsune_space(),
                                             basis,
                                             timeout,
+                                            BroadcastTo::Notify,
                                             payload,
                                         ))
                                     }).map_err(KdError::other)?;
@@ -880,7 +881,7 @@ async fn handle_gossip(
 async fn handle_query_op_hashes(
     kdirect: Arc<Kd1>,
     input: QueryOpHashesEvt,
-) -> KdResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindow)>> {
+) -> KdResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowInclusive)>> {
     let QueryOpHashesEvt {
         space,
         window,
@@ -920,7 +921,7 @@ async fn handle_query_op_hashes(
     entries.dedup();
 
     // TODO: produce proper time window of actual data returned
-    Ok(Some((entries, window)))
+    Ok(Some((entries, window.start..=window.end)))
 }
 
 async fn handle_fetch_op_data(

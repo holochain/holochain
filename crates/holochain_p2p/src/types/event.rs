@@ -7,7 +7,7 @@ use crate::*;
 use holochain_zome_types::signature::Signature;
 use kitsune_p2p::{
     agent_store::AgentInfoSigned,
-    event::{MetricKind, MetricQuery, MetricQueryAnswer, TimeWindow},
+    event::{MetricKind, MetricQuery, MetricQueryAnswer, TimeWindow, TimeWindowInclusive},
 };
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
@@ -218,7 +218,7 @@ ghost_actor::ghost_chan! {
             window: TimeWindow,
             max_ops: usize,
             include_limbo: bool,
-        ) -> Option<(Vec<holo_hash::DhtOpHash>, TimeWindow)>;
+        ) -> Option<(Vec<holo_hash::DhtOpHash>, TimeWindowInclusive)>;
 
         /// The p2p module needs access to the content for a given set of DhtOpHashes.
         fn fetch_op_data(

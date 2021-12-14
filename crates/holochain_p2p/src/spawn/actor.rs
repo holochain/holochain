@@ -4,12 +4,14 @@ use crate::event::*;
 use crate::*;
 
 use futures::future::FutureExt;
+use kitsune_p2p::actor::BroadcastTo;
 use kitsune_p2p::event::full_time_window;
 use kitsune_p2p::event::MetricDatum;
 use kitsune_p2p::event::MetricKind;
 use kitsune_p2p::event::MetricQuery;
 use kitsune_p2p::event::MetricQueryAnswer;
 use kitsune_p2p::event::TimeWindow;
+use kitsune_p2p::event::TimeWindowInclusive;
 
 use crate::types::AgentPubKeyExt;
 
@@ -296,7 +298,9 @@ impl WrapEvtSender {
         window: TimeWindow,
         max_ops: usize,
         include_limbo: bool,
-    ) -> impl Future<Output = HolochainP2pResult<Option<(Vec<holo_hash::DhtOpHash>, TimeWindow)>>>
+    ) -> impl Future<
+        Output = HolochainP2pResult<Option<(Vec<holo_hash::DhtOpHash>, TimeWindowInclusive)>>,
+    >
            + 'static
            + Send {
         timing_trace!(
@@ -889,7 +893,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         &mut self,
         input: kitsune_p2p::event::QueryOpHashesEvt,
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<
-        Option<(Vec<Arc<kitsune_p2p::KitsuneOpHash>>, TimeWindow)>,
+        Option<(Vec<Arc<kitsune_p2p::KitsuneOpHash>>, TimeWindowInclusive)>,
     > {
         let kitsune_p2p::event::QueryOpHashesEvt {
             space,
@@ -1091,7 +1095,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
             kitsune_p2p
-                .broadcast(space, basis, timeout, payload)
+                .broadcast(space, basis, timeout, BroadcastTo::Notify, payload)
                 .await?;
             Ok(())
         }
@@ -1202,7 +1206,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         Ok(async move {
             let mut input =
                 kitsune_p2p::actor::RpcMulti::new(&tuning_params, space, basis, payload);
-            // TODO - We're just targeting a single remote node for now
+            // NOTE - We're just targeting a single remote node for now
             //        without doing any pagination / etc...
             //        Setting up RpcMulti to act like RpcSingle
             input.max_remote_agent_count = 1;

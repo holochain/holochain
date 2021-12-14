@@ -38,7 +38,7 @@ pub enum SysValidationError {
     SourceChainError(#[from] SourceChainError),
     #[error("Dna is missing for this hash {0:?}. Cannot validate without dna.")]
     DnaMissing(DnaHash),
-    // TODO: Remove this when SysValidationResult is replace with SysValidationOutcome
+    // NOTE: can remove this if SysValidationResult is replaced with SysValidationOutcome
     #[error(transparent)]
     ValidationOutcome(#[from] ValidationOutcome),
     #[error(transparent)]

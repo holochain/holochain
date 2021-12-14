@@ -195,12 +195,18 @@ pub enum MetricQueryAnswer {
     Oldest(Option<KAgent>),
 }
 
-/// A range of timestamps, measured in milliseconds
+/// An exclusive range of timestamps, measured in microseconds
 pub type TimeWindow = std::ops::Range<Timestamp>;
+/// An inclusive range of timestamps, measured in microseconds
+pub type TimeWindowInclusive = std::ops::RangeInclusive<Timestamp>;
 
 /// A time window which covers all of recordable time
 pub fn full_time_window() -> TimeWindow {
     Timestamp::MIN..Timestamp::MAX
+}
+/// A time window which inclusively covers all of recordable time
+pub fn full_time_window_inclusive() -> TimeWindowInclusive {
+    Timestamp::MIN..=Timestamp::MAX
 }
 type KSpace = Arc<super::KitsuneSpace>;
 type KAgent = Arc<super::KitsuneAgent>;
@@ -242,7 +248,7 @@ ghost_actor::ghost_chan! {
         /// Gather a list of op-hashes from our implementor that meet criteria.
         /// Get the oldest and newest times for ops within a time window and max number of ops.
         // maackle: do we really need to *individually* wrap all these op hashes in Arcs?
-        fn query_op_hashes(input: QueryOpHashesEvt) -> Option<(Vec<KOpHash>, TimeWindow)>;
+        fn query_op_hashes(input: QueryOpHashesEvt) -> Option<(Vec<KOpHash>, TimeWindowInclusive)>;
 
         /// Gather all op-hash data for a list of op-hashes from our implementor.
         fn fetch_op_data(input: FetchOpDataEvt) -> Vec<(KOpHash, Vec<u8>)>;
