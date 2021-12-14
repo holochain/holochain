@@ -102,6 +102,13 @@ holochain_test_wasm_common = { version = "0.0.16", path = "../test_utils/wasm_co
 unwrap_to = { version = "0.1.0", optional = false }
 arbitrary = { version = "1.0", features = ["derive"] }
 
+[build-dependencies]
+serde = { version = "1.0", features = [ "derive" ] }
+serde_json = { version = "1.0.51" }
+toml = "0.5.6"
+chrono = "0.4.6"
+hostname = "0.3.1"
+
 [[bench]]
 name = "bench"
 harness = false
