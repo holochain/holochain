@@ -217,7 +217,6 @@ async fn run_test(
         .get_dht_env(&alice_cell_id.dna_hash())
         .unwrap();
     wait_for_integration(&alice_env, expected_count, num_attempts, delay_per_attempt).await;
-    holochain_state::prelude::dump_tmp(&alice_env);
 
     let alice_env = conductors[0]
         .get_dht_env(&alice_cell_id.dna_hash())

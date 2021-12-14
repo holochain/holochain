@@ -173,7 +173,7 @@ async fn mock_network_sharded_gossip() {
         },
     };
     use holochain_p2p::{dht_arc::DhtLocation, AgentPubKeyExt, DnaHashExt};
-    use holochain_sqlite::db::AsP2pAgentStoreConExt;
+    use holochain_sqlite::db::AsP2pStateTxExt;
     use kitsune_p2p::TransportConfig;
     use kitsune_p2p_types::tx2::tx2_adapter::AdapterFactory;
 
@@ -509,7 +509,10 @@ async fn mock_network_sharded_gossip() {
                                             dna,
                                             module,
                                             gossip: GossipProtocol::Sharded(
-                                                ShardedGossipWire::missing_ops(missing_ops, true),
+                                                ShardedGossipWire::missing_ops(
+                                                    missing_ops,
+                                                    MissingOpsStatus::AllComplete as u8,
+                                                ),
                                             ),
                                         };
                                         channel.send(msg.addressed((*agent).clone())).await;
@@ -580,16 +583,13 @@ async fn mock_network_sharded_gossip() {
         let alice_info = alice_info.clone();
         async move {
             loop {
-                let info = alice_p2p_env
-                    .conn()
-                    .unwrap()
-                    .p2p_get_agent(&alice_kit)
-                    .unwrap();
                 {
-                    if let Some(info) = &info {
-                        println!("Alice coverage {:.2}", info.storage_arc.coverage());
+                    let mut conn = alice_p2p_env.conn().unwrap();
+                    let txn = conn.transaction().unwrap();
+                    let info = txn.p2p_get_agent(&alice_kit).unwrap();
+                    {
+                        *alice_info.lock() = info;
                     }
-                    *alice_info.lock() = info;
                 }
                 tokio::time::sleep(std::time::Duration::from_secs(5)).await;
             }
@@ -692,7 +692,7 @@ async fn mock_network_sharding() {
     };
     use holochain_p2p::mock_network::{GossipProtocol, MockScenario};
     use holochain_p2p::{AgentPubKeyExt, DnaHashExt};
-    use holochain_sqlite::db::AsP2pAgentStoreConExt;
+    use holochain_state::prelude::*;
     use holochain_types::dht_op::WireOps;
     use holochain_types::element::WireElementOps;
     use kitsune_p2p::gossip::sharded_gossip::test_utils::check_agent_boom;
@@ -989,7 +989,7 @@ async fn mock_network_sharding() {
                                             dna,
                                             module,
                                             gossip: GossipProtocol::Sharded(
-                                                ShardedGossipWire::missing_ops(missing_ops, true),
+                                                ShardedGossipWire::missing_ops(missing_ops, 2),
                                             ),
                                         };
                                         channel.send(msg.addressed((*agent).clone())).await;
@@ -1073,17 +1073,15 @@ async fn mock_network_sharding() {
         let alice_info = alice_info.clone();
         async move {
             loop {
-                let info = alice_p2p_env
-                    .conn()
-                    .unwrap()
-                    .p2p_get_agent(&alice_kit)
-                    .unwrap();
-                {
-                    if let Some(info) = &info {
-                        eprintln!("Alice coverage {:.2}", info.storage_arc.coverage());
+                fresh_reader_test(alice_p2p_env.clone(), |txn| {
+                    let info = txn.p2p_get_agent(&alice_kit).unwrap();
+                    {
+                        if let Some(info) = &info {
+                            eprintln!("Alice coverage {:.2}", info.storage_arc.coverage());
+                        }
+                        *alice_info.lock() = info;
                     }
-                    *alice_info.lock() = info;
-                }
+                });
                 tokio::time::sleep(std::time::Duration::from_secs(5)).await;
             }
         }

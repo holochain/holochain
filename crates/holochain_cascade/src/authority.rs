@@ -15,8 +15,6 @@ use holochain_types::prelude::*;
 use holochain_zome_types::agent_activity::DeterministicGetAgentActivityFilter;
 use tracing::*;
 
-pub use get_entry_ops_query::WireDhtOp;
-
 #[cfg(test)]
 mod test;
 

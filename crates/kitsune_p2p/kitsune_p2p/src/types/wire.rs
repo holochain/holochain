@@ -1,5 +1,6 @@
 //! KitsuneP2p Wire Protocol Encoding Decoding
 
+use crate::actor::BroadcastTo;
 use crate::agent_store::AgentInfoSigned;
 use crate::types::*;
 use derive_more::*;
@@ -48,7 +49,9 @@ kitsune_p2p_types::write_codec_enum! {
             /// see mod_idx description
             mod_cnt.4: u32,
 
-            data.5: WireData,
+            destination.5: BroadcastTo,
+
+            data.6: WireData,
         },
 
         /// Fire-and-forget broadcast message.
@@ -56,7 +59,8 @@ kitsune_p2p_types::write_codec_enum! {
         Broadcast(0x23) {
             space.0: Arc<KitsuneSpace>,
             to_agent.1: Arc<KitsuneAgent>,
-            data.2: WireData,
+            destination.2: BroadcastTo,
+            data.3: WireData,
         },
 
         /// Gossip op with opaque data section,

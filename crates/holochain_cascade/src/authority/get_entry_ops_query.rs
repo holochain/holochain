@@ -12,13 +12,10 @@ use holochain_types::prelude::HasValidationStatus;
 use holochain_types::prelude::WireEntryOps;
 use holochain_zome_types::EntryType;
 use holochain_zome_types::EntryVisibility;
-use holochain_zome_types::Header;
 use holochain_zome_types::Judged;
-use holochain_zome_types::Signature;
 use holochain_zome_types::SignedHeader;
 use holochain_zome_types::TryFrom;
 use holochain_zome_types::TryInto;
-use holochain_zome_types::ValidationStatus;
 
 #[derive(Debug, Clone)]
 pub struct GetEntryOpsQuery(EntryHash);
@@ -26,32 +23,6 @@ pub struct GetEntryOpsQuery(EntryHash);
 impl GetEntryOpsQuery {
     pub fn new(hash: EntryHash) -> Self {
         Self(hash)
-    }
-}
-
-// TODO: Move this to holochain types.
-// TODO: This currently looks the same as
-// [`WireElementOps`] but there are more things
-// we can condense on entry ops due to sharing the
-// same entry hash.
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct WireDhtOp {
-    pub validation_status: Option<ValidationStatus>,
-    pub op_type: DhtOpType,
-    pub header: Header,
-    pub signature: Signature,
-}
-
-impl HasValidationStatus for WireDhtOp {
-    type Data = Self;
-
-    fn validation_status(&self) -> Option<ValidationStatus> {
-        self.validation_status
-    }
-
-    fn data(&self) -> &Self {
-        self
     }
 }
 
