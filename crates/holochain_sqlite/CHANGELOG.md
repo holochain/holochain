@@ -3,7 +3,12 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
-- Adds `basis_hash` index to `DhtOp` table. This makes get queries faster.
+
+## 0.0.20
+
+## 0.0.19
+
+- Adds `basis_hash` index to `DhtOp` table. This makes get queries faster. [\#1143](https://github.com/holochain/holochain/pull/1143)
 
 ## 0.0.18
 

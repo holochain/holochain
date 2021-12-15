@@ -27,9 +27,9 @@ use std::time::{Duration, SystemTime};
 use tokio::time::Instant;
 
 pub use self::bandwidth::BandwidthThrottle;
-use self::metrics::Metrics;
 use self::ops::OpsBatchQueue;
 use self::state_map::RoundStateMap;
+use crate::metrics::Metrics;
 
 use super::simple_bloom::{HowToConnect, MetaOpKey};
 
@@ -48,7 +48,6 @@ mod state_map;
 mod store;
 
 mod bandwidth;
-mod metrics;
 mod next_target;
 
 #[cfg(all(test, feature = "test_utils"))]
@@ -61,10 +60,6 @@ pub(crate) mod tests;
 ///    in the case of the pool buf management, any gossips larger than
 ///    16000 will now be shrunk resulting in additional memory thrashing
 const MAX_SEND_BUF_BYTES: usize = 16_000_000;
-
-/// The maximum number of different nodes that will be
-/// gossiped with if gossip is triggered.
-const MAX_TRIGGERS: u8 = 2;
 
 /// The timeout for a gossip round if there is no contact. One minute.
 const ROUND_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
@@ -152,6 +147,7 @@ impl ShardedGossip {
         evt_sender: EventSender,
         gossip_type: GossipType,
         bandwidth: Arc<BandwidthThrottle>,
+        metrics: Metrics,
     ) -> Arc<Self> {
         let this = Arc::new(Self {
             ep_hnd,
@@ -160,7 +156,7 @@ impl ShardedGossip {
                 tuning_params,
                 space,
                 evt_sender,
-                inner: Share::new(ShardedGossipLocalState::default()),
+                inner: Share::new(ShardedGossipLocalState::new(metrics)),
                 gossip_type,
                 closing: AtomicBool::new(false),
             },
@@ -375,6 +371,13 @@ pub struct ShardedGossipLocalState {
 }
 
 impl ShardedGossipLocalState {
+    fn new(metrics: Metrics) -> Self {
+        Self {
+            metrics,
+            ..Default::default()
+        }
+    }
+
     fn remove_state(&mut self, state_key: &StateKey, error: bool) -> Option<RoundState> {
         // Check if the round to be removed matches the current initiate_tgt
         let init_tgt = self
@@ -1069,6 +1072,7 @@ impl AsGossipModuleFactory for ShardedRecentGossipFactory {
         space: Arc<KitsuneSpace>,
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
+        metrics: Metrics,
     ) -> GossipModule {
         GossipModule(ShardedGossip::new(
             tuning_params,
@@ -1077,6 +1081,7 @@ impl AsGossipModuleFactory for ShardedRecentGossipFactory {
             evt_sender,
             GossipType::Recent,
             self.bandwidth.clone(),
+            metrics,
         ))
     }
 }
@@ -1098,6 +1103,7 @@ impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
         space: Arc<KitsuneSpace>,
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
+        metrics: Metrics,
     ) -> GossipModule {
         GossipModule(ShardedGossip::new(
             tuning_params,
@@ -1106,6 +1112,7 @@ impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
             evt_sender,
             GossipType::Historical,
             self.bandwidth.clone(),
+            metrics,
         ))
     }
 }

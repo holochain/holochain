@@ -47,7 +47,7 @@ fn merge_hashes(
 
         match valid_activity {
             ChainItems::Full(_) => {
-                // TODO: Currently not handling full headers from
+                // TODO: BACKLOG: Currently not handling full headers from
                 // the activity authority.
             }
             ChainItems::Hashes(hashes) => {
@@ -57,7 +57,7 @@ fn merge_hashes(
         }
         match rejected_activity {
             ChainItems::Full(_) => {
-                // TODO: Currently not handling full headers from
+                // TODO: BACKLOG: Currently not handling full headers from
                 // the activity authority.
             }
             ChainItems::Hashes(hashes) => {
@@ -190,12 +190,14 @@ fn merge_status_only(
                 }
                 (ChainStatus::Valid(_), ChainStatus::Forked(c))
                 | (ChainStatus::Forked(c), ChainStatus::Valid(_)) => {
-                    // TODO: If the valid and forked chain heads are the same then they are in conflict here.
+                    // If the valid and forked chain heads are the same then they are in conflict here.
+                    // TODO: BACKLOG: When we handle conflicts this should count as a conflict.
                     merged_status = Some(ChainStatus::Forked(c));
                 }
                 (ChainStatus::Invalid(c), ChainStatus::Valid(_))
                 | (ChainStatus::Valid(_), ChainStatus::Invalid(c)) => {
-                    // TODO: If the valid and invalid chain heads are the same then they are in conflict here.
+                    // If the valid and invalid chain heads are the same then they are in conflict here.
+                    // TODO: BACKLOG: When we handle conflicts this should count as a conflict.
                     merged_status = Some(ChainStatus::Invalid(c));
                 }
                 (ChainStatus::Forked(a), ChainStatus::Forked(b)) => {
