@@ -24,6 +24,7 @@ use holochain_types::prelude::*;
 use std::{fmt::Debug, sync::Arc};
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct DeterministicGetAgentActivityQuery {
     agent: AgentPubKey,
     filter: DeterministicGetAgentActivityFilter,

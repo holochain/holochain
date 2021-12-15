@@ -107,10 +107,10 @@ impl SimpleBloomMod {
 
     fn saw_recently(&self, info: &NodeInfo, last_touch_fudge_ms: u32) -> KitsuneP2pResult<bool> {
         Ok(if info.was_err {
-            info.last_touch.elapsed()?.as_millis() as u32 + last_touch_fudge_ms
+            info.last_touch.elapsed().as_millis() as u32 + last_touch_fudge_ms
                 <= self.tuning_params.gossip_peer_on_error_next_gossip_delay_ms
         } else {
-            info.last_touch.elapsed()?.as_millis() as u32 + last_touch_fudge_ms
+            info.last_touch.elapsed().as_millis() as u32 + last_touch_fudge_ms
                 <= self
                     .tuning_params
                     .gossip_peer_on_success_next_gossip_delay_ms

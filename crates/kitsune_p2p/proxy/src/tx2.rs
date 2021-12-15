@@ -119,7 +119,7 @@ impl AsConHnd for ProxyConHnd {
     }
 
     fn close(&self, _code: u32, _reason: &str) -> BoxFuture<'static, ()> {
-        // TODO - FIXME
+        // NOTE
         // we don't want to close the underlying sub_con,
         // it could be shared for proxying...
         // do we want to do *anything*?
@@ -373,7 +373,7 @@ impl AsEpHnd for ProxyEpHnd {
         _code: u32,
         _reason: &str,
     ) -> BoxFuture<'static, ()> {
-        // TODO - FIXME
+        // NOTE
         // we don't want to close the underlying sub_con,
         // it could be shared for proxying...
         // do we want to do *anything*?

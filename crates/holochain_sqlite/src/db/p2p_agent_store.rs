@@ -54,7 +54,7 @@ pub trait AsP2pStateTxExt {
     fn p2p_query_near_basis(&self, basis: u32, limit: u32) -> DatabaseResult<Vec<AgentInfoSigned>>;
 }
 
-impl AsP2pAgentStoreConExt for crate::db::PConn {
+impl AsP2pAgentStoreConExt for crate::db::PConnGuard {
     fn p2p_get_agent(&mut self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>> {
         self.with_reader(move |reader| reader.p2p_get_agent(agent))
     }

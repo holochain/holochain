@@ -719,7 +719,7 @@ macro_rules! wasm_io_fixturator {
 macro_rules! enum_fixturator {
     ( $enum:ident, $empty:expr ) => {
         use rand::seq::IteratorRandom;
-        use $crate::prelude::strum::IntoEnumIterator;
+        use $crate::prelude::IntoEnumIterator;
         fixturator!(
             $enum,
             $empty,

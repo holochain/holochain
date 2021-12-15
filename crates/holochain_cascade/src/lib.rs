@@ -106,9 +106,6 @@ where
     }
 
     /// Add the cache to the cascade.
-    // TODO: We do want to be able to use the cache without
-    // the network but we always need a cache when we have a
-    // network. Perhaps this can be proven at the type level?
     pub fn with_cache(self, cache: DbWrite<DbKindCache>) -> Self {
         Self {
             cache: Some(cache),
@@ -304,63 +301,81 @@ where
         Ok(network.get_agent_activity(agent, query, options).await?)
     }
 
-    fn cascading<Q>(&mut self, query: Q) -> CascadeResult<Q::Output>
+    async fn cascading<Q>(&mut self, query: Q) -> CascadeResult<Q::Output>
     where
-        Q: Query<Item = Judged<SignedHeaderHashed>>,
+        Q: Query<Item = Judged<SignedHeaderHashed>> + Send + 'static,
+        <Q as holochain_state::prelude::Query>::Output: Send + 'static,
     {
-        let mut conns = Vec::new();
-        let mut txns = Vec::new();
-        if let Some(cache) = &mut self.cache {
-            conns.push(cache.conn()?);
+        let mut conns: Vec<(_, Box<dyn PermittedConn + Send>)> = Vec::with_capacity(3);
+        if let Some(cache) = self.cache.clone() {
+            conns.push((cache.conn_permit().await, Box::new(cache)));
         }
-        if let Some(dht) = &mut self.dht {
-            conns.push(dht.conn()?);
+        if let Some(dht) = self.dht.clone() {
+            conns.push((dht.conn_permit().await, Box::new(dht)));
         }
-        if let Some(authored) = &mut self.authored {
-            conns.push(authored.conn()?);
+        if let Some(authored) = self.authored.clone() {
+            conns.push((authored.conn_permit().await, Box::new(authored)));
         }
-        for conn in &mut conns {
-            let txn = conn.transaction().map_err(StateQueryError::from)?;
-            txns.push(txn);
-        }
-        let txns_ref: Vec<_> = txns.iter().collect();
-        let results = match &self.scratch {
-            Some(scratch) => {
-                scratch.apply_and_then(|scratch| query.run(DbScratch::new(&txns_ref, scratch)))?
+        let scratch = self.scratch.clone();
+        let results = tokio::task::spawn_blocking(move || {
+            let mut conns = conns
+                .into_iter()
+                .map(|(permit, conn)| conn.from_permit(permit))
+                .collect::<DatabaseResult<Vec<_>>>()?;
+            let mut txns = Vec::with_capacity(conns.len());
+            for conn in &mut conns {
+                let txn = conn.transaction().map_err(StateQueryError::from)?;
+                txns.push(txn);
             }
-            None => query.run(Txns::from(&txns_ref[..]))?,
-        };
+            let txns_ref: Vec<_> = txns.iter().collect();
+            let results = match scratch {
+                Some(scratch) => scratch
+                    .apply_and_then(|scratch| query.run(DbScratch::new(&txns_ref, scratch)))?,
+                None => query.run(Txns::from(&txns_ref[..]))?,
+            };
+            CascadeResult::Ok(results)
+        })
+        .await??;
         Ok(results)
     }
 
     /// Search through the stores and return the first non-none result.
-    fn find_map<F, T>(&mut self, mut f: F) -> CascadeResult<Option<T>>
+    async fn find_map<F, T>(&mut self, mut f: F) -> CascadeResult<Option<T>>
     where
-        F: FnMut(&dyn Store) -> CascadeResult<Option<T>>,
+        T: Send + 'static,
+        F: FnMut(&dyn Store) -> CascadeResult<Option<T>> + Send + 'static,
     {
-        if let Some(cache) = &mut self.cache {
-            let mut conn = cache.conn()?;
-            let txn = conn.transaction().map_err(StateQueryError::from)?;
-            let txn = Txn::from(&txn);
-            let r = f(&txn)?;
+        let find = |permit, conn: Box<dyn PermittedConn + Send>, mut f: F| async move {
+            tokio::task::spawn_blocking(move || {
+                let mut conn = conn.from_permit(permit)?;
+                let txn = conn.transaction().map_err(StateQueryError::from)?;
+                let txn = Txn::from(&txn);
+                let r = f(&txn)?;
+                CascadeResult::Ok((r, f))
+            })
+            .await?
+        };
+        if let Some(cache) = self.cache.clone() {
+            let permit = cache.conn_permit().await;
+            let (r, f1) = find(permit, Box::new(cache), f).await?;
+            f = f1;
+
             if r.is_some() {
                 return Ok(r);
             }
         }
-        if let Some(dht) = &mut self.dht {
-            let mut conn = dht.conn()?;
-            let txn = conn.transaction().map_err(StateQueryError::from)?;
-            let txn = Txn::from(&txn);
-            let r = f(&txn)?;
+        if let Some(dht) = self.dht.clone() {
+            let permit = dht.conn_permit().await;
+            let (r, f1) = find(permit, Box::new(dht), f).await?;
+            f = f1;
             if r.is_some() {
                 return Ok(r);
             }
         }
-        if let Some(authored) = &mut self.authored {
-            let mut conn = authored.conn()?;
-            let txn = conn.transaction().map_err(StateQueryError::from)?;
-            let txn = Txn::from(&txn);
-            let r = f(&txn)?;
+        if let Some(authored) = self.authored.clone() {
+            let permit = authored.conn_permit().await;
+            let (r, f1) = find(permit, Box::new(authored), f).await?;
+            f = f1;
             if r.is_some() {
                 return Ok(r);
             }
@@ -382,10 +397,17 @@ where
         mut options: NetworkGetOptions,
     ) -> CascadeResult<Option<EntryHashed>> {
         let private_data = self.private_data.clone();
-        let result = self.find_map(|store| {
-            Ok(store
-                .get_public_or_authored_entry(&hash, private_data.as_ref().map(|a| a.as_ref()))?)
-        })?;
+        let result = self
+            .find_map({
+                let hash = hash.clone();
+                move |store| {
+                    Ok(store.get_public_or_authored_entry(
+                        &hash,
+                        private_data.as_ref().map(|a| a.as_ref()),
+                    )?)
+                }
+            })
+            .await?;
         if result.is_some() {
             return Ok(result.map(EntryHashed::from_content_sync));
         }
@@ -394,10 +416,17 @@ where
 
         // Check if we have the data now after the network call.
         let private_data = self.private_data.clone();
-        let result = self.find_map(|store| {
-            Ok(store
-                .get_public_or_authored_entry(&hash, private_data.as_ref().map(|a| a.as_ref()))?)
-        })?;
+        let result = self
+            .find_map({
+                let hash = hash.clone();
+                move |store| {
+                    Ok(store.get_public_or_authored_entry(
+                        &hash,
+                        private_data.as_ref().map(|a| a.as_ref()),
+                    )?)
+                }
+            })
+            .await?;
         Ok(result.map(EntryHashed::from_content_sync))
     }
 
@@ -408,7 +437,12 @@ where
         hash: HeaderHash,
         mut options: NetworkGetOptions,
     ) -> CascadeResult<Option<SignedHeaderHashed>> {
-        let result = self.find_map(|store| Ok(store.get_header(&hash)?))?;
+        let result = self
+            .find_map({
+                let hash = hash.clone();
+                move |store| Ok(store.get_header(&hash)?)
+            })
+            .await?;
         if result.is_some() {
             return Ok(result);
         }
@@ -416,7 +450,9 @@ where
         self.fetch_element(hash.clone().into(), options).await?;
 
         // Check if we have the data now after the network call.
-        let result = self.find_map(|store| Ok(store.get_header(&hash)?))?;
+        let result = self
+            .find_map(move |store| Ok(store.get_header(&hash)?))
+            .await?;
         Ok(result)
     }
 
@@ -428,10 +464,17 @@ where
         mut options: NetworkGetOptions,
     ) -> CascadeResult<Option<Element>> {
         let private_data = self.private_data.clone();
-        let result = self.find_map(|store| {
-            Ok(store
-                .get_public_or_authored_element(&hash, private_data.as_ref().map(|a| a.as_ref()))?)
-        })?;
+        let result = self
+            .find_map({
+                let hash = hash.clone();
+                move |store| {
+                    Ok(store.get_public_or_authored_element(
+                        &hash,
+                        private_data.as_ref().map(|a| a.as_ref()),
+                    )?)
+                }
+            })
+            .await?;
         if result.is_some() {
             return Ok(result);
         }
@@ -440,10 +483,14 @@ where
 
         let private_data = self.private_data.clone();
         // Check if we have the data now after the network call.
-        let result = self.find_map(|store| {
-            Ok(store
-                .get_public_or_authored_element(&hash, private_data.as_ref().map(|a| a.as_ref()))?)
-        })?;
+        let result = self
+            .find_map(move |store| {
+                Ok(store.get_public_or_authored_element(
+                    &hash,
+                    private_data.as_ref().map(|a| a.as_ref()),
+                )?)
+            })
+            .await?;
         Ok(result)
     }
 
@@ -460,7 +507,7 @@ where
         // We don't need metadata and only need the content
         // so if we have it locally then we can avoid the network.
         if let GetStrategy::Content = options.strategy {
-            let results = self.cascading(query.clone())?;
+            let results = self.cascading(query.clone()).await?;
             // We got a result so can short circuit.
             if results.is_some() {
                 return Ok(results);
@@ -473,14 +520,13 @@ where
 
         // If we are not in the process of authoring this hash or its
         // authority we need a network call.
-        // TODO: do we want to put this behind an option, to allow cache-only queries?
         if !(authoring || authority) {
             self.fetch_element(entry_hash.into(), options.into())
                 .await?;
         }
 
         // Check if we have the data now after the network call.
-        let results = self.cascading(query)?;
+        let results = self.cascading(query).await?;
         Ok(results)
     }
 
@@ -495,14 +541,14 @@ where
         let query: GetElementDetailsQuery =
             self.construct_query_with_data_access(header_hash.clone());
 
-        // TODO: we can short circuit if we have any local deletes on a header.
+        // DESIGN: we can short circuit if we have any local deletes on a header.
         // Is this bad because we will not go back to the network until our
         // cache is cleared. Could someone create an attack based on this fact?
 
         // We don't need metadata and only need the content
         // so if we have it locally then we can avoid the network.
         if let GetStrategy::Content = options.strategy {
-            let results = self.cascading(query.clone())?;
+            let results = self.cascading(query.clone()).await?;
             // We got a result so can short circuit.
             if results.is_some() {
                 return Ok(results);
@@ -515,14 +561,13 @@ where
 
         // If we are not in the process of authoring this hash or its
         // authority we need a network call.
-        // TODO: do we want to put this behind an option, to allow cache-only queries?
         if !(authoring || authority) {
             self.fetch_element(header_hash.into(), options.into())
                 .await?;
         }
 
         // Check if we have the data now after the network call.
-        let results = self.cascading(query)?;
+        let results = self.cascading(query).await?;
         Ok(results)
     }
 
@@ -540,14 +585,14 @@ where
         let authority = self.am_i_an_authority(header_hash.clone().into()).await?;
         let query: GetLiveElementQuery = self.construct_query_with_data_access(header_hash.clone());
 
-        // TODO: we can short circuit if we have any local deletes on a header.
+        // DESIGN: we can short circuit if we have any local deletes on a header.
         // Is this bad because we will not go back to the network until our
         // cache is cleared. Could someone create an attack based on this fact?
 
         // We don't need metadata and only need the content
         // so if we have it locally then we can avoid the network.
         if let GetStrategy::Content = options.strategy {
-            let results = self.cascading(query.clone())?;
+            let results = self.cascading(query.clone()).await?;
             // We got a result so can short circuit.
             if results.is_some() {
                 return Ok(results);
@@ -560,14 +605,13 @@ where
 
         // If we are not in the process of authoring this hash or its
         // authority we need a network call.
-        // TODO: do we want to put this behind an option, to allow cache-only queries?
         if !(authoring || authority) {
             self.fetch_element(header_hash.into(), options.into())
                 .await?;
         }
 
         // Check if we have the data now after the network call.
-        let results = self.cascading(query)?;
+        let results = self.cascading(query).await?;
         Ok(results)
     }
 
@@ -586,7 +630,7 @@ where
         // We don't need metadata and only need the content
         // so if we have it locally then we can avoid the network.
         if let GetStrategy::Content = options.strategy {
-            let results = self.cascading(query.clone())?;
+            let results = self.cascading(query.clone()).await?;
             // We got a result so can short circuit.
             if results.is_some() {
                 return Ok(results);
@@ -599,14 +643,13 @@ where
 
         // If we are not in the process of authoring this hash or its
         // authority we need a network call.
-        // TODO: do we want to put this behind an option, to allow cache-only queries?
         if !(authoring || authority) {
             self.fetch_element(entry_hash.into(), options.into())
                 .await?;
         }
 
         // Check if we have the data now after the network call.
-        let results = self.cascading(query)?;
+        let results = self.cascading(query).await?;
         Ok(results)
     }
 
@@ -677,7 +720,7 @@ where
             self.fetch_links(key.clone(), options).await?;
         }
         let query = GetLinksQuery::new(key.base, key.zome_id, key.tag);
-        let results = self.cascading(query)?;
+        let results = self.cascading(query).await?;
         Ok(results)
     }
 
@@ -694,7 +737,7 @@ where
             self.fetch_links(key.clone(), options).await?;
         }
         let query = GetLinkDetailsQuery::new(key.base, key.zome_id, key.tag);
-        let results = self.cascading(query)?;
+        let results = self.cascading(query).await?;
         Ok(results)
     }
 
@@ -716,7 +759,7 @@ where
         options: GetActivityOptions,
     ) -> CascadeResult<AgentActivityResponse<Element>> {
         let status_only = !options.include_rejected_activity && !options.include_valid_activity;
-        // TODO: Evaluate if it's ok to **not** go to another authority for agent activity?
+        // DESIGN: Evaluate if it's ok to **not** go to another authority for agent activity?
         let authority = self.am_i_an_authority(agent.clone().into()).await?;
         let merged_response = if !authority {
             let results = self
@@ -770,7 +813,7 @@ where
         let valid_activity = match valid_activity {
             ChainItems::Hashes(hashes) => {
                 // If we can't get one of the headers then don't return any.
-                // TODO: Is this the correct choice?
+                // DESIGN: Is this the correct choice?
                 let maybe_chain: Option<Vec<_>> = self
                     .get_concurrent(
                         hashes.into_iter().map(|(_, h)| h.into()),
@@ -780,7 +823,10 @@ where
                     .into_iter()
                     .collect();
                 match maybe_chain {
-                    Some(chain) => ChainItems::Full(chain),
+                    Some(mut chain) => {
+                        chain.sort_unstable_by_key(|el| el.header().header_seq());
+                        ChainItems::Full(chain)
+                    }
                     None => ChainItems::Full(Vec::with_capacity(0)),
                 }
             }
@@ -790,7 +836,7 @@ where
         let rejected_activity = match rejected_activity {
             ChainItems::Hashes(hashes) => {
                 // If we can't get one of the headers then don't return any.
-                // TODO: Is this the correct choice?
+                // DESIGN: Is this the correct choice?
                 let maybe_chain: Option<Vec<_>> = self
                     .get_concurrent(
                         hashes.into_iter().map(|(_, h)| h.into()),
@@ -800,7 +846,10 @@ where
                     .into_iter()
                     .collect();
                 match maybe_chain {
-                    Some(chain) => ChainItems::Full(chain),
+                    Some(mut chain) => {
+                        chain.sort_unstable_by_key(|el| el.header().header_seq());
+                        ChainItems::Full(chain)
+                    }
                     None => ChainItems::Full(Vec::with_capacity(0)),
                 }
             }
