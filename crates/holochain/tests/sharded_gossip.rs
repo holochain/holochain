@@ -674,6 +674,7 @@ async fn mock_network_sharded_gossip() {
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "Prototype test that is not suitable for CI"]
 /// This is a prototype test to demonstrate how to create a
 /// simulated network.
 /// It tests one real agent talking to a number of simulated agents.
