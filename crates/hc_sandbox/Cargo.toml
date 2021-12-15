@@ -1,6 +1,6 @@
 [package]
 name = "holochain_cli_sandbox"
-version = "0.0.17"
+version = "0.0.18"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_cli_sandbox"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
@@ -20,10 +20,10 @@ ansi_term = "0.12"
 chrono = "0.4.6"
 futures = "0.3"
 lazy_static = "1.4.0"
-holochain_conductor_api = { path = "../holochain_conductor_api", version = "0.0.19"}
-holochain_types = { path = "../holochain_types", version = "0.0.19"}
-holochain_websocket = { path = "../holochain_websocket", version = "0.0.19"}
-holochain_p2p = { path = "../holochain_p2p", version = "0.0.19"}
+holochain_conductor_api = { path = "../holochain_conductor_api", version = "0.0.20"}
+holochain_types = { path = "../holochain_types", version = "0.0.20"}
+holochain_websocket = { path = "../holochain_websocket", version = "0.0.20"}
+holochain_p2p = { path = "../holochain_p2p", version = "0.0.20"}
 nanoid = "0.3"
 observability = "0.1.3"
 serde_yaml = "0.8"
