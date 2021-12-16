@@ -4,6 +4,7 @@ use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use holochain_zome_types::info::CallInfo;
+use crate::core::ribosome::RibosomeError;
 use std::sync::Arc;
 
 pub fn call_info(
@@ -71,7 +72,11 @@ pub fn call_info(
                 cap_grant,
             })
         }
-        _ => unreachable!(),
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "call_info".into()
+        ).to_string()))
     }
 }
 

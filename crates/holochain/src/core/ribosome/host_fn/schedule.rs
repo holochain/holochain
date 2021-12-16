@@ -3,6 +3,7 @@ use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
+use crate::core::ribosome::RibosomeError;
 
 pub fn schedule(
     _ribosome: Arc<impl RibosomeT>,
@@ -30,7 +31,11 @@ pub fn schedule(
                 .map_err(|e| WasmError::Host(e.to_string()))?;
             Ok(())
         }
-        _ => unreachable!(),
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "schedule".into()
+        ).to_string()))
     }
 }
 

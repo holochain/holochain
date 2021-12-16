@@ -914,7 +914,6 @@ impl Cell {
     }
 
     /// Instantiate a Ribosome for use by this Cell's workflows
-    // TODO: reevaluate once Workflows are fully implemented (after B-01567)
     pub(crate) async fn get_ribosome(&self) -> CellResult<RealRibosome> {
         match self.conductor_api.get_dna(self.dna_hash()) {
             Some(dna) => Ok(RealRibosome::new(dna)),
@@ -923,7 +922,6 @@ impl Cell {
     }
 
     /// Accessor for the authored database backing this Cell
-    // TODO: reevaluate once Workflows are fully implemented (after B-01567)
     pub(crate) fn authored_env(&self) -> &DbWrite<DbKindAuthored> {
         &self.space.authored_env
     }
