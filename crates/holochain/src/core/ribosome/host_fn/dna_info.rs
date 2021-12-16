@@ -6,6 +6,7 @@ use holochain_zome_types::info::DnaInfo;
 use crate::core::ribosome::HostFnAccess;
 use holo_hash::HasHash;
 use holochain_types::prelude::*;
+use crate::core::ribosome::RibosomeError;
 
 pub fn dna_info(
     ribosome: Arc<impl RibosomeT>,
@@ -26,7 +27,11 @@ pub fn dna_info(
                     .collect(),
             })
         },
-        _ => unreachable!(),
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "dna_info".into()
+        ).to_string()))
     }
 }
 
