@@ -313,9 +313,9 @@ impl EndpointAdapt for QuicEndpointAdapt {
         use kitsune_p2p_types::dependencies::url2;
         let mut url = url2::url2!("{}://{}", crate::SCHEME, addr);
 
-        // TODO - FIXME - not sure how slow `get_if_addrs` is
-        //                might be better to do this once on bind
-        //                and just cache the bound address
+        // MAYBE - not sure how slow `get_if_addrs` is
+        //         might be better to do this once on bind
+        //         and just cache the bound address
         if let Some(host) = url.host_str() {
             if host == "0.0.0.0" {
                 for iface in if_addrs::get_if_addrs().map_err(KitsuneError::other)? {

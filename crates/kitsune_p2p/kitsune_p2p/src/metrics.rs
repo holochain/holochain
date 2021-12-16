@@ -1,6 +1,15 @@
-use Instant;
+use std::collections::HashMap;
+use std::collections::VecDeque;
+use std::sync::Arc;
 
-use super::*;
+use tokio::time::Instant;
+
+use crate::types::*;
+use kitsune_p2p_types::agent_info::AgentInfoSigned;
+
+/// The maximum number of different nodes that will be
+/// gossiped with if gossip is triggered.
+const MAX_TRIGGERS: u8 = 2;
 
 /// Maximum amount of history we will track
 /// per remote node.
@@ -24,94 +33,183 @@ struct NodeInfo {
 #[derive(Debug, Default)]
 /// Metrics tracking for remote nodes to help
 /// choose which remote node to initiate the next round with.
-pub(super) struct Metrics {
-    /// Map of remote nodes.
-    map: HashMap<StateKey, NodeInfo>,
+pub struct Metrics {
+    /// Map of remote agents.
+    map: HashMap<Arc<KitsuneAgent>, NodeInfo>,
+
     // Number of times we need to force initiate
     // the next round.
     force_initiates: u8,
 }
 
 /// Outcome of a gossip round.
-pub(super) enum RoundOutcome {
+#[derive(PartialOrd, Ord, PartialEq, Eq)]
+pub enum RoundOutcome {
     Success(Instant),
     Error(Instant),
 }
 
+pub enum AgentLike<'lt> {
+    Info(&'lt AgentInfoSigned),
+    PubKey(&'lt Arc<KitsuneAgent>),
+}
+
+impl<'lt> From<&'lt AgentInfoSigned> for AgentLike<'lt> {
+    fn from(i: &'lt AgentInfoSigned) -> Self {
+        Self::Info(i)
+    }
+}
+
+impl<'lt> From<&'lt Arc<KitsuneAgent>> for AgentLike<'lt> {
+    fn from(pk: &'lt Arc<KitsuneAgent>) -> Self {
+        Self::PubKey(pk)
+    }
+}
+
+impl<'lt> AgentLike<'lt> {
+    pub fn agent(&self) -> &Arc<KitsuneAgent> {
+        match self {
+            Self::Info(i) => &i.agent,
+            Self::PubKey(pk) => pk,
+        }
+    }
+}
+
 impl Metrics {
     #[cfg(test)]
-    pub(super) fn new() -> Self {
+    pub fn new() -> Self {
         Self::default()
     }
 
     /// Record a gossip round has been initiated by us.
-    pub(super) fn record_initiate(&mut self, key: StateKey) {
-        let info = self.map.entry(key).or_default();
-        record_instant(&mut info.initiates);
-        info.current_round = true;
+    pub fn record_initiate<'a, T, I>(&mut self, remote_agent_list: I)
+    where
+        T: Into<AgentLike<'a>>,
+        I: IntoIterator<Item = T>,
+    {
+        for agent_info in remote_agent_list {
+            let info = self
+                .map
+                .entry(agent_info.into().agent().clone())
+                .or_default();
+            record_instant(&mut info.initiates);
+            info.current_round = true;
+        }
     }
 
     /// Record a remote gossip round has started.
-    pub(super) fn record_remote_round(&mut self, key: StateKey) {
-        let info = self.map.entry(key).or_default();
-        record_instant(&mut info.remote_rounds);
-        info.current_round = true;
+    pub fn record_remote_round<'a, T, I>(&mut self, remote_agent_list: I)
+    where
+        T: Into<AgentLike<'a>>,
+        I: IntoIterator<Item = T>,
+    {
+        for agent_info in remote_agent_list {
+            let info = self
+                .map
+                .entry(agent_info.into().agent().clone())
+                .or_default();
+            record_instant(&mut info.remote_rounds);
+            info.current_round = true;
+        }
     }
 
     /// Record a gossip round has completed successfully.
-    pub(super) fn record_success(&mut self, key: StateKey) {
-        let info = self.map.entry(key).or_default();
-        record_instant(&mut info.complete_rounds);
-        info.current_round = false;
-        if info.is_initiate_round() {
+    pub fn record_success<'a, T, I>(&mut self, remote_agent_list: I)
+    where
+        T: Into<AgentLike<'a>>,
+        I: IntoIterator<Item = T>,
+    {
+        let mut should_dec_force_initiates = false;
+
+        for agent_info in remote_agent_list {
+            let info = self
+                .map
+                .entry(agent_info.into().agent().clone())
+                .or_default();
+            record_instant(&mut info.complete_rounds);
+            info.current_round = false;
+            if info.is_initiate_round() {
+                should_dec_force_initiates = true;
+            }
+        }
+
+        if should_dec_force_initiates {
             self.force_initiates = self.force_initiates.saturating_sub(1);
         }
     }
 
     /// Record a gossip round has finished with an error.
-    pub(super) fn record_error(&mut self, key: StateKey) {
-        let info = self.map.entry(key).or_default();
-        record_instant(&mut info.errors);
-        info.current_round = false;
+    pub fn record_error<'a, T, I>(&mut self, remote_agent_list: I)
+    where
+        T: Into<AgentLike<'a>>,
+        I: IntoIterator<Item = T>,
+    {
+        for agent_info in remote_agent_list {
+            let info = self
+                .map
+                .entry(agent_info.into().agent().clone())
+                .or_default();
+            record_instant(&mut info.errors);
+            info.current_round = false;
+        }
     }
 
     /// Record that we should force initiate the next few rounds.
-    pub(super) fn record_force_initiate(&mut self) {
+    pub fn record_force_initiate(&mut self) {
         self.force_initiates = MAX_TRIGGERS;
     }
 
     /// Get the last successful round time.
-    pub(super) fn last_success(&self, key: &StateKey) -> Option<&Instant> {
-        self.map
-            .get(key)
-            .and_then(|info| info.complete_rounds.back())
+    pub fn last_success<'a, T, I>(&self, remote_agent_list: I) -> Option<&Instant>
+    where
+        T: Into<AgentLike<'a>>,
+        I: IntoIterator<Item = T>,
+    {
+        remote_agent_list
+            .into_iter()
+            .filter_map(|agent_info| self.map.get(agent_info.into().agent()))
+            .map(|info| info.complete_rounds.back())
+            .flatten()
+            .min()
     }
 
     /// Is this node currently in an active round?
-    pub(super) fn is_current_round(&self, key: &StateKey) -> bool {
-        self.map.get(key).map_or(false, |info| info.current_round)
+    pub fn is_current_round<'a, T, I>(&self, remote_agent_list: I) -> bool
+    where
+        T: Into<AgentLike<'a>>,
+        I: IntoIterator<Item = T>,
+    {
+        remote_agent_list
+            .into_iter()
+            .filter_map(|agent_info| self.map.get(agent_info.into().agent()))
+            .map(|info| info.current_round)
+            .any(|x| x)
     }
 
-    /// What was the last outcome for this nodes gossip round?
-    pub(super) fn last_outcome(&self, key: &StateKey) -> Option<RoundOutcome> {
-        self.map.get(key).and_then(
-            |info| match (info.errors.back(), info.complete_rounds.back()) {
-                (Some(error), Some(success)) => {
-                    if error > success {
-                        Some(RoundOutcome::Error(*error))
-                    } else {
-                        Some(RoundOutcome::Success(*success))
-                    }
-                }
-                (Some(error), None) => Some(RoundOutcome::Error(*error)),
-                (None, Some(success)) => Some(RoundOutcome::Success(*success)),
-                (None, None) => None,
-            },
-        )
+    /// What was the last outcome for this node's gossip round?
+    pub fn last_outcome<'a, T, I>(&self, remote_agent_list: I) -> Option<RoundOutcome>
+    where
+        T: Into<AgentLike<'a>>,
+        I: IntoIterator<Item = T>,
+    {
+        remote_agent_list
+            .into_iter()
+            .filter_map(|agent_info| self.map.get(agent_info.into().agent()))
+            .map(|info| {
+                [
+                    info.errors.back().map(|x| RoundOutcome::Error(*x)),
+                    info.complete_rounds
+                        .back()
+                        .map(|x| RoundOutcome::Success(*x)),
+                ]
+            })
+            .flatten()
+            .flatten()
+            .max()
     }
 
     /// Should we force initiate the next round?
-    pub(super) fn forced_initiate(&self) -> bool {
+    pub fn forced_initiate(&self) -> bool {
         self.force_initiates > 0
     }
 }
@@ -141,13 +239,13 @@ impl std::fmt::Display for Metrics {
         });
         let trace = *TRACE;
         write!(f, "Metrics:")?;
-        let mut average_last_completion = Duration::default();
-        let mut max_last_completion = Duration::default();
-        let mut average_completion_frequency = Duration::default();
+        let mut average_last_completion = std::time::Duration::default();
+        let mut max_last_completion = std::time::Duration::default();
+        let mut average_completion_frequency = std::time::Duration::default();
         let mut complete_rounds = 0;
         let mut min_complete_rounds = usize::MAX;
         for (key, info) in &self.map {
-            let completion_frequency: Duration =
+            let completion_frequency: std::time::Duration =
                 info.complete_rounds.iter().map(|i| i.elapsed()).sum();
             let completion_frequency = completion_frequency
                 .checked_div(info.complete_rounds.len() as u32)

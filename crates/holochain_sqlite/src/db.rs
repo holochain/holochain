@@ -106,9 +106,36 @@ pub struct DbRead<Kind: DbKindT> {
     read_semaphore: Arc<Semaphore>,
 }
 
+#[derive(Shrinkwrap)]
+#[shrinkwrap(mutable)]
+pub struct PConnGuard(#[shrinkwrap(main_field)] pub PConn, OwnedSemaphorePermit);
+
+pub struct PConnPermit(OwnedSemaphorePermit);
+
+pub trait PermittedConn {
+    fn from_permit(&self, permit: PConnPermit) -> DatabaseResult<PConnGuard>;
+}
+
+impl<Kind: DbKindT> PermittedConn for DbRead<Kind> {
+    fn from_permit(&self, permit: PConnPermit) -> DatabaseResult<PConnGuard> {
+        Ok(PConnGuard(self.conn()?, permit.0))
+    }
+}
+
+impl<Kind: DbKindT> PermittedConn for DbWrite<Kind> {
+    fn from_permit(&self, permit: PConnPermit) -> DatabaseResult<PConnGuard> {
+        Ok(PConnGuard(self.conn()?, permit.0))
+    }
+}
+
 impl<Kind: DbKindT> DbRead<Kind> {
     pub fn conn(&self) -> DatabaseResult<PConn> {
         self.connection_pooled()
+    }
+
+    pub async fn conn_permit(&self) -> PConnPermit {
+        let g = self.acquire_reader_permit().await;
+        PConnPermit(g)
     }
 
     /// Accessor for the [DbKindT] of the DbWrite
@@ -166,6 +193,11 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
     /// Create or open an existing database reference,
     pub fn open(path_prefix: &Path, kind: Kind) -> DatabaseResult<Self> {
         Self::open_with_sync_level(path_prefix, kind, DbSyncLevel::default())
+    }
+
+    pub async fn conn_write_permit(&self) -> PConnPermit {
+        let g = self.acquire_writer_permit().await;
+        PConnPermit(g)
     }
 
     pub fn open_with_sync_level(

@@ -60,6 +60,15 @@ pub struct RpcMultiResponse {
     pub response: Vec<u8>,
 }
 
+#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+/// The destination of a broadcast message.
+pub enum BroadcastTo {
+    /// Send to notify.
+    Notify,
+    /// Send to publish agent info.
+    PublishAgentInfo,
+}
+
 type KSpace = Arc<super::KitsuneSpace>;
 type KAgent = Arc<super::KitsuneAgent>;
 type KAgents = Vec<Arc<super::KitsuneAgent>>;
@@ -96,6 +105,7 @@ ghost_actor::ghost_chan! {
             space: KSpace,
             basis: KBasis,
             timeout: KitsuneTimeout,
+            destination: BroadcastTo,
             payload: Payload
         ) -> ();
 

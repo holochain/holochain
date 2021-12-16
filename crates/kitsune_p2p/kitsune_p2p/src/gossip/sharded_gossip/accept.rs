@@ -8,12 +8,13 @@ impl ShardedGossipLocal {
         &self,
         peer_cert: Tx2Cert,
         remote_arc_set: Vec<ArcInterval>,
+        remote_agent_list: Vec<AgentInfoSigned>,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let (local_agents, accept_is_from_target) = self.inner.share_mut(|i, _| {
             let accept_is_from_target = i
                 .initiate_tgt
                 .as_ref()
-                .map(|tgt| *tgt.0.cert() == peer_cert)
+                .map(|tgt| tgt.cert == peer_cert)
                 .unwrap_or(false);
             Ok((i.local_agents.clone(), accept_is_from_target))
         })?;
@@ -38,11 +39,16 @@ impl ShardedGossipLocal {
                 .map(|(_, a)| a)
                 .collect();
 
-        let mut gossip = Vec::with_capacity(2);
+        let mut gossip = Vec::new();
 
         // Generate the bloom filters and new state.
         let state = self
-            .generate_blooms(local_agent_arcs, remote_arc_set, &mut gossip)
+            .generate_blooms(
+                remote_agent_list.clone(),
+                local_agent_arcs,
+                remote_arc_set,
+                &mut gossip,
+            )
             .await?;
 
         self.inner.share_mut(|inner, _| {
@@ -50,7 +56,7 @@ impl ShardedGossipLocal {
             // a stale accept comes in for the same peer cert?
             // Maybe we need to check timestamps on messages or have unique round ids?
             inner.round_map.insert(peer_cert.clone(), state);
-            inner.metrics.record_initiate(peer_cert);
+            inner.metrics.record_initiate(&remote_agent_list);
             Ok(())
         })?;
         Ok(gossip)
