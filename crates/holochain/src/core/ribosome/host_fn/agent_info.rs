@@ -3,6 +3,7 @@ use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
+use crate::core::ribosome::RibosomeError;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -37,7 +38,11 @@ pub fn agent_info<'a>(
                     .map_err(|e| WasmError::Host(e.to_string()))?,
             })
         }
-        _ => unreachable!(),
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "agent_info".into()
+        ).to_string()))
     }
 }
 
