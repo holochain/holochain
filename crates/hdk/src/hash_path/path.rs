@@ -13,14 +13,12 @@ use validate::RequiredValidationType;
 /// See `impl From<String> for Path` below.
 pub const DELIMITER: &str = ".";
 
-/// "hdk.path" as utf8 bytes
 /// All paths use the same link tag and entry def id.
 /// Different pathing schemes/systems/implementations should namespace themselves by their path
 /// components rather than trying to layer different link namespaces over the same path components.
 /// Similarly there is no need to define different entry types for different pathing strategies.
-///
-/// @todo - revisit whether there is a need/use-case for different link tags or entries
-/// See anchors implementation.
+/// The DHT_PREFIX ends up as both the prefix of the link tags and also in the
+/// `PathEntry` struct itself to mitigate collisions on the DHT.
 pub const DHT_PREFIX: [u8; 1] = [0x00];
 
 /// Each path component is arbitrary bytes to be hashed together in a predictable way when the path
@@ -65,6 +63,10 @@ impl From<Component> for Vec<u8> {
 /// which gives us a fixed width encoding for strings, which gives us a clean/easy way to support
 /// sharding based on strings by iterating over u32s rather than deciding what to do with variable
 /// width u8 or u16 characters.
+///
+/// IMPORTANT: if you are not using sharding and make heavy use of `Path` then
+/// consider building your `Component` directly from `my_string.as_bytes()` to
+/// achieve much more compact utf8 representations of each `Component`.
 impl From<&str> for Component {
     fn from(s: &str) -> Self {
         let bytes: Vec<u8> = s
@@ -144,6 +146,9 @@ impl TryFrom<&Component> for String {
 /// i.e. the ahead-of-time predictability of the hashes of a given path allows us to travel "up"
 /// the tree and the linking functionality of the holochain DHT allows us to travel "down" the tree
 /// after at least one DHT participant has followed the path "up".
+/// Note that the `Path` is not literally committed and/or linked from/to as
+/// base and target. For this the [ `PathEntry` ] exists, which achieves a
+/// constant size for the DHT representation of each node of the `Path`.
 #[derive(
     Clone, Debug, PartialEq, Default, serde::Deserialize, serde::Serialize, SerializedBytes,
 )]
@@ -158,6 +163,21 @@ entry_def!(Path EntryDef {
     required_validation_type: RequiredValidationType::default(),
 });
 
+/// A [ `PathEntry` ] is the hash of a [ `Path` ] and the [ `DHT_PREFIX` ].
+/// This is what is committed and shared on the DHT to build links off as their
+/// base and target. If we committed the `Path` directly then the size of each
+/// node entry content would be the size of all the components of the path.
+/// Given that `ensure` populates all the ancestor nodes committing [ A, B, C ]
+/// would create entries with content [ A ], [ A, B ], [ A, B, C ]. For deep
+/// paths, or paths with a large component (in bytes) at any node, this would
+/// create a lot of redundant data in every descendent entry.
+/// Instead, we commit a `PathEntry` so each node is constant size, just the
+/// hash of the full `Path` up to that point. This means that committing
+/// `PathEntry` instead of `Path` for `[A, B, C]` results in entries with
+/// content [ HashA ], [ HashAB ], [ HashABC ]. Note that if A + B + C is much
+/// less than the size of a holochain hash (~40 bytes) then this approach is
+/// worse than simply committing the `Path` but in practise this is often not
+/// the case, and `PathEntry` becomes a more scalable generalised solution.
 #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize, SerializedBytes)]
 pub struct PathEntry([u8; 1], EntryHash);
 
@@ -314,7 +334,7 @@ impl Path {
         }
     }
 
-    /// Touch and list all the links from this anchor to anchors below it.
+    /// Touch and list all the links from this path to paths below it.
     /// Only returns links between paths, not to other entries that might have their own links.
     pub fn children(&self) -> ExternResult<Vec<holochain_zome_types::link::Link>> {
         Self::ensure(self)?;
@@ -328,6 +348,13 @@ impl Path {
         Ok(unwrapped)
     }
 
+    /// Touch and list all the links from this path to paths below it.
+    /// Same as `Path::children` but returns `Vec<Path>` rather than `Vec<Link>`.
+    /// This is more than just a convenience. In general it's not possible to
+    /// construct a full `Path` from a child `Link` alone as only a single
+    /// `Component` is encoded into the link tag. To build a full child path
+    /// the parent path + child link must be combined, which this function does
+    /// to produce each child, by using `&self` as that parent.
     pub fn children_paths(&self) -> ExternResult<Vec<Self>> {
         let children = self.children()?;
         let components: ExternResult<Vec<Option<Component>>> = children
@@ -365,10 +392,14 @@ impl Path {
         )
     }
 
+    /// Mutate this `Path` into a child of itself by appending a `Component`.
     pub fn append_component(&mut self, component: Component) {
         self.0.push(component);
     }
 
+    /// Accessor for the last `Component` of this `Path`.
+    /// This can be thought of as the leaf of the implied tree structure of
+    /// which this `Path` is one branch of.
     pub fn leaf(&self) -> Option<&Component> {
         self.0.last()
     }
