@@ -162,12 +162,28 @@ fn hash_path_root() {
 #[cfg(test)]
 #[test]
 fn hash_path_anchor_path() {
-    for (atype, text, path_string) in vec![
-        ("foo", None, "hdkanchor.foo"),
-        ("foo", Some("bar".to_string()), "hdkanchor.foo.bar"),
-    ] {
+    let examples = [
+        (
+            "foo",
+            None,
+            Path::from(vec![
+                Component::from(vec![0, 0]),
+                Component::from(vec![102, 111, 111]),
+            ]),
+        ),
+        (
+            "foo",
+            Some("bar".to_string()),
+            Path::from(vec![
+                Component::from(vec![0, 0]),
+                Component::from(vec![102, 111, 111]),
+                Component::from(vec![98, 97, 114]),
+            ]),
+        ),
+    ];
+    for (atype, text, path) in examples {
         assert_eq!(
-            Path::from(path_string),
+            path,
             (&Anchor {
                 anchor_type: atype.to_string(),
                 anchor_text: text,
@@ -198,12 +214,9 @@ fn hash_path_anchor_entry_def() {
 #[test]
 fn hash_path_anchor_from_path() {
     let path = Path::from(vec![
-        Component::from(vec![
-            104, 0, 0, 0, 100, 0, 0, 0, 107, 0, 0, 0, 97, 0, 0, 0, 110, 0, 0, 0, 99, 0, 0, 0, 104,
-            0, 0, 0, 111, 0, 0, 0, 114, 0, 0, 0,
-        ]),
-        Component::from(vec![102, 0, 0, 0, 111, 0, 0, 0, 111, 0, 0, 0]),
-        Component::from(vec![98, 0, 0, 0, 97, 0, 0, 0, 114, 0, 0, 0]),
+        Component::from(vec![0, 0]),
+        Component::from(vec![102, 111, 111]),
+        Component::from(vec![98, 97, 114]),
     ]);
 
     assert_eq!(
