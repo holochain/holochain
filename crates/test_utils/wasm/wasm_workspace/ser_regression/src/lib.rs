@@ -40,7 +40,7 @@ fn create_channel(name: String) -> ExternResult<EntryHash> {
     let sb: SerializedBytes = channel_hash.clone().try_into().unwrap();
     create_entry(&channel)?;
     debug!("sb in channel {:?}", sb);
-    create_link(hash_entry(&path)?, channel_hash.clone(), ())?;
+    create_link(path.path_entry_hash()?, channel_hash.clone(), ())?;
     Ok(channel_hash)
 }
 
