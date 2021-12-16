@@ -5,6 +5,7 @@ use holochain_wasmer_host::prelude::WasmError;
 use ring::rand::SecureRandom;
 use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
+use crate::core::ribosome::RibosomeError;
 
 /// return n crypto secure random bytes from the standard holochain crypto lib
 pub fn random_bytes(
@@ -22,7 +23,11 @@ pub fn random_bytes(
 
             Ok(Bytes::from(bytes))
         },
-        _ => unreachable!(),
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "random_bytes".into()
+        ).to_string()))
     }
 }
 
