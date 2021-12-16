@@ -106,7 +106,7 @@ arbitrary = { version = "1.0", features = ["derive"] }
 serde = { version = "1.0", features = [ "derive" ] }
 serde_json = { version = "1.0.51" }
 toml = "0.5.6"
-chrono = "0.4.6"
+chrono = { version = "0.4.6", features = [ "serde" ] }
 hostname = "0.3.1"
 
 [[bench]]
