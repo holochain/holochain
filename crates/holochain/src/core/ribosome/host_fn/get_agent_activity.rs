@@ -6,6 +6,7 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
+use crate::core::ribosome::RibosomeError;
 
 pub fn get_agent_activity(
     _ribosome: Arc<impl RibosomeT>,
@@ -32,22 +33,26 @@ pub fn get_agent_activity(
                 },
             };
 
-    // Get the network from the context
-    let network = call_context.host_context.network().clone();
+        // Get the network from the context
+        let network = call_context.host_context.network().clone();
 
-    // timeouts must be handled by the network
-    tokio_helper::block_forever_on(async move {
-        let workspace = call_context.host_context.workspace();
-        let mut cascade = Cascade::from_workspace_network(&workspace, network);
-        let activity = cascade
-            .get_agent_activity(agent_pubkey, chain_query_filter, options)
-            .await
-            .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
+        // timeouts must be handled by the network
+        tokio_helper::block_forever_on(async move {
+            let workspace = call_context.host_context.workspace();
+            let mut cascade = Cascade::from_workspace_network(&workspace, network);
+            let activity = cascade
+                .get_agent_activity(agent_pubkey, chain_query_filter, options)
+                .await
+                .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
 
-                Ok(activity.into())
-            })
+                    Ok(activity.into())
+                })
         },
-        _ => unreachable!(),
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "get_agent_activity".into()
+        ).to_string()))
     }
 }
 
