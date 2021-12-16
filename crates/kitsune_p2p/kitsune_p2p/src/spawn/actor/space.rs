@@ -1049,7 +1049,8 @@ impl Space {
         parallel_notify_permit: Arc<tokio::sync::Semaphore>,
     ) -> Self {
         let metrics = MetricsSync::default();
-        let metric_exchange = MetricExchangeSync::spawn(metrics.clone());
+        let metric_exchange =
+            MetricExchangeSync::spawn(space.clone(), evt_sender.clone(), metrics.clone());
 
         let gossip_mod = config
             .tuning_params
