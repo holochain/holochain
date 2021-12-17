@@ -8,6 +8,7 @@ use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
 use holochain_p2p::event::GetRequest;
+use crate::core::ribosome::RibosomeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn must_get_header<'a>(
@@ -23,7 +24,7 @@ pub fn must_get_header<'a>(
             // timeouts must be handled by the network
             tokio_helper::block_forever_on(async move {
                 let workspace = call_context.host_context.workspace();
-                let mut cascade = Cascade::from_workspace_network(workspace, network);
+                let mut cascade = Cascade::from_workspace_network(&workspace, network);
                 match cascade
                     .retrieve_header(header_hash.clone(),
                     // Set every GetOptions manually here.
@@ -85,6 +86,10 @@ pub fn must_get_header<'a>(
                     }
             })
         },
-        _ => unreachable!(),
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "must_get_header".into()
+        ).to_string()))
     }
 }

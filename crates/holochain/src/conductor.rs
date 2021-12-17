@@ -11,7 +11,7 @@
 
 #![deny(missing_docs)]
 
-// TODO: clean up allows once parent is fully documented
+// TODO: clean up allow(missing_docs) once parent is fully documented
 
 pub mod api;
 mod cell;
@@ -32,6 +32,7 @@ pub mod manager;
 pub mod p2p_agent_store;
 pub mod p2p_metrics;
 pub mod paths;
+pub mod space;
 pub mod state;
 
 pub use cell::error::CellError;

@@ -1,11 +1,12 @@
 use crate::core::ribosome::CallContext;
+use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCall;
+use futures::future::join_all;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
+use crate::core::ribosome::RibosomeError;
 use std::sync::Arc;
-use crate::core::ribosome::HostFnAccess;
-use futures::future::join_all;
 
 pub fn call(
     _ribosome: Arc<impl RibosomeT>,
@@ -13,10 +14,13 @@ pub fn call(
     inputs: Vec<Call>,
 ) -> Result<Vec<ZomeCallResponse>, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
-        HostFnAccess{ write_workspace: Permission::Allow, .. } => {
-            let results: Vec<Result<Result<ZomeCallResponse, _>, _>> = tokio_helper::block_forever_on(async move {
-                join_all(inputs.into_iter().map(|input| {
-                    async {
+        HostFnAccess {
+            write_workspace: Permission::Allow,
+            ..
+        } => {
+            let results: Vec<Result<Result<ZomeCallResponse, _>, _>> =
+                tokio_helper::block_forever_on(async move {
+                    join_all(inputs.into_iter().map(|input| async {
                         let Call {
                             to_cell,
                             zome_name,
@@ -25,7 +29,13 @@ pub fn call(
                             payload,
                             provenance,
                         } = input;
-                        let cell_id = to_cell.unwrap_or_else(|| call_context.host_context().call_zome_handle().cell_id().clone());
+                        let cell_id = to_cell.unwrap_or_else(|| {
+                            call_context
+                                .host_context()
+                                .call_zome_handle()
+                                .cell_id()
+                                .clone()
+                        });
                         let invocation = ZomeCall {
                             cell_id,
                             zome_name,
@@ -34,23 +44,41 @@ pub fn call(
                             cap_secret,
                             provenance,
                         };
-                        call_context.host_context().call_zome_handle().call_zome(
-                            invocation,
-                            call_context.host_context().workspace().clone()
-                        ).await
+                        call_context
+                            .host_context()
+                            .call_zome_handle()
+                            .call_zome(
+                                invocation,
+                                call_context
+                                    .host_context()
+                                    .workspace_write()
+                                    .clone()
+                                    .try_into()
+                                    .expect("Must have source chain to make zome call"),
+                            )
+                            .await
+                    }))
+                    .await
+                });
+            let results: Result<Vec<_>, _> = results
+                .into_iter()
+                .map(|result| match result {
+                    Ok(v) => match v {
+                        Ok(v) => Ok(v),
+                        Err(ribosome_error) => Err(WasmError::Host(ribosome_error.to_string())),
+                    },
+                    Err(conductor_api_error) => {
+                        Err(WasmError::Host(conductor_api_error.to_string()))
                     }
-                })).await
-            });
-            let results: Result<Vec<_>, _> = results.into_iter().map(|result| match result {
-                Ok(v) => match v {
-                    Ok(v) => Ok(v),
-                    Err(ribosome_error) => Err(WasmError::Host(ribosome_error.to_string())),
-                },
-                Err(conductor_api_error) => Err(WasmError::Host(conductor_api_error.to_string())),
-            }).collect();
+                })
+                .collect();
             Ok(results?)
-        },
-        _ => unreachable!(),
+        }
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "call".into()
+        ).to_string()))
     }
 }
 
@@ -160,9 +188,9 @@ pub mod wasm_test {
                 .unwrap();
 
         // Check alice's source chain contains the new value
-        let has_hash: bool = fresh_reader_test(alice_call_data.env.clone(), |txn| {
+        let has_hash: bool = fresh_reader_test(alice_call_data.authored_env.clone(), |txn| {
             txn.query_row(
-                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE header_hash = :hash AND is_authored = 1)",
+                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE header_hash = :hash)",
                 named_params! {
                     ":hash": header_hash
                 },
@@ -209,9 +237,9 @@ pub mod wasm_test {
                 .unwrap();
 
         // Check alice's source chain contains the new value
-        let has_hash: bool = fresh_reader_test(alice_call_data.env.clone(), |txn| {
+        let has_hash: bool = fresh_reader_test(alice_call_data.authored_env.clone(), |txn| {
             txn.query_row(
-                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE header_hash = :hash AND is_authored = 1)",
+                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE header_hash = :hash)",
                 named_params! {
                     ":hash": header_hash
                 },

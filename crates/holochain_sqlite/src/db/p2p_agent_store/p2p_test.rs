@@ -32,7 +32,11 @@ fn rand_signed_at_ms() -> u64 {
     now - rng.gen_range(1000, 2000)
 }
 
-async fn rand_insert(db: &DbWrite, space: &Arc<KitsuneSpace>, agent: &Arc<KitsuneAgent>) {
+async fn rand_insert(
+    db: &DbWrite<DbKindP2pAgentStore>,
+    space: &Arc<KitsuneSpace>,
+    agent: &Arc<KitsuneAgent>,
+) {
     let mut rng = rand::thread_rng();
 
     let signed_at_ms = rand_signed_at_ms();
@@ -66,7 +70,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
 
     let space = rand_space();
 
-    let db = DbWrite::test(&tmp_dir, DbKind::P2pAgentStore(space.clone())).unwrap();
+    let db = DbWrite::test(&tmp_dir, DbKindP2pAgentStore(space.clone())).unwrap();
 
     let mut example_agent = rand_agent();
 
@@ -79,7 +83,8 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
         }
     }
 
-    let mut con = db.connection_pooled().unwrap();
+    let permit = db.conn_permit().await;
+    let mut con = db.from_permit(permit).unwrap();
 
     // check that we only get 20 results
     let all = con.p2p_list_agents().unwrap();
@@ -132,7 +137,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
             DhtArc::new(0, u32::MAX / 4).interval().into(),
         )
         .unwrap();
-    // TODO - not sure this is right with <= num_nonzero... but it breaks
+    // NOTE - not sure this is right with <= num_nonzero... but it breaks
     //        sometimes if we just use '<'
     assert!(all.len() > 0 && all.len() <= num_nonzero);
 

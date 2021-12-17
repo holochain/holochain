@@ -7,6 +7,7 @@ use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
 use futures::future::join_all;
+use crate::core::ribosome::RibosomeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_links<'a>(
@@ -32,7 +33,7 @@ pub fn get_links<'a>(
                             tag: tag_prefix,
                         };
                         Cascade::from_workspace_network(
-                            call_context.host_context.workspace(),
+                            &call_context.host_context.workspace(),
                             call_context.host_context.network().to_owned(),
                         ).dht_get_links(key, GetLinksOptions::default()).await
                     }
@@ -47,7 +48,11 @@ pub fn get_links<'a>(
             ).collect();
             Ok(results?)
         },
-        _ => unreachable!(),
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "get_links".into()
+        ).to_string()))
     }
 }
 
@@ -327,7 +332,7 @@ pub mod slow_tests {
         // Plus one length path for the commit existing.
         expected_count += WaitOps::ENTRY + WaitOps::LINK;
 
-        wait_for_integration_1m(&alice_call_data.env, expected_count).await;
+        wait_for_integration_1m(&alice_call_data.dht_env, expected_count).await;
 
         let invocation = new_zome_call(
             &alice_call_data.cell_id,

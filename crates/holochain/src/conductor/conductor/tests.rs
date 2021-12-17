@@ -27,7 +27,7 @@ use matches::assert_matches;
 async fn can_update_state() {
     let envs = test_environments();
     let dna_store = MockDnaStore::new();
-    let keystore = envs.conductor().keystore().clone();
+    let keystore = envs.keystore().clone();
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
@@ -38,7 +38,7 @@ async fn can_update_state() {
         keystore,
         envs.path().to_path_buf().into(),
         holochain_p2p,
-        DbSyncLevel::default(),
+        DbSyncStrategy::default(),
         post_commit_sender,
     )
     .await
@@ -70,7 +70,7 @@ async fn can_update_state() {
 #[tokio::test(flavor = "multi_thread")]
 async fn can_add_clone_cell_to_app() {
     let envs = test_environments();
-    let keystore = envs.conductor().keystore().clone();
+    let keystore = envs.keystore().clone();
     let holochain_p2p = holochain_p2p::stub_network().await;
 
     let agent = fixt!(AgentPubKey);
@@ -87,7 +87,7 @@ async fn can_add_clone_cell_to_app() {
         keystore,
         envs.path().to_path_buf().into(),
         holochain_p2p,
-        DbSyncLevel::default(),
+        DbSyncStrategy::default(),
         post_commit_sender,
     )
     .await
@@ -162,7 +162,7 @@ async fn app_ids_are_unique() {
         environments.keystore().clone(),
         environments.path().to_path_buf().into(),
         holochain_p2p,
-        DbSyncLevel::default(),
+        DbSyncStrategy::default(),
         post_commit_sender,
     )
     .await
@@ -581,7 +581,6 @@ async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
         .await
         .unwrap();
 
-    // TODO: match the errors more tightly
     assert_matches!(response, AdminResponse::Error(_));
     let response = make_signing_call(&mut app_client, &cell2).await;
 
@@ -793,14 +792,13 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
     );
 }
 
-// TODO: we need a test with a failure during a validation callback that happens
-//       *inline*. It's not enough to have a failing validate_create_entry for
-//       instance, because that failure will be returned by the zome call.
-//
 // NB: currently the pre-genesis and post-genesis handling of panics is the same.
 //   If we implement [ B-04188 ], then this test will be made more possible.
 //   Otherwise, we have to devise a way to discover whether a panic happened
 //   during genesis or not.
+// NOTE: we need a test with a failure during a validation callback that happens
+//       *inline*. It's not enough to have a failing validate_create_entry for
+//       instance, because that failure will be returned by the zome call.
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "need to figure out how to write this test"]
 async fn test_apps_disable_on_panic_after_genesis() {

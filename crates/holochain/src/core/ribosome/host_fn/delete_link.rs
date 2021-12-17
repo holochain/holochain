@@ -1,12 +1,12 @@
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::CallContext;
+use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeT;
 use holochain_cascade::error::CascadeResult;
 use holochain_cascade::Cascade;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
-use crate::core::ribosome::HostFnAccess;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn delete_link<'a>(
@@ -15,8 +15,14 @@ pub fn delete_link<'a>(
     input: DeleteLinkInput,
 ) -> Result<HeaderHash, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
-        HostFnAccess{ write_workspace: Permission::Allow, .. } => {
-            let DeleteLinkInput { address, chain_top_ordering } = input;
+        HostFnAccess {
+            write_workspace: Permission::Allow,
+            ..
+        } => {
+            let DeleteLinkInput {
+                address,
+                chain_top_ordering,
+            } = input;
             // get the base address from the add link header
             // don't allow the wasm developer to get this wrong
             // it is never valid to have divergent base address for add/remove links
@@ -27,21 +33,24 @@ pub fn delete_link<'a>(
 
             // handle timeouts at the network layer
             let address_2 = address.clone();
-            let maybe_add_link: Option<SignedHeaderHashed> = tokio_helper::block_forever_on(async move {
-                let workspace = call_context_2.host_context.workspace();
-                CascadeResult::Ok(
-                    Cascade::from_workspace_network(workspace, network)
-                        .dht_get(address_2.into(), GetOptions::content())
-                        .await?
-                        .map(|el| el.into_inner().0),
-                )
-            })
-            .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
+            let maybe_add_link: Option<SignedHeaderHashed> =
+                tokio_helper::block_forever_on(async move {
+                    let workspace = call_context_2.host_context.workspace();
+                    CascadeResult::Ok(
+                        Cascade::from_workspace_network(&workspace, network)
+                            .dht_get(address_2.into(), GetOptions::content())
+                            .await?
+                            .map(|el| el.into_inner().0),
+                    )
+                })
+                .map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))?;
 
             let base_address = match maybe_add_link {
                 Some(add_link_signed_header_hash) => {
                     match add_link_signed_header_hash.header() {
-                        Header::CreateLink(link_add_header) => Ok(link_add_header.base_address.clone()),
+                        Header::CreateLink(link_add_header) => {
+                            Ok(link_add_header.base_address.clone())
+                        }
                         // the add link header hash provided was found but didn't point to an AddLink
                         // header (it is something else) so we cannot proceed
                         _ => Err(RibosomeError::ElementDeps(address.clone().into())),
@@ -56,7 +65,12 @@ pub fn delete_link<'a>(
             }
             .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?;
 
-            let source_chain = call_context.host_context.workspace().source_chain();
+            let source_chain = call_context
+                .host_context
+                .workspace_write()
+                .source_chain()
+                .as_ref()
+                .expect("Must have source chain if write_workspace access is given");
             let zome = call_context.zome.clone();
 
             // handle timeouts at the source chain layer
@@ -70,11 +84,17 @@ pub fn delete_link<'a>(
                 let header_hash = source_chain
                     .put(Some(zome), header_builder, None, chain_top_ordering)
                     .await
-                    .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
+                    .map_err(|source_chain_error| {
+                        WasmError::Host(source_chain_error.to_string())
+                    })?;
                 Ok(header_hash)
             })
-        },
-        _ => unreachable!(),
+        }
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "delete_link".into()
+        ).to_string()))
     }
 }
 
@@ -110,7 +130,8 @@ pub mod slow_tests {
 
         // remove a link
         let _: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Link, "delete_link", link_one).unwrap();
+            crate::call_test_ribosome!(host_access, TestWasm::Link, "delete_link", link_one)
+                .unwrap();
 
         let links: Vec<Link> = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
 
@@ -118,7 +139,8 @@ pub mod slow_tests {
 
         // remove a link
         let _: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Link, "delete_link", link_two).unwrap();
+            crate::call_test_ribosome!(host_access, TestWasm::Link, "delete_link", link_two)
+                .unwrap();
 
         let links: Vec<Link> = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();
 
@@ -134,7 +156,8 @@ pub mod slow_tests {
 
         assert!(links.len() == 2);
 
-        let _: () = crate::call_test_ribosome!(host_access, TestWasm::Link, "delete_all_links", ()).unwrap();
+        let _: () = crate::call_test_ribosome!(host_access, TestWasm::Link, "delete_all_links", ())
+            .unwrap();
 
         // Should be no links left
         let links: Vec<Link> = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ()).unwrap();

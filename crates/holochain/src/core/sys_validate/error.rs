@@ -36,9 +36,9 @@ pub enum SysValidationError {
     KeystoreError(#[from] KeystoreError),
     #[error(transparent)]
     SourceChainError(#[from] SourceChainError),
-    #[error("Dna is missing for this cell {0:?}. Cannot validate without dna.")]
-    DnaMissing(CellId),
-    // TODO: Remove this when SysValidationResult is replace with SysValidationOutcome
+    #[error("Dna is missing for this hash {0:?}. Cannot validate without dna.")]
+    DnaMissing(DnaHash),
+    // NOTE: can remove this if SysValidationResult is replaced with SysValidationOutcome
     #[error(transparent)]
     ValidationOutcome(#[from] ValidationOutcome),
     #[error(transparent)]

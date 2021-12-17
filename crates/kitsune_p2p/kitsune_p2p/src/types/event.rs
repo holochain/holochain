@@ -12,8 +12,8 @@ use std::{collections::HashSet, sync::Arc, time::SystemTime};
 pub struct QueryOpHashesEvt {
     /// The "space" context.
     pub space: KSpace,
-    /// The agents from which to fetch, along with a DhtArcSet to filter by.
-    pub agents: Vec<(KAgent, DhtArcSet)>,
+    /// The DhtArcSet to filter by.
+    pub arc_set: DhtArcSet,
     /// The time window to search within.
     pub window: TimeWindow,
     /// Maximum number of ops to return.
@@ -27,8 +27,6 @@ pub struct QueryOpHashesEvt {
 pub struct FetchOpDataEvt {
     /// The "space" context.
     pub space: KSpace,
-    /// The "agent" context.
-    pub agents: Vec<KAgent>,
     /// The op-hashes to fetch
     pub op_hashes: Vec<KOpHash>,
 }
@@ -197,12 +195,18 @@ pub enum MetricQueryAnswer {
     Oldest(Option<KAgent>),
 }
 
-/// A range of timestamps, measured in milliseconds
+/// An exclusive range of timestamps, measured in microseconds
 pub type TimeWindow = std::ops::Range<Timestamp>;
+/// An inclusive range of timestamps, measured in microseconds
+pub type TimeWindowInclusive = std::ops::RangeInclusive<Timestamp>;
 
 /// A time window which covers all of recordable time
 pub fn full_time_window() -> TimeWindow {
     Timestamp::MIN..Timestamp::MAX
+}
+/// A time window which inclusively covers all of recordable time
+pub fn full_time_window_inclusive() -> TimeWindowInclusive {
+    Timestamp::MIN..=Timestamp::MAX
 }
 type KSpace = Arc<super::KitsuneSpace>;
 type KAgent = Arc<super::KitsuneAgent>;
@@ -233,18 +237,18 @@ ghost_actor::ghost_chan! {
         fn query_metrics(query: MetricQuery) -> MetricQueryAnswer;
 
         /// We are receiving a request from a remote node.
-        fn call(space: KSpace, to_agent: KAgent, from_agent: KAgent, payload: Payload) -> Vec<u8>;
+        fn call(space: KSpace, to_agent: KAgent, payload: Payload) -> Vec<u8>;
 
         /// We are receiving a notification from a remote node.
-        fn notify(space: KSpace, to_agent: KAgent, from_agent: KAgent, payload: Payload) -> ();
+        fn notify(space: KSpace, to_agent: KAgent, payload: Payload) -> ();
 
         /// We are receiving a dht op we may need to hold distributed via gossip.
-        fn gossip(space: KSpace, to_agent: KAgent, ops: Ops) -> ();
+        fn gossip(space: KSpace, ops: Ops) -> ();
 
         /// Gather a list of op-hashes from our implementor that meet criteria.
         /// Get the oldest and newest times for ops within a time window and max number of ops.
         // maackle: do we really need to *individually* wrap all these op hashes in Arcs?
-        fn query_op_hashes(input: QueryOpHashesEvt) -> Option<(Vec<KOpHash>, TimeWindow)>;
+        fn query_op_hashes(input: QueryOpHashesEvt) -> Option<(Vec<KOpHash>, TimeWindowInclusive)>;
 
         /// Gather all op-hash data for a list of op-hashes from our implementor.
         fn fetch_op_data(input: FetchOpDataEvt) -> Vec<(KOpHash, Vec<u8>)>;

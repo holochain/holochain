@@ -1,8 +1,9 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use std::sync::Arc;
-use holochain_wasmer_host::prelude::WasmError;
 use holochain_types::prelude::*;
+use holochain_wasmer_host::prelude::WasmError;
+use std::sync::Arc;
+use crate::core::ribosome::RibosomeError;
 
 pub fn schedule(
     _ribosome: Arc<impl RibosomeT>,
@@ -10,31 +11,49 @@ pub fn schedule(
     input: String,
 ) -> Result<(), WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
-        HostFnAccess{ write_workspace: Permission::Allow, .. } => {
-            call_context.host_context().workspace().source_chain().scratch().apply(|scratch| {
-                scratch.add_scheduled_fn(ScheduledFn::new(call_context.zome.zome_name().clone(), input.into()));
-            }).map_err(|e| WasmError::Host(e.to_string()))?;
+        HostFnAccess {
+            write_workspace: Permission::Allow,
+            ..
+        } => {
+            call_context
+                .host_context()
+                .workspace_write()
+                .source_chain()
+                .as_ref()
+                .expect("Must have source chain if write_workspace access is given")
+                .scratch()
+                .apply(|scratch| {
+                    scratch.add_scheduled_fn(ScheduledFn::new(
+                        call_context.zome.zome_name().clone(),
+                        input.into(),
+                    ));
+                })
+                .map_err(|e| WasmError::Host(e.to_string()))?;
             Ok(())
-        },
-        _ => unreachable!(),
+        }
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "schedule".into()
+        ).to_string()))
     }
 }
 
 #[cfg(test)]
 pub mod tests {
-    use ::fixt::prelude::*;
-    use holochain_wasm_test_utils::TestWasm;
-    use crate::sweettest::SweetDnaFile;
-    use holochain_types::prelude::AgentPubKeyFixturator;
-    use crate::core::ribosome::MockDnaStore;
-    use hdk::prelude::*;
-    use crate::sweettest::SweetConductor;
     use crate::conductor::ConductorBuilder;
-    use holochain_state::schedule::fn_is_scheduled;
+    use crate::core::ribosome::MockDnaStore;
+    use crate::sweettest::SweetConductor;
+    use crate::sweettest::SweetDnaFile;
+    use ::fixt::prelude::*;
+    use hdk::prelude::*;
     use holochain_state::prelude::schedule_fn;
-    use rusqlite::Transaction;
     use holochain_state::prelude::*;
+    use holochain_state::schedule::fn_is_scheduled;
     use holochain_state::schedule::live_scheduled_fns;
+    use holochain_types::prelude::AgentPubKeyFixturator;
+    use holochain_wasm_test_utils::TestWasm;
+    use rusqlite::Transaction;
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "test_utils")]
@@ -62,82 +81,100 @@ pub mod tests {
             SweetConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
 
         let _apps = conductor
-        .setup_app_for_agents(
-            "app-",
-            &[alice_pubkey.clone(), bob_pubkey.clone()],
-            &[dna_file.into()],
-        )
-        .await
-        .unwrap();
+            .setup_app_for_agents(
+                "app-",
+                &[alice_pubkey.clone(), bob_pubkey.clone()],
+                &[dna_file.into()],
+            )
+            .await
+            .unwrap();
 
         let cell_id = conductor.handle().list_cell_ids(None)[0].clone();
-        let cell_env = conductor.handle().get_cell_env(&cell_id).unwrap();
+        let cell_env = conductor
+            .handle()
+            .get_authored_env(cell_id.dna_hash())
+            .unwrap();
+        let author = cell_id.agent_pubkey().clone();
 
-        cell_env.async_commit(move |txn: &mut Transaction| {
-            let now = Timestamp::now();
-            let the_past = (now - std::time::Duration::from_millis(1)).unwrap();
-            let the_future = (now + std::time::Duration::from_millis(1000)).unwrap();
-            let the_distant_future = (now + std::time::Duration::from_millis(2000)).unwrap();
+        cell_env
+            .async_commit(move |txn: &mut Transaction| {
+                let now = Timestamp::now();
+                let the_past = (now - std::time::Duration::from_millis(1)).unwrap();
+                let the_future = (now + std::time::Duration::from_millis(1000)).unwrap();
+                let the_distant_future = (now + std::time::Duration::from_millis(2000)).unwrap();
 
-            let ephemeral_scheduled_fn = ScheduledFn::new("foo".into(), "bar".into());
-            let persisted_scheduled_fn = ScheduledFn::new("1".into(), "2".into());
-            let persisted_schedule = Schedule::Persisted("* * * * * * * ".into());
+                let ephemeral_scheduled_fn = ScheduledFn::new("foo".into(), "bar".into());
+                let persisted_scheduled_fn = ScheduledFn::new("1".into(), "2".into());
+                let persisted_schedule = Schedule::Persisted("* * * * * * * ".into());
 
-            schedule_fn(txn, persisted_scheduled_fn.clone(), Some(persisted_schedule.clone()), now).unwrap();
-            schedule_fn(txn, ephemeral_scheduled_fn.clone(), None, now).unwrap();
+                schedule_fn(
+                    txn,
+                    &author,
+                    persisted_scheduled_fn.clone(),
+                    Some(persisted_schedule.clone()),
+                    now,
+                )
+                .unwrap();
+                schedule_fn(txn, &author, ephemeral_scheduled_fn.clone(), None, now).unwrap();
 
-            assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone()).unwrap());
-            assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone()).unwrap());
+                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &author).unwrap());
+                assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &author).unwrap());
 
-            // Deleting live ephemeral scheduled fns from now should delete.
-            delete_live_ephemeral_scheduled_fns(txn, now).unwrap();
-            assert!(!fn_is_scheduled(txn, ephemeral_scheduled_fn.clone()).unwrap());
-            assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone()).unwrap());
+                // Deleting live ephemeral scheduled fns from now should delete.
+                delete_live_ephemeral_scheduled_fns(txn, now, &author).unwrap();
+                assert!(!fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &author,).unwrap());
+                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &author,).unwrap());
 
-            schedule_fn(txn, ephemeral_scheduled_fn.clone(), None, now).unwrap();
-            assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone()).unwrap());
-            assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone()).unwrap());
+                schedule_fn(txn, &author, ephemeral_scheduled_fn.clone(), None, now).unwrap();
+                assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &author,).unwrap());
+                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &author,).unwrap());
 
-            // Deleting live ephemeral fns from a past time should do nothing.
-            delete_live_ephemeral_scheduled_fns(txn, the_past).unwrap();
-            assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone()).unwrap());
-            assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone()).unwrap());
+                // Deleting live ephemeral fns from a past time should do nothing.
+                delete_live_ephemeral_scheduled_fns(txn, the_past, &author).unwrap();
+                assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &author,).unwrap());
+                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &author,).unwrap());
 
-            // Deleting live ephemeral fns from the future should delete.
-            delete_live_ephemeral_scheduled_fns(txn, the_future).unwrap();
-            assert!(!fn_is_scheduled(txn, ephemeral_scheduled_fn.clone()).unwrap());
-            assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone()).unwrap());
+                // Deleting live ephemeral fns from the future should delete.
+                delete_live_ephemeral_scheduled_fns(txn, the_future, &author).unwrap();
+                assert!(!fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &author,).unwrap());
+                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &author,).unwrap());
 
-            // Deleting all ephemeral fns should delete.
-            schedule_fn(txn, ephemeral_scheduled_fn.clone(), None, now).unwrap();
-            assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone()).unwrap());
-            delete_all_ephemeral_scheduled_fns(txn).unwrap();
-            assert!(!fn_is_scheduled(txn, ephemeral_scheduled_fn.clone()).unwrap());
-            assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone()).unwrap());
+                // Deleting all ephemeral fns should delete.
+                schedule_fn(txn, &author, ephemeral_scheduled_fn.clone(), None, now).unwrap();
+                assert!(fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &author,).unwrap());
+                delete_all_ephemeral_scheduled_fns(txn, &author).unwrap();
+                assert!(!fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &author,).unwrap());
+                assert!(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &author,).unwrap());
 
-            let ephemeral_future_schedule = Schedule::Ephemeral(std::time::Duration::from_millis(1001));
-            schedule_fn(
-                txn,
-                ephemeral_scheduled_fn.clone(),
-                Some(ephemeral_future_schedule.clone()),
-                now
-            ).unwrap();
-            assert_eq!(
-                vec![
-                    (persisted_scheduled_fn.clone(), Some(persisted_schedule.clone()))
-                ],
-                live_scheduled_fns(txn, the_future).unwrap(),
-            );
-            assert_eq!(
-                vec![
-                    (persisted_scheduled_fn, Some(persisted_schedule)),
-                    (ephemeral_scheduled_fn, Some(ephemeral_future_schedule)),
-                ],
-                live_scheduled_fns(txn, the_distant_future).unwrap(),
-            );
+                let ephemeral_future_schedule =
+                    Schedule::Ephemeral(std::time::Duration::from_millis(1001));
+                schedule_fn(
+                    txn,
+                    &author,
+                    ephemeral_scheduled_fn.clone(),
+                    Some(ephemeral_future_schedule.clone()),
+                    now,
+                )
+                .unwrap();
+                assert_eq!(
+                    vec![(
+                        persisted_scheduled_fn.clone(),
+                        Some(persisted_schedule.clone())
+                    )],
+                    live_scheduled_fns(txn, the_future, &author,).unwrap(),
+                );
+                assert_eq!(
+                    vec![
+                        (persisted_scheduled_fn, Some(persisted_schedule)),
+                        (ephemeral_scheduled_fn, Some(ephemeral_future_schedule)),
+                    ],
+                    live_scheduled_fns(txn, the_distant_future, &author,).unwrap(),
+                );
 
-            Result::<(), DatabaseError>::Ok(())
-        }).await.unwrap();
+                Result::<(), DatabaseError>::Ok(())
+            })
+            .await
+            .unwrap();
         Ok(())
     }
 
@@ -180,83 +217,43 @@ pub mod tests {
         let bobbo = bobbo.zome(TestWasm::Schedule);
 
         // Let's just drive alice to exhaust all ticks.
-        let _schedule: () = conductor
-            .call(
-                &alice,
-                "schedule",
-                ()
-            )
-            .await;
+        let _schedule: () = conductor.call(&alice, "schedule", ()).await;
         let mut i: usize = 0;
         while i < 10 {
             tokio::time::sleep(std::time::Duration::from_millis(2)).await;
             conductor.handle().dispatch_scheduled_fns().await;
             i = i + 1;
         }
-        let query_tick: Vec<Element> = conductor
-        .call(
-            &alice,
-            "query_tick",
-            ()
-        )
-        .await;
+        let query_tick: Vec<Element> = conductor.call(&alice, "query_tick", ()).await;
         assert_eq!(query_tick.len(), 5);
 
         // The persistent schedule should run once in second.
-        let query_tock: Vec<Element> = conductor
-            .call(
-                &alice,
-                "query_tock",
-                ()
-            ).await;
+        let query_tock: Vec<Element> = conductor.call(&alice, "query_tock", ()).await;
         assert!(query_tock.len() < 3);
 
         // If Bob does a few ticks and then calls `start_scheduler` the
         // ephemeral scheduled task will be flushed so the ticks will not be
         // exhaused until the function is rescheduled.
-        let _shedule: () = conductor
-            .call(
-                &bobbo,
-                "schedule",
-                ()
-            ).await;
+        let _shedule: () = conductor.call(&bobbo, "schedule", ()).await;
         conductor.handle().dispatch_scheduled_fns().await;
-        let query1: Vec<Element> = conductor
-            .call(
-                &bobbo,
-                "query_tick",
-                ()
-            ).await;
+        let query1: Vec<Element> = conductor.call(&bobbo, "query_tick", ()).await;
         assert_eq!(query1.len(), 1);
         conductor.handle().dispatch_scheduled_fns().await;
-        let query2: Vec<Element> = conductor
-            .call(
-                &bobbo,
-                "query_tick",
-                ()
-            ).await;
+        let query2: Vec<Element> = conductor.call(&bobbo, "query_tick", ()).await;
         assert_eq!(query2.len(), query1.len() + 1);
 
         // With a fast scheduler bob should clear everything out.
-        let _ = conductor.clone().start_scheduler(std::time::Duration::from_millis(1)).await;
+        let _ = conductor
+            .clone()
+            .start_scheduler(std::time::Duration::from_millis(1))
+            .await;
 
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        let q: Vec<Element> = conductor
-        .call(
-            &bobbo,
-            "query_tick",
-            ()
-        )
-        .await;
+        let q: Vec<Element> = conductor.call(&bobbo, "query_tick", ()).await;
         assert_eq!(q.len(), query2.len());
 
         // Rescheduling will allow bob catch up to alice.
-        let _shedule: () = conductor
-            .call(
-                &bobbo,
-                "schedule",
-                ()
-            ).await;
+        let _shedule: () = conductor.call(&bobbo, "schedule", ()).await;
 
         tokio::time::sleep(std::time::Duration::from_millis(150)).await;
         let q2: Vec<Element> = conductor

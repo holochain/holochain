@@ -4,6 +4,7 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
+use crate::core::ribosome::RibosomeError;
 
 pub fn x_25519_x_salsa20_poly1305_encrypt(
     _ribosome: Arc<impl RibosomeT>,
@@ -35,7 +36,11 @@ pub fn x_25519_x_salsa20_poly1305_encrypt(
             })
             .map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))
         },
-        _ => unreachable!(),
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "x_25519_x_salsa20_poly1305_encrypt".into()
+        ).to_string()))
     }
 }
 

@@ -24,12 +24,3 @@ pub mod test_utils;
 
 // Re-export rusqlite for use with `impl_to_sql_via_as_ref!` macro
 pub use ::rusqlite;
-
-#[macro_export]
-/// Macro to generate a fresh reader from an DbRead with less boilerplate
-macro_rules! fresh_reader {
-    ($env: expr, $f: expr) => {{
-        let mut conn = $env.conn()?;
-        $crate::db::ReadManager::with_reader(&mut conn, $f)
-    }};
-}

@@ -1,6 +1,5 @@
 SELECT
-  hash,
-  authored_timestamp
+  hash
 FROM
   DHtOp
 WHERE

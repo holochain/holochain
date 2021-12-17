@@ -588,27 +588,18 @@ impl RibosomeT for RealRibosome {
         host_access: ZomeCallHostAccess,
         invocation: ZomeCallInvocation,
     ) -> RibosomeResult<ZomeCallResponse> {
-        Ok(if invocation.is_authorized(&host_access)? {
-            // make a copy of these for the error handling below
-            let zome_name = invocation.zome.zome_name().clone();
-            let fn_name = invocation.fn_name.clone();
+        // make a copy of these for the error handling below
+        let zome_name = invocation.zome.zome_name().clone();
+        let fn_name = invocation.fn_name.clone();
 
-            let guest_output: ExternIO =
-                match self.call_iterator(host_access.into(), invocation).next() {
-                    Ok(Some((_zome, extern_io))) => extern_io,
-                    Ok(None) => return Err(RibosomeError::ZomeFnNotExists(zome_name, fn_name)),
-                    Err((_zome, ribosome_error)) => return Err(ribosome_error),
-                };
+        let guest_output: ExternIO = match self.call_iterator(host_access.into(), invocation).next()
+        {
+            Ok(Some((_zome, extern_io))) => extern_io,
+            Ok(None) => return Err(RibosomeError::ZomeFnNotExists(zome_name, fn_name)),
+            Err((_zome, ribosome_error)) => return Err(ribosome_error),
+        };
 
-            ZomeCallResponse::Ok(guest_output)
-        } else {
-            ZomeCallResponse::Unauthorized(
-                invocation.cell_id.clone(),
-                invocation.zome.zome_name().clone(),
-                invocation.fn_name.clone(),
-                invocation.provenance.clone(),
-            )
-        })
+        Ok(ZomeCallResponse::Ok(guest_output))
     }
 
     /// Post commit works a bit different to the other callbacks.
