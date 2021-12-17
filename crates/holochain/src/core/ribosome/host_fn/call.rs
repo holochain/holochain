@@ -5,6 +5,7 @@ use crate::core::ribosome::ZomeCall;
 use futures::future::join_all;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
+use crate::core::ribosome::RibosomeError;
 use std::sync::Arc;
 
 pub fn call(
@@ -73,7 +74,11 @@ pub fn call(
                 .collect();
             Ok(results?)
         }
-        _ => unreachable!(),
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "call".into()
+        ).to_string()))
     }
 }
 

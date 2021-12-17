@@ -4,6 +4,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeT;
 use holochain_wasmer_host::prelude::WasmError;
+use crate::core::ribosome::RibosomeError;
 
 use holochain_types::prelude::*;
 use std::sync::Arc;
@@ -112,7 +113,11 @@ pub fn update<'a>(
                 }
             }
         }
-        _ => unreachable!(),
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "update".into()
+        ).to_string()))
     }
 }
 

@@ -8,6 +8,7 @@ use ring::signature::Ed25519KeyPair;
 use ring::signature::KeyPair;
 use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
+use crate::core::ribosome::RibosomeError;
 
 pub fn sign_ephemeral(
     _ribosome: Arc<impl RibosomeT>,
@@ -34,7 +35,11 @@ pub fn sign_ephemeral(
                 key: AgentPubKey::from_raw_32(ephemeral_keypair.public_key().as_ref().to_vec()),
             })
         },
-        _ => unreachable!(),
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "sign_ephemeral".into()
+        ).to_string()))
     }
 
 }
