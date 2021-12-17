@@ -4,6 +4,7 @@
 use super::*;
 use crate::conductor::handle::ConductorHandleT;
 use crate::conductor::space::Space;
+use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use crate::core::sys_validate::check_and_hold_store_element;
@@ -54,9 +55,8 @@ pub async fn sys_validation_workflow(
     space: Arc<Space>,
     trigger_app_validation: TriggerSender,
     sys_validation_trigger: TriggerSender,
-    // TODO: Update HolochainP2p to reflect changes to pass through network.
     network: HolochainP2pDna,
-    conductor_handle: &dyn ConductorHandleT,
+    conductor_handle: ConductorHandle,
 ) -> WorkflowResult<WorkComplete> {
     let complete = sys_validation_workflow_inner(
         workspace,
@@ -79,48 +79,74 @@ async fn sys_validation_workflow_inner(
     workspace: Arc<SysValidationWorkspace>,
     space: Arc<Space>,
     network: HolochainP2pDna,
-    conductor_handle: &dyn ConductorHandleT,
+    conductor_handle: ConductorHandle,
     sys_validation_trigger: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     let env = workspace.dht_env.clone();
     let sorted_ops = validation_query::get_ops_to_sys_validate(&env).await?;
-    tracing::debug!("sys validating {} ops", sorted_ops.len());
+    let start_len = sorted_ops.len();
+    tracing::debug!("Validating {} ops", start_len);
+    let start = (start_len >= NUM_CONCURRENT_OPS).then(|| std::time::Instant::now());
+    let saturated = start.is_some();
 
     // Process each op
-    let iter = sorted_ops.into_iter().map(|so| {
-        // Create an incoming ops sender for any dependencies we find
-        // that we are meant to be holding but aren't.
-        // If we are not holding them they will be added to our incoming ops.
-        let incoming_dht_ops_sender =
-            IncomingDhtOpSender::new(space.clone(), sys_validation_trigger.clone());
-        let network = network.clone();
-        let workspace = workspace.clone();
-        async move {
-            let (op, op_hash) = so.into_inner();
-            let r = validate_op(
-                &op,
-                &(*workspace),
-                network,
-                conductor_handle,
-                Some(incoming_dht_ops_sender),
-            )
-            .await;
-            r.map(|o| (op_hash, o))
+    let iter = sorted_ops.into_iter().map({
+        let space = space.clone();
+        move |so| {
+            // Create an incoming ops sender for any dependencies we find
+            // that we are meant to be holding but aren't.
+            // If we are not holding them they will be added to our incoming ops.
+            let incoming_dht_ops_sender =
+                IncomingDhtOpSender::new(space.clone(), sys_validation_trigger.clone());
+            let network = network.clone();
+            let workspace = workspace.clone();
+            let conductor_handle = conductor_handle.clone();
+            async move {
+                let (op, op_hash) = so.into_inner();
+                let op_type = op.get_type();
+                let dependency = get_dependency(op_type, &op.header());
+                let r = validate_op(
+                    &op,
+                    &(*workspace),
+                    network,
+                    conductor_handle.as_ref(),
+                    Some(incoming_dht_ops_sender),
+                )
+                .await;
+                r.map(|o| (op_hash, o, dependency))
+            }
         }
     });
     use futures::stream::StreamExt;
     let mut iter = futures::stream::iter(iter)
         .buffer_unordered(NUM_CONCURRENT_OPS)
-        .ready_chunks(NUM_CONCURRENT_OPS);
+        .ready_chunks(NUM_CONCURRENT_OPS * 100);
+    let (tx, rx) = tokio::sync::mpsc::channel(NUM_CONCURRENT_OPS * 100);
+    let jh = tokio::spawn(async move {
+        while let Some(op) = iter.next().await {
+            if let Err(_) = tx.send(op).await {
+                tracing::warn!("app validation task has failed to send ops. This is not a problem if the conductor is shutting down");
+                break;
+            }
+        }
+    });
+    let mut iter =
+        tokio_stream::wrappers::ReceiverStream::new(rx).ready_chunks(NUM_CONCURRENT_OPS * 100);
 
     let mut total = 0;
+    let mut round_time = start.is_some().then(|| std::time::Instant::now());
     while let Some(chunk) = iter.next().await {
-        let t = space
+        let num_ops: usize = chunk.iter().map(|c| c.len()).sum();
+        tracing::debug!("Committing {} ops", num_ops);
+        let (t, a, m, r) = space
             .dht_env
             .async_commit(move |mut txn| {
                 let mut total = 0;
-                for outcome in chunk {
-                    let (op_hash, outcome) = outcome?;
+                let mut awaiting = 0;
+                let mut missing = 0;
+                let mut rejected = 0;
+                for outcome in chunk.into_iter().flatten() {
+                    let (op_hash, outcome, dependency) = outcome?;
                     match outcome {
                         Outcome::Accepted => {
                             total += 1;
@@ -131,9 +157,15 @@ async fn sys_validation_workflow_inner(
                             )?;
                         }
                         Outcome::SkipAppValidation => {
-                            put_integration_limbo(&mut txn, op_hash, ValidationStatus::Valid)?;
+                            total += 1;
+                            if let Dependency::Null = dependency {
+                                put_integrated(&mut txn, op_hash, ValidationStatus::Valid)?;
+                            } else {
+                                put_integration_limbo(&mut txn, op_hash, ValidationStatus::Valid)?;
+                            }
                         }
                         Outcome::AwaitingOpDep(missing_dep) => {
+                            awaiting += 1;
                             // TODO: Try and get this dependency to add to limbo
                             //
                             // I actually can't see how we can do this because there's no
@@ -147,6 +179,7 @@ async fn sys_validation_workflow_inner(
                             put_validation_limbo(&mut txn, op_hash, status)?;
                         }
                         Outcome::MissingDhtDep => {
+                            missing += 1;
                             // TODO: Not sure what missing dht dep is. Check if we need this.
                             put_validation_limbo(
                                 &mut txn,
@@ -155,17 +188,44 @@ async fn sys_validation_workflow_inner(
                             )?;
                         }
                         Outcome::Rejected => {
-                            put_integration_limbo(&mut txn, op_hash, ValidationStatus::Rejected)?;
+                            rejected += 1;
+                            if let Dependency::Null = dependency {
+                                put_integrated(&mut txn, op_hash, ValidationStatus::Rejected)?;
+                            } else {
+                                put_integration_limbo(
+                                    &mut txn,
+                                    op_hash,
+                                    ValidationStatus::Rejected,
+                                )?;
+                            }
                         }
                     }
                 }
-                WorkflowResult::Ok(total)
+                WorkflowResult::Ok((total, awaiting, missing, rejected))
             })
             .await?;
         total += t;
+        if let (Some(start), Some(round_time)) = (start, &mut round_time) {
+            let round_el = round_time.elapsed();
+            *round_time = std::time::Instant::now();
+            let avg_ops_ps = total as f64 / start.elapsed().as_micros() as f64 * 1_000_000.0;
+            let ops_ps = t as f64 / round_el.as_micros() as f64 * 1_000_000.0;
+            tracing::info!(
+                "Sys validation is saturated. Util {:.2}%. OPS/s avg {:.2}, this round {:.2}",
+                (start_len - total) as f64 / NUM_CONCURRENT_OPS as f64 * 100.0,
+                avg_ops_ps,
+                ops_ps
+            );
+        }
+        tracing::debug!("{} committed, {} awaiting sys dep, {} missing dht dep, {} rejected. {} committed this round", t, a, m, r, total);
     }
-    tracing::debug!("accepted {} ops", total);
-    Ok(WorkComplete::Complete)
+    jh.await?;
+    tracing::debug!("Accepted {} ops", total);
+    Ok(if saturated {
+        WorkComplete::Incomplete
+    } else {
+        WorkComplete::Complete
+    })
 }
 
 async fn validate_op(
@@ -812,6 +872,7 @@ impl SysValidationWorkspace {
                     Header.seq = :seq
                     AND
                     Header.hash != :hash
+                    LIMIT 1
                 )
                 ",
                         named_params! {
@@ -851,11 +912,12 @@ impl SysValidationWorkspace {
         network: Network,
     ) -> Cascade<Network> {
         let cascade = Cascade::empty()
-            .with_authored(self.authored_env.clone())
             .with_dht(self.dht_env.clone())
             .with_network(network, self.cache.clone());
         match &self.scratch {
-            Some(scratch) => cascade.with_scratch(scratch.clone()),
+            Some(scratch) => cascade
+                .with_authored(self.authored_env.clone())
+                .with_scratch(scratch.clone()),
             None => cascade,
         }
     }
@@ -881,6 +943,19 @@ fn put_integration_limbo(
 ) -> WorkflowResult<()> {
     set_validation_status(txn, hash.clone(), status)?;
     set_validation_stage(txn, hash, ValidationLimboStatus::AwaitingIntegration)?;
+    Ok(())
+}
+
+pub fn put_integrated(
+    txn: &mut Transaction<'_>,
+    hash: DhtOpHash,
+    status: ValidationStatus,
+) -> WorkflowResult<()> {
+    set_validation_status(txn, hash.clone(), status)?;
+    // This set the validation stage to pending which is correct when
+    // it's integrated.
+    set_validation_stage(txn, hash.clone(), ValidationLimboStatus::Pending)?;
+    set_when_integrated(txn, hash, Timestamp::now())?;
     Ok(())
 }
 

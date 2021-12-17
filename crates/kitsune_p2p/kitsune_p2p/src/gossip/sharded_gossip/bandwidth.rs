@@ -1,4 +1,7 @@
-use std::num::NonZeroU32;
+use std::{
+    num::NonZeroU32,
+    sync::atomic::{AtomicU64, AtomicUsize},
+};
 
 use governor::{clock::Clock, Quota};
 
@@ -49,6 +52,13 @@ where
     clock: C,
     inbound: Option<RateLimiter<NotKeyed, InMemoryState, C>>,
     outbound: Option<RateLimiter<NotKeyed, InMemoryState, C>>,
+    start_time: Instant,
+    bits_inbound: AtomicUsize,
+    peak_inbound: AtomicUsize,
+    bits_outbound: AtomicUsize,
+    peak_outbound: AtomicUsize,
+    last_inbound_time: AtomicU64,
+    last_outbound_time: AtomicU64,
 }
 
 impl BandwidthThrottle {
@@ -102,6 +112,13 @@ where
             clock,
             inbound,
             outbound,
+            start_time: Instant::now(),
+            bits_inbound: AtomicUsize::new(0),
+            peak_inbound: AtomicUsize::new(0),
+            bits_outbound: AtomicUsize::new(0),
+            peak_outbound: AtomicUsize::new(0),
+            last_inbound_time: AtomicU64::new(0),
+            last_outbound_time: AtomicU64::new(0),
         }
     }
 
@@ -131,6 +148,34 @@ where
                     }
                 }
             }
+            let el = self.start_time.elapsed();
+            let last_s = self
+                .last_outbound_time
+                .swap(el.as_secs(), std::sync::atomic::Ordering::Relaxed);
+            let total_bits = self
+                .bits_outbound
+                .fetch_add(bits.get() as usize, std::sync::atomic::Ordering::Relaxed)
+                + bits.get() as usize;
+            let bps = total_bits
+                .checked_div(el.as_secs() as usize)
+                .unwrap_or_default();
+            let current_bps = (bits.get() as u64).checked_div(last_s).unwrap_or_default();
+            let max_bps = self
+                .peak_outbound
+                .fetch_max(bps, std::sync::atomic::Ordering::Relaxed)
+                .max(bps);
+            let s = tracing::trace_span!("bandwidth");
+            s.in_scope(|| {
+                tracing::trace!(
+                    "Outbound current: {}bps {:.2}mbps, average: {}bps {:.2}mbps, max: {}bps {:.2}mbps",
+                    current_bps,
+                    current_bps as f64 / 1_000_000.0,
+                    bps,
+                    bps as f64 / 1_000_000.0,
+                    max_bps,
+                    max_bps as f64 / 1_000_000.0
+                )
+            })
         }
     }
 
@@ -160,6 +205,34 @@ where
                     }
                 }
             }
+            let el = self.start_time.elapsed();
+            let last_s = self
+                .last_inbound_time
+                .swap(el.as_secs(), std::sync::atomic::Ordering::Relaxed);
+            let total_bits = self
+                .bits_inbound
+                .fetch_add(bits.get() as usize, std::sync::atomic::Ordering::Relaxed)
+                + bits.get() as usize;
+            let bps = total_bits
+                .checked_div(el.as_secs() as usize)
+                .unwrap_or_default();
+            let current_bps = (bits.get() as u64).checked_div(last_s).unwrap_or_default();
+            let max_bps = self
+                .peak_inbound
+                .fetch_max(bps, std::sync::atomic::Ordering::Relaxed)
+                .max(bps);
+            let s = tracing::trace_span!("bandwidth");
+            s.in_scope(|| {
+                tracing::trace!(
+                    "Inbound current: {}bps {:.2}mbps, average: {}bps {:.2}mbps, max: {}bps {:.2}mbps",
+                    current_bps,
+                    current_bps as f64 / 1_000_000.0,
+                    bps,
+                    bps as f64 / 1_000_000.0,
+                    max_bps,
+                    max_bps as f64 / 1_000_000.0
+                )
+            })
         }
     }
 }

@@ -78,6 +78,7 @@ CREATE TABLE IF NOT EXISTS Header (
 );
 CREATE INDEX IF NOT EXISTS Header_type_idx ON Header ( type );
 CREATE INDEX IF NOT EXISTS Header_author ON Header ( author );
+CREATE INDEX IF NOT EXISTS Header_seq_idx ON Header ( seq );
 
 
 -- NB: basis_hash, header_hash, and entry_hash, in general, will have

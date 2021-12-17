@@ -56,10 +56,15 @@ async fn get_ops_to_validate(
             ",
         );
     }
+    // TODO: There is a very unlikely chance that 10000 ops
+    // could all fail to validate and prevent validation from
+    // moving on but this is not easy to overcome.
+    // Once we impl abandoned this won't happen anyway.
     sql.push_str(
         "
         ORDER BY 
         DhtOp.op_order ASC
+        LIMIT 10000
         ",
     );
     env.async_reader(move |txn| {
