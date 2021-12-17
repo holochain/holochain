@@ -6,6 +6,7 @@ use xsalsa20poly1305::XSalsa20Poly1305;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use crate::core::ribosome::HostFnAccess;
+use crate::core::ribosome::RibosomeError;
 
 pub fn x_salsa20_poly1305_decrypt(
     _ribosome: Arc<impl RibosomeT>,
@@ -27,7 +28,11 @@ pub fn x_salsa20_poly1305_decrypt(
                 }
             )
         },
-        _ => unreachable!(),
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "x_salsa20_poly1305_decrypt".into()
+        ).to_string()))
     }
 }
 
