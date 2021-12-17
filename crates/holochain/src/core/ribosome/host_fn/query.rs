@@ -4,6 +4,7 @@ use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
+use crate::core::ribosome::RibosomeError;
 
 pub fn query(
     _ribosome: Arc<impl RibosomeT>,
@@ -26,7 +27,11 @@ pub fn query(
                 .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
             Ok(elements)
         }),
-        _ => unreachable!(),
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "query".into()
+        ).to_string()))
     }
 }
 

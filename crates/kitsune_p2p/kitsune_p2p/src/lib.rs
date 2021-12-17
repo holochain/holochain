@@ -8,6 +8,8 @@ pub mod dependencies {
     pub use ::url2;
 }
 
+mod metrics;
+
 mod types;
 pub use types::*;
 

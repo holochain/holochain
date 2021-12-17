@@ -38,6 +38,7 @@ pub struct Scratch {
     entries: HashMap<EntryHash, Arc<Entry>>,
     chain_top_ordering: ChainTopOrdering,
     scheduled_fns: Vec<ScheduledFn>,
+    chain_head: Option<(u32, usize)>,
 }
 
 #[derive(Debug, Clone)]
@@ -81,7 +82,29 @@ impl Scratch {
         chain_top_ordering: ChainTopOrdering,
     ) {
         self.respect_chain_top_ordering(chain_top_ordering);
+        let seq = item.header().header_seq();
+        match &mut self.chain_head {
+            Some((h, i)) => {
+                if seq > *h {
+                    *h = seq;
+                    *i = self.zomed_headers.len();
+                }
+            }
+            h @ None => *h = Some((seq, self.zomed_headers.len())),
+        }
         self.zomed_headers.push((zome, item));
+    }
+
+    pub fn chain_head(&self) -> Option<(HeaderHash, u32, Timestamp)> {
+        self.chain_head.as_ref().and_then(|(_, i)| {
+            self.zomed_headers.get(*i).map(|(_, h)| {
+                (
+                    h.header_address().clone(),
+                    h.header().header_seq(),
+                    h.header().timestamp(),
+                )
+            })
+        })
     }
 
     pub fn add_entry(&mut self, entry_hashed: EntryHashed, chain_top_ordering: ChainTopOrdering) {
@@ -176,6 +199,7 @@ impl Scratch {
     pub fn drain_zomed_headers(
         &mut self,
     ) -> impl Iterator<Item = (Option<Zome>, SignedHeaderHashed)> + '_ {
+        self.chain_head = None;
         self.zomed_headers.drain(..)
     }
 

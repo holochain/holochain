@@ -5,6 +5,7 @@ use futures::future::join_all;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
+use crate::core::ribosome::RibosomeError;
 use std::sync::Arc;
 
 pub fn call_remote(
@@ -52,7 +53,11 @@ pub fn call_remote(
 
             Ok(results?)
         }
-        _ => unreachable!(),
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "call_remote".into()
+        ).to_string()))
     }
 }
 

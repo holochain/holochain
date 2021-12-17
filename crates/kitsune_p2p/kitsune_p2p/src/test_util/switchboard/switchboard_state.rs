@@ -1,6 +1,6 @@
 //! An in-memory network for sharded kitsune tests.
 
-use crate::event::{QueryOpHashesEvt, TimeWindow};
+use crate::event::{QueryOpHashesEvt, TimeWindowInclusive};
 use crate::gossip::sharded_gossip::{BandwidthThrottle, GossipType, ShardedGossip};
 use crate::test_util::spawn_handler;
 use crate::types::gossip::*;
@@ -133,6 +133,7 @@ impl Switchboard {
             evt_sender,
             self.gossip_type,
             bandwidth,
+            Default::default(),
         );
         let gossip = GossipModule(gossip);
         let gossip2 = gossip.clone();
@@ -534,7 +535,7 @@ impl SwitchboardState {
             max_ops,
             include_limbo: _,
         }: QueryOpHashesEvt,
-    ) -> Option<(Vec<Arc<KitsuneOpHash>>, TimeWindow)> {
+    ) -> Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowInclusive)> {
         let (ops, timestamps): (Vec<_>, Vec<_>) = self
             .ops
             .iter()
@@ -552,17 +553,18 @@ impl SwitchboardState {
         if ops.is_empty() {
             None
         } else {
-            let window = timestamps
-                .into_iter()
-                .fold(window, |mut window, timestamp| {
-                    if timestamp < window.start {
-                        window.start = timestamp;
-                    }
-                    if timestamp > window.end {
-                        window.end = timestamp;
-                    }
-                    window
-                });
+            let window =
+                timestamps
+                    .into_iter()
+                    .fold(window.start..=window.end, |mut window, timestamp| {
+                        if timestamp < *window.start() {
+                            window = timestamp..=*window.end();
+                        }
+                        if timestamp > *window.end() {
+                            window = *window.start()..=timestamp;
+                        }
+                        window
+                    });
             Some((ops, window))
         }
     }
