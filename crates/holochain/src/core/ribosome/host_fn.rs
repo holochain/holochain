@@ -51,9 +51,6 @@ host_fn_api_impls! {
     fn agent_info (()) -> zt::info::AgentInfo;
 
     // @todo
-    fn app_info (()) -> zt::info::AppInfo;
-
-    // @todo
     fn dna_info (()) -> zt::info::DnaInfo;
 
     // @todo
