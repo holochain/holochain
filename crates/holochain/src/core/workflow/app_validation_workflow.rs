@@ -83,7 +83,7 @@ async fn app_validation_workflow_inner(
     let sorted_ops = validation_query::get_ops_to_app_validate(&env).await?;
     let start_len = sorted_ops.len();
     tracing::debug!("validating {} ops", start_len);
-    let start = (start_len >= NUM_CONCURRENT_OPS).then(|| std::time::Instant::now());
+    let start = (start_len >= NUM_CONCURRENT_OPS).then(std::time::Instant::now);
     let saturated = start.is_some();
 
     // Validate all the ops
@@ -113,7 +113,7 @@ async fn app_validation_workflow_inner(
     let (tx, rx) = tokio::sync::mpsc::channel(NUM_CONCURRENT_OPS * 100);
     let jh = tokio::spawn(async move {
         while let Some(op) = iter.next().await {
-            if let Err(_) = tx.send(op).await {
+            if tx.send(op).await.is_err() {
                 tracing::warn!("app validation task has failed to send ops. This is not a problem if the conductor is shutting down");
                 break;
             }
@@ -123,7 +123,7 @@ async fn app_validation_workflow_inner(
         tokio_stream::wrappers::ReceiverStream::new(rx).ready_chunks(NUM_CONCURRENT_OPS * 100);
 
     let mut total = 0;
-    let mut round_time = start.is_some().then(|| std::time::Instant::now());
+    let mut round_time = start.is_some().then(std::time::Instant::now);
     while let Some(chunk) = iter.next().await {
         tracing::debug!(
             "Committing {} ops",

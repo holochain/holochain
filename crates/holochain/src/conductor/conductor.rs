@@ -1742,7 +1742,7 @@ async fn p2p_event_task(
             async move {
                 let start = (num_tasks.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1
                     >= NUM_PARALLEL_EVTS)
-                    .then(|| std::time::Instant::now());
+                    .then(std::time::Instant::now);
 
                 if let Err(e) = handle.dispatch_holochain_p2p_event(evt).await {
                     tracing::error!(
