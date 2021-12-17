@@ -4,7 +4,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE** Removed `app_info` from HDK [1108](https://github.com/holochain/holochain/pull/1108)
 - Permissions on host functions now return an error instead of panicking [1141](https://github.com/holochain/holochain/pull/1141)
+
 
 ## 0.0.120
 

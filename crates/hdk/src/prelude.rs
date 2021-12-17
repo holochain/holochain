@@ -103,7 +103,6 @@ macro_rules! holochain_externs {
             __zome_info,
             __call_info,
             __dna_info,
-            __app_info,
             __random_bytes,
             __sys_time,
             __agent_info,
