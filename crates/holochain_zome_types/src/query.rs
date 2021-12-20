@@ -23,7 +23,7 @@ pub use holochain_serialized_bytes::prelude::*;
 /// between N forks of equal length that proceed it. With an inclusive hash
 /// bounded range the final header always points unambiguously at the "correct"
 /// fork that the range is over. Start hashes are not needed to provide this
-/// property so ranges can be hash terminted with a length of proceeding
+/// property so ranges can be hash terminated with a length of preceeding
 /// elements to return only. Technically the seq bounded ranges do not imply
 /// any fork disambiguation and so could be a range but for simplicity we left
 /// the API symmetrical in boundedness across all enum variants.
