@@ -492,34 +492,22 @@ mod tests {
                 "hash bounded 3a",
             ),
             (
-                ChainQueryFilterRange::HeaderHashTerminated(
-                    headers[2].as_hash().clone(),
-                    1,
-                ),
+                ChainQueryFilterRange::HeaderHashTerminated(headers[2].as_hash().clone(), 1),
                 vec![false, true, true, false, false, false, false],
                 "hash terminated not start",
             ),
             (
-                ChainQueryFilterRange::HeaderHashTerminated(
-                    headers[2].as_hash().clone(),
-                    0,
-                ),
+                ChainQueryFilterRange::HeaderHashTerminated(headers[2].as_hash().clone(), 0),
                 vec![false, false, true, false, false, false, false],
                 "hash terminated not start 0 prior",
             ),
             (
-                ChainQueryFilterRange::HeaderHashTerminated(
-                    headers[5].as_hash().clone(),
-                    7,
-                ),
+                ChainQueryFilterRange::HeaderHashTerminated(headers[5].as_hash().clone(), 7),
                 vec![true, true, true, true, false, true, false],
                 "hash terminated main chain before chain start",
             ),
             (
-                ChainQueryFilterRange::HeaderHashTerminated(
-                    headers[4].as_hash().clone(),
-                    7,
-                ),
+                ChainQueryFilterRange::HeaderHashTerminated(headers[4].as_hash().clone(), 7),
                 vec![true, true, true, false, true, false, false],
                 "hash terminated 3a chain before chain start",
             ),
