@@ -208,7 +208,9 @@ impl ChainQueryFilter {
 
     /// If the sequence range supports fork disambiguation, apply it to remove
     /// headers that are not in the correct branch.
-    pub fn headers_without_forks(&self, headers: Vec<HeaderHashed>) -> Vec<HeaderHashed> {
+    /// Numerical range bounds do NOT support fork disambiguation, and neither
+    /// does unbounded, but everything hash bounded does.
+    pub fn disambiguate_forks(&self, headers: Vec<HeaderHashed>) -> Vec<HeaderHashed> {
         match &self.sequence_range {
             ChainQueryFilterRange::Unbounded => headers,
             ChainQueryFilterRange::HeaderSeqRange(start, end) => headers
@@ -262,7 +264,7 @@ impl ChainQueryFilter {
 
     /// Filter a vector of hashed headers according to the query.
     pub fn filter_headers(&self, headers: Vec<HeaderHashed>) -> Vec<HeaderHashed> {
-        self.headers_without_forks(headers)
+        self.disambiguate_forks(headers)
             .into_iter()
             .filter(|header| {
                 self.header_type
