@@ -219,9 +219,9 @@ impl ChainQueryFilter {
                 .collect(),
             ChainQueryFilterRange::HeaderHashRange(start, end) => {
                 let mut header_hashmap = headers
-                    .iter()
+                    .into_iter()
                     .map(|header| (header.as_hash().clone(), header))
-                    .collect::<HashMap<HeaderHash, &HeaderHashed>>();
+                    .collect::<HashMap<HeaderHash, HeaderHashed>>();
                 let mut filtered_headers = Vec::new();
                 let mut maybe_next_header = header_hashmap.remove(end);
                 while let Some(next_header) = maybe_next_header {
@@ -229,9 +229,10 @@ impl ChainQueryFilter {
                         .as_content()
                         .prev_header()
                         .and_then(|prev_header| header_hashmap.remove(prev_header));
-                    filtered_headers.push(next_header.clone());
+                    let is_start = next_header.as_hash() == start;
+                    filtered_headers.push(next_header);
                     // This comes after the push to make the range inclusive.
-                    if next_header.as_hash() == start {
+                    if is_start {
                         break;
                     }
                 }
