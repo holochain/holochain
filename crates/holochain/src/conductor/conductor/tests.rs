@@ -581,7 +581,6 @@ async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
         .await
         .unwrap();
 
-    // TODO: match the errors more tightly
     assert_matches!(response, AdminResponse::Error(_));
     let response = make_signing_call(&mut app_client, &cell2).await;
 
@@ -793,14 +792,13 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
     );
 }
 
-// TODO: we need a test with a failure during a validation callback that happens
-//       *inline*. It's not enough to have a failing validate_create_entry for
-//       instance, because that failure will be returned by the zome call.
-//
 // NB: currently the pre-genesis and post-genesis handling of panics is the same.
 //   If we implement [ B-04188 ], then this test will be made more possible.
 //   Otherwise, we have to devise a way to discover whether a panic happened
 //   during genesis or not.
+// NOTE: we need a test with a failure during a validation callback that happens
+//       *inline*. It's not enough to have a failing validate_create_entry for
+//       instance, because that failure will be returned by the zome call.
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "need to figure out how to write this test"]
 async fn test_apps_disable_on_panic_after_genesis() {

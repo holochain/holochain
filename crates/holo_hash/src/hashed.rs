@@ -11,7 +11,7 @@ use crate::PrimitiveHashType;
 /// Represents some piece of content along with its hash representation, so that
 /// hashes need not be calculated multiple times.
 /// Provides an easy constructor which consumes the content.
-// TODO: consider making lazy with OnceCell
+// MAYBE: consider making lazy with OnceCell
 #[cfg_attr(feature = "serialization", derive(Debug, Serialize, Deserialize))]
 pub struct HoloHashed<C: HashableContent> {
     /// Whatever type C is as data.

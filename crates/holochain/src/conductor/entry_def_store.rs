@@ -59,7 +59,7 @@ pub(crate) async fn get_entry_def_from_ids(
 #[tracing::instrument(skip(dna))]
 /// Get all the [EntryDef] for this dna
 pub(crate) fn get_entry_defs(
-    dna: DnaFile, // TODO: make generic
+    dna: DnaFile,
 ) -> EntryDefStoreResult<Vec<(EntryDefBufferKey, EntryDef)>> {
     let invocation = EntryDefsInvocation;
 

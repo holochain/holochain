@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
-use super::metrics::Metrics;
 use super::*;
+use crate::metrics::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// A remote node we can connect to.
@@ -137,13 +137,13 @@ fn next_remote_node(
         .filter(|n| !metrics.is_current_round(&n.agent_info_list))
         .find(|n| {
             match metrics.last_outcome(&n.agent_info_list) {
-                Some(metrics::RoundOutcome::Success(when)) => {
+                Some(RoundOutcome::Success(when)) => {
                     // If we should force initiate then we don't need to wait for the delay.
                     metrics.forced_initiate()
                         || when.elapsed().as_millis() as u32
                             >= tuning_params.gossip_peer_on_success_next_gossip_delay_ms
                 }
-                Some(metrics::RoundOutcome::Error(when)) => {
+                Some(RoundOutcome::Error(when)) => {
                     when.elapsed().as_millis() as u32
                         >= tuning_params.gossip_peer_on_error_next_gossip_delay_ms
                 }
@@ -154,7 +154,6 @@ fn next_remote_node(
 
 #[cfg(test)]
 mod tests {
-    use crate::gossip::sharded_gossip::metrics::Metrics;
     use fixt::prelude::*;
     use rand::distributions::Alphanumeric;
     use test_case::test_case;

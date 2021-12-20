@@ -470,7 +470,8 @@ where
     pub fn chain_head(&self) -> SourceChainResult<(HeaderHash, u32, Timestamp)> {
         // Check scratch for newer head.
         Ok(self.scratch.apply(|scratch| {
-            chain_head_scratch(&(*scratch), self.author.as_ref())
+            scratch
+                .chain_head()
                 .unwrap_or_else(|| self.persisted_chain_head())
         })?)
     }
@@ -478,8 +479,7 @@ where
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> SourceChainResult<u32> {
         Ok(self.scratch.apply(|scratch| {
-            let scratch_max =
-                chain_head_scratch(&(*scratch), self.author.as_ref()).map(|(_, s, _)| s);
+            let scratch_max = scratch.chain_head().map(|(_, s, _)| s);
             scratch_max
                 .map(|s| std::cmp::max(s, self.persisted_seq))
                 .unwrap_or(self.persisted_seq)
@@ -987,26 +987,6 @@ fn chain_head_db(
         .run(Txn::from(txn))?
         .ok_or(SourceChainError::ChainEmpty)?;
     Ok((prev_header, last_header_seq, last_header_timestamp))
-}
-
-fn chain_head_scratch(
-    scratch: &Scratch,
-    author: &AgentPubKey,
-) -> Option<(HeaderHash, u32, Timestamp)> {
-    scratch
-        .headers()
-        .filter_map(|shh| {
-            if shh.header().author() == author {
-                Some((
-                    shh.header_address().clone(),
-                    shh.header().header_seq(),
-                    shh.header().timestamp(),
-                ))
-            } else {
-                None
-            }
-        })
-        .max_by_key(|h| h.1)
 }
 
 /// Check if there is a current countersigning session and if so, return the

@@ -521,7 +521,7 @@ pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
             return;
         } else {
             let total_time_waited = delay * i as u32;
-            tracing::debug!(?count, ?total_time_waited, counts = ?query_integration(env).await.integrated);
+            tracing::debug!(?count, ?total_time_waited, counts = ?query_integration(env).await);
         }
         tokio::time::sleep(delay).await;
     }
