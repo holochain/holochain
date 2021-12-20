@@ -2380,6 +2380,7 @@ dependencies = [
  "holochain_wasmer_host",
  "holochain_websocket",
  "holochain_zome_types",
+ "hostname",
  "human-panic",
  "itertools 0.10.1",
  "kitsune_p2p",
