@@ -89,7 +89,7 @@ fn commit_existing_path(_: ()) -> ExternResult<()> {
     if let Some(parent) = path.parent() {
         parent.ensure()?;
         hdk::prelude::create_link(parent.path_entry_hash()?, path.path_entry_hash()?, LinkTag::new(
-            DHT_PREFIX.iter()
+            [DHT_PREFIX].iter()
                 .chain(match path.leaf() {
                     None => <Vec<u8>>::new(),
                     Some(component) => UnsafeBytes::from(SerializedBytes::try_from(component)?).into(),

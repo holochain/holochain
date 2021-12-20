@@ -19,7 +19,7 @@ pub const DELIMITER: &str = ".";
 /// Similarly there is no need to define different entry types for different pathing strategies.
 /// The DHT_PREFIX ends up as both the prefix of the link tags and also in the
 /// `PathEntry` struct itself to mitigate collisions on the DHT.
-pub const DHT_PREFIX: [u8; 1] = [0x00];
+pub const DHT_PREFIX: u8 = 0;
 
 /// Each path component is arbitrary bytes to be hashed together in a predictable way when the path
 /// is hashed to create something that can be linked and discovered by all DHT participants.
@@ -179,11 +179,17 @@ entry_def!(Path EntryDef {
 /// worse than simply committing the `Path` but in practise this is often not
 /// the case, and `PathEntry` becomes a more scalable generalised solution.
 #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize, SerializedBytes)]
-pub struct PathEntry([u8; 1], EntryHash);
+pub struct PathEntry(#[serde(with = "serde_bytes")] Vec<u8>);
 
 impl PathEntry {
     pub fn new(entry_hash: EntryHash) -> Self {
-        Self(DHT_PREFIX, entry_hash)
+        Self(
+            [DHT_PREFIX]
+                .iter()
+                .chain(entry_hash.get_raw_32())
+                .cloned()
+                .collect(),
+        )
     }
 }
 
@@ -303,7 +309,7 @@ impl Path {
                     parent.path_entry_hash()?,
                     self.path_entry_hash()?,
                     LinkTag::new(
-                        DHT_PREFIX
+                        [DHT_PREFIX]
                             .iter()
                             .chain(
                                 match self.leaf() {
@@ -340,7 +346,7 @@ impl Path {
         Self::ensure(self)?;
         let mut unwrapped = get_links(
             self.path_entry_hash()?,
-            Some(holochain_zome_types::link::LinkTag::new(DHT_PREFIX)),
+            Some(holochain_zome_types::link::LinkTag::new([DHT_PREFIX])),
         )?;
         // Only need one of each hash to build the tree.
         unwrapped.sort_unstable_by(|a, b| a.tag.cmp(&b.tag));
@@ -360,7 +366,7 @@ impl Path {
         let components: ExternResult<Vec<Option<Component>>> = children
             .into_iter()
             .map(|link| {
-                let component_bytes = &link.tag.0[DHT_PREFIX.len()..];
+                let component_bytes = &link.tag.0[1..];
                 if component_bytes.is_empty() {
                     Ok(None)
                 } else {
@@ -388,7 +394,7 @@ impl Path {
         Self::ensure(self)?;
         get_link_details(
             self.path_entry_hash()?,
-            Some(holochain_zome_types::link::LinkTag::new(DHT_PREFIX)),
+            Some(holochain_zome_types::link::LinkTag::new([DHT_PREFIX])),
         )
     }
 
