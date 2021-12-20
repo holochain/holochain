@@ -32,7 +32,7 @@ pub use holochain_serialized_bytes::prelude::*;
 /// handled as inclusive first, to enforce the integrity of the query, then the
 /// exclusiveness achieved by simply removing the final element after the fact.
 #[derive(serde::Serialize, serde::Deserialize, PartialEq, Clone, Debug)]
-pub enum ChainQueryFilterSequenceRange {
+pub enum ChainQueryFilterRange {
     /// Do NOT apply any range filtering for this query.
     Unbounded,
     /// A range over source chain sequence numbers.
@@ -51,7 +51,7 @@ pub enum ChainQueryFilterSequenceRange {
     HeaderHashTerminated(HeaderHash, u32),
 }
 
-impl Default for ChainQueryFilterSequenceRange {
+impl Default for ChainQueryFilterRange {
     fn default() -> Self {
         Self::Unbounded
     }
@@ -64,7 +64,7 @@ impl Default for ChainQueryFilterSequenceRange {
 #[non_exhaustive]
 pub struct ChainQueryFilter {
     /// Limit the results to a range of elements according to their headers.
-    pub sequence_range: ChainQueryFilterSequenceRange,
+    pub sequence_range: ChainQueryFilterRange,
     /// Filter by EntryType
     // NB: if this filter is set, you can't verify the results, so don't
     //     use this in validation
@@ -177,7 +177,7 @@ impl ChainQueryFilter {
     }
 
     /// Filter on sequence range.
-    pub fn sequence_range(mut self, sequence_range: ChainQueryFilterSequenceRange) -> Self {
+    pub fn sequence_range(mut self, sequence_range: ChainQueryFilterRange) -> Self {
         self.sequence_range = sequence_range;
         self
     }
@@ -210,12 +210,12 @@ impl ChainQueryFilter {
     /// headers that are not in the correct branch.
     pub fn headers_without_forks(&self, headers: Vec<HeaderHashed>) -> Vec<HeaderHashed> {
         match &self.sequence_range {
-            ChainQueryFilterSequenceRange::Unbounded => headers,
-            ChainQueryFilterSequenceRange::HeaderSeqRange(start, end) => headers
+            ChainQueryFilterRange::Unbounded => headers,
+            ChainQueryFilterRange::HeaderSeqRange(start, end) => headers
                 .into_iter()
                 .filter(|header| *start <= header.header_seq() && header.header_seq() <= *end)
                 .collect(),
-            ChainQueryFilterSequenceRange::HeaderHashRange(start, end) => {
+            ChainQueryFilterRange::HeaderHashRange(start, end) => {
                 let mut header_hashmap = headers
                     .iter()
                     .map(|header| (header.as_hash().clone(), header))
@@ -235,7 +235,7 @@ impl ChainQueryFilter {
                 }
                 filtered_headers
             }
-            ChainQueryFilterSequenceRange::HeaderHashTerminated(end, n) => {
+            ChainQueryFilterRange::HeaderHashTerminated(end, n) => {
                 let mut header_hashmap = headers
                     .iter()
                     .map(|header| (header.as_hash().clone(), header))
@@ -313,7 +313,7 @@ mod tests {
     use crate::fixt::AppEntryTypeFixturator;
     use crate::fixt::*;
     use crate::header::EntryType;
-    use crate::ChainQueryFilterSequenceRange;
+    use crate::ChainQueryFilterRange;
     use crate::HeaderHashed;
     use ::fixt::prelude::*;
     use holo_hash::HasHash;
@@ -448,32 +448,32 @@ mod tests {
 
         for (sequence_range, expected, name) in vec![
             (
-                ChainQueryFilterSequenceRange::Unbounded,
+                ChainQueryFilterRange::Unbounded,
                 vec![true, true, true, true, true, true, true],
                 "unbounded",
             ),
             (
-                ChainQueryFilterSequenceRange::HeaderSeqRange(0, 0),
+                ChainQueryFilterRange::HeaderSeqRange(0, 0),
                 vec![true, false, false, false, false, false, false],
                 "first only",
             ),
             (
-                ChainQueryFilterSequenceRange::HeaderSeqRange(0, 1),
+                ChainQueryFilterRange::HeaderSeqRange(0, 1),
                 vec![true, true, false, false, false, false, false],
                 "several from start",
             ),
             (
-                ChainQueryFilterSequenceRange::HeaderSeqRange(1, 2),
+                ChainQueryFilterRange::HeaderSeqRange(1, 2),
                 vec![false, true, true, false, false, false, false],
                 "several not start",
             ),
             (
-                ChainQueryFilterSequenceRange::HeaderSeqRange(2, 999),
+                ChainQueryFilterRange::HeaderSeqRange(2, 999),
                 vec![false, false, true, true, true, true, true],
                 "exceeds chain length, not start",
             ),
             (
-                ChainQueryFilterSequenceRange::HeaderHashRange(
+                ChainQueryFilterRange::HeaderHashRange(
                     headers[2].as_hash().clone(),
                     headers[6].as_hash().clone(),
                 ),
@@ -481,7 +481,7 @@ mod tests {
                 "hash bounded not 3a",
             ),
             (
-                ChainQueryFilterSequenceRange::HeaderHashRange(
+                ChainQueryFilterRange::HeaderHashRange(
                     headers[2].as_hash().clone(),
                     headers[4].as_hash().clone(),
                 ),
@@ -489,7 +489,7 @@ mod tests {
                 "hash bounded 3a",
             ),
             (
-                ChainQueryFilterSequenceRange::HeaderHashTerminated(
+                ChainQueryFilterRange::HeaderHashTerminated(
                     headers[2].as_hash().clone(),
                     1,
                 ),
@@ -497,7 +497,7 @@ mod tests {
                 "hash terminated not start",
             ),
             (
-                ChainQueryFilterSequenceRange::HeaderHashTerminated(
+                ChainQueryFilterRange::HeaderHashTerminated(
                     headers[2].as_hash().clone(),
                     0,
                 ),
@@ -505,7 +505,7 @@ mod tests {
                 "hash terminated not start 0 prior",
             ),
             (
-                ChainQueryFilterSequenceRange::HeaderHashTerminated(
+                ChainQueryFilterRange::HeaderHashTerminated(
                     headers[5].as_hash().clone(),
                     7,
                 ),
@@ -513,7 +513,7 @@ mod tests {
                 "hash terminated main chain before chain start",
             ),
             (
-                ChainQueryFilterSequenceRange::HeaderHashTerminated(
+                ChainQueryFilterRange::HeaderHashTerminated(
                     headers[4].as_hash().clone(),
                     7,
                 ),
@@ -543,7 +543,7 @@ mod tests {
                 &ChainQueryFilter::new()
                     .header_type(headers[0].header_type())
                     .entry_type(headers[0].entry_type().unwrap().clone())
-                    .sequence_range(ChainQueryFilterSequenceRange::HeaderSeqRange(0, 0)),
+                    .sequence_range(ChainQueryFilterRange::HeaderSeqRange(0, 0)),
                 &headers
             ),
             [true, false, false, false, false, false, false].to_vec()
@@ -554,7 +554,7 @@ mod tests {
                 &ChainQueryFilter::new()
                     .header_type(headers[1].header_type())
                     .entry_type(headers[0].entry_type().unwrap().clone())
-                    .sequence_range(ChainQueryFilterSequenceRange::HeaderSeqRange(0, 999)),
+                    .sequence_range(ChainQueryFilterRange::HeaderSeqRange(0, 999)),
                 &headers
             ),
             [false, false, false, false, false, true, false].to_vec()
@@ -564,7 +564,7 @@ mod tests {
             map_query(
                 &ChainQueryFilter::new()
                     .entry_type(headers[0].entry_type().unwrap().clone())
-                    .sequence_range(ChainQueryFilterSequenceRange::HeaderSeqRange(0, 999)),
+                    .sequence_range(ChainQueryFilterRange::HeaderSeqRange(0, 999)),
                 &headers
             ),
             [true, false, false, false, true, true, false].to_vec()

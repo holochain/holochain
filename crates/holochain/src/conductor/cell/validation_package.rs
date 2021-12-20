@@ -180,7 +180,7 @@ pub(super) async fn get_as_authority(
             let query = ChainQueryFilter::default()
                 .include_entries(true)
                 .entry_type(EntryType::App(app_entry_type))
-                .sequence_range(ChainQueryFilterSequenceRange::HeaderSeqRange(
+                .sequence_range(ChainQueryFilterRange::HeaderSeqRange(
                     0,
                     header_seq.saturating_sub(1),
                 ));
@@ -196,7 +196,7 @@ pub(super) async fn get_as_authority(
         RequiredValidationType::Full => {
             let query = &ChainQueryFilter::default()
                 .include_entries(true)
-                .sequence_range(ChainQueryFilterSequenceRange::HeaderSeqRange(
+                .sequence_range(ChainQueryFilterRange::HeaderSeqRange(
                     0,
                     header_seq.saturating_sub(1),
                 ));

@@ -24,7 +24,7 @@ use holochain_types::env::DbRead;
 use holochain_types::env::DbWrite;
 use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::header;
-use holochain_zome_types::query::ChainQueryFilterSequenceRange;
+use holochain_zome_types::query::ChainQueryFilterRange;
 use holochain_zome_types::CapAccess;
 use holochain_zome_types::CapGrant;
 use holochain_zome_types::CapSecret;
@@ -650,17 +650,17 @@ where
                 ",
                     );
                     sql.push_str(match query.sequence_range {
-                        ChainQueryFilterSequenceRange::Unbounded => "",
-                        ChainQueryFilterSequenceRange::HeaderSeqRange(_, _) => "
+                        ChainQueryFilterRange::Unbounded => "",
+                        ChainQueryFilterRange::HeaderSeqRange(_, _) => "
                         OR (Header.seq BETWEEN :range_start AND :range_end)",
-                        ChainQueryFilterSequenceRange::HeaderHashRange(_, _) => "
+                        ChainQueryFilterRange::HeaderHashRange(_, _) => "
                         OR (
                             Header.seq BETWEEN
                             (SELECT Header.seq WHERE Header.hash = :range_start_hash)
                             AND
                             (SELECT Header.seq WHERE Header.hash = :range_end_hash)
                         )",
-                        ChainQueryFilterSequenceRange::HeaderHashTerminated(_, _) => "
+                        ChainQueryFilterRange::HeaderHashTerminated(_, _) => "
                         OR (
                             Header.seq BETWEEN
                             (SELECT Header.seq WHERE Header.hash = :range_end_hash) - :range_prior_count
@@ -685,24 +685,24 @@ where
                                 ":entry_type": query.entry_type,
                                 ":header_type": query.header_type,
                                 ":range_start": match query.sequence_range {
-                                    ChainQueryFilterSequenceRange::HeaderSeqRange(start, _) => Some(start),
+                                    ChainQueryFilterRange::HeaderSeqRange(start, _) => Some(start),
                                     _ => None,
                                 },
                                 ":range_end": match query.sequence_range {
-                                    ChainQueryFilterSequenceRange::HeaderSeqRange(_, end) => Some(end),
+                                    ChainQueryFilterRange::HeaderSeqRange(_, end) => Some(end),
                                     _ => None,
                                 },
                                 ":range_start_hash": match &query.sequence_range {
-                                    ChainQueryFilterSequenceRange::HeaderHashRange(start_hash, _) => Some(start_hash.clone()),
+                                    ChainQueryFilterRange::HeaderHashRange(start_hash, _) => Some(start_hash.clone()),
                                     _ => None,
                                 },
                                 ":range_end_hash": match &query.sequence_range {
-                                    ChainQueryFilterSequenceRange::HeaderHashRange(_, end_hash)
-                                    | ChainQueryFilterSequenceRange::HeaderHashTerminated(end_hash, _) => Some(end_hash.clone()),
+                                    ChainQueryFilterRange::HeaderHashRange(_, end_hash)
+                                    | ChainQueryFilterRange::HeaderHashTerminated(end_hash, _) => Some(end_hash.clone()),
                                     _ => None,
                                 },
                                 ":range_prior_count": match query.sequence_range {
-                                    ChainQueryFilterSequenceRange::HeaderHashTerminated(_, prior_count) => Some(prior_count),
+                                    ChainQueryFilterRange::HeaderHashTerminated(_, prior_count) => Some(prior_count),
                                     _ => None,
                                 },
                             },

@@ -610,7 +610,7 @@ async fn get_validation_package_remote(
             const NUM_RETRY_GETS: u8 = 3;
 
             let mut query = holochain_zome_types::query::ChainQueryFilter::new()
-                .sequence_range(ChainQueryFilterSequenceRange::HeaderSeqRange(
+                .sequence_range(ChainQueryFilterRange::HeaderSeqRange(
                     0,
                     element.header().header_seq().saturating_sub(1),
                 ))
