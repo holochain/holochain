@@ -132,7 +132,7 @@ workflows:
    tests:
       jobs:
          - merge-release-test
-         - merge-release-test-mac
+         # - merge-release-test-mac
          - merge-test
          # - merge-test-mac
 
