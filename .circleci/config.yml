@@ -39,7 +39,8 @@ jobs:
    merge-release-test-mac:
       macos:
          xcode: "13.2.1"
-      resource_class: xlarge
+      # todo: use "large" which is currently blocked on our plan
+      resource_class: medium
       environment:
          CACHIX_NAME: holochain-ci
          NIXPKGS_ALLOW_UNFREE: 1
@@ -93,7 +94,8 @@ jobs:
    merge-test-mac:
       macos:
          xcode: "12.0.0"
-      resource_class: xlarge
+      # todo: use "large" which is currently blocked on our plan
+      resource_class: medium
       environment:
          CACHIX_NAME: holochain-ci
          NIXPKGS_ALLOW_UNFREE: 1
