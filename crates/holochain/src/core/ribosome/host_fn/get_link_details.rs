@@ -7,6 +7,7 @@ use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
 use futures::future::join_all;
+use crate::core::ribosome::RibosomeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_link_details<'a>(
@@ -46,7 +47,11 @@ pub fn get_link_details<'a>(
             ).collect();
             Ok(results?)
         },
-        _ => unreachable!(),
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "get_link_details".into()
+        ).to_string()))
     }
 }
 

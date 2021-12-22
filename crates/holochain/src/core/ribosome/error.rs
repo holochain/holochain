@@ -94,6 +94,10 @@ pub enum RibosomeError {
     /// ident
     #[error(transparent)]
     SecurePrimitive(#[from] holochain_zome_types::SecurePrimitiveError),
+
+    /// Zome function doesn't have permissions to call a Host function.
+    #[error("Host function {2} cannot be called from zome function {1} in zome {0}")]
+    HostFnPermissions(ZomeName, FunctionName, String),
 }
 
 impl From<xsalsa20poly1305::aead::Error> for RibosomeError {

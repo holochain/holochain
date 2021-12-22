@@ -55,7 +55,11 @@ pub fn create_link<'a>(
             // being atomic
             Ok(header_hash)
         }
-        _ => unreachable!(),
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "create_link".into()
+        ).to_string()))
     }
 }
 
