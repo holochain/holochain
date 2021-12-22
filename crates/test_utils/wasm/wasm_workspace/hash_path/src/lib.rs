@@ -1,10 +1,13 @@
 use hdk::prelude::*;
 
-entry_defs![Path::entry_def()];
+entry_defs![
+    Path::entry_def(),
+    PathEntry::entry_def()
+];
 
 #[hdk_extern]
-fn hash(path_string: String) -> ExternResult<EntryHash> {
-    Path::from(path_string).hash()
+fn path_entry_hash(path_string: String) -> ExternResult<EntryHash> {
+    Path::from(path_string).path_entry_hash()
 }
 
 #[hdk_extern]
