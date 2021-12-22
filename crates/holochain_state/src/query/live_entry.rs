@@ -113,15 +113,26 @@ impl Query for GetLiveEntryQuery {
     where
         S: Store,
     {
-        // Choose an arbitrary header
-        let header = state.creates.into_iter().map(|(_, v)| v).next();
+        // If we have author authority then find a header from this author.
+        let authored_header = self.1.as_ref().map(|a| a.as_ref()).and_then(|a| {
+            state
+                .creates
+                .iter()
+                .map(|(_, v)| v)
+                .find(|h| *h.header().author() == *a)
+                .cloned()
+        });
+        let is_authored = authored_header.is_some();
+        // If there is no authored header, choose an arbitrary header.
+        let header = authored_header.or_else(|| state.creates.into_iter().map(|(_, v)| v).next());
         match header {
             Some(header) => {
                 let entry_hash = header
                     .header()
                     .entry_hash()
                     .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.header().clone()))?;
-                let author = self.1.as_ref().map(|a| a.as_ref());
+                // If this header is authored then we can get an authored entry.
+                let author = is_authored.then(|| header.header().author());
                 let element = stores
                     .get_public_or_authored_entry(entry_hash, author)?
                     .map(|entry| Element::new(header, Some(entry)));
