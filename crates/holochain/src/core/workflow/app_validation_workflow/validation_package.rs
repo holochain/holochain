@@ -23,7 +23,10 @@ pub async fn get_as_author_sub_chain(
             ChainQueryFilter::default()
                 .include_entries(true)
                 .entry_type(EntryType::App(app_entry_type))
-                .sequence_range(0..header_seq),
+                .sequence_range(ChainQueryFilterRange::HeaderSeqRange(
+                    0,
+                    header_seq.saturating_sub(1),
+                )),
         )
         .await?;
     Ok(ValidationPackage::new(elements))
@@ -37,7 +40,10 @@ pub async fn get_as_author_full(
         .query(
             ChainQueryFilter::default()
                 .include_entries(true)
-                .sequence_range(0..header_seq),
+                .sequence_range(ChainQueryFilterRange::HeaderSeqRange(
+                    0,
+                    header_seq.saturating_sub(1),
+                )),
         )
         .await?;
     Ok(ValidationPackage::new(elements))
