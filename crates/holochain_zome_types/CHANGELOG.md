@@ -4,6 +4,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased](https://github.com/holochain/holochain/holochain_zome_types-v0.0.2-alpha.1...HEAD)
 
+- BREAKING CHANGE: Range filters on chain queries are now INCLUSIVE and support hash bounds [#1142](https://github.com/holochain/holochain/pull/1142)
+- BREAKING CHANGE: Chain queries now support restricting results to a list of entry hashes [#1142](https://github.com/holochain/holochain/pull/1142)
+
+## 0.0.18
+
 ## 0.0.17
 
 - BREAKING CHANGE: Add all function names in a wasm to the zome info [\#1081](https://github.com/holochain/holochain/pull/1081)
