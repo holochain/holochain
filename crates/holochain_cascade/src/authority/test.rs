@@ -228,7 +228,9 @@ async fn get_agent_activity() {
         _ => unreachable!(),
     };
 
-    let filter = td.query_filter.sequence_range(0..20u32);
+    let filter = td
+        .query_filter
+        .sequence_range(ChainQueryFilterRange::HeaderSeqRange(0, 19));
     let result = handle_get_agent_activity(
         env.env().into(),
         td.agent.clone(),
