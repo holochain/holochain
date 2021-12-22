@@ -63,6 +63,7 @@ async fn get_ops_to_validate(
     sql.push_str(
         "
         ORDER BY 
+        DhtOp.num_validation_attempts ASC,
         DhtOp.op_order ASC
         LIMIT 10000
         ",

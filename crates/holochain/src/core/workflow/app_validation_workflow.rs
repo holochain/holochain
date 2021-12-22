@@ -106,24 +106,36 @@ async fn app_validation_workflow_inner(
             }
         }
     });
+
+    // Create a stream of concurrent validation futures.
+    // This will run NUM_CONCURRENT_OPS validation futures concurrently and
+    // return up to NUM_CONCURRENT_OPS * 100 results.
     use futures::stream::StreamExt;
     let mut iter = futures::stream::iter(iter)
         .buffer_unordered(NUM_CONCURRENT_OPS)
         .ready_chunks(NUM_CONCURRENT_OPS * 100);
+
+    // Spawn a task to actually drive the stream.
+    // This allows the stream to make progress in the background while
+    // we are committing previous results to the database.
     let (tx, rx) = tokio::sync::mpsc::channel(NUM_CONCURRENT_OPS * 100);
     let jh = tokio::spawn(async move {
         while let Some(op) = iter.next().await {
+            // Send the result to task that will commit to the database.
             if tx.send(op).await.is_err() {
                 tracing::warn!("app validation task has failed to send ops. This is not a problem if the conductor is shutting down");
                 break;
             }
         }
     });
+
+    // Create a stream that will chunk up to NUM_CONCURRENT_OPS * 100 ready results.
     let mut iter =
         tokio_stream::wrappers::ReceiverStream::new(rx).ready_chunks(NUM_CONCURRENT_OPS * 100);
 
     let mut total = 0;
     let mut round_time = start.is_some().then(std::time::Instant::now);
+    // Pull in a chunk of results.
     while let Some(chunk) = iter.next().await {
         tracing::debug!(
             "Committing {} ops",

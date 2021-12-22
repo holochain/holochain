@@ -9,6 +9,7 @@ use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 
+use rusqlite::OptionalExtension;
 use tracing::*;
 
 #[cfg(test)]
@@ -26,12 +27,33 @@ pub async fn integrate_dht_ops_workflow(
     let time = holochain_zome_types::Timestamp::now();
     let changed = vault
         .async_commit(move |txn| {
+            let activity_integrated: Option<u32> = txn
+                .query_row(
+                    holochain_sqlite::sql::sql_cell::ACTIVITY_INTEGRATED_UPPER_BOUND,
+                    named_params! {
+                        ":register_activity": DhtOpType::RegisterAgentActivity,
+                    },
+                    |row| row.get(0),
+                )
+                .optional()?;
+            let activity_missing: u32 = txn
+                .query_row(
+                    holochain_sqlite::sql::sql_cell::ACTIVITY_MISSING_DEP_UPPER_BOUND,
+                    named_params! {
+                        ":register_activity": DhtOpType::RegisterAgentActivity,
+                    },
+                    |row| row.get(0),
+                )
+                .optional()?
+                .unwrap_or(u32::MAX);
             let mut total = 0;
             let changed = txn
                 .prepare_cached(holochain_sqlite::sql::sql_cell::UPDATE_INTEGRATE_DEP_ACTIVITY)?
                 .execute(named_params! {
                     ":when_integrated": time,
                     ":register_activity": DhtOpType::RegisterAgentActivity,
+                    ":activity_integrated": activity_integrated,
+                    ":activity_missing": activity_missing,
                 })?;
             total += changed;
             let changed = txn

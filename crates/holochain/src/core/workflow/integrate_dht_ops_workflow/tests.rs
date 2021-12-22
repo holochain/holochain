@@ -531,12 +531,20 @@ fn store_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     (pre_state, expect, "store entry")
 }
 
-fn register_agent_activity(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let op = DhtOp::RegisterAgentActivity(a.signature.clone(), a.dna_header.clone());
-    let pre_state = vec![Db::IntQueue(op.clone())];
+fn register_agent_activity(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+    a.link_add.header_seq = 5;
+    let dep = DhtOp::RegisterAgentActivity(a.signature.clone(), a.link_add.clone().into());
+    let hash = HeaderHash::with_data_sync(&Header::CreateLink(a.link_add.clone()));
+    let mut new_header = a.link_add.clone();
+    new_header.prev_header = hash;
+    new_header.header_seq += 1;
+    let op = DhtOp::RegisterAgentActivity(a.signature.clone(), new_header.clone().into());
+    let pre_state = vec![Db::Integrated(dep.clone()), Db::IntQueue(op.clone())];
     let expect = vec![
+        Db::Integrated(dep.clone()),
+        Db::MetaActivity(a.link_add.clone().into()),
         Db::Integrated(op.clone()),
-        Db::MetaActivity(a.dna_header.clone()),
+        Db::MetaActivity(new_header.clone().into()),
     ];
     (pre_state, expect, "register agent activity")
 }
@@ -677,8 +685,6 @@ async fn test_ops_state() {
     let env = test_env.env();
 
     let tests = [
-        store_element,
-        store_entry,
         register_agent_activity,
         register_replaced_by_for_entry,
         register_updated_element,

@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Adds better batching to validation workflows for much faster validation. [#1167](https://github.com/holochain/holochain/pull/1167).
+
 - Permissions on host functions now return an error instead of panicking [1141](https://github.com/holochain/holochain/pull/1141)
 
 ## 0.0.120

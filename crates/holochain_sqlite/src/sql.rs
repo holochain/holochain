@@ -2,6 +2,10 @@ pub mod sql_cell {
     pub(crate) const SCHEMA: &str = include_str!("sql/cell/schema.sql");
     pub const UPDATE_INTEGRATE_DEP_ACTIVITY: &str =
         include_str!("sql/cell/update_dep_activity.sql");
+    pub const ACTIVITY_INTEGRATED_UPPER_BOUND: &str =
+        include_str!("sql/cell/activity_integrated_upper_bound.sql");
+    pub const ACTIVITY_MISSING_DEP_UPPER_BOUND: &str =
+        include_str!("sql/cell/activity_missing_dep_upper_bound.sql");
     pub const UPDATE_INTEGRATE_DEP_STORE_ELEMENT: &str =
         include_str!("sql/cell/update_dep_store_element.sql");
     pub const UPDATE_INTEGRATE_DEP_STORE_ENTRY: &str =

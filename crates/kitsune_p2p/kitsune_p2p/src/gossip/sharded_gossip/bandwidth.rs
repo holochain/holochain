@@ -169,11 +169,11 @@ where
                 tracing::trace!(
                     "Outbound current: {}bps {:.2}mbps, average: {}bps {:.2}mbps, max: {}bps {:.2}mbps",
                     current_bps,
-                    current_bps as f64 / 1_000_000.0,
+                    current_bps as f64 / 1_048_576.0,
                     bps,
-                    bps as f64 / 1_000_000.0,
+                    bps as f64 / 1_048_576.0,
                     max_bps,
-                    max_bps as f64 / 1_000_000.0
+                    max_bps as f64 / 1_048_576.0
                 )
             })
         }
