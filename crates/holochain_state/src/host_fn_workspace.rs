@@ -66,11 +66,36 @@ impl SourceChainWorkspace {
     ) -> SourceChainResult<Self> {
         let source_chain =
             SourceChain::new(authored.clone(), dht.clone(), keystore, author).await?;
+        Self::new_inner(authored, dht, cache, source_chain).await
+    }
+
+    /// Create a source chain with a blank chain head.
+    /// You probably don't want this.
+    /// This type is only useful for when a source chain
+    /// really needs to be constructed before genesis runs.
+    pub async fn raw_empty(
+        authored: DbWrite<DbKindAuthored>,
+        dht: DbWrite<DbKindDht>,
+        cache: DbWrite<DbKindCache>,
+        keystore: MetaLairClient,
+        author: AgentPubKey,
+    ) -> SourceChainResult<Self> {
+        let source_chain =
+            SourceChain::raw_empty(authored.clone(), dht.clone(), keystore, author).await?;
+        Self::new_inner(authored, dht, cache, source_chain).await
+    }
+
+    async fn new_inner(
+        authored: DbWrite<DbKindAuthored>,
+        dht: DbWrite<DbKindDht>,
+        cache: DbWrite<DbKindCache>,
+        source_chain: SourceChain,
+    ) -> SourceChainResult<Self> {
         Ok(Self {
             inner: HostFnWorkspace {
                 source_chain: Some(source_chain.clone()),
                 authored: authored.into(),
-                dht: dht.clone().into(),
+                dht: dht.into(),
                 cache,
             },
             source_chain,

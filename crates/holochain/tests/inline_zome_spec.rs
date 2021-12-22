@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use ::fixt::prelude::*;
 use hdk::prelude::*;
 use holochain::{
     conductor::api::error::ConductorApiResult,
@@ -16,6 +17,8 @@ use holochain::{
     core::ribosome::guest_callback::validate::ValidateResult, test_utils::wait_for_integration_1m,
 };
 use holochain::{core::SourceChainError, test_utils::display_agent_infos};
+use holochain_keystore::MetaLairClient;
+use holochain_state::prelude::{fresh_reader_test, StateMutationError, Store, Txn};
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::element::ElementEntry;
@@ -445,4 +448,243 @@ async fn can_call_real_zomes_too() {
         .call(&cell.zome("create_entry"), "get_post", hash.clone())
         .await;
     assert_eq!(el.unwrap().header_address(), &hash)
+}
+
+#[tokio::test(flavor = "multi_thread")]
+/// Test that elements can be manually inserted into a source chain.
+async fn insert_source_chain() {
+    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome", simple_crud_zome())
+        .await
+        .unwrap();
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let apps = conductor
+        .setup_app("app", &[dna_file.clone()])
+        .await
+        .unwrap();
+    let (alice,) = apps.into_tuple();
+
+    let zome = alice.zome("zome");
+
+    // Trigger init.
+    let _: Vec<Option<Element>> = conductor
+        .call(
+            &zome,
+            "read_entry",
+            EntryHash::from(alice.cell_id().agent_pubkey().clone()),
+        )
+        .await;
+
+    // Get the current chain source chain.
+    let get_chain = |env| {
+        fresh_reader_test(env, |txn| {
+            let chain: Vec<(HeaderHash, u32)> = txn
+                .prepare("SELECT hash, seq FROM Header ORDER BY seq")
+                .unwrap()
+                .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+                .unwrap()
+                .collect::<Result<_, _>>()
+                .unwrap();
+            chain
+        })
+    };
+
+    // Get the source chain.
+    let chain = get_chain(alice.authored_env().clone());
+    let original_elements: Vec<_> = fresh_reader_test(alice.authored_env().clone(), |txn| {
+        let txn: Txn = (&txn).into();
+        chain
+            .iter()
+            .map(|h| txn.get_element(&h.0.clone().into()).unwrap().unwrap())
+            .collect()
+    });
+    // Chain should be 4 long.
+    assert_eq!(chain.len(), 4);
+    // Last seq should be 3.
+    assert_eq!(chain.last().unwrap().1, 3);
+
+    // Inject a header with the wrong author.
+    let entry = Entry::app(().try_into().unwrap()).unwrap();
+    let mut header = Create {
+        author: fixt!(AgentPubKey),
+        timestamp: Timestamp::now(),
+        header_seq: 4,
+        prev_header: chain.last().unwrap().0.clone(),
+        entry_type: EntryType::App(AppEntryType::new(
+            1.into(),
+            0.into(),
+            EntryVisibility::Public,
+        )),
+        entry_hash: EntryHash::with_data_sync(&entry),
+    };
+    let shh = SignedHeaderHashed::with_presigned(
+        HeaderHashed::from_content_sync(header.clone().into()),
+        fixt!(Signature),
+    );
+    let element = Element::new(shh, Some(entry.clone()));
+    let result = conductor
+        .clone()
+        .insert_elements_into_source_chain(alice.cell_id().clone(), false, false, vec![element])
+        .await;
+    // This gets rejected.
+    assert!(matches!(
+        result,
+        Err(ConductorApiError::StateMutationError(
+            StateMutationError::AuthorsMustMatch
+        ))
+    ));
+
+    // Insert with correct author.
+    header.author = alice.agent_pubkey().clone();
+
+    let element = make_element(&conductor.keystore(), header.clone().into()).await;
+    let hash = element.header_address().clone();
+    conductor
+        .clone()
+        .insert_elements_into_source_chain(alice.cell_id().clone(), false, false, vec![element])
+        .await
+        .expect("Should pass with valid agent");
+
+    let chain = get_chain(alice.authored_env().clone());
+    // Chain should be 5 long.
+    assert_eq!(chain.len(), 5);
+    // Last header should be the one we just inserted.
+    assert_eq!(chain.last().unwrap().0, hash);
+
+    // Make the header a fork
+    header.header_seq = 3;
+    header.prev_header = chain[2].0.clone();
+
+    let element = make_element(&conductor.keystore(), header.clone().into()).await;
+    let hash = element.header_address().clone();
+    let result = conductor
+        .clone()
+        .insert_elements_into_source_chain(
+            alice.cell_id().clone(),
+            false,
+            false,
+            vec![element.clone()],
+        )
+        .await;
+
+    // Validation is off so forking is possible.
+    assert!(result.is_ok());
+
+    let chain = get_chain(alice.authored_env().clone());
+    // Chain should be 6 long.
+    assert_eq!(chain.len(), 6);
+    // The new header will be in the chain
+    assert!(chain.iter().any(|i| i.0 == hash));
+
+    // Insert with truncation on.
+    let result = conductor
+        .clone()
+        .insert_elements_into_source_chain(
+            alice.cell_id().clone(),
+            true,
+            false,
+            vec![element.clone()],
+        )
+        .await;
+
+    // An invalid chain is still possible because validation is off.
+    // Note this cell is now in an invalid state.
+    assert!(result.is_ok());
+
+    let chain = get_chain(alice.authored_env().clone());
+    // Chain should be 1 long.
+    assert_eq!(chain.len(), 1);
+    // The new header will be in the chain
+    assert!(chain.iter().any(|i| i.0 == hash));
+
+    // Restore the original elements
+    let result = conductor
+        .clone()
+        .insert_elements_into_source_chain(
+            alice.cell_id().clone(),
+            true,
+            false,
+            original_elements.clone(),
+        )
+        .await;
+
+    assert!(result.is_ok());
+    let chain = get_chain(alice.authored_env().clone());
+    // Chain should be 4 long.
+    assert_eq!(chain.len(), 4);
+    // Last seq should be 3.
+    assert_eq!(chain.last().unwrap().1, 3);
+
+    // Make the header a fork
+    header.header_seq = 2;
+    header.prev_header = chain[1].0.clone();
+    let element = make_element(&conductor.keystore(), header.clone().into()).await;
+
+    // Insert an invalid header with validation on.
+    let result = conductor
+        .clone()
+        .insert_elements_into_source_chain(
+            alice.cell_id().clone(),
+            false,
+            true,
+            vec![element.clone()],
+        )
+        .await;
+
+    // Fork is detected
+    assert!(result.is_err());
+
+    // Restore and validate the original elements
+    let result = conductor
+        .clone()
+        .insert_elements_into_source_chain(
+            alice.cell_id().clone(),
+            true,
+            true,
+            original_elements.clone(),
+        )
+        .await;
+
+    // Restoring the original elements is ok because they
+    // will pass validation.
+    assert!(result.is_ok());
+
+    // Start a second conductor.
+    let mut conductor = SweetConductor::from_standard_config().await;
+
+    // The dna needs to be installed first.
+    conductor.register_dna(dna_file.clone()).await.unwrap();
+
+    // Insert the chain from the original conductor.
+    conductor
+        .clone()
+        .insert_elements_into_source_chain(
+            alice.cell_id().clone(),
+            true,
+            true,
+            original_elements.clone(),
+        )
+        .await
+        .expect("Can cold start");
+
+    let apps = conductor
+        .setup_app_for_agent("cold_start", alice.agent_pubkey().clone(), &[dna_file])
+        .await
+        .unwrap();
+    let (alice_backup,) = apps.into_tuple();
+    let chain = get_chain(alice_backup.authored_env().clone());
+    // Chain should be 4 long.
+    assert_eq!(chain.len(), 4);
+    // Last seq should be 3.
+    assert_eq!(chain.last().unwrap().1, 3);
+}
+
+async fn make_element(keystore: &MetaLairClient, header: Header) -> Element {
+    let shh = SignedHeaderHashed::new(
+        keystore,
+        HeaderHashed::from_content_sync(header.clone().into()),
+    )
+    .await
+    .unwrap();
+    let entry = Entry::app(().try_into().unwrap()).unwrap();
+    Element::new(shh, Some(entry.clone()))
 }

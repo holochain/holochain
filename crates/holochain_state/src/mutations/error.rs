@@ -19,6 +19,8 @@ pub enum StateMutationError {
     ScheduleError(#[from] holochain_zome_types::schedule::ScheduleError),
     #[error(transparent)]
     HolochainP2pError(#[from] holochain_p2p::HolochainP2pError),
+    #[error("Authors of headers must all be the same when inserting to the source chain")]
+    AuthorsMustMatch,
 }
 
 pub type StateMutationResult<T> = Result<T, StateMutationError>;

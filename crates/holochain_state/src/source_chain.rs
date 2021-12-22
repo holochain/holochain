@@ -142,7 +142,7 @@ impl SourceChain {
         Ok(countersigning_agent_state)
     }
 
-    async fn put_with_header(
+    pub async fn put_with_header(
         &self,
         zome: Option<Zome>,
         header: Header,
@@ -389,6 +389,44 @@ where
                 move |txn| chain_head_db(&txn, author)
             })
             .await?;
+        Ok(Self {
+            scratch,
+            vault,
+            dht_env,
+            keystore,
+            author,
+            persisted_seq,
+            persisted_head,
+            persisted_timestamp,
+            public_only: false,
+        })
+    }
+
+    /// Create a source chain with a blank chain head.
+    /// You probably don't want this.
+    /// This type is only useful for when a source chain
+    /// really needs to be constructed before genesis runs.
+    pub async fn raw_empty(
+        vault: AuthorDb,
+        dht_env: DhtDb,
+        keystore: MetaLairClient,
+        author: AgentPubKey,
+    ) -> SourceChainResult<Self> {
+        let scratch = Scratch::new().into_sync();
+        let author = Arc::new(author);
+        let (persisted_head, persisted_seq, persisted_timestamp) = vault
+            .async_reader({
+                let author = author.clone();
+                move |txn| chain_head_db(&txn, author)
+            })
+            .await
+            .unwrap_or_else(|_| {
+                (
+                    HeaderHash::from_raw_32(vec![0u8; 32]),
+                    0,
+                    Timestamp::from_micros(0),
+                )
+            });
         Ok(Self {
             scratch,
             vault,
@@ -942,7 +980,8 @@ pub fn put_raw(
     Ok(ops_to_integrate)
 }
 
-fn chain_head_db(
+/// Get the current chain head of the database.
+pub fn chain_head_db(
     txn: &Transaction,
     author: Arc<AgentPubKey>,
 ) -> SourceChainResult<(HeaderHash, u32, Timestamp)> {
