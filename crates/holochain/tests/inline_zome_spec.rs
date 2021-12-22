@@ -642,11 +642,10 @@ async fn insert_source_chain() {
             true,
             original_elements.clone(),
         )
-        .await;
-
-    // Restoring the original elements is ok because they
-    // will pass validation.
-    assert!(result.is_ok());
+        // Restoring the original elements is ok because they
+        // will pass validation.
+        .await
+        .expect("Should restore original chain");
 
     // Start a second conductor.
     let mut conductor = SweetConductor::from_standard_config().await;
