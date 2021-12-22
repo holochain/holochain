@@ -634,7 +634,7 @@ async fn insert_source_chain() {
     assert!(result.is_err());
 
     // Restore and validate the original elements
-    let result = conductor
+    conductor
         .clone()
         .insert_elements_into_source_chain(
             alice.cell_id().clone(),
