@@ -313,7 +313,7 @@ impl Path {
                             .iter()
                             .chain(
                                 match self.leaf() {
-                                    None => <Vec<u8>>::new(),
+                                    None => <Vec<u8>>::with_capacity(0),
                                     Some(component) => {
                                         UnsafeBytes::from(SerializedBytes::try_from(component)?)
                                             .into()
