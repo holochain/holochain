@@ -813,7 +813,7 @@ impl Cell {
         let signal_tx = self.signal_broadcaster().await;
         let ribosome = self.get_ribosome().await?;
         let invocation =
-            ZomeCallInvocation::from_interface_call(self.conductor_api.clone(), call).await?;
+            ZomeCallInvocation::try_from_interface_call(self.conductor_api.clone(), call).await?;
 
         let args = CallZomeWorkflowArgs {
             cell_id: self.id.clone(),
