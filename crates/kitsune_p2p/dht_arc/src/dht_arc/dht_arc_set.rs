@@ -285,6 +285,18 @@ impl<T: num_traits::AsPrimitive<u32>> ArcInterval<T> {
             Self::Bounded(start, end)
         }
     }
+
+    pub fn length(&self) -> u64 {
+        match self {
+            ArcInterval::Empty => 0,
+            ArcInterval::Full => 2u64.pow(32),
+            ArcInterval::Bounded(lo, hi) => {
+                let lo = lo.as_();
+                let hi = hi.as_();
+                hi as u64 - lo as u64 + 1
+            }
+        }
+    }
 }
 
 impl ArcInterval<u32> {
