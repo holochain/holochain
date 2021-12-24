@@ -10,7 +10,6 @@ use holochain_types::activity::ChainItems;
 fn options() -> holochain_p2p::event::GetOptions {
     holochain_p2p::event::GetOptions {
         follow_redirects: false,
-        // TODO: These are probably irrelevant now
         all_live_headers_with_metadata: true,
         request_type: Default::default(),
     }

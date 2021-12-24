@@ -7,7 +7,7 @@ use futures::stream::StreamExt;
 use ghost_actor::GhostControlSender;
 //use ghost_actor::dependencies::tracing;
 use crate::types::direct::*;
-use kitsune_p2p::actor::KitsuneP2pSender;
+use kitsune_p2p::actor::{BroadcastTo, KitsuneP2pSender};
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::event::*;
 use kitsune_p2p::*;
@@ -534,6 +534,7 @@ async fn handle_srv_events(
                                             root.to_kitsune_space(),
                                             basis,
                                             timeout,
+                                            BroadcastTo::Notify,
                                             payload,
                                         ))
                                     }).map_err(KdError::other)?;
@@ -777,7 +778,7 @@ async fn handle_query_peer_density(
     kdirect: Arc<Kd1>,
     space: Arc<KitsuneSpace>,
     dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
-) -> KdResult<kitsune_p2p_types::dht_arc::PeerDensity> {
+) -> KdResult<kitsune_p2p_types::dht_arc::PeerViewBeta> {
     let root = KdHash::from_kitsune_space(&space);
     let density = kdirect.persist.query_peer_density(root, dht_arc).await?;
     Ok(density)

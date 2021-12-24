@@ -59,8 +59,8 @@ pub(crate) async fn spawn_test_agent(
 
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::dependencies::lair_keystore_api_0_0;
-use kitsune_p2p_types::dht_arc::DhtArcBucket;
 use kitsune_p2p_types::dht_arc::DhtArcSet;
+use kitsune_p2p_types::dht_arc::PeerStratBeta;
 use lair_keystore_api_0_0::entry::EntrySignEd25519;
 use lair_keystore_api_0_0::internal::sign_ed25519::*;
 
@@ -196,8 +196,9 @@ impl KitsuneP2pEventHandler for AgentHarness {
         &mut self,
         _space: Arc<KitsuneSpace>,
         dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
-    ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht_arc::PeerDensity> {
-        let arcs = self
+    ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht_arc::PeerViewBeta> {
+        let strat = PeerStratBeta::default();
+        let arcs: Vec<_> = self
             .agent_store
             .values()
             .filter_map(|v| {
@@ -210,9 +211,9 @@ impl KitsuneP2pEventHandler for AgentHarness {
             .collect();
 
         // contains is already checked in the iterator
-        let bucket = DhtArcBucket::new_unchecked(dht_arc, arcs);
+        let view = strat.view_unchecked(dht_arc, arcs.as_slice());
 
-        Ok(async move { Ok(bucket.density()) }.boxed().into())
+        Ok(async move { Ok(view) }.boxed().into())
     }
 
     fn handle_put_metric_datum(&mut self, datum: MetricDatum) -> KitsuneP2pEventHandlerResult<()> {

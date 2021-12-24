@@ -5,6 +5,7 @@ use crate::types::persist::*;
 use crate::*;
 use futures::future::{BoxFuture, FutureExt};
 use kitsune_p2p::dht_arc::DhtArcSet;
+use kitsune_p2p::dht_arc::PeerStratBeta;
 use kitsune_p2p::event::MetricDatum;
 use kitsune_p2p::event::MetricQuery;
 use kitsune_p2p::event::MetricQueryAnswer;
@@ -391,7 +392,7 @@ impl AsKdPersist for PersistMem {
         &self,
         root: KdHash,
         dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
-    ) -> BoxFuture<'static, KdResult<kitsune_p2p_types::dht_arc::PeerDensity>> {
+    ) -> BoxFuture<'static, KdResult<kitsune_p2p_types::dht_arc::PeerViewBeta>> {
         let store = self.0.share_mut(move |i, _| match i.agent_info.get(&root) {
             Some(store) => Ok(store.clone()),
             None => Err("root not found".into()),
@@ -401,7 +402,7 @@ impl AsKdPersist for PersistMem {
                 Err(_) => return Err("root not found".into()),
                 Ok(store) => store,
             };
-            let arcs = store
+            let arcs: Vec<_> = store
                 .get_all()?
                 .into_iter()
                 .filter_map(|v| {
@@ -414,9 +415,7 @@ impl AsKdPersist for PersistMem {
                 .collect();
 
             // contains is already checked in the iterator
-            let bucket = kitsune_p2p::dht_arc::DhtArcBucket::new_unchecked(dht_arc, arcs);
-
-            Ok(bucket.density())
+            Ok(PeerStratBeta::default().view_unchecked(dht_arc, arcs.as_slice()))
         }
         .boxed()
     }

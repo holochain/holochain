@@ -178,6 +178,7 @@ pub async fn generate_test_data(
     } else {
         None
     };
+    let is_cached = cached.is_some();
     let (data, dna_hash) = match cached {
         Some(cached) => {
             let uuid = cached.uuid.clone();
@@ -201,11 +202,11 @@ pub async fn generate_test_data(
         authored: data.authored,
     };
     let data = MockNetworkData::new(generated_data);
-    let conn = cache_data(in_memory, &data);
+    let conn = cache_data(in_memory, &data, is_cached);
     (data, conn)
 }
 
-fn cache_data(in_memory: bool, data: &MockNetworkData) -> Connection {
+fn cache_data(in_memory: bool, data: &MockNetworkData, is_cached: bool) -> Connection {
     let mut conn = if in_memory {
         Connection::open_in_memory().unwrap()
     } else {
@@ -214,6 +215,9 @@ fn cache_data(in_memory: bool, data: &MockNetworkData) -> Connection {
         let p = p.join("mock_test_data.sqlite3");
         Connection::open(p).unwrap()
     };
+    if is_cached && !in_memory {
+        return conn;
+    }
     holochain_sqlite::schema::SCHEMA_CELL
         .initialize(&mut conn, None)
         .unwrap();
@@ -227,7 +231,7 @@ fn cache_data(in_memory: bool, data: &MockNetworkData) -> Connection {
         "
         CREATE TABLE IF NOT EXISTS Authored (
             agent       BLOB    NOT NULL,
-            dht_op_hash BLOB    NOT NUll,
+            dht_op_hash BLOB    NOT NUll
         )
         ",
         [],
@@ -236,7 +240,7 @@ fn cache_data(in_memory: bool, data: &MockNetworkData) -> Connection {
     txn.execute(
         "
         CREATE TABLE IF NOT EXISTS Uuid(
-            uuid TEXT NOT NULL,
+            uuid TEXT NOT NULL
         )
         ",
         [],
