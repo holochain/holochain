@@ -1,21 +1,21 @@
-//! ## Holochain Development Kit (HDK)
-//!
-//! The HDK provides high and low level functions for writing Holochain applications (hApps).
+//! The Holochain Development Kit (HDK) provides high and low level functions for writing Holochain applications.
 //! 
-//! Features of a hApp can be written as reusable components. In Holochain terminology these components are called "zomes". 
+//! Functions of a Holochain application (hApp) can be organized into reusable components. In Holochain terminology these components are called "zomes". 
 //! A zome is compiled into a WebAssembly (WASM) binary. All of the zomes of an application are bundled to a hApp.
 //! 
 //! hApps can be installed on a device running a Holochain conductor. Clients can then call the zome functions via Remote Procedure Calls (RPC).
-//! Each function specifies the response it returns to the client as part of the zome's code.
+//! Each function specifies the response it returns to the client as part of a zome's code.
 //! 
-//! Holochain makes use of WASM binaries to obtain deterministic and shareable artefacts that run in a sandboxed environment.
-//! These properties are guaranteed for WASM binaries by the WASM specification.
+//! hApps are required to be deterministic and shareable artefacts with a unique hash value, and must run in a sandboxed environment on the hosting system.
+//! These requirements are met by WASM binaries as per the [WebAssembly specification](https://webassembly.github.io/spec/core/). 
+//! Instead of coming with its own custom runtime environment for hApps, Holochain makes use of WASM as the format of its applications.
+//! 
 //! Low-level communication between the conductor and WASM binaries, like typing and serialization of data, is encapsulated by the HDK.
-//! Using the HDK, hApp developers can focus on their application's logic.
+//! Using the HDK, hApp developers can focus on their application's logic. [Learn more about WASM in Holochain.](https://github.com/holochain/holochain/blob/develop/crates/hdk/ON-WASM.md)
 //! 
 //! To start developing hApps, there's a [**hApp build tutorial**](https://github.com/holochain/happ-build-tutorial).
 //! 
-//! ### Example zomes 🍭
+//! # Example zomes 🍭
 //!
 //! The HDK is used in all the WASMs used to test Holochain itself.
 //! As they are used directly by tests in CI they are guaranteed to compile and work for at least the tests we define against them.
