@@ -5,20 +5,7 @@ use crate::{
     region_data::RegionData,
 };
 
-#[derive(
-    Copy,
-    Clone,
-    Debug,
-    Hash,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    derive_more::From,
-    derive_more::AsRef,
-    derive_more::Deref,
-)]
-pub struct Loc(u32);
+pub use kitsune_p2p_dht_arc::DhtLocation as Loc;
 
 #[derive(
     Copy,

@@ -293,7 +293,11 @@ impl<T: num_traits::AsPrimitive<u32>> ArcInterval<T> {
             ArcInterval::Bounded(lo, hi) => {
                 let lo = lo.as_();
                 let hi = hi.as_();
-                hi as u64 - lo as u64 + 1
+                if is_full(lo, hi) {
+                    2u64.pow(32)
+                } else {
+                    (hi).wrapping_sub(lo).wrapping_add(1) as u64
+                }
             }
         }
     }
@@ -489,6 +493,21 @@ fn is_full(start: u32, end: u32) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_length() {
+        assert_eq!(ArcInterval::Bounded(10, 20).length(), 11);
+        assert_eq!(ArcInterval::Bounded(-10, 0).length(), 11);
+        assert_eq!(ArcInterval::Bounded(1, 0).length(), 2u64.pow(32));
+        assert_eq!(
+            ArcInterval::Bounded(0, u32::MAX / 2).length(),
+            u32::MAX as u64 / 2 + 1
+        );
+        assert_eq!(
+            ArcInterval::Bounded(u32::MAX / 2, 0).length(),
+            u32::MAX as u64 / 2 + 3
+        );
+    }
 
     #[test]
     fn arc_contains() {

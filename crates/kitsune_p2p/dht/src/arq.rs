@@ -4,6 +4,8 @@ mod arq_set;
 mod peer_view;
 mod strat;
 
+use std::num::Wrapping;
+
 pub use arq_set::*;
 pub use peer_view::*;
 pub use strat::*;
@@ -116,9 +118,9 @@ impl Arq {
     /// true if the centerpoint is closer to the left edge of the central chunk,
     /// false if closer to the right edge.
     fn left_oriented(&self) -> bool {
-        let s = self.spacing();
+        let s = Wrapping(self.spacing());
         let left = *self.center / s * s;
-        *self.center - left < s / 2
+        *self.center - left < s / Wrapping(2)
     }
 
     /// Calculate chunks at successive distances from the center.
@@ -136,8 +138,8 @@ impl Arq {
     fn chunk_at(&self, sequence: u32) -> ArqBounds {
         let s = self.spacing();
         // the offset of the central chunk
-        let center = *self.center / s;
-        let left_oriented = (*self.center - center * s) < s / 2;
+        let center = self.center.as_u32() / s;
+        let left_oriented = (*self.center - Wrapping(center * s)) < Wrapping(s / 2);
         let offset = if left_oriented {
             if sequence % 2 == 1 {
                 center.wrapping_sub((sequence / 2 + 1))
@@ -186,19 +188,19 @@ pub struct ArqBounds {
 impl ArqBounds {
     pub fn from_arq(arq: Arq) -> Self {
         let s = arq.spacing();
-        let left = *arq.center / s * s;
-        let left_oriented = *arq.center - left < s / 2;
+        let left = arq.center.as_u32() / s * s;
+        let left_oriented = arq.center.as_u32() - left < s / 2;
         let wing = arq.count as u32 / 2 * s;
         let offset = if arq.count == 0 {
             left
         } else if arq.count % 2 == 0 {
             if left_oriented {
-                left.wrapping_sub(wing)
+                left - wing
             } else {
-                left.wrapping_sub(wing - s)
+                left - wing - s
             }
         } else {
-            left.wrapping_sub(wing)
+            left - wing
         };
         Self {
             offset,
@@ -285,11 +287,11 @@ impl ArqBounds {
     }
 
     pub fn left(&self) -> u32 {
-        self.offset * 2u32.pow(self.power as u32)
+        (self.offset as u64 * 2u64.pow(self.power as u32)) as u32
     }
 
     pub fn right(&self) -> u32 {
-        (self.offset + self.count) * 2u32.pow(self.power as u32) - 1
+        ((self.offset + self.count) as u64 * 2u64.pow(self.power as u32) - 1) as u32
     }
 }
 
@@ -321,6 +323,13 @@ pub fn requantize(old_power: u8, old_count: u32, new_power: u8) -> Option<(u8, u
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_boundaries() {
+        let b = ArqBounds::from_interval(4, ArcInterval::new(-16, 15)).unwrap();
+        assert_eq!(b.left(), 0);
+        assert_eq!(b.right(), 0);
+    }
 
     #[test]
     fn test_is_full() {
@@ -374,7 +383,7 @@ mod tests {
         );
 
         // If the center is shifted by 1, then the opposite is true.
-        c.center = Loc::from(*c.center - 1);
+        c.center = Loc::from(*c.center - Wrapping(1));
         assert_eq!(
             c.to_interval(),
             ArcInterval::new(40 - 4 * 3, 40 + 4 * 3 - 1)

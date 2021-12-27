@@ -15,6 +15,7 @@ tracing = "0.1.29"
 num-traits = "0.2.14"
 
 [dev-dependencies]
+kitsune_p2p_dht_arc = { path = "../dht_arc", features = ["test_utils"]}
 maplit = "1"
 observability = "0.1"
 pretty_assertions = "0.7.2"
