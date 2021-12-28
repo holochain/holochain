@@ -1,19 +1,31 @@
 use crate::arq::ArqBounds;
 
-#[derive(Debug, Clone, PartialEq, Eq, derive_more::From, derive_more::IntoIterator)]
-pub struct ArqSet(pub(super) Vec<ArqBounds>);
+/// A collection of ArqBounds.
+/// All bounds are guaranteed to be quantized to the same power
+/// (the lowest common power).
+#[derive(Debug, Clone, PartialEq, Eq, derive_more::IntoIterator)]
+pub struct ArqSet {
+    #[into_iterator]
+    pub(super) arqs: Vec<ArqBounds>,
+    power: u8,
+}
 
 impl ArqSet {
     /// Normalize all arqs to be of the same power (use the minimum power)
     pub fn new(arqs: Vec<ArqBounds>) -> Self {
         if let Some(pow) = arqs.iter().map(|a| a.power).min() {
-            Self(
-                arqs.into_iter()
+            Self {
+                arqs: arqs
+                    .into_iter()
                     .map(|a| a.requantize(pow).unwrap())
                     .collect(),
-            )
+                power: pow,
+            }
         } else {
-            Self(vec![])
+            Self {
+                arqs: vec![],
+                power: 1,
+            }
         }
     }
 
@@ -43,8 +55,8 @@ fn normalize_arqs() {
     ]);
 
     assert_eq!(
-        s,
-        ArqSet(vec![
+        s.arqs,
+        vec![
             ArqBounds {
                 offset: 0,
                 power: 8,
@@ -60,6 +72,6 @@ fn normalize_arqs() {
                 power: 8,
                 count: 3 * 16
             },
-        ])
+        ]
     );
 }

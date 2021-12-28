@@ -54,11 +54,30 @@ impl Arq {
     pub fn resize(&self, strat: &ArqStrat, view: &PeerView) -> Self {
         let bounds = ArqBounds::from_arq(self.clone());
         let extrapolated_coverage = view.extrapolated_coverage(&bounds) + 1.0;
+        // Whether growing or shrinking, we want to requantize if the next chunk
+        // we would add or remove is too large or too small.
+        //
+        // It's too large if the resize would cause us to hop completely over our
+        // target range (jumping from below the min to above the max, or vice versa).
+        //
+        // It's too small if... TODO!
+        // ...if we already have more than our target number of chunks and the next
+        // change in coverage would be less than half of what we want it to be
+        // but, if we don't have a lot of chunks already, we may just want to grow
+        // by several chunks at once rather than downsampling
+        //
+        // We check regardless of whether growing or shrinking, but either way
+        // we check at the boundary of the change.
+
         if extrapolated_coverage < strat.min_coverage {
+            // Figure out the direction we're growing into.
+            // Calculate how much coverage increased the last time we grew a chunk in this direction,
+            // and use that value to extrapolate how much our coverage will increase if we grow by
+            // the same amount.
             let mut cov = extrapolated_coverage;
             let mut num_chunks = 0;
             while cov < strat.min_coverage && !is_full(self.power, self.count + num_chunks) {
-                cov += view.coverage(&self.chunk_at(self.count + num_chunks));
+                cov += view.raw_coverage(&self.chunk_at(self.count + num_chunks));
                 num_chunks += 1;
             }
             debug_assert!(cov <= strat.max_coverage());
@@ -68,7 +87,7 @@ impl Arq {
             let mut num_chunks = 0;
             let mut shrunken = self.clone();
             while cov > strat.max_coverage() && self.count - num_chunks > 0 {
-                let c = view.coverage(&self.chunk_at(self.count - num_chunks));
+                let c = view.raw_coverage(&self.chunk_at(self.count - num_chunks));
                 dbg!(&c, &shrunken);
                 // if the next quantum leap would make us overshoot our target range,
                 // upsample to smaller quantization first
@@ -176,6 +195,21 @@ impl Arq {
             }
         }
     }
+
+    /// Get a reference to the arq's center.
+    pub fn center(&self) -> Loc {
+        self.center
+    }
+
+    /// Get a reference to the arq's power.
+    pub fn power(&self) -> u8 {
+        self.power
+    }
+
+    /// Get a reference to the arq's count.
+    pub fn count(&self) -> u32 {
+        self.count
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -195,12 +229,12 @@ impl ArqBounds {
             left
         } else if arq.count % 2 == 0 {
             if left_oriented {
-                left - wing
+                left.wrapping_sub(wing)
             } else {
-                left - wing - s
+                left.wrapping_sub(wing + s)
             }
         } else {
-            left - wing
+            left.wrapping_sub(wing)
         };
         Self {
             offset,
@@ -252,7 +286,7 @@ impl ArqBounds {
     /// If count is 0, there is no boundary.
     /// If count is 1, both boundary chunks are the same: the central chunk.
     /// Otherwise, returns two different chunks.
-    fn boundary_chunks(&self) -> Option<(ArqBounds, ArqBounds)> {
+    pub fn boundary_chunks(&self) -> Option<(ArqBounds, ArqBounds)> {
         if self.count == 0 {
             None
         } else if self.count == 1 {
@@ -286,12 +320,28 @@ impl ArqBounds {
         }
     }
 
+    pub fn chunk_width(&self) -> u64 {
+        2u64.pow(self.power as u32)
+    }
+
     pub fn left(&self) -> u32 {
         (self.offset as u64 * 2u64.pow(self.power as u32)) as u32
     }
 
     pub fn right(&self) -> u32 {
         ((self.offset + self.count) as u64 * 2u64.pow(self.power as u32) - 1) as u32
+    }
+
+    /// Return a plausible place for the centerpoint of the Arq.
+    /// Obviously these pseudo-centerpoints are not evenly distributed, so
+    /// be careful where you use them.
+    pub fn pseudocenter(&self) -> Loc {
+        let left = self.left() as u64;
+        let mut right = self.right() as u64;
+        if right < left {
+            right += 2u64.pow(32);
+        }
+        Loc::from(((right - left) / 2) as u32)
     }
 }
 
