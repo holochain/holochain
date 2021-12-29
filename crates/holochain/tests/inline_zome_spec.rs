@@ -19,6 +19,7 @@ use holochain::{core::SourceChainError, test_utils::display_agent_infos};
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::element::ElementEntry;
+use matches::assert_matches;
 use tokio_stream::StreamExt;
 
 #[derive(
@@ -445,4 +446,34 @@ async fn can_call_real_zomes_too() {
         .call(&cell.zome("create_entry"), "get_post", hash.clone())
         .await;
     assert_eq!(el.unwrap().header_address(), &hash)
+}
+
+/// Simple scenario involving two agents using the same DNA
+#[tokio::test(flavor = "multi_thread")]
+async fn call_non_existing_zome_fails_gracefully() -> anyhow::Result<()> {
+    // Bundle the single zome into a DnaFile
+    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_crud_zome()).await?;
+
+    // Create a Conductor
+    let mut conductor = SweetConductor::from_standard_config().await;
+
+    // Get two agents
+    let agent = SweetAgents::one(conductor.keystore()).await;
+
+    // Install DNA and install and enable apps in conductor
+    let app = conductor
+        .setup_app_for_agent("app1", agent.clone(), &[dna_file.clone()])
+        .await
+        .unwrap();
+
+    let (alice,) = app.into_tuple();
+
+    // Call the a zome fn on a non existing zome on Alice's app
+    let result: ConductorApiResult<HeaderHash> = conductor
+        .call_fallible(&alice.zome("non_existing_zome"), "create_unit", ())
+        .await;
+
+    assert_matches!(result, Err(_));
+
+    Ok(())
 }
