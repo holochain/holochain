@@ -1,20 +1,20 @@
 //! The Holochain Development Kit (HDK) provides high and low level functions for writing Holochain applications.
-//! 
-//! Functions of a Holochain application (hApp) can be organized into reusable components. In Holochain terminology these components are called "zomes". 
+//!
+//! Functions of a Holochain application (hApp) can be organized into reusable components. In Holochain terminology these components are called "zomes".
 //! A zome is compiled into a WebAssembly (WASM) binary. All of the zomes of an application are bundled to a hApp.
-//! 
+//!
 //! hApps can be installed on a device running a Holochain conductor. Clients can then call the zome functions via Remote Procedure Calls (RPC).
 //! Each function specifies the response it returns to the client as part of a zome's code.
-//! 
+//!
 //! hApps are required to be deterministic and shareable artefacts with a unique hash value, and must run in a sandboxed environment on the hosting system.
-//! These requirements are met by WASM binaries as per the [WebAssembly specification](https://webassembly.github.io/spec/core/). 
+//! These requirements are met by WASM binaries as per the [WebAssembly specification](https://webassembly.github.io/spec/core/).
 //! Instead of coming with its own custom runtime environment for hApps, Holochain makes use of WASM as the format of its applications.
-//! 
+//!
 //! Low-level communication between the conductor and WASM binaries, like typing and serialization of data, is encapsulated by the HDK.
 //! Using the HDK, hApp developers can focus on their application's logic. [Learn more about WASM in Holochain.](https://github.com/holochain/holochain/blob/develop/crates/hdk/ON-WASM.md)
-//! 
+//!
 //! To start developing hApps, there's a [**hApp build tutorial**](https://github.com/holochain/happ-build-tutorial).
-//! 
+//!
 //! # Example zomes 🍭
 //!
 //! The HDK is used in all the WASMs used to test Holochain itself.
@@ -46,7 +46,7 @@
 //!
 //! The lowest layer is the structs and serialization that define how the host and the guest communicate.
 //! You cannot change this but you can reimplement it in your language of choice (e.g. Haskell?) by referencing the Rust zome types and extern function signatures.
-//! 
+//!
 //! > Note: From the perspective of hApp development in WASM the 'guest' is the WASM and the 'host' is the running Holochain conductor.
 //! > The host is _not_ the 'host operating system' in this context.
 //!
@@ -178,7 +178,7 @@
 //! This means you should not rely on data existing _between_ agents unless you have another source of integrity such as cryptographic countersignatures.
 //!
 //! Use a post commit hook and signals or remote calls if you need to notify other agents about completed commits.
-//! 
+//!
 //! ### HDK should be pinned 📌
 //!
 //! The basic functionality of the HDK is to communicate with the Holochain conductor using a specific typed interface.
