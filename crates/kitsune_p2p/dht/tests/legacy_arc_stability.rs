@@ -2,7 +2,7 @@ mod common;
 
 use std::collections::HashSet;
 
-use common::*;
+use common::continuous::*;
 use kitsune_p2p_dht_arc::*;
 
 fn pass_report(report: &RunReport, redundancy_target: f64) -> bool {

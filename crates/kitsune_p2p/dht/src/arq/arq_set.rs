@@ -28,10 +28,6 @@ impl ArqSet {
             }
         }
     }
-
-    pub fn coverage(lo: u32, hi: u32) {
-        todo!("probably not needed")
-    }
 }
 
 #[test]

@@ -36,6 +36,16 @@ impl Arq {
         }
     }
 
+    pub fn new_full(center: Loc, power: u8) -> Self {
+        let count = 2u32.pow(32 - power as u32);
+        assert!(is_full(power, count));
+        Self {
+            center,
+            power,
+            count,
+        }
+    }
+
     pub fn spacing(&self) -> u32 {
         2u32.pow(self.power as u32)
     }
@@ -43,83 +53,13 @@ impl Arq {
     /// Requantize to a different power. If requantizing to a higher power,
     /// only requantize if there is no information loss due to rounding.
     /// Otherwise, return None.
-    pub fn requantize(&self, power: u8) -> Option<Self> {
-        requantize(self.power, self.count, power).map(|(power, count)| Self {
-            center: self.center,
-            power,
-            count,
-        })
-    }
-
-    pub fn resize(&self, strat: &ArqStrat, view: &PeerView) -> Self {
-        let bounds = ArqBounds::from_arq(self.clone());
-        let extrapolated_coverage = view.extrapolated_coverage(&bounds) + 1.0;
-        // Whether growing or shrinking, we want to requantize if the next chunk
-        // we would add or remove is too large or too small.
-        //
-        // It's too large if the resize would cause us to hop completely over our
-        // target range (jumping from below the min to above the max, or vice versa).
-        //
-        // It's too small if... TODO!
-        // ...if we already have more than our target number of chunks and the next
-        // change in coverage would be less than half of what we want it to be
-        // but, if we don't have a lot of chunks already, we may just want to grow
-        // by several chunks at once rather than downsampling
-        //
-        // We check regardless of whether growing or shrinking, but either way
-        // we check at the boundary of the change.
-
-        if extrapolated_coverage < strat.min_coverage {
-            // Figure out the direction we're growing into.
-            // Calculate how much coverage increased the last time we grew a chunk in this direction,
-            // and use that value to extrapolate how much our coverage will increase if we grow by
-            // the same amount.
-            let mut cov = extrapolated_coverage;
-            let mut num_chunks = 0;
-            while cov < strat.min_coverage && !is_full(self.power, self.count + num_chunks) {
-                cov += view.raw_coverage(&self.chunk_at(self.count + num_chunks));
-                num_chunks += 1;
-            }
-            debug_assert!(cov <= strat.max_coverage());
-            self.grow(num_chunks)
-        } else if extrapolated_coverage > strat.max_coverage() {
-            let mut cov = extrapolated_coverage;
-            let mut num_chunks = 0;
-            let mut shrunken = self.clone();
-            while cov > strat.max_coverage() && self.count - num_chunks > 0 {
-                let c = view.raw_coverage(&self.chunk_at(self.count - num_chunks));
-                dbg!(&c, &shrunken);
-                // if the next quantum leap would make us overshoot our target range,
-                // upsample to smaller quantization first
-                if c > strat.buffer_width() {
-                    shrunken = shrunken
-                        .requantize(shrunken.power - 1)
-                        .expect("upsampling is infallible");
-                    num_chunks *= 2;
-                    continue;
-                }
-                cov += c;
-                num_chunks += 1;
-            }
-            debug_assert!(cov >= strat.min_coverage && cov <= strat.max_coverage());
-            shrunken
-        } else {
-            self.clone()
-        }
-    }
-
-    /// Grow by as many chunks as it takes to land within the target range.
-    /// Requantize to a higher power after growing if necessary.
-    pub fn grow(&self, num_chunks: u32) -> Self {
-        // find the coverage for successive steps outside of the current bounds.
-        //
-        todo!()
-    }
-
-    /// Shrink by as many chunks as it takes to land within the target range.
-    /// Requantize to a lower power before shrinking if necessary.
-    pub fn shrink(&self, num_chunks: u32) -> Self {
-        todo!()
+    pub fn requantize(&mut self, power: u8) -> bool {
+        requantize(self.power, self.count, power)
+            .map(|(power, count)| {
+                self.power = power;
+                self.count = count;
+            })
+            .is_some()
     }
 
     pub fn to_bounds(&self) -> ArqBounds {
@@ -127,11 +67,7 @@ impl Arq {
     }
 
     pub fn to_interval(&self) -> ArcInterval {
-        if let Some((a, b)) = self.boundary_chunks() {
-            ArcInterval::new(a.left(), b.right())
-        } else {
-            ArcInterval::Empty
-        }
+        self.to_bounds().to_interval()
     }
 
     /// true if the centerpoint is closer to the left edge of the central chunk,
@@ -220,30 +156,41 @@ pub struct ArqBounds {
 }
 
 impl ArqBounds {
+    // TODO: test
     pub fn from_arq(arq: Arq) -> Self {
         let s = arq.spacing();
-        let left = arq.center.as_u32() / s * s;
-        let left_oriented = arq.center.as_u32() - left < s / 2;
+        let left_edge = arq.center.as_u32() / s * s;
+        let left_oriented = arq.center.as_u32() - left_edge < s / 2;
         let wing = arq.count as u32 / 2 * s;
         let offset = if arq.count == 0 {
-            left
+            left_edge
         } else if arq.count % 2 == 0 {
             if left_oriented {
-                left.wrapping_sub(wing)
+                left_edge.wrapping_sub(wing)
             } else {
-                left.wrapping_sub(wing + s)
+                left_edge.wrapping_sub(wing + s)
             }
         } else {
-            left.wrapping_sub(wing)
-        };
+            left_edge.wrapping_sub(wing)
+        } / s;
         Self {
-            offset,
+            offset: offset,
             power: arq.power,
             count: arq.count,
         }
     }
 
+    pub fn from_interval_rounded(power: u8, interval: ArcInterval) -> Self {
+        Self::from_interval_inner(power, interval, true).unwrap()
+    }
+
     pub fn from_interval(power: u8, interval: ArcInterval) -> Option<Self> {
+        Self::from_interval_inner(power, interval, false)
+    }
+
+    fn from_interval_inner(power: u8, interval: ArcInterval, rounded: bool) -> Option<Self> {
+        assert!(power > 0);
+        let full_count = 2u32.pow(32 - power as u32);
         match interval {
             ArcInterval::Empty => Some(Self {
                 offset: 0,
@@ -253,15 +200,20 @@ impl ArqBounds {
             ArcInterval::Full => Some(Self {
                 offset: 0,
                 power,
-                count: 2u32.pow(32 - power as u32),
+                count: full_count,
             }),
             ArcInterval::Bounded(lo, hi) => {
                 let lo = lo.as_u32();
                 let hi = hi.as_u32();
                 let s = 2u32.pow(power as u32);
                 let offset = lo / s;
-                let count = (hi - lo) / s;
-                if lo == offset * s && (hi - lo) == count * s {
+                let diff = if lo <= hi {
+                    hi - lo
+                } else {
+                    (2u64.pow(32) - (hi as u64) + (lo as u64) + 1) as u32
+                };
+                let count = diff / s;
+                if rounded || lo == offset * s && diff == count * s {
                     Some(Self {
                         offset,
                         power,
@@ -275,7 +227,9 @@ impl ArqBounds {
     }
 
     pub fn to_interval(&self) -> ArcInterval {
-        if let Some((a, b)) = self.boundary_chunks() {
+        if is_full(self.power, self.count) {
+            ArcInterval::Full
+        } else if let Some((a, b)) = self.boundary_chunks() {
             ArcInterval::new(a.left(), b.right())
         } else {
             ArcInterval::Empty
@@ -324,12 +278,15 @@ impl ArqBounds {
         2u64.pow(self.power as u32)
     }
 
+    // TODO: test
     pub fn left(&self) -> u32 {
         (self.offset as u64 * 2u64.pow(self.power as u32)) as u32
     }
 
+    // TODO: test
     pub fn right(&self) -> u32 {
-        ((self.offset + self.count) as u64 * 2u64.pow(self.power as u32) - 1) as u32
+        ((self.offset.wrapping_add(self.count)) as u64
+            * 2u64.pow(self.power as u32).wrapping_sub(1)) as u32
     }
 
     /// Return a plausible place for the centerpoint of the Arq.
@@ -389,11 +346,20 @@ mod tests {
 
         assert!(!is_full(30, 3));
         assert!(is_full(30, 4));
+        assert!(is_full(29, 8));
 
         assert!(is_full(1, 2u32.pow(31)));
         assert!(!is_full(1, 2u32.pow(31) - 1));
         assert!(is_full(2, 2u32.pow(30)));
         assert!(!is_full(2, 2u32.pow(30) - 1));
+    }
+
+    #[test]
+    fn test_full_intervals() {
+        let full1 = Arq::new_full(0.into(), 29);
+        let full2 = Arq::new_full(2u32.pow(31).into(), 25);
+        assert_eq!(full1.to_interval(), ArcInterval::Full);
+        assert_eq!(full2.to_interval(), ArcInterval::Full);
     }
 
     #[test]
@@ -448,13 +414,15 @@ mod tests {
             count: 10,
         };
 
-        assert_eq!(c.requantize(18).map(|c| c.count), Some(40));
-        assert_eq!(c.requantize(19).map(|c| c.count), Some(20));
-        assert_eq!(c.requantize(20).map(|c| c.count), Some(10));
-        assert_eq!(c.requantize(21).map(|c| c.count), Some(5));
-        assert_eq!(c.requantize(22).map(|c| c.count), None);
-        assert_eq!(c.requantize(23).map(|c| c.count), None);
-        assert_eq!(c.requantize(24).map(|c| c.count), None);
+        let rq = |a: Arq, p| a.clone().requantize(p).then(|| a);
+
+        assert_eq!(rq(c.clone(), 18).map(|c| c.count), Some(40));
+        assert_eq!(rq(c.clone(), 19).map(|c| c.count), Some(20));
+        assert_eq!(rq(c.clone(), 20).map(|c| c.count), Some(10));
+        assert_eq!(rq(c.clone(), 21).map(|c| c.count), Some(5));
+        assert_eq!(rq(c.clone(), 22).map(|c| c.count), None);
+        assert_eq!(rq(c.clone(), 23).map(|c| c.count), None);
+        assert_eq!(rq(c.clone(), 24).map(|c| c.count), None);
 
         let c = Arq {
             center: Loc::from(42),
@@ -462,8 +430,8 @@ mod tests {
             count: 256,
         };
 
-        assert_eq!(c.requantize(12).map(|c| c.count), Some(256 * 256));
-        assert_eq!(c.requantize(28).map(|c| c.count), Some(1));
-        assert_eq!(c.requantize(29).map(|c| c.count), None);
+        assert_eq!(rq(c.clone(), 12).map(|c| c.count), Some(256 * 256));
+        assert_eq!(rq(c.clone(), 28).map(|c| c.count), Some(1));
+        assert_eq!(rq(c.clone(), 29).map(|c| c.count), None);
     }
 }

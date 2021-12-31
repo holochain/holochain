@@ -1,4 +1,4 @@
-//! Tests of arc resizing behavior.
+//! Tests of arq resizing behavior.
 
 mod common;
 use common::*;
@@ -7,16 +7,20 @@ use kitsune_p2p_dht::arq::*;
 use kitsune_p2p_dht::op::*;
 use kitsune_p2p_dht_arc::ArcInterval;
 
+use crate::common::quantized::generate_ideal_coverage;
+use crate::common::quantized::print_arqs;
+use crate::common::quantized::seeded_rng;
+
 #[test]
 /// If extrapolated coverage remains above the maximum coverage threshold even
-/// when shrinking to empty, let the arc be resized to empty.
+/// when shrinking to empty, let the arq be resized to empty.
 fn test_shrink_to_empty() {
     todo!()
 }
 
 #[test]
 /// If extrapolated coverage remains below the minimum coverage threshold even
-/// when growing to full, let the arc be resized to full.
+/// when growing to full, let the arq be resized to full.
 fn test_grow_to_full() {
     todo!()
 }
@@ -38,7 +42,7 @@ fn test_grow_by_multiple_chunks() {
 #[test]
 /// If the space to our left is completely oversaturated
 /// and the space to our right is completely undersaturated,
-/// we should resize our arc so that the average coverage is within the
+/// we should resize our arq so that the average coverage is within the
 /// acceptable range
 fn test_degenerate_asymmetrical_coverage() {
     let a = Arq::new(
@@ -54,11 +58,12 @@ fn test_degenerate_asymmetrical_coverage() {
     let strat = ArqStrat {
         min_coverage: 5.0,
         buffer: 0.2,
+        ..Default::default()
     };
-    let view = PeerView::new(others);
+    let view = PeerView::new(strat, others);
     let extrapolated = view.extrapolated_coverage(&a.to_bounds());
     assert_eq!(extrapolated, 10.0);
-    let resized = a.resize(&strat, &view);
+    let resized = view.update_arq(a);
 }
 
 #[test]
@@ -67,28 +72,50 @@ fn test_degenerate_asymmetrical_coverage() {
 fn test_scenario() {
     let mut rng = seeded_rng(None);
 
-    // start with a full arc
-    let a = Arq::new(Loc::from(0x0), 3, 2u32.pow(32 - 3));
-
     // aim for coverage between 10 and 12.
     let strat = ArqStrat {
         min_coverage: 10.0,
         buffer: 0.2,
+        ..Default::default()
     };
+    let jitter = 0.000;
 
-    let arcs: Vec<_> =
-        simple_parameterized_generator(&mut rng, 10, 0.0001, ArcLenStrategy::Constant(1.0))
+    {
+        // start with a full arq
+        let arq = Arq::new_full(Loc::from(0x0), strat.max_power);
+        let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, 10, jitter, 0)
             .into_iter()
-            .map(|arc| ArqBounds::from_interval(3, arc.interval()).unwrap())
+            .map(|arq| ArqBounds::from_interval_rounded(strat.max_power, arq.to_interval()))
+            .collect();
+        let view = PeerView::new(strat.clone(), ArqSet::new(peers));
+        let extrapolated = view.extrapolated_coverage(&arq.to_bounds());
+        assert_eq!(extrapolated, 11.0);
+
+        // expect that the arq remains full under these conditions
+        let resized = view.update_arq(arq.clone());
+        assert_eq!(resized, arq);
+    }
+
+    {
+        // start with a full arq again
+        let arq = Arq::new_full(Loc::from(0x0), strat.max_power);
+        let peer_arqs = generate_ideal_coverage(&mut rng, &strat, 100, jitter, 0);
+        print_arqs(&peer_arqs);
+
+        let peers: Vec<_> = peer_arqs
+            .into_iter()
+            .map(|arq| ArqBounds::from_interval_rounded(strat.max_power, arq.to_interval()))
             .collect();
 
-    let view = PeerView::new(ArqSet::new(arcs));
-    let extrapolated = view.extrapolated_coverage(&a.to_bounds());
-    assert_eq!(extrapolated, 10.0);
+        let view = PeerView::new(strat.clone(), ArqSet::new(peers));
+        let extrapolated = view.extrapolated_coverage(&arq.to_bounds());
+        assert_eq!(extrapolated, 10.0);
 
-    let resized = a.resize(&strat, &view);
-    assert_eq!(resized.power(), 3);
-    assert_eq!(resized.count(), 2u32.pow(32 - 3));
+        // expect that the arq shrinks
+        let resized = view.update_arq(arq.clone());
+        assert_eq!(resized.power(), strat.max_power);
+        assert_eq!(resized.count(), 8);
+    }
 
     todo!("add more peers and watch it upsample and shrink")
 }
