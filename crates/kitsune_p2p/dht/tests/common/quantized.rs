@@ -1,6 +1,9 @@
 use kitsune_p2p_dht::arq::Arq;
+use kitsune_p2p_dht::arq::ArqSet;
 use kitsune_p2p_dht::arq::ArqStrat;
-use kitsune_p2p_dht_arc::*;
+use kitsune_p2p_dht::arq::PeerView;
+use kitsune_p2p_dht_arc::DhtLocation as Loc;
+use quickcheck_macros::quickcheck;
 use rand::prelude::StdRng;
 use rand::thread_rng;
 use rand::Rng;
@@ -26,10 +29,13 @@ pub fn unit_arq(strat: &ArqStrat, center: f64, len: f64, power_offset: i8) -> Ar
         center
     );
     assert!(0.0 <= len && len <= 1.0, "len out of bounds {}", len);
+
     let full_len = full_len();
-    let center = DhtLocation::from((full_len * center) as u32);
+    let center = Loc::from((full_len * center) as u32);
     if len == 1.0 {
         Arq::new_full(center, strat.max_power)
+    } else if len == 0.0 {
+        Arq::new(center, strat.min_power, 0)
     } else {
         let po = power_offset as f64;
 
@@ -74,19 +80,180 @@ pub fn generate_ideal_coverage(
 
     let nf = n as f64;
     let coverage = strat.min_coverage as f64;
+
     (0..n)
         .map(|i| {
             let center =
                 ((i as f64 / nf) + (2.0 * jitter * rng.gen::<f64>()) - jitter).rem_euclid(1.0);
-            let len = coverage / nf;
+            let len = (coverage / nf).min(1.0);
             unit_arq(strat, center, len, power_offset)
         })
         .collect()
 }
 
 /// View ascii for all arcs
-pub fn print_arqs(arqs: &Peers) {
+pub fn print_arqs(arqs: &Peers, len: usize) {
     for (i, arq) in arqs.into_iter().enumerate() {
-        println!("|{}| {}", arq.to_interval().to_ascii(64), i);
+        println!("|{}| {}", arq.to_interval().to_ascii(len), i);
     }
+}
+
+#[test]
+fn test_unit_arc() {
+    let strat = ArqStrat {
+        min_coverage: 10.0,
+        buffer: 0.2,
+        ..Default::default()
+    };
+    let expected_chunks = strat.min_chunks();
+
+    let a1 = unit_arq(&strat, 0.0, 0.0, 0);
+    assert_eq!(a1.power(), strat.min_power);
+    assert_eq!(a1.count(), 0);
+
+    let a1 = unit_arq(&strat, 0.0, 1.0, 0);
+    assert_eq!(a1.power(), 29);
+    assert_eq!(a1.count(), expected_chunks);
+
+    let a2 = unit_arq(&strat, 0.0, 1.0 / 2.0, 0);
+    assert_eq!(a2.power(), 29);
+    assert_eq!(a2.count(), expected_chunks);
+
+    let a3 = unit_arq(&strat, 0.0, 1.0 / 4.0, 0);
+    assert_eq!(a3.power(), 28);
+    assert_eq!(a3.count(), expected_chunks);
+
+    let a4 = unit_arq(&strat, 0.0, 1.0 / 8.0, 0);
+    assert_eq!(a4.power(), 27);
+    assert_eq!(a4.count(), expected_chunks);
+
+    let a5 = unit_arq(&strat, 0.0, 1.0 / 16.0, 0);
+    assert_eq!(a5.power(), 26);
+    assert_eq!(a5.count(), expected_chunks);
+
+    let a6 = unit_arq(&strat, 0.0, 1.0 / 32.0, 0);
+    assert_eq!(a6.power(), 25);
+    assert_eq!(a6.count(), expected_chunks);
+}
+
+use proptest::proptest;
+
+#[test]
+fn test_ideal_coverage_case() {
+    let strat = ArqStrat {
+        min_coverage: 10.0,
+        buffer: 0.144,
+        ..Default::default()
+    };
+
+    let mut rng = seeded_rng(None);
+    let arq = Arq::new_full(Loc::from(0x0), strat.max_power);
+    let peer_arqs = generate_ideal_coverage(&mut rng, &strat, 100, 0.0, 0);
+    print_arqs(&peer_arqs, 64);
+
+    let peers: Vec<_> = peer_arqs.into_iter().map(|arq| arq.to_bounds()).collect();
+
+    let view = PeerView::new(strat.clone(), ArqSet::new(peers));
+    let extrapolated = view.extrapolated_coverage(&arq.to_bounds());
+    assert!((dbg!(extrapolated) - 10.0).abs() < 1.0);
+}
+
+proptest! {
+    #[test]
+    fn test_ideal_coverage(min_coverage in 10f64..100.0, buffer in 0.01f64..0.99) {
+        let strat = ArqStrat {
+            min_coverage,
+            buffer,
+            ..Default::default()
+        };
+        let mut rng = seeded_rng(None);
+        let arq = Arq::new_full(Loc::from(0x0), strat.max_power);
+        let peer_arqs = generate_ideal_coverage(&mut rng, &strat, 100, 0.0, 0);
+
+        let peers: Vec<_> = peer_arqs.into_iter().map(|arq| arq.to_bounds()).collect();
+
+        let view = PeerView::new(strat.clone(), ArqSet::new(peers));
+        let extrapolated = view.extrapolated_coverage(&arq.to_bounds());
+        println!(
+            "{} <= {} <= {}",
+            strat.min_coverage,
+            extrapolated,
+            strat.max_coverage()
+        );
+        assert!(strat.min_coverage <= extrapolated);
+        assert!(extrapolated <= strat.max_coverage());
+    }
+
+    #[test]
+    fn chunk_count_is_alwayss_within_bounds(center in 0.0f64..0.999, len in 0.001f64..1.0) {
+        let (strat, center, len) = qc_setup(center, len);
+        let a = unit_arq(&strat, center, len, 0);
+        // println!(
+        //     "{} <= {} <= {}",
+        //     strat.min_chunks(),
+        //     a.count(),
+        //     strat.max_chunks()
+        // );
+        assert!(a.count() >= strat.min_chunks());
+        assert!(a.count() <= strat.max_chunks());
+    }
+}
+
+#[quickcheck]
+fn chunk_count_is_always_within_bounds(center: f64, len: f64) -> bool {
+    let (strat, center, len) = qc_setup(center, len);
+    let a = unit_arq(&strat, center, len, 0);
+    if len > 0.0 {
+        println!(
+            "{} <= {} <= {}",
+            strat.min_chunks(),
+            a.count(),
+            strat.max_chunks()
+        );
+        a.count() >= strat.min_chunks() && a.count() <= strat.max_chunks()
+    } else {
+        true
+    }
+}
+
+#[quickcheck]
+fn power_is_always_within_bounds(center: f64, len: f64) -> bool {
+    let (strat, center, len) = qc_setup(center, len);
+    let a = unit_arq(&strat, center, len, 0);
+    println!(
+        "{} <= {} <= {}",
+        strat.min_power,
+        a.power(),
+        strat.max_power
+    );
+    a.power() >= strat.min_power && a.power() <= strat.max_power
+}
+
+#[quickcheck]
+fn length_is_always_close(center: f64, len: f64) -> bool {
+    let (strat, center, len) = qc_setup(center, len);
+    let a = unit_arq(&strat, center, len, 0);
+    let target_len = (len * 2f64.powf(32.0)) as i64;
+    let true_len = a.to_interval().length() as i64;
+    println!("{} ~ {} ({})", true_len, target_len, a.spacing());
+    (true_len - target_len).abs() < a.spacing() as i64
+}
+
+fn qc_setup(center: f64, len: f64) -> (ArqStrat, f64, f64) {
+    let center = if center.is_finite() {
+        center.rem_euclid(1.0)
+    } else {
+        0.0
+    };
+    let len = if len.is_finite() {
+        len.rem_euclid(1.0)
+    } else {
+        1.0
+    };
+    let strat = ArqStrat {
+        min_coverage: 10.0,
+        buffer: 0.144,
+        ..Default::default()
+    };
+    (strat, center, len)
 }

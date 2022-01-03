@@ -1,4 +1,5 @@
 use super::ArqSet;
+use quickcheck::Arbitrary;
 
 #[derive(Debug, Clone)]
 pub struct ArqStrat {
@@ -56,6 +57,19 @@ pub struct ArqStrat {
     /// defined by this diff. TODO: do this.
     pub max_power_diff: u8,
 }
+
+// impl Arbitrary for ArqStrat {
+//     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+//         Self {
+//             min_coverage: f64::arbitrary(g).rem_euclid(99.0) + 1.0,
+//             buffer: f64::arbitrary(g).rem_euclid(0.9) + 0.1,
+//             min_power: (u8::arbitrary(g) % 20) + 1,
+//             max_power: 31 - (u8::arbitrary(g) % 3),
+//             power_std_dev_threshold: 1.0,
+//             max_power_diff: 2,
+//         }
+//     }
+// }
 
 impl Default for ArqStrat {
     fn default() -> Self {
