@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use kitsune_p2p::dht_arc::DhtArc;
+use kitsune_p2p::dht_arc::{ArcInterval, DhtArc, DhtArcSet};
 use kitsune_p2p::{KitsuneAgent, KitsuneSignature, KitsuneSpace};
 use rand::Rng;
 use std::sync::Arc;
@@ -36,11 +36,17 @@ async fn rand_insert(
     db: &DbWrite<DbKindP2pAgentStore>,
     space: &Arc<KitsuneSpace>,
     agent: &Arc<KitsuneAgent>,
+    long: bool,
 ) {
     let mut rng = rand::thread_rng();
 
     let signed_at_ms = rand_signed_at_ms();
-    let expires_at_ms = signed_at_ms + rng.gen_range(100, 200);
+
+    let expires_at_ms = if long {
+        signed_at_ms + rng.gen_range(10000, 20000)
+    } else {
+        signed_at_ms + rng.gen_range(100, 200)
+    };
 
     let half_len = match rng.gen_range(0_u8, 9_u8) {
         0 => 0,
@@ -65,6 +71,45 @@ async fn rand_insert(
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[allow(unused_assignments)]
+async fn test_p2p_agent_store_extrapolated_coverage() {
+    let tmp_dir = tempdir::TempDir::new("p2p_agent_store_extrapolated_coverage").unwrap();
+
+    let space = rand_space();
+
+    let db = DbWrite::test(&tmp_dir, DbKindP2pAgentStore(space.clone())).unwrap();
+
+    let mut example_agent = rand_agent();
+
+    for _ in 0..20 {
+        example_agent = rand_agent();
+
+        rand_insert(&db, &space, &example_agent, true).await;
+    }
+
+    let permit = db.conn_permit().await;
+    let mut con = db.from_permit(permit).unwrap();
+
+    let res = con.p2p_extrapolated_coverage(DhtArcSet::Full).unwrap();
+    println!("{:?}", res);
+    assert_eq!(1, res.len());
+
+    let res = con
+        .p2p_extrapolated_coverage(DhtArcSet::from(
+            &[
+                ArcInterval::from_bounds((1.into(), (u32::MAX / 2 - 1).into())),
+                ArcInterval::from_bounds(((u32::MAX / 2 + 1).into(), (u32::MAX - 1).into())),
+            ][..],
+        ))
+        .unwrap();
+    println!("{:?}", res);
+    assert_eq!(2, res.len());
+
+    // clean up temp dir
+    tmp_dir.close().unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_p2p_agent_store_gossip_query_sanity() {
     let tmp_dir = tempdir::TempDir::new("p2p_agent_store_gossip_query_sanity").unwrap();
 
@@ -79,7 +124,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
 
         // insert multiple times to test idempotence of "upsert"
         for _ in 0..3 {
-            rand_insert(&db, &space, &example_agent).await;
+            rand_insert(&db, &space, &example_agent, false).await;
         }
     }
 
