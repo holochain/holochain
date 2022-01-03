@@ -29,7 +29,7 @@ use tokio::time::Instant;
 pub use self::bandwidth::BandwidthThrottle;
 use self::ops::OpsBatchQueue;
 use self::state_map::RoundStateMap;
-use crate::metrics::Metrics;
+use crate::metrics::MetricsSync;
 
 use super::simple_bloom::{HowToConnect, MetaOpKey};
 
@@ -147,7 +147,7 @@ impl ShardedGossip {
         evt_sender: EventSender,
         gossip_type: GossipType,
         bandwidth: Arc<BandwidthThrottle>,
-        metrics: Metrics,
+        metrics: MetricsSync,
     ) -> Arc<Self> {
         let this = Arc::new(Self {
             ep_hnd,
@@ -367,11 +367,11 @@ pub struct ShardedGossipLocalState {
     round_map: RoundStateMap,
     /// Metrics that track remote node states and help guide
     /// the next node to gossip with.
-    metrics: Metrics,
+    metrics: MetricsSync,
 }
 
 impl ShardedGossipLocalState {
-    fn new(metrics: Metrics) -> Self {
+    fn new(metrics: MetricsSync) -> Self {
         Self {
             metrics,
             ..Default::default()
@@ -394,12 +394,12 @@ impl ShardedGossipLocalState {
         let r = self.round_map.remove(state_key);
         if let Some(r) = &r {
             if error {
-                self.metrics.record_error(&r.remote_agent_list);
+                self.metrics.write().record_error(&r.remote_agent_list);
             } else {
-                self.metrics.record_success(&r.remote_agent_list);
+                self.metrics.write().record_success(&r.remote_agent_list);
             }
         } else if init_tgt && error {
-            self.metrics.record_error(&remote_agent_list);
+            self.metrics.write().record_error(&remote_agent_list);
         }
         r
     }
@@ -417,7 +417,7 @@ impl ShardedGossipLocalState {
                     if no_current_round_exist && when_initiated.elapsed() > ROUND_TIMEOUT =>
                 {
                     tracing::error!("Tgt expired {:?}", cert);
-                    self.metrics.record_error(remote_agent_list);
+                    self.metrics.write().record_error(remote_agent_list);
                     self.initiate_tgt = None;
                 }
                 None if no_current_round_exist => {
@@ -431,7 +431,7 @@ impl ShardedGossipLocalState {
     fn new_integrated_data(&mut self) -> KitsuneResult<()> {
         let s = tracing::trace_span!("gossip_trigger", agents = ?self.show_local_agents());
         s.in_scope(|| self.log_state());
-        self.metrics.record_force_initiate();
+        self.metrics.write().record_force_initiate();
         Ok(())
     }
 
@@ -549,9 +549,13 @@ impl ShardedGossipLocal {
             {
                 let initiate_tgt = i.initiate_tgt.take().unwrap();
                 if error {
-                    i.metrics.record_error(&initiate_tgt.remote_agent_list);
+                    i.metrics
+                        .write()
+                        .record_error(&initiate_tgt.remote_agent_list);
                 } else {
-                    i.metrics.record_success(&initiate_tgt.remote_agent_list);
+                    i.metrics
+                        .write()
+                        .record_success(&initiate_tgt.remote_agent_list);
                 }
             }
             Ok(())
@@ -790,7 +794,7 @@ impl ShardedGossipLocal {
             .share_mut(|i, _| {
                 for (cert, r) in i.round_map.take_timed_out_rounds() {
                     tracing::warn!("The node {:?} has timed out their gossip round", cert);
-                    i.metrics.record_error(&r.remote_agent_list);
+                    i.metrics.write().record_error(&r.remote_agent_list);
                 }
                 Ok(())
             })
@@ -1072,7 +1076,7 @@ impl AsGossipModuleFactory for ShardedRecentGossipFactory {
         space: Arc<KitsuneSpace>,
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
-        metrics: Metrics,
+        metrics: MetricsSync,
     ) -> GossipModule {
         GossipModule(ShardedGossip::new(
             tuning_params,
@@ -1103,7 +1107,7 @@ impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
         space: Arc<KitsuneSpace>,
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
-        metrics: Metrics,
+        metrics: MetricsSync,
     ) -> GossipModule {
         GossipModule(ShardedGossip::new(
             tuning_params,

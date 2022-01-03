@@ -76,7 +76,7 @@ pub trait AsGossipModuleFactory: 'static + Send + Sync {
         space: Arc<KitsuneSpace>,
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
-        metrics: Metrics,
+        metrics: MetricsSync,
     ) -> GossipModule;
 }
 
@@ -89,7 +89,7 @@ impl GossipModuleFactory {
         space: Arc<KitsuneSpace>,
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
-        metrics: Metrics,
+        metrics: MetricsSync,
     ) -> GossipModule {
         self.0
             .spawn_gossip_task(tuning_params, space, ep_hnd, evt_sender, metrics)
