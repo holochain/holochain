@@ -302,7 +302,7 @@ pub enum AdminRequest {
     /// Insert [`Element`]s into the source chain of the [`CellId`].
     ///
     /// All elements must be authored and signed by the same agent.
-    /// The [`Dna`] (but not necessarily the cell) must already exist
+    /// The [`DnaFile`] (but not necessarily the cell) must already be installed.
     /// on this conductor.
     ///
     /// Care is needed when using this command as it can result in

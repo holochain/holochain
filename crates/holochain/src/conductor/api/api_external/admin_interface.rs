@@ -333,9 +333,9 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             }
             AddElements {
                 cell_id,
-                elements,
                 truncate,
                 validate,
+                elements,
             } => {
                 self.conductor_handle
                     .clone()
