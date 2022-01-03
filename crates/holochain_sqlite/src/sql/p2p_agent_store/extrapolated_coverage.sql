@@ -6,16 +6,16 @@ SELECT
       WHEN (storage_start_loc <= storage_end_loc) THEN IFNULL(
         CAST(storage_end_loc AS FLOAT) - CAST(storage_start_loc AS FLOAT),
         0.0
-      ) / 4294967295.0
+      )
       ELSE -- else if start is after end
       IFNULL(
         4294967295.0 - CAST(storage_start_loc AS FLOAT) + CAST(storage_end_loc AS FLOAT),
         0.0
-      ) / 4294967295.0
+      )
     END
-  ) * (
+  ) / (
     -- then extrapolate assuming similar coverage for the rest of the arc
-    4294967295.0 / CASE
+    CASE
       WHEN (:start_loc <= :end_loc) THEN -- if start is before end
       CAST(:end_loc AS FLOAT) - CAST(:start_loc AS FLOAT)
       ELSE -- else if start is after end
