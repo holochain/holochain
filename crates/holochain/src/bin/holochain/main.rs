@@ -55,6 +55,12 @@ struct Opt {
     useful when running a conductor for the first time"
     )]
     interactive: bool,
+
+    #[structopt(
+        long,
+        help = "Display version information such as git revision and HDK version"
+    )]
+    build_info: bool,
 }
 
 fn main() {
@@ -69,6 +75,11 @@ async fn async_main() {
     human_panic::setup_panic!();
 
     let opt = Opt::from_args();
+
+    if opt.build_info {
+        println!("{}", option_env!("BUILD_INFO").unwrap_or("{}"));
+        return;
+    }
 
     observability::init_fmt(opt.structured.clone()).expect("Failed to start contextual logging");
     debug!("observability initialized");

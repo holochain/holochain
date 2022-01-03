@@ -1,6 +1,6 @@
 [package]
 name = "holochain_sqlite"
-version = "0.0.20"
+version = "0.0.21"
 description = "Abstractions for persistence of Holochain state via SQLite"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -23,9 +23,9 @@ fallible-iterator = "0.2.0"
 failure = "0.1.6"
 fixt = { version = "0.0.8", path = "../fixt" }
 futures = "0.3.1"
-holo_hash = { path = "../holo_hash", features = ["rusqlite"], version = "0.0.13"}
+holo_hash = { path = "../holo_hash", features = ["rusqlite"], version = "0.0.14"}
 holochain_serialized_bytes = "=0.0.51"
-holochain_zome_types = { version = "0.0.18", path = "../holochain_zome_types" }
+holochain_zome_types = { version = "0.0.19", path = "../holochain_zome_types" }
 kitsune_p2p = { version = "0.0.18", path = "../kitsune_p2p/kitsune_p2p" }
 lazy_static = "1.4.0"
 once_cell = "1.4.1"

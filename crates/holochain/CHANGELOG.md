@@ -4,7 +4,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.0.121
+
+- **BREAKING CHANGE** Removed `app_info` from HDK [1108](https://github.com/holochain/holochain/pull/1108)
 - Permissions on host functions now return an error instead of panicking [1141](https://github.com/holochain/holochain/pull/1141)
+- Add `--build-info` CLI flag for displaying various information in JSON format. [\#1163](https://github.com/holochain/holochain/pull/1163)
 
 ## 0.0.120
 
@@ -33,7 +37,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **BREAKING CHANGE** `entry_defs` added to `zome_info` and referenced by macros [PR1055](https://github.com/holochain/holochain/pull/1055)
 
 - **BREAKING CHANGE**: The notion of “cell nicknames” (“nicks”) and “app slots” has been unified into the notion of “app roles”. This introduces several breaking changes. In general, you will need to rebuild any app bundles you are using, and potentially update some usages of the admin interface. In particular:
-
+  
   - The `slots` field in App manifests is now called `roles`
   - The `InstallApp` admin method now takes a `role_id` field instead of a `nick` field
   - In the return value for any admin method which lists installed apps, e.g. `ListEnabledApps`, any reference to `"slots"` is now named `"roles"`
@@ -63,7 +67,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `call_info` is now implemented [1047](https://github.com/holochain/holochain/pull/1047)
 
 - `dna_info` now returns `DnaInfo` correctly [\#1044](https://github.com/holochain/holochain/pull/1044)
-
+  
   - `ZomeInfo` no longer includes what is now on `DnaInfo`
   - `ZomeInfo` renames `zome_name` and `zome_id` to `name` and `id`
   - `DnaInfo` includes `name`, `hash`, `properties`
