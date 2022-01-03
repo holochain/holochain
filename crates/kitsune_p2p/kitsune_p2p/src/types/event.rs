@@ -212,6 +212,8 @@ pub fn full_time_window_inclusive() -> TimeWindowInclusive {
 }
 
 /// Generic Kitsune Request of the implementor
+/// This enum may be easier to add variants to for future updates,
+/// rather than adding a full new top-level event message type.
 pub enum KGenReq {
     /// Extrapolated Peer Coverage
     PeerExtrapCov {
