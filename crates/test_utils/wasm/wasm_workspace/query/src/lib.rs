@@ -1,11 +1,11 @@
 use hdk::prelude::*;
 
-entry_defs![Path::entry_def()];
+entry_defs![PathEntry::entry_def()];
 
 fn path(s: &str) -> ExternResult<EntryHash> {
     let path = Path::from(s);
     path.ensure()?;
-    path.hash()
+    path.path_entry_hash()
 }
 
 #[hdk_extern]

@@ -17,7 +17,7 @@ impl ShardedGossipLocal {
                     .as_ref()
                     .map(|tgt| tgt.cert == peer_cert)
                     .unwrap_or(false);
-                let when_initiated = i.initiate_tgt.as_ref().map(|i| i.when_initiated).flatten();
+                let when_initiated = i.initiate_tgt.as_ref().and_then(|i| i.when_initiated);
                 Ok((
                     i.local_agents.clone(),
                     when_initiated,

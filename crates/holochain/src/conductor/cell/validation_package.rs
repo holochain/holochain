@@ -180,7 +180,10 @@ pub(super) async fn get_as_authority(
             let query = ChainQueryFilter::default()
                 .include_entries(true)
                 .entry_type(EntryType::App(app_entry_type))
-                .sequence_range(0..header_seq);
+                .sequence_range(ChainQueryFilterRange::HeaderSeqRange(
+                    0,
+                    header_seq.saturating_sub(1),
+                ));
 
             // Collect and return the sub chain
             let elements = match cascade.get_validation_package_local(&header_hash)? {
@@ -188,17 +191,15 @@ pub(super) async fn get_as_authority(
                 None => return Ok(None.into()),
             };
 
-            let elements = elements
-                .into_iter()
-                .filter(|el| query.check(el.header()))
-                .collect();
-
-            Ok(Some(ValidationPackage::new(elements)).into())
+            Ok(Some(ValidationPackage::new(query.filter_elements(elements))).into())
         }
         RequiredValidationType::Full => {
             let query = &ChainQueryFilter::default()
                 .include_entries(true)
-                .sequence_range(0..header_seq);
+                .sequence_range(ChainQueryFilterRange::HeaderSeqRange(
+                    0,
+                    header_seq.saturating_sub(1),
+                ));
 
             // Collect and return the sub chain
             let elements = match cascade.get_validation_package_local(&header_hash)? {
@@ -206,12 +207,7 @@ pub(super) async fn get_as_authority(
                 None => return Ok(None.into()),
             };
 
-            let elements = elements
-                .into_iter()
-                .filter(|el| query.check(el.header()))
-                .collect();
-
-            Ok(Some(ValidationPackage::new(elements)).into())
+            Ok(Some(ValidationPackage::new(query.filter_elements(elements))).into())
         }
         RequiredValidationType::Custom => {
             let elements = match cascade.get_validation_package_local(&header_hash)? {

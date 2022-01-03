@@ -8,6 +8,7 @@ use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
 use holochain_p2p::event::GetRequest;
+use crate::core::ribosome::RibosomeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn must_get_header<'a>(
@@ -85,6 +86,10 @@ pub fn must_get_header<'a>(
                     }
             })
         },
-        _ => unreachable!(),
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "must_get_header".into()
+        ).to_string()))
     }
 }
