@@ -20,7 +20,7 @@ impl PeerView {
     ///
     /// NB: This includes the filter arq, since we are contributing to coverage too!
     pub fn extrapolated_coverage(&self, filter: &ArqBounds) -> f64 {
-        let filter = dbg!(filter.to_interval());
+        let filter = filter.to_interval();
         let filter_len = filter.length();
         let base = DhtArcSet::from_interval(filter.clone());
         let sum = self.filtered_arqs(filter).fold(0u64, |sum, arq| {
