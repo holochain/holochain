@@ -86,6 +86,7 @@ use holochain_state::prelude::StateMutationResult;
 use holochain_state::source_chain;
 use holochain_types::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
+use kitsune_p2p::event::{KGenReq, KGenRes};
 use kitsune_p2p::KitsuneSpace;
 use kitsune_p2p_types::config::JOIN_NETWORK_TIMEOUT;
 use std::collections::HashMap;
@@ -592,6 +593,26 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let space = event.dna_hash().to_kitsune();
         trace!(dispatch_event = ?event);
         match event {
+            holochain_p2p::event::HolochainP2pEvent::KGenReq { arg, respond, .. } => match arg {
+                KGenReq::PeerExtrapCov { space, dht_arc_set } => {
+                    let env = { self.p2p_env(space) };
+                    respond.respond(Ok(async move {
+                        use holochain_sqlite::db::AsP2pAgentStoreConExt;
+                        let permit = env.conn_permit().await;
+                        let res = tokio::task::spawn_blocking(move || {
+                            let mut conn = env.from_permit(permit)?;
+                            conn.p2p_extrapolated_coverage(dht_arc_set)
+                        })
+                        .await;
+                        let res = res
+                            .map_err(holochain_p2p::HolochainP2pError::other)
+                            .and_then(|r| r.map_err(holochain_p2p::HolochainP2pError::other))?;
+                        Ok(KGenRes::PeerExtrapCov(res))
+                    }
+                    .boxed()
+                    .into()));
+                }
+            },
             PutAgentInfoSigned {
                 peer_data, respond, ..
             } => {

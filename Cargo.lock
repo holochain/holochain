@@ -2236,7 +2236,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.0.116"
+version = "0.0.117"
 dependencies = [
  "fixt",
  "hdk_derive",
@@ -2255,7 +2255,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.0.18"
+version = "0.0.19"
 dependencies = [
  "holochain_zome_types",
  "paste",
@@ -2324,7 +2324,7 @@ dependencies = [
 
 [[package]]
 name = "holo_hash"
-version = "0.0.13"
+version = "0.0.14"
 dependencies = [
  "arbitrary",
  "base64",
@@ -2346,7 +2346,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.0.120"
+version = "0.0.121"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2431,7 +2431,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2464,7 +2464,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "anyhow",
  "futures",
@@ -2524,7 +2524,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "derive_more",
  "directories 2.0.2",
@@ -2548,7 +2548,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_keystore"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "base64",
  "ghost_actor 0.3.0-alpha.4",
@@ -2570,7 +2570,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "async-trait",
  "fixt",
@@ -2622,7 +2622,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_sqlite"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2669,7 +2669,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -2712,7 +2712,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.0.16"
+version = "0.0.17"
 dependencies = [
  "hdk",
  "serde",
@@ -2720,7 +2720,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2785,7 +2785,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "fixt",
  "holo_hash",
@@ -2843,7 +2843,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_websocket"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "criterion",
  "futures",
@@ -2871,7 +2871,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.0.18"
+version = "0.0.19"
 dependencies = [
  "arbitrary",
  "chrono",

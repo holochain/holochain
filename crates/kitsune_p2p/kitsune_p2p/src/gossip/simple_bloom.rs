@@ -185,7 +185,7 @@ pub(crate) struct SimpleBloomModInner {
     local_data_map: DataMap,
     local_key_set: KeySet,
 
-    metrics: Metrics,
+    metrics: MetricsSync,
 
     /// Metrics to be recorded at the end of this round of gossip
     pending_metrics: Vec<(Vec<Arc<KitsuneAgent>>, NodeInfo)>,
@@ -200,7 +200,7 @@ pub(crate) struct SimpleBloomModInner {
 }
 
 impl SimpleBloomModInner {
-    pub fn new(metrics: Metrics) -> Self {
+    pub fn new(metrics: MetricsSync) -> Self {
         // pick an old instant for initialization
         const ONE_DAY_MICROS: i64 = 1000 * 1000 * 60 * 60 * 24;
         let old_us = proc_count_now_us() - ONE_DAY_MICROS;
@@ -263,7 +263,7 @@ impl SimpleBloomMod {
         space: Arc<KitsuneSpace>,
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
-        metrics: Metrics,
+        metrics: MetricsSync,
     ) -> Arc<Self> {
         let inner = SimpleBloomModInner::new(metrics);
 
@@ -324,7 +324,7 @@ impl SimpleBloomMod {
         Ok(
             match self
                 .inner
-                .share_mut(|i, _| Ok(i.metrics.last_outcome(&agents)))?
+                .share_mut(|i, _| Ok(i.metrics.read().last_outcome(&agents)))?
             {
                 Some(RoundOutcome::Success(last_touch)) => Some(NodeInfo {
                     last_touch,
@@ -347,9 +347,9 @@ impl SimpleBloomMod {
     ) -> KitsuneP2pResult<()> {
         self.inner.share_mut(|i, _| {
             if info.was_err {
-                i.metrics.record_error(&agents);
+                i.metrics.write().record_error(&agents);
             } else {
-                i.metrics.record_success(&agents);
+                i.metrics.write().record_success(&agents);
             }
             Ok(())
         })?;
@@ -509,7 +509,7 @@ impl AsGossipModuleFactory for SimpleBloomModFactory {
         space: Arc<KitsuneSpace>,
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
-        metrics: Metrics,
+        metrics: MetricsSync,
     ) -> GossipModule {
         GossipModule(SimpleBloomMod::new(
             tuning_params,
