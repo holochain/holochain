@@ -166,9 +166,9 @@ impl ArqBounds {
             left_edge
         } else if arq.count % 2 == 0 {
             if left_oriented {
-                left_edge.wrapping_sub(wing)
-            } else {
                 left_edge.wrapping_sub(wing + s)
+            } else {
+                left_edge.wrapping_sub(wing)
             }
         } else {
             left_edge.wrapping_sub(wing)
@@ -299,6 +299,11 @@ impl ArqBounds {
             right += 2u64.pow(32);
         }
         Loc::from(((right - left) / 2) as u32)
+    }
+
+    /// Get a reference to the arq bounds's count.
+    pub fn count(&self) -> u32 {
+        self.count
     }
 }
 
@@ -433,5 +438,28 @@ mod tests {
         assert_eq!(rq(c.clone(), 12).map(|c| c.count), Some(256 * 256));
         assert_eq!(rq(c.clone(), 28).map(|c| c.count), Some(1));
         assert_eq!(rq(c.clone(), 29).map(|c| c.count), None);
+    }
+
+    #[test]
+    fn to_bounds_regression() {
+        // 3264675840 -> 3264675840
+        // 3264708608 -> 3264675840
+        let a1 = Arq::new(3264675840u32.into(), 16, 6);
+        // let a2 = Arq::new((3264675840u32 + 3000).into(), 16, 6);
+        let a2 = Arq::new(3264708608u32.into(), 16, 6);
+        assert_eq!(a1.to_bounds().offset + 1, a2.to_bounds().offset);
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn test_preserve_ordering_for_bounds(mut centers: Vec<u32>, count in 0u32..8, power in 10u8..20) {
+            let n = centers.len();
+            centers.sort();
+            let arqs: Vec<_> = centers.into_iter().map(|c| Arq::new(c.into(), power, count)).collect();
+            let mut bounds: Vec<_> = arqs.into_iter().map(|a| a.to_bounds()).enumerate().collect();
+            bounds.sort_by_key(|(_, b)| b.left());
+            let indices: Vec<_> = bounds.into_iter().map(|(i, _)| i).collect();
+            assert_eq!(indices, (0..n).collect::<Vec<_>>());
+        }
     }
 }

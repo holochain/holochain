@@ -28,6 +28,16 @@ impl ArqSet {
             }
         }
     }
+
+    /// Get a reference to the arq set's power.
+    pub fn power(&self) -> u8 {
+        self.power
+    }
+
+    /// Get a reference to the arq set's arqs.
+    pub fn arqs(&self) -> &[ArqBounds] {
+        self.arqs.as_ref()
+    }
 }
 
 #[test]

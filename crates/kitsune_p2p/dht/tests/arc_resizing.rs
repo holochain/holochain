@@ -100,11 +100,11 @@ fn test_scenario() {
         // start with a full arq again
         let arq = Arq::new_full(Loc::from(0x0), strat.max_power);
         let peer_arqs = generate_ideal_coverage(&mut rng, &strat, 100, jitter, 0);
-        print_arqs(&peer_arqs, 64);
 
-        let peers: Vec<_> = peer_arqs.into_iter().map(|arq| arq.to_bounds()).collect();
+        let peers = ArqSet::new(peer_arqs.into_iter().map(|arq| arq.to_bounds()).collect());
+        print_arqs(&peers, 64);
 
-        let view = PeerView::new(strat.clone(), ArqSet::new(peers));
+        let view = PeerView::new(strat.clone(), peers);
         let extrapolated = view.extrapolated_coverage(&arq.to_bounds());
         assert_eq!(extrapolated, 10.0);
 

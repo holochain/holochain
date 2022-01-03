@@ -13,8 +13,6 @@ once_cell = "1.8"
 rand = "0.8.4"
 sparse-fenwick = { path = "/home/michael/Holo/sparse-fenwick" }
 statrs = "0.15"
-quickcheck = "1"
-quickcheck_macros = "1"
 tracing = "0.1.29"
 
 [dev-dependencies]
