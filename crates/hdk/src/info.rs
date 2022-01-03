@@ -13,11 +13,6 @@ pub fn agent_info() -> ExternResult<AgentInfo> {
     HDK.with(|h| h.borrow().agent_info(()))
 }
 
-/// @todo Not implemented
-pub fn app_info() -> ExternResult<AppInfo> {
-    HDK.with(|h| h.borrow().app_info(()))
-}
-
 /// Get the DNA information.
 /// There are no inputs to [ `dna_info` ].
 ///

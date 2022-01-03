@@ -12,6 +12,7 @@ fn main() {
     let wasms_path = format!("{}/{}/", env!("CARGO_MANIFEST_DIR"), "wasm_workspace");
     println!("cargo:rerun-if-changed=Cargo.toml");
     println!("cargo:rerun-if-changed=../../../Cargo.lock");
+
     // We want to rebuild if anything upstream of the wasms has changed.
     // Since we use local paths, changes to those crates will not affect the
     // Cargo.toml, so we check each upstream local source directory directly.
