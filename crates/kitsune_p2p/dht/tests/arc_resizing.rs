@@ -8,7 +8,6 @@ use kitsune_p2p_dht::op::*;
 use kitsune_p2p_dht_arc::ArcInterval;
 
 use crate::common::quantized::generate_ideal_coverage;
-use crate::common::quantized::print_arqs;
 use crate::common::quantized::seeded_rng;
 
 #[test]
@@ -46,11 +45,14 @@ fn test_grow_by_multiple_chunks() {
 /// acceptable range
 fn test_degenerate_asymmetrical_coverage() {
     let a = Arq::new(
-        Loc::from(0x80),
-        4, // 0x10
+        Loc::from(0x100 / 2),
+        4, // log2 of 0x10
         0x10,
     );
-    assert_eq!(a.to_interval(), ArcInterval::new(0, 0x100 - 1));
+    assert_eq!(
+        a.to_interval(),
+        ArcInterval::new(0, 2u32.pow(4) * 0x100 - 1)
+    );
 
     let other = ArqBounds::from_interval(4, ArcInterval::new(0x0, 0x80)).unwrap();
     let others = ArqSet::new(vec![other; 20]);
@@ -102,15 +104,18 @@ fn test_scenario() {
         let peer_arqs = generate_ideal_coverage(&mut rng, &strat, 100, jitter, 0);
 
         let peers = ArqSet::new(peer_arqs.into_iter().map(|arq| arq.to_bounds()).collect());
+        let peer_power = peers.power();
         print_arqs(&peers, 64);
+        assert_eq!(peer_power, 26);
 
         let view = PeerView::new(strat.clone(), peers);
         let extrapolated = view.extrapolated_coverage(&arq.to_bounds());
-        assert_eq!(extrapolated, 10.0);
+        assert!(strat.min_coverage <= extrapolated && extrapolated <= strat.max_coverage());
 
         // expect that the arq shrinks
         let resized = view.update_arq(arq.clone());
-        assert_eq!(resized.power(), strat.max_power);
+        dbg!(resized.to_interval().to_ascii(64));
+        assert_eq!(resized.power(), peer_power);
         assert_eq!(resized.count(), 8);
     }
 

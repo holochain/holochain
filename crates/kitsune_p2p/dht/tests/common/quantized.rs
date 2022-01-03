@@ -103,19 +103,6 @@ pub fn generate_ideal_coverage(
         .collect()
 }
 
-/// View ascii for all arcs
-pub fn print_arqs(arqs: &ArqSet, len: usize) {
-    println!("{} arqs, power: {}", arqs.arqs().len(), arqs.power());
-    for (i, arq) in arqs.arqs().into_iter().enumerate() {
-        println!(
-            "|{}| {}:\t{}",
-            arq.to_interval().to_ascii(len),
-            i,
-            arq.count()
-        );
-    }
-}
-
 #[test]
 fn test_unit_arc() {
     let strat = ArqStrat {
@@ -123,35 +110,43 @@ fn test_unit_arc() {
         buffer: 0.2,
         ..Default::default()
     };
-    let expected_chunks = strat.min_chunks();
+    let expected_chunks = 8;
 
-    let a1 = unit_arq(&strat, 0.0, 0.0, 0);
-    assert_eq!(a1.power(), strat.min_power);
-    assert_eq!(a1.count(), 0);
-
-    let a1 = unit_arq(&strat, 0.0, 1.0, 0);
-    assert_eq!(a1.power(), 29);
-    assert_eq!(a1.count(), expected_chunks);
-
-    let a2 = unit_arq(&strat, 0.0, 1.0 / 2.0, 0);
-    assert_eq!(a2.power(), 29);
-    assert_eq!(a2.count(), expected_chunks);
-
-    let a3 = unit_arq(&strat, 0.0, 1.0 / 4.0, 0);
-    assert_eq!(a3.power(), 28);
-    assert_eq!(a3.count(), expected_chunks);
-
-    let a4 = unit_arq(&strat, 0.0, 1.0 / 8.0, 0);
-    assert_eq!(a4.power(), 27);
-    assert_eq!(a4.count(), expected_chunks);
-
-    let a5 = unit_arq(&strat, 0.0, 1.0 / 16.0, 0);
-    assert_eq!(a5.power(), 26);
-    assert_eq!(a5.count(), expected_chunks);
-
-    let a6 = unit_arq(&strat, 0.0, 1.0 / 32.0, 0);
-    assert_eq!(a6.power(), 25);
-    assert_eq!(a6.count(), expected_chunks);
+    {
+        let a = unit_arq(&strat, 0.0, 0.0, 0);
+        assert_eq!(a.power(), strat.min_power);
+        assert_eq!(a.count(), 0);
+    }
+    {
+        let a = unit_arq(&strat, 0.0, 1.0, 0);
+        assert_eq!(a.power(), 29);
+        assert_eq!(a.count(), 8);
+    }
+    {
+        let a = unit_arq(&strat, 0.0, 1.0 / 2.0, 0);
+        assert_eq!(a.power(), 28);
+        assert_eq!(a.count(), expected_chunks);
+    }
+    {
+        let a = unit_arq(&strat, 0.0, 1.0 / 4.0, 0);
+        assert_eq!(a.power(), 27);
+        assert_eq!(a.count(), expected_chunks);
+    }
+    {
+        let a = unit_arq(&strat, 0.0, 1.0 / 8.0, 0);
+        assert_eq!(a.power(), 26);
+        assert_eq!(a.count(), expected_chunks);
+    }
+    {
+        let a = unit_arq(&strat, 0.0, 1.0 / 16.0, 0);
+        assert_eq!(a.power(), 25);
+        assert_eq!(a.count(), expected_chunks);
+    }
+    {
+        let a = unit_arq(&strat, 0.0, 1.0 / 32.0, 0);
+        assert_eq!(a.power(), 24);
+        assert_eq!(a.count(), expected_chunks);
+    }
 }
 
 use proptest::proptest;

@@ -62,7 +62,7 @@ impl PeerView {
     }
 
     fn update_size(&self, mut arq: Arq) -> Arq {
-        let bounds = ArqBounds::from_arq(arq.clone());
+        let bounds = arq.to_bounds();
         let extrapolated_coverage = self.extrapolated_coverage(&bounds);
         if extrapolated_coverage < self.strat.min_coverage {
             arq.count += 1;
@@ -151,28 +151,32 @@ mod tests {
 
     use kitsune_p2p_dht_arc::ArcInterval;
 
+    use crate::arq::{pow2, print_arqs};
+
     use super::*;
 
     fn int(pow: u8, lo: u32, hi: u32) -> ArqBounds {
-        ArqBounds::from_interval(pow, ArcInterval::new(lo, hi)).unwrap()
+        ArqBounds::from_interval(pow, ArcInterval::new(pow2(pow) * lo, pow2(pow) * hi)).unwrap()
     }
 
     #[test]
     fn test_coverage() {
-        let view = PeerView::new(
-            Default::default(),
-            ArqSet::new(vec![
-                // 01
-                //  12
-                //   23
-                int(4, 0, 0x20),
-                int(4, 0x10, 0x30),
-                int(4, 0x20, 0x40),
-            ]),
-        );
-        assert_eq!(view.extrapolated_coverage(&int(4, 0, 0x10)), 1.0);
-        assert_eq!(view.extrapolated_coverage(&int(4, 0, 0x20)), 1.5);
-        assert_eq!(view.extrapolated_coverage(&int(4, 0, 0x40)), 1.5);
-        assert_eq!(view.extrapolated_coverage(&int(4, 0x10, 0x20)), 2.0);
+        let pow = 25;
+        let arqs = ArqSet::new(vec![
+            // 01
+            //  12
+            //   23
+            int(pow, 0, 0x20),
+            int(pow, 0x10, 0x30),
+            int(pow, 0x20, 0x40),
+        ]);
+        let view = PeerView::new(Default::default(), arqs);
+        assert_eq!(view.extrapolated_coverage(&int(pow, 0, 0x10)), 2.0);
+        assert_eq!(view.extrapolated_coverage(&int(pow, 0, 0x20)), 2.5);
+        assert_eq!(view.extrapolated_coverage(&int(pow, 0, 0x40)), 2.5);
+
+        // All arcs get filtered out, so this would normally be 3, but actually
+        // it's simply 1.
+        assert_eq!(view.extrapolated_coverage(&int(pow, 0x10, 0x20)), 1.0);
     }
 }

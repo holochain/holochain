@@ -40,6 +40,19 @@ impl ArqSet {
     }
 }
 
+/// View ascii for all arcs
+pub fn print_arqs(arqs: &ArqSet, len: usize) {
+    println!("{} arqs, power: {}", arqs.arqs().len(), arqs.power());
+    for (i, arq) in arqs.arqs().into_iter().enumerate() {
+        println!(
+            "|{}| {}:\t{}",
+            arq.to_interval().to_ascii(len),
+            i,
+            arq.count()
+        );
+    }
+}
+
 #[test]
 fn normalize_arqs() {
     let s = ArqSet::new(vec![

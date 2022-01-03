@@ -14,6 +14,14 @@ use kitsune_p2p_dht_arc::ArcInterval;
 
 use crate::op::Loc;
 
+pub fn pow2(p: u8) -> u32 {
+    2u32.pow(p as u32)
+}
+
+pub fn pow2f(p: u8) -> f64 {
+    2f64.powf(p as f64)
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Arq {
     /// Location around which this coverage is centered
@@ -63,19 +71,29 @@ impl Arq {
     }
 
     pub fn to_bounds(&self) -> ArqBounds {
-        ArqBounds::from_arq(self.clone())
+        let s = self.spacing();
+        let c = self.center.as_u32();
+        let center_offset = c / s;
+        let left_oriented = c - center_offset * s < s / 2;
+        let wing = if left_oriented {
+            self.count / 2
+        } else {
+            (self.count.saturating_sub(1)) / 2
+        };
+        let offset = if self.count == 0 {
+            center_offset
+        } else {
+            center_offset.wrapping_sub(wing)
+        };
+        ArqBounds {
+            offset,
+            power: self.power,
+            count: self.count,
+        }
     }
 
     pub fn to_interval(&self) -> ArcInterval {
         self.to_bounds().to_interval()
-    }
-
-    /// true if the centerpoint is closer to the left edge of the central chunk,
-    /// false if closer to the right edge.
-    fn left_oriented(&self) -> bool {
-        let s = Wrapping(self.spacing());
-        let left = *self.center / s * s;
-        *self.center - left < s / Wrapping(2)
     }
 
     /// Calculate chunks at successive distances from the center.
@@ -156,30 +174,6 @@ pub struct ArqBounds {
 }
 
 impl ArqBounds {
-    // TODO: test
-    pub fn from_arq(arq: Arq) -> Self {
-        let s = arq.spacing();
-        let left_edge = arq.center.as_u32() / s * s;
-        let left_oriented = arq.center.as_u32() - left_edge < s / 2;
-        let wing = arq.count as u32 / 2 * s;
-        let offset = if arq.count == 0 {
-            left_edge
-        } else if arq.count % 2 == 0 {
-            if left_oriented {
-                left_edge.wrapping_sub(wing + s)
-            } else {
-                left_edge.wrapping_sub(wing)
-            }
-        } else {
-            left_edge.wrapping_sub(wing)
-        } / s;
-        Self {
-            offset: offset,
-            power: arq.power,
-            count: arq.count,
-        }
-    }
-
     pub fn from_interval_rounded(power: u8, interval: ArcInterval) -> Self {
         Self::from_interval_inner(power, interval, true).unwrap()
     }
@@ -213,6 +207,8 @@ impl ArqBounds {
                     (2u64.pow(32) - (hi as u64) + (lo as u64) + 1) as u32
                 };
                 let count = diff / s;
+                // TODO: this is kinda wrong. The right bound of the interval
+                // should be 1 less.
                 if rounded || lo == offset * s && diff == count * s {
                     Some(Self {
                         offset,
@@ -250,7 +246,7 @@ impl ArqBounds {
             let mut b = self.clone();
             a.count = 1;
             b.count = 1;
-            b.offset += self.count - 1;
+            b.offset = b.offset.wrapping_add(self.count - 1);
             Some((a, b))
         }
     }
@@ -285,8 +281,8 @@ impl ArqBounds {
 
     // TODO: test
     pub fn right(&self) -> u32 {
-        ((self.offset.wrapping_add(self.count)) as u64
-            * 2u64.pow(self.power as u32).wrapping_sub(1)) as u32
+        ((self.offset.wrapping_add(self.count)) as u64 * 2u64.pow(self.power as u32))
+            .wrapping_sub(1) as u32
     }
 
     /// Return a plausible place for the centerpoint of the Arq.
@@ -337,13 +333,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_boundaries() {
-        let b = ArqBounds::from_interval(4, ArcInterval::new(-16, 15)).unwrap();
-        assert_eq!(b.left(), 0);
-        assert_eq!(b.right(), 0);
-    }
-
-    #[test]
     fn test_is_full() {
         assert!(!is_full(31, 1));
         assert!(is_full(31, 2));
@@ -381,53 +370,142 @@ mod tests {
         assert_eq!(c.chunk_at(3).offset, 14);
     }
 
+    /// A function to help make it clearer how an expected ArcInterval
+    /// is being constructed:
+    /// - p: the power
+    /// - e: the left edge of the center chunk
+    /// - l: how many chunks are to the left of `e`
+    /// - r: how many chunks are to the right of `e`
+    fn arc_interval_helper(p: u8, e: u32, l: u32, r: u32) -> ArcInterval {
+        ArcInterval::new(
+            e.wrapping_sub(2u32.pow(p as u32) * l),
+            e.wrapping_add(2u32.pow(p as u32) * r).wrapping_sub(1),
+        )
+    }
+
     #[test]
-    fn coverage_center_parity() {
+    fn test_interval_progression_left_oriented() {
+        let power = 2;
+        let mut a = Arq {
+            center: Loc::from(41),
+            power,
+            count: 0,
+        };
+
+        let ih = |e, l, r| arc_interval_helper(power, e, l, r);
+
+        assert_eq!(a.to_interval(), ArcInterval::Empty);
+
+        a.count = 1;
+        assert_eq!(a.to_interval(), ih(40, 0, 1));
+
+        a.count = 2;
+        assert_eq!(a.to_interval(), ih(40, 1, 1));
+
+        a.count = 3;
+        assert_eq!(a.to_interval(), ih(40, 1, 2));
+
+        a.count = 4;
+        assert_eq!(a.to_interval(), ih(40, 2, 2));
+
+        a.count = 5;
+        assert_eq!(a.to_interval(), ih(40, 2, 3));
+
+        a.count = 33;
+        // the left edge overflows
+        assert_eq!(a.to_interval(), ih(40, 16, 17));
+
+        let c = u32::MAX - 41 + 1;
+        let r = u32::MAX - 44 + 1;
+        // the right edge overflows
+        a.center = Loc::from(c);
+        assert_eq!(a.to_interval(), ih(r, 16, 17));
+    }
+
+    #[test]
+    fn test_interval_progression_right_oriented() {
+        let power = 2;
+        let mut a = Arq {
+            center: Loc::from(42),
+            power,
+            count: 0,
+        };
+
+        let ih = |e, l, r| arc_interval_helper(power, e, l, r);
+
+        assert_eq!(a.to_interval(), ArcInterval::Empty);
+
+        a.count = 1;
+        assert_eq!(a.to_interval(), ih(40, 0, 1));
+
+        a.count = 2;
+        assert_eq!(a.to_interval(), ih(40, 0, 2));
+
+        a.count = 3;
+        assert_eq!(a.to_interval(), ih(40, 1, 2));
+
+        a.count = 4;
+        assert_eq!(a.to_interval(), ih(40, 1, 3));
+
+        a.count = 5;
+        assert_eq!(a.to_interval(), ih(40, 2, 3));
+
+        a.count = 33;
+        // the left edge overflows
+        assert_eq!(a.to_interval(), ih(40, 16, 17));
+
+        let c = u32::MAX - 42 + 1;
+        let r = u32::MAX - 44 + 1;
+        // the right edge overflows
+        a.center = Loc::from(c);
+        assert_eq!(a.to_interval(), ih(r, 16, 17));
+    }
+
+    #[test]
+    fn arq_center_parity() {
         // An odd chunk count leads to the same number of chunks around the central chunk.
         let mut c = Arq {
             center: Loc::from(42),
             power: 2,
             count: 5,
         };
-        assert_eq!(
-            c.to_interval(),
-            ArcInterval::new(40 - 4 * 2, 40 + 4 * 3 - 1)
-        );
+
+        let ih = |e, l, r| arc_interval_helper(2, e, l, r);
+
+        assert_eq!(c.to_interval(), ih(40, 2, 3));
 
         // An even chunk count leads to the new chunk being added to the right
         // in this case, since 42 is closer to the right edge of its containing
         // chunk (43) than to the left edge (40)
         c.count = 6;
-        assert_eq!(
-            c.to_interval(),
-            ArcInterval::new(40 - 4 * 2, 40 + 4 * 4 - 1)
-        );
+        assert_eq!(c.to_interval(), ih(40, 2, 4));
 
         // If the center is shifted by 1, then the opposite is true.
         c.center = Loc::from(*c.center - Wrapping(1));
-        assert_eq!(
-            c.to_interval(),
-            ArcInterval::new(40 - 4 * 3, 40 + 4 * 3 - 1)
-        );
+        assert_eq!(c.to_interval(), ih(40, 3, 3));
     }
 
     #[test]
-    fn coverage_requantize() {
+    fn arq_requantize() {
         let c = Arq {
             center: Loc::from(42),
             power: 20,
             count: 10,
         };
 
-        let rq = |a: Arq, p| a.clone().requantize(p).then(|| a);
+        let rq = |c: &Arq, p| {
+            let mut c = c.clone();
+            let ok = c.requantize(p);
+            ok.then(|| c)
+        };
 
-        assert_eq!(rq(c.clone(), 18).map(|c| c.count), Some(40));
-        assert_eq!(rq(c.clone(), 19).map(|c| c.count), Some(20));
-        assert_eq!(rq(c.clone(), 20).map(|c| c.count), Some(10));
-        assert_eq!(rq(c.clone(), 21).map(|c| c.count), Some(5));
-        assert_eq!(rq(c.clone(), 22).map(|c| c.count), None);
-        assert_eq!(rq(c.clone(), 23).map(|c| c.count), None);
-        assert_eq!(rq(c.clone(), 24).map(|c| c.count), None);
+        assert_eq!(rq(&c, 18).map(|c| c.count), Some(40));
+        assert_eq!(rq(&c, 19).map(|c| c.count), Some(20));
+        assert_eq!(rq(&c, 20).map(|c| c.count), Some(10));
+        assert_eq!(rq(&c, 21).map(|c| c.count), Some(5));
+        assert_eq!(rq(&c, 22).map(|c| c.count), None);
+        assert_eq!(rq(&c, 23).map(|c| c.count), None);
+        assert_eq!(rq(&c, 24).map(|c| c.count), None);
 
         let c = Arq {
             center: Loc::from(42),
@@ -435,9 +513,9 @@ mod tests {
             count: 256,
         };
 
-        assert_eq!(rq(c.clone(), 12).map(|c| c.count), Some(256 * 256));
-        assert_eq!(rq(c.clone(), 28).map(|c| c.count), Some(1));
-        assert_eq!(rq(c.clone(), 29).map(|c| c.count), None);
+        assert_eq!(rq(&c, 12).map(|c| c.count), Some(256 * 256));
+        assert_eq!(rq(&c, 28).map(|c| c.count), Some(1));
+        assert_eq!(rq(&c, 29).map(|c| c.count), None);
     }
 
     #[test]
@@ -453,13 +531,40 @@ mod tests {
     proptest::proptest! {
         #[test]
         fn test_preserve_ordering_for_bounds(mut centers: Vec<u32>, count in 0u32..8, power in 10u8..20) {
+            // given a list of sorted centerpoints
             let n = centers.len();
             centers.sort();
+
+            // build identical arqs at each centerpoint and convert them to ArqBounds
             let arqs: Vec<_> = centers.into_iter().map(|c| Arq::new(c.into(), power, count)).collect();
             let mut bounds: Vec<_> = arqs.into_iter().map(|a| a.to_bounds()).enumerate().collect();
+
+            // Ensure the list of ArqBounds also grows monotonically.
+            // However, there may be one point at which monotonicity is broken,
+            // corresponding to the left edge wrapping around.
             bounds.sort_by_key(|(_, b)| b.left());
-            let indices: Vec<_> = bounds.into_iter().map(|(i, _)| i).collect();
-            assert_eq!(indices, (0..n).collect::<Vec<_>>());
+
+            let mut prev = 0;
+            let mut split = None;
+            for (i, (ix, _)) in bounds.iter().enumerate() {
+                if prev > *ix {
+                    split = Some(i);
+                    break;
+                }
+                prev = *ix;
+            }
+
+            // Split the list of bounds in two, if a discontinuity was found,
+            // and check the monotonicity of each piece separately.
+            let (b1, b2) = bounds.split_at(split.unwrap_or(0));
+            let ix1: Vec<_> = b1.iter().map(|(i, _)| i).collect();
+            let ix2: Vec<_> = b2.iter().map(|(i, _)| i).collect();
+            let mut ix1s = ix1.clone();
+            let mut ix2s = ix2.clone();
+            ix1s.sort();
+            ix2s.sort();
+            assert_eq!(ix1, ix1s);
+            assert_eq!(ix2, ix2s);
         }
     }
 }
