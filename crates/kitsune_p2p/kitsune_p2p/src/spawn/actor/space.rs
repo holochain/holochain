@@ -64,6 +64,12 @@ ghost_actor::ghost_chan! {
 
         /// Incoming Metric Exchange
         fn incoming_metric_exchange(space: KSpace, msgs: VecMXM) -> ();
+
+        /// New Con
+        fn new_con(url: TxUrl, con: WireConHnd) -> ();
+
+        /// Del Con
+        fn del_con(url: TxUrl) -> ();
     }
 }
 
@@ -413,6 +419,20 @@ impl SpaceInternalHandler for Space {
         msgs: Vec<MetricExchangeMsg>,
     ) -> InternalHandlerResult<()> {
         self.ro_inner.metric_exchange.write().ingest_msgs(msgs);
+        unit_ok_fut()
+    }
+
+    fn handle_new_con(
+        &mut self,
+        url: TxUrl,
+        con: Tx2ConHnd<wire::Wire>,
+    ) -> InternalHandlerResult<()> {
+        self.ro_inner.metric_exchange.write().new_con(url, con);
+        unit_ok_fut()
+    }
+
+    fn handle_del_con(&mut self, url: TxUrl) -> InternalHandlerResult<()> {
+        self.ro_inner.metric_exchange.write().del_con(url);
         unit_ok_fut()
     }
 }

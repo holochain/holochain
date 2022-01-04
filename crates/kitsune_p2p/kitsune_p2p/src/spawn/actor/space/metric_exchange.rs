@@ -4,11 +4,17 @@ use kitsune_p2p_types::dht_arc::DhtArcSet;
 
 const EXTRAP_COV_CHECK_FREQ_MS: u128 = 1000 * 60; // update once per minute
 
+struct RemoteRef {
+    agents: Vec<Arc<KitsuneAgent>>,
+    con: Tx2ConHnd<wire::Wire>,
+}
+
 pub(crate) struct MetricExchange {
     shutdown: bool,
     extrap_cov: f32,
     #[allow(dead_code)]
     metrics: MetricsSync,
+    remote_refs: HashMap<TxUrl, RemoteRef>,
 }
 
 impl MetricExchange {
@@ -17,6 +23,7 @@ impl MetricExchange {
             shutdown: false,
             extrap_cov: 0.0,
             metrics,
+            remote_refs: HashMap::new(),
         }
     }
 
@@ -25,6 +32,29 @@ impl MetricExchange {
     }
 
     pub fn tick(&mut self) {}
+
+    pub fn new_con(&mut self, url: TxUrl, con: Tx2ConHnd<wire::Wire>) {
+        use std::collections::hash_map::Entry::*;
+        match self.remote_refs.entry(url) {
+            Vacant(e) => {
+                e.insert(RemoteRef {
+                    agents: vec![],
+                    con,
+                });
+            }
+            Occupied(mut e) => {
+                if e.get().con != con {
+                    let e = e.get_mut();
+                    e.con = con;
+                    e.agents = vec![];
+                }
+            }
+        }
+    }
+
+    pub fn del_con(&mut self, url: TxUrl) {
+        self.remote_refs.remove(&url);
+    }
 
     pub fn ingest_msgs(&mut self, _msgs: Vec<MetricExchangeMsg>) {}
 }

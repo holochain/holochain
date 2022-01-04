@@ -67,6 +67,12 @@ ghost_actor::ghost_chan! {
 
         /// Incoming Metric Exchange
         fn incoming_metric_exchange(space: KSpace, msgs: VecMXM) -> ();
+
+        /// New Con
+        fn new_con(url: TxUrl, con: WireConHnd) -> ();
+
+        /// Del Con
+        fn del_con(url: TxUrl) -> ();
     }
 }
 
@@ -209,21 +215,22 @@ impl KitsuneP2pActor {
                         #[allow(clippy::single_match)]
                         match event {
                             OutgoingConnection(Tx2EpConnection {
-                                con: _,
-                                url: _,
+                                con,
+                                url,
                             }) => {
+                                let _ = i_s.new_con(url, con).await;
                             }
                             IncomingConnection(Tx2EpConnection {
-                                con: _,
-                                url: _,
+                                con,
+                                url,
                             }) => {
+                                let _ = i_s.new_con(url, con).await;
                             }
                             ConnectionClosed(Tx2EpConnectionClosed {
-                                con: _,
-                                url: _,
-                                code: _,
-                                reason: _,
+                                url,
+                                ..
                             }) => {
+                                let _ = i_s.del_con(url).await;
                             }
                             IncomingRequest(Tx2EpIncomingRequest { data, respond, .. }) => {
                                 match data {
@@ -539,6 +546,38 @@ impl InternalHandler for KitsuneP2pActor {
         Ok(async move {
             let (_, space_inner) = space_sender.await;
             space_inner.incoming_metric_exchange(space, msgs).await
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_new_con(
+        &mut self,
+        url: TxUrl,
+        con: Tx2ConHnd<wire::Wire>,
+    ) -> InternalHandlerResult<()> {
+        let spaces = self.spaces.iter().map(|(_, s)| s.get()).collect::<Vec<_>>();
+        Ok(async move {
+            let mut all = Vec::new();
+            for (_, space) in futures::future::join_all(spaces).await {
+                all.push(space.new_con(url.clone(), con.clone()));
+            }
+            let _ = futures::future::join_all(all).await;
+            Ok(())
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_del_con(&mut self, url: TxUrl) -> InternalHandlerResult<()> {
+        let spaces = self.spaces.iter().map(|(_, s)| s.get()).collect::<Vec<_>>();
+        Ok(async move {
+            let mut all = Vec::new();
+            for (_, space) in futures::future::join_all(spaces).await {
+                all.push(space.del_con(url.clone()));
+            }
+            let _ = futures::future::join_all(all).await;
+            Ok(())
         }
         .boxed()
         .into())
