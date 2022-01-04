@@ -358,6 +358,73 @@ pub fn check_update_reference(
     }
 }
 
+/// Validate a chain of headers with an optional starting point.
+pub fn validate_chain<'iter>(
+    mut headers: impl Iterator<Item = &'iter HeaderHashed>,
+    persisted_chain_head: &Option<(HeaderHash, u32)>,
+) -> SysValidationResult<()> {
+    // Check the chain starts in a valid way.
+    let mut last_item = match headers.next() {
+        Some(hh) => {
+            let header = hh.as_content();
+            let hash = hh.as_hash();
+            match persisted_chain_head {
+                Some((prev_hash, prev_seq)) => {
+                    check_prev_header_chain(prev_hash, *prev_seq, header)
+                        .map_err(ValidationOutcome::from)?;
+                }
+                None => {
+                    // If there's no persisted chain head, then the first header
+                    // must be a DNA.
+                    if !matches!(header, Header::Dna(_)) {
+                        return Err(ValidationOutcome::from(PrevHeaderError::InvalidRoot).into());
+                    }
+                }
+            }
+            let seq = header.header_seq();
+            (hash, seq)
+        }
+        None => return Ok(()),
+    };
+
+    for hh in headers {
+        let header = hh.as_content();
+        let hash = hh.as_hash();
+        // Check each item of the chain is valid.
+        check_prev_header_chain(last_item.0, last_item.1, header)
+            .map_err(ValidationOutcome::from)?;
+        last_item = (hash, header.header_seq());
+    }
+    Ok(())
+}
+
+// Check the header is valid for the previous header.
+fn check_prev_header_chain(
+    prev_header_hash: &HeaderHash,
+    prev_header_seq: u32,
+    header: &Header,
+) -> Result<(), PrevHeaderError> {
+    // DNA cannot appear later in the chain.
+    if matches!(header, Header::Dna(_)) {
+        Err(PrevHeaderError::InvalidRoot)
+    } else if header.prev_header().map_or(true, |p| p != prev_header_hash) {
+        // Check the prev hash matches.
+        Err(PrevHeaderError::HashMismatch)
+    } else if header
+        .header_seq()
+        .checked_sub(1)
+        .map_or(true, |s| prev_header_seq != s)
+    {
+        // Check the prev seq is one less.
+        Err(PrevHeaderError::InvalidSeq(
+            header.header_seq(),
+            prev_header_seq,
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 /// If we are not holding this header then
 /// retrieve it and send it as a RegisterAddLink DhtOp
 /// to our incoming_dht_ops_workflow.

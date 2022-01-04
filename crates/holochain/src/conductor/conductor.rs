@@ -503,7 +503,8 @@ where
         })
     }
 
-    fn get_or_create_space(&self, dna_hash: &DnaHash) -> ConductorResult<Space> {
+    /// Get a dna space or create it if one doesn't exist.
+    pub(super) fn get_or_create_space(&self, dna_hash: &DnaHash) -> ConductorResult<Space> {
         self.spaces.get_or_create_space(dna_hash)
     }
 
