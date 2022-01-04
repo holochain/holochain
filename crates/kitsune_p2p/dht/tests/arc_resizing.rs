@@ -85,7 +85,8 @@ fn test_scenario() {
     {
         // start with a full arq
         let arq = Arq::new_full(Loc::from(0x0), strat.max_power);
-        let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, 10, jitter, 0)
+        // create 10 peers, all with full arcs, fully covering the DHT
+        let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, None, 10, jitter, 0)
             .into_iter()
             .map(|arq| arq.to_bounds())
             .collect();
@@ -101,16 +102,23 @@ fn test_scenario() {
     {
         // start with a full arq again
         let arq = Arq::new_full(Loc::from(0x0), strat.max_power);
-        let peer_arqs = generate_ideal_coverage(&mut rng, &strat, 100, jitter, 0);
+        // create 100 peers, with arcs at about 10%,
+        // covering a bit more than they need to
+        let peer_arqs =
+            generate_ideal_coverage(&mut rng, &strat, Some(13.0), 100, jitter, 0).into_iter();
+        // .enumerate()
+        // .filter(|(i, _)| i % 10 == 0)
+        // .map(|(_, a)| a);
 
-        let peers = ArqSet::new(peer_arqs.into_iter().map(|arq| arq.to_bounds()).collect());
+        let peers = ArqSet::new(peer_arqs.map(|arq| arq.to_bounds()).collect());
         let peer_power = peers.power();
         print_arqs(&peers, 64);
         assert_eq!(peer_power, 26);
 
         let view = PeerView::new(strat.clone(), peers);
         let extrapolated = view.extrapolated_coverage(&arq.to_bounds());
-        assert!(strat.min_coverage <= extrapolated && extrapolated <= strat.max_coverage());
+        assert!(extrapolated > strat.max_coverage());
+        // assert!(strat.min_coverage <= extrapolated && extrapolated <= strat.max_coverage());
 
         // expect that the arq shrinks
         let resized = view.update_arq(arq.clone());

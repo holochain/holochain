@@ -18,11 +18,23 @@ impl PeerView {
 
     /// Extrapolate the coverage of the entire network from our local view.
     ///
-    /// NB: This includes the filter arq, since we are contributing to coverage too!
+    /// NB: This includes the filter arq, since our arc is contributing to total coverage too!
     pub fn extrapolated_coverage(&self, filter: &ArqBounds) -> f64 {
         let filter = filter.to_interval();
+        if filter == ArcInterval::Empty {
+            return 0.0;
+        }
         let filter_len = filter.length();
         let base = DhtArcSet::from_interval(filter.clone());
+
+        // FIXME: We can't just filter arcs on the fly here, because we might be
+        // trying to get coverage info for an area we don't have arcs for
+        // (because we don't store arcs for agents outside of our arc).
+        // So, we need to extrapolate the arcs we do have to extend into the
+        // unknown area outside the filter.
+        // For now though, just filter arcs on the fly so we have something to test.
+        // But, this means that the behavior for growing arcs is going to be a bit
+        // different in the future.
         let sum = self.filtered_arqs(filter).fold(0u64, |sum, arq| {
             let arc = arq.to_interval();
             let s = DhtArcSet::from_interval(arc);
@@ -56,21 +68,44 @@ impl PeerView {
     /// More detail on these assumptions here:
     /// https://hackmd.io/@hololtd/r1IAIbr5Y/https%3A%2F%2Fhackmd.io%2FK_fkBj6XQO2rCUZRRL9n2g
     pub fn update_arq(&self, mut arq: Arq) -> Arq {
-        arq = self.update_power(arq);
-        arq = self.update_size(arq);
-        arq
-    }
+        let mut was_over = false;
+        let mut was_under = false;
 
-    fn update_size(&self, mut arq: Arq) -> Arq {
-        let bounds = arq.to_bounds();
-        let extrapolated_coverage = self.extrapolated_coverage(&bounds);
-        if extrapolated_coverage < self.strat.min_coverage {
-            arq.count += 1;
-        } else if extrapolated_coverage > self.strat.max_coverage() {
-            // shrink
-            arq.count -= 1;
-        };
-        arq
+        // FIXME: this is the part to work on next
+        loop {
+            let bounds = arq.to_bounds();
+            let cov = self.extrapolated_coverage(&bounds);
+            let under = cov < self.strat.min_coverage;
+            let over = cov > self.strat.max_coverage();
+
+            dbg!(cov, &arq);
+            dbg!((under, over, was_under, was_over));
+            if under {
+                if was_over {
+                    if !arq.requantize(arq.power - 1) {
+                        arq.count += 1;
+                        arq.requantize(arq.power - 1);
+                    }
+                } else {
+                    arq.count += 1;
+                }
+            } else if over {
+                if was_under {
+                    if !arq.requantize(arq.power - 1) {
+                        arq.count -= 1;
+                        arq.requantize(arq.power - 1);
+                    }
+                } else {
+                    arq.count -= 1;
+                }
+            } else {
+                break;
+            }
+
+            was_under = under;
+            was_over = over;
+        }
+        self.update_power(arq)
     }
 
     #[allow(unused_parens)]

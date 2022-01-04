@@ -81,6 +81,7 @@ pub fn unit_arq(strat: &ArqStrat, unit_center: f64, unit_len: f64, power_offset:
 pub fn generate_ideal_coverage(
     rng: &mut StdRng,
     strat: &ArqStrat,
+    cov: Option<f64>,
     n: u32,
     jitter: f64,
     power_offset: i8,
@@ -90,7 +91,7 @@ pub fn generate_ideal_coverage(
 
     let nf = n as f64;
     // aim for the middle of the coverage target range
-    let coverage = (strat.min_coverage + strat.max_coverage()) / 2.0;
+    let coverage = cov.unwrap_or_else(|| (strat.min_coverage + strat.max_coverage()) / 2.0);
     let len = (coverage / nf).min(1.0);
 
     (0..n)
@@ -163,7 +164,7 @@ fn test_ideal_coverage_case() {
 
     let mut rng = seeded_rng(None);
     let arq = Arq::new_full(Loc::from(0x0), strat.max_power);
-    let peer_arqs = generate_ideal_coverage(&mut rng, &strat, 100, 0.0, 0);
+    let peer_arqs = generate_ideal_coverage(&mut rng, &strat, None, 100, 0.0, 0);
 
     let peers = ArqSet::new(peer_arqs.into_iter().map(|arq| arq.to_bounds()).collect());
 
@@ -195,7 +196,7 @@ proptest! {
         };
         let mut rng = seeded_rng(None);
         let arq = Arq::new_full(Loc::from(0x0), strat.max_power);
-        let peer_arqs = generate_ideal_coverage(&mut rng, &strat, 100, 0.0, 0);
+        let peer_arqs = generate_ideal_coverage(&mut rng, &strat, None, 100, 0.0, 0);
 
         let peers = ArqSet::new(peer_arqs.into_iter().map(|arq| arq.to_bounds()).collect());
 
