@@ -240,6 +240,7 @@ async fn test_rpc_multi_logic_mocked() {
             config.tuning_params.concurrent_limit_per_thread,
         )),
         config,
+        metrics: Default::default(),
     });
 
     let basis = Arc::new(KitsuneBasis(vec![0; 36]));

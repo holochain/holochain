@@ -137,7 +137,7 @@ CREATE TABLE IF NOT EXISTS DhtOp (
     dependency          BLOB           NULL,
 
 
-    FOREIGN KEY(header_hash) REFERENCES Header(hash)
+    FOREIGN KEY(header_hash) REFERENCES Header(hash) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS DhtOp_type_dep_idx ON DhtOp ( type, dependency );
 CREATE INDEX IF NOT EXISTS DhtOp_validation_stage_idx ON DhtOp ( validation_stage, type, dependency );

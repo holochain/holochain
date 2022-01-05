@@ -4,6 +4,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Adds the ability to manually insert elements into a source chain using the `AdminRequest::AddElements` command. Please check the docs and PR for more details / warnings on proper usage. [#1166](https://github.com/holochain/holochain/pull/1166)
+## 0.0.21
+
 ## 0.0.20
 
 ## 0.0.19

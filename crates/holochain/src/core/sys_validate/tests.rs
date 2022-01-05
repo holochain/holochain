@@ -430,3 +430,135 @@ async fn incoming_ops_filters_private_entry() {
     });
     assert_eq!(num_entries, 0);
 }
+
+#[test]
+/// Test the chain validation works.
+fn valid_chain_test() {
+    let author = fixt!(AgentPubKey);
+    // Create a valid chain.
+    let mut headers = vec![];
+    headers.push(HeaderHashed::from_content_sync(Header::Dna(Dna {
+        author: author.clone(),
+        timestamp: Timestamp::from_micros(0),
+        hash: fixt!(DnaHash),
+    })));
+    headers.push(HeaderHashed::from_content_sync(Header::Create(Create {
+        author: author.clone(),
+        timestamp: Timestamp::from_micros(1),
+        header_seq: 1,
+        prev_header: headers[0].to_hash(),
+        entry_type: fixt!(EntryType),
+        entry_hash: fixt!(EntryHash),
+    })));
+    headers.push(HeaderHashed::from_content_sync(Header::Create(Create {
+        author: author.clone(),
+        timestamp: Timestamp::from_micros(2),
+        header_seq: 2,
+        prev_header: headers[1].to_hash(),
+        entry_type: fixt!(EntryType),
+        entry_hash: fixt!(EntryHash),
+    })));
+    // Valid chain passes.
+    validate_chain(headers.iter(), &None).expect("Valid chain");
+
+    // Create a forked chain.
+    let mut fork = headers.clone();
+    fork.push(HeaderHashed::from_content_sync(Header::Create(Create {
+        author: author.clone(),
+        timestamp: Timestamp::from_micros(10),
+        header_seq: 1,
+        prev_header: headers[0].to_hash(),
+        entry_type: fixt!(EntryType),
+        entry_hash: fixt!(EntryHash),
+    })));
+    let err = validate_chain(fork.iter(), &None).expect_err("Forked chain");
+    assert!(matches!(
+        err,
+        SysValidationError::ValidationOutcome(ValidationOutcome::PrevHeaderError(
+            PrevHeaderError::HashMismatch
+        ))
+    ));
+
+    // Test a chain with the wrong seq.
+    let mut wrong_seq = headers.clone();
+    *wrong_seq[2].as_content_mut().header_seq_mut().unwrap() = 3;
+    let err = validate_chain(wrong_seq.iter(), &None).expect_err("Wrong seq");
+    assert!(matches!(
+        err,
+        SysValidationError::ValidationOutcome(ValidationOutcome::PrevHeaderError(
+            PrevHeaderError::InvalidSeq(_, _)
+        ))
+    ));
+
+    // Test a wrong root gets rejected.
+    let mut wrong_root = headers.clone();
+    wrong_root[0] = HeaderHashed::from_content_sync(Header::Create(Create {
+        author: author.clone(),
+        timestamp: Timestamp::from_micros(0),
+        header_seq: 0,
+        prev_header: headers[0].to_hash(),
+        entry_type: fixt!(EntryType),
+        entry_hash: fixt!(EntryHash),
+    }));
+    let err = validate_chain(wrong_root.iter(), &None).expect_err("Wrong root");
+    assert!(matches!(
+        err,
+        SysValidationError::ValidationOutcome(ValidationOutcome::PrevHeaderError(
+            PrevHeaderError::InvalidRoot
+        ))
+    ));
+
+    // Test without dna at root gets rejected.
+    let mut dna_not_at_root = headers.clone();
+    dna_not_at_root.push(headers[0].clone());
+    let err = validate_chain(dna_not_at_root.iter(), &None).expect_err("Dna not at root");
+    assert!(matches!(
+        err,
+        SysValidationError::ValidationOutcome(ValidationOutcome::PrevHeaderError(
+            PrevHeaderError::InvalidRoot
+        ))
+    ));
+
+    // Test if there is a existing head that a dna in the new chain is rejected.
+    let err =
+        validate_chain(headers.iter(), &Some((fixt!(HeaderHash), 0))).expect_err("Dna not at root");
+    assert!(matches!(
+        err,
+        SysValidationError::ValidationOutcome(ValidationOutcome::PrevHeaderError(
+            PrevHeaderError::InvalidRoot
+        ))
+    ));
+
+    // Check a sequence that is broken gets rejected.
+    let mut wrong_seq = headers[1..].to_vec();
+    *wrong_seq[0].as_content_mut().header_seq_mut().unwrap() = 3;
+    *wrong_seq[1].as_content_mut().header_seq_mut().unwrap() = 4;
+    let err = validate_chain(
+        wrong_seq.iter(),
+        &Some((wrong_seq[0].prev_header().unwrap().clone(), 0)),
+    )
+    .expect_err("Wrong seq");
+    assert!(matches!(
+        err,
+        SysValidationError::ValidationOutcome(ValidationOutcome::PrevHeaderError(
+            PrevHeaderError::InvalidSeq(_, _)
+        ))
+    ));
+
+    // Check the correct sequence gets accepted with a root.
+    let correct_seq = headers[1..].to_vec();
+    validate_chain(
+        correct_seq.iter(),
+        &Some((correct_seq[0].prev_header().unwrap().clone(), 0)),
+    )
+    .expect("Correct seq");
+
+    let err = validate_chain(correct_seq.iter(), &Some((fixt!(HeaderHash), 0)))
+        .expect_err("Hash is wrong");
+    assert!(matches!(
+        err,
+        SysValidationError::ValidationOutcome(ValidationOutcome::PrevHeaderError(
+            PrevHeaderError::HashMismatch
+        ))
+    ));
+}

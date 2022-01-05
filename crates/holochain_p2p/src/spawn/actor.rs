@@ -5,13 +5,7 @@ use crate::*;
 
 use futures::future::FutureExt;
 use kitsune_p2p::actor::BroadcastTo;
-use kitsune_p2p::event::full_time_window;
-use kitsune_p2p::event::MetricDatum;
-use kitsune_p2p::event::MetricKind;
-use kitsune_p2p::event::MetricQuery;
-use kitsune_p2p::event::MetricQueryAnswer;
-use kitsune_p2p::event::TimeWindow;
-use kitsune_p2p::event::TimeWindowInclusive;
+use kitsune_p2p::event::*;
 
 use crate::types::AgentPubKeyExt;
 
@@ -46,6 +40,13 @@ macro_rules! timing_trace {
 struct WrapEvtSender(futures::channel::mpsc::Sender<HolochainP2pEvent>);
 
 impl WrapEvtSender {
+    pub fn k_gen_req(
+        &self,
+        arg: KGenReq,
+    ) -> impl Future<Output = HolochainP2pResult<KGenRes>> + 'static + Send {
+        timing_trace!({ self.0.k_gen_req(arg) }, "(hp2p:handle) k_gen_req",)
+    }
+
     pub fn put_agent_info_signed(
         &self,
         dna_hash: DnaHash,
@@ -592,6 +593,16 @@ impl HolochainP2pActor {
 impl ghost_actor::GhostHandler<kitsune_p2p::event::KitsuneP2pEvent> for HolochainP2pActor {}
 
 impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
+    fn handle_k_gen_req(
+        &mut self,
+        arg: KGenReq,
+    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<KGenRes> {
+        let evt_sender = self.evt_sender.clone();
+        Ok(async move { Ok(evt_sender.k_gen_req(arg).await?) }
+            .boxed()
+            .into())
+    }
+
     /// We need to store signed agent info.
     #[tracing::instrument(skip(self), level = "trace")]
     fn handle_put_agent_info_signed(

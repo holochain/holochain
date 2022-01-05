@@ -16,7 +16,7 @@ let
     inputsFrom = lib.reverseList [
       { shellHook = nixEnvPrefixEval; }
 
-      holonix.shell
+      holonix.main
 
       { shellHook = ''
         echo Using "$NIX_ENV_PREFIX" as target prefix...

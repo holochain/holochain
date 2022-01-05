@@ -138,6 +138,10 @@ impl HarnessAgentControlHandler for AgentHarness {
 impl ghost_actor::GhostHandler<KitsuneP2pEvent> for AgentHarness {}
 
 impl KitsuneP2pEventHandler for AgentHarness {
+    fn handle_k_gen_req(&mut self, _: KGenReq) -> KitsuneP2pEventHandlerResult<KGenRes> {
+        Err("unimplemented".into())
+    }
+
     fn handle_put_agent_info_signed(
         &mut self,
         input: PutAgentInfoSignedEvt,

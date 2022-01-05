@@ -8,7 +8,8 @@ use super::*;
 use crate::HoloHash;
 use crate::{error::HoloHashResult, HashType};
 
-/// A wrapper around HoloHash to denote that deserialization should /// base-64 strings rather than raw byte arrays
+/// A wrapper around HoloHash that `Serialize`s into a base64 string
+/// rather than a raw byte array.
 #[derive(
     Debug,
     Clone,
