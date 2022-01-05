@@ -7,3 +7,5 @@ pub mod partition;
 pub mod region;
 pub mod region_data;
 pub mod tree;
+
+pub mod test_utils;

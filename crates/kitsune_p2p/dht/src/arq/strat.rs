@@ -72,6 +72,8 @@ impl Default for ArqStrat {
 }
 
 impl ArqStrat {
+    pub const MAX_POWER: u8 = u8::MAX;
+
     /// The max coverage as expressed by the min coverage and the buffer
     pub fn max_coverage(&self) -> f64 {
         self.min_coverage * (self.buffer + 1.0)

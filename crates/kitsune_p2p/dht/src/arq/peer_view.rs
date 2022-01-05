@@ -1,6 +1,6 @@
 use kitsune_p2p_dht_arc::{ArcInterval, DhtArcSet};
 
-use crate::arq::is_full;
+use crate::{arq::is_full, test_utils::get_input};
 
 use super::{Arq, ArqBounds, ArqSet, ArqStrat};
 
@@ -67,54 +67,40 @@ impl PeerView {
     ///
     /// More detail on these assumptions here:
     /// https://hackmd.io/@hololtd/r1IAIbr5Y/https%3A%2F%2Fhackmd.io%2FK_fkBj6XQO2rCUZRRL9n2g
-    pub fn update_arq(&self, mut arq: Arq) -> Arq {
-        let mut was_over = false;
-        let mut was_under = false;
+    pub fn update_arq(&self, mut arq: Arq) -> Option<Arq> {
+        let cov = self.extrapolated_coverage(&arq.to_bounds());
 
-        // FIXME: this is the part to work on next
-        loop {
-            let bounds = arq.to_bounds();
-            let cov = self.extrapolated_coverage(&bounds);
-            let under = cov < self.strat.min_coverage;
-            let over = cov > self.strat.max_coverage();
+        let old_count = arq.count();
+        let old_power = arq.power();
+        let under = cov < self.strat.min_coverage;
+        let over = cov > self.strat.max_coverage();
+        let new_count = if under {
+            // grow. ratio is > 1. never grow by more than 2x.
+            let ratio = (self.strat.min_coverage / cov).min(2.0);
+            (arq.count() as f64 * ratio).ceil() as u32
+        } else if over {
+            // shrink. ratio is < 1. never shrink by more than half.
+            let ratio = (self.strat.max_coverage() / cov).max(0.5);
+            (arq.count() as f64 * ratio).floor() as u32
+        } else {
+            return None;
+        };
 
-            dbg!(cov, &arq);
-            dbg!((under, over, was_under, was_over));
-            if under {
-                if was_over {
-                    if !arq.requantize(arq.power - 1) {
-                        arq.count += 1;
-                        arq.requantize(arq.power - 1);
-                    }
-                } else {
-                    arq.count += 1;
-                }
-            } else if over {
-                if was_under {
-                    if !arq.requantize(arq.power - 1) {
-                        arq.count -= 1;
-                        arq.requantize(arq.power - 1);
-                    }
-                } else {
-                    arq.count -= 1;
-                }
-            } else {
-                break;
-            }
+        arq.count = new_count;
+        let new_cov = self.extrapolated_coverage(&arq.to_bounds());
 
-            was_under = under;
-            was_over = over;
+        // If this change causes us to go below the target coverage,
+        // don't update. This can happen in particular when shrinking would
+        // cause us to lose sight of peers.
+        if over && (new_cov < self.strat.min_coverage) {
+            return None;
         }
-        self.update_power(arq)
-    }
 
-    #[allow(unused_parens)]
-    fn update_power(&self, mut arq: Arq) -> Arq {
-        // NOTE: these stats will be baked into the view eventually.
         let PowerStats { median, .. } = self.power_stats(&arq);
 
-        // check for power downshift opportunity
+        #[allow(unused_parens)]
         loop {
+            // check for power downshift opportunity
             if (
                 // not already at the minimum
                 arq.power > self.strat.min_power
@@ -122,33 +108,50 @@ impl PeerView {
                 && (median as i8 - arq.power as i8) < self.strat.max_power_diff as i8
                 // only power down if too few chunks
                 && arq.count < self.strat.min_chunks()
-                // attempt to requantize (cannot fail for downshift)
-                && arq.requantize(arq.power - 1)
             ) {
-                // we downshifted!
+                arq = arq.downshift();
             } else {
                 break;
             }
         }
 
-        // check for power upshift opportunity
+        #[allow(unused_parens)]
         loop {
+            // check for power upshift opportunity
             if (
                 // not already at the maximum
-                arq.power < u8::MAX
+                arq.power < ArqStrat::MAX_POWER
                 // don't power up if power is already too high
                 && (arq.power as i8 - median as i8) < self.strat.max_power_diff as i8
                 // only power up if too many chunks
                 && arq.count > self.strat.max_chunks()
-                // attempt to requantize (this may fail if chunk count is odd)
-                && arq.requantize(arq.power + 1)
             ) {
-                // we upshifted!
+                // Attempt to requantize to the next higher power.
+                // If we only grew by one chunk, into an odd count, then don't
+                // force upshifting, because that would either require undoing
+                // the growth, or growing by 2 instead of 1. In this case, skip
+                // upshifting, and we'll upshift on the next update.
+                let force = new_count as i32 - old_count as i32 > 1;
+                if let Some(a) = arq.upshift(force) {
+                    arq = a
+                } else {
+                    break;
+                }
             } else {
                 break;
             }
         }
-        arq
+
+        if arq.count() > self.strat.max_chunks() {
+            *arq.count_mut() = self.strat.max_chunks();
+        }
+
+        if arq.power() == old_power && arq.count() == old_count {
+            // no overall change
+            None
+        } else {
+            Some(arq)
+        }
     }
 
     pub fn power_stats(&self, filter: &Arq) -> PowerStats {

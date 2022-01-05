@@ -70,6 +70,28 @@ impl Arq {
             .is_some()
     }
 
+    pub fn downshift(&self) -> Self {
+        let (power, count) = power_downshift(self.power, self.count);
+        let mut a = self.clone();
+        a.power = power;
+        a.count = count;
+        a
+    }
+
+    pub fn upshift(&self, force: bool) -> Option<Self> {
+        let count = if force && self.count % 2 == 1 {
+            self.count + 1
+        } else {
+            self.count
+        };
+        power_upshift(self.power, count).map(|(power, count)| {
+            let mut a = self.clone();
+            a.power = power;
+            a.count = count;
+            a
+        })
+    }
+
     pub fn to_bounds(&self) -> ArqBounds {
         let s = self.spacing();
         let c = self.center.as_u32();
@@ -163,6 +185,11 @@ impl Arq {
     /// Get a reference to the arq's count.
     pub fn count(&self) -> u32 {
         self.count
+    }
+
+    /// Get a mutable reference to the arq's count.
+    pub fn count_mut(&mut self) -> &mut u32 {
+        &mut self.count
     }
 }
 
@@ -313,6 +340,7 @@ pub fn is_full(power: u8, count: u32) -> bool {
     }
 }
 
+#[deprecated = "use power_downshift/power_upshift instead"]
 pub fn requantize(old_power: u8, old_count: u32, new_power: u8) -> Option<(u8, u32)> {
     if old_power < new_power {
         let factor = 2u32.pow((new_power - old_power) as u32);
@@ -325,6 +353,18 @@ pub fn requantize(old_power: u8, old_count: u32, new_power: u8) -> Option<(u8, u
     } else {
         let count = old_count * 2u32.pow((old_power - new_power) as u32);
         Some((new_power, count))
+    }
+}
+
+pub fn power_downshift(power: u8, count: u32) -> (u8, u32) {
+    (power - 1, count * 2)
+}
+
+pub fn power_upshift(power: u8, count: u32) -> Option<(u8, u32)> {
+    if count % 2 == 0 {
+        Some((power + 1, count / 2))
+    } else {
+        None
     }
 }
 

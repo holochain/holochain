@@ -1,3 +1,4 @@
+use kitsune_p2p_dht::test_utils::get_input;
 use kitsune_p2p_dht_arc::*;
 use rand::prelude::StdRng;
 use rand::thread_rng;
@@ -425,13 +426,4 @@ pub fn print_arcs(arcs: &Peers) {
     for (i, arc) in arcs.into_iter().enumerate() {
         println!("|{}| {}", arc.to_ascii(64), i);
     }
-}
-
-/// Wait for input, to slow down overwhelmingly large iterations
-pub fn get_input() {
-    let mut input_string = String::new();
-    std::io::stdin()
-        .read_line(&mut input_string)
-        .ok()
-        .expect("Failed to read line");
 }

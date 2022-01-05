@@ -1,14 +1,13 @@
 //! Tests of arq resizing behavior.
 
 mod common;
-use common::*;
 
 use kitsune_p2p_dht::arq::*;
 use kitsune_p2p_dht::op::*;
 use kitsune_p2p_dht_arc::ArcInterval;
 
-use crate::common::quantized::generate_ideal_coverage;
-use crate::common::quantized::seeded_rng;
+use kitsune_p2p_dht::test_utils::generate_ideal_coverage;
+use kitsune_p2p_dht::test_utils::seeded_rng;
 
 #[test]
 /// If extrapolated coverage remains above the maximum coverage threshold even
@@ -69,7 +68,7 @@ fn test_degenerate_asymmetrical_coverage() {
 }
 
 #[test]
-/// Test resizing across several of quantization levels to get a feel for how
+/// Test resizing across several quantization levels to get a feel for how
 /// it should work.
 fn test_scenario() {
     let mut rng = seeded_rng(None);
@@ -78,6 +77,7 @@ fn test_scenario() {
     let strat = ArqStrat {
         min_coverage: 10.0,
         buffer: 0.2,
+        max_power_diff: 2,
         ..Default::default()
     };
     let jitter = 0.000;
@@ -95,37 +95,56 @@ fn test_scenario() {
         assert_eq!(extrapolated, 11.0);
 
         // expect that the arq remains full under these conditions
-        let resized = view.update_arq(arq.clone());
-        assert_eq!(resized, arq);
+        let resized = view.update_arq(arq);
+        assert!(resized.is_none());
     }
 
     {
         // start with a full arq again
-        let arq = Arq::new_full(Loc::from(0x0), strat.max_power);
+        let mut arq = Arq::new_full(Loc::from(0x0), strat.max_power);
         // create 100 peers, with arcs at about 10%,
         // covering a bit more than they need to
-        let peer_arqs =
-            generate_ideal_coverage(&mut rng, &strat, Some(13.0), 100, jitter, 0).into_iter();
-        // .enumerate()
-        // .filter(|(i, _)| i % 10 == 0)
-        // .map(|(_, a)| a);
+        let peer_arqs = generate_ideal_coverage(&mut rng, &strat, Some(13.0), 100, jitter, 0);
 
-        let peers = ArqSet::new(peer_arqs.map(|arq| arq.to_bounds()).collect());
-        let peer_power = peers.power();
-        print_arqs(&peers, 64);
-        assert_eq!(peer_power, 26);
+        {
+            let peers = ArqSet::new(peer_arqs.iter().map(|arq| arq.to_bounds()).collect());
+            let peer_power = peers.power();
+            // print_arqs(&peers, 64);
+            assert_eq!(peer_power, 26);
 
-        let view = PeerView::new(strat.clone(), peers);
-        let extrapolated = view.extrapolated_coverage(&arq.to_bounds());
-        assert!(extrapolated > strat.max_coverage());
-        // assert!(strat.min_coverage <= extrapolated && extrapolated <= strat.max_coverage());
+            let view = PeerView::new(strat.clone(), peers);
+            let extrapolated = view.extrapolated_coverage(&arq.to_bounds());
+            assert!(extrapolated > strat.max_coverage());
+            // assert!(strat.min_coverage <= extrapolated && extrapolated <= strat.max_coverage());
 
-        // expect that the arq shrinks
-        let resized = view.update_arq(arq.clone());
-        dbg!(resized.to_interval().to_ascii(64));
-        assert_eq!(resized.power(), peer_power);
-        assert_eq!(resized.count(), 8);
+            // update the arq until there is no change
+            while view.update_arq(arq.clone()).map(|a| arq = a).is_some() {}
+
+            // expect that the arq shrinks
+            assert_eq!(arq.power(), peer_power);
+            assert!(arq.count() <= 8);
+        }
+        {
+            // create the same view but with all arcs cut in half, so that the
+            // coverage is uniformly undersaturated.
+            let peers = ArqSet::new(
+                peer_arqs
+                    .clone()
+                    .iter_mut()
+                    .map(|arq| {
+                        let mut arq = arq.downshift();
+                        *arq.count_mut() = arq.count() / 2;
+                        arq.to_bounds()
+                    })
+                    .collect(),
+            );
+            let peer_power = peers.power();
+            let view = PeerView::new(strat.clone(), peers);
+
+            // assert that our arc will grow as large as it can to pick up the slack.
+            while view.update_arq(arq.clone()).map(|a| arq = a).is_some() {}
+            assert_eq!(arq.power(), peer_power + strat.max_power_diff);
+            assert!(arq.count() == strat.max_chunks());
+        }
     }
-
-    todo!("add more peers and watch it upsample and shrink")
 }

@@ -1,18 +1,28 @@
-use kitsune_p2p_dht::arq::Arq;
-use kitsune_p2p_dht::arq::ArqSet;
-use kitsune_p2p_dht::arq::ArqStrat;
-use kitsune_p2p_dht::arq::PeerView;
+use crate::arq::Arq;
+use crate::arq::ArqSet;
+use crate::arq::ArqStrat;
+use crate::arq::PeerView;
 use kitsune_p2p_dht_arc::DhtLocation as Loc;
 use rand::prelude::StdRng;
 use rand::thread_rng;
 use rand::Rng;
 use rand::SeedableRng;
 
+/// Wait for input, to slow down overwhelmingly large iterations
+pub fn get_input() {
+    let mut input_string = String::new();
+    std::io::stdin()
+        .read_line(&mut input_string)
+        .ok()
+        .expect("Failed to read line");
+}
+
 pub fn seeded_rng(seed: Option<u64>) -> StdRng {
     let seed = seed.unwrap_or_else(|| thread_rng().gen());
     tracing::info!("RNG seed: {}", seed);
     StdRng::seed_from_u64(seed)
 }
+
 fn full_len() -> f64 {
     2f64.powf(32.0)
 }
@@ -150,50 +160,21 @@ fn test_unit_arc() {
     }
 }
 
-use proptest::proptest;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::proptest;
 
-#[test]
-fn test_ideal_coverage_case() {
-    let strat = ArqStrat {
-        // min_coverage: 44.93690369578987,
-        // buffer: 0.1749926,
-        min_coverage: 21.620980,
-        buffer: 0.1,
-        ..Default::default()
-    };
-
-    let mut rng = seeded_rng(None);
-    let arq = Arq::new_full(Loc::from(0x0), strat.max_power);
-    let peer_arqs = generate_ideal_coverage(&mut rng, &strat, None, 100, 0.0, 0);
-
-    let peers = ArqSet::new(peer_arqs.into_iter().map(|arq| arq.to_bounds()).collect());
-
-    let view = PeerView::new(strat.clone(), peers);
-    let extrapolated = view.extrapolated_coverage(&arq.to_bounds());
-    println!(
-        "{} <= {} <= {}",
-        strat.min_coverage,
-        extrapolated,
-        strat.max_coverage()
-    );
-    assert!(strat.min_coverage.floor() <= extrapolated);
-    assert!(extrapolated <= strat.max_coverage().ceil());
-}
-
-proptest! {
-
-    /// Ensure that something close to the ideal coverage is generated under a
-    /// range of ArqStrat parameters.
-    /// NOTE: this is not perfect. The final assertion has to be fudged a bit,
-    /// so this test asserts that the extrapolated coverage falls within the
-    /// range, +/- 1 on either end.
     #[test]
-    fn test_ideal_coverage(min_coverage in 40f64..100.0, buffer in 0.1f64..0.5) {
+    fn test_ideal_coverage_case() {
         let strat = ArqStrat {
-            min_coverage,
-            buffer,
+            // min_coverage: 44.93690369578987,
+            // buffer: 0.1749926,
+            min_coverage: 21.620980,
+            buffer: 0.1,
             ..Default::default()
         };
+
         let mut rng = seeded_rng(None);
         let arq = Arq::new_full(Loc::from(0x0), strat.max_power);
         let peer_arqs = generate_ideal_coverage(&mut rng, &strat, None, 100, 0.0, 0);
@@ -202,57 +183,90 @@ proptest! {
 
         let view = PeerView::new(strat.clone(), peers);
         let extrapolated = view.extrapolated_coverage(&arq.to_bounds());
-        assert!(strat.min_coverage - 1.0 <= extrapolated, "extrapolated less than min {} <= {}", strat.min_coverage - 1.0, extrapolated);
-        assert!(extrapolated <= strat.max_coverage() + 1.0, "extrapolated greater than max {} <= {}", extrapolated, strat.max_coverage() + 1.0);
-    }
-
-    #[test]
-    fn chunk_count_is_always_within_bounds(center in 0.0f64..0.999, len in 0.001f64..1.0) {
-        let strat = ArqStrat {
-            min_coverage: 10.0,
-            buffer: 0.144,
-            ..Default::default()
-        };
-        let a = unit_arq(&strat, center, len, 0);
-        // println!(
-        //     "{} <= {} <= {}",
-        //     strat.min_chunks(),
-        //     a.count(),
-        //     strat.max_chunks()
-        // );
-        assert!(a.count() >= strat.min_chunks());
-        assert!(a.count() <= strat.max_chunks());
-    }
-
-    #[test]
-    fn power_is_always_within_bounds(center in 0.0f64..0.999, len in 0.001f64..1.0) {
-        let strat = ArqStrat {
-            min_coverage: 10.0,
-            buffer: 0.144,
-            ..Default::default()
-        };
-        let a = unit_arq(&strat, center, len, 0);
         println!(
             "{} <= {} <= {}",
-            strat.min_power,
-            a.power(),
-            strat.max_power
+            strat.min_coverage,
+            extrapolated,
+            strat.max_coverage()
         );
-        assert!(a.power() >= strat.min_power);
-        assert!(a.power() <= strat.max_power);
+        assert!(strat.min_coverage.floor() <= extrapolated);
+        assert!(extrapolated <= strat.max_coverage().ceil());
     }
 
-    #[test]
-    fn length_is_always_close(center in 0.0f64..0.999, len in 0.001f64..1.0) {
-        let strat = ArqStrat {
-            min_coverage: 10.0,
-            buffer: 0.144,
-            ..Default::default()
-        };
-        let a = unit_arq(&strat, center, len, 0);
-        let target_len = (len * 2f64.powf(32.0)) as i64;
-        let true_len = a.to_interval().length() as i64;
-        println!("{} ~ {} ({})", true_len, target_len, a.spacing());
-        assert!((true_len - target_len).abs() < a.spacing() as i64);
+    proptest! {
+
+        /// Ensure that something close to the ideal coverage is generated under a
+        /// range of ArqStrat parameters.
+        /// NOTE: this is not perfect. The final assertion has to be fudged a bit,
+        /// so this test asserts that the extrapolated coverage falls within the
+        /// range, +/- 1 on either end.
+        #[test]
+        fn test_ideal_coverage(min_coverage in 40f64..100.0, buffer in 0.1f64..0.5) {
+            let strat = ArqStrat {
+                min_coverage,
+                buffer,
+                ..Default::default()
+            };
+            let mut rng = seeded_rng(None);
+            let arq = Arq::new_full(Loc::from(0x0), strat.max_power);
+            let peer_arqs = generate_ideal_coverage(&mut rng, &strat, None, 100, 0.0, 0);
+
+            let peers = ArqSet::new(peer_arqs.into_iter().map(|arq| arq.to_bounds()).collect());
+
+            let view = PeerView::new(strat.clone(), peers);
+            let extrapolated = view.extrapolated_coverage(&arq.to_bounds());
+            assert!(strat.min_coverage - 1.0 <= extrapolated, "extrapolated less than min {} <= {}", strat.min_coverage - 1.0, extrapolated);
+            assert!(extrapolated <= strat.max_coverage() + 1.0, "extrapolated greater than max {} <= {}", extrapolated, strat.max_coverage() + 1.0);
+        }
+
+        #[test]
+        fn chunk_count_is_always_within_bounds(center in 0.0f64..0.999, len in 0.001f64..1.0) {
+            let strat = ArqStrat {
+                min_coverage: 10.0,
+                buffer: 0.144,
+                ..Default::default()
+            };
+            let a = unit_arq(&strat, center, len, 0);
+            // println!(
+            //     "{} <= {} <= {}",
+            //     strat.min_chunks(),
+            //     a.count(),
+            //     strat.max_chunks()
+            // );
+            assert!(a.count() >= strat.min_chunks());
+            assert!(a.count() <= strat.max_chunks());
+        }
+
+        #[test]
+        fn power_is_always_within_bounds(center in 0.0f64..0.999, len in 0.001f64..1.0) {
+            let strat = ArqStrat {
+                min_coverage: 10.0,
+                buffer: 0.144,
+                ..Default::default()
+            };
+            let a = unit_arq(&strat, center, len, 0);
+            println!(
+                "{} <= {} <= {}",
+                strat.min_power,
+                a.power(),
+                strat.max_power
+            );
+            assert!(a.power() >= strat.min_power);
+            assert!(a.power() <= strat.max_power);
+        }
+
+        #[test]
+        fn length_is_always_close(center in 0.0f64..0.999, len in 0.001f64..1.0) {
+            let strat = ArqStrat {
+                min_coverage: 10.0,
+                buffer: 0.144,
+                ..Default::default()
+            };
+            let a = unit_arq(&strat, center, len, 0);
+            let target_len = (len * 2f64.powf(32.0)) as i64;
+            let true_len = a.to_interval().length() as i64;
+            println!("{} ~ {} ({})", true_len, target_len, a.spacing());
+            assert!((true_len - target_len).abs() < a.spacing() as i64);
+        }
     }
 }
