@@ -197,6 +197,7 @@ pub enum MetricQueryAnswer {
 
 /// An exclusive range of timestamps, measured in microseconds
 pub type TimeWindow = std::ops::Range<Timestamp>;
+
 /// An inclusive range of timestamps, measured in microseconds
 pub type TimeWindowInclusive = std::ops::RangeInclusive<Timestamp>;
 
@@ -204,10 +205,31 @@ pub type TimeWindowInclusive = std::ops::RangeInclusive<Timestamp>;
 pub fn full_time_window() -> TimeWindow {
     Timestamp::MIN..Timestamp::MAX
 }
+
 /// A time window which inclusively covers all of recordable time
 pub fn full_time_window_inclusive() -> TimeWindowInclusive {
     Timestamp::MIN..=Timestamp::MAX
 }
+
+/// Generic Kitsune Request of the implementor
+/// This enum may be easier to add variants to for future updates,
+/// rather than adding a full new top-level event message type.
+pub enum KGenReq {
+    /// Extrapolated Peer Coverage
+    PeerExtrapCov {
+        /// The space to extrapolate coverage
+        space: Arc<super::KitsuneSpace>,
+        /// Storage arcs of joined agents
+        dht_arc_set: DhtArcSet,
+    },
+}
+
+/// Generic Kitsune Respons from the imlementor
+pub enum KGenRes {
+    /// Extrapolated Peer Coverage
+    PeerExtrapCov(Vec<f64>),
+}
+
 type KSpace = Arc<super::KitsuneSpace>;
 type KAgent = Arc<super::KitsuneAgent>;
 type KOpHash = Arc<super::KitsuneOpHash>;
@@ -218,6 +240,9 @@ ghost_actor::ghost_chan! {
     /// The KitsuneP2pEvent stream allows handling events generated from the
     /// KitsuneP2p actor.
     pub chan KitsuneP2pEvent<super::KitsuneP2pError> {
+        /// Generic Kitsune Request of the implementor
+        fn k_gen_req(arg: KGenReq) -> KGenRes;
+
         /// We need to store signed agent info.
         fn put_agent_info_signed(input: PutAgentInfoSignedEvt) -> ();
 

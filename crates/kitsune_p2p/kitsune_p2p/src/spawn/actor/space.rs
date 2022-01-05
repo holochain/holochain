@@ -633,11 +633,15 @@ impl KitsuneP2pHandler for Space {
         };
         let timeout = KitsuneTimeout::from_millis(timeout_ms);
 
+        let start = tokio::time::Instant::now();
+
         let discover_fut = discover::search_and_discover_peer_connect(
             self.ro_inner.clone(),
             to_agent.clone(),
             timeout,
         );
+
+        let metrics = self.ro_inner.metrics.clone();
 
         Ok(async move {
             match discover_fut.await {
@@ -649,9 +653,31 @@ impl KitsuneP2pHandler for Space {
                     let payload = wire::Wire::call(space.clone(), to_agent.clone(), payload.into());
                     let res = con_hnd.request(&payload, timeout).await?;
                     match res {
-                        wire::Wire::Failure(wire::Failure { reason }) => Err(reason.into()),
-                        wire::Wire::CallResp(wire::CallResp { data }) => Ok(data.into()),
-                        r => Err(format!("invalid response: {:?}", r).into()),
+                        wire::Wire::Failure(wire::Failure { reason }) => {
+                            metrics
+                                .write()
+                                .record_reachability_event(false, [&to_agent]);
+                            metrics
+                                .write()
+                                .record_latency_micros(start.elapsed().as_micros(), [&to_agent]);
+                            Err(reason.into())
+                        }
+                        wire::Wire::CallResp(wire::CallResp { data }) => {
+                            metrics.write().record_reachability_event(true, [&to_agent]);
+                            metrics
+                                .write()
+                                .record_latency_micros(start.elapsed().as_micros(), [&to_agent]);
+                            Ok(data.into())
+                        }
+                        r => {
+                            metrics
+                                .write()
+                                .record_reachability_event(false, [&to_agent]);
+                            metrics
+                                .write()
+                                .record_latency_micros(start.elapsed().as_micros(), [&to_agent]);
+                            Err(format!("invalid response: {:?}", r).into())
+                        }
                     }
                 }
                 discover::PeerDiscoverResult::Err(e) => Err(e),
@@ -971,6 +997,7 @@ pub(crate) struct SpaceReadOnlyInner {
     #[allow(dead_code)]
     pub(crate) config: Arc<KitsuneP2pConfig>,
     pub(crate) parallel_notify_permit: Arc<tokio::sync::Semaphore>,
+    pub(crate) metrics: MetricsSync,
 }
 
 /// A Kitsune P2p Node can track multiple "spaces" -- Non-interacting namespaced
@@ -1002,6 +1029,8 @@ impl Space {
         bandwidth_throttles: BandwidthThrottles,
         parallel_notify_permit: Arc<tokio::sync::Semaphore>,
     ) -> Self {
+        let metrics = MetricsSync::default();
+
         let gossip_mod = config
             .tuning_params
             .gossip_strategy
@@ -1036,7 +1065,7 @@ impl Space {
                         space.clone(),
                         ep_hnd.clone(),
                         evt_sender.clone(),
-                        Metrics::default(),
+                        metrics.clone(),
                     ),
                 )
             })
@@ -1128,6 +1157,7 @@ impl Space {
             ep_hnd,
             config: config.clone(),
             parallel_notify_permit,
+            metrics,
         });
 
         Self {
