@@ -1023,6 +1023,13 @@ impl KitsuneP2pHandler for Space {
             .any(|agent_arc| agent_arc.contains(loc));
         Ok(async move { Ok(r) }.boxed().into())
     }
+
+    fn handle_dump_network_metrics(
+        &mut self,
+        _space: Option<Arc<KitsuneSpace>>,
+    ) -> KitsuneP2pHandlerResult<serde_json::Value> {
+        unimplemented!()
+    }
 }
 
 pub(crate) struct SpaceReadOnlyInner {

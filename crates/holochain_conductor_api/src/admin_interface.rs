@@ -272,6 +272,12 @@ pub enum AdminRequest {
         dht_ops_cursor: Option<u64>,
     },
 
+    /// Dump the network metrics tracked by kitsune.
+    DumpNetworkMetrics {
+        /// If set, limit the metrics dumped to a single dna hash space.
+        dna_hash: Option<DnaHash>,
+    },
+
     /// Add a list [AgentInfoSigned] to this conductor's peer store.
     /// This is another way of finding peers on a dht.
     ///
@@ -523,6 +529,10 @@ pub enum AdminResponse {
     ///
     /// [`AdminRequest::DumpFullState`]: enum.AdminRequest.html#variant.DumpFullState
     FullStateDumped(FullStateDump),
+
+    /// The successful result of a call to [`AdminRequest::DumpNetworkMetrics`].
+    /// The string is a json blob of the metrics results.
+    NetworkMetricsDumped(String),
 
     /// The succesful response to an [`AdminRequest::AddAgentInfo`].
     ///

@@ -102,6 +102,7 @@ impl MetricExchangeSync {
                             // MAYBE: ignore outliers?
                             let count = res.len() as f64;
                             let res = res.into_iter().fold(0.0, |a, x| a + x) / count;
+                            println!("!!!@@@!!! local extrap cov: {} !@!", res as f32);
                             mx.write().extrap_cov = res as f32;
                         }
                     }
