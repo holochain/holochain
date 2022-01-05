@@ -140,7 +140,7 @@ CREATE TABLE IF NOT EXISTS DhtOp (
     FOREIGN KEY(header_hash) REFERENCES Header(hash)
 );
 CREATE INDEX IF NOT EXISTS DhtOp_type_dep_idx ON DhtOp ( type, dependency );
-CREATE INDEX IF NOT EXISTS DhtOp_validation_stage_idx ON DhtOp ( validation_stage );
+CREATE INDEX IF NOT EXISTS DhtOp_validation_stage_idx ON DhtOp ( validation_stage, type, dependency );
 CREATE INDEX IF NOT EXISTS DhtOp_validation_status_idx ON DhtOp ( validation_status );
 CREATE INDEX IF NOT EXISTS DhtOp_authored_timestamp_idx ON DhtOp ( authored_timestamp );
 CREATE INDEX IF NOT EXISTS DhtOp_storage_center_loc_idx ON DhtOp ( storage_center_loc );

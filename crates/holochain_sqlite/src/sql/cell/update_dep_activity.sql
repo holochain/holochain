@@ -7,16 +7,13 @@ WHERE
   validation_stage = 3
   AND validation_status IS NOT NULL
   AND DhtOp.type = :register_activity
-  AND EXISTS(
+  AND DhtOp.header_hash IN (
     SELECT
-      1
+      hash
     FROM
       Header
     WHERE
-      DhtOp.header_hash = Header.hash
-      AND seq > :activity_integrated
+      seq > :activity_integrated
       AND seq < :activity_missing
-    LIMIT
-      1
+      AND author = :author
   )
--- TODO this needs to be per agent.
