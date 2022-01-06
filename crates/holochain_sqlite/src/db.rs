@@ -11,9 +11,9 @@ use kitsune_p2p::KitsuneSpace;
 use parking_lot::Mutex;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::{collections::HashMap, path::Path};
+use std::{path::PathBuf, sync::atomic::AtomicUsize};
 use tokio::{
     sync::{OwnedSemaphorePermit, Semaphore},
     task,
@@ -104,6 +104,8 @@ pub struct DbRead<Kind: DbKindT> {
     connection_pool: ConnectionPool,
     write_semaphore: Arc<Semaphore>,
     read_semaphore: Arc<Semaphore>,
+    max_readers: usize,
+    num_readers: Arc<AtomicUsize>,
 }
 
 #[derive(Shrinkwrap)]
@@ -166,9 +168,23 @@ impl<Kind: DbKindT> DbRead<Kind> {
         F: FnOnce(Transaction) -> Result<R, E> + Send + 'static,
         R: Send + 'static,
     {
+        let waiting = self
+            .num_readers
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        if waiting > self.max_readers {
+            let s = tracing::info_span!("holochain_perf", kind = ?self.kind().kind());
+            s.in_scope(|| {
+                tracing::info!(
+                    "Database read connection is saturated. Util {:.2}%",
+                    waiting as f64 / self.max_readers as f64 * 100.0
+                )
+            });
+        }
         let _g = self.acquire_reader_permit().await;
+        self.num_readers
+            .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
         let mut conn = self.conn()?;
-        let r = task::spawn_blocking(move || conn.with_reader(f))
+        let r = tokio::task::spawn_blocking(move || conn.with_reader(f))
             .await
             .map_err(DatabaseError::from)?;
         r
@@ -274,6 +290,8 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         Ok(DbWrite(DbRead {
             write_semaphore: Self::get_write_semaphore(kind.kind()),
             read_semaphore: Self::get_read_semaphore(kind.kind()),
+            max_readers: num_read_threads(),
+            num_readers: Arc::new(AtomicUsize::new(0)),
             kind,
             path,
             connection_pool: pool,
@@ -603,7 +621,14 @@ impl<'e> PConn {
         E: From<DatabaseError>,
         F: 'e + FnOnce(Transaction) -> Result<R, E>,
     {
+        let start = std::time::Instant::now();
         let txn = self.transaction().map_err(DatabaseError::from)?;
+        if start.elapsed().as_millis() > 100 {
+            let s = tracing::debug_span!("timing_1");
+            s.in_scope(
+                || tracing::debug!(file = %file!(), line = %line!(), time = ?start.elapsed()),
+            );
+        }
         f(txn)
     }
 
