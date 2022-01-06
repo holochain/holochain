@@ -20,6 +20,7 @@ struct Expected {
 
 struct SharedData {
     seq: u32,
+    agent: AgentPubKey,
     prev_hash: HeaderHash,
     last_header: HeaderHash,
     last_entry: EntryHash,
@@ -192,6 +193,7 @@ fn create_and_insert_op(
     };
 
     if facts.sequential {
+        *header.author_mut() = data.agent.clone();
         *header.header_seq_mut().unwrap() = data.seq;
         *header.prev_header_mut().unwrap() = data.prev_hash.clone();
         data.seq += 1;
@@ -233,6 +235,7 @@ fn test_data(env: &DbRead<DbKindDht>) -> Expected {
 
     let mut data = SharedData {
         seq: 0,
+        agent: fixt!(AgentPubKey),
         prev_hash: fixt!(HeaderHash),
         last_header: fixt!(HeaderHash),
         last_entry: fixt!(EntryHash),

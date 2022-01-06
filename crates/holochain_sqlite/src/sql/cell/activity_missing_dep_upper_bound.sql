@@ -61,3 +61,5 @@ FROM
     GROUP BY
       author
   )
+GROUP BY
+  author

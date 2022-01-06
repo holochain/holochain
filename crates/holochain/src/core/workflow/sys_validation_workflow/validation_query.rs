@@ -159,6 +159,7 @@ mod tests {
                     )
                     .unwrap();
                 }
+                txn.execute("UPDATE DhtOp SET num_validation_attempts = 0", [])?;
                 DatabaseResult::Ok(())
             })
             .unwrap();

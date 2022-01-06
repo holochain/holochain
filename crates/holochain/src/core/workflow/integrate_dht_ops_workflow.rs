@@ -49,7 +49,7 @@ pub async fn integrate_dht_ops_workflow(
                 })
                 .collect::<rusqlite::Result<Vec<_>>>()?;
             tracing::debug!(?activity_integrated);
-            let activity_missing: HashMap<AgentPubKey, u32> = txn
+            let activity_missing: HashMap<AgentPubKey, i64> = txn
                 .prepare_cached(holochain_sqlite::sql::sql_cell::ACTIVITY_MISSING_DEP_UPPER_BOUND)?
                 .query_map(
                     named_params! {
@@ -58,7 +58,7 @@ pub async fn integrate_dht_ops_workflow(
                     |row| {
                         Ok((
                             row.get::<_, Option<AgentPubKey>>(0)?,
-                            row.get::<_, Option<u32>>(1)?,
+                            row.get::<_, Option<i64>>(1)?,
                         ))
                     },
                 )?
