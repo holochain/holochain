@@ -1733,16 +1733,38 @@ async fn p2p_event_task(
     /// The number of events we allow to run in parallel before
     /// starting to await on the join handles.
     const NUM_PARALLEL_EVTS: usize = 100;
+    let num_tasks = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let max_time = Arc::new(std::sync::atomic::AtomicU64::new(0));
     p2p_evt
         .for_each_concurrent(NUM_PARALLEL_EVTS, |evt| {
             let handle = handle.clone();
+            let num_tasks = num_tasks.clone();
+            let max_time = max_time.clone();
             async move {
+                let start = (num_tasks.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1
+                    >= NUM_PARALLEL_EVTS)
+                    .then(std::time::Instant::now);
+
                 if let Err(e) = handle.dispatch_holochain_p2p_event(evt).await {
                     tracing::error!(
                         message = "error dispatching network event",
                         error = ?e,
                     );
                 }
+                match start {
+                    Some(start) => {
+                        let el = start.elapsed();
+                        let us = el.as_micros() as u64;
+                        let max_us = max_time
+                            .fetch_max(us, std::sync::atomic::Ordering::Relaxed)
+                            .max(us);
+
+                        let s = tracing::info_span!("holochain_perf", this_event_time = ?el, max_event_micros = %max_us);
+                        s.in_scope(|| tracing::info!("dispatch_holochain_p2p_event is saturated"))
+                    }
+                    None => max_time.store(0, std::sync::atomic::Ordering::Relaxed),
+                }
+                num_tasks.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
             }
             .in_current_span()
         })
