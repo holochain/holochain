@@ -170,6 +170,28 @@ impl<'lt> AgentLike<'lt> {
 }
 
 impl Metrics {
+    /// Dump json encoded metrics
+    pub fn dump(&self) -> serde_json::Value {
+        let agents: serde_json::Value = self
+            .map
+            .iter()
+            .map(|(a, i)| {
+                (
+                    a.to_string(),
+                    serde_json::json!({
+                        "reachability_quotient": *i.reachability_quotient,
+                        "latency_micros": *i.latency_micros,
+                    }),
+                )
+            })
+            .collect::<serde_json::map::Map<String, serde_json::Value>>()
+            .into();
+
+        serde_json::json!({
+            "agents": agents,
+        })
+    }
+
     /// Sucessful and unsuccessful messages from the remote
     /// can be combined to estimate a "reachability quotient"
     /// between 1 (or 0 if empty) and 100. Errors are weighted

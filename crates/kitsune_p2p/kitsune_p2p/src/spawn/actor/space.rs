@@ -1028,7 +1028,16 @@ impl KitsuneP2pHandler for Space {
         &mut self,
         _space: Option<Arc<KitsuneSpace>>,
     ) -> KitsuneP2pHandlerResult<serde_json::Value> {
-        unimplemented!()
+        let space = self.ro_inner.space.clone();
+        let metrics = self.ro_inner.metrics.read().dump();
+        Ok(async move {
+            Ok(serde_json::json!({
+                "space": space.to_string(),
+                "metrics": metrics,
+            }))
+        }
+        .boxed()
+        .into())
     }
 }
 
