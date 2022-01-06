@@ -125,6 +125,9 @@ pub struct Metrics {
     /// Map of remote agents.
     map: HashMap<Arc<KitsuneAgent>, NodeInfo>,
 
+    /// Aggregate Extrapolated Dht Coverage
+    agg_extrap_cov: RunAvg,
+
     // Number of times we need to force initiate
     // the next round.
     force_initiates: u8,
@@ -188,8 +191,16 @@ impl Metrics {
             .into();
 
         serde_json::json!({
+            "aggExtrapCov": *self.agg_extrap_cov,
             "agents": agents,
         })
+    }
+
+    /// Record an individual extrapolated coverage event
+    /// (either from us or a remote)
+    /// and add it to our running aggregate extrapolated coverage metric.
+    pub fn record_extrap_cov_event(&mut self, extrap_cov: f32) {
+        self.agg_extrap_cov.push(extrap_cov);
     }
 
     /// Sucessful and unsuccessful messages from the remote

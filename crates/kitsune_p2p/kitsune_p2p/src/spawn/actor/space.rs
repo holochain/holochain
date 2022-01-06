@@ -5,7 +5,7 @@ use ghost_actor::dependencies::tracing;
 use kitsune_p2p_mdns::*;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
-use kitsune_p2p_types::dht_arc::DhtArc;
+use kitsune_p2p_types::dht_arc::{DhtArc, DhtArcSet};
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
@@ -281,6 +281,7 @@ impl SpaceInternalHandler for Space {
         arc: DhtArc,
     ) -> SpaceInternalHandlerResult<()> {
         self.agent_arcs.insert(agent, arc);
+        self.update_metric_exchange_arcset();
         Ok(async move { Ok(()) }.boxed().into())
     }
 
@@ -650,6 +651,7 @@ impl KitsuneP2pHandler for Space {
     ) -> KitsuneP2pHandlerResult<()> {
         self.local_joined_agents.remove(&agent);
         self.agent_arcs.remove(&agent);
+        self.update_metric_exchange_arcset();
         for module in self.gossip_mod.values() {
             module.local_agent_leave(agent.clone());
         }
@@ -1231,6 +1233,15 @@ impl Space {
             mdns_listened_spaces: HashSet::new(),
             gossip_mod,
         }
+    }
+
+    fn update_metric_exchange_arcset(&mut self) {
+        let arc_set = self
+            .agent_arcs
+            .iter()
+            .map(|(_, a)| DhtArcSet::from_interval(a.interval()))
+            .fold(DhtArcSet::new_empty(), |a, i| a.union(&i));
+        self.ro_inner.metric_exchange.write().update_arcset(arc_set);
     }
 
     fn publish_leave_agent_info(
