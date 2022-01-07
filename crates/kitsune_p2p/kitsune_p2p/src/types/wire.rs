@@ -9,13 +9,25 @@ use std::sync::Arc;
 
 /// Type used for content data of wire messages.
 #[derive(
-    Debug, Clone, PartialEq, Deref, AsRef, From, Into, serde::Serialize, serde::Deserialize,
+    Debug, Clone, PartialEq, Eq, Deref, AsRef, From, Into, serde::Serialize, serde::Deserialize,
 )]
 pub struct WireData(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
+/// Enum containing the individual metric exchange messages used by clients
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum MetricExchangeMsg {
+    /// To start off, let's use a naive single message sending
+    /// everything we care about.
+    V1UniBlast {
+        /// The extrapolated coverage calculated by this node
+        /// note this is NOT the aggregate the node has collected,
+        /// just the direct extrapolation based on known peer infos.
+        extrap_cov_f32_le: WireData,
+    },
+
+    /// Future proof by having an unknown message catch-all variant
+    /// that we can ignore for any future variants that are added
     #[serde(other)]
     UnknownMessage,
 }

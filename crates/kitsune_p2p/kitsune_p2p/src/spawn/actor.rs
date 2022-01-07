@@ -866,41 +866,29 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         &mut self,
         space: Option<Arc<KitsuneSpace>>,
     ) -> KitsuneP2pHandlerResult<serde_json::Value> {
-        match space {
-            Some(space) => {
-                let space_sender = match self.spaces.get_mut(&space) {
-                    None => return Err(KitsuneP2pError::RoutingSpaceError(space)),
-                    Some(space) => space.get(),
-                };
-                Ok(async move {
-                    let (space_sender, _) = space_sender.await;
-                    let res = space_sender.dump_network_metrics(Some(space)).await?;
-                    Ok(serde_json::json!([res]))
-                }
-                .boxed()
-                .into())
-            }
-            None => {
-                let spaces = self
-                    .spaces
-                    .iter()
-                    .map(|(h, s)| {
-                        let h = h.clone();
-                        let s = s.get();
-                        s.then(move |r| async move { (h, r) })
-                    })
-                    .collect::<Vec<_>>();
-                Ok(async move {
-                    let mut all = Vec::new();
-                    for (h, (space, _)) in futures::future::join_all(spaces).await {
-                        all.push(space.dump_network_metrics(Some(h)));
+        let spaces = self
+            .spaces
+            .iter()
+            .filter_map(|(h, s)| {
+                if let Some(space) = &space {
+                    if h != space {
+                        return None;
                     }
-                    Ok(futures::future::try_join_all(all).await?.into())
                 }
-                .boxed()
-                .into())
+                let h = h.clone();
+                let s = s.get();
+                Some(s.then(move |r| async move { (h, r) }))
+            })
+            .collect::<Vec<_>>();
+        Ok(async move {
+            let mut all = Vec::new();
+            for (h, (space, _)) in futures::future::join_all(spaces).await {
+                all.push(space.dump_network_metrics(Some(h)));
             }
+            Ok(futures::future::try_join_all(all).await?.into())
         }
+        .boxed()
+        .into())
     }
 }
 
