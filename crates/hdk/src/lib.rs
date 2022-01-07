@@ -1,14 +1,16 @@
 //! The Holochain Development Kit (HDK) provides high and low level functions for writing Holochain applications.
 //!
 //! Functions of a Holochain application (hApp) can be organized into reusable components. In Holochain terminology these components are called "zomes".
-//! A zome is compiled into a WebAssembly (WASM) binary. All of the zomes of an application are bundled to a hApp.
+//! One or multiple zomes are compiled into a WebAssembly (WASM) binary, referred to as a DNA. All of the DNAs of an application are bundled to a hApp.
 //!
-//! hApps can be installed on a device running a Holochain conductor. Clients can then call the zome functions via Remote Procedure Calls (RPC).
-//! Each function specifies the response it returns to the client as part of a zome's code.
+//! hApps can be installed on a device that's running a so-called conductor, Holochain's runtime. Clients can then call each zome's functions via Remote Procedure Calls (RPC).
+//! Every zome function specifies the response it returns to the client as part of a zome's code.
+//! [More info on Holochain's architecture](https://developer.holochain.org/concepts/2_application_architecture/)
 //!
-//! hApps are required to be deterministic and shareable artefacts with a unique hash value, and must run in a sandboxed environment on the hosting system.
-//! These requirements are met by WASM binaries as per the [WebAssembly specification](https://webassembly.github.io/spec/core/).
-//! Instead of coming with its own custom runtime environment for hApps, Holochain makes use of WASM as the format of its applications.
+//! hApps are required to be deterministic and shareable artifacts with a unique hash value, and must run in a sandboxed environment on the hosting system.
+//! Instead of writing and maintaining a custom format and specification for these artifacts as well as a runtime environment to execute them,
+//! Holochain makes use of WASM as the format of its applications. WASM binaries meet the aforementioned requirements as per the
+//! [WebAssembly specification](https://webassembly.github.io/spec/core/).
 //!
 //! Low-level communication between the conductor and WASM binaries, like typing and serialization of data, is encapsulated by the HDK.
 //! Using the HDK, hApp developers can focus on their application's logic. [Learn more about WASM in Holochain.](https://github.com/holochain/holochain/blob/develop/crates/hdk/ON-WASM.md)
