@@ -47,7 +47,7 @@ impl Partition {
         // TODO: optimize
         self.heap
             .iter()
-            .map(|r| tree.lookup(&r.coords).size as usize)
+            .map(|r| tree.lookup(&r.coords.to_bounds()).size as usize)
             .sum()
     }
 }

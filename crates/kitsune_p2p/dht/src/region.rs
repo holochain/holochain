@@ -8,8 +8,8 @@ pub struct Region {
 impl Region {
     pub fn split(self, tree: &Tree) -> Option<(Self, Self)> {
         let (c1, c2) = self.coords.halve()?;
-        let d1 = tree.lookup(&c1);
-        let d2 = tree.lookup(&c2);
+        let d1 = tree.lookup(&c1.to_bounds());
+        let d2 = tree.lookup(&c2.to_bounds());
         let r1 = Self {
             coords: c1,
             data: d1,

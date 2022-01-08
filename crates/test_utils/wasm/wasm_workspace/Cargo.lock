@@ -494,6 +494,7 @@ name = "kitsune_p2p_timestamp"
 version = "0.0.5"
 dependencies = [
  "chrono",
+ "derive_more",
  "serde",
  "thiserror",
 ]

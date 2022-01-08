@@ -1,16 +1,4 @@
-use crate::op::OpHash;
-
-pub type Hash32 = [u8; 32];
-
-pub fn fake_hash() -> Hash32 {
-    use rand::distributions::*;
-
-    let mut rng = rand::thread_rng();
-    let uni = Uniform::from(u8::MIN..=u8::MAX);
-    let bytes: Vec<u8> = uni.sample_iter(&mut rng).take(32).collect();
-    let bytes: [u8; 32] = bytes.try_into().unwrap();
-    bytes
-}
+use crate::hash::{OpHash, RegionHash};
 
 pub fn array_xor<const N: usize>(a: &mut [u8; N], b: &[u8; N]) {
     for i in 0..N {
@@ -18,13 +6,10 @@ pub fn array_xor<const N: usize>(a: &mut [u8; N], b: &[u8; N]) {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct RegionHash([u8; 32]);
-
 impl RegionHash {
     /// Any null node hashes just get ignored.
     pub fn xor(&mut self, other: &Self) {
-        array_xor(&mut self.0, &other.0);
+        array_xor(&mut *self, &other);
     }
 }
 
@@ -39,7 +24,7 @@ impl std::ops::Add for RegionHash {
 
 impl num_traits::Zero for RegionHash {
     fn zero() -> Self {
-        Self([0; 32])
+        Self::new([0; 32])
     }
 
     fn is_zero(&self) -> bool {
@@ -49,7 +34,7 @@ impl num_traits::Zero for RegionHash {
 
 impl From<OpHash> for RegionHash {
     fn from(h: OpHash) -> Self {
-        Self(h.0)
+        Self::new(h.0)
     }
 }
 

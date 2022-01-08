@@ -13,8 +13,8 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-
 chrono = "0.4.6"
+derive_more = "0.99"
 serde = { version = "1.0", features = [ "derive" ] }
 thiserror = "1"
 

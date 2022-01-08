@@ -1,3 +1,5 @@
+use kitsune_p2p_dht_arc::DhtArcSet;
+
 use crate::arq::ArqBounds;
 
 /// A collection of ArqBounds.
@@ -29,6 +31,10 @@ impl ArqSet {
         }
     }
 
+    pub fn single(arq: ArqBounds) -> Self {
+        Self::new(vec![arq])
+    }
+
     /// Get a reference to the arq set's power.
     pub fn power(&self) -> u8 {
         self.power
@@ -37,6 +43,37 @@ impl ArqSet {
     /// Get a reference to the arq set's arqs.
     pub fn arqs(&self) -> &[ArqBounds] {
         self.arqs.as_ref()
+    }
+
+    pub fn to_dht_arc_set(&self) -> DhtArcSet {
+        DhtArcSet::from(
+            self.arqs
+                .iter()
+                .map(|a| a.to_interval())
+                .collect::<Vec<_>>(),
+        )
+    }
+
+    pub fn requantize(&self, power: u8) -> Option<Self> {
+        self.arqs
+            .iter()
+            .map(|a| a.requantize(power))
+            .collect::<Option<Vec<_>>>()
+            .map(|arqs| Self { arqs, power })
+    }
+
+    pub fn intersection(&self, other: &Self) -> Self {
+        let power = self.power.min(other.power());
+        let a1 = self.requantize(power).unwrap().to_dht_arc_set();
+        let a2 = other.requantize(power).unwrap().to_dht_arc_set();
+        Self {
+            arqs: DhtArcSet::intersection(&a1, &a2)
+                .intervals()
+                .into_iter()
+                .map(|interval| ArqBounds::from_interval(power, interval).expect("cannot fail"))
+                .collect(),
+            power,
+        }
     }
 }
 

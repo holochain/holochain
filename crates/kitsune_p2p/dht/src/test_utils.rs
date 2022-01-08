@@ -1,3 +1,6 @@
+pub mod op_store;
+pub mod test_node;
+
 use crate::arq::Arq;
 use crate::arq::ArqSet;
 use crate::arq::ArqStrat;
