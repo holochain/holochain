@@ -45,10 +45,6 @@ pub struct RegionData {
     pub count: u32,
 }
 
-impl RegionData {
-    pub const MASS: usize = std::mem::size_of::<RegionData>();
-}
-
 impl num_traits::Zero for RegionData {
     fn zero() -> Self {
         Self {

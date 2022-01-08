@@ -42,6 +42,14 @@ pub struct Interval<C: Coord> {
 }
 
 impl<C: Coord> Interval<C> {
+    pub fn new(power: u32, offset: u32) -> Self {
+        Self {
+            power,
+            offset,
+            phantom: PhantomData,
+        }
+    }
+
     pub fn length(&self) -> u64 {
         // If power is 32, this overflows a u32
         2u64.pow(self.power)
@@ -62,16 +70,8 @@ impl<C: Coord> Interval<C> {
         } else {
             let power = self.power - 1;
             Some((
-                Interval {
-                    power,
-                    offset: self.offset * 2,
-                    phantom: PhantomData,
-                },
-                Interval {
-                    power,
-                    offset: self.offset * 2 + 1,
-                    phantom: PhantomData,
-                },
+                Interval::new(power, self.offset * 2),
+                Interval::new(power, self.offset * 2 + 1),
             ))
         }
     }
@@ -79,40 +79,6 @@ impl<C: Coord> Interval<C> {
 
 pub type SpaceInterval = Interval<SpaceCoord>;
 pub type TimeInterval = Interval<TimeCoord>;
-
-#[derive(Copy, Clone, Debug)]
-pub struct RegionCoords {
-    pub space: SpaceInterval,
-    pub time: TimeInterval,
-}
-
-impl RegionCoords {
-    pub fn halve(self) -> Option<(Self, Self)> {
-        let (sa, sb) = self.space.halve()?;
-        Some((
-            Self {
-                space: sa,
-                time: self.time,
-            },
-            Self {
-                space: sb,
-                time: self.time,
-            },
-        ))
-    }
-
-    pub fn to_bounds(&self) -> RegionBounds {
-        RegionBounds {
-            x: self.space.bounds(),
-            t: self.time.bounds(),
-        }
-    }
-}
-
-pub struct RegionBounds {
-    pub x: (SpaceCoord, SpaceCoord),
-    pub t: (TimeCoord, TimeCoord),
-}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Dimension {

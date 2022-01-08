@@ -12,5 +12,5 @@ fn test_basic() {
     let alice = TestNode::new(topo.clone(), todo!());
     let bob = TestNode::new(topo.clone(), todo!());
 
-    OpData::fake(0, 0, 10);
+    OpData::fake(0, 10, 10);
 }

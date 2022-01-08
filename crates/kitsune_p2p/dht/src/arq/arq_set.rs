@@ -8,7 +8,7 @@ use crate::arq::ArqBounds;
 #[derive(Debug, Clone, PartialEq, Eq, derive_more::IntoIterator)]
 pub struct ArqSet {
     #[into_iterator]
-    pub(super) arqs: Vec<ArqBounds>,
+    pub(crate) arqs: Vec<ArqBounds>,
     power: u8,
 }
 

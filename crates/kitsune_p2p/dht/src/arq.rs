@@ -7,12 +7,17 @@ mod strat;
 use std::num::Wrapping;
 
 pub use arq_set::*;
+use kitsune_p2p_timestamp::Timestamp;
 pub use peer_view::*;
 pub use strat::*;
 
 use kitsune_p2p_dht_arc::ArcInterval;
 
-use crate::op::Loc;
+use crate::{
+    coords::{SpaceCoord, SpaceInterval},
+    op::Loc,
+    region::{telescoping_times, RegionCoords},
+};
 
 pub fn pow2(p: u8) -> u32 {
     2u32.pow(p as u32)
@@ -130,7 +135,7 @@ impl Arq {
     ///         ... 5 3 1 0 2 4 6 ...
     ///                - or -
     ///         ... 6 4 2 0 1 2 3 ...
-    fn chunk_at(&self, sequence: u32) -> ArqBounds {
+    fn chunk_at(&self, sequence: u32) -> SpaceInterval {
         let s = self.spacing();
         // the offset of the central chunk
         let center = self.center.as_u32() / s;
@@ -148,14 +153,14 @@ impl Arq {
                 center.wrapping_sub(sequence / 2)
             }
         };
-        ArqBounds::chunk(self.power, offset)
+        SpaceInterval::new(self.power.into(), offset)
     }
 
     /// Return the chunks at the leftmost and rightmost edge of this Arq.
     /// If count is 0, there is no boundary.
     /// If count is 1, both boundary chunks are the same: the central chunk.
     /// Otherwise, returns two different chunks.
-    pub fn boundary_chunks(&self) -> Option<(ArqBounds, ArqBounds)> {
+    pub fn boundary_chunks(&self) -> Option<(SpaceInterval, SpaceInterval)> {
         if self.count == 0 {
             None
         } else if self.count == 1 {
@@ -289,12 +294,18 @@ impl ArqBounds {
         })
     }
 
-    pub fn chunk(power: u8, offset: u32) -> Self {
-        Self {
-            power,
-            offset,
-            count: 1,
-        }
+    pub fn chunk_offsets(&self) -> impl Iterator<Item = SpaceCoord> + '_ {
+        (0..self.count).map(|c| (c + self.offset).into())
+    }
+
+    pub fn regions_with_telescoping_time(
+        &self,
+        now: Timestamp,
+    ) -> impl Iterator<Item = RegionCoords> + '_ {
+        self.chunk_offsets().flat_map(|x| {
+            telescoping_times(now)
+                .map(|t| RegionCoords::new(SpaceInterval::new(self.power as u32, *x), t))
+        })
     }
 
     pub fn chunk_width(&self) -> u64 {

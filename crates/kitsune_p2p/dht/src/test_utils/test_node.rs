@@ -1,5 +1,7 @@
 use std::ops::Add;
 
+use kitsune_p2p_timestamp::Timestamp;
+
 use crate::{
     agent::AgentInfo,
     arq::{Arq, ArqSet},
@@ -7,6 +9,7 @@ use crate::{
     hash::{fake_hash, AgentKey},
     host::{AccessOpStore, AccessPeerStore},
     op::Op,
+    region::Region,
     region_data::RegionData,
     tree::Tree,
 };
@@ -34,15 +37,31 @@ impl TestNode {
         ArqSet::single(self.agent_info.arq.to_bounds())
     }
 
+    /// Quick 'n dirty simulation of a gossip round. Mutates both nodes as if
+    /// they were exchanging gossip messages, without the rigmarole of a real protocol
     pub fn gossip_with(&mut self, other: &mut Self) {
         let mut stats = TestNodeGossipRoundStats::default();
+        let now = Timestamp::now();
 
         // 1. calculate common arqset
         let common_arqs = self.arq_set().intersection(&other.arq_set());
 
         // 2. calculate regions
-        stats.region_data_sent += todo!();
-        stats.region_data_rcvd += todo!();
+        let region_coords: Vec<_> = common_arqs
+            .arqs
+            .iter()
+            .flat_map(|a| a.regions_with_telescoping_time(now))
+            .collect();
+        let regions_self: Vec<Region> = region_coords
+            .iter()
+            .map(|r| Region::new(*r, self.query_region_data(r)))
+            .collect();
+        let regions_other: Vec<Region> = region_coords
+            .iter()
+            .map(|r| Region::new(*r, other.query_region_data(r)))
+            .collect();
+        stats.region_data_sent += regions_self.len() as u32 * Region::MASS;
+        stats.region_data_rcvd += regions_other.len() as u32 * Region::MASS;
 
         // 3. send regions
 
