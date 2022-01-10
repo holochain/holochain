@@ -19,7 +19,7 @@ pub fn call(
             write_workspace: Permission::Allow,
             ..
         } => {
-            let results: Vec<Result<Result<ZomeCallResponse, _>, _>> =
+            let results: Vec<Result<ZomeCallResponse, WasmError>> =
                 tokio_helper::block_forever_on(async move {
                     join_all(inputs.into_iter().map(|input| async {
                         let Call {
@@ -34,13 +34,16 @@ pub fn call(
                         .agent_pubkey()
                         .clone();
 
-                        match target {
+                        let result: Result<ZomeCallResponse, WasmError> = match target {
                             CallTarget::Agent(target_agent) => {
-                                call_context
+                                match call_context
                                 .host_context()
                                 .network()
                                 .call_remote(provenance, target_agent, zome_name, fn_name, cap_secret, payload)
-                                .await
+                                .await {
+                                    Ok(serialized_bytes) => ZomeCallResponse::try_from(serialized_bytes).map_err(WasmError::from),
+                                    Err(e) => Ok(ZomeCallResponse::NetworkError(e.to_string())),
+                                }
                             },
                             CallTarget::Cell(target_cell) => {
                                 let cell_id = match target_cell {
@@ -59,7 +62,7 @@ pub fn call(
                                     cap_secret,
                                     provenance,
                                 };
-                                call_context
+                                match call_context
                                     .host_context()
                                     .call_zome_handle()
                                     .call_zome(
@@ -71,23 +74,19 @@ pub fn call(
                                             .try_into()
                                             .expect("Must have source chain to make zome call"),
                                     )
-                                    .await
+                                    .await {
+                                        Ok(Ok(zome_call_response)) => Ok(zome_call_response),
+                                        Ok(Err(ribosome_error)) => Err(WasmError::Host(ribosome_error.to_string())),
+                                        Err(conductor_api_error) => Err(WasmError::Host(conductor_api_error.to_string())),
+                                    }
                             }
-                        }
+                        };
+                        result
                     }))
                     .await
                 });
             let results: Result<Vec<_>, _> = results
                 .into_iter()
-                .map(|result| match result {
-                    Ok(v) => match v {
-                        Ok(v) => Ok(v),
-                        Err(ribosome_error) => Err(WasmError::Host(ribosome_error.to_string())),
-                    },
-                    Err(conductor_api_error) => {
-                        Err(WasmError::Host(conductor_api_error.to_string()))
-                    }
-                })
                 .collect();
             Ok(results?)
         }
@@ -115,7 +114,7 @@ pub mod wasm_test {
     use holochain_zome_types::ZomeCallResponse;
     use matches::assert_matches;
     use rusqlite::named_params;
-    use crate::test_utils::setup_app;
+    use crate::conductor::interface::websocket::test_utils::setup_app;
 
     use crate::conductor::{api::ZomeCall, ConductorHandle};
     use crate::test_utils::conductor_setup::ConductorTestData;
