@@ -7,6 +7,7 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use crate::core::ribosome::RibosomeError;
 use std::sync::Arc;
+use holochain_p2p::HolochainP2pDnaT;
 
 pub fn call(
     _ribosome: Arc<impl RibosomeT>,
@@ -22,41 +23,57 @@ pub fn call(
                 tokio_helper::block_forever_on(async move {
                     join_all(inputs.into_iter().map(|input| async {
                         let Call {
-                            to_cell,
+                            target,
                             zome_name,
                             fn_name,
                             cap_secret,
                             payload,
-                            provenance,
                         } = input;
-                        let cell_id = to_cell.unwrap_or_else(|| {
-                            call_context
+                        let provenance = call_context.host_context.workspace().source_chain()
+                        .as_ref().expect("Must have source chain to know provenance")
+                        .agent_pubkey()
+                        .clone();
+
+                        match target {
+                            CallTarget::Agent(target_agent) => {
+                                call_context
                                 .host_context()
-                                .call_zome_handle()
-                                .cell_id()
-                                .clone()
-                        });
-                        let invocation = ZomeCall {
-                            cell_id,
-                            zome_name,
-                            fn_name,
-                            payload,
-                            cap_secret,
-                            provenance,
-                        };
-                        call_context
-                            .host_context()
-                            .call_zome_handle()
-                            .call_zome(
-                                invocation,
+                                .network()
+                                .call_remote(provenance, target_agent, zome_name, fn_name, cap_secret, payload)
+                                .await
+                            },
+                            CallTarget::Cell(target_cell) => {
+                                let cell_id = match target_cell {
+                                    CallTargetCell::Other(cell_id) => cell_id,
+                                    CallTargetCell::Local => call_context
+                                        .host_context()
+                                        .call_zome_handle()
+                                        .cell_id()
+                                        .clone(),
+                                };
+                                let invocation = ZomeCall {
+                                    cell_id,
+                                    zome_name,
+                                    fn_name,
+                                    payload,
+                                    cap_secret,
+                                    provenance,
+                                };
                                 call_context
                                     .host_context()
-                                    .workspace_write()
-                                    .clone()
-                                    .try_into()
-                                    .expect("Must have source chain to make zome call"),
-                            )
-                            .await
+                                    .call_zome_handle()
+                                    .call_zome(
+                                        invocation,
+                                        call_context
+                                            .host_context()
+                                            .workspace_write()
+                                            .clone()
+                                            .try_into()
+                                            .expect("Must have source chain to make zome call"),
+                                    )
+                                    .await
+                            }
+                        }
                     }))
                     .await
                 });
@@ -98,6 +115,7 @@ pub mod wasm_test {
     use holochain_zome_types::ZomeCallResponse;
     use matches::assert_matches;
     use rusqlite::named_params;
+    use crate::test_utils::setup_app;
 
     use crate::conductor::{api::ZomeCall, ConductorHandle};
     use crate::test_utils::conductor_setup::ConductorTestData;
@@ -274,5 +292,125 @@ pub mod wasm_test {
         let cell_data = vec![(bob_installed_cell, None)];
         install_app("bob_app", cell_data, vec![dna_file], handle.clone()).await;
         bob_cell_id
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    /// we can call a fn on a remote
+    async fn call_remote_test() {
+        // ////////////
+        // START DNA
+        // ////////////
+
+        let dna_def = DnaDef {
+            name: "call_remote_test".to_string(),
+            uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+            properties: SerializedBytes::try_from(()).unwrap(),
+            zomes: vec![TestWasm::WhoAmI.into()].into(),
+        };
+        let dna_file = DnaFile::new(dna_def, vec![TestWasm::WhoAmI.into()])
+            .await
+            .unwrap();
+
+        // //////////
+        // END DNA
+        // //////////
+
+        // ///////////
+        // START ALICE
+        // ///////////
+
+        let alice_agent_id = fake_agent_pubkey_1();
+        let alice_cell_id = CellId::new(dna_file.dna_hash().to_owned(), alice_agent_id.clone());
+        let alice_installed_cell = InstalledCell::new(alice_cell_id.clone(), "alice_handle".into());
+
+        // /////////
+        // END ALICE
+        // /////////
+
+        // /////////
+        // START BOB
+        // /////////
+
+        let bob_agent_id = fake_agent_pubkey_2();
+        let bob_cell_id = CellId::new(dna_file.dna_hash().to_owned(), bob_agent_id.clone());
+        let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
+
+        // ///////
+        // END BOB
+        // ///////
+
+        // ///////////////
+        // START CONDUCTOR
+        // ///////////////
+
+        let mut dna_store = MockDnaStore::new();
+
+        dna_store.expect_get().return_const(Some(dna_file.clone()));
+        dna_store
+            .expect_add_dnas::<Vec<_>>()
+            .times(2)
+            .return_const(());
+        dna_store
+            .expect_add_entry_defs::<Vec<_>>()
+            .times(2)
+            .return_const(());
+
+        let (_tmpdir, _app_api, handle) = setup_app(
+            vec![(alice_installed_cell, None), (bob_installed_cell, None)],
+            dna_store,
+        )
+        .await;
+
+        // /////////////
+        // END CONDUCTOR
+        // /////////////
+
+        // BOB INIT (to do cap grant)
+
+        let _ = handle
+            .call_zome(ZomeCall {
+                cell_id: bob_cell_id,
+                zome_name: TestWasm::WhoAmI.into(),
+                cap_secret: None,
+                fn_name: "set_access".into(),
+                payload: ExternIO::encode(()).unwrap(),
+                provenance: bob_agent_id.clone(),
+            })
+            .await
+            .unwrap();
+
+        // ALICE DOING A CALL
+
+        let output = handle
+            .call_zome(ZomeCall {
+                cell_id: alice_cell_id,
+                zome_name: TestWasm::WhoAmI.into(),
+                cap_secret: None,
+                fn_name: "whoarethey".into(),
+                payload: ExternIO::encode(&bob_agent_id).unwrap(),
+                provenance: alice_agent_id,
+            })
+            .await
+            .unwrap()
+            .unwrap();
+
+        match output {
+            ZomeCallResponse::Ok(guest_output) => {
+                let agent_info: AgentInfo = guest_output.decode().unwrap();
+                assert_eq!(
+                    agent_info.agent_initial_pubkey,
+                    bob_agent_id
+                );
+                assert_eq!(
+                    agent_info.agent_latest_pubkey,
+                    bob_agent_id
+                );
+            }
+            _ => unreachable!(),
+        }
+
+        let shutdown = handle.take_shutdown_handle().unwrap();
+        handle.shutdown();
+        shutdown.await.unwrap().unwrap();
     }
 }

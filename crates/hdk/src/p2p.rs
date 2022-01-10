@@ -12,7 +12,7 @@ use crate::prelude::*;
 /// - cap_secret: The capability secret if required.
 /// - payload: The arguments to the function you are calling.
 pub fn call<I>(
-    to_cell: Option<CellId>,
+    to_cell: CallTargetCell,
     zome_name: ZomeName,
     fn_name: FunctionName,
     cap_secret: Option<CapSecret>,
@@ -21,17 +21,14 @@ pub fn call<I>(
 where
     I: serde::Serialize + std::fmt::Debug,
 {
-    // @todo is this secure to set this in the wasm rather than have the host inject it?
-    let provenance = agent_info()?.agent_latest_pubkey;
     Ok(HDK
         .with(|h| {
             h.borrow().call(vec![Call::new(
-                to_cell,
+                CallTarget::Cell(to_cell),
                 zome_name,
                 fn_name,
                 cap_secret,
                 ExternIO::encode(payload)?,
-                provenance,
             )])
         })?
         .into_iter()
@@ -74,8 +71,8 @@ where
 {
     Ok(HDK
         .with(|h| {
-            h.borrow().call_remote(vec![CallRemote::new(
-                agent,
+            h.borrow().call(vec![Call::new(
+                CallTarget::Agent(agent),
                 zome,
                 fn_name,
                 cap_secret,

@@ -32,7 +32,6 @@ use crate::core::ribosome::host_fn::accept_countersigning_preflight_request::acc
 use crate::core::ribosome::host_fn::agent_info::agent_info;
 use crate::core::ribosome::host_fn::call::call;
 use crate::core::ribosome::host_fn::call_info::call_info;
-use crate::core::ribosome::host_fn::call_remote::call_remote;
 use crate::core::ribosome::host_fn::capability_claims::capability_claims;
 use crate::core::ribosome::host_fn::capability_grants::capability_grants;
 use crate::core::ribosome::host_fn::capability_info::capability_info;
@@ -423,7 +422,6 @@ impl RealRibosome {
                 accept_countersigning_preflight_request,
             )
             .with_host_function(&mut ns, "__query", query)
-            .with_host_function(&mut ns, "__call_remote", call_remote)
             .with_host_function(&mut ns, "__remote_signal", remote_signal)
             .with_host_function(&mut ns, "__call", call)
             .with_host_function(&mut ns, "__create", create)
