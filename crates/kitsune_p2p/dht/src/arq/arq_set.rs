@@ -94,17 +94,17 @@ pub fn print_arqs(arqs: &ArqSet, len: usize) {
 fn normalize_arqs() {
     let s = ArqSet::new(vec![
         ArqBounds {
-            offset: 0,
+            offset: 0.into(),
             power: 10,
             count: 10,
         },
         ArqBounds {
-            offset: 0,
+            offset: 0.into(),
             power: 8,
             count: 40,
         },
         ArqBounds {
-            offset: 0,
+            offset: 0.into(),
             power: 12,
             count: 3,
         },
@@ -114,19 +114,19 @@ fn normalize_arqs() {
         s.arqs,
         vec![
             ArqBounds {
-                offset: 0,
+                offset: 0.into(),
                 power: 8,
-                count: 4 * 10
+                count: (4 * 10)
             },
             ArqBounds {
-                offset: 0,
+                offset: 0.into(),
                 power: 8,
                 count: 40
             },
             ArqBounds {
-                offset: 0,
+                offset: 0.into(),
                 power: 8,
-                count: 3 * 16
+                count: (3 * 16)
             },
         ]
     );

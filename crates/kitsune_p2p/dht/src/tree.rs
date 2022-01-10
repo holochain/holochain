@@ -1,7 +1,7 @@
 use sparse_fenwick::Fenwick2;
 
 use crate::{
-    coords::{Coord, RegionBounds, SpaceCoord, TimeCoord, Topology},
+    coords::{Coord, SpaceCoord, TimeCoord, Topology},
     op::Op,
     region_data::RegionData,
 };

@@ -14,7 +14,7 @@ pub use strat::*;
 use kitsune_p2p_dht_arc::ArcInterval;
 
 use crate::{
-    coords::{SpaceCoord, SpaceInterval},
+    coords::{Coord, SpaceCoord, SpaceInterval},
     op::Loc,
     region::{telescoping_times, RegionCoords},
 };
@@ -113,7 +113,7 @@ impl Arq {
             center_offset.wrapping_sub(wing)
         };
         ArqBounds {
-            offset,
+            offset: offset.into(),
             power: self.power,
             count: self.count,
         }
@@ -142,7 +142,7 @@ impl Arq {
         let left_oriented = (*self.center - Wrapping(center * s)) < Wrapping(s / 2);
         let offset = if left_oriented {
             if sequence % 2 == 1 {
-                center.wrapping_sub((sequence / 2 + 1))
+                center.wrapping_sub(sequence / 2 + 1)
             } else {
                 center.wrapping_add(sequence / 2)
             }
@@ -200,7 +200,7 @@ impl Arq {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ArqBounds {
-    offset: u32,
+    offset: SpaceCoord,
     power: u8,
     count: u32,
 }
@@ -219,12 +219,12 @@ impl ArqBounds {
         let full_count = 2u32.pow(32 - power as u32);
         match interval {
             ArcInterval::Empty => Some(Self {
-                offset: 0,
+                offset: 0.into(),
                 power,
                 count: 0,
             }),
             ArcInterval::Full => Some(Self {
-                offset: 0,
+                offset: 0.into(),
                 power,
                 count: full_count,
             }),
@@ -243,9 +243,9 @@ impl ArqBounds {
                 // should be 1 less.
                 if rounded || lo == offset * s && diff == count * s {
                     Some(Self {
-                        offset,
+                        offset: offset.into(),
                         power,
-                        count,
+                        count: count.into(),
                     })
                 } else {
                     None
@@ -278,7 +278,7 @@ impl ArqBounds {
             let mut b = self.clone();
             a.count = 1;
             b.count = 1;
-            b.offset = b.offset.wrapping_add(self.count - 1);
+            b.offset = (*b.offset).wrapping_add(self.count - 1).into();
             Some((a, b))
         }
     }
@@ -295,7 +295,9 @@ impl ArqBounds {
     }
 
     pub fn chunk_offsets(&self) -> impl Iterator<Item = SpaceCoord> + '_ {
-        (0..self.count).map(|c| (c + self.offset).into())
+        (0..self.count)
+            .map(SpaceCoord::from)
+            .map(|c| (c + self.offset))
     }
 
     pub fn regions_with_telescoping_time(
@@ -303,7 +305,7 @@ impl ArqBounds {
         now: Timestamp,
     ) -> impl Iterator<Item = RegionCoords> + '_ {
         self.chunk_offsets().flat_map(|x| {
-            telescoping_times(now)
+            telescoping_times()
                 .map(|t| RegionCoords::new(SpaceInterval::new(self.power as u32, *x), t))
         })
     }
@@ -314,13 +316,15 @@ impl ArqBounds {
 
     // TODO: test
     pub fn left(&self) -> u32 {
-        (self.offset as u64 * 2u64.pow(self.power as u32)) as u32
+        self.offset.exp_wrapping(self.power)
     }
 
     // TODO: test
     pub fn right(&self) -> u32 {
-        ((self.offset.wrapping_add(self.count)) as u64 * 2u64.pow(self.power as u32))
-            .wrapping_sub(1) as u32
+        self.offset
+            .wrapping_add(self.count)
+            .exp_wrapping(self.power)
+            .wrapping_sub(1)
     }
 
     /// Return a plausible place for the centerpoint of the Arq.
@@ -576,7 +580,7 @@ mod tests {
         let a1 = Arq::new(3264675840u32.into(), 16, 6);
         // let a2 = Arq::new((3264675840u32 + 3000).into(), 16, 6);
         let a2 = Arq::new(3264708608u32.into(), 16, 6);
-        assert_eq!(a1.to_bounds().offset + 1, a2.to_bounds().offset);
+        assert_eq!(*a1.to_bounds().offset + 1, *a2.to_bounds().offset);
     }
 
     proptest::proptest! {

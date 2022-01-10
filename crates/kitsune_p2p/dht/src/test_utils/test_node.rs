@@ -5,11 +5,11 @@ use kitsune_p2p_timestamp::Timestamp;
 use crate::{
     agent::AgentInfo,
     arq::{Arq, ArqSet},
-    coords::{RegionBounds, Topology},
+    coords::Topology,
     hash::{fake_hash, AgentKey},
     host::{AccessOpStore, AccessPeerStore},
     op::Op,
-    region::Region,
+    region::{Region, RegionBounds},
     region_data::RegionData,
     tree::Tree,
 };
@@ -54,11 +54,11 @@ impl TestNode {
             .collect();
         let regions_self: Vec<Region> = region_coords
             .iter()
-            .map(|r| Region::new(*r, self.query_region_data(r)))
+            .map(|r| Region::new(*r, self.query_region_data(&r.to_bounds())))
             .collect();
         let regions_other: Vec<Region> = region_coords
             .iter()
-            .map(|r| Region::new(*r, other.query_region_data(r)))
+            .map(|r| Region::new(*r, other.query_region_data(&r.to_bounds())))
             .collect();
         stats.region_data_sent += regions_self.len() as u32 * Region::MASS;
         stats.region_data_rcvd += regions_other.len() as u32 * Region::MASS;

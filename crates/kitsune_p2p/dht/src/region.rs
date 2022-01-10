@@ -1,5 +1,5 @@
 use crate::{
-    coords::{RegionCoords, SpaceCoord, SpaceInterval, TimeCoord, TimeInterval},
+    coords::{SpaceCoord, SpaceInterval, TimeCoord, TimeInterval},
     region_data::RegionData,
     tree::Tree,
 };

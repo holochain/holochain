@@ -3,17 +3,53 @@ use std::{marker::PhantomData, ops::Deref};
 use crate::op::{Loc, Timestamp};
 
 #[derive(
-    Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, derive_more::From, derive_more::Deref,
+    Copy,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    derive_more::Add,
+    derive_more::Deref,
+    derive_more::Display,
+    derive_more::From,
 )]
 pub struct SpaceCoord(u32);
 
 #[derive(
-    Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, derive_more::From, derive_more::Deref,
+    Copy,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    derive_more::Add,
+    derive_more::Deref,
+    derive_more::Display,
+    derive_more::From,
 )]
 pub struct TimeCoord(u32);
 
 pub trait Coord: From<u32> + Deref<Target = u32> {
     const MAX: u32 = u32::MAX;
+
+    fn exp(&self, pow: u8) -> u32 {
+        **self * 2u32.pow(pow as u32)
+    }
+
+    fn exp_wrapping(&self, pow: u8) -> u32 {
+        (**self as u64 * 2u64.pow(pow as u32)) as u32
+    }
+
+    fn wrapping_add(self, other: u32) -> Self {
+        Self::from((*self).wrapping_add(other))
+    }
+
+    fn wrapping_sub(self, other: u32) -> Self {
+        Self::from((*self).wrapping_sub(other))
+    }
 }
 
 impl Coord for SpaceCoord {}

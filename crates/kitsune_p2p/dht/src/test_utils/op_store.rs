@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
 use crate::{
-    coords::RegionBounds,
     op::{Op, OpData, Timestamp},
+    region::RegionBounds,
     Loc,
 };
 

@@ -7,9 +7,10 @@
 
 use crate::{
     agent::AgentInfo,
-    coords::{RegionBounds, SpacetimeCoords, Topology},
+    coords::{SpacetimeCoords, Topology},
     hash::AgentKey,
     op::{Op, Timestamp},
+    region::RegionBounds,
     region_data::RegionData,
     Loc,
 };
