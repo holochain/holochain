@@ -20,8 +20,6 @@ struct TestData {
     signature: Signature,
     original_entry: Entry,
     new_entry: Entry,
-    any_header: Header,
-    dna_header: Header,
     entry_update_header: Update,
     entry_update_entry: Update,
     original_header_hash: HeaderHash,
@@ -113,15 +111,10 @@ impl TestData {
             _ => {}
         };
 
-        // Dna Header
-        let dna_header = Header::Dna(fixt!(Dna));
-
         Self {
             signature: fixt!(Signature),
             original_entry,
             new_entry,
-            any_header,
-            dna_header,
             entry_update_header,
             entry_update_entry,
             original_header,
@@ -141,10 +134,7 @@ enum Db {
     IntegratedEmpty,
     IntQueue(DhtOp),
     IntQueueEmpty,
-    CasHeader(Header, Option<Signature>),
-    CasEntry(Entry, Option<Header>, Option<Signature>),
     MetaEmpty,
-    MetaHeader(Entry, Header),
     MetaActivity(Header),
     MetaUpdate(AnyDhtHash, Header),
     MetaDelete(HeaderHash, Header),
@@ -204,86 +194,6 @@ impl Db {
                             )
                             .unwrap();
                         assert!(found, "{}\n{:?}", here, op);
-                    }
-                    Db::CasHeader(header, _) => {
-                        let hash = HeaderHash::with_data_sync(&header);
-                        let found: bool = txn
-                            .query_row(
-                                "
-                                SELECT EXISTS(
-                                    SELECT 1 FROM DhtOP
-                                    WHERE when_integrated IS NOT NULL
-                                    AND header_hash = :hash
-                                    AND validation_status = :status
-                                    AND (type = :store_entry OR type = :store_element)
-                                )
-                                ",
-                                named_params! {
-                                    ":hash": hash,
-                                    ":status": ValidationStatus::Valid,
-                                    ":store_entry": DhtOpType::StoreEntry,
-                                    ":store_element": DhtOpType::StoreElement,
-                                },
-                                |row| row.get(0),
-                            )
-                            .unwrap();
-                        assert!(found, "{}\n{:?}", here, header);
-                    }
-                    Db::CasEntry(entry, _, _) => {
-                        let hash = EntryHash::with_data_sync(&entry);
-                        let basis: AnyDhtHash = hash.clone().into();
-                        let found: bool = txn
-                            .query_row(
-                                "
-                                SELECT EXISTS(
-                                    SELECT 1 FROM DhtOp
-                                    JOIN Header ON DhtOp.header_hash = Header.hash
-                                    WHERE DhtOp.when_integrated IS NOT NULL
-                                    AND DhtOp.validation_status = :status
-                                    AND (
-                                        (Header.entry_hash = :hash AND DhtOp.type = :store_element)
-                                        OR
-                                        (DhtOp.basis_hash = :basis AND DhtOp.type = :store_entry)
-                                    )
-                                )
-                                ",
-                                named_params! {
-                                    ":hash": hash,
-                                    ":basis": basis,
-                                    ":status": ValidationStatus::Valid,
-                                    ":store_entry": DhtOpType::StoreEntry,
-                                    ":store_element": DhtOpType::StoreElement,
-                                },
-                                |row| row.get(0),
-                            )
-                            .unwrap();
-                        assert!(found, "{}\n{:?}", here, entry);
-                    }
-                    Db::MetaHeader(entry, header) => {
-                        let hash = HeaderHash::with_data_sync(&header);
-                        let basis: AnyDhtHash = EntryHash::with_data_sync(&entry).into();
-                        let found: bool = txn
-                            .query_row(
-                                "
-                                SELECT EXISTS(
-                                    SELECT 1 FROM DhtOP
-                                    WHERE when_integrated IS NOT NULL
-                                    AND basis_hash = :basis
-                                    AND header_hash = :hash
-                                    AND validation_status = :status
-                                    AND type = :store_entry
-                                )
-                                ",
-                                named_params! {
-                                    ":basis": basis,
-                                    ":hash": hash,
-                                    ":status": ValidationStatus::Valid,
-                                    ":store_entry": DhtOpType::StoreEntry,
-                                },
-                                |row| row.get(0),
-                            )
-                            .unwrap();
-                        assert!(found, "{}\n{:?}", here, entry);
                     }
                     Db::MetaActivity(header) => {
                         let hash = HeaderHash::with_data_sync(&header);
@@ -492,51 +402,20 @@ fn clear_dbs(env: DbWrite<DbKindDht>) {
 // with a desired pre-state that you want the database in
 // and the expected state of the database after the workflow is run
 
-fn store_element(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let entry = match &a.any_header {
-        Header::Create(_) | Header::Update(_) => Some(a.original_entry.clone().into()),
-        _ => None,
-    };
-    let op = DhtOp::StoreElement(
-        a.signature.clone(),
-        a.any_header.clone().into(),
-        entry.clone(),
-    );
-    let pre_state = vec![Db::IntQueue(op.clone())];
-    // Add op data to pending
-    let mut expect = vec![
-        Db::Integrated(op.clone()),
-        Db::CasHeader(a.any_header.clone().into(), None),
-    ];
-    if let Some(_) = &entry {
-        expect.push(Db::CasEntry(a.original_entry.clone(), None, None));
-    }
-    (pre_state, expect, "store element")
-}
-
-fn store_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let op = DhtOp::StoreEntry(
-        a.signature.clone(),
-        a.original_header.clone(),
-        a.original_entry.clone().into(),
-    );
-    debug!(?a.original_header);
-    let pre_state = vec![Db::IntQueue(op.clone())];
+fn register_agent_activity(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+    a.link_add.header_seq = 5;
+    let dep = DhtOp::RegisterAgentActivity(a.signature.clone(), a.link_add.clone().into());
+    let hash = HeaderHash::with_data_sync(&Header::CreateLink(a.link_add.clone()));
+    let mut new_header = a.link_add.clone();
+    new_header.prev_header = hash;
+    new_header.header_seq += 1;
+    let op = DhtOp::RegisterAgentActivity(a.signature.clone(), new_header.clone().into());
+    let pre_state = vec![Db::Integrated(dep.clone()), Db::IntQueue(op.clone())];
     let expect = vec![
+        Db::Integrated(dep.clone()),
+        Db::MetaActivity(a.link_add.clone().into()),
         Db::Integrated(op.clone()),
-        Db::CasHeader(a.original_header.clone().into(), None),
-        Db::CasEntry(a.original_entry.clone(), None, None),
-        Db::MetaHeader(a.original_entry.clone(), a.original_header.clone().into()),
-    ];
-    (pre_state, expect, "store entry")
-}
-
-fn register_agent_activity(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let op = DhtOp::RegisterAgentActivity(a.signature.clone(), a.dna_header.clone());
-    let pre_state = vec![Db::IntQueue(op.clone())];
-    let expect = vec![
-        Db::Integrated(op.clone()),
-        Db::MetaActivity(a.dna_header.clone()),
+        Db::MetaActivity(new_header.clone().into()),
     ];
     (pre_state, expect, "register agent activity")
 }
@@ -677,8 +556,6 @@ async fn test_ops_state() {
     let env = test_env.env();
 
     let tests = [
-        store_element,
-        store_entry,
         register_agent_activity,
         register_replaced_by_for_entry,
         register_updated_element,
