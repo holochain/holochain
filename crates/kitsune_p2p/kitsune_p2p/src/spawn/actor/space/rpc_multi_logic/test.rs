@@ -229,6 +229,14 @@ async fn test_rpc_multi_logic_mocked() {
     });
     let ep_hnd = build_ep_hnd(config.clone(), m).await;
 
+    let metrics = MetricsSync::default();
+    let metric_exchange = MetricExchangeSync::spawn(
+        space.clone(),
+        config.tuning_params.clone(),
+        evt_sender.clone(),
+        metrics.clone(),
+    );
+
     // build up the ro_inner that discover calls expect
     let ro_inner = Arc::new(SpaceReadOnlyInner {
         space: space.clone(),
@@ -240,7 +248,8 @@ async fn test_rpc_multi_logic_mocked() {
             config.tuning_params.concurrent_limit_per_thread,
         )),
         config,
-        metrics: Default::default(),
+        metrics,
+        metric_exchange,
     });
 
     let basis = Arc::new(KitsuneBasis(vec![0; 36]));

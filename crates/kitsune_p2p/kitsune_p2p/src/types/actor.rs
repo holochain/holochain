@@ -70,6 +70,7 @@ pub enum BroadcastTo {
 }
 
 type KSpace = Arc<super::KitsuneSpace>;
+type KSpaceOpt = Option<Arc<super::KitsuneSpace>>;
 type KAgent = Arc<super::KitsuneAgent>;
 type KAgents = Vec<Arc<super::KitsuneAgent>>;
 type KBasis = Arc<super::KitsuneBasis>;
@@ -134,5 +135,10 @@ ghost_actor::ghost_chan! {
             space: KSpace,
             basis: KBasis,
         ) -> bool;
+
+        /// dump network metrics
+        fn dump_network_metrics(
+            space: KSpaceOpt,
+        ) -> serde_json::Value;
     }
 }

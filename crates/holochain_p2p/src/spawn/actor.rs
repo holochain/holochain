@@ -44,7 +44,13 @@ impl WrapEvtSender {
         &self,
         arg: KGenReq,
     ) -> impl Future<Output = HolochainP2pResult<KGenRes>> + 'static + Send {
-        timing_trace!({ self.0.k_gen_req(arg) }, "(hp2p:handle) k_gen_req",)
+        let dna_hash = match &arg {
+            KGenReq::PeerExtrapCov { space, .. } => DnaHash::from_kitsune(space),
+        };
+        timing_trace!(
+            { self.0.k_gen_req(dna_hash, arg) },
+            "(hp2p:handle) k_gen_req",
+        )
     }
 
     pub fn put_agent_info_signed(
@@ -1346,6 +1352,20 @@ impl HolochainP2pHandler for HolochainP2pActor {
                 .targeted_broadcast(space, agents, timeout, payload, false)
                 .await?;
             Ok(())
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_dump_network_metrics(
+        &mut self,
+        dna_hash: Option<DnaHash>,
+    ) -> HolochainP2pHandlerResult<String> {
+        let space = dna_hash.map(|h| h.into_kitsune());
+        let kitsune_p2p = self.kitsune_p2p.clone();
+        Ok(async move {
+            serde_json::to_string_pretty(&kitsune_p2p.dump_network_metrics(space).await?)
+                .map_err(HolochainP2pError::other)
         }
         .boxed()
         .into())
