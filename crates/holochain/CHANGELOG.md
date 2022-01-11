@@ -8,7 +8,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## 0.0.122
 - Adds better batching to validation workflows for much faster validation. [#1167](https://github.com/holochain/holochain/pull/1167).
-- Adds better batching to validation workflows for much faster validation. [\#1167](https://github.com/holochain/holochain/pull/1167).
 
 ## 0.0.121
 
