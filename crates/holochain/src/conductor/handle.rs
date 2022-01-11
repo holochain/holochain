@@ -613,7 +613,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                     }
                     .boxed()
                     .into()));
-                }
+                },
             },
             PutAgentInfoSigned {
                 peer_data, respond, ..

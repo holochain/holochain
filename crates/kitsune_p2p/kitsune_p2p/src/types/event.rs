@@ -142,6 +142,71 @@ pub fn full_time_window_inclusive() -> TimeWindowInclusive {
     Timestamp::MIN..=Timestamp::MAX
 }
 
+const METRIC_KIND_UNKNOWN: &str = "Unknown";
+const METRIC_KIND_REACHABILITY_QUOTIENT: &str = "ReachabilityQuotient";
+const METRIC_KIND_LATENCY_MICROS: &str = "LatencyMicros";
+const METRIC_KIND_AGG_EXTRAP_COV: &str = "AggExtrapCov";
+
+/// The type of metric recorded
+pub enum MetricRecordKind {
+    /// Failure to parse metric kind
+    Unknown,
+
+    /// ReachabilityQuotient metric kind
+    ReachabilityQuotient,
+
+    /// LatencyMicros metric kind
+    LatencyMicros,
+
+    /// AggExtrapCov metric kind
+    AggExtrapCov,
+}
+
+impl MetricRecordKind {
+    /// database format of this kind variant
+    pub fn to_db(&self) -> &'static str {
+        use MetricRecordKind::*;
+        match self {
+            Unknown => METRIC_KIND_UNKNOWN,
+            ReachabilityQuotient => METRIC_KIND_REACHABILITY_QUOTIENT,
+            LatencyMicros => METRIC_KIND_LATENCY_MICROS,
+            AggExtrapCov => METRIC_KIND_AGG_EXTRAP_COV,
+        }
+    }
+
+    /// parse a database kind into a rust enum variant
+    pub fn from_db(input: &str) -> Self {
+        use MetricRecordKind::*;
+        if input == METRIC_KIND_REACHABILITY_QUOTIENT {
+            ReachabilityQuotient
+        } else if input == METRIC_KIND_LATENCY_MICROS {
+            LatencyMicros
+        } else if input == METRIC_KIND_AGG_EXTRAP_COV {
+            AggExtrapCov
+        } else {
+            Unknown
+        }
+    }
+}
+
+/// An individual metric record
+pub struct MetricRecord {
+    /// kind of this record
+    pub kind: MetricRecordKind,
+
+    /// agent associated with this metric (if applicable)
+    pub agent: Option<Arc<super::KitsuneAgent>>,
+
+    /// timestamp this metric was recorded at
+    pub recorded_at_utc: Timestamp,
+
+    /// timestamp this metric will expire and be available for pruning
+    pub expires_at_utc: Timestamp,
+
+    /// additional data associated with this metric
+    pub data: serde_json::Value,
+}
+
 /// Generic Kitsune Request of the implementor
 /// This enum may be easier to add variants to for future updates,
 /// rather than adding a full new top-level event message type.
@@ -153,6 +218,15 @@ pub enum KGenReq {
 
         /// Storage arcs of joined agents
         dht_arc_set: DhtArcSet,
+    },
+
+    /// Record a set of metric records
+    RecordMetrics {
+        /// The space to associate the records with
+        space: Arc<super::KitsuneSpace>,
+
+        /// The records to record
+        records: Vec<MetricRecord>,
     },
 }
 
