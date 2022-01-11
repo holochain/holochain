@@ -1,10 +1,6 @@
 use sparse_fenwick::Fenwick2;
 
-use crate::{
-    coords::{Coord, SpaceCoord, TimeCoord, Topology},
-    op::Op,
-    region_data::RegionData,
-};
+use crate::{coords::*, op::Op, region::*};
 
 pub struct Tree {
     tree: Fenwick2<RegionData>,
@@ -28,5 +24,10 @@ impl Tree {
         let (sa, sb) = region.x;
         let (ta, tb) = region.t;
         self.tree.query((*sa, *ta), (*sb, *tb))
+    }
+
+    /// Get a reference to the tree's topo.
+    pub fn topo(&self) -> &Topology {
+        &self.topo
     }
 }

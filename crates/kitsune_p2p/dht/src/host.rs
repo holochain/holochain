@@ -11,7 +11,7 @@ use crate::{
     hash::AgentKey,
     op::{Op, Timestamp},
     region::RegionBounds,
-    region_data::RegionData,
+    region::RegionData,
     Loc,
 };
 

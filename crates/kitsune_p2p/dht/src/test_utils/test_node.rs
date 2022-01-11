@@ -9,8 +9,8 @@ use crate::{
     hash::{fake_hash, AgentKey},
     host::{AccessOpStore, AccessPeerStore},
     op::Op,
+    region::RegionData,
     region::{Region, RegionBounds},
-    region_data::RegionData,
     tree::Tree,
 };
 
@@ -43,6 +43,8 @@ impl TestNode {
         let mut stats = TestNodeGossipRoundStats::default();
         let now = Timestamp::now();
 
+        assert_eq!(self.tree.topo(), other.tree.topo());
+
         // 1. calculate common arqset
         let common_arqs = self.arq_set().intersection(&other.arq_set());
 
@@ -50,7 +52,7 @@ impl TestNode {
         let region_coords: Vec<_> = common_arqs
             .arqs
             .iter()
-            .flat_map(|a| a.regions_with_telescoping_time(now))
+            .flat_map(|a| a.regions_with_telescoping_time(self.tree.topo(), now))
             .collect();
         let regions_self: Vec<Region> = region_coords
             .iter()

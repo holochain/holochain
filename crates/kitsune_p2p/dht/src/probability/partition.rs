@@ -1,6 +1,6 @@
 use std::collections::BinaryHeap;
 
-use crate::{region::Region, region_data::RegionData, tree::Tree};
+use crate::{region::Region, region::RegionData, tree::Tree};
 
 #[derive(derive_more::Deref)]
 pub struct HeapRegion(Region);

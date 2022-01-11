@@ -32,6 +32,12 @@ pub struct SpaceCoord(u32);
 )]
 pub struct TimeCoord(u32);
 
+impl TimeCoord {
+    pub fn from_timestamp(topo: &Topology, timestamp: Timestamp) -> Self {
+        topo.time_coord(timestamp)
+    }
+}
+
 pub trait Coord: From<u32> + Deref<Target = u32> {
     const MAX: u32 = u32::MAX;
 
@@ -113,6 +119,12 @@ impl<C: Coord> Interval<C> {
     }
 }
 
+const D: Dimension = Dimension {
+    quantum: 1,
+    size: 1,
+    bit_depth: 1,
+};
+
 pub type SpaceInterval = Interval<SpaceCoord>;
 pub type TimeInterval = Interval<TimeCoord>;
 
@@ -128,7 +140,7 @@ pub struct Dimension {
 }
 
 impl Dimension {
-    pub fn identity() -> Self {
+    pub const fn identity() -> Self {
         Dimension {
             quantum: 1,
             size: u32::MAX,
@@ -149,7 +161,7 @@ pub struct Topology {
 impl Topology {
     const MAX_SPACE: u32 = u32::MAX;
 
-    pub fn identity(time_origin: Timestamp) -> Self {
+    pub const fn identity(time_origin: Timestamp) -> Self {
         Self {
             space: Dimension::identity(),
             time: Dimension::identity(),

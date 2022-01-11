@@ -1,16 +1,20 @@
-use crate::{
-    coords::{SpaceCoord, SpaceInterval, TimeCoord, TimeInterval},
-    region_data::RegionData,
-    tree::Tree,
-};
+mod region_coords;
+mod region_data;
+mod region_set;
+
+pub use region_coords::*;
+pub use region_data::*;
+pub use region_set::*;
+
+use crate::{coords::*, tree::Tree};
 
 #[derive(Debug, derive_more::Constructor)]
-pub struct Region {
+pub struct RegionImpl<T: std::ops::Add> {
     pub coords: RegionCoords,
     pub data: RegionData,
 }
 
-impl Region {
+impl<T: std::ops::Add> RegionImpl<T> {
     pub const MASS: u32 = std::mem::size_of::<Region>() as u32;
 
     pub fn split(self, tree: &Tree) -> Option<(Self, Self)> {
@@ -29,39 +33,7 @@ impl Region {
     }
 }
 
-#[derive(Copy, Clone, Debug, derive_more::Constructor)]
-pub struct RegionCoords {
-    pub space: SpaceInterval,
-    pub time: TimeInterval,
-}
-
-impl RegionCoords {
-    pub fn halve(self) -> Option<(Self, Self)> {
-        let (sa, sb) = self.space.halve()?;
-        Some((
-            Self {
-                space: sa,
-                time: self.time,
-            },
-            Self {
-                space: sb,
-                time: self.time,
-            },
-        ))
-    }
-
-    pub fn to_bounds(&self) -> RegionBounds {
-        RegionBounds {
-            x: self.space.bounds(),
-            t: self.time.bounds(),
-        }
-    }
-}
-
-pub struct RegionBounds {
-    pub x: (SpaceCoord, SpaceCoord),
-    pub t: (TimeCoord, TimeCoord),
-}
+pub type Region = RegionImpl<RegionData>;
 
 pub fn telescoping_times(now: TimeCoord) -> impl Iterator<Item = TimeInterval> {
     todo!();
