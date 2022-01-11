@@ -6,6 +6,7 @@ use crate::event::*;
 use crate::gossip::sharded_gossip::BandwidthThrottles;
 use crate::types::gossip::GossipModuleType;
 use crate::types::metrics::KitsuneMetrics;
+use crate::wire::MetricExchangeMsg;
 use crate::*;
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
@@ -36,6 +37,7 @@ type EvtRcv = futures::channel::mpsc::Receiver<KitsuneP2pEvent>;
 type KSpace = Arc<KitsuneSpace>;
 type KAgent = Arc<KitsuneAgent>;
 type KBasis = Arc<KitsuneBasis>;
+type VecMXM = Vec<MetricExchangeMsg>;
 type WireConHnd = Tx2ConHnd<wire::Wire>;
 type Payload = Box<[u8]>;
 
@@ -62,6 +64,15 @@ ghost_actor::ghost_chan! {
 
         /// Incoming Gossip
         fn incoming_gossip(space: KSpace, con: WireConHnd, remote_url: kitsune_p2p_types::tx2::tx2_utils::TxUrl, data: Payload, module_type: crate::types::gossip::GossipModuleType) -> ();
+
+        /// Incoming Metric Exchange
+        fn incoming_metric_exchange(space: KSpace, msgs: VecMXM) -> ();
+
+        /// New Con
+        fn new_con(url: TxUrl, con: WireConHnd) -> ();
+
+        /// Del Con
+        fn del_con(url: TxUrl) -> ();
     }
 }
 
@@ -203,6 +214,24 @@ impl KitsuneP2pActor {
                         use tx2_api::Tx2EpEvent::*;
                         #[allow(clippy::single_match)]
                         match event {
+                            OutgoingConnection(Tx2EpConnection {
+                                con,
+                                url,
+                            }) => {
+                                let _ = i_s.new_con(url, con).await;
+                            }
+                            IncomingConnection(Tx2EpConnection {
+                                con,
+                                url,
+                            }) => {
+                                let _ = i_s.new_con(url, con).await;
+                            }
+                            ConnectionClosed(Tx2EpConnectionClosed {
+                                url,
+                                ..
+                            }) => {
+                                let _ = i_s.del_con(url).await;
+                            }
                             IncomingRequest(Tx2EpIncomingRequest { data, respond, .. }) => {
                                 match data {
                                     wire::Wire::Call(wire::Call {
@@ -368,6 +397,12 @@ impl KitsuneP2pActor {
                                             );
                                         }
                                     }
+                                    wire::Wire::MetricExchange(wire::MetricExchange {
+                                        space,
+                                        msgs,
+                                    }) => {
+                                        let _ = i_s.incoming_metric_exchange(space, msgs).await;
+                                    }
                                     data => unimplemented!("{:?}", data),
                                 }
                             }
@@ -492,6 +527,57 @@ impl InternalHandler for KitsuneP2pActor {
             space_inner
                 .incoming_gossip(space, con, remote_url, data, module_type)
                 .await
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_incoming_metric_exchange(
+        &mut self,
+        space: Arc<KitsuneSpace>,
+        msgs: Vec<MetricExchangeMsg>,
+    ) -> InternalHandlerResult<()> {
+        let space_sender = match self.spaces.get_mut(&space) {
+            None => {
+                return unit_ok_fut();
+            }
+            Some(space) => space.get(),
+        };
+        Ok(async move {
+            let (_, space_inner) = space_sender.await;
+            space_inner.incoming_metric_exchange(space, msgs).await
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_new_con(
+        &mut self,
+        url: TxUrl,
+        con: Tx2ConHnd<wire::Wire>,
+    ) -> InternalHandlerResult<()> {
+        let spaces = self.spaces.iter().map(|(_, s)| s.get()).collect::<Vec<_>>();
+        Ok(async move {
+            let mut all = Vec::new();
+            for (_, space) in futures::future::join_all(spaces).await {
+                all.push(space.new_con(url.clone(), con.clone()));
+            }
+            let _ = futures::future::join_all(all).await;
+            Ok(())
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_del_con(&mut self, url: TxUrl) -> InternalHandlerResult<()> {
+        let spaces = self.spaces.iter().map(|(_, s)| s.get()).collect::<Vec<_>>();
+        Ok(async move {
+            let mut all = Vec::new();
+            for (_, space) in futures::future::join_all(spaces).await {
+                all.push(space.del_con(url.clone()));
+            }
+            let _ = futures::future::join_all(all).await;
+            Ok(())
         }
         .boxed()
         .into())
@@ -771,6 +857,35 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         Ok(async move {
             let (space_sender, _) = space_sender.await;
             space_sender.authority_for_hash(space, basis).await
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_dump_network_metrics(
+        &mut self,
+        space: Option<Arc<KitsuneSpace>>,
+    ) -> KitsuneP2pHandlerResult<serde_json::Value> {
+        let spaces = self
+            .spaces
+            .iter()
+            .filter_map(|(h, s)| {
+                if let Some(space) = &space {
+                    if h != space {
+                        return None;
+                    }
+                }
+                let h = h.clone();
+                let s = s.get();
+                Some(s.then(move |r| async move { (h, r) }))
+            })
+            .collect::<Vec<_>>();
+        Ok(async move {
+            let mut all = Vec::new();
+            for (h, (space, _)) in futures::future::join_all(spaces).await {
+                all.push(space.dump_network_metrics(Some(h)));
+            }
+            Ok(futures::future::try_join_all(all).await?.into())
         }
         .boxed()
         .into())

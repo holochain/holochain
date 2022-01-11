@@ -127,6 +127,10 @@ async fn multi_conductor() -> anyhow::Result<()> {
         ElementEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
     );
 
+    // See if we can fetch metric data from bobbo
+    let metrics = conductors[1].dump_network_metrics(None).await?;
+    println!("@!@! - metrics: {}", metrics);
+
     Ok(())
 }
 
