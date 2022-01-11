@@ -34,7 +34,7 @@ pub async fn validation_receipt_workflow(
     let cell_ids = conductor.list_cell_ids(Some(CellStatus::Joined));
 
     if cell_ids.is_empty() {
-        return Ok(WorkComplete::Incomplete);
+        return Ok(WorkComplete::Complete);
     }
 
     let validators = cell_ids
