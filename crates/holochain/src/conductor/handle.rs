@@ -303,6 +303,9 @@ pub trait ConductorHandleT: Send + Sync {
         dht_ops_cursor: Option<u64>,
     ) -> ConductorApiResult<FullStateDump>;
 
+    /// Dump the network metrics
+    async fn dump_network_metrics(&self, dna_hash: Option<DnaHash>) -> ConductorApiResult<String>;
+
     /// Access the broadcast Sender which will send a Signal across every
     /// attached app interface
     async fn signal_broadcaster(&self) -> SignalBroadcaster;
@@ -1192,6 +1195,14 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             integration_dump: full_integration_dump(&dht_env, dht_ops_cursor).await?,
         };
         Ok(out)
+    }
+
+    async fn dump_network_metrics(&self, dna_hash: Option<DnaHash>) -> ConductorApiResult<String> {
+        use holochain_p2p::HolochainP2pSender;
+        self.holochain_p2p
+            .dump_network_metrics(dna_hash)
+            .await
+            .map_err(super::api::error::ConductorApiError::other)
     }
 
     async fn signal_broadcaster(&self) -> SignalBroadcaster {
