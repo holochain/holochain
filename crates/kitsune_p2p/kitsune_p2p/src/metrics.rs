@@ -125,6 +125,9 @@ pub struct Metrics {
     /// Map of remote agents.
     map: HashMap<Arc<KitsuneAgent>, NodeInfo>,
 
+    /// Aggregate Extrapolated Dht Coverage
+    agg_extrap_cov: RunAvg,
+
     // Number of times we need to force initiate
     // the next round.
     force_initiates: u8,
@@ -170,6 +173,36 @@ impl<'lt> AgentLike<'lt> {
 }
 
 impl Metrics {
+    /// Dump json encoded metrics
+    pub fn dump(&self) -> serde_json::Value {
+        let agents: serde_json::Value = self
+            .map
+            .iter()
+            .map(|(a, i)| {
+                (
+                    a.to_string(),
+                    serde_json::json!({
+                        "reachability_quotient": *i.reachability_quotient,
+                        "latency_micros": *i.latency_micros,
+                    }),
+                )
+            })
+            .collect::<serde_json::map::Map<String, serde_json::Value>>()
+            .into();
+
+        serde_json::json!({
+            "aggExtrapCov": *self.agg_extrap_cov,
+            "agents": agents,
+        })
+    }
+
+    /// Record an individual extrapolated coverage event
+    /// (either from us or a remote)
+    /// and add it to our running aggregate extrapolated coverage metric.
+    pub fn record_extrap_cov_event(&mut self, extrap_cov: f32) {
+        self.agg_extrap_cov.push(extrap_cov);
+    }
+
     /// Sucessful and unsuccessful messages from the remote
     /// can be combined to estimate a "reachability quotient"
     /// between 1 (or 0 if empty) and 100. Errors are weighted

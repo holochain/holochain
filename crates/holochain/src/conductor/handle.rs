@@ -57,8 +57,6 @@ use super::{full_integration_dump, integration_dump};
 use crate::conductor::p2p_agent_store::get_single_agent_info;
 use crate::conductor::p2p_agent_store::query_peer_density;
 use crate::conductor::p2p_agent_store::P2pBatch;
-use crate::conductor::p2p_metrics::put_metric_datum;
-use crate::conductor::p2p_metrics::query_metrics;
 use crate::core::queue_consumer::QueueConsumerMap;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
 use crate::core::ribosome::real_ribosome::RealRibosome;
@@ -303,6 +301,9 @@ pub trait ConductorHandleT: Send + Sync {
         dht_ops_cursor: Option<u64>,
     ) -> ConductorApiResult<FullStateDump>;
 
+    /// Dump the network metrics
+    async fn dump_network_metrics(&self, dna_hash: Option<DnaHash>) -> ConductorApiResult<String>;
+
     /// Access the broadcast Sender which will send a Signal across every
     /// attached app interface
     async fn signal_broadcaster(&self) -> SignalBroadcaster;
@@ -474,6 +475,7 @@ pub struct ConductorHandleImpl<DS: DnaStore + 'static> {
         Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, DbWrite<DbKindP2pAgentStore>>>>,
 
     /// The database for storing p2p MetricDatum(s)
+    #[allow(dead_code)]
     pub(super) p2p_metrics_env:
         Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, DbWrite<DbKindP2pMetrics>>>>,
 
@@ -707,26 +709,6 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             } => {
                 let env = { self.p2p_env(space) };
                 let res = query_peer_density(env.into(), kitsune_space, dht_arc)
-                    .await
-                    .map_err(holochain_p2p::HolochainP2pError::other);
-                respond.respond(Ok(async move { res }.boxed().into()));
-            }
-            PutMetricDatum {
-                respond,
-                agent,
-                metric,
-                timestamp,
-                ..
-            } => {
-                let env = { self.p2p_metrics_env(space) };
-                let res = put_metric_datum(env, agent, metric, timestamp)
-                    .await
-                    .map_err(holochain_p2p::HolochainP2pError::other);
-                respond.respond(Ok(async move { res }.boxed().into()));
-            }
-            QueryMetrics { respond, query, .. } => {
-                let env = { self.p2p_metrics_env(space) };
-                let res = query_metrics(env, query)
                     .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
@@ -1192,6 +1174,14 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             integration_dump: full_integration_dump(&dht_env, dht_ops_cursor).await?,
         };
         Ok(out)
+    }
+
+    async fn dump_network_metrics(&self, dna_hash: Option<DnaHash>) -> ConductorApiResult<String> {
+        use holochain_p2p::HolochainP2pSender;
+        self.holochain_p2p
+            .dump_network_metrics(dna_hash)
+            .await
+            .map_err(super::api::error::ConductorApiError::other)
     }
 
     async fn signal_broadcaster(&self) -> SignalBroadcaster {
@@ -1670,6 +1660,7 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
             .clone()
     }
 
+    #[allow(dead_code)]
     pub(super) fn p2p_metrics_env(&self, space: Arc<KitsuneSpace>) -> DbWrite<DbKindP2pMetrics> {
         let mut p2p_metrics_env = self.p2p_metrics_env.lock();
         let db_sync_strategy = self.db_sync_strategy;
