@@ -108,17 +108,6 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
         todo!()
     }
 
-    fn handle_put_metric_datum(&mut self, datum: MetricDatum) -> KitsuneP2pEventHandlerResult<()> {
-        todo!()
-    }
-
-    fn handle_query_metrics(
-        &mut self,
-        query: MetricQuery,
-    ) -> KitsuneP2pEventHandlerResult<MetricQueryAnswer> {
-        todo!()
-    }
-
     fn handle_call(
         &mut self,
         space: Arc<KitsuneSpace>,
