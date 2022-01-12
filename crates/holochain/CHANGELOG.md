@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fixes issue where holochain could get stuck in infinite loop when trying to send validation receipts. [#1181](https://github.com/holochain/holochain/pull/1181).
+
 - Additional networking metric collection and associated admin api `DumpNetworkMetrics { dna_hash: Option<DnaHash> }` for inspection of metrics [#1160](https://github.com/holochain/holochain/pull/1160)
 
 ## 0.0.122
