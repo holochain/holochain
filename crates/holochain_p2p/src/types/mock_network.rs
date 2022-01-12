@@ -116,6 +116,8 @@ pub enum HolochainP2pMockMsg {
         /// The actual gossip wire protocol.
         gossip: GossipProtocol,
     },
+    /// MetricExchange
+    MetricExchange(kitsune_p2p::wire::MetricExchange),
     /// Aan error has occurred.
     Failure(String),
 }
@@ -407,6 +409,7 @@ impl HolochainP2pMockMsg {
                     module,
                 })
             }
+            HolochainP2pMockMsg::MetricExchange(msg) => kwire::Wire::MetricExchange(msg),
             HolochainP2pMockMsg::Failure(reason) => kwire::Wire::Failure(kwire::Failure { reason }),
         }
     }
@@ -462,6 +465,7 @@ impl HolochainP2pMockMsg {
                     gossip,
                 }
             }
+            kwire::Wire::MetricExchange(msg) => HolochainP2pMockMsg::MetricExchange(msg),
             kwire::Wire::PeerGet(msg) => HolochainP2pMockMsg::PeerGet(msg),
             kwire::Wire::PeerGetResp(msg) => HolochainP2pMockMsg::PeerGetResp(msg),
             kwire::Wire::PeerQuery(msg) => HolochainP2pMockMsg::PeerQuery(msg),

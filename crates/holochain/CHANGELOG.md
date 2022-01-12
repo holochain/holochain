@@ -4,6 +4,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fixes issue where holochain could get stuck in infinite loop when trying to send validation receipts. [#1181](https://github.com/holochain/holochain/pull/1181).
+
+- Additional networking metric collection and associated admin api `DumpNetworkMetrics { dna_hash: Option<DnaHash> }` for inspection of metrics [#1160](https://github.com/holochain/holochain/pull/1160)
+
+## 0.0.122
+- Adds better batching to validation workflows for much faster validation. [#1167](https://github.com/holochain/holochain/pull/1167).
+
+## 0.0.121
+
+- **BREAKING CHANGE** Removed `app_info` from HDK [1108](https://github.com/holochain/holochain/pull/1108)
+- Permissions on host functions now return an error instead of panicking [1141](https://github.com/holochain/holochain/pull/1141)
+- Add `--build-info` CLI flag for displaying various information in JSON format. [\#1163](https://github.com/holochain/holochain/pull/1163)
+
+## 0.0.120
+
 ## 0.0.119
 
 ## 0.0.118

@@ -94,7 +94,11 @@ pub fn create<'a>(
                 }
             }
         }
-        _ => unreachable!(),
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "create".into()
+        ).to_string()))
     }
 }
 

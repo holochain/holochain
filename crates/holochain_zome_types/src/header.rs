@@ -81,7 +81,7 @@ impl Default for ChainTopOrdering {
 /// are then used to check the integrity of data using cryptographic hash
 /// functions.
 #[allow(missing_docs)]
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[serde(tag = "type")]
 pub enum Header {
@@ -388,7 +388,7 @@ impl ZomeId {
 pub struct EntryDefIndex(pub u8);
 
 /// The Dna Header is always the first header in a source chain
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Dna {
     pub author: AgentPubKey,
@@ -399,7 +399,7 @@ pub struct Dna {
 
 /// Header for an agent validation package, used to determine whether an agent
 /// is allowed to participate in this DNA
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct AgentValidationPkg {
     pub author: AgentPubKey,
@@ -412,7 +412,7 @@ pub struct AgentValidationPkg {
 
 /// A header which declares that all zome init functions have successfully
 /// completed, and the chain is ready for commits. Contains no explicit data.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct InitZomesComplete {
     pub author: AgentPubKey,
@@ -422,7 +422,7 @@ pub struct InitZomesComplete {
 }
 
 /// Declares that a metadata Link should be made between two EntryHashes
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct CreateLink {
     pub author: AgentPubKey,
@@ -437,7 +437,7 @@ pub struct CreateLink {
 }
 
 /// Declares that a previously made Link should be nullified and considered removed.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct DeleteLink {
     pub author: AgentPubKey,
@@ -455,7 +455,7 @@ pub struct DeleteLink {
 
 /// When migrating to a new version of a DNA, this header is committed to the
 /// new chain to declare the migration path taken. **Currently unused**
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct OpenChain {
     pub author: AgentPubKey,
@@ -468,7 +468,7 @@ pub struct OpenChain {
 
 /// When migrating to a new version of a DNA, this header is committed to the
 /// old chain to declare the migration path taken. **Currently unused**
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct CloseChain {
     pub author: AgentPubKey,

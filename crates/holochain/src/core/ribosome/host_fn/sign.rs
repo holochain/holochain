@@ -4,6 +4,7 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
+use crate::core::ribosome::RibosomeError;
 
 pub fn sign(
     _ribosome: Arc<impl RibosomeT>,
@@ -15,7 +16,11 @@ pub fn sign(
             call_context.host_context.keystore().sign(input.key, input.data.into_vec().into()).await
         })
         .map_err(|keystore_error| WasmError::Host(keystore_error.to_string())),
-        _ => unreachable!(),
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "sign".into()
+        ).to_string()))
     }
 }
 

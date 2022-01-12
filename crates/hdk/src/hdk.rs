@@ -56,7 +56,6 @@ pub trait HdkT: Send + Sync {
     ) -> ExternResult<PreflightRequestAcceptance>;
     // Info
     fn agent_info(&self, agent_info_input: ()) -> ExternResult<AgentInfo>;
-    fn app_info(&self, app_info_input: ()) -> ExternResult<AppInfo>;
     fn dna_info(&self, dna_info_input: ()) -> ExternResult<DnaInfo>;
     fn zome_info(&self, zome_info_input: ()) -> ExternResult<ZomeInfo>;
     fn call_info(&self, call_info_input: ()) -> ExternResult<CallInfo>;
@@ -163,9 +162,6 @@ impl HdkT for ErrHdk {
         Self::err()
     }
     fn agent_info(&self, _: ()) -> ExternResult<AgentInfo> {
-        Self::err()
-    }
-    fn app_info(&self, _: ()) -> ExternResult<AppInfo> {
         Self::err()
     }
     fn dna_info(&self, _: ()) -> ExternResult<DnaInfo> {
@@ -332,9 +328,6 @@ impl HdkT for HostHdk {
     }
     fn agent_info(&self, _: ()) -> ExternResult<AgentInfo> {
         host_call::<(), AgentInfo>(__agent_info, ())
-    }
-    fn app_info(&self, _: ()) -> ExternResult<AppInfo> {
-        host_call::<(), AppInfo>(__app_info, ())
     }
     fn dna_info(&self, _: ()) -> ExternResult<DnaInfo> {
         host_call::<(), DnaInfo>(__dna_info, ())

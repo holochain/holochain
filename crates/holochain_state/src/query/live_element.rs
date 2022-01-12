@@ -100,7 +100,11 @@ impl Query for GetLiveElementQuery {
             Some(header) => {
                 let mut entry = None;
                 if let Some(entry_hash) = header.header().entry_hash() {
-                    let author = self.1.as_ref().map(|a| a.as_ref());
+                    let author = self
+                        .1
+                        .as_ref()
+                        .map(|a| a.as_ref())
+                        .filter(|a| *a == header.header().author());
                     entry = stores.get_public_or_authored_entry(entry_hash, author)?;
                 }
                 Ok(Some(Element::new(header, entry)))
