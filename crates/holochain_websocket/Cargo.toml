@@ -1,6 +1,6 @@
 [package]
 name = "holochain_websocket"
-version = "0.0.21"
+version = "0.0.22"
 description = "Holochain utilities for serving and connection with websockets"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -28,7 +28,7 @@ tungstenite = "0.12"
 url2 = "0.0.6"
 
 [dev-dependencies]
-holochain_types = { version = "0.0.21", path = "../holochain_types" }
+holochain_types = { version = "0.0.22", path = "../holochain_types" }
 linefeed = "0.6"
 unwrap_to = "0.1.0"
 observability = "0.1.3"
