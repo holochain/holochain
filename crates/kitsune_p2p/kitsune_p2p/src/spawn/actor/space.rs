@@ -459,7 +459,6 @@ async fn update_arc_length(
     arc: &mut DhtArc,
 ) -> KitsuneP2pResult<()> {
     let density = evt_sender.query_peer_density(space.clone(), *arc).await?;
-    dbg!(density.expected_count());
     arc.update_length(density);
     Ok(())
 }
@@ -1138,8 +1137,7 @@ impl Space {
         let i_s_c = i_s.clone();
         tokio::task::spawn(async move {
             loop {
-                // tokio::time::sleep(std::time::Duration::from_secs(5 * 60)).await;
-                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                tokio::time::sleep(std::time::Duration::from_secs(5 * 60)).await;
                 if let Err(e) = i_s_c.update_agent_info().await {
                     tracing::error!(failed_to_update_agent_info_for_space = ?e);
                 }
@@ -1339,7 +1337,6 @@ impl Space {
                 .get(agent)
                 .cloned()
                 .unwrap_or_else(|| DhtArc::full(agent.get_loc()))
-            // .unwrap_or_else(|| DhtArc::with_coverage(agent.get_loc(), 0.1))
         }
     }
 }
