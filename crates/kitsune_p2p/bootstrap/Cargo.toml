@@ -26,7 +26,7 @@ tokio = { version = "1", features = ["full"] }
 warp = "0.3"
 
 [dev-dependencies]
-kitsune_p2p = { version = "0.0.18", path = "../kitsune_p2p" }
+kitsune_p2p = { version = "0.0.19", path = "../kitsune_p2p" }
 fixt = { path = "../../fixt" ,version = "0.0.8"}
 criterion = "0.3"
 reqwest = "0.11.2"
