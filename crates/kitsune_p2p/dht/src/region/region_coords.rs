@@ -1,9 +1,9 @@
-use crate::coords::{SpaceCoord, SpaceInterval, TimeCoord, TimeInterval};
+use crate::coords::{SpaceCoord, SpaceSegment, TimeCoord, TimeSegment};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, derive_more::Constructor)]
 pub struct RegionCoords {
-    pub space: SpaceInterval,
-    pub time: TimeInterval,
+    pub space: SpaceSegment,
+    pub time: TimeSegment,
 }
 
 impl RegionCoords {

@@ -79,13 +79,13 @@ impl SpacetimeCoords {
 /// The length of an interval is 2^(power), and the position of its left edge
 /// is at (offset * length).
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Interval<C: Coord> {
+pub struct Segment<C: Coord> {
     pub power: u32,
     pub offset: u32,
     phantom: PhantomData<C>,
 }
 
-impl<C: Coord> Interval<C> {
+impl<C: Coord> Segment<C> {
     pub fn new(power: u32, offset: u32) -> Self {
         Self {
             power,
@@ -114,8 +114,8 @@ impl<C: Coord> Interval<C> {
         } else {
             let power = self.power - 1;
             Some((
-                Interval::new(power, self.offset * 2),
-                Interval::new(power, self.offset * 2 + 1),
+                Segment::new(power, self.offset * 2),
+                Segment::new(power, self.offset * 2 + 1),
             ))
         }
     }
@@ -127,8 +127,8 @@ const D: Dimension = Dimension {
     bit_depth: 1,
 };
 
-pub type SpaceInterval = Interval<SpaceCoord>;
-pub type TimeInterval = Interval<TimeCoord>;
+pub type SpaceSegment = Segment<SpaceCoord>;
+pub type TimeSegment = Segment<TimeCoord>;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Dimension {
@@ -189,21 +189,21 @@ impl Topology {
         (timestamp.as_micros() as u32).into()
     }
 
-    pub fn telescoping_times(&self, mut now: TimeCoord) -> Vec<TimeInterval> {
+    pub fn telescoping_times(&self, mut now: TimeCoord) -> Vec<TimeSegment> {
         self.telescoping_times_helper(*now, 0)
             .into_iter()
             .rev()
             .collect()
     }
 
-    fn telescoping_times_helper(&self, t: u32, offset: u32) -> Vec<TimeInterval> {
+    fn telescoping_times_helper(&self, t: u32, offset: u32) -> Vec<TimeSegment> {
         if t < self.time.quantum {
             vec![]
         } else {
             let pow = (t as f64 + 1.0).log2().floor() as u32 - 1;
             let len = 2u32.pow(pow);
             let mut v = self.telescoping_times_helper(t - len, offset + len);
-            v.push(TimeInterval::new(pow, offset));
+            v.push(TimeSegment::new(pow, offset));
             v
         }
     }
@@ -269,7 +269,7 @@ mod tests {
         fn telescoping_times_fit_total_time_span(now: u32) {
             let topo = Topology::identity(Timestamp::from_micros(0));
             let ts = topo.telescoping_times(now.into());
-            assert_eq!(ts.iter().map(TimeInterval::length).sum::<u64>(), now as u64);
+            assert_eq!(ts.iter().map(TimeSegment::length).sum::<u64>(), now as u64);
         }
 
         #[test]

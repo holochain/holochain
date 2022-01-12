@@ -131,7 +131,7 @@ impl Arq {
     ///         ... 5 3 1 0 2 4 6 ...
     ///                - or -
     ///         ... 6 4 2 0 1 2 3 ...
-    fn chunk_at(&self, sequence: u32) -> SpaceInterval {
+    fn chunk_at(&self, sequence: u32) -> SpaceSegment {
         let s = self.spacing();
         // the offset of the central chunk
         let center = self.center.as_u32() / s;
@@ -149,14 +149,14 @@ impl Arq {
                 center.wrapping_sub(sequence / 2)
             }
         };
-        SpaceInterval::new(self.power.into(), offset)
+        SpaceSegment::new(self.power.into(), offset)
     }
 
     /// Return the chunks at the leftmost and rightmost edge of this Arq.
     /// If count is 0, there is no boundary.
     /// If count is 1, both boundary chunks are the same: the central chunk.
     /// Otherwise, returns two different chunks.
-    pub fn boundary_chunks(&self) -> Option<(SpaceInterval, SpaceInterval)> {
+    pub fn boundary_chunks(&self) -> Option<(SpaceSegment, SpaceSegment)> {
         if self.count == 0 {
             None
         } else if self.count == 1 {
@@ -304,7 +304,7 @@ impl ArqBounds {
         self.chunk_offsets().flat_map(move |x| {
             topo.telescoping_times(TimeCoord::from_timestamp(topo, now))
                 .into_iter()
-                .map(move |t| RegionCoords::new(SpaceInterval::new(self.power as u32, *x), t))
+                .map(move |t| RegionCoords::new(SpaceSegment::new(self.power as u32, *x), t))
         })
     }
 
