@@ -13,11 +13,7 @@ pub use strat::*;
 
 use kitsune_p2p_dht_arc::ArcInterval;
 
-use crate::{
-    coords::*,
-    op::Loc,
-    region::{telescoping_times, RegionCoords},
-};
+use crate::{coords::*, op::Loc, region::RegionCoords};
 
 pub fn pow2(p: u8) -> u32 {
     2u32.pow(p as u32)
@@ -306,7 +302,8 @@ impl ArqBounds {
         now: Timestamp,
     ) -> impl Iterator<Item = RegionCoords> + 'a {
         self.chunk_offsets().flat_map(move |x| {
-            telescoping_times(TimeCoord::from_timestamp(topo, now))
+            topo.telescoping_times(TimeCoord::from_timestamp(topo, now))
+                .into_iter()
                 .map(move |t| RegionCoords::new(SpaceInterval::new(self.power as u32, *x), t))
         })
     }

@@ -1,6 +1,6 @@
 use crate::coords::{SpaceCoord, SpaceInterval, TimeCoord, TimeInterval};
 
-#[derive(Copy, Clone, Debug, derive_more::Constructor)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, derive_more::Constructor)]
 pub struct RegionCoords {
     pub space: SpaceInterval,
     pub time: TimeInterval,

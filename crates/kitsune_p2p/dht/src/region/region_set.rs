@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 
+use crate::tree::TreeDataConstraints;
+
 use super::{RegionCoords, RegionData, RegionImpl};
 
-pub struct RegionSetImpl<T: std::ops::Add>(HashMap<RegionCoords, T>);
+pub struct RegionSetImpl<T: TreeDataConstraints>(HashMap<RegionCoords, T>);
 
-impl<T: std::ops::Add> RegionSetImpl<T> {
-
+impl<T: TreeDataConstraints> RegionSetImpl<T> {
     pub fn new(regions: Vec<RegionImpl<T>>) -> Self {
         Self(regions.into_iter().map(|r| (r.coords, r.data)).collect())
     }
@@ -34,9 +35,10 @@ mod tests {
 
     #[test]
     fn region_diff() {
-        let coords = [
-            RegionCoords::new(space, time)
-        ]
-        let a = RegionSetImpl::new()
+        todo!()
+        // let coords = [
+        //     RegionCoords::new(space, time)
+        // ]
+        // let a = RegionSetImpl::new()
     }
 }

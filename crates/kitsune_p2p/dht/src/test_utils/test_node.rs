@@ -68,8 +68,8 @@ impl TestNode {
         // 3. send regions
 
         // 4. send ops
-        stats.op_data_sent += todo!();
-        stats.op_data_rcvd += todo!();
+        // stats.op_data_sent += todo!();
+        // stats.op_data_rcvd += todo!();
     }
 }
 

@@ -10,6 +10,7 @@ use crate::op::{Loc, Timestamp};
     Eq,
     PartialOrd,
     Ord,
+    Hash,
     derive_more::Add,
     derive_more::Deref,
     derive_more::Display,
@@ -25,6 +26,7 @@ pub struct SpaceCoord(u32);
     Eq,
     PartialOrd,
     Ord,
+    Hash,
     derive_more::Add,
     derive_more::Deref,
     derive_more::Display,
@@ -76,7 +78,7 @@ impl SpacetimeCoords {
 /// way of describing intervals uses tree coordinates as well:
 /// The length of an interval is 2^(power), and the position of its left edge
 /// is at (offset * length).
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Interval<C: Coord> {
     pub power: u32,
     pub offset: u32,
@@ -185,5 +187,97 @@ impl Topology {
             "Alternate quantizations of time are not yet supported"
         );
         (timestamp.as_micros() as u32).into()
+    }
+
+    pub fn telescoping_times(&self, mut now: TimeCoord) -> Vec<TimeInterval> {
+        self.telescoping_times_helper(*now, 0)
+            .into_iter()
+            .rev()
+            .collect()
+    }
+
+    fn telescoping_times_helper(&self, t: u32, offset: u32) -> Vec<TimeInterval> {
+        if t < self.time.quantum {
+            vec![]
+        } else {
+            let pow = (t as f64 + 1.0).log2().floor() as u32 - 1;
+            let len = 2u32.pow(pow);
+            let mut v = self.telescoping_times_helper(t - len, offset + len);
+            v.push(TimeInterval::new(pow, offset));
+            v
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn lengths(topo: &Topology, t: u32) -> Vec<u32> {
+        topo.telescoping_times(t.into())
+            .into_iter()
+            .map(|i| i.length() as u32)
+            .collect()
+    }
+
+    #[test]
+    fn test_telescoping_times_first_16_identity_topology() {
+        let topo = Topology::identity(Timestamp::from_micros(0));
+
+        assert_eq!(lengths(&topo, 0), vec![]);
+        assert_eq!(lengths(&topo, 1), vec![1]);
+        assert_eq!(lengths(&topo, 2), vec![1, 1]);
+        assert_eq!(lengths(&topo, 3), vec![2, 1]);
+        assert_eq!(lengths(&topo, 4), vec![2, 1, 1]);
+        assert_eq!(lengths(&topo, 5), vec![2, 2, 1]);
+        assert_eq!(lengths(&topo, 6), vec![2, 2, 1, 1]);
+        assert_eq!(lengths(&topo, 7), vec![4, 2, 1]);
+        assert_eq!(lengths(&topo, 8), vec![4, 2, 1, 1]);
+        assert_eq!(lengths(&topo, 9), vec![4, 2, 2, 1]);
+        assert_eq!(lengths(&topo, 10), vec![4, 2, 2, 1, 1]);
+        assert_eq!(lengths(&topo, 11), vec![4, 4, 2, 1]);
+        assert_eq!(lengths(&topo, 12), vec![4, 4, 2, 1, 1]);
+        assert_eq!(lengths(&topo, 13), vec![4, 4, 2, 2, 1]);
+        assert_eq!(lengths(&topo, 14), vec![4, 4, 2, 2, 1, 1]);
+        assert_eq!(lengths(&topo, 15), vec![8, 4, 2, 1]);
+    }
+
+    #[test]
+    fn test_telescoping_times_first_16_standard_topology() {
+        let topo = todo!("other time topology");
+
+        assert_eq!(lengths(&topo, 0), vec![]);
+        assert_eq!(lengths(&topo, 1), vec![1]);
+        assert_eq!(lengths(&topo, 2), vec![1, 1]);
+        assert_eq!(lengths(&topo, 3), vec![2, 1]);
+        assert_eq!(lengths(&topo, 4), vec![2, 1, 1]);
+        assert_eq!(lengths(&topo, 5), vec![2, 2, 1]);
+        assert_eq!(lengths(&topo, 6), vec![2, 2, 1, 1]);
+        assert_eq!(lengths(&topo, 7), vec![4, 2, 1]);
+        assert_eq!(lengths(&topo, 8), vec![4, 2, 1, 1]);
+        assert_eq!(lengths(&topo, 9), vec![4, 2, 2, 1]);
+        assert_eq!(lengths(&topo, 10), vec![4, 2, 2, 1, 1]);
+        assert_eq!(lengths(&topo, 11), vec![4, 4, 2, 1]);
+        assert_eq!(lengths(&topo, 12), vec![4, 4, 2, 1, 1]);
+        assert_eq!(lengths(&topo, 13), vec![4, 4, 2, 2, 1]);
+        assert_eq!(lengths(&topo, 14), vec![4, 4, 2, 2, 1, 1]);
+        assert_eq!(lengths(&topo, 15), vec![8, 4, 2, 1]);
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn telescoping_times_fit_total_time_span(now: u32) {
+            let topo = Topology::identity(Timestamp::from_micros(0));
+            let ts = topo.telescoping_times(now.into());
+            assert_eq!(ts.iter().map(TimeInterval::length).sum::<u64>(), now as u64);
+        }
+
+        #[test]
+        fn telescoping_times_end_with_1(now: u32) {
+            let topo = Topology::identity(Timestamp::from_micros(0));
+            if let Some(last) = topo.telescoping_times(now.into()).pop() {
+                assert_eq!(last.power, 0);
+            }
+        }
     }
 }
