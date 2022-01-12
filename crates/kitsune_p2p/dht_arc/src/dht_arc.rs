@@ -34,7 +34,10 @@ use crate::*;
 pub struct DhtLocation(pub Wrapping<u32>);
 
 impl DhtLocation {
-    pub fn new(loc: u32) -> Self {
+    pub const MIN: Self = Self::new(u32::MIN);
+    pub const MAX: Self = Self::new(u32::MAX);
+
+    pub const fn new(loc: u32) -> Self {
         Self(Wrapping(loc))
     }
 

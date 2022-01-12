@@ -4,13 +4,12 @@ use kitsune_p2p_timestamp::Timestamp;
 
 use crate::{
     agent::AgentInfo,
-    arq::{Arq, ArqSet},
+    arq::*,
     coords::Topology,
     hash::{fake_hash, AgentKey},
     host::{AccessOpStore, AccessPeerStore},
     op::Op,
-    region::RegionData,
-    region::{Region, RegionBounds},
+    region::*,
     tree::Tree,
 };
 
@@ -33,8 +32,32 @@ impl TestNode {
         }
     }
 
+    /// The ArqBounds to use when gossiping
+    pub fn arq_bounds(&self) -> ArqBounds {
+        self.agent_info.arq.to_bounds()
+    }
+
+    /// The ArqBounds to use when gossiping, as a singleton ArqSet
     pub fn arq_set(&self) -> ArqSet {
-        ArqSet::single(self.agent_info.arq.to_bounds())
+        ArqSet::single(self.arq_bounds())
+    }
+
+    /// Get the RegionSet for this node, suitable for gossiping
+    pub fn region_set(&self, arq_bounds: &ArqBounds) -> RegionSet {
+        if let Some(max_time) = self.ops.max_timestamp() {
+            let coords = RegionCoordSetXtcs::new(max_time, arq_bounds);
+            let data = coords
+                .region_coords_nested(self.tree.topo())
+                .map(|columns| {
+                    columns
+                        .map(|(_, coords)| self.query_region_data(&coords.to_bounds()))
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>();
+            RegionSetXtcs { coords, data }.into()
+        } else {
+            RegionSetXtcs::empty().into()
+        }
     }
 
     /// Quick 'n dirty simulation of a gossip round. Mutates both nodes as if
@@ -49,21 +72,10 @@ impl TestNode {
         let common_arqs = self.arq_set().intersection(&other.arq_set());
 
         // 2. calculate regions
-        let region_coords: Vec<_> = common_arqs
-            .arqs
-            .iter()
-            .flat_map(|a| a.regions_with_telescoping_time(self.tree.topo(), now))
-            .collect();
-        let regions_self: Vec<Region> = region_coords
-            .iter()
-            .map(|r| Region::new(*r, self.query_region_data(&r.to_bounds())))
-            .collect();
-        let regions_other: Vec<Region> = region_coords
-            .iter()
-            .map(|r| Region::new(*r, other.query_region_data(&r.to_bounds())))
-            .collect();
-        stats.region_data_sent += regions_self.len() as u32 * Region::MASS;
-        stats.region_data_rcvd += regions_other.len() as u32 * Region::MASS;
+        let regions_self = self.region_set(common_arqs);
+        let regions_other = other.region_set(common_arqs);
+        stats.region_data_sent += regions_self.count() as u32 * Region::MASS;
+        stats.region_data_rcvd += regions_other.count() as u32 * Region::MASS;
 
         // 3. send regions
 

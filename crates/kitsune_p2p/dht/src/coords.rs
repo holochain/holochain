@@ -80,6 +80,7 @@ impl SpacetimeCoords {
 /// is at (offset * length).
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Segment<C: Coord> {
+    // TODO: make `u8`?
     pub power: u32,
     pub offset: u32,
     phantom: PhantomData<C>,
@@ -189,8 +190,13 @@ impl Topology {
         (timestamp.as_micros() as u32).into()
     }
 
-    pub fn telescoping_times(&self, mut now: TimeCoord) -> Vec<TimeSegment> {
-        self.telescoping_times_helper(*now, 0)
+    /// Calculate the list of exponentially shrinking time windows, as per
+    /// this document: https://hackmd.io/@hololtd/r1IAIbr5Y
+    //
+    // NOTE: there is a more efficient algorithm that's possible, using binary
+    //   representations. It's in @maackle's dotted spiral notebook.
+    pub fn telescoping_times(&self, mut now: Timestamp) -> Vec<TimeSegment> {
+        self.telescoping_times_helper(*self.time_coord(now), 0)
             .into_iter()
             .rev()
             .collect()
@@ -214,7 +220,7 @@ mod tests {
     use super::*;
 
     fn lengths(topo: &Topology, t: u32) -> Vec<u32> {
-        topo.telescoping_times(t.into())
+        topo.telescoping_times(Timestamp::from_micros(t as i64))
             .into_iter()
             .map(|i| i.length() as u32)
             .collect()
@@ -224,7 +230,7 @@ mod tests {
     fn test_telescoping_times_first_16_identity_topology() {
         let topo = Topology::identity(Timestamp::from_micros(0));
 
-        assert_eq!(lengths(&topo, 0), vec![]);
+        assert_eq!(lengths(&topo, 0), Vec::<u32>::new());
         assert_eq!(lengths(&topo, 1), vec![1]);
         assert_eq!(lengths(&topo, 2), vec![1, 1]);
         assert_eq!(lengths(&topo, 3), vec![2, 1]);
@@ -246,7 +252,7 @@ mod tests {
     fn test_telescoping_times_first_16_standard_topology() {
         let topo = todo!("other time topology");
 
-        assert_eq!(lengths(&topo, 0), vec![]);
+        assert_eq!(lengths(&topo, 0), Vec::<u32>::new());
         assert_eq!(lengths(&topo, 1), vec![1]);
         assert_eq!(lengths(&topo, 2), vec![1, 1]);
         assert_eq!(lengths(&topo, 3), vec![2, 1]);
@@ -266,16 +272,16 @@ mod tests {
 
     proptest::proptest! {
         #[test]
-        fn telescoping_times_fit_total_time_span(now: u32) {
+        fn telescoping_times_fit_total_time_span(now: i64) {
             let topo = Topology::identity(Timestamp::from_micros(0));
-            let ts = topo.telescoping_times(now.into());
+            let ts = topo.telescoping_times(Timestamp::from_micros(now));
             assert_eq!(ts.iter().map(TimeSegment::length).sum::<u64>(), now as u64);
         }
 
         #[test]
-        fn telescoping_times_end_with_1(now: u32) {
+        fn telescoping_times_end_with_1(now: i64) {
             let topo = Topology::identity(Timestamp::from_micros(0));
-            if let Some(last) = topo.telescoping_times(now.into()).pop() {
+            if let Some(last) = topo.telescoping_times(Timestamp::from_micros(now)).pop() {
                 assert_eq!(last.power, 0);
             }
         }

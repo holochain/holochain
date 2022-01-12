@@ -1,5 +1,3 @@
-use super::ArqSet;
-
 #[derive(Debug, Clone)]
 pub struct ArqStrat {
     /// The minimum coverage the DHT seeks to maintain.

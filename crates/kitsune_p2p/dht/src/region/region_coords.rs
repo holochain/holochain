@@ -7,6 +7,7 @@ pub struct RegionCoords {
 }
 
 impl RegionCoords {
+    #[deprecated = "this is likely not needed in the current algorithm"]
     pub fn halve(self) -> Option<(Self, Self)> {
         let (sa, sb) = self.space.halve()?;
         Some((

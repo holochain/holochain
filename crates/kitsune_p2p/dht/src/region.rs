@@ -6,7 +6,7 @@ pub use region_coords::*;
 pub use region_data::*;
 pub use region_set::*;
 
-use crate::{coords::*, tree::*};
+use crate::tree::*;
 
 #[derive(Debug, derive_more::Constructor)]
 pub struct RegionImpl<T: TreeDataConstraints> {

@@ -210,6 +210,10 @@ impl ArqBounds {
         Self::from_interval_inner(power, interval, false)
     }
 
+    pub fn empty(power: u8) -> Self {
+        Self::from_interval(power, ArcInterval::Empty).unwrap()
+    }
+
     fn from_interval_inner(power: u8, interval: ArcInterval, rounded: bool) -> Option<Self> {
         assert!(power > 0);
         let full_count = 2u32.pow(32 - power as u32);
@@ -290,22 +294,8 @@ impl ArqBounds {
         })
     }
 
-    pub fn chunk_offsets(&self) -> impl Iterator<Item = SpaceCoord> + '_ {
-        (0..self.count)
-            .map(SpaceCoord::from)
-            .map(|c| (c + self.offset))
-    }
-
-    pub fn regions_with_telescoping_time<'a>(
-        &'a self,
-        topo: &'a Topology,
-        now: Timestamp,
-    ) -> impl Iterator<Item = RegionCoords> + 'a {
-        self.chunk_offsets().flat_map(move |x| {
-            topo.telescoping_times(TimeCoord::from_timestamp(topo, now))
-                .into_iter()
-                .map(move |t| RegionCoords::new(SpaceSegment::new(self.power as u32, *x), t))
-        })
+    pub fn segments(&self) -> impl Iterator<Item = SpaceSegment> + '_ {
+        (0..self.count).map(|c| SpaceSegment::new(self.power.into(), c + *self.offset))
     }
 
     pub fn chunk_width(&self) -> u64 {

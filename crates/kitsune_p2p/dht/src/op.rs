@@ -1,7 +1,7 @@
-use std::sync::Arc;
+use std::{borrow::Borrow, sync::Arc};
 
 use crate::{
-    coords::{SpacetimeCoords, Topology},
+    coords::{SpacetimeCoords, TimeCoord, Topology},
     hash::OpHash,
     region::RegionData,
 };
@@ -45,6 +45,12 @@ impl OpData {
             size,
             hash: fake_hash().into(),
         }
+    }
+}
+
+impl Borrow<Timestamp> for OpData {
+    fn borrow(&self) -> &Timestamp {
+        &self.timestamp
     }
 }
 
