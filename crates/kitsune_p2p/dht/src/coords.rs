@@ -219,6 +219,16 @@ impl Topology {
 mod tests {
     use super::*;
 
+    #[test]
+    fn segment_length() {
+        let s = TimeSegment {
+            power: 31,
+            offset: 0,
+            phantom: PhantomData,
+        };
+        assert_eq!(s.length(), 2u64.pow(31));
+    }
+
     fn lengths(topo: &Topology, t: u32) -> Vec<u32> {
         topo.telescoping_times(Timestamp::from_micros(t as i64))
             .into_iter()
@@ -272,7 +282,7 @@ mod tests {
 
     proptest::proptest! {
         #[test]
-        fn telescoping_times_fit_total_time_span(now: i64) {
+        fn telescoping_times_fit_total_time_span(now in 0i64..u32::MAX as i64) {
             let topo = Topology::identity(Timestamp::from_micros(0));
             let ts = topo.telescoping_times(Timestamp::from_micros(now));
             assert_eq!(ts.iter().map(TimeSegment::length).sum::<u64>(), now as u64);

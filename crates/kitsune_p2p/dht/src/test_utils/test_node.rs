@@ -43,54 +43,68 @@ impl TestNode {
     }
 
     /// Get the RegionSet for this node, suitable for gossiping
-    pub fn region_set(&self, arq_bounds: &ArqBounds) -> RegionSet {
-        if let Some(max_time) = self.ops.max_timestamp() {
-            let coords = RegionCoordSetXtcs::new(max_time, arq_bounds);
-            let data = coords
-                .region_coords_nested(self.tree.topo())
-                .map(|columns| {
-                    columns
-                        .map(|(_, coords)| self.query_region_data(&coords.to_bounds()))
-                        .collect::<Vec<_>>()
-                })
-                .collect::<Vec<_>>();
-            RegionSetXtcs { coords, data }.into()
-        } else {
-            RegionSetXtcs::empty().into()
-        }
+    pub fn region_set(&self, arq_set: ArqSet, now: Timestamp) -> RegionSet {
+        let coords = RegionCoordSetXtcs::new(now, arq_set);
+        let data = coords
+            .region_coords_nested(self.tree.topo())
+            .map(|columns| {
+                columns
+                    .map(|(_, coords)| self.query_region_data(&coords.to_bounds()))
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+        RegionSetXtcs { coords, data }.into()
     }
 
     /// Quick 'n dirty simulation of a gossip round. Mutates both nodes as if
     /// they were exchanging gossip messages, without the rigmarole of a real protocol
-    pub fn gossip_with(&mut self, other: &mut Self) {
+    pub fn gossip_with(&mut self, other: &mut Self, now: Timestamp) -> TestNodeGossipRoundStats {
         let mut stats = TestNodeGossipRoundStats::default();
-        let now = Timestamp::now();
 
         assert_eq!(self.tree.topo(), other.tree.topo());
+        let topo = self.tree.topo();
 
         // 1. calculate common arqset
         let common_arqs = self.arq_set().intersection(&other.arq_set());
 
-        // 2. calculate regions
-        let regions_self = self.region_set(common_arqs);
-        let regions_other = other.region_set(common_arqs);
+        // 2. calculate and "send" regions
+        let regions_self = self.region_set(common_arqs.clone(), now);
+        let regions_other = other.region_set(common_arqs.clone(), now);
         stats.region_data_sent += regions_self.count() as u32 * Region::MASS;
         stats.region_data_rcvd += regions_other.count() as u32 * Region::MASS;
 
-        // 3. send regions
+        // 3. calculate diffs and fetch ops
+        let diff_self = regions_self.diff(&regions_other);
+        let ops_self: Vec<_> = diff_self
+            .region_coords(topo)
+            .flat_map(|coords| self.query_op_data(&coords.to_bounds()))
+            .collect();
 
-        // 4. send ops
-        // stats.op_data_sent += todo!();
-        // stats.op_data_rcvd += todo!();
+        let diff_other = regions_other.diff(&regions_self);
+        let ops_other: Vec<_> = diff_other
+            .region_coords(topo)
+            .flat_map(|coords| other.query_op_data(&coords.to_bounds()))
+            .collect();
+
+        // 4. "send" missing ops
+        for op in ops_other {
+            stats.op_data_rcvd += op.size;
+            self.integrate_op(op);
+        }
+        for op in ops_self {
+            stats.op_data_sent += op.size;
+            other.integrate_op(op);
+        }
+        stats
     }
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct TestNodeGossipRoundStats {
-    region_data_sent: u32,
-    region_data_rcvd: u32,
-    op_data_sent: u32,
-    op_data_rcvd: u32,
+    pub region_data_sent: u32,
+    pub region_data_rcvd: u32,
+    pub op_data_sent: u32,
+    pub op_data_rcvd: u32,
 }
 
 impl TestNodeGossipRoundStats {

@@ -10,28 +10,18 @@ use super::{RegionCoords, RegionData, RegionImpl};
 #[derive(Debug, derive_more::Constructor)]
 pub struct RegionCoordSetXtcs {
     max_time: Timestamp,
-    arq: ArqBounds,
+    arq_set: ArqSet,
 }
 
 impl RegionCoordSetXtcs {
     /// Generate the XTCS region coords given the generating parameters.
     /// Each RegionCoords is paired with the relative spacetime coords, which
     /// can be used to pair the generated coords with stored data.
-    pub fn region_coords<'a>(
+    pub fn region_coords_flat<'a>(
         &'a self,
         topo: &'a Topology,
     ) -> impl Iterator<Item = ((SpaceCoord, TimeCoord), RegionCoords)> + 'a {
-        self.arq.segments().enumerate().flat_map(move |(ix, x)| {
-            topo.telescoping_times(self.max_time)
-                .into_iter()
-                .enumerate()
-                .map(move |(it, t)| {
-                    (
-                        (SpaceCoord::from(ix as u32), TimeCoord::from(it as u32)),
-                        RegionCoords::new(x, t),
-                    )
-                })
-        })
+        self.region_coords_nested(topo).flatten()
     }
 
     pub fn region_coords_nested<'a>(
@@ -39,23 +29,25 @@ impl RegionCoordSetXtcs {
         topo: &'a Topology,
     ) -> impl Iterator<Item = impl Iterator<Item = ((SpaceCoord, TimeCoord), RegionCoords)>> + 'a
     {
-        self.arq.segments().enumerate().map(move |(ix, x)| {
-            topo.telescoping_times(self.max_time)
-                .into_iter()
-                .enumerate()
-                .map(move |(it, t)| {
-                    (
-                        (SpaceCoord::from(ix as u32), TimeCoord::from(it as u32)),
-                        RegionCoords::new(x, t),
-                    )
-                })
+        self.arq_set.arqs().iter().flat_map(move |arq| {
+            arq.segments().enumerate().map(move |(ix, x)| {
+                topo.telescoping_times(self.max_time)
+                    .into_iter()
+                    .enumerate()
+                    .map(move |(it, t)| {
+                        (
+                            (SpaceCoord::from(ix as u32), TimeCoord::from(it as u32)),
+                            RegionCoords::new(x, t),
+                        )
+                    })
+            })
         })
     }
 
     pub fn empty() -> Self {
         Self {
             max_time: Timestamp::from_micros(0),
-            arq: ArqBounds::empty(11),
+            arq_set: ArqSet::empty(11),
         }
     }
 }
@@ -77,11 +69,11 @@ pub enum RegionSetImpl<T: TreeDataConstraints> {
 #[derive(Debug)]
 pub struct RegionSetImplXtcs<T: TreeDataConstraints> {
     /// The generator for the coordinates
-    pub(super) coords: RegionCoordSetXtcs,
+    pub(crate) coords: RegionCoordSetXtcs,
 
     /// The outer vec corresponds to the spatial segments;
     /// the inner vecs are the time segments.
-    pub(super) data: Vec<Vec<T>>,
+    pub(crate) data: Vec<Vec<T>>,
 }
 
 impl<T: TreeDataConstraints> RegionSetImplXtcs<T> {
@@ -101,9 +93,11 @@ impl<T: TreeDataConstraints> RegionSetImplXtcs<T> {
     }
 
     pub fn regions<'a>(&'a self, topo: &'a Topology) -> impl Iterator<Item = RegionImpl<T>> + 'a {
-        self.coords.region_coords(topo).map(|((ix, it), coords)| {
-            RegionImpl::new(coords, self.data[*ix as usize][*it as usize])
-        })
+        self.coords
+            .region_coords_flat(topo)
+            .map(|((ix, it), coords)| {
+                RegionImpl::new(coords, self.data[*ix as usize][*it as usize])
+            })
     }
 
     pub fn diff(&self, other: &Self) -> Self {
@@ -115,6 +109,18 @@ impl<T: TreeDataConstraints> RegionSetImpl<T> {
     pub fn count(&self) -> usize {
         match self {
             Self::Xtcs(set) => set.count(),
+        }
+    }
+    /// can be used to pair the generated coords with stored data.
+    pub fn region_coords<'a>(
+        &'a self,
+        topo: &'a Topology,
+    ) -> impl Iterator<Item = RegionCoords> + 'a {
+        match self {
+            Self::Xtcs(set) => set
+                .coords
+                .region_coords_flat(topo)
+                .map(|(_, coords)| coords),
         }
     }
 

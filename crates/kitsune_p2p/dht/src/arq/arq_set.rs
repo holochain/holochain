@@ -31,6 +31,10 @@ impl ArqSet {
         }
     }
 
+    pub fn empty(pow: u8) -> Self {
+        Self::single(ArqBounds::empty(pow))
+    }
+
     pub fn single(arq: ArqBounds) -> Self {
         Self::new(vec![arq])
     }
@@ -70,7 +74,7 @@ impl ArqSet {
             arqs: DhtArcSet::intersection(&a1, &a2)
                 .intervals()
                 .into_iter()
-                .map(|interval| ArqBounds::from_interval(power, interval).expect("cannot fail"))
+                .map(|interval| ArqBounds::from_interval(dbg!(power), dbg!(interval)).expect("cannot fail"))
                 .collect(),
             power,
         }

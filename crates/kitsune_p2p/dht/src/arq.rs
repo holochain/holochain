@@ -236,7 +236,7 @@ impl ArqBounds {
                 let diff = if lo <= hi {
                     hi - lo
                 } else {
-                    (2u64.pow(32) - (hi as u64) + (lo as u64) + 1) as u32
+                    (2u64.pow(32) - (lo as u64) + (hi as u64) + 1) as u32
                 };
                 let count = diff / s;
                 // TODO: this is kinda wrong. The right bound of the interval
@@ -569,6 +569,12 @@ mod tests {
         // let a2 = Arq::new((3264675840u32 + 3000).into(), 16, 6);
         let a2 = Arq::new(3264708608u32.into(), 16, 6);
         assert_eq!(*a1.to_bounds().offset + 1, *a2.to_bounds().offset);
+    }
+
+    #[test]
+    fn from_interval_regression() {
+        let i = ArcInterval::Bounded(4294967040u32.into(), 511.into());
+        assert!(ArqBounds::from_interval(8, i).is_some());
     }
 
     proptest::proptest! {
