@@ -234,6 +234,8 @@ pub enum KGenReq {
 pub enum KGenRes {
     /// Extrapolated Peer Coverage
     PeerExtrapCov(Vec<f64>),
+    /// Record a set of metric records
+    RecordMetrics(()),
 }
 
 type KSpace = Arc<super::KitsuneSpace>;

@@ -8,6 +8,9 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+#[cfg(test)]
+mod p2p_metrics_test;
+
 pub fn time_to_micros(t: SystemTime) -> DatabaseResult<i64> {
     t.duration_since(std::time::UNIX_EPOCH)
         .map_err(|e| DatabaseError::Other(e.into()))?
@@ -29,16 +32,23 @@ pub fn time_from_micros(micros: i64) -> DatabaseResult<SystemTime> {
 
 pub trait AsP2pMetricStoreConExt {
     fn p2p_log_metrics(&mut self, metrics: Vec<MetricRecord>) -> DatabaseResult<()>;
+    fn p2p_prune_metrics(&mut self) -> DatabaseResult<()>;
 }
 
 pub trait AsP2pMetricStoreTxExt {
     fn p2p_log_metrics(&self, metrics: Vec<MetricRecord>) -> DatabaseResult<()>;
+    fn p2p_prune_metrics(&self) -> DatabaseResult<()>;
 }
 
 impl AsP2pMetricStoreConExt for crate::db::PConnGuard {
     fn p2p_log_metrics(&mut self, metrics: Vec<MetricRecord>) -> DatabaseResult<()> {
         use crate::db::WriteManager;
         self.with_commit_sync(move |writer| writer.p2p_log_metrics(metrics))
+    }
+
+    fn p2p_prune_metrics(&mut self) -> DatabaseResult<()> {
+        use crate::db::WriteManager;
+        self.with_commit_sync(move |writer| writer.p2p_prune_metrics())
     }
 }
 
@@ -61,6 +71,17 @@ impl AsP2pMetricStoreTxExt for Transaction<'_> {
                 },
             )?;
         }
+        self.p2p_prune_metrics()
+    }
+
+    fn p2p_prune_metrics(&self) -> DatabaseResult<()> {
+        let now_micros = Timestamp::now().as_micros();
+        self.execute(
+            sql_p2p_metrics::PRUNE,
+            named_params! {
+                ":now_micros": now_micros,
+            },
+        )?;
         Ok(())
     }
 }
