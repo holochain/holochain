@@ -73,23 +73,28 @@ pub async fn p2p_put_all_batch(
                     }
                     responses.push((Ok(()), response));
                 }
-                tx.send(responses)
-                    .expect("We never drop the receiver before this send");
+                tx.send(responses).map_err(|_| {
+                    DatabaseError::Other(anyhow::anyhow!(
+                        "Failed to send response from background thread"
+                    ))
+                })?;
                 DatabaseResult::Ok(())
             })
             .await;
-        let responses = rx
-            .await
-            .expect("We never drop the sender before sending the responses");
+        let responses = rx.await;
         match result {
             Ok(_) => {
-                for (result, response) in responses {
-                    let _ = response.send(result.map_err(P2pBatchError::from));
+                if let Ok(responses) = responses {
+                    for (result, response) in responses {
+                        let _ = response.send(result.map_err(P2pBatchError::from));
+                    }
                 }
             }
             Err(e) => {
-                for (_, response) in responses {
-                    let _ = response.send(Err(P2pBatchError::BatchFailed(format!("{:?}", e))));
+                if let Ok(responses) = responses {
+                    for (_, response) in responses {
+                        let _ = response.send(Err(P2pBatchError::BatchFailed(format!("{:?}", e))));
+                    }
                 }
             }
         }
