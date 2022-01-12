@@ -475,7 +475,6 @@ pub struct ConductorHandleImpl<DS: DnaStore + 'static> {
         Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, DbWrite<DbKindP2pAgentStore>>>>,
 
     /// The database for storing p2p MetricDatum(s)
-    #[allow(dead_code)]
     pub(super) p2p_metrics_env:
         Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, DbWrite<DbKindP2pMetrics>>>>,
 

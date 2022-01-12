@@ -182,12 +182,12 @@ impl Timestamp {
     pub const MAX: Timestamp = Timestamp(i64::MAX);
 
     /// Returns the current system time as a Timestamp.
-    ///
-    /// This is behind a feature because we need Timestamp to be WASM compatible, and
-    /// chrono doesn't have a now() implementation for WASM.
-    #[cfg(feature = "now")]
     pub fn now() -> Timestamp {
-        Timestamp::from(chrono::offset::Utc::now())
+        let micros = std::time::SystemTime::now()
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .expect("SystemTime before UNIX_EPOCH")
+            .as_micros() as i64;
+        Timestamp(micros)
     }
 
     /// Largest possible Timestamp.
