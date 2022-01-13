@@ -55,8 +55,8 @@ impl Call {
         &self.fn_name
     }
 
-    pub fn cap_secret(&self) -> &Option<CapSecret> {
-        &self.cap_secret
+    pub fn cap_secret(&self) -> Option<&CapSecret> {
+        self.cap_secret.as_ref()
     }
 
     pub fn payload(&self) -> &ExternIO {

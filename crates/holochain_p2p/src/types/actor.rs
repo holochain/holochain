@@ -284,6 +284,11 @@ ghost_actor::ghost_chan! {
             agents: Vec<AgentPubKey>,
             signed_headers: Vec<SignedHeader>,
         ) -> ();
+
+        /// Dump network metrics.
+        fn dump_network_metrics(
+            dna_hash: Option<DnaHash>,
+        ) -> String;
     }
 }
 

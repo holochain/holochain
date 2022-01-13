@@ -219,6 +219,7 @@ pub enum KGenReq {
     PeerExtrapCov {
         /// The space to extrapolate coverage
         space: Arc<super::KitsuneSpace>,
+
         /// Storage arcs of joined agents
         dht_arc_set: DhtArcSet,
     },

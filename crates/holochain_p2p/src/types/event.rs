@@ -107,7 +107,7 @@ ghost_actor::ghost_chan! {
     /// the HolochainP2p actor.
     pub chan HolochainP2pEvent<super::HolochainP2pError> {
         /// Generic Kitsune Request of the implementor
-        fn k_gen_req(arg: KGenReq) -> KGenRes;
+        fn k_gen_req(dna_hash: DnaHash, arg: KGenReq) -> KGenRes;
 
         /// We need to store signed agent info.
         fn put_agent_info_signed(dna_hash: DnaHash, peer_data: Vec<AgentInfoSigned>) -> ();
@@ -271,7 +271,7 @@ impl HolochainP2pEvent {
     /// The dna_hash associated with this network p2p event.
     pub fn dna_hash(&self) -> &DnaHash {
         match_p2p_evt!(self => |dna_hash| { dna_hash }, {
-            HolochainP2pEvent::KGenReq { .. } => { unimplemented!("There is no single dna_hash for KGenReq") }
+            HolochainP2pEvent::KGenReq { dna_hash, .. } => { dna_hash }
             HolochainP2pEvent::Publish { dna_hash, .. } => { dna_hash }
             HolochainP2pEvent::FetchOpData { dna_hash, .. } => { dna_hash }
             HolochainP2pEvent::QueryOpHashes { dna_hash, .. } => { dna_hash }
