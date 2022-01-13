@@ -653,18 +653,6 @@ async fn handle_events(
                     .boxed()
                     .into()));
                 }
-                event::KitsuneP2pEvent::PutMetricDatum { respond, datum, .. } => {
-                    respond.r(Ok(handle_put_metric_datum(kdirect.clone(), datum)
-                        .map_err(KitsuneP2pError::other)
-                        .boxed()
-                        .into()));
-                }
-                event::KitsuneP2pEvent::QueryMetrics { respond, query, .. } => {
-                    respond.r(Ok(handle_query_metrics(kdirect.clone(), query)
-                        .map_err(KitsuneP2pError::other)
-                        .boxed()
-                        .into()));
-                }
                 event::KitsuneP2pEvent::Call {
                     respond,
                     space,
@@ -785,18 +773,6 @@ async fn handle_query_peer_density(
     let root = KdHash::from_kitsune_space(&space);
     let density = kdirect.persist.query_peer_density(root, dht_arc).await?;
     Ok(density)
-}
-
-async fn handle_put_metric_datum(kdirect: Arc<Kd1>, datum: MetricDatum) -> KdResult<()> {
-    kdirect.persist.store_metric_datum(datum).await
-}
-
-async fn handle_query_metrics(
-    kdirect: Arc<Kd1>,
-    query: MetricQuery,
-) -> KdResult<MetricQueryAnswer> {
-    // Why are there two nested futures here?
-    kdirect.persist.fetch_metrics(query).await.await
 }
 
 async fn handle_call(

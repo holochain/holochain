@@ -620,17 +620,6 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
         Ok(self.evt_sender.query_peer_density(space, dht_arc))
     }
 
-    fn handle_put_metric_datum(&mut self, datum: MetricDatum) -> KitsuneP2pEventHandlerResult<()> {
-        Ok(self.evt_sender.put_metric_datum(datum))
-    }
-
-    fn handle_query_metrics(
-        &mut self,
-        query: MetricQuery,
-    ) -> KitsuneP2pEventHandlerResult<MetricQueryAnswer> {
-        Ok(self.evt_sender.query_metrics(query))
-    }
-
     fn handle_call(
         &mut self,
         space: Arc<KitsuneSpace>,
@@ -917,13 +906,6 @@ mockall::mock! {
             &mut self,
             input: crate::event::QueryAgentsEvt,
         ) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>>;
-
-        fn handle_put_metric_datum(&mut self, datum: MetricDatum) -> KitsuneP2pEventHandlerResult<()>;
-
-        fn handle_query_metrics(
-            &mut self,
-            query: MetricQuery,
-        ) -> KitsuneP2pEventHandlerResult<MetricQueryAnswer>;
 
         fn handle_query_peer_density(
             &mut self,
