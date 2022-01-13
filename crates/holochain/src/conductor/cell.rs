@@ -354,9 +354,7 @@ impl Cell {
             | QueryAgentInfoSignedNearBasis { .. }
             | QueryPeerDensity { .. }
             | Publish { .. }
-            | PutMetricDatum { .. }
-            | FetchOpData { .. }
-            | QueryMetrics { .. } => {
+            | FetchOpData { .. } => {
                 // These events are aggregated over a set of cells, so need to be handled at the conductor level.
                 unreachable!()
             }

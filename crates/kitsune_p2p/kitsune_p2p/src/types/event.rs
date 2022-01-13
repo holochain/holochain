@@ -3,7 +3,7 @@
 use crate::types::agent_store::AgentInfoSigned;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::dht_arc::{DhtArcSet, DhtLocation};
-use std::{collections::HashSet, sync::Arc, time::SystemTime};
+use std::{collections::HashSet, sync::Arc};
 
 /// Gather a list of op-hashes from our implementor that meet criteria.
 /// Also get the start and end times for ops within a time window
@@ -126,75 +126,6 @@ impl QueryAgentsEvt {
     }
 }
 
-/// A single datum of metric info about an Agent, to be recorded by the client.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, derive_more::Display)]
-pub enum MetricKind {
-    /// Our fast gossip loop synced this node up to this timestamp.
-    /// The next quick loop can sync from this timestamp forward.
-    QuickGossip,
-
-    /// The last time a full slow gossip loop completed was at this timestamp.
-    /// If that is too recent, we won't run another slow loop.
-    SlowGossip,
-
-    /// The last time we got a connection/timeout error with this node,
-    /// ignoring inactivity timeouts.
-    /// Lets us skip recently unreachable nodes in gossip loops.
-    ConnectError,
-}
-
-/// A single row in the metrics database
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct MetricDatum {
-    /// The agent this event is about
-    pub agent: KAgent,
-    /// The kind of event
-    pub kind: MetricKind,
-    /// The time at which this occurred
-    pub timestamp: SystemTime,
-}
-
-/// The ordering is defined as such to facilitate in-memory metric store
-/// implementations such that the earliest and latest metrics can be easily obtained.
-impl PartialOrd for MetricDatum {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        match self.timestamp.cmp(&other.timestamp) {
-            std::cmp::Ordering::Equal => Some(self.agent.cmp(&other.agent)),
-            o => Some(o),
-        }
-    }
-}
-
-impl Ord for MetricDatum {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap()
-    }
-}
-
-/// Different kinds of queries about metric data
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum MetricQuery {
-    /// Filters for the "last sync" query.
-    LastSync {
-        /// The agent to query by
-        agent: KAgent,
-    },
-    /// Filters for the "oldest agent" query.
-    Oldest {
-        /// Agents whose last connection error is earlier than this time will be filtered out.
-        last_connect_error_threshold: std::time::SystemTime,
-    },
-}
-
-/// Corresponding response to `MetricQuery`
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum MetricQueryAnswer {
-    /// The last sync time for all agents.
-    LastSync(Option<std::time::SystemTime>),
-    /// The agent with the oldest last-connection time which satisfies the query.
-    Oldest(Option<KAgent>),
-}
-
 /// An exclusive range of timestamps, measured in microseconds
 pub type TimeWindow = std::ops::Range<Timestamp>;
 
@@ -255,12 +186,6 @@ ghost_actor::ghost_chan! {
 
         /// Query the peer density of a space for a given [`DhtArc`].
         fn query_peer_density(space: KSpace, dht_arc: kitsune_p2p_types::dht_arc::DhtArc) -> kitsune_p2p_types::dht_arc::PeerDensity;
-
-        /// Record a metric datum about an agent.
-        fn put_metric_datum(datum: MetricDatum) -> ();
-
-        /// Ask for metric data.
-        fn query_metrics(query: MetricQuery) -> MetricQueryAnswer;
 
         /// We are receiving a request from a remote node.
         fn call(space: KSpace, to_agent: KAgent, payload: Payload) -> Vec<u8>;

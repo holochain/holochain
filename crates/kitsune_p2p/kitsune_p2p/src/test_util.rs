@@ -68,13 +68,6 @@ mod harness_actor;
 #[allow(unused_imports)]
 pub(crate) use harness_actor::*;
 
-// NB: this is a copy of `KdMetricStore` from `kitsune_p2p_direct`, which
-//   is downstream of this crate.
-//   Since we plan to delete much of these tests, I opted to keep that type
-//   downstream, and just copy it upstream here for now.
-mod metric_store;
-pub use metric_store::*;
-
 pub(crate) mod scenario_def_local;
 
 #[cfg(feature = "mock_network")]

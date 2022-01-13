@@ -6,6 +6,56 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20220106.093622
+
+## [holochain-0.0.122](crates/holochain/CHANGELOG.md#0.0.122)
+
+- Adds better batching to validation workflows for much faster validation. [\#1167](https://github.com/holochain/holochain/pull/1167).
+
+## [holochain\_test\_wasm\_common-0.0.18](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.18)
+
+## [holochain\_cascade-0.0.22](crates/holochain_cascade/CHANGELOG.md#0.0.22)
+
+## [holochain\_cli-0.0.23](crates/holochain_cli/CHANGELOG.md#0.0.23)
+
+## [holochain\_cli\_sandbox-0.0.19](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.19)
+
+## [holochain\_websocket-0.0.22](crates/holochain_websocket/CHANGELOG.md#0.0.22)
+
+## [holochain\_conductor\_api-0.0.22](crates/holochain_conductor_api/CHANGELOG.md#0.0.22)
+
+- Adds the ability to manually insert elements into a source chain using the `AdminRequest::AddElements` command. Please check the docs and PR for more details / warnings on proper usage. [\#1166](https://github.com/holochain/holochain/pull/1166)
+
+## [holochain\_state-0.0.22](crates/holochain_state/CHANGELOG.md#0.0.22)
+
+## [holochain\_wasm\_test\_utils-0.0.22](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.22)
+
+## [holochain\_p2p-0.0.22](crates/holochain_p2p/CHANGELOG.md#0.0.22)
+
+## [holochain\_cli\_bundle-0.0.18](crates/holochain_cli_bundle/CHANGELOG.md#0.0.18)
+
+## [holochain\_types-0.0.22](crates/holochain_types/CHANGELOG.md#0.0.22)
+
+## [holochain\_keystore-0.0.22](crates/holochain_keystore/CHANGELOG.md#0.0.22)
+
+## [holochain\_sqlite-0.0.22](crates/holochain_sqlite/CHANGELOG.md#0.0.22)
+
+## [kitsune\_p2p-0.0.19](crates/kitsune_p2p/CHANGELOG.md#0.0.19)
+
+## [hdk-0.0.118](crates/hdk/CHANGELOG.md#0.0.118)
+
+- hdk: `Path` now split into `Path` and `PathEntry` [1156](https://github.com/holochain/holochain/pull/1156)
+- hdk: Minor changes and additions to `Path` methods [1156](https://github.com/holochain/holochain/pull/1156)
+
+## [hdk\_derive-0.0.20](crates/hdk_derive/CHANGELOG.md#0.0.20)
+
+## [holochain\_zome\_types-0.0.20](crates/holochain_zome_types/CHANGELOG.md#0.0.20)
+
+- BREAKING CHANGE: Range filters on chain queries are now INCLUSIVE and support hash bounds [\#1142](https://github.com/holochain/holochain/pull/1142)
+- BREAKING CHANGE: Chain queries now support restricting results to a list of entry hashes [\#1142](https://github.com/holochain/holochain/pull/1142)
+
+## [holo\_hash-0.0.15](crates/holo_hash/CHANGELOG.md#0.0.15)
+
 # 20211222.094252
 
 ## [holochain-0.0.121](crates/holochain/CHANGELOG.md#0.0.121)
