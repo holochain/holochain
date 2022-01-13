@@ -121,63 +121,53 @@ pub mod wasm_test {
     use crate::test_utils::install_app;
     use crate::test_utils::new_zome_call;
 
+    use ::fixt::prelude::*;
+    use crate::sweettest::SweetDnaFile;
+    use crate::sweettest::SweetConductor;
+    use crate::conductor::ConductorBuilder;
+
     #[tokio::test(flavor = "multi_thread")]
     async fn call_test() {
         observability::test_run().ok();
-
-        let zomes = vec![TestWasm::WhoAmI];
-        let mut conductor_test = ConductorTestData::two_agents(zomes, true).await;
-        let handle = conductor_test.handle();
-        let bob_cell_id = conductor_test.bob_call_data().unwrap().cell_id.clone();
-        let alice_call_data = conductor_test.alice_call_data();
-        let alice_cell_id = &alice_call_data.cell_id;
-        let alice_agent_id = alice_cell_id.agent_pubkey();
-        let bob_agent_id = bob_cell_id.agent_pubkey();
-
-        // BOB INIT (to do cap grant)
-
-        let _ = handle
-            .call_zome(ZomeCall {
-                cell_id: bob_cell_id.clone(),
-                zome_name: TestWasm::WhoAmI.into(),
-                cap_secret: None,
-                fn_name: "set_access".into(),
-                payload: ExternIO::encode(()).unwrap(),
-                provenance: bob_agent_id.clone(),
-            })
+        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::WhoAmI])
             .await
             .unwrap();
 
-        // ALICE DOING A CALL
+        let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
+        let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
 
-        let output = handle
-            .call_zome(ZomeCall {
-                cell_id: alice_cell_id.clone(),
-                zome_name: TestWasm::WhoAmI.into(),
-                cap_secret: None,
-                fn_name: "who_are_they_local".into(),
-                payload: ExternIO::encode(&bob_cell_id).unwrap(),
-                provenance: alice_agent_id.clone(),
-            })
+        let mut dna_store = MockDnaStore::new();
+        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
+        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
+        dna_store.expect_add_dna().return_const(());
+        dna_store
+            .expect_get()
+            .return_const(Some(dna_file.clone().into()));
+
+            let mut conductor =
+            SweetConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
+
+        let apps = conductor
+            .setup_app_for_agents(
+                "app-",
+                &[alice_pubkey.clone(), bob_pubkey.clone()],
+                &[dna_file.into()],
+            )
             .await
-            .unwrap()
             .unwrap();
 
-        match output {
-            ZomeCallResponse::Ok(guest_output) => {
-                let agent_info: AgentInfo = guest_output.decode().unwrap();
-                assert_eq!(
-                    &agent_info.agent_initial_pubkey,
-                    bob_agent_id
-                );
-                assert_eq!(
-                    &agent_info.agent_latest_pubkey,
-                    bob_agent_id
-                );
-            }
-            _ => unreachable!(),
-        }
-        conductor_test.shutdown_conductor().await;
+        let ((alice_cell,), (bobbo_cell,)) = apps.into_tuples();
+        let alice = alice_cell.zome(TestWasm::WhoAmI);
+        let bobbo = bobbo_cell.zome(TestWasm::WhoAmI);
+
+        let _: () = conductor.call(&bobbo, "set_access", ()).await;
+        let agent_info: AgentInfo = conductor.call(
+            &alice,
+            "who_are_they_local",
+            bobbo_cell.cell_id()
+        ).await;
+        assert_eq!(agent_info.agent_initial_pubkey, bob_pubkey);
+        assert_eq!(agent_info.agent_latest_pubkey, bob_pubkey);
     }
 
     /// When calling the same cell we need to make sure
