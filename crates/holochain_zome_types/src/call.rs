@@ -13,8 +13,8 @@ pub enum CallTargetCell {
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum CallTarget {
-    Agent(AgentPubKey),
-    Cell(CallTargetCell),
+    NetworkAgent(AgentPubKey),
+    ConductorCell(CallTargetCell),
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]

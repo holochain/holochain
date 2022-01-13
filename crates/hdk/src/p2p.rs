@@ -24,7 +24,7 @@ where
     Ok(HDK
         .with(|h| {
             h.borrow().call(vec![Call::new(
-                CallTarget::Cell(to_cell),
+                CallTarget::ConductorCell(to_cell),
                 zome_name,
                 fn_name,
                 cap_secret,
@@ -72,7 +72,7 @@ where
     Ok(HDK
         .with(|h| {
             h.borrow().call(vec![Call::new(
-                CallTarget::Agent(agent),
+                CallTarget::NetworkAgent(agent),
                 zome,
                 fn_name,
                 cap_secret,

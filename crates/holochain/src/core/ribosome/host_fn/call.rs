@@ -35,7 +35,7 @@ pub fn call(
                         .clone();
 
                         let result: Result<ZomeCallResponse, WasmError> = match target {
-                            CallTarget::Agent(target_agent) => {
+                            CallTarget::NetworkAgent(target_agent) => {
                                 match call_context
                                 .host_context()
                                 .network()
@@ -45,7 +45,7 @@ pub fn call(
                                     Err(e) => Ok(ZomeCallResponse::NetworkError(e.to_string())),
                                 }
                             },
-                            CallTarget::Cell(target_cell) => {
+                            CallTarget::ConductorCell(target_cell) => {
                                 let cell_id = match target_cell {
                                     CallTargetCell::Other(cell_id) => cell_id,
                                     CallTargetCell::Local => call_context
