@@ -123,6 +123,7 @@ impl AccessOpStore for TestNode {
     }
 
     fn query_region_data(&self, region: &RegionBounds) -> RegionData {
+        dbg!(region);
         self.tree.lookup(region)
     }
 
@@ -134,5 +135,68 @@ impl AccessOpStore for TestNode {
 impl AccessPeerStore for TestNode {
     fn get_agent_info(&self, _agent: AgentKey) -> crate::agent::AgentInfo {
         self.agent_info.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::op::OpData;
+
+    use super::*;
+
+    #[test]
+    fn integrate_and_query_ops() {
+        let topo = Topology::identity(Timestamp::from_micros(0));
+        let arq = Arq::new(0.into(), 8, 4);
+        let mut node = TestNode::new(topo, arq);
+
+        node.integrate_op(Op::new(OpData::fake(0, 10, 1234)));
+        node.integrate_op(Op::new(OpData::fake(1000, 20, 2345)));
+        node.integrate_op(Op::new(OpData::fake(2000, 15, 3456)));
+        {
+            let data = node.query_region_data(&RegionBounds {
+                x: (0.into(), 100.into()),
+                t: (0.into(), 20.into()),
+            });
+            assert_eq!(data.count, 1);
+            assert_eq!(data.size, 1234);
+        }
+        {
+            let data = node.query_region_data(&RegionBounds {
+                x: (0.into(), 1001.into()),
+                t: (0.into(), 21.into()),
+            });
+            assert_eq!(data.count, 2);
+            assert_eq!(data.size, 1234 + 2345);
+        }
+        {
+            let data = node.query_region_data(&RegionBounds {
+                x: (1000.into(), 1001.into()),
+                t: (0.into(), 20.into()),
+            });
+            assert_eq!(data.count, 1);
+            assert_eq!(data.size, 2345);
+        }
+    }
+
+    #[test]
+    fn gossip_regression() {
+        let topo = Topology::identity(Timestamp::from_micros(0));
+        let alice_arq = Arq::new(0.into(), 8, 4);
+        let bobbo_arq = Arq::new(128.into(), 8, 4);
+        let mut alice = TestNode::new(topo.clone(), alice_arq);
+        let mut bobbo = TestNode::new(topo.clone(), bobbo_arq);
+
+        alice.integrate_op(Op::new(OpData::fake(0, 10, 4321)));
+        bobbo.integrate_op(Op::new(OpData::fake(128, 20, 1234)));
+
+        // dbg!(&alice.tree.tree);
+        let b = (4294967295, 71);
+        let a = (4294967040, 64);
+
+        let ne = alice.tree.tree.prefix_sum(b);
+        let sw = alice.tree.tree.prefix_sum(a);
+        assert_eq!(ne, sw);
+        // alice.tree.tree.query((4294967040, 64), (4294967295, 71));
     }
 }

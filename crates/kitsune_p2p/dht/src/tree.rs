@@ -15,14 +15,16 @@ impl<T> TreeDataConstraints for T where
 }
 
 pub struct TreeImpl<T: TreeDataConstraints> {
-    tree: Fenwick2<T>,
+    pub(crate) tree: Fenwick2<T>,
     topo: Topology,
 }
 
 impl<T: TreeDataConstraints> TreeImpl<T> {
     pub fn new(topo: Topology) -> Self {
         Self {
-            tree: Fenwick2::new((SpaceCoord::MAX, TimeCoord::MAX)),
+            // TODO: take topology into account to reduce max size
+            // TODO: can use a smaller time dimension
+            tree: Fenwick2::new((SpaceCoord::MAX as usize + 1, TimeCoord::MAX as usize + 1)),
             topo,
         }
     }

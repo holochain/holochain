@@ -30,6 +30,7 @@ impl RegionCoords {
     }
 }
 
+#[derive(Debug)]
 pub struct RegionBounds {
     pub x: (SpaceCoord, SpaceCoord),
     pub t: (TimeCoord, TimeCoord),

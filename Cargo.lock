@@ -1761,12 +1761,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fenwick"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ad8c7269456fd609f700340399dca5fa160c4785c9623f87b6079e5a479f28b"
-
-[[package]]
 name = "filetime"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6296,7 +6290,6 @@ name = "sparse-fenwick"
 version = "0.1.0"
 dependencies = [
  "ahash 0.7.6",
- "fenwick",
  "num-traits",
  "once_cell",
 ]
