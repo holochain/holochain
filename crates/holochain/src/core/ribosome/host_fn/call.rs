@@ -110,13 +110,11 @@ pub mod wasm_test {
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::test_utils::fake_agent_pubkey_2;
-    use holochain_zome_types::ExternIO;
     use holochain_zome_types::ZomeCallResponse;
     use matches::assert_matches;
     use rusqlite::named_params;
-    use crate::conductor::interface::websocket::test_utils::setup_app;
 
-    use crate::conductor::{api::ZomeCall, ConductorHandle};
+    use crate::conductor::ConductorHandle;
     use crate::test_utils::conductor_setup::ConductorTestData;
     use crate::test_utils::install_app;
     use crate::test_utils::new_zome_call;
@@ -286,120 +284,45 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     /// we can call a fn on a remote
     async fn call_remote_test() {
-        // ////////////
-        // START DNA
-        // ////////////
-
-        let dna_def = DnaDef {
-            name: "call_remote_test".to_string(),
-            uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
-            properties: SerializedBytes::try_from(()).unwrap(),
-            zomes: vec![TestWasm::WhoAmI.into()].into(),
-        };
-        let dna_file = DnaFile::new(dna_def, vec![TestWasm::WhoAmI.into()])
+        observability::test_run().ok();
+        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::WhoAmI])
             .await
             .unwrap();
 
-        // //////////
-        // END DNA
-        // //////////
-
-        // ///////////
-        // START ALICE
-        // ///////////
-
-        let alice_agent_id = fake_agent_pubkey_1();
-        let alice_cell_id = CellId::new(dna_file.dna_hash().to_owned(), alice_agent_id.clone());
-        let alice_installed_cell = InstalledCell::new(alice_cell_id.clone(), "alice_handle".into());
-
-        // /////////
-        // END ALICE
-        // /////////
-
-        // /////////
-        // START BOB
-        // /////////
-
-        let bob_agent_id = fake_agent_pubkey_2();
-        let bob_cell_id = CellId::new(dna_file.dna_hash().to_owned(), bob_agent_id.clone());
-        let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
-
-        // ///////
-        // END BOB
-        // ///////
-
-        // ///////////////
-        // START CONDUCTOR
-        // ///////////////
+        let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
+        let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
 
         let mut dna_store = MockDnaStore::new();
-
-        dna_store.expect_get().return_const(Some(dna_file.clone()));
+        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
+        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
+        dna_store.expect_add_dna().return_const(());
         dna_store
-            .expect_add_dnas::<Vec<_>>()
-            .times(2)
-            .return_const(());
-        dna_store
-            .expect_add_entry_defs::<Vec<_>>()
-            .times(2)
-            .return_const(());
+            .expect_get()
+            .return_const(Some(dna_file.clone().into()));
 
-        let (_tmpdir, _app_api, handle) = setup_app(
-            vec![(alice_installed_cell, None), (bob_installed_cell, None)],
-            dna_store,
-        )
-        .await;
+            let mut conductor =
+            SweetConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
 
-        // /////////////
-        // END CONDUCTOR
-        // /////////////
-
-        // BOB INIT (to do cap grant)
-
-        let _ = handle
-            .call_zome(ZomeCall {
-                cell_id: bob_cell_id,
-                zome_name: TestWasm::WhoAmI.into(),
-                cap_secret: None,
-                fn_name: "set_access".into(),
-                payload: ExternIO::encode(()).unwrap(),
-                provenance: bob_agent_id.clone(),
-            })
+        let apps = conductor
+            .setup_app_for_agents(
+                "app-",
+                &[alice_pubkey.clone(), bob_pubkey.clone()],
+                &[dna_file.into()],
+            )
             .await
             .unwrap();
 
-        // ALICE DOING A CALL
+        let ((alice_cell,), (bobbo_cell,)) = apps.into_tuples();
+        let alice = alice_cell.zome(TestWasm::WhoAmI);
+        let bobbo = bobbo_cell.zome(TestWasm::WhoAmI);
 
-        let output = handle
-            .call_zome(ZomeCall {
-                cell_id: alice_cell_id,
-                zome_name: TestWasm::WhoAmI.into(),
-                cap_secret: None,
-                fn_name: "whoarethey".into(),
-                payload: ExternIO::encode(&bob_agent_id).unwrap(),
-                provenance: alice_agent_id,
-            })
-            .await
-            .unwrap()
-            .unwrap();
-
-        match output {
-            ZomeCallResponse::Ok(guest_output) => {
-                let agent_info: AgentInfo = guest_output.decode().unwrap();
-                assert_eq!(
-                    agent_info.agent_initial_pubkey,
-                    bob_agent_id
-                );
-                assert_eq!(
-                    agent_info.agent_latest_pubkey,
-                    bob_agent_id
-                );
-            }
-            _ => unreachable!(),
-        }
-
-        let shutdown = handle.take_shutdown_handle().unwrap();
-        handle.shutdown();
-        shutdown.await.unwrap().unwrap();
+        let _: () = conductor.call(&bobbo, "set_access", ()).await;
+        let agent_info: AgentInfo = conductor.call(
+            &alice,
+            "whoarethey",
+            bob_pubkey.clone()
+        ).await;
+        assert_eq!(agent_info.agent_initial_pubkey, bob_pubkey);
+        assert_eq!(agent_info.agent_latest_pubkey, bob_pubkey);
     }
 }
