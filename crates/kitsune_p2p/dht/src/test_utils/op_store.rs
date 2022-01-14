@@ -46,6 +46,10 @@ impl<D: TreeDataConstraints, O: OpRegion<D>> AccessOpStore<D, O> for OpStore<D, 
         }
         self.ops.extend(ops);
     }
+
+    fn topo(&self) -> &Topology {
+        self.tree.topo()
+    }
 }
 
 // impl OpStore<RegionData> {

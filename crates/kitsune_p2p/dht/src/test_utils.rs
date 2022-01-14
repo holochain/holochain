@@ -1,3 +1,4 @@
+pub mod gossip_direct;
 pub mod op_store;
 pub mod test_node;
 

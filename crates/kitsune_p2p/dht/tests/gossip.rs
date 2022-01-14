@@ -1,5 +1,10 @@
 use kitsune_p2p_dht::{
-    arq::*, coords::*, host::*, op::*, region::*, test_utils::test_node::TestNode,
+    arq::*,
+    coords::*,
+    host::*,
+    op::*,
+    region::*,
+    test_utils::{gossip_direct::gossip_direct, test_node::TestNode},
 };
 use kitsune_p2p_timestamp::Timestamp;
 
@@ -19,7 +24,7 @@ fn test_basic() {
     alice.integrate_op(OpData::fake(0, 10, 4321));
     bobbo.integrate_op(OpData::fake(128, 20, 1234));
 
-    let stats = alice.gossip_with(&mut bobbo, Timestamp::from_micros(30));
+    let stats = gossip_direct(&mut alice, &mut bobbo, Timestamp::from_micros(30));
 
     assert_eq!(stats.region_data_sent, REGION_MASS);
     assert_eq!(stats.region_data_rcvd, REGION_MASS);
