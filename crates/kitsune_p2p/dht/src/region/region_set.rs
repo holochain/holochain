@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{cmp::Ordering, collections::HashMap};
 
 use kitsune_p2p_dht_arc::ArcInterval;
 use kitsune_p2p_timestamp::Timestamp;
@@ -100,7 +100,25 @@ impl<T: TreeDataConstraints> RegionSetImplXtcs<T> {
             })
     }
 
+    /// Reshape the two region sets so that both match, omitting or merging
+    /// regions as needed
+    pub fn rectify(&mut self, other: &mut Self) {
+        debug_assert_eq!(
+            self.coords.arq_set, other.coords.arq_set,
+            "Currently, different ArqSets are not supported."
+        );
+        let (a, b, swap) = match self.coords.max_time.cmp(&other.coords.max_time) {
+            Ordering::Equal => return,
+            Ordering::Less => (self, other, false),
+            Ordering::Greater => (other, self, true),
+        };
+        todo!()
+    }
+
     pub fn diff(&self, other: &Self) -> Self {
+        // let mut a = self.to_owned();
+        // let mut b = other.to_owned();
+        // a.rectify(&mut b);
         todo!()
     }
 }

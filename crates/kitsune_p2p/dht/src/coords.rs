@@ -209,15 +209,20 @@ impl Topology {
         let mask = 1u32.rotate_right(1); // 0b100000...
         for _ in 0..(32 - zs - 1) {
             seg.power -= 1;
+
+            // remove the leading zero and shift left
             now &= !mask;
             now <<= 1;
 
             times.push(seg);
             if now & mask > 0 {
+                // if the MSB is 1, duplicate the segment
                 times.push(seg);
             }
             seg.offset += 2u32.pow(seg.power + 1);
         }
+        // Should be all zeroes at this point
+        debug_assert_eq!(now & !mask, 0);
         times
     }
 }
@@ -244,25 +249,27 @@ mod tests {
     }
 
     #[test]
+    #[rustfmt::skip]
     fn test_telescoping_times_first_16_identity_topology() {
         let topo = Topology::identity(Timestamp::from_micros(0));
 
-        assert_eq!(lengths(&topo, 0), Vec::<u32>::new());
-        assert_eq!(lengths(&topo, 1), vec![1]);
-        assert_eq!(lengths(&topo, 2), vec![1, 1]);
-        assert_eq!(lengths(&topo, 3), vec![2, 1]);
-        assert_eq!(lengths(&topo, 4), vec![2, 1, 1]);
-        assert_eq!(lengths(&topo, 5), vec![2, 2, 1]);
-        assert_eq!(lengths(&topo, 6), vec![2, 2, 1, 1]);
-        assert_eq!(lengths(&topo, 7), vec![4, 2, 1]);
-        assert_eq!(lengths(&topo, 8), vec![4, 2, 1, 1]);
-        assert_eq!(lengths(&topo, 9), vec![4, 2, 2, 1]);
-        assert_eq!(lengths(&topo, 10), vec![4, 2, 2, 1, 1]);
-        assert_eq!(lengths(&topo, 11), vec![4, 4, 2, 1]);
-        assert_eq!(lengths(&topo, 12), vec![4, 4, 2, 1, 1]);
-        assert_eq!(lengths(&topo, 13), vec![4, 4, 2, 2, 1]);
-        assert_eq!(lengths(&topo, 14), vec![4, 4, 2, 2, 1, 1]);
-        assert_eq!(lengths(&topo, 15), vec![8, 4, 2, 1]);
+                                                                // n++
+        assert_eq!(lengths(&topo, 0),  Vec::<u32>::new());      // 0001
+        assert_eq!(lengths(&topo, 1),  vec![1]);                // 0010
+        assert_eq!(lengths(&topo, 2),  vec![1, 1]);             // 0011
+        assert_eq!(lengths(&topo, 3),  vec![2, 1]);             // 0100
+        assert_eq!(lengths(&topo, 4),  vec![2, 1, 1]);          // 0101
+        assert_eq!(lengths(&topo, 5),  vec![2, 2, 1]);          // 0110
+        assert_eq!(lengths(&topo, 6),  vec![2, 2, 1, 1]);       // 0111
+        assert_eq!(lengths(&topo, 7),  vec![4, 2, 1]);          // 1000
+        assert_eq!(lengths(&topo, 8),  vec![4, 2, 1, 1]);       // 1001
+        assert_eq!(lengths(&topo, 9),  vec![4, 2, 2, 1]);       // 1010
+        assert_eq!(lengths(&topo, 10), vec![4, 2, 2, 1, 1]);    // 1011
+        assert_eq!(lengths(&topo, 11), vec![4, 4, 2, 1]);       // 1100
+        assert_eq!(lengths(&topo, 12), vec![4, 4, 2, 1, 1]);    // 1101
+        assert_eq!(lengths(&topo, 13), vec![4, 4, 2, 2, 1]);    // 1110
+        assert_eq!(lengths(&topo, 14), vec![4, 4, 2, 2, 1, 1]); // 1111
+        assert_eq!(lengths(&topo, 15), vec![8, 4, 2, 1]);      // 10000
     }
 
     #[test]
@@ -301,6 +308,14 @@ mod tests {
             if let Some(last) = topo.telescoping_times(Timestamp::from_micros(now)).pop() {
                 assert_eq!(last.power, 0);
             }
+        }
+
+        #[test]
+        fn telescoping_times_are_fractal(now: u32) {
+            let topo = Topology::identity(Timestamp::from_micros(0));
+            let a = lengths(&topo, now);
+            let b = lengths(&topo, now - a[0]);
+            assert_eq!(b.as_slice(), &a[1..]);
         }
     }
 }
