@@ -1,4 +1,9 @@
-use std::{marker::PhantomData, ops::Deref};
+use std::{
+    marker::PhantomData,
+    ops::{Deref, ShrAssign},
+};
+
+use num_traits::Zero;
 
 use crate::op::{Loc, Timestamp};
 
@@ -192,26 +197,28 @@ impl Topology {
 
     /// Calculate the list of exponentially shrinking time windows, as per
     /// this document: https://hackmd.io/@hololtd/r1IAIbr5Y
-    //
-    // NOTE: there is a more efficient algorithm that's possible, using binary
-    //   representations. It's in @maackle's dotted spiral notebook.
-    pub fn telescoping_times(&self, mut now: Timestamp) -> Vec<TimeSegment> {
-        self.telescoping_times_helper(*self.time_coord(now), 0)
-            .into_iter()
-            .rev()
-            .collect()
-    }
-
-    fn telescoping_times_helper(&self, t: u32, offset: u32) -> Vec<TimeSegment> {
-        if t < self.time.quantum {
-            vec![]
-        } else {
-            let pow = (t as f64 + 1.0).log2().floor() as u32 - 1;
-            let len = 2u32.pow(pow);
-            let mut v = self.telescoping_times_helper(t - len, offset + len);
-            v.push(TimeSegment::new(pow, offset));
-            v
+    pub fn telescoping_times(&self, now: Timestamp) -> Vec<TimeSegment> {
+        let mut now: u32 = *self.time_coord(now) + 1;
+        if now == 1 {
+            return vec![];
         }
+        let zs = now.leading_zeros();
+        now <<= zs;
+        let mut seg = TimeSegment::new(32 - zs - 1, 0);
+        let mut times = vec![];
+        let mask = 1u32.rotate_right(1); // 0b100000...
+        for _ in 0..(32 - zs - 1) {
+            seg.power -= 1;
+            now &= !mask;
+            now <<= 1;
+
+            times.push(seg);
+            if now & mask > 0 {
+                times.push(seg);
+            }
+            seg.offset += 2u32.pow(seg.power + 1);
+        }
+        times
     }
 }
 
