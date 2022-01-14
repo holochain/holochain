@@ -74,14 +74,26 @@ impl ArqSet {
             arqs: DhtArcSet::intersection(&a1, &a2)
                 .intervals()
                 .into_iter()
-                .map(|interval| ArqBounds::from_interval(dbg!(power), dbg!(interval)).expect("cannot fail"))
+                .map(|interval| {
+                    ArqBounds::from_interval(dbg!(power), dbg!(interval)).expect("cannot fail")
+                })
                 .collect(),
             power,
         }
     }
 }
 
-/// View ascii for all arcs
+/// View ascii for arq bounds
+pub fn print_arq(arq: &ArqBounds, len: usize) {
+    println!(
+        "|{}|\tpow: {}\tcount: {}",
+        arq.to_interval().to_ascii(len),
+        arq.power,
+        arq.count
+    );
+}
+
+/// View ascii for all arq bounds
 pub fn print_arqs(arqs: &ArqSet, len: usize) {
     println!("{} arqs, power: {}", arqs.arqs().len(), arqs.power());
     for (i, arq) in arqs.arqs().into_iter().enumerate() {

@@ -179,27 +179,40 @@ mod tests {
 
     #[test]
     fn test_regions() {
-        let arq = Arq::new(0.into(), 16, 5).to_bounds();
-        let coords = RegionCoordSetXtcs::new(Timestamp::from_micros(100), ArqSet::single(arq));
+        // (-512, 512)
+        let arq = Arq::new(0.into(), 8, 4).to_bounds();
+        assert_eq!(arq.left() as i32, -512);
+        assert_eq!(arq.right(), 511 as u32);
+
         let topo = Topology::identity(Timestamp::from_micros(1000));
         let mut store = OpStore::new(topo.clone());
 
-        let ops: Vec<_> = (0..2048 as u32)
-            .step_by(128)
+        // Create a nx by nt grid of ops and integrate into the store
+        let nx = 8;
+        let nt = 10;
+        let ops: Vec<_> = (-1024..1024 as i32)
+            .step_by(2056 / nx)
             .flat_map(move |x| {
-                (1000..11000 as i64).step_by(100).map(move |t| {
+                (1000..11000 as i64).step_by(10000 / nt).map(move |t| {
                     // 16 x 100 total ops.
                     // x interval: [-1024, -1024)
                     // t interval: [1000, 11000)
-                    OpData::fake(x.wrapping_sub(1024), t, 10)
+                    OpData::fake(x as u32, t, 10)
                 })
             })
             .collect();
-
-        assert_eq!(ops.len(), 16 * 100);
+        assert_eq!(ops.len(), nx * nt);
         store.integrate_ops(ops.into_iter());
+
+        // Calculate region data for all ops.
+        // The total count should be half of what's in the op store,
+        // since the arq covers exactly half of the ops
+        let coords = RegionCoordSetXtcs::new(Timestamp::from_micros(11000), ArqSet::single(arq));
         let rset = RegionSetXtcs::new(&topo, &store, coords);
-        todo!("do something with the region set");
+        assert_eq!(
+            rset.data.concat().iter().map(|r| r.count).sum::<u32>() as usize,
+            nx * nt / 2
+        );
     }
 
     #[test]

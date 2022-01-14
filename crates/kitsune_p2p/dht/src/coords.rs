@@ -209,17 +209,19 @@ impl Topology {
         let mask = 1u32.rotate_right(1); // 0b100000...
         for _ in 0..(32 - zs - 1) {
             seg.power -= 1;
+            seg.offset *= 2;
 
             // remove the leading zero and shift left
             now &= !mask;
             now <<= 1;
 
             times.push(seg);
+            seg.offset += 1;
             if now & mask > 0 {
                 // if the MSB is 1, duplicate the segment
                 times.push(seg);
+                seg.offset += 1;
             }
-            seg.offset += 2u32.pow(seg.power + 1);
         }
         // Should be all zeroes at this point
         debug_assert_eq!(now & !mask, 0);
@@ -296,10 +298,14 @@ mod tests {
 
     proptest::proptest! {
         #[test]
-        fn telescoping_times_fit_total_time_span(now in 0i64..u32::MAX as i64) {
+        fn telescoping_times_cover_total_time_span(now in 0i64..u32::MAX as i64) {
             let topo = Topology::identity(Timestamp::from_micros(0));
             let ts = topo.telescoping_times(Timestamp::from_micros(now));
-            assert_eq!(ts.iter().map(TimeSegment::length).sum::<u64>(), now as u64);
+            let total = ts.iter().fold(0u64, |len, t| {
+                assert_eq!(*t.bounds().0, len as u32, "t = {:?}, len = {}", t, len);
+                len + t.length()
+            });
+            assert_eq!(total, now as u64);
         }
 
         #[test]
