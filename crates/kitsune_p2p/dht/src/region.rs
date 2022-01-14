@@ -8,16 +8,16 @@ pub use region_set::*;
 
 use crate::tree::*;
 
+pub const REGION_MASS: u32 = std::mem::size_of::<Region<RegionData>>() as u32;
+
 #[derive(Debug, derive_more::Constructor)]
-pub struct RegionImpl<T: TreeDataConstraints> {
+pub struct Region<T: TreeDataConstraints = RegionData> {
     pub coords: RegionCoords,
     pub data: T,
 }
 
-impl<T: TreeDataConstraints> RegionImpl<T> {
-    pub const MASS: u32 = std::mem::size_of::<Region>() as u32;
-
-    pub fn split(self, tree: &TreeImpl<T>) -> Option<(Self, Self)> {
+impl<T: TreeDataConstraints> Region<T> {
+    pub fn split(self, tree: &Tree<T>) -> Option<(Self, Self)> {
         let (c1, c2) = self.coords.halve()?;
         let d1 = tree.lookup(&c1.to_bounds());
         let d2 = tree.lookup(&c2.to_bounds());
@@ -32,5 +32,3 @@ impl<T: TreeDataConstraints> RegionImpl<T> {
         Some((r1, r2))
     }
 }
-
-pub type Region = RegionImpl<RegionData>;

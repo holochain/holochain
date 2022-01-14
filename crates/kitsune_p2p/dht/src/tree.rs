@@ -3,7 +3,7 @@ use std::ops::{AddAssign, Sub};
 use num_traits::Zero;
 use sparse_fenwick::Fenwick2;
 
-use crate::{coords::*, op::Op, region::*};
+use crate::{coords::*, op::*, region::*};
 
 pub trait TreeDataConstraints:
     Zero + AddAssign + Sub<Output = Self> + Copy + std::fmt::Debug
@@ -14,12 +14,12 @@ impl<T> TreeDataConstraints for T where
 {
 }
 
-pub struct TreeImpl<T: TreeDataConstraints> {
+pub struct Tree<T: TreeDataConstraints = RegionData> {
     pub(crate) tree: Fenwick2<T>,
     topo: Topology,
 }
 
-impl<T: TreeDataConstraints> TreeImpl<T> {
+impl<T: TreeDataConstraints> Tree<T> {
     pub fn new(topo: Topology) -> Self {
         Self {
             // TODO: take topology into account to reduce max size
@@ -39,13 +39,14 @@ impl<T: TreeDataConstraints> TreeImpl<T> {
     pub fn topo(&self) -> &Topology {
         &self.topo
     }
-}
 
-impl TreeImpl<RegionData> {
-    pub fn add_op(&mut self, op: Op) {
-        let (coords, data) = op.to_tree_data(&self.topo);
-        self.tree.update(coords.to_tuple(), data);
+    pub fn add(&mut self, (coords, data): (SpacetimeCoords, T)) {
+        self.tree.update(coords.to_tuple(), data)
     }
 }
 
-pub type Tree = TreeImpl<RegionData>;
+impl Tree<RegionData> {
+    pub fn add_op(&mut self, op: Op) {
+        self.add(op.region_tuple(&self.topo));
+    }
+}

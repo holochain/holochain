@@ -18,8 +18,7 @@ use super::op_store::OpStore;
 pub struct TestNode {
     agent: AgentKey,
     agent_info: AgentInfo,
-    ops: OpStore,
-    tree: Tree,
+    store: OpStore,
 }
 
 impl TestNode {
@@ -27,9 +26,12 @@ impl TestNode {
         Self {
             agent: AgentKey(fake_hash()),
             agent_info: AgentInfo { arq },
-            ops: OpStore::default(),
-            tree: Tree::new(topo),
+            store: OpStore::new(topo),
         }
+    }
+
+    pub fn topo(&self) -> &Topology {
+        self.store.tree.topo()
     }
 
     /// The ArqBounds to use when gossiping
@@ -46,7 +48,7 @@ impl TestNode {
     pub fn region_set(&self, arq_set: ArqSet, now: Timestamp) -> RegionSet {
         let coords = RegionCoordSetXtcs::new(now, arq_set);
         let data = coords
-            .region_coords_nested(self.tree.topo())
+            .region_coords_nested(self.topo())
             .map(|columns| {
                 columns
                     .map(|(_, coords)| self.query_region_data(&coords.to_bounds()))
@@ -61,8 +63,8 @@ impl TestNode {
     pub fn gossip_with(&mut self, other: &mut Self, now: Timestamp) -> TestNodeGossipRoundStats {
         let mut stats = TestNodeGossipRoundStats::default();
 
-        assert_eq!(self.tree.topo(), other.tree.topo());
-        let topo = self.tree.topo();
+        assert_eq!(self.topo(), other.topo());
+        let topo = self.topo();
 
         // 1. calculate common arqset
         let common_arqs = self.arq_set().intersection(&other.arq_set());
@@ -70,8 +72,8 @@ impl TestNode {
         // 2. calculate and "send" regions
         let regions_self = self.region_set(common_arqs.clone(), now);
         let regions_other = other.region_set(common_arqs.clone(), now);
-        stats.region_data_sent += regions_self.count() as u32 * Region::MASS;
-        stats.region_data_rcvd += regions_other.count() as u32 * Region::MASS;
+        stats.region_data_sent += regions_self.count() as u32 * REGION_MASS;
+        stats.region_data_rcvd += regions_other.count() as u32 * REGION_MASS;
 
         // 3. calculate diffs and fetch ops
         let diff_self = regions_self.diff(&regions_other);
@@ -119,16 +121,15 @@ impl TestNodeGossipRoundStats {
 
 impl AccessOpStore for TestNode {
     fn query_op_data(&self, region: &RegionBounds) -> Vec<Op> {
-        self.ops.query_region(region)
+        self.store.query_op_data(region)
     }
 
     fn query_region_data(&self, region: &RegionBounds) -> RegionData {
-        dbg!(region);
-        self.tree.lookup(region)
+        self.store.query_region_data(region)
     }
 
-    fn integrate_op(&mut self, op: Op) {
-        self.tree.add_op(op);
+    fn integrate_ops<Ops: Clone + Iterator<Item = Op>>(&mut self, ops: Ops) {
+        self.store.integrate_ops(ops)
     }
 }
 
@@ -150,9 +151,14 @@ mod tests {
         let arq = Arq::new(0.into(), 8, 4);
         let mut node = TestNode::new(topo, arq);
 
-        node.integrate_op(Op::new(OpData::fake(0, 10, 1234)));
-        node.integrate_op(Op::new(OpData::fake(1000, 20, 2345)));
-        node.integrate_op(Op::new(OpData::fake(2000, 15, 3456)));
+        node.integrate_ops(
+            [
+                OpData::fake(0, 10, 1234),
+                OpData::fake(1000, 20, 2345),
+                OpData::fake(2000, 15, 3456),
+            ]
+            .into_iter(),
+        );
         {
             let data = node.query_region_data(&RegionBounds {
                 x: (0.into(), 100.into()),
@@ -187,15 +193,15 @@ mod tests {
         let mut alice = TestNode::new(topo.clone(), alice_arq);
         let mut bobbo = TestNode::new(topo.clone(), bobbo_arq);
 
-        alice.integrate_op(Op::new(OpData::fake(0, 10, 4321)));
-        bobbo.integrate_op(Op::new(OpData::fake(128, 20, 1234)));
+        alice.integrate_ops([OpData::fake(0, 10, 4321)].into_iter());
+        bobbo.integrate_ops([OpData::fake(128, 20, 1234)].into_iter());
 
         // dbg!(&alice.tree.tree);
         let b = (4294967295, 71);
         let a = (4294967040, 64);
 
-        let ne = alice.tree.tree.prefix_sum(b);
-        let sw = alice.tree.tree.prefix_sum(a);
+        let ne = alice.store.tree.tree.prefix_sum(b);
+        let sw = alice.store.tree.tree.prefix_sum(a);
         assert_eq!(ne, sw);
         // alice.tree.tree.query((4294967040, 64), (4294967295, 71));
     }

@@ -61,6 +61,7 @@ impl num_traits::Zero for RegionData {
 
 impl std::ops::AddAssign for RegionData {
     fn add_assign(&mut self, other: Self) {
+        // dbg!("add regions", &self, &other);
         self.hash.xor(&other.hash);
         self.size += other.size;
         self.count += other.count;
@@ -79,7 +80,7 @@ impl std::ops::Add for RegionData {
 impl std::ops::SubAssign for RegionData {
     fn sub_assign(&mut self, other: Self) {
         // XOR works as both addition and subtraction
-        dbg!(&self, &other);
+        // dbg!("subtract regions", &self, &other);
         self.hash.xor(&other.hash);
         self.size -= other.size;
         self.count -= other.count;

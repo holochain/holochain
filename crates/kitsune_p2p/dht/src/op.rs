@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, sync::Arc};
+use std::{borrow::Borrow, ops::RangeBounds, sync::Arc};
 
 use crate::{
     coords::{SpacetimeCoords, TimeCoord, Topology},
@@ -10,6 +10,7 @@ pub use kitsune_p2p_dht_arc::DhtLocation as Loc;
 
 pub use kitsune_p2p_timestamp::Timestamp;
 
+/// TODO: mark this as for testing only. /// This is indeed the type that Holochain provides.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct OpData {
     pub loc: Loc,
@@ -23,28 +24,15 @@ impl OpData {
         self.loc
     }
 
-    pub fn to_tree_data(&self, q: &Topology) -> (SpacetimeCoords, RegionData) {
-        let coords = SpacetimeCoords {
-            space: q.space_coord(self.loc),
-            time: q.time_coord(self.timestamp),
-        };
-        let data = RegionData {
-            hash: self.hash.into(),
-            size: self.size,
-            count: 1,
-        };
-        (coords, data)
-    }
-
     /// Obviously only for testing
-    pub fn fake(loc: u32, timestamp: i64, size: u32) -> Self {
+    pub fn fake(loc: u32, timestamp: i64, size: u32) -> Op {
         use crate::hash::fake_hash;
-        Self {
+        Op::new(Self {
             loc: Loc::from(loc),
             timestamp: Timestamp::from_micros(timestamp),
             size,
             hash: fake_hash().into(),
-        }
+        })
     }
 }
 
@@ -63,6 +51,51 @@ impl PartialOrd for OpData {
 impl Ord for OpData {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         (&self.timestamp, &self.loc).cmp(&(&other.timestamp, &other.loc))
+    }
+}
+
+pub trait OpRegion<D>: PartialOrd + Ord {
+    fn loc(&self) -> Loc;
+    fn timestamp(&self) -> Timestamp;
+    fn region_data(&self) -> D;
+
+    fn coords(&self, topo: &Topology) -> SpacetimeCoords {
+        SpacetimeCoords {
+            space: topo.space_coord(self.loc()),
+            time: topo.time_coord(self.timestamp()),
+        }
+    }
+    fn region_tuple(&self, topo: &Topology) -> (SpacetimeCoords, D) {
+        (self.coords(topo), self.region_data())
+    }
+
+    fn bound(timestamp: Timestamp, loc: Loc) -> Self;
+}
+
+impl OpRegion<RegionData> for OpData {
+    fn loc(&self) -> Loc {
+        self.loc
+    }
+
+    fn timestamp(&self) -> Timestamp {
+        self.timestamp
+    }
+
+    fn region_data(&self) -> RegionData {
+        RegionData {
+            hash: self.hash.into(),
+            size: self.size,
+            count: 1,
+        }
+    }
+
+    fn bound(timestamp: Timestamp, loc: Loc) -> Self {
+        Self {
+            loc,
+            timestamp,
+            size: 0,
+            hash: [0; 32].into(),
+        }
     }
 }
 

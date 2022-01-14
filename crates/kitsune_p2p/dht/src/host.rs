@@ -5,24 +5,32 @@
 
 // pub use op_store::*;
 
+use std::sync::Arc;
+
 use crate::{
     agent::AgentInfo,
     coords::{SpacetimeCoords, Topology},
     hash::AgentKey,
-    op::{Op, Timestamp},
+    op::{Op, OpData, OpRegion, Timestamp},
     region::RegionBounds,
     region::RegionData,
     Loc,
 };
 
-pub trait AccessOpStore {
-    fn query_op_data(&self, region: &RegionBounds) -> Vec<Op>;
+/// TODO: make async
+pub trait AccessOpStore<D = RegionData, O: OpRegion<D> = OpData> {
+    fn query_op_data(&self, region: &RegionBounds) -> Vec<Arc<O>>;
 
-    fn query_region_data(&self, region: &RegionBounds) -> RegionData;
+    fn query_region_data(&self, region: &RegionBounds) -> D;
 
-    fn integrate_op(&mut self, op: Op);
+    fn integrate_ops<Ops: Clone + Iterator<Item = Arc<O>>>(&mut self, ops: Ops);
+
+    fn integrate_op(&mut self, op: Arc<O>) {
+        self.integrate_ops([op].into_iter())
+    }
 }
 
+/// TODO: make async
 pub trait AccessPeerStore {
     fn get_agent_info(&self, agent: AgentKey) -> AgentInfo;
 }

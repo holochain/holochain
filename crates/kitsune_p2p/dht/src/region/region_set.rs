@@ -3,9 +3,9 @@ use std::{cmp::Ordering, collections::HashMap};
 use kitsune_p2p_dht_arc::ArcInterval;
 use kitsune_p2p_timestamp::Timestamp;
 
-use crate::{arq::*, coords::*, tree::TreeDataConstraints};
+use crate::{arq::*, coords::*, host::AccessOpStore, op::OpRegion, tree::TreeDataConstraints};
 
-use super::{RegionCoords, RegionData, RegionImpl};
+use super::{Region, RegionCoords, RegionData};
 
 #[derive(Debug, derive_more::Constructor)]
 pub struct RegionCoordSetXtcs {
@@ -57,9 +57,9 @@ impl RegionCoordSetXtcs {
 /// but this is an enum to make room for a more generic representation, e.g.
 /// a simple Vec<Region>, if we want a more intricate algorithm later.
 #[derive(Debug, derive_more::From)]
-pub enum RegionSetImpl<T: TreeDataConstraints> {
+pub enum RegionSet<T: TreeDataConstraints = RegionData> {
     /// eXponential Time, Constant Space.
-    Xtcs(RegionSetImplXtcs<T>),
+    Xtcs(RegionSetXtcs<T>),
 }
 
 /// Implementation for the compact XTCS region set format which gets sent over the wire.
@@ -67,21 +67,37 @@ pub enum RegionSetImpl<T: TreeDataConstraints> {
 /// The data to match the coordinates are specified in a 2D vector which must
 /// correspond to the generated coordinates.
 #[derive(Debug)]
-pub struct RegionSetImplXtcs<T: TreeDataConstraints> {
+pub struct RegionSetXtcs<D: TreeDataConstraints = RegionData> {
     /// The generator for the coordinates
     pub(crate) coords: RegionCoordSetXtcs,
 
     /// The outer vec corresponds to the spatial segments;
     /// the inner vecs are the time segments.
-    pub(crate) data: Vec<Vec<T>>,
+    pub(crate) data: Vec<Vec<D>>,
 }
 
-impl<T: TreeDataConstraints> RegionSetImplXtcs<T> {
+impl<D: TreeDataConstraints> RegionSetXtcs<D> {
     pub fn empty() -> Self {
         Self {
             coords: RegionCoordSetXtcs::empty(),
             data: vec![],
         }
+    }
+
+    pub fn new<O: OpRegion<D>, S: AccessOpStore<D, O>>(
+        topo: &Topology,
+        store: &S,
+        coords: RegionCoordSetXtcs,
+    ) -> Self {
+        let data = coords
+            .region_coords_nested(topo)
+            .map(|columns| {
+                columns
+                    .map(|(_, coords)| store.query_region_data(&coords.to_bounds()))
+                    .collect()
+            })
+            .collect();
+        Self { coords, data }
     }
 
     pub fn count(&self) -> usize {
@@ -92,12 +108,10 @@ impl<T: TreeDataConstraints> RegionSetImplXtcs<T> {
         }
     }
 
-    pub fn regions<'a>(&'a self, topo: &'a Topology) -> impl Iterator<Item = RegionImpl<T>> + 'a {
+    pub fn regions<'a>(&'a self, topo: &'a Topology) -> impl Iterator<Item = Region<D>> + 'a {
         self.coords
             .region_coords_flat(topo)
-            .map(|((ix, it), coords)| {
-                RegionImpl::new(coords, self.data[*ix as usize][*it as usize])
-            })
+            .map(|((ix, it), coords)| Region::new(coords, self.data[*ix as usize][*it as usize]))
     }
 
     /// Reshape the two region sets so that both match, omitting or merging
@@ -116,14 +130,14 @@ impl<T: TreeDataConstraints> RegionSetImplXtcs<T> {
     }
 
     pub fn diff(&self, other: &Self) -> Self {
-        // let mut a = self.to_owned();
-        // let mut b = other.to_owned();
+        let mut a = self.to_owned();
+        let mut b = other.to_owned();
         // a.rectify(&mut b);
         todo!()
     }
 }
 
-impl<T: TreeDataConstraints> RegionSetImpl<T> {
+impl<T: TreeDataConstraints> RegionSet<T> {
     pub fn count(&self) -> usize {
         match self {
             Self::Xtcs(set) => set.count(),
@@ -157,16 +171,40 @@ impl<T: TreeDataConstraints> RegionSetImpl<T> {
     }
 }
 
-pub type RegionSet = RegionSetImpl<RegionData>;
-pub type RegionSetXtcs = RegionSetImplXtcs<RegionData>;
-
 #[cfg(test)]
 mod tests {
+    use crate::{op::OpData, test_utils::op_store::OpStore};
+
     use super::*;
 
     #[test]
-    fn region_diff() {
-        todo!()
+    fn test_regions() {
+        let arq = Arq::new(0.into(), 16, 5).to_bounds();
+        let coords = RegionCoordSetXtcs::new(Timestamp::from_micros(100), ArqSet::single(arq));
+        let topo = Topology::identity(Timestamp::from_micros(1000));
+        let mut store = OpStore::new(topo.clone());
+
+        let ops: Vec<_> = (0..2048 as u32)
+            .step_by(128)
+            .flat_map(move |x| {
+                (1000..11000 as i64).step_by(100).map(move |t| {
+                    // 16 x 100 total ops.
+                    // x interval: [-1024, -1024)
+                    // t interval: [1000, 11000)
+                    OpData::fake(x.wrapping_sub(1024), t, 10)
+                })
+            })
+            .collect();
+
+        assert_eq!(ops.len(), 16 * 100);
+        store.integrate_ops(ops.into_iter());
+        let rset = RegionSetXtcs::new(&topo, &store, coords);
+        todo!("do something with the region set");
+    }
+
+    #[test]
+    fn test_rectify() {
+
         // let coords = [
         //     RegionCoords::new(space, time)
         // ]
