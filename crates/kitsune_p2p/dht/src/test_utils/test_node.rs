@@ -5,9 +5,9 @@ use kitsune_p2p_timestamp::Timestamp;
 use crate::{
     agent::AgentInfo,
     arq::*,
-    coords::Topology,
+    coords::{TimeCoord, Topology},
     hash::{fake_hash, AgentKey},
-    host::{AccessOpStore, AccessPeerStore},
+    host::{AccessOpStore, AccessPeerStore, HostAccess},
     op::Op,
     region::*,
     tree::Tree,
@@ -75,6 +75,12 @@ impl AccessPeerStore for TestNode {
 
     fn get_arq_set(&self) -> ArqSet {
         ArqSet::single(self.arq_bounds())
+    }
+}
+
+impl HostAccess for TestNode {
+    fn time_buffer(&self) -> TimeCoord {
+        1.into()
     }
 }
 

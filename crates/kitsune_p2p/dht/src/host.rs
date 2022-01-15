@@ -10,7 +10,7 @@ use std::sync::Arc;
 use crate::{
     agent::AgentInfo,
     arq::ArqSet,
-    coords::{SpacetimeCoords, Topology},
+    coords::{SpacetimeCoords, TimeCoord, Topology},
     hash::AgentKey,
     op::*,
     region::*,
@@ -54,11 +54,16 @@ pub trait AccessPeerStore {
     fn get_arq_set(&self) -> ArqSet;
 }
 
+// TODO: eventually move any methods out of here and into a component trait
 pub trait HostAccess<D: TreeDataConstraints = RegionData, O: OpRegion<D> = OpData>:
     AccessOpStore<D, O> + AccessPeerStore
 {
+    /// What +/- coordinate offset will you accept for timestamps?
+    /// e.g. if the time quantum is 5 min,
+    /// a time buffer of 2 will allow +/- 10 min.
+    fn time_buffer(&self) -> TimeCoord;
 }
-impl<T, D: TreeDataConstraints, O: OpRegion<D>> HostAccess<D, O> for T where
-    T: AccessOpStore<D, O> + AccessPeerStore
-{
-}
+// impl<T, D: TreeDataConstraints, O: OpRegion<D>> HostAccess<D, O> for T where
+//     T: AccessOpStore<D, O> + AccessPeerStore
+// {
+// }

@@ -6,7 +6,7 @@ pub fn gossip_direct_at<Peer: HostAccess>(
     left: &mut Peer,
     right: &mut Peer,
     now: Timestamp,
-) -> TestNodeGossipRoundStats {
+) -> GossipDirectResult<TestNodeGossipRoundStats> {
     gossip_direct((left, now), (right, now))
 }
 
@@ -15,13 +15,18 @@ pub fn gossip_direct_at<Peer: HostAccess>(
 pub fn gossip_direct<Peer: HostAccess>(
     (left, time_left): (&mut Peer, Timestamp),
     (right, time_right): (&mut Peer, Timestamp),
-) -> TestNodeGossipRoundStats {
+) -> GossipDirectResult<TestNodeGossipRoundStats> {
+    let tl = time_left.as_micros();
+    let tr = time_right.as_micros();
+    if (tl - tr).abs() as u32 > u32::min(*left.time_buffer(), *right.time_buffer()) {
+        return Err(GossipDirectError::TimesOutOfSync);
+    }
     let mut stats = TestNodeGossipRoundStats::default();
 
     assert_eq!(left.topo(), right.topo());
     let topo = left.topo();
     let common_arqs = {
-        // ROUND I: Initial handshake, exchange ArqSets
+        // ROUND I: Initial handshake, exchange ArqSets and as_at timestamps
 
         // - calculate common arqset
         left.get_arq_set().intersection(&right.get_arq_set())
@@ -69,7 +74,7 @@ pub fn gossip_direct<Peer: HostAccess>(
             right.integrate_op(op);
         }
     }
-    stats
+    Ok(stats)
 }
 
 #[derive(Clone, Debug, Default)]
@@ -89,3 +94,10 @@ impl TestNodeGossipRoundStats {
         self.region_data_rcvd + self.op_data_rcvd
     }
 }
+
+#[derive(Debug)]
+pub enum GossipDirectError {
+    TimesOutOfSync,
+}
+
+pub type GossipDirectResult<T> = Result<T, GossipDirectError>;
