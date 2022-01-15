@@ -58,9 +58,6 @@ host_fn_api_impls! {
 
     fn call (Vec<zt::call::Call>) -> Vec<zt::ZomeCallResponse>;
 
-    // Call a zome on a remote agent.
-    fn call_remote (Vec<zt::call_remote::CallRemote>) -> Vec<zt::ZomeCallResponse>;
-
     // @todo List all the local capability claims.
     fn capability_claims (()) -> ();
 
