@@ -14,21 +14,28 @@ pub fn call(
     call_context: Arc<CallContext>,
     inputs: Vec<Call>,
 ) -> Result<Vec<ZomeCallResponse>, WasmError> {
-    match HostFnAccess::from(&call_context.host_context()) {
-        HostFnAccess {
-            write_workspace: Permission::Allow,
-            ..
-        } => {
-            let results: Vec<Result<ZomeCallResponse, WasmError>> =
-                tokio_helper::block_forever_on(async move {
-                    join_all(inputs.into_iter().map(|input| async {
-                        let Call {
-                            target,
-                            zome_name,
-                            fn_name,
-                            cap_secret,
-                            payload,
-                        } = input;
+    let results: Vec<Result<ZomeCallResponse, WasmError>> =
+        tokio_helper::block_forever_on(async move {
+            join_all(inputs.into_iter().map(|input| async {
+                let Call {
+                    target,
+                    zome_name,
+                    fn_name,
+                    cap_secret,
+                    payload,
+                } = input;
+
+                match (&target, HostFnAccess::from(&call_context.host_context())) {
+                    (CallTarget::ConductorCell(_), HostFnAccess {
+                        write_workspace: Permission::Allow,
+                        agent_info: Permission::Allow,
+                        ..
+                    }) | (CallTarget::NetworkAgent(_), HostFnAccess {
+                        write_network: Permission::Allow,
+                        agent_info: Permission::Allow,
+                        ..
+                    }) => {
+
                         let provenance = call_context.host_context.workspace().source_chain()
                         .as_ref().expect("Must have source chain to know provenance")
                         .agent_pubkey()
@@ -82,20 +89,19 @@ pub fn call(
                             }
                         };
                         result
-                    }))
-                    .await
-                });
-            let results: Result<Vec<_>, _> = results
-                .into_iter()
-                .collect();
-            Ok(results?)
-        }
-        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
-            call_context.zome.zome_name().clone(),
-            call_context.function_name().clone(),
-            "call".into()
-        ).to_string()))
-    }
+                    },
+                    _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+                        call_context.zome.zome_name().clone(),
+                        call_context.function_name().clone(),
+                        "call".into()
+                    ).to_string())),
+                }
+            })).await
+    });
+    let results: Result<Vec<_>, _> = results
+        .into_iter()
+        .collect();
+    Ok(results?)
 }
 
 #[cfg(test)]
