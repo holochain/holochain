@@ -101,7 +101,7 @@ pub fn call(
     let results: Result<Vec<_>, _> = results
         .into_iter()
         .collect();
-    Ok(results?)
+    results
 }
 
 #[cfg(test)]
