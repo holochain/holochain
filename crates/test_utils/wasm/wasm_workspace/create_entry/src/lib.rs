@@ -134,7 +134,7 @@ fn call_create_entry(_: ()) -> ExternResult<HeaderHash> {
     hdk::prelude::create_entry(&post())?;
     // Create an entry via a `call`.
     let zome_call_response: ZomeCallResponse = call(
-        None,
+        CallTargetCell::Local,
         "create_entry".to_string().into(),
         "create_entry".to_string().into(),
         None,
