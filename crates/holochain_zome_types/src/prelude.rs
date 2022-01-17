@@ -3,7 +3,6 @@
 pub use crate::agent_activity::*;
 pub use crate::bytes::*;
 pub use crate::call::*;
-pub use crate::call_remote::*;
 pub use crate::capability::*;
 pub use crate::cell::*;
 pub use crate::countersigning::*;
