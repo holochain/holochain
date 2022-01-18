@@ -30,6 +30,7 @@ fn full_len() -> f64 {
     2f64.powf(32.0)
 }
 
+#[allow(dead_code)]
 type DataVec = statrs::statistics::Data<Vec<f64>>;
 
 pub type Peers = Vec<Arq>;

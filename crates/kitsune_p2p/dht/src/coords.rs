@@ -4,6 +4,7 @@ use std::{
 };
 
 use crate::op::{Loc, Timestamp};
+use derivative::Derivative;
 
 #[derive(
     Copy,
@@ -194,6 +195,14 @@ impl Topology {
         }
     }
 
+    pub fn identity_zero() -> Self {
+        Self {
+            space: Dimension::identity(),
+            time: Dimension::identity(),
+            time_origin: Timestamp::from_micros(0),
+        }
+    }
+
     pub fn standard(time_origin: Timestamp) -> Self {
         Self {
             space: Dimension::standard_space(),
@@ -212,15 +221,33 @@ impl Topology {
     }
 
     pub fn telescoping_times(&self, now: Timestamp) -> TelescopingTimes {
-        TelescopingTimes(self.time_coord(now) + TimeCoord(1))
+        TelescopingTimes {
+            time: self.time_coord(now) + TimeCoord(1),
+            limit: None,
+        }
     }
 }
 
 /// A type which generates a list of exponentially expanding time windows, as per
 /// this document: https://hackmd.io/@hololtd/r1IAIbr5Y
-pub struct TelescopingTimes(TimeCoord);
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Derivative)]
+#[derivative(PartialOrd, Ord)]
+pub struct TelescopingTimes {
+    time: TimeCoord,
+
+    #[derivative(PartialOrd = "ignore")]
+    #[derivative(Ord = "ignore")]
+    limit: Option<u32>,
+}
 
 impl TelescopingTimes {
+    pub fn empty() -> Self {
+        Self {
+            time: 0.into(),
+            limit: None,
+        }
+    }
+
     /// Calculate the exponentially expanding time segments using the binary
     /// representation of the current timestamp.
     ///
@@ -234,7 +261,7 @@ impl TelescopingTimes {
     /// the binary representation of the timestamp (+1) which generated,
     /// which illustrates this pattern.
     pub fn segments(&self) -> Vec<TimeSegment> {
-        let mut now: u32 = *self.0;
+        let mut now: u32 = *self.time;
         if now == 1 {
             return vec![];
         }
@@ -243,7 +270,9 @@ impl TelescopingTimes {
         let mut seg = TimeSegment::new(32 - zs - 1, 0);
         let mut times = vec![];
         let mask = 1u32.rotate_right(1); // 0b100000...
-        for _ in 0..(32 - zs - 1) {
+        let iters = 32 - zs - 1;
+        let mut max = self.limit.unwrap_or(iters * 2);
+        for _ in 0..iters {
             seg.power -= 1;
             seg.offset *= 2;
 
@@ -253,23 +282,40 @@ impl TelescopingTimes {
 
             times.push(seg);
             seg.offset += 1;
+            max -= 1;
+            if max == 0 {
+                break;
+            }
             if now & mask > 0 {
                 // if the MSB is 1, duplicate the segment
                 times.push(seg);
                 seg.offset += 1;
+                max -= 1;
+                if max == 0 {
+                    break;
+                }
             }
         }
-        // Should be all zeroes at this point
-        debug_assert_eq!(now & !mask, 0);
+        if self.limit.is_none() {
+            // Should be all zeroes at this point
+            debug_assert_eq!(now & !mask, 0)
+        }
         times
     }
 
+    pub fn limit(&self, limit: u32) -> Self {
+        Self {
+            time: self.time,
+            limit: Some(limit),
+        }
+    }
+
     pub fn rectify<T: AddAssign>(a: (&Self, &mut Vec<T>), b: (&Self, &mut Vec<T>)) {
-        let (left, right) = if a.0 .0 > b.0 .0 { (b, a) } else { (a, b) };
+        let (left, right) = if a.0.time > b.0.time { (b, a) } else { (a, b) };
         let (lt, ld) = left;
         let (rt, rd) = right;
         let mut lt: Vec<_> = lt.segments().iter().map(TimeSegment::length).collect();
-        let mut rt: Vec<_> = rt.segments().iter().map(TimeSegment::length).collect();
+        let rt: Vec<_> = rt.segments().iter().map(TimeSegment::length).collect();
         assert_eq!(lt.len(), ld.len());
         assert_eq!(rt.len(), rd.len());
         let mut i = 0;
@@ -337,9 +383,22 @@ mod tests {
     }
 
     #[test]
+    fn test_telescoping_times_limit() {
+        let topo = Topology::identity_zero();
+        let tt = topo.telescoping_times(Timestamp::from_micros(64));
+        assert_eq!(tt.segments().len(), 7);
+        assert_eq!(tt.limit(6).segments().len(), 6);
+        assert_eq!(tt.limit(4).segments().len(), 4);
+        assert_eq!(
+            tt.segments().into_iter().take(6).collect::<Vec<_>>(),
+            tt.limit(6).segments()
+        );
+    }
+
+    #[test]
     #[rustfmt::skip]
     fn test_telescoping_times_first_16_identity_topology() {
-        let topo = Topology::identity(Timestamp::from_micros(0));
+        let topo = Topology::identity_zero();
         let ts = Timestamp::from_micros;
 
                                                                     // n+1
@@ -395,7 +454,7 @@ mod tests {
     /// world, the data would be the region data (which has an AddAssign impl).
     #[test]
     fn test_rectify_telescoping_times() {
-        let topo = Topology::identity(Timestamp::from_micros(0));
+        let topo = Topology::identity_zero();
         {
             let a = topo.telescoping_times(Timestamp::from_micros(5));
             let b = topo.telescoping_times(Timestamp::from_micros(8));
@@ -422,7 +481,7 @@ mod tests {
     proptest::proptest! {
         #[test]
         fn telescoping_times_cover_total_time_span(now in 0i64..u32::MAX as i64) {
-            let topo = Topology::identity(Timestamp::from_micros(0));
+            let topo = Topology::identity_zero();
             let ts = topo.telescoping_times(Timestamp::from_micros(now)).segments();
             let total = ts.iter().fold(0u64, |len, t| {
                 assert_eq!(*t.bounds().0, len as u32, "t = {:?}, len = {}", t, len);
@@ -433,7 +492,7 @@ mod tests {
 
         #[test]
         fn telescoping_times_end_with_1(now: i64) {
-            let topo = Topology::identity(Timestamp::from_micros(0));
+            let topo = Topology::identity_zero();
             if let Some(last) = topo.telescoping_times(Timestamp::from_micros(now)).segments().pop() {
                 assert_eq!(last.power, 0);
             }
@@ -441,7 +500,7 @@ mod tests {
 
         #[test]
         fn telescoping_times_are_fractal(now: u32) {
-            let topo = Topology::identity(Timestamp::from_micros(0));
+            let topo = Topology::identity_zero();
             let a = lengths(&topo, Timestamp::from_micros(now as i64));
             let b = lengths(&topo, Timestamp::from_micros((now - a[0]) as i64));
             assert_eq!(b.as_slice(), &a[1..]);
@@ -449,7 +508,7 @@ mod tests {
 
         #[test]
         fn rectification_doesnt_panic(a: u32, b: u32) {
-            let topo = Topology::identity(Timestamp::from_micros(0));
+            let topo = Topology::identity_zero();
             let (a, b) = if a < b { (a, b)} else {(b, a)};
             let a = topo.telescoping_times(Timestamp::from_micros(a as i64));
             let b = topo.telescoping_times(Timestamp::from_micros(b as i64));

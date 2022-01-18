@@ -588,7 +588,6 @@ mod tests {
         #[test]
         fn test_preserve_ordering_for_bounds(mut centers: Vec<u32>, count in 0u32..8, power in 10u8..20) {
             // given a list of sorted centerpoints
-            let n = centers.len();
             centers.sort();
 
             // build identical arqs at each centerpoint and convert them to ArqBounds

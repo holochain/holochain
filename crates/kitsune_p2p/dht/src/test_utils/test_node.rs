@@ -13,7 +13,7 @@ use crate::{
 use super::op_store::OpStore;
 
 pub struct TestNode {
-    agent: AgentKey,
+    _agent: AgentKey,
     agent_info: AgentInfo,
     store: OpStore,
 }
@@ -21,7 +21,7 @@ pub struct TestNode {
 impl TestNode {
     pub fn new(topo: Topology, gopa: GossipParams, arq: Arq) -> Self {
         Self {
-            agent: AgentKey(fake_hash()),
+            _agent: AgentKey(fake_hash()),
             agent_info: AgentInfo { arq },
             store: OpStore::new(topo, gopa),
         }
@@ -34,7 +34,7 @@ impl TestNode {
 
     /// Get the RegionSet for this node, suitable for gossiping
     pub fn region_set(&self, arq_set: ArqSet, now: Timestamp) -> RegionSet {
-        let coords = RegionCoordSetXtcs::new(now, arq_set);
+        let coords = RegionCoordSetXtcs::new(self.topo().telescoping_times(now), arq_set);
         let data = coords
             .region_coords_nested(self.topo())
             .map(|columns| {

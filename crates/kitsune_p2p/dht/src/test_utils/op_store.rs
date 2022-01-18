@@ -9,6 +9,7 @@ use crate::{
     Loc,
 };
 
+#[derive(Clone)]
 pub struct OpStore<D: TreeDataConstraints = RegionData, O: OpRegion<D> = OpData> {
     pub(crate) ops: BTreeSet<Arc<O>>,
     pub(crate) tree: Tree<D>,

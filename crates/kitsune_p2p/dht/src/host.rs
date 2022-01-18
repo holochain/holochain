@@ -34,7 +34,7 @@ pub trait AccessOpStore<D: TreeDataConstraints = RegionData, O: OpRegion<D> = Op
 
     /// Get the RegionSet for this node, suitable for gossiping
     fn region_set(&self, arq_set: ArqSet, now: Timestamp) -> RegionSet<D> {
-        let coords = RegionCoordSetXtcs::new(now, arq_set);
+        let coords = RegionCoordSetXtcs::new(self.topo().telescoping_times(now), arq_set);
         let data = coords
             .region_coords_nested(self.topo())
             .map(|columns| {

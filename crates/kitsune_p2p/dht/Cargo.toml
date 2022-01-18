@@ -16,6 +16,7 @@ rand = "0.8.4"
 sparse-fenwick = { path = "/home/michael/Holo/sparse-fenwick" }
 statrs = "0.15"
 tracing = "0.1.29"
+derivative = "2.2.0"
 
 [dev-dependencies]
 kitsune_p2p_dht_arc = { path = "../dht_arc", features = ["test_utils"]}

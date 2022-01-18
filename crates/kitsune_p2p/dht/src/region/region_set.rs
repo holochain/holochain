@@ -14,7 +14,7 @@ use super::{Region, RegionCoords, RegionData};
 #[derive(Debug, PartialEq, Eq, derive_more::Constructor)]
 #[cfg_attr(feature = "testing", derive(Clone))]
 pub struct RegionCoordSetXtcs {
-    max_time: Timestamp,
+    times: TelescopingTimes,
     arq_set: ArqSet,
 }
 
@@ -36,7 +36,7 @@ impl RegionCoordSetXtcs {
     {
         self.arq_set.arqs().iter().flat_map(move |arq| {
             arq.segments().enumerate().map(move |(ix, x)| {
-                topo.telescoping_times(self.max_time)
+                self.times
                     .segments()
                     .into_iter()
                     .enumerate()
@@ -52,7 +52,7 @@ impl RegionCoordSetXtcs {
 
     pub fn empty() -> Self {
         Self {
-            max_time: Timestamp::from_micros(0),
+            times: TelescopingTimes::empty(),
             arq_set: ArqSet::empty(11),
         }
     }
@@ -128,26 +128,34 @@ impl<D: TreeDataConstraints> RegionSetXtcs<D> {
         if self.coords.arq_set != other.coords.arq_set {
             return Err(GossipError::ArqSetMismatchForDiff);
         }
-        if self.coords.max_time > other.coords.max_time {
+        if self.coords.times > other.coords.times {
             std::mem::swap(self, other);
         }
-        let ta = topo.telescoping_times(self.coords.max_time);
-        let tb = topo.telescoping_times(other.coords.max_time);
+        let mut len = 0;
         for (da, db) in self.data.iter_mut().zip(other.data.iter_mut()) {
-            TelescopingTimes::rectify((&ta, da), (&tb, db));
+            TelescopingTimes::rectify((&self.coords.times, da), (&other.coords.times, db));
+            len = da.len();
         }
-        other.coords.max_time = self.coords.max_time;
+        self.coords.times = self.coords.times.limit(len as u32);
+        other.coords.times = self.coords.times;
         Ok(())
     }
 
-    pub fn diff(mut self, mut other: Self, topo: &Topology) -> GossipResult<Vec<Region>> {
-        self.rectify(&mut other, topo);
+    pub fn diff(mut self, mut other: Self, topo: &Topology) -> GossipResult<Vec<Region<D>>> {
+        self.rectify(&mut other, topo)?;
 
-        todo!("pull out the regions which are different")
+        let regions = self
+            .regions(topo)
+            .into_iter()
+            .zip(other.regions(topo).into_iter())
+            .filter_map(|(a, b)| (a.data != b.data).then(|| a))
+            .collect();
+
+        Ok(regions)
     }
 }
 
-impl<T: TreeDataConstraints> RegionSet<T> {
+impl<D: TreeDataConstraints> RegionSet<D> {
     pub fn count(&self) -> usize {
         match self {
             Self::Xtcs(set) => set.count(),
@@ -168,9 +176,9 @@ impl<T: TreeDataConstraints> RegionSet<T> {
 
     /// Find a set of Regions which represents the intersection of the two
     /// input RegionSets.
-    pub fn diff(self, other: Self, topo: &Topology) -> GossipResult<Vec<Region>> {
+    pub fn diff(self, other: Self, topo: &Topology) -> GossipResult<Vec<Region<D>>> {
         match (self, other) {
-            (Self::Xtcs(left), Self::Xtcs(right)) => Ok(left.diff(right, topo)?.into()),
+            (Self::Xtcs(left), Self::Xtcs(right)) => left.diff(right, topo),
         }
         // Notes on a generic algorithm for the diff of generic regions:
         // can we use a Fenwick tree to look up regions?
@@ -238,7 +246,8 @@ mod tests {
         // Calculate region data for all ops.
         // The total count should be half of what's in the op store,
         // since the arq covers exactly half of the ops
-        let coords = RegionCoordSetXtcs::new(Timestamp::from_micros(11000), ArqSet::single(arq));
+        let times = topo.telescoping_times(Timestamp::from_micros(11000));
+        let coords = RegionCoordSetXtcs::new(times, ArqSet::single(arq));
         let rset = RegionSetXtcs::new(&topo, &store, coords);
         assert_eq!(
             rset.data.concat().iter().map(|r| r.count).sum::<u32>() as usize,
@@ -253,10 +262,10 @@ mod tests {
         let mut store = OpStore::new(topo.clone(), GossipParams::zero());
         store.integrate_ops(op_grid(&arq, 10..20).into_iter());
 
-        let coords_a =
-            RegionCoordSetXtcs::new(Timestamp::from_micros(20), ArqSet::single(arq.clone()));
-        let coords_b =
-            RegionCoordSetXtcs::new(Timestamp::from_micros(21), ArqSet::single(arq.clone()));
+        let tt_a = topo.telescoping_times(Timestamp::from_micros(20));
+        let tt_b = topo.telescoping_times(Timestamp::from_micros(30));
+        let coords_a = RegionCoordSetXtcs::new(tt_a, ArqSet::single(arq.clone()));
+        let coords_b = RegionCoordSetXtcs::new(tt_b, ArqSet::single(arq.clone()));
 
         let mut rset_a = RegionSetXtcs::new(&topo, &store, coords_a);
         let mut rset_b = RegionSetXtcs::new(&topo, &store, coords_b);
@@ -266,9 +275,47 @@ mod tests {
 
         assert_eq!(rset_a, rset_b);
 
-        // let coords = [
-        //     RegionCoords::new(space, time)
-        // ]
-        // let a = RegionSetImpl::new()
+        let coords: Vec<Vec<_>> = rset_a
+            .coords
+            .region_coords_nested(&topo)
+            .map(|col| col.collect())
+            .collect();
+
+        assert_eq!(coords.len(), arq.count() as usize);
+        for col in coords.iter() {
+            assert_eq!(col.len(), rset_a.coords.times.segments().len());
+        }
+    }
+
+    #[test]
+    fn test_diff() {
+        let arq = Arq::new(0.into(), 8, 4).to_bounds();
+        let topo = Topology::identity(Timestamp::from_micros(0));
+
+        let mut store1 = OpStore::new(topo.clone(), GossipParams::zero());
+        store1.integrate_ops(op_grid(&arq, 10..20).into_iter());
+
+        let mut store2 = store1.clone();
+        store2.integrate_ops(
+            [OpData::fake(12, 12, 4), OpData::fake(-300i32 as u32, 18, 4)].into_iter(),
+        );
+
+        let coords_a = RegionCoordSetXtcs::new(
+            topo.telescoping_times(Timestamp::from_micros(20)),
+            ArqSet::single(arq.clone()),
+        );
+        let coords_b = RegionCoordSetXtcs::new(
+            topo.telescoping_times(Timestamp::from_micros(21)),
+            ArqSet::single(arq.clone()),
+        );
+
+        let mut rset_a = RegionSetXtcs::new(&topo, &store1, coords_a);
+        let mut rset_b = RegionSetXtcs::new(&topo, &store2, coords_b);
+        dbg!(&rset_a, &rset_b);
+        assert_ne!(rset_a.data, rset_b.data);
+
+        let diff = rset_a.diff(rset_b, &topo).unwrap();
+
+        assert_eq!(diff.len(), 2);
     }
 }

@@ -6,14 +6,15 @@ use sparse_fenwick::Fenwick2;
 use crate::{coords::*, op::*, region::*};
 
 pub trait TreeDataConstraints:
-    Zero + AddAssign + Sub<Output = Self> + Copy + std::fmt::Debug
+    Eq + Zero + AddAssign + Sub<Output = Self> + Copy + std::fmt::Debug
 {
 }
 impl<T> TreeDataConstraints for T where
-    T: Zero + AddAssign + Sub<Output = T> + Copy + std::fmt::Debug
+    T: Eq + Zero + AddAssign + Sub<Output = T> + Copy + std::fmt::Debug
 {
 }
 
+#[derive(Clone)]
 pub struct Tree<T: TreeDataConstraints = RegionData> {
     pub(crate) tree: Fenwick2<T>,
     topo: Topology,
