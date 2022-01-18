@@ -1,3 +1,5 @@
+use crate::conductor::api::CellConductorReadHandle;
+use crate::conductor::interface::SignalBroadcaster;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
@@ -27,6 +29,12 @@ pub struct InitHostAccess {
     pub workspace: HostFnWorkspace,
     pub keystore: MetaLairClient,
     pub network: HolochainP2pDna,
+    pub signal_tx: SignalBroadcaster,
+    pub call_zome_handle: CellConductorReadHandle,
+    // NB: this is kind of an odd place for this, since CellId is not really a special
+    // "resource" to give access to, but rather it's a bit of data that makes sense in
+    // the context of zome calls, but not every CallContext
+    pub cell_id: CellId,
 }
 
 impl From<InitHostAccess> for HostContext {
