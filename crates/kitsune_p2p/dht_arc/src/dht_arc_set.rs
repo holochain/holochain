@@ -61,6 +61,8 @@ impl DhtArcSet {
         if is_full(start.into(), end.into()) {
             Self::new_full()
         } else {
+            let start = start.as_u32().min(MAX).into();
+            let end = end.as_u32().min(MAX).into();
             Self::Partial(
                 if start <= end {
                     vec![(start, end)]
