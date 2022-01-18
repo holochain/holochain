@@ -26,7 +26,7 @@ pub fn gossip_direct<Peer: HostAccess>(
     if left.topo() != right.topo() {
         return Err(GossipError::TopologyMismatch);
     }
-    let topo = left.topo();
+    let _topo = left.topo();
 
     let common_arqs = {
         // ROUND I: Initial handshake, exchange ArqSets and as-at timestamps
@@ -71,8 +71,8 @@ pub fn gossip_direct<Peer: HostAccess>(
         // ROUND IV: Calculate diffs and send missing ops
 
         // - calculate diffs
-        let diff_left = regions_left.clone().diff(regions_right.clone(), &topo)?;
-        let diff_right = regions_right.diff(regions_left, &topo)?;
+        let diff_left = regions_left.clone().diff(regions_right.clone())?;
+        let diff_right = regions_right.diff(regions_left)?;
 
         // - fetch ops
         let ops_left: Vec<_> = diff_left

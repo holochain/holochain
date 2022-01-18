@@ -8,11 +8,7 @@ pub use region_coords::*;
 pub use region_data::*;
 pub use region_set::*;
 
-use crate::{
-    coords::{SpacetimeCoords, Topology},
-    op::{Op, OpRegion},
-    tree::*,
-};
+use crate::tree::*;
 
 pub const REGION_MASS: u32 = std::mem::size_of::<Region<RegionData>>() as u32;
 

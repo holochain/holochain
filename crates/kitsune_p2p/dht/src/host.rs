@@ -43,7 +43,7 @@ pub trait AccessOpStore<D: TreeDataConstraints = RegionData, O: OpRegion<D> = Op
     fn region_set(&self, arq_set: ArqSet, now: Timestamp) -> RegionSet<D> {
         let coords = RegionCoordSetXtcs::new(self.topo().telescoping_times(now), arq_set);
         let data = coords
-            .region_coords_nested(self.topo())
+            .region_coords_nested()
             .map(|columns| {
                 columns
                     .map(|(_, coords)| self.query_region_coords(&coords))

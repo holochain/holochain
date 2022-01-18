@@ -1,5 +1,3 @@
-use kitsune_p2p_timestamp::Timestamp;
-
 use crate::{
     arq::*,
     coords::*,
@@ -24,14 +22,12 @@ impl RegionCoordSetXtcs {
     /// can be used to pair the generated coords with stored data.
     pub fn region_coords_flat<'a>(
         &'a self,
-        topo: &'a Topology,
     ) -> impl Iterator<Item = ((SpaceCoord, TimeCoord), RegionCoords)> + 'a {
-        self.region_coords_nested(topo).flatten()
+        self.region_coords_nested().flatten()
     }
 
     pub fn region_coords_nested<'a>(
         &'a self,
-        topo: &'a Topology,
     ) -> impl Iterator<Item = impl Iterator<Item = ((SpaceCoord, TimeCoord), RegionCoords)>> + 'a
     {
         self.arq_set.arqs().iter().flat_map(move |arq| {
@@ -93,12 +89,11 @@ impl<D: TreeDataConstraints> RegionSetXtcs<D> {
     }
 
     pub fn new<O: OpRegion<D>, S: AccessOpStore<D, O>>(
-        topo: &Topology,
         store: &S,
         coords: RegionCoordSetXtcs,
     ) -> Self {
         let data = coords
-            .region_coords_nested(topo)
+            .region_coords_nested()
             .map(|columns| {
                 columns
                     .map(|(_, coords)| store.query_region_coords(&coords))
@@ -116,15 +111,15 @@ impl<D: TreeDataConstraints> RegionSetXtcs<D> {
         }
     }
 
-    pub fn regions<'a>(&'a self, topo: &'a Topology) -> impl Iterator<Item = Region<D>> + 'a {
+    pub fn regions<'a>(&'a self) -> impl Iterator<Item = Region<D>> + 'a {
         self.coords
-            .region_coords_flat(topo)
+            .region_coords_flat()
             .map(|((ix, it), coords)| Region::new(coords, self.data[*ix as usize][*it as usize]))
     }
 
     /// Reshape the two region sets so that both match, omitting or merging
     /// regions as needed
-    pub fn rectify(&mut self, other: &mut Self, topo: &Topology) -> GossipResult<()> {
+    pub fn rectify(&mut self, other: &mut Self) -> GossipResult<()> {
         if self.coords.arq_set != other.coords.arq_set {
             return Err(GossipError::ArqSetMismatchForDiff);
         }
@@ -142,13 +137,13 @@ impl<D: TreeDataConstraints> RegionSetXtcs<D> {
         Ok(())
     }
 
-    pub fn diff(mut self, mut other: Self, topo: &Topology) -> GossipResult<Vec<Region<D>>> {
-        self.rectify(&mut other, topo)?;
+    pub fn diff(mut self, mut other: Self) -> GossipResult<Vec<Region<D>>> {
+        self.rectify(&mut other)?;
 
         let regions = self
-            .regions(topo)
+            .regions()
             .into_iter()
-            .zip(other.regions(topo).into_iter())
+            .zip(other.regions().into_iter())
             .filter_map(|(a, b)| (a.data != b.data).then(|| a))
             .collect();
 
@@ -163,23 +158,17 @@ impl<D: TreeDataConstraints> RegionSet<D> {
         }
     }
     /// can be used to pair the generated coords with stored data.
-    pub fn region_coords<'a>(
-        &'a self,
-        topo: &'a Topology,
-    ) -> impl Iterator<Item = RegionCoords> + 'a {
+    pub fn region_coords<'a>(&'a self) -> impl Iterator<Item = RegionCoords> + 'a {
         match self {
-            Self::Xtcs(set) => set
-                .coords
-                .region_coords_flat(topo)
-                .map(|(_, coords)| coords),
+            Self::Xtcs(set) => set.coords.region_coords_flat().map(|(_, coords)| coords),
         }
     }
 
     /// Find a set of Regions which represents the intersection of the two
     /// input RegionSets.
-    pub fn diff(self, other: Self, topo: &Topology) -> GossipResult<Vec<Region<D>>> {
+    pub fn diff(self, other: Self) -> GossipResult<Vec<Region<D>>> {
         match (self, other) {
-            (Self::Xtcs(left), Self::Xtcs(right)) => left.diff(right, topo),
+            (Self::Xtcs(left), Self::Xtcs(right)) => left.diff(right),
         }
         // Notes on a generic algorithm for the diff of generic regions:
         // can we use a Fenwick tree to look up regions?
@@ -193,6 +182,8 @@ impl<D: TreeDataConstraints> RegionSet<D> {
 #[cfg(test)]
 #[cfg(feature = "testing")]
 mod tests {
+
+    use kitsune_p2p_timestamp::Timestamp;
 
     use crate::{
         op::{Op, OpData},
@@ -249,7 +240,7 @@ mod tests {
         // since the arq covers exactly half of the ops
         let times = topo.telescoping_times(Timestamp::from_micros(11000));
         let coords = RegionCoordSetXtcs::new(times, ArqSet::single(arq));
-        let rset = RegionSetXtcs::new(&topo, &store, coords);
+        let rset = RegionSetXtcs::new(&store, coords);
         assert_eq!(
             rset.data.concat().iter().map(|r| r.count).sum::<u32>() as usize,
             nx * nt / 2
@@ -268,17 +259,17 @@ mod tests {
         let coords_a = RegionCoordSetXtcs::new(tt_a, ArqSet::single(arq.clone()));
         let coords_b = RegionCoordSetXtcs::new(tt_b, ArqSet::single(arq.clone()));
 
-        let mut rset_a = RegionSetXtcs::new(&topo, &store, coords_a);
-        let mut rset_b = RegionSetXtcs::new(&topo, &store, coords_b);
+        let mut rset_a = RegionSetXtcs::new(&store, coords_a);
+        let mut rset_b = RegionSetXtcs::new(&store, coords_b);
         assert_ne!(rset_a.data, rset_b.data);
 
-        rset_a.rectify(&mut rset_b, &topo).unwrap();
+        rset_a.rectify(&mut rset_b).unwrap();
 
         assert_eq!(rset_a, rset_b);
 
         let coords: Vec<Vec<_>> = rset_a
             .coords
-            .region_coords_nested(&topo)
+            .region_coords_nested()
             .map(|col| col.collect())
             .collect();
 
@@ -312,11 +303,11 @@ mod tests {
             ArqSet::single(arq.clone()),
         );
 
-        let rset_a = RegionSetXtcs::new(&topo, &store1, coords_a);
-        let rset_b = RegionSetXtcs::new(&topo, &store2, coords_b);
+        let rset_a = RegionSetXtcs::new(&store1, coords_a);
+        let rset_b = RegionSetXtcs::new(&store2, coords_b);
         assert_ne!(rset_a.data, rset_b.data);
 
-        let diff = rset_a.clone().diff(rset_b.clone(), &topo).unwrap();
+        let diff = rset_a.clone().diff(rset_b.clone()).unwrap();
         assert_eq!(diff.len(), 2);
 
         assert!(diff[0].coords.contains(&extra_ops[0].coords(&topo)));

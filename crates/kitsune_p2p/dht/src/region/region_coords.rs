@@ -1,4 +1,4 @@
-use crate::coords::{SpaceCoord, SpaceSegment, SpacetimeCoords, TimeCoord, TimeSegment, Topology};
+use crate::coords::{SpaceCoord, SpaceSegment, SpacetimeCoords, TimeCoord, TimeSegment};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, derive_more::Constructor)]
 pub struct RegionCoords {
