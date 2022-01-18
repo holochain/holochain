@@ -97,7 +97,7 @@ pub fn gossip_direct<Peer: HostAccess>(
     Ok(stats)
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, derive_more::Add)]
 pub struct TestNodeGossipRoundStats {
     pub region_data_sent: u32,
     pub region_data_rcvd: u32,

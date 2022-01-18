@@ -342,7 +342,7 @@ impl TelescopingTimes {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, derive_more::Constructor)]
 pub struct GossipParams {
     /// What +/- coordinate offset will you accept for timestamps?
     /// e.g. if the time quantum is 5 min,
