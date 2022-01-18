@@ -2661,6 +2661,7 @@ dependencies = [
  "scheduled-thread-pool",
  "serde",
  "serde_derive",
+ "serde_json",
  "shrinkwraprs",
  "sqlformat",
  "tempdir",
