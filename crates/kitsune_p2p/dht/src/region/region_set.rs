@@ -101,7 +101,7 @@ impl<D: TreeDataConstraints> RegionSetXtcs<D> {
             .region_coords_nested(topo)
             .map(|columns| {
                 columns
-                    .map(|(_, coords)| store.query_region_data(&coords.to_bounds()))
+                    .map(|(_, coords)| store.query_region_coords(&coords))
                     .collect()
             })
             .collect();
@@ -136,8 +136,9 @@ impl<D: TreeDataConstraints> RegionSetXtcs<D> {
             TelescopingTimes::rectify((&self.coords.times, da), (&other.coords.times, db));
             len = da.len();
         }
-        self.coords.times = self.coords.times.limit(len as u32);
-        other.coords.times = self.coords.times;
+        let times = other.coords.times.limit(len as u32);
+        self.coords.times = times;
+        other.coords.times = times;
         Ok(())
     }
 
@@ -285,6 +286,9 @@ mod tests {
         for col in coords.iter() {
             assert_eq!(col.len(), rset_a.coords.times.segments().len());
         }
+        let nt = coords[0].len();
+        assert_eq!(tt_b.segments()[0..nt], rset_a.coords.times.segments());
+        assert_eq!(tt_b.segments()[0..nt], rset_b.coords.times.segments());
     }
 
     #[test]
@@ -295,10 +299,9 @@ mod tests {
         let mut store1 = OpStore::new(topo.clone(), GossipParams::zero());
         store1.integrate_ops(op_grid(&arq, 10..20).into_iter());
 
+        let extra_ops = [OpData::fake(-300i32 as u32, 18, 4), OpData::fake(12, 12, 4)];
         let mut store2 = store1.clone();
-        store2.integrate_ops(
-            [OpData::fake(12, 12, 4), OpData::fake(-300i32 as u32, 18, 4)].into_iter(),
-        );
+        store2.integrate_ops(extra_ops.clone().into_iter());
 
         let coords_a = RegionCoordSetXtcs::new(
             topo.telescoping_times(Timestamp::from_micros(20)),
@@ -309,13 +312,27 @@ mod tests {
             ArqSet::single(arq.clone()),
         );
 
-        let mut rset_a = RegionSetXtcs::new(&topo, &store1, coords_a);
-        let mut rset_b = RegionSetXtcs::new(&topo, &store2, coords_b);
-        dbg!(&rset_a, &rset_b);
+        let rset_a = RegionSetXtcs::new(&topo, &store1, coords_a);
+        let rset_b = RegionSetXtcs::new(&topo, &store2, coords_b);
         assert_ne!(rset_a.data, rset_b.data);
 
-        let diff = rset_a.diff(rset_b, &topo).unwrap();
-
+        let diff = rset_a.clone().diff(rset_b.clone(), &topo).unwrap();
         assert_eq!(diff.len(), 2);
+
+        assert!(diff[0].coords.contains(&extra_ops[0].coords(&topo)));
+        assert!(diff[1].coords.contains(&extra_ops[1].coords(&topo)));
+
+        // Adding the region data from each extra op to the region data of the
+        // diff which was missing those ops should be the same as the query
+        // of the store which contains the extra ops over the same region
+        // TODO: proptest this
+        assert_eq!(
+            diff[0].data + extra_ops[0].region_data(),
+            store2.query_region_coords(&diff[0].coords)
+        );
+        assert_eq!(
+            diff[1].data + extra_ops[1].region_data(),
+            store2.query_region_coords(&diff[1].coords)
+        );
     }
 }

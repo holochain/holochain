@@ -77,11 +77,11 @@ pub fn gossip_direct<Peer: HostAccess>(
         // - fetch ops
         let ops_left: Vec<_> = diff_left
             .iter()
-            .flat_map(|r| left.query_op_data(&r.coords.to_bounds()))
+            .flat_map(|r| left.query_ops_by_coords(&r.coords))
             .collect();
         let ops_right: Vec<_> = diff_right
             .iter()
-            .flat_map(|r| right.query_op_data(&r.coords.to_bounds()))
+            .flat_map(|r| right.query_ops_by_coords(&r.coords))
             .collect();
 
         // - "send" missing ops

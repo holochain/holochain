@@ -20,8 +20,15 @@ use crate::{
 /// TODO: make async
 pub trait AccessOpStore<D: TreeDataConstraints = RegionData, O: OpRegion<D> = OpData> {
     fn query_op_data(&self, region: &RegionBounds) -> Vec<Arc<O>>;
+    fn query_ops_by_coords(&self, region: &RegionCoords) -> Vec<Arc<O>> {
+        self.query_op_data(&region.to_bounds())
+    }
 
-    fn query_region_data(&self, region: &RegionBounds) -> D;
+    fn query_region(&self, region: &RegionBounds) -> D;
+
+    fn query_region_coords(&self, region: &RegionCoords) -> D {
+        self.query_region(&region.to_bounds())
+    }
 
     fn integrate_ops<Ops: Clone + Iterator<Item = Arc<O>>>(&mut self, ops: Ops);
 
@@ -39,7 +46,7 @@ pub trait AccessOpStore<D: TreeDataConstraints = RegionData, O: OpRegion<D> = Op
             .region_coords_nested(self.topo())
             .map(|columns| {
                 columns
-                    .map(|(_, coords)| self.query_region_data(&coords.to_bounds()))
+                    .map(|(_, coords)| self.query_region_coords(&coords))
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();

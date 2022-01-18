@@ -39,7 +39,7 @@ impl TestNode {
             .region_coords_nested(self.topo())
             .map(|columns| {
                 columns
-                    .map(|(_, coords)| self.query_region_data(&coords.to_bounds()))
+                    .map(|(_, coords)| self.query_region_coords(&coords))
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
@@ -52,8 +52,8 @@ impl AccessOpStore for TestNode {
         self.store.query_op_data(region)
     }
 
-    fn query_region_data(&self, region: &RegionBounds) -> RegionData {
-        self.store.query_region_data(region)
+    fn query_region(&self, region: &RegionBounds) -> RegionData {
+        self.store.query_region(region)
     }
 
     fn integrate_ops<Ops: Clone + Iterator<Item = Op>>(&mut self, ops: Ops) {
@@ -101,7 +101,7 @@ mod tests {
             .into_iter(),
         );
         {
-            let data = node.query_region_data(&RegionBounds {
+            let data = node.query_region(&RegionBounds {
                 x: (0.into(), 100.into()),
                 t: (0.into(), 20.into()),
             });
@@ -109,7 +109,7 @@ mod tests {
             assert_eq!(data.size, 1234);
         }
         {
-            let data = node.query_region_data(&RegionBounds {
+            let data = node.query_region(&RegionBounds {
                 x: (0.into(), 1001.into()),
                 t: (0.into(), 21.into()),
             });
@@ -117,7 +117,7 @@ mod tests {
             assert_eq!(data.size, 1234 + 2345);
         }
         {
-            let data = node.query_region_data(&RegionBounds {
+            let data = node.query_region(&RegionBounds {
                 x: (1000.into(), 1001.into()),
                 t: (0.into(), 20.into()),
             });

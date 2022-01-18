@@ -1,4 +1,4 @@
-use crate::coords::{SpaceCoord, SpaceSegment, TimeCoord, TimeSegment};
+use crate::coords::{SpaceCoord, SpaceSegment, SpacetimeCoords, TimeCoord, TimeSegment, Topology};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, derive_more::Constructor)]
 pub struct RegionCoords {
@@ -7,26 +7,17 @@ pub struct RegionCoords {
 }
 
 impl RegionCoords {
-    #[deprecated = "this is likely not needed in the current algorithm"]
-    pub fn halve(self) -> Option<(Self, Self)> {
-        let (sa, sb) = self.space.halve()?;
-        Some((
-            Self {
-                space: sa,
-                time: self.time,
-            },
-            Self {
-                space: sb,
-                time: self.time,
-            },
-        ))
-    }
-
+    /// TODO: does this need to map to the actual absolute values, i.e. undergo
+    /// topological transformation, or is this correct?
     pub fn to_bounds(&self) -> RegionBounds {
         RegionBounds {
             x: self.space.bounds(),
             t: self.time.bounds(),
         }
+    }
+
+    pub fn contains(&self, coords: &SpacetimeCoords) -> bool {
+        self.space.contains(coords.space) && self.time.contains(coords.time)
     }
 }
 

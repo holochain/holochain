@@ -44,7 +44,9 @@ impl TimeCoord {
     }
 }
 
-pub trait Coord: From<u32> + Deref<Target = u32> {
+pub trait Coord:
+    From<u32> + Deref<Target = u32> + PartialEq + Eq + PartialOrd + Ord + std::fmt::Debug
+{
     const MAX: u32 = u32::MAX;
 
     fn exp(&self, pow: u8) -> u32 {
@@ -108,6 +110,15 @@ impl<C: Coord> Segment<C> {
         let l = self.length();
         let o = self.offset as u64;
         (C::from((o * l) as u32), C::from((o * l + l - 1) as u32))
+    }
+
+    pub fn contains(&self, coord: C) -> bool {
+        let (lo, hi) = self.bounds();
+        if lo <= hi {
+            lo <= coord && coord <= hi
+        } else {
+            lo <= coord || coord <= hi
+        }
     }
 
     /// Halving an interval is equivalent to taking the child nodes of the node
@@ -365,12 +376,16 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_contains() {
+        let s = TimeSegment::new(31, 0);
+        assert_eq!(s.bounds(), (0.into(), (u32::MAX / 2).into()));
+        assert!(s.contains(0.into()));
+        assert!(!s.contains((u32::MAX / 2 + 2).into()));
+    }
+
+    #[test]
     fn segment_length() {
-        let s = TimeSegment {
-            power: 31,
-            offset: 0,
-            phantom: PhantomData,
-        };
+        let s = TimeSegment::new(31, 0);
         assert_eq!(s.length(), 2u64.pow(31));
     }
 

@@ -39,7 +39,7 @@ impl<D: TreeDataConstraints, O: OpRegion<D>> AccessOpStore<D, O> for OpStore<D, 
             .collect()
     }
 
-    fn query_region_data(&self, region: &RegionBounds) -> D {
+    fn query_region(&self, region: &RegionBounds) -> D {
         self.tree.lookup(region)
     }
 
