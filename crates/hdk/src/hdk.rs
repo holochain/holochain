@@ -1,5 +1,6 @@
 use crate::prelude::*;
 
+use holo_hash::DnaHash;
 #[cfg(feature = "mock")]
 use mockall::*;
 
@@ -29,6 +30,10 @@ pub trait HdkT: Send + Sync {
         get_agent_activity_input: GetAgentActivityInput,
     ) -> ExternResult<AgentActivity>;
     fn query(&self, filter: ChainQueryFilter) -> ExternResult<Vec<Element>>;
+    /// Close this source chain and point to a new [`DnaHash`].
+    fn close_chain(&self, new_dna_hash: DnaHash) -> ExternResult<HeaderHash>;
+    /// Open this source chain from a previous [`DnaHash`].
+    fn open_chain(&self, prev_dna_hash: DnaHash) -> ExternResult<HeaderHash>;
     // Ed25519
     fn sign(&self, sign: Sign) -> ExternResult<Signature>;
     fn sign_ephemeral(&self, sign_ephemeral: SignEphemeral) -> ExternResult<EphemeralSignatures>;
@@ -118,6 +123,12 @@ impl HdkT for ErrHdk {
         Self::err()
     }
     fn sign(&self, _: Sign) -> ExternResult<Signature> {
+        Self::err()
+    }
+    fn close_chain(&self, _: DnaHash) -> ExternResult<HeaderHash> {
+        Self::err()
+    }
+    fn open_chain(&self, _: DnaHash) -> ExternResult<HeaderHash> {
         Self::err()
     }
     fn sign_ephemeral(&self, _: SignEphemeral) -> ExternResult<EphemeralSignatures> {
@@ -263,6 +274,12 @@ impl HdkT for HostHdk {
     }
     fn query(&self, filter: ChainQueryFilter) -> ExternResult<Vec<Element>> {
         host_call::<ChainQueryFilter, Vec<Element>>(__query, filter)
+    }
+    fn close_chain(&self, new_dna_hash: DnaHash) -> ExternResult<HeaderHash> {
+        host_call::<DnaHash, HeaderHash>(__close_chain, new_dna_hash)
+    }
+    fn open_chain(&self, prev_dna_hash: DnaHash) -> ExternResult<HeaderHash> {
+        host_call::<DnaHash, HeaderHash>(__open_chain, prev_dna_hash)
     }
     fn sign(&self, sign: Sign) -> ExternResult<Signature> {
         host_call::<Sign, Signature>(__sign, sign)

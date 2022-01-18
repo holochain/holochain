@@ -4,7 +4,9 @@ use super::guest_callback::migrate_agent::MigrateAgentHostAccess;
 use super::guest_callback::post_commit::PostCommitHostAccess;
 use super::guest_callback::validate::ValidateHostAccess;
 use super::guest_callback::validation_package::ValidationPackageHostAccess;
+use super::host_fn::close_chain::close_chain;
 use super::host_fn::get_agent_activity::get_agent_activity;
+use super::host_fn::open_chain::open_chain;
 use super::host_fn::HostFnApi;
 use super::HostContext;
 use super::ZomeCallHostAccess;
@@ -430,6 +432,8 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__delete_link", delete_link)
             .with_host_function(&mut ns, "__update", update)
             .with_host_function(&mut ns, "__delete", delete)
+            .with_host_function(&mut ns, "__close_chain", close_chain)
+            .with_host_function(&mut ns, "__open_chain", open_chain)
             .with_host_function(&mut ns, "__schedule", schedule);
 
         imports.register("env", ns);

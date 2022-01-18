@@ -1,3 +1,4 @@
+use crate::holo_hash::DnaHash;
 use hdk::prelude::*;
 
 #[hdk_entry(
@@ -54,6 +55,16 @@ fn create_entry(_: ()) -> ExternResult<HeaderHash> {
 #[hdk_extern]
 fn create_post(post: crate::Post) -> ExternResult<HeaderHash> {
     hdk::prelude::create_entry(&post)
+}
+
+#[hdk_extern]
+fn close_chain(new_dna_hash: DnaHash) -> ExternResult<HeaderHash> {
+    HDK.with(|h| h.borrow().close_chain(new_dna_hash))
+}
+
+#[hdk_extern]
+fn open_chain(prev_dna_hash: DnaHash) -> ExternResult<HeaderHash> {
+    HDK.with(|h| h.borrow().open_chain(prev_dna_hash))
 }
 
 #[hdk_extern]

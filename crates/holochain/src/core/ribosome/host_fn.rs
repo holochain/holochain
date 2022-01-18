@@ -67,6 +67,10 @@ host_fn_api_impls! {
     // @todo Get the capability for the current zome call.
     fn capability_info (()) -> ();
 
+    fn close_chain(holo_hash::DnaHash) -> holo_hash::HeaderHash;
+
+    fn open_chain(holo_hash::DnaHash) -> holo_hash::HeaderHash;
+
     // The EntryDefId determines how a create is handled on the host side.
     // CapGrant and CapClaim are handled natively.
     // App entries are referenced by entry defs then SerializedBytes stuffed into an Entry::App.

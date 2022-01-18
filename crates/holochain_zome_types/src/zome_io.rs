@@ -104,6 +104,10 @@ wasm_io_types! {
     // @todo Get the capability for the current zome call.
     fn capability_info (()) -> ();
 
+    fn close_chain(holo_hash::DnaHash) -> holo_hash::HeaderHash;
+
+    fn open_chain(holo_hash::DnaHash) -> holo_hash::HeaderHash;
+
     // Returns HeaderHash of the newly created element.
     fn create (zt::entry::CreateInput) -> holo_hash::HeaderHash;
 
