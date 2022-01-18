@@ -7,13 +7,13 @@ default_unreleasable: true
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased](https://github.com/holochain/holochain/compare/hdk-v0.0.100...HEAD)
+- docs: Add introduction to front-page and move example section up [1172](https://github.com/holochain/holochain/pull/1172)
 
 ## 0.0.118
 
 - hdk: `Path` now split into `Path` and `PathEntry` [1156](https://github.com/holochain/holochain/pull/1156)
 - hdk: Minor changes and additions to `Path` methods [1156](https://github.com/holochain/holochain/pull/1156)
 - hdk: `call` and `call_remote` are the same thing under the hood [1180](https://github.com/holochain/holochain/pull/1180)
-- docs: Add introduction to front-page and move example section up [1172](https://github.com/holochain/holochain/pull/1172)
 
 ## 0.0.117
 
