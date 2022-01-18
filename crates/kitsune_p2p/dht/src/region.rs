@@ -1,7 +1,9 @@
+mod error;
 mod region_coords;
 mod region_data;
 mod region_set;
 
+pub use error::*;
 pub use region_coords::*;
 pub use region_data::*;
 pub use region_set::*;

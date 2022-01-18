@@ -119,6 +119,10 @@ impl Arq {
         self.to_bounds().to_interval()
     }
 
+    pub fn length(&self) -> u64 {
+        self.to_interval().length()
+    }
+
     /// Calculate chunks at successive distances from the center.
     /// index 0 is the chunk containing the center location.
     /// index 1 is the adjacent chunk to the left or right, depending on the
@@ -262,6 +266,10 @@ impl ArqBounds {
         } else {
             ArcInterval::Empty
         }
+    }
+
+    pub fn length(&self) -> u64 {
+        self.to_interval().length()
     }
 
     /// Return the chunks at the leftmost and rightmost edge of this Arq.

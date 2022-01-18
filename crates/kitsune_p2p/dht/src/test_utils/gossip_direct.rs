@@ -1,12 +1,16 @@
 use kitsune_p2p_timestamp::Timestamp;
 
-use crate::{host::HostAccess, region::*};
+use crate::{
+    error::{GossipError, GossipResult},
+    host::HostAccess,
+    region::*,
+};
 
 pub fn gossip_direct_at<Peer: HostAccess>(
     left: &mut Peer,
     right: &mut Peer,
     now: Timestamp,
-) -> GossipDirectResult<TestNodeGossipRoundStats> {
+) -> GossipResult<TestNodeGossipRoundStats> {
     gossip_direct((left, now), (right, now))
 }
 
@@ -15,21 +19,37 @@ pub fn gossip_direct_at<Peer: HostAccess>(
 pub fn gossip_direct<Peer: HostAccess>(
     (left, time_left): (&mut Peer, Timestamp),
     (right, time_right): (&mut Peer, Timestamp),
-) -> GossipDirectResult<TestNodeGossipRoundStats> {
-    let tl = time_left.as_micros();
-    let tr = time_right.as_micros();
-    if (tl - tr).abs() as u32 > u32::min(*left.time_buffer(), *right.time_buffer()) {
-        return Err(GossipDirectError::TimesOutOfSync);
-    }
+) -> GossipResult<TestNodeGossipRoundStats> {
     let mut stats = TestNodeGossipRoundStats::default();
 
-    assert_eq!(left.topo(), right.topo());
+    // - ensure identical topologies (especially the time_origin)
+    if left.topo() != right.topo() {
+        return Err(GossipError::TopologyMismatch);
+    }
     let topo = left.topo();
+
     let common_arqs = {
-        // ROUND I: Initial handshake, exchange ArqSets and as_at timestamps
+        // ROUND I: Initial handshake, exchange ArqSets and as-at timestamps
+
+        let gpl = left.gossip_params();
+        let gpr = right.gossip_params();
+
+        // - ensure compatible as-at timestamps
+        let tl = time_left.as_micros();
+        let tr = time_right.as_micros();
+        if (tl - tr).abs() as u32 > u32::min(*gpl.max_time_offset, *gpr.max_time_offset) {
+            return Err(GossipError::TimesOutOfSync);
+        }
 
         // - calculate common arqset
-        left.get_arq_set().intersection(&right.get_arq_set())
+        let al = left.get_arq_set();
+        let ar = right.get_arq_set();
+        if (al.power() as i8 - ar.power() as i8).abs() as u8
+            > u8::min(gpl.max_space_power_offset, gpr.max_space_power_offset)
+        {
+            return Err(GossipError::ArqPowerDiffTooLarge);
+        }
+        al.intersection(&ar)
     };
 
     {
@@ -51,8 +71,8 @@ pub fn gossip_direct<Peer: HostAccess>(
         // ROUND IV: Calculate diffs and send missing ops
 
         // - calculate diffs
-        let diff_left = regions_left.diff(&regions_right);
-        let diff_right = regions_right.diff(&regions_left);
+        let diff_left = regions_left.diff(&regions_right)?;
+        let diff_right = regions_right.diff(&regions_left)?;
 
         // - fetch ops
         let ops_left: Vec<_> = diff_left
@@ -94,10 +114,3 @@ impl TestNodeGossipRoundStats {
         self.region_data_rcvd + self.op_data_rcvd
     }
 }
-
-#[derive(Debug)]
-pub enum GossipDirectError {
-    TimesOutOfSync,
-}
-
-pub type GossipDirectResult<T> = Result<T, GossipDirectError>;

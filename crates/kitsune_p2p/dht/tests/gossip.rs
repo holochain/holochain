@@ -16,10 +16,12 @@ Test generating the fingerprint, based on data in the tree
 #[test]
 fn test_basic() {
     let topo = Topology::identity(Timestamp::from_micros(0));
+    let gopa = GossipParams::zero();
+
     let alice_arq = Arq::new(0.into(), 8, 4);
     let bobbo_arq = Arq::new(128.into(), 8, 4);
-    let mut alice = TestNode::new(topo.clone(), alice_arq);
-    let mut bobbo = TestNode::new(topo.clone(), bobbo_arq);
+    let mut alice = TestNode::new(topo.clone(), gopa, alice_arq);
+    let mut bobbo = TestNode::new(topo.clone(), gopa, bobbo_arq);
 
     alice.integrate_op(OpData::fake(0, 10, 4321));
     bobbo.integrate_op(OpData::fake(128, 20, 1234));

@@ -1,9 +1,15 @@
-use std::{cmp::Ordering, collections::HashMap};
+use std::cmp::Ordering;
 
-use kitsune_p2p_dht_arc::ArcInterval;
 use kitsune_p2p_timestamp::Timestamp;
 
-use crate::{arq::*, coords::*, host::AccessOpStore, op::OpRegion, tree::TreeDataConstraints};
+use crate::{
+    arq::*,
+    coords::*,
+    error::{GossipError, GossipResult},
+    host::AccessOpStore,
+    op::OpRegion,
+    tree::TreeDataConstraints,
+};
 
 use super::{Region, RegionCoords, RegionData};
 
@@ -116,23 +122,24 @@ impl<D: TreeDataConstraints> RegionSetXtcs<D> {
 
     /// Reshape the two region sets so that both match, omitting or merging
     /// regions as needed
-    pub fn rectify(&mut self, other: &mut Self) {
-        debug_assert_eq!(
-            self.coords.arq_set, other.coords.arq_set,
-            "Currently, different ArqSets are not supported."
-        );
+    pub fn rectify(&mut self, other: &mut Self) -> GossipResult<()> {
+        if self.coords.arq_set != other.coords.arq_set {
+            return Err(GossipError::ArqSetMismatchForDiff);
+        }
         let (a, b, swap) = match self.coords.max_time.cmp(&other.coords.max_time) {
-            Ordering::Equal => return,
+            Ordering::Equal => return Ok(()),
             Ordering::Less => (self, other, false),
             Ordering::Greater => (other, self, true),
         };
         todo!()
     }
 
-    pub fn diff(&self, other: &Self) -> Self {
+    pub fn diff(&self, other: &Self) -> GossipResult<Self> {
         let mut a = self.to_owned();
         let mut b = other.to_owned();
+
         // a.rectify(&mut b);
+        // let coords = &a.coords;
         todo!()
     }
 }
@@ -158,9 +165,9 @@ impl<T: TreeDataConstraints> RegionSet<T> {
 
     /// Find a set of Regions which represents the intersection of the two
     /// input RegionSets.
-    pub fn diff(&self, other: &Self) -> Self {
+    pub fn diff(&self, other: &Self) -> GossipResult<Self> {
         match (self, other) {
-            (Self::Xtcs(left), Self::Xtcs(right)) => left.diff(right).into(),
+            (Self::Xtcs(left), Self::Xtcs(right)) => Ok(left.diff(right)?.into()),
         }
         // Notes on a generic algorithm for the diff of generic regions:
         // can we use a Fenwick tree to look up regions?
@@ -173,34 +180,55 @@ impl<T: TreeDataConstraints> RegionSet<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{op::OpData, test_utils::op_store::OpStore};
+    use std::ops::Range;
+
+    use crate::{
+        op::{Op, OpData},
+        test_utils::op_store::OpStore,
+    };
 
     use super::*;
+
+    /// Only works for arqs that don't span `u32::MAX / 2`
+    fn op_grid(arq: &ArqBounds, trange: impl Iterator<Item = i32> + Clone) -> Vec<Op> {
+        let (left, right) = (arq.left(), arq.right());
+        let mid = u32::MAX / 2;
+        assert!(
+            !(left < mid && right > mid),
+            "This hacky logic does not work for arqs which span `u32::MAX / 2`"
+        );
+        let xstep = (arq.length() / arq.count() as u64) as usize;
+        (left as i32..arq.right() as i32 + 1)
+            .step_by(xstep)
+            .flat_map(|x| {
+                trange.clone().map(move |t| {
+                    // 16 x 100 total ops.
+                    // x interval: [-1024, -1024)
+                    // t interval: [1000, 11000)
+                    OpData::fake(x as u32, t as i64, 10)
+                })
+            })
+            .collect()
+    }
 
     #[test]
     fn test_regions() {
         // (-512, 512)
-        let arq = Arq::new(0.into(), 8, 4).to_bounds();
+        let pow = 8;
+        let arq = Arq::new(0.into(), pow, 4).to_bounds();
         assert_eq!(arq.left() as i32, -512);
         assert_eq!(arq.right(), 511 as u32);
 
         let topo = Topology::identity(Timestamp::from_micros(1000));
-        let mut store = OpStore::new(topo.clone());
+        let mut store = OpStore::new(topo.clone(), GossipParams::zero());
 
         // Create a nx by nt grid of ops and integrate into the store
         let nx = 8;
         let nt = 10;
-        let ops: Vec<_> = (-1024..1024 as i32)
-            .step_by(2056 / nx)
-            .flat_map(move |x| {
-                (1000..11000 as i64).step_by(10000 / nt).map(move |t| {
-                    // 16 x 100 total ops.
-                    // x interval: [-1024, -1024)
-                    // t interval: [1000, 11000)
-                    OpData::fake(x as u32, t, 10)
-                })
-            })
-            .collect();
+        let ops = op_grid(
+            &Arq::new(0.into(), pow, 8).to_bounds(),
+            (1000..11000 as i32).step_by(1000),
+        );
         assert_eq!(ops.len(), nx * nt);
         store.integrate_ops(ops.into_iter());
 
@@ -217,6 +245,16 @@ mod tests {
 
     #[test]
     fn test_rectify() {
+        let time_origin: i32 = 1000;
+        let arq = Arq::new(0.into(), 8, 4).to_bounds();
+        let topo = Topology::identity(Timestamp::from_micros(time_origin as i64));
+        let mut store = OpStore::new(topo.clone(), GossipParams::zero());
+        store.integrate_ops(op_grid(&arq, 0..10).into_iter());
+
+        let coords_a =
+            RegionCoordSetXtcs::new(Timestamp::from_micros(100), ArqSet::single(arq.clone()));
+        let coords_b =
+            RegionCoordSetXtcs::new(Timestamp::from_micros(102), ArqSet::single(arq.clone()));
 
         // let coords = [
         //     RegionCoords::new(space, time)

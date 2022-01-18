@@ -1,7 +1,7 @@
 use std::{collections::BTreeSet, ops::Bound, sync::Arc};
 
 use crate::{
-    coords::Topology,
+    coords::{GossipParams, Topology},
     host::AccessOpStore,
     op::{Op, OpData, OpRegion, Timestamp},
     region::{RegionBounds, RegionData},
@@ -12,13 +12,15 @@ use crate::{
 pub struct OpStore<D: TreeDataConstraints = RegionData, O: OpRegion<D> = OpData> {
     pub(crate) ops: BTreeSet<Arc<O>>,
     pub(crate) tree: Tree<D>,
+    pub(crate) gossip_params: GossipParams,
 }
 
 impl<D: TreeDataConstraints, O: OpRegion<D>> OpStore<D, O> {
-    pub fn new(topo: Topology) -> Self {
+    pub fn new(topo: Topology, gossip_params: GossipParams) -> Self {
         Self {
             ops: Default::default(),
             tree: Tree::new(topo),
+            gossip_params,
         }
     }
 }
@@ -49,6 +51,10 @@ impl<D: TreeDataConstraints, O: OpRegion<D>> AccessOpStore<D, O> for OpStore<D, 
 
     fn topo(&self) -> &Topology {
         self.tree.topo()
+    }
+
+    fn gossip_params(&self) -> GossipParams {
+        self.gossip_params.clone()
     }
 }
 

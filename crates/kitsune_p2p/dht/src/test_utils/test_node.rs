@@ -5,7 +5,7 @@ use kitsune_p2p_timestamp::Timestamp;
 use crate::{
     agent::AgentInfo,
     arq::*,
-    coords::{TimeCoord, Topology},
+    coords::{GossipParams, TimeCoord, Topology},
     hash::{fake_hash, AgentKey},
     host::{AccessOpStore, AccessPeerStore, HostAccess},
     op::Op,
@@ -22,11 +22,11 @@ pub struct TestNode {
 }
 
 impl TestNode {
-    pub fn new(topo: Topology, arq: Arq) -> Self {
+    pub fn new(topo: Topology, gopa: GossipParams, arq: Arq) -> Self {
         Self {
             agent: AgentKey(fake_hash()),
             agent_info: AgentInfo { arq },
-            store: OpStore::new(topo),
+            store: OpStore::new(topo, gopa),
         }
     }
 
@@ -66,6 +66,10 @@ impl AccessOpStore for TestNode {
     fn topo(&self) -> &Topology {
         self.store.topo()
     }
+
+    fn gossip_params(&self) -> GossipParams {
+        self.store.gossip_params()
+    }
 }
 
 impl AccessPeerStore for TestNode {
@@ -78,12 +82,6 @@ impl AccessPeerStore for TestNode {
     }
 }
 
-impl HostAccess for TestNode {
-    fn time_buffer(&self) -> TimeCoord {
-        1.into()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::op::OpData;
@@ -93,8 +91,9 @@ mod tests {
     #[test]
     fn integrate_and_query_ops() {
         let topo = Topology::identity(Timestamp::from_micros(0));
+        let gopa = GossipParams::zero();
         let arq = Arq::new(0.into(), 8, 4);
-        let mut node = TestNode::new(topo, arq);
+        let mut node = TestNode::new(topo, gopa, arq);
 
         node.integrate_ops(
             [
@@ -133,10 +132,11 @@ mod tests {
     #[test]
     fn gossip_regression() {
         let topo = Topology::identity(Timestamp::from_micros(0));
+        let gopa = GossipParams::zero();
         let alice_arq = Arq::new(0.into(), 8, 4);
         let bobbo_arq = Arq::new(128.into(), 8, 4);
-        let mut alice = TestNode::new(topo.clone(), alice_arq);
-        let mut bobbo = TestNode::new(topo.clone(), bobbo_arq);
+        let mut alice = TestNode::new(topo.clone(), gopa, alice_arq);
+        let mut bobbo = TestNode::new(topo.clone(), gopa, bobbo_arq);
 
         alice.integrate_ops([OpData::fake(0, 10, 4321)].into_iter());
         bobbo.integrate_ops([OpData::fake(128, 20, 1234)].into_iter());
