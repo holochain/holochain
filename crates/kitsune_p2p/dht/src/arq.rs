@@ -350,7 +350,6 @@ pub fn is_full(power: u8, count: u32) -> bool {
     }
 }
 
-#[deprecated = "use power_downshift/power_upshift instead"]
 pub fn requantize(old_power: u8, old_count: u32, new_power: u8) -> Option<(u8, u32)> {
     if old_power < new_power {
         let factor = 2u32.pow((new_power - old_power) as u32);
