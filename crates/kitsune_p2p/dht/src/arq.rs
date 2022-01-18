@@ -7,13 +7,12 @@ mod strat;
 use std::num::Wrapping;
 
 pub use arq_set::*;
-use kitsune_p2p_timestamp::Timestamp;
 pub use peer_view::*;
 pub use strat::*;
 
 use kitsune_p2p_dht_arc::ArcInterval;
 
-use crate::{coords::*, op::Loc, region::RegionCoords};
+use crate::{coords::*, op::Loc};
 
 pub fn pow2(p: u8) -> u32 {
     2u32.pow(p as u32)

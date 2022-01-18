@@ -3,9 +3,8 @@ pub mod op_store;
 pub mod test_node;
 
 use crate::arq::Arq;
-use crate::arq::ArqSet;
 use crate::arq::ArqStrat;
-use crate::arq::PeerView;
+
 use kitsune_p2p_dht_arc::DhtLocation as Loc;
 use rand::prelude::StdRng;
 use rand::thread_rng;
@@ -166,6 +165,8 @@ fn test_unit_arc() {
 
 #[cfg(test)]
 mod tests {
+    use crate::arq::{ArqSet, PeerView};
+
     use super::*;
     use proptest::proptest;
 

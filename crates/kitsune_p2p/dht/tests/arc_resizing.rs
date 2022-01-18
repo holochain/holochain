@@ -1,5 +1,7 @@
 //! Tests of arq resizing behavior.
 
+#![cfg(feature = "testing")]
+
 mod common;
 
 use kitsune_p2p_dht::arq::*;

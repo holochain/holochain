@@ -1,3 +1,5 @@
+#![cfg(feature = "testing")]
+
 mod common;
 
 use std::collections::HashSet;

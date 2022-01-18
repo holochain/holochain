@@ -1,7 +1,7 @@
-use std::{borrow::Borrow, ops::RangeBounds, sync::Arc};
+use std::{borrow::Borrow, sync::Arc};
 
 use crate::{
-    coords::{SpacetimeCoords, TimeCoord, Topology},
+    coords::{SpacetimeCoords, Topology},
     hash::OpHash,
     region::RegionData,
 };

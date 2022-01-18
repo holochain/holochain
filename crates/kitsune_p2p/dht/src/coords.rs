@@ -1,9 +1,7 @@
 use std::{
     marker::PhantomData,
-    ops::{Add, AddAssign, Deref, ShrAssign},
+    ops::{AddAssign, Deref},
 };
-
-use num_traits::Zero;
 
 use crate::op::{Loc, Timestamp};
 

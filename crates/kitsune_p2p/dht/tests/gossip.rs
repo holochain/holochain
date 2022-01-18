@@ -1,3 +1,5 @@
+#![cfg(feature = "testing")]
+
 use kitsune_p2p_dht::{
     arq::*,
     coords::*,

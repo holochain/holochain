@@ -1,7 +1,5 @@
 use kitsune_p2p_dht_arc::{ArcInterval, DhtArcSet};
 
-use crate::{arq::is_full, test_utils::get_input};
-
 use super::{Arq, ArqBounds, ArqSet, ArqStrat};
 
 pub struct PeerView {
@@ -189,7 +187,7 @@ mod tests {
 
     use kitsune_p2p_dht_arc::ArcInterval;
 
-    use crate::arq::{pow2, print_arqs};
+    use crate::arq::pow2;
 
     use super::*;
 

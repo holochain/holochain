@@ -10,12 +10,11 @@ use std::sync::Arc;
 use crate::{
     agent::AgentInfo,
     arq::ArqSet,
-    coords::{GossipParams, SpacetimeCoords, TimeCoord, Topology},
+    coords::{GossipParams, Topology},
     hash::AgentKey,
     op::*,
     region::*,
     tree::TreeDataConstraints,
-    Loc,
 };
 
 /// TODO: make async

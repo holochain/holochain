@@ -3,7 +3,7 @@ use std::{collections::BTreeSet, ops::Bound, sync::Arc};
 use crate::{
     coords::{GossipParams, Topology},
     host::AccessOpStore,
-    op::{Op, OpData, OpRegion, Timestamp},
+    op::{OpData, OpRegion, Timestamp},
     region::{RegionBounds, RegionData},
     tree::{Tree, TreeDataConstraints},
     Loc,

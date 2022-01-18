@@ -1,16 +1,13 @@
-use std::ops::Add;
-
 use kitsune_p2p_timestamp::Timestamp;
 
 use crate::{
     agent::AgentInfo,
     arq::*,
-    coords::{GossipParams, TimeCoord, Topology},
+    coords::{GossipParams, Topology},
     hash::{fake_hash, AgentKey},
-    host::{AccessOpStore, AccessPeerStore, HostAccess},
+    host::{AccessOpStore, AccessPeerStore},
     op::Op,
     region::*,
-    tree::Tree,
 };
 
 use super::op_store::OpStore;

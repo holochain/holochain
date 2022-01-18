@@ -1,5 +1,3 @@
-use std::cmp::Ordering;
-
 use kitsune_p2p_timestamp::Timestamp;
 
 use crate::{
@@ -14,6 +12,7 @@ use crate::{
 use super::{Region, RegionCoords, RegionData};
 
 #[derive(Debug, PartialEq, Eq, derive_more::Constructor)]
+#[cfg_attr(feature = "testing", derive(Clone))]
 pub struct RegionCoordSetXtcs {
     max_time: Timestamp,
     arq_set: ArqSet,
@@ -64,6 +63,7 @@ impl RegionCoordSetXtcs {
 /// but this is an enum to make room for a more generic representation, e.g.
 /// a simple Vec<Region>, if we want a more intricate algorithm later.
 #[derive(Debug, derive_more::From)]
+#[cfg_attr(feature = "testing", derive(Clone))]
 pub enum RegionSet<T: TreeDataConstraints = RegionData> {
     /// eXponential Time, Constant Space.
     Xtcs(RegionSetXtcs<T>),
@@ -74,6 +74,7 @@ pub enum RegionSet<T: TreeDataConstraints = RegionData> {
 /// The data to match the coordinates are specified in a 2D vector which must
 /// correspond to the generated coordinates.
 #[derive(Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "testing", derive(Clone))]
 pub struct RegionSetXtcs<D: TreeDataConstraints = RegionData> {
     /// The generator for the coordinates
     pub(crate) coords: RegionCoordSetXtcs,
@@ -139,8 +140,8 @@ impl<D: TreeDataConstraints> RegionSetXtcs<D> {
         Ok(())
     }
 
-    pub fn diff(&mut self, other: &mut Self, topo: &Topology) -> GossipResult<Vec<Region>> {
-        self.rectify(other, topo);
+    pub fn diff(mut self, mut other: Self, topo: &Topology) -> GossipResult<Vec<Region>> {
+        self.rectify(&mut other, topo);
 
         todo!("pull out the regions which are different")
     }
@@ -167,9 +168,9 @@ impl<T: TreeDataConstraints> RegionSet<T> {
 
     /// Find a set of Regions which represents the intersection of the two
     /// input RegionSets.
-    pub fn diff(&self, other: &Self) -> GossipResult<Self> {
+    pub fn diff(self, other: Self, topo: &Topology) -> GossipResult<Vec<Region>> {
         match (self, other) {
-            (Self::Xtcs(left), Self::Xtcs(right)) => Ok(left.diff(right)?.into()),
+            (Self::Xtcs(left), Self::Xtcs(right)) => Ok(left.diff(right, topo)?.into()),
         }
         // Notes on a generic algorithm for the diff of generic regions:
         // can we use a Fenwick tree to look up regions?
@@ -181,8 +182,8 @@ impl<T: TreeDataConstraints> RegionSet<T> {
 }
 
 #[cfg(test)]
+#[cfg(feature = "testing")]
 mod tests {
-    use std::ops::Range;
 
     use crate::{
         op::{Op, OpData},
@@ -261,7 +262,7 @@ mod tests {
         let mut rset_b = RegionSetXtcs::new(&topo, &store, coords_b);
         assert_ne!(rset_a.data, rset_b.data);
 
-        rset_a.rectify(&mut rset_b).unwrap();
+        rset_a.rectify(&mut rset_b, &topo).unwrap();
 
         assert_eq!(rset_a, rset_b);
 
