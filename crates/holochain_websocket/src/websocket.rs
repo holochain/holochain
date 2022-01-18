@@ -69,6 +69,8 @@ pub(crate) type RxFromWebsocket = tokio_stream::wrappers::ReceiverStream<Incomin
 #[derive(Debug)]
 /// When dropped both to / from socket tasks are shutdown.
 pub struct PairShutdown {
+    #[allow(dead_code)]
+    /// This is here for it's drop impl so it's not actually dead code.
     close_from_socket: Trigger,
     close_to_socket: TxToWebsocket,
 }

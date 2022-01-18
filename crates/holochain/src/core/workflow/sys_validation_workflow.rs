@@ -152,7 +152,7 @@ async fn sys_validation_workflow_inner(
         tracing::debug!("Committing {} ops", num_ops);
         let (t, a, m, r) = space
             .dht_env
-            .async_commit(move |mut txn| {
+            .async_commit(move |txn| {
                 let mut total = 0;
                 let mut awaiting = 0;
                 let mut missing = 0;
@@ -163,7 +163,7 @@ async fn sys_validation_workflow_inner(
                         Outcome::Accepted => {
                             total += 1;
                             put_validation_limbo(
-                                &mut txn,
+                                txn,
                                 op_hash,
                                 ValidationLimboStatus::SysValidated,
                             )?;
@@ -171,9 +171,9 @@ async fn sys_validation_workflow_inner(
                         Outcome::SkipAppValidation => {
                             total += 1;
                             if let Dependency::Null = dependency {
-                                put_integrated(&mut txn, op_hash, ValidationStatus::Valid)?;
+                                put_integrated(txn, op_hash, ValidationStatus::Valid)?;
                             } else {
-                                put_integration_limbo(&mut txn, op_hash, ValidationStatus::Valid)?;
+                                put_integration_limbo(txn, op_hash, ValidationStatus::Valid)?;
                             }
                         }
                         Outcome::AwaitingOpDep(missing_dep) => {
@@ -188,27 +188,19 @@ async fn sys_validation_workflow_inner(
                             // we were meant to get a StoreElement or StoreEntry or
                             // RegisterAgentActivity or RegisterAddLink.
                             let status = ValidationLimboStatus::AwaitingSysDeps(missing_dep);
-                            put_validation_limbo(&mut txn, op_hash, status)?;
+                            put_validation_limbo(txn, op_hash, status)?;
                         }
                         Outcome::MissingDhtDep => {
                             missing += 1;
                             // TODO: Not sure what missing dht dep is. Check if we need this.
-                            put_validation_limbo(
-                                &mut txn,
-                                op_hash,
-                                ValidationLimboStatus::Pending,
-                            )?;
+                            put_validation_limbo(txn, op_hash, ValidationLimboStatus::Pending)?;
                         }
                         Outcome::Rejected => {
                             rejected += 1;
                             if let Dependency::Null = dependency {
-                                put_integrated(&mut txn, op_hash, ValidationStatus::Rejected)?;
+                                put_integrated(txn, op_hash, ValidationStatus::Rejected)?;
                             } else {
-                                put_integration_limbo(
-                                    &mut txn,
-                                    op_hash,
-                                    ValidationStatus::Rejected,
-                                )?;
+                                put_integration_limbo(txn, op_hash, ValidationStatus::Rejected)?;
                             }
                         }
                     }

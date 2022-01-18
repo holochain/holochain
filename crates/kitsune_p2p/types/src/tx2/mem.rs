@@ -18,6 +18,7 @@ use std::sync::atomic;
 
 /// Configuration for MemBackendAdapt
 #[non_exhaustive]
+#[derive(Default)]
 pub struct MemConfig {
     /// Tls config
     /// Default: None = ephemeral.
@@ -26,15 +27,6 @@ pub struct MemConfig {
     /// Tuning Params
     /// Default: None = default.
     pub tuning_params: Option<KitsuneP2pTuningParams>,
-}
-
-impl Default for MemConfig {
-    fn default() -> Self {
-        Self {
-            tls: None,
-            tuning_params: None,
-        }
-    }
 }
 
 impl MemConfig {
@@ -47,7 +39,7 @@ impl MemConfig {
             Some(tls) => tls,
         };
 
-        let tuning_params = tuning_params.unwrap_or_else(KitsuneP2pTuningParams::default);
+        let tuning_params = tuning_params.unwrap_or_default();
 
         Ok((tls, tuning_params))
     }

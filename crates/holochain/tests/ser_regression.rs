@@ -209,9 +209,5 @@ pub async fn setup_app(
 
     let handle = conductor_handle.clone();
 
-    (
-        envs,
-        RealAppInterfaceApi::new(conductor_handle, Default::default()),
-        handle,
-    )
+    (envs, RealAppInterfaceApi::new(conductor_handle), handle)
 }
