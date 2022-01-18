@@ -123,26 +123,26 @@ impl<D: TreeDataConstraints> RegionSetXtcs<D> {
 
     /// Reshape the two region sets so that both match, omitting or merging
     /// regions as needed
-    pub fn rectify(&mut self, other: &mut Self) -> GossipResult<()> {
+    pub fn rectify(&mut self, other: &mut Self, topo: &Topology) -> GossipResult<()> {
         if self.coords.arq_set != other.coords.arq_set {
             return Err(GossipError::ArqSetMismatchForDiff);
         }
-        let (a, b, swap) = match self.coords.max_time.cmp(&other.coords.max_time) {
-            Ordering::Equal => return Ok(()),
-            Ordering::Less => (self, other, false),
-            Ordering::Greater => (other, self, true),
-        };
-
-        todo!()
+        if self.coords.max_time > other.coords.max_time {
+            std::mem::swap(self, other);
+        }
+        let ta = topo.telescoping_times(self.coords.max_time);
+        let tb = topo.telescoping_times(other.coords.max_time);
+        for (da, db) in self.data.iter_mut().zip(other.data.iter_mut()) {
+            TelescopingTimes::rectify((&ta, da), (&tb, db));
+        }
+        other.coords.max_time = self.coords.max_time;
+        Ok(())
     }
 
-    pub fn diff(&self, other: &Self) -> GossipResult<Self> {
-        let mut a = self.to_owned();
-        let mut b = other.to_owned();
+    pub fn diff(&mut self, other: &mut Self, topo: &Topology) -> GossipResult<Vec<Region>> {
+        self.rectify(other, topo);
 
-        // a.rectify(&mut b);
-        // let coords = &a.coords;
-        todo!()
+        todo!("pull out the regions which are different")
     }
 }
 
