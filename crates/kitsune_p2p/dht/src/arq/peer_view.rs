@@ -1,6 +1,6 @@
 use kitsune_p2p_dht_arc::{ArcInterval, DhtArcSet};
 
-use super::{Arq, ArqBounds, ArqSet, ArqStrat};
+use super::{is_full, Arq, ArqBounds, ArqSet, ArqStrat};
 
 pub struct PeerView {
     /// The strategy which generated this view
@@ -20,7 +20,9 @@ impl PeerView {
     pub fn extrapolated_coverage(&self, filter: &ArqBounds) -> f64 {
         let filter = filter.to_interval();
         if filter == ArcInterval::Empty {
-            return 0.0;
+            // More accurately this would be 0, but it's handy to not have
+            // divide-by-zero crashes
+            return 1.0;
         }
         let filter_len = filter.length();
         let base = DhtArcSet::from_interval(filter.clone());
@@ -73,13 +75,17 @@ impl PeerView {
         let under = cov < self.strat.min_coverage;
         let over = cov > self.strat.max_coverage();
         let new_count = if under {
-            // grow. ratio is > 1. never grow by more than 2x.
-            let ratio = (self.strat.min_coverage / cov).min(2.0);
-            (arq.count() as f64 * ratio).ceil() as u32
+            // grow. ratio is > 1.
+            // never grow by more than 2x.
+            // always grow by at least 1.
+            let ratio = (self.strat.midline_coverage() / cov).clamp(0.5, 2.0);
+            (old_count as f64 * ratio).ceil() as u32
         } else if over {
-            // shrink. ratio is < 1. never shrink by more than half.
-            let ratio = (self.strat.max_coverage() / cov).max(0.5);
-            (arq.count() as f64 * ratio).floor() as u32
+            // shrink. ratio is < 1.
+            // never shrink by more than half.
+            // always shrink by at least 1.
+            let ratio = (self.strat.midline_coverage() / cov).clamp(0.5, 2.0);
+            (old_count as f64 * ratio).floor() as u32
         } else {
             return None;
         };
@@ -118,7 +124,7 @@ impl PeerView {
             // check for power upshift opportunity
             if (
                 // not already at the maximum
-                arq.power < ArqStrat::MAX_POWER
+                arq.power < self.strat.max_power
                 // don't power up if power is already too high
                 && (arq.power as i8 - median as i8) < self.strat.max_power_diff as i8
                 // only power up if too many chunks
@@ -138,6 +144,10 @@ impl PeerView {
             } else {
                 break;
             }
+        }
+
+        if is_full(arq.power(), arq.count()) {
+            arq = Arq::new_full(arq.center(), arq.power());
         }
 
         if arq.count() > self.strat.max_chunks() {

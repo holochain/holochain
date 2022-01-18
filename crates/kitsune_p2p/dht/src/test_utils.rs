@@ -105,7 +105,7 @@ pub fn generate_ideal_coverage(
 
     let nf = n as f64;
     // aim for the middle of the coverage target range
-    let coverage = cov.unwrap_or_else(|| (strat.min_coverage + strat.max_coverage()) / 2.0);
+    let coverage = cov.unwrap_or_else(|| strat.midline_coverage());
     let len = (coverage / nf).min(1.0);
 
     (0..n)

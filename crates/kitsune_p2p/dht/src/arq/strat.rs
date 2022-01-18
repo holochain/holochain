@@ -62,6 +62,9 @@ impl Default for ArqStrat {
             // this buffer implies min-max chunk count of 8-16
             buffer: 0.1425,
             min_power: 1,
+            // the max power should be set so that a full arq is representable,
+            // i.e. the number of chunks needed at max power is within the valid
+            // range of chunk count
             max_power: 32 - 3,
             power_std_dev_threshold: 1.0,
             max_power_diff: 2,
@@ -70,7 +73,10 @@ impl Default for ArqStrat {
 }
 
 impl ArqStrat {
-    pub const MAX_POWER: u8 = u8::MAX;
+    /// The midline between min and max coverage
+    pub fn midline_coverage(&self) -> f64 {
+        (self.min_coverage + self.max_coverage()) / 2.0
+    }
 
     /// The max coverage as expressed by the min coverage and the buffer
     pub fn max_coverage(&self) -> f64 {
