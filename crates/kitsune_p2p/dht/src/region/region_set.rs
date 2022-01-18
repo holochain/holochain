@@ -13,7 +13,7 @@ use crate::{
 
 use super::{Region, RegionCoords, RegionData};
 
-#[derive(Debug, derive_more::Constructor)]
+#[derive(Debug, PartialEq, Eq, derive_more::Constructor)]
 pub struct RegionCoordSetXtcs {
     max_time: Timestamp,
     arq_set: ArqSet,
@@ -38,6 +38,7 @@ impl RegionCoordSetXtcs {
         self.arq_set.arqs().iter().flat_map(move |arq| {
             arq.segments().enumerate().map(move |(ix, x)| {
                 topo.telescoping_times(self.max_time)
+                    .segments()
                     .into_iter()
                     .enumerate()
                     .map(move |(it, t)| {
@@ -72,7 +73,7 @@ pub enum RegionSet<T: TreeDataConstraints = RegionData> {
 /// The coordinates for the regions are specified by a few values.
 /// The data to match the coordinates are specified in a 2D vector which must
 /// correspond to the generated coordinates.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct RegionSetXtcs<D: TreeDataConstraints = RegionData> {
     /// The generator for the coordinates
     pub(crate) coords: RegionCoordSetXtcs,
@@ -131,6 +132,7 @@ impl<D: TreeDataConstraints> RegionSetXtcs<D> {
             Ordering::Less => (self, other, false),
             Ordering::Greater => (other, self, true),
         };
+
         todo!()
     }
 
@@ -245,16 +247,23 @@ mod tests {
 
     #[test]
     fn test_rectify() {
-        let time_origin: i32 = 1000;
         let arq = Arq::new(0.into(), 8, 4).to_bounds();
-        let topo = Topology::identity(Timestamp::from_micros(time_origin as i64));
+        let topo = Topology::identity(Timestamp::from_micros(0));
         let mut store = OpStore::new(topo.clone(), GossipParams::zero());
-        store.integrate_ops(op_grid(&arq, 0..10).into_iter());
+        store.integrate_ops(op_grid(&arq, 10..20).into_iter());
 
         let coords_a =
-            RegionCoordSetXtcs::new(Timestamp::from_micros(100), ArqSet::single(arq.clone()));
+            RegionCoordSetXtcs::new(Timestamp::from_micros(20), ArqSet::single(arq.clone()));
         let coords_b =
-            RegionCoordSetXtcs::new(Timestamp::from_micros(102), ArqSet::single(arq.clone()));
+            RegionCoordSetXtcs::new(Timestamp::from_micros(21), ArqSet::single(arq.clone()));
+
+        let mut rset_a = RegionSetXtcs::new(&topo, &store, coords_a);
+        let mut rset_b = RegionSetXtcs::new(&topo, &store, coords_b);
+        assert_ne!(rset_a.data, rset_b.data);
+
+        rset_a.rectify(&mut rset_b).unwrap();
+
+        assert_eq!(rset_a, rset_b);
 
         // let coords = [
         //     RegionCoords::new(space, time)
