@@ -74,74 +74,106 @@ impl PeerView {
         let old_power = arq.power();
         let under = cov < self.strat.min_coverage;
         let over = cov > self.strat.max_coverage();
+
+        // The ratio of ideal coverage vs actual observed coverage.
+        // A ratio > 1 indicates undersaturation and a need to grow.
+        // A ratio < 1 indicates oversaturation and a need to shrink.
+        // We cap the growth at 2x in either direction
+        let cov_ratio = (self.strat.midline_coverage() / cov).clamp(0.5, 2.0);
+
+        // We want to know which of our peers are likely to be making a similar
+        // update to us, because that will affect the overall coverage more
+        // than the drop in the bucket that we can provide.
+        //
+        // If all peers have seen the same change as us since their last update,
+        // they will on average move similarly to us, and so we should only make
+        // a small step in the direction of the target, trusting that our peers
+        // will do the same.
+        //
+        // Conversely, if all peers are stable, e.g. if we just came online to
+        // find a situation where all peers around us are under-representing,
+        // but stable, then we want to make a much bigger leap.
+        let peer_velocity_factor = 1.0 + self.peers.len() as f64;
+
+        let growth_factor = (cov_ratio - 1.0) / peer_velocity_factor + 1.0;
+
         let new_count = if under {
-            // grow. ratio is > 1.
-            // never grow by more than 2x.
-            // always grow by at least 1.
-            let ratio = (self.strat.midline_coverage() / cov).clamp(0.5, 2.0);
-            (old_count as f64 * ratio).ceil() as u32
+            // Ensure we grow by at least 1
+            (old_count as f64 * growth_factor).ceil() as u32
         } else if over {
-            // shrink. ratio is < 1.
-            // never shrink by more than half.
-            // always shrink by at least 1.
-            let ratio = (self.strat.midline_coverage() / cov).clamp(0.5, 2.0);
-            (old_count as f64 * ratio).floor() as u32
+            // Ensure we shrink by at least 1
+            (old_count as f64 * growth_factor).floor() as u32
         } else {
+            // No change if between the min and max target coverage
             old_count
         };
 
         if new_count != old_count {
-            arq.count = new_count;
-            let new_cov = self.extrapolated_coverage(&arq.to_bounds());
+            let mut tentative = arq.clone();
+            tentative.count = new_count;
 
-            // If this change causes us to go below the target coverage,
-            // don't update. This can happen in particular when shrinking would
-            // cause us to lose sight of peers.
+            // If shrinking caused us to go below the target coverage,
+            // don't update. This happens when we shink too much and
+            // lose sight of peers.
+            let new_cov = self.extrapolated_coverage(&tentative.to_bounds());
             if over && (new_cov < self.strat.min_coverage) {
                 return false;
             }
         }
 
+        // Commit the change to the count
+        arq.count = new_count;
+
         let PowerStats { median, .. } = self.power_stats(&arq);
+
+        let power_above_min = |pow| {
+            // not already at the minimum
+            pow > self.strat.min_power
+             // don't power down if power is already too low
+             && (median as i8 - pow as i8) < self.strat.max_power_diff as i8
+        };
 
         #[allow(unused_parens)]
         loop {
             // check for power downshift opportunity
-            if (
-                // not already at the minimum
-                arq.power > self.strat.min_power
-                // don't power down if power is already too low
-                && (median as i8 - arq.power as i8) < self.strat.max_power_diff as i8
-                // only power down if too few chunks
-                && arq.count < self.strat.min_chunks()
-            ) {
-                *arq = arq.downshift();
+            if arq.count < self.strat.min_chunks() {
+                if power_above_min(arq.power) {
+                    *arq = arq.downshift();
+                } else {
+                    arq.count = self.strat.min_chunks();
+                }
             } else {
                 break;
             }
         }
 
+        let power_below_max = |pow| {
+            // not already at the maximum
+            pow < self.strat.max_power
+            // don't power up if power is already too high
+            && (pow as i8 - median as i8) < self.strat.max_power_diff as i8
+        };
+
         #[allow(unused_parens)]
         loop {
             // check for power upshift opportunity
-            if (
-                // not already at the maximum
-                arq.power < self.strat.max_power
-                // don't power up if power is already too high
-                && (arq.power as i8 - median as i8) < self.strat.max_power_diff as i8
-                // only power up if too many chunks
-                && arq.count > self.strat.max_chunks()
-            ) {
-                // Attempt to requantize to the next higher power.
-                // If we only grew by one chunk, into an odd count, then don't
-                // force upshifting, because that would either require undoing
-                // the growth, or growing by 2 instead of 1. In this case, skip
-                // upshifting, and we'll upshift on the next update.
-                let force = new_count as i32 - old_count as i32 > 1;
-                if let Some(a) = arq.upshift(force) {
-                    *arq = a
+            if arq.count > self.strat.max_chunks() {
+                if power_below_max(arq.power) {
+                    // Attempt to requantize to the next higher power.
+                    // If we only grew by one chunk, into an odd count, then don't
+                    // force upshifting, because that would either require undoing
+                    // the growth, or growing by 2 instead of 1. In this case, skip
+                    // upshifting, and we'll upshift on the next update.
+                    let force = new_count as i32 - old_count as i32 > 1;
+                    if let Some(a) = arq.upshift(force) {
+                        *arq = a
+                    } else {
+                        break;
+                    }
                 } else {
-                    break;
+                    // If we could not upshift due to other constraints, then we cannot
+                    // grow any larger than the max_chunks.
+                    arq.count = self.strat.max_chunks();
                 }
             } else {
                 break;
@@ -150,10 +182,6 @@ impl PeerView {
 
         if is_full(arq.power(), arq.count()) {
             *arq = Arq::new_full(arq.center(), arq.power());
-        }
-
-        if arq.count() > self.strat.max_chunks() {
-            *arq.count_mut() = self.strat.max_chunks();
         }
 
         // check if anything changed

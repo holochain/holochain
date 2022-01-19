@@ -97,6 +97,7 @@ fn test_grow_to_full() {
         ..Default::default()
     };
     let jitter = 0.01;
+    dbg!(strat.max_chunks());
 
     // generate peers with deficient coverage
     let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(7.0), 1000, jitter, 0)
@@ -109,7 +110,10 @@ fn test_grow_to_full() {
 
     // start with an arq comparable to one's peers
     let mut arq = Arq::new(0.into(), peer_power, 12);
-    resize_to_equilibrium(&view, &mut arq);
+    print_arq(&arq.to_bounds(), 64);
+    while view.update_arq(&mut arq) {
+        print_arq(&arq.to_bounds(), 64);
+    }
     // ensure that the arq grows to full size
     assert_eq!(arq.power(), strat.max_power);
     assert_eq!(arq.count(), 8);
@@ -117,6 +121,10 @@ fn test_grow_to_full() {
 }
 
 #[test]
+#[ignore = "this may not be a property we want"]
+// XXX: We only want to do this if other peers have not moved. But currently
+//      we have no way of determining this.
+//
 /// If the current coverage is far from the target, shrinking can occur in
 /// multiple chunks
 fn test_shrink_by_multiple_chunks() {
@@ -147,6 +155,10 @@ fn test_shrink_by_multiple_chunks() {
 }
 
 #[test]
+#[ignore = "this may not be a property we want"]
+// XXX: We only want to do this if other peers have not moved. But currently
+//      we have no way of determining this.
+//
 /// If the current coverage is far from the target, growing can occur in
 /// multiple chunks
 fn test_grow_by_multiple_chunks() {
@@ -184,16 +196,16 @@ fn test_grow_by_multiple_chunks() {
 /// (not a very good test, probably)
 fn test_degenerate_asymmetrical_coverage() {
     let other = ArqBounds::from_interval(4, ArcInterval::new(0x0, 0x80)).unwrap();
-    let others = ArqSet::new(vec![other; 20]);
+    let others = ArqSet::new(vec![other; 9]);
     // aim for coverage between 5 and 6.
     let strat = ArqStrat {
         min_coverage: 5.0,
-        buffer: 0.2,
+        buffer: 0.1,
         ..Default::default()
     };
     let view = PeerView::new(strat, others);
 
-    let mut arq = Arq::new(
+    let arq = Arq::new(
         Loc::from(0x100 / 2),
         4, // log2 of 0x10
         0x10,
@@ -201,8 +213,11 @@ fn test_degenerate_asymmetrical_coverage() {
     assert_eq!(arq.to_interval(), ArcInterval::new(0, 0x100 - 1));
 
     let extrapolated = view.extrapolated_coverage(&arq.to_bounds());
-    assert_eq!(extrapolated, 11.0);
-    let resized = view.update_arq(&mut arq);
+    assert_eq!(extrapolated, 5.5);
+    let old = arq.clone();
+    let mut new = arq.clone();
+    let resized = view.update_arq(&mut new);
+    assert_eq!(old, new);
     assert!(!resized);
 }
 
@@ -263,6 +278,9 @@ fn test_scenario() {
             assert_eq!(arq.power(), peer_power);
             assert!(arq.count() <= 8);
         }
+        println!("-------------------");
+        println!("-------------------");
+        println!("-------------------");
         {
             // create the same view but with all arcs cut in half, so that the
             // coverage is uniformly undersaturated.
@@ -279,9 +297,11 @@ fn test_scenario() {
             );
             let peer_power = peers.power();
             let view = PeerView::new(strat.clone(), peers);
-
+            print_arq(&arq.to_bounds(), 64);
             // assert that our arc will grow as large as it can to pick up the slack.
-            while view.update_arq(&mut arq) {}
+            while view.update_arq(&mut arq) {
+                print_arq(&arq.to_bounds(), 64);
+            }
             assert_eq!(arq.power(), peer_power + strat.max_power_diff);
             assert!(arq.count() == strat.max_chunks());
         }

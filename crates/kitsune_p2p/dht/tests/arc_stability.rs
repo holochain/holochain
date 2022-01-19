@@ -26,7 +26,7 @@ fn parameterized_stability_test() {
     tracing::info!("");
     tracing::debug!("{}", EpochStats::oneline_header());
     let eq = determine_equilibrium(2, peers, |peers| {
-        let (peers, stats) = run_one_epoch(&strat, peers, None, DETAIL);
+        let (peers, stats) = run_one_epoch(&strat, peers, None, 2);
         tracing::debug!("{}", stats.oneline());
         (peers, stats)
     });
