@@ -8,6 +8,7 @@ use std::sync::Arc;
 use xsalsa20poly1305::aead::{generic_array::GenericArray, Aead, NewAead};
 use xsalsa20poly1305::XSalsa20Poly1305;
 use crate::core::ribosome::HostFnAccess;
+use crate::core::ribosome::RibosomeError;
 
 pub fn x_salsa20_poly1305_encrypt(
     _ribosome: Arc<impl RibosomeT>,
@@ -43,7 +44,11 @@ pub fn x_salsa20_poly1305_encrypt(
                 ),
             )
         },
-        _ => unreachable!(),
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "x_salsa20_poly1305_encrypt".into()
+        ).to_string()))
     }
 }
 

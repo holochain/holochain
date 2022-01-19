@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use holo_hash::HeaderHash;
 use holochain_p2p::event::GetOptions;
 use holochain_sqlite::rusqlite::named_params;
@@ -87,8 +89,6 @@ impl Query for GetElementOpsQuery {
             DhtOpType::StoreElement => {
                 if state.header.is_none() {
                     state.header = Some(dht_op.map(|d| d.header));
-                } else {
-                    // TODO: This is weird there are multiple store elements ops for the same header??
                 }
             }
             DhtOpType::RegisterDeletedBy => {

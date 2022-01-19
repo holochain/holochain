@@ -36,9 +36,9 @@ pub enum SysValidationError {
     KeystoreError(#[from] KeystoreError),
     #[error(transparent)]
     SourceChainError(#[from] SourceChainError),
-    #[error("Dna is missing for this cell {0:?}. Cannot validate without dna.")]
-    DnaMissing(CellId),
-    // TODO: Remove this when SysValidationResult is replace with SysValidationOutcome
+    #[error("Dna is missing for this hash {0:?}. Cannot validate without dna.")]
+    DnaMissing(DnaHash),
+    // NOTE: can remove this if SysValidationResult is replaced with SysValidationOutcome
     #[error(transparent)]
     ValidationOutcome(#[from] ValidationOutcome),
     #[error(transparent)]
@@ -152,6 +152,8 @@ impl ValidationOutcome {
 
 #[derive(Error, Debug)]
 pub enum PrevHeaderError {
+    #[error("The previous header in the source chain doesn't match the next header")]
+    HashMismatch,
     #[error("Root of source chain must be Dna")]
     InvalidRoot,
     #[error("Previous header sequence number {1} != ({0} - 1)")]

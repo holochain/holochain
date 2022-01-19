@@ -9,8 +9,8 @@ use self::validation_package::get_as_author_sub_chain;
 
 use super::error::WorkflowResult;
 use super::sys_validation_workflow::validation_query;
-use crate::conductor::api::CellConductorApiT;
 use crate::conductor::entry_def_store::get_entry_def;
+use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use crate::core::ribosome::guest_callback::validate::ValidateHostAccess;
@@ -32,10 +32,12 @@ use error::AppValidationResult;
 pub use error::*;
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
+use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::GetActivityOptions;
-use holochain_p2p::HolochainP2pCell;
-use holochain_p2p::HolochainP2pCellT;
+use holochain_p2p::HolochainP2pDna;
+use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
+use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 use rusqlite::Transaction;
@@ -53,15 +55,16 @@ pub mod validation_package;
 
 const NUM_CONCURRENT_OPS: usize = 50;
 
-#[instrument(skip(workspace, trigger_integration, conductor_api, network))]
+#[instrument(skip(workspace, trigger_integration, conductor_handle, network))]
 pub async fn app_validation_workflow(
-    workspace: AppValidationWorkspace,
+    dna_hash: Arc<DnaHash>,
+    workspace: Arc<AppValidationWorkspace>,
     trigger_integration: TriggerSender,
-    conductor_api: impl CellConductorApiT,
-    network: HolochainP2pCell,
+    conductor_handle: ConductorHandle,
+    network: HolochainP2pDna,
 ) -> WorkflowResult<WorkComplete> {
     let complete =
-        app_validation_workflow_inner(Arc::new(workspace), conductor_api, &network).await?;
+        app_validation_workflow_inner(dna_hash, workspace, conductor_handle, &network).await?;
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // trigger other workflows
@@ -71,75 +74,146 @@ pub async fn app_validation_workflow(
 }
 
 async fn app_validation_workflow_inner(
+    dna_hash: Arc<DnaHash>,
     workspace: Arc<AppValidationWorkspace>,
-    conductor_api: impl CellConductorApiT,
-    network: &HolochainP2pCell,
+    conductor_handle: ConductorHandle,
+    network: &HolochainP2pDna,
 ) -> WorkflowResult<WorkComplete> {
-    let env = workspace.vault.clone().into();
+    let env = workspace.dht_env.clone().into();
     let sorted_ops = validation_query::get_ops_to_app_validate(&env).await?;
-    let conductor_api = Arc::new(conductor_api);
-    let this_agent = network.from_agent();
+    let start_len = sorted_ops.len();
+    tracing::debug!("validating {} ops", start_len);
+    let start = (start_len >= NUM_CONCURRENT_OPS).then(std::time::Instant::now);
+    let saturated = start.is_some();
 
     // Validate all the ops
-    let iter = sorted_ops.into_iter().map(|so| {
+    let iter = sorted_ops.into_iter().map({
         let network = network.clone();
-        let conductor_api = conductor_api.clone();
         let workspace = workspace.clone();
-        async move {
-            let (op, op_hash) = so.into_inner();
-            let author = op.header().author().clone();
-            let op_light = op.to_light();
+        move |so| {
+            let network = network.clone();
+            let conductor_handle = conductor_handle.clone();
+            let workspace = workspace.clone();
+            let dna_hash = dna_hash.clone();
+            async move {
+                let (op, op_hash) = so.into_inner();
+                let dependency = get_dependency(op.get_type(), &op.header());
+                let op_light = op.to_light();
 
-            // Validate this op
-            let r = validate_op(op, &(*conductor_api), &(*workspace), &network).await;
-            (op_hash, author, op_light, r)
+                // Validate this op
+                let r = validate_op(dna_hash, op, &conductor_handle, &(*workspace), &network).await;
+                (op_hash, dependency, op_light, r)
+            }
         }
     });
+
+    // Create a stream of concurrent validation futures.
+    // This will run NUM_CONCURRENT_OPS validation futures concurrently and
+    // return up to NUM_CONCURRENT_OPS * 100 results.
     use futures::stream::StreamExt;
     let mut iter = futures::stream::iter(iter)
         .buffer_unordered(NUM_CONCURRENT_OPS)
-        .ready_chunks(NUM_CONCURRENT_OPS);
+        .ready_chunks(NUM_CONCURRENT_OPS * 100);
 
+    // Spawn a task to actually drive the stream.
+    // This allows the stream to make progress in the background while
+    // we are committing previous results to the database.
+    let (tx, rx) = tokio::sync::mpsc::channel(NUM_CONCURRENT_OPS * 100);
+    let jh = tokio::spawn(async move {
+        while let Some(op) = iter.next().await {
+            // Send the result to task that will commit to the database.
+            if tx.send(op).await.is_err() {
+                tracing::warn!("app validation task has failed to send ops. This is not a problem if the conductor is shutting down");
+                break;
+            }
+        }
+    });
+
+    // Create a stream that will chunk up to NUM_CONCURRENT_OPS * 100 ready results.
+    let mut iter =
+        tokio_stream::wrappers::ReceiverStream::new(rx).ready_chunks(NUM_CONCURRENT_OPS * 100);
+
+    let mut total = 0;
+    let mut round_time = start.is_some().then(std::time::Instant::now);
+    // Pull in a chunk of results.
     while let Some(chunk) = iter.next().await {
-        let this_agent = this_agent.clone();
-        workspace
-            .vault
+        tracing::debug!(
+            "Committing {} ops",
+            chunk.iter().map(|c| c.len()).sum::<usize>()
+        );
+        let (t, a, r) = workspace
+            .dht_env
             .async_commit(move |mut txn| {
-                for outcome in chunk {
-                    let (op_hash, author, op_light, outcome) = outcome;
+                let mut total = 0;
+                let mut awaiting = 0;
+                let mut rejected = 0;
+                for outcome in chunk.into_iter().flatten() {
+                    let (op_hash, dependency, op_light, outcome) = outcome;
                     // Get the outcome or return the error
                     let outcome = outcome.or_else(|outcome_or_err| outcome_or_err.try_into())?;
 
                     if let Outcome::AwaitingDeps(_) | Outcome::Rejected(_) = &outcome {
                         warn!(
-                            agent = %which_agent(&this_agent),
                             msg = "DhtOp has failed app validation",
                             outcome = ?outcome,
                         );
                     }
                     match outcome {
                         Outcome::Accepted => {
-                            put_integration_limbo(&mut txn, op_hash, ValidationStatus::Valid)?;
+                            total += 1;
+                            if let Dependency::Null = dependency {
+                                put_integrated(&mut txn, op_hash, ValidationStatus::Valid)?;
+                            } else {
+                                put_integration_limbo(&mut txn, op_hash, ValidationStatus::Valid)?;
+                            }
                         }
                         Outcome::AwaitingDeps(deps) => {
+                            awaiting += 1;
                             let status = ValidationLimboStatus::AwaitingAppDeps(deps);
                             put_validation_limbo(&mut txn, op_hash, status)?;
                         }
                         Outcome::Rejected(_) => {
-                            if author == this_agent {
-                                tracing::warn!("Authored invalid op! If you didn't hack your node, this is a bug in Holochain.\nOp: {:?}", op_light);
+                            rejected += 1;
+                            tracing::warn!("Received invalid op! Warrants aren't implemented yet, so we can't do anything about this right now, but be warned that somebody on the network has maliciously hacked their node.\nOp: {:?}", op_light);
+                            if let Dependency::Null = dependency {
+                                put_integrated(&mut txn, op_hash, ValidationStatus::Rejected)?;
                             } else {
-                                tracing::warn!("Received invalid op! Warrants aren't implemented yet, so we can't do anything about this right now, but be warned that somebody on the network has maliciously hacked their node.\nOp: {:?}", op_light);
+                                put_integration_limbo(&mut txn, op_hash, ValidationStatus::Rejected)?;
                             }
-                            put_integration_limbo(&mut txn, op_hash, ValidationStatus::Rejected)?;
                         }
                     }
                 }
-                WorkflowResult::Ok(())
+                WorkflowResult::Ok((total, awaiting, rejected))
             })
             .await?;
+        total += t;
+        if let (Some(start), Some(round_time)) = (start, &mut round_time) {
+            let round_el = round_time.elapsed();
+            *round_time = std::time::Instant::now();
+            let avg_ops_ps = total as f64 / start.elapsed().as_micros() as f64 * 1_000_000.0;
+            let ops_ps = t as f64 / round_el.as_micros() as f64 * 1_000_000.0;
+            tracing::info!(
+                "App validation is saturated. Util {:.2}%. OPS/s avg {:.2}, this round {:.2}",
+                (start_len - total) as f64 / NUM_CONCURRENT_OPS as f64 * 100.0,
+                avg_ops_ps,
+                ops_ps
+            );
+        }
+        tracing::debug!(
+            "{} committed, {} awaiting sys dep, {} rejected. {} committed this round",
+            t,
+            a,
+            r,
+            total
+        );
     }
-    Ok(WorkComplete::Complete)
+    jh.await?;
+    tracing::debug!("accepted {} ops", total);
+    Ok(if saturated {
+        WorkComplete::Incomplete
+    } else {
+        WorkComplete::Complete
+    })
 }
 
 pub fn to_single_zome(zomes_to_invoke: ZomesToInvoke) -> AppValidationResult<Zome> {
@@ -150,13 +224,14 @@ pub fn to_single_zome(zomes_to_invoke: ZomesToInvoke) -> AppValidationResult<Zom
 }
 
 async fn validate_op(
+    dna_hash: Arc<DnaHash>,
     op: DhtOp,
-    conductor_api: &impl CellConductorApiT,
+    conductor_handle: &ConductorHandle,
     workspace: &AppValidationWorkspace,
-    network: &HolochainP2pCell,
+    network: &HolochainP2pDna,
 ) -> AppValidationOutcome<Outcome> {
     // Get the workspace for the validation calls
-    let workspace_lock = workspace.validation_workspace(network.from_agent()).await?;
+    let workspace_lock = workspace.validation_workspace().await?;
 
     // Create the element
     let element = get_element(op)?;
@@ -165,14 +240,14 @@ async fn validate_op(
     check_for_caps(&element)?;
 
     // Get the dna file
-    let dna_file = conductor_api.get_this_dna();
-    let dna_file =
-        dna_file.map_err(|_| AppValidationError::DnaMissing(conductor_api.cell_id().clone()))?;
+    let dna_file = conductor_handle
+        .get_dna(dna_hash.as_ref())
+        .ok_or_else(|| AppValidationError::DnaMissing((*dna_hash).clone()))?;
 
     // Get the EntryDefId associated with this Element if there is one
     let entry_def = {
         let mut cascade = workspace.full_cascade(network.clone());
-        get_associated_entry_def(&element, dna_file.dna(), conductor_api, &mut cascade).await?
+        get_associated_entry_def(&element, dna_file.dna(), conductor_handle, &mut cascade).await?
     };
 
     // Create the ribosome
@@ -273,13 +348,13 @@ async fn validate_op(
 async fn get_associated_entry_def(
     element: &Element,
     dna_def: &DnaDefHashed,
-    conductor_api: &impl CellConductorApiT,
+    conductor_handle: &ConductorHandle,
     cascade: &mut Cascade,
 ) -> AppValidationOutcome<Option<EntryDef>> {
     match get_app_entry_type(element, cascade).await? {
         Some(aet) => {
             let zome = get_zome_info(&aet, dna_def)?.1.clone();
-            Ok(get_entry_def(aet.id(), zome, dna_def, conductor_api).await?)
+            Ok(get_entry_def(aet.id(), zome, dna_def, &(**conductor_handle)).await?)
         }
         None => Ok(None),
     }
@@ -467,8 +542,8 @@ async fn get_validation_package(
     // from_agent: Option<AgentPubKey>,
     workspace: Option<&AppValidationWorkspace>,
     ribosome: &impl RibosomeT,
-    workspace_lock: &HostFnWorkspace,
-    network: &HolochainP2pCell,
+    workspace_lock: &HostFnWorkspaceRead,
+    network: &HolochainP2pDna,
 ) -> AppValidationOutcome<Option<ValidationPackage>> {
     match entry_def {
         Some(entry_def) => match workspace {
@@ -506,8 +581,8 @@ async fn get_validation_package_local(
     element: &Element,
     required_validation_type: RequiredValidationType,
     ribosome: &impl RibosomeT,
-    workspace_lock: &HostFnWorkspace,
-    network: &HolochainP2pCell,
+    workspace_lock: &HostFnWorkspaceRead,
+    network: &HolochainP2pDna,
 ) -> AppValidationOutcome<Option<ValidationPackage>> {
     let header_seq = element.header().header_seq();
     match required_validation_type {
@@ -517,17 +592,21 @@ async fn get_validation_package_local(
                 Some(EntryType::App(aet)) => aet,
                 _ => return Ok(None),
             };
-            Ok(Some(
-                get_as_author_sub_chain(header_seq, app_entry_type, workspace_lock.source_chain())
-                    .await?,
-            ))
+            match workspace_lock.source_chain() {
+                Some(source_chain) => Ok(Some(
+                    get_as_author_sub_chain(header_seq, app_entry_type, source_chain).await?,
+                )),
+                None => Ok(None),
+            }
         }
-        RequiredValidationType::Full => Ok(Some(
-            get_as_author_full(header_seq, workspace_lock.source_chain()).await?,
-        )),
+        RequiredValidationType::Full => match workspace_lock.source_chain() {
+            Some(source_chain) => Ok(Some(get_as_author_full(header_seq, source_chain).await?)),
+            None => Ok(None),
+        },
         RequiredValidationType::Custom => {
             {
-                let cascade = Cascade::from_workspace(workspace_lock);
+                let cascade =
+                    Cascade::from_workspace(workspace_lock.stores(), workspace_lock.author());
                 if let Some(elements) =
                     cascade.get_validation_package_local(element.header_address())?
                 {
@@ -566,8 +645,8 @@ async fn get_validation_package_remote(
     // from_agent: Option<AgentPubKey>,
     workspace: &AppValidationWorkspace,
     ribosome: &impl RibosomeT,
-    workspace_lock: &HostFnWorkspace,
-    network: &HolochainP2pCell,
+    workspace_lock: &HostFnWorkspaceRead,
+    network: &HolochainP2pDna,
 ) -> AppValidationOutcome<Option<ValidationPackage>> {
     match entry_def.required_validation_type {
         // Only needs the element
@@ -606,10 +685,12 @@ async fn get_validation_package_remote(
             // if the data really isn't available.
             // TODO: Another solution is to up the timeout for parallel gets.
             const NUM_RETRY_GETS: u8 = 3;
-            let range = 0..element.header().header_seq().saturating_sub(1);
 
             let mut query = holochain_zome_types::query::ChainQueryFilter::new()
-                .sequence_range(range)
+                .sequence_range(ChainQueryFilterRange::HeaderSeqRange(
+                    0,
+                    element.header().header_seq().saturating_sub(1),
+                ))
                 .include_entries(true);
             if let (RequiredValidationType::SubChain, Some(et)) = (
                 entry_def.required_validation_type,
@@ -717,17 +798,18 @@ async fn get_validation_package_remote(
     }
 }
 
-pub async fn run_validation_callback_direct(
+pub async fn run_validation_callback_direct<W: Into<HostFnWorkspaceRead>>(
     zome: ZomesToInvoke,
     element: Element,
     ribosome: &impl RibosomeT,
-    workspace: HostFnWorkspace,
-    network: HolochainP2pCell,
-    conductor_api: &impl CellConductorApiT,
+    workspace: W,
+    network: HolochainP2pDna,
+    conductor_handle: &ConductorHandle,
 ) -> AppValidationResult<Outcome> {
+    let workspace = workspace.into();
     let outcome = {
         let mut cascade = Cascade::from_workspace_network(&workspace, network.clone());
-        get_associated_entry_def(&element, ribosome.dna_def(), conductor_api, &mut cascade).await
+        get_associated_entry_def(&element, ribosome.dna_def(), conductor_handle, &mut cascade).await
     };
 
     // The outcome could be awaiting a dependency to get the entry def
@@ -769,8 +851,8 @@ fn run_validation_callback_inner(
     validation_package: Option<Arc<ValidationPackage>>,
     entry_def_id: Option<EntryDefId>,
     ribosome: &impl RibosomeT,
-    workspace_lock: HostFnWorkspace,
-    network: HolochainP2pCell,
+    workspace_lock: HostFnWorkspaceRead,
+    network: HolochainP2pDna,
 ) -> AppValidationResult<Outcome> {
     let validate: ValidateResult = ribosome.run_validate(
         ValidateHostAccess::new(workspace_lock, network),
@@ -788,14 +870,14 @@ fn run_validation_callback_inner(
     }
 }
 
-pub fn run_create_link_validation_callback(
+pub fn run_create_link_validation_callback<W: Into<HostFnWorkspaceRead>>(
     zome: Zome,
     link_add: Arc<CreateLink>,
     base: Arc<Entry>,
     target: Arc<Entry>,
     ribosome: &impl RibosomeT,
-    workspace_lock: HostFnWorkspace,
-    network: HolochainP2pCell,
+    workspace_lock: W,
+    network: HolochainP2pDna,
 ) -> AppValidationResult<Outcome> {
     let invocation = ValidateCreateLinkInvocation {
         zome,
@@ -804,28 +886,28 @@ pub fn run_create_link_validation_callback(
         target,
     };
     let invocation = ValidateLinkInvocation::<ValidateCreateLinkInvocation>::new(invocation);
-    run_link_validation_callback(invocation, ribosome, workspace_lock, network)
+    run_link_validation_callback(invocation, ribosome, workspace_lock.into(), network)
 }
 
-pub fn run_delete_link_validation_callback(
+pub fn run_delete_link_validation_callback<W: Into<HostFnWorkspaceRead>>(
     zome: Zome,
     delete_link: DeleteLink,
     ribosome: &impl RibosomeT,
-    workspace_lock: HostFnWorkspace,
-    network: HolochainP2pCell,
+    workspace_lock: W,
+    network: HolochainP2pDna,
 ) -> AppValidationResult<Outcome> {
     let invocation = ValidateDeleteLinkInvocation { zome, delete_link };
     let invocation = ValidateLinkInvocation::<ValidateDeleteLinkInvocation>::new(invocation);
-    run_link_validation_callback(invocation, ribosome, workspace_lock, network)
+    run_link_validation_callback(invocation, ribosome, workspace_lock.into(), network)
 }
 
-pub fn run_link_validation_callback<I: Invocation + 'static>(
+pub fn run_link_validation_callback<I: Invocation + 'static, W: Into<HostFnWorkspaceRead>>(
     invocation: ValidateLinkInvocation<I>,
     ribosome: &impl RibosomeT,
-    workspace_lock: HostFnWorkspace,
-    network: HolochainP2pCell,
+    workspace_lock: W,
+    network: HolochainP2pDna,
 ) -> AppValidationResult<Outcome> {
-    let access = ValidateLinkHostAccess::new(workspace_lock, network);
+    let access = ValidateLinkHostAccess::new(workspace_lock.into(), network);
     let validate = ribosome.run_validate_link(access, invocation)?;
     match validate {
         ValidateLinkResult::Valid => Ok(Outcome::Accepted),
@@ -835,28 +917,45 @@ pub fn run_link_validation_callback<I: Invocation + 'static>(
 }
 
 pub struct AppValidationWorkspace {
-    vault: EnvWrite,
-    cache: EnvWrite,
+    authored_env: DbRead<DbKindAuthored>,
+    dht_env: DbWrite<DbKindDht>,
+    cache: DbWrite<DbKindCache>,
+    keystore: MetaLairClient,
 }
 
 impl AppValidationWorkspace {
-    pub fn new(vault: EnvWrite, cache: EnvWrite) -> Self {
-        Self { vault, cache }
+    pub fn new(
+        authored_env: DbRead<DbKindAuthored>,
+        dht_env: DbWrite<DbKindDht>,
+        cache: DbWrite<DbKindCache>,
+        keystore: MetaLairClient,
+    ) -> Self {
+        Self {
+            authored_env,
+            dht_env,
+            cache,
+            keystore,
+        }
     }
 
-    pub async fn validation_workspace(
-        &self,
-        author: AgentPubKey,
-    ) -> AppValidationResult<HostFnWorkspace> {
-        Ok(HostFnWorkspace::new(self.vault.clone(), self.cache.clone(), author).await?)
+    pub async fn validation_workspace(&self) -> AppValidationResult<HostFnWorkspaceRead> {
+        Ok(HostFnWorkspace::new(
+            self.authored_env.clone(),
+            self.dht_env.clone().into(),
+            self.cache.clone(),
+            self.keystore.clone(),
+            None,
+        )
+        .await?)
     }
 
-    pub fn full_cascade<Network: HolochainP2pCellT + Clone + 'static + Send>(
+    pub fn full_cascade<Network: HolochainP2pDnaT + Clone + 'static + Send>(
         &self,
         network: Network,
     ) -> Cascade<Network> {
         Cascade::empty()
-            .with_vault(self.vault.clone().into())
+            .with_authored(self.authored_env.clone())
+            .with_dht(self.dht_env.clone().into())
             .with_network(network, self.cache.clone())
     }
 }
@@ -880,12 +979,15 @@ pub fn put_integration_limbo(
     Ok(())
 }
 
-impl From<&HostFnWorkspace> for AppValidationWorkspace {
-    fn from(h: &HostFnWorkspace) -> Self {
-        let (vault, cache) = h.databases();
-        Self {
-            vault: vault.into(),
-            cache,
-        }
-    }
+pub fn put_integrated(
+    txn: &mut Transaction<'_>,
+    hash: DhtOpHash,
+    status: ValidationStatus,
+) -> WorkflowResult<()> {
+    set_validation_status(txn, hash.clone(), status)?;
+    // This set the validation stage to pending which is correct when
+    // it's integrated.
+    set_validation_stage(txn, hash.clone(), ValidationLimboStatus::Pending)?;
+    set_when_integrated(txn, hash, Timestamp::now())?;
+    Ok(())
 }

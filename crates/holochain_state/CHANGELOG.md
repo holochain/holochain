@@ -4,6 +4,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.0.22
+
+## 0.0.21
+
+## 0.0.20
+
+## 0.0.19
+
+## 0.0.18
+
+## 0.0.17
+
+- Some databases can handle corruption by wiping the db file and starting again. [\#1039](https://github.com/holochain/holochain/pull/1039).
+
+## 0.0.16
+
+## 0.0.15
+
 ## 0.0.14
 
 - BREAKING CHANGE. Source chain `query` will now return results in header sequence order ascending.

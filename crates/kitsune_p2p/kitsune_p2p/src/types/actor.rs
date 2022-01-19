@@ -12,9 +12,6 @@ pub struct RpcMulti {
     /// The "space" context.
     pub space: Arc<super::KitsuneSpace>,
 
-    /// The agent making the request.
-    pub from_agent: Arc<super::KitsuneAgent>,
-
     /// The "basis" hash/coordinate of destination neigborhood.
     pub basis: Arc<super::KitsuneBasis>,
 
@@ -40,13 +37,11 @@ impl RpcMulti {
     pub fn new(
         tuning_params: &KitsuneP2pTuningParams,
         space: Arc<super::KitsuneSpace>,
-        from_agent: Arc<super::KitsuneAgent>,
         basis: Arc<super::KitsuneBasis>,
         payload: Vec<u8>,
     ) -> Self {
         Self {
             space,
-            from_agent,
             basis,
             payload,
             max_remote_agent_count: tuning_params.default_rpc_multi_remote_agent_count,
@@ -65,7 +60,17 @@ pub struct RpcMultiResponse {
     pub response: Vec<u8>,
 }
 
+#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+/// The destination of a broadcast message.
+pub enum BroadcastTo {
+    /// Send to notify.
+    Notify,
+    /// Send to publish agent info.
+    PublishAgentInfo,
+}
+
 type KSpace = Arc<super::KitsuneSpace>;
+type KSpaceOpt = Option<Arc<super::KitsuneSpace>>;
 type KAgent = Arc<super::KitsuneAgent>;
 type KAgents = Vec<Arc<super::KitsuneAgent>>;
 type KBasis = Arc<super::KitsuneBasis>;
@@ -86,7 +91,7 @@ ghost_actor::ghost_chan! {
 
         /// Make a request of a single remote agent, expecting a response.
         /// The remote side will receive a "Call" event.
-        fn rpc_single(space: KSpace, to_agent: KAgent, from_agent: KAgent, payload: Payload, timeout_ms: OptU64) -> Vec<u8>;
+        fn rpc_single(space: KSpace, to_agent: KAgent, payload: Payload, timeout_ms: OptU64) -> Vec<u8>;
 
         /// Make a request to multiple destination agents - awaiting/aggregating the responses.
         /// The remote sides will see these messages as "Call" events.
@@ -101,6 +106,7 @@ ghost_actor::ghost_chan! {
             space: KSpace,
             basis: KBasis,
             timeout: KitsuneTimeout,
+            destination: BroadcastTo,
             payload: Payload
         ) -> ();
 
@@ -110,7 +116,6 @@ ghost_actor::ghost_chan! {
         /// least one connection with a node in the agent set.
         fn targeted_broadcast(
             space: KSpace,
-            from_agent: KAgent,
             agents: KAgents,
             timeout: KitsuneTimeout,
             payload: Payload,
@@ -128,8 +133,12 @@ ghost_actor::ghost_chan! {
         /// Check if an agent is an authority for a hash.
         fn authority_for_hash(
             space: KSpace,
-            agent: KAgent,
             basis: KBasis,
         ) -> bool;
+
+        /// dump network metrics
+        fn dump_network_metrics(
+            space: KSpaceOpt,
+        ) -> serde_json::Value;
     }
 }

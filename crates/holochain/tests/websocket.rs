@@ -40,7 +40,7 @@ async fn call_admin() {
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
-    // TODO: B-01453: can we make this port 0 and find out the dynamic port later?
+    // MAYBE: B-01453: can we make this port 0 and find out the dynamic port later?
     let port = 9909;
 
     let tmp_dir = TempDir::new("conductor_cfg").unwrap();
@@ -112,7 +112,7 @@ async fn call_zome() {
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
-    // TODO: B-01453: can we make this port 0 and find out the dynamic port later?
+    // MAYBE: B-01453: can we make this port 0 and find out the dynamic port later?
     let admin_port = 9910;
     let app_port = 9913;
 
@@ -204,7 +204,7 @@ async fn remote_signals() -> anyhow::Result<()> {
 
     let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
 
-    // TODO: write helper for agents across conductors
+    // MAYBE: write helper for agents across conductors
     let all_agents: Vec<HoloHash<hash_type::Agent>> =
         future::join_all(conductors.iter().map(|c| SweetAgents::one(c.keystore()))).await;
 
@@ -260,7 +260,7 @@ async fn emit_signals() {
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
-    // TODO: B-01453: can we make this port 0 and find out the dynamic port later?
+    // MAYBE: B-01453: can we make this port 0 and find out the dynamic port later?
     let admin_port = 9911;
 
     let tmp_dir = TempDir::new("conductor_cfg_emit_signals").unwrap();
@@ -373,6 +373,38 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn list_app_interfaces_succeeds() -> Result<()> {
+    observability::test_run().ok();
+
+    info!("creating config");
+    let tmp_dir = TempDir::new("conductor_cfg").unwrap();
+    let environment_path = tmp_dir.path().to_path_buf();
+    let config = create_config(0, environment_path);
+    let conductor_handle = Conductor::builder().config(config).build().await?;
+    let port = admin_port(&conductor_handle).await;
+    info!("building conductor");
+    let (mut client, mut _rx): (WebsocketSender, WebsocketReceiver) = holochain_websocket::connect(
+        url2!("ws://127.0.0.1:{}", port),
+        Arc::new(WebsocketConfig {
+            default_request_timeout_s: 1,
+            ..Default::default()
+        }),
+    )
+    .await?;
+
+    let request = AdminRequest::ListAppInterfaces;
+
+    // Request the list of app interfaces that the conductor has attached
+    let response: Result<Result<AdminResponse, _>, tokio::time::error::Elapsed> =
+        tokio::time::timeout(Duration::from_secs(1), client.request(request)).await;
+
+    // There should be no app interfaces listed
+    assert_matches!(response, Ok(Ok(AdminResponse::AppInterfacesListed(interfaces))) if interfaces.len() == 0);
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
     if let Err(e) = conductor_admin_interface_ends_with_shutdown_inner().await {
         panic!("{:#?}", e);
@@ -478,7 +510,7 @@ async fn concurrent_install_dna() {
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
-    // TODO: B-01453: can we make this port 0 and find out the dynamic port later?
+    // MAYBE: B-01453: can we make this port 0 and find out the dynamic port later?
     let admin_port = 9912;
     // let app_port = 9914;
 

@@ -1,3 +1,5 @@
+use crate::gossip::sharded_gossip::store::TimeChunk;
+
 use super::*;
 
 impl ShardedGossipLocal {
@@ -46,88 +48,112 @@ impl ShardedGossipLocal {
     /// - Expect this function to complete in an average of 10 ms and worst case 100 ms.
     pub(super) async fn generate_ops_blooms_for_time_window(
         &self,
-        local_agents: &HashSet<Arc<KitsuneAgent>>,
         common_arc_set: &Arc<DhtArcSet>,
-        mut search_time_window: TimeWindow,
-    ) -> KitsuneResult<Vec<TimedBloomFilter>> {
-        let mut results = Vec::new();
-        loop {
-            // Get the local agents within the arc set.
-            let local_agents_within_arc_set: Vec<_> =
-                store::agents_within_arcset(&self.evt_sender, &self.space, common_arc_set.clone())
-                    .await?
-                    .into_iter()
-                    .filter(|(a, _)| local_agents.contains(a))
-                    .filter(|(_, i)| !i.is_empty())
-                    .collect();
+        search_time_window: TimeWindow,
+    ) -> KitsuneResult<Batch<TimedBloomFilter>> {
+        use futures::TryStreamExt;
 
-            // Get the op hashes which fit within the common arc set from these local agents.
-            let result = store::all_op_hashes_within_arcset(
-                &self.evt_sender,
-                &self.space,
-                local_agents_within_arc_set.as_slice(),
-                common_arc_set,
-                search_time_window.clone(),
-                Self::UPPER_HASHES_BOUND,
-                true,
+        // If the common arc set is empty there's no
+        // blooms to generate.
+        if common_arc_set.is_empty() {
+            return Ok(Batch::Complete(Vec::with_capacity(0)));
+        }
+
+        let mut total_blooms = 0;
+        let search_end = search_time_window.end;
+
+        let stream = store::hash_chunks_query(
+            self.evt_sender.clone(),
+            self.space.clone(),
+            (**common_arc_set).clone(),
+            search_time_window.clone(),
+            true,
+        );
+        let batch = stream
+            // Take more chunks while there is less then
+            // the upper limit for number of blooms.
+            .try_take_while(|_| {
+                total_blooms += 1;
+                futures::future::ready(Ok(total_blooms <= Self::UPPER_BLOOM_BOUND))
+            })
+            // Fold the chunks into a batch of [`TimedBloomFilter`].
+            .try_fold(
+                // Start with a partial batch where the cursor is
+                // set to the end of the time window.
+                Batch::Partial {
+                    cursor: search_time_window.end,
+                    data: Vec::new(),
+                },
+                |batch,
+                 TimeChunk {
+                     window,
+                     cursor,
+                     hashes,
+                 }| {
+                    async move {
+                        // If the window for this time chunk matches
+                        // the end of our search window then this is
+                        // the final result.
+                        let complete = search_end == window.end;
+
+                        // If there were no hashes found then create an
+                        // empty bloom filter for this time window.
+
+                        let bloom = if hashes.is_empty() {
+                            TimedBloomFilter {
+                                bloom: None,
+                                time: window,
+                            }
+                        } else {
+                            // Otherwise create the bloom filter from the hashes.
+                            let mut bloom =
+                                bloomfilter::Bloom::new_for_fp_rate(hashes.len(), Self::TGT_FP);
+
+                            let mut iter = hashes.into_iter().peekable();
+
+                            while iter.peek().is_some() {
+                                for hash in iter.by_ref().take(100) {
+                                    bloom.set(&Arc::new(MetaOpKey::Op(hash)));
+                                }
+                                // Yield to the conductor every 100 hashes. Because tasks have
+                                // polling budgets this gives the runtime a chance to schedule other
+                                // tasks so they don't starve.
+                                tokio::task::yield_now().await;
+                            }
+                            TimedBloomFilter {
+                                bloom: Some(bloom),
+                                time: window,
+                            }
+                        };
+                        match batch {
+                            Batch::Partial { mut data, .. } | Batch::Complete(mut data) => {
+                                // Add this bloom to the batch and set it to complete
+                                // if this is the final bloom.
+                                data.push(bloom);
+                                if complete {
+                                    Ok(Batch::Complete(data))
+                                } else {
+                                    Ok(Batch::Partial { data, cursor })
+                                }
+                            }
+                        }
+                    }
+                },
             )
             .await?;
 
-            // If there are none then don't create a bloom.
-            let (ops_within_common_arc, found_time_window) = match result {
-                Some(r) => r,
-                None => {
-                    if !local_agents_within_arc_set.is_empty() {
-                        // We have local agents within the arc but no hashes.
-                        let bloom = TimedBloomFilter {
-                            bloom: None,
-                            time: search_time_window,
-                        };
-                        results.push(bloom);
-                    }
-                    break;
+        match batch {
+            Batch::Complete(data) => Ok(Batch::Complete(data)),
+            Batch::Partial { cursor, data } => {
+                // If the take while limit was reached then this is a
+                // partial batch, otherwise is must be complete.
+                if data.len() == Self::UPPER_BLOOM_BOUND {
+                    Ok(Batch::Partial { cursor, data })
+                } else {
+                    Ok(Batch::Complete(data))
                 }
-            };
-
-            let num_found = ops_within_common_arc.len();
-
-            // Create the bloom from the op hashes.
-            let mut bloom =
-                bloomfilter::Bloom::new_for_fp_rate(ops_within_common_arc.len(), Self::TGT_FP);
-
-            for hash in ops_within_common_arc {
-                bloom.set(&Arc::new(MetaOpKey::Op(hash)));
-            }
-
-            // If we found the maximum number of ops we can then
-            // there might still be more ops in the search window.
-            // TODO: Not sure this is correct?
-            if num_found >= Self::UPPER_HASHES_BOUND
-                && found_time_window.end <= search_time_window.end
-            {
-                let bloom = TimedBloomFilter {
-                    bloom: Some(bloom),
-                    // the `time_window.end` is exclusive, but has already been incremented
-                    // to account for this
-                    time: search_time_window.start..found_time_window.end,
-                };
-                // Adjust the search window to search the remaining time window.
-                // Include the end of the last time bound.
-                search_time_window = found_time_window
-                    .end
-                    .saturating_sub(&Duration::from_micros(1))
-                    ..search_time_window.end;
-                results.push(bloom);
-            } else {
-                let bloom = TimedBloomFilter {
-                    bloom: Some(bloom),
-                    time: search_time_window,
-                };
-                results.push(bloom);
-                break;
             }
         }
-        Ok(results)
     }
 
     /// Check a bloom filter for missing ops.
@@ -140,53 +166,66 @@ impl ShardedGossipLocal {
     /// - The expected performance per op is average 10ms and worst 100 ms.
     pub(super) async fn check_ops_bloom(
         &self,
-        local_agents_within_arc_set: Vec<(Arc<KitsuneAgent>, ArcInterval)>,
-        state: RoundState,
-        remote_bloom: TimedBloomFilter,
-    ) -> KitsuneResult<HashMap<Arc<KitsuneOpHash>, Vec<u8>>> {
-        let RoundState { common_arc_set, .. } = state;
+        common_arc_set: DhtArcSet,
+        remote_bloom: &TimedBloomFilter,
+    ) -> KitsuneResult<Batch<Arc<KitsuneOpHash>>> {
+        use futures::TryStreamExt;
         let TimedBloomFilter {
             bloom: remote_bloom,
             time,
         } = remote_bloom;
-        if let Some((hashes, _)) = store::all_op_hashes_within_arcset(
-            &self.evt_sender,
-            &self.space,
-            local_agents_within_arc_set.as_slice(),
-            &common_arc_set,
-            time,
-            // TOOD: This means we will pull all hashes we have for this
-            // time window into memory. Is that ok?
-            usize::MAX,
+        let end = time.end;
+        let mut stream = store::hash_chunks_query(
+            self.evt_sender.clone(),
+            self.space.clone(),
+            common_arc_set,
+            time.clone(),
             false,
-        )
-        .await?
-        {
-            let missing_hashes: Vec<_> = match remote_bloom {
-                Some(remote_bloom) => hashes
-                    .into_iter()
-                    .filter(|hash| !remote_bloom.check(&Arc::new(MetaOpKey::Op(hash.clone()))))
-                    .collect(),
-                // No remote bloom so they are missing everything.
-                None => hashes,
-            };
-            let agents = local_agents_within_arc_set
-                .iter()
-                .map(|(a, _)| a)
-                .cloned()
-                .collect();
-            let missing_ops = self
-                .evt_sender
-                .fetch_op_data(FetchOpDataEvt {
-                    space: self.space.clone(),
-                    agents,
-                    op_hashes: missing_hashes,
-                })
-                .await
-                .map_err(KitsuneError::other)?;
-            Ok(missing_ops.into_iter().collect())
-        } else {
-            Ok(HashMap::new())
+        );
+        // Take a single chunk of hashes for this time window.
+        let chunk = stream.try_next().await?;
+
+        match chunk {
+            Some(TimeChunk {
+                window,
+                cursor,
+                hashes,
+            }) => {
+                // A chunk was found so check the bloom.
+                let missing_hashes = match remote_bloom {
+                    Some(remote_bloom) => {
+                        let mut iter = hashes.into_iter().peekable();
+                        let mut missing_hashes = Vec::new();
+
+                        while iter.peek().is_some() {
+                            for hash in iter.by_ref().take(100) {
+                                if !remote_bloom.check(&Arc::new(MetaOpKey::Op(hash.clone()))) {
+                                    missing_hashes.push(hash);
+                                }
+                            }
+                            // Yield to avoid starving the runtime.
+                            tokio::task::yield_now().await;
+                        }
+                        missing_hashes
+                    }
+                    // No remote bloom so they are missing everything.
+                    None => hashes,
+                };
+
+                // If the found time window is the same as the blooms window
+                // then this batch of missing hashes is complete.
+                if window.end == end {
+                    Ok(Batch::Complete(missing_hashes))
+                } else {
+                    // Otherwise save the cursor and return
+                    // a partial batch.
+                    Ok(Batch::Partial {
+                        cursor,
+                        data: missing_hashes,
+                    })
+                }
+            }
+            None => Ok(Batch::Complete(Vec::with_capacity(0))),
         }
     }
 }
@@ -200,4 +239,13 @@ async fn get_agent_info(
         .await?
         // Need to collect to know the length for the bloom filter.
         .collect())
+}
+
+#[derive(Debug)]
+/// A batch of data which is either complete
+/// or has the cursor for the timestamp the partial
+/// batch got to.
+pub(super) enum Batch<T> {
+    Complete(Vec<T>),
+    Partial { cursor: Timestamp, data: Vec<T> },
 }

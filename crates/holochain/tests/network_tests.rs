@@ -22,7 +22,7 @@ use holochain::test_utils::test_network;
 use holochain_cascade::integrate_single_metadata;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::GetMetaOptions;
-use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pDna;
 use holochain_p2p::HolochainP2pRef;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_sqlite::db::ReadManager;
@@ -479,9 +479,9 @@ impl Shutdown {
 async fn run_fixt_network(
     element_fixt_store: BTreeMap<HeaderHash, Element>,
     meta_fixt_store: BTreeMap<AnyDhtHash, TimedHeaderHash>,
-) -> (HolochainP2pCell, Shutdown) {
+) -> (HolochainP2pDna, Shutdown) {
     // Create the network
-    let (network, mut recv, cell_network) = test_network(None, None).await;
+    let (network, mut recv, dna_network) = test_network(None, None).await;
     let (kill, killed) = tokio::sync::oneshot::channel();
 
     // Return fixt store data to gets
@@ -545,7 +545,7 @@ async fn run_fixt_network(
         }
     });
     (
-        cell_network,
+        dna_network,
         Shutdown {
             handle,
             kill,

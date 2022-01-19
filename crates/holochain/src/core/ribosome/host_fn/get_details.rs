@@ -6,6 +6,7 @@ use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
 use futures::future::join_all;
+use crate::core::ribosome::RibosomeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_details<'a>(
@@ -23,7 +24,7 @@ pub fn get_details<'a>(
                             get_options,
                         } = input;
                         Cascade::from_workspace_network(
-                            call_context.host_context.workspace(),
+                            &call_context.host_context.workspace(),
                             call_context.host_context.network().to_owned(),
                         ).get_details(any_dht_hash, get_options).await
                     }
@@ -32,7 +33,11 @@ pub fn get_details<'a>(
             let results: Result<Vec<_>, _> = results.into_iter().map(|result| result.map_err(|cascade_error| WasmError::Host(cascade_error.to_string()))).collect();
             Ok(results?)
         },
-        _ => unreachable!(),
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "get_details".into()
+        ).to_string()))
     }
 }
 

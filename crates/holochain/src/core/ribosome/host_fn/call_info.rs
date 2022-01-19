@@ -4,6 +4,7 @@ use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use holochain_zome_types::info::CallInfo;
+use crate::core::ribosome::RibosomeError;
 use std::sync::Arc;
 
 pub fn call_info(
@@ -30,6 +31,8 @@ pub fn call_info(
                             .host_context
                             .workspace()
                             .source_chain()
+                            .as_ref()
+                            .expect("Must have source chain if bindings access is given")
                             .valid_cap_grant(
                                 check_function,
                                 check_agent,
@@ -48,6 +51,8 @@ pub fn call_info(
                             .host_context
                             .workspace()
                             .source_chain()
+                            .as_ref()
+                            .expect("Must have source chain if bindings access is given")
                             .agent_pubkey()
                             .clone();
                         (author.clone(), CapGrant::ChainAuthor(author))
@@ -60,12 +65,18 @@ pub fn call_info(
                     .host_context
                     .workspace()
                     .source_chain()
+                    .as_ref()
+                    .expect("Must have source chain if bindings access is given")
                     .persisted_chain_head(),
                 provenance,
                 cap_grant,
             })
         }
-        _ => unreachable!(),
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "call_info".into()
+        ).to_string()))
     }
 }
 

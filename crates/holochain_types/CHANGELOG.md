@@ -4,7 +4,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-- FIX: [Bug](https://github.com/holochain/holochain/issues/1101) that was allowing `HeaderWithoutEntry` to shutdown apps. [#1105](https://github.com/holochain/holochain/pull/1105)
+## 0.0.22
+
+## 0.0.21
+
+## 0.0.20
+
+## 0.0.19
+
+## 0.0.18
+
+## 0.0.17
+
+## 0.0.16
+
+## 0.0.15
+
+- FIX: [Bug](https://github.com/holochain/holochain/issues/1101) that was allowing `HeaderWithoutEntry` to shutdown apps. [\#1105](https://github.com/holochain/holochain/pull/1105)
 
 ## 0.0.14
 

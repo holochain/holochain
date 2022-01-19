@@ -10,11 +10,11 @@ use super::*;
 mod test;
 
 #[derive(Debug, Clone)]
-pub struct GetLiveElementQuery(HeaderHash);
+pub struct GetLiveElementQuery(HeaderHash, Option<Arc<AgentPubKey>>);
 
 impl GetLiveElementQuery {
     pub fn new(hash: HeaderHash) -> Self {
-        Self(hash)
+        Self(hash, None)
     }
 }
 
@@ -31,7 +31,7 @@ impl Query for GetLiveElementQuery {
         WHERE DhtOp.type IN (:create_type, :delete_type, :update_type)
         AND DhtOp.basis_hash = :header_hash
         AND DhtOp.validation_status = :status
-        AND (DhtOp.when_integrated IS NOT NULL OR DhtOp.is_authored = 1)
+        AND DhtOp.when_integrated IS NOT NULL
         "
         .into()
     }
@@ -100,11 +100,28 @@ impl Query for GetLiveElementQuery {
             Some(header) => {
                 let mut entry = None;
                 if let Some(entry_hash) = header.header().entry_hash() {
-                    entry = stores.get_entry(entry_hash)?;
+                    let author = self
+                        .1
+                        .as_ref()
+                        .map(|a| a.as_ref())
+                        .filter(|a| *a == header.header().author());
+                    entry = stores.get_public_or_authored_entry(entry_hash, author)?;
                 }
                 Ok(Some(Element::new(header, entry)))
             }
             None => Ok(None),
         }
+    }
+}
+
+impl PrivateDataQuery for GetLiveElementQuery {
+    type Hash = HeaderHash;
+
+    fn with_private_data_access(hash: Self::Hash, author: Arc<AgentPubKey>) -> Self {
+        Self(hash, Some(author))
+    }
+
+    fn without_private_data_access(hash: Self::Hash) -> Self {
+        Self::new(hash)
     }
 }

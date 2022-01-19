@@ -1,8 +1,8 @@
 use crate::core::ribosome::CallContext;
+use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_wasmer_host::prelude::WasmError;
-use crate::core::ribosome::HostFnAccess;
 
 use holochain_types::prelude::*;
 use std::sync::Arc;
@@ -14,7 +14,10 @@ pub fn create_link<'a>(
     input: CreateLinkInput,
 ) -> Result<HeaderHash, WasmError> {
     match HostFnAccess::from(&call_context.host_context()) {
-        HostFnAccess{ write_workspace: Permission::Allow, .. } => {
+        HostFnAccess {
+            write_workspace: Permission::Allow,
+            ..
+        } => {
             let CreateLinkInput {
                 base_address,
                 target_address,
@@ -28,28 +31,35 @@ pub fn create_link<'a>(
                 .expect("Failed to get ID for current zome");
 
             // Construct the link add
-            let header_builder = builder::CreateLink::new(base_address, target_address, zome_id, tag);
+            let header_builder =
+                builder::CreateLink::new(base_address, target_address, zome_id, tag);
 
-    let header_hash = tokio_helper::block_forever_on(tokio::task::spawn(async move {
-        // push the header into the source chain
-        let header_hash = call_context
-            .host_context
-            .workspace()
-            .source_chain()
-            .put(Some(call_context.zome.clone()), header_builder, None, chain_top_ordering)
-            .await?;
-        Ok::<HeaderHash, RibosomeError>(header_hash)
-    }))
-    .map_err(|join_error| WasmError::Host(join_error.to_string()))?
-    .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?;
+            let header_hash = tokio_helper::block_forever_on(tokio::task::spawn(async move {
+                // push the header into the source chain
+                let header_hash = call_context
+                    .host_context
+                    .workspace_write()
+                    .source_chain()
+                    .as_ref()
+                    .expect("Must have source chain if write_workspace access is given")
+                    .put(Some(call_context.zome.clone()), header_builder, None, chain_top_ordering)
+                    .await?;
+                Ok::<HeaderHash, RibosomeError>(header_hash)
+            }))
+            .map_err(|join_error| WasmError::Host(join_error.to_string()))?
+            .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))?;
 
             // return the hash of the committed link
             // note that validation is handled by the workflow
             // if the validation fails this commit will be rolled back by virtue of the DB transaction
             // being atomic
             Ok(header_hash)
-        },
-        _ => unreachable!(),
+        }
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "create_link".into()
+        ).to_string()))
     }
 }
 

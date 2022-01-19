@@ -7,6 +7,7 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 use holochain_zome_types::GetOptions;
+use crate::core::ribosome::RibosomeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn must_get_valid_element<'a>(
@@ -22,7 +23,7 @@ pub fn must_get_valid_element<'a>(
             // timeouts must be handled by the network
             tokio_helper::block_forever_on(async move {
                 let workspace = call_context.host_context.workspace();
-                let mut cascade = Cascade::from_workspace_network(workspace, network);
+                let mut cascade = Cascade::from_workspace_network(&workspace, network);
                 match cascade
                     .get_header_details(header_hash.clone(),
                     GetOptions::content())
@@ -74,7 +75,11 @@ pub fn must_get_valid_element<'a>(
                     }
             })
         },
-        _ => unreachable!(),
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "must_get_valid_element".into()
+        ).to_string()))
     }
 
 }

@@ -1,8 +1,9 @@
 use super::*;
 use crate::here;
+use crate::prelude::mutations_helpers::insert_valid_integrated_op;
 use crate::prelude::*;
 use holochain_types::element::SignedHeaderHashedExt;
-use holochain_types::env::EnvWrite;
+use holochain_types::env::DbWrite;
 use observability;
 
 #[derive(Clone)]
@@ -13,13 +14,13 @@ struct TestData {
     zome_id: ZomeId,
     tag: LinkTag,
     expected_link: Link,
-    env: EnvWrite,
+    env: DbWrite<DbKindDht>,
     scratch: Scratch,
     query: GetLinksQuery,
     query_no_tag: GetLinksQuery,
 }
 
-fn fixtures(env: EnvWrite, n: usize) -> Vec<TestData> {
+fn fixtures(env: DbWrite<DbKindDht>, n: usize) -> Vec<TestData> {
     let mut tag_fix = BytesFixturator::new(Predictable);
     let mut zome_id = ZomeIdFixturator::new(Predictable);
     let mut data = Vec::new();
@@ -175,7 +176,7 @@ impl TestData {
         self.env
             .conn()
             .unwrap()
-            .with_commit_test(|txn| mutations_helpers::insert_valid_authored_op(txn, op).unwrap())
+            .with_commit_test(|txn| insert_valid_integrated_op(txn, op).unwrap())
             .unwrap();
     }
     fn add_link_scratch(&mut self) {
@@ -194,7 +195,7 @@ impl TestData {
         self.env
             .conn()
             .unwrap()
-            .with_commit_test(|txn| mutations_helpers::insert_valid_authored_op(txn, op).unwrap())
+            .with_commit_test(|txn| insert_valid_integrated_op(txn, op).unwrap())
             .unwrap();
     }
     fn delete_link_scratch(&mut self) {
@@ -298,7 +299,7 @@ impl TestData {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_add_and_delete_link() {
-    let test_env = test_cell_env();
+    let test_env = test_dht_env();
     let arc = test_env.env();
 
     let mut td = fixtures(arc.clone(), 1).into_iter().next().unwrap();
@@ -373,7 +374,7 @@ async fn can_add_and_delete_link() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn multiple_links() {
-    let test_env = test_cell_env();
+    let test_env = test_dht_env();
     let arc = test_env.env();
 
     let mut td = fixtures(arc.clone().into(), 10);
@@ -439,7 +440,7 @@ async fn multiple_links() {
 #[tokio::test(flavor = "multi_thread")]
 async fn duplicate_links() {
     observability::test_run().ok();
-    let test_env = test_cell_env();
+    let test_env = test_dht_env();
     let arc = test_env.env();
 
     let mut td = fixtures(arc.clone(), 10);
@@ -501,7 +502,7 @@ async fn duplicate_links() {
 #[tokio::test(flavor = "multi_thread")]
 async fn links_on_same_base() {
     observability::test_run().ok();
-    let test_env = test_cell_env();
+    let test_env = test_dht_env();
     let arc = test_env.env();
 
     let mut td = fixtures(arc.clone(), 10);
@@ -587,7 +588,7 @@ async fn links_on_same_base() {
 #[tokio::test(flavor = "multi_thread")]
 async fn links_on_same_tag() {
     observability::test_run().ok();
-    let test_env = test_cell_env();
+    let test_env = test_dht_env();
     let arc = test_env.env();
 
     let mut td = fixtures(arc.clone(), 10);

@@ -200,6 +200,6 @@ impl AppInterfaceConfig {
 }
 
 // TODO: Tons of consistency check tests were ripped out in the great legacy code cleanup
-// We need to add these back in when we've landed the new Dna format
+// We should add these back in when we've landed the new Dna format
 // See https://github.com/holochain/holochain/blob/7750a0291e549be006529e4153b3b6cf0d686462/crates/holochain/src/conductor/state/tests.rs#L1
 // for all old tests

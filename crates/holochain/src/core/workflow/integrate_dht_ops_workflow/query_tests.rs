@@ -20,30 +20,96 @@ struct Expected {
 
 struct SharedData {
     seq: u32,
+    agent: AgentPubKey,
     prev_hash: HeaderHash,
-    original_header: HeaderHash,
+    last_header: HeaderHash,
+    last_entry: EntryHash,
+    last_link: HeaderHash,
 }
 #[derive(Debug, Clone, Copy, Default)]
 struct Facts {
-    store_element: bool,
-    register_activity: bool,
-    update_element: bool,
-    deleted_by: bool,
     integrated: bool,
-    sequential: bool,
-    original_header: bool,
     awaiting_integration: bool,
+    sequential: bool,
+    last_header: bool,
+    last_entry: bool,
+    last_link: bool,
+}
+#[derive(Debug, Clone, Copy)]
+struct Scenario {
+    facts: Facts,
+    op: DhtOpType,
+}
+
+impl Scenario {
+    fn with_dep(op_type: DhtOpType) -> [Self; 2] {
+        match op_type {
+            DhtOpType::RegisterAgentActivity => {
+                let mut dep = Self::without_dep(op_type);
+                let mut op = Self::without_dep(op_type);
+                dep.facts.integrated = true;
+                dep.facts.awaiting_integration = false;
+                dep.facts.sequential = true;
+                op.facts.sequential = true;
+                [dep, op]
+            }
+            DhtOpType::RegisterDeletedEntryHeader | DhtOpType::RegisterUpdatedContent => {
+                let mut dep = Self::without_dep(DhtOpType::StoreEntry);
+                let mut op = Self::without_dep(op_type);
+                dep.facts.integrated = true;
+                dep.facts.awaiting_integration = false;
+                op.facts.last_header = true;
+                [dep, op]
+            }
+            DhtOpType::RegisterDeletedBy | DhtOpType::RegisterUpdatedElement => {
+                let mut dep = Self::without_dep(DhtOpType::StoreElement);
+                let mut op = Self::without_dep(op_type);
+                dep.facts.integrated = true;
+                dep.facts.awaiting_integration = false;
+                op.facts.last_header = true;
+                [dep, op]
+            }
+            DhtOpType::RegisterAddLink => {
+                let mut dep = Self::without_dep(DhtOpType::StoreEntry);
+                let mut op = Self::without_dep(op_type);
+                dep.facts.integrated = true;
+                dep.facts.awaiting_integration = false;
+                op.facts.last_entry = true;
+                [dep, op]
+            }
+            DhtOpType::RegisterRemoveLink => {
+                let mut dep = Self::without_dep(DhtOpType::RegisterAddLink);
+                let mut op = Self::without_dep(op_type);
+                dep.facts.integrated = true;
+                dep.facts.awaiting_integration = false;
+                op.facts.last_link = true;
+                [dep, op]
+            }
+            _ => unreachable!("These ops have no dependencies"),
+        }
+    }
+
+    fn without_dep(op_type: DhtOpType) -> Self {
+        Self {
+            facts: Facts {
+                integrated: false,
+                awaiting_integration: true,
+                ..Default::default()
+            },
+            op: op_type,
+        }
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn integrate_query() {
     observability::test_run().ok();
-    let env = test_cell_env();
+    let env = test_dht_env();
     let expected = test_data(&env.env().into());
     let (qt, _rx) = TriggerSender::new();
     // dump_tmp(&env.env());
     let test_network = test_network(None, None).await;
-    let holochain_p2p_cell = test_network.cell_network();
+    let holochain_p2p_cell = test_network.dna_network();
     integrate_dht_ops_workflow(env.env().into(), qt, holochain_p2p_cell)
         .await
         .unwrap();
@@ -71,43 +137,79 @@ async fn integrate_query() {
     assert_eq!(hashes, expected.hashes);
 }
 
-fn create_and_insert_op(env: &EnvRead, facts: Facts, data: &mut SharedData) -> DhtOpHashed {
-    let mut update = fixt!(Update);
-    if facts.original_header && facts.update_element {
-        update.original_header_address = data.original_header.clone();
-    }
+fn create_and_insert_op(
+    env: &DbRead<DbKindDht>,
+    scenario: Scenario,
+    data: &mut SharedData,
+) -> DhtOpHashed {
+    let Scenario { facts, op } = scenario;
+    let entry = matches!(
+        op,
+        DhtOpType::StoreElement
+            | DhtOpType::StoreEntry
+            | DhtOpType::RegisterUpdatedContent
+            | DhtOpType::RegisterUpdatedElement
+    )
+    .then(|| Entry::App(fixt!(AppEntryBytes)));
+
+    let mut header: Header = match op {
+        DhtOpType::RegisterAgentActivity
+        | DhtOpType::StoreElement
+        | DhtOpType::StoreEntry
+        | DhtOpType::RegisterUpdatedContent
+        | DhtOpType::RegisterUpdatedElement => {
+            let mut update = fixt!(Update);
+            if facts.last_header {
+                update.original_header_address = data.last_header.clone();
+            }
+            if let Some(entry) = &entry {
+                update.entry_hash = EntryHash::with_data_sync(entry);
+            }
+            data.last_entry = update.entry_hash.clone();
+            update.into()
+        }
+        DhtOpType::RegisterDeletedBy | DhtOpType::RegisterDeletedEntryHeader => {
+            let mut delete = fixt!(Delete);
+            if facts.last_header {
+                delete.deletes_address = data.last_header.clone();
+            }
+            delete.into()
+        }
+        DhtOpType::RegisterAddLink => {
+            let mut create_link = fixt!(CreateLink);
+            if facts.last_entry {
+                create_link.base_address = data.last_entry.clone();
+            }
+            data.last_link = HeaderHash::with_data_sync(&Header::CreateLink(create_link.clone()));
+            create_link.into()
+        }
+        DhtOpType::RegisterRemoveLink => {
+            let mut delete_link = fixt!(DeleteLink);
+            if facts.last_link {
+                delete_link.link_add_address = data.last_link.clone();
+            }
+            delete_link.into()
+        }
+    };
 
     if facts.sequential {
-        update.header_seq = data.seq;
-        update.prev_header = data.prev_hash.clone();
+        *header.author_mut() = data.agent.clone();
+        *header.header_seq_mut().unwrap() = data.seq;
+        *header.prev_header_mut().unwrap() = data.prev_hash.clone();
         data.seq += 1;
-        data.prev_hash = HeaderHash::with_data_sync(&Header::Update(update.clone()));
+        data.prev_hash = HeaderHash::with_data_sync(&header);
     }
 
-    let header = Header::Update(update.clone());
-    data.original_header = HeaderHash::with_data_sync(&header);
-    let state = if facts.register_activity {
-        DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
-            fixt!(Signature),
-            header.clone(),
-        ))
-    } else if facts.store_element {
-        DhtOpHashed::from_content_sync(DhtOp::StoreElement(fixt!(Signature), header.clone(), None))
-    } else if facts.update_element {
-        DhtOpHashed::from_content_sync(DhtOp::RegisterUpdatedElement(
-            fixt!(Signature),
-            update.clone(),
-            None,
-        ))
-    } else {
-        unreachable!()
-    };
+    data.last_header = HeaderHash::with_data_sync(&header);
+    let state = DhtOpHashed::from_content_sync(
+        DhtOp::from_type(op, SignedHeader(header.clone(), fixt!(Signature)), entry).unwrap(),
+    );
 
     env.conn()
         .unwrap()
         .with_commit_sync(|txn| {
             let hash = state.as_hash().clone();
-            insert_op(txn, state.clone(), false).unwrap();
+            insert_op(txn, state.clone()).unwrap();
             set_validation_status(txn, hash.clone(), ValidationStatus::Valid).unwrap();
             if facts.integrated {
                 set_when_integrated(txn, hash.clone(), holochain_zome_types::Timestamp::now())
@@ -127,96 +229,38 @@ fn create_and_insert_op(env: &EnvRead, facts: Facts, data: &mut SharedData) -> D
     state
 }
 
-fn test_data(env: &EnvRead) -> Expected {
+fn test_data(env: &DbRead<DbKindDht>) -> Expected {
     let mut hashes = HashSet::new();
     let mut ops = HashMap::new();
 
     let mut data = SharedData {
         seq: 0,
+        agent: fixt!(AgentPubKey),
         prev_hash: fixt!(HeaderHash),
-        original_header: fixt!(HeaderHash),
+        last_header: fixt!(HeaderHash),
+        last_entry: fixt!(EntryHash),
+        last_link: fixt!(HeaderHash),
     };
-    let mut facts = Facts {
-        register_activity: true,
-        integrated: true,
-        sequential: true,
-        ..Default::default()
-    };
-    let op = create_and_insert_op(env, facts, &mut data);
-    tracing::debug!(hash = ?op.as_hash());
-    hashes.insert(op.as_hash().clone());
-    ops.insert(op.as_hash().clone(), op);
-
-    facts.integrated = false;
-    facts.awaiting_integration = true;
-    let op = create_and_insert_op(env, facts, &mut data);
-    tracing::debug!(hash = ?op.as_hash());
-    hashes.insert(op.as_hash().clone());
-    ops.insert(op.as_hash().clone(), op);
-
-    let facts = Facts {
-        store_element: true,
-        integrated: false,
-        awaiting_integration: true,
-        ..Default::default()
-    };
-    let op = create_and_insert_op(env, facts, &mut data);
-    tracing::debug!(hash = ?op.as_hash());
-    hashes.insert(op.as_hash().clone());
-    ops.insert(op.as_hash().clone(), op);
-
-    let facts = Facts {
-        register_activity: true,
-        integrated: false,
-        awaiting_integration: true,
-        ..Default::default()
-    };
-    let op = create_and_insert_op(env, facts, &mut data);
-    tracing::debug!(hash = ?op.as_hash());
-    ops.insert(op.as_hash().clone(), op);
-
-    // Original header but dep not integrated
-    let facts = Facts {
-        store_element: true,
-        integrated: false,
-        ..Default::default()
-    };
-    let op = create_and_insert_op(env, facts, &mut data);
-    tracing::debug!(hash = ?op.as_hash());
-    ops.insert(op.as_hash().clone(), op);
-
-    let facts = Facts {
-        update_element: true,
-        original_header: false,
-        integrated: false,
-        awaiting_integration: true,
-        ..Default::default()
-    };
-    let op = create_and_insert_op(env, facts, &mut data);
-    tracing::debug!(hash = ?op.as_hash());
-    ops.insert(op.as_hash().clone(), op);
-
-    // Original header
-    let facts = Facts {
-        store_element: true,
-        integrated: true,
-        ..Default::default()
-    };
-    let op = create_and_insert_op(env, facts, &mut data);
-    tracing::debug!(hash = ?op.as_hash());
-    hashes.insert(op.as_hash().clone());
-    ops.insert(op.as_hash().clone(), op);
-
-    let facts = Facts {
-        update_element: true,
-        original_header: true,
-        integrated: false,
-        awaiting_integration: true,
-        ..Default::default()
-    };
-    let op = create_and_insert_op(env, facts, &mut data);
-    tracing::debug!(hash = ?op.as_hash());
-    hashes.insert(op.as_hash().clone());
-    ops.insert(op.as_hash().clone(), op);
+    let ops_with_deps = [
+        DhtOpType::RegisterAgentActivity,
+        DhtOpType::RegisterAddLink,
+        DhtOpType::RegisterRemoveLink,
+        DhtOpType::RegisterUpdatedContent,
+        DhtOpType::RegisterUpdatedElement,
+        DhtOpType::RegisterDeletedBy,
+        DhtOpType::RegisterDeletedEntryHeader,
+    ];
+    for op_type in ops_with_deps {
+        let scenario = Scenario::without_dep(op_type);
+        let op = create_and_insert_op(env, scenario, &mut data);
+        ops.insert(op.as_hash().clone(), op);
+        let scenarios = Scenario::with_dep(op_type);
+        let op = create_and_insert_op(env, scenarios[0], &mut data);
+        hashes.insert(op.as_hash().clone());
+        ops.insert(op.as_hash().clone(), op);
+        let op = create_and_insert_op(env, scenarios[1], &mut data);
+        hashes.insert(op.as_hash().clone());
+        ops.insert(op.as_hash().clone(), op);
+    }
     Expected { hashes, ops }
 }

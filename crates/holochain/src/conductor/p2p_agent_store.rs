@@ -12,7 +12,6 @@ use holochain_p2p::AgentPubKeyExt;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::StateMutationResult;
 use holochain_state::prelude::StateQueryResult;
-use holochain_types::prelude::*;
 use holochain_zome_types::CellId;
 use kitsune_p2p::KitsuneBinType;
 use std::sync::Arc;
@@ -40,14 +39,17 @@ pub enum P2pBatchError {
 
 /// Inject multiple agent info entries into the peer store
 pub async fn inject_agent_infos<'iter, I: IntoIterator<Item = &'iter AgentInfoSigned> + Send>(
-    env: EnvWrite,
+    env: DbWrite<DbKindP2pAgentStore>,
     iter: I,
 ) -> StateMutationResult<()> {
     Ok(p2p_put_all(&env, iter.into_iter()).await?)
 }
 
 /// Inject multiple agent info entries into the peer store in batches.
-pub async fn p2p_put_all_batch(env: EnvWrite, rx: tokio::sync::mpsc::Receiver<P2pBatch>) {
+pub async fn p2p_put_all_batch(
+    env: DbWrite<DbKindP2pAgentStore>,
+    rx: tokio::sync::mpsc::Receiver<P2pBatch>,
+) {
     let stream = tokio_stream::wrappers::ReceiverStream::new(rx);
     let mut stream = stream.ready_chunks(100);
     while let Some(batch) = stream.next().await {
@@ -71,23 +73,28 @@ pub async fn p2p_put_all_batch(env: EnvWrite, rx: tokio::sync::mpsc::Receiver<P2
                     }
                     responses.push((Ok(()), response));
                 }
-                tx.send(responses)
-                    .expect("We never drop the receiver before this send");
+                tx.send(responses).map_err(|_| {
+                    DatabaseError::Other(anyhow::anyhow!(
+                        "Failed to send response from background thread"
+                    ))
+                })?;
                 DatabaseResult::Ok(())
             })
             .await;
-        let responses = rx
-            .await
-            .expect("We never drop the sender before sending the responses");
+        let responses = rx.await;
         match result {
             Ok(_) => {
-                for (result, response) in responses {
-                    let _ = response.send(result.map_err(P2pBatchError::from));
+                if let Ok(responses) = responses {
+                    for (result, response) in responses {
+                        let _ = response.send(result.map_err(P2pBatchError::from));
+                    }
                 }
             }
             Err(e) => {
-                for (_, response) in responses {
-                    let _ = response.send(Err(P2pBatchError::BatchFailed(format!("{:?}", e))));
+                if let Ok(responses) = responses {
+                    for (_, response) in responses {
+                        let _ = response.send(Err(P2pBatchError::BatchFailed(format!("{:?}", e))));
+                    }
                 }
             }
         }
@@ -95,13 +102,15 @@ pub async fn p2p_put_all_batch(env: EnvWrite, rx: tokio::sync::mpsc::Receiver<P2
 }
 
 /// Helper function to get all the peer data from this conductor
-pub async fn all_agent_infos(env: EnvRead) -> StateQueryResult<Vec<AgentInfoSigned>> {
+pub async fn all_agent_infos(
+    env: DbRead<DbKindP2pAgentStore>,
+) -> StateQueryResult<Vec<AgentInfoSigned>> {
     env.async_reader(|r| Ok(r.p2p_list_agents()?)).await
 }
 
 /// Helper function to get a single agent info
 pub async fn get_single_agent_info(
-    env: EnvRead,
+    env: DbRead<DbKindP2pAgentStore>,
     _space: DnaHash,
     agent: AgentPubKey,
 ) -> StateQueryResult<Option<AgentInfoSigned>> {
@@ -112,7 +121,7 @@ pub async fn get_single_agent_info(
 
 /// Interconnect every provided pair of conductors via their peer store databases
 #[cfg(any(test, feature = "test_utils"))]
-pub async fn exchange_peer_info(envs: Vec<EnvWrite>) {
+pub async fn exchange_peer_info(envs: Vec<DbWrite<DbKindP2pAgentStore>>) {
     for (i, a) in envs.iter().enumerate() {
         for (j, b) in envs.iter().enumerate() {
             if i == j {
@@ -134,42 +143,62 @@ pub async fn exchange_peer_info(envs: Vec<EnvWrite>) {
     }
 }
 
+async fn run_query<F, R>(db: DbRead<DbKindP2pAgentStore>, f: F) -> ConductorResult<R>
+where
+    R: Send + 'static,
+    F: FnOnce(PConnGuard) -> ConductorResult<R> + Send + 'static,
+{
+    let permit = db.conn_permit().await;
+    let r = tokio::task::spawn_blocking(move || {
+        let conn = db.from_permit(permit)?;
+        f(conn)
+    })
+    .await??;
+    Ok(r)
+}
+
 /// Get agent info for a single agent
-pub fn get_agent_info_signed(
-    environ: EnvWrite,
+pub async fn get_agent_info_signed(
+    environ: DbRead<DbKindP2pAgentStore>,
     _kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>,
 ) -> ConductorResult<Option<AgentInfoSigned>> {
-    Ok(environ.conn()?.p2p_get_agent(&kitsune_agent)?)
+    run_query(environ, move |mut conn| {
+        Ok(conn.p2p_get_agent(&kitsune_agent)?)
+    })
+    .await
 }
 
 /// Get all agent info for a single space
-pub fn list_all_agent_info(
-    environ: EnvWrite,
+pub async fn list_all_agent_info(
+    environ: DbRead<DbKindP2pAgentStore>,
     _kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
 ) -> ConductorResult<Vec<AgentInfoSigned>> {
-    Ok(environ.conn()?.p2p_list_agents()?)
+    run_query(environ, move |mut conn| Ok(conn.p2p_list_agents()?)).await
 }
 
 /// Get all agent info for a single space near a basis loc
-pub fn list_all_agent_info_signed_near_basis(
-    environ: EnvWrite,
+pub async fn list_all_agent_info_signed_near_basis(
+    environ: DbRead<DbKindP2pAgentStore>,
     _kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     basis_loc: u32,
     limit: u32,
 ) -> ConductorResult<Vec<AgentInfoSigned>> {
-    Ok(environ.conn()?.p2p_query_near_basis(basis_loc, limit)?)
+    run_query(environ, move |mut conn| {
+        Ok(conn.p2p_query_near_basis(basis_loc, limit)?)
+    })
+    .await
 }
 
 /// Get the peer density an agent is currently seeing within
 /// a given [`DhtArc`]
-pub fn query_peer_density(
-    env: EnvWrite,
+pub async fn query_peer_density(
+    env: DbRead<DbKindP2pAgentStore>,
     kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     dht_arc: DhtArc,
 ) -> ConductorResult<PeerDensity> {
     let now = now();
-    let arcs = env.conn()?.p2p_list_agents()?;
+    let arcs = run_query(env, move |mut conn| Ok(conn.p2p_list_agents()?)).await?;
     let arcs = arcs
         .into_iter()
         .filter_map(|v| {
@@ -193,7 +222,7 @@ pub fn query_peer_density(
 
 /// Put single agent info into store
 pub async fn put_agent_info_signed(
-    environ: EnvWrite,
+    environ: DbWrite<DbKindP2pAgentStore>,
     agent_info_signed: kitsune_p2p::agent_store::AgentInfoSigned,
 ) -> ConductorResult<()> {
     Ok(p2p_put(&environ, &agent_info_signed).await?)
@@ -211,7 +240,10 @@ fn is_expired(now: u64, info: &AgentInfoSigned) -> bool {
 }
 
 /// Dump the agents currently in the peer store
-pub async fn dump_state(env: EnvRead, cell_id: Option<CellId>) -> StateQueryResult<P2pAgentsDump> {
+pub async fn dump_state(
+    env: DbRead<DbKindP2pAgentStore>,
+    cell_id: Option<CellId>,
+) -> StateQueryResult<P2pAgentsDump> {
     use std::fmt::Write;
     let cell_id = cell_id.map(|c| c.into_dna_and_agent()).map(|c| {
         (
@@ -289,7 +321,7 @@ mod tests {
         p2p_put(&env, &agent_info_signed).await.unwrap();
 
         let ret = env
-            .conn()
+            .from_permit(env.conn_permit().await)
             .unwrap()
             .p2p_get_agent(&agent_info_signed.agent)
             .unwrap();
@@ -304,7 +336,12 @@ mod tests {
         let env = t_env.env();
 
         // - Check no data in the store to start
-        let count = env.conn().unwrap().p2p_list_agents().unwrap().len();
+        let count = env
+            .from_permit(env.conn_permit().await)
+            .unwrap()
+            .p2p_list_agents()
+            .unwrap()
+            .len();
 
         assert_eq!(count, 0);
 

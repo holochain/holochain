@@ -4,6 +4,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.0.22
+
+## 0.0.21
+
+- Gets won’t return private entries unless you are have committed a header for that entry. [\#1157](https://github.com/holochain/holochain/pull/1157)
+
+## 0.0.20
+
+## 0.0.19
+
+- Fixes database queries that were running on the runtime thread instead of the background thread. Makes the connections wait for a permit before taking a database connection from the pool. [\#1145](https://github.com/holochain/holochain/pull/1145)
+
+## 0.0.18
+
+## 0.0.17
+
+## 0.0.16
+
+## 0.0.15
+
 ## 0.0.14
 
 ## 0.0.13

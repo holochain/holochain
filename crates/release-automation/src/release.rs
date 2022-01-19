@@ -89,14 +89,17 @@ pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &crate::cli::ReleaseArgs) -
             ReleaseSteps::PushForPrToMain => {
                 // todo(backlog): push the release branch
                 // todo(backlog): create a PR against the main branch
+                warn!("{:?} not implemeted", step)
             }
             ReleaseSteps::CreatePrToMain => {
                 // todo: create a pull request from the release branch to the main branch
                 // todo: notify someone to review the PR
+                warn!("{:?} not implemeted", step)
             }
             ReleaseSteps::VerifyMainBranch => {
                 // todo: verify we're on the main branch
                 // todo: verify the Pr has been merged
+                warn!("{:?} not implemeted", step)
             }
             ReleaseSteps::PublishToCratesIo => publish_to_crates_io(&ws, cmd_args)?,
             ReleaseSteps::AddOwnersToCratesIo => {
@@ -107,13 +110,16 @@ pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &crate::cli::ReleaseArgs) -
             ReleaseSteps::PushReleaseTag => {
                 // todo: push all the tags that originated in this workspace release to the upstream:
                 // - every crate release tag
+                warn!("{:?} not implemeted", step)
             }
             ReleaseSteps::PushForDevelopPr => {
                 // todo(backlog): push the release branch
+                warn!("{:?} not implemeted", step)
             }
             ReleaseSteps::CreatePrToDevelop => {
                 // todo(backlog): create a PR against the develop branch
                 // todo: verify the Pr has been merged
+                warn!("{:?} not implemeted", step)
             }
         }
     }

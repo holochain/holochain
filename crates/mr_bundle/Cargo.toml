@@ -1,6 +1,6 @@
 [package]
 name = "mr_bundle"
-version = "0.0.4"
+version = "0.0.6"
 authors = ["Michael Dougherty <maackle.d@gmail.com>"]
 edition = "2018"
 description = "Implements the un-/packing of bundles that either embed or reference a set of resources"
@@ -10,12 +10,15 @@ documentation = "https://docs.rs/mr_bundle"
 
 [dependencies]
 bytes = "1.0"
+derive_more = "0.99"
+either = "1.5"
 flate2 = "1.0"
-holochain_util = { path = "../holochain_util", version = "0.0.4"}
+holochain_util = { path = "../holochain_util", version = "0.0.6"}
 futures = "0.3"
 reqwest = "0.11"
 rmp-serde = "0.15"
 serde = { version = "1.0", features = [ "serde_derive", "derive" ] }
+serde_bytes = "0.11"
 serde_derive = "1.0"
 thiserror = "1.0"
 

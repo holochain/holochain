@@ -1,24 +1,34 @@
 use super::*;
+use crate::metrics::*;
 use crate::types::gossip::GossipModule;
 use ghost_actor::dependencies::tracing;
 use kitsune_p2p_mdns::*;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
-use kitsune_p2p_types::dht_arc::DhtArc;
+use kitsune_p2p_types::dht_arc::{DhtArc, DhtArcSet};
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
 use url2::Url2;
+
+/// How often to record historical metrics
+/// (currently once per hour)
+const HISTORICAL_METRIC_RECORD_FREQ_MS: u64 = 1000 * 60 * 60;
+
+mod metric_exchange;
+use metric_exchange::*;
 
 mod rpc_multi_logic;
 
 type KSpace = Arc<KitsuneSpace>;
 type KAgent = Arc<KitsuneAgent>;
 type KBasis = Arc<KitsuneBasis>;
+type VecMXM = Vec<MetricExchangeMsg>;
 type WireConHnd = Tx2ConHnd<wire::Wire>;
 type Payload = Box<[u8]>;
 
 ghost_actor::ghost_chan! {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) chan SpaceInternal<crate::KitsuneP2pError> {
         /// List online agents that claim to be covering a basis hash
         fn list_online_agents_for_basis_hash(space: KSpace, from_agent: KAgent, basis: KBasis) -> HashSet<KAgent>;
@@ -28,6 +38,9 @@ ghost_actor::ghost_chan! {
 
         /// Update / publish a single agent info
         fn update_single_agent_info(agent: KAgent) -> ();
+
+        /// Update / publish a single agent info
+        fn publish_agent_info_signed(input: PutAgentInfoSignedEvt) -> ();
 
         /// see if an agent is locally joined
         fn is_agent_local(agent: KAgent) -> bool;
@@ -46,11 +59,21 @@ ghost_actor::ghost_chan! {
             to_agent: KAgent,
             mod_idx: u32,
             mod_cnt: u32,
+            destination: BroadcastTo,
             data: crate::wire::WireData,
         ) -> ();
 
         /// Incoming Gossip
         fn incoming_gossip(space: KSpace, con: WireConHnd, remote_url: TxUrl, data: Payload, module_type: crate::types::gossip::GossipModuleType) -> ();
+
+        /// Incoming Metric Exchange
+        fn incoming_metric_exchange(space: KSpace, msgs: VecMXM) -> ();
+
+        /// New Con
+        fn new_con(url: TxUrl, con: WireConHnd) -> ();
+
+        /// Del Con
+        fn del_con(url: TxUrl) -> ();
     }
 }
 
@@ -159,8 +182,8 @@ impl SpaceInternalHandler for Space {
                 };
                 peer_data.push(update_single_agent_info(input).await?);
             }
-            evt_sender
-                .put_agent_info_signed(PutAgentInfoSignedEvt {
+            internal_sender
+                .publish_agent_info_signed(PutAgentInfoSignedEvt {
                     space: space.clone(),
                     peer_data,
                 })
@@ -207,12 +230,41 @@ impl SpaceInternalHandler for Space {
                 single_storage_arc_per_space,
             };
             let peer_data = vec![update_single_agent_info(input).await?];
-            evt_sender
-                .put_agent_info_signed(PutAgentInfoSignedEvt {
+            internal_sender
+                .publish_agent_info_signed(PutAgentInfoSignedEvt {
                     space: space.clone(),
                     peer_data,
                 })
                 .await?;
+            Ok(())
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_publish_agent_info_signed(
+        &mut self,
+        input: PutAgentInfoSignedEvt,
+    ) -> SpaceInternalHandlerResult<()> {
+        let timeout = self.config.tuning_params.implicit_timeout();
+        let tasks: Vec<_> = input
+            .peer_data
+            .into_iter()
+            .map(|agent_info| {
+                let data = agent_info.encode().unwrap();
+                self.handle_broadcast(
+                    self.space.clone(),
+                    Arc::new(KitsuneBasis::new(agent_info.agent.0.clone())),
+                    timeout,
+                    BroadcastTo::PublishAgentInfo,
+                    data.into(),
+                )
+            })
+            .collect();
+        Ok(async move {
+            for f in tasks {
+                f?.await?;
+            }
             Ok(())
         }
         .boxed()
@@ -233,6 +285,7 @@ impl SpaceInternalHandler for Space {
         arc: DhtArc,
     ) -> SpaceInternalHandlerResult<()> {
         self.agent_arcs.insert(agent, arc);
+        self.update_metric_exchange_arcset();
         Ok(async move { Ok(()) }.boxed().into())
     }
 
@@ -243,21 +296,46 @@ impl SpaceInternalHandler for Space {
         _to_agent: Arc<KitsuneAgent>,
         mod_idx: u32,
         mod_cnt: u32,
+        destination: BroadcastTo,
         data: crate::wire::WireData,
     ) -> InternalHandlerResult<()> {
         // first, forward this incoming broadcast to all connected
         // local agents.
-        let mut local_events = Vec::new();
-        for agent in self.local_joined_agents.iter().cloned() {
-            if let Some(arc) = self.agent_arcs.get(&agent) {
-                if arc.contains(basis.get_loc()) {
-                    let fut = self.evt_sender.notify(
-                        space.clone(),
-                        agent.clone(),
-                        agent.clone(),
-                        data.clone().into(),
-                    );
-                    local_events.push(async move {
+        let mut local_notify_events = Vec::new();
+        let mut local_agent_info_events = Vec::new();
+        match destination {
+            BroadcastTo::Notify => {
+                for agent in self.local_joined_agents.iter().cloned() {
+                    if let Some(arc) = self.agent_arcs.get(&agent) {
+                        if arc.contains(basis.get_loc()) {
+                            let fut = self.evt_sender.notify(
+                                space.clone(),
+                                agent.clone(),
+                                data.clone().into(),
+                            );
+                            local_notify_events.push(async move {
+                                if let Err(err) = fut.await {
+                                    tracing::warn!(?err, "failed local broadcast");
+                                }
+                            });
+                        }
+                    }
+                }
+            }
+            BroadcastTo::PublishAgentInfo => {
+                if self
+                    .agent_arcs
+                    .values()
+                    .any(|arc| arc.contains(basis.get_loc()))
+                {
+                    let info = AgentInfoSigned::decode(&data[..])?;
+                    let fut = self
+                        .evt_sender
+                        .put_agent_info_signed(PutAgentInfoSignedEvt {
+                            space: self.space.clone(),
+                            peer_data: vec![info],
+                        });
+                    local_agent_info_events.push(async move {
                         if let Err(err) = fut.await {
                             tracing::warn!(?err, "failed local broadcast");
                         }
@@ -274,7 +352,8 @@ impl SpaceInternalHandler for Space {
             discover::get_cached_remotes_near_basis(ro_inner.clone(), basis.get_loc(), timeout);
 
         Ok(async move {
-            futures::future::join_all(local_events).await;
+            futures::future::join_all(local_notify_events).await;
+            futures::future::join_all(local_agent_info_events).await;
 
             let info_list = fut.await?;
 
@@ -303,7 +382,8 @@ impl SpaceInternalHandler for Space {
                     };
 
                     // generate our broadcast payload
-                    let payload = wire::Wire::broadcast(space, info.agent.clone(), data);
+                    let payload =
+                        wire::Wire::broadcast(space, info.agent.clone(), destination, data);
 
                     // forward the data
                     if let Err(err) = con_hnd.notify(&payload, timeout).await {
@@ -335,6 +415,29 @@ impl SpaceInternalHandler for Space {
                 module_type
             ),
         }
+        unit_ok_fut()
+    }
+
+    fn handle_incoming_metric_exchange(
+        &mut self,
+        _space: Arc<KitsuneSpace>,
+        msgs: Vec<MetricExchangeMsg>,
+    ) -> InternalHandlerResult<()> {
+        self.ro_inner.metric_exchange.write().ingest_msgs(msgs);
+        unit_ok_fut()
+    }
+
+    fn handle_new_con(
+        &mut self,
+        url: TxUrl,
+        con: Tx2ConHnd<wire::Wire>,
+    ) -> InternalHandlerResult<()> {
+        self.ro_inner.metric_exchange.write().new_con(url, con);
+        unit_ok_fut()
+    }
+
+    fn handle_del_con(&mut self, url: TxUrl) -> InternalHandlerResult<()> {
+        self.ro_inner.metric_exchange.write().del_con(url);
         unit_ok_fut()
     }
 }
@@ -461,6 +564,8 @@ use ghost_actor::dependencies::must_future::MustBoxFuture;
 impl ghost_actor::GhostControlHandler for Space {
     fn handle_ghost_actor_shutdown(mut self) -> MustBoxFuture<'static, ()> {
         async move {
+            self.ro_inner.metric_exchange.write().shutdown();
+
             use futures::sink::SinkExt;
             // this is a curtesy, ok if fails
             let _ = self.evt_sender.close().await;
@@ -550,6 +655,7 @@ impl KitsuneP2pHandler for Space {
     ) -> KitsuneP2pHandlerResult<()> {
         self.local_joined_agents.remove(&agent);
         self.agent_arcs.remove(&agent);
+        self.update_metric_exchange_arcset();
         for module in self.gossip_mod.values() {
             module.local_agent_leave(agent.clone());
         }
@@ -560,7 +666,6 @@ impl KitsuneP2pHandler for Space {
         &mut self,
         space: Arc<KitsuneSpace>,
         to_agent: Arc<KitsuneAgent>,
-        from_agent: Arc<KitsuneAgent>,
         payload: Vec<u8>,
         timeout_ms: Option<u64>,
     ) -> KitsuneP2pHandlerResult<Vec<u8>> {
@@ -572,30 +677,51 @@ impl KitsuneP2pHandler for Space {
         };
         let timeout = KitsuneTimeout::from_millis(timeout_ms);
 
+        let start = tokio::time::Instant::now();
+
         let discover_fut = discover::search_and_discover_peer_connect(
             self.ro_inner.clone(),
             to_agent.clone(),
             timeout,
         );
 
+        let metrics = self.ro_inner.metrics.clone();
+
         Ok(async move {
             match discover_fut.await {
                 discover::PeerDiscoverResult::OkShortcut => {
                     // reflect this request locally
-                    evt_sender.call(space, to_agent, from_agent, payload).await
+                    evt_sender.call(space, to_agent, payload).await
                 }
                 discover::PeerDiscoverResult::OkRemote { con_hnd, .. } => {
-                    let payload = wire::Wire::call(
-                        space.clone(),
-                        from_agent.clone(),
-                        to_agent.clone(),
-                        payload.into(),
-                    );
+                    let payload = wire::Wire::call(space.clone(), to_agent.clone(), payload.into());
                     let res = con_hnd.request(&payload, timeout).await?;
                     match res {
-                        wire::Wire::Failure(wire::Failure { reason }) => Err(reason.into()),
-                        wire::Wire::CallResp(wire::CallResp { data }) => Ok(data.into()),
-                        r => Err(format!("invalid response: {:?}", r).into()),
+                        wire::Wire::Failure(wire::Failure { reason }) => {
+                            metrics
+                                .write()
+                                .record_reachability_event(false, [&to_agent]);
+                            metrics
+                                .write()
+                                .record_latency_micros(start.elapsed().as_micros(), [&to_agent]);
+                            Err(reason.into())
+                        }
+                        wire::Wire::CallResp(wire::CallResp { data }) => {
+                            metrics.write().record_reachability_event(true, [&to_agent]);
+                            metrics
+                                .write()
+                                .record_latency_micros(start.elapsed().as_micros(), [&to_agent]);
+                            Ok(data.into())
+                        }
+                        r => {
+                            metrics
+                                .write()
+                                .record_reachability_event(false, [&to_agent]);
+                            metrics
+                                .write()
+                                .record_latency_micros(start.elapsed().as_micros(), [&to_agent]);
+                            Err(format!("invalid response: {:?}", r).into())
+                        }
                     }
                 }
                 discover::PeerDiscoverResult::Err(e) => Err(e),
@@ -633,20 +759,45 @@ impl KitsuneP2pHandler for Space {
         space: Arc<KitsuneSpace>,
         basis: Arc<KitsuneBasis>,
         timeout: KitsuneTimeout,
+        destination: BroadcastTo,
         payload: Vec<u8>,
     ) -> KitsuneP2pHandlerResult<()> {
         // first, forward this data to all connected local agents.
-        let mut local_events = Vec::new();
-        for agent in self.local_joined_agents.iter().cloned() {
-            if let Some(arc) = self.agent_arcs.get(&agent) {
-                if arc.contains(basis.get_loc()) {
-                    let fut = self.evt_sender.notify(
-                        space.clone(),
-                        agent.clone(),
-                        agent.clone(),
-                        payload.clone(),
-                    );
-                    local_events.push(async move {
+        let mut local_notify_events = Vec::new();
+        let mut local_agent_info_events = Vec::new();
+        match destination {
+            BroadcastTo::Notify => {
+                for agent in self.local_joined_agents.iter().cloned() {
+                    if let Some(arc) = self.agent_arcs.get(&agent) {
+                        if arc.contains(basis.get_loc()) {
+                            let fut = self.evt_sender.notify(
+                                space.clone(),
+                                agent.clone(),
+                                payload.clone(),
+                            );
+                            local_notify_events.push(async move {
+                                if let Err(err) = fut.await {
+                                    tracing::warn!(?err, "failed local broadcast");
+                                }
+                            });
+                        }
+                    }
+                }
+            }
+            BroadcastTo::PublishAgentInfo => {
+                if self
+                    .agent_arcs
+                    .values()
+                    .any(|arc| arc.contains(basis.get_loc()))
+                {
+                    let info = AgentInfoSigned::decode(&payload[..])?;
+                    let fut = self
+                        .evt_sender
+                        .put_agent_info_signed(PutAgentInfoSignedEvt {
+                            space: self.space.clone(),
+                            peer_data: vec![info],
+                        });
+                    local_agent_info_events.push(async move {
                         if let Err(err) = fut.await {
                             tracing::warn!(?err, "failed local broadcast");
                         }
@@ -661,9 +812,10 @@ impl KitsuneP2pHandler for Space {
         let discover_fut =
             discover::search_remotes_covering_basis(ro_inner.clone(), basis.get_loc(), timeout);
         Ok(async move {
-            futures::future::join_all(local_events).await;
+            futures::future::join_all(local_notify_events).await;
+            futures::future::join_all(local_agent_info_events).await;
 
-            // TODO - FIXME
+            // NOTE
             // Holochain currently does all its testing without any remote nodes
             // if we do this inline, it takes us to the 30 second timeout
             // on every one of those... so spawning for now, which means
@@ -736,6 +888,7 @@ impl KitsuneP2pHandler for Space {
                         agent,
                         mod_idx as u32,
                         mod_cnt as u32,
+                        destination,
                         payload.clone().into(),
                     );
 
@@ -762,7 +915,6 @@ impl KitsuneP2pHandler for Space {
     fn handle_targeted_broadcast(
         &mut self,
         space: Arc<KitsuneSpace>,
-        from_agent: Arc<KitsuneAgent>,
         agents: Vec<Arc<KitsuneAgent>>,
         timeout: KitsuneTimeout,
         payload: Vec<u8>,
@@ -793,7 +945,6 @@ impl KitsuneP2pHandler for Space {
                         .ok()
                 };
                 let space = space.clone();
-                let from_agent = from_agent.clone();
                 let payload = payload.clone();
                 let evt_sender = evt_sender.clone();
                 let ro_inner = ro_inner.clone();
@@ -808,7 +959,7 @@ impl KitsuneP2pHandler for Space {
                         discover::PeerDiscoverResult::OkShortcut => {
                             // reflect this request locally
                             evt_sender
-                                .notify(space, agent, from_agent, payload)
+                                .notify(space, agent, payload)
                                 .map(|r| {
                                     if let Err(e) = r {
                                         tracing::error!(
@@ -820,7 +971,12 @@ impl KitsuneP2pHandler for Space {
                                 .await;
                         }
                         discover::PeerDiscoverResult::OkRemote { con_hnd, .. } => {
-                            let payload = wire::Wire::broadcast(space, agent, payload.into());
+                            let payload = wire::Wire::broadcast(
+                                space,
+                                agent,
+                                BroadcastTo::Notify,
+                                payload.into(),
+                            );
                             con_hnd
                                 .notify(&payload, timeout)
                                 .map(|r| {
@@ -864,14 +1020,30 @@ impl KitsuneP2pHandler for Space {
     fn handle_authority_for_hash(
         &mut self,
         _space: Arc<KitsuneSpace>,
-        agent: Arc<KitsuneAgent>,
         basis: Arc<KitsuneBasis>,
     ) -> KitsuneP2pHandlerResult<bool> {
-        let r = match self.agent_arcs.get(&agent) {
-            Some(agent_arc) => agent_arc.contains(basis.get_loc()),
-            None => false,
-        };
+        let loc = basis.get_loc();
+        let r = self
+            .agent_arcs
+            .values()
+            .any(|agent_arc| agent_arc.contains(loc));
         Ok(async move { Ok(r) }.boxed().into())
+    }
+
+    fn handle_dump_network_metrics(
+        &mut self,
+        _space: Option<Arc<KitsuneSpace>>,
+    ) -> KitsuneP2pHandlerResult<serde_json::Value> {
+        let space = self.ro_inner.space.clone();
+        let metrics = self.ro_inner.metrics.read().dump();
+        Ok(async move {
+            Ok(serde_json::json!({
+                "space": space.to_string(),
+                "metrics": metrics,
+            }))
+        }
+        .boxed()
+        .into())
     }
 }
 
@@ -885,6 +1057,8 @@ pub(crate) struct SpaceReadOnlyInner {
     #[allow(dead_code)]
     pub(crate) config: Arc<KitsuneP2pConfig>,
     pub(crate) parallel_notify_permit: Arc<tokio::sync::Semaphore>,
+    pub(crate) metrics: MetricsSync,
+    pub(crate) metric_exchange: MetricExchangeSync,
 }
 
 /// A Kitsune P2p Node can track multiple "spaces" -- Non-interacting namespaced
@@ -916,6 +1090,38 @@ impl Space {
         bandwidth_throttles: BandwidthThrottles,
         parallel_notify_permit: Arc<tokio::sync::Semaphore>,
     ) -> Self {
+        let metrics = MetricsSync::default();
+
+        {
+            let space = space.clone();
+            let metrics = metrics.clone();
+            let evt_sender = evt_sender.clone();
+            tokio::task::spawn(async move {
+                loop {
+                    tokio::time::sleep(std::time::Duration::from_millis(
+                        HISTORICAL_METRIC_RECORD_FREQ_MS,
+                    ))
+                    .await;
+
+                    let records = metrics.read().dump_historical();
+
+                    let _ = evt_sender
+                        .k_gen_req(KGenReq::RecordMetrics {
+                            space: space.clone(),
+                            records,
+                        })
+                        .await;
+                }
+            });
+        }
+
+        let metric_exchange = MetricExchangeSync::spawn(
+            space.clone(),
+            config.tuning_params.clone(),
+            evt_sender.clone(),
+            metrics.clone(),
+        );
+
         let gossip_mod = config
             .tuning_params
             .gossip_strategy
@@ -950,6 +1156,7 @@ impl Space {
                         space.clone(),
                         ep_hnd.clone(),
                         evt_sender.clone(),
+                        metrics.clone(),
                     ),
                 )
             })
@@ -1041,6 +1248,8 @@ impl Space {
             ep_hnd,
             config: config.clone(),
             parallel_notify_permit,
+            metrics,
+            metric_exchange,
         });
 
         Self {
@@ -1056,6 +1265,15 @@ impl Space {
             mdns_listened_spaces: HashSet::new(),
             gossip_mod,
         }
+    }
+
+    fn update_metric_exchange_arcset(&mut self) {
+        let arc_set = self
+            .agent_arcs
+            .iter()
+            .map(|(_, a)| DhtArcSet::from_interval(a.interval()))
+            .fold(DhtArcSet::new_empty(), |a, i| a.union(&i));
+        self.ro_inner.metric_exchange.write().update_arcset(arc_set);
     }
 
     fn publish_leave_agent_info(

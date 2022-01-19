@@ -8,15 +8,31 @@ impl ShardedGossipLocal {
         &self,
         peer_cert: Tx2Cert,
         remote_arc_set: Vec<ArcInterval>,
+        remote_agent_list: Vec<AgentInfoSigned>,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
-        let (local_agents, accept_is_from_target) = self.inner.share_mut(|i, _| {
-            let accept_is_from_target = i
-                .initiate_tgt
-                .as_ref()
-                .map(|tgt| *tgt.0.cert() == peer_cert)
-                .unwrap_or(false);
-            Ok((i.local_agents.clone(), accept_is_from_target))
-        })?;
+        let (local_agents, when_initiated, accept_is_from_target) =
+            self.inner.share_mut(|i, _| {
+                let accept_is_from_target = i
+                    .initiate_tgt
+                    .as_ref()
+                    .map(|tgt| tgt.cert == peer_cert)
+                    .unwrap_or(false);
+                let when_initiated = i.initiate_tgt.as_ref().and_then(|i| i.when_initiated);
+                Ok((
+                    i.local_agents.clone(),
+                    when_initiated,
+                    accept_is_from_target,
+                ))
+            })?;
+
+        if let Some(when_initiated) = when_initiated {
+            let _ = self.inner.share_ref(|i| {
+                i.metrics
+                    .write()
+                    .record_latency_micros(when_initiated.elapsed().as_micros(), &local_agents);
+                Ok(())
+            });
+        }
 
         // This accept is not from our current target so ignore.
         if !accept_is_from_target {
@@ -32,13 +48,22 @@ impl ShardedGossipLocal {
 
         // Get the local intervals.
         let local_agent_arcs =
-            store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents).await?;
+            store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents)
+                .await?
+                .into_iter()
+                .map(|(_, a)| a)
+                .collect();
 
-        let mut gossip = Vec::with_capacity(2);
+        let mut gossip = Vec::new();
 
         // Generate the bloom filters and new state.
         let state = self
-            .generate_blooms(local_agent_arcs, remote_arc_set, &mut gossip)
+            .generate_blooms(
+                remote_agent_list.clone(),
+                local_agent_arcs,
+                remote_arc_set,
+                &mut gossip,
+            )
             .await?;
 
         self.inner.share_mut(|inner, _| {
@@ -46,7 +71,7 @@ impl ShardedGossipLocal {
             // a stale accept comes in for the same peer cert?
             // Maybe we need to check timestamps on messages or have unique round ids?
             inner.round_map.insert(peer_cert.clone(), state);
-            inner.metrics.record_initiate(peer_cert);
+            inner.metrics.write().record_initiate(&remote_agent_list);
             Ok(())
         })?;
         Ok(gossip)

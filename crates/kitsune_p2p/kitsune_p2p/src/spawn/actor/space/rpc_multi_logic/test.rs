@@ -154,7 +154,6 @@ async fn test_rpc_multi_logic_mocked() {
                                 let resp = match wire {
                                     wire::Wire::Call(wire::Call {
                                         space: _,
-                                        from_agent: _,
                                         to_agent: _,
                                         data,
                                     }) => {
@@ -230,6 +229,14 @@ async fn test_rpc_multi_logic_mocked() {
     });
     let ep_hnd = build_ep_hnd(config.clone(), m).await;
 
+    let metrics = MetricsSync::default();
+    let metric_exchange = MetricExchangeSync::spawn(
+        space.clone(),
+        config.tuning_params.clone(),
+        evt_sender.clone(),
+        metrics.clone(),
+    );
+
     // build up the ro_inner that discover calls expect
     let ro_inner = Arc::new(SpaceReadOnlyInner {
         space: space.clone(),
@@ -241,16 +248,16 @@ async fn test_rpc_multi_logic_mocked() {
             config.tuning_params.concurrent_limit_per_thread,
         )),
         config,
+        metrics,
+        metric_exchange,
     });
 
-    let agent = Arc::new(KitsuneAgent(vec![0; 36]));
     let basis = Arc::new(KitsuneBasis(vec![0; 36]));
 
     // excercise the rpc multi logic
     let res = handle_rpc_multi(
         actor::RpcMulti {
             space,
-            from_agent: agent.clone(),
             basis,
             payload: b"test".to_vec(),
             max_remote_agent_count: 3,

@@ -65,7 +65,6 @@ struct Outer {
     remote_request_grace_ms: u64,
     max_timeout: KitsuneTimeout,
     space: Arc<KitsuneSpace>,
-    from_agent: Arc<KitsuneAgent>,
     basis: Arc<KitsuneBasis>,
     payload: Vec<u8>,
 }
@@ -104,7 +103,6 @@ impl Outer {
     ) -> Self {
         let RpcMulti {
             space,
-            from_agent,
             basis,
             payload,
             max_remote_agent_count,
@@ -130,7 +128,6 @@ impl Outer {
             remote_request_grace_ms,
             max_timeout,
             space,
-            from_agent,
             basis,
             payload,
         };
@@ -296,17 +293,11 @@ impl Outer {
         let evt_sender = self.ro_inner.evt_sender.clone();
 
         let space = self.space.clone();
-        let from_agent = self.from_agent.clone();
         let payload = self.payload.clone();
 
         Arc::new(move |to_agent, permit| {
             let report_results = report_results.clone();
-            let fut = evt_sender.call(
-                space.clone(),
-                to_agent.clone(),
-                from_agent.clone(),
-                payload.clone(),
-            );
+            let fut = evt_sender.call(space.clone(), to_agent.clone(), payload.clone());
 
             // see add_tokio_task vs add_task
             add_tokio_task(
@@ -339,7 +330,6 @@ impl Outer {
 
         let ro_inner = self.ro_inner.clone();
         let space = self.space.clone();
-        let from_agent = self.from_agent.clone();
         let payload = self.payload.clone();
         let max_timeout = self.max_timeout;
 
@@ -347,7 +337,6 @@ impl Outer {
             let report_results = report_results.clone();
             let ro_inner = ro_inner.clone();
             let space = space.clone();
-            let from_agent = from_agent.clone();
             let payload = payload.clone();
 
             add_tokio_task(
@@ -368,19 +357,36 @@ impl Outer {
                             PeerDiscoverResult::OkRemote { con_hnd, .. } => con_hnd,
                         };
 
-                    let msg =
-                        wire::Wire::call(space, from_agent, info.agent.clone(), payload.into());
+                    let msg = wire::Wire::call(space, info.agent.clone(), payload.into());
+
+                    let start = tokio::time::Instant::now();
 
                     let res = con_hnd.request(&msg, max_timeout).await;
 
                     match res {
                         Ok(wire::Wire::CallResp(c)) => {
+                            ro_inner
+                                .metrics
+                                .write()
+                                .record_reachability_event(true, [&info.agent]);
+                            ro_inner
+                                .metrics
+                                .write()
+                                .record_latency_micros(start.elapsed().as_micros(), [&info.agent]);
                             report_results(RpcMultiResponse {
                                 agent: info.agent.clone(),
                                 response: c.data.into(),
                             });
                         }
                         oth => {
+                            ro_inner
+                                .metrics
+                                .write()
+                                .record_reachability_event(false, [&info.agent]);
+                            ro_inner
+                                .metrics
+                                .write()
+                                .record_latency_micros(start.elapsed().as_micros(), [&info.agent]);
                             tracing::warn!(?oth, "unexpected remote call result");
                         }
                     }

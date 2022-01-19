@@ -88,16 +88,10 @@ wasm_io_types! {
     fn agent_info (()) -> zt::info::AgentInfo;
 
     // @todo
-    fn app_info (()) -> zt::info::AppInfo;
-
-    // @todo
     fn dna_info (()) -> zt::info::DnaInfo;
 
     // @todo
     fn call_info (()) -> zt::info::CallInfo;
-
-    // Header hash of the DeleteLink element.
-    fn call_remote (Vec<zt::call_remote::CallRemote>) -> Vec<zt::ZomeCallResponse>;
 
     fn call (Vec<zt::call::Call>) -> Vec<zt::ZomeCallResponse>;
 

@@ -4,6 +4,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.0.19
+
+## 0.0.18
+
+## 0.0.17
+
+- Agent info is now published as well as gossiped. [\#1115](https://github.com/holochain/holochain/pull/1115)
+- BREAKING: Network wire message has changed format so will not be compatible with older versions. [1143](https://github.com/holochain/holochain/pull/1143).
+- Fixes to gossip that allows batching of large amounts of data. [1143](https://github.com/holochain/holochain/pull/1143).
+
+## 0.0.16
+
+## 0.0.15
+
+- BREAKING: Wire message `Call` no longer takes `from_agent`. [\#1091](https://github.com/holochain/holochain/pull/1091)
+
+## 0.0.14
+
+## 0.0.13
+
 ## 0.0.12
 
 - BREAKING: Return `ShardedGossipWire::Busy` if we are overloaded with incoming gossip. [\#1076](https://github.com/holochain/holochain/pull/1076)

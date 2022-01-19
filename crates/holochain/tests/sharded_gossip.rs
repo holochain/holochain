@@ -172,7 +172,7 @@ async fn mock_network_sharded_gossip() {
         },
     };
     use holochain_p2p::{dht_arc::DhtLocation, AgentPubKeyExt, DnaHashExt};
-    use holochain_sqlite::db::AsP2pAgentStoreConExt;
+    use holochain_sqlite::db::AsP2pStateTxExt;
     use kitsune_p2p::TransportConfig;
     use kitsune_p2p_types::tx2::tx2_adapter::AdapterFactory;
 
@@ -319,6 +319,7 @@ async fn mock_network_sharded_gossip() {
                     HolochainP2pMockMsg::PeerGetResp(_) => debug!("PeerGetResp"),
                     HolochainP2pMockMsg::PeerQuery(_) => debug!("PeerQuery"),
                     HolochainP2pMockMsg::PeerQueryResp(_) => debug!("PeerQueryResp"),
+                    HolochainP2pMockMsg::MetricExchange(_) => debug!("MetricExchange"),
                     HolochainP2pMockMsg::Gossip {
                         dna,
                         module,
@@ -334,6 +335,7 @@ async fn mock_network_sharded_gossip() {
                                         // agent at a time.
                                         last_intervals = Some(intervals);
                                         let arc = data.agent_to_arc[&agent];
+                                        let agent_info = data.agent_to_info[&agent].clone();
                                         let interval = arc.interval();
 
                                         // If we have info for alice check the overlap.
@@ -359,7 +361,10 @@ async fn mock_network_sharded_gossip() {
                                             dna: dna.clone(),
                                             module: module.clone(),
                                             gossip: GossipProtocol::Sharded(
-                                                ShardedGossipWire::accept(vec![interval]),
+                                                ShardedGossipWire::accept(
+                                                    vec![interval],
+                                                    vec![agent_info],
+                                                ),
                                             ),
                                         };
                                         channel.send(msg.addressed((*agent).clone())).await;
@@ -504,7 +509,10 @@ async fn mock_network_sharded_gossip() {
                                             dna,
                                             module,
                                             gossip: GossipProtocol::Sharded(
-                                                ShardedGossipWire::missing_ops(missing_ops, true),
+                                                ShardedGossipWire::missing_ops(
+                                                    missing_ops,
+                                                    MissingOpsStatus::AllComplete as u8,
+                                                ),
                                             ),
                                         };
                                         channel.send(msg.addressed((*agent).clone())).await;
@@ -575,13 +583,13 @@ async fn mock_network_sharded_gossip() {
         let alice_info = alice_info.clone();
         async move {
             loop {
-                let info = alice_p2p_env
-                    .conn()
-                    .unwrap()
-                    .p2p_get_agent(&alice_kit)
-                    .unwrap();
                 {
-                    *alice_info.lock() = info;
+                    let mut conn = alice_p2p_env.conn().unwrap();
+                    let txn = conn.transaction().unwrap();
+                    let info = txn.p2p_get_agent(&alice_kit).unwrap();
+                    {
+                        *alice_info.lock() = info;
+                    }
                 }
                 tokio::time::sleep(std::time::Duration::from_secs(5)).await;
             }

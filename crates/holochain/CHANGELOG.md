@@ -4,11 +4,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fixes issue where holochain could get stuck in infinite loop when trying to send validation receipts. [#1181](https://github.com/holochain/holochain/pull/1181).
+- Additional networking metric collection and associated admin api `DumpNetworkMetrics { dna_hash: Option<DnaHash> }` for inspection of metrics [#1160](https://github.com/holochain/holochain/pull/1160)
+- **BREAKING CHANGE** - Schema change for metrics database. Holochain will persist historical metrics once per hour, if you do not clear the metrics database it will crash at that point. [#1183](https://github.com/holochain/holochain/pull/1183)
+
+## 0.0.122
+- Adds better batching to validation workflows for much faster validation. [#1167](https://github.com/holochain/holochain/pull/1167).
+
+## 0.0.121
+
+- **BREAKING CHANGE** Removed `app_info` from HDK [1108](https://github.com/holochain/holochain/pull/1108)
+- Permissions on host functions now return an error instead of panicking [1141](https://github.com/holochain/holochain/pull/1141)
+- Add `--build-info` CLI flag for displaying various information in JSON format. [\#1163](https://github.com/holochain/holochain/pull/1163)
+
+## 0.0.120
+
+## 0.0.119
+
+## 0.0.118
+
+- **BREAKING CHANGE** - Gossip now exchanges local peer info with `initiate` and `accept` request types. [\#1114](https://github.com/holochain/holochain/pull/1114).
+
+## 0.0.117
+
+## 0.0.116
+
+## 0.0.115
+
 - Fix [issue](https://github.com/holochain/holochain/issues/1100) where private dht ops were being leaked through the incoming ops sender. [1104](https://github.com/holochain/holochain/pull/1104).
-- Kitsune now attempts to rebind the network interface in the event of endpoint shutdown. Note, it's still recommended to bind to `0.0.0.0` as the OS provides additional resiliency for interfaces coming and going. [#1083](https://github.com/holochain/holochain/pull/1083)
-- **BREAKING CHANGE** current chain head including recent writes available in agent info [#1079](https://github.com/holochain/holochain/pull/1079)
-- **BREAKING (If using new lair)** If you are using the new (non-legacy) `lair_server` keystore, you will need to rebuild your keystore, we now pre-hash the passphrase used to access it to mitigate some information leakage. [#1094](https://github.com/holochain/holochain/pull/1094)
-- Better lair signature fallback child process management. The child process will now be properly restarted if it exits. (Note this can take a few millis on Windows, and may result in some signature errors.) [#1094](https://github.com/holochain/holochain/pull/1094)
+- Kitsune now attempts to rebind the network interface in the event of endpoint shutdown. Note, it’s still recommended to bind to `0.0.0.0` as the OS provides additional resiliency for interfaces coming and going. [\#1083](https://github.com/holochain/holochain/pull/1083)
+- **BREAKING CHANGE** current chain head including recent writes available in agent info [\#1079](https://github.com/holochain/holochain/pull/1079)
+- **BREAKING (If using new lair)** If you are using the new (non-legacy) `lair_server` keystore, you will need to rebuild your keystore, we now pre-hash the passphrase used to access it to mitigate some information leakage. [\#1094](https://github.com/holochain/holochain/pull/1094)
+- Better lair signature fallback child process management. The child process will now be properly restarted if it exits. (Note this can take a few millis on Windows, and may result in some signature errors.) [\#1094](https://github.com/holochain/holochain/pull/1094)
 
 ## 0.0.114
 

@@ -21,12 +21,12 @@ mod tests {
         harness.magic_peer_info_exchange().await.unwrap();
 
         let r1 = p2p1
-            .rpc_single(space.clone(), a2.clone(), a1.clone(), b"m1".to_vec(), None)
+            .rpc_single(space.clone(), a1.clone(), b"m1".to_vec(), None)
             .await
             .unwrap();
         let s = std::time::Instant::now();
         let r2 = match p2p2
-            .rpc_single(space.clone(), a1, a2, b"m2".to_vec(), None)
+            .rpc_single(space.clone(), a2, b"m2".to_vec(), None)
             .await
         {
             Err(_) => {
@@ -58,7 +58,6 @@ mod tests {
         let mut input = actor::RpcMulti::new(
             &Default::default(),
             space,
-            a1.clone(),
             TestVal::test_val(),
             b"test-multi-request".to_vec(),
         );
@@ -146,9 +145,7 @@ mod tests {
         let a2: Arc<KitsuneAgent> = TestVal::test_val();
         p2p.join(space.clone(), a2.clone()).await?;
 
-        let res = p2p
-            .rpc_single(space, a2, a1, b"hello".to_vec(), None)
-            .await?;
+        let res = p2p.rpc_single(space, a1, b"hello".to_vec(), None).await?;
         assert_eq!(b"echo: hello".to_vec(), res);
 
         harness.ghost_actor_shutdown().await?;
@@ -173,7 +170,6 @@ mod tests {
         let mut input = actor::RpcMulti::new(
             &Default::default(),
             space,
-            a1.clone(),
             TestVal::test_val(),
             b"test-multi-request".to_vec(),
         );
@@ -205,7 +201,6 @@ mod tests {
         let mut input = actor::RpcMulti::new(
             &Default::default(),
             space,
-            a1.clone(),
             TestVal::test_val(),
             b"test-multi-request".to_vec(),
         );
@@ -359,5 +354,58 @@ mod tests {
 
         harness.ghost_actor_shutdown().await?;
         Ok(())
+    }
+
+    /// Test that we can publish agent info.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "Need a better way then waiting 6 minutes to test this"]
+    async fn test_publish_agent_info() {
+        observability::test_run().ok();
+
+        let (harness, _evt) = spawn_test_harness_mem().await.unwrap();
+
+        harness.add_space().await.unwrap();
+
+        // - Add the first agent
+        let (a1, _) = harness.add_publish_only_agent("one".into()).await.unwrap();
+
+        let peer_data = harness
+            .dump_local_peer_data(dbg!(a1.clone()))
+            .await
+            .unwrap();
+        let a1_peer_info = peer_data[&a1].clone();
+        // - Add the second agent
+        let (a2, _) = harness.add_publish_only_agent("two".into()).await.unwrap();
+
+        // - Add the second agent
+        let (a3, _) = harness
+            .add_publish_only_agent("three".into())
+            .await
+            .unwrap();
+
+        harness
+            .inject_peer_info(a3.clone(), a1_peer_info.clone())
+            .await
+            .unwrap();
+
+        // There's no way to trigger a publishing of peer data without waiting
+        // for > five minutes.
+        tokio::time::sleep(std::time::Duration::from_secs(6 * 60)).await;
+
+        let a1_peers = harness.dump_local_peer_data(a1.clone()).await.unwrap();
+        let a2_peers = harness.dump_local_peer_data(a2.clone()).await.unwrap();
+        let a3_peers = harness.dump_local_peer_data(a3.clone()).await.unwrap();
+
+        // a1 and a2 have each others peer info.
+        assert!(a1_peers.get(&a3).is_some());
+        assert!(a3_peers.get(&a1).is_some());
+
+        // a2 doesn't have anyone's info and no one has a2's info.
+        assert!(a1_peers.get(&a2).is_none());
+        assert!(a3_peers.get(&a2).is_none());
+        assert!(a2_peers.get(&a1).is_none());
+        assert!(a2_peers.get(&a3).is_none());
+
+        harness.ghost_actor_shutdown().await.unwrap();
     }
 }
