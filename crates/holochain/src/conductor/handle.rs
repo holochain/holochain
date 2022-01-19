@@ -57,8 +57,6 @@ use super::{full_integration_dump, integration_dump};
 use crate::conductor::p2p_agent_store::get_single_agent_info;
 use crate::conductor::p2p_agent_store::query_peer_density;
 use crate::conductor::p2p_agent_store::P2pBatch;
-use crate::conductor::p2p_metrics::put_metric_datum;
-use crate::conductor::p2p_metrics::query_metrics;
 use crate::core::queue_consumer::QueueConsumerMap;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
 use crate::core::ribosome::real_ribosome::RealRibosome;
@@ -615,6 +613,24 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                     .boxed()
                     .into()));
                 }
+                KGenReq::RecordMetrics { space, records } => {
+                    let env = { self.p2p_metrics_env(space) };
+                    respond.respond(Ok(async move {
+                        use holochain_sqlite::db::AsP2pMetricStoreConExt;
+                        let permit = env.conn_permit().await;
+                        let res = tokio::task::spawn_blocking(move || {
+                            let mut conn = env.from_permit(permit)?;
+                            conn.p2p_log_metrics(records)
+                        })
+                        .await;
+                        let res = res
+                            .map_err(holochain_p2p::HolochainP2pError::other)
+                            .and_then(|r| r.map_err(holochain_p2p::HolochainP2pError::other))?;
+                        Ok(KGenRes::RecordMetrics(res))
+                    }
+                    .boxed()
+                    .into()));
+                }
             },
             PutAgentInfoSigned {
                 peer_data, respond, ..
@@ -710,26 +726,6 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             } => {
                 let env = { self.p2p_env(space) };
                 let res = query_peer_density(env.into(), kitsune_space, dht_arc)
-                    .await
-                    .map_err(holochain_p2p::HolochainP2pError::other);
-                respond.respond(Ok(async move { res }.boxed().into()));
-            }
-            PutMetricDatum {
-                respond,
-                agent,
-                metric,
-                timestamp,
-                ..
-            } => {
-                let env = { self.p2p_metrics_env(space) };
-                let res = put_metric_datum(env, agent, metric, timestamp)
-                    .await
-                    .map_err(holochain_p2p::HolochainP2pError::other);
-                respond.respond(Ok(async move { res }.boxed().into()));
-            }
-            QueryMetrics { respond, query, .. } => {
-                let env = { self.p2p_metrics_env(space) };
-                let res = query_metrics(env, query)
                     .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));

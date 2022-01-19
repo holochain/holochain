@@ -1,8 +1,6 @@
 #![allow(clippy::too_many_arguments)]
 //! Module containing incoming events from the HolochainP2p actor.
 
-use std::time::SystemTime;
-
 use crate::*;
 use holochain_zome_types::signature::Signature;
 use kitsune_p2p::{agent_store::AgentInfoSigned, event::*};
@@ -134,12 +132,6 @@ ghost_actor::ghost_chan! {
         /// Query the peer density of a space for a given [`DhtArc`].
         fn query_peer_density(dna_hash: DnaHash, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, dht_arc: kitsune_p2p_types::dht_arc::DhtArc) -> kitsune_p2p_types::dht_arc::PeerDensity;
 
-        /// We need to store some metric data on behalf of kitsune.
-        fn put_metric_datum(dna_hash: DnaHash, to_agent: AgentPubKey, agent: AgentPubKey, metric: MetricKind, timestamp: SystemTime) -> ();
-
-        /// We need to provide some metric data to kitsune.
-        fn query_metrics(dna_hash: DnaHash, to_agent: AgentPubKey, query: MetricQuery) -> MetricQueryAnswer;
-
         /// A remote node is attempting to make a remote call on us.
         fn call_remote(
             dna_hash: DnaHash,
@@ -259,8 +251,6 @@ macro_rules! match_p2p_evt {
             HolochainP2pEvent::ValidationReceiptReceived { $i, .. } => { $($t)* }
             HolochainP2pEvent::SignNetworkData { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetAgentInfoSigned { $i, .. } => { $($t)* }
-            HolochainP2pEvent::PutMetricDatum { $i, .. } => { $($t)* }
-            HolochainP2pEvent::QueryMetrics { $i, .. } => { $($t)* }
             HolochainP2pEvent::CountersigningAuthorityResponse { $i, .. } => { $($t)* }
             $($t2)*
         }

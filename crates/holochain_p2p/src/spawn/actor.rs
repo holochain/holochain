@@ -17,7 +17,6 @@ use kitsune_p2p::actor::KitsuneP2pSender;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use std::collections::HashSet;
 use std::future::Future;
-use std::time::SystemTime;
 
 macro_rules! timing_trace {
     ($code:block $($rest:tt)*) => {{
@@ -46,6 +45,7 @@ impl WrapEvtSender {
     ) -> impl Future<Output = HolochainP2pResult<KGenRes>> + 'static + Send {
         let dna_hash = match &arg {
             KGenReq::PeerExtrapCov { space, .. } => DnaHash::from_kitsune(space),
+            KGenReq::RecordMetrics { space, .. } => DnaHash::from_kitsune(space),
         };
         timing_trace!(
             { self.0.k_gen_req(dna_hash, arg) },
@@ -145,35 +145,6 @@ impl WrapEvtSender {
         timing_trace!(
             { self.0.query_peer_density(dna_hash, kitsune_space, dht_arc) },
             "(hp2p:handle) query_peer_density",
-        )
-    }
-
-    fn put_metric_datum(
-        &self,
-        dna_hash: DnaHash,
-        to_agent: AgentPubKey,
-        agent: AgentPubKey,
-        kind: MetricKind,
-        timestamp: SystemTime,
-    ) -> impl Future<Output = HolochainP2pResult<()>> + 'static + Send {
-        timing_trace!(
-            {
-                self.0
-                    .put_metric_datum(dna_hash, to_agent, agent, kind, timestamp)
-            },
-            "(hp2p:handle) put_metric_datum",
-        )
-    }
-
-    fn query_metrics(
-        &self,
-        dna_hash: DnaHash,
-        to_agent: AgentPubKey,
-        query: MetricQuery,
-    ) -> impl Future<Output = HolochainP2pResult<MetricQueryAnswer>> + 'static + Send {
-        timing_trace!(
-            { self.0.query_metrics(dna_hash, to_agent, query) },
-            "(hp2p:handle) query_metrics",
         )
     }
 
@@ -723,44 +694,6 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         }
         .boxed()
         .into())
-    }
-
-    fn handle_put_metric_datum(
-        &mut self,
-        datum: MetricDatum,
-    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<()> {
-        let evt_sender = self.evt_sender.clone();
-        // These dummy values are not used
-        let dna_hash = DnaHash::from_raw_32([0; 32].to_vec());
-        let to_agent = AgentPubKey::from_raw_32([0; 32].to_vec());
-
-        let agent = AgentPubKey::from_kitsune(&datum.agent);
-        let kind = datum.kind;
-        let timestamp = datum.timestamp;
-        Ok(async move {
-            Ok(evt_sender
-                .put_metric_datum(dna_hash, to_agent, agent, kind, timestamp)
-                .await?)
-        }
-        .boxed()
-        .into())
-    }
-
-    fn handle_query_metrics(
-        &mut self,
-        query: kitsune_p2p::event::MetricQuery,
-    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<MetricQueryAnswer> {
-        let evt_sender = self.evt_sender.clone();
-
-        // These dummy values are not used
-        let dna_hash = DnaHash::from_raw_32([0; 32].to_vec());
-        let to_agent = AgentPubKey::from_raw_32([0; 32].to_vec());
-
-        Ok(
-            async move { Ok(evt_sender.query_metrics(dna_hash, to_agent, query).await?) }
-                .boxed()
-                .into(),
-        )
     }
 
     #[tracing::instrument(skip(self, space, to_agent, payload), level = "trace")]

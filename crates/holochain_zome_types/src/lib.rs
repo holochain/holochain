@@ -14,8 +14,6 @@ pub mod agent_activity;
 pub mod bytes;
 #[allow(missing_docs)]
 pub mod call;
-#[allow(missing_docs)]
-pub mod call_remote;
 pub mod capability;
 pub mod cell;
 pub mod countersigning;
