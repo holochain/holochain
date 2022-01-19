@@ -197,6 +197,12 @@ impl Arq {
     }
 }
 
+impl From<Arq> for ArqBounds {
+    fn from(a: Arq) -> Self {
+        a.to_bounds()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ArqBounds {
     offset: SpaceCoord,

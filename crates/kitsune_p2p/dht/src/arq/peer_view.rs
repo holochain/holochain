@@ -67,7 +67,7 @@ impl PeerView {
     ///
     /// More detail on these assumptions here:
     /// https://hackmd.io/@hololtd/r1IAIbr5Y/https%3A%2F%2Fhackmd.io%2FK_fkBj6XQO2rCUZRRL9n2g
-    pub fn update_arq(&self, mut arq: Arq) -> Option<Arq> {
+    pub fn update_arq(&self, arq: &mut Arq) -> bool {
         let cov = self.extrapolated_coverage(&arq.to_bounds());
 
         let old_count = arq.count();
@@ -87,17 +87,19 @@ impl PeerView {
             let ratio = (self.strat.midline_coverage() / cov).clamp(0.5, 2.0);
             (old_count as f64 * ratio).floor() as u32
         } else {
-            return None;
+            old_count
         };
 
-        arq.count = new_count;
-        let new_cov = self.extrapolated_coverage(&arq.to_bounds());
+        if new_count != old_count {
+            arq.count = new_count;
+            let new_cov = self.extrapolated_coverage(&arq.to_bounds());
 
-        // If this change causes us to go below the target coverage,
-        // don't update. This can happen in particular when shrinking would
-        // cause us to lose sight of peers.
-        if over && (new_cov < self.strat.min_coverage) {
-            return None;
+            // If this change causes us to go below the target coverage,
+            // don't update. This can happen in particular when shrinking would
+            // cause us to lose sight of peers.
+            if over && (new_cov < self.strat.min_coverage) {
+                return false;
+            }
         }
 
         let PowerStats { median, .. } = self.power_stats(&arq);
@@ -113,7 +115,7 @@ impl PeerView {
                 // only power down if too few chunks
                 && arq.count < self.strat.min_chunks()
             ) {
-                arq = arq.downshift();
+                *arq = arq.downshift();
             } else {
                 break;
             }
@@ -137,7 +139,7 @@ impl PeerView {
                 // upshifting, and we'll upshift on the next update.
                 let force = new_count as i32 - old_count as i32 > 1;
                 if let Some(a) = arq.upshift(force) {
-                    arq = a
+                    *arq = a
                 } else {
                     break;
                 }
@@ -147,19 +149,15 @@ impl PeerView {
         }
 
         if is_full(arq.power(), arq.count()) {
-            arq = Arq::new_full(arq.center(), arq.power());
+            *arq = Arq::new_full(arq.center(), arq.power());
         }
 
         if arq.count() > self.strat.max_chunks() {
             *arq.count_mut() = self.strat.max_chunks();
         }
 
-        if arq.power() == old_power && arq.count() == old_count {
-            // no overall change
-            None
-        } else {
-            Some(arq)
-        }
+        // check if anything changed
+        !(arq.power() == old_power && arq.count() == old_count)
     }
 
     pub fn power_stats(&self, filter: &Arq) -> PowerStats {

@@ -11,14 +11,8 @@ use kitsune_p2p_dht_arc::ArcInterval;
 use kitsune_p2p_dht::test_utils::generate_ideal_coverage;
 use kitsune_p2p_dht::test_utils::seeded_rng;
 
-fn resize_to_equilibrium(view: &PeerView, mut arq: Arq) -> Arq {
-    loop {
-        if let Some(resized) = view.update_arq(arq.clone()) {
-            arq = resized;
-        } else {
-            return arq;
-        }
-    }
+fn resize_to_equilibrium(view: &PeerView, arq: &mut Arq) {
+    while view.update_arq(arq) {}
 }
 
 #[test]
@@ -47,11 +41,11 @@ fn test_shrink_towards_empty() {
     let view = PeerView::new(strat.clone(), peer_arqs);
 
     // start with a full arq at max power
-    let arq = Arq::new_full(0.into(), strat.max_power);
-    let resized = resize_to_equilibrium(&view, arq.clone());
+    let mut arq = Arq::new_full(0.into(), strat.max_power);
+    resize_to_equilibrium(&view, &mut arq);
     // test that the arc gets reduced in power to match those of its peers
-    assert_eq!(resized.power(), peer_power);
-    assert!(resized.count() <= 8);
+    assert_eq!(arq.power(), peer_power);
+    assert!(arq.count() <= 8);
 }
 
 #[test]
@@ -81,11 +75,11 @@ fn test_grow_towards_full() {
     let view = PeerView::new(strat.clone(), peer_arqs);
 
     // start with an arq comparable to one's peers
-    let arq = Arq::new(0.into(), peer_power, 12);
-    let resized = resize_to_equilibrium(&view, arq.clone());
+    let mut arq = Arq::new(0.into(), peer_power, 12);
+    resize_to_equilibrium(&view, &mut arq);
     // ensure that the arq grows to full size
-    assert_eq!(resized.power(), peer_power + 2);
-    assert_eq!(resized.count(), strat.max_chunks());
+    assert_eq!(arq.power(), peer_power + 2);
+    assert_eq!(arq.count(), strat.max_chunks());
 }
 
 #[test]
@@ -114,12 +108,12 @@ fn test_grow_to_full() {
     let view = PeerView::new(strat.clone(), peer_arqs);
 
     // start with an arq comparable to one's peers
-    let arq = Arq::new(0.into(), peer_power, 12);
-    let resized = resize_to_equilibrium(&view, arq.clone());
+    let mut arq = Arq::new(0.into(), peer_power, 12);
+    resize_to_equilibrium(&view, &mut arq);
     // ensure that the arq grows to full size
-    assert_eq!(resized.power(), strat.max_power);
-    assert_eq!(resized.count(), 8);
-    assert!(is_full(resized.power(), resized.count()));
+    assert_eq!(arq.power(), strat.max_power);
+    assert_eq!(arq.count(), 8);
+    assert!(is_full(arq.power(), arq.count()));
 }
 
 #[test]
@@ -146,7 +140,8 @@ fn test_shrink_by_multiple_chunks() {
     let view = PeerView::new(strat.clone(), peer_arqs);
 
     let arq = Arq::new(0.into(), peer_power + 1, 12);
-    let resized = view.update_arq(arq.clone()).unwrap();
+    let mut resized = arq.clone();
+    view.update_arq(&mut resized);
     assert_eq!(arq.power(), resized.power());
     assert_eq!(resized.count(), 6);
 }
@@ -175,7 +170,8 @@ fn test_grow_by_multiple_chunks() {
     let view = PeerView::new(strat.clone(), peer_arqs);
 
     let arq = Arq::new(0.into(), peer_power - 1, 6);
-    let resized = view.update_arq(arq.clone()).unwrap();
+    let mut resized = arq.clone();
+    view.update_arq(&mut resized);
     assert_eq!(arq.power(), resized.power());
     assert_eq!(resized.count(), 12);
 }
@@ -184,14 +180,9 @@ fn test_grow_by_multiple_chunks() {
 /// If the space to our left is oversaturated by double,
 /// and the space to our right is completely empty,
 /// we should not resize
+///
+/// (not a very good test, probably)
 fn test_degenerate_asymmetrical_coverage() {
-    let a = Arq::new(
-        Loc::from(0x100 / 2),
-        4, // log2 of 0x10
-        0x10,
-    );
-    assert_eq!(a.to_interval(), ArcInterval::new(0, 0x100 - 1));
-
     let other = ArqBounds::from_interval(4, ArcInterval::new(0x0, 0x80)).unwrap();
     let others = ArqSet::new(vec![other; 20]);
     // aim for coverage between 5 and 6.
@@ -201,10 +192,18 @@ fn test_degenerate_asymmetrical_coverage() {
         ..Default::default()
     };
     let view = PeerView::new(strat, others);
-    let extrapolated = view.extrapolated_coverage(&a.to_bounds());
+
+    let mut arq = Arq::new(
+        Loc::from(0x100 / 2),
+        4, // log2 of 0x10
+        0x10,
+    );
+    assert_eq!(arq.to_interval(), ArcInterval::new(0, 0x100 - 1));
+
+    let extrapolated = view.extrapolated_coverage(&arq.to_bounds());
     assert_eq!(extrapolated, 11.0);
-    let resized = view.update_arq(a);
-    assert!(resized.is_none());
+    let resized = view.update_arq(&mut arq);
+    assert!(!resized);
 }
 
 #[test]
@@ -224,7 +223,7 @@ fn test_scenario() {
 
     {
         // start with a full arq
-        let arq = Arq::new_full(Loc::from(0x0), strat.max_power);
+        let mut arq = Arq::new_full(Loc::from(0x0), strat.max_power);
         // create 10 peers, all with full arcs, fully covering the DHT
         let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, None, 10, jitter, 0)
             .into_iter()
@@ -235,8 +234,8 @@ fn test_scenario() {
         assert_eq!(extrapolated, 11.0);
 
         // expect that the arq remains full under these conditions
-        let resized = view.update_arq(arq);
-        assert!(resized.is_none());
+        let resized = view.update_arq(&mut arq);
+        assert!(!resized);
     }
 
     {
@@ -258,7 +257,7 @@ fn test_scenario() {
             // assert!(strat.min_coverage <= extrapolated && extrapolated <= strat.max_coverage());
 
             // update the arq until there is no change
-            while view.update_arq(arq.clone()).map(|a| arq = a).is_some() {}
+            while view.update_arq(&mut arq) {}
 
             // expect that the arq shrinks
             assert_eq!(arq.power(), peer_power);
@@ -282,7 +281,7 @@ fn test_scenario() {
             let view = PeerView::new(strat.clone(), peers);
 
             // assert that our arc will grow as large as it can to pick up the slack.
-            while view.update_arq(arq.clone()).map(|a| arq = a).is_some() {}
+            while view.update_arq(&mut arq) {}
             assert_eq!(arq.power(), peer_power + strat.max_power_diff);
             assert!(arq.count() == strat.max_chunks());
         }

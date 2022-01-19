@@ -14,7 +14,8 @@ pub struct ArqSet {
 
 impl ArqSet {
     /// Normalize all arqs to be of the same power (use the minimum power)
-    pub fn new(arqs: Vec<ArqBounds>) -> Self {
+    pub fn new<A: Into<ArqBounds>>(arqs: Vec<A>) -> Self {
+        let arqs: Vec<ArqBounds> = arqs.into_iter().map(|a| a.into()).collect();
         if let Some(pow) = arqs.iter().map(|a| a.power).min() {
             Self {
                 arqs: arqs
