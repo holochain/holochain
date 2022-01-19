@@ -1,2 +1,2 @@
 pub mod continuous;
-// pub mod quantized;
+pub mod quantized;

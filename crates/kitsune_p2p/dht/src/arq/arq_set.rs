@@ -5,9 +5,23 @@ use crate::arq::ArqBounds;
 /// A collection of ArqBounds.
 /// All bounds are guaranteed to be quantized to the same power
 /// (the lowest common power).
-#[derive(Debug, Clone, PartialEq, Eq, derive_more::IntoIterator)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    derive_more::Deref,
+    derive_more::DerefMut,
+    derive_more::IntoIterator,
+    derive_more::Index,
+    derive_more::IndexMut,
+)]
 pub struct ArqSet {
     #[into_iterator]
+    #[deref]
+    #[deref_mut]
+    #[index]
+    #[index_mut]
     pub(crate) arqs: Vec<ArqBounds>,
     power: u8,
 }
@@ -82,6 +96,19 @@ impl ArqSet {
             power,
         }
     }
+
+    /// View ascii for all arq bounds
+    pub fn print_arqs(&self, len: usize) {
+        println!("{} arqs, power: {}", self.arqs().len(), self.power());
+        for (i, arq) in self.arqs().into_iter().enumerate() {
+            println!(
+                "|{}| {}:\t{}",
+                arq.to_interval().to_ascii(len),
+                i,
+                arq.count()
+            );
+        }
+    }
 }
 
 /// View ascii for arq bounds
@@ -92,19 +119,6 @@ pub fn print_arq(arq: &ArqBounds, len: usize) {
         arq.power,
         arq.count
     );
-}
-
-/// View ascii for all arq bounds
-pub fn print_arqs(arqs: &ArqSet, len: usize) {
-    println!("{} arqs, power: {}", arqs.arqs().len(), arqs.power());
-    for (i, arq) in arqs.arqs().into_iter().enumerate() {
-        println!(
-            "|{}| {}:\t{}",
-            arq.to_interval().to_ascii(len),
-            i,
-            arq.count()
-        );
-    }
 }
 
 #[test]
