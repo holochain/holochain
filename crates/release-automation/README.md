@@ -170,7 +170,7 @@ Automated steps still require running the tool manually ;-).
     export HOLONIX_REPO=${HOLONIX_REPO:?}
 
     export TAG=$(git tag --list | grep holochain- | tail -n1)
-    export VERSION=${TAG/holochain-/}
+    export VERSION=\${TAG/holochain-/}
     export VERSION_COMPAT="v${VERSION//./_}"
     export RELEASE_BRANCH=$(git branch --show-current)
     EOF
