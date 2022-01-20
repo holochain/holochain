@@ -25,9 +25,15 @@ impl PeerView {
         }
     }
 
+    /// The actual coverage of all arcs in this view.
+    /// TODO: this only makes sense when the view contains all agents in the DHT.
+    ///       So, it's more useful for testing. Probably want to tease out some
+    ///       concept of a test DHT from this.
+    pub fn actual_coverage(&self) -> f64 {
+        actual_coverage(self.peers.iter())
+    }
+
     /// Extrapolate the coverage of the entire network from our local view.
-    ///
-    /// NB: This includes the filter arq, since our arc is contributing to total coverage too!
     pub fn extrapolated_coverage(&self, filter: &ArqBounds) -> f64 {
         self.extrapolated_coverage_and_filtered_count(filter).0
     }
@@ -46,7 +52,8 @@ impl PeerView {
             return (1.0, 1);
         }
         let filter_len = filter.length();
-        let base = DhtArcSet::from_interval(filter.clone());
+
+        let initial = (0, 0);
 
         // FIXME: We can't just filter arcs on the fly here, because we might be
         // trying to get coverage info for an area we don't have arcs for
@@ -58,25 +65,18 @@ impl PeerView {
         // different in the future.
         let (sum, count) = self
             .filtered_arqs(filter)
-            .fold((0u64, 0usize), |(sum, count), arq| {
-                let arc = arq.to_interval();
-                let s = DhtArcSet::from_interval(arc);
-                let sum = sum
-                    + base
-                        .intersection(&s)
-                        .intervals()
-                        .into_iter()
-                        .map(|i| i.length())
-                        .sum::<u64>();
-                (sum, count + 1)
-            });
-        let cov = sum as f64 / filter_len as f64 + 1.0;
-        (cov, count + 1)
+            .fold(initial, |(sum, count), arq| (sum + arq.length(), count + 1));
+        let cov = sum as f64 / filter_len as f64;
+        (cov, count)
     }
 
     /// Compute the total coverage observed within the filter interval.
     pub fn raw_coverage(&self, filter: &ArqBounds) -> f64 {
         self.extrapolated_coverage(filter) * filter.to_interval().length() as f64 / 2f64.powf(32.0)
+    }
+
+    pub fn update_arq(&self, arq: &mut Arq) -> bool {
+        self.update_arq_with_stats(arq).changed
     }
 
     /// Take an arq and potentially resize and requantize it based on this view.
@@ -93,7 +93,7 @@ impl PeerView {
     ///
     /// More detail on these assumptions here:
     /// https://hackmd.io/@hololtd/r1IAIbr5Y/https%3A%2F%2Fhackmd.io%2FK_fkBj6XQO2rCUZRRL9n2g
-    pub fn update_arq(&self, arq: &mut Arq) -> bool {
+    pub fn update_arq_with_stats(&self, arq: &mut Arq) -> UpdateArqStats {
         let (cov, num_peers) = self.extrapolated_coverage_and_filtered_count(&arq.to_bounds());
 
         let old_count = arq.count();
@@ -143,14 +143,19 @@ impl PeerView {
             // lose sight of peers.
             let new_cov = self.extrapolated_coverage(&tentative.to_bounds());
             if over && (new_cov < self.strat.min_coverage) {
-                return false;
+                return UpdateArqStats {
+                    changed: false,
+                    power: None,
+                    num_peers,
+                };
             }
         }
 
         // Commit the change to the count
         arq.count = new_count;
 
-        let PowerStats { median, .. } = self.power_stats(&arq);
+        let power_stats = self.power_stats(&arq);
+        let PowerStats { median, .. } = power_stats;
 
         let power_above_min = |pow| {
             // not already at the minimum
@@ -211,7 +216,13 @@ impl PeerView {
         }
 
         // check if anything changed
-        !(arq.power() == old_power && arq.count() == old_count)
+        let changed = !(arq.power() == old_power && arq.count() == old_count);
+
+        UpdateArqStats {
+            changed,
+            power: Some(power_stats),
+            num_peers,
+        }
     }
 
     pub fn power_stats(&self, filter: &Arq) -> PowerStats {
@@ -226,7 +237,7 @@ impl PeerView {
         let median = powers.median() as u8;
         let std_dev = powers.std_dev().unwrap_or_default();
         if std_dev > self.strat.power_std_dev_threshold {
-            tracing::warn!("Large power std dev: {}", std_dev);
+            // tracing::warn!("Large power std dev: {}", std_dev);
         }
         PowerStats { median, std_dev }
     }
@@ -244,6 +255,23 @@ impl PeerView {
     }
 }
 
+pub struct UpdateArqStats {
+    pub changed: bool,
+    pub power: Option<PowerStats>,
+    pub num_peers: usize,
+}
+
+/// The actual coverage provided by these peers. Assumes that this is the
+/// entire view of the DHT, all peers are accounted for here.
+pub fn actual_coverage<'a, A: 'a, P: Iterator<Item = &'a A>>(peers: P) -> f64
+where
+    ArqBounds: From<&'a A>,
+{
+    peers
+        .map(|a| ArqBounds::from(a).length() as f64 / 2f64.powf(32.0))
+        .sum()
+}
+
 pub struct PowerStats {
     pub median: u8,
     pub std_dev: f64,
@@ -259,61 +287,66 @@ mod tests {
 
     use super::*;
 
-    fn int(pow: u8, lo: u32, hi: u32) -> ArqBounds {
-        ArqBounds::from_interval(pow, ArcInterval::new(pow2(pow) * lo, pow2(pow) * hi)).unwrap()
+    fn make_arq(pow: u8, lo: u32, hi: u32) -> ArqBounds {
+        ArqBounds::from_interval_rounded(
+            pow,
+            ArcInterval::new(pow2(pow) * lo, (pow2(pow) as u64 * hi as u64) as u32),
+        )
     }
 
     #[test]
     fn test_filtered_arqs() {
         let pow = 25;
-        let a = int(pow, 0, 0x20);
-        let b = int(pow, 0x10, 0x30);
-        let c = int(pow, 0x20, 0x40);
+        let a = make_arq(pow, 0, 0x20);
+        let b = make_arq(pow, 0x10, 0x30);
+        let c = make_arq(pow, 0x20, 0x40);
         assert_eq!(a.pseudocenter(), Loc::from(pow2(pow) * 0x10 - 1));
         assert_eq!(b.pseudocenter(), Loc::from(pow2(pow) * 0x20 - 1));
         assert_eq!(c.pseudocenter(), Loc::from(pow2(pow) * 0x30 - 1));
         let arqs = ArqSet::new(vec![a, b, c]);
         arqs.print_arqs(64);
         let view = PeerView::new(Default::default(), arqs);
-        assert_eq!(
-            view.filtered_arqs(int(pow, 0, 0x10).to_interval())
+
+        let get = |b: ArqBounds| {
+            view.filtered_arqs(b.to_interval())
                 .cloned()
-                .collect::<Vec<_>>(),
-            vec![a]
-        );
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(get(make_arq(pow, 0, 0x10)), vec![a]);
+        assert_eq!(get(make_arq(pow, 0, 0x20)), vec![a, b]);
+        assert_eq!(get(make_arq(pow, 0, 0x40)), vec![a, b, c]);
+        assert_eq!(get(make_arq(pow, 0x10, 0x20)), vec![b]);
     }
 
     #[test]
     fn test_coverage() {
-        let pow = 25;
-        let arqs = ArqSet::new(vec![
-            // 01
-            //  12
-            //   23
-            int(pow, 0, 0x20),
-            int(pow, 0x10, 0x30),
-            int(pow, 0x20, 0x40),
-        ]);
+        let pow = 24;
+        let arqs = ArqSet::new(
+            (0..0x100)
+                .step_by(0x10)
+                .map(|x| make_arq(pow, x, x + 0x20))
+                .collect(),
+        );
         arqs.print_arqs(64);
         let view = PeerView::new(Default::default(), arqs);
         assert_eq!(
-            view.extrapolated_coverage_and_filtered_count(&int(pow, 0, 0x10)),
+            view.extrapolated_coverage_and_filtered_count(&make_arq(pow, 0, 0x10)),
+            (2.0, 1)
+        );
+        assert_eq!(
+            view.extrapolated_coverage_and_filtered_count(&make_arq(pow, 0, 0x20)),
             (2.0, 2)
         );
         assert_eq!(
-            view.extrapolated_coverage_and_filtered_count(&int(pow, 0, 0x20)),
-            (2.5, 3)
-        );
-        assert_eq!(
-            view.extrapolated_coverage_and_filtered_count(&int(pow, 0, 0x40)),
-            (2.5, 4)
+            view.extrapolated_coverage_and_filtered_count(&make_arq(pow, 0, 0x40)),
+            (2.0, 4)
         );
 
         // TODO: when changing PeerView logic to bake in the filter,
         // this will probably change
         assert_eq!(
-            view.extrapolated_coverage_and_filtered_count(&int(pow, 0x10, 0x20)),
-            (2.0, 2)
+            view.extrapolated_coverage_and_filtered_count(&make_arq(pow, 0x10, 0x20)),
+            (2.0, 1)
         );
     }
 }

@@ -6,6 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+colored = { version = "2", optional = true }
+derivative = "2.2.0"
 derive_more = "0.99"
 kitsune_p2p_dht_arc = { path = "../dht_arc"}
 kitsune_p2p_timestamp = { path = "../timestamp", features = ["now"]}
@@ -16,7 +18,6 @@ rand = "0.8.4"
 sparse-fenwick = { path = "/home/michael/Holo/sparse-fenwick" }
 statrs = "0.15"
 tracing = "0.1.29"
-derivative = "2.2.0"
 
 [dev-dependencies]
 kitsune_p2p_dht_arc = { path = "../dht_arc", features = ["test_utils"]}
@@ -30,4 +31,6 @@ rand = "0.8"
 [workspace]
 
 [features]
-testing = []
+testing = [
+  "colored"
+]

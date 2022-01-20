@@ -14,14 +14,15 @@ fn parameterized_stability_test() {
 
     let mut rng = seeded_rng(None);
 
-    let n = 100;
-    // let j = 0.0;
-    let j = 10.0 / n as f64;
+    let n = 50;
+    let j = 0.005;
+    // let j = 10.0 / n as f64;
+    let min_coverage = 5.0;
 
-    let r = 50;
-    let rf = r as f64;
-
-    let strat = ArqStrat::default();
+    let strat = ArqStrat {
+        min_coverage,
+        ..Default::default()
+    };
     println!("{}", strat.summary());
 
     let peers = generate_ideal_coverage(&mut rng, &strat, None, n, j, 0);

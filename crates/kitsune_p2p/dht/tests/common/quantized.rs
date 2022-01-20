@@ -14,6 +14,8 @@ use statrs::statistics::*;
 use std::collections::HashSet;
 use std::iter;
 
+use colored::*;
+
 /// Maximum number of iterations. If we iterate this much, we assume the
 /// system is divergent (unable to reach equilibrium).
 const DIVERGENCE_ITERS: usize = 40;
@@ -137,18 +139,39 @@ pub fn run_one_epoch(
         }
         let mut arq = peers.get_mut(i).unwrap();
         let before = arq.length() as f64;
+        let before_pow = arq.power();
 
-        view.update_arq(&mut arq);
+        let stats = view.update_arq_with_stats(&mut arq);
 
         let after = arq.length() as f64;
         let delta = after - before;
 
-        println!(
-            "{} {} {:?}",
-            arq.report(64),
-            delta,
-            view.extrapolated_coverage_and_filtered_count(&arq.to_bounds())
-        );
+        {
+            let delta = delta as i64 / 2i64.pow(before_pow as u32);
+            let delta_str = if delta == 0 {
+                "    ".into()
+            } else if delta > 0 {
+                format!("Δ{:<+3}", delta).green()
+            } else {
+                format!("Δ{:<+3}", delta).red()
+            };
+
+            let cov_str = format!("{: >6.2}", view.extrapolated_coverage(&arq.to_bounds()));
+
+            let power_str = stats
+                .power
+                .map(|p| format!("{:2}", p.median).normal())
+                .unwrap_or("??".magenta());
+            println!(
+                "#{:<3} {} {} cov={}  mp= {}  #p={: >3}",
+                i,
+                arq.report(64),
+                delta_str,
+                cov_str,
+                power_str,
+                stats.num_peers
+            );
+        }
 
         power_total += arq.power() as f64;
         cov_total += after;
@@ -299,7 +322,7 @@ impl RunBatch {
             Vergence::Convergent => RunReportOutcome::Convergent {
                 redundancy_stats: Stats::new(DataVec::new(
                     self.histories()
-                        .map(|hs| hs.last().unwrap().min_redundancy as f64)
+                        .filter_map(|hs| hs.last().map(|h| h.min_redundancy as f64))
                         .collect(),
                 )),
             },

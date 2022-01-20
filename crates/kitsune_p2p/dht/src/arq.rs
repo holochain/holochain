@@ -7,6 +7,7 @@ mod strat;
 use std::num::Wrapping;
 
 pub use arq_set::*;
+use colored::*;
 pub use peer_view::*;
 pub use strat::*;
 
@@ -214,6 +215,12 @@ impl From<&Arq> for ArqBounds {
     }
 }
 
+impl From<&ArqBounds> for ArqBounds {
+    fn from(a: &ArqBounds) -> Self {
+        *a
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct ArqBounds {
     offset: SpaceCoord,
@@ -359,7 +366,7 @@ impl ArqBounds {
     /// View ascii for arq bounds
     pub fn report(&self, len: usize) -> String {
         format!(
-            "|{}| {} *2^{}",
+            "|{}| c= {:>2} p= {:<2}",
             self.to_interval().to_ascii(len),
             self.count,
             self.power

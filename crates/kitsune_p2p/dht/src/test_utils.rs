@@ -2,6 +2,7 @@ pub mod gossip_direct;
 pub mod op_store;
 pub mod test_node;
 
+use crate::arq::actual_coverage;
 use crate::arq::Arq;
 use crate::arq::ArqStrat;
 
@@ -105,17 +106,29 @@ pub fn generate_ideal_coverage(
 
     let nf = n as f64;
     // aim for the middle of the coverage target range
-    let coverage = cov.unwrap_or_else(|| strat.midline_coverage());
-    let len = (coverage / nf).min(1.0);
+    let target = cov.unwrap_or_else(|| strat.midline_coverage());
+    let len = (target / nf).min(1.0);
 
-    (0..n)
+    let peers: Vec<_> = (0..n)
         .map(|i| {
             let center =
                 ((i as f64 / nf) + (2.0 * jitter * rng.gen::<f64>()) - jitter).rem_euclid(1.0);
 
             unit_arq(strat, center, len, power_offset)
         })
-        .collect()
+        .collect();
+
+    let cov = actual_coverage(peers.iter());
+    let min = target - strat.buffer_width() / 2.0;
+    let max = target + strat.buffer_width() / 2.0;
+    assert!(
+        min <= cov && cov <= max,
+        "Ideal coverage is incorrect: !({} <= {} <= {})",
+        min,
+        cov,
+        max
+    );
+    peers
 }
 
 #[test]
@@ -182,20 +195,19 @@ mod tests {
         };
 
         let mut rng = seeded_rng(None);
-        let arq = Arq::new_full(Loc::from(0x0), strat.max_power);
         let peer_arqs = generate_ideal_coverage(&mut rng, &strat, None, 100, 0.0, 0);
 
         let peers = ArqSet::new(peer_arqs.into_iter().map(|arq| arq.to_bounds()).collect());
 
         let view = PeerView::new(strat.clone(), peers);
-        let extrapolated = view.extrapolated_coverage(&arq.to_bounds());
+        let cov = view.actual_coverage();
 
         // TODO: tighten this up so we don't need +/- 1
         let min = strat.min_coverage - 1.0;
         let max = strat.max_coverage() + 1.0;
-        println!("{} <= {} <= {}", min, extrapolated, max);
-        assert!(min <= extrapolated);
-        assert!(extrapolated <= max);
+        println!("{} <= {} <= {}", min, cov, max);
+        assert!(min <= cov);
+        assert!(cov <= max);
     }
 
     proptest! {
@@ -212,19 +224,17 @@ mod tests {
                 ..Default::default()
             };
             let mut rng = seeded_rng(None);
-            let arq = Arq::new_full(Loc::from(0x0), strat.max_power);
             let peer_arqs = generate_ideal_coverage(&mut rng, &strat, None, num_peers, 0.0, 0);
 
             let peers = ArqSet::new(peer_arqs.into_iter().map(|arq| arq.to_bounds()).collect());
 
             let view = PeerView::new(strat.clone(), peers);
-            let extrapolated = view.extrapolated_coverage(&arq.to_bounds());
+            let cov = view.actual_coverage();
 
-            // TODO: tighten this up so we don't need +/- 1
-            let min = strat.min_coverage - 1.0;
-            let max = strat.max_coverage() + 1.0;
-            assert!(min <= extrapolated, "extrapolated less than min {} <= {}", min, extrapolated);
-            assert!(extrapolated <= max, "extrapolated greater than max {} <= {}", extrapolated, max);
+            let min = strat.min_coverage;
+            let max = strat.max_coverage();
+            assert!(min <= cov, "extrapolated less than min {} <= {}", min, cov);
+            assert!(cov <= max, "extrapolated greater than max {} <= {}", cov, max);
         }
 
         #[test]

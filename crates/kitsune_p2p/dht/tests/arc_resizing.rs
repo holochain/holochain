@@ -31,8 +31,8 @@ fn test_shrink_towards_empty() {
     };
     let jitter = 0.01;
 
-    // generate peers with too much coverage
-    let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(14.0), 1000, jitter, 0)
+    // generate peers with a bit too much coverage (14 > 12)
+    let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(14.5), 100, jitter, 0)
         .into_iter()
         .map(|arq| arq.to_bounds())
         .collect();
@@ -44,8 +44,12 @@ fn test_shrink_towards_empty() {
     let mut arq = Arq::new_full(0.into(), strat.max_power);
     resize_to_equilibrium(&view, &mut arq);
     // test that the arc gets reduced in power to match those of its peers
-    assert_eq!(arq.power(), peer_power);
-    assert!(arq.count() <= 8);
+    assert!(
+        arq.power() <= peer_power,
+        "{} <= {}",
+        arq.power(),
+        peer_power
+    );
 }
 
 #[test]
@@ -196,7 +200,7 @@ fn test_grow_by_multiple_chunks() {
 /// (not a very good test, probably)
 fn test_degenerate_asymmetrical_coverage() {
     let other = ArqBounds::from_interval(4, ArcInterval::new(0x0, 0x80)).unwrap();
-    let others = ArqSet::new(vec![other; 9]);
+    let others = ArqSet::new(vec![other; 10]);
     // aim for coverage between 5 and 6.
     let strat = ArqStrat {
         min_coverage: 5.0,
@@ -213,7 +217,7 @@ fn test_degenerate_asymmetrical_coverage() {
     assert_eq!(arq.to_interval(), ArcInterval::new(0, 0x100 - 1));
 
     let extrapolated = view.extrapolated_coverage(&arq.to_bounds());
-    assert_eq!(extrapolated, 5.5);
+    assert_eq!(extrapolated, 5.0);
     let old = arq.clone();
     let mut new = arq.clone();
     let resized = view.update_arq(&mut new);
@@ -246,7 +250,7 @@ fn test_scenario() {
             .collect();
         let view = PeerView::new(strat.clone(), ArqSet::new(peers));
         let extrapolated = view.extrapolated_coverage(&arq.to_bounds());
-        assert_eq!(extrapolated, 11.0);
+        assert_eq!(extrapolated, 10.0);
 
         // expect that the arq remains full under these conditions
         let resized = view.update_arq(&mut arq);
