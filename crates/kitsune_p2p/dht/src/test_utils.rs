@@ -205,7 +205,7 @@ mod tests {
         /// so this test asserts that the extrapolated coverage falls within the
         /// range, +/- 1 on either end.
         #[test]
-        fn test_ideal_coverage(min_coverage in 40f64..100.0, buffer in 0.1f64..0.5) {
+        fn test_ideal_coverage(min_coverage in 40f64..100.0, buffer in 0.1f64..0.5, num_peers in 100u32..200) {
             let strat = ArqStrat {
                 min_coverage,
                 buffer,
@@ -213,7 +213,7 @@ mod tests {
             };
             let mut rng = seeded_rng(None);
             let arq = Arq::new_full(Loc::from(0x0), strat.max_power);
-            let peer_arqs = generate_ideal_coverage(&mut rng, &strat, None, 100, 0.0, 0);
+            let peer_arqs = generate_ideal_coverage(&mut rng, &strat, None, num_peers, 0.0, 0);
 
             let peers = ArqSet::new(peer_arqs.into_iter().map(|arq| arq.to_bounds()).collect());
 

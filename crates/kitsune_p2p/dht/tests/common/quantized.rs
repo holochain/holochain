@@ -140,14 +140,15 @@ pub fn run_one_epoch(
 
         view.update_arq(&mut arq);
 
-        println!(
-            "{} {:?}",
-            arq.report(64),
-            view.extrapolated_coverage_and_filtered_count(&arq.to_bounds())
-        );
-
         let after = arq.length() as f64;
         let delta = after - before;
+
+        println!(
+            "{} {} {:?}",
+            arq.report(64),
+            delta,
+            view.extrapolated_coverage_and_filtered_count(&arq.to_bounds())
+        );
 
         power_total += arq.power() as f64;
         cov_total += after;
