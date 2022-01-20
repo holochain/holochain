@@ -110,9 +110,9 @@ fn test_grow_to_full() {
 
     // start with an arq comparable to one's peers
     let mut arq = Arq::new(0.into(), peer_power, 12);
-    print_arq(&arq.to_bounds(), 64);
+    print_arq(&arq, 64);
     while view.update_arq(&mut arq) {
-        print_arq(&arq.to_bounds(), 64);
+        print_arq(&arq, 64);
     }
     // ensure that the arq grows to full size
     assert_eq!(arq.power(), strat.max_power);
@@ -297,10 +297,10 @@ fn test_scenario() {
             );
             let peer_power = peers.power();
             let view = PeerView::new(strat.clone(), peers);
-            print_arq(&arq.to_bounds(), 64);
+            print_arq(&arq, 64);
             // assert that our arc will grow as large as it can to pick up the slack.
             while view.update_arq(&mut arq) {
-                print_arq(&arq.to_bounds(), 64);
+                print_arq(&arq, 64);
             }
             assert_eq!(arq.power(), peer_power + strat.max_power_diff);
             assert!(arq.count() == strat.max_chunks());

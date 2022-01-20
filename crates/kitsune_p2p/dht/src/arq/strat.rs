@@ -113,4 +113,19 @@ impl ArqStrat {
     fn chunk_count_threshold(&self) -> f64 {
         (self.buffer + 1.0) / self.buffer
     }
+
+    pub fn summary(&self) -> String {
+        format!(
+            "
+        min coverage: {}
+        max coverage: {}
+        min chunks:   {}
+        max chunks:   {}
+        ",
+            self.min_coverage,
+            self.max_coverage(),
+            self.min_chunks(),
+            self.max_chunks()
+        )
+    }
 }

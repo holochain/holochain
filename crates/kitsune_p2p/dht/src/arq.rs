@@ -195,6 +195,11 @@ impl Arq {
     pub fn count_mut(&mut self) -> &mut u32 {
         &mut self.count
     }
+
+    /// View ascii for arq bounds
+    pub fn report(&self, len: usize) -> String {
+        self.to_bounds().report(len)
+    }
 }
 
 impl From<Arq> for ArqBounds {
@@ -203,7 +208,13 @@ impl From<Arq> for ArqBounds {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+impl From<&Arq> for ArqBounds {
+    fn from(a: &Arq) -> Self {
+        a.to_bounds()
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct ArqBounds {
     offset: SpaceCoord,
     power: u8,
@@ -337,12 +348,22 @@ impl ArqBounds {
         if right < left {
             right += 2u64.pow(32);
         }
-        Loc::from(((right - left) / 2) as u32)
+        Loc::from(((right + left) / 2) as u32)
     }
 
     /// Get a reference to the arq bounds's count.
     pub fn count(&self) -> u32 {
         self.count
+    }
+
+    /// View ascii for arq bounds
+    pub fn report(&self, len: usize) -> String {
+        format!(
+            "|{}| {} *2^{}",
+            self.to_interval().to_ascii(len),
+            self.count,
+            self.power
+        )
     }
 }
 

@@ -7,22 +7,43 @@ pub struct PeerView {
     strat: ArqStrat,
     /// The peers in this view (TODO: replace with calculated values)
     peers: ArqSet,
+
+    #[cfg(feature = "testing")]
+    /// Omit the arq at this index from all peer considerations.
+    /// Useful for tests which update all arqs, without needing to
+    /// construct a new PeerView for each arq needing to be updated
+    pub skip_index: Option<usize>,
 }
 
 impl PeerView {
     pub fn new(strat: ArqStrat, arqs: ArqSet) -> Self {
-        Self { strat, peers: arqs }
+        Self {
+            strat,
+            peers: arqs,
+            #[cfg(feature = "testing")]
+            skip_index: None,
+        }
     }
 
     /// Extrapolate the coverage of the entire network from our local view.
     ///
     /// NB: This includes the filter arq, since our arc is contributing to total coverage too!
     pub fn extrapolated_coverage(&self, filter: &ArqBounds) -> f64 {
+        self.extrapolated_coverage_and_filtered_count(filter).0
+    }
+
+    /// Return the extrapolated coverage and the number of arqs which match the filter.
+    /// These two are complected together simply for efficiency's sake, to
+    /// minimize computation
+    ///
+    /// TODO: this probably will be rewritten when PeerView is rewritten to
+    /// have the filter baked in.
+    pub fn extrapolated_coverage_and_filtered_count(&self, filter: &ArqBounds) -> (f64, usize) {
         let filter = filter.to_interval();
         if filter == ArcInterval::Empty {
             // More accurately this would be 0, but it's handy to not have
             // divide-by-zero crashes
-            return 1.0;
+            return (1.0, 1);
         }
         let filter_len = filter.length();
         let base = DhtArcSet::from_interval(filter.clone());
@@ -35,17 +56,22 @@ impl PeerView {
         // For now though, just filter arcs on the fly so we have something to test.
         // But, this means that the behavior for growing arcs is going to be a bit
         // different in the future.
-        let sum = self.filtered_arqs(filter).fold(0u64, |sum, arq| {
-            let arc = arq.to_interval();
-            let s = DhtArcSet::from_interval(arc);
-            sum + base
-                .intersection(&s)
-                .intervals()
-                .into_iter()
-                .map(|i| i.length())
-                .sum::<u64>()
-        });
-        sum as f64 / filter_len as f64 + 1.0
+        let (sum, count) = self
+            .filtered_arqs(filter)
+            .fold((0u64, 0usize), |(sum, count), arq| {
+                let arc = arq.to_interval();
+                let s = DhtArcSet::from_interval(arc);
+                let sum = sum
+                    + base
+                        .intersection(&s)
+                        .intervals()
+                        .into_iter()
+                        .map(|i| i.length())
+                        .sum::<u64>();
+                (sum, count + 1)
+            });
+        let cov = sum as f64 / filter_len as f64 + 1.0;
+        (cov, count + 1)
     }
 
     /// Compute the total coverage observed within the filter interval.
@@ -68,7 +94,7 @@ impl PeerView {
     /// More detail on these assumptions here:
     /// https://hackmd.io/@hololtd/r1IAIbr5Y/https%3A%2F%2Fhackmd.io%2FK_fkBj6XQO2rCUZRRL9n2g
     pub fn update_arq(&self, arq: &mut Arq) -> bool {
-        let cov = self.extrapolated_coverage(&arq.to_bounds());
+        let (cov, num_peers) = self.extrapolated_coverage_and_filtered_count(&arq.to_bounds());
 
         let old_count = arq.count();
         let old_power = arq.power();
@@ -93,7 +119,7 @@ impl PeerView {
         // Conversely, if all peers are stable, e.g. if we just came online to
         // find a situation where all peers around us are under-representing,
         // but stable, then we want to make a much bigger leap.
-        let peer_velocity_factor = 1.0 + self.peers.len() as f64;
+        let peer_velocity_factor = 1.0 + num_peers as f64;
 
         let growth_factor = (cov_ratio - 1.0) / peer_velocity_factor + 1.0;
 
@@ -206,10 +232,15 @@ impl PeerView {
     }
 
     fn filtered_arqs<'a>(&'a self, filter: ArcInterval) -> impl Iterator<Item = &'a ArqBounds> {
-        self.peers
-            .arqs
-            .iter()
-            .filter(move |arq| filter.contains(arq.pseudocenter()))
+        let it = self.peers.arqs.iter();
+
+        #[cfg(feature = "testing")]
+        let it = it
+            .enumerate()
+            .filter(|(i, _)| self.skip_index.as_ref() != Some(i))
+            .map(|(_, arq)| arq);
+
+        it.filter(move |arq| filter.contains(arq.pseudocenter()))
     }
 }
 
@@ -224,11 +255,32 @@ mod tests {
     use kitsune_p2p_dht_arc::ArcInterval;
 
     use crate::arq::pow2;
+    use crate::Loc;
 
     use super::*;
 
     fn int(pow: u8, lo: u32, hi: u32) -> ArqBounds {
         ArqBounds::from_interval(pow, ArcInterval::new(pow2(pow) * lo, pow2(pow) * hi)).unwrap()
+    }
+
+    #[test]
+    fn test_filtered_arqs() {
+        let pow = 25;
+        let a = int(pow, 0, 0x20);
+        let b = int(pow, 0x10, 0x30);
+        let c = int(pow, 0x20, 0x40);
+        assert_eq!(a.pseudocenter(), Loc::from(pow2(pow) * 0x10 - 1));
+        assert_eq!(b.pseudocenter(), Loc::from(pow2(pow) * 0x20 - 1));
+        assert_eq!(c.pseudocenter(), Loc::from(pow2(pow) * 0x30 - 1));
+        let arqs = ArqSet::new(vec![a, b, c]);
+        arqs.print_arqs(64);
+        let view = PeerView::new(Default::default(), arqs);
+        assert_eq!(
+            view.filtered_arqs(int(pow, 0, 0x10).to_interval())
+                .cloned()
+                .collect::<Vec<_>>(),
+            vec![a]
+        );
     }
 
     #[test]
@@ -242,13 +294,26 @@ mod tests {
             int(pow, 0x10, 0x30),
             int(pow, 0x20, 0x40),
         ]);
+        arqs.print_arqs(64);
         let view = PeerView::new(Default::default(), arqs);
-        assert_eq!(view.extrapolated_coverage(&int(pow, 0, 0x10)), 2.0);
-        assert_eq!(view.extrapolated_coverage(&int(pow, 0, 0x20)), 2.5);
-        assert_eq!(view.extrapolated_coverage(&int(pow, 0, 0x40)), 2.5);
+        assert_eq!(
+            view.extrapolated_coverage_and_filtered_count(&int(pow, 0, 0x10)),
+            (2.0, 2)
+        );
+        assert_eq!(
+            view.extrapolated_coverage_and_filtered_count(&int(pow, 0, 0x20)),
+            (2.5, 3)
+        );
+        assert_eq!(
+            view.extrapolated_coverage_and_filtered_count(&int(pow, 0, 0x40)),
+            (2.5, 4)
+        );
 
-        // All arcs get filtered out, so this would normally be 3, but actually
-        // it's simply 1.
-        assert_eq!(view.extrapolated_coverage(&int(pow, 0x10, 0x20)), 1.0);
+        // TODO: when changing PeerView logic to bake in the filter,
+        // this will probably change
+        assert_eq!(
+            view.extrapolated_coverage_and_filtered_count(&int(pow, 0x10, 0x20)),
+            (2.0, 2)
+        );
     }
 }

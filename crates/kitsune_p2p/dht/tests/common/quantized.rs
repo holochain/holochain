@@ -108,8 +108,15 @@ pub fn run_one_epoch(
     dynamic_peer_indices: Option<&HashSet<usize>>,
     detail: u8,
 ) -> (Peers, EpochStats) {
-    let mut net = 0.0;
-    let mut gross = 0.0;
+    let mut cov_total = 0.0;
+    let mut cov_min = full_len();
+    let mut cov_max = 0.0;
+    let mut power_min = 32;
+    let mut power_max = 0;
+    let mut power_total = 0.0;
+    let mut delta_net = 0.0;
+    let mut delta_gross = 0.0;
+
     let mut delta_min = full_len();
     let mut delta_max = -full_len();
     let mut index_min = peers.len();
@@ -118,9 +125,11 @@ pub fn run_one_epoch(
     let peer_arqset = ArqSet::new(peers.clone());
 
     // TODO: update the continuous test framework to only use one view per epoch
-    let view = PeerView::new(strat.clone(), peer_arqset.clone());
+    let mut view = PeerView::new(strat.clone(), peer_arqset.clone());
 
     for i in 0..peers.len() {
+        view.skip_index = Some(i);
+
         if let Some(dynamic) = dynamic_peer_indices {
             if !dynamic.contains(&i) {
                 continue;
@@ -131,11 +140,33 @@ pub fn run_one_epoch(
 
         view.update_arq(&mut arq);
 
+        println!(
+            "{} {:?}",
+            arq.report(64),
+            view.extrapolated_coverage_and_filtered_count(&arq.to_bounds())
+        );
+
         let after = arq.length() as f64;
         let delta = after - before;
-        // dbg!(&before, &after, &delta);
-        net += delta;
-        gross += delta.abs();
+
+        power_total += arq.power() as f64;
+        cov_total += after;
+        delta_net += delta;
+        delta_gross += delta.abs();
+        if after < cov_min {
+            cov_min = after;
+        }
+        if after > cov_max {
+            cov_max = after;
+        }
+
+        if arq.power() > power_max {
+            power_max = arq.power();
+        }
+        if arq.power() < power_min {
+            power_min = arq.power();
+        }
+
         if delta < delta_min {
             delta_min = delta;
             index_min = i;
@@ -144,6 +175,7 @@ pub fn run_one_epoch(
             delta_max = delta;
             index_max = i;
         }
+        view.skip_index = None;
     }
 
     if detail >= 2 {
@@ -166,11 +198,17 @@ pub fn run_one_epoch(
     let tot = peers.len() as f64;
     let min_redundancy = 1111;
     let stats = EpochStats {
-        net_delta_avg: net / tot / full_len(),
-        gross_delta_avg: gross / tot / full_len(),
+        net_delta_avg: delta_net / tot / full_len(),
+        gross_delta_avg: delta_gross / tot / full_len(),
         min_redundancy: min_redundancy,
         delta_min: delta_min / full_len(),
         delta_max: delta_max / full_len(),
+        min_coverage: cov_min / full_len(),
+        max_coverage: cov_max / full_len(),
+        avg_redundancy: cov_total / full_len(),
+        min_power: power_min,
+        max_power: power_max,
+        mean_power: power_total / tot,
     };
     (peers, stats)
 }
@@ -351,21 +389,33 @@ pub struct EpochStats {
     pub delta_min: f64,
     // pub delta_variance: f64,
     pub min_redundancy: u32,
+    pub min_coverage: f64,
+    pub max_coverage: f64,
+    pub avg_redundancy: f64,
+    pub min_power: u8,
+    pub max_power: u8,
+    pub mean_power: f64,
 }
 
 impl EpochStats {
     pub fn oneline_header() -> String {
-        format!("rdun   net Δ%   gross Δ%   min Δ%   max Δ%")
+        format!(
+            "rdun   net Δ%   gross Δ%   min Δ%   max Δ%   avg cov   min pow   avg pow   max pow"
+        )
     }
 
     pub fn oneline(&self) -> String {
         format!(
-            "{:4}   {:>+6.3}   {:>8.3}   {:>6.3}   {:>6.3}",
+            "{:4}   {:>+6.3}   {:>8.3}   {:>6.3}   {:>6.3}   {:>7}   {:>7}   {:>7}   {:>7}",
             self.min_redundancy,
             self.net_delta_avg * 100.0,
             self.gross_delta_avg * 100.0,
             self.delta_min * 100.0,
             self.delta_max * 100.0,
+            self.avg_redundancy,
+            self.min_power,
+            self.mean_power,
+            self.max_power,
         )
     }
 }

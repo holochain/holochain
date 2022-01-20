@@ -112,13 +112,33 @@ impl ArqSet {
 }
 
 /// View ascii for arq bounds
-pub fn print_arq(arq: &ArqBounds, len: usize) {
+pub fn print_arq<'a, A>(arq: &'a A, len: usize)
+where
+    ArqBounds: From<&'a A>,
+{
+    let arq: ArqBounds = arq.into();
     println!(
-        "|{}|\tpow: {}\tcount: {}",
+        "|{}| {} *2^{}",
         arq.to_interval().to_ascii(len),
-        arq.power,
-        arq.count
+        arq.count(),
+        arq.power
     );
+}
+
+pub fn print_arqs<'a, A>(arqs: &'a [A], len: usize)
+where
+    ArqBounds: From<&'a A>,
+{
+    for (i, arq) in arqs.iter().enumerate() {
+        let arq: ArqBounds = arq.into();
+        println!(
+            "|{}| {}:\t{} *2^{}",
+            arq.to_interval().to_ascii(len),
+            i,
+            arq.count(),
+            arq.power
+        );
+    }
 }
 
 #[test]
