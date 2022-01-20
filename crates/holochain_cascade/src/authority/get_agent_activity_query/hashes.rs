@@ -140,9 +140,10 @@ impl Query for GetAgentActivityQuery {
         let valid = state.valid;
         let rejected = state.rejected;
         let valid_activity = if self.options.include_valid_activity {
-            let valid = valid
+            let valid = self
+                .filter
+                .filter_headers(valid)
                 .into_iter()
-                .filter(|h| self.filter.check(h.as_content()))
                 .map(|h| (h.header_seq(), h.into_hash()))
                 .collect();
             ChainItems::Hashes(valid)
@@ -150,9 +151,10 @@ impl Query for GetAgentActivityQuery {
             ChainItems::NotRequested
         };
         let rejected_activity = if self.options.include_rejected_activity {
-            let rejected = rejected
+            let rejected = self
+                .filter
+                .filter_headers(rejected)
                 .into_iter()
-                .filter(|h| self.filter.check(h.as_content()))
                 .map(|h| (h.header_seq(), h.into_hash()))
                 .collect();
             ChainItems::Hashes(rejected)

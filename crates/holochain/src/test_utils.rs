@@ -637,7 +637,8 @@ async fn get_integration_dumps<Db: ReadAccess<DbKindDht>>(envs: &[&Db]) -> Integ
     IntegrationStateDumps(output)
 }
 
-async fn query_integration<Db: ReadAccess<DbKindDht>>(env: &Db) -> IntegrationStateDump {
+/// Show the current db state.
+pub async fn query_integration<Db: ReadAccess<DbKindDht>>(env: &Db) -> IntegrationStateDump {
     crate::conductor::integration_dump(&env.clone().into())
         .await
         .unwrap()

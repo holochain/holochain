@@ -81,37 +81,74 @@ async fn app_validation_workflow_inner(
 ) -> WorkflowResult<WorkComplete> {
     let env = workspace.dht_env.clone().into();
     let sorted_ops = validation_query::get_ops_to_app_validate(&env).await?;
-    tracing::debug!("app validating {} ops", sorted_ops.len());
+    let start_len = sorted_ops.len();
+    tracing::debug!("validating {} ops", start_len);
+    let start = (start_len >= NUM_CONCURRENT_OPS).then(std::time::Instant::now);
+    let saturated = start.is_some();
 
     // Validate all the ops
-    let iter = sorted_ops.into_iter().map(|so| {
+    let iter = sorted_ops.into_iter().map({
         let network = network.clone();
-        let conductor_handle = conductor_handle.clone();
         let workspace = workspace.clone();
-        let dna_hash = dna_hash.clone();
-        async move {
-            let (op, op_hash) = so.into_inner();
-            let author = op.header().author().clone();
-            let op_light = op.to_light();
+        move |so| {
+            let network = network.clone();
+            let conductor_handle = conductor_handle.clone();
+            let workspace = workspace.clone();
+            let dna_hash = dna_hash.clone();
+            async move {
+                let (op, op_hash) = so.into_inner();
+                let dependency = get_dependency(op.get_type(), &op.header());
+                let op_light = op.to_light();
 
-            // Validate this op
-            let r = validate_op(dna_hash, op, &conductor_handle, &(*workspace), &network).await;
-            (op_hash, author, op_light, r)
+                // Validate this op
+                let r = validate_op(dna_hash, op, &conductor_handle, &(*workspace), &network).await;
+                (op_hash, dependency, op_light, r)
+            }
         }
     });
+
+    // Create a stream of concurrent validation futures.
+    // This will run NUM_CONCURRENT_OPS validation futures concurrently and
+    // return up to NUM_CONCURRENT_OPS * 100 results.
     use futures::stream::StreamExt;
     let mut iter = futures::stream::iter(iter)
         .buffer_unordered(NUM_CONCURRENT_OPS)
-        .ready_chunks(NUM_CONCURRENT_OPS);
+        .ready_chunks(NUM_CONCURRENT_OPS * 100);
+
+    // Spawn a task to actually drive the stream.
+    // This allows the stream to make progress in the background while
+    // we are committing previous results to the database.
+    let (tx, rx) = tokio::sync::mpsc::channel(NUM_CONCURRENT_OPS * 100);
+    let jh = tokio::spawn(async move {
+        while let Some(op) = iter.next().await {
+            // Send the result to task that will commit to the database.
+            if tx.send(op).await.is_err() {
+                tracing::warn!("app validation task has failed to send ops. This is not a problem if the conductor is shutting down");
+                break;
+            }
+        }
+    });
+
+    // Create a stream that will chunk up to NUM_CONCURRENT_OPS * 100 ready results.
+    let mut iter =
+        tokio_stream::wrappers::ReceiverStream::new(rx).ready_chunks(NUM_CONCURRENT_OPS * 100);
 
     let mut total = 0;
+    let mut round_time = start.is_some().then(std::time::Instant::now);
+    // Pull in a chunk of results.
     while let Some(chunk) = iter.next().await {
-        let t = workspace
+        tracing::debug!(
+            "Committing {} ops",
+            chunk.iter().map(|c| c.len()).sum::<usize>()
+        );
+        let (t, a, r) = workspace
             .dht_env
             .async_commit(move |mut txn| {
                 let mut total = 0;
-                for outcome in chunk {
-                    let (op_hash, _, op_light, outcome) = outcome;
+                let mut awaiting = 0;
+                let mut rejected = 0;
+                for outcome in chunk.into_iter().flatten() {
+                    let (op_hash, dependency, op_light, outcome) = outcome;
                     // Get the outcome or return the error
                     let outcome = outcome.or_else(|outcome_or_err| outcome_or_err.try_into())?;
 
@@ -124,25 +161,59 @@ async fn app_validation_workflow_inner(
                     match outcome {
                         Outcome::Accepted => {
                             total += 1;
-                            put_integration_limbo(&mut txn, op_hash, ValidationStatus::Valid)?;
+                            if let Dependency::Null = dependency {
+                                put_integrated(&mut txn, op_hash, ValidationStatus::Valid)?;
+                            } else {
+                                put_integration_limbo(&mut txn, op_hash, ValidationStatus::Valid)?;
+                            }
                         }
                         Outcome::AwaitingDeps(deps) => {
+                            awaiting += 1;
                             let status = ValidationLimboStatus::AwaitingAppDeps(deps);
                             put_validation_limbo(&mut txn, op_hash, status)?;
                         }
                         Outcome::Rejected(_) => {
-                                tracing::warn!("Received invalid op! Warrants aren't implemented yet, so we can't do anything about this right now, but be warned that somebody on the network has maliciously hacked their node.\nOp: {:?}", op_light);
-                            put_integration_limbo(&mut txn, op_hash, ValidationStatus::Rejected)?;
+                            rejected += 1;
+                            tracing::warn!("Received invalid op! Warrants aren't implemented yet, so we can't do anything about this right now, but be warned that somebody on the network has maliciously hacked their node.\nOp: {:?}", op_light);
+                            if let Dependency::Null = dependency {
+                                put_integrated(&mut txn, op_hash, ValidationStatus::Rejected)?;
+                            } else {
+                                put_integration_limbo(&mut txn, op_hash, ValidationStatus::Rejected)?;
+                            }
                         }
                     }
                 }
-                WorkflowResult::Ok(total)
+                WorkflowResult::Ok((total, awaiting, rejected))
             })
             .await?;
         total += t;
+        if let (Some(start), Some(round_time)) = (start, &mut round_time) {
+            let round_el = round_time.elapsed();
+            *round_time = std::time::Instant::now();
+            let avg_ops_ps = total as f64 / start.elapsed().as_micros() as f64 * 1_000_000.0;
+            let ops_ps = t as f64 / round_el.as_micros() as f64 * 1_000_000.0;
+            tracing::info!(
+                "App validation is saturated. Util {:.2}%. OPS/s avg {:.2}, this round {:.2}",
+                (start_len - total) as f64 / NUM_CONCURRENT_OPS as f64 * 100.0,
+                avg_ops_ps,
+                ops_ps
+            );
+        }
+        tracing::debug!(
+            "{} committed, {} awaiting sys dep, {} rejected. {} committed this round",
+            t,
+            a,
+            r,
+            total
+        );
     }
+    jh.await?;
     tracing::debug!("accepted {} ops", total);
-    Ok(WorkComplete::Complete)
+    Ok(if saturated {
+        WorkComplete::Incomplete
+    } else {
+        WorkComplete::Complete
+    })
 }
 
 pub fn to_single_zome(zomes_to_invoke: ZomesToInvoke) -> AppValidationResult<Zome> {
@@ -614,10 +685,12 @@ async fn get_validation_package_remote(
             // if the data really isn't available.
             // TODO: Another solution is to up the timeout for parallel gets.
             const NUM_RETRY_GETS: u8 = 3;
-            let range = 0..element.header().header_seq().saturating_sub(1);
 
             let mut query = holochain_zome_types::query::ChainQueryFilter::new()
-                .sequence_range(range)
+                .sequence_range(ChainQueryFilterRange::HeaderSeqRange(
+                    0,
+                    element.header().header_seq().saturating_sub(1),
+                ))
                 .include_entries(true);
             if let (RequiredValidationType::SubChain, Some(et)) = (
                 entry_def.required_validation_type,
@@ -903,5 +976,18 @@ pub fn put_integration_limbo(
 ) -> WorkflowResult<()> {
     set_validation_status(txn, hash.clone(), status)?;
     set_validation_stage(txn, hash, ValidationLimboStatus::AwaitingIntegration)?;
+    Ok(())
+}
+
+pub fn put_integrated(
+    txn: &mut Transaction<'_>,
+    hash: DhtOpHash,
+    status: ValidationStatus,
+) -> WorkflowResult<()> {
+    set_validation_status(txn, hash.clone(), status)?;
+    // This set the validation stage to pending which is correct when
+    // it's integrated.
+    set_validation_stage(txn, hash.clone(), ValidationLimboStatus::Pending)?;
+    set_when_integrated(txn, hash, Timestamp::now())?;
     Ok(())
 }

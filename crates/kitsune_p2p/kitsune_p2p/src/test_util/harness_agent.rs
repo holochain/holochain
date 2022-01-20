@@ -70,7 +70,6 @@ struct AgentHarness {
     harness_chan: HarnessEventChannel,
     agent_store: HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>,
     gossip_store: HashMap<Arc<KitsuneOpHash>, String>,
-    metric_store: KdMetricStore,
 }
 
 impl AgentHarness {
@@ -86,7 +85,6 @@ impl AgentHarness {
             harness_chan,
             agent_store: HashMap::new(),
             gossip_store: HashMap::new(),
-            metric_store: KdMetricStore::default(),
         })
     }
 }
@@ -138,6 +136,10 @@ impl HarnessAgentControlHandler for AgentHarness {
 impl ghost_actor::GhostHandler<KitsuneP2pEvent> for AgentHarness {}
 
 impl KitsuneP2pEventHandler for AgentHarness {
+    fn handle_k_gen_req(&mut self, _: KGenReq) -> KitsuneP2pEventHandlerResult<KGenRes> {
+        Err("unimplemented".into())
+    }
+
     fn handle_put_agent_info_signed(
         &mut self,
         input: PutAgentInfoSignedEvt,
@@ -214,19 +216,6 @@ impl KitsuneP2pEventHandler for AgentHarness {
         let view = strat.view_unchecked(dht_arc, arcs.as_slice());
 
         Ok(async move { Ok(view) }.boxed().into())
-    }
-
-    fn handle_put_metric_datum(&mut self, datum: MetricDatum) -> KitsuneP2pEventHandlerResult<()> {
-        self.metric_store.put_metric_datum(datum);
-        Ok(async move { Ok(()) }.boxed().into())
-    }
-
-    fn handle_query_metrics(
-        &mut self,
-        query: MetricQuery,
-    ) -> KitsuneP2pEventHandlerResult<MetricQueryAnswer> {
-        let answer = self.metric_store.query_metrics(query);
-        Ok(async move { Ok(answer) }.boxed().into())
     }
 
     fn handle_call(

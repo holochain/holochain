@@ -56,7 +56,6 @@ pub trait HdkT: Send + Sync {
     ) -> ExternResult<PreflightRequestAcceptance>;
     // Info
     fn agent_info(&self, agent_info_input: ()) -> ExternResult<AgentInfo>;
-    fn app_info(&self, app_info_input: ()) -> ExternResult<AppInfo>;
     fn dna_info(&self, dna_info_input: ()) -> ExternResult<DnaInfo>;
     fn zome_info(&self, zome_info_input: ()) -> ExternResult<ZomeInfo>;
     fn call_info(&self, call_info_input: ()) -> ExternResult<CallInfo>;
@@ -70,7 +69,6 @@ pub trait HdkT: Send + Sync {
     ) -> ExternResult<Vec<LinkDetails>>;
     // P2P
     fn call(&self, call: Vec<Call>) -> ExternResult<Vec<ZomeCallResponse>>;
-    fn call_remote(&self, call_remote: Vec<CallRemote>) -> ExternResult<Vec<ZomeCallResponse>>;
     fn emit_signal(&self, app_signal: AppSignal) -> ExternResult<()>;
     fn remote_signal(&self, remote_signal: RemoteSignal) -> ExternResult<()>;
     // Random
@@ -165,9 +163,6 @@ impl HdkT for ErrHdk {
     fn agent_info(&self, _: ()) -> ExternResult<AgentInfo> {
         Self::err()
     }
-    fn app_info(&self, _: ()) -> ExternResult<AppInfo> {
-        Self::err()
-    }
     fn dna_info(&self, _: ()) -> ExternResult<DnaInfo> {
         Self::err()
     }
@@ -192,9 +187,6 @@ impl HdkT for ErrHdk {
     }
     // P2P
     fn call(&self, _: Vec<Call>) -> ExternResult<Vec<ZomeCallResponse>> {
-        Self::err()
-    }
-    fn call_remote(&self, _: Vec<CallRemote>) -> ExternResult<Vec<ZomeCallResponse>> {
         Self::err()
     }
     fn emit_signal(&self, _: AppSignal) -> ExternResult<()> {
@@ -333,9 +325,6 @@ impl HdkT for HostHdk {
     fn agent_info(&self, _: ()) -> ExternResult<AgentInfo> {
         host_call::<(), AgentInfo>(__agent_info, ())
     }
-    fn app_info(&self, _: ()) -> ExternResult<AppInfo> {
-        host_call::<(), AppInfo>(__app_info, ())
-    }
     fn dna_info(&self, _: ()) -> ExternResult<DnaInfo> {
         host_call::<(), DnaInfo>(__dna_info, ())
     }
@@ -362,9 +351,6 @@ impl HdkT for HostHdk {
     }
     fn call(&self, call: Vec<Call>) -> ExternResult<Vec<ZomeCallResponse>> {
         host_call::<Vec<Call>, Vec<ZomeCallResponse>>(__call, call)
-    }
-    fn call_remote(&self, call_remote: Vec<CallRemote>) -> ExternResult<Vec<ZomeCallResponse>> {
-        host_call::<Vec<CallRemote>, Vec<ZomeCallResponse>>(__call_remote, call_remote)
     }
     fn emit_signal(&self, app_signal: AppSignal) -> ExternResult<()> {
         host_call::<AppSignal, ()>(__emit_signal, app_signal)

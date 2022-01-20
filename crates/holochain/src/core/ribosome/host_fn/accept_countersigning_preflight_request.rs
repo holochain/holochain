@@ -5,6 +5,7 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 use tracing::error;
+use crate::core::ribosome::RibosomeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn accept_countersigning_preflight_request<'a>(
@@ -91,7 +92,11 @@ pub fn accept_countersigning_preflight_request<'a>(
                 ))
             })
         }
-        _ => unreachable!(),
+        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+                call_context.zome.zome_name().clone(),
+                call_context.function_name().clone(),
+                "accept_countersigning_preflight_request".into()
+            ).to_string()))
     }
 }
 

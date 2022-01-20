@@ -51,18 +51,12 @@ host_fn_api_impls! {
     fn agent_info (()) -> zt::info::AgentInfo;
 
     // @todo
-    fn app_info (()) -> zt::info::AppInfo;
-
-    // @todo
     fn dna_info (()) -> zt::info::DnaInfo;
 
     // @todo
     fn call_info (()) -> zt::info::CallInfo;
 
     fn call (Vec<zt::call::Call>) -> Vec<zt::ZomeCallResponse>;
-
-    // Call a zome on a remote agent.
-    fn call_remote (Vec<zt::call_remote::CallRemote>) -> Vec<zt::ZomeCallResponse>;
 
     // @todo List all the local capability claims.
     fn capability_claims (()) -> ();

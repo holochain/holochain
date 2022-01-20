@@ -1,14 +1,9 @@
 //! in-memory persistence module for kitsune direct
 
-use crate::types::metric_store::KdMetricStore;
 use crate::types::persist::*;
 use crate::*;
 use futures::future::{BoxFuture, FutureExt};
 use kitsune_p2p::dht_arc::DhtArcSet;
-use kitsune_p2p::dht_arc::PeerStratBeta;
-use kitsune_p2p::event::MetricDatum;
-use kitsune_p2p::event::MetricQuery;
-use kitsune_p2p::event::MetricQueryAnswer;
 use kitsune_p2p::event::TimeWindow;
 use kitsune_p2p_types::tls::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
@@ -208,7 +203,6 @@ struct PersistMemInner {
     agent_info: HashMap<KdHash, Arc<AgentStore>>,
     entries: HashMap<KdHash, Arc<AgentEntryStore>>,
     ui_cache: Arc<UiStore>,
-    metric_store: KdMetricStore,
 }
 
 struct PersistMem(Share<PersistMemInner>, Uniq);
@@ -222,7 +216,6 @@ impl PersistMem {
                 agent_info: HashMap::new(),
                 entries: HashMap::new(),
                 ui_cache: UiStore::new(),
-                metric_store: KdMetricStore::default(),
             }),
             Uniq::default(),
         ))
@@ -416,30 +409,6 @@ impl AsKdPersist for PersistMem {
 
             // contains is already checked in the iterator
             Ok(PeerStratBeta::default().view_unchecked(dht_arc, arcs.as_slice()))
-        }
-        .boxed()
-    }
-
-    fn put_metric_datum(&self, datum: MetricDatum) -> BoxFuture<'static, KdResult<()>> {
-        let inner = self.0.clone();
-        async move {
-            inner
-                .share_mut(|inner, _| {
-                    inner.metric_store.put_metric_datum(datum);
-                    Ok(())
-                })
-                .map_err(KdError::other)?;
-            Ok(())
-        }
-        .boxed()
-    }
-
-    fn query_metrics(&self, query: MetricQuery) -> BoxFuture<'static, KdResult<MetricQueryAnswer>> {
-        let inner = self.0.clone();
-        async move {
-            inner
-                .share_mut(|inner, _| Ok(inner.metric_store.query_metrics(query)))
-                .map_err(KdError::other)
         }
         .boxed()
     }

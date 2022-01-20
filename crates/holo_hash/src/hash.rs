@@ -30,7 +30,7 @@ use crate::has_hash::HasHash;
 use crate::HashType;
 use crate::PrimitiveHashType;
 
-#[cfg(feature = "encoding")]
+#[cfg(feature = "hashing")]
 use crate::encode;
 
 /// Length of the prefix bytes (3)
