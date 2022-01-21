@@ -33,9 +33,8 @@ fn test_shrink_towards_empty() {
 
     // generate peers with a bit too much coverage (14 > 12)
     let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(14.5), 100, jitter, 0);
-    let peer_arqs = ArqSet::new(peers);
-    let peer_power = peer_arqs.power();
-    let view = PeerView::new(strat.clone(), peer_arqs);
+    let peer_power = peers.iter().map(|p| p.power()).min().unwrap();
+    let view = PeerView::new(strat.clone(), peers);
 
     // start with a full arq at max power
     let mut arq = Arq::new_full(0.into(), strat.max_power);
@@ -68,9 +67,8 @@ fn test_grow_towards_full() {
 
     // generate peers with deficient coverage
     let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(7.0), 1000, jitter, 0);
-    let peer_arqs = ArqSet::new(peers);
-    let peer_power = peer_arqs.power();
-    let view = PeerView::new(strat.clone(), peer_arqs);
+    let peer_power = peers.iter().map(|p| p.power()).min().unwrap();
+    let view = PeerView::new(strat.clone(), peers);
 
     // start with an arq comparable to one's peers
     let mut arq = Arq::new(0.into(), peer_power, 12);
@@ -99,9 +97,8 @@ fn test_grow_to_full() {
 
     // generate peers with deficient coverage
     let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(7.0), 1000, jitter, 0);
-    let peer_arqs = ArqSet::new(peers);
-    let peer_power = peer_arqs.power();
-    let view = PeerView::new(strat.clone(), peer_arqs);
+    let peer_power = peers.iter().map(|p| p.power()).min().unwrap();
+    let view = PeerView::new(strat.clone(), peers);
 
     // start with an arq comparable to one's peers
     let mut arq = Arq::new(0.into(), peer_power, 12);
@@ -135,9 +132,8 @@ fn test_shrink_by_multiple_chunks() {
 
     // generate peers with far too much coverage
     let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(22.0), 1000, jitter, 0);
-    let peer_arqs = ArqSet::new(peers);
-    let peer_power = peer_arqs.power();
-    let view = PeerView::new(strat.clone(), peer_arqs);
+    let peer_power = peers.iter().map(|p| p.power()).min().unwrap();
+    let view = PeerView::new(strat.clone(), peers);
 
     let arq = Arq::new(0.into(), peer_power + 1, 12);
     let mut resized = arq.clone();
@@ -166,9 +162,8 @@ fn test_grow_by_multiple_chunks() {
 
     // generate peers with far too little coverage
     let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(5.0), 1000, jitter, 0);
-    let peer_arqs = ArqSet::new(peers);
-    let peer_power = peer_arqs.power();
-    let view = PeerView::new(strat.clone(), peer_arqs);
+    let peer_power = peers.iter().map(|p| p.power()).min().unwrap();
+    let view = PeerView::new(strat.clone(), peers);
 
     let arq = Arq::new(0.into(), peer_power - 1, 6);
     let mut resized = arq.clone();
@@ -187,7 +182,7 @@ fn test_degenerate_asymmetrical_coverage() {
     let other = ArqBounds::from_interval(4, ArcInterval::new(0x0, 0x80))
         .unwrap()
         .to_arq();
-    let others = ArqSet::new(vec![other; 10]);
+    let others = vec![other; 10];
     // aim for coverage between 5 and 6.
     let strat = ArqStrat {
         min_coverage: 5.0,
@@ -232,7 +227,7 @@ fn test_scenario() {
         let mut arq = Arq::new_full(Loc::from(0x0), strat.max_power);
         // create 10 peers, all with full arcs, fully covering the DHT
         let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, None, 10, jitter, 0);
-        let view = PeerView::new(strat.clone(), ArqSet::new(peers));
+        let view = PeerView::new(strat.clone(), peers);
         let extrapolated = view.extrapolated_coverage(&arq.to_bounds());
         assert_eq!(extrapolated, 10.0);
 
@@ -246,15 +241,14 @@ fn test_scenario() {
         let mut arq = Arq::new_full(Loc::from(0x0), strat.max_power);
         // create 100 peers, with arcs at about 10%,
         // covering a bit more than they need to
-        let peer_arqs = generate_ideal_coverage(&mut rng, &strat, Some(13.0), 100, jitter, 0);
+        let peers = generate_ideal_coverage(&mut rng, &strat, Some(13.0), 100, jitter, 0);
 
         {
-            let peers = ArqSet::new(peer_arqs.clone());
-            let peer_power = peers.power();
+            let peer_power = peers.iter().map(|p| p.power()).min().unwrap();
             // print_arqs(&peers, 64);
             assert_eq!(peer_power, 26);
 
-            let view = PeerView::new(strat.clone(), peers);
+            let view = PeerView::new(strat.clone(), peers.clone());
             let extrapolated = view.extrapolated_coverage(&arq.to_bounds());
             assert!(extrapolated > strat.max_coverage());
             // assert!(strat.min_coverage <= extrapolated && extrapolated <= strat.max_coverage());
@@ -266,24 +260,19 @@ fn test_scenario() {
             assert_eq!(arq.power(), peer_power);
             assert!(arq.count() <= 8);
         }
-        println!("-------------------");
-        println!("-------------------");
-        println!("-------------------");
         {
             // create the same view but with all arcs cut in half, so that the
             // coverage is uniformly undersaturated.
-            let peers = ArqSet::new(
-                peer_arqs
-                    .clone()
-                    .iter_mut()
-                    .map(|arq| {
-                        let mut arq = arq.downshift();
-                        *arq.count_mut() = arq.count() / 2;
-                        arq
-                    })
-                    .collect(),
-            );
-            let peer_power = peers.power();
+            let peers: Vec<_> = peers
+                .clone()
+                .iter_mut()
+                .map(|arq| {
+                    let mut arq = arq.downshift();
+                    *arq.count_mut() = arq.count() / 2;
+                    arq
+                })
+                .collect();
+            let peer_power = peers.iter().map(|p| p.power()).min().unwrap();
             let view = PeerView::new(strat.clone(), peers);
             print_arq(&arq, 64);
             // assert that our arc will grow as large as it can to pick up the slack.

@@ -118,10 +118,8 @@ pub fn run_one_epoch(
     let mut delta_min = full_len();
     let mut delta_max = -full_len();
 
-    let peer_arqset = ArqSet::new(peers.clone());
-
     // TODO: update the continuous test framework to only use one view per epoch
-    let mut view = PeerView::new(strat.clone(), peer_arqset.clone());
+    let mut view = PeerView::new(strat.clone(), peers.clone());
 
     if detail {
         println!(

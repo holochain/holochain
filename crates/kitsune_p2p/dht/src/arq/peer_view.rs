@@ -1,12 +1,12 @@
 use kitsune_p2p_dht_arc::ArcInterval;
 
-use super::{is_full, Arq, ArqBounded, ArqBounds, ArqSet, ArqStrat};
+use super::{is_full, Arq, ArqBounded, ArqBounds, ArqStrat};
 
 pub struct PeerView {
     /// The strategy which generated this view
     strat: ArqStrat,
     /// The peers in this view (TODO: replace with calculated values)
-    peers: ArqSet,
+    peers: Vec<Arq>,
 
     #[cfg(feature = "testing")]
     /// Omit the arq at this index from all peer considerations.
@@ -16,10 +16,10 @@ pub struct PeerView {
 }
 
 impl PeerView {
-    pub fn new(strat: ArqStrat, arqs: ArqSet) -> Self {
+    pub fn new(strat: ArqStrat, peers: Vec<Arq>) -> Self {
         Self {
             strat,
-            peers: arqs,
+            peers,
             #[cfg(feature = "testing")]
             skip_index: None,
         }
@@ -101,17 +101,22 @@ impl PeerView {
         let old_power = arq.power();
         let under = cov < self.strat.min_coverage;
         let over = cov > self.strat.max_coverage();
-        let slacking = np < cov * self.strat.slack_factor;
+        let slacking = |np, cov| np <= cov * self.strat.slacker_ratio;
 
-        let growth_factor = if slacking {
+        let growth_factor = if slacking(np, cov) {
             // The "slacker" factor. If our observed coverage is significantly
             // greater than the number of peers we see, it's an indication
             // that we may need to pick up more slack.
             //
-            // This check balanced out stable but unequitable situations where
+            // This check helps balance out stable but unequitable situations where
             // all peers have a similar estimated coverage, but some peers are
             // holding much more than others.
-            cov / np
+            let sf = cov / np;
+            if sf.is_finite() {
+                sf
+            } else {
+                2.0
+            }
         } else if over || under {
             // The ratio of ideal coverage vs actual observed coverage.
             // A ratio > 1 indicates undersaturation and a need to grow.
@@ -145,8 +150,7 @@ impl PeerView {
             // Ensure we shrink by at least 1
             (old_count as f64 * growth_factor).floor() as u32
         } else {
-            // No change if between the min and max target coverage,
-            // but allow changes due to slacking
+            // Allow growth if we are found to be slacking
             (old_count as f64 * growth_factor).round() as u32
         };
 
@@ -160,7 +164,7 @@ impl PeerView {
             // lose sight of peers.
             let new_cov = self.extrapolated_coverage(&tentative.to_bounds());
             if (over && new_cov < self.strat.min_coverage)
-                || (!slacking && np < new_cov * self.strat.slack_factor)
+                || (!slacking(np, cov) && slacking(np, new_cov))
             {
                 return UpdateArqStats {
                     changed: false,
@@ -246,11 +250,12 @@ impl PeerView {
 
     pub fn power_stats(&self, filter: &Arq) -> PowerStats {
         use statrs::statistics::*;
-        let powers: Vec<_> = self
+        let mut powers: Vec<_> = self
             .filtered_arqs(filter.to_interval())
             .filter(|a| a.count > 0)
             .map(|a| a.power as f64)
             .collect();
+        powers.push(filter.power() as f64);
         let powers = statrs::statistics::Data::new(powers);
         let median = powers.median() as u8;
         let std_dev = powers.std_dev().unwrap_or_default();
@@ -261,7 +266,7 @@ impl PeerView {
     }
 
     fn filtered_arqs<'a>(&'a self, filter: ArcInterval) -> impl Iterator<Item = &'a Arq> {
-        let it = self.peers.arqs.iter();
+        let it = self.peers.iter();
 
         #[cfg(feature = "testing")]
         let it = it
@@ -300,7 +305,7 @@ mod tests {
 
     use kitsune_p2p_dht_arc::ArcInterval;
 
-    use crate::arq::pow2;
+    use crate::arq::{pow2, print_arqs};
     use crate::Loc;
 
     use super::*;
@@ -322,8 +327,8 @@ mod tests {
         assert_eq!(a.center, Loc::from(pow2(pow) * 0x10 - 1));
         assert_eq!(b.center, Loc::from(pow2(pow) * 0x20 - 1));
         assert_eq!(c.center, Loc::from(pow2(pow) * 0x30 - 1));
-        let arqs = ArqSet::new(vec![a, b, c]);
-        arqs.print_arqs(64);
+        let arqs = vec![a, b, c];
+        print_arqs(&arqs, 64);
         let view = PeerView::new(Default::default(), arqs);
 
         let get = |b: Arq| {
@@ -340,13 +345,11 @@ mod tests {
     #[test]
     fn test_coverage() {
         let pow = 24;
-        let arqs = ArqSet::new(
-            (0..0x100)
-                .step_by(0x10)
-                .map(|x| make_arq(pow, x, x + 0x20))
-                .collect(),
-        );
-        arqs.print_arqs(64);
+        let arqs: Vec<_> = (0..0x100)
+            .step_by(0x10)
+            .map(|x| make_arq(pow, x, x + 0x20))
+            .collect();
+        print_arqs(&arqs, 64);
         let view = PeerView::new(Default::default(), arqs);
         assert_eq!(
             view.extrapolated_coverage_and_filtered_count(&make_arq(pow, 0, 0x10).to_bounds()),

@@ -63,6 +63,16 @@ fn parameterized_stability_test_messy() {
 
     let peers = generate_messy_coverage(&mut rng, &strat, len_mean, len_std, n, j, 2);
 
+    println!("INITIAL CONDITIONS:");
+    for (i, arq) in peers.iter().enumerate() {
+        println!(
+            "|{}| #{:<3} {:>3} {:>3}",
+            arq.to_interval().to_ascii(64),
+            i,
+            arq.count(),
+            arq.power()
+        );
+    }
     tracing::info!("");
     tracing::debug!("{}", EpochStats::oneline_header());
     let eq = determine_equilibrium(1, peers.clone(), |peers| {

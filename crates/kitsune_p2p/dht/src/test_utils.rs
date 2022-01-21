@@ -211,7 +211,7 @@ fn test_unit_arc() {
 
 #[cfg(test)]
 mod tests {
-    use crate::arq::{ArqSet, PeerView};
+    use crate::arq::PeerView;
 
     use super::*;
     use proptest::proptest;
@@ -227,16 +227,13 @@ mod tests {
         };
 
         let mut rng = seeded_rng(None);
-        let peer_arqs = generate_ideal_coverage(&mut rng, &strat, None, 100, 0.0, 0);
-        let peers = ArqSet::new(peer_arqs);
+        let peers = generate_ideal_coverage(&mut rng, &strat, None, 100, 0.0, 0);
 
         let view = PeerView::new(strat.clone(), peers);
         let cov = view.actual_coverage();
 
-        // TODO: tighten this up so we don't need +/- 1
-        let min = strat.min_coverage - 1.0;
-        let max = strat.max_coverage() + 1.0;
-        println!("{} <= {} <= {}", min, cov, max);
+        let min = strat.min_coverage;
+        let max = strat.max_coverage();
         assert!(min <= cov);
         assert!(cov <= max);
     }
@@ -255,10 +252,7 @@ mod tests {
                 ..Default::default()
             };
             let mut rng = seeded_rng(None);
-            let peer_arqs = generate_ideal_coverage(&mut rng, &strat, None, num_peers, 0.0, 0);
-
-            let peers = ArqSet::new(peer_arqs);
-
+            let peers = generate_ideal_coverage(&mut rng, &strat, None, num_peers, 0.0, 0);
             let view = PeerView::new(strat.clone(), peers);
             let cov = view.actual_coverage();
 
@@ -276,12 +270,7 @@ mod tests {
                 ..Default::default()
             };
             let a = unit_arq(&strat, center, len, 0);
-            // println!(
-            //     "{} <= {} <= {}",
-            //     strat.min_chunks(),
-            //     a.count(),
-            //     strat.max_chunks()
-            // );
+
             assert!(a.count() >= strat.min_chunks());
             assert!(a.count() <= strat.max_chunks());
         }
@@ -294,12 +283,6 @@ mod tests {
                 ..Default::default()
             };
             let a = unit_arq(&strat, center, len, 0);
-            println!(
-                "{} <= {} <= {}",
-                strat.min_power,
-                a.power(),
-                strat.max_power
-            );
             assert!(a.power() >= strat.min_power);
             assert!(a.power() <= strat.max_power);
         }
@@ -314,7 +297,6 @@ mod tests {
             let a = unit_arq(&strat, center, len, 0);
             let target_len = (len * 2f64.powf(32.0)) as i64;
             let true_len = a.to_interval().length() as i64;
-            println!("{} ~ {} ({})", true_len, target_len, a.spacing());
             assert!((true_len - target_len).abs() < a.spacing() as i64);
         }
     }
