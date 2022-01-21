@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased](https://github.com/holochain/holochain/compare/hdk-v0.0.100...HEAD)
 - docs: Add introduction to front-page and move example section up [1172](https://github.com/holochain/holochain/pull/1172)
 
+## 0.0.119
+
 ## 0.0.118
 
 - hdk: `Path` now split into `Path` and `PathEntry` [1156](https://github.com/holochain/holochain/pull/1156)
