@@ -359,11 +359,10 @@ Automated steps still require running the tool manually ;-).
     ```
 
 0. _[M]_ [Draft and create a GitHub release](https://github.com/holochain/holochain/releases/new) from the new holochain tag on holochain/holochain.
-    0. Select the new holochain tag via the _Choose a tag_ button.
-
-    0. Choose the title: _Holochain <VERSION>_
-
-    0. Set the description according to this template:
+    
+    1. Select the new holochain tag via the _Choose a tag_ button.
+    2. Choose the title: _holochain `<VERSION>`_
+    3. Set the description according to this template:
 
         ```md
         <INSERT HOLOCHAIN CHANGELOG ENTRIES>
