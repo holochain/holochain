@@ -95,33 +95,48 @@ impl PeerView {
     /// https://hackmd.io/@hololtd/r1IAIbr5Y/https%3A%2F%2Fhackmd.io%2FK_fkBj6XQO2rCUZRRL9n2g
     pub fn update_arq_with_stats(&self, arq: &mut Arq) -> UpdateArqStats {
         let (cov, num_peers) = self.extrapolated_coverage_and_filtered_count(&arq.to_bounds());
+        let np = num_peers as f64;
 
         let old_count = arq.count();
         let old_power = arq.power();
         let under = cov < self.strat.min_coverage;
         let over = cov > self.strat.max_coverage();
+        let slacking = np < cov * self.strat.slack_factor;
 
-        // The ratio of ideal coverage vs actual observed coverage.
-        // A ratio > 1 indicates undersaturation and a need to grow.
-        // A ratio < 1 indicates oversaturation and a need to shrink.
-        // We cap the growth at 2x in either direction
-        let cov_ratio = (self.strat.midline_coverage() / cov).clamp(0.5, 2.0);
+        let growth_factor = if slacking {
+            // The "slacker" factor. If our observed coverage is significantly
+            // greater than the number of peers we see, it's an indication
+            // that we may need to pick up more slack.
+            //
+            // This check balanced out stable but unequitable situations where
+            // all peers have a similar estimated coverage, but some peers are
+            // holding much more than others.
+            cov / np
+        } else if over || under {
+            // The ratio of ideal coverage vs actual observed coverage.
+            // A ratio > 1 indicates undersaturation and a need to grow.
+            // A ratio < 1 indicates oversaturation and a need to shrink.
+            // We cap the growth at 2x in either direction
+            let cov_ratio = (self.strat.midline_coverage() / cov).clamp(0.5, 2.0);
 
-        // We want to know which of our peers are likely to be making a similar
-        // update to us, because that will affect the overall coverage more
-        // than the drop in the bucket that we can provide.
-        //
-        // If all peers have seen the same change as us since their last update,
-        // they will on average move similarly to us, and so we should only make
-        // a small step in the direction of the target, trusting that our peers
-        // will do the same.
-        //
-        // Conversely, if all peers are stable, e.g. if we just came online to
-        // find a situation where all peers around us are under-representing,
-        // but stable, then we want to make a much bigger leap.
-        let peer_velocity_factor = 1.0 + num_peers as f64;
+            // We want to know which of our peers are likely to be making a similar
+            // update to us, because that will affect the overall coverage more
+            // than the drop in the bucket that we can provide.
+            //
+            // If all peers have seen the same change as us since their last update,
+            // they will on average move similarly to us, and so we should only make
+            // a small step in the direction of the target, trusting that our peers
+            // will do the same.
+            //
+            // Conversely, if all peers are stable, e.g. if we just came online to
+            // find a situation where all peers around us are under-representing,
+            // but stable, then we want to make a much bigger leap.
+            let peer_velocity_factor = 1.0 + np;
 
-        let growth_factor = (cov_ratio - 1.0) / peer_velocity_factor + 1.0;
+            (cov_ratio - 1.0) / peer_velocity_factor + 1.0
+        } else {
+            1.0
+        };
 
         let new_count = if under {
             // Ensure we grow by at least 1
@@ -130,8 +145,9 @@ impl PeerView {
             // Ensure we shrink by at least 1
             (old_count as f64 * growth_factor).floor() as u32
         } else {
-            // No change if between the min and max target coverage
-            old_count
+            // No change if between the min and max target coverage,
+            // but allow changes due to slacking
+            (old_count as f64 * growth_factor).round() as u32
         };
 
         if new_count != old_count {
@@ -139,10 +155,13 @@ impl PeerView {
             tentative.count = new_count;
 
             // If shrinking caused us to go below the target coverage,
-            // don't update. This happens when we shink too much and
+            // or to start "slacking" (not seeing enough peers), then
+            // don't update. This happens when we shrink too much and
             // lose sight of peers.
             let new_cov = self.extrapolated_coverage(&tentative.to_bounds());
-            if over && (new_cov < self.strat.min_coverage) {
+            if (over && new_cov < self.strat.min_coverage)
+                || (!slacking && np < new_cov * self.strat.slack_factor)
+            {
                 return UpdateArqStats {
                     changed: false,
                     power: None,
@@ -227,12 +246,11 @@ impl PeerView {
 
     pub fn power_stats(&self, filter: &Arq) -> PowerStats {
         use statrs::statistics::*;
-        let mut powers: Vec<_> = self
+        let powers: Vec<_> = self
             .filtered_arqs(filter.to_interval())
             .filter(|a| a.count > 0)
             .map(|a| a.power as f64)
             .collect();
-        powers.push(filter.power as f64);
         let powers = statrs::statistics::Data::new(powers);
         let median = powers.median() as u8;
         let std_dev = powers.std_dev().unwrap_or_default();

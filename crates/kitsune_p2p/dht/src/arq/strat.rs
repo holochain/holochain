@@ -23,13 +23,6 @@ pub struct ArqStrat {
     /// chunks.
     pub max_power: u8,
 
-    /// If the standard deviation of the powers of each arq in this view is
-    /// greater than this threshold, then we might do something different when
-    /// it comes to our decision to requantize. For now, just print a warning.
-    ///
-    /// TODO: this can probably be expressed in terms of `max_power_diff`.
-    pub power_std_dev_threshold: f64,
-
     /// If the difference between the arq's power and the median power of all
     /// peer arqs (including this one) is greater than this diff,
     /// then don't requantize:
@@ -53,6 +46,20 @@ pub struct ArqStrat {
     /// choose not to gossip with agents whose power falls outside the range
     /// defined by this diff. TODO: do this.
     pub max_power_diff: u8,
+
+    /// If at any time the number of peers seen by a node is less than the
+    /// extrapolated coverage scaled by this factor, then we assume that we need
+    /// to grow our arc so that we can see more peers.
+    /// In other words, we are "slacking" if at any time:
+    ///     num_peers < extrapolated_coverage * slack_factor
+    pub slack_factor: f64,
+
+    /// If the standard deviation of the powers of each arq in this view is
+    /// greater than this threshold, then we might do something different when
+    /// it comes to our decision to requantize. For now, just print a warning.
+    ///
+    /// TODO: this can probably be expressed in terms of `max_power_diff`.
+    pub power_std_dev_threshold: f64,
 }
 
 impl Default for ArqStrat {
@@ -68,6 +75,7 @@ impl Default for ArqStrat {
             max_power: 32 - 3,
             power_std_dev_threshold: 1.0,
             max_power_diff: 2,
+            slack_factor: 0.667,
         }
     }
 }

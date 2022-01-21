@@ -14,10 +14,10 @@ use colored::*;
 
 /// Maximum number of iterations. If we iterate this much, we assume the
 /// system is divergent (unable to reach equilibrium).
-const DIVERGENCE_ITERS: usize = 40;
+const DIVERGENCE_ITERS: usize = 60;
 
 /// Number of consecutive rounds of no movement before declaring convergence.
-const CONVERGENCE_WINDOW: usize = 3;
+const CONVERGENCE_WINDOW: usize = 1;
 
 /// Level of detail in reporting.
 pub const DETAIL: u8 = 1;
@@ -123,6 +123,13 @@ pub fn run_one_epoch(
     // TODO: update the continuous test framework to only use one view per epoch
     let mut view = PeerView::new(strat.clone(), peer_arqset.clone());
 
+    if detail {
+        println!(
+            "|{: ^64}|  {:<3} {:>3} {:>3} {:>4} {:>6} {:>3} {:>3} {:>4}",
+            "<arc>", "idx", "cnt", "pwr", "Δ", "cov", "mp", "#p", "slk",
+        )
+    }
+
     for i in 0..peers.len() {
         view.skip_index = Some(i);
 
@@ -150,14 +157,23 @@ pub fn run_one_epoch(
                 format!("Δ{:<+3}", delta).red()
             };
 
-            let cov_str = format!("{: >6.2}", view.extrapolated_coverage(&arq.to_bounds()));
+            let cov = view.extrapolated_coverage(&arq.to_bounds());
+            let slack_factor = cov / stats.num_peers as f64;
+
+            let slack_str = if slack_factor > 2.0 {
+                format!("{:4.2}", cov / stats.num_peers as f64).underline()
+            } else {
+                format!("{:4.2}", cov / stats.num_peers as f64).normal()
+            };
+
+            let cov_str = format!("{: >6.2}", cov);
 
             let power_str = stats
                 .power
                 .map(|p| format!("{:2}", p.median).normal())
                 .unwrap_or("??".magenta());
             println!(
-                "|{}| #{:<3} c={:>2}  p={:<2} {} cov={}  mp= {}  #p={: >3}",
+                "|{}| #{:<3} {:>3} {:>3} {} {} {:>3} {: >3} {}",
                 arq.to_interval().to_ascii(64),
                 i,
                 arq.count(),
@@ -165,7 +181,8 @@ pub fn run_one_epoch(
                 delta_str,
                 cov_str,
                 power_str,
-                stats.num_peers
+                stats.num_peers,
+                slack_str,
             );
         }
 

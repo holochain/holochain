@@ -27,8 +27,7 @@ fn parameterized_stability_test() {
     println!("{}", strat.summary());
 
     let peers = generate_ideal_coverage(&mut rng, &strat, Some(10.0), n, j, 0);
-    let view = PeerView::new(strat.clone(), ArqSet::new(peers.clone()));
-    let cov = view.extrapolated_coverage(&Arq::new_full(0.into(), 27).to_bounds());
+
     tracing::info!("");
     tracing::debug!("{}", EpochStats::oneline_header());
     let eq = determine_equilibrium(1, peers.clone(), |peers| {
@@ -41,7 +40,6 @@ fn parameterized_stability_test() {
     // assert!(pass_report(&report, rf * 2.0));
 }
 
-/// Equilibrium test for a single distribution
 #[test]
 fn parameterized_stability_test_messy() {
     std::env::set_var("RUST_LOG", "debug");
@@ -53,7 +51,7 @@ fn parameterized_stability_test_messy() {
     let n = 30;
     let j = 0.01;
     let len_mean = 0.25;
-    let len_std = 0.75;
+    let len_std = 0.20;
     // let j = 10.0 / n as f64;
     let min_coverage = 5.0;
 
@@ -64,8 +62,7 @@ fn parameterized_stability_test_messy() {
     println!("{}", strat.summary());
 
     let peers = generate_messy_coverage(&mut rng, &strat, len_mean, len_std, n, j, 2);
-    let view = PeerView::new(strat.clone(), ArqSet::new(peers.clone()));
-    let cov = view.extrapolated_coverage(&Arq::new_full(0.into(), 27).to_bounds());
+
     tracing::info!("");
     tracing::debug!("{}", EpochStats::oneline_header());
     let eq = determine_equilibrium(1, peers.clone(), |peers| {
