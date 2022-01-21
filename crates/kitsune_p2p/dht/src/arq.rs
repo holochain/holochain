@@ -4,10 +4,13 @@ mod arq_set;
 mod peer_view;
 mod strat;
 
+#[cfg(feature = "testing")]
+mod ascii;
+
 use std::num::Wrapping;
 
 pub use arq_set::*;
-use colored::*;
+
 pub use peer_view::*;
 pub use strat::*;
 
@@ -23,11 +26,42 @@ pub fn pow2f(p: u8) -> f64 {
     2f64.powf(p as f64)
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+pub trait ArqBounded: Sized {
+    fn to_interval(&self) -> ArcInterval;
+
+    fn length(&self) -> u64;
+
+    /// Get a reference to the arq's power.
+    fn power(&self) -> u8;
+
+    /// Get a reference to the arq's count.
+    fn count(&self) -> u32;
+
+    /// Requantize to a different power. If requantizing to a higher power,
+    /// only requantize if there is no information loss due to rounding.
+    /// Otherwise, return None.
+    fn requantize(&self, power: u8) -> Option<Self>;
+
+    fn is_full(&self) -> bool {
+        is_full(self.power(), self.count())
+    }
+
+    fn is_empty(&self) -> bool {
+        self.count() == 0
+    }
+
+    fn to_bounds(&self) -> ArqBounds;
+
+    fn to_ascii(&self, len: usize) -> String {
+        self.to_bounds().to_ascii(len)
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Arq {
     /// Location around which this coverage is centered
     center: Loc,
-    /// The level of quantization. Total length is `2^grid * count`.
+    /// The level of quantization. Total ArqBoundsength is `2^grid * count`.
     /// The power must be between 0 and 31, inclusive.
     power: u8,
     /// The number of unit lengths.
@@ -62,13 +96,12 @@ impl Arq {
     /// Requantize to a different power. If requantizing to a higher power,
     /// only requantize if there is no information loss due to rounding.
     /// Otherwise, return None.
-    pub fn requantize(&mut self, power: u8) -> bool {
-        requantize(self.power, self.count, power)
-            .map(|(power, count)| {
-                self.power = power;
-                self.count = count;
-            })
-            .is_some()
+    pub fn requantize(&self, power: u8) -> Option<Self> {
+        requantize(self.power, self.count, power).map(|(power, count)| Self {
+            center: self.center,
+            power,
+            count,
+        })
     }
 
     pub fn downshift(&self) -> Self {
@@ -91,36 +124,6 @@ impl Arq {
             a.count = count;
             a
         })
-    }
-
-    pub fn to_bounds(&self) -> ArqBounds {
-        let s = self.spacing();
-        let c = self.center.as_u32();
-        let center_offset = c / s;
-        let left_oriented = c - center_offset * s < s / 2;
-        let wing = if left_oriented {
-            self.count / 2
-        } else {
-            (self.count.saturating_sub(1)) / 2
-        };
-        let offset = if self.count == 0 {
-            center_offset
-        } else {
-            center_offset.wrapping_sub(wing)
-        };
-        ArqBounds {
-            offset: offset.into(),
-            power: self.power,
-            count: self.count,
-        }
-    }
-
-    pub fn to_interval(&self) -> ArcInterval {
-        self.to_bounds().to_interval()
-    }
-
-    pub fn length(&self) -> u64 {
-        self.to_interval().length()
     }
 
     /// Calculate chunks at successive distances from the center.
@@ -182,24 +185,9 @@ impl Arq {
         self.center
     }
 
-    /// Get a reference to the arq's power.
-    pub fn power(&self) -> u8 {
-        self.power
-    }
-
-    /// Get a reference to the arq's count.
-    pub fn count(&self) -> u32 {
-        self.count
-    }
-
     /// Get a mutable reference to the arq's count.
     pub fn count_mut(&mut self) -> &mut u32 {
         &mut self.count
-    }
-
-    /// View ascii for arq bounds
-    pub fn report(&self, len: usize) -> String {
-        self.to_bounds().report(len)
     }
 }
 
@@ -221,11 +209,95 @@ impl From<&ArqBounds> for ArqBounds {
     }
 }
 
+impl ArqBounded for Arq {
+    fn to_bounds(&self) -> ArqBounds {
+        let s = self.spacing();
+        let c = self.center.as_u32();
+        let center_offset = c / s;
+        let left_oriented = c - center_offset * s < s / 2;
+        let wing = if left_oriented {
+            self.count / 2
+        } else {
+            (self.count.saturating_sub(1)) / 2
+        };
+        let offset = if self.count == 0 {
+            center_offset
+        } else {
+            center_offset.wrapping_sub(wing)
+        };
+        ArqBounds {
+            offset: offset.into(),
+            power: self.power,
+            count: self.count,
+        }
+    }
+
+    fn to_interval(&self) -> ArcInterval {
+        self.to_bounds().to_interval()
+    }
+
+    fn length(&self) -> u64 {
+        self.to_interval().length()
+    }
+
+    fn power(&self) -> u8 {
+        self.power
+    }
+
+    fn count(&self) -> u32 {
+        self.count
+    }
+
+    fn requantize(&self, power: u8) -> Option<Self> {
+        requantize(self.power, self.count, power).map(|(power, count)| Self {
+            center: self.center,
+            power,
+            count,
+        })
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct ArqBounds {
     offset: SpaceCoord,
     power: u8,
     count: u32,
+}
+
+impl ArqBounded for ArqBounds {
+    fn to_bounds(&self) -> ArqBounds {
+        *self
+    }
+
+    fn to_interval(&self) -> ArcInterval {
+        if is_full(self.power, self.count) {
+            ArcInterval::Full
+        } else if let Some((a, b)) = self.boundary_chunks() {
+            ArcInterval::new(a.left(), b.right())
+        } else {
+            ArcInterval::Empty
+        }
+    }
+
+    fn length(&self) -> u64 {
+        self.to_interval().length()
+    }
+
+    fn power(&self) -> u8 {
+        self.power
+    }
+
+    fn count(&self) -> u32 {
+        self.count
+    }
+
+    fn requantize(&self, power: u8) -> Option<Self> {
+        requantize(self.power, self.count, power).map(|(power, count)| Self {
+            offset: self.offset,
+            power,
+            count,
+        })
+    }
 }
 
 impl ArqBounds {
@@ -235,6 +307,14 @@ impl ArqBounds {
 
     pub fn from_interval(power: u8, interval: ArcInterval) -> Option<Self> {
         Self::from_interval_inner(power, interval, false)
+    }
+
+    pub fn to_arq(&self) -> Arq {
+        Arq {
+            center: self.pseudocenter(),
+            power: self.power,
+            count: self.count,
+        }
     }
 
     pub fn empty(power: u8) -> Self {
@@ -281,20 +361,6 @@ impl ArqBounds {
         }
     }
 
-    pub fn to_interval(&self) -> ArcInterval {
-        if is_full(self.power, self.count) {
-            ArcInterval::Full
-        } else if let Some((a, b)) = self.boundary_chunks() {
-            ArcInterval::new(a.left(), b.right())
-        } else {
-            ArcInterval::Empty
-        }
-    }
-
-    pub fn length(&self) -> u64 {
-        self.to_interval().length()
-    }
-
     /// Return the chunks at the leftmost and rightmost edge of this Arq.
     /// If count is 0, there is no boundary.
     /// If count is 1, both boundary chunks are the same: the central chunk.
@@ -312,17 +378,6 @@ impl ArqBounds {
             b.offset = (*b.offset).wrapping_add(self.count - 1).into();
             Some((a, b))
         }
-    }
-
-    /// Requantize to a different power. If requantizing to a higher power,
-    /// only requantize if there is no information loss due to rounding.
-    /// Otherwise, return None.
-    pub fn requantize(&self, power: u8) -> Option<Self> {
-        requantize(self.power, self.count, power).map(|(power, count)| Self {
-            offset: self.offset,
-            power,
-            count,
-        })
     }
 
     pub fn segments(&self) -> impl Iterator<Item = SpaceSegment> + '_ {
@@ -361,16 +416,6 @@ impl ArqBounds {
     /// Get a reference to the arq bounds's count.
     pub fn count(&self) -> u32 {
         self.count
-    }
-
-    /// View ascii for arq bounds
-    pub fn report(&self, len: usize) -> String {
-        format!(
-            "|{}| c= {:>2} p= {:<2}",
-            self.to_interval().to_ascii(len),
-            self.count,
-            self.power
-        )
     }
 }
 
@@ -576,11 +621,7 @@ mod tests {
             count: 10,
         };
 
-        let rq = |c: &Arq, p| {
-            let mut c = c.clone();
-            let ok = c.requantize(p);
-            ok.then(|| c)
-        };
+        let rq = |c: &Arq, p| (*c).requantize(p);
 
         assert_eq!(rq(&c, 18).map(|c| c.count), Some(40));
         assert_eq!(rq(&c, 19).map(|c| c.count), Some(20));

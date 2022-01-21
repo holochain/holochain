@@ -1,6 +1,6 @@
-use kitsune_p2p_dht_arc::{ArcInterval, DhtArcSet};
+use kitsune_p2p_dht_arc::ArcInterval;
 
-use super::{is_full, Arq, ArqBounds, ArqSet, ArqStrat};
+use super::{is_full, Arq, ArqBounded, ArqBounds, ArqSet, ArqStrat};
 
 pub struct PeerView {
     /// The strategy which generated this view
@@ -242,7 +242,7 @@ impl PeerView {
         PowerStats { median, std_dev }
     }
 
-    fn filtered_arqs<'a>(&'a self, filter: ArcInterval) -> impl Iterator<Item = &'a ArqBounds> {
+    fn filtered_arqs<'a>(&'a self, filter: ArcInterval) -> impl Iterator<Item = &'a Arq> {
         let it = self.peers.arqs.iter();
 
         #[cfg(feature = "testing")]
@@ -251,7 +251,7 @@ impl PeerView {
             .filter(|(i, _)| self.skip_index.as_ref() != Some(i))
             .map(|(_, arq)| arq);
 
-        it.filter(move |arq| filter.contains(arq.pseudocenter()))
+        it.filter(move |arq| filter.contains(arq.center))
     }
 }
 
@@ -287,11 +287,12 @@ mod tests {
 
     use super::*;
 
-    fn make_arq(pow: u8, lo: u32, hi: u32) -> ArqBounds {
+    fn make_arq(pow: u8, lo: u32, hi: u32) -> Arq {
         ArqBounds::from_interval_rounded(
             pow,
             ArcInterval::new(pow2(pow) * lo, (pow2(pow) as u64 * hi as u64) as u32),
         )
+        .to_arq()
     }
 
     #[test]
@@ -300,14 +301,14 @@ mod tests {
         let a = make_arq(pow, 0, 0x20);
         let b = make_arq(pow, 0x10, 0x30);
         let c = make_arq(pow, 0x20, 0x40);
-        assert_eq!(a.pseudocenter(), Loc::from(pow2(pow) * 0x10 - 1));
-        assert_eq!(b.pseudocenter(), Loc::from(pow2(pow) * 0x20 - 1));
-        assert_eq!(c.pseudocenter(), Loc::from(pow2(pow) * 0x30 - 1));
+        assert_eq!(a.center, Loc::from(pow2(pow) * 0x10 - 1));
+        assert_eq!(b.center, Loc::from(pow2(pow) * 0x20 - 1));
+        assert_eq!(c.center, Loc::from(pow2(pow) * 0x30 - 1));
         let arqs = ArqSet::new(vec![a, b, c]);
         arqs.print_arqs(64);
         let view = PeerView::new(Default::default(), arqs);
 
-        let get = |b: ArqBounds| {
+        let get = |b: Arq| {
             view.filtered_arqs(b.to_interval())
                 .cloned()
                 .collect::<Vec<_>>()
@@ -330,22 +331,22 @@ mod tests {
         arqs.print_arqs(64);
         let view = PeerView::new(Default::default(), arqs);
         assert_eq!(
-            view.extrapolated_coverage_and_filtered_count(&make_arq(pow, 0, 0x10)),
+            view.extrapolated_coverage_and_filtered_count(&make_arq(pow, 0, 0x10).to_bounds()),
             (2.0, 1)
         );
         assert_eq!(
-            view.extrapolated_coverage_and_filtered_count(&make_arq(pow, 0, 0x20)),
+            view.extrapolated_coverage_and_filtered_count(&make_arq(pow, 0, 0x20).to_bounds()),
             (2.0, 2)
         );
         assert_eq!(
-            view.extrapolated_coverage_and_filtered_count(&make_arq(pow, 0, 0x40)),
+            view.extrapolated_coverage_and_filtered_count(&make_arq(pow, 0, 0x40).to_bounds()),
             (2.0, 4)
         );
 
         // TODO: when changing PeerView logic to bake in the filter,
         // this will probably change
         assert_eq!(
-            view.extrapolated_coverage_and_filtered_count(&make_arq(pow, 0x10, 0x20)),
+            view.extrapolated_coverage_and_filtered_count(&make_arq(pow, 0x10, 0x20).to_bounds()),
             (2.0, 1)
         );
     }

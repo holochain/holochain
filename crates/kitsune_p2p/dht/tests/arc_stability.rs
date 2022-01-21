@@ -2,7 +2,7 @@ mod common;
 
 use common::quantized::*;
 use kitsune_p2p_dht::{
-    arq::{print_arqs, Arq, ArqSet, ArqStrat, PeerView},
+    arq::*,
     test_utils::{generate_ideal_coverage, seeded_rng},
 };
 
@@ -14,10 +14,11 @@ fn parameterized_stability_test() {
 
     let mut rng = seeded_rng(None);
 
-    let n = 50;
-    let j = 0.005;
+    let detail = false;
+    let n = 150;
+    let j = 1.0;
     // let j = 10.0 / n as f64;
-    let min_coverage = 5.0;
+    let min_coverage = 50.0;
 
     let strat = ArqStrat {
         min_coverage,
@@ -33,11 +34,10 @@ fn parameterized_stability_test() {
     tracing::info!("");
     tracing::debug!("{}", EpochStats::oneline_header());
     let eq = determine_equilibrium(1, peers.clone(), |peers| {
-        let (peers, stats) = run_one_epoch(&strat, peers, None, 1);
+        let (peers, stats) = run_one_epoch(&strat, peers, None, detail);
         tracing::debug!("{}", stats.oneline());
         (peers, stats)
     });
-    // print_arqs(&eq.runs()[0].peers, 64);
     let report = eq.report();
     report.log();
     // assert!(pass_report(&report, rf * 2.0));

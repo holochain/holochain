@@ -1,11 +1,7 @@
 #![allow(dead_code)]
 #![cfg(feature = "testing")]
 
-use kitsune_p2p_dht::arq::Arq;
-use kitsune_p2p_dht::arq::ArqSet;
-use kitsune_p2p_dht::arq::ArqStrat;
-use kitsune_p2p_dht::arq::PeerView;
-use kitsune_p2p_dht::test_utils::get_input;
+use kitsune_p2p_dht::arq::*;
 use rand::prelude::StdRng;
 use rand::thread_rng;
 use rand::Rng;
@@ -108,7 +104,7 @@ pub fn run_one_epoch(
     strat: &ArqStrat,
     mut peers: Peers,
     dynamic_peer_indices: Option<&HashSet<usize>>,
-    detail: u8,
+    detail: bool,
 ) -> (Peers, EpochStats) {
     let mut cov_total = 0.0;
     let mut cov_min = full_len();
@@ -121,8 +117,6 @@ pub fn run_one_epoch(
 
     let mut delta_min = full_len();
     let mut delta_max = -full_len();
-    let mut index_min = peers.len();
-    let mut index_max = peers.len();
 
     let peer_arqset = ArqSet::new(peers.clone());
 
@@ -146,7 +140,7 @@ pub fn run_one_epoch(
         let after = arq.length() as f64;
         let delta = after - before;
 
-        {
+        if detail {
             let delta = delta as i64 / 2i64.pow(before_pow as u32);
             let delta_str = if delta == 0 {
                 "    ".into()
@@ -163,9 +157,11 @@ pub fn run_one_epoch(
                 .map(|p| format!("{:2}", p.median).normal())
                 .unwrap_or("??".magenta());
             println!(
-                "#{:<3} {} {} cov={}  mp= {}  #p={: >3}",
+                "|{}| #{:<3} c={:>2}  p={:<2} {} cov={}  mp= {}  #p={: >3}",
+                arq.to_interval().to_ascii(64),
                 i,
-                arq.report(64),
+                arq.count(),
+                arq.power(),
                 delta_str,
                 cov_str,
                 power_str,
@@ -193,30 +189,11 @@ pub fn run_one_epoch(
 
         if delta < delta_min {
             delta_min = delta;
-            index_min = i;
         }
         if delta > delta_max {
             delta_max = delta;
-            index_max = i;
         }
         view.skip_index = None;
-    }
-
-    if detail >= 2 {
-        tracing::info!(
-            "min: |{}| {}",
-            peers[index_min].to_interval().to_ascii(64),
-            index_min
-        );
-        tracing::info!(
-            "max: |{}| {}",
-            peers[index_max].to_interval().to_ascii(64),
-            index_max
-        );
-        tracing::info!("");
-    } else if detail >= 3 {
-        peer_arqset.print_arqs(64);
-        get_input();
     }
 
     let tot = peers.len() as f64;
@@ -430,7 +407,7 @@ impl EpochStats {
 
     pub fn oneline(&self) -> String {
         format!(
-            "{:4}   {:>+6.3}   {:>8.3}   {:>6.3}   {:>6.3}   {:>7}   {:>7}   {:>7}   {:>7}",
+            "{:4}   {:>+6.3}   {:>8.3}   {:>6.3}   {:>6.3}   {:>7.2}   {:>7}   {:>7.2}   {:>7}",
             self.min_redundancy,
             self.net_delta_avg * 100.0,
             self.gross_delta_avg * 100.0,

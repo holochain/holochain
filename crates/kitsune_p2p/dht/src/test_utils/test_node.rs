@@ -33,7 +33,7 @@ impl TestNode {
     }
 
     /// Get the RegionSet for this node, suitable for gossiping
-    pub fn region_set(&self, arq_set: ArqSet, now: Timestamp) -> RegionSet {
+    pub fn region_set(&self, arq_set: ArqBoundsSet, now: Timestamp) -> RegionSet {
         let coords = RegionCoordSetXtcs::new(self.topo().telescoping_times(now), arq_set);
         let data = coords
             .region_coords_nested()
@@ -74,8 +74,8 @@ impl AccessPeerStore for TestNode {
         self.agent_info.clone()
     }
 
-    fn get_arq_set(&self) -> ArqSet {
-        ArqSet::single(self.arq_bounds())
+    fn get_arq_set(&self) -> ArqBoundsSet {
+        ArqBoundsSet::single(self.arq_bounds())
     }
 }
 

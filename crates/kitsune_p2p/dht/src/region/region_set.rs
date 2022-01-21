@@ -13,7 +13,7 @@ use super::{Region, RegionCoords, RegionData};
 #[cfg_attr(feature = "testing", derive(Clone))]
 pub struct RegionCoordSetXtcs {
     times: TelescopingTimes,
-    arq_set: ArqSet,
+    arq_set: ArqBoundsSet,
 }
 
 impl RegionCoordSetXtcs {
@@ -49,7 +49,7 @@ impl RegionCoordSetXtcs {
     pub fn empty() -> Self {
         Self {
             times: TelescopingTimes::empty(),
-            arq_set: ArqSet::empty(11),
+            arq_set: ArqBoundsSet::empty(),
         }
     }
 }
@@ -239,7 +239,7 @@ mod tests {
         // The total count should be half of what's in the op store,
         // since the arq covers exactly half of the ops
         let times = topo.telescoping_times(Timestamp::from_micros(11000));
-        let coords = RegionCoordSetXtcs::new(times, ArqSet::single(arq));
+        let coords = RegionCoordSetXtcs::new(times, ArqBoundsSet::single(arq));
         let rset = RegionSetXtcs::new(&store, coords);
         assert_eq!(
             rset.data.concat().iter().map(|r| r.count).sum::<u32>() as usize,
@@ -256,8 +256,8 @@ mod tests {
 
         let tt_a = topo.telescoping_times(Timestamp::from_micros(20));
         let tt_b = topo.telescoping_times(Timestamp::from_micros(30));
-        let coords_a = RegionCoordSetXtcs::new(tt_a, ArqSet::single(arq.clone()));
-        let coords_b = RegionCoordSetXtcs::new(tt_b, ArqSet::single(arq.clone()));
+        let coords_a = RegionCoordSetXtcs::new(tt_a, ArqBoundsSet::single(arq.clone()));
+        let coords_b = RegionCoordSetXtcs::new(tt_b, ArqBoundsSet::single(arq.clone()));
 
         let mut rset_a = RegionSetXtcs::new(&store, coords_a);
         let mut rset_b = RegionSetXtcs::new(&store, coords_b);
@@ -296,11 +296,11 @@ mod tests {
 
         let coords_a = RegionCoordSetXtcs::new(
             topo.telescoping_times(Timestamp::from_micros(20)),
-            ArqSet::single(arq.clone()),
+            ArqBoundsSet::single(arq.clone()),
         );
         let coords_b = RegionCoordSetXtcs::new(
             topo.telescoping_times(Timestamp::from_micros(21)),
-            ArqSet::single(arq.clone()),
+            ArqBoundsSet::single(arq.clone()),
         );
 
         let rset_a = RegionSetXtcs::new(&store1, coords_a);

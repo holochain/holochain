@@ -32,10 +32,7 @@ fn test_shrink_towards_empty() {
     let jitter = 0.01;
 
     // generate peers with a bit too much coverage (14 > 12)
-    let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(14.5), 100, jitter, 0)
-        .into_iter()
-        .map(|arq| arq.to_bounds())
-        .collect();
+    let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(14.5), 100, jitter, 0);
     let peer_arqs = ArqSet::new(peers);
     let peer_power = peer_arqs.power();
     let view = PeerView::new(strat.clone(), peer_arqs);
@@ -70,10 +67,7 @@ fn test_grow_towards_full() {
     let jitter = 0.01;
 
     // generate peers with deficient coverage
-    let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(7.0), 1000, jitter, 0)
-        .into_iter()
-        .map(|arq| arq.to_bounds())
-        .collect();
+    let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(7.0), 1000, jitter, 0);
     let peer_arqs = ArqSet::new(peers);
     let peer_power = peer_arqs.power();
     let view = PeerView::new(strat.clone(), peer_arqs);
@@ -104,10 +98,7 @@ fn test_grow_to_full() {
     dbg!(strat.max_chunks());
 
     // generate peers with deficient coverage
-    let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(7.0), 1000, jitter, 0)
-        .into_iter()
-        .map(|arq| arq.to_bounds())
-        .collect();
+    let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(7.0), 1000, jitter, 0);
     let peer_arqs = ArqSet::new(peers);
     let peer_power = peer_arqs.power();
     let view = PeerView::new(strat.clone(), peer_arqs);
@@ -143,10 +134,7 @@ fn test_shrink_by_multiple_chunks() {
     let jitter = 0.01;
 
     // generate peers with far too much coverage
-    let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(22.0), 1000, jitter, 0)
-        .into_iter()
-        .map(|arq| arq.to_bounds())
-        .collect();
+    let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(22.0), 1000, jitter, 0);
     let peer_arqs = ArqSet::new(peers);
     let peer_power = peer_arqs.power();
     let view = PeerView::new(strat.clone(), peer_arqs);
@@ -177,10 +165,7 @@ fn test_grow_by_multiple_chunks() {
     let jitter = 0.01;
 
     // generate peers with far too little coverage
-    let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(5.0), 1000, jitter, 0)
-        .into_iter()
-        .map(|arq| arq.to_bounds())
-        .collect();
+    let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(5.0), 1000, jitter, 0);
     let peer_arqs = ArqSet::new(peers);
     let peer_power = peer_arqs.power();
     let view = PeerView::new(strat.clone(), peer_arqs);
@@ -199,7 +184,9 @@ fn test_grow_by_multiple_chunks() {
 ///
 /// (not a very good test, probably)
 fn test_degenerate_asymmetrical_coverage() {
-    let other = ArqBounds::from_interval(4, ArcInterval::new(0x0, 0x80)).unwrap();
+    let other = ArqBounds::from_interval(4, ArcInterval::new(0x0, 0x80))
+        .unwrap()
+        .to_arq();
     let others = ArqSet::new(vec![other; 10]);
     // aim for coverage between 5 and 6.
     let strat = ArqStrat {
@@ -244,10 +231,7 @@ fn test_scenario() {
         // start with a full arq
         let mut arq = Arq::new_full(Loc::from(0x0), strat.max_power);
         // create 10 peers, all with full arcs, fully covering the DHT
-        let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, None, 10, jitter, 0)
-            .into_iter()
-            .map(|arq| arq.to_bounds())
-            .collect();
+        let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, None, 10, jitter, 0);
         let view = PeerView::new(strat.clone(), ArqSet::new(peers));
         let extrapolated = view.extrapolated_coverage(&arq.to_bounds());
         assert_eq!(extrapolated, 10.0);
@@ -265,7 +249,7 @@ fn test_scenario() {
         let peer_arqs = generate_ideal_coverage(&mut rng, &strat, Some(13.0), 100, jitter, 0);
 
         {
-            let peers = ArqSet::new(peer_arqs.iter().map(|arq| arq.to_bounds()).collect());
+            let peers = ArqSet::new(peer_arqs.clone());
             let peer_power = peers.power();
             // print_arqs(&peers, 64);
             assert_eq!(peer_power, 26);
@@ -295,7 +279,7 @@ fn test_scenario() {
                     .map(|arq| {
                         let mut arq = arq.downshift();
                         *arq.count_mut() = arq.count() / 2;
-                        arq.to_bounds()
+                        arq
                     })
                     .collect(),
             );

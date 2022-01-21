@@ -2,9 +2,7 @@ pub mod gossip_direct;
 pub mod op_store;
 pub mod test_node;
 
-use crate::arq::actual_coverage;
-use crate::arq::Arq;
-use crate::arq::ArqStrat;
+use crate::arq::*;
 
 use kitsune_p2p_dht_arc::DhtLocation as Loc;
 use rand::prelude::StdRng;
@@ -196,8 +194,7 @@ mod tests {
 
         let mut rng = seeded_rng(None);
         let peer_arqs = generate_ideal_coverage(&mut rng, &strat, None, 100, 0.0, 0);
-
-        let peers = ArqSet::new(peer_arqs.into_iter().map(|arq| arq.to_bounds()).collect());
+        let peers = ArqSet::new(peer_arqs);
 
         let view = PeerView::new(strat.clone(), peers);
         let cov = view.actual_coverage();
@@ -226,7 +223,7 @@ mod tests {
             let mut rng = seeded_rng(None);
             let peer_arqs = generate_ideal_coverage(&mut rng, &strat, None, num_peers, 0.0, 0);
 
-            let peers = ArqSet::new(peer_arqs.into_iter().map(|arq| arq.to_bounds()).collect());
+            let peers = ArqSet::new(peer_arqs);
 
             let view = PeerView::new(strat.clone(), peers);
             let cov = view.actual_coverage();

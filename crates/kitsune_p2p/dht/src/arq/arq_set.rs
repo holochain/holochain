@@ -2,6 +2,11 @@ use kitsune_p2p_dht_arc::DhtArcSet;
 
 use crate::arq::ArqBounds;
 
+use super::{Arq, ArqBounded};
+
+pub type ArqSet = ArqSetImpl<Arq>;
+pub type ArqBoundsSet = ArqSetImpl<ArqBounds>;
+
 /// A collection of ArqBounds.
 /// All bounds are guaranteed to be quantized to the same power
 /// (the lowest common power).
@@ -16,21 +21,20 @@ use crate::arq::ArqBounds;
     derive_more::Index,
     derive_more::IndexMut,
 )]
-pub struct ArqSet {
+pub struct ArqSetImpl<A: ArqBounded> {
     #[into_iterator]
     #[deref]
     #[deref_mut]
     #[index]
     #[index_mut]
-    pub(crate) arqs: Vec<ArqBounds>,
+    pub(crate) arqs: Vec<A>,
     power: u8,
 }
 
-impl ArqSet {
+impl<A: ArqBounded> ArqSetImpl<A> {
     /// Normalize all arqs to be of the same power (use the minimum power)
-    pub fn new<A: Into<ArqBounds>>(arqs: Vec<A>) -> Self {
-        let arqs: Vec<ArqBounds> = arqs.into_iter().map(|a| a.into()).collect();
-        if let Some(pow) = arqs.iter().map(|a| a.power).min() {
+    pub fn new(arqs: Vec<A>) -> Self {
+        if let Some(pow) = arqs.iter().map(|a| a.power()).min() {
             Self {
                 arqs: arqs
                     .into_iter()
@@ -46,11 +50,11 @@ impl ArqSet {
         }
     }
 
-    pub fn empty(pow: u8) -> Self {
-        Self::single(ArqBounds::empty(pow))
+    pub fn empty() -> Self {
+        Self::new(vec![])
     }
 
-    pub fn single(arq: ArqBounds) -> Self {
+    pub fn single(arq: A) -> Self {
         Self::new(vec![arq])
     }
 
@@ -60,7 +64,7 @@ impl ArqSet {
     }
 
     /// Get a reference to the arq set's arqs.
-    pub fn arqs(&self) -> &[ArqBounds] {
+    pub fn arqs(&self) -> &[A] {
         self.arqs.as_ref()
     }
 
@@ -81,11 +85,11 @@ impl ArqSet {
             .map(|arqs| Self { arqs, power })
     }
 
-    pub fn intersection(&self, other: &Self) -> Self {
+    pub fn intersection(&self, other: &Self) -> ArqSetImpl<ArqBounds> {
         let power = self.power.min(other.power());
         let a1 = self.requantize(power).unwrap().to_dht_arc_set();
         let a2 = other.requantize(power).unwrap().to_dht_arc_set();
-        Self {
+        ArqSetImpl {
             arqs: DhtArcSet::intersection(&a1, &a2)
                 .intervals()
                 .into_iter()
@@ -101,49 +105,31 @@ impl ArqSet {
     pub fn print_arqs(&self, len: usize) {
         println!("{} arqs, power: {}", self.arqs().len(), self.power());
         for (i, arq) in self.arqs().into_iter().enumerate() {
-            println!(
-                "|{}| {}:\t{}",
-                arq.to_interval().to_ascii(len),
-                i,
-                arq.count()
-            );
+            println!("|{}| {}:\t{}", arq.to_ascii(len), i, arq.count());
         }
     }
 }
 
 /// View ascii for arq bounds
-pub fn print_arq<'a, A>(arq: &'a A, len: usize)
-where
-    ArqBounds: From<&'a A>,
-{
-    let arq: ArqBounds = arq.into();
-    println!(
-        "|{}| {} *2^{}",
-        arq.to_interval().to_ascii(len),
-        arq.count(),
-        arq.power
-    );
+pub fn print_arq<'a, A: ArqBounded>(arq: &'a A, len: usize) {
+    println!("|{}| {} *2^{}", arq.to_ascii(len), arq.count(), arq.power());
 }
 
-pub fn print_arqs<'a, A>(arqs: &'a [A], len: usize)
-where
-    ArqBounds: From<&'a A>,
-{
+pub fn print_arqs<'a, A: ArqBounded>(arqs: &'a [A], len: usize) {
     for (i, arq) in arqs.iter().enumerate() {
-        let arq: ArqBounds = arq.into();
         println!(
             "|{}| {}:\t{} *2^{}",
-            arq.to_interval().to_ascii(len),
+            arq.to_ascii(len),
             i,
             arq.count(),
-            arq.power
+            arq.power()
         );
     }
 }
 
 #[test]
 fn normalize_arqs() {
-    let s = ArqSet::new(vec![
+    let s = ArqSetImpl::new(vec![
         ArqBounds {
             offset: 0.into(),
             power: 10,
