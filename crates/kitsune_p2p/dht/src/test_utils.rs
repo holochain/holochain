@@ -47,7 +47,7 @@ pub fn unit_arq(strat: &ArqStrat, unit_center: f64, unit_len: f64, power_offset:
     );
 
     if power_offset != 0 {
-        unimplemented!(
+        tracing::warn!(
             "power_offset logic is not yet tested, and should not be used before revisiting"
         );
     }
@@ -83,8 +83,10 @@ pub fn unit_arq(strat: &ArqStrat, unit_center: f64, unit_len: f64, power_offset:
 
         let min = strat.min_chunks() as f64 * 2f64.powf(po);
         let max = strat.max_chunks() as f64 * 2f64.powf(po);
-        assert!(count >= min as u32, "count < min: {} < {}", count, min);
-        assert!(count <= max as u32, "count > max: {} > {}", count, max);
+        if power_offset == 0 {
+            assert!(count >= min as u32, "count < min: {} < {}", count, min);
+            assert!(count <= max as u32, "count > max: {} > {}", count, max);
+        }
         Arq::new(center, power as u8, count)
     }
 }
@@ -121,11 +123,43 @@ pub fn generate_ideal_coverage(
     let max = target + strat.buffer_width() / 2.0;
     assert!(
         min <= cov && cov <= max,
-        "Ideal coverage is incorrect: !({} <= {} <= {})",
+        "Ideal coverage was generated incorrectly: !({} <= {} <= {})",
         min,
         cov,
         max
     );
+    peers
+}
+
+pub fn generate_messy_coverage(
+    rng: &mut StdRng,
+    strat: &ArqStrat,
+    len_mean: f64,
+    len_std: f64,
+    n: u32,
+    jitter: f64,
+    power_offset_range: i8,
+) -> Peers {
+    use rand::distributions::*;
+
+    tracing::info!("N = {}, J = {}", n, jitter);
+    tracing::info!("ArqStrat: = {:#?}", strat);
+
+    let len_dist = statrs::distribution::Normal::new(len_mean, len_std).unwrap();
+
+    let nf = n as f64;
+
+    let peers: Vec<_> = (0..n)
+        .map(|i| {
+            let power_offset =
+                rng.gen::<i8>().rem_euclid(power_offset_range * 2 + 1) - power_offset_range;
+            let center =
+                ((i as f64 / nf) + (2.0 * jitter * rng.gen::<f64>()) - jitter).rem_euclid(1.0);
+            let len = len_dist.sample(rng).clamp(0.0, 1.0);
+            unit_arq(strat, center, len, power_offset)
+        })
+        .collect();
+
     peers
 }
 
