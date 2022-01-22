@@ -52,6 +52,10 @@ pub struct ArqStrat {
     /// to grow our arc so that we can see more peers.
     /// In other words, we are "slacking" if at any time:
     ///     num_peers < extrapolated_coverage * slack_factor
+    ///
+    /// If this is set too high, it may prevent arcs from legitimately shrinking.
+    /// If set too low, it will hamper the ability for extremely small arcs to
+    /// reach a proper size
     pub slacker_ratio: f64,
 
     /// If the standard deviation of the powers of each arq in this view is
@@ -75,7 +79,7 @@ impl Default for ArqStrat {
             max_power: 32 - 3,
             power_std_dev_threshold: 1.0,
             max_power_diff: 2,
-            slacker_ratio: 0.9,
+            slacker_ratio: 0.75,
         }
     }
 }
