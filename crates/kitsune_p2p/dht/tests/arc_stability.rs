@@ -6,13 +6,14 @@ use kitsune_p2p_dht::{
     test_utils::{generate_ideal_coverage, generate_messy_coverage, seeded_rng},
 };
 
-fn pass_report(report: &RunReport, redundancy_target: f64) -> bool {
-    pass_redundancy(&report.overall_redundancy_stats, redundancy_target);
+const DETAIL: bool = false;
+
+fn pass_report(report: &RunReport, redundancy_target: f64) {
     match &report.outcome {
         RunReportOutcome::Convergent { redundancy_stats } => {
             pass_redundancy(redundancy_stats, redundancy_target)
         }
-        _ => false
+        _ => panic!("Divergent outcome is a failure")
         // RunReportOutcome::Divergent {
         //     redundancy_stats, ..
         // } => pass_redundancy(redundancy_stats, redundancy_target),
@@ -23,26 +24,32 @@ fn pass_report(report: &RunReport, redundancy_target: f64) -> bool {
 /// Stats.
 /// Currently this does not assert a very strong guarantee. Over time we want
 /// to reduce the margins closer to zero.
-fn pass_redundancy(stats: &Stats, redundancy_target: f64) -> bool {
+fn pass_redundancy(stats: &Stats, redundancy_target: f64) {
     let rf = redundancy_target as f64;
 
     let margin_min = 0.40;
     let margin_median_lo = 0.40;
-    let margin_median_hi = 0.20;
-    stats.median >= rf * (1.0 - margin_median_lo)
-        && stats.median <= rf * (1.0 + margin_median_hi)
-        && stats.min >= rf * (1.0 - margin_min)
+
+    assert!(
+        stats.median >= rf * (1.0 - margin_median_lo),
+        "median min redundancy too low: {}",
+        stats.median
+    );
+    assert!(
+        stats.min >= rf * (1.0 - margin_min),
+        "minimum min redundancy too low: {}",
+        stats.min
+    );
 }
 
 /// Equilibrium test for a single distribution
 #[test]
-fn stability_test_near_ideal() {
+fn stability_test_case_near_ideal() {
     std::env::set_var("RUST_LOG", "debug");
     observability::test_run().ok();
 
     let mut rng = seeded_rng(None);
 
-    let detail = true;
     let n = 150;
     let j = 0.1;
     // let j = 10.0 / n as f64;
@@ -58,24 +65,28 @@ fn stability_test_near_ideal() {
 
     tracing::info!("");
     tracing::debug!("{}", EpochStats::oneline_header());
-    let eq = determine_equilibrium(1, peers.clone(), |peers| {
-        let (peers, stats) = run_one_epoch(&strat, peers, None, detail);
+    let runs = determine_equilibrium(1, peers.clone(), |peers| {
+        let (peers, stats) = run_one_epoch(&strat, peers, None, DETAIL);
         tracing::debug!("{}", stats.oneline());
         (peers, stats)
     });
-    let report = eq.report();
+
+    let report = runs.report();
     report.log();
-    assert!(pass_report(&report, min_coverage));
+    pass_report(&report, min_coverage);
+
+    let actual_cov = actual_coverage(runs.runs()[0].peers.iter());
+    assert!(actual_cov >= strat.min_coverage);
+    assert!(actual_cov <= strat.max_coverage());
 }
 
 #[test]
-fn stability_test_messy() {
+fn stability_test_case_messy() {
     std::env::set_var("RUST_LOG", "debug");
     observability::test_run().ok();
 
     let mut rng = seeded_rng(None);
 
-    let detail = true;
     let n = 300;
     let j = 0.01;
     let len_mean = 0.50;
@@ -90,18 +101,107 @@ fn stability_test_messy() {
 
     let peers = generate_messy_coverage(&mut rng, &strat, len_mean, len_std, n, j, 0);
 
-    println!("INITIAL CONDITIONS:");
-    for (i, arq) in peers.iter().enumerate() {
-        println!(
-            "|{}| #{:<3} {:>3} {:>3}",
-            arq.to_interval().to_ascii(64),
-            i,
-            arq.count(),
-            arq.power()
-        );
+    if DETAIL {
+        println!("INITIAL CONDITIONS:");
+        for (i, arq) in peers.iter().enumerate() {
+            println!(
+                "|{}| #{:<3} {:>3} {:>3}",
+                arq.to_interval().to_ascii(64),
+                i,
+                arq.count(),
+                arq.power()
+            );
+        }
     }
+
     tracing::info!("");
     tracing::debug!("{}", EpochStats::oneline_header());
+    let runs = determine_equilibrium(1, peers.clone(), |peers| {
+        let (peers, stats) = run_one_epoch(&strat, peers, None, DETAIL);
+        tracing::debug!("{}", stats.oneline());
+        (peers, stats)
+    });
+    let report = runs.report();
+    report.log();
+    pass_report(&report, min_coverage);
+
+    let actual_cov = actual_coverage(runs.runs()[0].peers.iter());
+    assert!(actual_cov >= strat.min_coverage);
+    assert!(actual_cov <= strat.max_coverage());
+}
+
+proptest::proptest! {
+
+    #[test]
+    #[ignore = "takes a very long time. run sparingly."]
+    fn stability_test(num_peers in 100u32..300, min_coverage in 50.0f64..100.0, j in 0.0..1.0) {
+        std::env::set_var("RUST_LOG", "debug");
+        observability::test_run().ok();
+
+        let mut rng = seeded_rng(None);
+
+        let len_mean = 0.50;
+        let len_std = 0.35;
+
+        let strat = ArqStrat {
+            min_coverage,
+            ..Default::default()
+        };
+        println!("{}", strat.summary());
+
+        let peers = generate_messy_coverage(&mut rng, &strat, len_mean, len_std, num_peers, j, 0);
+
+        let runs = determine_equilibrium(3, peers.clone(), |peers| {
+            let (peers, stats) = run_one_epoch(&strat, peers, None, DETAIL);
+            (peers, stats)
+        });
+        let report = runs.report();
+        report.log();
+        pass_report(&report, min_coverage);
+
+        let actual_cov = actual_coverage(runs.runs()[0].peers.iter());
+        assert!(actual_cov >= strat.min_coverage);
+        assert!(actual_cov <= strat.max_coverage());
+
+    }
+}
+
+#[test]
+fn stability_test_regression() {
+    std::env::set_var("RUST_LOG", "debug");
+    observability::test_run().ok();
+
+    let mut rng = seeded_rng(None);
+
+    let num_peers = 138;
+    let min_coverage = 50.0;
+    let j = 0.0;
+
+    let detail = true;
+    let len_mean = 0.50;
+    let len_std = 0.35;
+
+    let strat = ArqStrat {
+        min_coverage,
+        ..Default::default()
+    };
+    println!("{}", strat.summary());
+
+    let peers = generate_messy_coverage(&mut rng, &strat, len_mean, len_std, num_peers, j, 0);
+
+    if detail {
+        println!("INITIAL CONDITIONS:");
+        for (i, arq) in peers.iter().enumerate() {
+            println!(
+                "|{}| #{:<3} {:>3} {:>3}",
+                arq.to_interval().to_ascii(64),
+                i,
+                arq.count(),
+                arq.power()
+            );
+        }
+    }
+
     let eq = determine_equilibrium(1, peers.clone(), |peers| {
         let (peers, stats) = run_one_epoch(&strat, peers, None, detail);
         tracing::debug!("{}", stats.oneline());
@@ -109,5 +209,9 @@ fn stability_test_messy() {
     });
     let report = eq.report();
     report.log();
-    assert!(pass_report(&report, min_coverage));
+    pass_report(&report, min_coverage);
+
+    let actual_cov = actual_coverage(eq.runs()[0].peers.iter());
+    assert!(actual_cov >= strat.min_coverage);
+    assert!(actual_cov <= strat.max_coverage());
 }
