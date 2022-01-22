@@ -75,7 +75,7 @@ impl Default for ArqStrat {
             max_power: 32 - 3,
             power_std_dev_threshold: 1.0,
             max_power_diff: 2,
-            slacker_ratio: 0.667,
+            slacker_ratio: 0.9,
         }
     }
 }
@@ -110,20 +110,6 @@ impl ArqStrat {
         let max_chunks = self.min_chunks() * 2;
         assert!(max_chunks % 2 == 0);
         max_chunks
-    }
-
-    pub fn slacker_factor(&self, num_peers: usize) -> f64 {
-        let np = num_peers as f64;
-        if np <= self.min_coverage * self.slacker_ratio {
-            let sf = self.min_coverage / np;
-            if sf.is_nan() {
-                f64::INFINITY
-            } else {
-                sf
-            }
-        } else {
-            1.0
-        }
     }
 
     /// The chunk count which gives us the quantization resolution appropriate

@@ -2,6 +2,7 @@
 #![cfg(feature = "testing")]
 
 use kitsune_p2p_dht::arq::*;
+use kitsune_p2p_dht::test_utils::min_redundancy::calc_min_redundancy;
 use rand::prelude::StdRng;
 use rand::thread_rng;
 use rand::Rng;
@@ -123,8 +124,8 @@ pub fn run_one_epoch(
 
     if detail {
         println!(
-            "|{: ^64}|  {:<3} {:>3} {:>3} {:>4} {:>6} {:>3} {:>3} {:>4}",
-            "<arc>", "idx", "cnt", "pwr", "Δ", "cov", "mp", "#p", "slk",
+            "|{: ^64}|  {:<3} {:>3} {:>3} {:>3} {:>4} {:>6} {:>3} {:>4}",
+            "<arc>", "idx", "cnt", "pwr", "mp", "Δ", "cov", "#p", "slk",
         )
     }
 
@@ -146,22 +147,29 @@ pub fn run_one_epoch(
         let delta = after - before;
 
         if detail {
-            let delta = delta as i64 / 2i64.pow(before_pow as u32);
-            let delta_str = if delta == 0 {
+            let d = delta as i64 / 2i64.pow(before_pow as u32);
+            let delta_str = if d == 0 {
                 "    ".into()
-            } else if delta > 0 {
-                format!("Δ{:<+3}", delta).green()
+            } else if d > 0 {
+                format!("{:>+4}", d).green()
             } else {
-                format!("Δ{:<+3}", delta).red()
+                format!("{:>+4}", d).red()
+            };
+            let delta_str = if d.abs() > strat.max_chunks() as i64 {
+                delta_str.bold()
+            } else {
+                delta_str
             };
 
             let cov = view.extrapolated_coverage(&arq.to_bounds());
-            let slack_factor = cov / stats.num_peers as f64;
+            let slack_factor = view.slack_factor(cov, stats.num_peers);
 
-            let slack_str = if slack_factor > 2.0 {
-                format!("{:4.2}", cov / stats.num_peers as f64).underline()
+            let slack_str = if slack_factor == 1.0 {
+                "    ".into()
+            } else if slack_factor > 3.0 {
+                format!("{:4.2}", slack_factor).bold()
             } else {
-                format!("{:4.2}", cov / stats.num_peers as f64).normal()
+                format!("{:4.2}", slack_factor).normal()
             };
 
             let cov_str = format!("{: >6.2}", cov);
@@ -171,14 +179,14 @@ pub fn run_one_epoch(
                 .map(|p| format!("{:2}", p.median).normal())
                 .unwrap_or("??".magenta());
             println!(
-                "|{}| #{:<3} {:>3} {:>3} {} {} {:>3} {: >3} {}",
+                "|{}| #{:<3} {:>3} {:>3} {:>3} {} {} {: >3} {}",
                 arq.to_interval().to_ascii(64),
                 i,
                 arq.count(),
                 arq.power(),
+                power_str,
                 delta_str,
                 cov_str,
-                power_str,
                 stats.num_peers,
                 slack_str,
             );
@@ -212,11 +220,11 @@ pub fn run_one_epoch(
     }
 
     let tot = peers.len() as f64;
-    let min_redundancy = 1111;
+    let min_redundancy = calc_min_redundancy(peers.clone());
     let stats = EpochStats {
         net_delta_avg: delta_net / tot / full_len(),
         gross_delta_avg: delta_gross / tot / full_len(),
-        min_redundancy: min_redundancy,
+        min_redundancy,
         delta_min: delta_min / full_len(),
         delta_max: delta_max / full_len(),
         min_coverage: cov_min / full_len(),

@@ -79,6 +79,78 @@ impl PeerView {
         self.update_arq_with_stats(arq).changed
     }
 
+    fn is_slacking(&self, cov: f64, num_peers: usize) -> bool {
+        num_peers as f64 <= cov * self.strat.slacker_ratio
+    }
+
+    pub fn slack_factor(&self, cov: f64, num_peers: usize) -> f64 {
+        if self.is_slacking(cov, num_peers) {
+            let sf = cov / num_peers as f64;
+            if sf.is_nan() {
+                f64::INFINITY
+            } else {
+                sf
+            }
+        } else {
+            1.0
+        }
+    }
+
+    fn growth_factor(&self, cov: f64, num_peers: usize, median_power_diff: i8) -> f64 {
+        let np = num_peers as f64;
+        let under = cov < self.strat.min_coverage;
+        let over = cov > self.strat.max_coverage();
+
+        // The ratio of ideal coverage vs actual observed coverage.
+        // A ratio > 1 indicates undersaturation and a need to grow.
+        // A ratio < 1 indicates oversaturation and a need to shrink.
+        let cov_diff = if over || under {
+            let ratio = self.strat.midline_coverage() / cov;
+
+            // We want to know which of our peers are likely to be making a similar
+            // update to us, because that will affect the overall coverage more
+            // than the drop in the bucket that we can provide.
+            //
+            // If all peers have seen the same change as us since their last update,
+            // they will on average move similarly to us, and so we should only make
+            // a small step in the direction of the target, trusting that our peers
+            // will do the same.
+            //
+            // Conversely, if all peers are stable, e.g. if we just came online to
+            // find a situation where all peers around us are under-representing,
+            // but stable, then we want to make a much bigger leap.
+            let peer_dampening_factor = 1.0 / (1.0 + np);
+
+            (ratio - 1.0) * peer_dampening_factor + 1.0
+        } else {
+            1.0
+        };
+
+        // The "slacker" factor. If our observed coverage is significantly
+        // greater than the number of peers we see, it's an indication
+        // that we may need to pick up more slack.
+        //
+        // This check helps balance out stable but unequitable situations where
+        // all peers have a similar estimated coverage, but some peers are
+        // holding much more than others.
+        let slack_factor = self.slack_factor(cov, num_peers);
+
+        let unbounded_growth = cov_diff * slack_factor;
+
+        // The difference between the median power and the arq's power helps
+        // determine some limits on growth.
+        // If we are at the median growth, then it makes sense to cap
+        // our movement by 2x in either direction (1/2 to 2)
+        // If we are 1 below the median, then our range is (1/2 to 4)
+        // If we are 2 below the median, then our range is (1/2 to 8)
+        // If we are 1 above the median, then our range is (1/4 to 2)
+        // If we are 2 above the median, then our range is (1/8 to 2)
+        let mpd = median_power_diff as f64;
+        let min = 2f64.powf(mpd).min(0.5);
+        let max = 2f64.powf(mpd).max(2.0);
+        unbounded_growth.clamp(min, max)
+    }
+
     /// Take an arq and potentially resize and requantize it based on this view.
     ///
     /// This represents an iterative step towards the ideal coverage, based on
@@ -95,53 +167,20 @@ impl PeerView {
     /// https://hackmd.io/@hololtd/r1IAIbr5Y/https%3A%2F%2Fhackmd.io%2FK_fkBj6XQO2rCUZRRL9n2g
     pub fn update_arq_with_stats(&self, arq: &mut Arq) -> UpdateArqStats {
         let (cov, num_peers) = self.extrapolated_coverage_and_filtered_count(&arq.to_bounds());
-        let np = num_peers as f64;
 
         let old_count = arq.count();
         let old_power = arq.power();
         let under = cov < self.strat.min_coverage;
         let over = cov > self.strat.max_coverage();
-        let slacking = |np, cov| np <= cov * self.strat.slacker_ratio;
 
-        let growth_factor = if slacking(np, cov) {
-            // The "slacker" factor. If our observed coverage is significantly
-            // greater than the number of peers we see, it's an indication
-            // that we may need to pick up more slack.
-            //
-            // This check helps balance out stable but unequitable situations where
-            // all peers have a similar estimated coverage, but some peers are
-            // holding much more than others.
-            let sf = cov / np;
-            if sf.is_finite() {
-                sf
-            } else {
-                2.0
-            }
-        } else if over || under {
-            // The ratio of ideal coverage vs actual observed coverage.
-            // A ratio > 1 indicates undersaturation and a need to grow.
-            // A ratio < 1 indicates oversaturation and a need to shrink.
-            // We cap the growth at 2x in either direction
-            let cov_ratio = (self.strat.midline_coverage() / cov).clamp(0.5, 2.0);
+        let power_stats = self.power_stats(&arq);
+        let PowerStats {
+            median: median_power,
+            ..
+        } = power_stats;
 
-            // We want to know which of our peers are likely to be making a similar
-            // update to us, because that will affect the overall coverage more
-            // than the drop in the bucket that we can provide.
-            //
-            // If all peers have seen the same change as us since their last update,
-            // they will on average move similarly to us, and so we should only make
-            // a small step in the direction of the target, trusting that our peers
-            // will do the same.
-            //
-            // Conversely, if all peers are stable, e.g. if we just came online to
-            // find a situation where all peers around us are under-representing,
-            // but stable, then we want to make a much bigger leap.
-            let peer_velocity_factor = 1.0 + np;
-
-            (cov_ratio - 1.0) / peer_velocity_factor + 1.0
-        } else {
-            1.0
-        };
+        let median_power_diff = median_power as i8 - arq.power() as i8;
+        let growth_factor = self.growth_factor(cov, num_peers, median_power_diff);
 
         let new_count = if under {
             // Ensure we grow by at least 1
@@ -162,12 +201,16 @@ impl PeerView {
             // or to start "slacking" (not seeing enough peers), then
             // don't update. This happens when we shrink too much and
             // lose sight of peers.
-            let new_cov = self.extrapolated_coverage(&tentative.to_bounds());
-            if (over && new_cov < self.strat.min_coverage)
-                || (!slacking(np, cov) && slacking(np, new_cov))
+            let (new_cov, new_num_peers) =
+                self.extrapolated_coverage_and_filtered_count(&tentative.to_bounds());
+            if new_count < old_count
+                && (new_cov < self.strat.min_coverage
+                    || (!self.is_slacking(cov, num_peers)
+                        && self.is_slacking(new_cov, new_num_peers)))
             {
                 return UpdateArqStats {
                     changed: false,
+                    desired_delta: new_count as i32 - old_count as i32,
                     power: None,
                     num_peers,
                 };
@@ -177,14 +220,11 @@ impl PeerView {
         // Commit the change to the count
         arq.count = new_count;
 
-        let power_stats = self.power_stats(&arq);
-        let PowerStats { median, .. } = power_stats;
-
         let power_above_min = |pow| {
             // not already at the minimum
             pow > self.strat.min_power
              // don't power down if power is already too low
-             && (median as i8 - pow as i8) < self.strat.max_power_diff as i8
+             && (median_power as i8 - pow as i8) < self.strat.max_power_diff as i8
         };
 
         #[allow(unused_parens)]
@@ -205,7 +245,7 @@ impl PeerView {
             // not already at the maximum
             pow < self.strat.max_power
             // don't power up if power is already too high
-            && (pow as i8 - median as i8) < self.strat.max_power_diff as i8
+            && (pow as i8 - median_power as i8) < self.strat.max_power_diff as i8
         };
 
         #[allow(unused_parens)]
@@ -243,6 +283,7 @@ impl PeerView {
 
         UpdateArqStats {
             changed,
+            desired_delta: new_count as i32 - old_count as i32,
             power: Some(power_stats),
             num_peers,
         }
@@ -280,6 +321,7 @@ impl PeerView {
 
 pub struct UpdateArqStats {
     pub changed: bool,
+    pub desired_delta: i32,
     pub power: Option<PowerStats>,
     pub num_peers: usize,
 }

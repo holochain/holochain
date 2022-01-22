@@ -1,4 +1,5 @@
 pub mod gossip_direct;
+pub mod min_redundancy;
 pub mod op_store;
 pub mod test_node;
 

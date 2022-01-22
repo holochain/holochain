@@ -31,6 +31,10 @@ pub trait ArqBounded: Sized {
 
     fn length(&self) -> u64;
 
+    fn length_ratio(&self) -> f64 {
+        self.length() as f64 / 2f64.powf(32.0)
+    }
+
     /// Get a reference to the arq's power.
     fn power(&self) -> u8;
 
