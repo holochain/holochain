@@ -7,6 +7,9 @@ default_unreleasable: true
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased](https://github.com/holochain/holochain/compare/hdk-v0.0.100...HEAD)
+- docs: Add introduction to front-page and move example section up [1172](https://github.com/holochain/holochain/pull/1172)
+
+## 0.0.119
 
 - hdk: `encoding` from `holo_hash` re-exported as hdk feature [1177](https://github.com/holochain/holochain/pull/1177)
 
