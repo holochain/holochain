@@ -24,6 +24,7 @@ use holochain_types::env::DbRead;
 use holochain_types::env::DbWrite;
 use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::header;
+use holochain_zome_types::query::ChainQueryFilterRange;
 use holochain_zome_types::CapAccess;
 use holochain_zome_types::CapGrant;
 use holochain_zome_types::CapSecret;
@@ -142,7 +143,7 @@ impl SourceChain {
         Ok(countersigning_agent_state)
     }
 
-    async fn put_with_header(
+    pub async fn put_with_header(
         &self,
         zome: Option<Zome>,
         header: Header,
@@ -402,6 +403,44 @@ where
         })
     }
 
+    /// Create a source chain with a blank chain head.
+    /// You probably don't want this.
+    /// This type is only useful for when a source chain
+    /// really needs to be constructed before genesis runs.
+    pub async fn raw_empty(
+        vault: AuthorDb,
+        dht_env: DhtDb,
+        keystore: MetaLairClient,
+        author: AgentPubKey,
+    ) -> SourceChainResult<Self> {
+        let scratch = Scratch::new().into_sync();
+        let author = Arc::new(author);
+        let (persisted_head, persisted_seq, persisted_timestamp) = vault
+            .async_reader({
+                let author = author.clone();
+                move |txn| chain_head_db(&txn, author)
+            })
+            .await
+            .unwrap_or_else(|_| {
+                (
+                    HeaderHash::from_raw_32(vec![0u8; 32]),
+                    0,
+                    Timestamp::from_micros(0),
+                )
+            });
+        Ok(Self {
+            scratch,
+            vault,
+            dht_env,
+            keystore,
+            author,
+            persisted_seq,
+            persisted_head,
+            persisted_timestamp,
+            public_only: false,
+        })
+    }
+
     pub fn public_only(&mut self) {
         self.public_only = true;
     }
@@ -608,10 +647,6 @@ where
     /// used by the `query` host function, which crosses the wasm boundary
     // FIXME: This query needs to be tested.
     pub async fn query(&self, query: QueryFilter) -> SourceChainResult<Vec<Element>> {
-        let (range_min, range_max) = match query.sequence_range.clone() {
-            Some(range) => (Some(range.start), Some(range.end)),
-            None => (None, None),
-        };
         let author = self.author.clone();
         let public_only = self.public_only;
         let mut elements = self
@@ -649,9 +684,30 @@ where
                 WHERE
                 Header.author = :author
                 AND
-                (:range_min IS NULL OR Header.seq >= :range_min)
-                AND
-                (:range_max IS NULL OR Header.seq < :range_max)
+                (:range_start IS NULL AND :range_end IS NULL AND :range_start_hash IS NULL AND :range_end_hash IS NULL AND :range_prior_count IS NULL)
+                ",
+                    );
+                    sql.push_str(match query.sequence_range {
+                        ChainQueryFilterRange::Unbounded => "",
+                        ChainQueryFilterRange::HeaderSeqRange(_, _) => "
+                        OR (Header.seq BETWEEN :range_start AND :range_end)",
+                        ChainQueryFilterRange::HeaderHashRange(_, _) => "
+                        OR (
+                            Header.seq BETWEEN
+                            (SELECT Header.seq WHERE Header.hash = :range_start_hash)
+                            AND
+                            (SELECT Header.seq WHERE Header.hash = :range_end_hash)
+                        )",
+                        ChainQueryFilterRange::HeaderHashTerminated(_, _) => "
+                        OR (
+                            Header.seq BETWEEN
+                            (SELECT Header.seq WHERE Header.hash = :range_end_hash) - :range_prior_count
+                            AND
+                            (SELECT Header.seq WHERE Header.hash = :range_end_hash)
+                        )",
+                    });
+                    sql.push_str(
+                        "
                 AND
                 (:entry_type IS NULL OR Header.entry_type = :entry_type)
                 AND
@@ -662,12 +718,31 @@ where
                     let mut stmt = txn.prepare(&sql)?;
                     let elements = stmt
                         .query_and_then(
-                            named_params! {
+                        named_params! {
                                 ":author": author.as_ref(),
-                                ":range_min": range_min,
-                                ":range_max": range_max,
                                 ":entry_type": query.entry_type,
                                 ":header_type": query.header_type,
+                                ":range_start": match query.sequence_range {
+                                    ChainQueryFilterRange::HeaderSeqRange(start, _) => Some(start),
+                                    _ => None,
+                                },
+                                ":range_end": match query.sequence_range {
+                                    ChainQueryFilterRange::HeaderSeqRange(_, end) => Some(end),
+                                    _ => None,
+                                },
+                                ":range_start_hash": match &query.sequence_range {
+                                    ChainQueryFilterRange::HeaderHashRange(start_hash, _) => Some(start_hash.clone()),
+                                    _ => None,
+                                },
+                                ":range_end_hash": match &query.sequence_range {
+                                    ChainQueryFilterRange::HeaderHashRange(_, end_hash)
+                                    | ChainQueryFilterRange::HeaderHashTerminated(end_hash, _) => Some(end_hash.clone()),
+                                    _ => None,
+                                },
+                                ":range_prior_count": match query.sequence_range {
+                                    ChainQueryFilterRange::HeaderHashTerminated(_, prior_count) => Some(prior_count),
+                                    _ => None,
+                                },
                             },
                             |row| {
                                 let header = from_blob::<SignedHeader>(row.get("header_blob")?)?;
@@ -699,7 +774,6 @@ where
         self.scratch.apply(|scratch| {
             let mut scratch_elements: Vec<_> = scratch
                 .headers()
-                .filter(|shh| query.check(shh.header()))
                 .filter_map(|shh| {
                     let entry = match shh.header().entry_hash() {
                         Some(eh) if query.include_entries => scratch.get_entry(eh).ok()?,
@@ -712,7 +786,7 @@ where
 
             elements.extend(scratch_elements);
         })?;
-        Ok(elements)
+        Ok(query.filter_elements(elements))
     }
 
     pub async fn is_chain_locked(&self, lock: Vec<u8>) -> SourceChainResult<bool> {
@@ -942,7 +1016,8 @@ pub fn put_raw(
     Ok(ops_to_integrate)
 }
 
-fn chain_head_db(
+/// Get the current chain head of the database.
+pub fn chain_head_db(
     txn: &Transaction,
     author: Arc<AgentPubKey>,
 ) -> SourceChainResult<(HeaderHash, u32, Timestamp)> {

@@ -5,17 +5,25 @@ use ghost_actor::dependencies::tracing;
 use kitsune_p2p_mdns::*;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
-use kitsune_p2p_types::dht_arc::DhtArc;
+use kitsune_p2p_types::dht_arc::{DhtArc, DhtArcSet};
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
 use url2::Url2;
+
+/// How often to record historical metrics
+/// (currently once per hour)
+const HISTORICAL_METRIC_RECORD_FREQ_MS: u64 = 1000 * 60 * 60;
+
+mod metric_exchange;
+use metric_exchange::*;
 
 mod rpc_multi_logic;
 
 type KSpace = Arc<KitsuneSpace>;
 type KAgent = Arc<KitsuneAgent>;
 type KBasis = Arc<KitsuneBasis>;
+type VecMXM = Vec<MetricExchangeMsg>;
 type WireConHnd = Tx2ConHnd<wire::Wire>;
 type Payload = Box<[u8]>;
 
@@ -57,6 +65,15 @@ ghost_actor::ghost_chan! {
 
         /// Incoming Gossip
         fn incoming_gossip(space: KSpace, con: WireConHnd, remote_url: TxUrl, data: Payload, module_type: crate::types::gossip::GossipModuleType) -> ();
+
+        /// Incoming Metric Exchange
+        fn incoming_metric_exchange(space: KSpace, msgs: VecMXM) -> ();
+
+        /// New Con
+        fn new_con(url: TxUrl, con: WireConHnd) -> ();
+
+        /// Del Con
+        fn del_con(url: TxUrl) -> ();
     }
 }
 
@@ -268,6 +285,7 @@ impl SpaceInternalHandler for Space {
         arc: DhtArc,
     ) -> SpaceInternalHandlerResult<()> {
         self.agent_arcs.insert(agent, arc);
+        self.update_metric_exchange_arcset();
         Ok(async move { Ok(()) }.boxed().into())
     }
 
@@ -399,6 +417,29 @@ impl SpaceInternalHandler for Space {
         }
         unit_ok_fut()
     }
+
+    fn handle_incoming_metric_exchange(
+        &mut self,
+        _space: Arc<KitsuneSpace>,
+        msgs: Vec<MetricExchangeMsg>,
+    ) -> InternalHandlerResult<()> {
+        self.ro_inner.metric_exchange.write().ingest_msgs(msgs);
+        unit_ok_fut()
+    }
+
+    fn handle_new_con(
+        &mut self,
+        url: TxUrl,
+        con: Tx2ConHnd<wire::Wire>,
+    ) -> InternalHandlerResult<()> {
+        self.ro_inner.metric_exchange.write().new_con(url, con);
+        unit_ok_fut()
+    }
+
+    fn handle_del_con(&mut self, url: TxUrl) -> InternalHandlerResult<()> {
+        self.ro_inner.metric_exchange.write().del_con(url);
+        unit_ok_fut()
+    }
 }
 
 struct UpdateAgentInfoInput<'borrow> {
@@ -523,6 +564,8 @@ use ghost_actor::dependencies::must_future::MustBoxFuture;
 impl ghost_actor::GhostControlHandler for Space {
     fn handle_ghost_actor_shutdown(mut self) -> MustBoxFuture<'static, ()> {
         async move {
+            self.ro_inner.metric_exchange.write().shutdown();
+
             use futures::sink::SinkExt;
             // this is a curtesy, ok if fails
             let _ = self.evt_sender.close().await;
@@ -612,6 +655,7 @@ impl KitsuneP2pHandler for Space {
     ) -> KitsuneP2pHandlerResult<()> {
         self.local_joined_agents.remove(&agent);
         self.agent_arcs.remove(&agent);
+        self.update_metric_exchange_arcset();
         for module in self.gossip_mod.values() {
             module.local_agent_leave(agent.clone());
         }
@@ -633,11 +677,15 @@ impl KitsuneP2pHandler for Space {
         };
         let timeout = KitsuneTimeout::from_millis(timeout_ms);
 
+        let start = tokio::time::Instant::now();
+
         let discover_fut = discover::search_and_discover_peer_connect(
             self.ro_inner.clone(),
             to_agent.clone(),
             timeout,
         );
+
+        let metrics = self.ro_inner.metrics.clone();
 
         Ok(async move {
             match discover_fut.await {
@@ -649,9 +697,31 @@ impl KitsuneP2pHandler for Space {
                     let payload = wire::Wire::call(space.clone(), to_agent.clone(), payload.into());
                     let res = con_hnd.request(&payload, timeout).await?;
                     match res {
-                        wire::Wire::Failure(wire::Failure { reason }) => Err(reason.into()),
-                        wire::Wire::CallResp(wire::CallResp { data }) => Ok(data.into()),
-                        r => Err(format!("invalid response: {:?}", r).into()),
+                        wire::Wire::Failure(wire::Failure { reason }) => {
+                            metrics
+                                .write()
+                                .record_reachability_event(false, [&to_agent]);
+                            metrics
+                                .write()
+                                .record_latency_micros(start.elapsed().as_micros(), [&to_agent]);
+                            Err(reason.into())
+                        }
+                        wire::Wire::CallResp(wire::CallResp { data }) => {
+                            metrics.write().record_reachability_event(true, [&to_agent]);
+                            metrics
+                                .write()
+                                .record_latency_micros(start.elapsed().as_micros(), [&to_agent]);
+                            Ok(data.into())
+                        }
+                        r => {
+                            metrics
+                                .write()
+                                .record_reachability_event(false, [&to_agent]);
+                            metrics
+                                .write()
+                                .record_latency_micros(start.elapsed().as_micros(), [&to_agent]);
+                            Err(format!("invalid response: {:?}", r).into())
+                        }
                     }
                 }
                 discover::PeerDiscoverResult::Err(e) => Err(e),
@@ -959,6 +1029,22 @@ impl KitsuneP2pHandler for Space {
             .any(|agent_arc| agent_arc.contains(loc));
         Ok(async move { Ok(r) }.boxed().into())
     }
+
+    fn handle_dump_network_metrics(
+        &mut self,
+        _space: Option<Arc<KitsuneSpace>>,
+    ) -> KitsuneP2pHandlerResult<serde_json::Value> {
+        let space = self.ro_inner.space.clone();
+        let metrics = self.ro_inner.metrics.read().dump();
+        Ok(async move {
+            Ok(serde_json::json!({
+                "space": space.to_string(),
+                "metrics": metrics,
+            }))
+        }
+        .boxed()
+        .into())
+    }
 }
 
 pub(crate) struct SpaceReadOnlyInner {
@@ -971,6 +1057,8 @@ pub(crate) struct SpaceReadOnlyInner {
     #[allow(dead_code)]
     pub(crate) config: Arc<KitsuneP2pConfig>,
     pub(crate) parallel_notify_permit: Arc<tokio::sync::Semaphore>,
+    pub(crate) metrics: MetricsSync,
+    pub(crate) metric_exchange: MetricExchangeSync,
 }
 
 /// A Kitsune P2p Node can track multiple "spaces" -- Non-interacting namespaced
@@ -1002,6 +1090,38 @@ impl Space {
         bandwidth_throttles: BandwidthThrottles,
         parallel_notify_permit: Arc<tokio::sync::Semaphore>,
     ) -> Self {
+        let metrics = MetricsSync::default();
+
+        {
+            let space = space.clone();
+            let metrics = metrics.clone();
+            let evt_sender = evt_sender.clone();
+            tokio::task::spawn(async move {
+                loop {
+                    tokio::time::sleep(std::time::Duration::from_millis(
+                        HISTORICAL_METRIC_RECORD_FREQ_MS,
+                    ))
+                    .await;
+
+                    let records = metrics.read().dump_historical();
+
+                    let _ = evt_sender
+                        .k_gen_req(KGenReq::RecordMetrics {
+                            space: space.clone(),
+                            records,
+                        })
+                        .await;
+                }
+            });
+        }
+
+        let metric_exchange = MetricExchangeSync::spawn(
+            space.clone(),
+            config.tuning_params.clone(),
+            evt_sender.clone(),
+            metrics.clone(),
+        );
+
         let gossip_mod = config
             .tuning_params
             .gossip_strategy
@@ -1036,7 +1156,7 @@ impl Space {
                         space.clone(),
                         ep_hnd.clone(),
                         evt_sender.clone(),
-                        Metrics::default(),
+                        metrics.clone(),
                     ),
                 )
             })
@@ -1128,6 +1248,8 @@ impl Space {
             ep_hnd,
             config: config.clone(),
             parallel_notify_permit,
+            metrics,
+            metric_exchange,
         });
 
         Self {
@@ -1143,6 +1265,15 @@ impl Space {
             mdns_listened_spaces: HashSet::new(),
             gossip_mod,
         }
+    }
+
+    fn update_metric_exchange_arcset(&mut self) {
+        let arc_set = self
+            .agent_arcs
+            .iter()
+            .map(|(_, a)| DhtArcSet::from_interval(a.interval()))
+            .fold(DhtArcSet::new_empty(), |a, i| a.union(&i));
+        self.ro_inner.metric_exchange.write().update_arcset(arc_set);
     }
 
     fn publish_leave_agent_info(

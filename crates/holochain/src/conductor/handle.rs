@@ -57,8 +57,6 @@ use super::{full_integration_dump, integration_dump};
 use crate::conductor::p2p_agent_store::get_single_agent_info;
 use crate::conductor::p2p_agent_store::query_peer_density;
 use crate::conductor::p2p_agent_store::P2pBatch;
-use crate::conductor::p2p_metrics::put_metric_datum;
-use crate::conductor::p2p_metrics::query_metrics;
 use crate::core::queue_consumer::QueueConsumerMap;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
 use crate::core::ribosome::real_ribosome::RealRibosome;
@@ -72,15 +70,21 @@ use holochain_conductor_api::FullStateDump;
 use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::JsonDump;
 use holochain_keystore::MetaLairClient;
+use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_p2p::DnaHashExt;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::conn::DbSyncStrategy;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
+use holochain_state::prelude::SourceChainError;
+use holochain_state::prelude::SourceChainResult;
+use holochain_state::prelude::StateMutationError;
+use holochain_state::prelude::StateMutationResult;
 use holochain_state::source_chain;
 use holochain_types::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
+use kitsune_p2p::event::{KGenReq, KGenRes};
 use kitsune_p2p::KitsuneSpace;
 use kitsune_p2p_types::config::JOIN_NETWORK_TIMEOUT;
 use std::collections::HashMap;
@@ -297,6 +301,9 @@ pub trait ConductorHandleT: Send + Sync {
         dht_ops_cursor: Option<u64>,
     ) -> ConductorApiResult<FullStateDump>;
 
+    /// Dump the network metrics
+    async fn dump_network_metrics(&self, dna_hash: Option<DnaHash>) -> ConductorApiResult<String>;
+
     /// Access the broadcast Sender which will send a Signal across every
     /// attached app interface
     async fn signal_broadcaster(&self) -> SignalBroadcaster;
@@ -322,6 +329,15 @@ pub trait ConductorHandleT: Send + Sync {
     /// Manually remove some cells. Should only be used when handling errors in Cells,
     /// allowing individual Cells to be shut down.
     async fn remove_cells(&self, cell_ids: &[CellId]);
+
+    /// Inject elements into a source chain for a cell.
+    async fn insert_elements_into_source_chain(
+        self: Arc<Self>,
+        cell_id: CellId,
+        truncate: bool,
+        validate: bool,
+        elements: Vec<Element>,
+    ) -> ConductorApiResult<()>;
 
     /// Retrieve the authored environment for this dna. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
@@ -578,6 +594,44 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let space = event.dna_hash().to_kitsune();
         trace!(dispatch_event = ?event);
         match event {
+            holochain_p2p::event::HolochainP2pEvent::KGenReq { arg, respond, .. } => match arg {
+                KGenReq::PeerExtrapCov { space, dht_arc_set } => {
+                    let env = { self.p2p_env(space) };
+                    respond.respond(Ok(async move {
+                        use holochain_sqlite::db::AsP2pAgentStoreConExt;
+                        let permit = env.conn_permit().await;
+                        let res = tokio::task::spawn_blocking(move || {
+                            let mut conn = env.from_permit(permit)?;
+                            conn.p2p_extrapolated_coverage(dht_arc_set)
+                        })
+                        .await;
+                        let res = res
+                            .map_err(holochain_p2p::HolochainP2pError::other)
+                            .and_then(|r| r.map_err(holochain_p2p::HolochainP2pError::other))?;
+                        Ok(KGenRes::PeerExtrapCov(res))
+                    }
+                    .boxed()
+                    .into()));
+                }
+                KGenReq::RecordMetrics { space, records } => {
+                    let env = { self.p2p_metrics_env(space) };
+                    respond.respond(Ok(async move {
+                        use holochain_sqlite::db::AsP2pMetricStoreConExt;
+                        let permit = env.conn_permit().await;
+                        let res = tokio::task::spawn_blocking(move || {
+                            let mut conn = env.from_permit(permit)?;
+                            conn.p2p_log_metrics(records)
+                        })
+                        .await;
+                        let res = res
+                            .map_err(holochain_p2p::HolochainP2pError::other)
+                            .and_then(|r| r.map_err(holochain_p2p::HolochainP2pError::other))?;
+                        Ok(KGenRes::RecordMetrics(res))
+                    }
+                    .boxed()
+                    .into()));
+                }
+            },
             PutAgentInfoSigned {
                 peer_data, respond, ..
             } => {
@@ -672,26 +726,6 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             } => {
                 let env = { self.p2p_env(space) };
                 let res = query_peer_density(env.into(), kitsune_space, dht_arc)
-                    .await
-                    .map_err(holochain_p2p::HolochainP2pError::other);
-                respond.respond(Ok(async move { res }.boxed().into()));
-            }
-            PutMetricDatum {
-                respond,
-                agent,
-                metric,
-                timestamp,
-                ..
-            } => {
-                let env = { self.p2p_metrics_env(space) };
-                let res = put_metric_datum(env, agent, metric, timestamp)
-                    .await
-                    .map_err(holochain_p2p::HolochainP2pError::other);
-                respond.respond(Ok(async move { res }.boxed().into()));
-            }
-            QueryMetrics { respond, query, .. } => {
-                let env = { self.p2p_metrics_env(space) };
-                let res = query_metrics(env, query)
                     .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
@@ -1159,6 +1193,14 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(out)
     }
 
+    async fn dump_network_metrics(&self, dna_hash: Option<DnaHash>) -> ConductorApiResult<String> {
+        use holochain_p2p::HolochainP2pSender;
+        self.holochain_p2p
+            .dump_network_metrics(dna_hash)
+            .await
+            .map_err(super::api::error::ConductorApiError::other)
+    }
+
     async fn signal_broadcaster(&self) -> SignalBroadcaster {
         self.conductor.signal_broadcaster()
     }
@@ -1222,6 +1264,167 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn remove_cells(&self, cell_ids: &[CellId]) {
         self.conductor.remove_cells(cell_ids.to_vec()).await
+    }
+
+    async fn insert_elements_into_source_chain(
+        self: Arc<Self>,
+        cell_id: CellId,
+        truncate: bool,
+        validate: bool,
+        elements: Vec<Element>,
+    ) -> ConductorApiResult<()> {
+        // Get or create the space for this cell.
+        // Note: This doesn't require the cell be installed.
+        let space = self.conductor.get_or_create_space(cell_id.dna_hash())?;
+
+        // Get the chain head if there is one.
+        let persisted_chain_head = space
+            .authored_env
+            .async_reader({
+                let author = Arc::new(cell_id.agent_pubkey().clone());
+                move |txn| holochain_state::prelude::chain_head_db(&txn, author)
+            })
+            .await
+            .ok()
+            .map(|c| (c.0, c.1));
+
+        let network = self.holochain_p2p.to_dna(cell_id.dna_hash().clone());
+
+        // Validate the elements.
+        if validate {
+            // Create a raw source chain to validate against because
+            // genesis may not have been run yet.
+            let workspace = SourceChainWorkspace::raw_empty(
+                space.authored_env.clone(),
+                space.dht_env.clone(),
+                space.cache.clone(),
+                self.keystore.clone(),
+                cell_id.agent_pubkey().clone(),
+            )
+            .await?;
+
+            // Create the ribosome.
+            let ribosome = self
+                .get_dna(cell_id.dna_hash())
+                .map(RealRibosome::new)
+                .ok_or_else(|| DnaError::DnaMissing(cell_id.dna_hash().to_owned()))?;
+
+            let sc = workspace.source_chain();
+
+            // Validate the chain.
+            crate::core::validate_chain(
+                elements.iter().map(|e| e.header_hashed()),
+                &persisted_chain_head.clone().filter(|_| !truncate),
+            )
+            .map_err(|e| SourceChainError::InvalidCommit(e.to_string()))?;
+
+            // Add the elements to the source chain so we can validate them.
+            sc.scratch()
+                .apply(|scratch| {
+                    for el in elements.clone() {
+                        holochain_state::prelude::insert_element_scratch(
+                            scratch,
+                            None,
+                            el,
+                            Default::default(),
+                        );
+                    }
+                })
+                .map_err(SourceChainError::from)?;
+
+            // Run the individual element validations.
+            crate::core::workflow::inline_validation(
+                workspace.clone(),
+                network.clone(),
+                self.clone(),
+                None,
+                ribosome,
+            )
+            .await
+            .map_err(Box::new)?;
+        }
+        let authored_env = space.authored_env;
+        let dht_env = space.dht_env;
+
+        // Produce the op lights for each element.
+        let data = elements
+            .into_iter()
+            .map(|el| {
+                let ops = produce_op_lights_from_elements(vec![&el])?;
+                // Check have the same author as cell.
+                let (shh, entry) = el.into_inner();
+                if shh.header().author() != cell_id.agent_pubkey() {
+                    return Err(StateMutationError::AuthorsMustMatch);
+                }
+                Ok((shh, ops, entry.into_option()))
+            })
+            .collect::<StateMutationResult<Vec<_>>>()?;
+
+        // Commit the elements to the source chain.
+        let ops_to_integrate = authored_env
+            .async_commit({
+                let cell_id = cell_id.clone();
+                move |txn| {
+                    // Truncate the chain if requested.
+                    if truncate {
+                        txn.execute(
+                            "DELETE FROM Header WHERE author = ?",
+                            [cell_id.agent_pubkey()],
+                        )
+                        .map_err(StateMutationError::from)?;
+                    } else if let Some((hash, _)) = persisted_chain_head {
+                        // If we have a persisted chain head, check if it has moved.
+                        let latest_chain_head = holochain_state::prelude::chain_head_db(
+                            txn,
+                            Arc::new(cell_id.agent_pubkey().clone()),
+                        )?
+                        .0;
+
+                        if hash != latest_chain_head {
+                            return Err(SourceChainError::HeadMoved(
+                                Vec::with_capacity(0),
+                                Vec::with_capacity(0),
+                                None,
+                                None,
+                            ));
+                        }
+                    }
+                    let mut ops_to_integrate = Vec::new();
+
+                    // Commit the elements and ops to the authored db.
+                    for (shh, ops, entry) in data {
+                        // Clippy is wrong :(
+                        #[allow(clippy::needless_collect)]
+                        let basis = ops
+                            .iter()
+                            .map(|op| op.dht_basis().clone())
+                            .collect::<Vec<_>>();
+                        ops_to_integrate.extend(
+                            source_chain::put_raw(txn, shh, ops, entry)?
+                                .into_iter()
+                                .zip(basis.into_iter()),
+                        );
+                    }
+                    SourceChainResult::Ok(ops_to_integrate)
+                }
+            })
+            .await?;
+
+        // Check which ops need to be integrated.
+        // Only integrated if a cell is installed.
+        if self
+            .list_cell_ids(Some(CellStatus::Joined))
+            .contains(&cell_id)
+        {
+            holochain_state::integrate::authored_ops_to_dht_db(
+                &network,
+                ops_to_integrate,
+                &authored_env,
+                &dht_env,
+            )
+            .await?;
+        }
+        Ok(())
     }
 
     #[cfg(any(test, feature = "test_utils"))]

@@ -307,6 +307,10 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::FullStateDumped(state))
             }
+            DumpNetworkMetrics { dna_hash } => {
+                let dump = self.conductor_handle.dump_network_metrics(dna_hash).await?;
+                Ok(AdminResponse::NetworkMetricsDumped(dump))
+            }
             AddAgentInfo { agent_infos } => {
                 self.conductor_handle.add_agent_infos(agent_infos).await?;
                 Ok(AdminResponse::AgentInfoAdded)
@@ -330,6 +334,18 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 tracing::warn!("Admin method DeactivateApp is deprecated: use DisableApp instead (functionality is identical).");
                 self.handle_admin_request_inner(DisableApp { installed_app_id })
                     .await
+            }
+            AddElements {
+                cell_id,
+                truncate,
+                validate,
+                elements,
+            } => {
+                self.conductor_handle
+                    .clone()
+                    .insert_elements_into_source_chain(cell_id, truncate, validate, elements)
+                    .await?;
+                Ok(AdminResponse::ElementsAdded)
             }
         }
     }

@@ -272,6 +272,12 @@ pub enum AdminRequest {
         dht_ops_cursor: Option<u64>,
     },
 
+    /// Dump the network metrics tracked by kitsune.
+    DumpNetworkMetrics {
+        /// If set, limit the metrics dumped to a single dna hash space.
+        dna_hash: Option<DnaHash>,
+    },
+
     /// Add a list [AgentInfoSigned] to this conductor's peer store.
     /// This is another way of finding peers on a dht.
     ///
@@ -297,6 +303,48 @@ pub enum AdminRequest {
     RequestAgentInfo {
         /// Optionally choose a specific agent info
         cell_id: Option<CellId>,
+    },
+
+    /// Insert [`Element`]s into the source chain of the [`CellId`].
+    ///
+    /// All elements must be authored and signed by the same agent.
+    /// The [`DnaFile`] (but not necessarily the cell) must already be installed.
+    /// on this conductor.
+    ///
+    /// Care is needed when using this command as it can result in
+    /// an invalid chain.
+    /// Additionally, if conflicting source chain elements are
+    /// inserted, on different nodes then the chain will be forked.
+    ///
+    /// If an invalid or forked chain is inserted,
+    /// and then pushed to the DHT, then this can't be undone.
+    ///
+    /// Note that the cell does not need to exist to run this command.
+    /// It is possible to insert elements into a source chain before
+    /// the cell is created. This can be used to restore from backup.
+    ///
+    /// If the cell is installed it is best to call [`AdminRequest::DisableApp`]
+    /// before running this command as otherwise the chain head may move.
+    /// If `truncate` is true the chain head is not checked and any new
+    /// elements will be lost.
+    AddElements {
+        /// The cell that the elements are being inserted into.
+        cell_id: CellId,
+        /// If this is true then all elements in the source chain will be
+        /// removed before the new elements are inserted.
+        /// WARNING this cannot be undone. Use with care!
+        ///
+        /// If this is false then the elements will be appended to the end
+        /// of the source chain.
+        truncate: bool,
+        /// If this is true then the elements will be validated before insertion.
+        /// This is much slower but is useful for verify the chain is valid.
+        ///
+        /// If this is false then elements will be inserted as is.
+        /// This could lead to an invalid chain.
+        validate: bool,
+        /// The elements to inserted into the source chain.
+        elements: Vec<Element>,
     },
 }
 
@@ -482,6 +530,10 @@ pub enum AdminResponse {
     /// [`AdminRequest::DumpFullState`]: enum.AdminRequest.html#variant.DumpFullState
     FullStateDumped(FullStateDump),
 
+    /// The successful result of a call to [`AdminRequest::DumpNetworkMetrics`].
+    /// The string is a json blob of the metrics results.
+    NetworkMetricsDumped(String),
+
     /// The succesful response to an [`AdminRequest::AddAgentInfo`].
     ///
     /// This means the agent info was successfully added to the peer store.
@@ -495,6 +547,8 @@ pub enum AdminResponse {
     ///
     /// [`AdminRequest::RequestAgentInfo`]: enum.AdminRequest.html#variant.RequestAgentInfo
     AgentInfoRequested(Vec<AgentInfoSigned>),
+
+    ElementsAdded,
 }
 
 /// Error type that goes over the websocket wire.

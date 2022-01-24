@@ -152,6 +152,8 @@ impl ValidationOutcome {
 
 #[derive(Error, Debug)]
 pub enum PrevHeaderError {
+    #[error("The previous header in the source chain doesn't match the next header")]
+    HashMismatch,
     #[error("Root of source chain must be Dna")]
     InvalidRoot,
     #[error("Previous header sequence number {1} != ({0} - 1)")]

@@ -2236,7 +2236,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.0.116"
+version = "0.0.119"
 dependencies = [
  "fixt",
  "hdk_derive",
@@ -2255,7 +2255,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.0.18"
+version = "0.0.21"
 dependencies = [
  "holochain_zome_types",
  "paste",
@@ -2324,7 +2324,7 @@ dependencies = [
 
 [[package]]
 name = "holo_hash"
-version = "0.0.13"
+version = "0.0.16"
 dependencies = [
  "arbitrary",
  "base64",
@@ -2346,7 +2346,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.0.120"
+version = "0.0.123"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2380,6 +2380,7 @@ dependencies = [
  "holochain_wasmer_host",
  "holochain_websocket",
  "holochain_zome_types",
+ "hostname",
  "human-panic",
  "itertools 0.10.1",
  "kitsune_p2p",
@@ -2430,7 +2431,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.0.20"
+version = "0.0.23"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2463,7 +2464,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.0.21"
+version = "0.0.24"
 dependencies = [
  "anyhow",
  "futures",
@@ -2476,7 +2477,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.0.17"
+version = "0.0.19"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -2497,7 +2498,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.0.18"
+version = "0.0.20"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -2523,7 +2524,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.0.20"
+version = "0.0.23"
 dependencies = [
  "derive_more",
  "directories 2.0.2",
@@ -2547,7 +2548,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_keystore"
-version = "0.0.20"
+version = "0.0.23"
 dependencies = [
  "base64",
  "ghost_actor 0.3.0-alpha.4",
@@ -2569,7 +2570,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.0.20"
+version = "0.0.23"
 dependencies = [
  "async-trait",
  "fixt",
@@ -2588,6 +2589,7 @@ dependencies = [
  "rand 0.7.3",
  "serde",
  "serde_bytes",
+ "serde_json",
  "thiserror",
  "tokio",
  "tokio-stream",
@@ -2621,7 +2623,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_sqlite"
-version = "0.0.20"
+version = "0.0.23"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2657,6 +2659,7 @@ dependencies = [
  "scheduled-thread-pool",
  "serde",
  "serde_derive",
+ "serde_json",
  "shrinkwraprs",
  "sqlformat",
  "tempdir",
@@ -2668,7 +2671,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.0.20"
+version = "0.0.23"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -2711,7 +2714,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.0.16"
+version = "0.0.19"
 dependencies = [
  "hdk",
  "serde",
@@ -2719,7 +2722,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.0.20"
+version = "0.0.23"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2784,7 +2787,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.0.20"
+version = "0.0.23"
 dependencies = [
  "fixt",
  "holo_hash",
@@ -2842,7 +2845,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_websocket"
-version = "0.0.20"
+version = "0.0.23"
 dependencies = [
  "criterion",
  "futures",
@@ -2870,7 +2873,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.0.18"
+version = "0.0.21"
 dependencies = [
  "arbitrary",
  "chrono",
@@ -3216,7 +3219,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p"
-version = "0.0.18"
+version = "0.0.20"
 dependencies = [
  "arbitrary",
  "arrayref",
@@ -3245,6 +3248,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_bytes",
+ "serde_json",
  "shrinkwraprs",
  "test-case",
  "thiserror",
@@ -4337,9 +4341,9 @@ checksum = "28988d872ab76095a6e6ac88d99b54fd267702734fd7ffe610ca27f533ddb95a"
 
 [[package]]
 name = "openssl-src"
-version = "111.16.0+1.1.1l"
+version = "111.17.0+1.1.1m"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ab2173f69416cf3ec12debb5823d244127d23a9b127d5a5189aa97c5fa2859f"
+checksum = "05d6a336abd10814198f66e2a91ccd7336611f30334119ca8ce300536666fcf4"
 dependencies = [
  "cc",
 ]

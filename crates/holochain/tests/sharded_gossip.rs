@@ -319,6 +319,7 @@ async fn mock_network_sharded_gossip() {
                     HolochainP2pMockMsg::PeerGetResp(_) => debug!("PeerGetResp"),
                     HolochainP2pMockMsg::PeerQuery(_) => debug!("PeerQuery"),
                     HolochainP2pMockMsg::PeerQueryResp(_) => debug!("PeerQueryResp"),
+                    HolochainP2pMockMsg::MetricExchange(_) => debug!("MetricExchange"),
                     HolochainP2pMockMsg::Gossip {
                         dna,
                         module,

@@ -91,6 +91,7 @@ async fn run_test(
             .unwrap()
     };
 
+    holochain_state::prelude::dump_tmp(&alice_dht_env);
     // Validation should be empty
     fresh_reader_test(alice_dht_env, |txn| {
         let limbo = show_limbo(&txn);

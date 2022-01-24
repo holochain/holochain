@@ -3,9 +3,6 @@
 use crate::*;
 use futures::future::BoxFuture;
 use kitsune_p2p::dht_arc::DhtArcSet;
-use kitsune_p2p::event::MetricDatum;
-use kitsune_p2p::event::MetricQuery;
-use kitsune_p2p::event::MetricQueryAnswer;
 use kitsune_p2p::event::TimeWindow;
 use kitsune_p2p_types::tls::TlsConfig;
 use std::future::Future;
@@ -57,12 +54,6 @@ pub trait AsKdPersist: 'static + Send + Sync {
         root: KdHash,
         dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
     ) -> BoxFuture<'static, KdResult<kitsune_p2p_types::dht_arc::PeerDensity>>;
-
-    /// Store agent info
-    fn put_metric_datum(&self, datum: MetricDatum) -> BoxFuture<'static, KdResult<()>>;
-
-    /// Store agent info
-    fn query_metrics(&self, query: MetricQuery) -> BoxFuture<'static, KdResult<MetricQueryAnswer>>;
 
     /// Store entry
     fn store_entry(
@@ -188,22 +179,6 @@ impl KdPersist {
     ) -> impl Future<Output = KdResult<kitsune_p2p_types::dht_arc::PeerDensity>> + 'static + Send
     {
         AsKdPersist::query_peer_density(&*self.0, root, dht_arc)
-    }
-
-    /// Store agent info
-    pub fn store_metric_datum(
-        &self,
-        datum: MetricDatum,
-    ) -> impl Future<Output = KdResult<()>> + 'static + Send {
-        AsKdPersist::put_metric_datum(&*self.0, datum)
-    }
-
-    /// "Query" metric info
-    pub async fn fetch_metrics(
-        &self,
-        query: MetricQuery,
-    ) -> impl Future<Output = KdResult<MetricQueryAnswer>> + 'static + Send {
-        AsKdPersist::query_metrics(&*self.0, query)
     }
 
     /// Store entry

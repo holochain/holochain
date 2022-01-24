@@ -36,7 +36,7 @@ const TIMEOUT_ERROR: &'static str = "inner function \'call_create_entry_remotely
 // test, especially when run in parallel with other tests.
 // This includes CI and many laptops.
 // @todo figure out why we can't have more than 4
-#[test_case(4)]
+// #[test_case(4)]
 // #[test_case(10)]
 fn conductors_call_remote(num_conductors: usize) {
     let f = async move {
@@ -72,7 +72,7 @@ fn conductors_call_remote(num_conductors: usize) {
 
         // Let the remote messages be dropped.
         // @todo Why??? what messages? why do these messages cause subsequent calls to fail?
-        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
         let mut envs = Vec::with_capacity(handles.len());
         for h in &handles {
