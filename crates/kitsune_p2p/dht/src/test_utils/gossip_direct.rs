@@ -1,6 +1,5 @@
-use kitsune_p2p_timestamp::Timestamp;
-
 use crate::{
+    coords::TimeCoord,
     error::{GossipError, GossipResult},
     host::HostAccess,
     region::*,
@@ -9,7 +8,7 @@ use crate::{
 pub fn gossip_direct_at<Peer: HostAccess>(
     left: &mut Peer,
     right: &mut Peer,
-    now: Timestamp,
+    now: TimeCoord,
 ) -> GossipResult<TestNodeGossipRoundStats> {
     gossip_direct((left, now), (right, now))
 }
@@ -17,8 +16,8 @@ pub fn gossip_direct_at<Peer: HostAccess>(
 /// Quick 'n dirty simulation of a gossip round. Mutates both nodes as if
 /// they were exchanging gossip messages, without the rigmarole of a real protocol
 pub fn gossip_direct<Peer: HostAccess>(
-    (left, time_left): (&mut Peer, Timestamp),
-    (right, time_right): (&mut Peer, Timestamp),
+    (left, time_left): (&mut Peer, TimeCoord),
+    (right, time_right): (&mut Peer, TimeCoord),
 ) -> GossipResult<TestNodeGossipRoundStats> {
     let mut stats = TestNodeGossipRoundStats::default();
 
@@ -35,8 +34,8 @@ pub fn gossip_direct<Peer: HostAccess>(
         let gpr = right.gossip_params();
 
         // - ensure compatible as-at timestamps
-        let tl = time_left.as_micros();
-        let tr = time_right.as_micros();
+        let tl = *time_left as i64;
+        let tr = *time_right as i64;
         if (tl - tr).abs() as u32 > u32::min(*gpl.max_time_offset, *gpr.max_time_offset) {
             return Err(GossipError::TimesOutOfSync);
         }

@@ -1,4 +1,5 @@
 use kitsune_p2p_dht_arc::ArcInterval;
+use num_traits::Zero;
 
 use super::{is_full, Arq, ArqBounded, ArqBounds, ArqStrat};
 
@@ -85,11 +86,13 @@ impl PeerView {
 
     pub fn slack_factor(&self, cov: f64, num_peers: usize) -> f64 {
         if self.is_slacking(cov, num_peers) {
-            let sf = cov / num_peers as f64;
-            if sf.is_nan() {
+            if num_peers.is_zero() {
+                // Prevent a NaN.
+                // This value gets clamped anyway, so it will never actually
+                // lead to an infinite value.
                 f64::INFINITY
             } else {
-                sf
+                cov / num_peers as f64
             }
         } else {
             1.0
@@ -141,10 +144,14 @@ impl PeerView {
         // determine some limits on growth.
         // If we are at the median growth, then it makes sense to cap
         // our movement by 2x in either direction (1/2 to 2)
+        //
         // If we are 1 below the median, then our range is (1/2 to 4)
         // If we are 2 below the median, then our range is (1/2 to 8)
         // If we are 1 above the median, then our range is (1/4 to 2)
         // If we are 2 above the median, then our range is (1/8 to 2)
+        //
+        // Note that there is also a hard limit on growth described by
+        // ArqStrat::max_power_diff, enforced elsewhere.
         let mpd = median_power_diff as f64;
         let min = 2f64.powf(mpd).min(0.5);
         let max = 2f64.powf(mpd).max(2.0);
@@ -170,8 +177,6 @@ impl PeerView {
 
         let old_count = arq.count();
         let old_power = arq.power();
-        let under = cov < self.strat.min_coverage;
-        let over = cov > self.strat.max_coverage();
 
         let power_stats = self.power_stats(&arq);
         let PowerStats {
@@ -182,15 +187,12 @@ impl PeerView {
         let median_power_diff = median_power as i8 - arq.power() as i8;
         let growth_factor = self.growth_factor(cov, num_peers, median_power_diff);
 
-        let new_count = if under {
-            // Ensure we grow by at least 1
-            (old_count as f64 * growth_factor).ceil() as u32
-        } else if over {
+        let new_count = if growth_factor < 1.0 {
             // Ensure we shrink by at least 1
             (old_count as f64 * growth_factor).floor() as u32
         } else {
-            // Allow growth if we are found to be slacking
-            (old_count as f64 * growth_factor).round() as u32
+            // Ensure we grow by at least 1 (if there is any growth at all)
+            (old_count as f64 * growth_factor).ceil() as u32
         };
 
         if new_count != old_count {
@@ -227,13 +229,14 @@ impl PeerView {
              && (median_power as i8 - pow as i8) < self.strat.max_power_diff as i8
         };
 
-        #[allow(unused_parens)]
         loop {
             // check for power downshift opportunity
             if arq.count < self.strat.min_chunks() {
                 if power_above_min(arq.power) {
                     *arq = arq.downshift();
                 } else {
+                    // If we could not downshift due to other constraints, then we cannot
+                    // shrink any smaller than the min_chunks.
                     arq.count = self.strat.min_chunks();
                 }
             } else {
@@ -248,7 +251,6 @@ impl PeerView {
             && (pow as i8 - median_power as i8) < self.strat.max_power_diff as i8
         };
 
-        #[allow(unused_parens)]
         loop {
             // check for power upshift opportunity
             if arq.count > self.strat.max_chunks() {

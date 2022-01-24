@@ -113,37 +113,6 @@ fn test_grow_to_full() {
 }
 
 #[test]
-#[ignore = "this may not be a property we want"]
-// XXX: We only want to do this if other peers have not moved. But currently
-//      we have no way of determining this.
-//
-/// If the current coverage is far from the target, shrinking can occur in
-/// multiple chunks
-fn test_shrink_by_multiple_chunks() {
-    let mut rng = seeded_rng(None);
-
-    // aim for coverage between 10 and 12
-    let strat = ArqStrat {
-        min_coverage: 10.0,
-        buffer: 0.2,
-        ..Default::default()
-    };
-    let jitter = 0.01;
-
-    // generate peers with far too much coverage
-    let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(22.0), 1000, jitter, 0);
-    let peer_power = peers.iter().map(|p| p.power()).min().unwrap();
-    let view = PeerView::new(strat.clone(), peers);
-
-    let arq = Arq::new(0.into(), peer_power + 1, 12);
-    let mut resized = arq.clone();
-    view.update_arq(&mut resized);
-    assert_eq!(arq.power(), resized.power());
-    assert_eq!(resized.count(), 6);
-}
-
-#[test]
-#[ignore = "this may not be a property we want"]
 // XXX: We only want to do this if other peers have not moved. But currently
 //      we have no way of determining this.
 //
@@ -245,7 +214,6 @@ fn test_scenario() {
 
         {
             let peer_power = peers.iter().map(|p| p.power()).min().unwrap();
-            // print_arqs(&peers, 64);
             assert_eq!(peer_power, 26);
 
             let view = PeerView::new(strat.clone(), peers.clone());
@@ -256,9 +224,8 @@ fn test_scenario() {
             // update the arq until there is no change
             while view.update_arq(&mut arq) {}
 
-            // expect that the arq shrinks
+            // expect that the arq shrinks to at least the ballpark of the peers
             assert_eq!(arq.power(), peer_power);
-            assert!(arq.count() <= 8);
         }
         {
             // create the same view but with all arcs cut in half, so that the

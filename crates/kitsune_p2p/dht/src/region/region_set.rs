@@ -238,7 +238,7 @@ mod tests {
         // Calculate region data for all ops.
         // The total count should be half of what's in the op store,
         // since the arq covers exactly half of the ops
-        let times = topo.telescoping_times(Timestamp::from_micros(11000));
+        let times = TelescopingTimes::new(TimeCoord::from(11000));
         let coords = RegionCoordSetXtcs::new(times, ArqBoundsSet::single(arq));
         let rset = RegionSetXtcs::new(&store, coords);
         assert_eq!(
@@ -250,12 +250,12 @@ mod tests {
     #[test]
     fn test_rectify() {
         let arq = Arq::new(0.into(), 8, 4).to_bounds();
-        let topo = Topology::identity(Timestamp::from_micros(0));
+        let topo = Topology::identity_zero();
         let mut store = OpStore::new(topo.clone(), GossipParams::zero());
         store.integrate_ops(op_grid(&arq, 10..20).into_iter());
 
-        let tt_a = topo.telescoping_times(Timestamp::from_micros(20));
-        let tt_b = topo.telescoping_times(Timestamp::from_micros(30));
+        let tt_a = TelescopingTimes::new(TimeCoord::from(20));
+        let tt_b = TelescopingTimes::new(TimeCoord::from(30));
         let coords_a = RegionCoordSetXtcs::new(tt_a, ArqBoundsSet::single(arq.clone()));
         let coords_b = RegionCoordSetXtcs::new(tt_b, ArqBoundsSet::single(arq.clone()));
 
@@ -285,7 +285,7 @@ mod tests {
     #[test]
     fn test_diff() {
         let arq = Arq::new(0.into(), 8, 4).to_bounds();
-        let topo = Topology::identity(Timestamp::from_micros(0));
+        let topo = Topology::identity_zero();
 
         let mut store1 = OpStore::new(topo.clone(), GossipParams::zero());
         store1.integrate_ops(op_grid(&arq, 10..20).into_iter());
@@ -295,11 +295,11 @@ mod tests {
         store2.integrate_ops(extra_ops.clone().into_iter());
 
         let coords_a = RegionCoordSetXtcs::new(
-            topo.telescoping_times(Timestamp::from_micros(20)),
+            TelescopingTimes::new(TimeCoord::from(20)),
             ArqBoundsSet::single(arq.clone()),
         );
         let coords_b = RegionCoordSetXtcs::new(
-            topo.telescoping_times(Timestamp::from_micros(21)),
+            TelescopingTimes::new(TimeCoord::from(21)),
             ArqBoundsSet::single(arq.clone()),
         );
 

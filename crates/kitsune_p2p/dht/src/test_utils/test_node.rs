@@ -1,9 +1,7 @@
-use kitsune_p2p_timestamp::Timestamp;
-
 use crate::{
     agent::AgentInfo,
     arq::*,
-    coords::{GossipParams, Topology},
+    coords::{GossipParams, TelescopingTimes, TimeCoord, Topology},
     hash::{fake_hash, AgentKey},
     host::{AccessOpStore, AccessPeerStore},
     op::Op,
@@ -33,8 +31,8 @@ impl TestNode {
     }
 
     /// Get the RegionSet for this node, suitable for gossiping
-    pub fn region_set(&self, arq_set: ArqBoundsSet, now: Timestamp) -> RegionSet {
-        let coords = RegionCoordSetXtcs::new(self.topo().telescoping_times(now), arq_set);
+    pub fn region_set(&self, arq_set: ArqBoundsSet, now: TimeCoord) -> RegionSet {
+        let coords = RegionCoordSetXtcs::new(TelescopingTimes::new(now), arq_set);
         let data = coords
             .region_coords_nested()
             .map(|columns| {
@@ -87,7 +85,7 @@ mod tests {
 
     #[test]
     fn integrate_and_query_ops() {
-        let topo = Topology::identity(Timestamp::from_micros(0));
+        let topo = Topology::identity_zero();
         let gopa = GossipParams::zero();
         let arq = Arq::new(0.into(), 8, 4);
         let mut node = TestNode::new(topo, gopa, arq);
@@ -128,7 +126,7 @@ mod tests {
 
     #[test]
     fn gossip_regression() {
-        let topo = Topology::identity(Timestamp::from_micros(0));
+        let topo = Topology::identity_zero();
         let gopa = GossipParams::zero();
         let alice_arq = Arq::new(0.into(), 8, 4);
         let bobbo_arq = Arq::new(128.into(), 8, 4);

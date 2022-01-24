@@ -230,13 +230,6 @@ impl Topology {
         let t = (t.as_micros() - self.time_origin.as_micros()).max(0);
         ((t / self.time.quantum as i64) as u32).into()
     }
-
-    pub fn telescoping_times(&self, now: Timestamp) -> TelescopingTimes {
-        TelescopingTimes {
-            time: self.time_coord(now) + TimeCoord(1),
-            limit: None,
-        }
-    }
 }
 
 /// A type which generates a list of exponentially expanding time windows, as per
@@ -259,6 +252,10 @@ impl TelescopingTimes {
         }
     }
 
+    pub fn new(time: TimeCoord) -> Self {
+        Self { time, limit: None }
+    }
+
     /// Calculate the exponentially expanding time segments using the binary
     /// representation of the current timestamp.
     ///
@@ -272,7 +269,7 @@ impl TelescopingTimes {
     /// the binary representation of the timestamp (+1) which generated,
     /// which illustrates this pattern.
     pub fn segments(&self) -> Vec<TimeSegment> {
-        let mut now: u32 = *self.time;
+        let mut now: u32 = *self.time + 1;
         if now == 1 {
             return vec![];
         }
@@ -389,8 +386,8 @@ mod tests {
         assert_eq!(s.length(), 2u64.pow(31));
     }
 
-    fn lengths(topo: &Topology, t: Timestamp) -> Vec<u32> {
-        topo.telescoping_times(t)
+    fn lengths(t: TimeCoord) -> Vec<u32> {
+        TelescopingTimes::new(t)
             .segments()
             .into_iter()
             .map(|i| i.length() as u32)
@@ -399,8 +396,7 @@ mod tests {
 
     #[test]
     fn test_telescoping_times_limit() {
-        let topo = Topology::identity_zero();
-        let tt = topo.telescoping_times(Timestamp::from_micros(64));
+        let tt = TelescopingTimes::new(64.into());
         assert_eq!(tt.segments().len(), 7);
         assert_eq!(tt.limit(6).segments().len(), 6);
         assert_eq!(tt.limit(4).segments().len(), 4);
@@ -412,54 +408,26 @@ mod tests {
 
     #[test]
     #[rustfmt::skip]
-    fn test_telescoping_times_first_16_identity_topology() {
-        let topo = Topology::identity_zero();
-        let ts = Timestamp::from_micros;
+    fn test_telescoping_times_first_16() {
+        let ts = TimeCoord::from;
 
                                                                     // n+1
-        assert_eq!(lengths(&topo, ts(0)),  Vec::<u32>::new());      // 0001
-        assert_eq!(lengths(&topo, ts(1)),  vec![1]);                // 0010
-        assert_eq!(lengths(&topo, ts(2)),  vec![1, 1]);             // 0011
-        assert_eq!(lengths(&topo, ts(3)),  vec![2, 1]);             // 0100
-        assert_eq!(lengths(&topo, ts(4)),  vec![2, 1, 1]);          // 0101
-        assert_eq!(lengths(&topo, ts(5)),  vec![2, 2, 1]);          // 0110
-        assert_eq!(lengths(&topo, ts(6)),  vec![2, 2, 1, 1]);       // 0111
-        assert_eq!(lengths(&topo, ts(7)),  vec![4, 2, 1]);          // 1000
-        assert_eq!(lengths(&topo, ts(8)),  vec![4, 2, 1, 1]);       // 1001
-        assert_eq!(lengths(&topo, ts(9)),  vec![4, 2, 2, 1]);       // 1010
-        assert_eq!(lengths(&topo, ts(10)), vec![4, 2, 2, 1, 1]);    // 1011
-        assert_eq!(lengths(&topo, ts(11)), vec![4, 4, 2, 1]);       // 1100
-        assert_eq!(lengths(&topo, ts(12)), vec![4, 4, 2, 1, 1]);    // 1101
-        assert_eq!(lengths(&topo, ts(13)), vec![4, 4, 2, 2, 1]);    // 1110
-        assert_eq!(lengths(&topo, ts(14)), vec![4, 4, 2, 2, 1, 1]); // 1111
-        assert_eq!(lengths(&topo, ts(15)), vec![8, 4, 2, 1]);      // 10000
-    }
-
-    #[test]
-    fn test_telescoping_times_first_16_standard_topology() {
-        let origin = Timestamp::now();
-        let topo = Topology::standard(origin);
-        let q = topo.time.quantum;
-        // a little extra just to demonstrate that the timestamps do get quantized.
-        let extra = q * 3 / 4;
-        let ts = |t| Timestamp::from_micros(origin.as_micros() + (q * t + extra) as i64);
-
-        assert_eq!(lengths(&topo, ts(0)), Vec::<u32>::new());
-        assert_eq!(lengths(&topo, ts(1)), vec![1]);
-        assert_eq!(lengths(&topo, ts(2)), vec![1, 1]);
-        assert_eq!(lengths(&topo, ts(3)), vec![2, 1]);
-        assert_eq!(lengths(&topo, ts(4)), vec![2, 1, 1]);
-        assert_eq!(lengths(&topo, ts(5)), vec![2, 2, 1]);
-        assert_eq!(lengths(&topo, ts(6)), vec![2, 2, 1, 1]);
-        assert_eq!(lengths(&topo, ts(7)), vec![4, 2, 1]);
-        assert_eq!(lengths(&topo, ts(8)), vec![4, 2, 1, 1]);
-        assert_eq!(lengths(&topo, ts(9)), vec![4, 2, 2, 1]);
-        assert_eq!(lengths(&topo, ts(10)), vec![4, 2, 2, 1, 1]);
-        assert_eq!(lengths(&topo, ts(11)), vec![4, 4, 2, 1]);
-        assert_eq!(lengths(&topo, ts(12)), vec![4, 4, 2, 1, 1]);
-        assert_eq!(lengths(&topo, ts(13)), vec![4, 4, 2, 2, 1]);
-        assert_eq!(lengths(&topo, ts(14)), vec![4, 4, 2, 2, 1, 1]);
-        assert_eq!(lengths(&topo, ts(15)), vec![8, 4, 2, 1]);
+        assert_eq!(lengths(ts(0)),  Vec::<u32>::new());      // 0001
+        assert_eq!(lengths(ts(1)),  vec![1]);                // 0010
+        assert_eq!(lengths(ts(2)),  vec![1, 1]);             // 0011
+        assert_eq!(lengths(ts(3)),  vec![2, 1]);             // 0100
+        assert_eq!(lengths(ts(4)),  vec![2, 1, 1]);          // 0101
+        assert_eq!(lengths(ts(5)),  vec![2, 2, 1]);          // 0110
+        assert_eq!(lengths(ts(6)),  vec![2, 2, 1, 1]);       // 0111
+        assert_eq!(lengths(ts(7)),  vec![4, 2, 1]);          // 1000
+        assert_eq!(lengths(ts(8)),  vec![4, 2, 1, 1]);       // 1001
+        assert_eq!(lengths(ts(9)),  vec![4, 2, 2, 1]);       // 1010
+        assert_eq!(lengths(ts(10)), vec![4, 2, 2, 1, 1]);    // 1011
+        assert_eq!(lengths(ts(11)), vec![4, 4, 2, 1]);       // 1100
+        assert_eq!(lengths(ts(12)), vec![4, 4, 2, 1, 1]);    // 1101
+        assert_eq!(lengths(ts(13)), vec![4, 4, 2, 2, 1]);    // 1110
+        assert_eq!(lengths(ts(14)), vec![4, 4, 2, 2, 1, 1]); // 1111
+        assert_eq!(lengths(ts(15)), vec![8, 4, 2, 1]);      // 10000
     }
 
     /// Test that data generated by two different telescoping time sets can be
@@ -469,10 +437,9 @@ mod tests {
     /// world, the data would be the region data (which has an AddAssign impl).
     #[test]
     fn test_rectify_telescoping_times() {
-        let topo = Topology::identity_zero();
         {
-            let a = topo.telescoping_times(Timestamp::from_micros(5));
-            let b = topo.telescoping_times(Timestamp::from_micros(8));
+            let a = TelescopingTimes::new(5.into());
+            let b = TelescopingTimes::new(8.into());
 
             // the actual integers used here don't matter,
             // they're just picked so that sums look distinct
@@ -483,8 +450,8 @@ mod tests {
             assert_eq!(db, vec![32, 16]);
         }
         {
-            let a = topo.telescoping_times(Timestamp::from_micros(14));
-            let b = topo.telescoping_times(Timestamp::from_micros(16));
+            let a = TelescopingTimes::new(14.into());
+            let b = TelescopingTimes::new(16.into());
             let mut da = vec![128, 64, 32, 16, 8, 4];
             let mut db = vec![32, 16, 8, 4, 1];
             TelescopingTimes::rectify((&a, &mut da), (&b, &mut db));
@@ -495,9 +462,8 @@ mod tests {
 
     proptest::proptest! {
         #[test]
-        fn telescoping_times_cover_total_time_span(now in 0i64..u32::MAX as i64) {
-            let topo = Topology::identity_zero();
-            let ts = topo.telescoping_times(Timestamp::from_micros(now)).segments();
+        fn telescoping_times_cover_total_time_span(now in 0u32..u32::MAX) {
+            let ts = TelescopingTimes::new(now.into()).segments();
             let total = ts.iter().fold(0u64, |len, t| {
                 assert_eq!(*t.bounds().0, len as u32, "t = {:?}, len = {}", t, len);
                 len + t.length()
@@ -506,27 +472,24 @@ mod tests {
         }
 
         #[test]
-        fn telescoping_times_end_with_1(now: i64) {
-            let topo = Topology::identity_zero();
-            if let Some(last) = topo.telescoping_times(Timestamp::from_micros(now)).segments().pop() {
+        fn telescoping_times_end_with_1(now: u32) {
+            if let Some(last) = TelescopingTimes::new(now.into()).segments().pop() {
                 assert_eq!(last.power, 0);
             }
         }
 
         #[test]
         fn telescoping_times_are_fractal(now: u32) {
-            let topo = Topology::identity_zero();
-            let a = lengths(&topo, Timestamp::from_micros(now as i64));
-            let b = lengths(&topo, Timestamp::from_micros((now - a[0]) as i64));
+            let a = lengths(now.into());
+            let b = lengths((now - a[0]).into());
             assert_eq!(b.as_slice(), &a[1..]);
         }
 
         #[test]
         fn rectification_doesnt_panic(a: u32, b: u32) {
-            let topo = Topology::identity_zero();
             let (a, b) = if a < b { (a, b)} else {(b, a)};
-            let a = topo.telescoping_times(Timestamp::from_micros(a as i64));
-            let b = topo.telescoping_times(Timestamp::from_micros(b as i64));
+            let a = TelescopingTimes::new(a.into());
+            let b = TelescopingTimes::new(b.into());
             let mut da = vec![1; a.segments().len()];
             let mut db = vec![1; b.segments().len()];
             TelescopingTimes::rectify((&a, &mut da), (&b, &mut db));

@@ -10,7 +10,7 @@ use std::sync::Arc;
 use crate::{
     agent::AgentInfo,
     arq::ArqBoundsSet,
-    coords::{GossipParams, Topology},
+    coords::{GossipParams, TelescopingTimes, TimeCoord, Topology},
     hash::AgentKey,
     op::*,
     region::*,
@@ -40,8 +40,8 @@ pub trait AccessOpStore<D: TreeDataConstraints = RegionData, O: OpRegion<D> = Op
     fn topo(&self) -> &Topology;
 
     /// Get the RegionSet for this node, suitable for gossiping
-    fn region_set(&self, arq_set: ArqBoundsSet, now: Timestamp) -> RegionSet<D> {
-        let coords = RegionCoordSetXtcs::new(self.topo().telescoping_times(now), arq_set);
+    fn region_set(&self, arq_set: ArqBoundsSet, now: TimeCoord) -> RegionSet<D> {
+        let coords = RegionCoordSetXtcs::new(TelescopingTimes::new(now), arq_set);
         let data = coords
             .region_coords_nested()
             .map(|columns| {
