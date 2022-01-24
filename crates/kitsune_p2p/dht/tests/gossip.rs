@@ -14,14 +14,15 @@ use kitsune_p2p_timestamp::Timestamp;
 fn test_basic() {
     let topo = Topology::identity_zero();
     let gopa = GossipParams::new(1.into(), 0);
+    let ts = |t: u32| topo.timestamp(t.into());
 
     let alice_arq = Arq::new(0.into(), 8, 4);
     let bobbo_arq = Arq::new(128.into(), 8, 4);
     let mut alice = TestNode::new(topo.clone(), gopa, alice_arq);
     let mut bobbo = TestNode::new(topo.clone(), gopa, bobbo_arq);
 
-    alice.integrate_op(OpData::fake(0, 10, 4321));
-    bobbo.integrate_op(OpData::fake(128, 20, 1234));
+    alice.integrate_op(OpData::fake(0.into(), ts(10), 4321));
+    bobbo.integrate_op(OpData::fake(128.into(), ts(20), 1234));
 
     let ta = TimeCoord::from(30);
     let tb = TimeCoord::from(31);
@@ -40,14 +41,15 @@ fn test_basic() {
 fn test_gossip_scenario() {
     let topo = Topology::standard(Timestamp::from_micros(0));
     let gopa = GossipParams::new(1.into(), 0);
+    let ts = |t: u32| topo.timestamp(t.into());
 
     let alice_arq = Arq::new(0.into(), 8, 4);
     let bobbo_arq = Arq::new(128.into(), 8, 4);
     let mut alice = TestNode::new(topo.clone(), gopa, alice_arq);
     let mut bobbo = TestNode::new(topo.clone(), gopa, bobbo_arq);
 
-    alice.integrate_op(OpData::fake(0, 10, 4321));
-    bobbo.integrate_op(OpData::fake(128, 20, 1234));
+    alice.integrate_op(OpData::fake(0.into(), ts(10), 4321));
+    bobbo.integrate_op(OpData::fake(128.into(), ts(20), 1234));
 
     let ta = TimeCoord::from(30);
     let tb = TimeCoord::from(31);

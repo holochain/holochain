@@ -25,11 +25,11 @@ impl OpData {
     }
 
     /// Obviously only for testing
-    pub fn fake(loc: u32, timestamp: i64, size: u32) -> Op {
+    pub fn fake(loc: Loc, timestamp: Timestamp, size: u32) -> Op {
         use crate::hash::fake_hash;
         Op::new(Self {
-            loc: Loc::from(loc),
-            timestamp: Timestamp::from_micros(timestamp),
+            loc,
+            timestamp,
             size,
             hash: fake_hash().into(),
         })

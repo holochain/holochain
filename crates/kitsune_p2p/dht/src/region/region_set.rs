@@ -188,12 +188,13 @@ mod tests {
     use crate::{
         op::{Op, OpData},
         test_utils::op_store::OpStore,
+        Loc,
     };
 
     use super::*;
 
     /// Only works for arqs that don't span `u32::MAX / 2`
-    fn op_grid(arq: &ArqBounds, trange: impl Iterator<Item = i32> + Clone) -> Vec<Op> {
+    fn op_grid(arq: &ArqBounds, trange: impl Iterator<Item = i64> + Clone) -> Vec<Op> {
         let (left, right) = (arq.left(), arq.right());
         let mid = u32::MAX / 2;
         assert!(
@@ -208,7 +209,7 @@ mod tests {
                     // 16 x 100 total ops.
                     // x interval: [-1024, -1024)
                     // t interval: [1000, 11000)
-                    OpData::fake(x as u32, t as i64, 10)
+                    OpData::fake(Loc::from(x as u32), Timestamp::from_micros(t), 10)
                 })
             })
             .collect()
@@ -230,7 +231,7 @@ mod tests {
         let nt = 10;
         let ops = op_grid(
             &Arq::new(0.into(), pow, 8).to_bounds(),
-            (1000..11000 as i32).step_by(1000),
+            (1000..11000 as i64).step_by(1000),
         );
         assert_eq!(ops.len(), nx * nt);
         store.integrate_ops(ops.into_iter());
@@ -290,7 +291,10 @@ mod tests {
         let mut store1 = OpStore::new(topo.clone(), GossipParams::zero());
         store1.integrate_ops(op_grid(&arq, 10..20).into_iter());
 
-        let extra_ops = [OpData::fake(-300i32 as u32, 18, 4), OpData::fake(12, 12, 4)];
+        let extra_ops = [
+            OpData::fake(Loc::from(-300i32 as u32), Timestamp::from_micros(18), 4),
+            OpData::fake(Loc::from(12), Timestamp::from_micros(12), 4),
+        ];
         let mut store2 = store1.clone();
         store2.integrate_ops(extra_ops.clone().into_iter());
 

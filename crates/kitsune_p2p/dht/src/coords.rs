@@ -230,6 +230,11 @@ impl Topology {
         let t = (t.as_micros() - self.time_origin.as_micros()).max(0);
         ((t / self.time.quantum as i64) as u32).into()
     }
+
+    pub fn timestamp(&self, t: TimeCoord) -> Timestamp {
+        let t = *t as i64 * self.time.quantum as i64;
+        Timestamp::from_micros(t + self.time_origin.as_micros())
+    }
 }
 
 /// A type which generates a list of exponentially expanding time windows, as per

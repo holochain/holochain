@@ -79,6 +79,8 @@ impl AccessPeerStore for TestNode {
 
 #[cfg(test)]
 mod tests {
+    use kitsune_p2p_timestamp::Timestamp;
+
     use crate::op::OpData;
 
     use super::*;
@@ -92,9 +94,9 @@ mod tests {
 
         node.integrate_ops(
             [
-                OpData::fake(0, 10, 1234),
-                OpData::fake(1000, 20, 2345),
-                OpData::fake(2000, 15, 3456),
+                OpData::fake(0.into(), Timestamp::from_micros(10), 1234),
+                OpData::fake(1000.into(), Timestamp::from_micros(20), 2345),
+                OpData::fake(2000.into(), Timestamp::from_micros(15), 3456),
             ]
             .into_iter(),
         );
@@ -133,8 +135,10 @@ mod tests {
         let mut alice = TestNode::new(topo.clone(), gopa, alice_arq);
         let mut bobbo = TestNode::new(topo.clone(), gopa, bobbo_arq);
 
-        alice.integrate_ops([OpData::fake(0, 10, 4321)].into_iter());
-        bobbo.integrate_ops([OpData::fake(128, 20, 1234)].into_iter());
+        alice.integrate_ops([OpData::fake(0.into(), Timestamp::from_micros(10), 4321)].into_iter());
+        bobbo.integrate_ops(
+            [OpData::fake(128.into(), Timestamp::from_micros(20), 1234)].into_iter(),
+        );
 
         // dbg!(&alice.tree.tree);
         let b = (4294967295, 71);
