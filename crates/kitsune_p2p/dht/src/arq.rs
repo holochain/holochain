@@ -226,8 +226,10 @@ impl ArqBounded for Arq {
         };
         let offset = if self.count == 0 {
             center_offset
+        } else if center_offset >= wing {
+            center_offset - wing
         } else {
-            center_offset.wrapping_sub(wing)
+            2u32.pow(32 - self.power as u32) - wing + center_offset
         };
         ArqBounds {
             offset: offset.into(),
@@ -313,6 +315,14 @@ impl ArqBounds {
         Self::from_interval_inner(power, interval, false)
     }
 
+    pub fn from_parts(power: u8, offset: SpaceCoord, count: u32) -> Self {
+        Self {
+            power,
+            offset,
+            count,
+        }
+    }
+
     pub fn to_arq(&self) -> Arq {
         Arq {
             center: self.pseudocenter(),
@@ -344,21 +354,23 @@ impl ArqBounds {
                 let hi = hi.as_u32();
                 let s = 2u32.pow(power as u32);
                 let offset = lo / s;
-                let diff = if lo <= hi {
-                    hi - lo
+                let len = if lo <= hi {
+                    hi - lo + 1
                 } else {
                     (2u64.pow(32) - (lo as u64) + (hi as u64) + 1) as u32
                 };
-                let count = diff / s;
+                let count = len / s;
                 // TODO: this is kinda wrong. The right bound of the interval
-                // should be 1 less.
-                if rounded || lo == offset * s && diff == count * s {
+                // should be 1 less, but we'll accept if it bleeds over by 1 too.
+                if rounded || lo == offset * s && (dbg!(len % s) <= 1) {
                     Some(Self {
                         offset: offset.into(),
                         power,
                         count: count.into(),
                     })
                 } else {
+                    tracing::warn!("{} =?= {} == {} * {}", lo, offset * s, offset, s);
+                    tracing::warn!("{} =?= {} == {} * {}", len, count * s, count, s);
                     None
                 }
             }
@@ -398,6 +410,7 @@ impl ArqBounds {
     }
 
     // TODO: test
+    // XXX: doesn't really apply for an empty ArqBounds!
     pub fn right(&self) -> u32 {
         self.offset
             .wrapping_add(self.count)
@@ -420,6 +433,11 @@ impl ArqBounds {
     /// Get a reference to the arq bounds's count.
     pub fn count(&self) -> u32 {
         self.count
+    }
+
+    /// Get a reference to the arq bounds's offset.
+    pub fn offset(&self) -> SpaceCoord {
+        self.offset
     }
 }
 
@@ -644,6 +662,27 @@ mod tests {
         assert_eq!(rq(&c, 12).map(|c| c.count), Some(256 * 256));
         assert_eq!(rq(&c, 28).map(|c| c.count), Some(1));
         assert_eq!(rq(&c, 29).map(|c| c.count), None);
+    }
+
+    #[test]
+    fn to_bounds() {
+        let pow: u8 = 4;
+        {
+            let a = Arq::new((8 * 2u32.pow(pow.into())).into(), pow, 16);
+            let b = a.to_bounds();
+            assert_eq!(b.offset(), SpaceCoord::from(0));
+            assert_eq!(b.count(), 16);
+        }
+        {
+            let a = Arq::new((8 * 2u32.pow(pow.into())).into(), pow, 18);
+            let b = a.to_bounds();
+            dbg!(b);
+            assert_eq!(
+                b.offset().exp(pow),
+                (a.center().as_i32() - 9 * 2i32.pow(pow.into())) as u32
+            );
+            assert_eq!(b.count(), 18);
+        }
     }
 
     #[test]

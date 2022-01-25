@@ -148,6 +148,7 @@ fn test_grow_by_multiple_chunks() {
 ///
 /// (not a very good test, probably)
 fn test_degenerate_asymmetrical_coverage() {
+    observability::test_run().ok();
     let other = ArqBounds::from_interval(4, ArcInterval::new(0x0, 0x80))
         .unwrap()
         .to_arq();

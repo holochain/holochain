@@ -1,6 +1,6 @@
 use kitsune_p2p_dht_arc::DhtArcSet;
 
-use crate::arq::ArqBounds;
+use crate::{arq::ArqBounds, coords::SpaceCoord};
 
 use super::{Arq, ArqBounded};
 
@@ -86,6 +86,8 @@ impl<A: ArqBounded> ArqSetImpl<A> {
     }
 
     pub fn intersection(&self, other: &Self) -> ArqSetImpl<ArqBounds> {
+        use gcollections::ops::*;
+        use interval::interval_set::*;
         let power = self.power.min(other.power());
         let a1 = self.requantize(power).unwrap().to_dht_arc_set();
         let a2 = other.requantize(power).unwrap().to_dht_arc_set();
@@ -118,53 +120,74 @@ pub fn print_arq<'a, A: ArqBounded>(arq: &'a A, len: usize) {
 pub fn print_arqs<'a, A: ArqBounded>(arqs: &'a [A], len: usize) {
     for (i, arq) in arqs.iter().enumerate() {
         println!(
-            "|{}| {}:\t{} *2^{}",
+            "|{}| {}:\t{} +{} *2^{}",
             arq.to_ascii(len),
             i,
+            arq.to_bounds().offset(),
             arq.count(),
             arq.power()
         );
     }
 }
 
-#[test]
-fn normalize_arqs() {
-    let s = ArqSetImpl::new(vec![
-        ArqBounds {
-            offset: 0.into(),
-            power: 10,
-            count: 10,
-        },
-        ArqBounds {
-            offset: 0.into(),
-            power: 8,
-            count: 40,
-        },
-        ArqBounds {
-            offset: 0.into(),
-            power: 12,
-            count: 3,
-        },
-    ]);
+mod tests {
 
-    assert_eq!(
-        s.arqs,
-        vec![
+    use super::*;
+
+    #[test]
+    fn intersect_arqs() {
+        observability::test_run().ok();
+        let a = Arq::new(536870912.into(), 27, 11);
+        let b = Arq::new(805306368.into(), 27, 11);
+        dbg!(a.to_bounds().offset());
+
+        let a = ArqSet::single(a);
+        let b = ArqSet::single(b);
+        let c = a.intersection(&b);
+        print_arqs(&a, 64);
+        print_arqs(&b, 64);
+        print_arqs(&c, 64);
+    }
+
+    #[test]
+    fn normalize_arqs() {
+        let s = ArqSetImpl::new(vec![
             ArqBounds {
                 offset: 0.into(),
-                power: 8,
-                count: (4 * 10)
+                power: 10,
+                count: 10,
             },
             ArqBounds {
                 offset: 0.into(),
                 power: 8,
-                count: 40
+                count: 40,
             },
             ArqBounds {
                 offset: 0.into(),
-                power: 8,
-                count: (3 * 16)
+                power: 12,
+                count: 3,
             },
-        ]
-    );
+        ]);
+
+        assert_eq!(
+            s.arqs,
+            vec![
+                ArqBounds {
+                    offset: 0.into(),
+                    power: 8,
+                    count: (4 * 10)
+                },
+                ArqBounds {
+                    offset: 0.into(),
+                    power: 8,
+                    count: 40
+                },
+                ArqBounds {
+                    offset: 0.into(),
+                    power: 8,
+                    count: (3 * 16)
+                },
+            ]
+        );
+    }
 }

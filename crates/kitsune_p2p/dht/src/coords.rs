@@ -6,6 +6,9 @@ use std::{
 use crate::op::{Loc, Timestamp};
 use derivative::Derivative;
 
+/// Represents some number of space quanta. The actual DhtLocation that this
+/// coordinate corresponds to depends upon the space quantum size specified
+/// in the Topology
 #[derive(
     Copy,
     Clone,
@@ -22,6 +25,9 @@ use derivative::Derivative;
 )]
 pub struct SpaceCoord(u32);
 
+/// Represents some number of time quanta. The actual Timestamp that this
+/// coordinate corresponds to depends upon the time quantum size specified
+/// in the Topology
 #[derive(
     Copy,
     Clone,
