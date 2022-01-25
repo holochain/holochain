@@ -29,13 +29,11 @@ pub fn zome_info(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod test {
-    use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::prelude::*;
     use crate::sweettest::SweetDnaFile;
-    use crate::core::ribosome::MockDnaStore;
     use crate::sweettest::SweetConductor;
-    use crate::conductor::ConductorBuilder;
+    use crate::sweettest::SweetAgents;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn zome_info_test() {
@@ -44,22 +42,8 @@ pub mod test {
             .await
             .unwrap();
 
-        let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
-        let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
-
-        let mut dna_store = MockDnaStore::new();
-        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
-        dna_store.expect_add_dna().return_const(());
-        dna_store
-            .expect_get()
-            .return_const(Some(dna_file.clone().into()));
-        dna_store
-            .expect_get_entry_def()
-            .return_const(EntryDef::default_with_id("thing"));
-
-        let mut conductor =
-            SweetConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let (alice_pubkey, bob_pubkey) = SweetAgents::two(conductor.keystore()).await;
 
         let apps = conductor
             .setup_app_for_agents(

@@ -575,69 +575,6 @@ pub mod wasm_test {
             .expect("Time went backwards")
     }
 
-    // /// Directly call a function in a TestWasm
-    // #[macro_export]
-    // macro_rules! call_test_ribosome {
-    //     ( $host_access:expr, $test_wasm:expr, $fn_name:literal, $input:expr ) => {{
-    //         let mut host_access = $host_access.clone();
-    //         let input = $input.clone();
-    //         tokio::task::spawn(async move {
-    //             use holo_hash::*;
-    //             use $crate::core::ribosome::RibosomeT;
-
-    //             let ribosome =
-    //                 $crate::fixt::RealRibosomeFixturator::new($crate::fixt::curve::Zomes(vec![
-    //                     $test_wasm.into(),
-    //                 ]))
-    //                 .next()
-    //                 .unwrap();
-
-    //             let author = host_access
-    //                 .workspace()
-    //                 .source_chain()
-    //                 .as_ref()
-    //                 .unwrap()
-    //                 .agent_pubkey()
-    //                 .clone();
-
-    //             // Required because otherwise the network will return routing errors
-    //             let test_network = crate::test_utils::test_network(
-    //                 Some(ribosome.dna_def().as_hash().clone()),
-    //                 Some(author),
-    //             )
-    //             .await;
-    //             let dna_network = test_network.dna_network();
-    //             host_access.network = dna_network;
-
-    //             let invocation =
-    //                 $crate::fixt::ZomeCallInvocationFixturator::new($crate::fixt::NamedInvocation(
-    //                     cell_id,
-    //                     $test_wasm.into(),
-    //                     $fn_name.into(),
-    //                     holochain_zome_types::ExternIO::encode(input).unwrap(),
-    //                 ))
-    //                 .next()
-    //                 .unwrap();
-
-    //             match ribosome.call_zome_function(host_access, invocation.clone()) {
-    //                 Ok(crate::core::ribosome::ZomeCallResponse::Ok(guest_output)) => {
-    //                     Ok(guest_output.decode().unwrap())
-    //                 }
-    //                 Ok(crate::core::ribosome::ZomeCallResponse::Unauthorized(_, _, _, _)) => {
-    //                     unreachable!()
-    //                 }
-    //                 Ok(crate::core::ribosome::ZomeCallResponse::NetworkError(_)) => unreachable!(),
-    //                 Ok(crate::core::ribosome::ZomeCallResponse::CountersigningSession(e)) => {
-    //                     panic!("Failed a countersigning session {}", e)
-    //                 }
-    //                 Err(e) => Err(e),
-    //             }
-    //         })
-    //         .await
-    //         .unwrap()
-    //     }};
-    // }
-
     #[test]
     fn fn_components_iterate() {
         let fn_components = FnComponents::from(vec!["foo".into(), "bar".into(), "baz".into()]);

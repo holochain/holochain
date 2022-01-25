@@ -16,7 +16,6 @@ pub fn capability_grants(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    // use crate::fixt::ZomeCallHostAccessFixturator;
     use crate::sweettest::SweetDnaFile;
     use crate::{conductor::ConductorBuilder, sweettest::SweetConductor};
     use ::fixt::prelude::*;
@@ -26,50 +25,71 @@ pub mod wasm_test {
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_agent_pubkey_2;
     use holochain_wasm_test_utils::TestWasm;
+    use crate::sweettest::SweetAgents;
 
     use matches::assert_matches;
 
-    // #[tokio::test(flavor = "multi_thread")]
-    // async fn ribosome_capability_secret_test<'a>() {
-    //     observability::test_run().ok();
-    //     let host_access = fixt!(ZomeCallHostAccess, Predictable);
+    #[tokio::test(flavor = "multi_thread")]
+    async fn ribosome_capability_secret_test() {
+        observability::test_run().ok();
+        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Capability])
+            .await
+            .unwrap();
 
-    //     let _: CapSecret =
-    //         crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ())
-    //             .unwrap();
-    // }
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let (alice_pubkey, bob_pubkey) = SweetAgents::two(conductor.keystore()).await;
 
-    // #[tokio::test(flavor = "multi_thread")]
-    // async fn ribosome_transferable_cap_grant<'a>() {
-    //     observability::test_run().ok();
-    //     let host_access = fixt!(ZomeCallHostAccess, Predictable);
+        let apps = conductor
+            .setup_app_for_agents(
+                "app-",
+                &[alice_pubkey.clone(), bob_pubkey.clone()],
+                &[dna_file.into()],
+            )
+            .await
+            .unwrap();
 
-    //     let secret: CapSecret =
-    //         crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ())
-    //             .unwrap();
-    //     let header: HeaderHash = crate::call_test_ribosome!(
-    //         host_access,
-    //         TestWasm::Capability,
-    //         "transferable_cap_grant",
-    //         secret
-    //     )
-    //     .unwrap();
-    //     let maybe_element: Option<Element> =
-    //         crate::call_test_ribosome!(host_access, TestWasm::Capability, "get_entry", header)
-    //             .unwrap();
+        let ((alice,), (bobbo,)) = apps.into_tuples();
+        let alice = alice.zome(TestWasm::Capability);
+        let _bobbo = bobbo.zome(TestWasm::Capability);
 
-    //     let entry_secret: CapSecret = match maybe_element {
-    //         Some(element) => {
-    //             let cap_grant_entry: CapGrantEntry = element.entry().to_grant_option().unwrap();
-    //             match cap_grant_entry.access {
-    //                 CapAccess::Transferable { secret, .. } => secret,
-    //                 _ => unreachable!(),
-    //             }
-    //         }
-    //         _ => unreachable!(),
-    //     };
-    //     assert_eq!(entry_secret, secret,);
-    // }
+        let _: CapSecret = conductor.call(&alice, "cap_secret", ()).await;
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn ribosome_transferable_cap_grant() {
+        observability::test_run().ok();
+        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Capability])
+            .await
+            .unwrap();
+
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let (alice_pubkey, bob_pubkey) = SweetAgents::two(conductor.keystore()).await;
+
+        let apps = conductor
+            .setup_app_for_agents(
+                "app-",
+                &[alice_pubkey.clone(), bob_pubkey.clone()],
+                &[dna_file.into()],
+            )
+            .await
+            .unwrap();
+
+        let ((alice,), (bobbo,)) = apps.into_tuples();
+        let alice = alice.zome(TestWasm::Capability);
+        let _bobbo = bobbo.zome(TestWasm::Capability);
+
+        let secret: CapSecret = conductor.call(&alice, "cap_secret", ()).await;
+        let header: HeaderHash = conductor.call(&alice, "transferable_cap_grant", secret).await;
+        let maybe_element: Option<Element> = conductor.call(&alice, "get_entry", header).await;
+        let entry_secret: CapSecret = maybe_element.and_then(|element| {
+            let cap_grant_entry = element.entry().to_grant_option().unwrap();
+            match cap_grant_entry.access {
+                CapAccess::Transferable { secret, .. } => Some(secret),
+                _ => None,
+            }
+        }).unwrap();
+        assert_eq!(entry_secret, secret);
+    }
 
     // MAYBE: [ B-03669 ] can move this to an integration test (may need to switch to using a RealDnaStore)
     #[tokio::test(flavor = "multi_thread")]
