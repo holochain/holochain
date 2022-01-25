@@ -61,10 +61,29 @@ pub fn gossip_direct<Peer: HostAccess>(
         // - calculate regions
         let regions_left = left.region_set(common_arqs.clone(), time_left);
         let regions_right = right.region_set(common_arqs.clone(), time_right);
-        stats.region_data_sent += regions_left.count() as u32 * REGION_MASS;
-        stats.region_data_rcvd += regions_right.count() as u32 * REGION_MASS;
+        stats.regions_sent += regions_left.count() as u32;
+        stats.regions_rcvd += regions_right.count() as u32;
         (regions_left, regions_right)
     };
+    {
+        let RegionSet::Xtcs(l) = regions_left.clone();
+        let RegionSet::Xtcs(r) = regions_right.clone();
+        // dbg!(l.data, r.data);
+    }
+    // dbg!(
+    //     &regions_left
+    //         .regions()
+    //         .into_iter()
+    //         .filter(|r| r.data.count > 0)
+    //         .map(|r| r.coords.space.offset)
+    //         .collect::<Vec<_>>(),
+    //     &regions_right
+    //         .regions()
+    //         .into_iter()
+    //         .filter(|r| r.data.count > 0)
+    //         .map(|r| r.coords.space.offset)
+    //         .collect::<Vec<_>>(),
+    // );
 
     {
         // ROUND IV: Calculate diffs and send missing ops
@@ -72,6 +91,8 @@ pub fn gossip_direct<Peer: HostAccess>(
         // - calculate diffs
         let diff_left = regions_left.clone().diff(regions_right.clone())?;
         let diff_right = regions_right.diff(regions_left)?;
+
+        // dbg!(&diff_left, &diff_right);
 
         // - fetch ops
         let ops_left: Vec<_> = diff_left
@@ -85,10 +106,12 @@ pub fn gossip_direct<Peer: HostAccess>(
 
         // - "send" missing ops
         for op in ops_right {
+            stats.ops_rcvd += 1;
             stats.op_data_rcvd += op.size;
             left.integrate_op(op);
         }
         for op in ops_left {
+            stats.ops_sent += 1;
             stats.op_data_sent += op.size;
             right.integrate_op(op);
         }
@@ -98,18 +121,20 @@ pub fn gossip_direct<Peer: HostAccess>(
 
 #[derive(Clone, Debug, Default, derive_more::Add)]
 pub struct TestNodeGossipRoundStats {
-    pub region_data_sent: u32,
-    pub region_data_rcvd: u32,
+    pub regions_sent: u32,
+    pub regions_rcvd: u32,
+    pub ops_sent: u32,
+    pub ops_rcvd: u32,
     pub op_data_sent: u32,
     pub op_data_rcvd: u32,
 }
 
 impl TestNodeGossipRoundStats {
     pub fn total_sent(&self) -> u32 {
-        self.region_data_sent + self.op_data_sent
+        self.regions_sent + self.op_data_sent
     }
 
     pub fn total_rcvd(&self) -> u32 {
-        self.region_data_rcvd + self.op_data_rcvd
+        self.regions_rcvd + self.op_data_rcvd
     }
 }

@@ -31,6 +31,24 @@ impl Arq {
     }
 }
 
+pub fn add_location_ascii(mut s: String, locs: Vec<Loc>) -> String {
+    let len = s.len();
+
+    let mut buf = vec![0; len];
+    for loc in locs {
+        let loc = loc_downscale(len, loc);
+        buf[loc] += 1;
+    }
+    for (i, v) in buf.into_iter().enumerate() {
+        if v > 0 {
+            // add hex representation of number of ops in this bucket
+            let c = format!("{:x}", v.min(0xf));
+            s.replace_range(i..i + 1, &c);
+        }
+    }
+    s
+}
+
 impl ArqBounds {
     /// Handy ascii representation of an arc, especially useful when
     /// looking at several arcs at once to get a sense of their overlap

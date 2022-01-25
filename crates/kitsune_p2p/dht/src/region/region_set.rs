@@ -65,6 +65,43 @@ pub enum RegionSet<T: TreeDataConstraints = RegionData> {
     Xtcs(RegionSetXtcs<T>),
 }
 
+
+impl<D: TreeDataConstraints> RegionSet<D> {
+    pub fn count(&self) -> usize {
+        match self {
+            Self::Xtcs(set) => set.count(),
+        }
+    }
+
+    /// can be used to pair the generated coords with stored data.
+    pub fn region_coords<'a>(&'a self) -> impl Iterator<Item = RegionCoords> + 'a {
+        match self {
+            Self::Xtcs(set) => set.coords.region_coords_flat().map(|(_, coords)| coords),
+        }
+    }
+
+    pub fn regions<'a>(&'a self) -> impl Iterator<Item = Region<D>> + 'a {
+        match self {
+            Self::Xtcs(set) => set.regions(),
+        }
+    }
+
+    /// Find a set of Regions which represents the intersection of the two
+    /// input RegionSets.
+    pub fn diff(self, other: Self) -> GossipResult<Vec<Region<D>>> {
+        match (self, other) {
+            (Self::Xtcs(left), Self::Xtcs(right)) => left.diff(right),
+        }
+        // Notes on a generic algorithm for the diff of generic regions:
+        // can we use a Fenwick tree to look up regions?
+        // idea:
+        // sort the regions by power (problem, there are two power)
+        // lookup the region to see if there's already a direct hit (most efficient if the sorting guarantees that larger regions get looked up later)
+        // PROBLEM: we *can't* resolve rectangles where one is not a subset of the other
+    }
+}
+
+
 /// Implementation for the compact XTCS region set format which gets sent over the wire.
 /// The coordinates for the regions are specified by a few values.
 /// The data to match the coordinates are specified in a 2D vector which must
@@ -148,34 +185,6 @@ impl<D: TreeDataConstraints> RegionSetXtcs<D> {
             .collect();
 
         Ok(regions)
-    }
-}
-
-impl<D: TreeDataConstraints> RegionSet<D> {
-    pub fn count(&self) -> usize {
-        match self {
-            Self::Xtcs(set) => set.count(),
-        }
-    }
-    /// can be used to pair the generated coords with stored data.
-    pub fn region_coords<'a>(&'a self) -> impl Iterator<Item = RegionCoords> + 'a {
-        match self {
-            Self::Xtcs(set) => set.coords.region_coords_flat().map(|(_, coords)| coords),
-        }
-    }
-
-    /// Find a set of Regions which represents the intersection of the two
-    /// input RegionSets.
-    pub fn diff(self, other: Self) -> GossipResult<Vec<Region<D>>> {
-        match (self, other) {
-            (Self::Xtcs(left), Self::Xtcs(right)) => left.diff(right),
-        }
-        // Notes on a generic algorithm for the diff of generic regions:
-        // can we use a Fenwick tree to look up regions?
-        // idea:
-        // sort the regions by power (problem, there are two power)
-        // lookup the region to see if there's already a direct hit (most efficient if the sorting guarantees that larger regions get looked up later)
-        // PROBLEM: we *can't* resolve rectangles where one is not a subset of the other
     }
 }
 

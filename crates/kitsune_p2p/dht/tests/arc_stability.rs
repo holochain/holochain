@@ -65,7 +65,7 @@ fn stability_test_case_messy() {
     std::env::set_var("RUST_LOG", "debug");
     observability::test_run().ok();
 
-    let detail = false;
+    let detail = true;
 
     let mut rng = seeded_rng(None);
     let n = 300;
@@ -122,6 +122,7 @@ fn parameterized_stability_test(strat: &ArqStrat, peers: Vec<Arq>, detail: bool)
         }
     }
 
+    tracing::debug!("{}", EpochStats::oneline_header());
     let eq = determine_equilibrium(1, peers.clone(), |peers| {
         let (peers, stats) = run_one_epoch(strat, peers, None, detail);
         tracing::debug!("{}", stats.oneline());

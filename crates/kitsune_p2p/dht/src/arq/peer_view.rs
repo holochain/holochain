@@ -6,6 +6,7 @@ use super::{is_full, Arq, ArqBounded, ArqBounds, ArqStrat};
 pub struct PeerView {
     /// The strategy which generated this view
     strat: ArqStrat,
+
     /// The peers in this view (TODO: replace with calculated values)
     peers: Vec<Arq>,
 

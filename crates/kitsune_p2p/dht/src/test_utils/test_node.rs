@@ -1,6 +1,6 @@
 use crate::{
     agent::AgentInfo,
-    arq::*,
+    arq::{ascii::add_location_ascii, *},
     coords::{GossipParams, TelescopingTimes, TimeCoord, Topology},
     hash::{fake_hash, AgentKey},
     host::{AccessOpStore, AccessPeerStore},
@@ -25,6 +25,11 @@ impl TestNode {
         }
     }
 
+    /// The Arq to use when gossiping
+    pub fn arq(&self) -> Arq {
+        self.agent_info.arq
+    }
+
     /// The ArqBounds to use when gossiping
     pub fn arq_bounds(&self) -> ArqBounds {
         self.agent_info.arq.to_bounds()
@@ -42,6 +47,21 @@ impl TestNode {
             })
             .collect::<Vec<_>>();
         RegionSetXtcs { coords, data }.into()
+    }
+
+    pub fn ascii_arq_and_ops(&self, i: usize, len: usize) -> String {
+        let arq = self.arq();
+        format!(
+            "|{}| {}: {}/{} @ {}",
+            add_location_ascii(
+                arq.to_ascii(len),
+                self.store.ops.iter().map(|o| o.loc).collect()
+            ),
+            i,
+            arq.power(),
+            arq.count(),
+            arq.center()
+        )
     }
 }
 

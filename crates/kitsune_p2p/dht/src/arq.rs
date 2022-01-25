@@ -5,7 +5,7 @@ mod peer_view;
 mod strat;
 
 #[cfg(feature = "testing")]
-mod ascii;
+pub mod ascii;
 
 use std::num::Wrapping;
 
@@ -65,7 +65,7 @@ pub trait ArqBounded: Sized {
 pub struct Arq {
     /// Location around which this coverage is centered
     center: Loc,
-    /// The level of quantization. Total ArqBoundsength is `2^grid * count`.
+    /// The level of quantization. Total ArqBounds length is `2^power * count`.
     /// The power must be between 0 and 31, inclusive.
     power: u8,
     /// The number of unit lengths.

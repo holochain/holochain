@@ -120,8 +120,8 @@ pub fn generate_ideal_coverage(
         .collect();
 
     let cov = actual_coverage(peers.iter());
-    let min = target - strat.buffer_width() / 2.0;
-    let max = target + strat.buffer_width() / 2.0;
+    let min = target / (strat.buffer + 1.0);
+    let max = min + strat.buffer_width();
     assert!(
         min <= cov && cov <= max,
         "Ideal coverage was generated incorrectly: !({} <= {} <= {})",

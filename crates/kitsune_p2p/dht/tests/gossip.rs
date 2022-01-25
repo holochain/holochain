@@ -1,6 +1,7 @@
 #![cfg(feature = "testing")]
 
 use kitsune_p2p_dht::{
+    arq::ascii::add_location_ascii,
     arq::*,
     coords::*,
     host::*,
@@ -37,8 +38,8 @@ fn test_basic() {
 
     let stats = gossip_direct((&mut alice, ta), (&mut bobbo, tb)).unwrap();
 
-    assert_eq!(stats.region_data_sent, 3 * nta * REGION_MASS);
-    assert_eq!(stats.region_data_rcvd, 3 * ntb * REGION_MASS);
+    assert_eq!(stats.regions_sent, 3 * nta);
+    assert_eq!(stats.regions_rcvd, 3 * ntb);
     assert_eq!(stats.op_data_sent, 4321);
     assert_eq!(stats.op_data_rcvd, 1234);
 }
@@ -48,38 +49,28 @@ fn test_gossip_scenario() {
     observability::test_run().ok();
     let topo = Topology::standard(Timestamp::from_micros(0));
     let gopa = GossipParams::new(1.into(), 0);
-    let ts = |t: u32| topo.timestamp(t.into());
 
     let mut rng = seeded_rng(None);
 
-    let strat = ArqStrat {
-        min_coverage: 5.0,
-        ..Default::default()
-    };
-
     // must be a power of 2.
     let pow = 4;
-    let n = 2usize.pow(pow); // 128;
+    let n = 2usize.pow(pow);
     let ops_per_node = 10;
+
+    let strat = ArqStrat {
+        min_coverage: n as f64,
+        ..Default::default()
+    };
 
     let max_time = topo.timestamp(TimeCoord::from(525600 / 12)); // 1 year
 
     let arqs = generate_ideal_coverage(&mut rng, &strat, None, n as u32, 0.0, 0);
-    for (i, arq) in arqs.iter().enumerate() {
-        println!(
-            "|{}| {}: {}/{} @ {}",
-            arq.to_ascii(64),
-            i,
-            arq.power(),
-            arq.count(),
-            arq.center()
-        );
-    }
     let mut nodes: Vec<_> = arqs
         .iter()
         .map(|a| TestNode::new(topo.clone(), gopa, *a))
         .collect();
 
+    let num_ops = ops_per_node * n;
     let ops = std::iter::repeat_with(|| {
         OpData::fake(
             Loc::new(rng.gen()),
@@ -87,7 +78,7 @@ fn test_gossip_scenario() {
             rng.gen_range(1..16_000_000),
         )
     })
-    .take(n as usize * ops_per_node);
+    .take(num_ops);
 
     for (i, op) in ops.enumerate() {
         nodes[i % n].integrate_op(op);
@@ -97,33 +88,54 @@ fn test_gossip_scenario() {
         x: (0.into(), u32::MAX.into()),
         t: (0.into(), u32::MAX.into()),
     };
+
     assert_eq!(
         nodes
             .iter()
-            .map(|n| n.query_op_data(&full_region).len())
+            .enumerate()
+            .map(|(i, n)| {
+                let arq = n.arq();
+                let ops = n.query_op_data(&full_region);
+                println!("{}", n.ascii_arq_and_ops(i, 64));
+                ops.len()
+            })
             .collect::<Vec<_>>(),
         vec![ops_per_node; n]
     );
 
-    for p in 1..pow {
-        let x: usize = 2usize.pow(p);
-        for i in (0..n / x).step_by(x) {
-            let a = i;
-            let b = i + x / 2;
-            dbg!("{}, {}", a, b);
-            let (n1, n2) = get_two_mut(nodes.as_mut_slice(), a, b);
+    {
+        {
+            let (n1, n2) = get_two_mut(nodes.as_mut_slice(), 0, 1);
             let stats = gossip_direct_at(n1, n2, topo.time_coord(max_time)).unwrap();
-            dbg!(stats);
+            assert_eq!(stats.ops_sent, ops_per_node as u32);
+            assert_eq!(stats.ops_rcvd, ops_per_node as u32);
+        }
+        println!("vvvvvvvvvvvvvvvvvvvvvvvvvvv");
+        for (i, n) in nodes.iter().take(2).enumerate() {
+            println!("{}", n.ascii_arq_and_ops(i, 64));
         }
     }
 
-    assert_eq!(
-        nodes
-            .iter()
-            .map(|n| n.query_op_data(&full_region).len())
-            .collect::<Vec<_>>(),
-        vec![ops_per_node * n; n]
-    )
+    // Do a bunch of gossip such that node 0 will be exposed to all ops created
+    for p in 0..pow {
+        let x: usize = 2usize.pow(p + 1);
+        for i in (0..n).step_by(x) {
+            let a = i;
+            let b = i + x / 2;
+            let (n1, n2) = get_two_mut(nodes.as_mut_slice(), a, b);
+            let stats = gossip_direct_at(n1, n2, topo.time_coord(max_time)).unwrap();
+            println!(
+                "{:>2} <-> {:<2}  regions sent/rcvd: {}/{}, ops sent/rcvd: {:3}/{:3}",
+                a, b, stats.regions_sent, stats.regions_rcvd, stats.ops_sent, stats.ops_rcvd
+            );
+        }
+    }
+
+    for (i, n) in nodes.iter().enumerate() {
+        println!("{}", n.ascii_arq_and_ops(i, 64));
+    }
+
+    assert_eq!(nodes[0].query_op_data(&full_region).len(), num_ops);
 }
 
 /// from https://www.reddit.com/r/rust/comments/7dep46/multiple_references_to_a_vectors_elements/

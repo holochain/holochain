@@ -1,6 +1,6 @@
 use kitsune_p2p_dht_arc::DhtArcSet;
 
-use crate::{arq::ArqBounds, coords::SpaceCoord};
+use crate::arq::ArqBounds;
 
 use super::{Arq, ArqBounded};
 
@@ -86,8 +86,6 @@ impl<A: ArqBounded> ArqSetImpl<A> {
     }
 
     pub fn intersection(&self, other: &Self) -> ArqSetImpl<ArqBounds> {
-        use gcollections::ops::*;
-        use interval::interval_set::*;
         let power = self.power.min(other.power());
         let a1 = self.requantize(power).unwrap().to_dht_arc_set();
         let a2 = other.requantize(power).unwrap().to_dht_arc_set();
@@ -95,9 +93,7 @@ impl<A: ArqBounded> ArqSetImpl<A> {
             arqs: DhtArcSet::intersection(&a1, &a2)
                 .intervals()
                 .into_iter()
-                .map(|interval| {
-                    ArqBounds::from_interval(dbg!(power), dbg!(interval)).expect("cannot fail")
-                })
+                .map(|interval| ArqBounds::from_interval(power, interval).expect("cannot fail"))
                 .collect(),
             power,
         }

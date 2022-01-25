@@ -30,6 +30,7 @@ impl<D: TreeDataConstraints, O: OpRegion<D>> AccessOpStore<D, O> for OpStore<D, 
     fn query_op_data(&self, region: &RegionBounds) -> Vec<Arc<O>> {
         let (x0, x1) = region.x;
         let (t0, t1) = region.t;
+        let topo = self.topo();
         let op0 = O::bound(Timestamp::from_micros(*t0 as i64), Loc::from(*x0));
         let op1 = O::bound(Timestamp::from_micros(*t1 as i64), Loc::from(*x1));
         self.ops
