@@ -85,7 +85,6 @@ pub fn call_info(
 pub mod test {
     use crate::conductor::ConductorBuilder;
     use crate::core::ribosome::MockDnaStore;
-    use crate::fixt::ZomeCallHostAccessFixturator;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
     use ::fixt::prelude::*;
@@ -93,11 +92,44 @@ pub mod test {
     use holochain_zome_types::prelude::*;
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn invoke_import_call_info_test() {
-        let host_access = fixt!(ZomeCallHostAccess, Predictable);
-        let call_info: CallInfo =
-            crate::call_test_ribosome!(host_access, TestWasm::ZomeInfo, "call_info", ()).unwrap();
-        assert_eq!(call_info.as_at.1, 2);
+    async fn call_info_test() {
+        observability::test_run().ok();
+        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::ZomeInfo])
+            .await
+            .unwrap();
+
+        let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
+        let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
+
+        let mut dna_store = MockDnaStore::new();
+        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
+        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
+        dna_store.expect_add_dna().return_const(());
+        dna_store
+            .expect_get()
+            .return_const(Some(dna_file.clone().into()));
+        dna_store
+            .expect_get_entry_def()
+            .return_const(EntryDef::default_with_id("thing"));
+
+        let mut conductor =
+            SweetConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
+
+        let apps = conductor
+            .setup_app_for_agents(
+                "app-",
+                &[alice_pubkey.clone(), bob_pubkey.clone()],
+                &[dna_file.into()],
+            )
+            .await
+            .unwrap();
+
+        let ((alice,), (bobbo,)) = apps.into_tuples();
+        let alice = alice.zome(TestWasm::ZomeInfo);
+        let _bobbo = bobbo.zome(TestWasm::ZomeInfo);
+
+        let call_info: CallInfo = conductor.call(&alice, "call_info", ()).await;
+        assert_eq!(call_info.as_at.1, 3);
     }
 
     #[tokio::test(flavor = "multi_thread")]

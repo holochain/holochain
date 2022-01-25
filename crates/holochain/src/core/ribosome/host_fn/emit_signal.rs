@@ -16,7 +16,7 @@ pub fn emit_signal(
         HostFnAccess{ write_workspace: Permission::Allow, .. } => {
             let cell_id = CellId::new(
                 ribosome.dna_def().as_hash().clone(),
-                call_context.host_context.workspace().source_chain().agent_pubkey().clone(),
+                call_context.host_context.workspace().source_chain().as_ref().expect("Must have a source chain to emit signals").agent_pubkey().clone(),
             );
             // call_context.host_context().cell_id().clone();
             let signal = Signal::App(cell_id, input);

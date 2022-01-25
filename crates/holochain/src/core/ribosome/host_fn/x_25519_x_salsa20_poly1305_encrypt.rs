@@ -44,79 +44,79 @@ pub fn x_25519_x_salsa20_poly1305_encrypt(
     }
 }
 
-#[cfg(test)]
-#[cfg(feature = "slow_tests")]
-pub mod wasm_test {
+// #[cfg(test)]
+// #[cfg(feature = "slow_tests")]
+// pub mod wasm_test {
 
-    use crate::fixt::ZomeCallHostAccessFixturator;
-    use ::fixt::prelude::*;
-    use hdk::prelude::*;
-    // use holochain_state::host_fn_workspace::HostFnWorkspace;
-    use holochain_wasm_test_utils::TestWasm;
+//     use crate::fixt::ZomeCallHostAccessFixturator;
+//     use ::fixt::prelude::*;
+//     use hdk::prelude::*;
+//     // use holochain_state::host_fn_workspace::HostFnWorkspace;
+//     use holochain_wasm_test_utils::TestWasm;
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn invoke_import_x_25519_x_salsa20_poly1305_encrypt_test() {
-        let host_access = fixt!(ZomeCallHostAccess, Predictable);
-        let alice: X25519PubKey = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::XSalsa20Poly1305,
-            "create_x25519_keypair",
-            ()
-        ).unwrap();
-        let bob: X25519PubKey = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::XSalsa20Poly1305,
-            "create_x25519_keypair",
-            ()
-        ).unwrap();
-        let carol: X25519PubKey = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::XSalsa20Poly1305,
-            "create_x25519_keypair",
-            ()
-        ).unwrap();
+//     #[tokio::test(flavor = "multi_thread")]
+//     async fn invoke_import_x_25519_x_salsa20_poly1305_encrypt_test() {
+//         let host_access = fixt!(ZomeCallHostAccess, Predictable);
+//         let alice: X25519PubKey = crate::call_test_ribosome!(
+//             host_access,
+//             TestWasm::XSalsa20Poly1305,
+//             "create_x25519_keypair",
+//             ()
+//         ).unwrap();
+//         let bob: X25519PubKey = crate::call_test_ribosome!(
+//             host_access,
+//             TestWasm::XSalsa20Poly1305,
+//             "create_x25519_keypair",
+//             ()
+//         ).unwrap();
+//         let carol: X25519PubKey = crate::call_test_ribosome!(
+//             host_access,
+//             TestWasm::XSalsa20Poly1305,
+//             "create_x25519_keypair",
+//             ()
+//         ).unwrap();
 
-        let data = XSalsa20Poly1305Data::from(vec![1, 2, 3, 4]);
+//         let data = XSalsa20Poly1305Data::from(vec![1, 2, 3, 4]);
 
-        let encrypt_input =
-            X25519XSalsa20Poly1305Encrypt::new(alice.clone(), bob.clone(), data.clone());
+//         let encrypt_input =
+//             X25519XSalsa20Poly1305Encrypt::new(alice.clone(), bob.clone(), data.clone());
 
-        let encrypt_output: XSalsa20Poly1305EncryptedData = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::XSalsa20Poly1305,
-            "x_25519_x_salsa20_poly1305_encrypt",
-            encrypt_input
-        ).unwrap();
+//         let encrypt_output: XSalsa20Poly1305EncryptedData = crate::call_test_ribosome!(
+//             host_access,
+//             TestWasm::XSalsa20Poly1305,
+//             "x_25519_x_salsa20_poly1305_encrypt",
+//             encrypt_input
+//         ).unwrap();
 
-        let decrypt_input =
-            holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt::new(
-                bob.clone(),
-                alice.clone(),
-                encrypt_output.clone(),
-            );
+//         let decrypt_input =
+//             holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt::new(
+//                 bob.clone(),
+//                 alice.clone(),
+//                 encrypt_output.clone(),
+//             );
 
-        let decrypt_output: Option<XSalsa20Poly1305Data> = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::XSalsa20Poly1305,
-            "x_25519_x_salsa20_poly1305_decrypt",
-            decrypt_input
-        ).unwrap();
+//         let decrypt_output: Option<XSalsa20Poly1305Data> = crate::call_test_ribosome!(
+//             host_access,
+//             TestWasm::XSalsa20Poly1305,
+//             "x_25519_x_salsa20_poly1305_decrypt",
+//             decrypt_input
+//         ).unwrap();
 
-        assert_eq!(decrypt_output, Some(data.clone()),);
+//         assert_eq!(decrypt_output, Some(data.clone()),);
 
-        let bad_decrypt_input =
-            holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt::new(
-                carol.clone(),
-                alice.clone(),
-                encrypt_output,
-            );
-        let bad_decrypt_output: Result<Option<XSalsa20Poly1305Data>, _> = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::XSalsa20Poly1305,
-            "x_25519_x_salsa20_poly1305_decrypt",
-            bad_decrypt_input
-        );
+//         let bad_decrypt_input =
+//             holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt::new(
+//                 carol.clone(),
+//                 alice.clone(),
+//                 encrypt_output,
+//             );
+//         let bad_decrypt_output: Result<Option<XSalsa20Poly1305Data>, _> = crate::call_test_ribosome!(
+//             host_access,
+//             TestWasm::XSalsa20Poly1305,
+//             "x_25519_x_salsa20_poly1305_decrypt",
+//             bad_decrypt_input
+//         );
 
-        assert!(bad_decrypt_output.is_err());
-    }
-}
+//         assert!(bad_decrypt_output.is_err());
+//     }
+// }

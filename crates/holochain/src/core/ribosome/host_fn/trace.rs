@@ -41,11 +41,14 @@ pub mod wasm_test {
 
     use crate::fixt::CallContextFixturator;
     use crate::fixt::RealRibosomeFixturator;
-    use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::prelude::*;
     use std::sync::Arc;
+    use crate::sweettest::SweetDnaFile;
+    use crate::core::ribosome::MockDnaStore;
+    use crate::conductor::ConductorBuilder;
+    use crate::sweettest::SweetConductor;
 
     /// we can get an entry hash out of the fn directly
     #[tokio::test(flavor = "multi_thread")]
@@ -68,10 +71,41 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn wasm_trace_test() {
-        let host_access = fixt!(ZomeCallHostAccess, Predictable);
+        observability::test_run().ok();
+        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Debug])
+            .await
+            .unwrap();
 
-        // this shows that we can get line numbers out of wasm
-        let output: () = crate::call_test_ribosome!(host_access, TestWasm::Debug, "debug", ()).unwrap();
-        assert_eq!(output, ());
+        let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
+        let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
+
+        let mut dna_store = MockDnaStore::new();
+        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
+        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
+        dna_store.expect_add_dna().return_const(());
+        dna_store
+            .expect_get()
+            .return_const(Some(dna_file.clone().into()));
+        dna_store
+            .expect_get_entry_def()
+            .return_const(EntryDef::default_with_id("thing"));
+
+        let mut conductor =
+            SweetConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
+
+        let apps = conductor
+            .setup_app_for_agents(
+                "app-",
+                &[alice_pubkey.clone(), bob_pubkey.clone()],
+                &[dna_file.into()],
+            )
+            .await
+            .unwrap();
+
+        let ((alice,), (bobbo,)) = apps.into_tuples();
+        let alice = alice.zome(TestWasm::Debug);
+        let _bobbo = bobbo.zome(TestWasm::Debug);
+
+        let _: () = conductor.call(&alice, "debug", ()).await;
     }
 }

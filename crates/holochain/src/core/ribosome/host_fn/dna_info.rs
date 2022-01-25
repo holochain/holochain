@@ -35,19 +35,19 @@ pub fn dna_info(
     }
 }
 
-#[cfg(test)]
-#[cfg(feature = "slow_tests")]
-pub mod test {
-    use crate::fixt::ZomeCallHostAccessFixturator;
-    use ::fixt::prelude::*;
-    use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::prelude::*;
+// #[cfg(test)]
+// #[cfg(feature = "slow_tests")]
+// pub mod test {
+//     use crate::fixt::ZomeCallHostAccessFixturator;
+//     use ::fixt::prelude::*;
+//     use holochain_wasm_test_utils::TestWasm;
+//     use holochain_zome_types::prelude::*;
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn invoke_import_dna_info_test() {
-        let host_access = fixt!(ZomeCallHostAccess, Predictable);
-        let dna_info: DnaInfo =
-            crate::call_test_ribosome!(host_access, TestWasm::ZomeInfo, "dna_info", ()).unwrap();
-        assert_eq!(dna_info.name, String::from("test"));
-    }
-}
+//     #[tokio::test(flavor = "multi_thread")]
+//     async fn invoke_import_dna_info_test() {
+//         let host_access = fixt!(ZomeCallHostAccess, Predictable);
+//         let dna_info: DnaInfo =
+//             crate::call_test_ribosome!(host_access, TestWasm::ZomeInfo, "dna_info", ()).unwrap();
+//         assert_eq!(dna_info.name, String::from("test"));
+//     }
+// }

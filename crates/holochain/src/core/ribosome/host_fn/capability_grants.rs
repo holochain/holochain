@@ -16,7 +16,7 @@ pub fn capability_grants(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::fixt::ZomeCallHostAccessFixturator;
+    // use crate::fixt::ZomeCallHostAccessFixturator;
     use crate::sweettest::SweetDnaFile;
     use crate::{conductor::ConductorBuilder, sweettest::SweetConductor};
     use ::fixt::prelude::*;
@@ -29,47 +29,47 @@ pub mod wasm_test {
 
     use matches::assert_matches;
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn ribosome_capability_secret_test<'a>() {
-        observability::test_run().ok();
-        let host_access = fixt!(ZomeCallHostAccess, Predictable);
+    // #[tokio::test(flavor = "multi_thread")]
+    // async fn ribosome_capability_secret_test<'a>() {
+    //     observability::test_run().ok();
+    //     let host_access = fixt!(ZomeCallHostAccess, Predictable);
 
-        let _: CapSecret =
-            crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ())
-                .unwrap();
-    }
+    //     let _: CapSecret =
+    //         crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ())
+    //             .unwrap();
+    // }
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn ribosome_transferable_cap_grant<'a>() {
-        observability::test_run().ok();
-        let host_access = fixt!(ZomeCallHostAccess, Predictable);
+    // #[tokio::test(flavor = "multi_thread")]
+    // async fn ribosome_transferable_cap_grant<'a>() {
+    //     observability::test_run().ok();
+    //     let host_access = fixt!(ZomeCallHostAccess, Predictable);
 
-        let secret: CapSecret =
-            crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ())
-                .unwrap();
-        let header: HeaderHash = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::Capability,
-            "transferable_cap_grant",
-            secret
-        )
-        .unwrap();
-        let maybe_element: Option<Element> =
-            crate::call_test_ribosome!(host_access, TestWasm::Capability, "get_entry", header)
-                .unwrap();
+    //     let secret: CapSecret =
+    //         crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ())
+    //             .unwrap();
+    //     let header: HeaderHash = crate::call_test_ribosome!(
+    //         host_access,
+    //         TestWasm::Capability,
+    //         "transferable_cap_grant",
+    //         secret
+    //     )
+    //     .unwrap();
+    //     let maybe_element: Option<Element> =
+    //         crate::call_test_ribosome!(host_access, TestWasm::Capability, "get_entry", header)
+    //             .unwrap();
 
-        let entry_secret: CapSecret = match maybe_element {
-            Some(element) => {
-                let cap_grant_entry: CapGrantEntry = element.entry().to_grant_option().unwrap();
-                match cap_grant_entry.access {
-                    CapAccess::Transferable { secret, .. } => secret,
-                    _ => unreachable!(),
-                }
-            }
-            _ => unreachable!(),
-        };
-        assert_eq!(entry_secret, secret,);
-    }
+    //     let entry_secret: CapSecret = match maybe_element {
+    //         Some(element) => {
+    //             let cap_grant_entry: CapGrantEntry = element.entry().to_grant_option().unwrap();
+    //             match cap_grant_entry.access {
+    //                 CapAccess::Transferable { secret, .. } => secret,
+    //                 _ => unreachable!(),
+    //             }
+    //         }
+    //         _ => unreachable!(),
+    //     };
+    //     assert_eq!(entry_secret, secret,);
+    // }
 
     // MAYBE: [ B-03669 ] can move this to an integration test (may need to switch to using a RealDnaStore)
     #[tokio::test(flavor = "multi_thread")]

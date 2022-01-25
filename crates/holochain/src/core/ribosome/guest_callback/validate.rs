@@ -294,10 +294,12 @@ mod slow_tests {
     use crate::fixt::*;
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
-    use holochain_state::source_chain::SourceChainResult;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use std::sync::Arc;
+    use crate::sweettest::SweetAgents;
+    use crate::sweettest::SweetConductor;
+    use crate::sweettest::SweetDnaFile;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_unimplemented() {
@@ -374,52 +376,32 @@ mod slow_tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn pass_validate_test<'a>() {
-        let host_access = fixt!(ZomeCallHostAccess, Predictable);
+    async fn pass_validate_test() {
+        observability::test_run().ok();
+        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Validate])
+            .await
+            .unwrap();
 
-        let output: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Validate, "always_validates", ())
-                .unwrap();
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let (alice_pubkey, bob_pubkey) = SweetAgents::two(conductor.keystore()).await;
 
-        // the chain head should be the committed entry header
-        let chain_head = tokio_helper::block_forever_on(async move {
-            SourceChainResult::Ok(
-                host_access
-                    .workspace
-                    .source_chain()
-                    .as_ref()
-                    .unwrap()
-                    .chain_head()?
-                    .0,
+        let apps = conductor
+            .setup_app_for_agents(
+                "app-",
+                &[alice_pubkey.clone(), bob_pubkey.clone()],
+                &[dna_file.into()],
             )
-        })
-        .unwrap();
+            .await
+            .unwrap();
 
-        assert_eq!(chain_head, output);
-    }
+        let ((alice,), (bobbo,)) = apps.into_tuples();
+        let alice = alice.zome(TestWasm::Validate);
+        let _bobbo = bobbo.zome(TestWasm::Validate);
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn fail_validate_test<'a>() {
-        let host_access = fixt!(ZomeCallHostAccess, Predictable);
+        let output: HeaderHash = conductor.call(&alice, "always_validates", ()).await;
+        let _output_element: Element = conductor.call(&alice, "must_get_valid_element", output).await;
 
-        let output: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Validate, "never_validates", ())
-                .unwrap();
-
-        // the chain head should be the committed entry header
-        let chain_head = tokio_helper::block_forever_on(async move {
-            SourceChainResult::Ok(
-                host_access
-                    .workspace
-                    .source_chain()
-                    .as_ref()
-                    .unwrap()
-                    .chain_head()?
-                    .0,
-            )
-        })
-        .unwrap();
-
-        assert_eq!(chain_head, output);
+        let invalid_output: Result<HeaderHash, _> = conductor.call_fallible(&alice, "never_validates", ()).await;
+        assert!(invalid_output.is_err());
     }
 }

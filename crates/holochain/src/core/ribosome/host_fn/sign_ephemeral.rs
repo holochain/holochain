@@ -44,57 +44,57 @@ pub fn sign_ephemeral(
 
 }
 
-#[cfg(test)]
-#[cfg(feature = "slow_tests")]
-pub mod wasm_test {
-    use crate::fixt::ZomeCallHostAccessFixturator;
-    use ::fixt::prelude::*;
-    use hdk::prelude::*;
-    use holochain_keystore::AgentPubKeyExt;
-    use holochain_wasm_test_utils::TestWasm;
+// #[cfg(test)]
+// #[cfg(feature = "slow_tests")]
+// pub mod wasm_test {
+//     use crate::fixt::ZomeCallHostAccessFixturator;
+//     use ::fixt::prelude::*;
+//     use hdk::prelude::*;
+//     use holochain_keystore::AgentPubKeyExt;
+//     use holochain_wasm_test_utils::TestWasm;
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn ribosome_sign_ephemeral_test() {
-        let host_access = fixt!(ZomeCallHostAccess, Predictable);
+//     #[tokio::test(flavor = "multi_thread")]
+//     async fn ribosome_sign_ephemeral_test() {
+//         let host_access = fixt!(ZomeCallHostAccess, Predictable);
 
-        let output: Vec<EphemeralSignatures> =
-            crate::call_test_ribosome!(host_access, TestWasm::Sign, "sign_ephemeral", ()).unwrap();
+//         let output: Vec<EphemeralSignatures> =
+//             crate::call_test_ribosome!(host_access, TestWasm::Sign, "sign_ephemeral", ()).unwrap();
 
-        #[derive(Serialize, Deserialize, Debug)]
-        struct One([u8; 2]);
-        #[derive(Serialize, Deserialize, Debug)]
-        struct Two([u8; 2]);
+//         #[derive(Serialize, Deserialize, Debug)]
+//         struct One([u8; 2]);
+//         #[derive(Serialize, Deserialize, Debug)]
+//         struct Two([u8; 2]);
 
-        assert!(output[0]
-            .key
-            .verify_signature_raw(
-                &output[0].signatures[0],
-                holochain_serialized_bytes::encode(&One([1, 2])).unwrap().into()
-            )
-            .await);
+//         assert!(output[0]
+//             .key
+//             .verify_signature_raw(
+//                 &output[0].signatures[0],
+//                 holochain_serialized_bytes::encode(&One([1, 2])).unwrap().into()
+//             )
+//             .await);
 
-        assert!(output[0]
-            .key
-            .verify_signature_raw(
-                &output[0].signatures[1],
-                holochain_serialized_bytes::encode(&One([3, 4])).unwrap().into()
-            )
-            .await);
+//         assert!(output[0]
+//             .key
+//             .verify_signature_raw(
+//                 &output[0].signatures[1],
+//                 holochain_serialized_bytes::encode(&One([3, 4])).unwrap().into()
+//             )
+//             .await);
 
-        assert!(output[1]
-            .key
-            .verify_signature_raw(
-                &output[1].signatures[0],
-                holochain_serialized_bytes::encode(&One([1, 2])).unwrap().into()
-            )
-            .await);
+//         assert!(output[1]
+//             .key
+//             .verify_signature_raw(
+//                 &output[1].signatures[0],
+//                 holochain_serialized_bytes::encode(&One([1, 2])).unwrap().into()
+//             )
+//             .await);
 
-        assert!(output[1]
-            .key
-            .verify_signature_raw(
-                &output[1].signatures[1],
-                holochain_serialized_bytes::encode(&Two([2, 3])).unwrap().into()
-            )
-            .await);
-    }
-}
+//         assert!(output[1]
+//             .key
+//             .verify_signature_raw(
+//                 &output[1].signatures[1],
+//                 holochain_serialized_bytes::encode(&Two([2, 3])).unwrap().into()
+//             )
+//             .await);
+//     }
+// }

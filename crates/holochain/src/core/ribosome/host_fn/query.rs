@@ -35,35 +35,35 @@ pub fn query(
     }
 }
 
-#[cfg(test)]
-#[cfg(feature = "slow_tests")]
-pub mod slow_tests {
-    use crate::fixt::ZomeCallHostAccessFixturator;
-    use ::fixt::prelude::*;
-    use hdk::prelude::*;
-    use query::ChainQueryFilter;
+// #[cfg(test)]
+// #[cfg(feature = "slow_tests")]
+// pub mod slow_tests {
+//     use crate::fixt::ZomeCallHostAccessFixturator;
+//     use ::fixt::prelude::*;
+//     use hdk::prelude::*;
+//     use query::ChainQueryFilter;
 
-    use holochain_wasm_test_utils::TestWasm;
+//     use holochain_wasm_test_utils::TestWasm;
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn query_smoke_test() {
-        let host_access = fixt!(ZomeCallHostAccess, Predictable);
+//     #[tokio::test(flavor = "multi_thread")]
+//     async fn query_smoke_test() {
+//         let host_access = fixt!(ZomeCallHostAccess, Predictable);
 
-        let _hash_a: EntryHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Query, "add_path", "a".to_string())
-                .unwrap();
-        let _hash_b: EntryHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Query, "add_path", "b".to_string())
-                .unwrap();
+//         let _hash_a: EntryHash =
+//             crate::call_test_ribosome!(host_access, TestWasm::Query, "add_path", "a".to_string())
+//                 .unwrap();
+//         let _hash_b: EntryHash =
+//             crate::call_test_ribosome!(host_access, TestWasm::Query, "add_path", "b".to_string())
+//                 .unwrap();
 
-        let elements: Vec<Element> = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::Query,
-            "query",
-            ChainQueryFilter::default()
-        )
-        .unwrap();
+//         let elements: Vec<Element> = crate::call_test_ribosome!(
+//             host_access,
+//             TestWasm::Query,
+//             "query",
+//             ChainQueryFilter::default()
+//         )
+//         .unwrap();
 
-        assert_eq!(elements.len(), 5);
-    }
-}
+//         assert_eq!(elements.len(), 5);
+//     }
+// }

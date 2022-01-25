@@ -25,18 +25,18 @@ pub fn sys_time(
     }
 }
 
-#[cfg(test)]
-#[cfg(feature = "slow_tests")]
-pub mod wasm_test {
-    use crate::fixt::ZomeCallHostAccessFixturator;
-    use ::fixt::prelude::*;
-    use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::Timestamp;
+// #[cfg(test)]
+// #[cfg(feature = "slow_tests")]
+// pub mod wasm_test {
+//     use crate::fixt::ZomeCallHostAccessFixturator;
+//     use ::fixt::prelude::*;
+//     use holochain_wasm_test_utils::TestWasm;
+//     use holochain_zome_types::Timestamp;
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn invoke_import_sys_time_test() {
-        let host_access = fixt!(ZomeCallHostAccess, Predictable);
-        let _: Timestamp =
-            crate::call_test_ribosome!(host_access, TestWasm::SysTime, "sys_time", ()).unwrap();
-    }
-}
+//     #[tokio::test(flavor = "multi_thread")]
+//     async fn invoke_import_sys_time_test() {
+//         let host_access = fixt!(ZomeCallHostAccess, Predictable);
+//         let _: Timestamp =
+//             crate::call_test_ribosome!(host_access, TestWasm::SysTime, "sys_time", ()).unwrap();
+//     }
+// }

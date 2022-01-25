@@ -195,49 +195,49 @@ pub mod wasm_test {
         assert_eq!(chain_head, output);
     }
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn ribosome_create_entry_test<'a>() {
-        observability::test_run().ok();
-        let host_access = fixt!(ZomeCallHostAccess, Predictable);
+    // #[tokio::test(flavor = "multi_thread")]
+    // async fn ribosome_create_entry_test<'a>() {
+    //     observability::test_run().ok();
+    //     let host_access = fixt!(ZomeCallHostAccess, Predictable);
 
-        // get the result of a commit entry
-        let output: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Create, "create_entry", ()).unwrap();
+    //     // get the result of a commit entry
+    //     let output: HeaderHash =
+    //         crate::call_test_ribosome!(host_access, TestWasm::Create, "create_entry", ()).unwrap();
 
-        // the chain head should be the committed entry header
-        let host_access_2 = host_access.clone();
-        let chain_head = tokio_helper::block_forever_on(async move {
-            SourceChainResult::Ok(
-                host_access_2
-                    .workspace
-                    .source_chain()
-                    .as_ref()
-                    .unwrap()
-                    .chain_head()?
-                    .0,
-            )
-        })
-        .unwrap();
+    //     // the chain head should be the committed entry header
+    //     let host_access_2 = host_access.clone();
+    //     let chain_head = tokio_helper::block_forever_on(async move {
+    //         SourceChainResult::Ok(
+    //             host_access_2
+    //                 .workspace
+    //                 .source_chain()
+    //                 .as_ref()
+    //                 .unwrap()
+    //                 .chain_head()?
+    //                 .0,
+    //         )
+    //     })
+    //     .unwrap();
 
-        assert_eq!(&chain_head, &output);
+    //     assert_eq!(&chain_head, &output);
 
-        let round: Option<Element> =
-            crate::call_test_ribosome!(host_access, TestWasm::Create, "get_entry", ()).unwrap();
+    //     let round: Option<Element> =
+    //         crate::call_test_ribosome!(host_access, TestWasm::Create, "get_entry", ()).unwrap();
 
-        let bytes: Vec<u8> = match round.clone().and_then(|el| el.into()) {
-            Some(holochain_zome_types::entry::Entry::App(entry_bytes)) => {
-                entry_bytes.bytes().to_vec()
-            }
-            other => panic!("unexpected output: {:?}", other),
-        };
-        // this should be the content "foo" of the committed post
-        assert_eq!(vec![163, 102, 111, 111], bytes);
+    //     let bytes: Vec<u8> = match round.clone().and_then(|el| el.into()) {
+    //         Some(holochain_zome_types::entry::Entry::App(entry_bytes)) => {
+    //             entry_bytes.bytes().to_vec()
+    //         }
+    //         other => panic!("unexpected output: {:?}", other),
+    //     };
+    //     // this should be the content "foo" of the committed post
+    //     assert_eq!(vec![163, 102, 111, 111], bytes);
 
-        let round_twice: Vec<Option<Element>> =
-            crate::call_test_ribosome!(host_access, TestWasm::Create, "get_entry_twice", ())
-                .unwrap();
-        assert_eq!(round_twice, vec![round.clone(), round],);
-    }
+    //     let round_twice: Vec<Option<Element>> =
+    //         crate::call_test_ribosome!(host_access, TestWasm::Create, "get_entry_twice", ())
+    //             .unwrap();
+    //     assert_eq!(round_twice, vec![round.clone(), round],);
+    // }
 
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "david.b (this test is flaky)"]
