@@ -292,14 +292,14 @@ mod slow_tests {
     use crate::core::ribosome::ZomesToInvoke;
     use crate::fixt::curve::Zomes;
     use crate::fixt::*;
+    use crate::sweettest::SweetAgents;
+    use crate::sweettest::SweetConductor;
+    use crate::sweettest::SweetDnaFile;
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use std::sync::Arc;
-    use crate::sweettest::SweetAgents;
-    use crate::sweettest::SweetConductor;
-    use crate::sweettest::SweetDnaFile;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_unimplemented() {
@@ -399,9 +399,12 @@ mod slow_tests {
         let _bobbo = bobbo.zome(TestWasm::Validate);
 
         let output: HeaderHash = conductor.call(&alice, "always_validates", ()).await;
-        let _output_element: Element = conductor.call(&alice, "must_get_valid_element", output).await;
+        let _output_element: Element = conductor
+            .call(&alice, "must_get_valid_element", output)
+            .await;
 
-        let invalid_output: Result<HeaderHash, _> = conductor.call_fallible(&alice, "never_validates", ()).await;
+        let invalid_output: Result<HeaderHash, _> =
+            conductor.call_fallible(&alice, "never_validates", ()).await;
         assert!(invalid_output.is_err());
     }
 }

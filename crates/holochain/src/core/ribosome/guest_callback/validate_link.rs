@@ -296,13 +296,13 @@ mod slow_tests {
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
     use crate::fixt::*;
+    use crate::sweettest::SweetAgents;
+    use crate::sweettest::SweetConductor;
+    use crate::sweettest::SweetDnaFile;
     use ::fixt::prelude::*;
     use holo_hash::HeaderHash;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use crate::sweettest::SweetAgents;
-    use crate::sweettest::SweetConductor;
-    use crate::sweettest::SweetDnaFile;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_link_add_unimplemented() {
@@ -363,7 +363,6 @@ mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn pass_validate_link_add_test<'a>() {
-
         observability::test_run().ok();
         let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::ValidateLink])
             .await
@@ -386,9 +385,13 @@ mod slow_tests {
         let _bobbo = bobbo.zome(TestWasm::ValidateLink);
 
         let output: HeaderHash = conductor.call(&alice, "add_valid_link", ()).await;
-        let _element: Element = conductor.call(&alice, "must_get_valid_element", output).await;
+        let _element: Element = conductor
+            .call(&alice, "must_get_valid_element", output)
+            .await;
 
-        let invalid_output: Result<HeaderHash, _> = conductor.call_fallible(&alice, "add_invalid_link", ()).await;
+        let invalid_output: Result<HeaderHash, _> = conductor
+            .call_fallible(&alice, "add_invalid_link", ())
+            .await;
         assert!(invalid_output.is_err());
     }
 }
