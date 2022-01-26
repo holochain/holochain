@@ -49,55 +49,51 @@ pub mod wasm_test {
         assert_eq!(*output.hash_type(), holo_hash::hash_type::Entry);
     }
 
-    // #[tokio::test(flavor = "multi_thread")]
-    // /// we can get an entry hash out of the fn via. a wasm call
-    // async fn ribosome_hash_entry_test() {
-    //     let input = EntryFixturator::new(::fixt::Predictable).next().unwrap();
-    //     let host_access = fixt!(ZomeCallHostAccess, Predictable);
-    //     let output: EntryHash =
-    //         crate::call_test_ribosome!(host_access, TestWasm::HashEntry, "hash_entry", input).unwrap();
-    //     assert_eq!(*output.hash_type(), holo_hash::hash_type::Entry);
+    #[tokio::test(flavor = "multi_thread")]
+    /// we can get an entry hash out of the fn via. a wasm call
+    async fn ribosome_hash_entry_test() {
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::HashEntry).await;
+        let input = EntryFixturator::new(::fixt::Predictable).next().unwrap();
+        let output: EntryHash = conductor.call(&alice, "hash_entry", input).await;
+        assert_eq!(*output.hash_type(), holo_hash::hash_type::Entry);
 
-    //     let entry_hash_output: EntryHash = crate::call_test_ribosome!(
-    //         host_access,
-    //         TestWasm::HashEntry,
-    //         "twenty_three_degrees_entry_hash",
-    //         ()
-    //     ).unwrap();
+        let entry_hash_output: EntryHash = conductor
+            .call(&alice, "twenty_three_degrees_entry_hash", ())
+            .await;
 
-    //     let hash_output: EntryHash = crate::call_test_ribosome!(
-    //         host_access,
-    //         TestWasm::HashEntry,
-    //         "twenty_three_degrees_hash",
-    //         ()
-    //     ).unwrap();
+        let hash_output: EntryHash = conductor
+            .call(&alice, "twenty_three_degrees_hash", ())
+            .await;
 
-    //     assert_eq!(entry_hash_output, hash_output);
-    // }
+        assert_eq!(entry_hash_output, hash_output);
+    }
 
-    // #[tokio::test(flavor = "multi_thread")]
-    // /// the hash path underlying anchors wraps entry_hash
-    // async fn ribosome_hash_path_pwd_test() {
-    //     let host_access = fixt!(ZomeCallHostAccess, Predictable);
-    //     let input = "foo.bar".to_string();
-    //     let output: EntryHash =
-    //         crate::call_test_ribosome!(host_access, TestWasm::HashPath, "path_entry_hash", input).unwrap();
+    #[tokio::test(flavor = "multi_thread")]
+    /// the hash path underlying anchors wraps entry_hash
+    async fn ribosome_hash_path_pwd_test() {
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::HashPath).await;
+        let input = "foo.bar".to_string();
+        let output: EntryHash = conductor.call(&alice, "path_entry_hash", input).await;
 
-    //     let expected_path = hdk::hash_path::path::Path::from(vec![
-    //         Component::from("foo"),
-    //         Component::from("bar")
-    //     ]);
+        let expected_path =
+            hdk::hash_path::path::Path::from(vec![Component::from("foo"), Component::from("bar")]);
 
-    //     let path_hash = holochain_zome_types::entry::EntryHashed::from_content_sync(
-    //         Entry::try_from(expected_path).unwrap(),
-    //     )
-    //     .into_hash();
+        let path_hash = holochain_zome_types::entry::EntryHashed::from_content_sync(
+            Entry::try_from(expected_path).unwrap(),
+        )
+        .into_hash();
 
-    //     let path_entry_hash = holochain_zome_types::entry::EntryHashed::from_content_sync(
-    //         Entry::try_from(PathEntry::new(path_hash)).unwrap(),
-    //     )
-    //     .into_hash();
+        let path_entry_hash = holochain_zome_types::entry::EntryHashed::from_content_sync(
+            Entry::try_from(PathEntry::new(path_hash)).unwrap(),
+        )
+        .into_hash();
 
-    //     assert_eq!(path_entry_hash.into_inner(), output.into_inner(),);
-    // }
+        assert_eq!(path_entry_hash.into_inner(), output.into_inner(),);
+    }
 }

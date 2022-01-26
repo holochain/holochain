@@ -104,10 +104,10 @@ pub fn delete_link<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use hdk::prelude::*;
     use holo_hash::HeaderHash;
     use holochain_wasm_test_utils::TestWasm;
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_delete_link_add_remove() {
@@ -132,18 +132,22 @@ pub mod slow_tests {
         assert!(links.len() == 2);
 
         // remove a link
-        let _: HeaderHash = conductor.call(&alice, "delete_link", link_headers[0].clone()).await;
+        let _: HeaderHash = conductor
+            .call(&alice, "delete_link", link_headers[0].clone())
+            .await;
 
         let links: Vec<Link> = conductor.call(&alice, "get_links", ()).await;
 
         assert!(links.len() == 1);
 
         // remove a link
-        let _: HeaderHash = conductor.call(&alice, "delete_link", link_headers[1].clone()).await;
+        let _: HeaderHash = conductor
+            .call(&alice, "delete_link", link_headers[1].clone())
+            .await;
 
         let links: Vec<Link> = conductor.call(&alice, "get_links", ()).await;
 
-            assert!(links.len() == 0);
+        assert!(links.len() == 0);
 
         // Add some links then delete them all
         let _h: HeaderHash = conductor.call(&alice, "create_link", ()).await;
