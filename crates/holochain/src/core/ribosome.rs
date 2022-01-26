@@ -567,7 +567,13 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
 #[cfg(test)]
 pub mod wasm_test {
     use crate::core::ribosome::FnComponents;
+    use crate::sweettest::SweetAgents;
+    use crate::sweettest::SweetConductor;
+    use crate::sweettest::SweetDnaFile;
+    use crate::sweettest::SweetZome;
     use core::time::Duration;
+    use holo_hash::AgentPubKey;
+    use holochain_wasm_test_utils::TestWasm;
 
     pub fn now() -> Duration {
         std::time::SystemTime::now()
@@ -581,5 +587,44 @@ pub mod wasm_test {
         let expected = vec!["foo_bar_baz", "foo_bar", "foo"];
 
         assert_eq!(fn_components.into_iter().collect::<Vec<String>>(), expected,);
+    }
+
+    pub struct RibosomeTestFixture {
+        pub conductor: SweetConductor,
+        pub alice_pubkey: AgentPubKey,
+        pub bob_pubkey: AgentPubKey,
+        pub alice: SweetZome,
+        pub bob: SweetZome,
+    }
+
+    impl RibosomeTestFixture {
+        pub async fn new(test_wasm: TestWasm) -> Self {
+            let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![test_wasm])
+                .await
+                .unwrap();
+
+            let mut conductor = SweetConductor::from_standard_config().await;
+            let (alice_pubkey, bob_pubkey) = SweetAgents::two(conductor.keystore()).await;
+
+            let apps = conductor
+                .setup_app_for_agents(
+                    "app-",
+                    &[alice_pubkey.clone(), bob_pubkey.clone()],
+                    &[dna_file.into()],
+                )
+                .await
+                .unwrap();
+
+            let ((alice,), (bob,)) = apps.into_tuples();
+            let alice = alice.zome(test_wasm);
+            let bob = bob.zome(test_wasm);
+            Self {
+                conductor,
+                alice_pubkey,
+                bob_pubkey,
+                alice,
+                bob,
+            }
+        }
     }
 }

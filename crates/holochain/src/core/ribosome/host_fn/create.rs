@@ -159,9 +159,7 @@ pub mod wasm_test {
     use holochain_wasm_test_utils::TestWasm;
     use observability;
     use std::sync::Arc;
-    use crate::sweettest::SweetConductor;
-    use crate::sweettest::SweetAgents;
-    use crate::sweettest::SweetDnaFile;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
     /// we can get an entry hash out of the fn directly
@@ -201,25 +199,11 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_create_entry_test() {
         observability::test_run().ok();
-        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
-            .await
-            .unwrap();
-
-        let mut conductor = SweetConductor::from_standard_config().await;
-        let (alice_pubkey, bob_pubkey) = SweetAgents::two(conductor.keystore()).await;
-
-        let apps = conductor
-            .setup_app_for_agents(
-                "app-",
-                &[alice_pubkey.clone(), bob_pubkey.clone()],
-                &[dna_file.into()],
-            )
-            .await
-            .unwrap();
-
-        let ((alice,), (bobbo,)) = apps.into_tuples();
-        let alice = alice.zome(TestWasm::Create);
-        let _bobbo = bobbo.zome(TestWasm::Create);
+        let RibosomeTestFixture {
+            conductor,
+            alice,
+            ..
+        } = RibosomeTestFixture::new(TestWasm::Create).await;
 
         // get the result of a commit entry
         let _output: HeaderHash = conductor.call(&alice, "create_entry", ()).await;
