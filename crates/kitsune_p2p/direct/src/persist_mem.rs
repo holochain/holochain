@@ -3,7 +3,7 @@
 use crate::types::persist::*;
 use crate::*;
 use futures::future::{BoxFuture, FutureExt};
-use kitsune_p2p::dht_arc::DhtArcSet;
+use kitsune_p2p::dht_arc::{DhtArcSet, PeerStratBeta};
 use kitsune_p2p::event::TimeWindow;
 use kitsune_p2p_types::tls::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
