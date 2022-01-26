@@ -1,7 +1,6 @@
 #![cfg(feature = "testing")]
 
 use kitsune_p2p_dht::{
-    arq::ascii::add_location_ascii,
     arq::*,
     coords::*,
     host::*,
@@ -21,7 +20,7 @@ use rand::Rng;
 fn test_basic() {
     let topo = Topology::identity_zero();
     let gopa = GossipParams::new(1.into(), 0);
-    let ts = |t: u32| topo.timestamp(t.into());
+    let ts = |t: u32| TimeCoord::from(t).to_timestamp(&topo);
 
     let alice_arq = Arq::new(0.into(), 8, 4);
     let bobbo_arq = Arq::new(128.into(), 8, 4);
@@ -45,7 +44,7 @@ fn test_basic() {
 }
 
 #[test]
-fn test_gossip_scenario() {
+fn gossip_scenario_full_sync() {
     observability::test_run().ok();
     let topo = Topology::standard(Timestamp::from_micros(0));
     let gopa = GossipParams::new(1.into(), 0);
@@ -62,7 +61,7 @@ fn test_gossip_scenario() {
         ..Default::default()
     };
 
-    let max_time = topo.timestamp(TimeCoord::from(525600 / 12)); // 1 year
+    let max_time = TimeCoord::from(525600 / 12).to_timestamp(&topo); // 1 year
 
     let arqs = generate_ideal_coverage(&mut rng, &strat, None, n as u32, 0.0, 0);
     let mut nodes: Vec<_> = arqs
@@ -89,12 +88,13 @@ fn test_gossip_scenario() {
         t: (0.into(), u32::MAX.into()),
     };
 
+    // Assert that each node has the expected number of ops to start with,
+    // and print each arq at the same time.
     assert_eq!(
         nodes
             .iter()
             .enumerate()
             .map(|(i, n)| {
-                let arq = n.arq();
                 let ops = n.query_op_data(&full_region);
                 println!("{}", n.ascii_arq_and_ops(i, 64));
                 ops.len()
@@ -102,19 +102,6 @@ fn test_gossip_scenario() {
             .collect::<Vec<_>>(),
         vec![ops_per_node; n]
     );
-
-    {
-        {
-            let (n1, n2) = get_two_mut(nodes.as_mut_slice(), 0, 1);
-            let stats = gossip_direct_at(n1, n2, topo.time_coord(max_time)).unwrap();
-            assert_eq!(stats.ops_sent, ops_per_node as u32);
-            assert_eq!(stats.ops_rcvd, ops_per_node as u32);
-        }
-        println!("vvvvvvvvvvvvvvvvvvvvvvvvvvv");
-        for (i, n) in nodes.iter().take(2).enumerate() {
-            println!("{}", n.ascii_arq_and_ops(i, 64));
-        }
-    }
 
     // Do a bunch of gossip such that node 0 will be exposed to all ops created
     for p in 0..pow {

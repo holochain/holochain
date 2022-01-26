@@ -1,8 +1,7 @@
 use crate::{
-    coords::TimeCoord,
+    coords::{Coord, TimeCoord},
     error::{GossipError, GossipResult},
     host::HostAccess,
-    region::*,
 };
 
 pub fn gossip_direct_at<Peer: HostAccess>(
@@ -34,9 +33,11 @@ pub fn gossip_direct<Peer: HostAccess>(
         let gpr = right.gossip_params();
 
         // - ensure compatible as-at timestamps
-        let tl = *time_left as i64;
-        let tr = *time_right as i64;
-        if (tl - tr).abs() as u32 > u32::min(*gpl.max_time_offset, *gpr.max_time_offset) {
+        let tl = time_left.inner() as i64;
+        let tr = time_right.inner() as i64;
+        if (tl - tr).abs() as u32
+            > u32::min(gpl.max_time_offset.inner(), gpr.max_time_offset.inner())
+        {
             return Err(GossipError::TimesOutOfSync);
         }
 
@@ -66,33 +67,11 @@ pub fn gossip_direct<Peer: HostAccess>(
         (regions_left, regions_right)
     };
     {
-        let RegionSet::Xtcs(l) = regions_left.clone();
-        let RegionSet::Xtcs(r) = regions_right.clone();
-        // dbg!(l.data, r.data);
-    }
-    // dbg!(
-    //     &regions_left
-    //         .regions()
-    //         .into_iter()
-    //         .filter(|r| r.data.count > 0)
-    //         .map(|r| r.coords.space.offset)
-    //         .collect::<Vec<_>>(),
-    //     &regions_right
-    //         .regions()
-    //         .into_iter()
-    //         .filter(|r| r.data.count > 0)
-    //         .map(|r| r.coords.space.offset)
-    //         .collect::<Vec<_>>(),
-    // );
-
-    {
         // ROUND IV: Calculate diffs and send missing ops
 
         // - calculate diffs
         let diff_left = regions_left.clone().diff(regions_right.clone())?;
         let diff_right = regions_right.diff(regions_left)?;
-
-        // dbg!(&diff_left, &diff_right);
 
         // - fetch ops
         let ops_left: Vec<_> = diff_left

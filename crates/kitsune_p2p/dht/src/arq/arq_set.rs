@@ -126,6 +126,7 @@ pub fn print_arqs<'a, A: ArqBounded>(arqs: &'a [A], len: usize) {
     }
 }
 
+#[cfg(test)]
 mod tests {
 
     use super::*;

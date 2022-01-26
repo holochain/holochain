@@ -3,10 +3,9 @@ use std::{collections::BTreeSet, ops::Bound, sync::Arc};
 use crate::{
     coords::{GossipParams, Topology},
     host::AccessOpStore,
-    op::{OpData, OpRegion, Timestamp},
+    op::{OpData, OpRegion},
     region::{RegionBounds, RegionData},
     tree::{Tree, TreeDataConstraints},
-    Loc,
 };
 
 #[derive(Clone)]
@@ -31,11 +30,15 @@ impl<D: TreeDataConstraints, O: OpRegion<D>> AccessOpStore<D, O> for OpStore<D, 
         let (x0, x1) = region.x;
         let (t0, t1) = region.t;
         let topo = self.topo();
-        let op0 = O::bound(Timestamp::from_micros(*t0 as i64), Loc::from(*x0));
-        let op1 = O::bound(Timestamp::from_micros(*t1 as i64), Loc::from(*x1));
+        let loc0 = x0.to_loc(topo);
+        let loc1 = x1.to_loc(topo);
+        let ts0 = t0.to_timestamp(topo);
+        let ts1 = t1.to_timestamp(topo);
+        let op0 = O::bound(ts0, loc0);
+        let op1 = O::bound(ts1, loc1);
         self.ops
             .range((Bound::Included(op0), Bound::Included(op1)))
-            .filter(|o| *x0 <= o.loc().as_u32() && o.loc().as_u32() <= *x1)
+            .filter(|o| loc0 <= o.loc() && o.loc() <= loc1)
             .cloned()
             .collect()
     }

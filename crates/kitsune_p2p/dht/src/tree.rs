@@ -33,7 +33,8 @@ impl<T: TreeDataConstraints> Tree<T> {
     pub fn lookup(&self, region: &RegionBounds) -> T {
         let (sa, sb) = region.x;
         let (ta, tb) = region.t;
-        self.tree.query((*sa, *ta), (*sb, *tb))
+        self.tree
+            .query((sa.inner(), ta.inner()), (sb.inner(), tb.inner()))
     }
 
     /// Get a reference to the tree's topo.

@@ -391,13 +391,14 @@ impl ArqBounds {
             let mut b = self.clone();
             a.count = 1;
             b.count = 1;
-            b.offset = (*b.offset).wrapping_add(self.count - 1).into();
+            b.offset = (b.offset.inner()).wrapping_add(self.count - 1).into();
             Some((a, b))
         }
     }
 
     pub fn segments(&self) -> impl Iterator<Item = SpaceSegment> + '_ {
-        (0..self.count).map(|c| SpaceSegment::new(self.power.into(), c.wrapping_add(*self.offset)))
+        (0..self.count)
+            .map(|c| SpaceSegment::new(self.power.into(), c.wrapping_add(self.offset.inner())))
     }
 
     pub fn chunk_width(&self) -> u64 {
@@ -692,7 +693,7 @@ mod tests {
         let a1 = Arq::new(3264675840u32.into(), 16, 6);
         // let a2 = Arq::new((3264675840u32 + 3000).into(), 16, 6);
         let a2 = Arq::new(3264708608u32.into(), 16, 6);
-        assert_eq!(*a1.to_bounds().offset + 1, *a2.to_bounds().offset);
+        assert_eq!(a1.to_bounds().offset + 1.into(), a2.to_bounds().offset);
     }
 
     #[test]

@@ -22,26 +22,20 @@ impl RegionCoordSetXtcs {
     /// can be used to pair the generated coords with stored data.
     pub fn region_coords_flat<'a>(
         &'a self,
-    ) -> impl Iterator<Item = ((SpaceCoord, TimeCoord), RegionCoords)> + 'a {
+    ) -> impl Iterator<Item = ((u32, u32), RegionCoords)> + 'a {
         self.region_coords_nested().flatten()
     }
 
     pub fn region_coords_nested<'a>(
         &'a self,
-    ) -> impl Iterator<Item = impl Iterator<Item = ((SpaceCoord, TimeCoord), RegionCoords)>> + 'a
-    {
+    ) -> impl Iterator<Item = impl Iterator<Item = ((u32, u32), RegionCoords)>> + 'a {
         self.arq_set.arqs().iter().flat_map(move |arq| {
             arq.segments().enumerate().map(move |(ix, x)| {
                 self.times
                     .segments()
                     .into_iter()
                     .enumerate()
-                    .map(move |(it, t)| {
-                        (
-                            (SpaceCoord::from(ix as u32), TimeCoord::from(it as u32)),
-                            RegionCoords::new(x, t),
-                        )
-                    })
+                    .map(move |(it, t)| ((ix as u32, it as u32), RegionCoords::new(x, t)))
             })
         })
     }
@@ -64,7 +58,6 @@ pub enum RegionSet<T: TreeDataConstraints = RegionData> {
     /// eXponential Time, Constant Space.
     Xtcs(RegionSetXtcs<T>),
 }
-
 
 impl<D: TreeDataConstraints> RegionSet<D> {
     pub fn count(&self) -> usize {
@@ -100,7 +93,6 @@ impl<D: TreeDataConstraints> RegionSet<D> {
         // PROBLEM: we *can't* resolve rectangles where one is not a subset of the other
     }
 }
-
 
 /// Implementation for the compact XTCS region set format which gets sent over the wire.
 /// The coordinates for the regions are specified by a few values.
@@ -151,7 +143,7 @@ impl<D: TreeDataConstraints> RegionSetXtcs<D> {
     pub fn regions<'a>(&'a self) -> impl Iterator<Item = Region<D>> + 'a {
         self.coords
             .region_coords_flat()
-            .map(|((ix, it), coords)| Region::new(coords, self.data[*ix as usize][*it as usize]))
+            .map(|((ix, it), coords)| Region::new(coords, self.data[ix as usize][it as usize]))
     }
 
     /// Reshape the two region sets so that both match, omitting or merging

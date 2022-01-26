@@ -1,7 +1,4 @@
-use std::{
-    marker::PhantomData,
-    ops::{AddAssign, Deref},
-};
+use std::{marker::PhantomData, num::Wrapping, ops::AddAssign};
 
 use crate::op::{Loc, Timestamp};
 use derivative::Derivative;
@@ -19,11 +16,16 @@ use derivative::Derivative;
     Ord,
     Hash,
     derive_more::Add,
-    derive_more::Deref,
     derive_more::Display,
     derive_more::From,
 )]
 pub struct SpaceCoord(u32);
+
+impl SpaceCoord {
+    pub fn to_loc(&self, topo: &Topology) -> Loc {
+        Loc::from(Wrapping(self.0) * Wrapping(topo.space.quantum))
+    }
+}
 
 /// Represents some number of time quanta. The actual Timestamp that this
 /// coordinate corresponds to depends upon the time quantum size specified
@@ -38,7 +40,6 @@ pub struct SpaceCoord(u32);
     Ord,
     Hash,
     derive_more::Add,
-    derive_more::Deref,
     derive_more::Display,
     derive_more::From,
 )]
@@ -48,32 +49,46 @@ impl TimeCoord {
     pub fn from_timestamp(topo: &Topology, timestamp: Timestamp) -> Self {
         topo.time_coord(timestamp)
     }
+
+    pub fn to_timestamp(&self, topo: &Topology) -> Timestamp {
+        let t = self.0 as i64 * topo.time.quantum as i64;
+        Timestamp::from_micros(t + topo.time_origin.as_micros())
+    }
 }
 
-pub trait Coord:
-    From<u32> + Deref<Target = u32> + PartialEq + Eq + PartialOrd + Ord + std::fmt::Debug
-{
+pub trait Coord: From<u32> + PartialEq + Eq + PartialOrd + Ord + std::fmt::Debug {
     const MAX: u32 = u32::MAX;
 
+    fn inner(&self) -> u32;
+
     fn exp(&self, pow: u8) -> u32 {
-        **self * 2u32.pow(pow as u32)
+        self.inner() * 2u32.pow(pow as u32)
     }
 
     fn exp_wrapping(&self, pow: u8) -> u32 {
-        (**self as u64 * 2u64.pow(pow as u32)) as u32
+        (self.inner() as u64 * 2u64.pow(pow as u32)) as u32
     }
 
     fn wrapping_add(self, other: u32) -> Self {
-        Self::from((*self).wrapping_add(other))
+        Self::from((self.inner()).wrapping_add(other))
     }
 
     fn wrapping_sub(self, other: u32) -> Self {
-        Self::from((*self).wrapping_sub(other))
+        Self::from((self.inner()).wrapping_sub(other))
     }
 }
 
-impl Coord for SpaceCoord {}
-impl Coord for TimeCoord {}
+impl Coord for SpaceCoord {
+    fn inner(&self) -> u32 {
+        self.0
+    }
+}
+
+impl Coord for TimeCoord {
+    fn inner(&self) -> u32 {
+        self.0
+    }
+}
 
 pub struct SpacetimeCoords {
     pub space: SpaceCoord,
@@ -236,11 +251,6 @@ impl Topology {
         let t = (t.as_micros() - self.time_origin.as_micros()).max(0);
         ((t / self.time.quantum as i64) as u32).into()
     }
-
-    pub fn timestamp(&self, t: TimeCoord) -> Timestamp {
-        let t = *t as i64 * self.time.quantum as i64;
-        Timestamp::from_micros(t + self.time_origin.as_micros())
-    }
 }
 
 /// A type which generates a list of exponentially expanding time windows, as per
@@ -280,7 +290,7 @@ impl TelescopingTimes {
     /// the binary representation of the timestamp (+1) which generated,
     /// which illustrates this pattern.
     pub fn segments(&self) -> Vec<TimeSegment> {
-        let mut now: u32 = *self.time + 1;
+        let mut now: u32 = self.time.inner() + 1;
         if now == 1 {
             return vec![];
         }
@@ -476,7 +486,7 @@ mod tests {
         fn telescoping_times_cover_total_time_span(now in 0u32..u32::MAX) {
             let ts = TelescopingTimes::new(now.into()).segments();
             let total = ts.iter().fold(0u64, |len, t| {
-                assert_eq!(*t.bounds().0, len as u32, "t = {:?}, len = {}", t, len);
+                assert_eq!(t.bounds().0.inner(), len as u32, "t = {:?}, len = {}", t, len);
                 len + t.length()
             });
             assert_eq!(total, now as u64);
