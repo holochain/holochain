@@ -103,39 +103,36 @@ pub(crate) fn get_original_address<'a>(
     .map_err(|ribosome_error| WasmError::Host(ribosome_error.to_string()))
 }
 
-// #[cfg(test)]
-// #[cfg(feature = "slow_tests")]
-// pub mod wasm_test {
-//     use crate::fixt::ZomeCallHostAccessFixturator;
-//     use ::fixt::prelude::*;
-//     use hdk::prelude::*;
-//     use holochain_wasm_test_utils::TestWasm;
+#[cfg(test)]
+#[cfg(feature = "slow_tests")]
+pub mod wasm_test {
+    use hdk::prelude::*;
+    use holochain_wasm_test_utils::TestWasm;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
-//     #[tokio::test(flavor = "multi_thread")]
-//     async fn ribosome_delete_entry_test<'a>() {
-//         observability::test_run().ok();
-//         let host_access = fixt!(ZomeCallHostAccess, Predictable);
+    #[tokio::test(flavor = "multi_thread")]
+    async fn ribosome_delete_entry_test<'a>() {
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::Crd).await;
 
-//         let thing_a: HeaderHash =
-//             crate::call_test_ribosome!(host_access, TestWasm::Crd, "create", ()).unwrap();
-//         let get_thing: Option<Element> =
-//             crate::call_test_ribosome!(host_access, TestWasm::Crd, "reed", thing_a).unwrap();
-//         match get_thing {
-//             Some(element) => assert!(element.entry().as_option().is_some()),
+        let thing_a: HeaderHash = conductor.call(&alice, "create", ()).await;
+        let get_thing: Option<Element> = conductor.call(&alice, "reed", thing_a.clone()).await;
+        match get_thing {
+            Some(element) => assert!(element.entry().as_option().is_some()),
 
-//             None => unreachable!(),
-//         }
+            None => unreachable!(),
+        }
 
-//         let _: HeaderHash =
-//             crate::call_test_ribosome!(host_access, TestWasm::Crd, "delete", thing_a).unwrap();
+        let _: HeaderHash = conductor.call(&alice, "delete", thing_a.clone()).await;
 
-//         let get_thing: Option<Element> =
-//             crate::call_test_ribosome!(host_access, TestWasm::Crd, "reed", thing_a).unwrap();
-//         match get_thing {
-//             None => {
-//                 // this is what we want, deletion => None for a get
-//             }
-//             _ => unreachable!(),
-//         }
-//     }
-// }
+        let get_thing: Option<Element> = conductor.call(&alice, "reed", thing_a).await;
+        match get_thing {
+            None => {
+                // this is what we want, deletion => None for a get
+            }
+            _ => unreachable!(),
+        }
+    }
+}
