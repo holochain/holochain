@@ -2247,7 +2247,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.0.118"
+version = "0.0.119"
 dependencies = [
  "fixt",
  "hdk_derive",
@@ -2266,7 +2266,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "holochain_zome_types",
  "paste",
@@ -2335,7 +2335,7 @@ dependencies = [
 
 [[package]]
 name = "holo_hash"
-version = "0.0.15"
+version = "0.0.16"
 dependencies = [
  "arbitrary",
  "base64",
@@ -2357,7 +2357,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.0.122"
+version = "0.0.123"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2444,7 +2444,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.0.22"
+version = "0.0.23"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2477,7 +2477,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.0.23"
+version = "0.0.24"
 dependencies = [
  "anyhow",
  "futures",
@@ -2490,7 +2490,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.0.18"
+version = "0.0.19"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -2511,7 +2511,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.0.19"
+version = "0.0.20"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -2537,7 +2537,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.0.22"
+version = "0.0.23"
 dependencies = [
  "derive_more",
  "directories 2.0.2",
@@ -2561,7 +2561,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_keystore"
-version = "0.0.22"
+version = "0.0.23"
 dependencies = [
  "base64",
  "ghost_actor 0.3.0-alpha.4",
@@ -2583,7 +2583,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.0.22"
+version = "0.0.23"
 dependencies = [
  "async-trait",
  "fixt",
@@ -2636,7 +2636,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_sqlite"
-version = "0.0.22"
+version = "0.0.23"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2684,7 +2684,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.0.22"
+version = "0.0.23"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -2727,7 +2727,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.0.18"
+version = "0.0.19"
 dependencies = [
  "hdk",
  "serde",
@@ -2735,7 +2735,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.0.22"
+version = "0.0.23"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2800,7 +2800,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.0.22"
+version = "0.0.23"
 dependencies = [
  "fixt",
  "holo_hash",
@@ -2816,9 +2816,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.73"
+version = "0.0.76"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5af45652fd4b0e5b1ed2a721e5b0007d6334ee1e11677e918d7252c4f5a95bd0"
+checksum = "85e0bf4cd72c3b854b4dabf06a01de9a443b2513c91a9549a79f680c99335676"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -2828,9 +2828,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_guest"
-version = "0.0.73"
+version = "0.0.76"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "265c2dec85c91d10b01473d8163f3a841a14b47d78d764b7f6625a53f1dc1868"
+checksum = "4f5e433f6129edb7cad3315550b7607e9b451a02f96e00ca9a000929b1b8217a"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
@@ -2841,9 +2841,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_host"
-version = "0.0.73"
+version = "0.0.76"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f695556f79ae652cd55867aa3872757854a8e028c02f969a4e17215a60ad253a"
+checksum = "6dc11660133ce329dcbed20b44038f4c22d361642b200391d249caa15e7bbd1a"
 dependencies = [
  "bimap",
  "holochain_serialized_bytes",
@@ -2854,11 +2854,19 @@ dependencies = [
  "serde",
  "tracing",
  "wasmer",
+ "wasmer-compiler",
+ "wasmer-compiler-cranelift",
+ "wasmer-derive",
+ "wasmer-engine",
+ "wasmer-engine-dylib",
+ "wasmer-engine-universal",
+ "wasmer-types",
+ "wasmer-vm",
 ]
 
 [[package]]
 name = "holochain_websocket"
-version = "0.0.22"
+version = "0.0.23"
 dependencies = [
  "criterion",
  "futures",
@@ -2886,7 +2894,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "arbitrary",
  "chrono",
@@ -3232,7 +3240,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p"
-version = "0.0.19"
+version = "0.0.20"
 dependencies = [
  "arbitrary",
  "arrayref",

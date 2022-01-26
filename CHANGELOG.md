@@ -6,6 +6,52 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+* Bump holochain-wasmer to fix a compilation issue. [#1194](https://github.com/holochain/holochain/pull/1194)
+
+# 20220120.093525
+
+## [holochain-0.0.123](crates/holochain/CHANGELOG.md#0.0.123)
+
+- Fixes issue where holochain could get stuck in infinite loop when trying to send validation receipts. [\#1181](https://github.com/holochain/holochain/pull/1181).
+- Additional networking metric collection and associated admin api `DumpNetworkMetrics { dna_hash: Option<DnaHash> }` for inspection of metrics [\#1160](https://github.com/holochain/holochain/pull/1160)
+- **BREAKING CHANGE** - Schema change for metrics database. Holochain will persist historical metrics once per hour, if you do not clear the metrics database it will crash at that point. [\#1183](https://github.com/holochain/holochain/pull/1183)
+
+## [holochain\_test\_wasm\_common-0.0.19](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.19)
+
+## [holochain\_cascade-0.0.23](crates/holochain_cascade/CHANGELOG.md#0.0.23)
+
+## [holochain\_cli-0.0.24](crates/holochain_cli/CHANGELOG.md#0.0.24)
+
+## [holochain\_cli\_sandbox-0.0.20](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.20)
+
+## [holochain\_websocket-0.0.23](crates/holochain_websocket/CHANGELOG.md#0.0.23)
+
+## [holochain\_conductor\_api-0.0.23](crates/holochain_conductor_api/CHANGELOG.md#0.0.23)
+
+## [holochain\_state-0.0.23](crates/holochain_state/CHANGELOG.md#0.0.23)
+
+## [holochain\_wasm\_test\_utils-0.0.23](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.23)
+
+## [holochain\_p2p-0.0.23](crates/holochain_p2p/CHANGELOG.md#0.0.23)
+
+## [holochain\_cli\_bundle-0.0.19](crates/holochain_cli_bundle/CHANGELOG.md#0.0.19)
+
+## [holochain\_types-0.0.23](crates/holochain_types/CHANGELOG.md#0.0.23)
+
+## [holochain\_keystore-0.0.23](crates/holochain_keystore/CHANGELOG.md#0.0.23)
+
+## [holochain\_sqlite-0.0.23](crates/holochain_sqlite/CHANGELOG.md#0.0.23)
+
+## [kitsune\_p2p-0.0.20](crates/kitsune_p2p/CHANGELOG.md#0.0.20)
+
+## [hdk-0.0.119](crates/hdk/CHANGELOG.md#0.0.119)
+
+## [hdk\_derive-0.0.21](crates/hdk_derive/CHANGELOG.md#0.0.21)
+
+## [holochain\_zome\_types-0.0.21](crates/holochain_zome_types/CHANGELOG.md#0.0.21)
+
+## [holo\_hash-0.0.16](crates/holo_hash/CHANGELOG.md#0.0.16)
+
 # 20220106.093622
 
 ## [holochain-0.0.122](crates/holochain/CHANGELOG.md#0.0.122)
