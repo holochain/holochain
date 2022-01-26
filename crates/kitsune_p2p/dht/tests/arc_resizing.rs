@@ -62,6 +62,7 @@ fn test_grow_towards_full() {
         max_power_diff: 2,
         ..Default::default()
     };
+    println!("{}", strat.summary());
     strat.max_chunks();
     let jitter = 0.01;
 
@@ -72,7 +73,12 @@ fn test_grow_towards_full() {
 
     // start with an arq comparable to one's peers
     let mut arq = Arq::new(0.into(), peer_power, 12);
-    resize_to_equilibrium(&view, &mut arq);
+    loop {
+        let stats = view.update_arq_with_stats(&mut arq);
+        if !stats.changed {
+            break;
+        }
+    }
     // ensure that the arq grows to full size
     assert_eq!(arq.power(), peer_power + 2);
     assert_eq!(arq.count(), strat.max_chunks());

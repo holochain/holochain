@@ -322,6 +322,7 @@ impl PeerView {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct UpdateArqStats {
     pub changed: bool,
     pub desired_delta: i32,
@@ -340,6 +341,7 @@ where
         .sum()
 }
 
+#[derive(Debug, Clone)]
 pub struct PowerStats {
     pub median: u8,
     pub std_dev: f64,
