@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+* Bump holochain-wasmer to fix a compilation issue. [#1194](https://github.com/holochain/holochain/pull/1194)
+
 # 20220120.093525
 
 ## [holochain-0.0.123](crates/holochain/CHANGELOG.md#0.0.123)
