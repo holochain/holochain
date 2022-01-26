@@ -825,6 +825,7 @@ async fn mock_network_sharding() {
                         }
                     },
                     HolochainP2pMockMsg::CallResp(_) => debug!("CallResp"),
+                    HolochainP2pMockMsg::MetricExchange(_) => debug!("MetricExchange"),
                     HolochainP2pMockMsg::PeerGet(_) => eprintln!("PeerGet"),
                     HolochainP2pMockMsg::PeerGetResp(_) => debug!("PeerGetResp"),
                     HolochainP2pMockMsg::PeerQuery(kitsune_p2p::wire::PeerQuery {
