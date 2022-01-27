@@ -599,11 +599,29 @@ impl std::fmt::Display for MetricsSync {
     }
 }
 
-impl std::ops::Deref for MetricsSync {
-    type Target = parking_lot::RwLock<Metrics>;
+impl MetricsSync {
+    /// Get a read lock for the metrics store.
+    pub fn read(&self) -> parking_lot::RwLockReadGuard<Metrics> {
+        match self.0.try_read_for(std::time::Duration::from_millis(100)) {
+            Some(g) => g,
+            // This won't block if a writer is waiting.
+            // NOTE: This is a bit of a hack to work around a lock somewhere that is errant-ly
+            // held over another call to lock. Really we should fix that error,
+            // potentially by using a closure pattern here to ensure the lock cannot
+            // be held beyond the access logic.
+            None => self.0.read_recursive(),
+        }
+    }
 
-    fn deref(&self) -> &Self::Target {
-        &*self.0
+    /// Get a write lock for the metrics store.
+    pub fn write(&self) -> parking_lot::RwLockWriteGuard<Metrics> {
+        match self.0.try_write_for(std::time::Duration::from_secs(100)) {
+            Some(g) => g,
+            None => {
+                eprintln!("Metrics lock likely deadlocked");
+                self.0.write()
+            }
+        }
     }
 }
 
