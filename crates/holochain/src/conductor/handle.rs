@@ -475,7 +475,6 @@ pub struct ConductorHandleImpl<DS: DnaStore + 'static> {
         Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, DbWrite<DbKindP2pAgentStore>>>>,
 
     /// The database for storing p2p MetricDatum(s)
-    #[allow(dead_code)]
     pub(super) p2p_metrics_env:
         Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, DbWrite<DbKindP2pMetrics>>>>,
 
@@ -610,6 +609,24 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                             .map_err(holochain_p2p::HolochainP2pError::other)
                             .and_then(|r| r.map_err(holochain_p2p::HolochainP2pError::other))?;
                         Ok(KGenRes::PeerExtrapCov(res))
+                    }
+                    .boxed()
+                    .into()));
+                }
+                KGenReq::RecordMetrics { space, records } => {
+                    let env = { self.p2p_metrics_env(space) };
+                    respond.respond(Ok(async move {
+                        use holochain_sqlite::db::AsP2pMetricStoreConExt;
+                        let permit = env.conn_permit().await;
+                        let res = tokio::task::spawn_blocking(move || {
+                            let mut conn = env.from_permit(permit)?;
+                            conn.p2p_log_metrics(records)
+                        })
+                        .await;
+                        let res = res
+                            .map_err(holochain_p2p::HolochainP2pError::other)
+                            .and_then(|r| r.map_err(holochain_p2p::HolochainP2pError::other))?;
+                        Ok(KGenRes::RecordMetrics(res))
                     }
                     .boxed()
                     .into()));
@@ -1660,7 +1677,6 @@ impl<DS: DnaStore + 'static> ConductorHandleImpl<DS> {
             .clone()
     }
 
-    #[allow(dead_code)]
     pub(super) fn p2p_metrics_env(&self, space: Arc<KitsuneSpace>) -> DbWrite<DbKindP2pMetrics> {
         let mut p2p_metrics_env = self.p2p_metrics_env.lock();
         let db_sync_strategy = self.db_sync_strategy;

@@ -6,10 +6,16 @@ use std::sync::Arc;
 
 use tokio::time::Instant;
 
+use crate::types::event::*;
 use crate::types::*;
+use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 
 use num_traits::*;
+
+/// how long historical metric records should be kept
+/// (currently set to 1 week)
+const HISTORICAL_RECORD_EXPIRE_DURATION_MICROS: i64 = 1000 * 1000 * 60 * 60 * 24 * 7;
 
 /// Running average that prioritizes memory and cpu efficiency
 /// over strict accuracy.
@@ -173,6 +179,44 @@ impl<'lt> AgentLike<'lt> {
 }
 
 impl Metrics {
+    /// Dump historical metrics for recording to db.
+    pub fn dump_historical(&self) -> Vec<MetricRecord> {
+        let now = Timestamp::now();
+
+        let expires_at =
+            Timestamp::from_micros(now.as_micros() + HISTORICAL_RECORD_EXPIRE_DURATION_MICROS);
+
+        let mut out = Vec::new();
+
+        for (agent, node) in self.map.iter() {
+            out.push(MetricRecord {
+                kind: MetricRecordKind::ReachabilityQuotient,
+                agent: Some(agent.clone()),
+                recorded_at_utc: now,
+                expires_at_utc: expires_at,
+                data: serde_json::json!(*node.reachability_quotient),
+            });
+
+            out.push(MetricRecord {
+                kind: MetricRecordKind::LatencyMicros,
+                agent: Some(agent.clone()),
+                recorded_at_utc: now,
+                expires_at_utc: expires_at,
+                data: serde_json::json!(*node.latency_micros),
+            });
+        }
+
+        out.push(MetricRecord {
+            kind: MetricRecordKind::AggExtrapCov,
+            agent: None,
+            recorded_at_utc: now,
+            expires_at_utc: expires_at,
+            data: serde_json::json!(*self.agg_extrap_cov),
+        });
+
+        out
+    }
+
     /// Dump json encoded metrics
     pub fn dump(&self) -> serde_json::Value {
         let agents: serde_json::Value = self
