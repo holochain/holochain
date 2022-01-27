@@ -446,8 +446,8 @@ where
         &self,
         dna: DnaFile,
     ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
-        let is_full_wasm_dna = dna
-            .dna_def()
+        let dna_def = dna.dna_def();
+        let is_full_wasm_dna = dna_def
             .zomes
             .iter()
             .all(|(_, zome_def)| matches!(zome_def, ZomeDef::Wasm(_)));

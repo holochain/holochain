@@ -21,7 +21,7 @@ use holochain_keystore::MetaLairClient;
 use holochain_state::prelude::{fresh_reader_test, StateMutationError, Store, Txn};
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::element::ElementEntry;
+use holochain_zome_types::{element::ElementEntry, op::Op};
 use matches::assert_matches;
 use tokio_stream::StreamExt;
 
@@ -358,8 +358,14 @@ fn simple_validation_zome() -> InlineZome {
             api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
                 .map_err(Into::into)
         })
-        .callback("validate_create_entry", |_api, data: ValidateData| {
-            let s: AppString = data.element.entry().to_app_option().unwrap().unwrap();
+        .callback("validate", |_api, data: Op| {
+            let s = match data {
+                Op::StoreEntry {
+                    entry: Entry::App(bytes),
+                    ..
+                } => AppString::try_from(bytes.into_sb()).unwrap(),
+                _ => return Ok(ValidateResult::Valid),
+            };
             if &s.0 == "" {
                 Ok(ValidateResult::Invalid("No empty strings allowed".into()))
             } else {
@@ -679,7 +685,7 @@ async fn insert_source_chain() {
 }
 
 async fn make_element(keystore: &MetaLairClient, header: Header) -> Element {
-    let shh = SignedHeaderHashed::new(
+    let shh = SignedHeaderHashed::sign(
         keystore,
         HeaderHashed::from_content_sync(header.clone().into()),
     )

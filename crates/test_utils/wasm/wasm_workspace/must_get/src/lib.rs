@@ -1,4 +1,3 @@
-
 use hdk::prelude::*;
 
 #[hdk_entry(id = "something")]
@@ -40,33 +39,42 @@ entry_defs![
 ];
 
 #[hdk_extern]
-fn validate_create_entry_entry_reference(data: ValidateData) -> ExternResult<ValidateCallbackResult> {
-    let entry_reference = EntryReference::try_from(&data.element)?;
+fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
+    let this_zome = zome_info()?;
 
-    let entry_hashed: EntryHashed = must_get_entry(entry_reference.into_inner())?;
-    let entry: Entry = entry_hashed.clone().into();
-    let _something_hashed: Something = entry_hashed.try_into()?;
-    let _something: Something = entry.try_into()?;
+    if let Op::StoreEntry {
+        header:
+            SignedHashed {
+                header:
+                    EntryCreationHeader::Create(Create { entry_type, .. })
+                    | EntryCreationHeader::Update(Update { entry_type, .. }),
+                ..
+            },
+        entry,
+    } = op
+    {
+        if let EntryType::App(app_entry_type) = entry_type {
+            if this_zome.matches_entry_def_id(&app_entry_type, EntryReference::entry_def_id()) {
+                let entry_reference = EntryReference::try_from(&entry)?;
+                let entry_hashed: EntryHashed = must_get_entry(entry_reference.into_inner())?;
+                let entry: Entry = entry_hashed.clone().into();
+                let _something_hashed: Something = entry_hashed.try_into()?;
+                let _something: Something = entry.try_into()?;
+            }
+            if this_zome.matches_entry_def_id(&app_entry_type, HeaderReference::entry_def_id()) {
+                let header_reference = HeaderReference::try_from(&entry)?;
+                let signed_header_hashed: SignedHeaderHashed =
+                    must_get_header(header_reference.into_inner())?;
+                let _header: Header = signed_header_hashed.into();
+            }
+            if this_zome.matches_entry_def_id(&app_entry_type, ElementReference::entry_def_id()) {
+                let element_reference = ElementReference::try_from(&entry)?;
 
-    Ok(ValidateCallbackResult::Valid)
-}
-
-#[hdk_extern]
-fn validate_create_entry_header_reference(data: ValidateData) -> ExternResult<ValidateCallbackResult> {
-    let header_reference = HeaderReference::try_from(&data.element)?;
-
-    let signed_header_hashed: SignedHeaderHashed = must_get_header(header_reference.into_inner())?;
-    let _header: Header = signed_header_hashed.into();
-
-    Ok(ValidateCallbackResult::Valid)
-}
-
-#[hdk_extern]
-fn validate_create_entry_element_reference(data: ValidateData) -> ExternResult<ValidateCallbackResult> {
-    let element_reference = ElementReference::try_from(&data.element)?;
-
-    let element: Element = must_get_valid_element(element_reference.into_inner())?;
-    let _something: Something = element.try_into()?;
+                let element: Element = must_get_valid_element(element_reference.into_inner())?;
+                let _something: Something = element.try_into()?;
+            }
+        }
+    }
 
     Ok(ValidateCallbackResult::Valid)
 }
@@ -82,7 +90,12 @@ fn create_entry(_: ()) -> ExternResult<(HeaderHash, HeaderHash, HeaderHash, Head
     let element_reference_hash = hdk::prelude::create_entry(ElementReference(header_hash.clone()))?;
     let entry_reference_hash = hdk::prelude::create_entry(EntryReference(entry_hash))?;
 
-    Ok((header_hash, header_reference_hash, element_reference_hash, entry_reference_hash))
+    Ok((
+        header_hash,
+        header_reference_hash,
+        element_reference_hash,
+        entry_reference_hash,
+    ))
 }
 
 #[hdk_extern]

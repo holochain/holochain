@@ -96,7 +96,7 @@ where
     .await??;
 
     // TODO: Validate scratch items
-    super::inline_validation(workspace, network, conductor_handle, None, ribosome).await?;
+    super::inline_validation(workspace, network, conductor_handle, ribosome).await?;
 
     Ok(result)
 }
@@ -107,6 +107,7 @@ pub mod tests {
 
     use super::*;
     use crate::conductor::handle::MockConductorHandleT;
+    use crate::core::ribosome::guest_callback::validate::ValidateResult;
     use crate::core::ribosome::MockRibosomeT;
     use crate::fixt::DnaDefFixturator;
     use crate::fixt::MetaLairClientFixturator;
@@ -166,6 +167,9 @@ pub mod tests {
         ribosome
             .expect_run_init()
             .returning(move |_workspace, _invocation| Ok(InitResult::Pass));
+        ribosome
+            .expect_run_validate()
+            .returning(move |_, _| Ok(ValidateResult::Valid));
         ribosome.expect_dna_def().return_const(dna_def_hashed);
 
         let conductor_handle = Arc::new(MockConductorHandleT::new());

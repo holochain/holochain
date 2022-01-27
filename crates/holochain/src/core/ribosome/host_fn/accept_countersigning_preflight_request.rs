@@ -1,11 +1,11 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
+use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmError;
 use std::sync::Arc;
 use tracing::error;
-use crate::core::ribosome::RibosomeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn accept_countersigning_preflight_request<'a>(
@@ -92,11 +92,14 @@ pub fn accept_countersigning_preflight_request<'a>(
                 ))
             })
         }
-        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+        _ => Err(WasmError::Host(
+            RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
-                "accept_countersigning_preflight_request".into()
-            ).to_string()))
+                "accept_countersigning_preflight_request".into(),
+            )
+            .to_string(),
+        )),
     }
 }
 
@@ -506,7 +509,7 @@ pub mod wasm_test {
         assert_eq!(alice_activity.valid_activity.len(), 8);
         assert_eq!(
             &alice_activity.valid_activity[6].1,
-            countersigned_header_alice.header_hashed().as_hash(),
+            countersigned_header_alice.header_address(),
         );
 
         let bob_activity: AgentActivity = conductor
@@ -523,7 +526,7 @@ pub mod wasm_test {
         assert_eq!(bob_activity.valid_activity.len(), 6);
         assert_eq!(
             &bob_activity.valid_activity[4].1,
-            countersigned_header_bob.header_hashed().as_hash(),
+            countersigned_header_bob.header_address(),
         );
     }
 }
