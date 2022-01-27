@@ -69,9 +69,8 @@ pub(crate) type RxFromWebsocket = tokio_stream::wrappers::ReceiverStream<Incomin
 #[derive(Debug)]
 /// When dropped both to / from socket tasks are shutdown.
 pub struct PairShutdown {
-    #[allow(dead_code)]
     /// This is here for it's drop impl so it's not actually dead code.
-    close_from_socket: Trigger,
+    _close_from_socket: Trigger,
     close_to_socket: TxToWebsocket,
 }
 
@@ -148,7 +147,7 @@ impl Websocket {
         let (close_from_socket, pair_shutdown) = Valve::new();
         let pair_shutdown_handle = PairShutdown {
             close_to_socket: tx_to_websocket.clone(),
-            close_from_socket,
+            _close_from_socket: close_from_socket,
         };
         // Only shutdown if both trigger arcs are dropped
         let pair_shutdown_handle = Arc::new(pair_shutdown_handle);

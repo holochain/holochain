@@ -11,6 +11,10 @@ use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
 use url2::Url2;
 
+/// How often to record historical metrics
+/// (currently once per hour)
+const HISTORICAL_METRIC_RECORD_FREQ_MS: u64 = 1000 * 60 * 60;
+
 mod metric_exchange;
 use metric_exchange::*;
 
@@ -1087,6 +1091,30 @@ impl Space {
         parallel_notify_permit: Arc<tokio::sync::Semaphore>,
     ) -> Self {
         let metrics = MetricsSync::default();
+
+        {
+            let space = space.clone();
+            let metrics = metrics.clone();
+            let evt_sender = evt_sender.clone();
+            tokio::task::spawn(async move {
+                loop {
+                    tokio::time::sleep(std::time::Duration::from_millis(
+                        HISTORICAL_METRIC_RECORD_FREQ_MS,
+                    ))
+                    .await;
+
+                    let records = metrics.read().dump_historical();
+
+                    let _ = evt_sender
+                        .k_gen_req(KGenReq::RecordMetrics {
+                            space: space.clone(),
+                            records,
+                        })
+                        .await;
+                }
+            });
+        }
+
         let metric_exchange = MetricExchangeSync::spawn(
             space.clone(),
             config.tuning_params.clone(),
