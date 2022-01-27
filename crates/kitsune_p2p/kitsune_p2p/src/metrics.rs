@@ -605,9 +605,14 @@ impl MetricsSync {
         match self.0.try_read_for(std::time::Duration::from_millis(100)) {
             Some(g) => g,
             // This won't block if a writer is waiting.
+            // NOTE: This is a bit of a hack to work around a lock somewhere that is errant-ly 
+            // held over another call to lock. Really we should fix that error,
+            // potentially by using a closure pattern here to ensure the lock cannot
+            // be held beyond the access logic.
             None => self.0.read_recursive(),
         }
     }
+    
     /// Get a write lock for the metrics store.
     pub fn write(&self) -> parking_lot::RwLockWriteGuard<Metrics> {
         match self.0.try_write_for(std::time::Duration::from_secs(100)) {
