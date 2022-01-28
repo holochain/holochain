@@ -77,10 +77,16 @@ pub fn unit_arq(strat: &ArqStrat, unit_center: f64, unit_len: f64, power_offset:
         // Find the difference as described above, including the power_offset.
         // NOTE: this should be modified to take the ArqStrat::buffer into
         // consideration, because a narrower buffer requires a smaller power.
-        let power = (log_len + po - pow_min_chunks).floor();
+        let mut power = (log_len + po - pow_min_chunks).floor();
 
         let q = 2f64.powf(power);
-        let count = (len / q).round() as u32;
+        let mut count = (len / q).round() as u32;
+
+        // Small correction since I didn't get the math quite right.
+        if count > strat.max_chunks() {
+            count /= 2;
+            power += 1.0;
+        }
 
         let min = strat.min_chunks() as f64 * 2f64.powf(po);
         let max = strat.max_chunks() as f64 * 2f64.powf(po);

@@ -108,11 +108,15 @@ impl ArqStrat {
 
     /// The upper bound of number of chunks to maintain in an arq.
     /// When the chunk count exceeds this number, double the chunk size.
+    ///
     /// This is expressed in terms of min_chunks because we want this value
-    /// to always be even.
+    /// to always be odd -- this is because when growing the arq, we need to
+    /// downshift the power, and we can only downshift losslessly if the count
+    /// is even, and the most common case of exceeding the max_chunks is
+    /// is to exceed the max_chunks by 1, which would be an even number.
     pub fn max_chunks(&self) -> u32 {
-        let max_chunks = self.min_chunks() * 2;
-        assert!(max_chunks % 2 == 0);
+        let max_chunks = self.min_chunks() * 2 - 1;
+        assert!(max_chunks % 2 == 1);
         max_chunks
     }
 

@@ -6,3 +6,6 @@
 # everyone who runs the test benefits from these saved cases.
 cc f3a78399f776e21823c32d69968c22bed68a705ed91975088257822e37584b75 # shrinks to min_coverage = 40.0, buffer = 0.1
 cc a16b08b7b7657e6654ce6428892eee99ce8aafd9db3096f6e96d15cb71502bc0 # shrinks to min_coverage = 40.0, buffer = 0.24312421515429483, num_peers = 134
+cc b0a45edf9a8bfbf14d1d4da6fa5947dbe2909fce3ee0222f5315b5f492084709 # shrinks to center = 0.0, len = 0.9903702803455133
+cc 5a470257bf951809b9797ccdec1e7b47547083f678454f99d25e6708d452416a # shrinks to min_coverage = 46.654015826773346, buffer = 0.49587848817064173, num_peers = 117
+cc 2c9fb936731be40577ea0773108bc28c9550b403bada03e55695d20d885a4b6e # shrinks to min_coverage = 76.78284244250997, buffer = 0.21370848915762652, num_peers = 171
