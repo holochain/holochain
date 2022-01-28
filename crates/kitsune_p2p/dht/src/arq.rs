@@ -14,7 +14,7 @@ pub use arq_set::*;
 pub use peer_view::*;
 pub use strat::*;
 
-use kitsune_p2p_dht_arc::ArcInterval;
+use kitsune_p2p_dht_arc::{ArcInterval, DhtArc};
 
 use crate::{coords::*, op::Loc};
 
@@ -192,6 +192,15 @@ impl Arq {
     /// Get a mutable reference to the arq's count.
     pub fn count_mut(&mut self) -> &mut u32 {
         &mut self.count
+    }
+
+    pub fn to_dht_arc(&self) -> DhtArc {
+        let len = self.length();
+        DhtArc::new(self.center, (len / 2) as u32)
+    }
+
+    pub fn from_dht_arc(dht_arc: DhtArc) -> Self {
+        todo!("use unit_arq code")
     }
 }
 
