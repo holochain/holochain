@@ -574,6 +574,11 @@ pub mod wasm_test {
     use core::time::Duration;
     use holo_hash::AgentPubKey;
     use holochain_wasm_test_utils::TestWasm;
+    // use crate::conductor::Conductor;
+    // use holochain_types::prelude::*;
+
+    // use crate::core::ribosome::test_keystore;
+    // use holochain_types::test_utils::test_keystore;
 
     pub fn now() -> Duration {
         std::time::SystemTime::now()
@@ -604,7 +609,9 @@ pub mod wasm_test {
                 .unwrap();
 
             let mut conductor = SweetConductor::from_standard_config().await;
-            let (alice_pubkey, bob_pubkey) = SweetAgents::two(conductor.keystore()).await;
+            let (alice_pubkey, bob_pubkey) = SweetAgents::alice_and_bob();
+
+            dbg!(&alice_pubkey, &bob_pubkey);
 
             let apps = conductor
                 .setup_app_for_agents(

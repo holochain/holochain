@@ -67,6 +67,7 @@ pub mod wasm_test {
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
+    #[cfg(feature = "test_utils")]
     async fn invoke_import_xsalsa20_poly1305_encrypt_test() {
         observability::test_run().ok();
         let RibosomeTestFixture {

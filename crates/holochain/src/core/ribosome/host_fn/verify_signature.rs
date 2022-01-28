@@ -161,7 +161,7 @@ pub mod wasm_test {
                     )
                     .await;
 
-                assert_eq!(expect, output_raw, "raw: {}", name);
+                assert_eq!(expect, output_raw, "raw: {}, {}", name, k);
             }
         }
     }

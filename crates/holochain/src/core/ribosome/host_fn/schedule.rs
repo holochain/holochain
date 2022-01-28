@@ -255,7 +255,7 @@ pub mod tests {
         // Rescheduling will allow bob catch up to alice.
         let _shedule: () = conductor.call(&bobbo, "schedule", ()).await;
 
-        tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         let q2: Vec<Element> = conductor
             .call(
                 &bobbo,
