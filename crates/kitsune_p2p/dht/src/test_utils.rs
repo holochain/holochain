@@ -202,7 +202,7 @@ mod tests {
         /// range of ArqStrat parameters.
         /// NOTE: this is not perfect. The final assertion has to be fudged a bit,
         /// so this test asserts that the extrapolated coverage falls within the
-        /// range, +/- 1 on either end.
+        /// range.
         #[test]
         fn test_ideal_coverage(min_coverage in 40f64..100.0, buffer in 0.1f64..0.5, num_peers in 100u32..200) {
             let strat = ArqStrat {
