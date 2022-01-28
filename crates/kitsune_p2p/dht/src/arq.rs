@@ -199,8 +199,12 @@ impl Arq {
         DhtArc::new(self.center, (len / 2) as u32)
     }
 
-    pub fn from_dht_arc(dht_arc: DhtArc) -> Self {
-        todo!("use unit_arq code")
+    pub fn from_dht_arc(strat: &ArqStrat, dht_arc: DhtArc) -> Self {
+        approximate_arq(
+            strat,
+            dht_arc.center_loc(),
+            (dht_arc.half_length() as u64 * 2).saturating_sub(1),
+        )
     }
 }
 
@@ -488,6 +492,48 @@ pub fn power_upshift(power: u8, count: u32) -> Option<(u8, u32)> {
     }
 }
 
+/// Given a center and a length, give Arq which matches most closely given the provided strategy
+pub fn approximate_arq(strat: &ArqStrat, center: Loc, len: u64) -> Arq {
+    if len == 2u64.pow(32) {
+        Arq::new_full(center, strat.max_power)
+    } else if len == 0 {
+        Arq::new(center, strat.min_power, 0)
+    } else {
+        let len = len as f64;
+
+        // the log2 of the length tells us roughly what `power` to use to
+        // represent the entire length as a single chunk.
+        let log_len = len.log2();
+
+        // log2 of min_chunks lets us know by how much to reduce the above power
+        // so that we have a small enough power to actually use at least min_chunks
+        // number of chunks. For instance if min_chunks is 8, this power is 3,
+        // which will be subtracted from the above power to allow for
+        // at least 8 chunks in representing the length.
+        let pow_min_chunks = (strat.min_chunks() as f64).log2();
+
+        // Find the difference as described above, including the power_offset.
+        // NOTE: this should be modified to take the ArqStrat::buffer into
+        // consideration, because a narrower buffer requires a smaller power.
+        let mut power = (log_len - pow_min_chunks).floor();
+
+        let q = 2f64.powf(power);
+        let mut count = (len / q).round() as u32;
+
+        // Small correction since I didn't get the math quite right.
+        if count > strat.max_chunks() {
+            count /= 2;
+            power += 1.0;
+        }
+
+        let min = strat.min_chunks() as f64;
+        let max = strat.max_chunks() as f64;
+        debug_assert!(count >= min as u32, "count < min: {} < {}", count, min);
+        debug_assert!(count <= max as u32, "count > max: {} > {}", count, max);
+        Arq::new(center, power as u8, count)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -747,6 +793,19 @@ mod tests {
             ix2s.sort();
             assert_eq!(ix1, ix1s);
             assert_eq!(ix2, ix2s);
+        }
+
+        #[test]
+        fn dht_arc_roundtrip(center: u32, pow in 5..29u8, count in 0..8u32) {
+            let length = count as u64 * 2u64.pow(pow as u32);
+            let strat = ArqStrat::default();
+            let arq = approximate_arq(&strat, center.into(), length);
+            dbg!(arq);
+            let dht_arc = arq.to_dht_arc();
+            assert_eq!(dht_arc.half_length() as u64, length / 2);
+            let arq2 = Arq::from_dht_arc(&strat, dht_arc);
+            println!("{:?} == {:?}", arq, arq2);
+            assert_eq!(arq, arq2);
         }
     }
 }

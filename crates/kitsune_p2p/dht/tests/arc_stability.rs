@@ -56,7 +56,7 @@ fn stability_test_case_near_ideal() {
     };
     println!("{}", strat.summary());
 
-    let peers = generate_ideal_coverage(&mut rng, &strat, Some(cov * 2.0), n, j, 0);
+    let peers = generate_ideal_coverage(&mut rng, &strat, Some(cov * 2.0), n, j);
     parameterized_stability_test(&strat, peers, detail);
 }
 
@@ -77,7 +77,7 @@ fn stability_test_case_messy() {
         min_coverage: cov,
         ..Default::default()
     };
-    let peers = generate_messy_coverage(&mut rng, &strat, len_mean, len_std, n, j, 0);
+    let peers = generate_messy_coverage(&mut rng, &strat, len_mean, len_std, n, j);
     parameterized_stability_test(&strat, peers, detail);
 }
 
@@ -101,7 +101,7 @@ proptest::proptest! {
             ..Default::default()
         };
 
-        let peers = generate_messy_coverage(&mut rng, &strat, len_mean, len_std, num_peers, j, 0);
+        let peers = generate_messy_coverage(&mut rng, &strat, len_mean, len_std, num_peers, j);
         parameterized_stability_test(&strat, peers, detail);
     }
 }

@@ -35,7 +35,7 @@ type DataVec = statrs::statistics::Data<Vec<f64>>;
 
 pub type Peers = Vec<Arq>;
 
-pub fn unit_arq(strat: &ArqStrat, unit_center: f64, unit_len: f64, power_offset: i8) -> Arq {
+pub fn unit_arq(strat: &ArqStrat, unit_center: f64, unit_len: f64) -> Arq {
     assert!(
         0.0 <= unit_center && unit_center < 1.0,
         "center out of bounds {}",
@@ -47,55 +47,11 @@ pub fn unit_arq(strat: &ArqStrat, unit_center: f64, unit_len: f64, power_offset:
         unit_len
     );
 
-    if power_offset != 0 {
-        tracing::warn!(
-            "power_offset logic is not yet tested, and should not be used before revisiting"
-        );
-    }
-
-    let full_len = full_len();
-    let center = Loc::from((full_len * unit_center) as u32);
-    if unit_len == 1.0 {
-        Arq::new_full(center, strat.max_power)
-    } else if unit_len == 0.0 {
-        Arq::new(center, strat.min_power, 0)
-    } else {
-        let po = power_offset as f64;
-        let len = unit_len * full_len;
-
-        // the log2 of the length tells us roughly what `power` to use to
-        // represent the entire length as a single chunk.
-        let log_len = len.log2();
-
-        // log2 of min_chunks lets us know by how much to reduce the above power
-        // so that we have a small enough power to actually use at least min_chunks
-        // number of chunks. For instance if min_chunks is 8, this power is 3,
-        // which will be subtracted from the above power to allow for
-        // at least 8 chunks in representing the length.
-        let pow_min_chunks = (strat.min_chunks() as f64).log2();
-
-        // Find the difference as described above, including the power_offset.
-        // NOTE: this should be modified to take the ArqStrat::buffer into
-        // consideration, because a narrower buffer requires a smaller power.
-        let mut power = (log_len + po - pow_min_chunks).floor();
-
-        let q = 2f64.powf(power);
-        let mut count = (len / q).round() as u32;
-
-        // Small correction since I didn't get the math quite right.
-        if count > strat.max_chunks() {
-            count /= 2;
-            power += 1.0;
-        }
-
-        let min = strat.min_chunks() as f64 * 2f64.powf(po);
-        let max = strat.max_chunks() as f64 * 2f64.powf(po);
-        if power_offset == 0 {
-            assert!(count >= min as u32, "count < min: {} < {}", count, min);
-            assert!(count <= max as u32, "count > max: {} > {}", count, max);
-        }
-        Arq::new(center, power as u8, count)
-    }
+    approximate_arq(
+        strat,
+        Loc::from((unit_center * full_len()) as u32),
+        (unit_len * full_len()) as u64,
+    )
 }
 
 /// Each agent is perfectly evenly spaced around the DHT (+/- some jitter),
@@ -106,7 +62,6 @@ pub fn generate_ideal_coverage(
     cov: Option<f64>,
     n: u32,
     jitter: f64,
-    power_offset: i8,
 ) -> Peers {
     tracing::info!("N = {}, J = {}", n, jitter);
     tracing::info!("ArqStrat: = {:#?}", strat);
@@ -121,7 +76,7 @@ pub fn generate_ideal_coverage(
             let center =
                 ((i as f64 / nf) + (2.0 * jitter * rng.gen::<f64>()) - jitter).rem_euclid(1.0);
 
-            unit_arq(strat, center, len, power_offset)
+            unit_arq(strat, center, len)
         })
         .collect();
 
@@ -145,7 +100,6 @@ pub fn generate_messy_coverage(
     len_std: f64,
     n: u32,
     jitter: f64,
-    power_offset_range: i8,
 ) -> Peers {
     use rand::distributions::*;
 
@@ -158,12 +112,10 @@ pub fn generate_messy_coverage(
 
     let peers: Vec<_> = (0..n)
         .map(|i| {
-            let power_offset =
-                rng.gen::<i8>().rem_euclid(power_offset_range * 2 + 1) - power_offset_range;
             let center =
                 ((i as f64 / nf) + (2.0 * jitter * rng.gen::<f64>()) - jitter).rem_euclid(1.0);
             let len = len_dist.sample(rng).clamp(0.0, 1.0);
-            unit_arq(strat, center, len, power_offset)
+            unit_arq(strat, center, len)
         })
         .collect();
 
@@ -180,37 +132,37 @@ fn test_unit_arc() {
     let expected_chunks = 8;
 
     {
-        let a = unit_arq(&strat, 0.0, 0.0, 0);
+        let a = unit_arq(&strat, 0.0, 0.0);
         assert_eq!(a.power(), strat.min_power);
         assert_eq!(a.count(), 0);
     }
     {
-        let a = unit_arq(&strat, 0.0, 1.0, 0);
+        let a = unit_arq(&strat, 0.0, 1.0);
         assert_eq!(a.power(), 29);
         assert_eq!(a.count(), 8);
     }
     {
-        let a = unit_arq(&strat, 0.0, 1.0 / 2.0, 0);
+        let a = unit_arq(&strat, 0.0, 1.0 / 2.0);
         assert_eq!(a.power(), 28);
         assert_eq!(a.count(), expected_chunks);
     }
     {
-        let a = unit_arq(&strat, 0.0, 1.0 / 4.0, 0);
+        let a = unit_arq(&strat, 0.0, 1.0 / 4.0);
         assert_eq!(a.power(), 27);
         assert_eq!(a.count(), expected_chunks);
     }
     {
-        let a = unit_arq(&strat, 0.0, 1.0 / 8.0, 0);
+        let a = unit_arq(&strat, 0.0, 1.0 / 8.0);
         assert_eq!(a.power(), 26);
         assert_eq!(a.count(), expected_chunks);
     }
     {
-        let a = unit_arq(&strat, 0.0, 1.0 / 16.0, 0);
+        let a = unit_arq(&strat, 0.0, 1.0 / 16.0);
         assert_eq!(a.power(), 25);
         assert_eq!(a.count(), expected_chunks);
     }
     {
-        let a = unit_arq(&strat, 0.0, 1.0 / 32.0, 0);
+        let a = unit_arq(&strat, 0.0, 1.0 / 32.0);
         assert_eq!(a.power(), 24);
         assert_eq!(a.count(), expected_chunks);
     }
@@ -234,7 +186,7 @@ mod tests {
         };
 
         let mut rng = seeded_rng(None);
-        let peers = generate_ideal_coverage(&mut rng, &strat, None, 100, 0.0, 0);
+        let peers = generate_ideal_coverage(&mut rng, &strat, None, 100, 0.0);
 
         let view = PeerView::new(strat.clone(), peers);
         let cov = view.actual_coverage();
@@ -259,7 +211,7 @@ mod tests {
                 ..Default::default()
             };
             let mut rng = seeded_rng(None);
-            let peers = generate_ideal_coverage(&mut rng, &strat, None, num_peers, 0.0, 0);
+            let peers = generate_ideal_coverage(&mut rng, &strat, None, num_peers, 0.0);
             let view = PeerView::new(strat.clone(), peers);
             let cov = view.actual_coverage();
 
@@ -276,7 +228,7 @@ mod tests {
                 buffer: 0.144,
                 ..Default::default()
             };
-            let a = unit_arq(&strat, center, len, 0);
+            let a = unit_arq(&strat, center, len);
 
             assert!(a.count() >= strat.min_chunks());
             assert!(a.count() <= strat.max_chunks());
@@ -289,7 +241,7 @@ mod tests {
                 buffer: 0.144,
                 ..Default::default()
             };
-            let a = unit_arq(&strat, center, len, 0);
+            let a = unit_arq(&strat, center, len);
             assert!(a.power() >= strat.min_power);
             assert!(a.power() <= strat.max_power);
         }
@@ -301,7 +253,7 @@ mod tests {
                 buffer: 0.144,
                 ..Default::default()
             };
-            let a = unit_arq(&strat, center, len, 0);
+            let a = unit_arq(&strat, center, len);
             let target_len = (len * 2f64.powf(32.0)) as i64;
             let true_len = a.to_interval().length() as i64;
             assert!((true_len - target_len).abs() < a.spacing() as i64);

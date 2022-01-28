@@ -63,7 +63,7 @@ fn gossip_scenario_full_sync() {
 
     let max_time = TimeCoord::from(525600 / 12).to_timestamp(&topo); // 1 year
 
-    let arqs = generate_ideal_coverage(&mut rng, &strat, None, n as u32, 0.0, 0);
+    let arqs = generate_ideal_coverage(&mut rng, &strat, None, n as u32, 0.0);
     let mut nodes: Vec<_> = arqs
         .iter()
         .map(|a| TestNode::new(topo.clone(), gopa, *a))

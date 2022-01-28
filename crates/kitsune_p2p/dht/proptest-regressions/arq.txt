@@ -1,0 +1,14 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 86f86d813d6b9bfc7b9121bcd1ec79e5186593a147cbbc4a07fb75ac56d7f589 # shrinks to center = 0, pow = 93, count = 240266593
+cc 82adecb24fea474a946f1a5fe059c8150bf0f88bf259c2184c861a3e7a1e164e # shrinks to center = 0, pow = 29, count = 9
+cc 8b613f39f49019b5b85ac888e442fc78a4a3c5b08d4a6ac552f25f43532feb34 # shrinks to center = 0, pow = 0, count = 0
+cc 28d4acd22890773cf8c2251c3998e960f26e2773472b96cf15bb69705b6caaca # shrinks to center = 0, pow = 1, count = 0
+cc 0189bf01f9c65a3d3763c95921689f5a1ac1f57152e94d9ecb866fcbfbf6971b # shrinks to center = 0, pow = 1, count = 1
+cc 4ff091d2c68ae13cbb50704d7e1b7ce09d5dd8eb0a18a9e330060ead9922908e # shrinks to center = 0, pow = 2, count = 1
+cc 2114cf98e01fc238006b6570d03c3cd3929d5883606c763dc4b149aad6a0b75a # shrinks to center = 0, pow = 3, count = 1
+cc 90bdeafe40d63355ed1b0f165443968553acc1a3bdc2090eae8b4cae7035cd8d # shrinks to center = 0, pow = 4, count = 1

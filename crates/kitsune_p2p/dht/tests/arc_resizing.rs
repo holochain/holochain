@@ -32,7 +32,7 @@ fn test_shrink_towards_empty() {
     let jitter = 0.01;
 
     // generate peers with a bit too much coverage (14 > 12)
-    let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(14.5), 100, jitter, 0);
+    let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(14.5), 100, jitter);
     let peer_power = peers.iter().map(|p| p.power()).min().unwrap();
     let view = PeerView::new(strat.clone(), peers);
 
@@ -67,7 +67,7 @@ fn test_grow_towards_full() {
     let jitter = 0.01;
 
     // generate peers with deficient coverage
-    let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(7.0), 1000, jitter, 0);
+    let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(7.0), 1000, jitter);
     let peer_power = peers.iter().map(|p| p.power()).min().unwrap();
     let view = PeerView::new(strat.clone(), peers);
 
@@ -102,7 +102,7 @@ fn test_grow_to_full() {
     dbg!(strat.max_chunks());
 
     // generate peers with deficient coverage
-    let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(7.0), 1000, jitter, 0);
+    let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(7.0), 1000, jitter);
     let peer_power = peers.iter().map(|p| p.power()).min().unwrap();
     let view = PeerView::new(strat.clone(), peers);
 
@@ -136,7 +136,7 @@ fn test_grow_by_multiple_chunks() {
     let jitter = 0.01;
 
     // generate peers with far too little coverage
-    let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(5.0), 1000, jitter, 0);
+    let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(5.0), 1000, jitter);
     let peer_power = peers.iter().map(|p| p.power()).min().unwrap();
     let view = PeerView::new(strat.clone(), peers);
 
@@ -201,7 +201,7 @@ fn test_scenario() {
         // start with a full arq
         let mut arq = Arq::new_full(Loc::from(0x0), strat.max_power);
         // create 10 peers, all with full arcs, fully covering the DHT
-        let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, None, 10, jitter, 0);
+        let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, None, 10, jitter);
         let view = PeerView::new(strat.clone(), peers);
         let extrapolated = view.extrapolated_coverage(&arq.to_bounds());
         assert_eq!(extrapolated, 10.0);
@@ -216,7 +216,7 @@ fn test_scenario() {
         let mut arq = Arq::new_full(Loc::from(0x0), strat.max_power);
         // create 100 peers, with arcs at about 10%,
         // covering a bit more than they need to
-        let peers = generate_ideal_coverage(&mut rng, &strat, Some(13.0), 100, jitter, 0);
+        let peers = generate_ideal_coverage(&mut rng, &strat, Some(13.0), 100, jitter);
 
         {
             let peer_power = peers.iter().map(|p| p.power()).min().unwrap();
