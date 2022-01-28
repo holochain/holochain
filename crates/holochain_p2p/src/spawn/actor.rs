@@ -140,9 +140,8 @@ impl WrapEvtSender {
         dna_hash: DnaHash,
         kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
         dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
-    ) -> impl Future<Output = HolochainP2pResult<kitsune_p2p_types::dht_arc::PeerViewBeta>>
-           + 'static
-           + Send {
+    ) -> impl Future<Output = HolochainP2pResult<kitsune_p2p_types::dht_arc::PeerView>> + 'static + Send
+    {
         timing_trace!(
             { self.0.query_peer_density(dna_hash, kitsune_space, dht_arc) },
             "(hp2p:handle) query_peer_density",
@@ -684,7 +683,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         &mut self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
         dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
-    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht_arc::PeerViewBeta>
+    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht_arc::PeerView>
     {
         let h_space = DnaHash::from_kitsune(&space);
         let evt_sender = self.evt_sender.clone();

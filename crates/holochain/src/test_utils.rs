@@ -228,12 +228,7 @@ where
                 }
                 QueryPeerDensity { respond, .. } => {
                     respond.r(Ok(async move {
-                        Ok(PeerViewBeta::new(
-                            Default::default(),
-                            DhtArc::full(0),
-                            1.0,
-                            1,
-                        ))
+                        Ok(PeerViewBeta::new(Default::default(), DhtArc::full(0), 1.0, 1).into())
                     }
                     .boxed()
                     .into()));

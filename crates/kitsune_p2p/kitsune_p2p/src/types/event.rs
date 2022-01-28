@@ -261,7 +261,7 @@ ghost_actor::ghost_chan! {
         fn query_agents(input: QueryAgentsEvt) -> Vec<crate::types::agent_store::AgentInfoSigned>;
 
         /// Query the peer density of a space for a given [`DhtArc`].
-        fn query_peer_density(space: KSpace, dht_arc: kitsune_p2p_types::dht_arc::DhtArc) -> kitsune_p2p_types::dht_arc::PeerViewBeta;
+        fn query_peer_density(space: KSpace, dht_arc: kitsune_p2p_types::dht_arc::DhtArc) -> kitsune_p2p_types::dht_arc::PeerView;
 
         /// We are receiving a request from a remote node.
         fn call(space: KSpace, to_agent: KAgent, payload: Payload) -> Vec<u8>;

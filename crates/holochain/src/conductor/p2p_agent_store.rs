@@ -5,8 +5,8 @@ use holo_hash::DnaHash;
 use holochain_conductor_api::AgentInfoDump;
 use holochain_conductor_api::P2pAgentsDump;
 use holochain_p2p::dht_arc::DhtArc;
-use holochain_p2p::dht_arc::PeerStratBeta;
-use holochain_p2p::dht_arc::PeerViewBeta;
+use holochain_p2p::dht_arc::PeerStrat;
+use holochain_p2p::dht_arc::PeerView;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use holochain_p2p::AgentPubKeyExt;
 use holochain_sqlite::prelude::*;
@@ -196,7 +196,7 @@ pub async fn query_peer_density(
     env: DbRead<DbKindP2pAgentStore>,
     kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     dht_arc: DhtArc,
-) -> ConductorResult<PeerViewBeta> {
+) -> ConductorResult<PeerView> {
     let now = now();
     let arcs = run_query(env, move |mut conn| Ok(conn.p2p_list_agents()?)).await?;
     let arcs: Vec<_> = arcs
@@ -215,7 +215,7 @@ pub async fn query_peer_density(
         .collect();
 
     // contains is already checked in the iterator
-    Ok(PeerStratBeta::default().view_unchecked(dht_arc, arcs.as_slice()))
+    Ok(PeerStrat::default().view_unchecked(dht_arc, arcs.as_slice()))
 }
 
 /// Put single agent info into store

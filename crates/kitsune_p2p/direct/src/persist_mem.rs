@@ -3,7 +3,7 @@
 use crate::types::persist::*;
 use crate::*;
 use futures::future::{BoxFuture, FutureExt};
-use kitsune_p2p::dht_arc::{DhtArcSet, PeerStratBeta};
+use kitsune_p2p::dht_arc::{DhtArcSet, PeerStrat};
 use kitsune_p2p::event::TimeWindow;
 use kitsune_p2p_types::tls::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
@@ -385,7 +385,7 @@ impl AsKdPersist for PersistMem {
         &self,
         root: KdHash,
         dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
-    ) -> BoxFuture<'static, KdResult<kitsune_p2p_types::dht_arc::PeerViewBeta>> {
+    ) -> BoxFuture<'static, KdResult<kitsune_p2p_types::dht_arc::PeerView>> {
         let store = self.0.share_mut(move |i, _| match i.agent_info.get(&root) {
             Some(store) => Ok(store.clone()),
             None => Err("root not found".into()),
@@ -408,7 +408,7 @@ impl AsKdPersist for PersistMem {
                 .collect();
 
             // contains is already checked in the iterator
-            Ok(PeerStratBeta::default().view_unchecked(dht_arc, arcs.as_slice()))
+            Ok(PeerStrat::default().view_unchecked(dht_arc, arcs.as_slice()))
         }
         .boxed()
     }
