@@ -54,6 +54,6 @@ pub mod test {
         } = RibosomeTestFixture::new(TestWasm::ZomeInfo).await;
 
         let dna_info: DnaInfo = conductor.call(&alice, "dna_info", ()).await;
-        assert_eq!(dna_info.name, String::from("test"));
+        assert_eq!(dna_info.name, String::from("Generated DnaDef"));
     }
 }

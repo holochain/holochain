@@ -18,18 +18,17 @@ pub fn hash_entry(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    // use super::*;
+    use super::*;
     use crate::core::ribosome::host_fn::hash_entry::hash_entry;
 
     use crate::fixt::CallContextFixturator;
     use crate::fixt::EntryFixturator;
     use crate::fixt::RealRibosomeFixturator;
-    // use crate::fixt::ZomeCallHostAccessFixturator;
-    // use ::fixt::prelude::*;
     use holo_hash::EntryHash;
-    // use holochain_wasm_test_utils::TestWasm;
+    use holochain_wasm_test_utils::TestWasm;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use std::sync::Arc;
-    // use hdk::hash_path::path::Component;
+    use hdk::hash_path::path::Component;
     use hdk::prelude::*;
 
     #[tokio::test(flavor = "multi_thread")]

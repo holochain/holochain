@@ -37,9 +37,9 @@ pub fn sign(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_sign_test() {
@@ -50,7 +50,9 @@ pub mod wasm_test {
             alice_pubkey,
             bob_pubkey,
             ..
-        } = RibosomeTestFixture::new(TestWasm::Link).await;
+        } = RibosomeTestFixture::new(TestWasm::Sign).await;
+
+        dbg!(&alice_pubkey);
 
         // signatures should not change for a given pubkey
         for (k, data, expect) in vec![
@@ -58,10 +60,10 @@ pub mod wasm_test {
                 alice_pubkey.clone(),
                 vec![100_u8, 200_u8, 50_u8],
                 vec![
-                    240, 134, 114, 170, 178, 165, 117, 201, 98, 239, 41, 23, 223, 162, 103, 77, 44,
-                    26, 215, 100, 248, 162, 55, 133, 60, 166, 234, 160, 229, 233, 46, 124, 6, 20,
-                    254, 231, 246, 199, 115, 107, 248, 226, 7, 140, 177, 73, 81, 180, 150, 51, 146,
-                    9, 17, 110, 244, 198, 74, 146, 200, 66, 155, 134, 46, 13,
+                    41, 122, 215, 238, 137, 34, 227, 178, 61, 7, 1, 151, 88, 203, 184, 158, 58, 27,
+                    118, 147, 122, 115, 97, 22, 146, 231, 28, 69, 145, 97, 123, 176, 13, 75, 104,
+                    117, 227, 207, 73, 218, 106, 83, 242, 80, 208, 123, 197, 11, 171, 24, 177, 95,
+                    116, 169, 183, 210, 109, 60, 169, 103, 224, 12, 89, 13,
                 ],
             ),
             (
