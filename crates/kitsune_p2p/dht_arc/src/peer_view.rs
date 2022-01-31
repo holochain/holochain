@@ -53,10 +53,10 @@ pub enum PeerView {
 impl PeerView {
     /// Given the current view of a peer and the peer's current coverage,
     /// this returns the next step to take in reaching the ideal coverage.
-    pub fn next_coverage(&self, current: f64) -> f64 {
+    pub fn update_arc(&self, dht_arc: &mut DhtArc) -> bool {
         match self {
-            Self::Alpha(s) => s.next_coverage(current),
-            Self::Beta(s) => s.next_coverage(current),
+            Self::Alpha(s) => s.update_arc(dht_arc),
+            Self::Beta(s) => s.update_arc(dht_arc),
         }
     }
 }

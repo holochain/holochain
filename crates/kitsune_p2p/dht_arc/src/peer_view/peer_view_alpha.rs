@@ -103,7 +103,8 @@ impl PeerViewAlpha {
 
     /// Given the current coverage, what is the next step to take in reaching
     /// the ideal coverage?
-    pub fn next_coverage(&self, current: f64) -> f64 {
+    pub fn update_arc(&self, dht_arc: &mut DhtArc) -> bool {
+        let current = dht_arc.coverage();
         let target = {
             let target_lo = self.target_coverage();
             let target_hi = (target_lo + self.strat.coverage_buffer).min(1.0);
@@ -119,12 +120,18 @@ impl PeerViewAlpha {
 
         // The change in arc we'd need to make to get to the target.
         let delta = target - current;
-        // If this is below our threshold then go straight to the target.
-        if delta.abs() < self.strat.delta_threshold {
-            target
-        // Other wise scale the delta to avoid rapid change.
+        if delta > 0.0 {
+            // If this is below our threshold then go straight to the target.
+            let new_coverage = if delta.abs() < self.strat.delta_threshold {
+                target
+            // Other wise scale the delta to avoid rapid change.
+            } else {
+                current + (delta * self.strat.delta_scale)
+            };
+            *dht_arc.half_length_mut() = (MAX_HALF_LENGTH as f64 * new_coverage) as u32;
+            true
         } else {
-            current + (delta * self.strat.delta_scale)
+            false
         }
     }
 

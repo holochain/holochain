@@ -287,7 +287,11 @@ impl RunBatch {
             Vergence::Convergent => RunReportOutcome::Convergent {
                 redundancy_stats: Stats::new(DataVec::new(
                     self.histories()
-                        .map(|hs| hs.last().unwrap().min_redundancy as f64)
+                        .map(|hs| {
+                            hs.last()
+                                .map(|l| l.min_redundancy as f64)
+                                .unwrap_or_default()
+                        })
                         .collect(),
                 )),
             },
