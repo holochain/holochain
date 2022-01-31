@@ -1,6 +1,5 @@
-use crate::dht_arc::loc_upscale;
+use crate::{loc_upscale, ArcInterval};
 
-use super::*;
 use pretty_assertions::assert_eq;
 
 #[test]
