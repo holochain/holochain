@@ -185,9 +185,20 @@ async fn call_zome() {
 
     // Call zome after restart
     tracing::info!("Restarting conductor");
-    let _holochain = start_holochain(config_path).await;
+    let (_holochain, admin_port) = start_holochain(config_path).await;
+    let admin_port = admin_port.await.unwrap();
+
+    let (mut client, _) = websocket_client_by_port(admin_port).await.unwrap();
 
     tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+
+    let request = AdminRequest::ListAppInterfaces;
+    let response = client.request(request);
+    let response = check_timeout(response, 3000).await;
+    let app_port = match response {
+        AdminResponse::AppInterfacesListed(ports) => *ports.first().unwrap(),
+        _ => panic!("Unexpected response"),
+    };
 
     // Call Zome again on the existing app interface port
     tracing::info!("Calling zome again");
