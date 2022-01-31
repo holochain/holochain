@@ -356,6 +356,13 @@ impl ArcInterval<DhtLocation> {
         matches!(self, Self::Empty)
     }
 
+    /// Check if arcs overlap
+    pub fn overlaps(&self, other: &Self) -> bool {
+        let a = DhtArcSet::from(self);
+        let b = DhtArcSet::from(other);
+        a.overlap(&b)
+    }
+
     /// Amount of intersection between two arcs
     pub fn overlap_coverage(&self, other: &Self) -> f64 {
         let a = DhtArcSet::from(self);
@@ -365,31 +372,57 @@ impl ArcInterval<DhtLocation> {
     }
 
     pub fn center_loc(&self) -> DhtLocation {
-        DhtArc::from_interval(self.clone()).center_loc
+        DhtArc::from_interval(self.clone()).center_loc()
     }
 
     #[cfg(any(test, feature = "test_utils"))]
     /// Handy ascii representation of an arc, especially useful when
     /// looking at several arcs at once to get a sense of their overlap
     pub fn to_ascii(&self, len: usize) -> String {
-        use crate::loc_downscale;
+        use crate::{loc_downscale, loc_upscale};
+
+        let empty = || " ".repeat(len);
+        let full = || "-".repeat(len);
+
+        // If lo and hi are less than one bucket's width apart when scaled down,
+        // decide whether to interpret this as empty or full
+        let decide = |lo: &DhtLocation, hi: &DhtLocation| {
+            let mid = loc_upscale(len, (len / 2) as i32);
+            if lo < hi {
+                if hi.as_u32() - lo.as_u32() < mid {
+                    empty()
+                } else {
+                    full()
+                }
+            } else if lo.as_u32() - hi.as_u32() < mid {
+                full()
+            } else {
+                empty()
+            }
+        };
 
         match self {
-            Self::Full => "-".repeat(len),
-            Self::Empty => " ".repeat(len),
-            Self::Bounded(lo, hi) => {
-                let lo = loc_downscale(len, *lo);
-                let hi = loc_downscale(len, *hi);
-                let mut s = if lo <= hi {
-                    vec![
-                        " ".repeat(lo),
-                        "-".repeat(hi - lo + 1),
-                        " ".repeat(len - hi - 1),
-                    ]
+            Self::Full => full(),
+            Self::Empty => empty(),
+            Self::Bounded(lo0, hi0) => {
+                let lo = loc_downscale(len, *lo0);
+                let hi = loc_downscale(len, *hi0);
+                let mut s = if lo0 <= hi0 {
+                    if lo >= hi {
+                        vec![decide(lo0, hi0)]
+                    } else {
+                        vec![
+                            " ".repeat(lo),
+                            "-".repeat(hi - lo + 1),
+                            " ".repeat((len - hi).saturating_sub(1)),
+                        ]
+                    }
+                } else if lo <= hi {
+                    vec![decide(lo0, hi0)]
                 } else {
                     vec![
                         "-".repeat(hi + 1),
-                        " ".repeat(lo - hi - 1),
+                        " ".repeat((lo - hi).saturating_sub(1)),
                         "-".repeat(len - lo),
                     ]
                 }

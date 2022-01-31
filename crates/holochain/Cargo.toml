@@ -90,8 +90,10 @@ sd-notify = "0.3.0"
 anyhow = "1.0.26"
 assert_cmd = "1.0.1"
 criterion = { version = "0.3", features = [ "async_tokio" ] }
+kitsune_p2p_bootstrap = { version = "0.0.1", path = "../kitsune_p2p/bootstrap" }
 maplit = "1"
 pretty_assertions = "0.6.1"
+reqwest = "0.11.2"
 serial_test = "0.4.0"
 test-case = "1.0.0"
 
