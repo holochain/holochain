@@ -20,7 +20,7 @@ use holochain_conductor_api::IntegrationStateDumps;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_p2p::dht_arc::DhtArc;
-use holochain_p2p::dht_arc::PeerDensity;
+use holochain_p2p::dht_arc::PeerViewBeta;
 use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::spawn_holochain_p2p;
 use holochain_p2p::HolochainP2pDna;
@@ -227,11 +227,16 @@ where
                     respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                 }
                 QueryPeerDensity { respond, .. } => {
-                    respond.r(Ok(
-                        async move { Ok(PeerDensity::new(DhtArc::full(0), 1.0, 1)) }
-                            .boxed()
-                            .into(),
-                    ));
+                    respond.r(Ok(async move {
+                        Ok(PeerViewBeta::new(
+                            Default::default(),
+                            DhtArc::full(0),
+                            1.0,
+                            1,
+                        ))
+                    }
+                    .boxed()
+                    .into()));
                 }
                 _ => {}
             }
