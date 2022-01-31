@@ -429,6 +429,7 @@ dependencies = [
  "rand",
  "serde",
  "serde_bytes",
+ "serde_yaml",
  "strum",
  "subtle",
  "thiserror",

@@ -46,7 +46,6 @@ pub mod test {
     use crate::sweettest::SweetDnaFile;
     use holochain_types::prelude::MockDnaStore;
     use crate::conductor::ConductorBuilder;
-    use holochain_types::properties::YamlProperties;
 
     async fn test_conductor(properties: SerializedBytes) -> (SweetConductor, SweetZome) {
         let (dna_file, _) = SweetDnaFile::from_test_wasms(random_uid(), vec![TestWasm::ZomeInfo], properties)

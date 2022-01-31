@@ -2893,6 +2893,7 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_bytes",
+ "serde_yaml",
  "shrinkwraprs",
  "strum",
  "subtle",

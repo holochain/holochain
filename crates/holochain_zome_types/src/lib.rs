@@ -38,6 +38,8 @@ pub mod metadata;
 #[allow(missing_docs)]
 pub mod migrate_agent;
 pub mod prelude;
+#[cfg(feature = "properties")]
+pub mod properties;
 pub mod query;
 pub mod request;
 /// Schedule functions to run outside a direct zome call.

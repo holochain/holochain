@@ -19,6 +19,7 @@ holochain_serialized_bytes = "=0.0.51"
 paste = "=1.0.5"
 serde = { version = "1.0", features = [ "derive" ] }
 serde_bytes = "0.11"
+serde_yaml = { version = "0.8", optional = true }
 subtle = "2"
 thiserror = "1.0.22"
 tracing = "0.1"
@@ -59,9 +60,11 @@ default = ["full-dna-def", "fixturators", "test_utils", "subtle-encoding"]
 # but used in Holochain
 full-dna-def = ["derive_builder", "nanoid", "shrinkwraprs"]
 
-full = ["default", "rusqlite", "num_enum", "kitsune_p2p_timestamp/full"]
+full = ["default", "rusqlite", "num_enum", "kitsune_p2p_timestamp/full", "properties"]
 
 fixturators = ["fixt", "rand", "strum", "holo_hash/fixturators", ]
+
+properties = ["serde_yaml"]
 
 test_utils = [
   "arbitrary",

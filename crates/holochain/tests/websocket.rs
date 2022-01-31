@@ -62,7 +62,7 @@ async fn call_admin() {
     let original_dna_hash = dna.dna_hash().clone();
 
     // Make properties
-    let properties = holochain_types::properties::YamlProperties::new(
+    let properties = holochain_zome_types::properties::YamlProperties::new(
         serde_yaml::from_str(
             r#"
 test: "example"
