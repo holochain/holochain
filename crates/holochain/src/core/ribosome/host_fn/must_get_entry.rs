@@ -16,6 +16,7 @@ pub fn must_get_entry<'a>(
     call_context: Arc<CallContext>,
     input: MustGetEntryInput,
 ) -> Result<EntryHashed, WasmError> {
+    dbg!(&input);
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             read_workspace_deterministic: Permission::Allow,
@@ -123,41 +124,91 @@ pub mod test {
     use holochain_wasm_test_utils::TestWasm;
     // use std::sync::Arc;
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
+    use crate::test_entry_impl;
+    use unwrap_to::unwrap_to;
 
     /// Mimics inside the must_get wasm.
     #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug, PartialEq)]
     struct Something(#[serde(with = "serde_bytes")] Vec<u8>);
 
+    #[derive(Deserialize, Serialize, SerializedBytes, Debug, Clone)]
+    struct HeaderReference(HeaderHash);
+    #[derive(Deserialize, Serialize, SerializedBytes, Debug, Clone)]
+    struct EntryReference(EntryHash);
+    #[derive(Deserialize, Serialize, SerializedBytes, Debug, Clone)]
+    struct ElementReference(HeaderHash);
+
+    test_entry_impl!(HeaderReference);
+    test_entry_impl!(EntryReference);
+    test_entry_impl!(ElementReference);
+
+    const HEADER_REFERENCE_ENTRY_DEF_ID: &str = "header_reference";
+
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_must_get_entry_test<'a>() {
         observability::test_run().ok();
         let RibosomeTestFixture {
-            conductor, alice, ..
+            conductor, alice, bob, alice_host_fn_caller, ..
         } = RibosomeTestFixture::new(TestWasm::MustGet).await;
 
-        // get the result of a commit entry
-        let (header_hash, header_reference_hash, element_reference_hash, entry_reference_hash): (
-            HeaderHash,
-            HeaderHash,
-            HeaderHash,
-            HeaderHash,
-        ) = conductor.call(&alice, "create_entry", ()).await;
+        // // get the result of a commit entry
+        // let (header_hash, header_reference_hash, element_reference_hash, entry_reference_hash): (
+        //     HeaderHash,
+        //     HeaderHash,
+        //     HeaderHash,
+        //     HeaderHash,
+        // ) = conductor.call(&alice, "create_entry", ()).await;
 
-        let _round_element: Element = conductor
-            .call(&alice, "must_get_valid_element", header_hash.clone())
-            .await;
+        // let _round_element: Element = conductor
+        //     .call(&alice, "must_get_valid_element", header_hash.clone())
+        //     .await;
 
-        let _header_reference_element: Element = conductor
-            .call(&alice, "must_get_valid_element", header_reference_hash)
-            .await;
-        let _element_reference_element: Element = conductor
-            .call(&alice, "must_get_valid_element", element_reference_hash)
-            .await;
-        let _entry_reference_element: Element = conductor
-            .call(&alice, "must_get_valid_element", entry_reference_hash)
-            .await;
+        // let _header_reference_element: Element = conductor
+        //     .call(&alice, "must_get_valid_element", header_reference_hash)
+        //     .await;
+        // let _element_reference_element: Element = conductor
+        //     .call(&alice, "must_get_valid_element", element_reference_hash)
+        //     .await;
+        // let _entry_reference_element: Element = conductor
+        //     .call(&alice, "must_get_valid_element", entry_reference_hash)
+        //     .await;
 
-        let (_header_dangling_header_hash, _element_dangling_header_hash, _entry_dangling_header_hash): (HeaderHash, HeaderHash, HeaderHash) = conductor.call(&alice, "create_dangling_references", ()).await;
+        let bad_header_hash = HeaderHash::from_raw_32(vec![0; 32]);
+        // let bad_entry_hash = EntryHash::from_raw_32(vec![0; 32]);
+
+        let bad_header_reference = HeaderReference(bad_header_hash.clone());
+        // let bad_element_reference = ElementReference(bad_header_hash);
+        // let bad_entry_reference = EntryReference(bad_entry_hash);
+
+        let header_dangling_header_hash = alice_host_fn_caller.commit_entry(Entry::try_from(bad_header_reference).unwrap(), HEADER_REFERENCE_ENTRY_DEF_ID).await;
+
+        let must_get_header: Result<SignedHeaderHashed, _> = conductor.call_fallible(&alice, "must_get_header", header_dangling_header_hash.clone()).await;
+        let must_get_valid_element: Result<Element, _> = conductor.call_fallible(&bob, "must_get_valid_element", header_dangling_header_hash).await;
+
+        dbg!(&must_get_header);
+        dbg!(&must_get_valid_element);
+
+            // let entry = ThisWasmEntry::NeverValidates;
+            // let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
+            // let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
+            // // 4
+            // let invalid_header_hash = call_data
+            //     .commit_entry(entry.clone().try_into().unwrap(), INVALID_ID)
+            //     .await;
+
+                // #[hdk_extern]
+                // fn create_dangling_references(_: ()) -> ExternResult<(HeaderHash, HeaderHash, HeaderHash)> {
+                //     let bad_header_hash = HeaderHash::from_raw_32(vec![0; 32]);
+                //     let bad_entry_hash = EntryHash::from_raw_32(vec![0; 32]);
+
+                //     Ok((
+                //         hdk::prelude::create_entry(HeaderReference(bad_header_hash.clone()))?,
+                //         hdk::prelude::create_entry(ElementReference(bad_header_hash))?,
+                //         hdk::prelude::create_entry(EntryReference(bad_entry_hash))?,
+                //     ))
+                // }
+
+        // let (_header_dangling_header_hash, _element_dangling_header_hash, _entry_dangling_header_hash): (HeaderHash, HeaderHash, HeaderHash) = conductor.call(&alice, "create_dangling_references", ()).await;
         // let _header_dangling_element: Element = conductor
         //     .call(
         //         &alice,

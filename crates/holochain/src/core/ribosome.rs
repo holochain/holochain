@@ -574,6 +574,7 @@ pub mod wasm_test {
     use core::time::Duration;
     use holo_hash::AgentPubKey;
     use holochain_wasm_test_utils::TestWasm;
+    use crate::test_utils::host_fn_caller::HostFnCaller;
     // use crate::conductor::Conductor;
     // use holochain_types::prelude::*;
 
@@ -600,6 +601,8 @@ pub mod wasm_test {
         pub bob_pubkey: AgentPubKey,
         pub alice: SweetZome,
         pub bob: SweetZome,
+        pub alice_host_fn_caller: HostFnCaller,
+        pub bob_host_fn_caller: HostFnCaller,
     }
 
     impl RibosomeTestFixture {
@@ -611,26 +614,42 @@ pub mod wasm_test {
             let mut conductor = SweetConductor::from_standard_config().await;
             let (alice_pubkey, bob_pubkey) = SweetAgents::alice_and_bob();
 
-            dbg!(&alice_pubkey, &bob_pubkey);
-
             let apps = conductor
                 .setup_app_for_agents(
                     "app-",
                     &[alice_pubkey.clone(), bob_pubkey.clone()],
-                    &[dna_file.into()],
+                    &[dna_file.clone().into()],
                 )
                 .await
                 .unwrap();
 
             let ((alice,), (bob,)) = apps.into_tuples();
+
+            let alice_host_fn_caller = HostFnCaller::create_for_zome(
+                alice.cell_id(),
+                &conductor.handle(),
+                &dna_file,
+                0
+            ).await;
+
+            let bob_host_fn_caller = HostFnCaller::create_for_zome(
+                bob.cell_id(),
+                &conductor.handle(),
+                &dna_file,
+                0
+            ).await;
+
             let alice = alice.zome(test_wasm);
             let bob = bob.zome(test_wasm);
+
             Self {
                 conductor,
                 alice_pubkey,
                 bob_pubkey,
                 alice,
                 bob,
+                alice_host_fn_caller,
+                bob_host_fn_caller,
             }
         }
     }

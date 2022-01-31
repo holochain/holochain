@@ -86,18 +86,6 @@ fn create_entry(_: ()) -> ExternResult<(HeaderHash, HeaderHash, HeaderHash, Head
 }
 
 #[hdk_extern]
-fn create_dangling_references(_: ()) -> ExternResult<(HeaderHash, HeaderHash, HeaderHash)> {
-    let bad_header_hash = HeaderHash::from_raw_32(vec![0; 32]);
-    let bad_entry_hash = EntryHash::from_raw_32(vec![0; 32]);
-
-    Ok((
-        hdk::prelude::create_entry(HeaderReference(bad_header_hash.clone()))?,
-        hdk::prelude::create_entry(ElementReference(bad_header_hash))?,
-        hdk::prelude::create_entry(EntryReference(bad_entry_hash))?,
-    ))
-}
-
-#[hdk_extern]
 fn must_get_valid_element(header_hash: HeaderHash) -> ExternResult<Element> {
     hdk::prelude::must_get_valid_element(header_hash)
 }

@@ -364,6 +364,7 @@ impl HostFnCaller {
     }
 }
 
+#[macro_export]
 macro_rules! test_entry_impl {
     ($type:ident) => {
         impl TryFrom<$type> for Entry {

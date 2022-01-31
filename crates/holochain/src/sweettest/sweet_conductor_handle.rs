@@ -1,9 +1,9 @@
 use super::SweetZome;
+use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::{api::error::ConductorApiResult, ConductorHandle};
 use holochain_conductor_api::ZomeCall;
 use holochain_types::prelude::*;
 use unwrap_to::unwrap_to;
-use crate::conductor::api::error::ConductorApiError;
 
 /// A wrapper around ConductorHandle with more convenient methods for testing
 /// and a cleanup drop
@@ -86,7 +86,9 @@ impl SweetConductorHandle {
             payload,
         };
         match self.handle().call_zome(call).await {
-            Ok(Ok(response)) => Ok(unwrap_to!(response => ZomeCallResponse::Ok).decode().expect("Couldn't deserialize zome call output")),
+            Ok(Ok(response)) => Ok(unwrap_to!(response => ZomeCallResponse::Ok)
+                .decode()
+                .expect("Couldn't deserialize zome call output")),
             Ok(Err(error)) => Err(ConductorApiError::Other(Box::new(error))),
             Err(error) => Err(error),
         }
