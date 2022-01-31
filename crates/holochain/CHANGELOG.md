@@ -4,12 +4,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Fixes issue where holochain could get stuck in infinite loop when trying to send validation receipts. [#1181](https://github.com/holochain/holochain/pull/1181).
-- Additional networking metric collection and associated admin api `DumpNetworkMetrics { dna_hash: Option<DnaHash> }` for inspection of metrics [#1160](https://github.com/holochain/holochain/pull/1160)
-- **BREAKING CHANGE** - Schema change for metrics database. Holochain will persist historical metrics once per hour, if you do not clear the metrics database it will crash at that point. [#1183](https://github.com/holochain/holochain/pull/1183)
+## 0.0.124
+
+## 0.0.123
+
+- Fixes issue where holochain could get stuck in infinite loop when trying to send validation receipts. [\#1181](https://github.com/holochain/holochain/pull/1181).
+- Additional networking metric collection and associated admin api `DumpNetworkMetrics { dna_hash: Option<DnaHash> }` for inspection of metrics [\#1160](https://github.com/holochain/holochain/pull/1160)
+- **BREAKING CHANGE** - Schema change for metrics database. Holochain will persist historical metrics once per hour, if you do not clear the metrics database it will crash at that point. [\#1183](https://github.com/holochain/holochain/pull/1183)
 
 ## 0.0.122
-- Adds better batching to validation workflows for much faster validation. [#1167](https://github.com/holochain/holochain/pull/1167).
+
+- Adds better batching to validation workflows for much faster validation. [\#1167](https://github.com/holochain/holochain/pull/1167).
 
 ## 0.0.121
 
