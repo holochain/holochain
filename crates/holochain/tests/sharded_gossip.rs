@@ -1030,6 +1030,7 @@ async fn mock_network_sharding() {
                         }
                     }
                     HolochainP2pMockMsg::Failure(reason) => panic!("Failure: {}", reason),
+                    HolochainP2pMockMsg::MetricExchange(_) => (),
                 }
             }
         }
