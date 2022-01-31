@@ -170,7 +170,7 @@ fn test_unit_arc() {
 
 #[cfg(test)]
 mod tests {
-    use crate::arq::PeerView;
+    use crate::arq::PeerViewQ;
 
     use super::*;
     use proptest::proptest;
@@ -188,7 +188,7 @@ mod tests {
         let mut rng = seeded_rng(None);
         let peers = generate_ideal_coverage(&mut rng, &strat, None, 100, 0.0);
 
-        let view = PeerView::new(strat.clone(), peers);
+        let view = PeerViewQ::new(strat.clone(), peers);
         let cov = view.actual_coverage();
 
         let min = strat.min_coverage;
@@ -212,7 +212,7 @@ mod tests {
             };
             let mut rng = seeded_rng(None);
             let peers = generate_ideal_coverage(&mut rng, &strat, None, num_peers, 0.0);
-            let view = PeerView::new(strat.clone(), peers);
+            let view = PeerViewQ::new(strat.clone(), peers);
             let cov = view.actual_coverage();
 
             let min = strat.min_coverage;

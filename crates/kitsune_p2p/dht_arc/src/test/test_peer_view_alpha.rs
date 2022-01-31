@@ -237,14 +237,14 @@ fn test_peer_density() {
     let strat = PeerStratAlpha::default();
     let arc = |c, n, h| {
         let mut arc = DhtArc::new(0, h);
-        arc.update_length(PeerViewAlpha::new(Default::default(), arc, c, n));
+        PeerViewAlpha::new(Default::default(), arc, c, n).update_arc(&mut arc);
         (arc.coverage() * 10000.0).round() / 10000.0
     };
 
     let converge = |arc: &mut DhtArc, peers: &Vec<DhtArc>| {
         for _ in 0..40 {
             let view = strat.view(*arc, peers.as_slice());
-            arc.update_length(view);
+            view.update_arc(arc);
         }
     };
 
@@ -393,44 +393,6 @@ fn test_check_redundancy() {
         peers.push(DhtArc::new(arm * Wrapping(i), arm.0 + 10));
     }
     assert_eq!(check_redundancy(peers), 4);
-}
-
-#[test]
-#[ignore = "too brittle"]
-fn test_peer_gaps() {
-    let converge = |peers: &mut Vec<DhtArc>| {
-        let strat: PeerStrat = PeerStratAlpha {
-            check_gaps: true,
-            ..Default::default()
-        }
-        .into();
-        let mut gaps = true;
-        for _ in 0..40 {
-            for i in 0..peers.len() {
-                let p = peers.clone();
-                let arc = peers.get_mut(i).unwrap();
-                let view = strat.view(*arc, p.as_slice());
-                arc.update_length(view);
-            }
-            if gaps {
-                gaps = check_for_gaps(peers.clone());
-            } else {
-                let bucket = DhtArcBucket::new(peers[0].clone(), peers.clone());
-                assert!(!check_for_gaps(peers.clone()), "{}", bucket);
-            }
-        }
-    };
-    let mut peers = even_dist_peers(DEFAULT_MIN_PEERS * 10, &[MAX_HALF_LENGTH / 4]);
-    converge(&mut peers);
-    for arc in peers {
-        assert_between((arc.coverage() * 100.0).round() / 100.0, 0.1, 0.15);
-    }
-
-    let mut peers = even_dist_peers(DEFAULT_MIN_PEERS, &[20]);
-    converge(&mut peers);
-    for arc in peers {
-        assert_eq!((arc.coverage() * 10.0).round() / 10.0, 1.0);
-    }
 }
 
 pub(crate) fn even_dist_peers(num: usize, half_lens: &[u32]) -> Vec<DhtArc> {

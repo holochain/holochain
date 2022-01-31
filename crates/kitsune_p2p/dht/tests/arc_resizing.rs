@@ -11,7 +11,7 @@ use kitsune_p2p_dht_arc::ArcInterval;
 use kitsune_p2p_dht::test_utils::generate_ideal_coverage;
 use kitsune_p2p_dht::test_utils::seeded_rng;
 
-fn resize_to_equilibrium(view: &PeerView, arq: &mut Arq) {
+fn resize_to_equilibrium(view: &PeerViewQ, arq: &mut Arq) {
     while view.update_arq(arq) {}
 }
 
@@ -34,7 +34,7 @@ fn test_shrink_towards_empty() {
     // generate peers with a bit too much coverage (14 > 12)
     let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(14.5), 100, jitter);
     let peer_power = peers.iter().map(|p| p.power()).min().unwrap();
-    let view = PeerView::new(strat.clone(), peers);
+    let view = PeerViewQ::new(strat.clone(), peers);
 
     // start with a full arq at max power
     let mut arq = Arq::new_full(0.into(), strat.max_power);
@@ -69,7 +69,7 @@ fn test_grow_towards_full() {
     // generate peers with deficient coverage
     let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(7.0), 1000, jitter);
     let peer_power = peers.iter().map(|p| p.power()).min().unwrap();
-    let view = PeerView::new(strat.clone(), peers);
+    let view = PeerViewQ::new(strat.clone(), peers);
 
     // start with an arq comparable to one's peers
     let mut arq = Arq::new(0.into(), peer_power, 12);
@@ -104,7 +104,7 @@ fn test_grow_to_full() {
     // generate peers with deficient coverage
     let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(7.0), 1000, jitter);
     let peer_power = peers.iter().map(|p| p.power()).min().unwrap();
-    let view = PeerView::new(strat.clone(), peers);
+    let view = PeerViewQ::new(strat.clone(), peers);
 
     // start with an arq comparable to one's peers
     let mut arq = Arq::new(0.into(), peer_power, 12);
@@ -138,7 +138,7 @@ fn test_grow_by_multiple_chunks() {
     // generate peers with far too little coverage
     let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, Some(5.0), 1000, jitter);
     let peer_power = peers.iter().map(|p| p.power()).min().unwrap();
-    let view = PeerView::new(strat.clone(), peers);
+    let view = PeerViewQ::new(strat.clone(), peers);
 
     let arq = Arq::new(0.into(), peer_power - 1, 6);
     let mut resized = arq.clone();
@@ -164,7 +164,7 @@ fn test_degenerate_asymmetrical_coverage() {
         buffer: 0.1,
         ..Default::default()
     };
-    let view = PeerView::new(strat, others);
+    let view = PeerViewQ::new(strat, others);
 
     let arq = Arq::new(
         Loc::from(0x100 / 2),
@@ -202,7 +202,7 @@ fn test_scenario() {
         let mut arq = Arq::new_full(Loc::from(0x0), strat.max_power);
         // create 10 peers, all with full arcs, fully covering the DHT
         let peers: Vec<_> = generate_ideal_coverage(&mut rng, &strat, None, 10, jitter);
-        let view = PeerView::new(strat.clone(), peers);
+        let view = PeerViewQ::new(strat.clone(), peers);
         let extrapolated = view.extrapolated_coverage(&arq.to_bounds());
         assert_eq!(extrapolated, 10.0);
 
@@ -222,7 +222,7 @@ fn test_scenario() {
             let peer_power = peers.iter().map(|p| p.power()).min().unwrap();
             assert_eq!(peer_power, 26);
 
-            let view = PeerView::new(strat.clone(), peers.clone());
+            let view = PeerViewQ::new(strat.clone(), peers.clone());
             let extrapolated = view.extrapolated_coverage(&arq.to_bounds());
             assert!(extrapolated > strat.max_coverage());
             // assert!(strat.min_coverage <= extrapolated && extrapolated <= strat.max_coverage());
@@ -246,7 +246,7 @@ fn test_scenario() {
                 })
                 .collect();
             let peer_power = peers.iter().map(|p| p.power()).min().unwrap();
-            let view = PeerView::new(strat.clone(), peers);
+            let view = PeerViewQ::new(strat.clone(), peers);
             print_arq(&arq, 64);
             // assert that our arc will grow as large as it can to pick up the slack.
             while view.update_arq(&mut arq) {

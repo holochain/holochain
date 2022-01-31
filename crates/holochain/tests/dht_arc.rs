@@ -38,7 +38,7 @@ async fn test_arc_redundancy() {
                 let p = peers.clone();
                 let arc = peers.get_mut(i).unwrap();
                 let view = PeerStratAlpha::default().view(*arc, p.as_slice());
-                arc.update_length(view);
+                view.update_arc(arc);
             }
 
             assert!(!check_for_gaps(peers.clone()));
@@ -86,7 +86,7 @@ async fn test_arc_redundancy_all() {
                 let p = peers.clone();
                 let arc = peers.get_mut(i).unwrap();
                 let view = PeerStratAlpha::default().view(*arc, p.as_slice());
-                arc.update_length(view);
+                view.update_arc(arc);
             }
 
             let r = check_redundancy(peers.clone());
@@ -151,7 +151,7 @@ async fn test_join_leave() {
             let p = peers.clone();
             let arc = peers.get_mut(i).unwrap();
             let view = PeerStratAlpha::default().view(arc.clone(), p.as_slice());
-            arc.update_length(view);
+            view.update_arc(arc);
         }
     };
     let mut peers = get_peers(num_peers, &coverages, keystore.clone()).await;

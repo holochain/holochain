@@ -3303,7 +3303,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "colored",
  "derivative",
@@ -3472,6 +3472,7 @@ dependencies = [
  "derive_more",
  "futures",
  "ghost_actor 0.3.0-alpha.4",
+ "kitsune_p2p_dht",
  "kitsune_p2p_dht_arc",
  "lair_keystore_api 0.0.9",
  "lair_keystore_api 0.1.0",

@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 #![cfg(feature = "testing")]
 
+use kitsune_p2p_dht::arq::PeerStrat;
 use kitsune_p2p_dht::test_utils::get_input;
 use kitsune_p2p_dht_arc::*;
 use rand::prelude::StdRng;
@@ -125,7 +126,7 @@ pub fn run_one_epoch(
         let arc = peers.get_mut(i).unwrap();
         let view = strat.view(*arc, p.as_slice());
         let before = arc.half_length() as f64;
-        arc.update_length(view);
+        view.update_arc(arc);
         let after = arc.half_length() as f64;
         let delta = after - before;
         // dbg!(&before, &after, &delta);

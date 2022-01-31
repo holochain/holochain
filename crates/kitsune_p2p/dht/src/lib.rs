@@ -8,6 +8,8 @@ pub mod op;
 pub mod region;
 pub mod tree;
 
+pub use arq::{PeerStrat, PeerView};
+
 #[cfg(feature = "testing")]
 pub mod test_utils;
 

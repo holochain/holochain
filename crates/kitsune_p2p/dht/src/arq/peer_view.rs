@@ -1,9 +1,40 @@
-use kitsune_p2p_dht_arc::ArcInterval;
+use kitsune_p2p_dht_arc::{ArcInterval, DhtArc, PeerViewAlpha, PeerViewBeta};
 use num_traits::Zero;
 
 use super::{is_full, Arq, ArqBounded, ArqBounds, ArqStrat};
 
-pub struct PeerView {
+/// A "view" of the peers in a neighborhood. The view consists of a few
+/// observations about the distribution of peers within a particular arc, used
+/// to make inferences about the rest of the (out-of-view) DHT, ultimately
+/// enabling the calculation of the target arc size for the agent who has this View.
+///
+/// The enum allows us to add different views (and different calculations of
+/// target arc length) over time.
+#[derive(derive_more::From)]
+pub enum PeerView {
+    Alpha(PeerViewAlpha),
+    Beta(PeerViewBeta),
+    Quantized(PeerViewQ),
+}
+
+impl PeerView {
+    /// Given the current view of a peer and the peer's current coverage,
+    /// this returns the next step to take in reaching the ideal coverage.
+    pub fn update_arc(&self, dht_arc: &mut DhtArc) -> bool {
+        match self {
+            Self::Alpha(v) => v.update_arc(dht_arc),
+            Self::Beta(v) => v.update_arc(dht_arc),
+            Self::Quantized(v) => {
+                let mut arq = Arq::from_dht_arc(&v.strat, dht_arc);
+                let updated = v.update_arq(&mut arq);
+                *dht_arc = arq.to_dht_arc();
+                updated
+            }
+        }
+    }
+}
+
+pub struct PeerViewQ {
     /// The strategy which generated this view
     strat: ArqStrat,
 
@@ -17,7 +48,7 @@ pub struct PeerView {
     pub skip_index: Option<usize>,
 }
 
-impl PeerView {
+impl PeerViewQ {
     pub fn new(strat: ArqStrat, peers: Vec<Arq>) -> Self {
         Self {
             strat,
@@ -376,7 +407,7 @@ mod tests {
         assert_eq!(c.center, Loc::from(pow2(pow) * 0x30 - 1));
         let arqs = vec![a, b, c];
         print_arqs(&arqs, 64);
-        let view = PeerView::new(Default::default(), arqs);
+        let view = PeerViewQ::new(Default::default(), arqs);
 
         let get = |b: Arq| {
             view.filtered_arqs(b.to_interval())
@@ -397,7 +428,7 @@ mod tests {
             .map(|x| make_arq(pow, x, x + 0x20))
             .collect();
         print_arqs(&arqs, 64);
-        let view = PeerView::new(Default::default(), arqs);
+        let view = PeerViewQ::new(Default::default(), arqs);
         assert_eq!(
             view.extrapolated_coverage_and_filtered_count(&make_arq(pow, 0, 0x10).to_bounds()),
             (2.0, 1)

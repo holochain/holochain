@@ -133,14 +133,6 @@ impl DhtArc {
         Self::new(center_loc, (MAX_HALF_LENGTH as f64 * coverage) as u32)
     }
 
-    /// Update the half length based on a PeerView reading.
-    /// This will converge on a new target instead of jumping directly
-    /// to the new target and is designed to be called at a given rate
-    /// with more recent peer views.
-    pub fn update_length<V: Into<PeerView>>(&mut self, view: V) {
-        view.into().update_arc(self);
-    }
-
     /// Check if a location is contained in this arc
     pub fn contains<I: Into<DhtLocation>>(&self, other_location: I) -> bool {
         let other_location = other_location.into();

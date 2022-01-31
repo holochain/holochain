@@ -200,7 +200,7 @@ impl Arq {
         DhtArc::new(self.center, hl)
     }
 
-    pub fn from_dht_arc(strat: &ArqStrat, dht_arc: DhtArc) -> Self {
+    pub fn from_dht_arc(strat: &ArqStrat, dht_arc: &DhtArc) -> Self {
         approximate_arq(
             strat,
             dht_arc.center_loc(),
@@ -797,7 +797,7 @@ mod tests {
             let strat = ArqStrat::default();
             let arq = approximate_arq(&strat, center.into(), length);
             let dht_arc = arq.to_dht_arc();
-            let arq2 = Arq::from_dht_arc(&strat, dht_arc);
+            let arq2 = Arq::from_dht_arc(&strat, &dht_arc);
             assert_eq!(arq, arq2);
         }
     }

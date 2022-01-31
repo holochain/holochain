@@ -318,6 +318,7 @@ pub mod transport_mem;
 pub mod transport_pool;
 pub mod tx2;
 
+pub use kitsune_p2p_dht as dht;
 pub use kitsune_p2p_dht_arc as dht_arc;
 
 use metrics::metric_task;

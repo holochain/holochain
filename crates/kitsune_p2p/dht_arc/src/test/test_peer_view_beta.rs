@@ -8,14 +8,14 @@ fn test_peer_coverage() {
     let strat = PeerStratBeta::default();
     let arc = |c, n, h| {
         let mut arc = DhtArc::new(0, h);
-        arc.update_length(PeerViewBeta::new(Default::default(), arc, c, n));
+        PeerViewBeta::new(Default::default(), arc, c, n).update_arc(&mut arc);
         (arc.coverage() * 10000.0).round() / 10000.0
     };
 
     let converge = |arc: &mut DhtArc, peers: &Vec<DhtArc>| {
         for _ in 0..40 {
             let view = strat.view(*arc, peers.as_slice());
-            arc.update_length(view);
+            view.update_arc(arc);
         }
     };
 

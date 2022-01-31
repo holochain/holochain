@@ -462,8 +462,8 @@ async fn update_arc_length(
     space: Arc<KitsuneSpace>,
     arc: &mut DhtArc,
 ) -> KitsuneP2pResult<()> {
-    let density = evt_sender.query_peer_density(space.clone(), *arc).await?;
-    arc.update_length(density);
+    let view = evt_sender.query_peer_density(space.clone(), *arc).await?;
+    view.update_arc(arc);
     Ok(())
 }
 
