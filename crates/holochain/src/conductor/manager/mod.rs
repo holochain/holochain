@@ -422,7 +422,7 @@ mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[should_panic]
+    // TODO: Check this is a panic in the handle_shutdown instead of expecting
     #[ignore = "panics in tokio break other tests"]
     async fn unrecoverable_error() {
         observability::test_run().ok();
@@ -455,7 +455,7 @@ mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[should_panic]
+    // TODO: Check this is a panic in the handle_shutdown instead of expecting
     #[ignore = "panics in tokio break other tests"]
     async fn unrecoverable_panic() {
         observability::test_run().ok();

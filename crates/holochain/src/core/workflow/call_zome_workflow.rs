@@ -383,6 +383,7 @@ async fn get_zome(
     }
 }
 
+// Should we just delete these?
 #[cfg(todo_redo_old_tests)]
 pub mod tests {
     use super::*;

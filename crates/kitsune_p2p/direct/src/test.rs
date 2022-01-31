@@ -3,6 +3,7 @@ use futures::stream::StreamExt;
 use kitsune_p2p_direct_api::kd_sys_kind::{self, *};
 
 #[tokio::test(flavor = "multi_thread")]
+// @neonphog Should we delete this?
 #[ignore = "hangin' (david.b)"]
 async fn test_direct_sanity() {
     let (bootstrap, driver, bootstrap_close) =

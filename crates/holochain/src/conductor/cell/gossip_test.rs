@@ -94,6 +94,8 @@ async fn signature_smoke_test() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+// TODO: Rewrite this using sweettest.
+// The idea of this test seems to be checking agent info is gossiped?
 #[ignore = "Conductors are not currently talking to each other"]
 async fn agent_info_test() {
     observability::test_run().ok();

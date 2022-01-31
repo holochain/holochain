@@ -421,6 +421,7 @@ pub mod test {
         // TODO: B-01440: this can't be done easily yet
         // because we can't serialize something that
         // doesn't deserialize
+        // @freesig: Can we just serialize something then change a few of the bytes?
     }
 
     #[tokio::test(flavor = "multi_thread")]

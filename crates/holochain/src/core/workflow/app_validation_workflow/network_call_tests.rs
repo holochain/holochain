@@ -695,6 +695,7 @@ async fn check_cascade(
 }
 
 #[tokio::test(flavor = "multi_thread")]
+// TODO: Check if this is still the case.
 #[ignore = "Only shows a potential problem, doesn't prove something is correct"]
 /// This test shows a potential slow read issue.
 /// The exact same code running here in this test is 10x

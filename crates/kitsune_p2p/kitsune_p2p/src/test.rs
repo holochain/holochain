@@ -41,6 +41,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    // @neonphog Is this test of any use?
     #[ignore] // david.b disabled while we're full sync, not actually making
               //         get requests
     async fn test_transport_multi_coms() -> Result<(), KitsuneP2pError> {
@@ -358,6 +359,7 @@ mod tests {
 
     /// Test that we can publish agent info.
     #[tokio::test(flavor = "multi_thread")]
+    // @freesig Can anyone think of a better way to do this?
     #[ignore = "Need a better way then waiting 6 minutes to test this"]
     async fn test_publish_agent_info() {
         observability::test_run().ok();

@@ -17,6 +17,7 @@ use std::time::Duration;
 /// verify this works is to run this with logging and check it outputs
 /// use `RUST_LOG=[agent_activity]=warn`
 #[tokio::test(flavor = "multi_thread")]
+// TODO: Rewrite test with sweetest and check the validation error.
 #[ignore = "TODO: complete when chain validation returns actual error"]
 async fn sys_validation_agent_activity_test() {
     observability::test_run().ok();

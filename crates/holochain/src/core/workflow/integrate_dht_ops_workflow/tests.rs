@@ -577,6 +577,7 @@ async fn test_ops_state() {
     }
 }
 
+// Can we just delete all these tests?
 #[cfg(todo_redo_old_tests)]
 async fn commit_entry<'env>(
     pre_state: Vec<Db>,

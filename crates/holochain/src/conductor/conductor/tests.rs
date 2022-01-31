@@ -524,6 +524,7 @@ async fn make_signing_call(client: &mut WebsocketSender, cell: &SweetCell) -> Ap
 /// not seem to be an issue, therefore I'm not putting the effort into fixing it
 /// right now.
 #[tokio::test(flavor = "multi_thread")]
+// TODO is this worth keeping?
 #[ignore = "we need a better mock keystore in order to implement this test"]
 #[allow(unreachable_code, unused_variables, unused_mut)]
 async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
@@ -692,36 +693,6 @@ async fn test_reenable_app() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "Causing a tokio thread to panic is problematic.
-This is supposed to emulate a panic in a wasm validation callback, but it's not the same.
-However, when wasm panics, it returns an error anyway, so the other similar test
-which tests for validation errors should be sufficient."]
-async fn test_cells_disable_on_validation_panic() {
-    observability::test_run().ok();
-    let bad_zome =
-        InlineZome::new_unique(Vec::new()).callback("validate", |_api, _data: ValidateData| {
-            panic!("intentional panic during validation");
-            #[allow(unreachable_code)]
-            Ok(ValidateResult::Valid)
-        });
-    let mut conductor = SweetConductor::from_standard_config().await;
-
-    // This may be an error, depending on if validation runs before or after
-    // the app is enabled. Proceed in either case.
-    let _ = common_genesis_test_app(&mut conductor, bad_zome).await;
-
-    // - Ensure that the app was disabled because one Cell panicked during validation
-    //   (while publishing genesis elements)
-    assert_eq_retry_10s!(
-        {
-            let state = conductor.get_state_from_handle().await.unwrap();
-            (state.enabled_apps().count(), state.stopped_apps().count())
-        },
-        (0, 1)
-    );
-}
-
-#[tokio::test(flavor = "multi_thread")]
 async fn test_installation_fails_if_genesis_self_check_is_invalid() {
     observability::test_run().ok();
     let bad_zome = InlineZome::new_unique(Vec::new()).callback(
@@ -800,6 +771,7 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
 //       *inline*. It's not enough to have a failing validate_create_entry for
 //       instance, because that failure will be returned by the zome call.
 #[tokio::test(flavor = "multi_thread")]
+// @maackle is this still the case?
 #[ignore = "need to figure out how to write this test"]
 async fn test_apps_disable_on_panic_after_genesis() {
     observability::test_run().ok();

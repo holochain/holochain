@@ -105,6 +105,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "test_utils")]
+    // TODO: Check if still flakey
     #[ignore = "Flaky. Gets stuck at end of test"]
     async fn remote_signal_test() -> anyhow::Result<()> {
         observability::test_run().ok();

@@ -38,7 +38,7 @@ async fn check_hashed_type() {
 }
 
 #[test]
-#[ignore = "TODO"]
+#[ignore = "TODO"] // @maackle why is this todo?
 fn check_serialized_bytes() {
     let h: HeaderHash =
         HeaderHash::try_from("uhCkkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm").unwrap();

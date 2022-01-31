@@ -267,6 +267,7 @@ pub fn calculate_missing_ops(
 /// Test that the above functions work as expected in one specific case:
 /// Out of 6 ops total, all 3 agents hold 3 ops each.
 #[tokio::test(flavor = "multi_thread")]
+// @maackle Can we delete this?
 #[ignore = "This test doesn't make sense anymore because it's using the event sender as if there were separate databases"]
 async fn test_three_way_sharded_ownership() {
     let mut u = arbitrary::Unstructured::new(&NOISE);

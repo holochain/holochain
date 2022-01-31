@@ -307,6 +307,7 @@ impl MetricTaskCounter {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+// @neonphog any idea why?
 #[ignore] // david.b this seems to be flakey now...
 async fn test_metric_task() {
     for _ in 0..20 {

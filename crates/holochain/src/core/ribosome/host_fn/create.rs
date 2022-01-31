@@ -240,6 +240,7 @@ pub mod wasm_test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    // TODO: rewrite with sweettest and check if still flaky.
     #[ignore = "david.b (this test is flaky)"]
     // maackle: this consistently passes for me with n = 37
     //          but starts to randomly lock up at n = 38,
