@@ -73,44 +73,41 @@ fn dna_info(_: ()) -> ExternResult<DnaInfo> {
     hdk::prelude::dna_info()
 }
 
-// /// `serde_yaml::Value` approach to handling properties.
-// /// As yaml is much more loosely typed then Rust is, everything in the yaml
-// /// ends up in a generic nested `Value` enum. Consider the following yaml:
-// ///
-// /// foo:
-// ///   bar: 1
-// ///   bing: baz
-// ///   -2: 6.0
-// ///
-// /// Here we have key/value of a mapping of ints, floats, strings all in
-// /// positions that Rust doesn't handle particularly well. These keys and values
-// /// can all be present or absent. Rust would represent this as enums for every
-// /// key/value that can be multiple types and `Option` along with default values
-// /// for anything that can be absent.
-// ///
-// /// For well known or relatively simple properties it may be ergonomic to
-// /// define a native Rust struct for the happ. For poorly defined or complex
-// /// properties it may be easier to use `serde_yaml::Value` directly. This does
-// /// several things that you will end up reinventing ad-hoc when your properties
-// /// become sufficiently complex:
-// ///
-// /// - Defining an enum to cover all yaml types that could appear anywhere
-// /// - Normalised handling of floats, negative ints and ints larger than `i64::MAX`
-// /// - Handling floats as mapping keys
-// /// - Handling many optional fields without an `Option` and `Default` explosion
-// ///
-// /// The main two drawbacks:
-// ///
-// /// - Loss of a declarative/typed structure that can be inspected visually/IDE
-// /// - Inclusion of an additional dependency on `serde_yaml` in the WASM
-// ///
-// /// The other option is to use `rmpv::Value` from the `rmpv` crate, but many
-// /// types supported by messagepack are not supported by yaml anyway. Also the
-// /// traversal support for moving through yaml mappings and using floats for
-// /// keys is relatively poor in `rmpv` compared to `serde_yaml`.
-// #[derive(Deserialize, Serialize, Debug, SerializedBytes)]
-// struct PropertiesValue(Value);
-
+/// `serde_yaml::Value` approach to handling properties.
+/// As yaml is much more loosely typed then Rust is, everything in the yaml
+/// ends up in a generic nested `Value` enum. Consider the following yaml:
+///
+/// foo:
+///   bar: 1
+///   bing: baz
+///   -2: 6.0
+///
+/// Here we have key/value of a mapping of ints, floats, strings all in
+/// positions that Rust doesn't handle particularly well. These keys and values
+/// can all be present or absent. Rust would represent this as enums for every
+/// key/value that can be multiple types and `Option` along with default values
+/// for anything that can be absent.
+///
+/// For well known or relatively simple properties it may be ergonomic to
+/// define a native Rust struct for the happ. For poorly defined or complex
+/// properties it may be easier to use `serde_yaml::Value` directly. This does
+/// several things that you will end up reinventing ad-hoc when your properties
+/// become sufficiently complex:
+///
+/// - Defining an enum to cover all yaml types that could appear anywhere
+/// - Normalised handling of floats, negative ints and ints larger than `i64::MAX`
+/// - Handling floats as mapping keys
+/// - Handling many optional fields without an `Option` and `Default` explosion
+///
+/// The main two drawbacks:
+///
+/// - Loss of a declarative/typed structure that can be inspected visually/IDE
+/// - Inclusion of an additional dependency on `serde_yaml` in the WASM
+///
+/// The other option is to use `rmpv::Value` from the `rmpv` crate, but many
+/// types supported by messagepack are not supported by yaml anyway. Also the
+/// traversal support for moving through yaml mappings and using floats for
+/// keys is relatively poor in `rmpv` compared to `serde_yaml`.
 #[hdk_extern]
 fn dna_info_value(k: String) -> ExternResult<serde_yaml::Value> {
     Ok(
