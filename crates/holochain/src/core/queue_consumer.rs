@@ -737,5 +737,5 @@ async fn next_job_or_exit(
 
 /// Does nothing.
 fn handle_workflow_error(err: WorkflowError) -> ManagedTaskResult {
-    Err(ConductorError::from(err).into())
+    Err(Box::new(ConductorError::from(err)).into())
 }

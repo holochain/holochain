@@ -128,7 +128,7 @@ impl Default for GetMetaOptions {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 /// Get links from the DHT.
 /// Fields tagged with `[Network]` are network-level controls.
 /// Fields tagged with `[Remote]` are controls that will be forwarded to the
@@ -140,12 +140,6 @@ pub struct GetLinksOptions {
     /// Note - if all requests time-out you will receive an empty result,
     /// not a timeout error.
     pub timeout_ms: Option<u64>,
-}
-
-impl Default for GetLinksOptions {
-    fn default() -> Self {
-        Self { timeout_ms: None }
-    }
 }
 
 #[derive(Debug, Clone)]

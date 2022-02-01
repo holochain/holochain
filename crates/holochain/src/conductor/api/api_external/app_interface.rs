@@ -4,7 +4,6 @@ use crate::conductor::api::error::ExternalApiWireError;
 use crate::conductor::api::error::SerializationError;
 use crate::conductor::interface::error::InterfaceError;
 use crate::conductor::interface::error::InterfaceResult;
-use crate::conductor::state::AppInterfaceId;
 use crate::conductor::ConductorHandle;
 
 use holochain_serialized_bytes::prelude::*;
@@ -42,16 +41,12 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
 #[derive(Clone)]
 pub struct RealAppInterfaceApi {
     conductor_handle: ConductorHandle,
-    interface_id: AppInterfaceId,
 }
 
 impl RealAppInterfaceApi {
     /// Create a new instance from a shared Conductor reference
-    pub fn new(conductor_handle: ConductorHandle, interface_id: AppInterfaceId) -> Self {
-        Self {
-            conductor_handle,
-            interface_id,
-        }
+    pub fn new(conductor_handle: ConductorHandle) -> Self {
+        Self { conductor_handle }
     }
 }
 

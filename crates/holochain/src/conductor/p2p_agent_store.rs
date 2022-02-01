@@ -56,14 +56,14 @@ pub async fn p2p_put_all_batch(
         let mut responses = Vec::with_capacity(batch.len());
         let (tx, rx) = tokio::sync::oneshot::channel();
         let result = env
-            .async_commit(move |mut txn| {
+            .async_commit(move |txn| {
                 'batch: for P2pBatch {
                     peer_data: batch,
                     result_sender: response,
                 } in batch
                 {
                     for info in batch {
-                        match p2p_put_single(&mut txn, &info) {
+                        match p2p_put_single(txn, &info) {
                             Ok(_) => (),
                             Err(e) => {
                                 responses.push((Err(e), response));

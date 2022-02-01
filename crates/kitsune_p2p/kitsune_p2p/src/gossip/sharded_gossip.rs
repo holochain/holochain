@@ -354,6 +354,7 @@ pub(crate) struct ShardedGossipTarget {
     pub(crate) cert: Tx2Cert,
     pub(crate) tie_break: u32,
     pub(crate) when_initiated: Option<tokio::time::Instant>,
+    #[allow(dead_code)]
     pub(crate) url: TxUrl,
 }
 
@@ -474,8 +475,6 @@ pub struct RoundState {
     /// Missing op hashes that have been batched for
     /// future processing.
     ops_batch_queue: OpsBatchQueue,
-    /// Round start time
-    created_at: Instant,
     /// Last moment we had any contact for this round.
     last_touch: Instant,
     /// Amount of time before a round is considered expired.
@@ -525,7 +524,6 @@ impl ShardedGossipLocal {
             received_all_incoming_ops_blooms: false,
             bloom_batch_cursor: None,
             ops_batch_queue: OpsBatchQueue::new(),
-            created_at: Instant::now(),
             last_touch: Instant::now(),
             round_timeout: ROUND_TIMEOUT,
         })
