@@ -95,7 +95,7 @@ maplit = "1"
 pretty_assertions = "0.6.1"
 reqwest = "0.11.2"
 serial_test = "0.4.0"
-test-case = "1.0.0"
+test-case = "1.2.1"
 
 # Dependencies for test_utils: keep in sync with above
 hdk = { version = "0.0.120", path = "../hdk", optional = false }

@@ -56,6 +56,14 @@ where
     block_on_given(f, &TOKIO)
 }
 
+/// Run a a task on the `TOKIO` static runtime.
+pub fn run_on<F>(f: F) -> F::Output
+where
+    F: futures::future::Future,
+{
+    TOKIO.block_on(f)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
