@@ -4,7 +4,6 @@ use std::sync::Arc;
 use crate::conductor::p2p_agent_store::all_agent_infos;
 use crate::conductor::p2p_agent_store::exchange_peer_info;
 use crate::conductor::ConductorHandle;
-use crate::core::ribosome::error::RibosomeResult;
 use crate::sweettest::*;
 use crate::test_utils::host_fn_caller::Post;
 use crate::test_utils::install_app;
@@ -32,7 +31,7 @@ use tracing::debug_span;
 #[test_case(2)]
 #[test_case(4)]
 #[tokio::test(flavor = "multi_thread")]
-async fn conductors_call_remote2(num_conductors: usize) {
+async fn conductors_call_remote(num_conductors: usize) {
     observability::test_run().ok();
     let (dna, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
         .await
@@ -363,52 +362,6 @@ async fn init_all(handles: &[TestHandle]) -> Vec<HeaderHash> {
         headers.push(result);
     }
     headers
-}
-
-async fn call_remote(a: TestHandle, b: TestHandle) -> RibosomeResult<ZomeCallResponse> {
-    let invocation = new_zome_call(
-        &a.cell_id,
-        "call_create_entry_remotely",
-        b.cell_id.agent_pubkey().clone(),
-        TestWasm::Create,
-    )
-    .unwrap();
-    a.call_zome(invocation).await.unwrap()
-}
-
-async fn call_each_other(
-    handles: &[TestHandle],
-    timeout: u64,
-) -> Vec<(usize, usize, Option<RibosomeResult<ZomeCallResponse>>)> {
-    let mut results = Vec::with_capacity(handles.len() * 2);
-    for (i, a) in handles.iter().cloned().enumerate() {
-        let mut futures = Vec::with_capacity(handles.len());
-        for (j, b) in handles.iter().cloned().enumerate() {
-            // Don't call self
-            if i == j {
-                continue;
-            }
-            let f = {
-                let a = a.clone();
-                async move {
-                    let f = call_remote(a, b);
-                    // We don't want to wait the maximum network timeout
-                    // in this test as it's a controlled local network
-                    match tokio::time::timeout(std::time::Duration::from_millis(timeout), f).await {
-                        Ok(r) => (i, j, Some(r)),
-                        Err(_) => (i, j, None),
-                    }
-                }
-            };
-            // Run a set of call remotes in parallel.
-            // Can't run everything in parallel or we get chain moved.
-            futures.push(tokio::task::spawn(f));
-        }
-        for f in futures {
-            results.push(f.await.unwrap());
-        }
-    }
-    results
 }
 
 async fn check_gossip(

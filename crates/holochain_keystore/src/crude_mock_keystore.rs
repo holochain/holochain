@@ -98,7 +98,7 @@ impl AsLairClient for RealOrMockKeystore {
         &self,
     ) -> ghost_actor::dependencies::futures::future::BoxFuture<'static, LairResult<()>> {
         match &self.real {
-            MetaLairClient::NewLair(client) => client.shutdown().boxed().into(),
+            MetaLairClient::NewLair(client) => client.shutdown().boxed(),
             MetaLairClient::Legacy(_) => unreachable!(),
         }
     }
@@ -110,7 +110,7 @@ impl AsLairClient for RealOrMockKeystore {
     {
         if self.use_mock.load(std::sync::atomic::Ordering::SeqCst) {
             let r = (self.mock)(request);
-            async move { r }.boxed().into()
+            async move { r }.boxed()
         } else {
             match &self.real {
                 MetaLairClient::NewLair(client) => client.0.request(request),

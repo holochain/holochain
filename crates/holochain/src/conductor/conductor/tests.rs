@@ -763,8 +763,7 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
 //       *inline*. It's not enough to have a failing validate_create_entry for
 //       instance, because that failure will be returned by the zome call.
 #[tokio::test(flavor = "multi_thread")]
-// @maackle is this still the case?
-#[ignore = "need to figure out how to write this test"]
+#[ignore = "need to figure out how to write this test, i.e. to make genesis panic"]
 async fn test_apps_disable_on_panic_after_genesis() {
     observability::test_run().ok();
     let unit_entry_def = EntryDef::default_with_id("unit");

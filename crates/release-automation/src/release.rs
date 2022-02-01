@@ -810,7 +810,7 @@ fn publish_paths_to_crates_io(
         let manifest_path = crt.manifest_path();
         let cargo_target_dir_string = cargo_target_dir
             .as_ref()
-            .map(|target_dir| format!("--target-dir={}", target_dir.to_string_lossy().to_string()));
+            .map(|target_dir| format!("--target-dir={}", target_dir.to_string_lossy()));
 
         let mut cmd = std::process::Command::new("cargo");
         cmd.args(
