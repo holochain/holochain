@@ -64,7 +64,9 @@ impl Drop for SupervisedChild {
     }
 }
 
-pub async fn start_holochain(config_path: PathBuf) -> SupervisedChild {
+pub async fn start_holochain(
+    config_path: PathBuf,
+) -> (SupervisedChild, tokio::sync::oneshot::Receiver<u16>) {
     tracing::info!("\n\n----\nstarting holochain\n----\n\n");
     let cmd = std::process::Command::cargo_bin("holochain").unwrap();
     let mut cmd = Command::from(cmd);
@@ -76,9 +78,9 @@ pub async fn start_holochain(config_path: PathBuf) -> SupervisedChild {
         .stderr(Stdio::piped())
         .kill_on_drop(true);
     let mut child = cmd.spawn().expect("Failed to spawn holochain");
-    spawn_output(&mut child);
+    let admin_port = spawn_output(&mut child);
     check_started(&mut child).await;
-    SupervisedChild("Holochain".to_string(), child)
+    (SupervisedChild("Holochain".to_string(), child), admin_port)
 }
 
 pub async fn call_foo_fn(app_port: u16, original_dna_hash: DnaHash) {
@@ -218,14 +220,25 @@ pub async fn register_and_install_dna_named(
     dna_hash
 }
 
-pub fn spawn_output(holochain: &mut Child) {
+pub fn spawn_output(holochain: &mut Child) -> tokio::sync::oneshot::Receiver<u16> {
     let stdout = holochain.stdout.take();
     let stderr = holochain.stderr.take();
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let mut tx = Some(tx);
     tokio::task::spawn(async move {
         if let Some(stdout) = stdout {
             let mut reader = BufReader::new(stdout).lines();
             while let Ok(Some(line)) = reader.next_line().await {
                 trace!("holochain bin stdout: {}", line);
+                tx = tx
+                    .take()
+                    .and_then(|tx| match check_line_for_admin_port(&line) {
+                        Some(port) => {
+                            let _ = tx.send(port);
+                            None
+                        }
+                        None => Some(tx),
+                    });
             }
         }
     });
@@ -237,6 +250,15 @@ pub fn spawn_output(holochain: &mut Child) {
             }
         }
     });
+    rx
+}
+
+fn check_line_for_admin_port(mut line: &str) -> Option<u16> {
+    line = line.strip_prefix("###")?;
+    line = line.strip_suffix("###")?;
+
+    let port = line.strip_prefix("ADMIN_PORT:")?;
+    port.parse::<u16>().ok()
 }
 
 pub async fn check_started(holochain: &mut Child) {

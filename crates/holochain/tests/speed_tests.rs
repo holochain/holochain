@@ -31,6 +31,7 @@ use holochain::conductor::config::InterfaceDriver;
 use holochain::conductor::ConductorBuilder;
 use holochain::conductor::ConductorHandle;
 
+use holochain::sweettest::*;
 use holochain_state::{prelude::test_environments, test_utils::TestEnvs};
 use holochain_test_wasm_common::AnchorInput;
 use holochain_types::prelude::*;
@@ -343,9 +344,5 @@ pub async fn setup_app(
 
     let handle = conductor_handle.clone();
 
-    (
-        envs,
-        RealAppInterfaceApi::new(conductor_handle, Default::default()),
-        handle,
-    )
+    (envs, RealAppInterfaceApi::new(conductor_handle), handle)
 }
