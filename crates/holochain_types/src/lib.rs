@@ -31,7 +31,6 @@ pub mod link;
 mod macros;
 pub mod metadata;
 pub mod prelude;
-pub mod properties;
 pub mod signal;
 pub mod validate;
 pub mod web_app;
