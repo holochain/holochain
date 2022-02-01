@@ -18,24 +18,6 @@ commands:
               command: ./docker/push.sh << parameters.box >> $CIRCLE_BRANCH
 
 jobs:
-   merge-release-test:
-      docker:
-         - image: nixos/nix:latest
-           auth:
-              username: $DOCKER_USER
-              password: $DOCKER_PASS
-      environment:
-         CACHIX_NAME: holochain-ci
-         NIXPKGS_ALLOW_UNFREE: 1
-      steps:
-         - checkout
-         - run:
-              name: Set up Nix cache
-              command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
-         - run:
-              name: PR release tests
-              no_output_timeout: 30m
-              command: ./scripts/ci_merge-release-test.sh
    merge-release-test-mac:
       macos:
          xcode: "13.2.1"
@@ -201,7 +183,6 @@ workflows:
    version: 2.1
    tests:
       jobs:
-         - merge-release-test
          # - merge-release-test-mac
          - standard-test
          - hc-static-checks
