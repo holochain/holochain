@@ -372,6 +372,7 @@ impl PreflightResponse {
 
 /// A preflight request can be accepted, or invalid, or valid but the local agent cannot accept it.
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(clippy::large_enum_variant)]
 pub enum PreflightRequestAcceptance {
     /// Preflight request accepted.
     Accepted(PreflightResponse),

@@ -10,6 +10,7 @@ use holochain_types::prelude::*;
 
 #[derive(Clone)]
 pub struct MigrateAgentInvocation {
+    #[allow(dead_code)]
     dna_def: DnaDef,
     migrate_agent: MigrateAgent,
 }

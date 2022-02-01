@@ -327,11 +327,7 @@ pub async fn setup_app_inner(
 
     let handle = conductor_handle.clone();
 
-    (
-        envs,
-        RealAppInterfaceApi::new(conductor_handle, Default::default()),
-        handle,
-    )
+    (envs, RealAppInterfaceApi::new(conductor_handle), handle)
 }
 
 /// If HC_WASM_CACHE_PATH is set warm the cache

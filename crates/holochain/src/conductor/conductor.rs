@@ -176,9 +176,6 @@ where
     /// Handle to the network actor.
     holochain_p2p: holochain_p2p::HolochainP2pRef,
 
-    /// Database sync strategy
-    db_sync_level: DbSyncStrategy,
-
     /// The map of running queue consumer workflows.
     queue_consumer_map: QueueConsumerMap,
 
@@ -391,7 +388,7 @@ where
         };
         let port = interface_id.port();
         tracing::debug!("Attaching interface {}", port);
-        let app_api = RealAppInterfaceApi::new(handle, interface_id.clone());
+        let app_api = RealAppInterfaceApi::new(handle);
         // This receiver is thrown away because we can produce infinite new
         // receivers from the Sender
         let (signal_tx, _r) = tokio::sync::broadcast::channel(SIGNAL_BUFFER_SIZE);
@@ -1300,7 +1297,6 @@ where
             keystore,
             root_env_dir,
             holochain_p2p,
-            db_sync_level,
             queue_consumer_map,
             post_commit,
         })

@@ -113,7 +113,7 @@ impl Spaces {
     {
         match self
             .map
-            .share_ref(|spaces| spaces.get(dna_hash).map(|s| f(s)))
+            .share_ref(|spaces| spaces.get(dna_hash).map(&mut f))
         {
             Some(r) => Ok(r),
             None => self
