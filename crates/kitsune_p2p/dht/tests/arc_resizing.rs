@@ -4,8 +4,8 @@
 
 mod common;
 
-use kitsune_p2p_dht::arq::*;
-use kitsune_p2p_dht::op::*;
+use kitsune_p2p_dht::arq::print_arq;
+use kitsune_p2p_dht::*;
 use kitsune_p2p_dht_arc::ArcInterval;
 
 use kitsune_p2p_dht::test_utils::generate_ideal_coverage;
@@ -115,7 +115,7 @@ fn test_grow_to_full() {
     // ensure that the arq grows to full size
     assert_eq!(arq.power(), strat.max_power);
     assert_eq!(arq.count(), 8);
-    assert!(is_full(arq.power(), arq.count()));
+    assert!(arq::is_full(arq.power(), arq.count()));
 }
 
 #[test]

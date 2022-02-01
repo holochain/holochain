@@ -2,8 +2,8 @@ mod common;
 
 use common::quantized::*;
 use kitsune_p2p_dht::{
-    arq::*,
     test_utils::{generate_ideal_coverage, generate_messy_coverage, seeded_rng},
+    *,
 };
 
 fn pass_report(report: &RunReport, redundancy_target: f64) {
