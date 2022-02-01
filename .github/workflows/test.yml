@@ -1,54 +1,88 @@
-name: Is Ready To Merge
+name: release and merge tests
 
 on:
+  pull_request: {}
   push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+    branches:
+      - main
+      - develop
+      - staging
 
 jobs:
-  can_merge:
-
-    runs-on: ubuntu-latest
-
+  can_release:
+    strategy:
+      fail-fast: true
+      matrix:
+        platform:
+          - ubuntu-latest
+          - macos-latest
+        cachixName:
+          - holochain-ci
+    runs-on: ${{ matrix.platform }}
     steps:
-    - uses: actions/checkout@v2
-#    - uses: docker://holochain/holonix:latest.develop
-    - uses: cachix/install-nix-action@v7
+      - name: Checkout repository
+        uses: actions/checkout@v2.4.0
+      - name: Install nix
+        uses: cachix/install-nix-action@v16
+      - name: Setup cachix
+        uses: cachix/cachix-action@v10
+        # Don't replace <YOUR_CACHIX_NAME> here!
+        if: ${{ matrix.cachixName != '<YOUR_CACHIX_NAME>' }}
+        with:
+          name: ${{ matrix.cachixName }}
+          signingKey: "${{ secrets.CACHIX_SIGNING_KEY }}"
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+      - name: Set NIX_PATH (FIXME)
+        # if: ${{ matrix.platform == 'macos-latest' }}
+        run: echo NIX_PATH=nixpkgs=$(./scripts/nix_path.sh) >> $GITHUB_ENV
 
-    # Necessary for now for the nix cache:
-    # https://github.com/actions/cache/issues/133#issuecomment-599102035
-    # - name: Fix /nix/store directory permissions
-    #   run: sudo chown -R $(whoami):$(id -ng) /nix/store
+      - name: Cache cargo related build files
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            .cargo/bin/
+            .cargo/registry/index/
+            .cargo/registry/cache/
+            .cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
 
-    # # Necessary for now for the cargo cache:
-    # # https://github.com/actions/cache/issues/133#issuecomment-599102035
-    # - name: Fix ~/.cargo directory permissions
-    #   run: sudo chown -R $(whoami):$(id -ng) ~/.cargo && sudo chown -R $(whoami):$(id -ng) ~/.cargo/registry
+      - name: Run cargo tests
+        run: ./scripts/ci_merge-release-test.sh
 
-    # - name: Cache nix
-    #   uses: actions/cache@v1
-    #   with:
-    #     path: /nix/store
-    #     key: ${{ runner.os }}-nix-store-${{ hashFiles('**/*.nix') }}
+      - name: Setup upterm session
+        uses: lhotari/action-upterm@v1
+        if: failure()
+        with:
+          ## limits ssh access and adds the ssh public key for the user which triggered the workflow
+          limit-access-to-actor: true
+          ## limits ssh access and adds the ssh public keys of the listed GitHub users
+          limit-access-to-users: steveeJ,jost-s,freesig,neonphog,thedavidmeister,maackle
 
-    # - name: Cache cargo registry
-    #   uses: actions/cache@v1
-    #   with:
-    #     path: ~/.cargo/registry
-    #     key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+  # can_merge:
 
-    # - name: Cache cargo index
-    #   uses: actions/cache@v1
-    #   with:
-    #     path: ~/.cargo/git
-    #     key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+  #   runs-on: ubuntu-latest
 
-    # - name: Cache cargo build
-    #   uses: actions/cache@v1
-    #   with:
-    #     path: target
-    #     key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+  #   steps:
+  #   - uses: actions/checkout@v2
+  #   - uses: cachix/install-nix-action@v7
 
-    - name: Merge Test
-      run: nix-shell --run 'hc-merge-test'
+  # Necessary for now for the nix cache:
+  # https://github.com/actions/cache/issues/133#issuecomment-599102035
+  # - name: Fix /nix/store directory permissions
+  #   run: sudo chown -R $(whoami):$(id -ng) /nix/store
+  # - name: Cache nix
+  #   uses: actions/cache@v1
+  #   with:
+  #     path: /nix/store
+  #     key: ${{ runner.os }}-nix-store-${{ hashFiles('**/*.nix') }}
+
+  #
+  # - name: Merge Test
+  #   run: nix-shell --run 'hc-merge-test'
