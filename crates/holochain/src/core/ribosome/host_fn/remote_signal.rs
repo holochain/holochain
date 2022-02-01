@@ -1,5 +1,6 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
+use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_types::access::Permission;
@@ -8,7 +9,6 @@ use holochain_zome_types::signal::RemoteSignal;
 use holochain_zome_types::zome::FunctionName;
 use std::sync::Arc;
 use tracing::Instrument;
-use crate::core::ribosome::RibosomeError;
 
 #[tracing::instrument(skip(_ribosome, call_context, input))]
 pub fn remote_signal(
@@ -44,11 +44,14 @@ pub fn remote_signal(
             );
             Ok(())
         }
-        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
-            call_context.zome.zome_name().clone(),
-            call_context.function_name().clone(),
-            "remote_signal".into()
-        ).to_string()))
+        _ => Err(WasmError::Host(
+            RibosomeError::HostFnPermissions(
+                call_context.zome.zome_name().clone(),
+                call_context.function_name().clone(),
+                "remote_signal".into(),
+            )
+            .to_string(),
+        )),
     }
 }
 
@@ -62,7 +65,6 @@ mod tests {
     use crate::sweettest::{SweetAgents, SweetConductorBatch};
     use futures::future;
     use hdk::prelude::*;
-    use matches::assert_matches;
 
     fn zome(agents: Vec<AgentPubKey>, num_signals: Arc<AtomicUsize>) -> InlineZome {
         let entry_def = EntryDef::default_with_id("entrydef");
@@ -105,8 +107,6 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "test_utils")]
-    // TODO: Check if still flakey
-    #[ignore = "Flaky. Gets stuck at end of test"]
     async fn remote_signal_test() -> anyhow::Result<()> {
         observability::test_run().ok();
         const NUM_CONDUCTORS: usize = 5;
@@ -114,6 +114,7 @@ mod tests {
         let num_signals = Arc::new(AtomicUsize::new(0));
 
         let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
+
         let agents =
             future::join_all(conductors.iter().map(|c| SweetAgents::one(c.keystore()))).await;
 
@@ -146,9 +147,7 @@ mod tests {
         crate::assert_eq_retry_10s!(num_signals.load(Ordering::SeqCst), NUM_CONDUCTORS);
 
         for mut signal in signals {
-            let r = signal.try_recv();
-            // Each handle should recv a signal
-            assert_matches!(r, Ok(_))
+            signal.try_recv().expect("Failed to recv signal");
         }
 
         Ok(())
