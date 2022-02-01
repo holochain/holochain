@@ -15,6 +15,7 @@ use ::fixt::prelude::*;
 use holochain_conductor_api::InstalledAppInfoStatus;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppRequest, AppResponse, ZomeCall};
 use holochain_keystore::crude_mock_keystore::spawn_crude_mock_keystore;
+use holochain_keystore::crude_mock_keystore::spawn_real_or_mock_keystore;
 use holochain_state::prelude::*;
 use holochain_types::test_utils::fake_cell_id;
 use holochain_wasm_test_utils::TestWasm;
@@ -524,17 +525,13 @@ async fn make_signing_call(client: &mut WebsocketSender, cell: &SweetCell) -> Ap
 /// not seem to be an issue, therefore I'm not putting the effort into fixing it
 /// right now.
 #[tokio::test(flavor = "multi_thread")]
-// TODO is this worth keeping?
-#[ignore = "we need a better mock keystore in order to implement this test"]
-#[allow(unreachable_code, unused_variables, unused_mut)]
 async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
     observability::test_run().ok();
-    let good_keystore = spawn_test_keystore().await.unwrap();
-    let bad_keystore = spawn_crude_mock_keystore(|| LairError::other("test error"))
+    let (keystore, keystore_control) = spawn_real_or_mock_keystore(|_| Err("test error".into()))
         .await
         .unwrap();
 
-    let envs = test_envs_with_keystore(good_keystore.clone());
+    let envs = test_envs_with_keystore(keystore.clone());
     let config = standard_config();
     let mut conductor = SweetConductor::new(
         SweetConductor::handle_from_existing(&envs, &config, &[]).await,
@@ -543,7 +540,7 @@ async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
     )
     .await;
 
-    let (agent1, agent2, agent3) = SweetAgents::three(good_keystore.clone()).await;
+    let (agent1, agent2, agent3) = SweetAgents::three(keystore.clone()).await;
 
     let (dna, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Sign])
         .await
@@ -567,7 +564,7 @@ async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
     let (mut admin_client, _) = conductor.admin_ws_client().await;
 
     // Now use the bad keystore to cause a signing error on the next zome call
-    todo!("switch keystore to always-erroring mode");
+    keystore_control.use_mock();
 
     let response: AdminResponse = admin_client
         .request(AdminRequest::InstallApp(Box::new(InstallAppPayload {
@@ -588,18 +585,13 @@ async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
     assert_matches!(response, AppResponse::Error(_));
 
     // Go back to the good keystore, see if we can proceed
-    todo!("switch keystore to always-correct mode");
+    keystore_control.use_real();
 
     let response = make_signing_call(&mut app_client, &cell2).await;
     assert_matches!(response, AppResponse::ZomeCall(_));
 
     let response = make_signing_call(&mut app_client, &cell1).await;
     assert_matches!(response, AppResponse::ZomeCall(_));
-
-    // conductor
-    //     .setup_app_for_agent("app3", agent3, &[dna.clone()])
-    //     .await
-    //     .unwrap();
 }
 
 pub(crate) fn simple_create_entry_zome() -> InlineZome {

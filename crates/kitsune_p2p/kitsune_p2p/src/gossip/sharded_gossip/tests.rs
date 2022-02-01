@@ -1,4 +1,3 @@
-use arbitrary::Arbitrary;
 use futures::FutureExt;
 
 use crate::spawn::MockKitsuneP2pEventHandler;
@@ -9,7 +8,6 @@ use fixt::prelude::*;
 
 mod bloom;
 mod common;
-mod handler_builder;
 mod test_two_nodes;
 
 impl ShardedGossipLocal {
