@@ -405,7 +405,7 @@ impl BindAdapt for MemBackendAdapt {
         let local_cert = self.0.clone();
         timeout
             .mix(async move {
-                let id = NEXT_MEM_ID.fetch_add(1, atomic::Ordering::Relaxed);
+                let id = NEXT_MEM_ID.fetch_add(1, atomic::Ordering::SeqCst);
                 let (c_send, c_recv) = t_chan(32);
                 let (ep, ep_active) = MemEndpointAdapt::new(c_send.clone(), id, local_cert.clone());
                 MEM_ENDPOINTS
